@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+import { generateTikzExamples } from '../../scripts/generateTikzExamples.mjs'
+
+test('generateTikzExamples writes representative TikZ files', async () => {
+  const outputDir = await mkdtemp(join(tmpdir(), 'stz-tikz-examples-'))
+
+  try {
+    const files = await generateTikzExamples({ outputDir })
+
+    assert.equal(files.length, 2)
+
+    const twoDimensionalSource = await readFile(
+      join(outputDir, 'diagram-2d.tex'),
+      'utf8',
+    )
+    const threeDimensionalSource = await readFile(
+      join(outputDir, 'diagram-3d.tex'),
+      'utf8',
+    )
+
+    assert.match(twoDimensionalSource, /\\begin\{tikzpicture\}/)
+    assert.match(twoDimensionalSource, /\$F\^\{\(1\)\}L\$/)
+    assert.match(twoDimensionalSource, /densely dotted/)
+    assert.match(threeDimensionalSource, /x=\{\(1cm,0cm\)\}/)
+    assert.match(threeDimensionalSource, /\\path\[/)
+    assert.match(threeDimensionalSource, /star points=5/)
+  } finally {
+    await rm(outputDir, { recursive: true, force: true })
+  }
+})
