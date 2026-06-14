@@ -4,8 +4,8 @@ We are building **StratifiedTikZ**, a web editor for drawing stratified diagrams
 
 The app supports both:
 
-- 2D graphical calculus: diagrams in R^2
-- 3D graphical calculus: diagrams in R^3
+- 2D graphical calculus: diagrams in \mathbb{R}^2
+- 3D graphical calculus: diagrams in \mathbb{R}^3
 
 The outputs should be readable and robust TikZ source codes.
 
