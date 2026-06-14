@@ -475,3 +475,79 @@ Free text labels are independent diagram objects.
 They are different from optional labels attached to strata.
 
 For example, a curve stratum may have a label field, but the user should also be able to place additional standalone text labels anywhere in the diagram.
+
+## Partial style changes along curves
+
+Ideally, the editor should support partial style changes along geometric 1-dimensional strata.
+
+This is useful for representing overlaps, under-crossings, or hidden parts of a curve.
+
+For example, a user may want one portion of a curve to be drawn as a solid line and another portion to be drawn as a densely dotted line.
+
+The intended user workflow is:
+
+1. Select a curve.
+2. Select a subrange along the curve.
+3. Choose a style override for that subrange.
+4. The preview updates to show the selected range with the overridden style.
+5. The TikZ output emits the curve as multiple path segments with different styles.
+
+For example, conceptually:
+
+```tex
+\draw[visible curve style]
+  (p0) .. controls (c1) and (c2) .. (q0);
+
+\draw[densely dotted curve style]
+  (q0) .. controls (d1) and (d2) .. (q1);
+
+\draw[visible curve style]
+  (q1) .. controls (e1) and (e2) .. (p1);
+```
+
+This feature is useful but not required for the MVP.
+
+For the MVP, each curve may have a single global style.
+
+The data model should nevertheless avoid assumptions that make partial style segments impossible later.
+
+## Curve range selection
+
+A partial style segment should be represented by a parameter range along the curve.
+
+For example:
+
+```ts
+from: 0.35
+to: 0.55
+```
+
+where `from` and `to` lie in `[0, 1]`.
+
+For a polyline, the parameter may be interpreted by normalized arclength.
+
+For a cubic Bézier curve, the parameter may initially be interpreted as the Bézier parameter.
+
+Later versions may use arclength parameterization for more predictable UI behavior.
+
+## Densely dotted hidden segments
+
+The main initial use case is to mark a subrange of a curve as hidden or overlapped.
+
+The preferred visual style for such a subrange is:
+
+```tex
+densely dotted
+```
+
+The UI may expose this as:
+
+```text
+Mark selected range as hidden / densely dotted
+```
+
+or:
+
+```text
+Segment style: densely dotted
+```

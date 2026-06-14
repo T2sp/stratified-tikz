@@ -204,6 +204,32 @@ Free text labels are independent from stratum labels.
 
 A stratum may have an attached label, but the user may also create arbitrary standalone text labels.
 
+## Partial style segments for curves
+
+The editor should eventually support partial style changes along geometric 1-dimensional strata, i.e. curves.
+
+This feature is primarily used to represent overlaps, under-crossings, or portions of a curve hidden behind another stratum.
+
+Important terminology:
+
+- "1-stratum" in this section means a geometrically 1-dimensional stratum.
+- In the data model, this is `geometricKind: "curve"`.
+- In 2D mode, such curves are codim 1.
+- In 3D mode, such curves are codim 2.
+
+The desired interaction is:
+
+1. The user selects a curve.
+2. The user selects a parameter range along the curve.
+3. The selected range is rendered with a different line style, for example `densely dotted`.
+4. The generated TikZ represents the curve as several path segments with different styles.
+
+This feature is not required for the MVP.
+
+For the MVP, it is acceptable to support only a single style per curve.
+
+However, the data model should be designed so that partial curve style segments can be added later without a major rewrite.
+
 
 ## Development rules
 

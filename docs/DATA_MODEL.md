@@ -409,6 +409,109 @@ export const defaultCurveStyle: CurveStyle = {
 };
 ```
 
+## Partial curve style segments
+
+Curves should eventually support partial style overrides along subranges.
+
+This is useful for representing overlaps, under-crossings, and hidden portions of curves.
+
+For the MVP, this feature may be ignored in the UI and TikZ output.
+
+However, the data model should be compatible with it.
+
+## Curve style segments
+
+A curve may have optional style segments.
+
+```ts
+export type CurveStyleSegment = {
+  id: string;
+  from: number;
+  to: number;
+  style: PartialCurveStyle;
+};
+```
+
+Here `from` and `to` are parameters in `[0, 1]`.
+
+They must satisfy:
+
+```ts
+0 <= from && from < to && to <= 1
+```
+
+## Partial curve style
+
+A partial curve style is an override of the global curve style.
+
+```ts
+export type PartialCurveStyle = Partial<CurveStyle>;
+```
+
+For example, a hidden or overlapped segment can be represented as:
+
+```ts
+{
+  lineStyle: "denselyDotted"
+}
+```
+
+## Extended line styles
+
+To support overlap and hidden-line notation, extend `LineStyle` as follows:
+
+```ts
+export type LineStyle =
+  | "solid"
+  | "dashed"
+  | "dotted"
+  | "denselyDotted";
+```
+
+Later versions may add:
+
+```ts
+| "looselyDotted"
+| "denselyDashed"
+| "looselyDashed"
+| "dashDot"
+```
+
+## Updated curve stratum
+
+Replace `visibilitySegments` with `styleSegments`.
+
+```ts
+export type CurveStratum = {
+  id: string;
+  codim: 1 | 2;
+  geometricKind: "curve";
+  kind: "polyline" | "cubicBezier";
+  name: string;
+  label?: string;
+  style: CurveStyle;
+  points: Vec3[];
+  styleSegments: CurveStyleSegment[];
+  layer: number;
+};
+```
+
+For MVP, `styleSegments` may simply be an empty array.
+
+## Validation of curve style segments
+
+The validation function should check:
+
+- every segment has a non-empty id
+- every segment satisfies `0 <= from < to <= 1`
+- segment ranges are finite numbers
+- segment styles are valid partial curve styles
+- line style values are supported
+
+For MVP, overlapping style segments may be disallowed.
+
+Later versions may support priority ordering among overlapping style segments.
+
 ## Point style
 
 A point style is used for geometric 0-dimensional strata.

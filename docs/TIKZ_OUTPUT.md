@@ -532,3 +532,77 @@ not:
 ```
 
 However, the UI may warn the user if the label text contains obviously unbalanced braces or other syntax likely to break LaTeX compilation.
+
+## Partial curve style segments
+
+The TikZ generator should eventually support partial style changes along curves.
+
+This is useful for representing overlaps, hidden portions, and under-crossings.
+
+The conceptual output is to split the original curve into several TikZ paths, each with its own style.
+
+For example:
+
+```tex
+% Solid visible part
+\draw[
+  draw=stzCurveA,
+  draw opacity=1,
+  line width=1.2pt
+]
+  (p0) .. controls (c1) and (c2) .. (q0);
+
+% Hidden / overlapped part
+\draw[
+  draw=stzCurveA,
+  draw opacity=1,
+  line width=1.2pt,
+  densely dotted
+]
+  (q0) .. controls (d1) and (d2) .. (q1);
+
+% Solid visible part
+\draw[
+  draw=stzCurveA,
+  draw opacity=1,
+  line width=1.2pt
+]
+  (q1) .. controls (e1) and (e2) .. (p1);
+```
+
+## Line style mapping
+
+The supported line style mapping should include:
+
+| Internal value | TikZ output |
+|---|---|
+| `solid` | no extra option |
+| `dashed` | `dashed` |
+| `dotted` | `dotted` |
+| `denselyDotted` | `densely dotted` |
+
+## MVP behavior
+
+For the MVP, the generator may ignore `styleSegments` and render each curve with a single global style.
+
+If `styleSegments` are ignored, this should be documented in the implementation.
+
+## Future behavior
+
+A later implementation should:
+
+1. Sort style segment endpoints.
+2. Split the curve into subpaths.
+3. Apply the global curve style to ordinary parts.
+4. Apply partial style overrides to specified ranges.
+5. Emit one readable TikZ `\draw` block per subpath.
+
+For polylines, splitting can be done by normalized arclength.
+
+For cubic Bézier curves, splitting can be done using De Casteljau subdivision.
+
+The generated output should remain readable, even if it uses generated intermediate coordinates such as:
+
+```tex
+\coordinate (curveA_split_1) at (...);
+```

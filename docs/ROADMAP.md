@@ -302,3 +302,29 @@ Possible future features:
 - movie move templates
 - 2D-to-3D embedding
 - 3D-to-2D projection
+
+## Later phase: Partial curve style segments
+
+Goal:
+
+Allow users to select a subrange of a curve and apply a different style to that subrange.
+
+Primary use case:
+
+- represent overlaps or hidden parts of curves using `densely dotted`
+
+Tasks:
+
+- Add `CurveStyleSegment`
+- Add `styleSegments` to `CurveStratum`
+- Add `denselyDotted` to `LineStyle`
+- Add UI for selecting a curve subrange
+- Add command: "mark selected range as densely dotted"
+- Render style segments in SVG preview
+- Split polyline curves by normalized arclength
+- Split cubic Bézier curves by subdivision
+- Export segmented curves to readable TikZ
+
+This feature is not required for the MVP.
+
+For the MVP, each curve may be rendered with a single global style.
