@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type SetStateAction } from 'react'
 import './App.css'
 import {
   threeDimensionalExample,
@@ -9,8 +9,8 @@ import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
   clearSelectionIfMissing,
-  createInspectorSections,
-  type InspectorSection,
+  cloneDiagram,
+  EditableInspector,
   type SelectedElement,
 } from './ui'
 
@@ -47,16 +47,15 @@ function App() {
     useState<CoordinateInputMode>('cursor')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
+  const [editableDiagram, setEditableDiagram] = useState<Diagram>(() =>
+    cloneDiagram(exampleOptions[0].diagram),
+  )
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
   const tikzSource = useMemo(
-    () => generateTikz(selectedExample.diagram),
-    [selectedExample],
-  )
-  const inspectorSections = useMemo(
-    () => createInspectorSections(selectedExample.diagram, selectedElement),
-    [selectedElement, selectedExample],
+    () => generateTikz(editableDiagram),
+    [editableDiagram],
   )
 
   async function copyTikz(): Promise<void> {
@@ -75,11 +74,18 @@ function App() {
   function selectExample(exampleId: ExampleId): void {
     const nextExample =
       exampleOptions.find((example) => example.id === exampleId) ?? exampleOptions[0]
+    const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
+    setEditableDiagram(nextDiagram)
     setSelectedElement((selection) =>
-      clearSelectionIfMissing(nextExample.diagram, selection),
+      clearSelectionIfMissing(nextDiagram, selection),
     )
+    setCopyStatus('idle')
+  }
+
+  function updateEditableDiagram(update: SetStateAction<Diagram>): void {
+    setEditableDiagram(update)
     setCopyStatus('idle')
   }
 
@@ -92,7 +98,7 @@ function App() {
         </div>
         <div className="status-strip" aria-label="Current diagram summary">
           <span>{selectedExample.name}</span>
-          <span>{selectedExample.diagram.ambientDimension}D</span>
+          <span>{editableDiagram.ambientDimension}D</span>
           <span>{coordinateInputMode}</span>
           <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
         </div>
@@ -145,7 +151,7 @@ function App() {
             </div>
           </div>
           <SvgDiagram
-            diagram={selectedExample.diagram}
+            diagram={editableDiagram}
             fitToView
             selectedElement={selectedElement}
             onSelectionChange={setSelectedElement}
@@ -156,10 +162,14 @@ function App() {
           <div className="panel-heading">
             <div>
               <h2>Inspector</h2>
-              <span>read-only selection details</span>
+              <span>basic fields and coordinates</span>
             </div>
           </div>
-          <ReadOnlyInspector sections={inspectorSections} />
+          <EditableInspector
+            diagram={editableDiagram}
+            selectedElement={selectedElement}
+            onDiagramChange={updateEditableDiagram}
+          />
         </article>
 
         <article className="workspace-panel source-panel">
@@ -188,39 +198,6 @@ function App() {
         </article>
       </section>
     </main>
-  )
-}
-
-function ReadOnlyInspector({
-  sections,
-}: {
-  sections: InspectorSection[]
-}) {
-  if (sections.length === 0) {
-    return (
-      <div className="empty-inspector">
-        <h3>No selection</h3>
-        <p>Click a stratum or free text label in the SVG preview.</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="inspector-content">
-      {sections.map((section) => (
-        <section key={section.title} className="inspector-section">
-          <h3>{section.title}</h3>
-          <dl>
-            {section.fields.map((field) => (
-              <div key={`${section.title}-${field.label}`}>
-                <dt>{field.label}</dt>
-                <dd>{field.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ))}
-    </div>
   )
 }
 

@@ -10,6 +10,13 @@ import {
   formatVec3,
 } from '../../src/ui/inspector.ts'
 import {
+  cloneDiagram,
+  updateLabelById,
+  updateSelectedElement,
+  updateStratumById,
+  updateVec3Coordinate,
+} from '../../src/ui/diagramUpdates.ts'
+import {
   clearSelectionIfMissing,
   findSelectedElement,
   selectionExistsInDiagram,
@@ -234,4 +241,141 @@ test('createInspectorSections reports free text label content', () => {
       .some((field) => field.label === 'Text' && field.value === '$F^{(1)}L$'),
     true,
   )
+})
+
+test('updateStratumById returns a new diagram without mutating the original', () => {
+  const originalName = twoDimensionalExample.strata[0].name
+  const updated = updateStratumById(
+    twoDimensionalExample,
+    'visibleWire',
+    (stratum) => ({
+      ...stratum,
+      name: 'Edited wire',
+    }),
+  )
+  const updatedStratum = updated.strata.find(
+    (stratum) => stratum.id === 'visibleWire',
+  )
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(updatedStratum?.name, 'Edited wire')
+  assert.equal(twoDimensionalExample.strata[0].name, originalName)
+  assert.equal(
+    updated.strata.find((stratum) => stratum.id === 'hiddenWire'),
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'hiddenWire'),
+  )
+  assert.equal(updated.labels, twoDimensionalExample.labels)
+})
+
+test('updateLabelById returns a new diagram and preserves unrelated strata', () => {
+  const updated = updateLabelById(
+    twoDimensionalExample,
+    'mathMorphismLabel',
+    (label) => ({
+      ...label,
+      text: '$G$',
+      layer: 7,
+    }),
+  )
+  const updatedLabel = updated.labels.find(
+    (label) => label.id === 'mathMorphismLabel',
+  )
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(updatedLabel?.text, '$G$')
+  assert.equal(updatedLabel?.layer, 7)
+  assert.equal(
+    twoDimensionalExample.labels.find((label) => label.id === 'mathMorphismLabel')
+      ?.text,
+    '$F^{(1)}L$',
+  )
+  assert.equal(updated.strata, twoDimensionalExample.strata)
+})
+
+test('updateSelectedElement updates the selected stratum helper path', () => {
+  const updated = updateSelectedElement(
+    twoDimensionalExample,
+    { kind: 'stratum', id: 'circlePoint' },
+    {
+      stratum: (stratum) => ({
+        ...stratum,
+        layer: 4,
+      }),
+    },
+  )
+
+  assert.equal(
+    updated.strata.find((stratum) => stratum.id === 'circlePoint')?.layer,
+    4,
+  )
+})
+
+test('updateSelectedElement updates the selected label helper path', () => {
+  const updated = updateSelectedElement(
+    twoDimensionalExample,
+    { kind: 'label', id: 'mathMorphismLabel' },
+    {
+      label: (label) => ({
+        ...label,
+        text: '$H$',
+      }),
+    },
+  )
+
+  assert.equal(
+    updated.labels.find((label) => label.id === 'mathMorphismLabel')?.text,
+    '$H$',
+  )
+})
+
+test('updateVec3Coordinate normalizes z to 0 for 2D coordinates', () => {
+  const point = updateVec3Coordinate({ x: 1, y: 2, z: 0 }, 'z', 9, 2)
+
+  assert.deepEqual(point, { x: 1, y: 2, z: 0 })
+})
+
+test('updateVec3Coordinate preserves editable z for 3D coordinates', () => {
+  const point = updateVec3Coordinate({ x: 1, y: 2, z: 0 }, 'z', 9, 3)
+
+  assert.deepEqual(point, { x: 1, y: 2, z: 9 })
+})
+
+test('cubic Bezier point labels remain semantic after coordinate editing', () => {
+  const updated = updateStratumById(
+    twoDimensionalExample,
+    'dashedMorphism',
+    (stratum) => {
+      if (stratum.geometricKind !== 'curve') {
+        return stratum
+      }
+
+      return {
+        ...stratum,
+        points: stratum.points.map((point, index) =>
+          index === 1 ? updateVec3Coordinate(point, 'x', -1.1, 2) : point,
+        ),
+      }
+    },
+  )
+  const curve = updated.strata.find((stratum) => stratum.id === 'dashedMorphism')
+
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected dashedMorphism to be a curve.')
+  }
+
+  assert.deepEqual(
+    describeCurvePoints(curve).map((description) => description.label),
+    ['Start', 'Control point 1', 'Control point 2', 'End'],
+  )
+  assert.deepEqual(curve.points[1], { x: -1.1, y: 2.3, z: 0 })
+})
+
+test('cloneDiagram creates an editable copy of an example diagram', () => {
+  const cloned = cloneDiagram(twoDimensionalExample)
+
+  assert.notEqual(cloned, twoDimensionalExample)
+  assert.notEqual(cloned.strata, twoDimensionalExample.strata)
+  assert.deepEqual(cloned, twoDimensionalExample)
 })

@@ -90,7 +90,12 @@ function createStratumSections(
     ...createGeometrySections(stratum, ambientDimension),
     {
       title: 'Style',
-      fields: [{ label: stratum.style.kind, value: formatStyleSummary(stratum.style) }],
+      fields: [
+        {
+          label: stratum.style.kind,
+          value: formatStratumStyleSummary(stratum.style),
+        },
+      ],
     },
   ]
 }
@@ -181,12 +186,14 @@ function createLabelSections(
     },
     {
       title: 'Style',
-      fields: [{ label: label.style.kind, value: formatLabelStyle(label.style) }],
+      fields: [
+        { label: label.style.kind, value: formatLabelStyleSummary(label.style) },
+      ],
     },
   ]
 }
 
-function formatStyleSummary(style: StratumStyle): string {
+export function formatStratumStyleSummary(style: StratumStyle): string {
   switch (style.kind) {
     case 'regionStyle':
     case 'sheetStyle':
@@ -211,7 +218,7 @@ function formatStyleSummary(style: StratumStyle): string {
   }
 }
 
-function formatLabelStyle(style: LabelStyle): string {
+export function formatLabelStyleSummary(style: LabelStyle): string {
   return [
     style.color,
     `opacity ${formatNumber(style.opacity)}`,
