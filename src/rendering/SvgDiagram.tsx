@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { MouseEvent } from 'react'
 import type {
   CurveStratum,
   Diagram,
@@ -6,7 +7,9 @@ import type {
   SheetStratum,
   Stratum,
   TextLabel,
+  Vec2,
 } from '../model/types'
+import type { SelectedElement } from '../ui/selection'
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
@@ -27,6 +30,8 @@ export type SvgDiagramProps = {
   width?: number
   height?: number
   fitToView?: boolean
+  selectedElement?: SelectedElement
+  onSelectionChange?: (selection: SelectedElement) => void
 }
 
 type RenderItem = {
@@ -38,19 +43,26 @@ type RenderItem = {
 const defaultWidth = 520
 const defaultHeight = 360
 const pointRadiusScale = 1.8
+const highlightColor = '#F4B400'
 
 export function SvgDiagram({
   diagram,
   width = defaultWidth,
   height = defaultHeight,
   fitToView = false,
+  selectedElement = null,
+  onSelectionChange,
 }: SvgDiagramProps): ReactElement {
   const camera = resolveSvgCamera(diagram, width, height, { fitToView })
   const items = [
     ...diagram.strata
       .filter((stratum) => shouldRenderStratum(diagram.ambientDimension, stratum))
-      .map((stratum) => renderStratum(stratum, camera, height)),
-    ...diagram.labels.map((label) => renderLabel(label, camera, height)),
+      .map((stratum) =>
+        renderStratum(stratum, camera, height, selectedElement, onSelectionChange),
+      ),
+    ...diagram.labels.map((label) =>
+      renderLabel(label, camera, height, selectedElement, onSelectionChange),
+    ),
   ].sort((left, right) => left.layer - right.layer || left.id.localeCompare(right.id))
 
   return (
@@ -59,6 +71,7 @@ export function SvgDiagram({
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
+      onClick={() => onSelectionChange?.(null)}
     >
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
       <g>{items.map((item) => item.element)}</g>
@@ -70,6 +83,8 @@ function renderStratum(
   stratum: Stratum,
   camera: Diagram['camera'],
   viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   switch (stratum.geometricKind) {
     case 'region':
@@ -79,11 +94,11 @@ function renderStratum(
         element: <g key={stratum.id} />,
       }
     case 'sheet':
-      return renderSheet(stratum, camera, viewportHeight)
+      return renderSheet(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
     case 'curve':
-      return renderCurve(stratum, camera, viewportHeight)
+      return renderCurve(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
     case 'point':
-      return renderPoint(stratum, camera, viewportHeight)
+      return renderPoint(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
   }
 }
 
@@ -91,25 +106,46 @@ function renderSheet(
   sheet: SheetStratum,
   camera: Diagram['camera'],
   viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const points = sheet.corners.map((corner) =>
     projectToSvgPoint(camera, corner, viewportHeight),
   )
+  const isSelected = isSelectedStratum(selectedElement, sheet.id)
 
   return {
     id: sheet.id,
     layer: sheet.layer,
     element: (
-      <polygon
+      <g
         key={sheet.id}
-        points={svgPointList(points)}
-        fill={sheet.style.fillColor}
-        fillOpacity={sheet.style.fillOpacity}
-        stroke={sheet.style.strokeColor}
-        strokeOpacity={sheet.style.strokeOpacity}
-        strokeWidth={1.5}
-        vectorEffect="non-scaling-stroke"
-      />
+        className="svg-selectable"
+        onClick={(event) =>
+          selectElement(event, { kind: 'stratum', id: sheet.id }, onSelectionChange)
+        }
+      >
+        {isSelected && (
+          <polygon
+            points={svgPointList(points)}
+            fill="none"
+            stroke={highlightColor}
+            strokeOpacity={0.9}
+            strokeWidth={5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        <polygon
+          points={svgPointList(points)}
+          fill={sheet.style.fillColor}
+          fillOpacity={sheet.style.fillOpacity}
+          stroke={sheet.style.strokeColor}
+          strokeOpacity={sheet.style.strokeOpacity}
+          strokeWidth={1.5}
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
     ),
   }
 }
@@ -118,6 +154,8 @@ function renderCurve(
   curve: CurveStratum,
   camera: Diagram['camera'],
   viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const points = curve.points.map((point) =>
     projectToSvgPoint(camera, point, viewportHeight),
@@ -127,23 +165,44 @@ function renderCurve(
       ? cubicBezierToSvgPath(points)
       : polylineToSvgPath(points)
   const dashArray = lineStyleToStrokeDasharray(curve.style.lineStyle)
+  const isSelected = isSelectedStratum(selectedElement, curve.id)
 
   return {
     id: curve.id,
     layer: curve.layer,
     element: (
-      <path
+      <g
         key={curve.id}
-        d={pathData}
-        fill="none"
-        stroke={curve.style.strokeColor}
-        strokeOpacity={curve.style.strokeOpacity}
-        strokeWidth={curve.style.lineWidth}
-        strokeDasharray={dashArray}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
+        className="svg-selectable"
+        onClick={(event) =>
+          selectElement(event, { kind: 'stratum', id: curve.id }, onSelectionChange)
+        }
+      >
+        {isSelected && (
+          <path
+            d={pathData}
+            fill="none"
+            stroke={highlightColor}
+            strokeOpacity={0.7}
+            strokeWidth={curve.style.lineWidth + 7}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        <path
+          d={pathData}
+          fill="none"
+          stroke={curve.style.strokeColor}
+          strokeOpacity={curve.style.strokeOpacity}
+          strokeWidth={curve.style.lineWidth}
+          strokeDasharray={dashArray}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
     ),
   }
 }
@@ -152,10 +211,13 @@ function renderPoint(
   point: PointStratum,
   camera: Diagram['camera'],
   viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
   const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
+  const isSelected = isSelectedStratum(selectedElement, point.id)
   const commonProps = {
     fill,
     stroke: point.style.color,
@@ -170,13 +232,16 @@ function renderPoint(
         id: point.id,
         layer: point.layer,
         element: (
-          <circle
+          <g
             key={point.id}
-            {...commonProps}
-            cx={center.x}
-            cy={center.y}
-            r={radius}
-          />
+            className="svg-selectable"
+            onClick={(event) =>
+              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+            }
+          >
+            {renderPointHighlight(center, radius, isSelected)}
+            <circle {...commonProps} cx={center.x} cy={center.y} r={radius} />
+          </g>
         ),
       }
     case 'square':
@@ -184,13 +249,21 @@ function renderPoint(
         id: point.id,
         layer: point.layer,
         element: (
-          <polygon
+          <g
             key={point.id}
-            {...commonProps}
-            points={svgPointList(
-              regularPolygonPoints(center, radius, 4, Math.PI / 4),
-            )}
-          />
+            className="svg-selectable"
+            onClick={(event) =>
+              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+            }
+          >
+            {renderPointHighlight(center, radius, isSelected)}
+            <polygon
+              {...commonProps}
+              points={svgPointList(
+                regularPolygonPoints(center, radius, 4, Math.PI / 4),
+              )}
+            />
+          </g>
         ),
       }
     case 'triangle':
@@ -198,13 +271,21 @@ function renderPoint(
         id: point.id,
         layer: point.layer,
         element: (
-          <polygon
+          <g
             key={point.id}
-            {...commonProps}
-            points={svgPointList(
-              regularPolygonPoints(center, radius, 3, -Math.PI / 2),
-            )}
-          />
+            className="svg-selectable"
+            onClick={(event) =>
+              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+            }
+          >
+            {renderPointHighlight(center, radius, isSelected)}
+            <polygon
+              {...commonProps}
+              points={svgPointList(
+                regularPolygonPoints(center, radius, 3, -Math.PI / 2),
+              )}
+            />
+          </g>
         ),
       }
     case 'star':
@@ -212,11 +293,19 @@ function renderPoint(
         id: point.id,
         layer: point.layer,
         element: (
-          <polygon
+          <g
             key={point.id}
-            {...commonProps}
-            points={svgPointList(starPolygonPoints(center, radius, radius * 0.45))}
-          />
+            className="svg-selectable"
+            onClick={(event) =>
+              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+            }
+          >
+            {renderPointHighlight(center, radius, isSelected)}
+            <polygon
+              {...commonProps}
+              points={svgPointList(starPolygonPoints(center, radius, radius * 0.45))}
+            />
+          </g>
         ),
       }
   }
@@ -226,27 +315,90 @@ function renderLabel(
   label: TextLabel,
   camera: Diagram['camera'],
   viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const position = projectToSvgPoint(camera, label.position, viewportHeight)
+  const isSelected = selectedElement?.kind === 'label' && selectedElement.id === label.id
 
   return {
     id: label.id,
     layer: label.layer,
     element: (
-      <text
+      <g
         key={label.id}
-        x={position.x}
-        y={position.y}
-        fill={label.style.color}
-        opacity={label.style.opacity}
-        fontSize={label.style.fontSize * 1.35}
-        textAnchor={anchorToTextAnchor(label.style.anchor)}
-        dominantBaseline={anchorToDominantBaseline(label.style.anchor)}
+        className="svg-selectable"
+        onClick={(event) =>
+          selectElement(event, { kind: 'label', id: label.id }, onSelectionChange)
+        }
       >
-        {label.text}
-      </text>
+        {isSelected && (
+          <circle
+            cx={position.x}
+            cy={position.y}
+            r={7}
+            fill="none"
+            stroke={highlightColor}
+            strokeOpacity={0.9}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        <text
+          x={position.x}
+          y={position.y}
+          fill={label.style.color}
+          opacity={label.style.opacity}
+          fontSize={label.style.fontSize * 1.35}
+          textAnchor={anchorToTextAnchor(label.style.anchor)}
+          dominantBaseline={anchorToDominantBaseline(label.style.anchor)}
+        >
+          {label.text}
+        </text>
+      </g>
     ),
   }
+}
+
+function renderPointHighlight(
+  center: Vec2,
+  radius: number,
+  isSelected: boolean,
+): ReactElement | null {
+  if (!isSelected) {
+    return null
+  }
+
+  return (
+    <circle
+      cx={center.x}
+      cy={center.y}
+      r={radius + 6}
+      fill="none"
+      stroke={highlightColor}
+      strokeOpacity={0.85}
+      strokeWidth={3}
+      vectorEffect="non-scaling-stroke"
+      pointerEvents="none"
+    />
+  )
+}
+
+function selectElement(
+  event: MouseEvent<SVGGElement>,
+  selection: NonNullable<SelectedElement>,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): void {
+  event.stopPropagation()
+  onSelectionChange?.(selection)
+}
+
+function isSelectedStratum(
+  selectedElement: SelectedElement,
+  id: string,
+): boolean {
+  return selectedElement?.kind === 'stratum' && selectedElement.id === id
 }
 
 function shouldRenderStratum(

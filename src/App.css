@@ -111,7 +111,10 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(340px, 1fr) minmax(380px, 1fr);
+  grid-template-columns:
+    minmax(360px, 1.15fr)
+    minmax(260px, 0.75fr)
+    minmax(360px, 1fr);
   gap: 20px;
   max-width: 1280px;
   margin: 0 auto;
@@ -181,6 +184,85 @@
   border-radius: 6px;
   background: #ffffff;
   font-family: var(--sans);
+}
+
+.svg-selectable {
+  cursor: pointer;
+}
+
+.svg-selectable:hover {
+  filter: drop-shadow(0 0 3px rgba(244, 180, 0, 0.55));
+}
+
+.inspector-content {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  overflow: auto;
+}
+
+.inspector-section {
+  display: grid;
+  gap: 8px;
+}
+
+.inspector-section h3,
+.empty-inspector h3 {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.inspector-section dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--border);
+}
+
+.inspector-section div {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.inspector-section dt,
+.inspector-section dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.inspector-section dt {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.inspector-section dd {
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+}
+
+.empty-inspector {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  min-height: 220px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-inspector p {
+  max-width: 260px;
+  font-size: 14px;
 }
 
 .tikz-source {

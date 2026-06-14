@@ -7,6 +7,12 @@ import {
 import type { CoordinateInputMode, Diagram } from './model/types'
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
+import {
+  clearSelectionIfMissing,
+  createInspectorSections,
+  type InspectorSection,
+  type SelectedElement,
+} from './ui'
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
@@ -40,12 +46,17 @@ function App() {
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>('cursor')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
+  const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
   const tikzSource = useMemo(
     () => generateTikz(selectedExample.diagram),
     [selectedExample],
+  )
+  const inspectorSections = useMemo(
+    () => createInspectorSections(selectedExample.diagram, selectedElement),
+    [selectedElement, selectedExample],
   )
 
   async function copyTikz(): Promise<void> {
@@ -62,7 +73,13 @@ function App() {
   }
 
   function selectExample(exampleId: ExampleId): void {
+    const nextExample =
+      exampleOptions.find((example) => example.id === exampleId) ?? exampleOptions[0]
+
     setSelectedExampleId(exampleId)
+    setSelectedElement((selection) =>
+      clearSelectionIfMissing(nextExample.diagram, selection),
+    )
     setCopyStatus('idle')
   }
 
@@ -77,6 +94,7 @@ function App() {
           <span>{selectedExample.name}</span>
           <span>{selectedExample.diagram.ambientDimension}D</span>
           <span>{coordinateInputMode}</span>
+          <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
         </div>
       </header>
 
@@ -126,7 +144,22 @@ function App() {
               <span>{selectedExample.summary}</span>
             </div>
           </div>
-          <SvgDiagram diagram={selectedExample.diagram} fitToView />
+          <SvgDiagram
+            diagram={selectedExample.diagram}
+            fitToView
+            selectedElement={selectedElement}
+            onSelectionChange={setSelectedElement}
+          />
+        </article>
+
+        <article className="workspace-panel inspector-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Inspector</h2>
+              <span>read-only selection details</span>
+            </div>
+          </div>
+          <ReadOnlyInspector sections={inspectorSections} />
         </article>
 
         <article className="workspace-panel source-panel">
@@ -155,6 +188,39 @@ function App() {
         </article>
       </section>
     </main>
+  )
+}
+
+function ReadOnlyInspector({
+  sections,
+}: {
+  sections: InspectorSection[]
+}) {
+  if (sections.length === 0) {
+    return (
+      <div className="empty-inspector">
+        <h3>No selection</h3>
+        <p>Click a stratum or free text label in the SVG preview.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="inspector-content">
+      {sections.map((section) => (
+        <section key={section.title} className="inspector-section">
+          <h3>{section.title}</h3>
+          <dl>
+            {section.fields.map((field) => (
+              <div key={`${section.title}-${field.label}`}>
+                <dt>{field.label}</dt>
+                <dd>{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
   )
 }
 
