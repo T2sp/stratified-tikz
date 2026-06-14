@@ -1,5 +1,6 @@
 import './App.css'
 import {
+  labelAnchorCheckExample,
   threeDimensionalExample,
   twoDimensionalExample,
 } from './examples'
@@ -19,7 +20,7 @@ function App() {
             <h2>2D Example</h2>
             <span>curves and points</span>
           </div>
-          <SvgDiagram diagram={twoDimensionalExample} />
+          <SvgDiagram diagram={twoDimensionalExample} fitToView />
         </article>
 
         <article className="preview-panel">
@@ -27,7 +28,15 @@ function App() {
             <h2>3D Example</h2>
             <span>sheets, curves, and junctions</span>
           </div>
-          <SvgDiagram diagram={threeDimensionalExample} />
+          <SvgDiagram diagram={threeDimensionalExample} fitToView />
+        </article>
+
+        <article className="preview-panel">
+          <div className="panel-heading">
+            <h2>Orientation and Anchor Check</h2>
+            <span>+x right, +y up</span>
+          </div>
+          <SvgDiagram diagram={labelAnchorCheckExample} />
         </article>
       </section>
     </main>

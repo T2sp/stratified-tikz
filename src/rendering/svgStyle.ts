@@ -17,11 +17,11 @@ export function lineStyleToStrokeDasharray(
 
 export function anchorToTextAnchor(anchor: LabelAnchor): 'start' | 'middle' | 'end' {
   if (anchor.includes('east')) {
-    return 'start'
+    return 'end'
   }
 
   if (anchor.includes('west')) {
-    return 'end'
+    return 'start'
   }
 
   return 'middle'
@@ -29,13 +29,13 @@ export function anchorToTextAnchor(anchor: LabelAnchor): 'start' | 'middle' | 'e
 
 export function anchorToDominantBaseline(
   anchor: LabelAnchor,
-): 'auto' | 'central' | 'hanging' {
+): 'central' | 'text-after-edge' | 'text-before-edge' {
   if (anchor.includes('north')) {
-    return 'hanging'
+    return 'text-before-edge'
   }
 
   if (anchor.includes('south')) {
-    return 'auto'
+    return 'text-after-edge'
   }
 
   return 'central'

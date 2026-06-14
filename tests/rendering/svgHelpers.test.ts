@@ -6,7 +6,15 @@ import {
   regularPolygonPoints,
   starPolygonPoints,
 } from '../../src/rendering/svgPath.ts'
-import { lineStyleToStrokeDasharray } from '../../src/rendering/svgStyle.ts'
+import { projectVec3 } from '../../src/geometry/projection.ts'
+import type { Diagram } from '../../src/model/types.ts'
+import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import {
+  anchorToDominantBaseline,
+  anchorToTextAnchor,
+  lineStyleToStrokeDasharray,
+} from '../../src/rendering/svgStyle.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -38,6 +46,26 @@ test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('denselyDotted'), '1 2')
 })
 
+test('label anchors map east and west to TikZ-like SVG text anchors', () => {
+  assert.equal(anchorToTextAnchor('center'), 'middle')
+  assert.equal(anchorToTextAnchor('east'), 'end')
+  assert.equal(anchorToTextAnchor('west'), 'start')
+  assert.equal(anchorToTextAnchor('north east'), 'end')
+  assert.equal(anchorToTextAnchor('north west'), 'start')
+  assert.equal(anchorToTextAnchor('south east'), 'end')
+  assert.equal(anchorToTextAnchor('south west'), 'start')
+})
+
+test('label vertical anchors map north and south to TikZ-like SVG baselines', () => {
+  assert.equal(anchorToDominantBaseline('center'), 'central')
+  assert.equal(anchorToDominantBaseline('north'), 'text-before-edge')
+  assert.equal(anchorToDominantBaseline('north east'), 'text-before-edge')
+  assert.equal(anchorToDominantBaseline('north west'), 'text-before-edge')
+  assert.equal(anchorToDominantBaseline('south'), 'text-after-edge')
+  assert.equal(anchorToDominantBaseline('south east'), 'text-after-edge')
+  assert.equal(anchorToDominantBaseline('south west'), 'text-after-edge')
+})
+
 test('regularPolygonPoints creates one vertex per requested side', () => {
   const square = regularPolygonPoints({ x: 10, y: 20 }, 5, 4, Math.PI / 4)
   const triangle = regularPolygonPoints({ x: 0, y: 0 }, 2, 3, -Math.PI / 2)
@@ -53,3 +81,66 @@ test('starPolygonPoints creates a simple five-point star polygon', () => {
   assert.ok(Math.abs(star[0].x) < 1e-12)
   assert.equal(star[0].y, -10)
 })
+
+test('resolveSvgCamera uses diagram camera by default', () => {
+  const diagram = createCameraTestDiagram()
+  const camera = resolveSvgCamera(diagram, 200, 120)
+  const viewPoint = projectVec3(camera, { x: 2, y: 3, z: 0 })
+  const svgPoint = projectToSvgPoint(camera, { x: 2, y: 3, z: 0 }, 120)
+
+  assert.deepEqual(camera, diagram.camera)
+  assert.deepEqual(viewPoint, { x: 34, y: 51 })
+  assert.deepEqual(svgPoint, { x: 34, y: 69 })
+})
+
+test('resolveSvgCamera uses fitted camera only when explicitly requested', () => {
+  const diagram = createCameraTestDiagram()
+  const defaultCamera = resolveSvgCamera(diagram, 200, 120)
+  const fittedCamera = resolveSvgCamera(diagram, 200, 120, { fitToView: true })
+
+  assert.deepEqual(defaultCamera, diagram.camera)
+  assert.notDeepEqual(fittedCamera, diagram.camera)
+})
+
+test('projectToSvgPoint keeps positive x right and makes positive y appear upward', () => {
+  const diagram = createCameraTestDiagram()
+  const camera = resolveSvgCamera(diagram, 200, 120)
+  const left = projectToSvgPoint(camera, { x: -1, y: 0, z: 0 }, 120)
+  const right = projectToSvgPoint(camera, { x: 1, y: 0, z: 0 }, 120)
+  const lower = projectToSvgPoint(camera, { x: 0, y: -1, z: 0 }, 120)
+  const upper = projectToSvgPoint(camera, { x: 0, y: 1, z: 0 }, 120)
+
+  assert.ok(right.x > left.x)
+  assert.ok(upper.y < lower.y)
+})
+
+function createCameraTestDiagram(): Diagram {
+  return {
+    version: 1,
+    ambientDimension: 2,
+    camera: {
+      mode: '2d',
+      scale: 12,
+      origin: { x: 10, y: 15 },
+    },
+    strata: [
+      {
+        id: 'testPoint',
+        codim: 2,
+        geometricKind: 'point',
+        name: 'Test point',
+        style: {
+          kind: 'pointStyle',
+          color: '#000000',
+          opacity: 1,
+          shape: 'circle',
+          fill: 'filled',
+          size: 3,
+        },
+        position: { x: 2, y: 3, z: 0 },
+        layer: 0,
+      },
+    ],
+    labels: [],
+  }
+}

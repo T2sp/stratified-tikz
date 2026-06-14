@@ -1,16 +1,13 @@
 import type { ReactElement } from 'react'
-import { projectVec3 } from '../geometry/projection'
 import type {
-  Camera,
   CurveStratum,
   Diagram,
   PointStratum,
   SheetStratum,
   Stratum,
   TextLabel,
-  Vec2,
-  Vec3,
 } from '../model/types'
+import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
   polylineToSvgPath,
@@ -18,6 +15,7 @@ import {
   starPolygonPoints,
   svgPointList,
 } from './svgPath'
+import { projectToSvgPoint } from './svgProjection'
 import {
   anchorToDominantBaseline,
   anchorToTextAnchor,
@@ -28,6 +26,7 @@ export type SvgDiagramProps = {
   diagram: Diagram
   width?: number
   height?: number
+  fitToView?: boolean
 }
 
 type RenderItem = {
@@ -38,20 +37,20 @@ type RenderItem = {
 
 const defaultWidth = 520
 const defaultHeight = 360
-const previewPadding = 36
 const pointRadiusScale = 1.8
 
 export function SvgDiagram({
   diagram,
   width = defaultWidth,
   height = defaultHeight,
+  fitToView = false,
 }: SvgDiagramProps): ReactElement {
-  const camera = createPreviewCamera(diagram, width, height)
+  const camera = resolveSvgCamera(diagram, width, height, { fitToView })
   const items = [
     ...diagram.strata
       .filter((stratum) => shouldRenderStratum(diagram.ambientDimension, stratum))
-      .map((stratum) => renderStratum(stratum, camera)),
-    ...diagram.labels.map((label) => renderLabel(label, camera)),
+      .map((stratum) => renderStratum(stratum, camera, height)),
+    ...diagram.labels.map((label) => renderLabel(label, camera, height)),
   ].sort((left, right) => left.layer - right.layer || left.id.localeCompare(right.id))
 
   return (
@@ -67,7 +66,11 @@ export function SvgDiagram({
   )
 }
 
-function renderStratum(stratum: Stratum, camera: Camera): RenderItem {
+function renderStratum(
+  stratum: Stratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): RenderItem {
   switch (stratum.geometricKind) {
     case 'region':
       return {
@@ -76,16 +79,22 @@ function renderStratum(stratum: Stratum, camera: Camera): RenderItem {
         element: <g key={stratum.id} />,
       }
     case 'sheet':
-      return renderSheet(stratum, camera)
+      return renderSheet(stratum, camera, viewportHeight)
     case 'curve':
-      return renderCurve(stratum, camera)
+      return renderCurve(stratum, camera, viewportHeight)
     case 'point':
-      return renderPoint(stratum, camera)
+      return renderPoint(stratum, camera, viewportHeight)
   }
 }
 
-function renderSheet(sheet: SheetStratum, camera: Camera): RenderItem {
-  const points = sheet.corners.map((corner) => projectVec3(camera, corner))
+function renderSheet(
+  sheet: SheetStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): RenderItem {
+  const points = sheet.corners.map((corner) =>
+    projectToSvgPoint(camera, corner, viewportHeight),
+  )
 
   return {
     id: sheet.id,
@@ -105,8 +114,14 @@ function renderSheet(sheet: SheetStratum, camera: Camera): RenderItem {
   }
 }
 
-function renderCurve(curve: CurveStratum, camera: Camera): RenderItem {
-  const points = curve.points.map((point) => projectVec3(camera, point))
+function renderCurve(
+  curve: CurveStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): RenderItem {
+  const points = curve.points.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
   const pathData =
     curve.kind === 'cubicBezier'
       ? cubicBezierToSvgPath(points)
@@ -133,8 +148,12 @@ function renderCurve(curve: CurveStratum, camera: Camera): RenderItem {
   }
 }
 
-function renderPoint(point: PointStratum, camera: Camera): RenderItem {
-  const center = projectVec3(camera, point.position)
+function renderPoint(
+  point: PointStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): RenderItem {
+  const center = projectToSvgPoint(camera, point.position, viewportHeight)
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
   const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
   const commonProps = {
@@ -193,8 +212,12 @@ function renderPoint(point: PointStratum, camera: Camera): RenderItem {
   }
 }
 
-function renderLabel(label: TextLabel, camera: Camera): RenderItem {
-  const position = projectVec3(camera, label.position)
+function renderLabel(
+  label: TextLabel,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): RenderItem {
+  const position = projectToSvgPoint(camera, label.position, viewportHeight)
 
   return {
     id: label.id,
@@ -231,79 +254,5 @@ function shouldRenderStratum(
     (stratum.geometricKind === 'sheet' && stratum.codim === 1) ||
     (stratum.geometricKind === 'curve' && stratum.codim === 2) ||
     (stratum.geometricKind === 'point' && stratum.codim === 3)
-  )
-}
-
-function createPreviewCamera(
-  diagram: Diagram,
-  width: number,
-  height: number,
-): Camera {
-  const modelPoints = collectDiagramPoints(diagram)
-  const unitCamera = {
-    ...diagram.camera,
-    scale: 1,
-    origin: { x: 0, y: 0 },
-  }
-  const projectedPoints = modelPoints.map((point) => projectVec3(unitCamera, point))
-  const bounds = getBounds(projectedPoints)
-  const spanX = Math.max(bounds.maxX - bounds.minX, 1)
-  const spanY = Math.max(bounds.maxY - bounds.minY, 1)
-  const availableWidth = Math.max(width - previewPadding * 2, 1)
-  const availableHeight = Math.max(height - previewPadding * 2, 1)
-  const scale = Math.min(availableWidth / spanX, availableHeight / spanY)
-  const usedWidth = spanX * scale
-  const usedHeight = spanY * scale
-
-  return {
-    ...diagram.camera,
-    scale,
-    origin: {
-      x: previewPadding + (availableWidth - usedWidth) / 2 - bounds.minX * scale,
-      y: previewPadding + (availableHeight - usedHeight) / 2 - bounds.minY * scale,
-    },
-  }
-}
-
-function collectDiagramPoints(diagram: Diagram): Vec3[] {
-  const stratumPoints = diagram.strata.flatMap((stratum) => {
-    switch (stratum.geometricKind) {
-      case 'region':
-        return []
-      case 'sheet':
-        return [...stratum.corners]
-      case 'curve':
-        return [...stratum.points]
-      case 'point':
-        return [stratum.position]
-    }
-  })
-
-  return [...stratumPoints, ...diagram.labels.map((label) => label.position)]
-}
-
-function getBounds(points: Vec2[]): {
-  minX: number
-  maxX: number
-  minY: number
-  maxY: number
-} {
-  if (points.length === 0) {
-    return { minX: -1, maxX: 1, minY: -1, maxY: 1 }
-  }
-
-  return points.reduce(
-    (bounds, point) => ({
-      minX: Math.min(bounds.minX, point.x),
-      maxX: Math.max(bounds.maxX, point.x),
-      minY: Math.min(bounds.minY, point.y),
-      maxY: Math.max(bounds.maxY, point.y),
-    }),
-    {
-      minX: points[0].x,
-      maxX: points[0].x,
-      minY: points[0].y,
-      maxY: points[0].y,
-    },
   )
 }
