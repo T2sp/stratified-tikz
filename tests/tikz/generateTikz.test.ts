@@ -35,6 +35,17 @@ test('2D output has codim 1 curves and codim 2 points', () => {
   assert.match(tikz, /\\node\[/)
 })
 
+test('2D output contains readable section headers', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram())
+
+  assertIncludesSection(tikz, 'Styles and colors')
+  assertIncludesSection(tikz, 'Coordinates')
+  assertIncludesSection(tikz, 'Codimension 1 strata: curves')
+  assertIncludesSection(tikz, 'Codimension 2 strata: points')
+  assertIncludesSection(tikz, 'Labels')
+  assert.doesNotMatch(tikz, /% Codimension 3 strata/)
+})
+
 test('3D output has codim 1 sheets, codim 2 curves, and codim 3 points', () => {
   const tikz = generateTikz(createThreeDimensionalDiagram())
 
@@ -44,6 +55,17 @@ test('3D output has codim 1 sheets, codim 2 curves, and codim 3 points', () => {
   assert.match(tikz, /\\path\[/)
   assert.match(tikz, /\\draw\[/)
   assert.match(tikz, /\\node\[/)
+})
+
+test('3D output contains readable section headers', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram())
+
+  assertIncludesSection(tikz, 'Styles and colors')
+  assertIncludesSection(tikz, 'Coordinates')
+  assertIncludesSection(tikz, 'Codimension 1 strata: sheets')
+  assertIncludesSection(tikz, 'Codimension 2 strata: curves')
+  assertIncludesSection(tikz, 'Codimension 3 strata: points')
+  assertIncludesSection(tikz, 'Labels')
 })
 
 test('custom colors are emitted as definecolor commands', () => {
@@ -76,6 +98,34 @@ test('denselyDotted maps to densely dotted', () => {
   assert.match(generateTikz(diagram), /densely dotted/)
 })
 
+test('non-default label styles are emitted', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'styledLabel',
+    name: 'Styled label',
+    text: '$\\alpha \\colon f \\Rightarrow g$',
+    position: { x: 0, y: 0, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#A23E48',
+      opacity: 0.65,
+      fontSize: 14,
+      anchor: 'north east',
+    },
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\definecolor\{stzLabelstyledLabel\}\{HTML\}\{A23E48\}/)
+  assert.match(tikz, /text=stzLabelstyledLabel/)
+  assert.match(tikz, /opacity=0\.65/)
+  assert.match(tikz, /font=\\fontsize\{14pt\}\{16\.8pt\}\\selectfont/)
+  assert.match(tikz, /anchor=north east/)
+  assert.match(tikz, /\$\\alpha \\colon f \\Rightarrow g\$/)
+})
+
 test('label text is preserved without automatic math wrapping', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
 
@@ -104,6 +154,18 @@ test('point shapes include circle, square, triangle, and star', () => {
   }
 })
 
+test('non-circular point shapes document required TikZ libraries', () => {
+  for (const shape of ['square', 'triangle', 'star'] satisfies PointShape[]) {
+    const tikz = generateTikz(createPointShapeDiagram(shape))
+
+    assert.match(
+      tikz,
+      /% Required TikZ libraries for non-circular point shapes:/,
+    )
+    assert.match(tikz, /% \\usetikzlibrary\{shapes\.geometric,shapes\.symbols\}/)
+  }
+})
+
 test('hollow points are emitted with white fill', () => {
   const tikz = generateTikz(
     createPointShapeDiagram('circle', {
@@ -113,6 +175,14 @@ test('hollow points are emitted with white fill', () => {
 
   assert.match(tikz, /fill=white/)
 })
+
+function assertIncludesSection(tikz: string, title: string): void {
+  assert.match(tikz, new RegExp(`% ${escapeRegExp(title)}`))
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 function createTwoDimensionalDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
