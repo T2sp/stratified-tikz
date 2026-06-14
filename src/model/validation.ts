@@ -302,7 +302,7 @@ function validateCurveStyle(
     pushError(
       errors,
       `${path}.lineStyle`,
-      'Curve line style must be solid, dashed, or dotted.',
+      'Curve line style must be solid, dashed, dotted, or denselyDotted.',
     )
   }
 }
@@ -332,7 +332,7 @@ function validatePartialCurveStyle(
     pushError(
       errors,
       `${path}.lineStyle`,
-      'Curve line style must be solid, dashed, or dotted.',
+      'Curve line style must be solid, dashed, dotted, or denselyDotted.',
     )
   }
 }

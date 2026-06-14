@@ -48,7 +48,7 @@ export type HexColor = `#${string}`
 
 export type Opacity = number
 
-export const lineStyles = ['solid', 'dashed', 'dotted'] as const
+export const lineStyles = ['solid', 'dashed', 'dotted', 'denselyDotted'] as const
 export type LineStyle = (typeof lineStyles)[number]
 
 export const pointShapes = ['circle', 'square', 'triangle', 'star'] as const
