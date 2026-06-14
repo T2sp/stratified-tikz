@@ -157,7 +157,6 @@ function renderPoint(
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
   const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
   const commonProps = {
-    key: point.id,
     fill,
     stroke: point.style.color,
     strokeWidth: 1.4,
@@ -170,7 +169,15 @@ function renderPoint(
       return {
         id: point.id,
         layer: point.layer,
-        element: <circle {...commonProps} cx={center.x} cy={center.y} r={radius} />,
+        element: (
+          <circle
+            key={point.id}
+            {...commonProps}
+            cx={center.x}
+            cy={center.y}
+            r={radius}
+          />
+        ),
       }
     case 'square':
       return {
@@ -178,6 +185,7 @@ function renderPoint(
         layer: point.layer,
         element: (
           <polygon
+            key={point.id}
             {...commonProps}
             points={svgPointList(
               regularPolygonPoints(center, radius, 4, Math.PI / 4),
@@ -191,6 +199,7 @@ function renderPoint(
         layer: point.layer,
         element: (
           <polygon
+            key={point.id}
             {...commonProps}
             points={svgPointList(
               regularPolygonPoints(center, radius, 3, -Math.PI / 2),
@@ -204,6 +213,7 @@ function renderPoint(
         layer: point.layer,
         element: (
           <polygon
+            key={point.id}
             {...commonProps}
             points={svgPointList(starPolygonPoints(center, radius, radius * 0.45))}
           />
