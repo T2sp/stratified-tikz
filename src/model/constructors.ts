@@ -10,6 +10,7 @@ import {
   defaultRegionStyle,
   defaultSheetStyle,
 } from './styles'
+import { normalizePointForAmbientDimension } from '../geometry/projection'
 import type {
   AmbientDimension,
   Camera,
@@ -34,6 +35,8 @@ import type {
   Vec3,
   WorkPlane,
 } from './types'
+
+export { normalizePointForAmbientDimension } from '../geometry/projection'
 
 export type CreateEmptyDiagramInput = {
   ambientDimension: AmbientDimension
@@ -276,13 +279,6 @@ export function createTextLabel({
     style: cloneLabelStyle(style),
     layer,
   }
-}
-
-export function normalizePointForAmbientDimension(
-  ambientDimension: AmbientDimension,
-  point: Vec3,
-): Vec3 {
-  return ambientDimension === 2 ? { ...point, z: 0 } : cloneVec3(point)
 }
 
 function cloneVec3(point: Vec3): Vec3 {
