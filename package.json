@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "node --test tests/geometry/projection.test.ts",
+    "test": "node --test tests/geometry/projection.test.ts tests/tikz/generateTikz.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
