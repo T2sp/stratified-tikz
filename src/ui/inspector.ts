@@ -1,4 +1,5 @@
 import type {
+  AmbientDimension,
   CurveStratum,
   Diagram,
   LabelStyle,
@@ -37,12 +38,20 @@ export function createInspectorSections(
   }
 
   return selected.kind === 'stratum'
-    ? createStratumSections(selected.element)
-    : createLabelSections(selected.element)
+    ? createStratumSections(selected.element, diagram.ambientDimension)
+    : createLabelSections(selected.element, diagram.ambientDimension)
 }
 
-export function formatVec3(point: Vec3): string {
-  return `(${formatNumber(point.x)}, ${formatNumber(point.y)}, ${formatNumber(point.z)})`
+export function formatVec3(
+  point: Vec3,
+  ambientDimension: AmbientDimension,
+): string {
+  const coordinates =
+    ambientDimension === 2
+      ? [point.x, point.y]
+      : [point.x, point.y, point.z]
+
+  return `(${coordinates.map(formatNumber).join(', ')})`
 }
 
 export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[] {
@@ -61,7 +70,10 @@ export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[
   }))
 }
 
-function createStratumSections(stratum: Stratum): InspectorSection[] {
+function createStratumSections(
+  stratum: Stratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection[] {
   return [
     {
       title: 'Selection',
@@ -75,7 +87,7 @@ function createStratumSections(stratum: Stratum): InspectorSection[] {
         { label: 'Attached label', value: stratum.label ?? 'none' },
       ],
     },
-    ...createGeometrySections(stratum),
+    ...createGeometrySections(stratum, ambientDimension),
     {
       title: 'Style',
       fields: [{ label: stratum.style.kind, value: formatStyleSummary(stratum.style) }],
@@ -83,7 +95,10 @@ function createStratumSections(stratum: Stratum): InspectorSection[] {
   ]
 }
 
-function createGeometrySections(stratum: Stratum): InspectorSection[] {
+function createGeometrySections(
+  stratum: Stratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection[] {
   switch (stratum.geometricKind) {
     case 'region':
       return [
@@ -93,25 +108,31 @@ function createGeometrySections(stratum: Stratum): InspectorSection[] {
         },
       ]
     case 'sheet':
-      return [createSheetGeometrySection(stratum)]
+      return [createSheetGeometrySection(stratum, ambientDimension)]
     case 'curve':
-      return [createCurveGeometrySection(stratum)]
+      return [createCurveGeometrySection(stratum, ambientDimension)]
     case 'point':
-      return [createPointGeometrySection(stratum)]
+      return [createPointGeometrySection(stratum, ambientDimension)]
   }
 }
 
-function createSheetGeometrySection(sheet: SheetStratum): InspectorSection {
+function createSheetGeometrySection(
+  sheet: SheetStratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection {
   return {
     title: 'Geometry',
     fields: sheet.corners.map((corner, index) => ({
       label: `Corner ${index + 1}`,
-      value: formatVec3(corner),
+      value: formatVec3(corner, ambientDimension),
     })),
   }
 }
 
-function createCurveGeometrySection(curve: CurveStratum): InspectorSection {
+function createCurveGeometrySection(
+  curve: CurveStratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection {
   return {
     title: 'Geometry',
     fields: [
@@ -119,20 +140,28 @@ function createCurveGeometrySection(curve: CurveStratum): InspectorSection {
       { label: 'Style segments', value: String(curve.styleSegments.length) },
       ...describeCurvePoints(curve).map((description) => ({
         label: description.label,
-        value: formatVec3(description.point),
+        value: formatVec3(description.point, ambientDimension),
       })),
     ],
   }
 }
 
-function createPointGeometrySection(point: PointStratum): InspectorSection {
+function createPointGeometrySection(
+  point: PointStratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection {
   return {
     title: 'Geometry',
-    fields: [{ label: 'Position', value: formatVec3(point.position) }],
+    fields: [
+      { label: 'Position', value: formatVec3(point.position, ambientDimension) },
+    ],
   }
 }
 
-function createLabelSections(label: TextLabel): InspectorSection[] {
+function createLabelSections(
+  label: TextLabel,
+  ambientDimension: AmbientDimension,
+): InspectorSection[] {
   return [
     {
       title: 'Selection',
@@ -146,7 +175,9 @@ function createLabelSections(label: TextLabel): InspectorSection[] {
     },
     {
       title: 'Geometry',
-      fields: [{ label: 'Position', value: formatVec3(label.position) }],
+      fields: [
+        { label: 'Position', value: formatVec3(label.position, ambientDimension) },
+      ],
     },
     {
       title: 'Style',

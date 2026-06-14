@@ -44,8 +44,12 @@ test('clearSelectionIfMissing clears selection when switching diagrams', () => {
   assert.equal(clearSelectionIfMissing(threeDimensionalExample, selection), null)
 })
 
-test('formatVec3 formats coordinates for inspector display', () => {
-  assert.equal(formatVec3({ x: 1.23456, y: -0, z: 2 }), '(1.235, 0, 2)')
+test('formatVec3 formats 2D coordinates without z', () => {
+  assert.equal(formatVec3({ x: 1.23456, y: -0, z: 2 }, 2), '(1.235, 0)')
+})
+
+test('formatVec3 formats 3D coordinates with z', () => {
+  assert.equal(formatVec3({ x: 1.23456, y: -0, z: 2 }, 3), '(1.235, 0, 2)')
 })
 
 test('createInspectorSections reports curve geometry and style summaries', () => {
@@ -118,6 +122,104 @@ test('createInspectorSections shows cubic Bezier control point labels', () => {
   assert.equal(labels.includes('Control point 1'), true)
   assert.equal(labels.includes('Control point 2'), true)
   assert.equal(labels.includes('End'), true)
+})
+
+test('2D cubic Bezier control point coordinates omit z', () => {
+  const sections = createInspectorSections(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'dashedMorphism',
+  })
+  const fields = sections.flatMap((section) => section.fields)
+
+  assert.equal(
+    fields.some(
+      (field) =>
+        field.label === 'Control point 1' && field.value === '(-0.7, 2.3)',
+    ),
+    true,
+  )
+  assert.equal(
+    fields.some(
+      (field) =>
+        field.label === 'Control point 2' && field.value === '(0.8, 0.9)',
+    ),
+    true,
+  )
+})
+
+test('2D point position coordinates omit z', () => {
+  const sections = createInspectorSections(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'circlePoint',
+  })
+
+  assert.equal(
+    sections
+      .flatMap((section) => section.fields)
+      .some((field) => field.label === 'Position' && field.value === '(-0.75, 1)'),
+    true,
+  )
+})
+
+test('3D polyline vertex coordinates include z', () => {
+  const sections = createInspectorSections(threeDimensionalExample, {
+    kind: 'stratum',
+    id: 'solidLine',
+  })
+
+  assert.equal(
+    sections
+      .flatMap((section) => section.fields)
+      .some(
+        (field) =>
+          field.label === 'Vertex 0' && field.value === '(-0.75, -0.75, 0.15)',
+      ),
+    true,
+  )
+})
+
+test('3D sheet corner coordinates include z', () => {
+  const sections = createInspectorSections(threeDimensionalExample, {
+    kind: 'stratum',
+    id: 'roseSheet',
+  })
+
+  assert.equal(
+    sections
+      .flatMap((section) => section.fields)
+      .some(
+        (field) =>
+          field.label === 'Corner 1' && field.value === '(-0.5, 0.2, -0.5)',
+      ),
+    true,
+  )
+})
+
+test('label positions follow ambient dimension coordinate display', () => {
+  const twoDSections = createInspectorSections(twoDimensionalExample, {
+    kind: 'label',
+    id: 'mathMorphismLabel',
+  })
+  const threeDSections = createInspectorSections(threeDimensionalExample, {
+    kind: 'label',
+    id: 'lineLabel',
+  })
+
+  assert.equal(
+    twoDSections
+      .flatMap((section) => section.fields)
+      .some((field) => field.label === 'Position' && field.value === '(0.15, 1.75)'),
+    true,
+  )
+  assert.equal(
+    threeDSections
+      .flatMap((section) => section.fields)
+      .some(
+        (field) =>
+          field.label === 'Position' && field.value === '(0.8, 0.15, 1.45)',
+      ),
+    true,
+  )
 })
 
 test('createInspectorSections reports free text label content', () => {
