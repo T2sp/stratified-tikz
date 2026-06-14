@@ -1,0 +1,477 @@
+# StratifiedTikZ specification
+
+## Goal
+
+StratifiedTikZ is a browser-based editor for drawing stratified diagrams used in graphical calculus.
+
+The app supports two ambient modes:
+
+- 2D mode: diagrams in R^2
+- 3D mode: diagrams in R^3
+
+The app should allow users to create diagrams consisting of strata, preview them in a canvas, edit their coordinates either numerically or graphically, and export readable TikZ code.
+
+## Core mathematical convention
+
+The term **n-stratum** means **codimension n**, not geometric dimension n.
+
+In 2D mode:
+
+| Codimension | Geometric object | Typical categorical role |
+|------------|------------------|---------------------------|
+| codim 0 | 2-dimensional region | object |
+| codim 1 | curve / wire | 1-morphism |
+| codim 2 | point / vertex / coupon | 2-morphism |
+
+In 3D mode:
+
+| Codimension | Geometric object | Typical categorical role |
+|------------|------------------|---------------------------|
+| codim 0 | 3-dimensional region | object |
+| codim 1 | surface / sheet | 1-morphism |
+| codim 2 | curve / line defect | 2-morphism |
+| codim 3 | point / junction | 3-morphism |
+
+The internal data model must use `codim`.
+
+Every diagram must specify its ambient dimension:
+
+```ts
+ambientDimension: 2 | 3
+```
+
+A stratum is valid only if:
+
+```ts
+0 <= codim && codim <= ambientDimension
+```
+
+## Initial scope
+
+The first version is not a full CAD system.
+
+It is a diagram editor optimized for mathematical graphical calculus and readable TikZ export.
+
+The MVP should support:
+
+- 2D and 3D ambient modes
+- codim 1 curves in 2D mode
+- codim 2 points in 2D mode
+- codim 1 sheets in 3D mode
+- codim 2 curves in 3D mode
+- codim 3 points in 3D mode
+- labels
+- layer ordering
+- coordinate editing by direct input
+- coordinate editing by cursor input
+- solid / dashed / dotted line styles
+- opacity for sheets
+- JSON save/load
+- readable TikZ export
+
+## Non-goals for MVP
+
+The MVP does not need:
+
+- full 3D mesh editing
+- automatic topological validation
+- automatic occlusion computation
+- arbitrary smooth stratified spaces
+- live LaTeX compilation
+- complete category-theoretic source/target checking
+- automatic conversion between 2D and 3D diagrams
+
+## Mode switching
+
+The user may choose either 2D mode or 3D mode when creating a new diagram.
+
+For the MVP, switching between 2D and 3D modes is allowed only when the diagram is empty.
+
+If the diagram is non-empty, the user should create a new diagram to switch ambient dimension.
+
+Later versions may support:
+
+- embedding a 2D diagram into a plane in 3D
+- projecting a 3D diagram to a 2D diagram
+- converting codimensions when mathematically meaningful
+
+## UI layout
+
+The app should roughly have:
+
+```text
++---------------------------------------------------------------+
+| Toolbar                                                       |
+| Mode: [2D] [3D]  Input: [Cursor] [Direct]                     |
++-------------------------------+-------------------------------+
+| Canvas / preview              | Inspector                     |
+|                               | selected stratum properties    |
++-------------------------------+-------------------------------+
+| Generated TikZ source                                         |
++---------------------------------------------------------------+
+```
+
+## Coordinate input modes
+
+The app supports two coordinate input methods.
+
+### Direct input mode
+
+In direct input mode, the user edits coordinates numerically in the inspector.
+
+For example, a selected point should expose fields such as:
+
+```text
+x: 0.0
+y: 1.0
+z: 0.0
+```
+
+In 2D mode, the z field should either be hidden or locked to 0.
+
+In 3D mode, all x, y, z fields are editable.
+
+Direct input is the canonical precise input method.
+
+### Cursor input mode
+
+In cursor input mode, the user places or moves points using the mouse or trackpad.
+
+In 2D mode, a screen position is converted to a model coordinate `(x, y, 0)`.
+
+In 3D mode, a screen position alone does not determine a unique 3D point. Therefore, the user must choose an active work plane.
+
+The initial 3D MVP should support these work planes:
+
+- xy-plane at fixed z
+- xz-plane at fixed y
+- yz-plane at fixed x
+
+For example:
+
+```ts
+workPlane = { kind: "xy", z: 0 }
+```
+
+means that cursor input creates or moves points in the plane z = 0.
+
+The inspector should show the active work plane and its fixed coordinate.
+
+### Hybrid editing
+
+The user may create a point by cursor input and later refine it by direct input.
+
+The user may also enter coordinates directly and then adjust them by dragging.
+
+The data model should not distinguish permanently between points created by cursor input and points created by direct input. The distinction belongs to the editor state, not to the diagram itself.
+
+## Rendering model
+
+In 2D mode, the preview uses ordinary 2D coordinates.
+
+In 3D mode, the preview uses an orthographic 2.5D projection.
+
+The 3D camera is represented by projected basis vectors:
+
+```ts
+xVector: [number, number]
+yVector: [number, number]
+zVector: [number, number]
+```
+
+A 3D point `(x,y,z)` is projected to:
+
+```text
+origin
+  + scale * x * xVector
+  + scale * y * yVector
+  + scale * z * zVector
+```
+
+## TikZ output principle
+
+Generated TikZ must be readable and editable by humans.
+
+It should be grouped into sections:
+
+- Styles
+- Coordinates
+- Codimension 1 strata
+- Codimension 2 strata
+- Codimension 3 strata, only in 3D mode
+- Labels
+
+The output should use semantic style names such as:
+
+- `visible codim one line`
+- `codim one sheet`
+- `visible codim two line`
+- `hidden codim two line`
+- `codim two dot`
+- `codim three dot`
+
+## Visual style customization
+
+The user must be able to customize the visual appearance of each visible stratum.
+
+Every visible stratum should support:
+
+- color
+- opacity
+
+More specific controls depend on the geometric kind of the stratum.
+
+## Sheet style customization
+
+For geometric 2-dimensional strata, namely sheets in 3D mode, the user should be able to edit:
+
+- fill color
+- fill opacity
+- boundary color
+- boundary opacity
+
+The default sheet style is:
+
+- fill color: light blue
+- fill opacity: 0.35
+- boundary color: matching blue
+- boundary opacity: 1
+
+## Curve style customization
+
+For geometric 1-dimensional strata, namely curves, the user should be able to edit:
+
+- stroke color
+- stroke opacity
+- line width
+- line style
+
+Supported line styles for the MVP:
+
+- solid
+- dashed
+- dotted
+
+Later versions may support:
+
+- densely dashed
+- loosely dashed
+- dash-dot
+- double line
+- oriented line with arrowheads
+
+The default curve style is:
+
+- stroke color: black
+- stroke opacity: 1
+- line width: 1.2pt
+- line style: solid
+
+## Point style customization
+
+For geometric 0-dimensional strata, namely points, the user should be able to edit:
+
+- point color
+- point opacity
+- point shape
+- filled or hollow style
+- point size
+
+Supported point shapes for the MVP:
+
+- circle
+- square
+- triangle
+- star
+
+Each point shape should have two variants:
+
+- filled
+- hollow
+
+The default point style is:
+
+- shape: circle
+- fill: filled
+- color: black
+- opacity: 1
+- size: 3pt
+
+## Style editing UI
+
+When a stratum is selected, the inspector should show style controls appropriate to its `geometricKind`.
+
+For a sheet:
+
+```text
+Fill color
+Fill opacity
+Boundary color
+Boundary opacity
+Layer
+```
+
+For a curve:
+
+```text
+Stroke color
+Stroke opacity
+Line width
+Line style
+Layer
+```
+
+For a point:
+
+```text
+Point color
+Point opacity
+Point shape
+Filled / hollow
+Point size
+Layer
+```
+
+In the MVP, colors may be selected by a browser color picker and stored as hex colors.
+
+Opacity should be represented as a number between 0 and 1.
+
+Line width should be represented in points.
+
+For example:
+
+```text
+1.2pt
+```
+
+Internally, line width may be stored as a number:
+
+```ts
+lineWidth: 1.2
+```
+
+and interpreted as points in TikZ output.
+
+Point size should also be represented in points.
+
+For example:
+
+```ts
+size: 3
+```
+
+means 3pt in TikZ output.
+
+## Style presets
+
+The app may provide style presets for convenience, but the user must not be restricted to presets.
+
+Presets are only shortcuts.
+
+The actual diagram model should store explicit style values so that TikZ output is stable and independent of the current preset list.
+
+## Free text labels
+
+The user must be able to place arbitrary text or mathematical labels at arbitrary positions.
+
+A free text label is exported to TikZ in the form:
+
+```tex
+\node at (#1) {#2};
+```
+
+Here `#1` is the label coordinate and `#2` is the label content.
+
+The coordinate `#1` can be specified either by:
+
+- direct numeric input
+- cursor-based graphical input
+
+The label content `#2` is entered as general text data.
+
+If the user wants to display a mathematical formula, the user should explicitly include LaTeX math delimiters.
+
+Examples:
+
+```text
+C
+$F$
+$F^{(1)}L$
+$\alpha \colon f \Rightarrow g$
+```
+
+The app must not automatically wrap label content in `$...$`.
+
+The app should preserve the label content exactly, except for minimal escaping needed to keep the generated TikZ syntactically valid.
+
+## Label placement
+
+In 2D mode, a label position is stored internally as a `Vec3` with `z = 0`.
+
+For example, the model coordinate:
+
+```ts
+{ x: 1.2, y: 0.5, z: 0 }
+```
+
+is exported as:
+
+```tex
+\node at (1.2,0.5) {$F$};
+```
+
+In 3D mode, a label position may use all three coordinates.
+
+For example:
+
+```ts
+{ x: 1.2, y: 0.5, z: 2.0 }
+```
+
+is exported as:
+
+```tex
+\node at (1.2,0.5,2.0) {$F$};
+```
+
+## Label input modes
+
+Free text labels support the same coordinate input modes as other diagram elements.
+
+### Direct input for labels
+
+In direct input mode, the inspector should expose:
+
+```text
+Text content
+x
+y
+z, only in 3D mode
+Layer
+```
+
+In 2D mode, the z coordinate should be hidden or locked to 0.
+
+### Cursor input for labels
+
+In cursor input mode, the user can select the label tool and click on the canvas to place a label.
+
+After placement, the inspector should allow editing the label content.
+
+In 3D mode, cursor placement of labels uses the active work plane.
+
+For example:
+
+```ts
+workPlane = { kind: "xy", z: 0 }
+```
+
+means that clicking on the canvas creates labels on the plane z = 0.
+
+## Label independence
+
+Free text labels are independent diagram objects.
+
+They are different from optional labels attached to strata.
+
+For example, a curve stratum may have a label field, but the user should also be able to place additional standalone text labels anywhere in the diagram.
