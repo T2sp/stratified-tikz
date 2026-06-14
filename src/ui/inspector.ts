@@ -21,6 +21,11 @@ export type InspectorSection = {
   fields: InspectorField[]
 }
 
+export type CurvePointDescription = {
+  label: string
+  point: Vec3
+}
+
 export function createInspectorSections(
   diagram: Diagram,
   selection: SelectedElement,
@@ -38,6 +43,22 @@ export function createInspectorSections(
 
 export function formatVec3(point: Vec3): string {
   return `(${formatNumber(point.x)}, ${formatNumber(point.y)}, ${formatNumber(point.z)})`
+}
+
+export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[] {
+  if (curve.kind === 'cubicBezier') {
+    const bezierLabels = ['Start', 'Control point 1', 'Control point 2', 'End']
+
+    return curve.points.map((point, index) => ({
+      label: bezierLabels[index] ?? `Point ${index + 1}`,
+      point,
+    }))
+  }
+
+  return curve.points.map((point, index) => ({
+    label: `Vertex ${index}`,
+    point,
+  }))
 }
 
 function createStratumSections(stratum: Stratum): InspectorSection[] {
@@ -96,9 +117,9 @@ function createCurveGeometrySection(curve: CurveStratum): InspectorSection {
     fields: [
       { label: 'Curve kind', value: curve.kind },
       { label: 'Style segments', value: String(curve.styleSegments.length) },
-      ...curve.points.map((point, index) => ({
-        label: `Point ${index + 1}`,
-        value: formatVec3(point),
+      ...describeCurvePoints(curve).map((description) => ({
+        label: description.label,
+        value: formatVec3(description.point),
       })),
     ],
   }

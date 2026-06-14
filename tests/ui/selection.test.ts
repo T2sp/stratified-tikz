@@ -6,6 +6,7 @@ import {
 } from '../../src/examples/index.ts'
 import {
   createInspectorSections,
+  describeCurvePoints,
   formatVec3,
 } from '../../src/ui/inspector.ts'
 import {
@@ -66,6 +67,57 @@ test('createInspectorSections reports curve geometry and style summaries', () =>
       .some((field) => field.value.includes('dashed')),
     true,
   )
+})
+
+test('describeCurvePoints labels cubic Bezier points semantically', () => {
+  const curve = twoDimensionalExample.strata.find(
+    (stratum) => stratum.id === 'dashedMorphism',
+  )
+
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(curve?.kind, 'cubicBezier')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected dashedMorphism to be a curve.')
+  }
+
+  assert.deepEqual(
+    describeCurvePoints(curve).map((description) => description.label),
+    ['Start', 'Control point 1', 'Control point 2', 'End'],
+  )
+})
+
+test('describeCurvePoints labels polyline points as vertices', () => {
+  const curve = threeDimensionalExample.strata.find(
+    (stratum) => stratum.id === 'solidLine',
+  )
+
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(curve?.kind, 'polyline')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected solidLine to be a curve.')
+  }
+
+  assert.deepEqual(
+    describeCurvePoints(curve).map((description) => description.label),
+    ['Vertex 0', 'Vertex 1', 'Vertex 2'],
+  )
+})
+
+test('createInspectorSections shows cubic Bezier control point labels', () => {
+  const sections = createInspectorSections(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'dashedMorphism',
+  })
+  const labels = sections.flatMap((section) =>
+    section.fields.map((field) => field.label),
+  )
+
+  assert.equal(labels.includes('Start'), true)
+  assert.equal(labels.includes('Control point 1'), true)
+  assert.equal(labels.includes('Control point 2'), true)
+  assert.equal(labels.includes('End'), true)
 })
 
 test('createInspectorSections reports free text label content', () => {
