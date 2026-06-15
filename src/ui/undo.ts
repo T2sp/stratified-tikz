@@ -2,10 +2,17 @@ import type { Diagram } from '../model/types.ts'
 import { cloneDiagram } from './diagramUpdates.ts'
 import {
   clearSelectionForLayerFilter,
-  normalizeLayerFilterForDiagram,
   type LayerFilter,
 } from './layerFilter.ts'
 import type { SelectedElement } from './selection.ts'
+
+export const maxDiagramHistorySize = 100
+
+export type DiagramHistory = {
+  past: Diagram[]
+  present: Diagram
+  future: Diagram[]
+}
 
 export type UndoableEditorState = {
   editableDiagram: Diagram
@@ -14,11 +21,19 @@ export type UndoableEditorState = {
   polylineDraft: unknown
   cubicBezierDraft: unknown
   sheetPolygonDraft: unknown
-  undoDiagram: Diagram | null
+  history: DiagramHistory
 }
 
 export type CommitDiagramChangeOptions = {
   undoSourceDiagram?: Diagram
+}
+
+export function createDiagramHistory(diagram: Diagram): DiagramHistory {
+  return {
+    past: [],
+    present: cloneDiagram(diagram),
+    future: [],
+  }
 }
 
 export function commitDiagramChange<T extends UndoableEditorState>(
@@ -27,44 +42,111 @@ export function commitDiagramChange<T extends UndoableEditorState>(
   options: CommitDiagramChangeOptions = {},
 ): T {
   if (areDiagramsEqual(current.editableDiagram, next.editableDiagram)) {
-    return next
+    return {
+      ...next,
+      history: current.history,
+    }
   }
+
+  const undoSourceDiagram = cloneDiagram(
+    options.undoSourceDiagram ?? current.editableDiagram,
+  )
+  const past =
+    options.undoSourceDiagram !== undefined &&
+    current.history.past.length > 0 &&
+    areDiagramsEqual(
+      current.history.past[current.history.past.length - 1],
+      undoSourceDiagram,
+    )
+      ? current.history.past
+      : appendBoundedPast(current.history.past, undoSourceDiagram)
 
   return {
     ...next,
-    undoDiagram: cloneDiagram(options.undoSourceDiagram ?? current.editableDiagram),
+    history: {
+      past,
+      present: cloneDiagram(next.editableDiagram),
+      future: [],
+    },
   }
 }
 
 export function undoLastDiagramChange<T extends UndoableEditorState>(
   current: T,
 ): T {
-  if (current.undoDiagram === null) {
+  if (!canUndoDiagramChange(current.history)) {
     return current
   }
 
-  const editableDiagram = cloneDiagram(current.undoDiagram)
-  const layerFilter = normalizeLayerFilterForDiagram(
-    editableDiagram,
-    current.layerFilter,
+  const previousDiagram = cloneDiagram(
+    current.history.past[current.history.past.length - 1],
   )
+  const past = current.history.past.slice(0, -1)
+  const future = [
+    cloneDiagram(current.editableDiagram),
+    ...current.history.future.map(cloneDiagram),
+  ]
 
   return {
     ...current,
-    editableDiagram,
+    editableDiagram: previousDiagram,
     selectedElement: clearSelectionForLayerFilter(
-      editableDiagram,
+      previousDiagram,
       current.selectedElement,
-      layerFilter,
+      current.layerFilter,
     ),
-    layerFilter,
     polylineDraft: null,
     cubicBezierDraft: null,
     sheetPolygonDraft: null,
-    undoDiagram: null,
+    history: {
+      past,
+      present: cloneDiagram(previousDiagram),
+      future,
+    },
   }
+}
+
+export function redoLastDiagramChange<T extends UndoableEditorState>(
+  current: T,
+): T {
+  if (!canRedoDiagramChange(current.history)) {
+    return current
+  }
+
+  const nextDiagram = cloneDiagram(current.history.future[0])
+  const future = current.history.future.slice(1).map(cloneDiagram)
+
+  return {
+    ...current,
+    editableDiagram: nextDiagram,
+    selectedElement: clearSelectionForLayerFilter(
+      nextDiagram,
+      current.selectedElement,
+      current.layerFilter,
+    ),
+    polylineDraft: null,
+    cubicBezierDraft: null,
+    sheetPolygonDraft: null,
+    history: {
+      past: appendBoundedPast(current.history.past, current.editableDiagram),
+      present: cloneDiagram(nextDiagram),
+      future,
+    },
+  }
+}
+
+export function canUndoDiagramChange(history: DiagramHistory): boolean {
+  return history.past.length > 0
+}
+
+export function canRedoDiagramChange(history: DiagramHistory): boolean {
+  return history.future.length > 0
 }
 
 export function areDiagramsEqual(left: Diagram, right: Diagram): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function appendBoundedPast(past: Diagram[], diagram: Diagram): Diagram[] {
+  return [...past, cloneDiagram(diagram)].slice(-maxDiagramHistorySize)
 }

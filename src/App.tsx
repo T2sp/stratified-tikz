@@ -55,6 +55,7 @@ import {
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  createDiagramHistory,
   createSheetPolygonDraft,
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
@@ -65,6 +66,7 @@ import {
   normalizeJsonDownloadFilename,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
+  redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
@@ -72,6 +74,7 @@ import {
   updateDiagramGeometryHandle,
   type DirectCoordinateInput,
   type DirectPathCreationError,
+  type DiagramHistory,
   type GeometryHandleTarget,
   type LayerFilter,
   type SelectedElement,
@@ -103,7 +106,7 @@ type EditableEditorState = {
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
   sheetPolygonDraft: SheetPolygonDraft | null
-  undoDiagram: Diagram | null
+  history: DiagramHistory
 }
 
 type ExampleOption = {
@@ -191,15 +194,19 @@ function App() {
     z: 0,
   })
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
-  const [editorState, setEditorState] = useState<EditableEditorState>(() => ({
-    editableDiagram: cloneDiagram(exampleOptions[0].diagram),
-    selectedElement: null,
-    layerFilter: allLayersFilter,
-    polylineDraft: null,
-    cubicBezierDraft: null,
-    sheetPolygonDraft: null,
-    undoDiagram: null,
-  }))
+  const [editorState, setEditorState] = useState<EditableEditorState>(() => {
+    const initialDiagram = cloneDiagram(exampleOptions[0].diagram)
+
+    return {
+      editableDiagram: initialDiagram,
+      selectedElement: null,
+      layerFilter: allLayersFilter,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      sheetPolygonDraft: null,
+      history: createDiagramHistory(initialDiagram),
+    }
+  })
   const {
     editableDiagram,
     selectedElement,
@@ -207,8 +214,10 @@ function App() {
     polylineDraft,
     cubicBezierDraft,
     sheetPolygonDraft,
-    undoDiagram,
+    history,
   } = editorState
+  const canUndo = history.past.length > 0
+  const canRedo = history.future.length > 0
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -314,11 +323,13 @@ function App() {
   }
 
   const undoLastChange = useCallback(function undoLastChange(): void {
-    if (undoDiagram === null) {
+    if (!canUndo) {
       return
     }
 
-    setSelectedExampleId(undoDiagram.ambientDimension === 2 ? '2d' : '3d')
+    const previousDiagram = history.past[history.past.length - 1]
+
+    setSelectedExampleId(previousDiagram.ambientDimension === 2 ? '2d' : '3d')
     geometryDragUndoDiagramRef.current = null
     setEditorState((current) => undoLastDiagramChange(current))
     setCopyStatus('idle')
@@ -328,7 +339,26 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
-  }, [undoDiagram])
+  }, [canUndo, history.past])
+
+  const redoLastChange = useCallback(function redoLastChange(): void {
+    if (!canRedo) {
+      return
+    }
+
+    const nextDiagram = history.future[0]
+
+    setSelectedExampleId(nextDiagram.ambientDimension === 2 ? '2d' : '3d')
+    geometryDragUndoDiagramRef.current = null
+    setEditorState((current) => redoLastDiagramChange(current))
+    setCopyStatus('idle')
+    setSaveLoadStatus('idle')
+    setSaveLoadMessage('')
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setSheetStatus('')
+    setDirectCreationStatus('')
+  }, [canRedo, history.future])
 
   function downloadJson(): void {
     try {
@@ -483,29 +513,36 @@ function App() {
   }, [removeCurrentSelection, selectedElement])
 
   useEffect(() => {
-    function handleUndoShortcut(event: KeyboardEvent): void {
-      if (
-        event.defaultPrevented ||
-        event.key.toLowerCase() !== 'z' ||
-        event.altKey ||
-        event.shiftKey ||
-        (!event.metaKey && !event.ctrlKey) ||
-        isEditableKeyboardTarget(event.target) ||
-        undoDiagram === null
-      ) {
+    function handleHistoryShortcut(event: KeyboardEvent): void {
+      if (event.defaultPrevented || event.altKey || isEditableKeyboardTarget(event.target)) {
         return
       }
 
-      event.preventDefault()
-      undoLastChange()
+      const key = event.key.toLowerCase()
+      const usesCommandModifier = event.metaKey || event.ctrlKey
+      const shouldUndo = key === 'z' && usesCommandModifier && !event.shiftKey
+      const shouldRedo =
+        (key === 'z' && usesCommandModifier && event.shiftKey) ||
+        (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey)
+
+      if (shouldUndo && canUndo) {
+        event.preventDefault()
+        undoLastChange()
+        return
+      }
+
+      if (shouldRedo && canRedo) {
+        event.preventDefault()
+        redoLastChange()
+      }
     }
 
-    window.addEventListener('keydown', handleUndoShortcut)
+    window.addEventListener('keydown', handleHistoryShortcut)
 
     return () => {
-      window.removeEventListener('keydown', handleUndoShortcut)
+      window.removeEventListener('keydown', handleHistoryShortcut)
     }
-  }, [undoDiagram, undoLastChange])
+  }, [canRedo, canUndo, redoLastChange, undoLastChange])
 
   function updateLayerFilter(nextFilter: LayerFilter): void {
     setEditorState((current) => {
@@ -1540,10 +1577,20 @@ function App() {
           <button
             type="button"
             className="toolbar-button"
-            disabled={undoDiagram === null}
+            disabled={!canUndo}
             onClick={undoLastChange}
+            title="Undo last diagram change"
           >
             Undo
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={!canRedo}
+            onClick={redoLastChange}
+            title="Redo the last undone diagram change"
+          >
+            Redo
           </button>
         </div>
 
