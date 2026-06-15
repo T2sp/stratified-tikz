@@ -22,6 +22,7 @@ import type {
   Vec3,
 } from '../model/types.ts'
 import type { SelectedElement } from './selection.ts'
+import { areFinitePoints } from './sheetDraft.ts'
 
 export type CoordinateAxis = 'x' | 'y' | 'z'
 
@@ -301,7 +302,11 @@ export function addPolygonSheetStratumWithResult(
   vertices: Vec3[],
   options: AddPolygonSheetStratumOptions = {},
 ): AddPolygonSheetStratumResult {
-  if (diagram.ambientDimension !== 3 || vertices.length < 3) {
+  if (
+    diagram.ambientDimension !== 3 ||
+    vertices.length < 3 ||
+    !areFinitePoints(vertices)
+  ) {
     return {
       diagram,
       id: null,

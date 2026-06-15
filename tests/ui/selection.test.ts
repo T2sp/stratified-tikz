@@ -576,6 +576,29 @@ test('addPolygonSheetStratumWithResult safely rejects invalid sheet creation', (
   assert.equal(twoDimensionalResult.id, null)
 })
 
+test('addPolygonSheetStratumWithResult rejects non-finite vertices', () => {
+  const invalidValues = [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+  ]
+
+  for (const invalidValue of invalidValues) {
+    const result = addPolygonSheetStratumWithResult(threeDimensionalExample, [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: invalidValue, z: 0 },
+      { x: 0, y: 1, z: 0 },
+    ])
+
+    assert.equal(result.diagram, threeDimensionalExample)
+    assert.equal(result.id, null)
+    assert.equal(
+      result.diagram.strata.some((stratum) => stratum.id === 'sheet-1'),
+      false,
+    )
+  }
+})
+
 test('addPolylineCurveStratum returns a new 2D diagram with codim 1 and z normalized', () => {
   const updated = addPolylineCurveStratum(
     twoDimensionalExample,

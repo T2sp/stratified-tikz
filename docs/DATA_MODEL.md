@@ -177,20 +177,39 @@ A sheet stratum is valid only in 3D mode.
 It represents codim 1 geometry in R^3.
 
 ```ts
-export type SheetStratum = {
+export type SheetStratum = QuadSheetStratum | PolygonSheetStratum;
+
+export type QuadSheetStratum = {
   id: string;
   codim: 1;
   geometricKind: "sheet";
   kind: "quadSheet";
   name: string;
   label?: string;
-  styleId: SheetStyleId;
+  style: SheetStyle;
   corners: [Vec3, Vec3, Vec3, Vec3];
+  layer: number;
+};
+
+export type PolygonSheetStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "polygonSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  vertices: Vec3[];
   layer: number;
 };
 ```
 
-The four corners should be ordered cyclically.
+Quad sheets use four cyclically ordered `corners`.
+
+Polygon sheets use cyclically ordered `vertices` and represent filled closed
+polygonal regions. A polygon sheet must have at least three vertices.
+
+Curved-boundary sheets and Bézier-boundary sheets are not implemented yet.
 
 ## Curve stratum
 
@@ -580,7 +599,9 @@ export type RegionStratum = {
 ### Sheet stratum
 
 ```ts
-export type SheetStratum = {
+export type SheetStratum = QuadSheetStratum | PolygonSheetStratum;
+
+export type QuadSheetStratum = {
   id: string;
   codim: 1;
   geometricKind: "sheet";
@@ -591,7 +612,24 @@ export type SheetStratum = {
   corners: [Vec3, Vec3, Vec3, Vec3];
   layer: number;
 };
+
+export type PolygonSheetStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "polygonSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  vertices: Vec3[];
+  layer: number;
+};
 ```
+
+In 3D mode, sheets are codimension 1. `quadSheet` remains supported for
+four-corner examples and templates. `polygonSheet` stores a filled closed
+polygonal region as cyclically ordered `vertices` and requires at least three
+vertices. Curved-boundary sheets are deferred to a later phase.
 
 ### Curve stratum
 

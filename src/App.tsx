@@ -25,11 +25,17 @@ import {
   addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
   addTextLabelWithResult,
+  appendSheetPolygonDraftPoint,
+  areFinitePoints,
+  arePointsOnWorkPlane,
   clearSelectionIfMissing,
   cloneDiagram,
+  createSheetPolygonDraft,
   EditableInspector,
+  sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
   type SelectedElement,
+  type SheetPolygonDraft,
   type WorkPlanePreviewTool,
 } from './ui'
 
@@ -42,16 +48,13 @@ type PolylineDraft = {
 type CubicBezierDraft = {
   points: Vec3[]
 } | null
-type SheetPolygonDraft = {
-  points: Vec3[]
-} | null
 
 type EditableEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
-  sheetPolygonDraft: SheetPolygonDraft
+  sheetPolygonDraft: SheetPolygonDraft | null
 }
 
 type ExampleOption = {
@@ -121,16 +124,25 @@ function App() {
     () => generateTikz(editableDiagram),
     [editableDiagram],
   )
+  const previewWorkPlane = sheetPolygonDraft?.workPlane ?? activeWorkPlane
   const workPlanePreview = useMemo(() => {
     if (!shouldShowWorkPlanePreview(editableDiagram.ambientDimension, creationTool)) {
       return undefined
     }
 
     return {
-      ...createWorkPlanePatch(activeWorkPlane),
-      label: `active ${activeWorkPlane.kind} plane`,
+      ...createWorkPlanePatch(previewWorkPlane),
+      label:
+        sheetPolygonDraft === null
+          ? `active ${previewWorkPlane.kind} plane`
+          : `sheet draft ${previewWorkPlane.kind} plane`,
     }
-  }, [activeWorkPlane, creationTool, editableDiagram.ambientDimension])
+  }, [
+    creationTool,
+    editableDiagram.ambientDimension,
+    previewWorkPlane,
+    sheetPolygonDraft,
+  ])
 
   async function copyTikz(): Promise<void> {
     try {
@@ -272,12 +284,16 @@ function App() {
     }
 
     setEditorState((current) => {
+      const placementWorkPlane =
+        creationTool === 'createSheet' && current.sheetPolygonDraft !== null
+          ? current.sheetPolygonDraft.workPlane
+          : activeWorkPlane
       const modelPoint = normalizePointForAmbientDimension(
         current.editableDiagram.ambientDimension,
         screenToModelOnWorkPlane(
           previewCamera,
           { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-          activeWorkPlane,
+          placementWorkPlane,
         ),
       )
 
@@ -336,15 +352,17 @@ function App() {
           return current
         }
 
-        const draftPoints = current.sheetPolygonDraft?.points ?? []
-
         return {
           ...current,
           polylineDraft: null,
           cubicBezierDraft: null,
-          sheetPolygonDraft: {
-            points: [...draftPoints, modelPoint],
-          },
+          sheetPolygonDraft:
+            current.sheetPolygonDraft === null
+              ? createSheetPolygonDraft(modelPoint, activeWorkPlane)
+              : appendSheetPolygonDraftPoint(
+                  current.sheetPolygonDraft,
+                  modelPoint,
+                ),
         }
       }
 
@@ -436,6 +454,16 @@ function App() {
       return
     }
 
+    if (!areFinitePoints(sheetPolygonDraft.points)) {
+      setSheetStatus('Sheet vertices must be finite numbers.')
+      return
+    }
+
+    if (!arePointsOnWorkPlane(sheetPolygonDraft.points, sheetPolygonDraft.workPlane)) {
+      setSheetStatus('Sheet vertices must stay on the draft work plane.')
+      return
+    }
+
     const result = addPolygonSheetStratumWithResult(
       editableDiagram,
       sheetPolygonDraft.points,
@@ -473,6 +501,11 @@ function App() {
   }
 
   function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
     setActiveWorkPlane((current) => {
       const fixedValue = workPlaneFixedValue(current)
 
@@ -488,6 +521,11 @@ function App() {
   }
 
   function updateWorkPlaneFixedValue(rawValue: string): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
     const fixedValue = Number(rawValue)
 
     if (!Number.isFinite(fixedValue)) {
