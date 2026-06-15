@@ -69,7 +69,7 @@ export type SavedDiagramFile = {
 
 Only `diagram` data is persisted. UI/editor state such as the selected element,
 active creation tool, coordinate input mode, active work plane, draft geometry,
-copy status, and temporary preview state is not saved.
+layer filter, copy status, and temporary preview state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
@@ -114,14 +114,24 @@ The editor state represents temporary UI choices such as selection, coordinate i
 ```ts
 export type CoordinateInputMode = "direct" | "cursor";
 
+export type LayerFilter =
+  | { kind: "all" }
+  | { kind: "layer"; layer: number };
+
 export type EditorState = {
   selectedId: string | null;
   coordinateInputMode: CoordinateInputMode;
   activeWorkPlane: WorkPlane;
+  layerFilter: LayerFilter;
   snapToGrid: boolean;
   gridSize: number;
 };
 ```
+
+The layer filter is derived from numeric `layer` values on strata and free text
+labels. It controls preview visibility and click selectability only. It is not
+part of `Diagram`, is reset to all layers when examples or JSON files are
+loaded, and does not affect TikZ generation.
 
 ## Work planes
 
