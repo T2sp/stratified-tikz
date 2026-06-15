@@ -31,6 +31,11 @@ export type SvgDiagramProps = {
   fitToView?: boolean
   selectedElement?: SelectedElement
   onSelectionChange?: (selection: SelectedElement) => void
+  onCanvasClick?: (
+    svgPoint: Vec2,
+    viewportHeight: number,
+    camera: Diagram['camera'],
+  ) => void
 }
 
 type RenderItem = {
@@ -51,6 +56,7 @@ export function SvgDiagram({
   fitToView = false,
   selectedElement = null,
   onSelectionChange,
+  onCanvasClick,
 }: SvgDiagramProps): ReactElement {
   const camera = resolveSvgCamera(diagram, width, height, { fitToView })
   const items = [
@@ -70,7 +76,14 @@ export function SvgDiagram({
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
-      onClick={() => onSelectionChange?.(null)}
+      onClick={(event) => {
+        if (onCanvasClick !== undefined) {
+          onCanvasClick(svgPointFromMouseEvent(event, width, height), height, camera)
+          return
+        }
+
+        onSelectionChange?.(null)
+      }}
     >
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
       <g>{items.map((item) => item.element)}</g>
@@ -392,8 +405,25 @@ function selectElement(
   selection: NonNullable<SelectedElement>,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): void {
+  if (onSelectionChange === undefined) {
+    return
+  }
+
   event.stopPropagation()
-  onSelectionChange?.(selection)
+  onSelectionChange(selection)
+}
+
+function svgPointFromMouseEvent(
+  event: MouseEvent<SVGSVGElement>,
+  viewportWidth: number,
+  viewportHeight: number,
+): Vec2 {
+  const bounds = event.currentTarget.getBoundingClientRect()
+
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * viewportWidth,
+    y: ((event.clientY - bounds.top) / bounds.height) * viewportHeight,
+  }
 }
 
 function isSelectedStratum(

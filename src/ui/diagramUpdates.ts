@@ -3,6 +3,7 @@ import type {
   AmbientDimension,
   Diagram,
   LabelStyle,
+  PointStyle,
   Stratum,
   StratumStyle,
   TextLabel,
@@ -95,6 +96,75 @@ export function updateLabelStyleById(
   }))
 }
 
+export type AddPointStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+}
+
+export type AddTextLabelOptions = {
+  id?: string
+  name?: string
+  text?: string
+  layer?: number
+}
+
+export function makeUniqueId(diagram: Diagram, prefix: string): string {
+  const existingIds = new Set([
+    ...diagram.strata.map((stratum) => stratum.id),
+    ...diagram.labels.map((label) => label.id),
+  ])
+  let index = 1
+
+  while (existingIds.has(`${prefix}-${index}`)) {
+    index += 1
+  }
+
+  return `${prefix}-${index}`
+}
+
+export function addPointStratum(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddPointStratumOptions = {},
+): Diagram {
+  const point: Stratum = {
+    codim: diagram.ambientDimension === 2 ? 2 : 3,
+    geometricKind: 'point',
+    id: options.id ?? makeUniqueId(diagram, 'point'),
+    name: options.name ?? 'Point',
+    style: createDefaultPointStyle(),
+    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
+    layer: options.layer ?? nextLayer(diagram),
+  }
+
+  return {
+    ...diagram,
+    strata: [...diagram.strata, point],
+  }
+}
+
+export function addTextLabel(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddTextLabelOptions = {},
+): Diagram {
+  const label: TextLabel = {
+    id: options.id ?? makeUniqueId(diagram, 'label'),
+    geometricKind: 'label',
+    name: options.name ?? 'Label',
+    text: options.text ?? 'Label',
+    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
+    style: createDefaultLabelStyle(),
+    layer: options.layer ?? nextLayer(diagram),
+  }
+
+  return {
+    ...diagram,
+    labels: [...diagram.labels, label],
+  }
+}
+
 export function updateStratumNameById(
   diagram: Diagram,
   id: string,
@@ -105,6 +175,36 @@ export function updateStratumNameById(
   }
 
   return updateStratumById(diagram, id, (stratum) => ({ ...stratum, name }))
+}
+
+function nextLayer(diagram: Diagram): number {
+  const layers = [
+    ...diagram.strata.map((stratum) => stratum.layer),
+    ...diagram.labels.map((label) => label.layer),
+  ]
+
+  return layers.length === 0 ? 0 : Math.max(...layers) + 1
+}
+
+function createDefaultPointStyle(): PointStyle {
+  return {
+    kind: 'pointStyle',
+    color: '#000000',
+    opacity: 1,
+    shape: 'circle',
+    fill: 'filled',
+    size: 3,
+  }
+}
+
+function createDefaultLabelStyle(): LabelStyle {
+  return {
+    kind: 'labelStyle',
+    color: '#000000',
+    opacity: 1,
+    fontSize: 10,
+    anchor: 'center',
+  }
 }
 
 export function updateSelectedElement(

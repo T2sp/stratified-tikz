@@ -4,18 +4,26 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from './examples'
-import type { CoordinateInputMode, Diagram } from './model/types'
+import {
+  normalizePointForAmbientDimension,
+  screenToModelOnWorkPlane,
+} from './geometry/projection'
+import type { Camera, CoordinateInputMode, Diagram, Vec2, WorkPlane } from './model/types'
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
+  addPointStratum,
+  addTextLabel,
   clearSelectionIfMissing,
   cloneDiagram,
   EditableInspector,
+  makeUniqueId,
   type SelectedElement,
 } from './ui'
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
+type CreationTool = 'select' | 'createPoint' | 'createLabel'
 
 type ExampleOption = {
   id: ExampleId
@@ -40,11 +48,22 @@ const exampleOptions: ExampleOption[] = [
 ]
 
 const coordinateInputModes: CoordinateInputMode[] = ['cursor', 'direct']
+const creationTools: Array<{ id: CreationTool; label: string }> = [
+  { id: 'select', label: 'Select' },
+  { id: 'createPoint', label: 'Add point' },
+  { id: 'createLabel', label: 'Add label' },
+]
+const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>('cursor')
+  const [creationTool, setCreationTool] = useState<CreationTool>('select')
+  const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
+    kind: 'xy',
+    z: 0,
+  })
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
   const [editableDiagram, setEditableDiagram] = useState<Diagram>(() =>
@@ -89,6 +108,76 @@ function App() {
     setCopyStatus('idle')
   }
 
+  function handlePreviewCreationClick(
+    svgPoint: Vec2,
+    viewportHeight: number,
+    previewCamera: Camera,
+  ): void {
+    if (creationTool === 'select') {
+      return
+    }
+
+    const modelPoint = normalizePointForAmbientDimension(
+      editableDiagram.ambientDimension,
+      screenToModelOnWorkPlane(
+        previewCamera,
+        { x: svgPoint.x, y: viewportHeight - svgPoint.y },
+        activeWorkPlane,
+      ),
+    )
+
+    if (creationTool === 'createPoint') {
+      const pointId = makeUniqueId(editableDiagram, 'point')
+
+      updateEditableDiagram((currentDiagram) =>
+        addPointStratum(currentDiagram, modelPoint, { id: pointId }),
+      )
+      setSelectedElement({ kind: 'stratum', id: pointId })
+      return
+    }
+
+    const labelId = makeUniqueId(editableDiagram, 'label')
+
+    updateEditableDiagram((currentDiagram) =>
+      addTextLabel(currentDiagram, modelPoint, { id: labelId }),
+    )
+    setSelectedElement({ kind: 'label', id: labelId })
+  }
+
+  function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
+    setActiveWorkPlane((current) => {
+      const fixedValue = workPlaneFixedValue(current)
+
+      switch (kind) {
+        case 'xy':
+          return { kind, z: fixedValue }
+        case 'xz':
+          return { kind, y: fixedValue }
+        case 'yz':
+          return { kind, x: fixedValue }
+      }
+    })
+  }
+
+  function updateWorkPlaneFixedValue(rawValue: string): void {
+    const fixedValue = Number(rawValue)
+
+    if (!Number.isFinite(fixedValue)) {
+      return
+    }
+
+    setActiveWorkPlane((current) => {
+      switch (current.kind) {
+        case 'xy':
+          return { ...current, z: fixedValue }
+        case 'xz':
+          return { ...current, y: fixedValue }
+        case 'yz':
+          return { ...current, x: fixedValue }
+      }
+    })
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -100,6 +189,7 @@ function App() {
           <span>{selectedExample.name}</span>
           <span>{editableDiagram.ambientDimension}D</span>
           <span>{coordinateInputMode}</span>
+          <span>{creationTool}</span>
           <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
         </div>
       </header>
@@ -130,6 +220,23 @@ function App() {
         </div>
 
         <div className="control-group">
+          <span className="control-label">Tool</span>
+          <div className="segmented-control">
+            {creationTools.map((tool) => (
+              <button
+                key={tool.id}
+                type="button"
+                className={creationTool === tool.id ? 'is-selected' : undefined}
+                aria-pressed={creationTool === tool.id}
+                onClick={() => setCreationTool(tool.id)}
+              >
+                {tool.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="control-group">
           <span className="control-label">Input</span>
           <div className="segmented-control">
             {coordinateInputModes.map((mode) => (
@@ -145,6 +252,36 @@ function App() {
             ))}
           </div>
         </div>
+
+        {editableDiagram.ambientDimension === 3 && (
+          <div className="control-group work-plane-control">
+            <span className="control-label">Work plane</span>
+            <select
+              className="toolbar-select"
+              value={activeWorkPlane.kind}
+              onChange={(event) =>
+                updateWorkPlaneKind(event.currentTarget.value as WorkPlane['kind'])
+              }
+            >
+              {workPlaneKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {workPlaneLabel(kind)}
+                </option>
+              ))}
+            </select>
+            <label className="work-plane-fixed">
+              <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
+              <input
+                type="number"
+                step="any"
+                value={String(workPlaneFixedValue(activeWorkPlane))}
+                onChange={(event) =>
+                  updateWorkPlaneFixedValue(event.currentTarget.value)
+                }
+              />
+            </label>
+          </div>
+        )}
       </section>
 
       <section className="workspace" aria-label="Preview and TikZ source">
@@ -159,7 +296,12 @@ function App() {
             diagram={editableDiagram}
             fitToView
             selectedElement={selectedElement}
-            onSelectionChange={setSelectedElement}
+            onSelectionChange={
+              creationTool === 'select' ? setSelectedElement : undefined
+            }
+            onCanvasClick={
+              creationTool === 'select' ? undefined : handlePreviewCreationClick
+            }
           />
         </article>
 
@@ -204,6 +346,39 @@ function App() {
       </section>
     </main>
   )
+}
+
+function workPlaneLabel(kind: WorkPlane['kind']): string {
+  switch (kind) {
+    case 'xy':
+      return 'xy plane'
+    case 'xz':
+      return 'xz plane'
+    case 'yz':
+      return 'yz plane'
+  }
+}
+
+function workPlaneFixedAxis(workPlane: WorkPlane): string {
+  switch (workPlane.kind) {
+    case 'xy':
+      return 'z'
+    case 'xz':
+      return 'y'
+    case 'yz':
+      return 'x'
+  }
+}
+
+function workPlaneFixedValue(workPlane: WorkPlane): number {
+  switch (workPlane.kind) {
+    case 'xy':
+      return workPlane.z
+    case 'xz':
+      return workPlane.y
+    case 'yz':
+      return workPlane.x
+  }
 }
 
 export default App

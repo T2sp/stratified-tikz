@@ -14,7 +14,10 @@ import {
 import type { CurveStyle } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  addPointStratum,
+  addTextLabel,
   cloneDiagram,
+  makeUniqueId,
   parseFiniteNumber,
   parseOpacity,
   parsePositiveFiniteNumber,
@@ -410,6 +413,102 @@ test('updateLabelById returns a new diagram and preserves unrelated strata', () 
     '$F^{(1)}L$',
   )
   assert.equal(updated.strata, twoDimensionalExample.strata)
+})
+
+test('makeUniqueId avoids collisions across strata and labels', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      ...twoDimensionalExample.strata,
+      {
+        ...twoDimensionalExample.strata[0],
+        id: 'point-1',
+      },
+    ],
+    labels: [
+      ...twoDimensionalExample.labels,
+      {
+        ...twoDimensionalExample.labels[0],
+        id: 'point-2',
+      },
+    ],
+  }
+
+  assert.equal(makeUniqueId(diagram, 'point'), 'point-3')
+})
+
+test('addPointStratum returns a new 2D diagram with codim 2 and z normalized', () => {
+  const updated = addPointStratum(
+    twoDimensionalExample,
+    { x: 3, y: 4, z: 9 },
+    { id: 'point-1' },
+  )
+  const point = updated.strata.find((stratum) => stratum.id === 'point-1')
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(updated.labels, twoDimensionalExample.labels)
+  assert.equal(twoDimensionalExample.strata.some((stratum) => stratum.id === 'point-1'), false)
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected added stratum to be a point.')
+  }
+
+  assert.equal(point.codim, 2)
+  assert.deepEqual(point.position, { x: 3, y: 4, z: 0 })
+  assert.equal(point.name.length > 0, true)
+})
+
+test('addPointStratum returns a new 3D diagram with codim 3', () => {
+  const updated = addPointStratum(
+    threeDimensionalExample,
+    { x: 3, y: 4, z: 5 },
+    { id: 'point-1' },
+  )
+  const point = updated.strata.find((stratum) => stratum.id === 'point-1')
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected added stratum to be a point.')
+  }
+
+  assert.equal(point.codim, 3)
+  assert.deepEqual(point.position, { x: 3, y: 4, z: 5 })
+})
+
+test('addTextLabel returns a new diagram with default text and valid style', () => {
+  const updated = addTextLabel(
+    twoDimensionalExample,
+    { x: 1, y: 2, z: 8 },
+    { id: 'label-1' },
+  )
+  const label = updated.labels.find((candidate) => candidate.id === 'label-1')
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(updated.strata, twoDimensionalExample.strata)
+  assert.equal(label?.text, 'Label')
+  assert.equal(label?.name.length ? label.name.length > 0 : false, true)
+  assert.deepEqual(label?.position, { x: 1, y: 2, z: 0 })
+  assert.equal(label?.style.kind, 'labelStyle')
+})
+
+test('generated TikZ includes newly added point and label', () => {
+  const withPoint = addPointStratum(
+    twoDimensionalExample,
+    { x: 3, y: 4, z: 0 },
+    { id: 'point-1' },
+  )
+  const withLabel = addTextLabel(
+    withPoint,
+    { x: 5, y: 6, z: 0 },
+    { id: 'label-1', text: 'New label' },
+  )
+  const tikz = generateTikz(withLabel)
+
+  assert.equal(tikz.includes('\\coordinate (pointpoint1'), true)
+  assert.equal(tikz.includes('New label'), true)
+  assert.equal(tikz.includes('(5,6)'), true)
 })
 
 test('updateStratumStyleById updates curve style immutably', () => {

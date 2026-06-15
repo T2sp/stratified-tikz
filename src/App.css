@@ -71,6 +71,40 @@
   font-weight: 650;
 }
 
+.toolbar-select,
+.work-plane-fixed input {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-h);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.toolbar-select {
+  padding: 6px 28px 6px 10px;
+}
+
+.work-plane-control {
+  flex-wrap: wrap;
+}
+
+.work-plane-fixed {
+  display: inline-grid;
+  grid-template-columns: auto 74px;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.work-plane-fixed input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--mono);
+}
+
 .toolbar-note {
   color: var(--muted);
   font-size: 12px;
