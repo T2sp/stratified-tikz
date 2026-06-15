@@ -1,5 +1,6 @@
 export * from './diagramUpdates.ts'
 export * from './EditableInspector.tsx'
+export * from './geometryHandles.ts'
 export * from './inspectorSummary.ts'
 export * from './jsonFilename.ts'
 export * from './layerFilter.ts'

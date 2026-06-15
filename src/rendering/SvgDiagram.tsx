@@ -1,5 +1,5 @@
-import type { ReactElement } from 'react'
-import type { MouseEvent } from 'react'
+import { useRef, type ReactElement } from 'react'
+import type { MouseEvent, PointerEvent } from 'react'
 import type {
   CurveStratum,
   Diagram,
@@ -11,6 +11,7 @@ import type {
   Vec3,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
+import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import type { SelectedElement } from '../ui/selection'
 import { resolveSvgCamera } from './svgCamera'
 import {
@@ -26,6 +27,11 @@ import {
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { mapClientPointToViewBox } from './svgViewBox'
+import {
+  curveHandleLabel,
+  shouldRenderSvgGeometryHandles,
+  vertexHandleLabel,
+} from './svgGeometryHandles'
 import {
   allLayersFilter,
   layerFilterIncludesLayer,
@@ -43,8 +49,15 @@ export type SvgDiagramProps = {
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
   layerFilter?: LayerFilter
+  showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
+    svgPoint: Vec2,
+    viewportHeight: number,
+    camera: Diagram['camera'],
+  ) => void
+  onGeometryHandleDrag?: (
+    target: GeometryHandleTarget,
     svgPoint: Vec2,
     viewportHeight: number,
     camera: Diagram['camera'],
@@ -66,6 +79,9 @@ const defaultWidth = 520
 const defaultHeight = 360
 const pointRadiusScale = 1.8
 const highlightColor = '#F4B400'
+const handleFillColor = '#ffffff'
+const handleStrokeColor = '#1D4ED8'
+const handleRadius = 5.6
 
 export function SvgDiagram({
   diagram,
@@ -78,9 +94,13 @@ export function SvgDiagram({
   sheetDraft,
   workPlanePreview,
   layerFilter = allLayersFilter,
+  showGeometryHandles = false,
   onSelectionChange,
   onCanvasClick,
+  onGeometryHandleDrag,
 }: SvgDiagramProps): ReactElement {
+  const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
+  const suppressNextCanvasClickRef = useRef(false)
   const extraPointsForFit = [
     ...(workPlanePreview?.corners ?? []),
     ...(sheetDraft ?? []),
@@ -123,7 +143,42 @@ export function SvgDiagram({
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
+      onPointerMove={(event) => {
+        const target = activeDragTargetRef.current
+
+        if (target === null || onGeometryHandleDrag === undefined) {
+          return
+        }
+
+        event.preventDefault()
+        onGeometryHandleDrag(
+          target,
+          svgPointFromPointerEvent(event, width, height),
+          height,
+          camera,
+        )
+      }}
+      onPointerUp={(event) => {
+        if (activeDragTargetRef.current !== null) {
+          event.preventDefault()
+          activeDragTargetRef.current = null
+          releasePointerCaptureIfHeld(event)
+          window.setTimeout(() => {
+            suppressNextCanvasClickRef.current = false
+          }, 0)
+        }
+      }}
+      onPointerCancel={(event) => {
+        activeDragTargetRef.current = null
+        suppressNextCanvasClickRef.current = false
+        releasePointerCaptureIfHeld(event)
+      }}
       onClick={(event) => {
+        if (suppressNextCanvasClickRef.current) {
+          suppressNextCanvasClickRef.current = false
+          return
+        }
+
         if (onCanvasClick !== undefined) {
           onCanvasClick(svgPointFromMouseEvent(event, width, height), height, camera)
           return
@@ -138,6 +193,25 @@ export function SvgDiagram({
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
+      {shouldRenderSvgGeometryHandles(
+        showGeometryHandles,
+        onGeometryHandleDrag !== undefined,
+      )
+        ? renderSelectedGeometryHandles(
+            diagram,
+            camera,
+            height,
+            selectedElement,
+            layerFilter,
+            (event, target) => {
+              event.preventDefault()
+              event.stopPropagation()
+              activeDragTargetRef.current = target
+              suppressNextCanvasClickRef.current = true
+              event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
+            },
+          )
+        : null}
     </svg>
   )
 }
@@ -726,6 +800,140 @@ function renderPointHighlight(
   )
 }
 
+function renderSelectedGeometryHandles(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+  onPointerDown: (
+    event: PointerEvent<SVGCircleElement>,
+    target: GeometryHandleTarget,
+  ) => void,
+): ReactElement | null {
+  if (selectedElement === null) {
+    return null
+  }
+
+  if (selectedElement.kind === 'label') {
+    const label = diagram.labels.find(
+      (candidate) => candidate.id === selectedElement.id,
+    )
+
+    if (
+      label === undefined ||
+      !layerFilterIncludesLayer(layerFilter, label.layer)
+    ) {
+      return null
+    }
+
+    return (
+      <g key="selected-label-handles" aria-label="Selected label drag handles">
+        {renderHandleCircle(
+          projectToSvgPoint(camera, label.position, viewportHeight),
+          { kind: 'labelPosition', labelId: label.id },
+          label.name,
+          onPointerDown,
+        )}
+      </g>
+    )
+  }
+
+  const stratum = diagram.strata.find(
+    (candidate) => candidate.id === selectedElement.id,
+  )
+
+  if (
+    stratum === undefined ||
+    !shouldRenderStratum(diagram.ambientDimension, stratum) ||
+    !layerFilterIncludesLayer(layerFilter, stratum.layer)
+  ) {
+    return null
+  }
+
+  switch (stratum.geometricKind) {
+    case 'region':
+      return null
+    case 'point':
+      return (
+        <g key="selected-point-handles" aria-label="Selected point drag handles">
+          {renderHandleCircle(
+            projectToSvgPoint(camera, stratum.position, viewportHeight),
+            { kind: 'pointPosition', stratumId: stratum.id },
+            stratum.name,
+            onPointerDown,
+          )}
+        </g>
+      )
+    case 'curve':
+      return (
+        <g key="selected-curve-handles" aria-label="Selected curve drag handles">
+          {stratum.points.map((point, index) =>
+            renderHandleCircle(
+              projectToSvgPoint(camera, point, viewportHeight),
+              { kind: 'curvePoint', stratumId: stratum.id, pointIndex: index },
+              curveHandleLabel(stratum.kind, index),
+              onPointerDown,
+            ),
+          )}
+        </g>
+      )
+    case 'sheet':
+      return (
+        <g key="selected-sheet-handles" aria-label="Selected sheet drag handles">
+          {sheetVertices(stratum).map((vertex, index) =>
+            renderHandleCircle(
+              projectToSvgPoint(camera, vertex, viewportHeight),
+              { kind: 'sheetVertex', stratumId: stratum.id, vertexIndex: index },
+              vertexHandleLabel(index),
+              onPointerDown,
+            ),
+          )}
+        </g>
+      )
+  }
+}
+
+function renderHandleCircle(
+  center: Vec2,
+  target: GeometryHandleTarget,
+  label: string,
+  onPointerDown: (
+    event: PointerEvent<SVGCircleElement>,
+    target: GeometryHandleTarget,
+  ) => void,
+): ReactElement {
+  return (
+    <circle
+      key={geometryHandleKey(target)}
+      className="svg-geometry-handle"
+      cx={center.x}
+      cy={center.y}
+      r={handleRadius}
+      fill={handleFillColor}
+      stroke={handleStrokeColor}
+      strokeWidth={2}
+      vectorEffect="non-scaling-stroke"
+      aria-label={label}
+      onPointerDown={(event) => onPointerDown(event, target)}
+      onClick={(event) => event.stopPropagation()}
+    />
+  )
+}
+
+function geometryHandleKey(target: GeometryHandleTarget): string {
+  switch (target.kind) {
+    case 'pointPosition':
+      return `point-handle-${target.stratumId}`
+    case 'labelPosition':
+      return `label-handle-${target.labelId}`
+    case 'curvePoint':
+      return `curve-handle-${target.stratumId}-${target.pointIndex}`
+    case 'sheetVertex':
+      return `sheet-handle-${target.stratumId}-${target.vertexIndex}`
+  }
+}
+
 function selectElement(
   event: MouseEvent<SVGGElement>,
   selection: NonNullable<SelectedElement>,
@@ -751,6 +959,26 @@ function svgPointFromMouseEvent(
     bounds,
     { width: viewportWidth, height: viewportHeight },
   )
+}
+
+function svgPointFromPointerEvent(
+  event: PointerEvent<SVGSVGElement>,
+  viewportWidth: number,
+  viewportHeight: number,
+): Vec2 {
+  const bounds = event.currentTarget.getBoundingClientRect()
+
+  return mapClientPointToViewBox(
+    { x: event.clientX, y: event.clientY },
+    bounds,
+    { width: viewportWidth, height: viewportHeight },
+  )
+}
+
+function releasePointerCaptureIfHeld(event: PointerEvent<SVGSVGElement>): void {
+  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    event.currentTarget.releasePointerCapture(event.pointerId)
+  }
 }
 
 function isSelectedStratum(

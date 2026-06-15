@@ -361,6 +361,14 @@
   filter: drop-shadow(0 0 3px rgba(244, 180, 0, 0.55));
 }
 
+.svg-geometry-handle {
+  cursor: grab;
+}
+
+.svg-geometry-handle:active {
+  cursor: grabbing;
+}
+
 .svg-filtered-out {
   cursor: default;
 }

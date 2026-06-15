@@ -16,6 +16,11 @@ import {
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
 import { mapClientPointToViewBox } from '../../src/rendering/svgViewBox.ts'
+import {
+  curveHandleLabel,
+  shouldRenderSvgGeometryHandles,
+  vertexHandleLabel,
+} from '../../src/rendering/svgGeometryHandles.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -269,6 +274,25 @@ test('mapClientPointToViewBox clamps clicks inside letterbox padding to the visi
     ),
     { x: 260, y: 0 },
   )
+})
+
+test('geometry handles render only when visible and draggable', () => {
+  assert.equal(shouldRenderSvgGeometryHandles(true, true), true)
+  assert.equal(shouldRenderSvgGeometryHandles(false, true), false)
+  assert.equal(shouldRenderSvgGeometryHandles(true, false), false)
+  assert.equal(shouldRenderSvgGeometryHandles(false, false), false)
+})
+
+test('geometry handle user-facing vertex labels are one-based', () => {
+  assert.equal(vertexHandleLabel(0), 'Vertex 1')
+  assert.equal(vertexHandleLabel(2), 'Vertex 3')
+  assert.equal(curveHandleLabel('polyline', 0), 'Vertex 1')
+  assert.equal(curveHandleLabel('polyline', 1), 'Vertex 2')
+  assert.equal(curveHandleLabel('cubicBezier', 0), 'Start')
+  assert.equal(curveHandleLabel('cubicBezier', 1), 'Control point 1')
+  assert.equal(curveHandleLabel('cubicBezier', 2), 'Control point 2')
+  assert.equal(curveHandleLabel('cubicBezier', 3), 'End')
+  assert.equal(curveHandleLabel('cubicBezier', 4), 'Point 5')
 })
 
 function createCameraTestDiagram(): Diagram {

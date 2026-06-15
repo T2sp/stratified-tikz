@@ -56,6 +56,8 @@ import {
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
   EditableInspector,
+  findSelectedElement,
+  layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
   parseDirectCoordinateRows,
@@ -63,8 +65,10 @@ import {
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
+  updateDiagramGeometryHandle,
   type DirectCoordinateInput,
   type DirectPathCreationError,
+  type GeometryHandleTarget,
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
@@ -677,6 +681,82 @@ function App() {
     if (creationTool !== 'createPolyline') {
       setCopyStatus('idle')
     }
+  }
+
+  function handleGeometryHandleDrag(
+    target: GeometryHandleTarget,
+    svgPoint: Vec2,
+    viewportHeight: number,
+    previewCamera: Camera,
+  ): void {
+    if (creationTool !== 'select') {
+      return
+    }
+
+    setEditorState((current) => {
+      if (!geometryHandleTargetsSelection(target, current.selectedElement)) {
+        return current
+      }
+
+      const selected = findSelectedElement(
+        current.editableDiagram,
+        current.selectedElement,
+      )
+
+      if (selected === null) {
+        return {
+          ...current,
+          selectedElement: null,
+        }
+      }
+
+      if (!layerFilterIncludesLayer(current.layerFilter, selected.element.layer)) {
+        return current
+      }
+
+      let modelPoint: Vec3
+
+      try {
+        modelPoint = normalizePointForAmbientDimension(
+          current.editableDiagram.ambientDimension,
+          screenToModelOnWorkPlane(
+            previewCamera,
+            { x: svgPoint.x, y: viewportHeight - svgPoint.y },
+            activeWorkPlane,
+          ),
+        )
+      } catch {
+        return current
+      }
+
+      const nextDiagram = updateDiagramGeometryHandle(
+        current.editableDiagram,
+        target,
+        modelPoint,
+      )
+
+      if (nextDiagram === current.editableDiagram) {
+        return current
+      }
+
+      return {
+        ...current,
+        editableDiagram: nextDiagram,
+        selectedElement: clearSelectionForLayerFilter(
+          nextDiagram,
+          current.selectedElement,
+          current.layerFilter,
+        ),
+        layerFilter: normalizeLayerFilterForDiagram(
+          nextDiagram,
+          current.layerFilter,
+        ),
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }
+    })
+    setCopyStatus('idle')
   }
 
   function updateDirectCoordinate(
@@ -1437,11 +1517,15 @@ function App() {
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
             layerFilter={layerFilter}
+            showGeometryHandles={creationTool === 'select'}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }
             onCanvasClick={
               creationTool === 'select' ? undefined : handlePreviewCreationClick
+            }
+            onGeometryHandleDrag={
+              creationTool === 'select' ? handleGeometryHandleDrag : undefined
             }
           />
         </article>
@@ -1497,6 +1581,30 @@ function workPlaneLabel(kind: WorkPlane['kind']): string {
       return 'xz plane'
     case 'yz':
       return 'yz plane'
+  }
+}
+
+function geometryHandleTargetsSelection(
+  target: GeometryHandleTarget,
+  selectedElement: SelectedElement,
+): boolean {
+  if (selectedElement === null) {
+    return false
+  }
+
+  switch (target.kind) {
+    case 'pointPosition':
+    case 'curvePoint':
+    case 'sheetVertex':
+      return (
+        selectedElement.kind === 'stratum' &&
+        selectedElement.id === target.stratumId
+      )
+    case 'labelPosition':
+      return (
+        selectedElement.kind === 'label' &&
+        selectedElement.id === target.labelId
+      )
   }
 }
 

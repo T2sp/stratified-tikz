@@ -567,6 +567,8 @@ Out of scope:
 
 ### Phase 10D: Cursor drag editing MVP
 
+Status: Implemented.
+
 Current issue:
 
 Existing path geometry can be edited manually in the inspector, but not by dragging in the SVG preview.
@@ -593,6 +595,25 @@ Requirements:
 * In 2D, dragged points remain at z = 0.
 * In 3D, dragging should use a clear editing plane.
 * Layer filtering should be respected.
+
+Implemented behavior:
+
+* The SVG preview shows drag handles only for the currently selected visible
+  point stratum, free text label, curve, or sheet.
+* Drag handles are preview/editor UI only. They are not stored in `Diagram`,
+  saved to JSON, or exported to TikZ.
+* Point handles update point positions.
+* Label handles update free text label positions.
+* Curve handles update polyline vertices and cubic Bezier start/control/end
+  points while preserving point order.
+* Sheet handles update sheet vertices while preserving vertex order.
+* 2D drag updates normalize coordinates to `z = 0`.
+* 3D drag uses the active `xy`, `xz`, or `yz` work plane and writes the resulting
+  model coordinates into the selected geometry.
+* Filtered-out layers remain non-interactive and do not expose drag handles.
+* Handle pointer events stop propagation so dragging does not select another
+  element, clear selection, create draft points, or interact with inspector
+  inputs.
 
 Out of scope:
 
