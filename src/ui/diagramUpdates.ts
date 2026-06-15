@@ -1,12 +1,15 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
+  cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
+  defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
 } from '../model/styles.ts'
 import type {
   AmbientDimension,
+  CurveStratum,
   Diagram,
   LabelStyle,
   PointStratum,
@@ -115,6 +118,12 @@ export type AddTextLabelOptions = {
   layer?: number
 }
 
+export type AddPolylineCurveStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+}
+
 export type AddPointStratumResult = {
   diagram: Diagram
   id: string
@@ -123,6 +132,11 @@ export type AddPointStratumResult = {
 export type AddTextLabelResult = {
   diagram: Diagram
   id: string
+}
+
+export type AddPolylineCurveStratumResult = {
+  diagram: Diagram
+  id: string | null
 }
 
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
@@ -187,6 +201,37 @@ export function addTextLabelWithResult(
   }
 }
 
+export function addPolylineCurveStratum(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddPolylineCurveStratumOptions = {},
+): Diagram {
+  return addPolylineCurveStratumWithResult(diagram, points, options).diagram
+}
+
+export function addPolylineCurveStratumWithResult(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddPolylineCurveStratumOptions = {},
+): AddPolylineCurveStratumResult {
+  if (points.length < 2) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const curve = createPolylineCurveForDiagram(diagram, points, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, curve],
+    },
+    id: curve.id,
+  }
+}
+
 export function updateStratumNameById(
   diagram: Diagram,
   id: string,
@@ -236,6 +281,26 @@ function createLabelForDiagram(
     text: options.text ?? 'Label',
     position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
     style: cloneLabelStyle(defaultLabelStyle),
+    layer: options.layer ?? nextLayer(diagram),
+  }
+}
+
+function createPolylineCurveForDiagram(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddPolylineCurveStratumOptions,
+): CurveStratum {
+  return {
+    codim: diagram.ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: options.id ?? makeUniqueId(diagram, 'curve'),
+    name: options.name ?? 'Curve',
+    style: cloneCurveStyle(defaultCurveStyle),
+    points: points.map((point) =>
+      normalizePointForAmbientDimension(diagram.ambientDimension, point),
+    ),
+    styleSegments: [],
     layer: options.layer ?? nextLayer(diagram),
   }
 }

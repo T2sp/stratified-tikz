@@ -8,10 +8,18 @@ import {
   normalizePointForAmbientDimension,
   screenToModelOnWorkPlane,
 } from './geometry/projection'
-import type { Camera, CoordinateInputMode, Diagram, Vec2, WorkPlane } from './model/types'
+import type {
+  Camera,
+  CoordinateInputMode,
+  Diagram,
+  Vec2,
+  Vec3,
+  WorkPlane,
+} from './model/types'
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
+  addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
   addTextLabelWithResult,
   clearSelectionIfMissing,
@@ -22,11 +30,15 @@ import {
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
-type CreationTool = 'select' | 'createPoint' | 'createLabel'
+type CreationTool = 'select' | 'createPoint' | 'createLabel' | 'createPolyline'
+type PolylineDraft = {
+  points: Vec3[]
+} | null
 
 type EditableEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
+  polylineDraft: PolylineDraft
 }
 
 type ExampleOption = {
@@ -56,6 +68,7 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'select', label: 'Select' },
   { id: 'createPoint', label: 'Add point' },
   { id: 'createLabel', label: 'Add label' },
+  { id: 'createPolyline', label: 'Add polyline' },
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
@@ -64,6 +77,7 @@ function App() {
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>('cursor')
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
+  const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -72,8 +86,9 @@ function App() {
   const [editorState, setEditorState] = useState<EditableEditorState>(() => ({
     editableDiagram: cloneDiagram(exampleOptions[0].diagram),
     selectedElement: null,
+    polylineDraft: null,
   }))
-  const { editableDiagram, selectedElement } = editorState
+  const { editableDiagram, selectedElement, polylineDraft } = editorState
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -104,8 +119,10 @@ function App() {
     setEditorState((current) => ({
       editableDiagram: nextDiagram,
       selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
+      polylineDraft: null,
     }))
     setCopyStatus('idle')
+    setPolylineStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -128,6 +145,25 @@ function App() {
     }))
   }
 
+  function updateCreationTool(tool: CreationTool): void {
+    setCreationTool(tool)
+
+    if (tool !== 'createPolyline') {
+      setEditorState((current) =>
+        current.polylineDraft === null
+          ? current
+          : {
+              ...current,
+              polylineDraft: null,
+            },
+      )
+      setPolylineStatus('')
+      return
+    }
+
+    setPolylineStatus('Click the preview to add vertices.')
+  }
+
   function handlePreviewCreationClick(
     svgPoint: Vec2,
     viewportHeight: number,
@@ -135,6 +171,12 @@ function App() {
   ): void {
     if (creationTool === 'select') {
       return
+    }
+
+    if (creationTool === 'createPolyline') {
+      setPolylineStatus(
+        `${(polylineDraft?.points.length ?? 0) + 1} vertices in draft.`,
+      )
     }
 
     setEditorState((current) => {
@@ -147,12 +189,24 @@ function App() {
         ),
       )
 
+      if (creationTool === 'createPolyline') {
+        const draftPoints = current.polylineDraft?.points ?? []
+
+        return {
+          ...current,
+          polylineDraft: {
+            points: [...draftPoints, modelPoint],
+          },
+        }
+      }
+
       if (creationTool === 'createPoint') {
         const result = addPointStratumWithResult(current.editableDiagram, modelPoint)
 
         return {
           editableDiagram: result.diagram,
           selectedElement: { kind: 'stratum', id: result.id },
+          polylineDraft: null,
         }
       }
 
@@ -161,9 +215,53 @@ function App() {
       return {
         editableDiagram: result.diagram,
         selectedElement: { kind: 'label', id: result.id },
+        polylineDraft: null,
       }
     })
+
+    if (creationTool !== 'createPolyline') {
+      setCopyStatus('idle')
+    }
+  }
+
+  function finishPolylineDraft(): void {
+    if (polylineDraft === null || polylineDraft.points.length < 2) {
+      setPolylineStatus('A polyline needs at least 2 vertices.')
+      return
+    }
+
+    const result = addPolylineCurveStratumWithResult(
+      editableDiagram,
+      polylineDraft.points,
+    )
+
+    if (result.id === null) {
+      setPolylineStatus('A polyline needs at least 2 vertices.')
+      return
+    }
+
+    const createdId = result.id
+
+    setEditorState((current) => ({
+      ...current,
+      editableDiagram: result.diagram,
+      selectedElement: { kind: 'stratum', id: createdId },
+      polylineDraft: null,
+    }))
+    setPolylineStatus('Polyline created.')
     setCopyStatus('idle')
+  }
+
+  function cancelPolylineDraft(): void {
+    setEditorState((current) =>
+      current.polylineDraft === null
+        ? current
+        : {
+            ...current,
+            polylineDraft: null,
+          },
+    )
+    setPolylineStatus('Polyline canceled.')
   }
 
   function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
@@ -250,13 +348,36 @@ function App() {
                 type="button"
                 className={creationTool === tool.id ? 'is-selected' : undefined}
                 aria-pressed={creationTool === tool.id}
-                onClick={() => setCreationTool(tool.id)}
+                onClick={() => updateCreationTool(tool.id)}
               >
                 {tool.label}
               </button>
             ))}
           </div>
         </div>
+
+        {creationTool === 'createPolyline' && (
+          <div className="control-group polyline-draft-control">
+            <span className="control-label">Polyline</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={finishPolylineDraft}
+            >
+              Finish polyline
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={cancelPolylineDraft}
+            >
+              Cancel polyline
+            </button>
+            <span className="toolbar-status" role="status">
+              {polylineStatus}
+            </span>
+          </div>
+        )}
 
         <div className="control-group">
           <span className="control-label">Input</span>
@@ -318,6 +439,7 @@ function App() {
             diagram={editableDiagram}
             fitToView
             selectedElement={selectedElement}
+            polylineDraft={polylineDraft?.points}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }

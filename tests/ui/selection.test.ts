@@ -14,6 +14,8 @@ import {
 import type { CurveStyle } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  addPolylineCurveStratum,
+  addPolylineCurveStratumWithResult,
   addPointStratum,
   addPointStratumWithResult,
   addTextLabel,
@@ -492,6 +494,96 @@ test('addPointStratum returns a new 3D diagram with codim 3', () => {
   assert.deepEqual(point.position, { x: 3, y: 4, z: 5 })
 })
 
+test('addPolylineCurveStratum returns a new 2D diagram with codim 1 and z normalized', () => {
+  const updated = addPolylineCurveStratum(
+    twoDimensionalExample,
+    [
+      { x: 1, y: 2, z: 8 },
+      { x: 3, y: 4, z: 9 },
+    ],
+    { id: 'curve-1' },
+  )
+  const curve = updated.strata.find((stratum) => stratum.id === 'curve-1')
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(updated.labels, twoDimensionalExample.labels)
+  assert.equal(
+    twoDimensionalExample.strata.some((stratum) => stratum.id === 'curve-1'),
+    false,
+  )
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected added stratum to be a curve.')
+  }
+
+  assert.equal(curve.codim, 1)
+  assert.equal(curve.kind, 'polyline')
+  assert.deepEqual(curve.points, [
+    { x: 1, y: 2, z: 0 },
+    { x: 3, y: 4, z: 0 },
+  ])
+  assert.equal(curve.name.length > 0, true)
+  assert.equal(curve.style.kind, 'curveStyle')
+  assert.equal(curve.style.lineWidth > 0, true)
+})
+
+test('addPolylineCurveStratum returns a new 3D diagram with codim 2', () => {
+  const updated = addPolylineCurveStratum(
+    threeDimensionalExample,
+    [
+      { x: 1, y: 2, z: 3 },
+      { x: 4, y: 5, z: 6 },
+    ],
+    { id: 'curve-1' },
+  )
+  const curve = updated.strata.find((stratum) => stratum.id === 'curve-1')
+
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected added stratum to be a curve.')
+  }
+
+  assert.equal(curve.codim, 2)
+  assert.deepEqual(curve.points, [
+    { x: 1, y: 2, z: 3 },
+    { x: 4, y: 5, z: 6 },
+  ])
+})
+
+test('addPolylineCurveStratumWithResult returns the updated diagram and created id atomically', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      ...twoDimensionalExample.strata,
+      {
+        ...twoDimensionalExample.strata[0],
+        id: 'curve-1',
+      },
+    ],
+  }
+  const result = addPolylineCurveStratumWithResult(diagram, [
+    { x: 1, y: 2, z: 0 },
+    { x: 3, y: 4, z: 0 },
+  ])
+
+  assert.equal(result.id, 'curve-2')
+  assert.equal(
+    result.diagram.strata.some((stratum) => stratum.id === result.id),
+    true,
+  )
+})
+
+test('addPolylineCurveStratumWithResult safely rejects fewer than 2 points', () => {
+  const result = addPolylineCurveStratumWithResult(twoDimensionalExample, [
+    { x: 1, y: 2, z: 0 },
+  ])
+
+  assert.equal(result.diagram, twoDimensionalExample)
+  assert.equal(result.id, null)
+})
+
 test('addTextLabel returns a new diagram with default text and valid style', () => {
   const updated = addTextLabel(
     twoDimensionalExample,
@@ -537,6 +629,23 @@ test('generated TikZ includes newly added point and label', () => {
   assert.equal(tikz.includes('\\coordinate (pointpoint1'), true)
   assert.equal(tikz.includes('New label'), true)
   assert.equal(tikz.includes('(5,6)'), true)
+})
+
+test('generated TikZ includes newly added polyline curve', () => {
+  const updated = addPolylineCurveStratum(
+    twoDimensionalExample,
+    [
+      { x: 7, y: 8, z: 4 },
+      { x: 9, y: 10, z: 5 },
+    ],
+    { id: 'curve-1' },
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('\\coordinate (curvecurve1'), true)
+  assert.equal(tikz.includes('(7,8)'), true)
+  assert.equal(tikz.includes('(9,10)'), true)
+  assert.equal(tikz.includes('\\draw['), true)
 })
 
 test('updateStratumStyleById updates curve style immutably', () => {

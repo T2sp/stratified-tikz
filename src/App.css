@@ -130,7 +130,8 @@
 }
 
 .segmented-control button,
-.copy-button {
+.copy-button,
+.toolbar-button {
   min-height: 34px;
   border: 0;
   border-radius: 5px;
@@ -146,12 +147,14 @@
 }
 
 .segmented-control button:hover,
-.copy-button:hover {
+.copy-button:hover,
+.toolbar-button:hover {
   background: var(--button-hover);
 }
 
 .segmented-control button:focus-visible,
-.copy-button:focus-visible {
+.copy-button:focus-visible,
+.toolbar-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -218,6 +221,26 @@
   background: var(--panel);
   font-size: 14px;
   white-space: nowrap;
+}
+
+.toolbar-button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  background: #ffffff;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.polyline-draft-control {
+  flex: 1 1 320px;
+}
+
+.toolbar-status {
+  min-width: 150px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .copy-status {

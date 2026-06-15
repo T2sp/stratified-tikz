@@ -8,6 +8,7 @@ import type {
   Stratum,
   TextLabel,
   Vec2,
+  Vec3,
 } from '../model/types'
 import type { SelectedElement } from '../ui/selection'
 import { resolveSvgCamera } from './svgCamera'
@@ -31,6 +32,7 @@ export type SvgDiagramProps = {
   height?: number
   fitToView?: boolean
   selectedElement?: SelectedElement
+  polylineDraft?: Vec3[]
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -56,6 +58,7 @@ export function SvgDiagram({
   height = defaultHeight,
   fitToView = false,
   selectedElement = null,
+  polylineDraft,
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
@@ -89,6 +92,7 @@ export function SvgDiagram({
     >
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
       <g>{items.map((item) => item.element)}</g>
+      {renderPolylineDraft(polylineDraft, camera, height)}
     </svg>
   )
 }
@@ -376,6 +380,52 @@ function renderLabel(
       </g>
     ),
   }
+}
+
+function renderPolylineDraft(
+  draft: Vec3[] | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (draft === undefined || draft.length === 0) {
+    return null
+  }
+
+  const points = draft.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const pathData = polylineToSvgPath(points)
+
+  return (
+    <g key="polyline-draft-preview" pointerEvents="none" aria-hidden="true">
+      {points.length >= 2 && (
+        <path
+          d={pathData}
+          fill="none"
+          stroke="#5F6C7B"
+          strokeOpacity={0.78}
+          strokeWidth={2}
+          strokeDasharray="7 5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {points.map((point, index) => (
+        <circle
+          key={`polyline-draft-vertex-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={4}
+          fill="#ffffff"
+          stroke="#5F6C7B"
+          strokeOpacity={0.9}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  )
 }
 
 function renderPointHighlight(
