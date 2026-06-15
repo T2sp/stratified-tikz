@@ -399,6 +399,8 @@ Phase 10 fills the most important practical editing gaps.
 
 ### Phase 10A: Remove selected elements
 
+Status: Implemented.
+
 Current issue:
 
 Elements can be created, but not removed.
@@ -416,6 +418,8 @@ Requirements:
 * Preserve diagram validity.
 * Add a toolbar button such as Remove selected.
 * Add keyboard support for Delete or Backspace if simple.
+* Delete and Backspace remove the current selection only when focus is outside
+  input, textarea, select, and contenteditable fields.
 
 Out of scope:
 

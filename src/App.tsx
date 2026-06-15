@@ -1,5 +1,7 @@
 import {
+  useCallback,
   useMemo,
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -48,6 +50,7 @@ import {
   EditableInspector,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
+  removeSelectedElement,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
   type LayerFilter,
@@ -313,6 +316,64 @@ function App() {
       selectedElement: selection,
     }))
   }
+
+  const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
+    if (selectedElement === null) {
+      return
+    }
+
+    setEditorState((current) => {
+      const result = removeSelectedElement(
+        current.editableDiagram,
+        current.selectedElement,
+      )
+
+      if (
+        !result.removed &&
+        current.selectedElement === result.selectedElement &&
+        current.polylineDraft === null &&
+        current.cubicBezierDraft === null &&
+        current.sheetPolygonDraft === null
+      ) {
+        return current
+      }
+
+      return {
+        ...current,
+        editableDiagram: result.diagram,
+        selectedElement: result.selectedElement,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }
+    })
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setSheetStatus('')
+    setCopyStatus('idle')
+  }, [selectedElement])
+
+  useEffect(() => {
+    function handleRemoveShortcut(event: KeyboardEvent): void {
+      if (
+        event.defaultPrevented ||
+        (event.key !== 'Delete' && event.key !== 'Backspace') ||
+        isEditableKeyboardTarget(event.target) ||
+        selectedElement === null
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      removeCurrentSelection()
+    }
+
+    window.addEventListener('keydown', handleRemoveShortcut)
+
+    return () => {
+      window.removeEventListener('keydown', handleRemoveShortcut)
+    }
+  }, [removeCurrentSelection, selectedElement])
 
   function updateLayerFilter(nextFilter: LayerFilter): void {
     setEditorState((current) => {
@@ -862,6 +923,18 @@ function App() {
           </select>
         </div>
 
+        <div className="control-group">
+          <span className="control-label">Selection</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={selectedElement === null}
+            onClick={removeCurrentSelection}
+          >
+            Remove selected
+          </button>
+        </div>
+
         <div className="control-group file-control">
           <span className="control-label">File</span>
           <label className="filename-field">
@@ -1045,6 +1118,19 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
   const layer = Number(value)
 
   return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
 }
 
 function layerFilterStatusLabel(layerFilter: LayerFilter): string {

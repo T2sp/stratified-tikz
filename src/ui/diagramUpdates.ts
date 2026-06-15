@@ -31,6 +31,12 @@ export type SelectedElementUpdaters = {
   label?: (label: TextLabel) => TextLabel
 }
 
+export type RemoveSelectedElementResult = {
+  diagram: Diagram
+  selectedElement: SelectedElement
+  removed: boolean
+}
+
 export function cloneDiagram(diagram: Diagram): Diagram {
   return structuredClone(diagram) as Diagram
 }
@@ -69,6 +75,53 @@ export function updateLabelById(
   })
 
   return changed ? { ...diagram, labels } : diagram
+}
+
+export function removeSelectedElement(
+  diagram: Diagram,
+  selectedElement: SelectedElement,
+): RemoveSelectedElementResult {
+  if (selectedElement === null) {
+    return {
+      diagram,
+      selectedElement: null,
+      removed: false,
+    }
+  }
+
+  if (selectedElement.kind === 'stratum') {
+    let removed = false
+    const strata = diagram.strata.filter((stratum) => {
+      if (!removed && stratum.id === selectedElement.id) {
+        removed = true
+        return false
+      }
+
+      return true
+    })
+
+    return {
+      diagram: removed ? { ...diagram, strata } : diagram,
+      selectedElement: null,
+      removed,
+    }
+  }
+
+  let removed = false
+  const labels = diagram.labels.filter((label) => {
+    if (!removed && label.id === selectedElement.id) {
+      removed = true
+      return false
+    }
+
+    return true
+  })
+
+  return {
+    diagram: removed ? { ...diagram, labels } : diagram,
+    selectedElement: null,
+    removed,
+  }
 }
 
 export function updateStratumStyleById(
