@@ -9,6 +9,8 @@ import {
 } from 'react'
 import './App.css'
 import {
+  emptyThreeDimensionalDiagram,
+  emptyTwoDimensionalDiagram,
   threeDimensionalExample,
   twoDimensionalExample,
 } from './examples'
@@ -75,7 +77,7 @@ import {
   type WorkPlanePreviewTool,
 } from './ui'
 
-type ExampleId = '2d' | '3d'
+type ExampleId = 'empty2d' | 'empty3d' | '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type CreationTool = WorkPlanePreviewTool
@@ -120,6 +122,18 @@ const exampleOptions: ExampleOption[] = [
     name: '3D example',
     summary: 'codim 1 sheets, codim 2 curves, codim 3 points',
     diagram: threeDimensionalExample,
+  },
+  {
+    id: 'empty2d',
+    name: 'Empty 2D',
+    summary: 'blank 2D canvas',
+    diagram: emptyTwoDimensionalDiagram,
+  },
+  {
+    id: 'empty3d',
+    name: 'Empty 3D',
+    summary: 'blank 3D canvas',
+    diagram: emptyThreeDimensionalDiagram,
   },
 ]
 

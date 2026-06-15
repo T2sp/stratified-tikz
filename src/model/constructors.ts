@@ -9,8 +9,8 @@ import {
   defaultPointStyle,
   defaultRegionStyle,
   defaultSheetStyle,
-} from './styles'
-import { normalizePointForAmbientDimension } from '../geometry/projection'
+} from './styles.ts'
+import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -35,9 +35,9 @@ import type {
   Vec2,
   Vec3,
   WorkPlane,
-} from './types'
+} from './types.ts'
 
-export { normalizePointForAmbientDimension } from '../geometry/projection'
+export { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 
 export type CreateEmptyDiagramInput = {
   ambientDimension: AmbientDimension

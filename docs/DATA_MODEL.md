@@ -55,6 +55,10 @@ export type Diagram = {
 };
 ```
 
+An empty canvas is represented by the same `Diagram` shape with `strata: []`
+and `labels: []`. Empty 2D and empty 3D diagrams are valid ordinary diagrams,
+not a separate null or draft state.
+
 ## Saved diagram file
 
 Phase 8A saves and loads diagrams using a small versioned JSON wrapper:

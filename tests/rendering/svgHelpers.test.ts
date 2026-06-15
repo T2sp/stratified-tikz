@@ -7,6 +7,7 @@ import {
   starPolygonPoints,
 } from '../../src/rendering/svgPath.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
+import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import type { Diagram } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
@@ -192,6 +193,28 @@ test('resolveSvgCamera matches draft and committed polyline framing', () => {
 
   assert.deepEqual(draftCamera, committedCamera)
   assert.equal(diagram.strata.length, 1)
+})
+
+test('resolveSvgCamera returns a safe fitted camera for empty diagrams', () => {
+  const empty2dCamera = resolveSvgCamera(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    200,
+    120,
+    { fitToView: true },
+  )
+  const empty3dCamera = resolveSvgCamera(
+    createEmptyDiagram({ ambientDimension: 3 }),
+    200,
+    120,
+    { fitToView: true },
+  )
+  const origin = projectToSvgPoint(empty2dCamera, { x: 0, y: 0, z: 0 }, 120)
+
+  assert.equal(empty2dCamera.mode, '2d')
+  assert.equal(empty3dCamera.mode, '3d')
+  assert.equal(Number.isFinite(empty2dCamera.scale), true)
+  assert.equal(Number.isFinite(empty3dCamera.scale), true)
+  assert.deepEqual(origin, { x: 100, y: 60 })
 })
 
 test('projectToSvgPoint keeps positive x right and makes positive y appear upward', () => {

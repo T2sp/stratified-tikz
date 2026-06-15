@@ -542,6 +542,11 @@ Implemented behavior:
 * Polyline and cubic Bezier direct creation are available in 2D and 3D.
 * Polygon sheet direct creation is available only in 3D diagrams.
 * Direct and cursor creation share an explicit numeric New element layer field.
+* The example selector includes Empty 2D and Empty 3D canvases for starting from
+  a valid blank diagram.
+* Empty canvases are ordinary diagrams with no strata and no free text labels;
+  cursor creation, direct creation, TikZ generation, and JSON save/load work
+  from them.
 * If a specific layer filter is active, the New element layer field syncs to
   that layer by default.
 * If the submitted New element layer would be hidden by the active filter, the
