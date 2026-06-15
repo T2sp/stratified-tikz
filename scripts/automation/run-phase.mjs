@@ -43,6 +43,7 @@ const phaseSlugs = {
   "10B": "direct-input-points-labels",
   "10C": "direct-input-paths-sheets",
   "10D": "cursor-drag-handle-editing",
+  "10E": "one-step-undo",
 };
 
 function makePhaseSpec(phase) {
