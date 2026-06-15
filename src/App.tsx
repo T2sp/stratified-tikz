@@ -12,18 +12,22 @@ import type { Camera, CoordinateInputMode, Diagram, Vec2, WorkPlane } from './mo
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
-  addPointStratum,
-  addTextLabel,
+  addPointStratumWithResult,
+  addTextLabelWithResult,
   clearSelectionIfMissing,
   cloneDiagram,
   EditableInspector,
-  makeUniqueId,
   type SelectedElement,
 } from './ui'
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
 type CreationTool = 'select' | 'createPoint' | 'createLabel'
+
+type EditableEditorState = {
+  editableDiagram: Diagram
+  selectedElement: SelectedElement
+}
 
 type ExampleOption = {
   id: ExampleId
@@ -65,10 +69,11 @@ function App() {
     z: 0,
   })
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
-  const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
-  const [editableDiagram, setEditableDiagram] = useState<Diagram>(() =>
-    cloneDiagram(exampleOptions[0].diagram),
-  )
+  const [editorState, setEditorState] = useState<EditableEditorState>(() => ({
+    editableDiagram: cloneDiagram(exampleOptions[0].diagram),
+    selectedElement: null,
+  }))
+  const { editableDiagram, selectedElement } = editorState
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -96,16 +101,31 @@ function App() {
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
-    setEditableDiagram(nextDiagram)
-    setSelectedElement((selection) =>
-      clearSelectionIfMissing(nextDiagram, selection),
-    )
+    setEditorState((current) => ({
+      editableDiagram: nextDiagram,
+      selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
+    }))
     setCopyStatus('idle')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
-    setEditableDiagram(update)
+    setEditorState((current) => {
+      const nextDiagram =
+        typeof update === 'function' ? update(current.editableDiagram) : update
+
+      return {
+        ...current,
+        editableDiagram: nextDiagram,
+      }
+    })
     setCopyStatus('idle')
+  }
+
+  function updateSelectedElement(selection: SelectedElement): void {
+    setEditorState((current) => ({
+      ...current,
+      selectedElement: selection,
+    }))
   }
 
   function handlePreviewCreationClick(
@@ -117,31 +137,33 @@ function App() {
       return
     }
 
-    const modelPoint = normalizePointForAmbientDimension(
-      editableDiagram.ambientDimension,
-      screenToModelOnWorkPlane(
-        previewCamera,
-        { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-        activeWorkPlane,
-      ),
-    )
-
-    if (creationTool === 'createPoint') {
-      const pointId = makeUniqueId(editableDiagram, 'point')
-
-      updateEditableDiagram((currentDiagram) =>
-        addPointStratum(currentDiagram, modelPoint, { id: pointId }),
+    setEditorState((current) => {
+      const modelPoint = normalizePointForAmbientDimension(
+        current.editableDiagram.ambientDimension,
+        screenToModelOnWorkPlane(
+          previewCamera,
+          { x: svgPoint.x, y: viewportHeight - svgPoint.y },
+          activeWorkPlane,
+        ),
       )
-      setSelectedElement({ kind: 'stratum', id: pointId })
-      return
-    }
 
-    const labelId = makeUniqueId(editableDiagram, 'label')
+      if (creationTool === 'createPoint') {
+        const result = addPointStratumWithResult(current.editableDiagram, modelPoint)
 
-    updateEditableDiagram((currentDiagram) =>
-      addTextLabel(currentDiagram, modelPoint, { id: labelId }),
-    )
-    setSelectedElement({ kind: 'label', id: labelId })
+        return {
+          editableDiagram: result.diagram,
+          selectedElement: { kind: 'stratum', id: result.id },
+        }
+      }
+
+      const result = addTextLabelWithResult(current.editableDiagram, modelPoint)
+
+      return {
+        editableDiagram: result.diagram,
+        selectedElement: { kind: 'label', id: result.id },
+      }
+    })
+    setCopyStatus('idle')
   }
 
   function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
@@ -297,7 +319,7 @@ function App() {
             fitToView
             selectedElement={selectedElement}
             onSelectionChange={
-              creationTool === 'select' ? setSelectedElement : undefined
+              creationTool === 'select' ? updateSelectedElement : undefined
             }
             onCanvasClick={
               creationTool === 'select' ? undefined : handlePreviewCreationClick

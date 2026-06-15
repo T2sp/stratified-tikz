@@ -1,9 +1,15 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import {
+  cloneLabelStyle,
+  clonePointStyle,
+  defaultLabelStyle,
+  defaultPointStyle,
+} from '../model/styles.ts'
 import type {
   AmbientDimension,
   Diagram,
   LabelStyle,
-  PointStyle,
+  PointStratum,
   Stratum,
   StratumStyle,
   TextLabel,
@@ -109,6 +115,16 @@ export type AddTextLabelOptions = {
   layer?: number
 }
 
+export type AddPointStratumResult = {
+  diagram: Diagram
+  id: string
+}
+
+export type AddTextLabelResult = {
+  diagram: Diagram
+  id: string
+}
+
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
   const existingIds = new Set([
     ...diagram.strata.map((stratum) => stratum.id),
@@ -128,19 +144,22 @@ export function addPointStratum(
   position: Vec3,
   options: AddPointStratumOptions = {},
 ): Diagram {
-  const point: Stratum = {
-    codim: diagram.ambientDimension === 2 ? 2 : 3,
-    geometricKind: 'point',
-    id: options.id ?? makeUniqueId(diagram, 'point'),
-    name: options.name ?? 'Point',
-    style: createDefaultPointStyle(),
-    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
-    layer: options.layer ?? nextLayer(diagram),
-  }
+  return addPointStratumWithResult(diagram, position, options).diagram
+}
+
+export function addPointStratumWithResult(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddPointStratumOptions = {},
+): AddPointStratumResult {
+  const point = createPointForDiagram(diagram, position, options)
 
   return {
-    ...diagram,
-    strata: [...diagram.strata, point],
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, point],
+    },
+    id: point.id,
   }
 }
 
@@ -149,19 +168,22 @@ export function addTextLabel(
   position: Vec3,
   options: AddTextLabelOptions = {},
 ): Diagram {
-  const label: TextLabel = {
-    id: options.id ?? makeUniqueId(diagram, 'label'),
-    geometricKind: 'label',
-    name: options.name ?? 'Label',
-    text: options.text ?? 'Label',
-    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
-    style: createDefaultLabelStyle(),
-    layer: options.layer ?? nextLayer(diagram),
-  }
+  return addTextLabelWithResult(diagram, position, options).diagram
+}
+
+export function addTextLabelWithResult(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddTextLabelOptions = {},
+): AddTextLabelResult {
+  const label = createLabelForDiagram(diagram, position, options)
 
   return {
-    ...diagram,
-    labels: [...diagram.labels, label],
+    diagram: {
+      ...diagram,
+      labels: [...diagram.labels, label],
+    },
+    id: label.id,
   }
 }
 
@@ -186,24 +208,35 @@ function nextLayer(diagram: Diagram): number {
   return layers.length === 0 ? 0 : Math.max(...layers) + 1
 }
 
-function createDefaultPointStyle(): PointStyle {
+function createPointForDiagram(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddPointStratumOptions,
+): PointStratum {
   return {
-    kind: 'pointStyle',
-    color: '#000000',
-    opacity: 1,
-    shape: 'circle',
-    fill: 'filled',
-    size: 3,
+    codim: diagram.ambientDimension === 2 ? 2 : 3,
+    geometricKind: 'point',
+    id: options.id ?? makeUniqueId(diagram, 'point'),
+    name: options.name ?? 'Point',
+    style: clonePointStyle(defaultPointStyle),
+    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
+    layer: options.layer ?? nextLayer(diagram),
   }
 }
 
-function createDefaultLabelStyle(): LabelStyle {
+function createLabelForDiagram(
+  diagram: Diagram,
+  position: Vec3,
+  options: AddTextLabelOptions,
+): TextLabel {
   return {
-    kind: 'labelStyle',
-    color: '#000000',
-    opacity: 1,
-    fontSize: 10,
-    anchor: 'center',
+    id: options.id ?? makeUniqueId(diagram, 'label'),
+    geometricKind: 'label',
+    name: options.name ?? 'Label',
+    text: options.text ?? 'Label',
+    position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
+    style: cloneLabelStyle(defaultLabelStyle),
+    layer: options.layer ?? nextLayer(diagram),
   }
 }
 

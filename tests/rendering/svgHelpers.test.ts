@@ -14,6 +14,7 @@ import {
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
+import { mapClientPointToViewBox } from '../../src/rendering/svgViewBox.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -161,6 +162,76 @@ test('projectToSvgPoint keeps positive x right and makes positive y appear upwar
 
   assert.ok(right.x > left.x)
   assert.ok(upper.y < lower.y)
+})
+
+test('mapClientPointToViewBox is unchanged when aspect ratios match', () => {
+  assert.deepEqual(
+    mapClientPointToViewBox(
+      { x: 260, y: 180 },
+      { left: 0, top: 0, width: 1040, height: 720 },
+      { width: 520, height: 360 },
+    ),
+    { x: 130, y: 90 },
+  )
+})
+
+test('mapClientPointToViewBox ignores horizontal letterbox padding for xMidYMid meet', () => {
+  const bounds = { left: 10, top: 20, width: 1200, height: 720 }
+  const viewBox = { width: 520, height: 360 }
+
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 90, y: 20 }, bounds, viewBox),
+    { x: 0, y: 0 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 600, y: 380 }, bounds, viewBox),
+    { x: 255, y: 180 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 610, y: 380 }, bounds, viewBox),
+    { x: 260, y: 180 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 1130, y: 740 }, bounds, viewBox),
+    { x: 520, y: 360 },
+  )
+})
+
+test('mapClientPointToViewBox ignores vertical letterbox padding for xMidYMid meet', () => {
+  const bounds = { left: 10, top: 20, width: 1040, height: 900 }
+  const viewBox = { width: 520, height: 360 }
+
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 10, y: 110 }, bounds, viewBox),
+    { x: 0, y: 0 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 530, y: 470 }, bounds, viewBox),
+    { x: 260, y: 180 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox({ x: 1050, y: 830 }, bounds, viewBox),
+    { x: 520, y: 360 },
+  )
+})
+
+test('mapClientPointToViewBox clamps clicks inside letterbox padding to the visible edge', () => {
+  assert.deepEqual(
+    mapClientPointToViewBox(
+      { x: 30, y: 380 },
+      { left: 10, top: 20, width: 1200, height: 720 },
+      { width: 520, height: 360 },
+    ),
+    { x: 0, y: 180 },
+  )
+  assert.deepEqual(
+    mapClientPointToViewBox(
+      { x: 530, y: 50 },
+      { left: 10, top: 20, width: 1040, height: 900 },
+      { width: 520, height: 360 },
+    ),
+    { x: 260, y: 0 },
+  )
 })
 
 function createCameraTestDiagram(): Diagram {

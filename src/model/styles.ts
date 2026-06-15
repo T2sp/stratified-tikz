@@ -3,7 +3,7 @@ import {
   lineStyles,
   pointFills,
   pointShapes,
-} from './types'
+} from './types.ts'
 import type {
   CurveStyle,
   HexColor,
@@ -16,7 +16,7 @@ import type {
   PointStyle,
   RegionStyle,
   SheetStyle,
-} from './types'
+} from './types.ts'
 
 export const defaultRegionStyle: RegionStyle = {
   kind: 'regionStyle',

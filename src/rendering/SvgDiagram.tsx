@@ -23,6 +23,7 @@ import {
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
 } from './svgStyle'
+import { mapClientPointToViewBox } from './svgViewBox'
 
 export type SvgDiagramProps = {
   diagram: Diagram
@@ -74,6 +75,7 @@ export function SvgDiagram({
     <svg
       className="svg-diagram"
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
       onClick={(event) => {
@@ -420,10 +422,11 @@ function svgPointFromMouseEvent(
 ): Vec2 {
   const bounds = event.currentTarget.getBoundingClientRect()
 
-  return {
-    x: ((event.clientX - bounds.left) / bounds.width) * viewportWidth,
-    y: ((event.clientY - bounds.top) / bounds.height) * viewportHeight,
-  }
+  return mapClientPointToViewBox(
+    { x: event.clientX, y: event.clientY },
+    bounds,
+    { width: viewportWidth, height: viewportHeight },
+  )
 }
 
 function isSelectedStratum(

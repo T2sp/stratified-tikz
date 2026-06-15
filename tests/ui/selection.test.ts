@@ -15,7 +15,9 @@ import type { CurveStyle } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addPointStratum,
+  addPointStratumWithResult,
   addTextLabel,
+  addTextLabelWithResult,
   cloneDiagram,
   makeUniqueId,
   parseFiniteNumber,
@@ -459,6 +461,19 @@ test('addPointStratum returns a new 2D diagram with codim 2 and z normalized', (
   assert.equal(point.name.length > 0, true)
 })
 
+test('addPointStratumWithResult returns the updated diagram and created id atomically', () => {
+  const result = addPointStratumWithResult(
+    twoDimensionalExample,
+    { x: 3, y: 4, z: 9 },
+  )
+
+  assert.equal(result.id, 'point-1')
+  assert.equal(
+    result.diagram.strata.some((stratum) => stratum.id === result.id),
+    true,
+  )
+})
+
 test('addPointStratum returns a new 3D diagram with codim 3', () => {
   const updated = addPointStratum(
     threeDimensionalExample,
@@ -491,6 +506,19 @@ test('addTextLabel returns a new diagram with default text and valid style', () 
   assert.equal(label?.name.length ? label.name.length > 0 : false, true)
   assert.deepEqual(label?.position, { x: 1, y: 2, z: 0 })
   assert.equal(label?.style.kind, 'labelStyle')
+})
+
+test('addTextLabelWithResult returns the updated diagram and created id atomically', () => {
+  const result = addTextLabelWithResult(
+    twoDimensionalExample,
+    { x: 1, y: 2, z: 8 },
+  )
+
+  assert.equal(result.id, 'label-1')
+  assert.equal(
+    result.diagram.labels.some((label) => label.id === result.id),
+    true,
+  )
 })
 
 test('generated TikZ includes newly added point and label', () => {
