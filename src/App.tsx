@@ -27,17 +27,14 @@ import {
   clearSelectionIfMissing,
   cloneDiagram,
   EditableInspector,
+  shouldShowWorkPlanePreview,
   type SelectedElement,
+  type WorkPlanePreviewTool,
 } from './ui'
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
-type CreationTool =
-  | 'select'
-  | 'createPoint'
-  | 'createLabel'
-  | 'createPolyline'
-  | 'createCubicBezier'
+type CreationTool = WorkPlanePreviewTool
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -84,13 +81,6 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
-function shouldShowWorkPlanePreview(
-  ambientDimension: Diagram['ambientDimension'],
-  creationTool: CreationTool,
-): boolean {
-  return ambientDimension === 3 && creationTool !== 'select'
-}
-
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
   const [coordinateInputMode, setCoordinateInputMode] =
@@ -125,7 +115,7 @@ function App() {
 
     return {
       ...createWorkPlanePatch(activeWorkPlane),
-      label: `${activeWorkPlane.kind} work plane`,
+      label: `active ${activeWorkPlane.kind} plane`,
     }
   }, [activeWorkPlane, creationTool, editableDiagram.ambientDimension])
 

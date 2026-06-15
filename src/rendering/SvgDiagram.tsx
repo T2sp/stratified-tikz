@@ -419,30 +419,30 @@ function renderWorkPlanePreview(
     <g key="work-plane-preview" pointerEvents="none" aria-hidden="true">
       <polygon
         points={svgPointList(corners)}
-        fill="#4D9DE0"
-        fillOpacity={0.1}
-        stroke="#1D6FA5"
-        strokeOpacity={0.45}
-        strokeWidth={1.4}
-        strokeDasharray="6 4"
+        fill="#F59E0B"
+        fillOpacity={0.035}
+        stroke="#B45309"
+        strokeOpacity={0.88}
+        strokeWidth={2.1}
+        strokeDasharray="3 5"
         vectorEffect="non-scaling-stroke"
       />
       <path
         d={polylineToSvgPath([corners[0], corners[2]])}
         fill="none"
-        stroke="#1D6FA5"
-        strokeOpacity={0.22}
+        stroke="#B45309"
+        strokeOpacity={0.5}
         strokeWidth={1}
-        strokeDasharray="3 5"
+        strokeDasharray="2 7"
         vectorEffect="non-scaling-stroke"
       />
       <path
         d={polylineToSvgPath([corners[1], corners[3]])}
         fill="none"
-        stroke="#1D6FA5"
-        strokeOpacity={0.22}
+        stroke="#B45309"
+        strokeOpacity={0.5}
         strokeWidth={1}
-        strokeDasharray="3 5"
+        strokeDasharray="2 7"
         vectorEffect="non-scaling-stroke"
       />
       {preview.label !== undefined && (
@@ -451,8 +451,8 @@ function renderWorkPlanePreview(
           y={labelPosition.y}
           dx={8}
           dy={-8}
-          fill="#1D6FA5"
-          opacity={0.72}
+          fill="#92400E"
+          opacity={0.9}
           fontSize={11}
           fontWeight={600}
           dominantBaseline="middle"
