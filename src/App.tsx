@@ -105,23 +105,28 @@ function App() {
       </header>
 
       <section className="toolbar" aria-label="Diagram controls">
-        <div className="control-group">
-          <span className="control-label">Example</span>
-          <div className="segmented-control">
-            {exampleOptions.map((example) => (
-              <button
-                key={example.id}
-                type="button"
-                className={
-                  selectedExampleId === example.id ? 'is-selected' : undefined
-                }
-                aria-pressed={selectedExampleId === example.id}
-                onClick={() => selectExample(example.id)}
-              >
-                {example.name}
-              </button>
-            ))}
+        <div className="control-stack">
+          <div className="control-group">
+            <span className="control-label">Example</span>
+            <div className="segmented-control">
+              {exampleOptions.map((example) => (
+                <button
+                  key={example.id}
+                  type="button"
+                  className={
+                    selectedExampleId === example.id ? 'is-selected' : undefined
+                  }
+                  aria-pressed={selectedExampleId === example.id}
+                  onClick={() => selectExample(example.id)}
+                >
+                  {example.name}
+                </button>
+              ))}
+            </div>
           </div>
+          <p className="toolbar-note">
+            Edits are temporary in this phase and reset when switching examples.
+          </p>
         </div>
 
         <div className="control-group">

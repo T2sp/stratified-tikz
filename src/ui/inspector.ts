@@ -84,7 +84,7 @@ function createStratumSections(
         { label: 'Geometric kind', value: stratum.geometricKind },
         { label: 'Codimension', value: String(stratum.codim) },
         { label: 'Layer', value: String(stratum.layer) },
-        { label: 'Attached label', value: stratum.label ?? 'none' },
+        { label: 'Attached label metadata', value: stratum.label ?? 'none' },
       ],
     },
     ...createGeometrySections(stratum, ambientDimension),
@@ -197,34 +197,54 @@ export function formatStratumStyleSummary(style: StratumStyle): string {
   switch (style.kind) {
     case 'regionStyle':
     case 'sheetStyle':
-      return [
-        `fill ${style.fillColor} @ ${formatNumber(style.fillOpacity)}`,
-        `stroke ${style.strokeColor} @ ${formatNumber(style.strokeOpacity)}`,
-      ].join('; ')
+      return joinStyleSummary([
+        `fill color: ${style.fillColor}`,
+        formatStyleNumber('fill opacity', style.fillOpacity),
+        `stroke color: ${style.strokeColor}`,
+        formatStyleNumber('stroke opacity', style.strokeOpacity),
+      ])
     case 'curveStyle':
-      return [
-        `stroke ${style.strokeColor} @ ${formatNumber(style.strokeOpacity)}`,
-        `width ${formatNumber(style.lineWidth)}pt`,
-        style.lineStyle,
-      ].join('; ')
+      return joinStyleSummary([
+        `stroke color: ${style.strokeColor}`,
+        formatStyleNumber('stroke opacity', style.strokeOpacity),
+        formatStyleNumber('line width', style.lineWidth, 'pt'),
+        `line style: ${style.lineStyle}`,
+      ])
     case 'pointStyle':
-      return [
-        style.color,
-        `opacity ${formatNumber(style.opacity)}`,
-        style.shape,
-        style.fill,
-        `size ${formatNumber(style.size)}pt`,
-      ].join('; ')
+      return joinStyleSummary([
+        `color: ${style.color}`,
+        formatStyleNumber('opacity', style.opacity),
+        `shape: ${style.shape}`,
+        `fill: ${style.fill}`,
+        formatStyleNumber('size', style.size, 'pt'),
+      ])
   }
 }
 
 export function formatLabelStyleSummary(style: LabelStyle): string {
-  return [
-    style.color,
-    `opacity ${formatNumber(style.opacity)}`,
-    `font ${formatNumber(style.fontSize)}pt`,
-    `anchor ${style.anchor}`,
-  ].join('; ')
+  return joinStyleSummary([
+    `color: ${style.color}`,
+    formatStyleNumber('opacity', style.opacity),
+    formatStyleNumber('font', style.fontSize, 'pt'),
+    `anchor: ${style.anchor}`,
+  ])
+}
+
+function joinStyleSummary(parts: Array<string | null>): string {
+  const visibleParts = parts.filter((part): part is string => part !== null)
+  return visibleParts.length === 0 ? 'none' : visibleParts.join('; ')
+}
+
+function formatStyleNumber(
+  label: string,
+  value: number | undefined,
+  suffix = '',
+): string | null {
+  if (value === undefined || !Number.isFinite(value)) {
+    return null
+  }
+
+  return `${label}: ${formatNumber(value)}${suffix}`
 }
 
 function formatNumber(value: number): string {

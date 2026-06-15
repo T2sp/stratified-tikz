@@ -59,10 +59,22 @@
   min-width: 0;
 }
 
+.control-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
 .control-label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
+}
+
+.toolbar-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .segmented-control {

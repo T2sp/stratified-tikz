@@ -7,8 +7,11 @@ import {
 import {
   createInspectorSections,
   describeCurvePoints,
+  formatLabelStyleSummary,
+  formatStratumStyleSummary,
   formatVec3,
 } from '../../src/ui/inspector.ts'
+import type { CurveStyle } from '../../src/model/types.ts'
 import {
   cloneDiagram,
   updateLabelById,
@@ -241,6 +244,71 @@ test('createInspectorSections reports free text label content', () => {
       .some((field) => field.label === 'Text' && field.value === '$F^{(1)}L$'),
     true,
   )
+})
+
+test('style summaries display opacity with readable labels', () => {
+  const curve = twoDimensionalExample.strata.find(
+    (stratum) => stratum.id === 'hiddenWire',
+  )
+
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected hiddenWire to be a curve.')
+  }
+
+  const summary = formatStratumStyleSummary(curve.style)
+
+  assert.equal(summary.includes('@'), false)
+  assert.equal(summary.includes('stroke opacity: 0.85'), true)
+  assert.equal(summary.includes('line style: denselyDotted'), true)
+})
+
+test('label style summaries display opacity with readable labels', () => {
+  const label = twoDimensionalExample.labels.find(
+    (textLabel) => textLabel.id === 'mathMorphismLabel',
+  )
+
+  assert.notEqual(label, undefined)
+
+  if (label === undefined) {
+    throw new Error('Expected mathMorphismLabel to exist.')
+  }
+
+  const summary = formatLabelStyleSummary(label.style)
+
+  assert.equal(summary.includes('@'), false)
+  assert.equal(summary.includes('opacity: 1'), true)
+  assert.equal(summary.includes('anchor: south'), true)
+})
+
+test('style summaries omit missing opacity values cleanly', () => {
+  const style = {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+  } as unknown as CurveStyle
+  const summary = formatStratumStyleSummary(style)
+
+  assert.equal(summary.includes('@'), false)
+  assert.equal(summary.includes('undefined'), false)
+  assert.equal(summary.includes('stroke opacity'), false)
+  assert.equal(summary.includes('line width: 1.2pt'), true)
+})
+
+test('stratum attached label is reported as metadata in helper output', () => {
+  const sections = createInspectorSections(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'visibleWire',
+  })
+  const fields = sections.flatMap((section) => section.fields)
+
+  assert.equal(
+    fields.some((field) => field.label === 'Attached label metadata'),
+    true,
+  )
+  assert.equal(fields.some((field) => field.label === 'Attached label'), false)
 })
 
 test('updateStratumById returns a new diagram without mutating the original', () => {

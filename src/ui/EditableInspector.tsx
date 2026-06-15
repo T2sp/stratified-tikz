@@ -100,19 +100,13 @@ function renderStratumInspector(
               )
             }
           />
-          <EditableTextField
-            label="Attached label"
-            value={stratum.label ?? ''}
-            placeholder="none"
-            onChange={(label) =>
-              onDiagramChange((currentDiagram) =>
-                updateStratumById(currentDiagram, stratum.id, (current) =>
-                  label === ''
-                    ? removeAttachedLabel(current)
-                    : { ...current, label },
-                ),
-              )
-            }
+          <ReadOnlyField
+            label="Attached label metadata"
+            value={stratum.label ?? 'none'}
+          />
+          <ReadOnlyField
+            label="Path labels"
+            value="not implemented in TikZ export yet"
           />
         </div>
       </section>
@@ -508,10 +502,6 @@ function EditablePointGroup({
       </div>
     </fieldset>
   )
-}
-
-function removeAttachedLabel(stratum: Stratum): Stratum {
-  return { ...stratum, label: undefined }
 }
 
 function formatSelectedGeometry(
