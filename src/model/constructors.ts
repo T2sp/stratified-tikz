@@ -77,6 +77,7 @@ export type CreateCurveStratumInput = {
   kind?: CurveKind
   name?: string
   label?: string
+  pathLabel?: string
   style?: CurveStyle
   points: Vec3[]
   styleSegments?: CurveStyleSegment[]
@@ -215,27 +216,31 @@ export function createCurveStratum({
   kind = 'polyline',
   name = 'Curve',
   label,
+  pathLabel,
   style = defaultCurveStyle,
   points,
   styleSegments = [],
   layer = 0,
 }: CreateCurveStratumInput): CurveStratum {
-  return withOptionalLabel(
-    {
-      id,
-      codim: ambientDimension === 2 ? 1 : 2,
-      geometricKind: 'curve',
-      kind,
-      name,
-      style: cloneCurveStyle(style),
-      points: points.map((point) =>
-        normalizePointForAmbientDimension(ambientDimension, point),
-      ),
-      styleSegments: styleSegments.map(cloneCurveStyleSegment),
-      layer,
-    },
-    label,
-  )
+  const curve: Omit<CurveStratum, 'label'> = {
+    id,
+    codim: ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind,
+    name,
+    style: cloneCurveStyle(style),
+    points: points.map((point) =>
+      normalizePointForAmbientDimension(ambientDimension, point),
+    ),
+    styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    layer,
+  }
+
+  if (pathLabel !== undefined) {
+    curve.pathLabel = pathLabel
+  }
+
+  return withOptionalLabel(curve, label)
 }
 
 export function createPointStratum({

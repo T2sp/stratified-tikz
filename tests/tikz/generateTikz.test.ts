@@ -3,12 +3,14 @@ import test from 'node:test'
 import {
   generateTikz,
   layerToTikzLayerName,
+  sanitizeTikzSpathSaveName,
   sanitizeTikzNameStem,
 } from '../../src/tikz/index.ts'
 import type {
   CurveStyle,
   Diagram,
   PointShape,
+  PointStratum,
   PointStyle,
   SheetStyle,
 } from '../../src/model/types.ts'
@@ -193,6 +195,161 @@ test('denselyDotted maps to densely dotted', () => {
   assert.match(generateTikz(diagram), /densely dotted/)
 })
 
+test('curve with empty path label emits no spath save option', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'unlabeled',
+      name: 'Unlabeled curve',
+      pathLabel: '   ',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.doesNotMatch(tikz, /spath\/save=/)
+  assert.doesNotMatch(tikz, /spath3/)
+})
+
+test('polyline curve with path label emits spath save option', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'wire-path',
+      name: 'Wire path',
+      pathLabel: 'wire path',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /% \\usetikzlibrary\{spath3\}/)
+  assert.match(tikz, /spath\/save=wirePath/)
+  assert.match(tikz, /\(curvePolyWirePath0p0\) -- \(curvePolyWirePath0p1\);/)
+})
+
+test('cubic Bezier curve with path label emits spath save option', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'cubicBezier',
+      id: 'arc-path',
+      name: 'Arc path',
+      pathLabel: 'arc path',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+        { x: 2, y: 1, z: 0 },
+        { x: 3, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /spath\/save=arcPath/)
+  assert.match(
+    tikz,
+    /\(curveBezierArcPath0p0\) \.\. controls \(curveBezierArcPath0p1\) and \(curveBezierArcPath0p2\) \.\. \(curveBezierArcPath0p3\);/,
+  )
+})
+
+test('polygon sheet with path label emits spath save option', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      id: 'surface-path',
+      name: 'Surface path',
+      pathLabel: 'surface boundary',
+      style: sheetStyle(),
+      vertices: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      layer: 0,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /spath\/save=surfaceBoundary/)
+  assert.match(
+    tikz,
+    /\(sheetPolySurfacePath0p0\) -- \(sheetPolySurfacePath0p1\) -- \(sheetPolySurfacePath0p2\) -- cycle;/,
+  )
+})
+
+test('point stratum path label is not emitted as spath save option', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const point = {
+    codim: 2,
+    geometricKind: 'point',
+    id: 'point-path',
+    name: 'Point path',
+    pathLabel: 'point path',
+    style: pointStyle(),
+    position: { x: 0, y: 0, z: 0 },
+    layer: 0,
+  } satisfies PointStratum & { pathLabel: string }
+  diagram.strata.push(point)
+
+  assert.doesNotMatch(generateTikz(diagram), /spath\/save=/)
+})
+
+test('free text labels are not emitted as spath save options', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'path-text',
+    name: 'Path text',
+    text: 'spath/save=notAPathLabel',
+    position: { x: 0, y: 0, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\{spath\/save=notAPathLabel\}/)
+  assert.doesNotMatch(tikz, /spath\/save=notAPathLabel,/)
+  assert.doesNotMatch(tikz, /% \\usetikzlibrary\{spath3\}/)
+})
+
 test('non-default label styles are emitted', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.labels.push({
@@ -299,6 +456,13 @@ test('TikZ name stem sanitizer falls back for blank or unsafe names', () => {
   assert.equal(sanitizeTikzNameStem('  ', 'sheet'), 'sheet')
   assert.equal(sanitizeTikzNameStem('\\{$%#&_ ^~}', 'curve'), 'curve')
   assert.equal(sanitizeTikzNameStem('123', 'point'), 'point123')
+})
+
+test('spath save name sanitizer keeps TikZ-safe non-empty names', () => {
+  assert.equal(sanitizeTikzSpathSaveName('my path'), 'myPath')
+  assert.equal(sanitizeTikzSpathSaveName('$F_{1}$'), 'F1')
+  assert.equal(sanitizeTikzSpathSaveName('123'), 'savedPath123')
+  assert.equal(sanitizeTikzSpathSaveName('\\{$%#&_ ^~}'), 'savedPath')
 })
 
 test('coordinate names include sanitized point, curve, and sheet names', () => {

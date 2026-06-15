@@ -227,6 +227,7 @@ export type PolygonSheetStratum = {
   kind: "polygonSheet";
   name: string;
   label?: string;
+  pathLabel?: string;
   style: SheetStyle;
   vertices: Vec3[];
   layer: number;
@@ -239,6 +240,28 @@ Polygon sheets use cyclically ordered `vertices` and represent filled closed
 polygonal regions. A polygon sheet must have at least three vertices.
 
 Curved-boundary sheets and Bézier-boundary sheets are not implemented yet.
+
+## Saved path labels
+
+Path-like strata may store an optional `pathLabel` string. This is not a visual
+or mathematical text label. It is a TikZ saved-path name used by the exporter to
+emit `spath/save=<name>` for eligible path-like output.
+
+Currently, `pathLabel` applies to:
+
+- `CurveStratum` for both `polyline` and `cubicBezier`
+- `PolygonSheetStratum` for the exported polygon sheet path
+
+It does not apply to `PointStratum`, and it is independent from free text labels
+stored in `diagram.labels`.
+
+Missing `pathLabel` fields are valid for backward compatibility. Empty or
+whitespace-only values mean no `spath/save` option should be emitted. When
+exporting, the raw string is trimmed and sanitized to a deterministic TikZ-safe
+name by keeping ASCII letters and digits, folding separators such as spaces or
+hyphens into camel-case word boundaries, and falling back to `savedPath` if the
+result would be empty. If the sanitized name starts with a digit, `savedPath` is
+prefixed before the digit.
 
 ## Curve stratum
 
@@ -262,9 +285,10 @@ export type CurveStratum = {
   kind: "polyline" | "cubicBezier";
   name: string;
   label?: string;
-  styleId: CurveStyleId;
+  pathLabel?: string;
+  style: CurveStyle;
   points: Vec3[];
-  visibilitySegments: VisibilitySegment[];
+  styleSegments: CurveStyleSegment[];
   layer: number;
 };
 ```
@@ -649,6 +673,7 @@ export type PolygonSheetStratum = {
   kind: "polygonSheet";
   name: string;
   label?: string;
+  pathLabel?: string;
   style: SheetStyle;
   vertices: Vec3[];
   layer: number;
@@ -670,9 +695,10 @@ export type CurveStratum = {
   kind: "polyline" | "cubicBezier";
   name: string;
   label?: string;
+  pathLabel?: string;
   style: CurveStyle;
   points: Vec3[];
-  visibilitySegments: VisibilitySegment[];
+  styleSegments: CurveStyleSegment[];
   layer: number;
 };
 ```
@@ -723,6 +749,10 @@ Here:
 - `#2` is the label content
 
 The label content is arbitrary user-provided text.
+
+Free text labels are separate from optional `pathLabel` saved-path names on
+path-like strata. A free text label is exported as node content and never as an
+`spath/save` option.
 
 Mathematical labels should be entered by the user using LaTeX math delimiters.
 

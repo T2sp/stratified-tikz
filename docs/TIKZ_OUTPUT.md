@@ -63,6 +63,43 @@ Free text labels are separate diagram objects. Their `name` fields do not
 create coordinate-name stems; labels are emitted directly as TikZ nodes at their
 stored model coordinates.
 
+## Saved path labels
+
+Path-like strata may also carry an optional `pathLabel` field. This field is
+not a displayed label. It is a TikZ saved-path name used to emit an `spath/save`
+option on the exported path:
+
+```tex
+\draw[
+  draw=stzCurveA,
+  draw opacity=1,
+  line width=1.2pt,
+  spath/save=myPath
+]
+  (p0) -- (p1);
+```
+
+If `pathLabel` is missing, empty, or only whitespace after trimming, no
+`spath/save` option is emitted. Saved path labels are currently exported for
+polyline curves, cubic Bézier curves, and polygon sheet paths. They are not
+emitted for point strata or for free text labels in `diagram.labels`.
+
+Saved path names are sanitized for TikZ safety by the same deterministic
+ASCII-letter-and-digit rules used for coordinate name stems: unsafe characters
+are removed, separators such as spaces and hyphens create camel-case word
+boundaries, and names that would otherwise be empty fall back to `savedPath`.
+If the sanitized name starts with a digit, `savedPath` is prefixed before the
+digit. For example, `my path` becomes `myPath`, `$F_{1}$` becomes `F1`, and
+`123` becomes `savedPath123`.
+
+When at least one `spath/save` option is emitted, the generated style/header
+section includes a comment documenting the required TikZ library:
+
+```tex
+% Required TikZ libraries for saved paths:
+% \usetikzlibrary{spath3}
+```
+
 ## Layer-aware output
 
 Generated TikZ uses PGF layers so that diagram `layer` values affect drawing
@@ -512,6 +549,9 @@ Here:
 The generator must preserve the user-provided label content as much as possible.
 
 The generator must not automatically wrap label content in `$...$`.
+
+Free text labels are independent from saved path labels. Text stored in
+`diagram.labels` is node content only; it never becomes an `spath/save` option.
 
 If the user wants math mode, the user should type `$...$` explicitly.
 

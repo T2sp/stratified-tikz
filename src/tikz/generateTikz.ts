@@ -42,6 +42,7 @@ type GenerateContext = {
   mode: TikzMode
   colors: ColorRegistry
   coordinates: CoordinateRegistry
+  hasSavedPaths: boolean
 }
 
 export function generateTikz(diagram: Diagram): string {
@@ -173,6 +174,10 @@ export function sanitizeTikzNameStem(name: string, fallback: string): string {
   return /^[a-zA-Z]/.test(safeStem) ? safeStem : `${fallbackStem}${safeStem}`
 }
 
+export function sanitizeTikzSpathSaveName(pathLabel: string): string {
+  return sanitizeTikzNameStem(pathLabel, 'savedPath')
+}
+
 export function layerToTikzLayerName(layer: number): string {
   const normalizedLayer = Object.is(layer, -0) ? 0 : layer
   const suffix = String(normalizedLayer)
@@ -189,6 +194,7 @@ function createContext(mode: TikzMode): GenerateContext {
     mode,
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
+    hasSavedPaths: false,
   }
 }
 
@@ -232,15 +238,25 @@ function emitTikzPictureStart(mode: TikzMode): string[] {
 }
 
 function emitRequiredLibraryComment(context: GenerateContext): string[] {
-  if (!context.coordinates.hasNonCircularPointShape) {
-    return []
+  const lines: string[] = []
+
+  if (context.coordinates.hasNonCircularPointShape) {
+    lines.push(
+      '% Required TikZ libraries for non-circular point shapes:',
+      '% \\usetikzlibrary{shapes.geometric,shapes.symbols}',
+      '',
+    )
   }
 
-  return [
-    '% Required TikZ libraries for non-circular point shapes:',
-    '% \\usetikzlibrary{shapes.geometric,shapes.symbols}',
-    '',
-  ]
+  if (context.hasSavedPaths) {
+    lines.push(
+      '% Required TikZ libraries for saved paths:',
+      '% \\usetikzlibrary{spath3}',
+      '',
+    )
+  }
+
+  return lines
 }
 
 function emitTikzLayerDeclarations(layers: number[]): string[] {
@@ -287,13 +303,20 @@ function emitSheet(
       vertex,
     ),
   )
+  const options = [
+    `fill=${fillColor}`,
+    `fill opacity=${formatNumber(sheet.style.fillOpacity)}`,
+    `draw=${strokeColor}`,
+    `draw opacity=${formatNumber(sheet.style.strokeOpacity)}`,
+    ...spathSaveOptions(
+      sheet.kind === 'polygonSheet' ? sheet.pathLabel : undefined,
+      context,
+    ),
+  ]
 
   return [
     `\\path[`,
-    `  fill=${fillColor},`,
-    `  fill opacity=${formatNumber(sheet.style.fillOpacity)},`,
-    `  draw=${strokeColor},`,
-    `  draw opacity=${formatNumber(sheet.style.strokeOpacity)}`,
+    ...formatTikzOptions(options),
     `]`,
     `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
     '',
@@ -333,6 +356,7 @@ function emitCurve(
     `draw opacity=${formatNumber(curve.style.strokeOpacity)}`,
     `line width=${formatNumber(curve.style.lineWidth)}pt`,
     ...(lineStyleOption === null ? [] : [lineStyleOption]),
+    ...spathSaveOptions(curve.pathLabel, context),
   ]
 
   return [
@@ -525,6 +549,21 @@ function formatCurvePath(curve: CurveStratum, coordinates: string[]): string {
   }
 
   return coordinates.map((name) => `(${name})`).join(' -- ')
+}
+
+function spathSaveOptions(
+  pathLabel: string | undefined,
+  context: GenerateContext,
+): string[] {
+  const trimmedPathLabel = pathLabel?.trim()
+
+  if (trimmedPathLabel === undefined || trimmedPathLabel.length === 0) {
+    return []
+  }
+
+  context.hasSavedPaths = true
+
+  return [`spath/save=${sanitizeTikzSpathSaveName(trimmedPathLabel)}`]
 }
 
 function formatTikzOptions(options: string[]): string[] {

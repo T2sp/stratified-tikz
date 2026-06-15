@@ -1,4 +1,9 @@
-import type { Diagram, Stratum } from '../../model/types.ts'
+import type {
+  CurveStratum,
+  Diagram,
+  PolygonSheetStratum,
+  Stratum,
+} from '../../model/types.ts'
 import {
   updateStratumById,
   updateStratumNameById,
@@ -59,10 +64,7 @@ export function StratumInspector({
             label="Attached label metadata"
             value={stratum.label ?? 'none'}
           />
-          <ReadOnlyField
-            label="Path labels"
-            value="not implemented in TikZ export yet"
-          />
+          <PathLabelField stratum={stratum} onDiagramChange={onDiagramChange} />
         </div>
       </section>
 
@@ -75,6 +77,59 @@ export function StratumInspector({
       <StyleEditor stratum={stratum} onDiagramChange={onDiagramChange} />
     </div>
   )
+}
+
+type PathLabelStratum = CurveStratum | PolygonSheetStratum
+
+function PathLabelField({
+  stratum,
+  onDiagramChange,
+}: {
+  stratum: Stratum
+  onDiagramChange: DiagramChangeHandler
+}) {
+  if (!isPathLabelStratum(stratum)) {
+    return <ReadOnlyField label="Path label" value="not applicable" />
+  }
+
+  return (
+    <EditableTextField
+      label="Path label"
+      value={stratum.pathLabel ?? ''}
+      onChange={(pathLabel) =>
+        onDiagramChange((currentDiagram) =>
+          updateStratumById(currentDiagram, stratum.id, (current) => {
+            if (!isPathLabelStratum(current)) {
+              return current
+            }
+
+            if (pathLabel.trim().length === 0) {
+              return omitPathLabel(current)
+            }
+
+            return {
+              ...current,
+              pathLabel,
+            }
+          }),
+        )
+      }
+    />
+  )
+}
+
+function isPathLabelStratum(stratum: Stratum): stratum is PathLabelStratum {
+  return (
+    stratum.geometricKind === 'curve' ||
+    (stratum.geometricKind === 'sheet' && stratum.kind === 'polygonSheet')
+  )
+}
+
+function omitPathLabel(stratum: PathLabelStratum): PathLabelStratum {
+  const withoutPathLabel = { ...stratum }
+  delete withoutPathLabel.pathLabel
+
+  return withoutPathLabel
 }
 
 function StratumGeometrySection({
