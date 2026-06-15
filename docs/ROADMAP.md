@@ -630,6 +630,29 @@ Out of scope:
 
 ⸻
 
+### Phase 10E: One-step undo
+
+Status: Implemented.
+
+Implemented behavior:
+
+* The toolbar has an Undo button, disabled when no undo snapshot exists.
+* `Cmd+Z` / `Ctrl+Z` triggers undo when focus is outside input, textarea,
+  select, and contenteditable fields.
+* Undo stores only the previous committed `Diagram` value in editor state.
+* Undo history is not saved to JSON and is not exported to TikZ.
+* Undo clears drafts and clears selection when the selected element no longer
+  exists in the restored diagram.
+* Loading JSON is treated as an undoable diagram replacement.
+
+Out of scope:
+
+* Redo.
+* Multi-step history.
+* Persistent history across save/load.
+
+⸻
+
 ## Phase 11: Bézier editing improvements
 
 ⸻

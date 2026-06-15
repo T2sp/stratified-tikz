@@ -62,6 +62,8 @@ export type SvgDiagramProps = {
     viewportHeight: number,
     camera: Diagram['camera'],
   ) => void
+  onGeometryHandleDragStart?: (target: GeometryHandleTarget) => void
+  onGeometryHandleDragEnd?: () => void
 }
 
 export type WorkPlanePreview = {
@@ -98,6 +100,8 @@ export function SvgDiagram({
   onSelectionChange,
   onCanvasClick,
   onGeometryHandleDrag,
+  onGeometryHandleDragStart,
+  onGeometryHandleDragEnd,
 }: SvgDiagramProps): ReactElement {
   const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
@@ -162,6 +166,7 @@ export function SvgDiagram({
         if (activeDragTargetRef.current !== null) {
           event.preventDefault()
           activeDragTargetRef.current = null
+          onGeometryHandleDragEnd?.()
           releasePointerCaptureIfHeld(event)
           window.setTimeout(() => {
             suppressNextCanvasClickRef.current = false
@@ -171,6 +176,7 @@ export function SvgDiagram({
       onPointerCancel={(event) => {
         activeDragTargetRef.current = null
         suppressNextCanvasClickRef.current = false
+        onGeometryHandleDragEnd?.()
         releasePointerCaptureIfHeld(event)
       }}
       onClick={(event) => {
@@ -208,6 +214,7 @@ export function SvgDiagram({
               event.stopPropagation()
               activeDragTargetRef.current = target
               suppressNextCanvasClickRef.current = true
+              onGeometryHandleDragStart?.(target)
               event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
             },
           )
