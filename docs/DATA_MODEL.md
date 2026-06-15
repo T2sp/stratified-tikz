@@ -73,7 +73,8 @@ export type SavedDiagramFile = {
 
 Only `diagram` data is persisted. UI/editor state such as the selected element,
 active creation tool, coordinate input mode, active work plane, draft geometry,
-layer filter, copy status, and temporary preview state is not saved.
+layer filter, copy status, undo/redo history, and temporary preview state is not
+saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
@@ -143,6 +144,13 @@ The current "new element layer" control is also UI state. Cursor and direct
 creation use it when committing new strata or free text labels, but the control
 itself is not saved. Once an element is created, its numeric `layer` is ordinary
 diagram data.
+
+Undo/redo history is editor state rather than diagram data. It is represented as
+bounded committed diagram snapshots with `past`, `present`, and `future`, with a
+limit of 100 past states. Undo moves backward through committed diagrams; redo
+cancels undo by moving forward through the future stack. Selection, layer
+filter, coordinate input mode, active work plane, direct form values, and draft
+geometry are not stored in history, and history is never saved to JSON.
 
 ## Work planes
 

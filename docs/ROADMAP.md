@@ -630,26 +630,36 @@ Out of scope:
 
 ⸻
 
-### Phase 10E: One-step undo
+### Phase 10E: Multi-step undo/redo
 
 Status: Implemented.
 
 Implemented behavior:
 
-* The toolbar has an Undo button, disabled when no undo snapshot exists.
-* `Cmd+Z` / `Ctrl+Z` triggers undo when focus is outside input, textarea,
+* The toolbar has Undo and Redo buttons, disabled when their respective history
+  direction is unavailable.
+* `Cmd+Z` / `Ctrl+Z` triggers undo, `Cmd+Shift+Z` / `Ctrl+Shift+Z` triggers
+  redo, and `Ctrl+Y` triggers redo when focus is outside input, textarea,
   select, and contenteditable fields.
-* Undo stores only the previous committed `Diagram` value in editor state.
-* Undo history is not saved to JSON and is not exported to TikZ.
-* Undo clears drafts and clears selection when the selected element no longer
-  exists in the restored diagram.
+* History is stored as editor/UI state with bounded committed diagram snapshots:
+  `past`, `present`, and `future`.
+* The history limit is 100 past committed diagram states.
+* Undo moves one step backward through committed diagram history.
+* Redo cancels undo by moving one step forward through the `future` history.
+* New committed diagram edits clear the redo future.
+* Undo/redo history is not saved to JSON and is not exported to TikZ.
+* Selection, layer filter, direct form values, and draft geometry are not stored
+  in history.
+* Undo/redo clear active drafts and clear selection when the selected element no
+  longer exists or is hidden by the current layer filter.
+* Drag-handle updates reuse the pre-drag diagram as the undo source so one undo
+  reverts the whole drag instead of each pointer move.
 * Loading JSON is treated as an undoable diagram replacement.
 
 Out of scope:
 
-* Redo.
-* Multi-step history.
 * Persistent history across save/load.
+* Branching history UI.
 
 ⸻
 
