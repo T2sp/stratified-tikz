@@ -46,8 +46,10 @@ a safe geometric default such as `point`, `curve`, or `sheet`. If a sanitized
 stem starts with a digit, the fallback is prefixed before the digit.
 
 Coordinate names remain deterministic and unique by combining the geometric
-prefix, optional concrete type, sanitized name stem, sorted element index, and
-coordinate index. Examples:
+prefix, optional concrete type, sanitized name stem, emission element index, and
+coordinate index. Elements are emitted by numeric layer, and elements on the
+same layer keep their original diagram order rather than being sorted by id.
+Examples:
 
 ```tex
 \coordinate (pointParticle0p0) at (0,0);
@@ -96,17 +98,24 @@ Drawing commands for sheets, curves, points, and free text labels are wrapped in
 
 ```tex
 \begin{pgfonlayer}{stratifiedLayer0}
+  %----------------------------------------
+  % Codimension 1 strata: curves
+  %----------------------------------------
   \draw[...] ...;
 \end{pgfonlayer}
 
 \begin{pgfonlayer}{stratifiedLayer1}
+  %----------------------------------------
+  % Labels
+  %----------------------------------------
   \node at (1,0) {$F$};
 \end{pgfonlayer}
 ```
 
-Within each layer, the generator preserves the existing relative emission order.
-Coordinate definitions remain outside layer blocks and keep the Phase 9A
-coordinate-name rules based on sanitized stratum names.
+Layers are emitted in deterministic numeric order. Within a layer, items that
+belong to the same emitted section preserve their existing relative diagram
+order. Coordinate definitions remain outside layer blocks and keep the Phase 9A
+coordinate-name rules based on sanitized stratum names and emission order.
 
 Selection and preview highlighting are not exported. Layer filtering and
 layer-based selection UI are not part of this phase.
@@ -180,6 +189,8 @@ In 2D mode, group output as:
 
 Layer blocks include comments for the contained codimension sections, such as
 `Codimension 1 strata: curves`, `Codimension 2 strata: points`, and `Labels`.
+Each in-layer section comment is surrounded by `%-----` separator comments for
+readability.
 
 ## Output sections in 3D mode
 
@@ -197,7 +208,8 @@ In 3D mode, group output as:
 
 Layer blocks include comments for the contained codimension sections, such as
 `Codimension 1 strata: sheets`, `Codimension 2 strata: curves`,
-`Codimension 3 strata: points`, and `Labels`.
+`Codimension 3 strata: points`, and `Labels`. Each in-layer section comment is
+surrounded by `%-----` separator comments for readability.
 
 ## Readability requirements
 
@@ -556,21 +568,23 @@ Then use:
 \node[text=stzLabelA] at (1.2,0.5) {$F$};
 ```
 
-## Label section
+## Layered label output
 
-Labels should be emitted near the end of the TikZ output.
+Free text labels are emitted inside the `pgfonlayer` block for their configured
+numeric layer.
 
-In both 2D and 3D modes, use the section:
+Within each layer, labels are grouped under a readable label comment:
 
 ```tex
-% ----------------------------------------------------------------------------
+%----------------------------------------
 % Labels
-% ----------------------------------------------------------------------------
+%----------------------------------------
 ```
 
 Each label should be emitted as a separate TikZ node.
 
-The output should remain readable.
+There is no separate non-layered label section. Selection and preview
+highlighting are not exported.
 
 ## Label content escaping
 

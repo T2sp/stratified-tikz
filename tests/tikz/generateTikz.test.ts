@@ -127,6 +127,32 @@ test('same-layer drawing command order is preserved', () => {
   )
 })
 
+test('same-kind same-layer drawing order follows diagram order, not id order', () => {
+  const tikz = generateTikz(createSameLayerOppositeIdCurveDiagram())
+  const layerZero = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(tikz, /\\coordinate \(curvePolyZCurve0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyACurve1p0\) at \(0,1\);/)
+  assert.ok(
+    tikz.indexOf('\\coordinate (curvePolyZCurve0p0)') <
+      tikz.indexOf('\\coordinate (curvePolyACurve1p0)'),
+  )
+  assert.ok(
+    layerZero.indexOf('(curvePolyZCurve0p0)') <
+      layerZero.indexOf('(curvePolyACurve1p0)'),
+  )
+})
+
+test('layer blocks use separated codimension comments', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram())
+  const layerZero = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(
+    layerZero,
+    /%---+\n\s*% Codimension 1 strata: curves\n\s*%---+/,
+  )
+})
+
 test('layer-aware output preserves Phase 9A coordinate names', () => {
   const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
 
@@ -505,6 +531,42 @@ function createLayeredTwoDimensionalDiagram(): Diagram {
     },
     layer: -1,
   })
+
+  return diagram
+}
+
+function createSameLayerOppositeIdCurveDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'z-curve',
+      name: 'Z curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'a-curve',
+      name: 'A curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
 
   return diagram
 }

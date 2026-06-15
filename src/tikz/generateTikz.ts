@@ -405,12 +405,12 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
   ]
 }
 
-function emitLayeredItems<T extends { layer: number; id: string }>(
+function emitLayeredItems<T extends { layer: number }>(
   sectionTitle: string,
   items: T[],
   emit: (item: T, index: number) => string[],
 ): LayeredTikzCommand[] {
-  return sortByLayer(items).map((item, index) => ({
+  return sortByLayer(items).map(({ item }, index) => ({
     layer: normalizeLayer(item.layer),
     sectionTitle,
     lines: emit(item, index),
@@ -439,7 +439,7 @@ function emitLayeredCommands(
 
     for (const command of commandsInLayer) {
       if (command.sectionTitle !== previousSectionTitle) {
-        lines.push(`  % ${command.sectionTitle}`)
+        lines.push(...layerSectionComment(command.sectionTitle))
         previousSectionTitle = command.sectionTitle
       }
 
@@ -462,6 +462,12 @@ function emitLayeredCommands(
 
 function indentLines(lines: string[]): string[] {
   return lines.map((line) => (line.length === 0 ? line : `  ${line}`))
+}
+
+function layerSectionComment(sectionTitle: string): string[] {
+  const separator = '  %----------------------------------------'
+
+  return [separator, `  % ${sectionTitle}`, separator]
 }
 
 function labelStyleOptions(
@@ -560,17 +566,21 @@ function formatNumber(value: number): string {
   return String(Number(value.toFixed(6)))
 }
 
-function sortByLayer<T extends { layer: number; id: string }>(items: T[]): T[] {
-  return [...items].sort((first, second) => {
-    const firstLayer = normalizeLayer(first.layer)
-    const secondLayer = normalizeLayer(second.layer)
+function sortByLayer<T extends { layer: number }>(
+  items: T[],
+): { item: T; originalIndex: number }[] {
+  return items
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((first, second) => {
+      const firstLayer = normalizeLayer(first.item.layer)
+      const secondLayer = normalizeLayer(second.item.layer)
 
-    if (firstLayer !== secondLayer) {
-      return firstLayer - secondLayer
-    }
+      if (firstLayer !== secondLayer) {
+        return firstLayer - secondLayer
+      }
 
-    return first.id.localeCompare(second.id)
-  })
+      return first.originalIndex - second.originalIndex
+    })
 }
 
 function normalizeLayer(layer: number): number {
