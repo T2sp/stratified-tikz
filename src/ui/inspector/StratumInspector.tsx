@@ -3,6 +3,7 @@ import type {
   Diagram,
   PolygonSheetStratum,
   Stratum,
+  WorkPlane,
 } from '../../model/types.ts'
 import {
   updateStratumById,
@@ -22,12 +23,14 @@ import type { DiagramChangeHandler } from './types.ts'
 export type StratumInspectorProps = {
   diagram: Diagram
   stratum: Stratum
+  activeWorkPlane: WorkPlane
   onDiagramChange: DiagramChangeHandler
 }
 
 export function StratumInspector({
   diagram,
   stratum,
+  activeWorkPlane,
   onDiagramChange,
 }: StratumInspectorProps) {
   return (
@@ -71,6 +74,7 @@ export function StratumInspector({
       <StratumGeometrySection
         diagram={diagram}
         stratum={stratum}
+        activeWorkPlane={activeWorkPlane}
         onDiagramChange={onDiagramChange}
       />
 
@@ -135,6 +139,7 @@ function omitPathLabel(stratum: PathLabelStratum): PathLabelStratum {
 function StratumGeometrySection({
   diagram,
   stratum,
+  activeWorkPlane,
   onDiagramChange,
 }: StratumInspectorProps) {
   switch (stratum.geometricKind) {
@@ -163,6 +168,7 @@ function StratumGeometrySection({
         <CurveGeometryEditor
           diagram={diagram}
           curve={stratum}
+          activeWorkPlane={activeWorkPlane}
           onDiagramChange={onDiagramChange}
         />
       )

@@ -1,3 +1,7 @@
+import {
+  cubicBezierControlToRelativePolar,
+  isEditableCubicBezierCurve,
+} from '../geometry/bezierControls.ts'
 import type {
   CurveStratum,
   Diagram,
@@ -38,21 +42,34 @@ type LayeredTikzCommand = {
   lines: string[]
 }
 
+export type CubicBezierControlExport = 'absolute' | 'relativePolar'
+
+export type GenerateTikzOptions = {
+  cubicBezierControlExport?: CubicBezierControlExport
+}
+
 type GenerateContext = {
   mode: TikzMode
   colors: ColorRegistry
   coordinates: CoordinateRegistry
   hasSavedPaths: boolean
+  options: Required<GenerateTikzOptions>
 }
 
-export function generateTikz(diagram: Diagram): string {
+export function generateTikz(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
   return diagram.ambientDimension === 2
-    ? generateTikz2D(diagram)
-    : generateTikz3D(diagram)
+    ? generateTikz2D(diagram, options)
+    : generateTikz3D(diagram, options)
 }
 
-export function generateTikz2D(diagram: Diagram): string {
-  const context = createContext('2d')
+export function generateTikz2D(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
+  const context = createContext('2d', options)
   const curveSectionTitle = 'Codimension 1 strata: curves'
   const pointSectionTitle = 'Codimension 2 strata: points'
   const labelSectionTitle = 'Labels'
@@ -97,8 +114,11 @@ export function generateTikz2D(diagram: Diagram): string {
   })
 }
 
-export function generateTikz3D(diagram: Diagram): string {
-  const context = createContext('3d')
+export function generateTikz3D(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
+  const context = createContext('3d', options)
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
   const curveSectionTitle = 'Codimension 2 strata: curves'
   const pointSectionTitle = 'Codimension 3 strata: points'
@@ -189,12 +209,18 @@ export function layerToTikzLayerName(layer: number): string {
   return `stratifiedLayer${suffix}`
 }
 
-function createContext(mode: TikzMode): GenerateContext {
+function createContext(
+  mode: TikzMode,
+  options: GenerateTikzOptions,
+): GenerateContext {
   return {
     mode,
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
     hasSavedPaths: false,
+    options: {
+      cubicBezierControlExport: options.cubicBezierControlExport ?? 'absolute',
+    },
   }
 }
 
@@ -343,7 +369,14 @@ function emitCurve(
     `Curve${curve.id}Stroke`,
     curve.style.strokeColor,
   )
-  const coordinates = curve.points.map((point, index) =>
+  const relativePolarPath = shouldUseRelativePolarCurvePath(curve, context)
+  const coordinatePoints = relativePolarPath
+    ? [
+        { point: curve.points[0], index: 0 },
+        { point: curve.points[3], index: 3 },
+      ]
+    : curve.points.map((point, index) => ({ point, index }))
+  const coordinates = coordinatePoints.map(({ point, index }) =>
     context.coordinates.define(
       curveCoordinateBaseName(curve, elementIndex),
       index,
@@ -363,7 +396,7 @@ function emitCurve(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    `  ${formatCurvePath(curve, coordinates)};`,
+    `  ${formatCurvePath(curve, coordinates, context)};`,
     '',
   ]
 }
@@ -543,12 +576,56 @@ function pointShapeOptions(
   }
 }
 
-function formatCurvePath(curve: CurveStratum, coordinates: string[]): string {
+function formatCurvePath(
+  curve: CurveStratum,
+  coordinates: string[],
+  context: GenerateContext,
+): string {
+  if (shouldUseRelativePolarCurvePath(curve, context) && coordinates.length === 2) {
+    const firstControl = cubicBezierControlToRelativePolar(
+      curve.points,
+      1,
+      2,
+      { kind: 'xy', z: 0 },
+    )
+    const secondControl = cubicBezierControlToRelativePolar(
+      curve.points,
+      2,
+      2,
+      { kind: 'xy', z: 0 },
+    )
+
+    if (firstControl !== null && secondControl !== null) {
+      return `(${coordinates[0]}) .. controls ${formatRelativePolarControl(firstControl)} and ${formatRelativePolarControl(secondControl)} .. (${coordinates[1]})`
+    }
+  }
+
   if (curve.kind === 'cubicBezier' && coordinates.length === 4) {
     return `(${coordinates[0]}) .. controls (${coordinates[1]}) and (${coordinates[2]}) .. (${coordinates[3]})`
   }
 
   return coordinates.map((name) => `(${name})`).join(' -- ')
+}
+
+function shouldUseRelativePolarCurvePath(
+  curve: CurveStratum,
+  context: GenerateContext,
+): boolean {
+  return (
+    context.mode === '2d' &&
+    context.options.cubicBezierControlExport === 'relativePolar' &&
+    isEditableCubicBezierCurve(curve)
+  )
+}
+
+function formatRelativePolarControl({
+  angleDegrees,
+  radius,
+}: {
+  angleDegrees: number
+  radius: number
+}): string {
+  return `+(${formatNumber(angleDegrees)}:${formatNumber(radius)})`
 }
 
 function spathSaveOptions(

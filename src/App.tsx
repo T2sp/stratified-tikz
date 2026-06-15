@@ -1709,6 +1709,7 @@ function App() {
           <EditableInspector
             diagram={editableDiagram}
             selectedElement={selectedElement}
+            activeWorkPlane={activeWorkPlane}
             onDiagramChange={updateEditableDiagram}
           />
         </article>

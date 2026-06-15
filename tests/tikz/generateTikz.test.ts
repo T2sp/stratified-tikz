@@ -279,6 +279,49 @@ test('cubic Bezier curve with path label emits spath save option', () => {
   )
 })
 
+test('cubic Bezier controls export as absolute coordinates by default', () => {
+  const diagram = createCubicBezierDiagram({ ambientDimension: 2 })
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(curveBezierArc0p1\) at \(1,1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc0p2\) at \(2,1\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierArc0p0\) \.\. controls \(curveBezierArc0p1\) and \(curveBezierArc0p2\) \.\. \(curveBezierArc0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+\(/)
+})
+
+test('2D cubic Bezier controls can export using relative polar syntax', () => {
+  const diagram = createCubicBezierDiagram({ ambientDimension: 2 })
+  const tikz = generateTikz(diagram, {
+    cubicBezierControlExport: 'relativePolar',
+  })
+
+  assert.match(tikz, /\\coordinate \(curveBezierArc0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc0p3\) at \(3,0\);/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierArc0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierArc0p2\)/)
+  assert.match(
+    tikz,
+    /\(curveBezierArc0p0\) \.\. controls \+\(45:1\.414214\) and \+\(135:1\.414214\) \.\. \(curveBezierArc0p3\);/,
+  )
+})
+
+test('relative polar Bezier export falls back to absolute controls in 3D', () => {
+  const diagram = createCubicBezierDiagram({ ambientDimension: 3 })
+  const tikz = generateTikz(diagram, {
+    cubicBezierControlExport: 'relativePolar',
+  })
+
+  assert.match(tikz, /\\coordinate \(curveBezierArc0p1\) at \(1,1,0\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierArc0p0\) \.\. controls \(curveBezierArc0p1\) and \(curveBezierArc0p2\) \.\. \(curveBezierArc0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+\(/)
+})
+
 test('polygon sheet with path label emits spath save option', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.strata.push(
@@ -769,6 +812,32 @@ function createCurveNamingDiagram(): Diagram {
       layer: 1,
     },
   )
+
+  return diagram
+}
+
+function createCubicBezierDiagram({
+  ambientDimension,
+}: {
+  ambientDimension: 2 | 3
+}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension })
+  diagram.strata.push({
+    codim: ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'arc',
+    name: 'Arc',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 1, z: 0 },
+      { x: 2, y: 1, z: 0 },
+      { x: 3, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
 
   return diagram
 }
