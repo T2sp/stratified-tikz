@@ -28,6 +28,7 @@ import {
   addTextLabelFromDirectInput,
   addTextLabelWithResult,
   cloneDiagram,
+  directCreationLayerOptions,
   makeUniqueId,
   normalizeDirectLabelText,
   parseDirectCoordinateInput,
@@ -55,8 +56,10 @@ import {
   type SelectedElement,
 } from '../../src/ui/selection.ts'
 import {
+  clearSelectionForLayerFilter,
   deriveAvailableLayers,
   layerFilterIncludesLayer,
+  type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
 
 function createEmptyDiagramForTest(ambientDimension: AmbientDimension): Diagram {
@@ -704,6 +707,44 @@ test('direct-created 3D point preserves z and has codim 3', () => {
   assert.deepEqual(point.position, { x: 1, y: 2, z: 3.25 })
 })
 
+test('direct-created point uses active layer filter layer and remains selected', () => {
+  const activeLayer = 2
+  const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
+  const result = addPointStratumFromDirectInput(
+    twoDimensionalExample,
+    { x: '1', y: '2', z: '99' },
+    {
+      id: 'filtered-direct-point',
+      ...directCreationLayerOptions(layerFilter),
+    },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const point = result.diagram.strata.find(
+    (stratum) => stratum.id === 'filtered-direct-point',
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected direct-created stratum to be a point.')
+  }
+
+  const selection: SelectedElement = { kind: 'stratum', id: result.id }
+
+  assert.equal(point.layer, activeLayer)
+  assert.equal(layerFilterIncludesLayer(layerFilter, point.layer), true)
+  assert.deepEqual(
+    clearSelectionForLayerFilter(result.diagram, selection, layerFilter),
+    selection,
+  )
+})
+
 test('addPolygonSheetStratum returns a new 3D diagram with codim 1', () => {
   const vertices = [
     { x: 0, y: 0, z: 1 },
@@ -1128,6 +1169,43 @@ test('direct-created label is added to diagram.labels', () => {
     text: '$F$',
     position: { x: 4, y: 5, z: 6 },
   })
+})
+
+test('direct-created label uses active layer filter layer and remains selected', () => {
+  const activeLayer = 2
+  const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
+  const result = addTextLabelFromDirectInput(
+    twoDimensionalExample,
+    { x: '3', y: '4', z: '99' },
+    '$F$',
+    {
+      id: 'filtered-direct-label',
+      ...directCreationLayerOptions(layerFilter),
+    },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct label creation to succeed.')
+  }
+
+  const label = result.diagram.labels.find(
+    (candidate) => candidate.id === 'filtered-direct-label',
+  )
+
+  if (label === undefined) {
+    throw new Error('Expected direct-created label to be present.')
+  }
+
+  const selection: SelectedElement = { kind: 'label', id: result.id }
+
+  assert.equal(label.layer, activeLayer)
+  assert.equal(layerFilterIncludesLayer(layerFilter, label.layer), true)
+  assert.deepEqual(
+    clearSelectionForLayerFilter(result.diagram, selection, layerFilter),
+    selection,
+  )
 })
 
 test('blank direct label text normalizes to the existing default label text', () => {

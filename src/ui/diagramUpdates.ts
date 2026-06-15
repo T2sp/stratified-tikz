@@ -268,6 +268,10 @@ export type DirectLabelCreationResult =
       diagram: Diagram
     }
 
+export type DirectCreationLayerOptions = {
+  layer?: number
+}
+
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
   const existingIds = new Set([
     ...diagram.strata.map((stratum) => stratum.id),
@@ -481,6 +485,12 @@ export function addTextLabelFromDirectInput(
     diagram: result.diagram,
     id: result.id,
   }
+}
+
+export function directCreationLayerOptions(
+  layerFilter: LayerFilter,
+): DirectCreationLayerOptions {
+  return layerFilter.kind === 'layer' ? { layer: layerFilter.layer } : {}
 }
 
 export function updateStratumNameById(

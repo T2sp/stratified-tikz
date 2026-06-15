@@ -50,6 +50,7 @@ import {
   createSheetPolygonDraft,
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
+  directCreationLayerOptions,
   EditableInspector,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
@@ -651,6 +652,7 @@ function App() {
       const result = addPointStratumFromDirectInput(
         editableDiagram,
         directCoordinates,
+        directCreationLayerOptions(layerFilter),
       )
 
       if (!result.ok) {
@@ -660,11 +662,7 @@ function App() {
 
       setEditorState((current) => ({
         editableDiagram: result.diagram,
-        selectedElement: clearSelectionForLayerFilter(
-          result.diagram,
-          { kind: 'stratum', id: result.id },
-          current.layerFilter,
-        ),
+        selectedElement: { kind: 'stratum', id: result.id },
         layerFilter: current.layerFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
@@ -679,6 +677,7 @@ function App() {
       editableDiagram,
       directCoordinates,
       directLabelText,
+      directCreationLayerOptions(layerFilter),
     )
 
     if (!result.ok) {
@@ -688,11 +687,7 @@ function App() {
 
     setEditorState((current) => ({
       editableDiagram: result.diagram,
-      selectedElement: clearSelectionForLayerFilter(
-        result.diagram,
-        { kind: 'label', id: result.id },
-        current.layerFilter,
-      ),
+      selectedElement: { kind: 'label', id: result.id },
       layerFilter: current.layerFilter,
       polylineDraft: null,
       cubicBezierDraft: null,
