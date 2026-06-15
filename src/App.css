@@ -77,6 +77,7 @@
 
 .toolbar-select,
 .toolbar-text-input,
+.direct-create-field input,
 .work-plane-fixed input {
   min-height: 34px;
   border: 1px solid var(--border);
@@ -125,6 +126,30 @@
   min-width: 0;
   padding: 6px 8px;
   font-family: var(--mono);
+}
+
+.direct-create-control {
+  flex: 1 1 420px;
+}
+
+.direct-create-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(70px, 96px);
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.direct-create-field input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--mono);
+}
+
+.direct-create-text {
+  grid-template-columns: auto minmax(140px, 220px);
 }
 
 .toolbar-note {

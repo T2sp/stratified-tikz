@@ -22,6 +22,7 @@ import {
   serializeDiagram,
 } from './model/serialization.ts'
 import type {
+  AmbientDimension,
   Camera,
   CoordinateInputMode,
   Diagram,
@@ -36,7 +37,9 @@ import {
   addPolygonSheetStratumWithResult,
   addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
+  addPointStratumFromDirectInput,
   addTextLabelWithResult,
+  addTextLabelFromDirectInput,
   appendSheetPolygonDraftPoint,
   areFinitePoints,
   arePointsOnWorkPlane,
@@ -53,6 +56,7 @@ import {
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
+  type DirectCoordinateInput,
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
@@ -102,6 +106,11 @@ const exampleOptions: ExampleOption[] = [
 ]
 
 const coordinateInputModes: CoordinateInputMode[] = ['cursor', 'direct']
+const defaultDirectCoordinates: DirectCoordinateInput = {
+  x: '0',
+  y: '0',
+  z: '0',
+}
 const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'select', label: 'Select' },
   { id: 'createPoint', label: 'Add point' },
@@ -120,6 +129,11 @@ function App() {
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [sheetStatus, setSheetStatus] = useState<string>('')
+  const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
+  const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
+    defaultDirectCoordinates,
+  )
+  const [directLabelText, setDirectLabelText] = useState<string>('Label')
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
@@ -214,6 +228,7 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setSheetStatus('')
+    setDirectCreationStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -306,6 +321,7 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setSheetStatus('')
+    setDirectCreationStatus('')
     setSaveLoadStatus('loaded')
     setSaveLoadMessage('JSON loaded.')
   }
@@ -406,6 +422,7 @@ function App() {
     }
 
     setCreationTool(tool)
+    setDirectCreationStatus('')
 
     if (
       tool !== 'createPolyline' &&
@@ -457,6 +474,13 @@ function App() {
     previewCamera: Camera,
   ): void {
     if (creationTool === 'select') {
+      return
+    }
+
+    if (
+      coordinateInputMode === 'direct' &&
+      (creationTool === 'createPoint' || creationTool === 'createLabel')
+    ) {
       return
     }
 
@@ -605,6 +629,77 @@ function App() {
     if (creationTool !== 'createPolyline') {
       setCopyStatus('idle')
     }
+  }
+
+  function updateDirectCoordinate(
+    axis: keyof DirectCoordinateInput,
+    value: string,
+  ): void {
+    setDirectCoordinates((current) => ({
+      ...current,
+      [axis]: value,
+    }))
+    setDirectCreationStatus('')
+  }
+
+  function createDirectElement(): void {
+    if (creationTool !== 'createPoint' && creationTool !== 'createLabel') {
+      return
+    }
+
+    if (creationTool === 'createPoint') {
+      const result = addPointStratumFromDirectInput(
+        editableDiagram,
+        directCoordinates,
+      )
+
+      if (!result.ok) {
+        setDirectCreationStatus('Coordinates must be finite numbers.')
+        return
+      }
+
+      setEditorState((current) => ({
+        editableDiagram: result.diagram,
+        selectedElement: clearSelectionForLayerFilter(
+          result.diagram,
+          { kind: 'stratum', id: result.id },
+          current.layerFilter,
+        ),
+        layerFilter: current.layerFilter,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }))
+      setDirectCreationStatus('Point created.')
+      setCopyStatus('idle')
+      return
+    }
+
+    const result = addTextLabelFromDirectInput(
+      editableDiagram,
+      directCoordinates,
+      directLabelText,
+    )
+
+    if (!result.ok) {
+      setDirectCreationStatus('Coordinates must be finite numbers.')
+      return
+    }
+
+    setEditorState((current) => ({
+      editableDiagram: result.diagram,
+      selectedElement: clearSelectionForLayerFilter(
+        result.diagram,
+        { kind: 'label', id: result.id },
+        current.layerFilter,
+      ),
+      layerFilter: current.layerFilter,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      sheetPolygonDraft: null,
+    }))
+    setDirectCreationStatus('Label created.')
+    setCopyStatus('idle')
   }
 
   function finishPolylineDraft(): void {
@@ -908,6 +1003,55 @@ function App() {
           </div>
         </div>
 
+        {coordinateInputMode === 'direct' &&
+          (creationTool === 'createPoint' || creationTool === 'createLabel') && (
+            <form
+              className="control-group direct-create-control"
+              aria-label="Direct creation"
+              onSubmit={(event) => {
+                event.preventDefault()
+                createDirectElement()
+              }}
+            >
+              <span className="control-label">
+                {creationTool === 'createPoint' ? 'Point' : 'Label'}
+              </span>
+              {creationTool === 'createLabel' && (
+                <label className="direct-create-field direct-create-text">
+                  <span>Text</span>
+                  <input
+                    className="toolbar-text-input"
+                    type="text"
+                    value={directLabelText}
+                    onChange={(event) => {
+                      setDirectLabelText(event.currentTarget.value)
+                      setDirectCreationStatus('')
+                    }}
+                  />
+                </label>
+              )}
+              {directCoordinateAxes(editableDiagram.ambientDimension).map((axis) => (
+                <label key={axis} className="direct-create-field">
+                  <span>{axis}</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={directCoordinates[axis]}
+                    onChange={(event) =>
+                      updateDirectCoordinate(axis, event.currentTarget.value)
+                    }
+                  />
+                </label>
+              ))}
+              <button type="submit" className="toolbar-button">
+                Create
+              </button>
+              <span className="toolbar-status" role="status">
+                {directCreationStatus}
+              </span>
+            </form>
+          )}
+
         <div className="control-group layer-filter-control">
           <span className="control-label">Layer</span>
           <select
@@ -1121,6 +1265,12 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
   const layer = Number(value)
 
   return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
+}
+
+function directCoordinateAxes(
+  ambientDimension: AmbientDimension,
+): Array<keyof DirectCoordinateInput> {
+  return ambientDimension === 2 ? ['x', 'y'] : ['x', 'y', 'z']
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
