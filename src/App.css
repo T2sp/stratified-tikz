@@ -76,6 +76,7 @@
 }
 
 .toolbar-select,
+.toolbar-text-input,
 .work-plane-fixed input {
   min-height: 34px;
   border: 1px solid var(--border);
@@ -88,6 +89,21 @@
 .toolbar-select {
   max-width: 160px;
   padding: 6px 28px 6px 10px;
+}
+
+.toolbar-text-input {
+  width: min(220px, 100%);
+  min-width: 150px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+}
+
+.filename-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(150px, 220px);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .work-plane-control {
@@ -394,6 +410,27 @@
   border-color: var(--focus);
   outline: 2px solid color-mix(in srgb, var(--focus) 20%, transparent);
   outline-offset: 0;
+}
+
+.inspector-checkbox-field {
+  align-items: start;
+}
+
+.inspector-checkbox-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-h);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.inspector-checkbox-control input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--focus);
 }
 
 .inspector-textarea {

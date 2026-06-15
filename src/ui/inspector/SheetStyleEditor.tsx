@@ -1,5 +1,10 @@
+import { useEffect, useState } from 'react'
 import type { HexColor, SheetStratum } from '../../model/types.ts'
 import { updateStratumStyleById } from '../diagramUpdates.ts'
+import {
+  updateSheetFillColor,
+  updateSheetStrokeColor,
+} from '../sheetStyleSync.ts'
 import {
   EditableColorField,
   EditableOpacityField,
@@ -15,10 +20,29 @@ export function SheetStyleEditor({
   sheet,
   onDiagramChange,
 }: SheetStyleEditorProps) {
+  const [linkStrokeToFill, setLinkStrokeToFill] = useState(false)
+
+  useEffect(() => {
+    setLinkStrokeToFill(false)
+  }, [sheet.id])
+
   return (
     <section className="inspector-section">
       <h3>Style</h3>
       <div className="inspector-form">
+        <label className="inspector-field inspector-checkbox-field">
+          <span className="inspector-field-label">Color link</span>
+          <span className="inspector-checkbox-control">
+            <input
+              type="checkbox"
+              checked={linkStrokeToFill}
+              onChange={(event) =>
+                setLinkStrokeToFill(event.currentTarget.checked)
+              }
+            />
+            <span>Link stroke to fill</span>
+          </span>
+        </label>
         <EditableColorField
           label="Fill color"
           value={sheet.style.fillColor}
@@ -26,7 +50,11 @@ export function SheetStyleEditor({
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, sheet.id, (style) =>
                 style.kind === 'sheetStyle'
-                  ? { ...style, fillColor: fillColor as HexColor }
+                  ? updateSheetFillColor(
+                      style,
+                      fillColor as HexColor,
+                      linkStrokeToFill,
+                    )
                   : style,
               ),
             )
@@ -46,15 +74,16 @@ export function SheetStyleEditor({
         <EditableColorField
           label="Stroke color"
           value={sheet.style.strokeColor}
-          onChange={(strokeColor) =>
+          onChange={(strokeColor) => {
+            setLinkStrokeToFill(false)
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, sheet.id, (style) =>
                 style.kind === 'sheetStyle'
-                  ? { ...style, strokeColor: strokeColor as HexColor }
+                  ? updateSheetStrokeColor(style, strokeColor as HexColor)
                   : style,
               ),
             )
-          }
+          }}
         />
         <EditableOpacityField
           label="Stroke opacity"

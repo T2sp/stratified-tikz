@@ -41,7 +41,9 @@ import {
   clearSelectionIfMissing,
   cloneDiagram,
   createSheetPolygonDraft,
+  defaultJsonDownloadFilename,
   EditableInspector,
+  normalizeJsonDownloadFilename,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
   type SelectedElement,
@@ -111,6 +113,9 @@ function App() {
   const [sheetStatus, setSheetStatus] = useState<string>('')
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
+  const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
+    defaultJsonDownloadFilename,
+  )
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
@@ -217,7 +222,7 @@ function App() {
       const link = document.createElement('a')
 
       link.href = url
-      link.download = 'stratified-tikz-diagram.json'
+      link.download = normalizeJsonDownloadFilename(jsonDownloadFilename)
       document.body.append(link)
       link.click()
       link.remove()
@@ -773,6 +778,17 @@ function App() {
 
         <div className="control-group file-control">
           <span className="control-label">File</span>
+          <label className="filename-field">
+            <span className="control-label">Name</span>
+            <input
+              className="toolbar-text-input"
+              type="text"
+              value={jsonDownloadFilename}
+              onChange={(event) =>
+                setJsonDownloadFilename(event.currentTarget.value)
+              }
+            />
+          </label>
           <button type="button" className="toolbar-button" onClick={downloadJson}>
             Download JSON
           </button>
