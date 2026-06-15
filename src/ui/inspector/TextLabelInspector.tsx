@@ -1,0 +1,103 @@
+import type { Diagram, TextLabel } from '../../model/types.ts'
+import {
+  updateLabelById,
+  updateVec3Coordinate,
+} from '../diagramUpdates.ts'
+import {
+  formatLabelStyleSummary,
+  formatVec3,
+} from '../inspector.ts'
+import { CoordinateEditor } from './CoordinateEditor.tsx'
+import {
+  EditableLongTextField,
+  EditableNumberField,
+  ReadOnlyField,
+} from './InspectorField.tsx'
+import type { DiagramChangeHandler } from './types.ts'
+
+export type TextLabelInspectorProps = {
+  diagram: Diagram
+  label: TextLabel
+  onDiagramChange: DiagramChangeHandler
+}
+
+export function TextLabelInspector({
+  diagram,
+  label,
+  onDiagramChange,
+}: TextLabelInspectorProps) {
+  return (
+    <div className="inspector-content editable-inspector">
+      <section className="inspector-section">
+        <h3>Selection</h3>
+        <div className="inspector-form">
+          <ReadOnlyField label="Type" value="free text label" />
+          <ReadOnlyField label="ID" value={label.id} />
+          <ReadOnlyField label="Name" value={label.name} />
+          <EditableLongTextField
+            label="Text"
+            value={label.text}
+            onChange={(text) =>
+              onDiagramChange((currentDiagram) =>
+                updateLabelById(currentDiagram, label.id, (current) => ({
+                  ...current,
+                  text,
+                })),
+              )
+            }
+          />
+          <EditableNumberField
+            label="Layer"
+            value={label.layer}
+            onChange={(layer) =>
+              onDiagramChange((currentDiagram) =>
+                updateLabelById(currentDiagram, label.id, (current) => ({
+                  ...current,
+                  layer,
+                })),
+              )
+            }
+          />
+        </div>
+      </section>
+
+      <section className="inspector-section">
+        <h3>Geometry</h3>
+        <div className="inspector-form">
+          <CoordinateEditor
+            label="Position"
+            point={label.position}
+            ambientDimension={diagram.ambientDimension}
+            onCoordinateChange={(axis, value) =>
+              onDiagramChange((currentDiagram) =>
+                updateLabelById(currentDiagram, label.id, (current) => ({
+                  ...current,
+                  position: updateVec3Coordinate(
+                    current.position,
+                    axis,
+                    value,
+                    currentDiagram.ambientDimension,
+                  ),
+                })),
+              )
+            }
+          />
+          <ReadOnlyField
+            label="Preview"
+            value={formatVec3(label.position, diagram.ambientDimension)}
+          />
+        </div>
+      </section>
+
+      <section className="inspector-section">
+        <h3>Style</h3>
+        <div className="inspector-form">
+          <ReadOnlyField
+            label={label.style.kind}
+            value={formatLabelStyleSummary(label.style)}
+          />
+        </div>
+      </section>
+    </div>
+  )
+}
