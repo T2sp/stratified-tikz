@@ -32,6 +32,12 @@ type CoordinateDefinition = {
   position: Vec3
 }
 
+type LayeredTikzCommand = {
+  layer: number
+  sectionTitle: string
+  lines: string[]
+}
+
 type GenerateContext = {
   mode: TikzMode
   colors: ColorRegistry
@@ -46,65 +52,102 @@ export function generateTikz(diagram: Diagram): string {
 
 export function generateTikz2D(diagram: Diagram): string {
   const context = createContext('2d')
-  const curves = sortByLayer(
-    diagram.strata.filter(
-      (stratum): stratum is CurveStratum =>
-        stratum.geometricKind === 'curve' && stratum.codim === 1,
+  const curveSectionTitle = 'Codimension 1 strata: curves'
+  const pointSectionTitle = 'Codimension 2 strata: points'
+  const labelSectionTitle = 'Labels'
+  const sectionTitles = [
+    curveSectionTitle,
+    pointSectionTitle,
+    labelSectionTitle,
+  ]
+  const drawingCommands = [
+    ...emitLayeredItems(
+      curveSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is CurveStratum =>
+          stratum.geometricKind === 'curve' && stratum.codim === 1,
+      ),
+      (curve, index) => emitCurve(curve, index, context),
     ),
-  ).flatMap((curve, index) => emitCurve(curve, index, context))
-  const points = sortByLayer(
-    diagram.strata.filter(
-      (stratum): stratum is PointStratum =>
-        stratum.geometricKind === 'point' && stratum.codim === 2,
+    ...emitLayeredItems(
+      pointSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is PointStratum =>
+          stratum.geometricKind === 'point' && stratum.codim === 2,
+      ),
+      (point, index) => emitPoint(point, index, context),
     ),
-  ).flatMap((point, index) => emitPoint(point, index, context))
-  const labels = sortByLayer(diagram.labels).flatMap((label) =>
-    emitLabel(label, context),
-  )
+    ...emitLayeredItems(labelSectionTitle, diagram.labels, (label) =>
+      emitLabel(label, context),
+    ),
+  ]
+  const layers = collectUsedLayers(drawingCommands)
 
   return assembleTikz({
     context,
+    layers,
     bodySections: [
       section('Coordinates', emitCoordinateDefinitions(context)),
-      section('Codimension 1 strata: curves', curves),
-      section('Codimension 2 strata: points', points),
-      section('Labels', labels),
+      section(
+        'Layered drawing commands',
+        emitLayeredCommands(drawingCommands, sectionTitles),
+      ),
     ],
   })
 }
 
 export function generateTikz3D(diagram: Diagram): string {
   const context = createContext('3d')
-  const sheets = sortByLayer(
-    diagram.strata.filter(
-      (stratum): stratum is SheetStratum =>
-        stratum.geometricKind === 'sheet' && stratum.codim === 1,
+  const sheetSectionTitle = 'Codimension 1 strata: sheets'
+  const curveSectionTitle = 'Codimension 2 strata: curves'
+  const pointSectionTitle = 'Codimension 3 strata: points'
+  const labelSectionTitle = 'Labels'
+  const sectionTitles = [
+    sheetSectionTitle,
+    curveSectionTitle,
+    pointSectionTitle,
+    labelSectionTitle,
+  ]
+  const drawingCommands = [
+    ...emitLayeredItems(
+      sheetSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is SheetStratum =>
+          stratum.geometricKind === 'sheet' && stratum.codim === 1,
+      ),
+      (sheet, index) => emitSheet(sheet, index, context),
     ),
-  ).flatMap((sheet, index) => emitSheet(sheet, index, context))
-  const curves = sortByLayer(
-    diagram.strata.filter(
-      (stratum): stratum is CurveStratum =>
-        stratum.geometricKind === 'curve' && stratum.codim === 2,
+    ...emitLayeredItems(
+      curveSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is CurveStratum =>
+          stratum.geometricKind === 'curve' && stratum.codim === 2,
+      ),
+      (curve, index) => emitCurve(curve, index, context),
     ),
-  ).flatMap((curve, index) => emitCurve(curve, index, context))
-  const points = sortByLayer(
-    diagram.strata.filter(
-      (stratum): stratum is PointStratum =>
-        stratum.geometricKind === 'point' && stratum.codim === 3,
+    ...emitLayeredItems(
+      pointSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is PointStratum =>
+          stratum.geometricKind === 'point' && stratum.codim === 3,
+      ),
+      (point, index) => emitPoint(point, index, context),
     ),
-  ).flatMap((point, index) => emitPoint(point, index, context))
-  const labels = sortByLayer(diagram.labels).flatMap((label) =>
-    emitLabel(label, context),
-  )
+    ...emitLayeredItems(labelSectionTitle, diagram.labels, (label) =>
+      emitLabel(label, context),
+    ),
+  ]
+  const layers = collectUsedLayers(drawingCommands)
 
   return assembleTikz({
     context,
+    layers,
     bodySections: [
       section('Coordinates', emitCoordinateDefinitions(context)),
-      section('Codimension 1 strata: sheets', sheets),
-      section('Codimension 2 strata: curves', curves),
-      section('Codimension 3 strata: points', points),
-      section('Labels', labels),
+      section(
+        'Layered drawing commands',
+        emitLayeredCommands(drawingCommands, sectionTitles),
+      ),
     ],
   })
 }
@@ -130,6 +173,17 @@ export function sanitizeTikzNameStem(name: string, fallback: string): string {
   return /^[a-zA-Z]/.test(safeStem) ? safeStem : `${fallbackStem}${safeStem}`
 }
 
+export function layerToTikzLayerName(layer: number): string {
+  const normalizedLayer = Object.is(layer, -0) ? 0 : layer
+  const suffix = String(normalizedLayer)
+    .replaceAll('-', 'Minus')
+    .replaceAll('.', 'Point')
+    .replaceAll('+', '')
+    .replaceAll('e', 'E')
+
+  return `stratifiedLayer${suffix}`
+}
+
 function createContext(mode: TikzMode): GenerateContext {
   return {
     mode,
@@ -140,15 +194,18 @@ function createContext(mode: TikzMode): GenerateContext {
 
 function assembleTikz({
   context,
+  layers,
   bodySections,
 }: {
   context: GenerateContext
+  layers: number[]
   bodySections: string[][]
 }): string {
   const lines = [
     ...section('Styles and colors', [
       ...emitRequiredLibraryComment(context),
       ...context.colors.emitDefinitions(),
+      ...emitTikzLayerDeclarations(layers),
       ...emitTikzPictureStart(context.mode),
     ]),
     ...bodySections.flat(),
@@ -182,6 +239,20 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
   return [
     '% Required TikZ libraries for non-circular point shapes:',
     '% \\usetikzlibrary{shapes.geometric,shapes.symbols}',
+    '',
+  ]
+}
+
+function emitTikzLayerDeclarations(layers: number[]): string[] {
+  if (layers.length === 0) {
+    return []
+  }
+
+  const layerNames = layers.map(layerToTikzLayerName)
+
+  return [
+    ...layerNames.map((layerName) => `\\pgfdeclarelayer{${layerName}}`),
+    `\\pgfsetlayers{${[...layerNames, 'main'].join(',')}}`,
     '',
   ]
 }
@@ -334,6 +405,65 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
   ]
 }
 
+function emitLayeredItems<T extends { layer: number; id: string }>(
+  sectionTitle: string,
+  items: T[],
+  emit: (item: T, index: number) => string[],
+): LayeredTikzCommand[] {
+  return sortByLayer(items).map((item, index) => ({
+    layer: normalizeLayer(item.layer),
+    sectionTitle,
+    lines: emit(item, index),
+  }))
+}
+
+function collectUsedLayers(commands: LayeredTikzCommand[]): number[] {
+  return [...new Set(commands.map((command) => command.layer))].sort(
+    (first, second) => first - second,
+  )
+}
+
+function emitLayeredCommands(
+  commands: LayeredTikzCommand[],
+  sectionTitles: string[],
+): string[] {
+  const layers = collectUsedLayers(commands)
+  const layeredLines = layers.flatMap((layer) => {
+    const layerName = layerToTikzLayerName(layer)
+    const commandsInLayer = commands.filter((command) => command.layer === layer)
+    const lines = [
+      `% Layer ${formatNumber(layer)}: ${layerName}`,
+      `\\begin{pgfonlayer}{${layerName}}`,
+    ]
+    let previousSectionTitle: string | null = null
+
+    for (const command of commandsInLayer) {
+      if (command.sectionTitle !== previousSectionTitle) {
+        lines.push(`  % ${command.sectionTitle}`)
+        previousSectionTitle = command.sectionTitle
+      }
+
+      lines.push(...indentLines(command.lines))
+    }
+
+    lines.push('\\end{pgfonlayer}', '')
+
+    return lines
+  })
+  const presentSectionTitles = new Set(
+    commands.map((command) => command.sectionTitle),
+  )
+  const emptySectionLines = sectionTitles
+    .filter((sectionTitle) => !presentSectionTitles.has(sectionTitle))
+    .map((sectionTitle) => `% ${sectionTitle}`)
+
+  return [...layeredLines, ...emptySectionLines]
+}
+
+function indentLines(lines: string[]): string[] {
+  return lines.map((line) => (line.length === 0 ? line : `  ${line}`))
+}
+
 function labelStyleOptions(
   label: TextLabel,
   context: GenerateContext,
@@ -432,12 +562,19 @@ function formatNumber(value: number): string {
 
 function sortByLayer<T extends { layer: number; id: string }>(items: T[]): T[] {
   return [...items].sort((first, second) => {
-    if (first.layer !== second.layer) {
-      return first.layer - second.layer
+    const firstLayer = normalizeLayer(first.layer)
+    const secondLayer = normalizeLayer(second.layer)
+
+    if (firstLayer !== secondLayer) {
+      return firstLayer - secondLayer
     }
 
     return first.id.localeCompare(second.id)
   })
+}
+
+function normalizeLayer(layer: number): number {
+  return Object.is(layer, -0) ? 0 : layer
 }
 
 class ColorRegistry {

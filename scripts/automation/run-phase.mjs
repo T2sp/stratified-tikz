@@ -2,14 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const phase = process.argv[2];
+const mode = process.argv[3] ?? "implement";
 
 const phases = {
-  "9B": {
+    "9B": {
     branch: "phase/9b-layer-aware-tikz-output",
     commitMessage: "Implement Phase 9B layer-aware TikZ output",
+    fixCommitMessage: "Fix Phase 9B same-layer TikZ ordering",
     implementPrompt: "prompts/phase-9b-implement.md",
     reviewPrompt: "prompts/phase-9b-review.md",
-  },
+    fixPrompt: "prompts/phase-9b-fix.md",
+    },
 };
 
 if (!phase || !phases[phase]) {
@@ -169,7 +172,22 @@ console.log(`Branch: ${spec.branch}`);
 assertCleanWorkingTree();
 checkoutPhaseBranch(spec.branch);
 
-runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
+const promptToRun =
+  mode === "fix" ? spec.fixPrompt : spec.implementPrompt;
+
+const promptLogName =
+  mode === "fix" ? "fix" : "implement";
+
+const commitMessage =
+  mode === "fix" ? spec.fixCommitMessage : spec.commitMessage;
+
+if (mode === "fix" && !promptToRun) {
+  console.error(`No fixPrompt configured for phase ${phase}`);
+  process.exit(1);
+}
+
+// runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
+runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`)
 
 runVerification();
 
@@ -218,7 +236,7 @@ run("git", ["status", "--short"]);
 run("git", ["diff", "--stat"]);
 
 run("git", ["add", "."]);
-run("git", ["commit", "-m", spec.commitMessage]);
+run("git", ["commit", "-m", commitMessage]);
 run("git", ["push", "-u", "origin", spec.branch]);
 
 console.log(`\nDone. Pushed ${spec.branch}.`);

@@ -61,6 +61,56 @@ Free text labels are separate diagram objects. Their `name` fields do not
 create coordinate-name stems; labels are emitted directly as TikZ nodes at their
 stored model coordinates.
 
+## Layer-aware output
+
+Generated TikZ uses PGF layers so that diagram `layer` values affect drawing
+order. Every numeric layer value used by an exported sheet, curve, point, or
+free text label is mapped to a deterministic TikZ-safe layer name:
+
+```text
+0  -> stratifiedLayer0
+1  -> stratifiedLayer1
+-1 -> stratifiedLayerMinus1
+```
+
+Sparse and negative layer values are supported. Decimal layer values, if present
+in diagram data, are converted with a readable safe suffix such as
+`stratifiedLayer1Point5`.
+
+The output declares all used diagram layers and sets their order before the
+`tikzpicture`:
+
+```tex
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfdeclarelayer{stratifiedLayer1}
+\pgfsetlayers{stratifiedLayer0,stratifiedLayer1,main}
+```
+
+Lower numeric layer values are listed before higher numeric layer values, so
+they render behind higher layers. The `main` layer is retained in
+`\pgfsetlayers` for compatibility, although exported diagram elements are placed
+on explicit `stratifiedLayer...` layers.
+
+Drawing commands for sheets, curves, points, and free text labels are wrapped in
+`pgfonlayer` blocks:
+
+```tex
+\begin{pgfonlayer}{stratifiedLayer0}
+  \draw[...] ...;
+\end{pgfonlayer}
+
+\begin{pgfonlayer}{stratifiedLayer1}
+  \node at (1,0) {$F$};
+\end{pgfonlayer}
+```
+
+Within each layer, the generator preserves the existing relative emission order.
+Coordinate definitions remain outside layer blocks and keep the Phase 9A
+coordinate-name rules based on sanitized stratum names.
+
+Selection and preview highlighting are not exported. Layer filtering and
+layer-based selection UI are not part of this phase.
+
 ## 2D TikZ basis
 
 In 2D mode, use ordinary TikZ coordinates.
@@ -124,17 +174,12 @@ In 2D mode, group output as:
 % ----------------------------------------------------------------------------
 
 % ----------------------------------------------------------------------------
-% Codimension 1 strata: curves
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 2 strata: points
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Labels
+% Layered drawing commands
 % ----------------------------------------------------------------------------
 ```
+
+Layer blocks include comments for the contained codimension sections, such as
+`Codimension 1 strata: curves`, `Codimension 2 strata: points`, and `Labels`.
 
 ## Output sections in 3D mode
 
@@ -146,21 +191,13 @@ In 3D mode, group output as:
 % ----------------------------------------------------------------------------
 
 % ----------------------------------------------------------------------------
-% Codimension 1 strata: sheets
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 2 strata: curves
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 3 strata: points
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Labels
+% Layered drawing commands
 % ----------------------------------------------------------------------------
 ```
+
+Layer blocks include comments for the contained codimension sections, such as
+`Codimension 1 strata: sheets`, `Codimension 2 strata: curves`,
+`Codimension 3 strata: points`, and `Labels`.
 
 ## Readability requirements
 
