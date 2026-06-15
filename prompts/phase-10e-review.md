@@ -1,295 +1,272 @@
-# Phase 10E Review Prompt: One-step undo
+Phase 10E Review Prompt: Multi-step undo/redo history
 
-Review Phase 10E only: one-step undo for diagram-editing operations.
+Environment
 
-Do not modify files yet.
-
-## Environment
-
-The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
+The default shell may use Node v16.17.0 at /usr/local/bin/node.
 
 This project requires Node >=22.12.0.
 
 Use:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH
-```
 
 when running npm commands.
 
 Verification commands:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
-```
 
-## Context
+Review instructions
 
-This project is StratifiedTikZ, a Vite + React + TypeScript app for drawing 2D and 3D stratified diagrams and exporting TikZ.
+Review Phase 10E only.
 
-Important conventions:
+Do not modify files.
 
-- `Diagram` contains persistent diagram data.
-- Selection, highlighting, active tools, draft geometry, active work plane, layer filter, coordinate input mode, and undo state are UI/editor state.
-- UI/editor state should not be saved into JSON export or exported to TikZ.
-- Phase 9B TikZ layer ordering convention is intentional:
-  - numeric layer order;
-  - codimension / element-kind section order within each layer;
-  - original order within each section.
-- Do not report the Phase 9B codimension section ordering convention as an issue in this review.
+At the end, output both:
 
-## Phase 10E intended behavior
+1. a human-readable review;
+2. a machine-readable JSON block between REVIEW_JSON_START and REVIEW_JSON_END.
 
-Phase 10E should add minimal one-step undo.
+If there are any Critical or Medium issues, set:
 
-Expected:
+"ready_to_commit": false
 
-- A visible Undo control exists.
-- Undo is disabled or inert when there is no undo snapshot.
-- One committed diagram edit can be undone.
-- Only one previous diagram state is stored.
-- Undo is not multi-step.
-- Redo is not implemented.
-- Undo state is editor/UI state only.
-- JSON export does not include undo history.
-- TikZ output does not depend on undo state.
-- UI-only changes do not create undo snapshots.
-- Undo leaves selection/drafts safe and non-stale.
+If only Low-priority issues remain, set:
 
-## Review scope
+"ready_to_commit": true
 
-Review only Phase 10E.
+Phase 10E goal
 
-Do not require:
+Phase 10E should implement multi-step undo/redo history.
 
-- redo
-- multi-step history
-- persistent history across reloads
-- command palette
-- timeline UI
-- new dependencies
-- unrelated refactors
-- changes to TikZ semantics
-- changes to diagram schema unless unavoidable
+It is not sufficient to support only one-step undo.
 
-## Checklist
+The user should be able to:
 
-### 1. Scope control
+* undo many previous committed diagram changes;
+* redo undone changes;
+* use undo/redo toolbar controls;
+* use keyboard shortcuts where appropriate.
 
-Check that the implementation is limited to one-step undo and supporting tests/docs.
+Redo is the operation that cancels undo.
 
-Flag as Medium or Critical if it introduces unrelated features such as:
+Core correctness requirements
 
-- redo
-- multi-step history beyond one previous diagram
-- major architecture rewrite without need
-- new dependencies
-- unrelated TikZ output changes
-- unrelated geometry/model/schema changes
-- unrelated save/load format changes
+Check that:
 
-### 2. Undo state location
+* history is editor/UI state only;
+* history is not stored in Diagram;
+* history is not saved to JSON;
+* generated TikZ depends only on current committed diagram;
+* undo/redo changes the committed diagram, not just UI status;
+* selection/filter/drafts/direct form state are not stored as part of diagram history;
+* history is bounded to a sufficiently large size, e.g. 100 states.
 
-Check that undo state is stored as UI/editor state, not in `Diagram`.
+Scope review
 
-Expected:
+Phase 10E should not add unrelated features.
 
-- undo snapshot stores a previous `Diagram` value or equivalent
-- undo state is not exported to TikZ
-- undo state is not saved in JSON
-- undo state does not affect diagram validation
+It should not implement:
 
-Flag if undo data is added to persistent diagram schema without a strong reason.
+* collaborative history;
+* persistent history in JSON;
+* timeline panel;
+* semantic command history UI;
+* snapping;
+* arbitrary work planes;
+* region strata;
+* TikZ import;
+* new dependencies;
+* broad UI redesign.
 
-### 3. One-step semantics
+Classify unrelated features according to severity.
 
-Verify true one-step undo semantics.
+Functional review checklist
 
-Expected example:
+1. Multi-step undo
 
-- initial diagram: `A`
-- edit to `B`
-- edit to `C`
-- undo restores `B`
-- a second undo does not restore `A`
+Check:
 
-Flag if implementation accidentally creates unbounded multi-step history, or if one-step undo does not work reliably.
+* more than one undo step works;
+* at least several consecutive committed changes can be undone;
+* undo restores previous diagram data exactly enough for editor use;
+* undo availability is correctly reflected in UI disabled state.
 
-### 4. Diagram mutation coverage
+If undo only supports one step, this is Medium.
 
-Inspect all diagram mutation paths.
+If undo is present but does not restore diagram data correctly, this is Critical or Medium depending on severity.
 
-Check likely paths:
+2. Redo
 
-- inspector edits
-- stratum name/layer edits
-- coordinate edits
-- style edits
-- label edits
-- cursor creation tools
-- direct-input creation tools, if present
-- remove/delete selected, if present
-- JSON load/import handling
-- drag handle editing, if present
+Check:
 
-Expected:
+* redo exists;
+* redo restores undone states in forward order;
+* redo availability is correctly reflected in UI disabled state;
+* redo is cleared when a new edit is made after undo.
 
-- committed diagram mutations are undo-aware
-- UI-only state changes are not undo-aware
+If redo is missing, classify as Medium because the user explicitly requested “undo cancel.”
 
-Flag as Medium if an important committed editing path bypasses undo.
+3. History limit
 
-Flag as Low if a minor edge path bypasses undo but is documented and not central.
+Check:
 
-### 5. UI-only state does not create undo snapshots
+* history is bounded;
+* limit is sufficiently large, preferably around 100 states;
+* no obvious unbounded memory growth for ordinary editing.
 
-Check that the following do not create undo history:
+If history is unbounded, classify as Medium unless project has a clear reason.
 
-- selecting an element
-- clearing selection
-- changing layer filter
-- changing active tool
-- changing coordinate input mode
-- changing active work plane
-- changing draft geometry before commit
+4. Undoable diagram changes
 
-Flag if selection/tool changes consume the one undo slot.
+Check that these committed diagram changes are undoable where implemented in the app:
 
-### 6. Drag editing behavior
+* cursor-created point;
+* cursor-created label;
+* cursor-created polyline;
+* cursor-created cubic Bézier;
+* cursor-created polygon sheet;
+* direct-created point;
+* direct-created label;
+* direct-created polyline;
+* direct-created cubic Bézier;
+* direct-created polygon sheet;
+* inspector name/layer/coordinate edits;
+* inspector style edits;
+* delete/remove selected elements, if implemented;
+* empty canvas switch, if implemented;
+* JSON load/import, depending on chosen policy.
 
-If Phase 10D drag editing exists, check undo behavior around dragging.
+If major edit paths bypass history, classify as Medium.
+
+If some obscure style field bypasses history but core behavior works, classify as Low or Medium depending on breadth.
+
+5. Non-undoable UI-only changes
+
+Check that these do not create history entries:
+
+* selection change;
+* layer filter change;
+* creation tool change;
+* coordinate input mode change;
+* active work plane change;
+* direct form text changes;
+* draft vertex additions before finish;
+* draft cancel;
+* status message changes;
+* copy TikZ.
+
+If UI-only changes pollute history significantly, classify as Medium.
+
+6. Draft and creation behavior
+
+Check:
+
+* draft construction does not create many history entries;
+* finishing a draft creates one undoable committed diagram change;
+* undo/redo clears or validates stale drafts;
+* creation remains visible/selected according to existing behavior.
+
+7. Drag edit grouping
+
+Check drag-handle editing behavior.
 
 Preferred:
 
-- one undo snapshot per completed drag operation, not per mousemove
+* one drag gesture creates one undoable change;
+* one undo reverts the whole drag.
 
-Acceptable for Phase 10E if clearly implemented and documented:
+If every pointer move creates a history entry, classify as Medium because it makes undo nearly unusable.
 
-- drag editing is covered by a commit boundary if available
-- if the current drag architecture cannot distinguish commit boundaries, implementation chooses the least surprising behavior and reports the limitation
+If drag edits are not undoable at all, classify as Medium.
 
-Flag as Medium if dragging creates many intermediate undo states or makes undo unusable.
+8. Selection after undo/redo
 
-### 7. Selection and draft safety after undo
+Check:
 
-Check that undo cannot leave stale references.
+* selection is not stored/restored as part of history;
+* if selected element still exists after undo/redo, selection may remain;
+* if selected element no longer exists, selection is cleared;
+* stale selection does not crash inspector/SVG;
+* layer filter does not cause invalid selection.
 
-Expected:
+9. Save/load/export behavior
 
-- selected element still exists -> selection may stay
-- selected element no longer exists -> selection is cleared
-- active drafts are cancelled or made safe if inconsistent
-- inspector does not show stale element data
-- preview does not crash
+Check:
 
-Flag if undo can leave the app in a broken state.
+* saved JSON includes only current diagram data;
+* no history fields like past, present, future, history, undoStack, or redoStack are saved;
+* loading behavior matches the implementation’s documented policy:
+    * either load is undoable;
+    * or load resets history.
+* loading does not leave stale drafts/selections.
 
-### 8. Save/load behavior
+If history is persisted in saved JSON, classify as Medium or Critical depending on compatibility impact.
 
-Check the chosen policy.
+10. Keyboard shortcuts
 
-Acceptable policies:
+Check:
 
-- loading a diagram is undoable as a committed diagram replacement; or
-- loading clears undo history for safety
+* Cmd+Z / Ctrl+Z triggers undo outside text inputs;
+* Cmd+Shift+Z / Ctrl+Shift+Z triggers redo outside text inputs;
+* optionally Ctrl+Y triggers redo;
+* shortcuts do not break native text editing in input fields.
 
-Either is fine if documented and consistent.
+If shortcuts are missing but buttons work, classify as Low unless the implement prompt explicitly required them as must-have. If shortcuts break typing in inputs, classify as Medium.
 
-Required:
+11. Tests
 
-- JSON export does not include undo state
-- JSON import does not require undo state
-- import/load leaves selection/drafts safe
+Check tests cover:
 
-### 9. Keyboard shortcut
+* multi-step undo;
+* redo;
+* redo clearing after new edit;
+* history limit;
+* creation undo;
+* inspector edit undo;
+* drag edit grouping if practical;
+* UI-only changes not creating history entries;
+* save/export excludes history;
+* selection validation after undo/redo if practical.
 
-Check whether `Cmd+Z` / `Ctrl+Z` is implemented.
+Missing tests for multi-step undo or redo should be Medium.
 
-It is desirable but not required if omitted with a reasonable limitation note.
+Missing tests for keyboard shortcuts may be Low.
 
-If implemented:
-
-- should not break normal text/numeric input editing
-- should not fire repeatedly in surprising ways
-- should respect disabled/no-history state
-
-Flag as Medium if the shortcut breaks native input editing.
-
-### 10. Tests
-
-Check that tests cover the core behavior.
-
-Expected tests:
-
-- undo restores previous diagram after a simple committed edit
-- undo is one-step, not multi-step
-- UI-only state changes do not create undo snapshots
-- stale selection is cleared or sanitized after undo
-- undo state is not included in JSON export, if existing test infrastructure makes this feasible
-
-Flag as Medium if there are no meaningful tests for undo behavior.
-
-Flag as Low if tests are present but miss a secondary edge case.
-
-### 11. Documentation
-
-Check that documentation is updated if an appropriate docs file exists.
-
-Expected concise docs:
-
-- one-step undo exists
-- undo state is editor state only
-- redo and multi-step history are future work
-
-Do not require extensive docs.
-
-### 12. Verification
+Verification
 
 Run:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
-```
 
-Report both results.
+Report results.
 
-## Severity guidance
+Output format
 
-Critical issues:
+Use this structure:
 
-- app cannot build
-- tests cannot run due to implementation errors
-- undo corrupts persistent diagram data
-- undo breaks core editing or preview rendering
-- JSON save/load schema is unintentionally broken
-- TikZ generation is unintentionally changed or broken
+**Summary:** pass / needs changes
+**Critical Issues**
+- ...
+**Medium Issues**
+- ...
+**Low-Priority Issues**
+- ...
+**What Looks Correct**
+- ...
+**Test Results**
+...
+**Build Results**
+...
+**Ready To Call Phase 10E Complete**
+Yes/No, with a short reason.
+**Suggested Targeted Follow-Up Prompt**
+If needed, provide a concise fix prompt.
 
-Medium issues:
+Then output:
 
-- important committed edit path is not undoable
-- undo is accidentally multi-step or not one-step
-- undo state is stored in persistent diagram data
-- UI-only actions consume undo history
-- stale selection after undo can crash inspector/preview
-- keyboard shortcut breaks text/numeric input editing
-- drag undo creates unusable many-step behavior
-- missing meaningful tests for the feature
-
-Low-priority issues:
-
-- minor UX wording issues
-- missing shortcut when button works and limitation is documented
-- small documentation gaps
-- minor edge path not covered if central paths work
-
-## Output format
-
-Return a human-readable review followed by a machine-readable JSON block exactly in this form:
-
-```text
 REVIEW_JSON_START
 {
   "summary": "pass or needs_changes",
@@ -300,11 +277,9 @@ REVIEW_JSON_START
   "suggested_fix_prompt": ""
 }
 REVIEW_JSON_END
-```
 
-Rules:
+Rules for JSON:
 
-- Set `ready_to_commit` to `false` if there are any Critical or Medium issues.
-- Set `summary` to `needs_changes` if there are any Critical or Medium issues.
-- Include a concise `suggested_fix_prompt` when `ready_to_commit` is false.
-- Do not modify files during this review.
+* critical_count, medium_count, and low_count must be numbers.
+* ready_to_commit must be false if critical_count > 0 or medium_count > 0.
+* suggested_fix_prompt should be a short targeted prompt if fixes are needed.

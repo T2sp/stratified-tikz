@@ -1,322 +1,521 @@
-# Phase 10E Implementation Prompt: One-step undo
+# Phase 10E Implementation Prompt: Multi-step undo/redo history
 
-Implement Phase 10E only: one-step undo for diagram-editing operations.
+Environment
 
-## Environment
-
-The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
+The default shell may use Node v16.17.0 at /usr/local/bin/node.
 
 This project requires Node >=22.12.0.
 
 Use:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH
-```
 
 when running npm commands.
 
 Verification commands:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
-```
 
-## Context
+Context
 
-This project is StratifiedTikZ, a Vite + React + TypeScript app for drawing 2D and 3D stratified diagrams and exporting TikZ.
+You are working on the StratifiedTikZ project.
+
+The app currently supports editing a committed Diagram through UI actions such as:
+
+* cursor creation;
+* direct creation;
+* inspector edits;
+* style edits;
+* layer edits;
+* coordinate edits;
+* drag-handle edits;
+* save/load;
+* empty canvas switching, if implemented.
+
+Phase 10E should add undo/redo support.
 
 Important conventions:
 
-- `ambientDimension: 2 | 3` is top-level on `Diagram`.
-- All internal coordinates are `Vec3`.
-- In 2D, `z` is hidden/locked/ignored and should remain `0`.
-- `n`-stratum means codimension `n`, not dimension.
-- Selection, highlighting, active tools, draft geometry, active work plane, layer filter, and coordinate input mode are UI/editor state and should not be saved into `Diagram` or exported to TikZ.
-- Free text labels are first-class objects in `diagram.labels`.
-- TikZ output is generated from diagram data only.
+* Diagram is the committed document data.
+* Selection, layer filter, coordinate input mode, creation tool, drafts, direct form state, work-plane state, and UI status messages are editor/UI state.
+* Generated TikZ must depend only on committed diagram data.
+* Undo/redo history should be editor/UI state, not stored in Diagram.
+* Undo/redo history should not be saved to JSON.
+* Undo/redo should not affect TikZ except by changing the committed diagram.
 
-Current relevant phases:
+Goal
 
-- Phase 8: save/load implemented.
-- Phase 9A: TikZ coordinate names use sanitized user-controlled name stems.
-- Phase 9B: layer-aware TikZ output implemented.
-  - Phase 9B ordering convention:
-    - numeric layer order;
-    - codimension / element-kind section order within each layer;
-    - original order within each section.
-  - Do not change this convention in Phase 10E.
-- Phase 9C: layer-based selection/filtering may be implemented before this phase.
-- Phase 9D: `spath/save` integration may be implemented before this phase.
-- Phase 10A: remove selected elements may be implemented before this phase.
-- Phase 10B: direct-input creation for points and labels may be implemented before this phase.
-- Phase 10C: direct-input creation for paths and sheets may be implemented before this phase.
-- Phase 10D: cursor drag handle editing may be implemented before this phase.
+Implement multi-step undo/redo for diagram edits.
 
-## Goal
+The user should be able to:
 
-Add a minimal, reliable, one-step undo feature.
+* undo many previous committed diagram changes;
+* redo undone changes;
+* see whether undo/redo are currently available;
+* use toolbar buttons and keyboard shortcuts.
 
-The user should be able to undo the immediately preceding committed diagram-editing operation.
+This is not just one-step undo.
 
-This is intentionally not a full multi-step history system.
+Use a sufficiently large bounded history, for example 100 states.
 
-## Required behavior
+Terminology
 
-Implement one-step undo for committed diagram changes.
+Use standard terminology:
 
-Examples of operations that should be undoable if they exist in the current codebase:
+* Undo: move one step backward in committed diagram history.
+* Redo: cancel an undo by moving one step forward in the history.
 
-- editing stratum name
-- editing stratum layer
-- editing stratum coordinates
-- editing stratum style
-- editing free text label text
-- editing free text label position
-- editing free text label style
-- creating a point
-- creating a label
-- creating a polyline curve
-- creating a cubic Bézier curve
-- creating a polygon sheet
-- removing selected elements
-- direct-input creation operations
-- drag handle edits, once a drag is committed
-- loading a diagram, if the app currently replaces the diagram through load
+The user may describe redo as “cancel undo”; implement it as Redo.
 
-The undo operation should restore the previous `Diagram` value.
+Scope
 
-Selection and draft/UI state should be made safe after undo.
-
-Recommended behavior:
-
-- After undo, clear stale selection if the selected element no longer exists.
-- Cancel active drafts if undo would make them inconsistent.
-- Do not store selection, draft geometry, layer filter, coordinate input mode, active work plane, or creation tool state in the undo snapshot.
-- Do not export undo state to TikZ.
-- Do not save undo state in JSON export.
-
-## Non-goals
+This is Phase 10E only.
 
 Do not implement:
 
-- redo
-- multi-step history
-- persistent history across save/load
-- keyboard shortcut customization UI
-- timeline UI
-- command palette
-- collaborative editing
-- diff UI
-- new dependencies
-- changes to TikZ output semantics
-- changes to diagram schema unless unavoidable
+* collaborative history;
+* persistent history in saved JSON;
+* branching history UI;
+* command-level semantic history;
+* grouped transactions beyond simple practical grouping;
+* timeline panel;
+* snapshots stored on disk;
+* new dependencies;
+* broad UI redesign.
 
-## UX requirements
+Do not change:
 
-Add a visible Undo control to the UI.
+* diagram data model unless absolutely necessary;
+* save/load file format;
+* TikZ generator semantics;
+* SVG renderer semantics;
+* creation geometry;
+* inspector behavior except to route edits through undoable updates;
+* style semantics;
+* layer-aware TikZ semantics;
+* layer filter semantics.
 
-Expected UX:
+1. Add undo/redo history state
 
-- A toolbar button labeled `Undo` or similar.
-- The button is disabled when there is no undo snapshot.
-- Clicking the button restores the previous diagram.
-- The app remains usable after undo.
+Implement an editor-level history structure.
 
-Keyboard shortcut:
+Preferred model:
 
-- Add `Cmd+Z` on macOS and `Ctrl+Z` on non-macOS if straightforward.
-- Do not let the shortcut break text/numeric input editing.
-- If an input or textarea is focused, native browser undo for that field should take priority where practical.
-- If shortcut support is risky or intrusive, implement the button first and document the limitation.
+type DiagramHistory = {
+  past: Diagram[];
+  present: Diagram;
+  future: Diagram[];
+};
 
-## Implementation guidance
-
-Prefer a small, explicit state helper rather than a large architecture rewrite.
-
-A good pattern is:
-
-```ts
-const [diagram, setDiagram] = useState<Diagram>(...);
-const [undoDiagram, setUndoDiagram] = useState<Diagram | null>(null);
-
-function commitDiagramChange(nextDiagram: Diagram) {
-  setUndoDiagram(diagram);
-  setDiagram(nextDiagram);
-}
-
-function undoLastChange() {
-  if (!undoDiagram) return;
-  setDiagram(undoDiagram);
-  setUndoDiagram(null);
-  // Clear or sanitize selection/drafts if needed.
-}
-```
-
-However, use React functional updates if necessary to avoid stale closure bugs.
-
-Important:
-
-- Ensure all diagram-mutating paths use the same commit helper.
-- Avoid pushing undo snapshots for UI-only changes.
-- Avoid pushing undo snapshots when the diagram did not actually change.
-- If an edit consists of many intermediate updates, such as dragging, prefer storing one undo snapshot for the committed drag operation rather than one per mousemove.
-  - If Phase 10D has a clear drag commit boundary, use it.
-  - If not, implement the least surprising behavior and document it.
-
-## Diagram mutation coverage
-
-Inspect the current codebase for all places where `setDiagram`, diagram update helpers, creation helpers, deletion helpers, load/import handlers, or drag-edit handlers are used.
-
-Route committed diagram mutations through a single undo-aware helper where feasible.
-
-At minimum, cover:
-
-- inspector edits
-- cursor creation tools
-- direct-input creation tools if present
-- delete/remove selected if present
-- JSON load/import if it replaces the diagram
-- drag handle editing if present
-
-If a mutation path is intentionally not covered, explain why in the implementation report.
-
-## Save/load behavior
-
-Undo history is editor state, not diagram data.
+or equivalent.
 
 Requirements:
 
-- JSON export should not include undo state.
-- JSON import should not require undo state.
-- Importing/loading a diagram should leave the app in a safe state.
+* present is the current committed diagram.
+* past contains previous committed diagrams.
+* future contains diagrams available for redo.
+* History is UI/editor state only.
+* Do not store history inside Diagram.
+* Do not save history to JSON.
+* Use immutable updates.
+* Bound the history size to a sufficiently large number, e.g. MAX_HISTORY_SIZE = 100.
 
-Recommended:
+When a new edit is committed:
 
-- Treat loading a diagram as an undoable committed diagram replacement when practical.
-- Alternatively, clear undo history on load if that is safer; document the chosen behavior.
+* push previous present into past;
+* set new diagram as present;
+* clear future;
+* truncate past to the history limit.
 
-Choose one clear policy and test it if feasible.
+When undo is triggered:
 
-## Selection and stale references
+* if past is non-empty:
+    * move current present to the front/top of future;
+    * pop the last item from past;
+    * set it as present.
 
-After undo:
+When redo is triggered:
 
-- If the selected stratum/label still exists, selection may be preserved.
-- If it no longer exists, selection must be cleared.
-- Draft geometry should be cancelled if it could refer to stale diagram state.
-- The preview should not crash.
-- The inspector should not show stale data.
+* if future is non-empty:
+    * push current present into past;
+    * take the next item from future;
+    * set it as present.
 
-## Tests
+2. Replace direct setEditableDiagram edit paths with undoable commits
 
-Add focused tests for undo behavior.
+Audit all places where committed diagram data changes.
 
-Depending on the existing test setup, use the most appropriate layer:
+Route real diagram edits through a common helper such as:
 
-- pure helper tests for undo/history helpers if introduced;
-- React component tests if existing UI tests already cover toolbar interactions;
-- focused unit tests for selection sanitization helpers if introduced.
+commitDiagramChange(nextDiagram, options?)
 
-Required coverage:
+or:
 
-1. One-step undo restores previous diagram after a simple committed edit.
+setDiagramWithHistory((current) => nextDiagram)
 
-Example:
+Required undoable operations include:
 
-- start with point name `A`
-- edit to `B`
-- undo
-- name is `A`
-- undo is no longer available
+* cursor-created point;
+* cursor-created label;
+* cursor-created polyline;
+* cursor-created cubic Bézier;
+* cursor-created polygon sheet;
+* direct-created point;
+* direct-created label;
+* direct-created polyline;
+* direct-created cubic Bézier;
+* direct-created polygon sheet;
+* inspector name edits;
+* inspector layer edits;
+* inspector coordinate edits;
+* inspector style edits;
+* drag-handle geometry edits;
+* delete/remove selected elements, if already implemented in Phase 10A;
+* empty canvas creation/switching, if implemented;
+* JSON load/import, if it replaces the committed diagram.
 
-2. Undo snapshot is replaced by the latest committed change, not accumulated as multi-step history.
+Non-diagram UI state changes should not create undo entries:
 
-Example:
+* selecting an element;
+* changing layer filter;
+* changing creation tool;
+* changing coordinate input mode;
+* changing active work plane;
+* changing direct form text fields;
+* changing draft points before finish;
+* toggling preview UI;
+* copy TikZ;
+* status message changes.
 
-- start with name `A`
-- edit to `B`
-- edit to `C`
-- undo
-- name is `B`
-- another undo does nothing
+Draft actions:
 
-This verifies one-step undo semantics.
+* adding polyline draft vertices should not necessarily create undo entries;
+* finishing/committing the polyline should create one undo entry;
+* canceling a draft should not create an undo entry;
+* same for cubic Bézier and sheet drafts.
 
-3. UI-only state changes do not create undo snapshots.
+3. Handle drag editing sensibly
 
-Example candidates:
+Drag-handle editing can produce many intermediate updates.
 
-- selecting an element
-- changing layer filter
-- changing creation tool
-- changing coordinate input mode
-- changing active work plane
+Avoid creating one undo entry per pointer move.
 
-Use whatever is easiest and stable in the current codebase.
+Preferred behavior:
 
-4. Undo clears stale selection or keeps only valid selection.
+* record a history entry at drag start or at drag commit/end;
+* during drag, update preview/current diagram as needed;
+* after drag ends, one undo should revert the entire drag to the pre-drag geometry.
 
-Example:
+If the current implementation only updates on pointer move and there is no explicit drag end structure, implement the simplest robust grouping that avoids excessive history pollution.
 
-- create or remove an element
-- undo
-- selected element should not refer to a non-existing stratum/label
+Acceptable MVP:
 
-5. JSON export/import does not include undo state.
+* store the pre-drag diagram at drag start;
+* update diagram during drag without pushing every intermediate state;
+* on drag end, commit one history entry from pre-drag to final state.
 
-If existing tests already verify saved JSON shape, update or add a small test to ensure undo state remains UI-only.
+If this is too large, at minimum avoid pushing dozens of history entries during one drag. Report any limitation.
 
-## Documentation
+4. Selection behavior after undo/redo
 
-Update documentation if there is a relevant UI or roadmap document.
+Keep selection as UI state, but make it safe.
 
-At minimum, add a concise note to an appropriate docs file, if one exists:
+After undo or redo:
 
-- Phase 10E adds one-step undo.
-- Undo stores only the previous `Diagram` value.
-- Undo history is editor state and is not exported to TikZ or JSON.
-- Redo and multi-step history are future work.
+* if the selected element still exists, keep selection;
+* if it no longer exists, clear selection;
+* do not store selection in history;
+* do not restore old selection from history.
 
-Do not over-document.
+This keeps the model simple and avoids saving UI state in history.
 
-## Scope control
+Layer filter behavior:
 
-Do not modify unrelated files unless necessary.
+* keep the current layer filter;
+* after undo/redo, if selected element is hidden or absent, clear selection;
+* do not store layer filter in history.
 
-Expected likely files:
+Draft behavior:
 
-- UI/App/editor state files
-- diagram update helper files if appropriate
-- tests
-- docs
+* undo/redo should clear active drafts, or otherwise ensure drafts do not point to stale geometry.
+* Prefer clearing drafts on undo/redo.
 
-Avoid unrelated formatting churn.
+Direct form state:
 
-## Verification
+* may remain unchanged.
+* Do not store it in history.
+
+5. UI controls
+
+Add user-visible undo/redo controls.
+
+Requirements:
+
+* Undo button;
+* Redo button;
+* disabled state when unavailable;
+* labels/tooltips are clear;
+* buttons should not be hidden in ordinary editor usage.
+
+Suggested labels:
+
+Undo
+Redo
+
+or:
+
+↶ Undo
+↷ Redo
+
+Keyboard shortcuts:
+
+* Cmd+Z / Ctrl+Z: undo;
+* Cmd+Shift+Z / Ctrl+Shift+Z: redo;
+* optionally Ctrl+Y on non-Mac-like platforms for redo.
+
+Avoid interfering with text input fields:
+
+* If the user is typing in an input/textarea/select/contenteditable field, do not steal ordinary text-editing undo/redo.
+* Only handle global shortcuts when focus is not inside an editable input, or carefully allow native input behavior.
+
+6. Save/load behavior
+
+Undo/redo history should not be saved.
+
+When loading/importing a diagram:
+
+Preferred behavior:
+
+* treat the loaded diagram as a committed diagram change, so Undo returns to the previous diagram;
+* clear redo future;
+* clear drafts and stale selection.
+
+Alternative acceptable behavior:
+
+* replace the current diagram and reset history.
+
+Choose one policy and document/test it.
+
+Preferred policy is more user-friendly:
+
+* loading a file can be undone.
+
+But if implementing this is risky, use reset-history behavior and report it clearly.
+
+Export/save JSON:
+
+* export only the current present diagram;
+* do not include past or future.
+
+7. Empty canvas behavior
+
+If empty canvas creation/switching exists:
+
+* switching to Empty 2D or Empty 3D should be undoable if it replaces the current committed diagram;
+* after undo, previous diagram returns;
+* after redo, empty diagram returns;
+* selection/drafts are cleared or validated.
+
+If empty canvas is not implemented yet, do not implement it as part of Phase 10E.
+
+8. Tests
+
+Add focused tests for history behavior.
+
+Required tests:
+
+A. Basic multi-step undo
+
+* start from a diagram;
+* commit at least three diagram changes;
+* undo repeatedly;
+* verify each previous diagram state is restored in reverse order;
+* verify more than one undo step works.
+
+B. Redo
+
+* commit changes;
+* undo at least two steps;
+* redo;
+* verify the undone state is restored forward;
+* redo again if possible.
+
+C. New edit clears redo future
+
+* commit A → B → C;
+* undo to B;
+* make new edit D;
+* verify redo is no longer available;
+* verify history is A → B → D, not A → B → C.
+
+D. History limit
+
+* commit more than the limit, or test helper behavior directly;
+* verify history is bounded, e.g. max 100 past states;
+* no unbounded growth.
+
+E. UI state not stored in diagram history
+
+Test where practical:
+
+* selection changes do not create undo entries;
+* layer filter changes do not create undo entries;
+* direct form input changes do not create undo entries;
+* draft changes before finish do not create undo entries.
+
+F. Creation undo
+
+* create point/label/curve/sheet;
+* undo removes it;
+* redo restores it.
+
+At least test point and one path-like element.
+More coverage is better.
+
+G. Inspector edit undo
+
+* edit a coordinate or layer/name/style;
+* undo restores previous diagram data;
+* redo reapplies edit.
+
+H. Drag edit grouping
+
+If drag editing has explicit helpers:
+
+* simulate drag start/update/end;
+* verify one undo reverts the whole drag, not just one pointer move.
+* If not practical, add a TODO/limitation and test the lower-level update helper where possible.
+
+I. Save/export excludes history
+
+If save serialization is testable:
+
+* export/save output contains only current diagram;
+* no past, present, future, or history metadata is included.
+
+J. Keyboard shortcut behavior
+
+If UI tests are available:
+
+* Cmd/Ctrl+Z triggers undo outside inputs;
+* input-focused shortcut does not break native text editing.
+
+Do not make keyboard tests brittle if the project does not already have such tests.
+
+9. Documentation
+
+Update relevant docs briefly.
+
+Good places:
+
+* docs/ROADMAP.md;
+* any UI/editor behavior documentation.
+
+Mention:
+
+* Phase 10E adds multi-step undo/redo;
+* history is bounded, e.g. 100 states;
+* redo cancels undo;
+* history is UI/editor state only;
+* history is not saved to JSON;
+* selection/filter/drafts are not part of history;
+* drag edits should be grouped as one undoable change where implemented.
+
+Do not add large unrelated docs.
+
+10. Manual verification checklist
+
+After implementation, run:
+
+PATH=/opt/homebrew/bin:$PATH npm run dev
+
+Verify:
+
+1. Create a point.
+2. Create a label.
+3. Create a polyline.
+4. Press Undo once:
+    * polyline disappears.
+5. Press Undo again:
+    * label disappears.
+6. Press Undo again:
+    * point disappears.
+7. Press Redo:
+    * point returns.
+8. Press Redo again:
+    * label returns.
+9. Press Redo again:
+    * polyline returns.
+10. Undo once, then make a new edit:
+
+* redo is disabled/cleared.
+
+11. Edit a coordinate in inspector:
+
+* undo restores old coordinate.
+* redo reapplies coordinate.
+
+12. Drag a handle:
+
+* one undo reverts the drag.
+
+13. Save JSON:
+
+* file does not contain history.
+
+14. Load JSON:
+
+* behavior matches the chosen load-history policy.
+
+11. Preserve existing behavior
+
+Do not regress:
+
+* cursor creation;
+* direct creation;
+* empty canvas behavior if implemented;
+* layer selection for new elements;
+* layer filtering;
+* selection behavior;
+* inspector editing;
+* style editing;
+* drag handle editing;
+* work-plane projection;
+* draft previews;
+* save/load current diagram;
+* SVG preview;
+* TikZ generation;
+* Phase 9A coordinate names;
+* Phase 9B layer-aware output;
+* Phase 9C layer filtering;
+* Phase 10D drag handles.
+
+12. Verification
 
 Run:
 
-```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
-```
 
-## Report after implementation
+13. Report after implementation
 
 Please report:
 
-- files modified
-- where undo state is stored
-- how committed diagram changes are routed through undo
-- which mutation paths are covered
-- which mutation paths, if any, are intentionally not covered
-- how stale selection/drafts are handled after undo
-- whether `Cmd+Z` / `Ctrl+Z` was implemented
-- chosen save/load undo policy
-- tests added or updated
-- documentation updated
-- test results
-- build results
-- remaining limitations
+* files modified;
+* history data structure used;
+* history limit;
+* how undo works;
+* how redo works;
+* how new edits clear redo future;
+* which diagram updates are undoable;
+* which UI-only changes are not undoable;
+* how selection is validated after undo/redo;
+* how drafts are handled after undo/redo;
+* how drag edits are grouped;
+* how save/load handles history;
+* keyboard shortcuts implemented;
+* tests added/updated;
+* test results;
+* build results;
+* remaining limitations.
