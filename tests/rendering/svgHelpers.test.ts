@@ -10,6 +10,7 @@ import { projectVec3 } from '../../src/geometry/projection.ts'
 import type { Diagram } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
@@ -150,6 +151,42 @@ test('resolveSvgCamera uses fitted camera only when explicitly requested', () =>
 
   assert.deepEqual(defaultCamera, diagram.camera)
   assert.notDeepEqual(fittedCamera, diagram.camera)
+})
+
+test('resolveSvgCamera fitted bounds include optional extra fit points', () => {
+  const diagram = createCameraTestDiagram()
+  const extraPoint = { x: 10, y: 3, z: 0 }
+  const withoutExtra = resolveSvgCamera(diagram, 200, 120, { fitToView: true })
+  const withExtra = resolveSvgCamera(diagram, 200, 120, {
+    fitToView: true,
+    extraPointsForFit: [extraPoint],
+  })
+
+  assert.notDeepEqual(withExtra, withoutExtra)
+  assert.ok(projectToSvgPoint(withoutExtra, extraPoint, 120).x > 200)
+  assert.ok(projectToSvgPoint(withExtra, extraPoint, 120).x <= 200)
+  assert.deepEqual(diagram, createCameraTestDiagram())
+})
+
+test('resolveSvgCamera matches draft and committed polyline framing', () => {
+  const diagram = createCameraTestDiagram()
+  const draftPoints = [
+    { x: 2, y: 3, z: 0 },
+    { x: 10, y: 3, z: 0 },
+  ]
+  const draftCamera = resolveSvgCamera(diagram, 200, 120, {
+    fitToView: true,
+    extraPointsForFit: draftPoints,
+  })
+  const committedDiagram = addPolylineCurveStratum(diagram, draftPoints, {
+    id: 'curve-1',
+  })
+  const committedCamera = resolveSvgCamera(committedDiagram, 200, 120, {
+    fitToView: true,
+  })
+
+  assert.deepEqual(draftCamera, committedCamera)
+  assert.equal(diagram.strata.length, 1)
 })
 
 test('projectToSvgPoint keeps positive x right and makes positive y appear upward', () => {

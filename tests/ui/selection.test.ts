@@ -4,6 +4,7 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import {
   createInspectorSections,
   describeCurvePoints,
@@ -582,6 +583,72 @@ test('addPolylineCurveStratumWithResult safely rejects fewer than 2 points', () 
 
   assert.equal(result.diagram, twoDimensionalExample)
   assert.equal(result.id, null)
+})
+
+test('addPolylineCurveStratumWithResult ignores a colliding custom id', () => {
+  const result = addPolylineCurveStratumWithResult(
+    twoDimensionalExample,
+    [
+      { x: 1, y: 2, z: 0 },
+      { x: 3, y: 4, z: 0 },
+    ],
+    { id: 'visibleWire' },
+  )
+
+  assert.equal(result.id, 'curve-1')
+  assert.equal(
+    result.diagram.strata.filter((stratum) => stratum.id === 'visibleWire')
+      .length,
+    1,
+  )
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('addPolylineCurveStratumWithResult rejects blank custom names safely', () => {
+  for (const name of ['', '   ']) {
+    const result = addPolylineCurveStratumWithResult(
+      twoDimensionalExample,
+      [
+        { x: 1, y: 2, z: 0 },
+        { x: 3, y: 4, z: 0 },
+      ],
+      { id: `blank-name-${name.length}`, name },
+    )
+    const curve = result.diagram.strata.find((stratum) => stratum.id === result.id)
+
+    assert.equal(curve?.geometricKind, 'curve')
+
+    if (curve?.geometricKind !== 'curve') {
+      throw new Error('Expected added stratum to be a curve.')
+    }
+
+    assert.equal(curve.name, 'Curve')
+    assert.equal(validateDiagram(result.diagram).valid, true)
+  }
+})
+
+test('addPolylineCurveStratumWithResult accepts trimmed custom id and name', () => {
+  const result = addPolylineCurveStratumWithResult(
+    twoDimensionalExample,
+    [
+      { x: 1, y: 2, z: 0 },
+      { x: 3, y: 4, z: 0 },
+    ],
+    { id: ' custom-curve ', name: '  Custom curve  ' },
+  )
+  const curve = result.diagram.strata.find((stratum) => stratum.id === result.id)
+
+  assert.equal(result.id, 'custom-curve')
+  assert.notEqual(result.diagram, twoDimensionalExample)
+  assert.equal(twoDimensionalExample.strata.some((stratum) => stratum.id === result.id), false)
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected added stratum to be a curve.')
+  }
+
+  assert.equal(curve.name, 'Custom curve')
+  assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
 test('addTextLabel returns a new diagram with default text and valid style', () => {

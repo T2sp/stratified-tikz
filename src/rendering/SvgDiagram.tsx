@@ -62,7 +62,11 @@ export function SvgDiagram({
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
-  const camera = resolveSvgCamera(diagram, width, height, { fitToView })
+  const camera = resolveSvgCamera(diagram, width, height, {
+    fitToView,
+    // TODO: Future 3D work-plane previews can pass their cropped patch points here.
+    extraPointsForFit: polylineDraft ?? [],
+  })
   const items = [
     ...diagram.strata
       .filter((stratum) => shouldRenderStratum(diagram.ambientDimension, stratum))

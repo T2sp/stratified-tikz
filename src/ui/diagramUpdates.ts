@@ -294,8 +294,8 @@ function createPolylineCurveForDiagram(
     codim: diagram.ambientDimension === 2 ? 1 : 2,
     geometricKind: 'curve',
     kind: 'polyline',
-    id: options.id ?? makeUniqueId(diagram, 'curve'),
-    name: options.name ?? 'Curve',
+    id: safeOptionalId(diagram, options.id, 'curve'),
+    name: safeOptionalName(options.name, 'Curve'),
     style: cloneCurveStyle(defaultCurveStyle),
     points: points.map((point) =>
       normalizePointForAmbientDimension(diagram.ambientDimension, point),
@@ -303,6 +303,38 @@ function createPolylineCurveForDiagram(
     styleSegments: [],
     layer: options.layer ?? nextLayer(diagram),
   }
+}
+
+function safeOptionalId(
+  diagram: Diagram,
+  id: string | undefined,
+  fallbackPrefix: string,
+): string {
+  const trimmedId = id?.trim()
+
+  if (trimmedId === undefined || trimmedId.length === 0) {
+    return makeUniqueId(diagram, fallbackPrefix)
+  }
+
+  const existingIds = new Set([
+    ...diagram.strata.map((stratum) => stratum.id),
+    ...diagram.labels.map((label) => label.id),
+  ])
+
+  return existingIds.has(trimmedId)
+    ? makeUniqueId(diagram, fallbackPrefix)
+    : trimmedId
+}
+
+function safeOptionalName(
+  name: string | undefined,
+  fallbackName: string,
+): string {
+  const trimmedName = name?.trim()
+
+  return trimmedName === undefined || trimmedName.length === 0
+    ? fallbackName
+    : trimmedName
 }
 
 export function updateSelectedElement(

@@ -6,7 +6,7 @@ import {
   isPointFill,
   isPointShape,
   isPositiveFiniteNumber,
-} from './styles'
+} from './styles.ts'
 import type {
   Camera,
   CurveStratum,

@@ -4,6 +4,7 @@ import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
 export type ResolveSvgCameraOptions = {
   fitToView?: boolean
   padding?: number
+  extraPointsForFit?: readonly Vec3[]
 }
 
 const defaultPreviewPadding = 36
@@ -23,6 +24,7 @@ export function resolveSvgCamera(
     width,
     height,
     options.padding ?? defaultPreviewPadding,
+    options.extraPointsForFit ?? [],
   )
 }
 
@@ -31,8 +33,9 @@ function createFittedCamera(
   width: number,
   height: number,
   padding: number,
+  extraPointsForFit: readonly Vec3[],
 ): Camera {
-  const modelPoints = collectDiagramPoints(diagram)
+  const modelPoints = [...collectDiagramPoints(diagram), ...extraPointsForFit]
   const unitCamera = {
     ...diagram.camera,
     scale: 1,
