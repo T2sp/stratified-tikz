@@ -14,6 +14,7 @@ import {
   parseFiniteNumber,
   updateLabelById,
   updateStratumById,
+  updateStratumNameById,
   updateVec3Coordinate,
   type CoordinateAxis,
 } from './diagramUpdates.ts'
@@ -79,10 +80,7 @@ function renderStratumInspector(
             value={stratum.name}
             onChange={(name) =>
               onDiagramChange((currentDiagram) =>
-                updateStratumById(currentDiagram, stratum.id, (current) => ({
-                  ...current,
-                  name,
-                })),
+                updateStratumNameById(currentDiagram, stratum.id, name),
               )
             }
           />

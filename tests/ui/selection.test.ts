@@ -14,9 +14,11 @@ import {
 import type { CurveStyle } from '../../src/model/types.ts'
 import {
   cloneDiagram,
+  parseFiniteNumber,
   updateLabelById,
   updateSelectedElement,
   updateStratumById,
+  updateStratumNameById,
   updateVec3Coordinate,
 } from '../../src/ui/diagramUpdates.ts'
 import {
@@ -335,6 +337,47 @@ test('updateStratumById returns a new diagram without mutating the original', ()
   assert.equal(updated.labels, twoDimensionalExample.labels)
 })
 
+test('updateStratumNameById updates valid non-empty names', () => {
+  const updated = updateStratumNameById(
+    twoDimensionalExample,
+    'visibleWire',
+    'my curve',
+  )
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(
+    updated.strata.find((stratum) => stratum.id === 'visibleWire')?.name,
+    'my curve',
+  )
+  assert.equal(
+    updated.strata.find((stratum) => stratum.id === 'hiddenWire'),
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'hiddenWire'),
+  )
+  assert.equal(updated.labels, twoDimensionalExample.labels)
+})
+
+test('updateStratumNameById rejects empty names', () => {
+  const updated = updateStratumNameById(twoDimensionalExample, 'visibleWire', '')
+
+  assert.equal(updated, twoDimensionalExample)
+  assert.equal(
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'visibleWire')
+      ?.name,
+    'Visible wire',
+  )
+})
+
+test('updateStratumNameById rejects whitespace-only names', () => {
+  const updated = updateStratumNameById(twoDimensionalExample, 'visibleWire', '   ')
+
+  assert.equal(updated, twoDimensionalExample)
+  assert.equal(
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'visibleWire')
+      ?.name,
+    'Visible wire',
+  )
+})
+
 test('updateLabelById returns a new diagram and preserves unrelated strata', () => {
   const updated = updateLabelById(
     twoDimensionalExample,
@@ -394,6 +437,83 @@ test('updateSelectedElement updates the selected label helper path', () => {
     updated.labels.find((label) => label.id === 'mathMorphismLabel')?.text,
     '$H$',
   )
+})
+
+test('parseFiniteNumber rejects invalid numeric input', () => {
+  assert.equal(parseFiniteNumber(''), null)
+  assert.equal(parseFiniteNumber('   '), null)
+  assert.equal(parseFiniteNumber('abc'), null)
+  assert.equal(parseFiniteNumber('NaN'), null)
+  assert.equal(parseFiniteNumber('Infinity'), null)
+  assert.equal(parseFiniteNumber('-Infinity'), null)
+})
+
+test('parseFiniteNumber accepts finite numeric input', () => {
+  assert.equal(parseFiniteNumber('3.25'), 3.25)
+  assert.equal(parseFiniteNumber('  -2  '), -2)
+})
+
+test('invalid numeric input does not write NaN into diagram state', () => {
+  const parsedValue = parseFiniteNumber('not a number')
+  const updated =
+    parsedValue === null
+      ? twoDimensionalExample
+      : updateStratumById(twoDimensionalExample, 'circlePoint', (stratum) => {
+          if (stratum.geometricKind !== 'point') {
+            return stratum
+          }
+
+          return {
+            ...stratum,
+            position: updateVec3Coordinate(stratum.position, 'x', parsedValue, 2),
+          }
+        })
+
+  assert.equal(updated, twoDimensionalExample)
+  const point = updated.strata.find((stratum) => stratum.id === 'circlePoint')
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected circlePoint to be a point.')
+  }
+
+  assert.equal(Number.isNaN(point.position.x), false)
+})
+
+test('valid numeric input updates coordinates through parsing helper', () => {
+  const parsedValue = parseFiniteNumber('4.5')
+
+  assert.notEqual(parsedValue, null)
+
+  if (parsedValue === null) {
+    throw new Error('Expected 4.5 to parse as a finite number.')
+  }
+
+  const updated = updateStratumById(
+    twoDimensionalExample,
+    'circlePoint',
+    (stratum) => {
+      if (stratum.geometricKind !== 'point') {
+        return stratum
+      }
+
+      return {
+        ...stratum,
+        position: updateVec3Coordinate(stratum.position, 'x', parsedValue, 2),
+      }
+    },
+  )
+  const point = updated.strata.find((stratum) => stratum.id === 'circlePoint')
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected circlePoint to be a point.')
+  }
+
+  assert.equal(point.position.x, 4.5)
+  assert.equal(point.position.z, 0)
 })
 
 test('updateVec3Coordinate normalizes z to 0 for 2D coordinates', () => {

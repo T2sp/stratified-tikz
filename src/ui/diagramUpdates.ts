@@ -55,6 +55,18 @@ export function updateLabelById(
   return changed ? { ...diagram, labels } : diagram
 }
 
+export function updateStratumNameById(
+  diagram: Diagram,
+  id: string,
+  name: string,
+): Diagram {
+  if (name.trim().length === 0) {
+    return diagram
+  }
+
+  return updateStratumById(diagram, id, (stratum) => ({ ...stratum, name }))
+}
+
 export function updateSelectedElement(
   diagram: Diagram,
   selectedElement: SelectedElement,
