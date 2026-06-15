@@ -248,6 +248,8 @@ Out of scope:
 
 ### Phase 9B: Layer-aware TikZ output
 
+Status: implemented
+
 Current issue:
 
 The inspector can edit layer, but generated TikZ does not reflect layer information.

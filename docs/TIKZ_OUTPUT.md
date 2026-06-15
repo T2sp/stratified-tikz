@@ -46,8 +46,10 @@ a safe geometric default such as `point`, `curve`, or `sheet`. If a sanitized
 stem starts with a digit, the fallback is prefixed before the digit.
 
 Coordinate names remain deterministic and unique by combining the geometric
-prefix, optional concrete type, sanitized name stem, sorted element index, and
-coordinate index. Examples:
+prefix, optional concrete type, sanitized name stem, emission element index, and
+coordinate index. Elements are emitted by numeric layer, and elements on the
+same layer keep their original diagram order rather than being sorted by id.
+Examples:
 
 ```tex
 \coordinate (pointParticle0p0) at (0,0);
@@ -60,6 +62,79 @@ coordinate index. Examples:
 Free text labels are separate diagram objects. Their `name` fields do not
 create coordinate-name stems; labels are emitted directly as TikZ nodes at their
 stored model coordinates.
+
+## Layer-aware output
+
+Generated TikZ uses PGF layers so that diagram `layer` values affect drawing
+order. Every numeric layer value used by an exported sheet, curve, point, or
+free text label is mapped to a deterministic TikZ-safe layer name:
+
+```text
+0  -> stratifiedLayer0
+1  -> stratifiedLayer1
+-1 -> stratifiedLayerMinus1
+```
+
+Sparse and negative layer values are supported. Decimal layer values, if present
+in diagram data, are converted with a readable safe suffix such as
+`stratifiedLayer1Point5`.
+
+The output declares all used diagram layers and sets their order before the
+`tikzpicture`:
+
+```tex
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfdeclarelayer{stratifiedLayer1}
+\pgfsetlayers{stratifiedLayer0,stratifiedLayer1,main}
+```
+
+Lower numeric layer values are listed before higher numeric layer values, so
+they render behind higher layers. The `main` layer is retained in
+`\pgfsetlayers` for compatibility, although exported diagram elements are placed
+on explicit `stratifiedLayer...` layers.
+
+Drawing commands for sheets, curves, points, and free text labels are wrapped in
+`pgfonlayer` blocks:
+
+```tex
+\begin{pgfonlayer}{stratifiedLayer0}
+  %----------------------------------------
+  % Codimension 1 strata: curves
+  %----------------------------------------
+  \draw[...] ...;
+\end{pgfonlayer}
+
+\begin{pgfonlayer}{stratifiedLayer1}
+  %----------------------------------------
+  % Labels
+  %----------------------------------------
+  \node at (1,0) {$F$};
+\end{pgfonlayer}
+```
+
+<!-- Layers are emitted in deterministic numeric order. Within a layer, items that
+belong to the same emitted section preserve their existing relative diagram
+order. Coordinate definitions remain outside layer blocks and keep the Phase 9A
+coordinate-name rules based on sanitized stratum names and emission order. -->
+
+## Ordering within TikZ layers
+
+Layer blocks are emitted in deterministic numeric layer order. Lower numeric layer values are placed behind higher numeric layer values.
+
+Within each TikZ layer block, commands are organized by codimension / element kind for readability. Therefore, the output does not necessarily preserve the full diagram.strata order across different codimension sections.
+
+The intended ordering rule is:
+
+1. numeric layer order;
+2. codimension / element-kind section order within each layer;
+3. original diagram order within each section.
+
+For example, curves and points on the same layer may be grouped into separate codimension sections even if their order in diagram.strata is interleaved. This is intentional so that the generated TikZ source remains readable and mathematically organized.
+
+Free text labels are emitted in their configured layer and are grouped consistently with the layer output format.
+
+Selection and preview highlighting are not exported. Layer filtering and
+layer-based selection UI are not part of this phase.
 
 ## 2D TikZ basis
 
@@ -124,17 +199,14 @@ In 2D mode, group output as:
 % ----------------------------------------------------------------------------
 
 % ----------------------------------------------------------------------------
-% Codimension 1 strata: curves
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 2 strata: points
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Labels
+% Layered drawing commands
 % ----------------------------------------------------------------------------
 ```
+
+Layer blocks include comments for the contained codimension sections, such as
+`Codimension 1 strata: curves`, `Codimension 2 strata: points`, and `Labels`.
+Each in-layer section comment is surrounded by `%-----` separator comments for
+readability.
 
 ## Output sections in 3D mode
 
@@ -146,21 +218,14 @@ In 3D mode, group output as:
 % ----------------------------------------------------------------------------
 
 % ----------------------------------------------------------------------------
-% Codimension 1 strata: sheets
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 2 strata: curves
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Codimension 3 strata: points
-% ----------------------------------------------------------------------------
-
-% ----------------------------------------------------------------------------
-% Labels
+% Layered drawing commands
 % ----------------------------------------------------------------------------
 ```
+
+Layer blocks include comments for the contained codimension sections, such as
+`Codimension 1 strata: sheets`, `Codimension 2 strata: curves`,
+`Codimension 3 strata: points`, and `Labels`. Each in-layer section comment is
+surrounded by `%-----` separator comments for readability.
 
 ## Readability requirements
 
@@ -519,21 +584,23 @@ Then use:
 \node[text=stzLabelA] at (1.2,0.5) {$F$};
 ```
 
-## Label section
+## Layered label output
 
-Labels should be emitted near the end of the TikZ output.
+Free text labels are emitted inside the `pgfonlayer` block for their configured
+numeric layer.
 
-In both 2D and 3D modes, use the section:
+Within each layer, labels are grouped under a readable label comment:
 
 ```tex
-% ----------------------------------------------------------------------------
+%----------------------------------------
 % Labels
-% ----------------------------------------------------------------------------
+%----------------------------------------
 ```
 
 Each label should be emitted as a separate TikZ node.
 
-The output should remain readable.
+There is no separate non-layered label section. Selection and preview
+highlighting are not exported.
 
 ## Label content escaping
 

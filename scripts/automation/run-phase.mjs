@@ -2,14 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const phase = process.argv[2];
+const mode = process.argv[3] ?? "implement";
 
 const phases = {
-  "9B": {
+    "9B": {
     branch: "phase/9b-layer-aware-tikz-output",
     commitMessage: "Implement Phase 9B layer-aware TikZ output",
+    fixCommitMessage: "Fix Phase 9B same-layer TikZ ordering",
     implementPrompt: "prompts/phase-9b-implement.md",
     reviewPrompt: "prompts/phase-9b-review.md",
-  },
+    fixPrompt: "prompts/phase-9b-fix.md",
+    },
 };
 
 if (!phase || !phases[phase]) {
@@ -87,38 +90,56 @@ function runCodex(promptFile, logFile) {
 
   console.log(`\nRunning Codex with prompt: ${promptFile}`);
 
-  const result = spawnSync(
-    "codex",
-    [
-      "exec",
-      "--sandbox",
-      "workspace-write",
-      "--ask-for-approval",
-      "never",
-      "-c",
-      "model_reasoning_effort=high",
-      prompt,
-    ],
-    {
-      encoding: "utf8",
-      env,
-      maxBuffer: 1024 * 1024 * 20,
-    },
-  );
+  const codexBin = process.env.CODEX_BIN ?? "codex";
+
+  const codexPathCheck = spawnSync("which", [codexBin], {
+    encoding: "utf8",
+    env,
+  });
+
+  const args = [
+    "exec",
+    "--sandbox",
+    "workspace-write",
+    "-c",
+    "model_reasoning_effort=high",
+    prompt,
+  ];
+
+  const result = spawnSync(codexBin, args, {
+    encoding: "utf8",
+    env,
+    maxBuffer: 1024 * 1024 * 50,
+  });
 
   const combined = [
+    `COMMAND: ${codexBin} ${args.map((a) => JSON.stringify(a)).join(" ")}`,
+    `PATH: ${env.PATH}`,
+    `which codex status: ${codexPathCheck.status}`,
+    `which codex stdout: ${codexPathCheck.stdout ?? ""}`,
+    `which codex stderr: ${codexPathCheck.stderr ?? ""}`,
+    `status: ${result.status}`,
+    `signal: ${result.signal}`,
+    `error: ${result.error ? String(result.error.stack ?? result.error) : ""}`,
+    "",
     "STDOUT:",
-    result.stdout,
+    result.stdout ?? "",
     "",
     "STDERR:",
-    result.stderr,
+    result.stderr ?? "",
   ].join("\n");
 
   writeFileSync(logFile, combined);
 
+  if (result.error) {
+    console.error(`Failed to start Codex. See ${logFile}`);
+    console.error(result.error);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
-    console.error(`Codex failed. See ${logFile}`);
-    console.error(result.stderr);
+    console.error(`Codex failed with status ${result.status}. See ${logFile}`);
+    console.error(result.stderr ?? "");
     process.exit(result.status ?? 1);
   }
 
@@ -151,7 +172,22 @@ console.log(`Branch: ${spec.branch}`);
 assertCleanWorkingTree();
 checkoutPhaseBranch(spec.branch);
 
-runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
+const promptToRun =
+  mode === "fix" ? spec.fixPrompt : spec.implementPrompt;
+
+const promptLogName =
+  mode === "fix" ? "fix" : "implement";
+
+const commitMessage =
+  mode === "fix" ? spec.fixCommitMessage : spec.commitMessage;
+
+if (mode === "fix" && !promptToRun) {
+  console.error(`No fixPrompt configured for phase ${phase}`);
+  process.exit(1);
+}
+
+// runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
+runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`)
 
 runVerification();
 
@@ -200,7 +236,7 @@ run("git", ["status", "--short"]);
 run("git", ["diff", "--stat"]);
 
 run("git", ["add", "."]);
-run("git", ["commit", "-m", spec.commitMessage]);
+run("git", ["commit", "-m", commitMessage]);
 run("git", ["push", "-u", "origin", spec.branch]);
 
 console.log(`\nDone. Pushed ${spec.branch}.`);

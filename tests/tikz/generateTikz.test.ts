@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   generateTikz,
+  layerToTikzLayerName,
   sanitizeTikzNameStem,
 } from '../../src/tikz/index.ts'
 import type {
@@ -77,6 +78,97 @@ test('custom colors are emitted as definecolor commands', () => {
   assert.match(tikz, /\\definecolor\{stzSheetpageFill\}\{HTML\}\{4D9DE0\}/)
   assert.match(tikz, /\\definecolor\{stzCurvelineStroke\}\{HTML\}\{FF00AA\}/)
   assert.match(tikz, /\\definecolor\{stzPointjunction\}\{HTML\}\{00AA33\}/)
+})
+
+test('TikZ layer names are deterministic and TikZ-safe', () => {
+  assert.equal(layerToTikzLayerName(0), 'stratifiedLayer0')
+  assert.equal(layerToTikzLayerName(2), 'stratifiedLayer2')
+  assert.equal(layerToTikzLayerName(-1), 'stratifiedLayerMinus1')
+  assert.equal(layerToTikzLayerName(1.5), 'stratifiedLayer1Point5')
+})
+
+test('generated TikZ declares used layers in numeric order', () => {
+  const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
+
+  assert.match(tikz, /\\pgfdeclarelayer\{stratifiedLayerMinus1\}/)
+  assert.match(tikz, /\\pgfdeclarelayer\{stratifiedLayer0\}/)
+  assert.match(tikz, /\\pgfdeclarelayer\{stratifiedLayer2\}/)
+  assert.match(
+    tikz,
+    /\\pgfsetlayers\{stratifiedLayerMinus1,stratifiedLayer0,stratifiedLayer2,main\}/,
+  )
+})
+
+test('generated TikZ groups drawing commands in pgfonlayer blocks', () => {
+  const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
+  const layerMinusOne = extractLayerBlock(tikz, 'stratifiedLayerMinus1')
+  const layerZero = extractLayerBlock(tikz, 'stratifiedLayer0')
+  const layerTwo = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.match(layerMinusOne, /\\node at \(0\.5,1\) \{\$L\$\};/)
+  assert.match(
+    layerZero,
+    /\(curvePolyBackWire0p0\) -- \(curvePolyBackWire0p1\);/,
+  )
+  assert.match(
+    layerTwo,
+    /\(curvePolyFrontWire1p0\) -- \(curvePolyFrontWire1p1\);/,
+  )
+  assert.match(layerTwo, /\] at \(pointFrontPoint0p0\) \{\};/)
+})
+
+test('same-layer drawing command order is preserved', () => {
+  const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
+  const layerTwo = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.ok(
+    layerTwo.indexOf('(curvePolyFrontWire1p0)') <
+      layerTwo.indexOf('(pointFrontPoint0p0)'),
+  )
+})
+
+test('same-kind same-layer drawing order follows diagram order, not id order', () => {
+  const tikz = generateTikz(createSameLayerOppositeIdCurveDiagram())
+  const layerZero = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(tikz, /\\coordinate \(curvePolyZCurve0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyACurve1p0\) at \(0,1\);/)
+  assert.ok(
+    tikz.indexOf('\\coordinate (curvePolyZCurve0p0)') <
+      tikz.indexOf('\\coordinate (curvePolyACurve1p0)'),
+  )
+  assert.ok(
+    layerZero.indexOf('(curvePolyZCurve0p0)') <
+      layerZero.indexOf('(curvePolyACurve1p0)'),
+  )
+})
+
+test('layer blocks use separated codimension comments', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram())
+  const layerZero = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(
+    layerZero,
+    /%---+\n\s*% Codimension 1 strata: curves\n\s*%---+/,
+  )
+})
+
+test('layer-aware output preserves Phase 9A coordinate names', () => {
+  const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
+
+  assert.match(tikz, /\\coordinate \(curvePolyBackWire0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyFrontWire1p0\) at \(0,0\.5\);/)
+  assert.match(tikz, /\\coordinate \(pointFrontPoint0p0\) at \(1,0\.5\);/)
+  assert.doesNotMatch(tikz, /curvePolycurve/)
+})
+
+test('single-layer diagrams still generate valid layer output', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram())
+
+  assert.match(tikz, /\\pgfdeclarelayer\{stratifiedLayer0\}/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer0,main\}/)
+  assert.match(tikz, /\\begin\{pgfonlayer\}\{stratifiedLayer0\}/)
+  assert.match(tikz, /\\end\{pgfonlayer\}/)
 })
 
 test('denselyDotted maps to densely dotted', () => {
@@ -361,6 +453,17 @@ function extractCoordinateNames(tikz: string): string[] {
   )
 }
 
+function extractLayerBlock(tikz: string, layerName: string): string {
+  const blockPattern = new RegExp(
+    `\\\\begin\\{pgfonlayer\\}\\{${escapeRegExp(layerName)}\\}([\\s\\S]*?)\\\\end\\{pgfonlayer\\}`,
+  )
+  const match = tikz.match(blockPattern)
+
+  assert.notEqual(match, null)
+
+  return match[1]
+}
+
 function normalizeGeneratedCoordinateNames(tikz: string): string {
   const coordinateNames = extractCoordinateNames(tikz)
   let normalized = tikz
@@ -370,6 +473,102 @@ function normalizeGeneratedCoordinateNames(tikz: string): string {
   })
 
   return normalized
+}
+
+function createLayeredTwoDimensionalDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'back-wire',
+      name: 'Back wire',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'front-wire',
+      name: 'Front wire',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0.5, z: 0 },
+        { x: 1, y: 0.5, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 2,
+    },
+    {
+      codim: 2,
+      geometricKind: 'point',
+      id: 'front-point',
+      name: 'Front point',
+      style: pointStyle(),
+      position: { x: 1, y: 0.5, z: 0 },
+      layer: 2,
+    },
+  )
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'negative-label',
+    name: 'Negative label',
+    text: '$L$',
+    position: { x: 0.5, y: 1, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: -1,
+  })
+
+  return diagram
+}
+
+function createSameLayerOppositeIdCurveDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'z-curve',
+      name: 'Z curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'a-curve',
+      name: 'A curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  return diagram
 }
 
 function createCurveNamingDiagram(): Diagram {
