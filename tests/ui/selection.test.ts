@@ -12,7 +12,7 @@ import {
   formatStratumStyleSummary,
   formatVec3,
 } from '../../src/ui/inspectorSummary.ts'
-import type { CurveStyle } from '../../src/model/types.ts'
+import type { AmbientDimension, CurveStyle, Diagram } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addCubicBezierCurveStratum,
@@ -22,11 +22,16 @@ import {
   addPolylineCurveStratum,
   addPolylineCurveStratumWithResult,
   addPointStratum,
+  addPointStratumFromDirectInput,
   addPointStratumWithResult,
   addTextLabel,
+  addTextLabelFromDirectInput,
   addTextLabelWithResult,
   cloneDiagram,
+  directCreationLayerOptions,
   makeUniqueId,
+  normalizeDirectLabelText,
+  parseDirectCoordinateInput,
   parseFiniteNumber,
   parseOpacity,
   parsePositiveFiniteNumber,
@@ -51,9 +56,22 @@ import {
   type SelectedElement,
 } from '../../src/ui/selection.ts'
 import {
+  clearSelectionForLayerFilter,
   deriveAvailableLayers,
   layerFilterIncludesLayer,
+  type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
+
+function createEmptyDiagramForTest(ambientDimension: AmbientDimension): Diagram {
+  const example =
+    ambientDimension === 2 ? twoDimensionalExample : threeDimensionalExample
+
+  return {
+    ...example,
+    strata: [],
+    labels: [],
+  }
+}
 
 test('findSelectedElement finds a selected stratum by id', () => {
   const selected = findSelectedElement(twoDimensionalExample, {
@@ -633,6 +651,100 @@ test('addPointStratum returns a new 3D diagram with codim 3', () => {
   assert.deepEqual(point.position, { x: 3, y: 4, z: 5 })
 })
 
+test('direct-created 2D point has z normalized to 0 and codim 2', () => {
+  const diagram = createEmptyDiagramForTest(2)
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: '1.5', y: '-2', z: '99' },
+    { id: 'direct-point' },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const point = result.diagram.strata.find(
+    (stratum) => stratum.id === 'direct-point',
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected direct-created stratum to be a point.')
+  }
+
+  assert.equal(point.codim, 2)
+  assert.deepEqual(point.position, { x: 1.5, y: -2, z: 0 })
+})
+
+test('direct-created 3D point preserves z and has codim 3', () => {
+  const diagram = createEmptyDiagramForTest(3)
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: '1', y: '2', z: '3.25' },
+    { id: 'direct-point' },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const point = result.diagram.strata.find(
+    (stratum) => stratum.id === 'direct-point',
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected direct-created stratum to be a point.')
+  }
+
+  assert.equal(point.codim, 3)
+  assert.deepEqual(point.position, { x: 1, y: 2, z: 3.25 })
+})
+
+test('direct-created point uses active layer filter layer and remains selected', () => {
+  const activeLayer = 2
+  const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
+  const result = addPointStratumFromDirectInput(
+    twoDimensionalExample,
+    { x: '1', y: '2', z: '99' },
+    {
+      id: 'filtered-direct-point',
+      ...directCreationLayerOptions(layerFilter),
+    },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const point = result.diagram.strata.find(
+    (stratum) => stratum.id === 'filtered-direct-point',
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected direct-created stratum to be a point.')
+  }
+
+  const selection: SelectedElement = { kind: 'stratum', id: result.id }
+
+  assert.equal(point.layer, activeLayer)
+  assert.equal(layerFilterIncludesLayer(layerFilter, point.layer), true)
+  assert.deepEqual(
+    clearSelectionForLayerFilter(result.diagram, selection, layerFilter),
+    selection,
+  )
+})
+
 test('addPolygonSheetStratum returns a new 3D diagram with codim 1', () => {
   const vertices = [
     { x: 0, y: 0, z: 1 },
@@ -1034,6 +1146,90 @@ test('addTextLabelWithResult returns the updated diagram and created id atomical
   )
 })
 
+test('direct-created label is added to diagram.labels', () => {
+  const diagram = createEmptyDiagramForTest(3)
+  const result = addTextLabelFromDirectInput(
+    diagram,
+    { x: '4', y: '5', z: '6' },
+    '$F$',
+    { id: 'direct-label' },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct label creation to succeed.')
+  }
+
+  assert.equal(result.diagram.strata.length, 0)
+  assert.equal(result.diagram.labels.length, 1)
+  assert.deepEqual(result.diagram.labels[0], {
+    ...result.diagram.labels[0],
+    id: 'direct-label',
+    text: '$F$',
+    position: { x: 4, y: 5, z: 6 },
+  })
+})
+
+test('direct-created label uses active layer filter layer and remains selected', () => {
+  const activeLayer = 2
+  const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
+  const result = addTextLabelFromDirectInput(
+    twoDimensionalExample,
+    { x: '3', y: '4', z: '99' },
+    '$F$',
+    {
+      id: 'filtered-direct-label',
+      ...directCreationLayerOptions(layerFilter),
+    },
+  )
+
+  assert.equal(result.ok, true)
+
+  if (!result.ok) {
+    throw new Error('Expected direct label creation to succeed.')
+  }
+
+  const label = result.diagram.labels.find(
+    (candidate) => candidate.id === 'filtered-direct-label',
+  )
+
+  if (label === undefined) {
+    throw new Error('Expected direct-created label to be present.')
+  }
+
+  const selection: SelectedElement = { kind: 'label', id: result.id }
+
+  assert.equal(label.layer, activeLayer)
+  assert.equal(layerFilterIncludesLayer(layerFilter, label.layer), true)
+  assert.deepEqual(
+    clearSelectionForLayerFilter(result.diagram, selection, layerFilter),
+    selection,
+  )
+})
+
+test('blank direct label text normalizes to the existing default label text', () => {
+  assert.equal(normalizeDirectLabelText(''), 'Label')
+  assert.equal(normalizeDirectLabelText('   '), 'Label')
+  assert.equal(normalizeDirectLabelText('$F$'), '$F$')
+})
+
+test('invalid direct numeric input does not create invalid geometry', () => {
+  const diagram = createEmptyDiagramForTest(3)
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: '1', y: 'Infinity', z: '' },
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.diagram, diagram)
+  assert.equal(result.diagram.strata.length, 0)
+  assert.equal(
+    parseDirectCoordinateInput({ x: 'NaN', y: '2', z: '3' }, 3),
+    null,
+  )
+})
+
 test('generated TikZ includes newly added point and label', () => {
   const withPoint = addPointStratum(
     twoDimensionalExample,
@@ -1050,6 +1246,39 @@ test('generated TikZ includes newly added point and label', () => {
   assert.equal(tikz.includes('\\coordinate (pointPoint4p0'), true)
   assert.equal(tikz.includes('New label'), true)
   assert.equal(tikz.includes('(5,6)'), true)
+})
+
+test('TikZ output for direct-created point and label matches model behavior', () => {
+  const withPoint = addPointStratumFromDirectInput(
+    createEmptyDiagramForTest(2),
+    { x: '1', y: '2', z: '99' },
+    { id: 'direct-point' },
+  )
+
+  assert.equal(withPoint.ok, true)
+
+  if (!withPoint.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const withLabel = addTextLabelFromDirectInput(
+    withPoint.diagram,
+    { x: '3', y: '4', z: '99' },
+    '$L$',
+    { id: 'direct-label' },
+  )
+
+  assert.equal(withLabel.ok, true)
+
+  if (!withLabel.ok) {
+    throw new Error('Expected direct label creation to succeed.')
+  }
+
+  const tikz = generateTikz(withLabel.diagram)
+
+  assert.match(tikz, /\\coordinate \(pointPoint0p0\) at \(1,2\);/)
+  assert.match(tikz, /\\node at \(3,4\) \{\$L\$\};/)
+  assert.doesNotMatch(tikz, /\(1,2,99\)/)
 })
 
 test('generated TikZ includes newly added polyline curve', () => {

@@ -240,6 +240,38 @@ export type AddPolygonSheetStratumResult = {
   id: string | null
 }
 
+export type DirectCoordinateInput = {
+  x: string
+  y: string
+  z: string
+}
+
+export type DirectPointCreationResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+    }
+
+export type DirectLabelCreationResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+    }
+
+export type DirectCreationLayerOptions = {
+  layer?: number
+}
+
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
   const existingIds = new Set([
     ...diagram.strata.map((stratum) => stratum.id),
@@ -397,6 +429,68 @@ export function addPolygonSheetStratumWithResult(
     },
     id: sheet.id,
   }
+}
+
+export function addPointStratumFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput,
+  options: AddPointStratumOptions = {},
+): DirectPointCreationResult {
+  const position = parseDirectCoordinateInput(
+    coordinates,
+    diagram.ambientDimension,
+  )
+
+  if (position === null) {
+    return {
+      ok: false,
+      diagram,
+    }
+  }
+
+  const result = addPointStratumWithResult(diagram, position, options)
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addTextLabelFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput,
+  text: string,
+  options: AddTextLabelOptions = {},
+): DirectLabelCreationResult {
+  const position = parseDirectCoordinateInput(
+    coordinates,
+    diagram.ambientDimension,
+  )
+
+  if (position === null) {
+    return {
+      ok: false,
+      diagram,
+    }
+  }
+
+  const result = addTextLabelWithResult(diagram, position, {
+    ...options,
+    text: normalizeDirectLabelText(text),
+  })
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function directCreationLayerOptions(
+  layerFilter: LayerFilter,
+): DirectCreationLayerOptions {
+  return layerFilter.kind === 'layer' ? { layer: layerFilter.layer } : {}
 }
 
 export function updateStratumNameById(
@@ -579,6 +673,27 @@ export function updateVec3Coordinate(
     ...point,
     [axis]: value,
   })
+}
+
+export function parseDirectCoordinateInput(
+  coordinates: DirectCoordinateInput,
+  ambientDimension: AmbientDimension,
+): Vec3 | null {
+  const x = parseFiniteNumber(coordinates.x)
+  const y = parseFiniteNumber(coordinates.y)
+  const z = ambientDimension === 2 ? 0 : parseFiniteNumber(coordinates.z)
+
+  if (x === null || y === null || z === null) {
+    return null
+  }
+
+  return normalizePointForAmbientDimension(ambientDimension, { x, y, z })
+}
+
+export function normalizeDirectLabelText(text: string): string {
+  const trimmedText = text.trim()
+
+  return trimmedText.length === 0 ? 'Label' : text
 }
 
 export function parseFiniteNumber(rawValue: string): number | null {

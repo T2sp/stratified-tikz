@@ -438,6 +438,8 @@ Notes:
 
 ### Phase 10B: Direct-input creation MVP
 
+Status: Implemented.
+
 Current issue:
 
 The toolbar has Input: cursor/direct, but creation is currently cursor-based.
@@ -477,6 +479,21 @@ Requirements:
 * Invalid numeric input must not write NaN.
 * Blank names should be rejected or replaced with safe defaults.
 * Direct-input creation state is UI/editor state, not Diagram.
+
+Implemented behavior:
+
+* When Input is `direct` and the active tool is Add point or Add label, the
+  toolbar shows direct numeric coordinate fields.
+* 2D direct creation exposes x/y only and normalizes z to 0.
+* 3D direct creation exposes x/y/z and preserves finite z values.
+* Direct-created points reuse the same defaults, codimension policy, id policy,
+  and layer policy as cursor-created points.
+* Direct-created labels are added to `diagram.labels`, use default text `Label`
+  for blank text input, and preserve user-provided LaTeX/text otherwise.
+* Invalid, blank, NaN, or infinite numeric coordinate input is rejected without
+  changing the diagram.
+* Direct form state and status messages are editor-only UI state and are not
+  saved in `Diagram` or reflected in TikZ unless an element is actually created.
 
 Out of scope:
 
