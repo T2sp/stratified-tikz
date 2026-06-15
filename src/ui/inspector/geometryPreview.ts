@@ -4,7 +4,7 @@ import type {
   PointStratum,
   SheetStratum,
 } from '../../model/types.ts'
-import { describeCurvePoints, formatVec3 } from '../inspector.ts'
+import { describeCurvePoints, formatVec3 } from '../inspectorSummary.ts'
 
 export function formatSelectedGeometry(
   stratum: SheetStratum | CurveStratum | PointStratum,

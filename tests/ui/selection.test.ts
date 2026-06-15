@@ -10,7 +10,7 @@ import {
   formatLabelStyleSummary,
   formatStratumStyleSummary,
   formatVec3,
-} from '../../src/ui/inspector.ts'
+} from '../../src/ui/inspectorSummary.ts'
 import type { CurveStyle } from '../../src/model/types.ts'
 import {
   cloneDiagram,

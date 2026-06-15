@@ -3,7 +3,7 @@ import {
   updateStratumById,
   updateVec3Coordinate,
 } from '../diagramUpdates.ts'
-import { describeCurvePoints } from '../inspector.ts'
+import { describeCurvePoints } from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import { ReadOnlyField } from './InspectorField.tsx'
 import { formatSelectedGeometry } from './geometryPreview.ts'

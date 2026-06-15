@@ -5,7 +5,7 @@ import {
 } from '../diagramUpdates.ts'
 import {
   formatStratumStyleSummary,
-} from '../inspector.ts'
+} from '../inspectorSummary.ts'
 import { CurveGeometryEditor } from './CurveGeometryEditor.tsx'
 import {
   EditableNumberField,

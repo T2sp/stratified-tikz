@@ -6,7 +6,7 @@ import {
 import {
   formatLabelStyleSummary,
   formatVec3,
-} from '../inspector.ts'
+} from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import {
   EditableLongTextField,
