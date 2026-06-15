@@ -27,6 +27,10 @@ import {
   updateVec3Coordinate,
 } from '../../src/ui/diagramUpdates.ts'
 import {
+  isHexColorString,
+  normalizeColorInputValue,
+} from '../../src/ui/colorInput.ts'
+import {
   clearSelectionIfMissing,
   findSelectedElement,
   selectionExistsInDiagram,
@@ -625,6 +629,110 @@ test('style edits are reflected in generated TikZ', () => {
   assert.equal(tikz.includes('draw opacity=0.45'), true)
   assert.equal(tikz.includes('line width=2.5pt'), true)
   assert.equal(tikz.includes('dashed'), true)
+})
+
+test('sheet style edits through update helpers are reflected in generated TikZ', () => {
+  const updated = updateStratumStyleById(
+    threeDimensionalExample,
+    'roseSheet',
+    (style) =>
+      style.kind === 'sheetStyle'
+        ? {
+            ...style,
+            fillColor: '#ABCDEF',
+            fillOpacity: 0.72,
+            strokeColor: '#123ABC',
+            strokeOpacity: 0.44,
+          }
+        : style,
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('{HTML}{ABCDEF}'), true)
+  assert.equal(tikz.includes('fill opacity=0.72'), true)
+  assert.equal(tikz.includes('{HTML}{123ABC}'), true)
+  assert.equal(tikz.includes('draw opacity=0.44'), true)
+})
+
+test('point style edits through update helpers are reflected in generated TikZ', () => {
+  const updated = updateStratumStyleById(
+    twoDimensionalExample,
+    'circlePoint',
+    (style) =>
+      style.kind === 'pointStyle'
+        ? {
+            ...style,
+            color: '#445566',
+            opacity: 0.5,
+            shape: 'square',
+            fill: 'hollow',
+            size: 5,
+          }
+        : style,
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('{HTML}{445566}'), true)
+  assert.equal(tikz.includes('regular polygon sides=4'), true)
+  assert.equal(tikz.includes('fill=white'), true)
+  assert.equal(tikz.includes('opacity=0.5'), true)
+  assert.equal(tikz.includes('inner sep=2.5pt'), true)
+})
+
+test('label style edits through update helpers are reflected in generated TikZ', () => {
+  const updated = updateLabelStyleById(
+    twoDimensionalExample,
+    'mathMorphismLabel',
+    (style) => ({
+      ...style,
+      color: '#778899',
+      opacity: 0.6,
+      fontSize: 13,
+      anchor: 'north west',
+    }),
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('{HTML}{778899}'), true)
+  assert.equal(tikz.includes('text=stzLabelmathMorphismLabel'), true)
+  assert.equal(tikz.includes('opacity=0.6'), true)
+  assert.equal(tikz.includes('\\fontsize{13pt}{15.6pt}\\selectfont'), true)
+  assert.equal(tikz.includes('anchor=north west'), true)
+})
+
+test('color input guard accepts valid hex colors and falls back for malformed values', () => {
+  assert.equal(isHexColorString('#A1b2C3'), true)
+  assert.equal(isHexColorString('not-a-color'), false)
+  assert.equal(normalizeColorInputValue('#A1b2C3'), '#A1b2C3')
+  assert.equal(normalizeColorInputValue('not-a-color'), '#000000')
+  assert.equal(normalizeColorInputValue(''), '#000000')
+  assert.equal(normalizeColorInputValue(undefined), '#000000')
+})
+
+test('color input fallback does not automatically commit to the diagram', () => {
+  const malformedColor = 'not-a-color'
+  const diagramWithMalformedColor = {
+    ...twoDimensionalExample,
+    labels: twoDimensionalExample.labels.map((label) =>
+      label.id === 'mathMorphismLabel'
+        ? {
+            ...label,
+            style: {
+              ...label.style,
+              color: malformedColor,
+            },
+          }
+        : label,
+    ),
+  }
+
+  assert.equal(normalizeColorInputValue(malformedColor), '#000000')
+  assert.equal(
+    diagramWithMalformedColor.labels.find(
+      (label) => label.id === 'mathMorphismLabel',
+    )?.style.color,
+    malformedColor,
+  )
 })
 
 test('invalid numeric input does not write NaN into diagram state', () => {

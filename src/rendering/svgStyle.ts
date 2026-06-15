@@ -1,5 +1,12 @@
 import type { LabelAnchor, LineStyle } from '../model/types'
 
+export type SvgLabelAnchorPlacement = {
+  textAnchor: 'start' | 'middle' | 'end'
+  dominantBaseline: 'middle'
+  dx: number
+  dy: number
+}
+
 export function lineStyleToStrokeDasharray(
   lineStyle: LineStyle,
 ): string | undefined {
@@ -15,7 +22,21 @@ export function lineStyleToStrokeDasharray(
   }
 }
 
-export function anchorToTextAnchor(anchor: LabelAnchor): 'start' | 'middle' | 'end' {
+export function svgLabelAnchorPlacement(
+  anchor: LabelAnchor,
+  fontSize: number,
+): SvgLabelAnchorPlacement {
+  const halfFontSize = Number.isFinite(fontSize) ? fontSize / 2 : 0
+
+  return {
+    textAnchor: anchorToTextAnchor(anchor),
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: anchorToVerticalOffset(anchor, halfFontSize),
+  }
+}
+
+function anchorToTextAnchor(anchor: LabelAnchor): 'start' | 'middle' | 'end' {
   if (anchor.includes('east')) {
     return 'end'
   }
@@ -27,16 +48,16 @@ export function anchorToTextAnchor(anchor: LabelAnchor): 'start' | 'middle' | 'e
   return 'middle'
 }
 
-export function anchorToDominantBaseline(
-  anchor: LabelAnchor,
-): 'central' | 'text-after-edge' | 'text-before-edge' {
+function anchorToVerticalOffset(anchor: LabelAnchor, halfFontSize: number): number {
+  // Model coordinates have already been projected into SVG screen coordinates
+  // when this placement is applied. Positive dy therefore moves text downward.
   if (anchor.includes('north')) {
-    return 'text-before-edge'
+    return halfFontSize
   }
 
   if (anchor.includes('south')) {
-    return 'text-after-edge'
+    return -halfFontSize
   }
 
-  return 'central'
+  return 0
 }

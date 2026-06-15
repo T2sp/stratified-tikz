@@ -11,9 +11,8 @@ import type { Diagram } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
 import {
-  anchorToDominantBaseline,
-  anchorToTextAnchor,
   lineStyleToStrokeDasharray,
+  svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
@@ -46,24 +45,74 @@ test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('denselyDotted'), '1 2')
 })
 
-test('label anchors map east and west to TikZ-like SVG text anchors', () => {
-  assert.equal(anchorToTextAnchor('center'), 'middle')
-  assert.equal(anchorToTextAnchor('east'), 'end')
-  assert.equal(anchorToTextAnchor('west'), 'start')
-  assert.equal(anchorToTextAnchor('north east'), 'end')
-  assert.equal(anchorToTextAnchor('north west'), 'start')
-  assert.equal(anchorToTextAnchor('south east'), 'end')
-  assert.equal(anchorToTextAnchor('south west'), 'start')
+test('label anchor placement maps every supported anchor to TikZ-like SVG placement', () => {
+  const fontSize = 20
+
+  assert.deepEqual(svgLabelAnchorPlacement('center', fontSize), {
+    textAnchor: 'middle',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 0,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('north', fontSize), {
+    textAnchor: 'middle',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 10,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('south', fontSize), {
+    textAnchor: 'middle',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: -10,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('east', fontSize), {
+    textAnchor: 'end',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 0,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('west', fontSize), {
+    textAnchor: 'start',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 0,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('north east', fontSize), {
+    textAnchor: 'end',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 10,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('north west', fontSize), {
+    textAnchor: 'start',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: 10,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('south east', fontSize), {
+    textAnchor: 'end',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: -10,
+  })
+  assert.deepEqual(svgLabelAnchorPlacement('south west', fontSize), {
+    textAnchor: 'start',
+    dominantBaseline: 'middle',
+    dx: 0,
+    dy: -10,
+  })
 })
 
-test('label vertical anchors map north and south to TikZ-like SVG baselines', () => {
-  assert.equal(anchorToDominantBaseline('center'), 'central')
-  assert.equal(anchorToDominantBaseline('north'), 'text-before-edge')
-  assert.equal(anchorToDominantBaseline('north east'), 'text-before-edge')
-  assert.equal(anchorToDominantBaseline('north west'), 'text-before-edge')
-  assert.equal(anchorToDominantBaseline('south'), 'text-after-edge')
-  assert.equal(anchorToDominantBaseline('south east'), 'text-after-edge')
-  assert.equal(anchorToDominantBaseline('south west'), 'text-after-edge')
+test('label vertical offsets are applied after model-to-SVG y conversion', () => {
+  const diagram = createCameraTestDiagram()
+  const camera = resolveSvgCamera(diagram, 200, 120)
+  const lower = projectToSvgPoint(camera, { x: 0, y: -1, z: 0 }, 120)
+  const upper = projectToSvgPoint(camera, { x: 0, y: 1, z: 0 }, 120)
+
+  assert.ok(upper.y < lower.y)
+  assert.ok(svgLabelAnchorPlacement('north', 20).dy > 0)
+  assert.ok(svgLabelAnchorPlacement('south', 20).dy < 0)
 })
 
 test('regularPolygonPoints creates one vertex per requested side', () => {

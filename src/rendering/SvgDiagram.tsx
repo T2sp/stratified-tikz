@@ -20,9 +20,8 @@ import {
 } from './svgPath'
 import { projectToSvgPoint } from './svgProjection'
 import {
-  anchorToDominantBaseline,
-  anchorToTextAnchor,
   lineStyleToStrokeDasharray,
+  svgLabelAnchorPlacement,
 } from './svgStyle'
 
 export type SvgDiagramProps = {
@@ -320,6 +319,8 @@ function renderLabel(
 ): RenderItem {
   const position = projectToSvgPoint(camera, label.position, viewportHeight)
   const isSelected = selectedElement?.kind === 'label' && selectedElement.id === label.id
+  const fontSize = label.style.fontSize * 1.35
+  const anchorPlacement = svgLabelAnchorPlacement(label.style.anchor, fontSize)
 
   return {
     id: label.id,
@@ -347,12 +348,13 @@ function renderLabel(
         )}
         <text
           x={position.x}
-          y={position.y}
+          y={position.y + anchorPlacement.dy}
           fill={label.style.color}
           opacity={label.style.opacity}
-          fontSize={label.style.fontSize * 1.35}
-          textAnchor={anchorToTextAnchor(label.style.anchor)}
-          dominantBaseline={anchorToDominantBaseline(label.style.anchor)}
+          fontSize={fontSize}
+          textAnchor={anchorPlacement.textAnchor}
+          dominantBaseline={anchorPlacement.dominantBaseline}
+          dx={anchorPlacement.dx}
         >
           {label.text}
         </text>

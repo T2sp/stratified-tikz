@@ -3,6 +3,7 @@ import {
   parseOpacity,
   parsePositiveFiniteNumber,
 } from '../diagramUpdates.ts'
+import { normalizeColorInputValue } from '../colorInput.ts'
 
 export function ReadOnlyField({
   label,
@@ -171,7 +172,7 @@ export function EditableColorField({
       <input
         className="inspector-input"
         type="color"
-        value={value}
+        value={normalizeColorInputValue(value)}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     </label>
