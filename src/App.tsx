@@ -1,4 +1,10 @@
-import { useMemo, useState, type SetStateAction } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type SetStateAction,
+} from 'react'
 import './App.css'
 import {
   threeDimensionalExample,
@@ -9,6 +15,10 @@ import {
   normalizePointForAmbientDimension,
   screenToModelOnWorkPlane,
 } from './geometry'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from './model/serialization.ts'
 import type {
   Camera,
   CoordinateInputMode,
@@ -41,6 +51,7 @@ import {
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
+type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type CreationTool = WorkPlanePreviewTool
 type PolylineDraft = {
   points: Vec3[]
@@ -98,6 +109,9 @@ function App() {
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [sheetStatus, setSheetStatus] = useState<string>('')
+  const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
+  const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
+  const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -174,6 +188,8 @@ function App() {
       sheetPolygonDraft: null,
     }))
     setCopyStatus('idle')
+    setSaveLoadStatus('idle')
+    setSaveLoadMessage('')
     setPolylineStatus('')
     setCubicBezierStatus('')
     setSheetStatus('')
@@ -190,6 +206,75 @@ function App() {
       }
     })
     setCopyStatus('idle')
+  }
+
+  function downloadJson(): void {
+    try {
+      const blob = new Blob([serializeDiagram(editableDiagram)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = 'stratified-tikz-diagram.json'
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setSaveLoadStatus('saved')
+      setSaveLoadMessage('JSON downloaded.')
+    } catch {
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage('Save failed.')
+    }
+  }
+
+  function openLoadJsonPicker(): void {
+    loadFileInputRef.current?.click()
+  }
+
+  async function loadJsonFile(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+
+    if (file === undefined) {
+      return
+    }
+
+    let text: string
+
+    try {
+      text = await file.text()
+    } catch {
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage('Could not read JSON file.')
+      return
+    }
+
+    const result = parseSavedDiagramJson(text)
+
+    if (!result.ok) {
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage(result.error)
+      return
+    }
+
+    setSelectedExampleId(result.diagram.ambientDimension === 2 ? '2d' : '3d')
+    setCreationTool('select')
+    setEditorState({
+      editableDiagram: result.diagram,
+      selectedElement: null,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      sheetPolygonDraft: null,
+    })
+    setCopyStatus('idle')
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setSheetStatus('')
+    setSaveLoadStatus('loaded')
+    setSaveLoadMessage('JSON loaded.')
   }
 
   function updateSelectedElement(selection: SelectedElement): void {
@@ -684,6 +769,33 @@ function App() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="control-group file-control">
+          <span className="control-label">File</span>
+          <button type="button" className="toolbar-button" onClick={downloadJson}>
+            Download JSON
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={openLoadJsonPicker}
+          >
+            Load JSON
+          </button>
+          <input
+            ref={loadFileInputRef}
+            className="file-input"
+            type="file"
+            accept="application/json,.json"
+            onChange={loadJsonFile}
+          />
+          <span
+            className={`toolbar-status file-status file-status-${saveLoadStatus}`}
+            role="status"
+          >
+            {saveLoadMessage}
+          </span>
         </div>
 
         {editableDiagram.ambientDimension === 3 && (

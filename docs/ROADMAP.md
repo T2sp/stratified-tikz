@@ -281,6 +281,12 @@ Goal:
 
 Allow persistence of diagrams.
 
+Phase 8A MVP:
+
+- Export current diagram as versioned JSON
+- Import versioned JSON and validate before loading
+- Keep UI/editor state out of saved files
+
 Tasks:
 
 - Export JSON

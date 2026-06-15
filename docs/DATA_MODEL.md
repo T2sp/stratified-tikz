@@ -55,6 +55,25 @@ export type Diagram = {
 };
 ```
 
+## Saved diagram file
+
+Phase 8A saves and loads diagrams using a small versioned JSON wrapper:
+
+```ts
+export type SavedDiagramFile = {
+  format: "stratified-tikz-diagram";
+  version: 1;
+  diagram: Diagram;
+};
+```
+
+Only `diagram` data is persisted. UI/editor state such as the selected element,
+active creation tool, coordinate input mode, active work plane, draft geometry,
+copy status, and temporary preview state is not saved.
+
+Loading a file must check the `format` discriminator, supported `version`, and
+validate the contained `diagram` before replacing the current editable diagram.
+
 ## Camera
 
 ```ts
