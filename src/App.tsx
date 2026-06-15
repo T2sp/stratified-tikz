@@ -33,8 +33,11 @@ import type {
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
+  addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
+  addPolygonSheetFromDirectInput,
   addPolygonSheetStratumWithResult,
+  addPolylineCurveFromDirectInput,
   addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
   addPointStratumFromDirectInput,
@@ -47,17 +50,20 @@ import {
   clearSelectionIfMissing,
   clearSelectionForLayerFilter,
   cloneDiagram,
+  commitDirectCreationResult,
   createSheetPolygonDraft,
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
-  directCreationLayerOptions,
   EditableInspector,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
+  parseDirectCoordinateRows,
+  parseDirectLayerInput,
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
   type DirectCoordinateInput,
+  type DirectPathCreationError,
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
@@ -68,6 +74,12 @@ type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type CreationTool = WorkPlanePreviewTool
+type DirectCreationTool =
+  | 'createPoint'
+  | 'createLabel'
+  | 'createPolyline'
+  | 'createCubicBezier'
+  | 'createSheet'
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -135,6 +147,16 @@ function App() {
     defaultDirectCoordinates,
   )
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
+  const [directLayerInput, setDirectLayerInput] = useState<string>('0')
+  const [directPolylineRows, setDirectPolylineRows] = useState<string>(
+    defaultDirectPolylineRows(2),
+  )
+  const [directCubicBezierRows, setDirectCubicBezierRows] = useState<string>(
+    defaultDirectCubicBezierRows(2),
+  )
+  const [directSheetRows, setDirectSheetRows] = useState<string>(
+    defaultDirectSheetRows(),
+  )
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
@@ -230,6 +252,10 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setDirectLayerInput('0')
+    setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
+    setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
+    setDirectSheetRows(defaultDirectSheetRows())
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -323,6 +349,10 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setDirectLayerInput('0')
+    setDirectPolylineRows(defaultDirectPolylineRows(result.diagram.ambientDimension))
+    setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
+    setDirectSheetRows(defaultDirectSheetRows())
     setSaveLoadStatus('loaded')
     setSaveLoadMessage('JSON loaded.')
   }
@@ -372,6 +402,12 @@ function App() {
     setSheetStatus('')
     setCopyStatus('idle')
   }, [selectedElement])
+
+  useEffect(() => {
+    if (layerFilter.kind === 'layer') {
+      setDirectLayerInput(String(layerFilter.layer))
+    }
+  }, [layerFilter])
 
   useEffect(() => {
     function handleRemoveShortcut(event: KeyboardEvent): void {
@@ -643,8 +679,33 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function updateDirectRowsForCreationTool(
+    tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+    value: string,
+  ): void {
+    switch (tool) {
+      case 'createPolyline':
+        setDirectPolylineRows(value)
+        break
+      case 'createCubicBezier':
+        setDirectCubicBezierRows(value)
+        break
+      case 'createSheet':
+        setDirectSheetRows(value)
+        break
+    }
+    setDirectCreationStatus('')
+  }
+
   function createDirectElement(): void {
-    if (creationTool !== 'createPoint' && creationTool !== 'createLabel') {
+    if (!isDirectCreationTool(creationTool)) {
+      return
+    }
+
+    const directLayer = parseDirectLayerInput(directLayerInput)
+
+    if (directLayer === null) {
+      setDirectCreationStatus('Layer must be a finite number.')
       return
     }
 
@@ -652,7 +713,7 @@ function App() {
       const result = addPointStratumFromDirectInput(
         editableDiagram,
         directCoordinates,
-        directCreationLayerOptions(layerFilter),
+        { layer: directLayer },
       )
 
       if (!result.ok) {
@@ -660,41 +721,161 @@ function App() {
         return
       }
 
-      setEditorState((current) => ({
-        editableDiagram: result.diagram,
-        selectedElement: { kind: 'stratum', id: result.id },
-        layerFilter: current.layerFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        sheetPolygonDraft: null,
-      }))
+      commitDirectCreatedElement(
+        result.diagram,
+        { kind: 'stratum', id: result.id },
+        directLayer,
+      )
       setDirectCreationStatus('Point created.')
       setCopyStatus('idle')
       return
     }
 
-    const result = addTextLabelFromDirectInput(
-      editableDiagram,
-      directCoordinates,
-      directLabelText,
-      directCreationLayerOptions(layerFilter),
-    )
+    if (creationTool === 'createLabel') {
+      const result = addTextLabelFromDirectInput(
+        editableDiagram,
+        directCoordinates,
+        directLabelText,
+        { layer: directLayer },
+      )
 
-    if (!result.ok) {
-      setDirectCreationStatus('Coordinates must be finite numbers.')
+      if (!result.ok) {
+        setDirectCreationStatus('Coordinates must be finite numbers.')
+        return
+      }
+
+      commitDirectCreatedElement(
+        result.diagram,
+        { kind: 'label', id: result.id },
+        directLayer,
+      )
+      setDirectCreationStatus('Label created.')
+      setCopyStatus('idle')
       return
     }
 
+    if (creationTool === 'createSheet') {
+      createDirectSheet(directLayer)
+      return
+    }
+
+    const coordinateRows = parseDirectCoordinateRows(
+      directRowsForCreationTool(creationTool),
+      editableDiagram.ambientDimension,
+    )
+
+    if (coordinateRows === null) {
+      setDirectCreationStatus('Coordinates must be finite rows.')
+      return
+    }
+
+    if (creationTool === 'createPolyline') {
+      const result = addPolylineCurveFromDirectInput(
+        editableDiagram,
+        coordinateRows,
+        { layer: directLayer },
+      )
+
+      if (!result.ok) {
+        setDirectCreationStatus(directCreationErrorMessage(result.error, 'polyline'))
+        return
+      }
+
+      commitDirectCreatedElement(
+        result.diagram,
+        { kind: 'stratum', id: result.id },
+        directLayer,
+      )
+      setDirectCreationStatus('Polyline created.')
+      setCopyStatus('idle')
+      return
+    }
+
+    const result = addCubicBezierCurveFromDirectInput(
+      editableDiagram,
+      coordinateRows,
+      { layer: directLayer },
+    )
+
+    if (!result.ok) {
+      setDirectCreationStatus(
+        directCreationErrorMessage(result.error, 'cubicBezier'),
+      )
+      return
+    }
+
+    commitDirectCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      directLayer,
+    )
+    setDirectCreationStatus('Cubic Bezier created.')
+    setCopyStatus('idle')
+  }
+
+  function createDirectSheet(directLayer: number): void {
+    const coordinateRows = parseDirectCoordinateRows(
+      directSheetRows,
+      editableDiagram.ambientDimension,
+    )
+
+    if (coordinateRows === null) {
+      setDirectCreationStatus('Coordinates must be finite rows.')
+      return
+    }
+
+    const result = addPolygonSheetFromDirectInput(editableDiagram, coordinateRows, {
+      layer: directLayer,
+    })
+
+    if (!result.ok) {
+      setDirectCreationStatus(directCreationErrorMessage(result.error, 'sheet'))
+      return
+    }
+
+    commitDirectCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      directLayer,
+    )
+    setDirectCreationStatus('Sheet created.')
+    setCopyStatus('idle')
+  }
+
+  function commitDirectCreatedElement(
+    diagram: Diagram,
+    selection: Exclude<SelectedElement, null>,
+    layer: number,
+  ): void {
     setEditorState((current) => ({
-      editableDiagram: result.diagram,
-      selectedElement: { kind: 'label', id: result.id },
-      layerFilter: current.layerFilter,
+      ...current,
+      ...commitDirectCreationResult(
+        diagram,
+        selection,
+        layer,
+        current.layerFilter,
+      ),
       polylineDraft: null,
       cubicBezierDraft: null,
       sheetPolygonDraft: null,
     }))
-    setDirectCreationStatus('Label created.')
-    setCopyStatus('idle')
+  }
+
+  function directRowsForCreationTool(tool: 'createPolyline' | 'createCubicBezier'): string {
+    return tool === 'createPolyline' ? directPolylineRows : directCubicBezierRows
+  }
+
+  function directRowsForCreationToolValue(
+    tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+  ): string {
+    switch (tool) {
+      case 'createPolyline':
+        return directPolylineRows
+      case 'createCubicBezier':
+        return directCubicBezierRows
+      case 'createSheet':
+        return directSheetRows
+    }
   }
 
   function finishPolylineDraft(): void {
@@ -998,8 +1179,7 @@ function App() {
           </div>
         </div>
 
-        {coordinateInputMode === 'direct' &&
-          (creationTool === 'createPoint' || creationTool === 'createLabel') && (
+        {coordinateInputMode === 'direct' && isDirectCreationTool(creationTool) && (
             <form
               className="control-group direct-create-control"
               aria-label="Direct creation"
@@ -1008,9 +1188,19 @@ function App() {
                 createDirectElement()
               }}
             >
-              <span className="control-label">
-                {creationTool === 'createPoint' ? 'Point' : 'Label'}
-              </span>
+              <span className="control-label">{directCreationTitle(creationTool)}</span>
+              <label className="direct-create-field">
+                <span>Layer</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={directLayerInput}
+                  onChange={(event) => {
+                    setDirectLayerInput(event.currentTarget.value)
+                    setDirectCreationStatus('')
+                  }}
+                />
+              </label>
               {creationTool === 'createLabel' && (
                 <label className="direct-create-field direct-create-text">
                   <span>Text</span>
@@ -1025,19 +1215,39 @@ function App() {
                   />
                 </label>
               )}
-              {directCoordinateAxes(editableDiagram.ambientDimension).map((axis) => (
-                <label key={axis} className="direct-create-field">
-                  <span>{axis}</span>
-                  <input
-                    type="number"
-                    step="any"
-                    value={directCoordinates[axis]}
+              {(creationTool === 'createPoint' || creationTool === 'createLabel') &&
+                directCoordinateAxes(editableDiagram.ambientDimension).map((axis) => (
+                  <label key={axis} className="direct-create-field">
+                    <span>{axis}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={directCoordinates[axis]}
+                      onChange={(event) =>
+                        updateDirectCoordinate(axis, event.currentTarget.value)
+                      }
+                    />
+                  </label>
+                ))}
+              {isDirectPathCreationTool(creationTool) && (
+                <label className="direct-create-field direct-coordinate-list">
+                  <span>Vertices</span>
+                  <textarea
+                    value={directRowsForCreationToolValue(creationTool)}
+                    rows={directCoordinateRowsTextAreaRows(creationTool)}
+                    spellCheck={false}
+                    placeholder={directCoordinateRowsPlaceholder(
+                      editableDiagram.ambientDimension,
+                    )}
                     onChange={(event) =>
-                      updateDirectCoordinate(axis, event.currentTarget.value)
+                      updateDirectRowsForCreationTool(
+                        creationTool,
+                        event.currentTarget.value,
+                      )
                     }
                   />
                 </label>
-              ))}
+              )}
               <button type="submit" className="toolbar-button">
                 Create
               </button>
@@ -1224,6 +1434,90 @@ function workPlaneLabel(kind: WorkPlane['kind']): string {
     case 'yz':
       return 'yz plane'
   }
+}
+
+function isDirectCreationTool(tool: CreationTool): tool is DirectCreationTool {
+  return tool !== 'select'
+}
+
+function isDirectPathCreationTool(
+  tool: DirectCreationTool,
+): tool is 'createPolyline' | 'createCubicBezier' | 'createSheet' {
+  return (
+    tool === 'createPolyline' ||
+    tool === 'createCubicBezier' ||
+    tool === 'createSheet'
+  )
+}
+
+function directCreationTitle(tool: DirectCreationTool): string {
+  switch (tool) {
+    case 'createPoint':
+      return 'Point'
+    case 'createLabel':
+      return 'Label'
+    case 'createPolyline':
+      return 'Polyline'
+    case 'createCubicBezier':
+      return 'Cubic Bezier'
+    case 'createSheet':
+      return 'Sheet'
+  }
+}
+
+function directCreationErrorMessage(
+  error: DirectPathCreationError,
+  kind: 'polyline' | 'cubicBezier' | 'sheet',
+): string {
+  switch (error) {
+    case 'invalidCoordinates':
+      return 'Coordinates must be finite numbers.'
+    case 'tooFewPoints':
+      return kind === 'sheet'
+        ? 'A sheet needs at least 3 vertices.'
+        : 'A polyline needs at least 2 vertices.'
+    case 'wrongPointCount':
+      return 'A cubic Bezier needs exactly 4 points.'
+    case 'unsupportedAmbientDimension':
+      return 'Sheets are available only in 3D.'
+  }
+}
+
+function directCoordinateRowsPlaceholder(
+  ambientDimension: AmbientDimension,
+): string {
+  return ambientDimension === 2 ? '0 0\n1 0' : '0 0 0\n1 0 0'
+}
+
+function directCoordinateRowsTextAreaRows(
+  tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+): number {
+  switch (tool) {
+    case 'createPolyline':
+      return 3
+    case 'createCubicBezier':
+      return 4
+    case 'createSheet':
+      return 4
+  }
+}
+
+function defaultDirectPolylineRows(
+  ambientDimension: AmbientDimension,
+): string {
+  return ambientDimension === 2 ? '0 0\n1 0' : '0 0 0\n1 0 0'
+}
+
+function defaultDirectCubicBezierRows(
+  ambientDimension: AmbientDimension,
+): string {
+  return ambientDimension === 2
+    ? '0 0\n0.3 0.6\n0.7 0.6\n1 0'
+    : '0 0 0\n0.3 0.6 0\n0.7 0.6 0\n1 0 0'
+}
+
+function defaultDirectSheetRows(): string {
+  return '0 0 0\n1 0 0\n0 1 0'
 }
 
 function workPlaneFixedAxis(workPlane: WorkPlane): string {

@@ -506,6 +506,8 @@ Out of scope:
 
 ### Phase 10C: Direct-input creation for paths and sheets
 
+Status: Implemented.
+
 Goal:
 
 Extend direct-input creation to complex objects.
@@ -532,6 +534,28 @@ Requirements:
     * 2D: z hidden/locked at 0
     * 3D: x, y, and z editable
 * Reject non-finite coordinates.
+
+Implemented behavior:
+
+* When Input is `direct`, Add polyline, Add cubic Bezier, and Add sheet expose
+  direct coordinate rows in the toolbar.
+* Polyline and cubic Bezier direct creation are available in 2D and 3D.
+* Polygon sheet direct creation is available only in 3D diagrams.
+* Direct creation has an explicit numeric Layer field shared by direct tools.
+* If a specific layer filter is active, the direct Layer field syncs to that
+  layer by default.
+* If the submitted direct Layer would be hidden by the active filter, the filter
+  switches to the created element's layer so the new element remains visible and
+  selected.
+* Direct-created paths and sheets are committed as ordinary `Diagram` data using
+  the same curve and polygon sheet model shapes as cursor-created elements.
+* Direct form state, selection, and layer filter remain editor-only UI state.
+* TikZ export depends only on committed diagram data and is unaffected by the
+  active direct form, selection, or layer filter.
+* In 2D direct path creation, z is not exposed and committed coordinates are
+  normalized to z = 0.
+* Invalid, blank, NaN, or infinite coordinate and layer input is rejected without
+  changing the diagram.
 
 Out of scope:
 

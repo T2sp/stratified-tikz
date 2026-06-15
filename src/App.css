@@ -78,6 +78,7 @@
 .toolbar-select,
 .toolbar-text-input,
 .direct-create-field input,
+.direct-coordinate-list textarea,
 .work-plane-fixed input {
   min-height: 34px;
   border: 1px solid var(--border);
@@ -150,6 +151,17 @@
 
 .direct-create-text {
   grid-template-columns: auto minmax(140px, 220px);
+}
+
+.direct-coordinate-list {
+  grid-template-columns: auto minmax(180px, 260px);
+}
+
+.direct-coordinate-list textarea {
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  resize: vertical;
 }
 
 .toolbar-note {
