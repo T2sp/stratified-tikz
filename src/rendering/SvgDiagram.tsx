@@ -28,6 +28,11 @@ import {
 } from './svgStyle'
 import { mapClientPointToViewBox } from './svgViewBox'
 import {
+  curveHandleLabel,
+  shouldRenderSvgGeometryHandles,
+  vertexHandleLabel,
+} from './svgGeometryHandles'
+import {
   allLayersFilter,
   layerFilterIncludesLayer,
   type LayerFilter,
@@ -44,6 +49,7 @@ export type SvgDiagramProps = {
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
   layerFilter?: LayerFilter
+  showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -88,6 +94,7 @@ export function SvgDiagram({
   sheetDraft,
   workPlanePreview,
   layerFilter = allLayersFilter,
+  showGeometryHandles = false,
   onSelectionChange,
   onCanvasClick,
   onGeometryHandleDrag,
@@ -186,20 +193,25 @@ export function SvgDiagram({
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
-      {renderSelectedGeometryHandles(
-        diagram,
-        camera,
-        height,
-        selectedElement,
-        layerFilter,
-        (event, target) => {
-          event.preventDefault()
-          event.stopPropagation()
-          activeDragTargetRef.current = target
-          suppressNextCanvasClickRef.current = true
-          event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
-        },
-      )}
+      {shouldRenderSvgGeometryHandles(
+        showGeometryHandles,
+        onGeometryHandleDrag !== undefined,
+      )
+        ? renderSelectedGeometryHandles(
+            diagram,
+            camera,
+            height,
+            selectedElement,
+            layerFilter,
+            (event, target) => {
+              event.preventDefault()
+              event.stopPropagation()
+              activeDragTargetRef.current = target
+              suppressNextCanvasClickRef.current = true
+              event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
+            },
+          )
+        : null}
     </svg>
   )
 }
@@ -873,7 +885,7 @@ function renderSelectedGeometryHandles(
             renderHandleCircle(
               projectToSvgPoint(camera, vertex, viewportHeight),
               { kind: 'sheetVertex', stratumId: stratum.id, vertexIndex: index },
-              `Vertex ${index}`,
+              vertexHandleLabel(index),
               onPointerDown,
             ),
           )}
@@ -907,25 +919,6 @@ function renderHandleCircle(
       onClick={(event) => event.stopPropagation()}
     />
   )
-}
-
-function curveHandleLabel(kind: CurveStratum['kind'], index: number): string {
-  if (kind === 'polyline') {
-    return `Vertex ${index}`
-  }
-
-  switch (index) {
-    case 0:
-      return 'Start'
-    case 1:
-      return 'Control point 1'
-    case 2:
-      return 'Control point 2'
-    case 3:
-      return 'End'
-    default:
-      return `Point ${index}`
-  }
 }
 
 function geometryHandleKey(target: GeometryHandleTarget): string {

@@ -1517,13 +1517,16 @@ function App() {
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
             layerFilter={layerFilter}
+            showGeometryHandles={creationTool === 'select'}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }
             onCanvasClick={
               creationTool === 'select' ? undefined : handlePreviewCreationClick
             }
-            onGeometryHandleDrag={handleGeometryHandleDrag}
+            onGeometryHandleDrag={
+              creationTool === 'select' ? handleGeometryHandleDrag : undefined
+            }
           />
         </article>
 
