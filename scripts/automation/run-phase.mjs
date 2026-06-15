@@ -1,27 +1,65 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const phase = process.argv[2];
+// const phase = process.argv[2];
+// const mode = process.argv[3] ?? "implement";
+
+// const phases = {
+//     "9B": {
+//     branch: "phase/9b-layer-aware-tikz-output",
+//     commitMessage: "Implement Phase 9B layer-aware TikZ output",
+//     fixCommitMessage: "Fix Phase 9B same-layer TikZ ordering",
+//     implementPrompt: "prompts/phase-9b-implement.md",
+//     reviewPrompt: "prompts/phase-9b-review.md",
+//     fixPrompt: "prompts/phase-9b-fix.md",
+//     },
+// };
+
+// if (!phase || !phases[phase]) {
+//   console.error("Usage: node scripts/automation/run-phase.mjs <phase>");
+//   console.error(`Known phases: ${Object.keys(phases).join(", ")}`);
+//   process.exit(1);
+// }
+
+// const spec = phases[phase];
+const phaseInput = process.argv[2];
 const mode = process.argv[3] ?? "implement";
 
-const phases = {
-    "9B": {
-    branch: "phase/9b-layer-aware-tikz-output",
-    commitMessage: "Implement Phase 9B layer-aware TikZ output",
-    fixCommitMessage: "Fix Phase 9B same-layer TikZ ordering",
-    implementPrompt: "prompts/phase-9b-implement.md",
-    reviewPrompt: "prompts/phase-9b-review.md",
-    fixPrompt: "prompts/phase-9b-fix.md",
-    },
-};
-
-if (!phase || !phases[phase]) {
-  console.error("Usage: node scripts/automation/run-phase.mjs <phase>");
-  console.error(`Known phases: ${Object.keys(phases).join(", ")}`);
+if (!phaseInput) {
+  console.error("Usage: node scripts/automation/run-phase.mjs <phase> [implement|fix]");
+  console.error("Example: node scripts/automation/run-phase.mjs 9C");
+  console.error("Example: node scripts/automation/run-phase.mjs 9C fix");
   process.exit(1);
 }
 
-const spec = phases[phase];
+const phase = phaseInput.toUpperCase();
+const phaseLower = phase.toLowerCase();
+
+const phaseSlugs = {
+  "9B": "layer-aware-tikz-output",
+  "9C": "layer-based-selection-filtering",
+  "9D": "spath-save-integration",
+  "10A": "remove-selected-elements",
+  "10B": "direct-input-points-labels",
+  "10C": "direct-input-paths-sheets",
+  "10D": "cursor-drag-handle-editing",
+};
+
+function makePhaseSpec(phase) {
+  const lower = phase.toLowerCase();
+  const slug = phaseSlugs[phase] ?? "implementation";
+
+  return {
+    branch: `phase/${lower}-${slug}`,
+    commitMessage: `Implement Phase ${phase}`,
+    fixCommitMessage: `Fix Phase ${phase}`,
+    implementPrompt: `prompts/phase-${lower}-implement.md`,
+    reviewPrompt: `prompts/phase-${lower}-review.md`,
+    fixPrompt: `prompts/phase-${lower}-fix.md`,
+  };
+}
+
+const spec = makePhaseSpec(phase);
 
 const env = {
   ...process.env,
@@ -172,6 +210,20 @@ console.log(`Branch: ${spec.branch}`);
 assertCleanWorkingTree();
 checkoutPhaseBranch(spec.branch);
 
+// const promptToRun =
+//   mode === "fix" ? spec.fixPrompt : spec.implementPrompt;
+
+// const promptLogName =
+//   mode === "fix" ? "fix" : "implement";
+
+// const commitMessage =
+//   mode === "fix" ? spec.fixCommitMessage : spec.commitMessage;
+
+// if (mode === "fix" && !promptToRun) {
+//   console.error(`No fixPrompt configured for phase ${phase}`);
+//   process.exit(1);
+// }
+
 const promptToRun =
   mode === "fix" ? spec.fixPrompt : spec.implementPrompt;
 
@@ -181,13 +233,14 @@ const promptLogName =
 const commitMessage =
   mode === "fix" ? spec.fixCommitMessage : spec.commitMessage;
 
-if (mode === "fix" && !promptToRun) {
-  console.error(`No fixPrompt configured for phase ${phase}`);
+if (mode !== "implement" && mode !== "fix") {
+  console.error(`Unknown mode: ${mode}`);
+  console.error("Use either 'implement' or 'fix'.");
   process.exit(1);
 }
 
 // runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
-runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`)
+runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`);
 
 runVerification();
 
