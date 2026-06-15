@@ -1,5 +1,9 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
+  normalizeLayerFilterForDiagram,
+  type LayerFilter,
+} from './layerFilter.ts'
+import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
@@ -30,6 +34,17 @@ export type SelectedElementUpdaters = {
   stratum?: (stratum: Stratum) => Stratum
   label?: (label: TextLabel) => TextLabel
 }
+
+export type RemoveSelectedElementResult = {
+  diagram: Diagram
+  selectedElement: SelectedElement
+  removed: boolean
+}
+
+export type RemoveSelectedElementWithLayerFilterResult =
+  RemoveSelectedElementResult & {
+    layerFilter: LayerFilter
+  }
 
 export function cloneDiagram(diagram: Diagram): Diagram {
   return structuredClone(diagram) as Diagram
@@ -69,6 +84,66 @@ export function updateLabelById(
   })
 
   return changed ? { ...diagram, labels } : diagram
+}
+
+export function removeSelectedElement(
+  diagram: Diagram,
+  selectedElement: SelectedElement,
+): RemoveSelectedElementResult {
+  if (selectedElement === null) {
+    return {
+      diagram,
+      selectedElement: null,
+      removed: false,
+    }
+  }
+
+  if (selectedElement.kind === 'stratum') {
+    let removed = false
+    const strata = diagram.strata.filter((stratum) => {
+      if (!removed && stratum.id === selectedElement.id) {
+        removed = true
+        return false
+      }
+
+      return true
+    })
+
+    return {
+      diagram: removed ? { ...diagram, strata } : diagram,
+      selectedElement: null,
+      removed,
+    }
+  }
+
+  let removed = false
+  const labels = diagram.labels.filter((label) => {
+    if (!removed && label.id === selectedElement.id) {
+      removed = true
+      return false
+    }
+
+    return true
+  })
+
+  return {
+    diagram: removed ? { ...diagram, labels } : diagram,
+    selectedElement: null,
+    removed,
+  }
+}
+
+export function removeSelectedElementWithLayerFilter(
+  diagram: Diagram,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+): RemoveSelectedElementWithLayerFilterResult {
+  const result = removeSelectedElement(diagram, selectedElement)
+
+  return {
+    ...result,
+    layerFilter: normalizeLayerFilterForDiagram(result.diagram, layerFilter),
+  }
 }
 
 export function updateStratumStyleById(

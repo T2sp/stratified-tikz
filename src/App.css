@@ -168,6 +168,20 @@
   background: var(--button-hover);
 }
 
+.segmented-control button:disabled,
+.copy-button:disabled,
+.toolbar-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.segmented-control button:disabled:hover,
+.copy-button:disabled:hover,
+.toolbar-button:disabled:hover {
+  background: transparent;
+}
+
 .segmented-control button:focus-visible,
 .copy-button:focus-visible,
 .toolbar-button:focus-visible {

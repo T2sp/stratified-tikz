@@ -30,6 +30,8 @@ import {
   parseFiniteNumber,
   parseOpacity,
   parsePositiveFiniteNumber,
+  removeSelectedElement,
+  removeSelectedElementWithLayerFilter,
   updateLabelById,
   updateLabelStyleById,
   updateSelectedElement,
@@ -48,6 +50,10 @@ import {
   selectionExistsInDiagram,
   type SelectedElement,
 } from '../../src/ui/selection.ts'
+import {
+  deriveAvailableLayers,
+  layerFilterIncludesLayer,
+} from '../../src/ui/layerFilter.ts'
 
 test('findSelectedElement finds a selected stratum by id', () => {
   const selected = findSelectedElement(twoDimensionalExample, {
@@ -422,6 +428,134 @@ test('updateLabelById returns a new diagram and preserves unrelated strata', () 
     '$F^{(1)}L$',
   )
   assert.equal(updated.strata, twoDimensionalExample.strata)
+})
+
+test('removeSelectedElement removes a selected stratum by id', () => {
+  const result = removeSelectedElement(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'visibleWire',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.selectedElement, null)
+  assert.equal(
+    result.diagram.strata.some((stratum) => stratum.id === 'visibleWire'),
+    false,
+  )
+  assert.equal(
+    result.diagram.strata.length,
+    twoDimensionalExample.strata.length - 1,
+  )
+  assert.equal(result.diagram.labels, twoDimensionalExample.labels)
+})
+
+test('removeSelectedElement removes a selected free text label by id', () => {
+  const result = removeSelectedElement(twoDimensionalExample, {
+    kind: 'label',
+    id: 'mathMorphismLabel',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.selectedElement, null)
+  assert.equal(
+    result.diagram.labels.some((label) => label.id === 'mathMorphismLabel'),
+    false,
+  )
+  assert.equal(
+    result.diagram.labels.length,
+    twoDimensionalExample.labels.length - 1,
+  )
+  assert.equal(result.diagram.strata, twoDimensionalExample.strata)
+})
+
+test('removeSelectedElement safely clears a stale selection without changing diagram data', () => {
+  const result = removeSelectedElement(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'missing-stratum',
+  })
+
+  assert.equal(result.removed, false)
+  assert.equal(result.diagram, twoDimensionalExample)
+  assert.equal(result.selectedElement, null)
+})
+
+test('removeSelectedElement removes at most one matching element', () => {
+  const duplicateIdDiagram = {
+    ...twoDimensionalExample,
+    strata: [
+      ...twoDimensionalExample.strata,
+      {
+        ...twoDimensionalExample.strata[0],
+        id: 'visibleWire',
+      },
+    ],
+  }
+  const result = removeSelectedElement(duplicateIdDiagram, {
+    kind: 'stratum',
+    id: 'visibleWire',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(
+    result.diagram.strata.filter((stratum) => stratum.id === 'visibleWire')
+      .length,
+    1,
+  )
+})
+
+test('removeSelectedElementWithLayerFilter resets a stale layer filter after deletion', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      {
+        ...twoDimensionalExample.strata[0],
+        id: 'only-layer-seven-stratum',
+        layer: 7,
+      },
+      {
+        ...twoDimensionalExample.strata[1],
+        id: 'remaining-layer-two-stratum',
+        layer: 2,
+      },
+    ],
+    labels: [
+      {
+        ...twoDimensionalExample.labels[0],
+        id: 'remaining-layer-two-label',
+        layer: 2,
+      },
+    ],
+  }
+
+  const result = removeSelectedElementWithLayerFilter(
+    diagram,
+    { kind: 'stratum', id: 'only-layer-seven-stratum' },
+    { kind: 'layer', layer: 7 },
+  )
+  const remainingStratum = result.diagram.strata.find(
+    (stratum) => stratum.id === 'remaining-layer-two-stratum',
+  )
+
+  assert.equal(result.removed, true)
+  assert.deepEqual(result.layerFilter, { kind: 'all' })
+  assert.equal(deriveAvailableLayers(result.diagram).includes(7), false)
+  assert.equal(remainingStratum === undefined, false)
+  assert.equal(
+    remainingStratum === undefined
+      ? false
+      : layerFilterIncludesLayer(result.layerFilter, remainingStratum.layer),
+    true,
+  )
+})
+
+test('generated TikZ no longer includes a removed selected element', () => {
+  const result = removeSelectedElement(twoDimensionalExample, {
+    kind: 'label',
+    id: 'mathMorphismLabel',
+  })
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(tikz.includes('$F^{(1)}L$'), false)
 })
 
 test('makeUniqueId avoids collisions across strata and labels', () => {
