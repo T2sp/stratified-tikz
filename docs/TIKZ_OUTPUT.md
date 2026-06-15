@@ -112,10 +112,26 @@ Drawing commands for sheets, curves, points, and free text labels are wrapped in
 \end{pgfonlayer}
 ```
 
-Layers are emitted in deterministic numeric order. Within a layer, items that
+<!-- Layers are emitted in deterministic numeric order. Within a layer, items that
 belong to the same emitted section preserve their existing relative diagram
 order. Coordinate definitions remain outside layer blocks and keep the Phase 9A
-coordinate-name rules based on sanitized stratum names and emission order.
+coordinate-name rules based on sanitized stratum names and emission order. -->
+
+## Ordering within TikZ layers
+
+Layer blocks are emitted in deterministic numeric layer order. Lower numeric layer values are placed behind higher numeric layer values.
+
+Within each TikZ layer block, commands are organized by codimension / element kind for readability. Therefore, the output does not necessarily preserve the full diagram.strata order across different codimension sections.
+
+The intended ordering rule is:
+
+1. numeric layer order;
+2. codimension / element-kind section order within each layer;
+3. original diagram order within each section.
+
+For example, curves and points on the same layer may be grouped into separate codimension sections even if their order in diagram.strata is interleaved. This is intentional so that the generated TikZ source remains readable and mathematically organized.
+
+Free text labels are emitted in their configured layer and are grouped consistently with the layer output format.
 
 Selection and preview highlighting are not exported. Layer filtering and
 layer-based selection UI are not part of this phase.
