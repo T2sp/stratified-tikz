@@ -167,6 +167,10 @@ function validateSheetStratum(
     )
   }
 
+  if (stratum.kind === 'polygonSheet') {
+    validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
+  }
+
   validateSheetStyle(stratum.style, `${path}.style`, errors)
   sheetVertices(stratum).forEach((vertex, index) => {
     validateVec3ForAmbient(
@@ -219,6 +223,7 @@ function validateCurveStratum(
   }
 
   validateCurveStyle(stratum.style, `${path}.style`, errors)
+  validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
   stratum.points.forEach((point, index) => {
     validateVec3ForAmbient(
       point,
@@ -576,6 +581,16 @@ function validateName(
 ): void {
   if (name.trim().length === 0) {
     pushError(errors, path, 'Name must be non-empty.')
+  }
+}
+
+function validateOptionalPathLabel(
+  pathLabel: string | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (pathLabel !== undefined && typeof pathLabel !== 'string') {
+    pushError(errors, path, 'Path label must be a string when present.')
   }
 }
 

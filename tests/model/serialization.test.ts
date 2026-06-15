@@ -131,6 +131,50 @@ test('diagram serialization round trips without changing diagram data', () => {
   assert.deepEqual(result.diagram, threeDimensionalExample)
 })
 
+test('diagram serialization preserves optional path labels', () => {
+  const diagramWithPathLabel: Diagram = {
+    ...twoDimensionalExample,
+    strata: twoDimensionalExample.strata.map((stratum) =>
+      stratum.geometricKind === 'curve'
+        ? { ...stratum, pathLabel: 'wire path' }
+        : stratum,
+    ),
+  }
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagramWithPathLabel))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram, diagramWithPathLabel)
+})
+
+test('parseSavedDiagramJson accepts missing optional path labels', () => {
+  const result = parseSavedDiagramJson(serializeDiagram(twoDimensionalExample))
+
+  assert.equal(result.ok, true)
+})
+
+test('parseSavedDiagramJson rejects non-string path labels', () => {
+  const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
+    diagram: {
+      strata: Array<{
+        pathLabel?: unknown
+      }>
+    }
+  }
+  saved.diagram.strata[0].pathLabel = 123
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected invalid path label to fail.')
+  }
+  assert.match(result.error, /Path label must be a string/)
+})
+
 test('serializeDiagram does not include editor-only state', () => {
   const serialized = serializeDiagram(twoDimensionalExample)
 

@@ -155,6 +155,7 @@ export type QuadSheetStratum = SheetStratumBase & {
 export type PolygonSheetStratum = SheetStratumBase & {
   kind: 'polygonSheet'
   vertices: Vec3[]
+  pathLabel?: string
 }
 
 export type SheetStratum = QuadSheetStratum | PolygonSheetStratum
@@ -168,6 +169,7 @@ export type CurveStratum = {
   kind: CurveKind
   name: string
   label?: string
+  pathLabel?: string
   style: CurveStyle
   points: Vec3[]
   styleSegments: CurveStyleSegment[]
