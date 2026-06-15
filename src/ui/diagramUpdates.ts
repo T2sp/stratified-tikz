@@ -1,5 +1,6 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
+  layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   type LayerFilter,
 } from './layerFilter.ts'
@@ -268,8 +269,32 @@ export type DirectLabelCreationResult =
       diagram: Diagram
     }
 
+export type DirectPathCreationError =
+  | 'invalidCoordinates'
+  | 'tooFewPoints'
+  | 'wrongPointCount'
+  | 'unsupportedAmbientDimension'
+
+export type DirectPathCreationResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: DirectPathCreationError
+    }
+
 export type DirectCreationLayerOptions = {
   layer?: number
+}
+
+export type DirectCreationCommitResult = {
+  diagram: Diagram
+  selectedElement: SelectedElement
+  layerFilter: LayerFilter
 }
 
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
@@ -347,7 +372,7 @@ export function addPolylineCurveStratumWithResult(
   points: Vec3[],
   options: AddPolylineCurveStratumOptions = {},
 ): AddPolylineCurveStratumResult {
-  if (points.length < 2) {
+  if (points.length < 2 || !areFinitePoints(points)) {
     return {
       diagram,
       id: null,
@@ -378,7 +403,7 @@ export function addCubicBezierCurveStratumWithResult(
   points: Vec3[],
   options: AddCubicBezierCurveStratumOptions = {},
 ): AddCubicBezierCurveStratumResult {
-  if (points.length !== 4) {
+  if (points.length !== 4 || !areFinitePoints(points)) {
     return {
       diagram,
       id: null,
@@ -487,10 +512,162 @@ export function addTextLabelFromDirectInput(
   }
 }
 
+export function addPolylineCurveFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput[],
+  options: AddPolylineCurveStratumOptions = {},
+): DirectPathCreationResult {
+  if (coordinates.length < 2) {
+    return {
+      ok: false,
+      diagram,
+      error: 'tooFewPoints',
+    }
+  }
+
+  const points = parseDirectCoordinateInputs(
+    coordinates,
+    diagram.ambientDimension,
+  )
+
+  if (points === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addPolylineCurveStratumWithResult(diagram, points, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'tooFewPoints',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addCubicBezierCurveFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput[],
+  options: AddCubicBezierCurveStratumOptions = {},
+): DirectPathCreationResult {
+  if (coordinates.length !== 4) {
+    return {
+      ok: false,
+      diagram,
+      error: 'wrongPointCount',
+    }
+  }
+
+  const points = parseDirectCoordinateInputs(
+    coordinates,
+    diagram.ambientDimension,
+  )
+
+  if (points === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addCubicBezierCurveStratumWithResult(diagram, points, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'wrongPointCount',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addPolygonSheetFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput[],
+  options: AddPolygonSheetStratumOptions = {},
+): DirectPathCreationResult {
+  if (diagram.ambientDimension !== 3) {
+    return {
+      ok: false,
+      diagram,
+      error: 'unsupportedAmbientDimension',
+    }
+  }
+
+  if (coordinates.length < 3) {
+    return {
+      ok: false,
+      diagram,
+      error: 'tooFewPoints',
+    }
+  }
+
+  const vertices = parseDirectCoordinateInputs(
+    coordinates,
+    diagram.ambientDimension,
+  )
+
+  if (vertices === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addPolygonSheetStratumWithResult(diagram, vertices, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'tooFewPoints',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
 export function directCreationLayerOptions(
   layerFilter: LayerFilter,
 ): DirectCreationLayerOptions {
   return layerFilter.kind === 'layer' ? { layer: layerFilter.layer } : {}
+}
+
+export function commitDirectCreationResult(
+  diagram: Diagram,
+  selectedElement: Exclude<SelectedElement, null>,
+  createdLayer: number,
+  layerFilter: LayerFilter,
+): DirectCreationCommitResult {
+  return {
+    diagram,
+    selectedElement,
+    layerFilter: layerFilterIncludesLayer(layerFilter, createdLayer)
+      ? layerFilter
+      : { kind: 'layer', layer: createdLayer },
+  }
 }
 
 export function updateStratumNameById(
@@ -690,10 +867,61 @@ export function parseDirectCoordinateInput(
   return normalizePointForAmbientDimension(ambientDimension, { x, y, z })
 }
 
+export function parseDirectCoordinateInputs(
+  coordinates: DirectCoordinateInput[],
+  ambientDimension: AmbientDimension,
+): Vec3[] | null {
+  const points = coordinates.map((coordinate) =>
+    parseDirectCoordinateInput(coordinate, ambientDimension),
+  )
+
+  return points.every((point): point is Vec3 => point !== null) ? points : null
+}
+
+export function parseDirectCoordinateRows(
+  rows: string,
+  ambientDimension: AmbientDimension,
+): DirectCoordinateInput[] | null {
+  const axisCount = ambientDimension === 2 ? 2 : 3
+  const trimmedRows = rows.trim()
+
+  if (trimmedRows.length === 0) {
+    return null
+  }
+
+  const coordinates: DirectCoordinateInput[] = []
+
+  for (const row of trimmedRows.split(/\r?\n/u)) {
+    const trimmedRow = row.trim()
+
+    if (trimmedRow.length === 0) {
+      continue
+    }
+
+    const parts = trimmedRow.split(/[\s,]+/u)
+
+    if (parts.length !== axisCount) {
+      return null
+    }
+
+    coordinates.push({
+      x: parts[0],
+      y: parts[1],
+      z: ambientDimension === 2 ? '0' : parts[2],
+    })
+  }
+
+  return coordinates.length === 0 ? null : coordinates
+}
+
 export function normalizeDirectLabelText(text: string): string {
   const trimmedText = text.trim()
 
   return trimmedText.length === 0 ? 'Label' : text
+}
+
+export function parseDirectLayerInput(rawValue: string): number | null {
+  return parseFiniteNumber(rawValue)
 }
 
 export function parseFiniteNumber(rawValue: string): number | null {
