@@ -87,38 +87,56 @@ function runCodex(promptFile, logFile) {
 
   console.log(`\nRunning Codex with prompt: ${promptFile}`);
 
-  const result = spawnSync(
-    "codex",
-    [
-      "exec",
-      "--sandbox",
-      "workspace-write",
-      "--ask-for-approval",
-      "never",
-      "-c",
-      "model_reasoning_effort=high",
-      prompt,
-    ],
-    {
-      encoding: "utf8",
-      env,
-      maxBuffer: 1024 * 1024 * 20,
-    },
-  );
+  const codexBin = process.env.CODEX_BIN ?? "codex";
+
+  const codexPathCheck = spawnSync("which", [codexBin], {
+    encoding: "utf8",
+    env,
+  });
+
+  const args = [
+    "exec",
+    "--sandbox",
+    "workspace-write",
+    "-c",
+    "model_reasoning_effort=high",
+    prompt,
+  ];
+
+  const result = spawnSync(codexBin, args, {
+    encoding: "utf8",
+    env,
+    maxBuffer: 1024 * 1024 * 50,
+  });
 
   const combined = [
+    `COMMAND: ${codexBin} ${args.map((a) => JSON.stringify(a)).join(" ")}`,
+    `PATH: ${env.PATH}`,
+    `which codex status: ${codexPathCheck.status}`,
+    `which codex stdout: ${codexPathCheck.stdout ?? ""}`,
+    `which codex stderr: ${codexPathCheck.stderr ?? ""}`,
+    `status: ${result.status}`,
+    `signal: ${result.signal}`,
+    `error: ${result.error ? String(result.error.stack ?? result.error) : ""}`,
+    "",
     "STDOUT:",
-    result.stdout,
+    result.stdout ?? "",
     "",
     "STDERR:",
-    result.stderr,
+    result.stderr ?? "",
   ].join("\n");
 
   writeFileSync(logFile, combined);
 
+  if (result.error) {
+    console.error(`Failed to start Codex. See ${logFile}`);
+    console.error(result.error);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
-    console.error(`Codex failed. See ${logFile}`);
-    console.error(result.stderr);
+    console.error(`Codex failed with status ${result.status}. See ${logFile}`);
+    console.error(result.stderr ?? "");
     process.exit(result.status ?? 1);
   }
 
