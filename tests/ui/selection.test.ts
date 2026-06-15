@@ -31,6 +31,7 @@ import {
   parseOpacity,
   parsePositiveFiniteNumber,
   removeSelectedElement,
+  removeSelectedElementWithLayerFilter,
   updateLabelById,
   updateLabelStyleById,
   updateSelectedElement,
@@ -49,6 +50,10 @@ import {
   selectionExistsInDiagram,
   type SelectedElement,
 } from '../../src/ui/selection.ts'
+import {
+  deriveAvailableLayers,
+  layerFilterIncludesLayer,
+} from '../../src/ui/layerFilter.ts'
 
 test('findSelectedElement finds a selected stratum by id', () => {
   const selected = findSelectedElement(twoDimensionalExample, {
@@ -495,6 +500,51 @@ test('removeSelectedElement removes at most one matching element', () => {
     result.diagram.strata.filter((stratum) => stratum.id === 'visibleWire')
       .length,
     1,
+  )
+})
+
+test('removeSelectedElementWithLayerFilter resets a stale layer filter after deletion', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      {
+        ...twoDimensionalExample.strata[0],
+        id: 'only-layer-seven-stratum',
+        layer: 7,
+      },
+      {
+        ...twoDimensionalExample.strata[1],
+        id: 'remaining-layer-two-stratum',
+        layer: 2,
+      },
+    ],
+    labels: [
+      {
+        ...twoDimensionalExample.labels[0],
+        id: 'remaining-layer-two-label',
+        layer: 2,
+      },
+    ],
+  }
+
+  const result = removeSelectedElementWithLayerFilter(
+    diagram,
+    { kind: 'stratum', id: 'only-layer-seven-stratum' },
+    { kind: 'layer', layer: 7 },
+  )
+  const remainingStratum = result.diagram.strata.find(
+    (stratum) => stratum.id === 'remaining-layer-two-stratum',
+  )
+
+  assert.equal(result.removed, true)
+  assert.deepEqual(result.layerFilter, { kind: 'all' })
+  assert.equal(deriveAvailableLayers(result.diagram).includes(7), false)
+  assert.equal(remainingStratum === undefined, false)
+  assert.equal(
+    remainingStratum === undefined
+      ? false
+      : layerFilterIncludesLayer(result.layerFilter, remainingStratum.layer),
+    true,
   )
 })
 

@@ -1,5 +1,9 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
+  normalizeLayerFilterForDiagram,
+  type LayerFilter,
+} from './layerFilter.ts'
+import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
@@ -36,6 +40,11 @@ export type RemoveSelectedElementResult = {
   selectedElement: SelectedElement
   removed: boolean
 }
+
+export type RemoveSelectedElementWithLayerFilterResult =
+  RemoveSelectedElementResult & {
+    layerFilter: LayerFilter
+  }
 
 export function cloneDiagram(diagram: Diagram): Diagram {
   return structuredClone(diagram) as Diagram
@@ -121,6 +130,19 @@ export function removeSelectedElement(
     diagram: removed ? { ...diagram, labels } : diagram,
     selectedElement: null,
     removed,
+  }
+}
+
+export function removeSelectedElementWithLayerFilter(
+  diagram: Diagram,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+): RemoveSelectedElementWithLayerFilterResult {
+  const result = removeSelectedElement(diagram, selectedElement)
+
+  return {
+    ...result,
+    layerFilter: normalizeLayerFilterForDiagram(result.diagram, layerFilter),
   }
 }
 

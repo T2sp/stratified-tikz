@@ -50,7 +50,7 @@ import {
   EditableInspector,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
-  removeSelectedElement,
+  removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
   type LayerFilter,
@@ -323,14 +323,16 @@ function App() {
     }
 
     setEditorState((current) => {
-      const result = removeSelectedElement(
+      const result = removeSelectedElementWithLayerFilter(
         current.editableDiagram,
         current.selectedElement,
+        current.layerFilter,
       )
 
       if (
         !result.removed &&
         current.selectedElement === result.selectedElement &&
+        current.layerFilter === result.layerFilter &&
         current.polylineDraft === null &&
         current.cubicBezierDraft === null &&
         current.sheetPolygonDraft === null
@@ -342,6 +344,7 @@ function App() {
         ...current,
         editableDiagram: result.diagram,
         selectedElement: result.selectedElement,
+        layerFilter: result.layerFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
         sheetPolygonDraft: null,
