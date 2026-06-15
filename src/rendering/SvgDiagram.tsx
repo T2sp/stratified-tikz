@@ -26,6 +26,11 @@ import {
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { mapClientPointToViewBox } from './svgViewBox'
+import {
+  allLayersFilter,
+  layerFilterIncludesLayer,
+  type LayerFilter,
+} from '../ui/layerFilter'
 
 export type SvgDiagramProps = {
   diagram: Diagram
@@ -37,6 +42,7 @@ export type SvgDiagramProps = {
   cubicBezierDraft?: Vec3[]
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
+  layerFilter?: LayerFilter
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -71,6 +77,7 @@ export function SvgDiagram({
   cubicBezierDraft,
   sheetDraft,
   workPlanePreview,
+  layerFilter = allLayersFilter,
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
@@ -88,10 +95,24 @@ export function SvgDiagram({
     ...diagram.strata
       .filter((stratum) => shouldRenderStratum(diagram.ambientDimension, stratum))
       .map((stratum) =>
-        renderStratum(stratum, camera, height, selectedElement, onSelectionChange),
+        renderStratum(
+          stratum,
+          camera,
+          height,
+          selectedElement,
+          layerFilter,
+          onSelectionChange,
+        ),
       ),
     ...diagram.labels.map((label) =>
-      renderLabel(label, camera, height, selectedElement, onSelectionChange),
+      renderLabel(
+        label,
+        camera,
+        height,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      ),
     ),
   ].sort((left, right) => left.layer - right.layer || left.id.localeCompare(right.id))
 
@@ -126,6 +147,7 @@ function renderStratum(
   camera: Diagram['camera'],
   viewportHeight: number,
   selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   switch (stratum.geometricKind) {
@@ -136,11 +158,32 @@ function renderStratum(
         element: <g key={stratum.id} />,
       }
     case 'sheet':
-      return renderSheet(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
+      return renderSheet(
+        stratum,
+        camera,
+        viewportHeight,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      )
     case 'curve':
-      return renderCurve(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
+      return renderCurve(
+        stratum,
+        camera,
+        viewportHeight,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      )
     case 'point':
-      return renderPoint(stratum, camera, viewportHeight, selectedElement, onSelectionChange)
+      return renderPoint(
+        stratum,
+        camera,
+        viewportHeight,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      )
   }
 }
 
@@ -149,12 +192,14 @@ function renderSheet(
   camera: Diagram['camera'],
   viewportHeight: number,
   selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const points = sheetVertices(sheet).map((vertex) =>
     projectToSvgPoint(camera, vertex, viewportHeight),
   )
-  const isSelected = isSelectedStratum(selectedElement, sheet.id)
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, sheet.id)
 
   return {
     id: sheet.id,
@@ -162,7 +207,9 @@ function renderSheet(
     element: (
       <g
         key={sheet.id}
-        className="svg-selectable"
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isIncludedByFilter ? undefined : 'none'}
         onClick={(event) =>
           selectElement(event, { kind: 'stratum', id: sheet.id }, onSelectionChange)
         }
@@ -197,6 +244,7 @@ function renderCurve(
   camera: Diagram['camera'],
   viewportHeight: number,
   selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const points = curve.points.map((point) =>
@@ -207,7 +255,8 @@ function renderCurve(
       ? cubicBezierToSvgPath(points)
       : polylineToSvgPath(points)
   const dashArray = lineStyleToStrokeDasharray(curve.style.lineStyle)
-  const isSelected = isSelectedStratum(selectedElement, curve.id)
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, curve.id)
 
   return {
     id: curve.id,
@@ -215,7 +264,9 @@ function renderCurve(
     element: (
       <g
         key={curve.id}
-        className="svg-selectable"
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isIncludedByFilter ? undefined : 'none'}
         onClick={(event) =>
           selectElement(event, { kind: 'stratum', id: curve.id }, onSelectionChange)
         }
@@ -254,12 +305,19 @@ function renderPoint(
   camera: Diagram['camera'],
   viewportHeight: number,
   selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
   const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
-  const isSelected = isSelectedStratum(selectedElement, point.id)
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, point.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, point.id)
+  const groupProps = {
+    className: isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out',
+    opacity: previewElementOpacity(isIncludedByFilter),
+    pointerEvents: isIncludedByFilter ? undefined : 'none',
+  } as const
   const commonProps = {
     fill,
     stroke: point.style.color,
@@ -276,7 +334,7 @@ function renderPoint(
         element: (
           <g
             key={point.id}
-            className="svg-selectable"
+            {...groupProps}
             onClick={(event) =>
               selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
             }
@@ -293,7 +351,7 @@ function renderPoint(
         element: (
           <g
             key={point.id}
-            className="svg-selectable"
+            {...groupProps}
             onClick={(event) =>
               selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
             }
@@ -315,7 +373,7 @@ function renderPoint(
         element: (
           <g
             key={point.id}
-            className="svg-selectable"
+            {...groupProps}
             onClick={(event) =>
               selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
             }
@@ -337,7 +395,7 @@ function renderPoint(
         element: (
           <g
             key={point.id}
-            className="svg-selectable"
+            {...groupProps}
             onClick={(event) =>
               selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
             }
@@ -358,10 +416,15 @@ function renderLabel(
   camera: Diagram['camera'],
   viewportHeight: number,
   selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const position = projectToSvgPoint(camera, label.position, viewportHeight)
-  const isSelected = selectedElement?.kind === 'label' && selectedElement.id === label.id
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, label.layer)
+  const isSelected =
+    isIncludedByFilter &&
+    selectedElement?.kind === 'label' &&
+    selectedElement.id === label.id
   const fontSize = label.style.fontSize * 1.35
   const anchorPlacement = svgLabelAnchorPlacement(label.style.anchor, fontSize)
 
@@ -371,7 +434,9 @@ function renderLabel(
     element: (
       <g
         key={label.id}
-        className="svg-selectable"
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isIncludedByFilter ? undefined : 'none'}
         onClick={(event) =>
           selectElement(event, { kind: 'label', id: label.id }, onSelectionChange)
         }
@@ -693,6 +758,10 @@ function isSelectedStratum(
   id: string,
 ): boolean {
   return selectedElement?.kind === 'stratum' && selectedElement.id === id
+}
+
+function previewElementOpacity(isIncludedByFilter: boolean): number | undefined {
+  return isIncludedByFilter ? undefined : 0.16
 }
 
 function shouldRenderStratum(

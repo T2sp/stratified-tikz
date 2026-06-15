@@ -296,6 +296,8 @@ Out of scope:
 
 ### Phase 9C: Layer-based selection and filtering
 
+Status: implemented
+
 Motivation:
 
 In 3D diagrams, elements can overlap and become difficult to select.
@@ -321,6 +323,21 @@ Requirements:
 * Layer filter is not exported to TikZ.
 * Layer filter should not affect generated TikZ.
 * Remove/delete operations should only act on the actual selected element.
+
+Implemented behavior:
+
+* The toolbar has a Layer control with `All layers` and numeric layers present in
+  the current diagram.
+* Available layers are derived from both strata and free text labels and sorted
+  numerically.
+* The layer filter is editor-only UI state. It is not stored in `Diagram`, not
+  saved to JSON, and not exported to TikZ.
+* When a specific layer is active, elements on other layers remain visible but
+  are de-emphasized in the SVG preview and cannot be selected by clicking.
+* Existing selections are cleared when they do not belong to the active layer.
+* Switching examples and loading JSON reset the filter to `All layers`.
+* Cursor creation keeps the existing default next-layer behavior. The active
+  filter does not silently retarget newly created elements to the filtered layer.
 
 Out of scope:
 

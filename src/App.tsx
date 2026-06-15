@@ -38,14 +38,19 @@ import {
   appendSheetPolygonDraftPoint,
   areFinitePoints,
   arePointsOnWorkPlane,
+  allLayersFilter,
   clearSelectionIfMissing,
+  clearSelectionForLayerFilter,
   cloneDiagram,
   createSheetPolygonDraft,
   defaultJsonDownloadFilename,
+  deriveAvailableLayers,
   EditableInspector,
+  normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
+  type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
   type WorkPlanePreviewTool,
@@ -65,6 +70,7 @@ type CubicBezierDraft = {
 type EditableEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
+  layerFilter: LayerFilter
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
   sheetPolygonDraft: SheetPolygonDraft | null
@@ -125,6 +131,7 @@ function App() {
   const [editorState, setEditorState] = useState<EditableEditorState>(() => ({
     editableDiagram: cloneDiagram(exampleOptions[0].diagram),
     selectedElement: null,
+    layerFilter: allLayersFilter,
     polylineDraft: null,
     cubicBezierDraft: null,
     sheetPolygonDraft: null,
@@ -132,6 +139,7 @@ function App() {
   const {
     editableDiagram,
     selectedElement,
+    layerFilter,
     polylineDraft,
     cubicBezierDraft,
     sheetPolygonDraft,
@@ -141,6 +149,10 @@ function App() {
     exampleOptions[0]
   const tikzSource = useMemo(
     () => generateTikz(editableDiagram),
+    [editableDiagram],
+  )
+  const availableLayers = useMemo(
+    () => deriveAvailableLayers(editableDiagram),
     [editableDiagram],
   )
   const previewWorkPlane = sheetPolygonDraft?.workPlane ?? activeWorkPlane
@@ -188,6 +200,7 @@ function App() {
     setEditorState((current) => ({
       editableDiagram: nextDiagram,
       selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
+      layerFilter: allLayersFilter,
       polylineDraft: null,
       cubicBezierDraft: null,
       sheetPolygonDraft: null,
@@ -204,10 +217,21 @@ function App() {
     setEditorState((current) => {
       const nextDiagram =
         typeof update === 'function' ? update(current.editableDiagram) : update
+      const nextSelection = clearSelectionForLayerFilter(
+        nextDiagram,
+        current.selectedElement,
+        current.layerFilter,
+      )
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        nextDiagram,
+        current.layerFilter,
+      )
 
       return {
         ...current,
         editableDiagram: nextDiagram,
+        selectedElement: nextSelection,
+        layerFilter: nextLayerFilter,
       }
     })
     setCopyStatus('idle')
@@ -270,6 +294,7 @@ function App() {
     setEditorState({
       editableDiagram: result.diagram,
       selectedElement: null,
+      layerFilter: allLayersFilter,
       polylineDraft: null,
       cubicBezierDraft: null,
       sheetPolygonDraft: null,
@@ -287,6 +312,25 @@ function App() {
       ...current,
       selectedElement: selection,
     }))
+  }
+
+  function updateLayerFilter(nextFilter: LayerFilter): void {
+    setEditorState((current) => {
+      const normalizedFilter = normalizeLayerFilterForDiagram(
+        current.editableDiagram,
+        nextFilter,
+      )
+
+      return {
+        ...current,
+        layerFilter: normalizedFilter,
+        selectedElement: clearSelectionForLayerFilter(
+          current.editableDiagram,
+          current.selectedElement,
+          normalizedFilter,
+        ),
+      }
+    })
   }
 
   function updateCreationTool(tool: CreationTool): void {
@@ -430,7 +474,12 @@ function App() {
 
         return {
           editableDiagram: result.diagram,
-          selectedElement: { kind: 'stratum', id: result.id },
+          selectedElement: clearSelectionForLayerFilter(
+            result.diagram,
+            { kind: 'stratum', id: result.id },
+            current.layerFilter,
+          ),
+          layerFilter: current.layerFilter,
           polylineDraft: null,
           cubicBezierDraft: null,
           sheetPolygonDraft: null,
@@ -461,7 +510,12 @@ function App() {
 
         return {
           editableDiagram: result.diagram,
-          selectedElement: { kind: 'stratum', id: result.id },
+          selectedElement: clearSelectionForLayerFilter(
+            result.diagram,
+            { kind: 'stratum', id: result.id },
+            current.layerFilter,
+          ),
+          layerFilter: current.layerFilter,
           polylineDraft: null,
           cubicBezierDraft: null,
           sheetPolygonDraft: null,
@@ -472,7 +526,12 @@ function App() {
 
       return {
         editableDiagram: result.diagram,
-        selectedElement: { kind: 'label', id: result.id },
+        selectedElement: clearSelectionForLayerFilter(
+          result.diagram,
+          { kind: 'label', id: result.id },
+          current.layerFilter,
+        ),
+        layerFilter: current.layerFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
         sheetPolygonDraft: null,
@@ -505,7 +564,11 @@ function App() {
     setEditorState((current) => ({
       ...current,
       editableDiagram: result.diagram,
-      selectedElement: { kind: 'stratum', id: createdId },
+      selectedElement: clearSelectionForLayerFilter(
+        result.diagram,
+        { kind: 'stratum', id: createdId },
+        current.layerFilter,
+      ),
       polylineDraft: null,
       cubicBezierDraft: null,
       sheetPolygonDraft: null,
@@ -569,7 +632,11 @@ function App() {
     setEditorState((current) => ({
       ...current,
       editableDiagram: result.diagram,
-      selectedElement: { kind: 'stratum', id: createdId },
+      selectedElement: clearSelectionForLayerFilter(
+        result.diagram,
+        { kind: 'stratum', id: createdId },
+        current.layerFilter,
+      ),
       polylineDraft: null,
       cubicBezierDraft: null,
       sheetPolygonDraft: null,
@@ -646,6 +713,7 @@ function App() {
           <span>{editableDiagram.ambientDimension}D</span>
           <span>{coordinateInputMode}</span>
           <span>{creationTool}</span>
+          <span>{layerFilterStatusLabel(layerFilter)}</span>
           <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
         </div>
       </header>
@@ -776,6 +844,24 @@ function App() {
           </div>
         </div>
 
+        <div className="control-group layer-filter-control">
+          <span className="control-label">Layer</span>
+          <select
+            className="toolbar-select"
+            value={layerFilterSelectValue(layerFilter)}
+            onChange={(event) =>
+              updateLayerFilter(parseLayerFilterSelectValue(event.currentTarget.value))
+            }
+          >
+            <option value="all">All layers</option>
+            {availableLayers.map((layer) => (
+              <option key={layer} value={String(layer)}>
+                Layer {formatLayerValue(layer)}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="control-group file-control">
           <span className="control-label">File</span>
           <label className="filename-field">
@@ -861,6 +947,7 @@ function App() {
             cubicBezierDraft={cubicBezierDraft?.points}
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
+            layerFilter={layerFilter}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }
@@ -944,6 +1031,30 @@ function workPlaneFixedValue(workPlane: WorkPlane): number {
     case 'yz':
       return workPlane.x
   }
+}
+
+function layerFilterSelectValue(layerFilter: LayerFilter): string {
+  return layerFilter.kind === 'all' ? 'all' : String(layerFilter.layer)
+}
+
+function parseLayerFilterSelectValue(value: string): LayerFilter {
+  if (value === 'all') {
+    return allLayersFilter
+  }
+
+  const layer = Number(value)
+
+  return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
+}
+
+function layerFilterStatusLabel(layerFilter: LayerFilter): string {
+  return layerFilter.kind === 'all'
+    ? 'all layers'
+    : `layer ${formatLayerValue(layerFilter.layer)}`
+}
+
+function formatLayerValue(layer: number): string {
+  return Number.isInteger(layer) ? String(layer) : String(layer)
 }
 
 export default App

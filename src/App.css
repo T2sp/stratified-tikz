@@ -263,6 +263,10 @@
   flex: 1 1 320px;
 }
 
+.layer-filter-control {
+  flex: 0 1 190px;
+}
+
 .file-input {
   display: none;
 }
@@ -296,6 +300,10 @@
 
 .svg-selectable:hover {
   filter: drop-shadow(0 0 3px rgba(244, 180, 0, 0.55));
+}
+
+.svg-filtered-out {
+  cursor: default;
 }
 
 .inspector-content {
