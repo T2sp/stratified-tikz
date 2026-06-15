@@ -3,9 +3,6 @@ import {
   updateStratumById,
   updateStratumNameById,
 } from '../diagramUpdates.ts'
-import {
-  formatStratumStyleSummary,
-} from '../inspectorSummary.ts'
 import { CurveGeometryEditor } from './CurveGeometryEditor.tsx'
 import {
   EditableNumberField,
@@ -14,6 +11,7 @@ import {
 } from './InspectorField.tsx'
 import { PointGeometryEditor } from './PointGeometryEditor.tsx'
 import { SheetGeometryEditor } from './SheetGeometryEditor.tsx'
+import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type StratumInspectorProps = {
@@ -74,15 +72,7 @@ export function StratumInspector({
         onDiagramChange={onDiagramChange}
       />
 
-      <section className="inspector-section">
-        <h3>Style</h3>
-        <div className="inspector-form">
-          <ReadOnlyField
-            label={stratum.style.kind}
-            value={formatStratumStyleSummary(stratum.style)}
-          />
-        </div>
-      </section>
+      <StyleEditor stratum={stratum} onDiagramChange={onDiagramChange} />
     </div>
   )
 }

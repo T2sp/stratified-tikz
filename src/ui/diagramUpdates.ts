@@ -2,7 +2,9 @@ import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type {
   AmbientDimension,
   Diagram,
+  LabelStyle,
   Stratum,
+  StratumStyle,
   TextLabel,
   Vec3,
 } from '../model/types.ts'
@@ -53,6 +55,44 @@ export function updateLabelById(
   })
 
   return changed ? { ...diagram, labels } : diagram
+}
+
+export function updateStratumStyleById(
+  diagram: Diagram,
+  id: string,
+  updater: (style: StratumStyle) => StratumStyle,
+): Diagram {
+  return updateStratumById(diagram, id, (stratum) => {
+    switch (stratum.geometricKind) {
+      case 'region': {
+        const style = updater(stratum.style)
+        return style.kind === 'regionStyle' ? { ...stratum, style } : stratum
+      }
+      case 'sheet': {
+        const style = updater(stratum.style)
+        return style.kind === 'sheetStyle' ? { ...stratum, style } : stratum
+      }
+      case 'curve': {
+        const style = updater(stratum.style)
+        return style.kind === 'curveStyle' ? { ...stratum, style } : stratum
+      }
+      case 'point': {
+        const style = updater(stratum.style)
+        return style.kind === 'pointStyle' ? { ...stratum, style } : stratum
+      }
+    }
+  })
+}
+
+export function updateLabelStyleById(
+  diagram: Diagram,
+  id: string,
+  updater: (style: LabelStyle) => LabelStyle,
+): Diagram {
+  return updateLabelById(diagram, id, (label) => ({
+    ...label,
+    style: updater(label.style),
+  }))
 }
 
 export function updateStratumNameById(
@@ -112,4 +152,24 @@ export function parseFiniteNumber(rawValue: string): number | null {
 
   const value = Number(rawValue)
   return Number.isFinite(value) ? value : null
+}
+
+export function parseOpacity(rawValue: string): number | null {
+  const value = parseFiniteNumber(rawValue)
+
+  if (value === null || value < 0 || value > 1) {
+    return null
+  }
+
+  return value
+}
+
+export function parsePositiveFiniteNumber(rawValue: string): number | null {
+  const value = parseFiniteNumber(rawValue)
+
+  if (value === null || value <= 0) {
+    return null
+  }
+
+  return value
 }

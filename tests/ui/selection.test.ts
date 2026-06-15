@@ -12,13 +12,18 @@ import {
   formatVec3,
 } from '../../src/ui/inspectorSummary.ts'
 import type { CurveStyle } from '../../src/model/types.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import {
   cloneDiagram,
   parseFiniteNumber,
+  parseOpacity,
+  parsePositiveFiniteNumber,
   updateLabelById,
+  updateLabelStyleById,
   updateSelectedElement,
   updateStratumById,
   updateStratumNameById,
+  updateStratumStyleById,
   updateVec3Coordinate,
 } from '../../src/ui/diagramUpdates.ts'
 import {
@@ -403,6 +408,108 @@ test('updateLabelById returns a new diagram and preserves unrelated strata', () 
   assert.equal(updated.strata, twoDimensionalExample.strata)
 })
 
+test('updateStratumStyleById updates curve style immutably', () => {
+  const updated = updateStratumStyleById(
+    twoDimensionalExample,
+    'visibleWire',
+    (style) =>
+      style.kind === 'curveStyle'
+        ? { ...style, lineStyle: 'dashed', strokeColor: '#123456' }
+        : style,
+  )
+  const curve = updated.strata.find((stratum) => stratum.id === 'visibleWire')
+  const originalCurve = twoDimensionalExample.strata.find(
+    (stratum) => stratum.id === 'visibleWire',
+  )
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(originalCurve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve' || originalCurve?.geometricKind !== 'curve') {
+    throw new Error('Expected visibleWire to be a curve.')
+  }
+
+  assert.equal(curve.style.lineStyle, 'dashed')
+  assert.equal(curve.style.strokeColor, '#123456')
+  assert.equal(originalCurve.style.lineStyle, 'solid')
+  assert.equal(updated.labels, twoDimensionalExample.labels)
+  assert.equal(
+    updated.strata.find((stratum) => stratum.id === 'hiddenWire'),
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'hiddenWire'),
+  )
+})
+
+test('updateStratumStyleById updates point shape and fill immutably', () => {
+  const updated = updateStratumStyleById(
+    twoDimensionalExample,
+    'circlePoint',
+    (style) =>
+      style.kind === 'pointStyle'
+        ? { ...style, shape: 'star', fill: 'hollow' }
+        : style,
+  )
+  const point = updated.strata.find((stratum) => stratum.id === 'circlePoint')
+
+  assert.equal(point?.geometricKind, 'point')
+
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected circlePoint to be a point.')
+  }
+
+  assert.equal(point.style.shape, 'star')
+  assert.equal(point.style.fill, 'hollow')
+  assert.equal(
+    twoDimensionalExample.strata.find((stratum) => stratum.id === 'circlePoint')
+      ?.geometricKind,
+    'point',
+  )
+})
+
+test('updateStratumStyleById updates sheet style immutably', () => {
+  const updated = updateStratumStyleById(
+    threeDimensionalExample,
+    'roseSheet',
+    (style) =>
+      style.kind === 'sheetStyle'
+        ? { ...style, fillOpacity: 0.6, strokeColor: '#654321' }
+        : style,
+  )
+  const sheet = updated.strata.find((stratum) => stratum.id === 'roseSheet')
+
+  assert.equal(sheet?.geometricKind, 'sheet')
+
+  if (sheet?.geometricKind !== 'sheet') {
+    throw new Error('Expected roseSheet to be a sheet.')
+  }
+
+  assert.equal(sheet.style.fillOpacity, 0.6)
+  assert.equal(sheet.style.strokeColor, '#654321')
+  assert.equal(updated.labels, threeDimensionalExample.labels)
+})
+
+test('updateLabelStyleById updates label anchor immutably', () => {
+  const updated = updateLabelStyleById(
+    twoDimensionalExample,
+    'mathMorphismLabel',
+    (style) => ({ ...style, anchor: 'north east', color: '#112233' }),
+  )
+  const label = updated.labels.find(
+    (candidate) => candidate.id === 'mathMorphismLabel',
+  )
+
+  assert.notEqual(updated, twoDimensionalExample)
+  assert.equal(label?.style.anchor, 'north east')
+  assert.equal(label?.style.color, '#112233')
+  assert.equal(
+    twoDimensionalExample.labels.find(
+      (candidate) => candidate.id === 'mathMorphismLabel',
+    )?.style.anchor,
+    'south',
+  )
+  assert.equal(updated.strata, twoDimensionalExample.strata)
+})
+
 test('updateSelectedElement updates the selected stratum helper path', () => {
   const updated = updateSelectedElement(
     twoDimensionalExample,
@@ -451,6 +558,73 @@ test('parseFiniteNumber rejects invalid numeric input', () => {
 test('parseFiniteNumber accepts finite numeric input', () => {
   assert.equal(parseFiniteNumber('3.25'), 3.25)
   assert.equal(parseFiniteNumber('  -2  '), -2)
+})
+
+test('parseOpacity rejects invalid opacity input', () => {
+  assert.equal(parseOpacity(''), null)
+  assert.equal(parseOpacity('NaN'), null)
+  assert.equal(parseOpacity('-0.1'), null)
+  assert.equal(parseOpacity('1.1'), null)
+})
+
+test('parseOpacity accepts opacity values from 0 to 1', () => {
+  assert.equal(parseOpacity('0'), 0)
+  assert.equal(parseOpacity('0.5'), 0.5)
+  assert.equal(parseOpacity('1'), 1)
+})
+
+test('parsePositiveFiniteNumber rejects nonpositive and invalid input', () => {
+  assert.equal(parsePositiveFiniteNumber(''), null)
+  assert.equal(parsePositiveFiniteNumber('NaN'), null)
+  assert.equal(parsePositiveFiniteNumber('0'), null)
+  assert.equal(parsePositiveFiniteNumber('-1'), null)
+})
+
+test('invalid opacity input does not write NaN into diagram state', () => {
+  const parsedValue = parseOpacity('2')
+  const updated =
+    parsedValue === null
+      ? twoDimensionalExample
+      : updateStratumStyleById(twoDimensionalExample, 'visibleWire', (style) =>
+          style.kind === 'curveStyle'
+            ? { ...style, strokeOpacity: parsedValue }
+            : style,
+        )
+
+  assert.equal(updated, twoDimensionalExample)
+  const curve = updated.strata.find((stratum) => stratum.id === 'visibleWire')
+
+  assert.equal(curve?.geometricKind, 'curve')
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected visibleWire to be a curve.')
+  }
+
+  assert.equal(Number.isNaN(curve.style.strokeOpacity), false)
+  assert.equal(curve.style.strokeOpacity, 1)
+})
+
+test('style edits are reflected in generated TikZ', () => {
+  const updated = updateStratumStyleById(
+    twoDimensionalExample,
+    'visibleWire',
+    (style) =>
+      style.kind === 'curveStyle'
+        ? {
+            ...style,
+            strokeColor: '#123456',
+            strokeOpacity: 0.45,
+            lineWidth: 2.5,
+            lineStyle: 'dashed',
+          }
+        : style,
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('{HTML}{123456}'), true)
+  assert.equal(tikz.includes('draw opacity=0.45'), true)
+  assert.equal(tikz.includes('line width=2.5pt'), true)
+  assert.equal(tikz.includes('dashed'), true)
 })
 
 test('invalid numeric input does not write NaN into diagram state', () => {

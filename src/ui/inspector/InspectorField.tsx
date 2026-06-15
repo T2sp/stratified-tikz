@@ -1,4 +1,8 @@
-import { parseFiniteNumber } from '../diagramUpdates.ts'
+import {
+  parseFiniteNumber,
+  parseOpacity,
+  parsePositiveFiniteNumber,
+} from '../diagramUpdates.ts'
 
 export function ReadOnlyField({
   label,
@@ -87,6 +91,118 @@ export function EditableNumberField({
           }
         }}
       />
+    </label>
+  )
+}
+
+export function EditableOpacityField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label}</span>
+      <input
+        className="inspector-input"
+        type="number"
+        min="0"
+        max="1"
+        step="0.05"
+        value={formatNumberInput(value)}
+        onChange={(event) => {
+          const parsedValue = parseOpacity(event.currentTarget.value)
+
+          if (parsedValue !== null) {
+            onChange(parsedValue)
+          }
+        }}
+      />
+    </label>
+  )
+}
+
+export function EditablePositiveNumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label}</span>
+      <input
+        className="inspector-input"
+        type="number"
+        min="0"
+        step="any"
+        value={formatNumberInput(value)}
+        onChange={(event) => {
+          const parsedValue = parsePositiveFiniteNumber(event.currentTarget.value)
+
+          if (parsedValue !== null) {
+            onChange(parsedValue)
+          }
+        }}
+      />
+    </label>
+  )
+}
+
+export function EditableColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label}</span>
+      <input
+        className="inspector-input"
+        type="color"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    </label>
+  )
+}
+
+export function EditableSelectField<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: readonly T[]
+  onChange: (value: T) => void
+}) {
+  return (
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label}</span>
+      <select
+        className="inspector-input"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value as T)}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </label>
   )
 }

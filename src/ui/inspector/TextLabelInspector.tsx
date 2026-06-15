@@ -4,7 +4,6 @@ import {
   updateVec3Coordinate,
 } from '../diagramUpdates.ts'
 import {
-  formatLabelStyleSummary,
   formatVec3,
 } from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
@@ -13,6 +12,7 @@ import {
   EditableNumberField,
   ReadOnlyField,
 } from './InspectorField.tsx'
+import { LabelStyleEditor } from './LabelStyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type TextLabelInspectorProps = {
@@ -89,15 +89,7 @@ export function TextLabelInspector({
         </div>
       </section>
 
-      <section className="inspector-section">
-        <h3>Style</h3>
-        <div className="inspector-form">
-          <ReadOnlyField
-            label={label.style.kind}
-            value={formatLabelStyleSummary(label.style)}
-          />
-        </div>
-      </section>
+      <LabelStyleEditor label={label} onDiagramChange={onDiagramChange} />
     </div>
   )
 }
