@@ -1,4 +1,5 @@
 import { projectVec3 } from '../geometry/projection.ts'
+import { sheetVertices } from '../model/sheets.ts'
 import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
 
 export type ResolveSvgCameraOptions = {
@@ -67,7 +68,7 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
       case 'region':
         return []
       case 'sheet':
-        return [...stratum.corners]
+        return [...sheetVertices(stratum)]
       case 'curve':
         return [...stratum.points]
       case 'point':

@@ -4,6 +4,7 @@ import type {
   PointStratum,
   SheetStratum,
 } from '../../model/types.ts'
+import { sheetVertices } from '../../model/sheets.ts'
 import { describeCurvePoints, formatVec3 } from '../inspectorSummary.ts'
 
 export function formatSelectedGeometry(
@@ -12,10 +13,10 @@ export function formatSelectedGeometry(
 ): string {
   switch (stratum.geometricKind) {
     case 'sheet':
-      return stratum.corners
+      return sheetVertices(stratum)
         .map(
-          (corner, index) =>
-            `Corner ${index + 1} ${formatVec3(corner, ambientDimension)}`,
+          (vertex, index) =>
+            `${stratum.kind === 'quadSheet' ? 'Corner' : 'Vertex'} ${index + 1} ${formatVec3(vertex, ambientDimension)}`,
         )
         .join('; ')
     case 'curve':

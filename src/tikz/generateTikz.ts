@@ -10,6 +10,7 @@ import type {
   TextLabel,
   Vec3,
 } from '../model/types'
+import { sheetVertices } from '../model/sheets.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
   kind: 'labelStyle',
@@ -196,8 +197,8 @@ function emitSheet(sheet: SheetStratum, context: GenerateContext): string[] {
     `Sheet${sheet.id}Stroke`,
     sheet.style.strokeColor,
   )
-  const coordinates = sheet.corners.map((corner, index) =>
-    context.coordinates.define(`sheet${sheet.id}`, index, corner),
+  const coordinates = sheetVertices(sheet).map((vertex, index) =>
+    context.coordinates.define(sheetCoordinateBaseName(sheet), index, vertex),
   )
 
   return [
@@ -210,6 +211,12 @@ function emitSheet(sheet: SheetStratum, context: GenerateContext): string[] {
     `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
     '',
   ]
+}
+
+function sheetCoordinateBaseName(sheet: SheetStratum): string {
+  return sheet.kind === 'polygonSheet'
+    ? `sheetPoly${sheet.id}`
+    : `sheet${sheet.id}`
 }
 
 function emitCurve(curve: CurveStratum, context: GenerateContext): string[] {

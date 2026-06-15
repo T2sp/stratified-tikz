@@ -17,6 +17,8 @@ import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addCubicBezierCurveStratum,
   addCubicBezierCurveStratumWithResult,
+  addPolygonSheetStratum,
+  addPolygonSheetStratumWithResult,
   addPolylineCurveStratum,
   addPolylineCurveStratumWithResult,
   addPointStratum,
@@ -497,6 +499,83 @@ test('addPointStratum returns a new 3D diagram with codim 3', () => {
   assert.deepEqual(point.position, { x: 3, y: 4, z: 5 })
 })
 
+test('addPolygonSheetStratum returns a new 3D diagram with codim 1', () => {
+  const vertices = [
+    { x: 0, y: 0, z: 1 },
+    { x: 2, y: 0, z: 1 },
+    { x: 1, y: 1, z: 1 },
+  ]
+  const updated = addPolygonSheetStratum(
+    threeDimensionalExample,
+    vertices,
+    { id: 'sheet-1' },
+  )
+  const sheet = updated.strata.find((stratum) => stratum.id === 'sheet-1')
+
+  assert.notEqual(updated, threeDimensionalExample)
+  assert.equal(updated.labels, threeDimensionalExample.labels)
+  assert.equal(
+    threeDimensionalExample.strata.some((stratum) => stratum.id === 'sheet-1'),
+    false,
+  )
+  assert.equal(sheet?.geometricKind, 'sheet')
+
+  if (sheet?.geometricKind !== 'sheet') {
+    throw new Error('Expected added stratum to be a sheet.')
+  }
+
+  assert.equal(sheet.codim, 1)
+  assert.equal(sheet.kind, 'polygonSheet')
+  if (sheet.kind !== 'polygonSheet') {
+    throw new Error('Expected added sheet to be a polygon sheet.')
+  }
+  assert.deepEqual(sheet.vertices, vertices)
+  assert.equal(sheet.name.length > 0, true)
+  assert.equal(sheet.style.kind, 'sheetStyle')
+  assert.equal(validateDiagram(updated).valid, true)
+})
+
+test('addPolygonSheetStratumWithResult returns the updated diagram and created id atomically', () => {
+  const diagram = {
+    ...threeDimensionalExample,
+    strata: [
+      ...threeDimensionalExample.strata,
+      {
+        ...threeDimensionalExample.strata[0],
+        id: 'sheet-1',
+      },
+    ],
+  }
+  const result = addPolygonSheetStratumWithResult(diagram, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  ])
+
+  assert.equal(result.id, 'sheet-2')
+  assert.equal(
+    result.diagram.strata.some((stratum) => stratum.id === result.id),
+    true,
+  )
+})
+
+test('addPolygonSheetStratumWithResult safely rejects invalid sheet creation', () => {
+  const twoPointResult = addPolygonSheetStratumWithResult(threeDimensionalExample, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+  ])
+  const twoDimensionalResult = addPolygonSheetStratumWithResult(twoDimensionalExample, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  ])
+
+  assert.equal(twoPointResult.diagram, threeDimensionalExample)
+  assert.equal(twoPointResult.id, null)
+  assert.equal(twoDimensionalResult.diagram, twoDimensionalExample)
+  assert.equal(twoDimensionalResult.id, null)
+})
+
 test('addPolylineCurveStratum returns a new 2D diagram with codim 1 and z normalized', () => {
   const updated = addPolylineCurveStratum(
     twoDimensionalExample,
@@ -853,6 +932,30 @@ test('generated TikZ includes newly added cubic Bezier curve', () => {
   )
   assert.equal(tikz.includes('(1,2)'), true)
   assert.equal(tikz.includes('(3,2)'), true)
+})
+
+test('generated TikZ includes newly added polygon sheet as a closed polygon', () => {
+  const updated = addPolygonSheetStratum(
+    threeDimensionalExample,
+    [
+      { x: 0, y: 0, z: 2 },
+      { x: 1, y: 0, z: 2 },
+      { x: 1.5, y: 0.75, z: 2 },
+      { x: 0.5, y: 1.5, z: 2 },
+      { x: -0.25, y: 0.75, z: 2 },
+    ],
+    { id: 'sheet-1' },
+  )
+  const tikz = generateTikz(updated)
+
+  assert.equal(tikz.includes('\\coordinate (sheetPolysheet10'), true)
+  assert.equal(tikz.includes('\\coordinate (sheetPolysheet14'), true)
+  assert.equal(
+    tikz.includes(
+      '(sheetPolysheet10) -- (sheetPolysheet11) -- (sheetPolysheet12) -- (sheetPolysheet13) -- (sheetPolysheet14) -- cycle;',
+    ),
+    true,
+  )
 })
 
 test('updateStratumStyleById updates curve style immutably', () => {

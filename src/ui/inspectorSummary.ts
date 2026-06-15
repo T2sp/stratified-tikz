@@ -10,6 +10,7 @@ import type {
   TextLabel,
   Vec3,
 } from '../model/types'
+import { sheetVertices } from '../model/sheets.ts'
 import { findSelectedElement, type SelectedElement } from './selection.ts'
 
 export type InspectorField = {
@@ -127,9 +128,9 @@ function createSheetGeometrySection(
 ): InspectorSection {
   return {
     title: 'Geometry',
-    fields: sheet.corners.map((corner, index) => ({
-      label: `Corner ${index + 1}`,
-      value: formatVec3(corner, ambientDimension),
+    fields: sheetVertices(sheet).map((vertex, index) => ({
+      label: `${sheet.kind === 'quadSheet' ? 'Corner' : 'Vertex'} ${index + 1}`,
+      value: formatVec3(vertex, ambientDimension),
     })),
   }
 }

@@ -10,6 +10,7 @@ import type {
   Vec2,
   Vec3,
 } from '../model/types'
+import { sheetVertices } from '../model/sheets.ts'
 import type { SelectedElement } from '../ui/selection'
 import { resolveSvgCamera } from './svgCamera'
 import {
@@ -34,6 +35,7 @@ export type SvgDiagramProps = {
   selectedElement?: SelectedElement
   polylineDraft?: Vec3[]
   cubicBezierDraft?: Vec3[]
+  sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
@@ -67,12 +69,14 @@ export function SvgDiagram({
   selectedElement = null,
   polylineDraft,
   cubicBezierDraft,
+  sheetDraft,
   workPlanePreview,
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
   const extraPointsForFit = [
     ...(workPlanePreview?.corners ?? []),
+    ...(sheetDraft ?? []),
     ...(polylineDraft ?? []),
     ...(cubicBezierDraft ?? []),
   ]
@@ -110,6 +114,7 @@ export function SvgDiagram({
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
       {renderWorkPlanePreview(workPlanePreview, camera, height)}
       <g>{items.map((item) => item.element)}</g>
+      {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
     </svg>
@@ -146,8 +151,8 @@ function renderSheet(
   selectedElement: SelectedElement,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
-  const points = sheet.corners.map((corner) =>
-    projectToSvgPoint(camera, corner, viewportHeight),
+  const points = sheetVertices(sheet).map((vertex) =>
+    projectToSvgPoint(camera, vertex, viewportHeight),
   )
   const isSelected = isSelectedStratum(selectedElement, sheet.id)
 
@@ -460,6 +465,64 @@ function renderWorkPlanePreview(
           {preview.label}
         </text>
       )}
+    </g>
+  )
+}
+
+function renderSheetDraft(
+  draft: Vec3[] | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (draft === undefined || draft.length === 0) {
+    return null
+  }
+
+  const points = draft.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const boundaryData = polylineToSvgPath(points)
+
+  return (
+    <g key="sheet-draft-preview" pointerEvents="none" aria-hidden="true">
+      {points.length >= 3 && (
+        <polygon
+          points={svgPointList(points)}
+          fill="#10B981"
+          fillOpacity={0.16}
+          stroke="#047857"
+          strokeOpacity={0.9}
+          strokeWidth={2}
+          strokeDasharray="9 4"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {points.length === 2 && (
+        <path
+          d={boundaryData}
+          fill="none"
+          stroke="#047857"
+          strokeOpacity={0.9}
+          strokeWidth={2}
+          strokeDasharray="9 4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {points.map((point, index) => (
+        <circle
+          key={`sheet-draft-vertex-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={4.3}
+          fill="#ffffff"
+          stroke="#047857"
+          strokeOpacity={0.95}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
     </g>
   )
 }

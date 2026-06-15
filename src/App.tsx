@@ -21,6 +21,7 @@ import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
   addCubicBezierCurveStratumWithResult,
+  addPolygonSheetStratumWithResult,
   addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
   addTextLabelWithResult,
@@ -41,12 +42,16 @@ type PolylineDraft = {
 type CubicBezierDraft = {
   points: Vec3[]
 } | null
+type SheetPolygonDraft = {
+  points: Vec3[]
+} | null
 
 type EditableEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
+  sheetPolygonDraft: SheetPolygonDraft
 }
 
 type ExampleOption = {
@@ -78,6 +83,7 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createLabel', label: 'Add label' },
   { id: 'createPolyline', label: 'Add polyline' },
   { id: 'createCubicBezier', label: 'Add cubic Bezier' },
+  { id: 'createSheet', label: 'Add sheet' },
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
@@ -88,6 +94,7 @@ function App() {
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
+  const [sheetStatus, setSheetStatus] = useState<string>('')
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -98,9 +105,15 @@ function App() {
     selectedElement: null,
     polylineDraft: null,
     cubicBezierDraft: null,
+    sheetPolygonDraft: null,
   }))
-  const { editableDiagram, selectedElement, polylineDraft, cubicBezierDraft } =
-    editorState
+  const {
+    editableDiagram,
+    selectedElement,
+    polylineDraft,
+    cubicBezierDraft,
+    sheetPolygonDraft,
+  } = editorState
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -138,15 +151,20 @@ function App() {
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
+    if (nextDiagram.ambientDimension === 2 && creationTool === 'createSheet') {
+      setCreationTool('select')
+    }
     setEditorState((current) => ({
       editableDiagram: nextDiagram,
       selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
       polylineDraft: null,
       cubicBezierDraft: null,
+      sheetPolygonDraft: null,
     }))
     setCopyStatus('idle')
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setSheetStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -170,20 +188,35 @@ function App() {
   }
 
   function updateCreationTool(tool: CreationTool): void {
+    if (
+      tool === 'createSheet' &&
+      editorState.editableDiagram.ambientDimension !== 3
+    ) {
+      return
+    }
+
     setCreationTool(tool)
 
-    if (tool !== 'createPolyline' && tool !== 'createCubicBezier') {
+    if (
+      tool !== 'createPolyline' &&
+      tool !== 'createCubicBezier' &&
+      tool !== 'createSheet'
+    ) {
       setEditorState((current) =>
-        current.polylineDraft === null && current.cubicBezierDraft === null
+        current.polylineDraft === null &&
+        current.cubicBezierDraft === null &&
+        current.sheetPolygonDraft === null
           ? current
           : {
               ...current,
               polylineDraft: null,
               cubicBezierDraft: null,
+              sheetPolygonDraft: null,
             },
       )
       setPolylineStatus('')
       setCubicBezierStatus('')
+      setSheetStatus('')
       return
     }
 
@@ -192,6 +225,8 @@ function App() {
       polylineDraft: tool === 'createPolyline' ? current.polylineDraft : null,
       cubicBezierDraft:
         tool === 'createCubicBezier' ? current.cubicBezierDraft : null,
+      sheetPolygonDraft:
+        tool === 'createSheet' ? current.sheetPolygonDraft : null,
     }))
     setPolylineStatus(
       tool === 'createPolyline' ? 'Click the preview to add vertices.' : '',
@@ -200,6 +235,9 @@ function App() {
       tool === 'createCubicBezier'
         ? 'Click Start, Control 1, Control 2, then End.'
         : '',
+    )
+    setSheetStatus(
+      tool === 'createSheet' ? 'Click the preview to add sheet vertices.' : '',
     )
   }
 
@@ -227,6 +265,12 @@ function App() {
       )
     }
 
+    if (creationTool === 'createSheet') {
+      setSheetStatus(
+        `${(sheetPolygonDraft?.points.length ?? 0) + 1} sheet vertices in draft.`,
+      )
+    }
+
     setEditorState((current) => {
       const modelPoint = normalizePointForAmbientDimension(
         current.editableDiagram.ambientDimension,
@@ -246,6 +290,7 @@ function App() {
             points: [...draftPoints, modelPoint],
           },
           cubicBezierDraft: null,
+          sheetPolygonDraft: null,
         }
       }
 
@@ -260,6 +305,7 @@ function App() {
             cubicBezierDraft: {
               points: nextPoints,
             },
+            sheetPolygonDraft: null,
           }
         }
 
@@ -272,6 +318,7 @@ function App() {
           return {
             ...current,
             cubicBezierDraft: null,
+            sheetPolygonDraft: null,
           }
         }
 
@@ -280,6 +327,24 @@ function App() {
           selectedElement: { kind: 'stratum', id: result.id },
           polylineDraft: null,
           cubicBezierDraft: null,
+          sheetPolygonDraft: null,
+        }
+      }
+
+      if (creationTool === 'createSheet') {
+        if (current.editableDiagram.ambientDimension !== 3) {
+          return current
+        }
+
+        const draftPoints = current.sheetPolygonDraft?.points ?? []
+
+        return {
+          ...current,
+          polylineDraft: null,
+          cubicBezierDraft: null,
+          sheetPolygonDraft: {
+            points: [...draftPoints, modelPoint],
+          },
         }
       }
 
@@ -291,6 +356,7 @@ function App() {
           selectedElement: { kind: 'stratum', id: result.id },
           polylineDraft: null,
           cubicBezierDraft: null,
+          sheetPolygonDraft: null,
         }
       }
 
@@ -301,6 +367,7 @@ function App() {
         selectedElement: { kind: 'label', id: result.id },
         polylineDraft: null,
         cubicBezierDraft: null,
+        sheetPolygonDraft: null,
       }
     })
 
@@ -333,6 +400,7 @@ function App() {
       selectedElement: { kind: 'stratum', id: createdId },
       polylineDraft: null,
       cubicBezierDraft: null,
+      sheetPolygonDraft: null,
     }))
     setPolylineStatus('Polyline created.')
     setCopyStatus('idle')
@@ -360,6 +428,48 @@ function App() {
           },
     )
     setCubicBezierStatus('Cubic Bezier canceled.')
+  }
+
+  function finishSheetDraft(): void {
+    if (sheetPolygonDraft === null || sheetPolygonDraft.points.length < 3) {
+      setSheetStatus('A sheet needs at least 3 vertices.')
+      return
+    }
+
+    const result = addPolygonSheetStratumWithResult(
+      editableDiagram,
+      sheetPolygonDraft.points,
+    )
+
+    if (result.id === null) {
+      setSheetStatus('A 3D sheet needs at least 3 vertices.')
+      return
+    }
+
+    const createdId = result.id
+
+    setEditorState((current) => ({
+      ...current,
+      editableDiagram: result.diagram,
+      selectedElement: { kind: 'stratum', id: createdId },
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      sheetPolygonDraft: null,
+    }))
+    setSheetStatus('Sheet created.')
+    setCopyStatus('idle')
+  }
+
+  function cancelSheetDraft(): void {
+    setEditorState((current) =>
+      current.sheetPolygonDraft === null
+        ? current
+        : {
+            ...current,
+            sheetPolygonDraft: null,
+          },
+    )
+    setSheetStatus('Sheet canceled.')
   }
 
   function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
@@ -440,17 +550,22 @@ function App() {
         <div className="control-group">
           <span className="control-label">Tool</span>
           <div className="segmented-control">
-            {creationTools.map((tool) => (
-              <button
-                key={tool.id}
-                type="button"
-                className={creationTool === tool.id ? 'is-selected' : undefined}
-                aria-pressed={creationTool === tool.id}
-                onClick={() => updateCreationTool(tool.id)}
-              >
-                {tool.label}
-              </button>
-            ))}
+            {creationTools
+              .filter(
+                (tool) =>
+                  tool.id !== 'createSheet' || editableDiagram.ambientDimension === 3,
+              )
+              .map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={creationTool === tool.id ? 'is-selected' : undefined}
+                  aria-pressed={creationTool === tool.id}
+                  onClick={() => updateCreationTool(tool.id)}
+                >
+                  {tool.label}
+                </button>
+              ))}
           </div>
         </div>
 
@@ -489,6 +604,29 @@ function App() {
             </button>
             <span className="toolbar-status" role="status">
               {cubicBezierStatus}
+            </span>
+          </div>
+        )}
+
+        {creationTool === 'createSheet' && editableDiagram.ambientDimension === 3 && (
+          <div className="control-group polyline-draft-control">
+            <span className="control-label">Sheet</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={finishSheetDraft}
+            >
+              Finish sheet
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={cancelSheetDraft}
+            >
+              Cancel sheet
+            </button>
+            <span className="toolbar-status" role="status">
+              {sheetStatus}
             </span>
           </div>
         )}
@@ -555,6 +693,7 @@ function App() {
             selectedElement={selectedElement}
             polylineDraft={polylineDraft?.points}
             cubicBezierDraft={cubicBezierDraft?.points}
+            sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined

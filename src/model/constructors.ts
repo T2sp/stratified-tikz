@@ -26,6 +26,7 @@ import type {
   LabelStyle,
   PointStratum,
   PointStyle,
+  QuadSheetStratum,
   RegionStratum,
   RegionStyle,
   SheetStratum,
@@ -194,19 +195,18 @@ export function createSheetStratum({
   corners,
   layer = 0,
 }: CreateSheetStratumInput): SheetStratum {
-  return withOptionalLabel(
-    {
-      id,
-      codim: 1,
-      geometricKind: 'sheet',
-      kind: 'quadSheet',
-      name,
-      style: cloneSheetStyle(style),
-      corners: corners.map(cloneVec3) as [Vec3, Vec3, Vec3, Vec3],
-      layer,
-    },
-    label,
-  )
+  const sheet: Omit<QuadSheetStratum, 'label'> = {
+    id,
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'quadSheet',
+    name,
+    style: cloneSheetStyle(style),
+    corners: corners.map(cloneVec3) as [Vec3, Vec3, Vec3, Vec3],
+    layer,
+  }
+
+  return withOptionalLabel(sheet, label)
 }
 
 export function createCurveStratum({

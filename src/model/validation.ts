@@ -7,6 +7,7 @@ import {
   isPointShape,
   isPositiveFiniteNumber,
 } from './styles.ts'
+import { sheetVertices } from './sheets.ts'
 import type {
   Camera,
   CurveStratum,
@@ -150,16 +151,28 @@ function validateSheetStratum(
     pushError(errors, `${path}.codim`, 'Sheets must have codimension 1.')
   }
 
-  if (stratum.kind !== 'quadSheet') {
-    pushError(errors, `${path}.kind`, 'Sheet kind must be quadSheet.')
+  if (stratum.kind !== 'quadSheet' && stratum.kind !== 'polygonSheet') {
+    pushError(errors, `${path}.kind`, 'Sheet kind must be quadSheet or polygonSheet.')
+  }
+
+  if (stratum.kind === 'quadSheet' && stratum.corners.length !== 4) {
+    pushError(errors, `${path}.corners`, 'Quad sheets must have exactly four corners.')
+  }
+
+  if (stratum.kind === 'polygonSheet' && stratum.vertices.length < 3) {
+    pushError(
+      errors,
+      `${path}.vertices`,
+      'Polygon sheets must have at least three vertices.',
+    )
   }
 
   validateSheetStyle(stratum.style, `${path}.style`, errors)
-  stratum.corners.forEach((corner, index) => {
+  sheetVertices(stratum).forEach((vertex, index) => {
     validateVec3ForAmbient(
-      corner,
+      vertex,
       ambientDimension,
-      `${path}.corners[${index}]`,
+      `${path}.${stratum.kind === 'quadSheet' ? 'corners' : 'vertices'}[${index}]`,
       errors,
     )
   })

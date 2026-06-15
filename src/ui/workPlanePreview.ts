@@ -6,6 +6,7 @@ export type WorkPlanePreviewTool =
   | 'createLabel'
   | 'createPolyline'
   | 'createCubicBezier'
+  | 'createSheet'
 
 export function shouldShowWorkPlanePreview(
   ambientDimension: AmbientDimension,
@@ -17,6 +18,7 @@ export function shouldShowWorkPlanePreview(
     case 'createLabel':
     case 'createPolyline':
     case 'createCubicBezier':
+    case 'createSheet':
       return ambientDimension === 3
   }
 }

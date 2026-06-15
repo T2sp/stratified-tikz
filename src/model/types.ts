@@ -137,17 +137,27 @@ export type RegionStratum = {
   layer: number
 }
 
-export type SheetStratum = {
+type SheetStratumBase = {
   id: string
   codim: 1
   geometricKind: 'sheet'
-  kind: 'quadSheet'
   name: string
   label?: string
   style: SheetStyle
-  corners: [Vec3, Vec3, Vec3, Vec3]
   layer: number
 }
+
+export type QuadSheetStratum = SheetStratumBase & {
+  kind: 'quadSheet'
+  corners: [Vec3, Vec3, Vec3, Vec3]
+}
+
+export type PolygonSheetStratum = SheetStratumBase & {
+  kind: 'polygonSheet'
+  vertices: Vec3[]
+}
+
+export type SheetStratum = QuadSheetStratum | PolygonSheetStratum
 
 export type CurveKind = 'polyline' | 'cubicBezier'
 

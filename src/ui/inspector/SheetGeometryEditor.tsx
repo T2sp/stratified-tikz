@@ -1,4 +1,5 @@
 import type { Diagram, SheetStratum } from '../../model/types.ts'
+import { sheetVertices, updateSheetVertex } from '../../model/sheets.ts'
 import {
   updateStratumById,
   updateVec3Coordinate,
@@ -23,11 +24,11 @@ export function SheetGeometryEditor({
     <section className="inspector-section">
       <h3>Geometry</h3>
       <div className="inspector-form">
-        {sheet.corners.map((corner, cornerIndex) => (
+        {sheetVertices(sheet).map((vertex, vertexIndex) => (
           <CoordinateEditor
-            key={`corner-${cornerIndex}`}
-            label={`Corner ${cornerIndex + 1}`}
-            point={corner}
+            key={`sheet-vertex-${vertexIndex}`}
+            label={`${sheet.kind === 'quadSheet' ? 'Corner' : 'Vertex'} ${vertexIndex + 1}`}
+            point={vertex}
             ambientDimension={diagram.ambientDimension}
             onCoordinateChange={(axis, value) =>
               onDiagramChange((currentDiagram) =>
@@ -36,18 +37,14 @@ export function SheetGeometryEditor({
                     return current
                   }
 
-                  const corners = current.corners.map((currentCorner, index) =>
-                    index === cornerIndex
-                      ? updateVec3Coordinate(
-                          currentCorner,
-                          axis,
-                          value,
-                          currentDiagram.ambientDimension,
-                        )
-                      : currentCorner,
-                  ) as SheetStratum['corners']
-
-                  return { ...current, corners }
+                  return updateSheetVertex(current, vertexIndex, (currentVertex) =>
+                    updateVec3Coordinate(
+                      currentVertex,
+                      axis,
+                      value,
+                      currentDiagram.ambientDimension,
+                    ),
+                  )
                 }),
               )
             }

@@ -3,9 +3,11 @@ import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
+  cloneSheetStyle,
   defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
+  defaultSheetStyle,
 } from '../model/styles.ts'
 import type {
   AmbientDimension,
@@ -13,6 +15,7 @@ import type {
   Diagram,
   LabelStyle,
   PointStratum,
+  PolygonSheetStratum,
   Stratum,
   StratumStyle,
   TextLabel,
@@ -130,6 +133,12 @@ export type AddCubicBezierCurveStratumOptions = {
   layer?: number
 }
 
+export type AddPolygonSheetStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+}
+
 export type AddPointStratumResult = {
   diagram: Diagram
   id: string
@@ -146,6 +155,11 @@ export type AddPolylineCurveStratumResult = {
 }
 
 export type AddCubicBezierCurveStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
+export type AddPolygonSheetStratumResult = {
   diagram: Diagram
   id: string | null
 }
@@ -274,6 +288,37 @@ export function addCubicBezierCurveStratumWithResult(
   }
 }
 
+export function addPolygonSheetStratum(
+  diagram: Diagram,
+  vertices: Vec3[],
+  options: AddPolygonSheetStratumOptions = {},
+): Diagram {
+  return addPolygonSheetStratumWithResult(diagram, vertices, options).diagram
+}
+
+export function addPolygonSheetStratumWithResult(
+  diagram: Diagram,
+  vertices: Vec3[],
+  options: AddPolygonSheetStratumOptions = {},
+): AddPolygonSheetStratumResult {
+  if (diagram.ambientDimension !== 3 || vertices.length < 3) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const sheet = createPolygonSheetForDiagram(diagram, vertices, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, sheet],
+    },
+    id: sheet.id,
+  }
+}
+
 export function updateStratumNameById(
   diagram: Diagram,
   id: string,
@@ -363,6 +408,25 @@ function createCubicBezierCurveForDiagram(
       normalizePointForAmbientDimension(diagram.ambientDimension, point),
     ),
     styleSegments: [],
+    layer: options.layer ?? nextLayer(diagram),
+  }
+}
+
+function createPolygonSheetForDiagram(
+  diagram: Diagram,
+  vertices: Vec3[],
+  options: AddPolygonSheetStratumOptions,
+): PolygonSheetStratum {
+  return {
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: safeOptionalId(diagram, options.id, 'sheet'),
+    name: safeOptionalName(options.name, 'Sheet'),
+    style: cloneSheetStyle(defaultSheetStyle),
+    vertices: vertices.map((vertex) =>
+      normalizePointForAmbientDimension(diagram.ambientDimension, vertex),
+    ),
     layer: options.layer ?? nextLayer(diagram),
   }
 }
