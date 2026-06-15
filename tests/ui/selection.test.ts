@@ -913,7 +913,7 @@ test('generated TikZ includes newly added point and label', () => {
   )
   const tikz = generateTikz(withLabel)
 
-  assert.equal(tikz.includes('\\coordinate (pointpoint1'), true)
+  assert.equal(tikz.includes('\\coordinate (pointPoint4p0'), true)
   assert.equal(tikz.includes('New label'), true)
   assert.equal(tikz.includes('(5,6)'), true)
 })
@@ -929,7 +929,7 @@ test('generated TikZ includes newly added polyline curve', () => {
   )
   const tikz = generateTikz(updated)
 
-  assert.equal(tikz.includes('\\coordinate (curvePolycurve1'), true)
+  assert.equal(tikz.includes('\\coordinate (curvePolyCurve3p0'), true)
   assert.equal(tikz.includes('(7,8)'), true)
   assert.equal(tikz.includes('(9,10)'), true)
   assert.equal(tikz.includes('\\draw['), true)
@@ -948,9 +948,9 @@ test('generated TikZ includes newly added cubic Bezier curve', () => {
   )
   const tikz = generateTikz(updated)
 
-  assert.equal(tikz.includes('\\coordinate (curveBeziercurve1'), true)
+  assert.equal(tikz.includes('\\coordinate (curveBezierCubicBezier3p0'), true)
   assert.equal(
-    tikz.includes('(curveBeziercurve10) .. controls (curveBeziercurve11) and (curveBeziercurve12) .. (curveBeziercurve13);'),
+    tikz.includes('(curveBezierCubicBezier3p0) .. controls (curveBezierCubicBezier3p1) and (curveBezierCubicBezier3p2) .. (curveBezierCubicBezier3p3);'),
     true,
   )
   assert.equal(tikz.includes('(1,2)'), true)
@@ -971,11 +971,11 @@ test('generated TikZ includes newly added polygon sheet as a closed polygon', ()
   )
   const tikz = generateTikz(updated)
 
-  assert.equal(tikz.includes('\\coordinate (sheetPolysheet10'), true)
-  assert.equal(tikz.includes('\\coordinate (sheetPolysheet14'), true)
+  assert.equal(tikz.includes('\\coordinate (sheetPolySheet2p0'), true)
+  assert.equal(tikz.includes('\\coordinate (sheetPolySheet2p4'), true)
   assert.equal(
     tikz.includes(
-      '(sheetPolysheet10) -- (sheetPolysheet11) -- (sheetPolysheet12) -- (sheetPolysheet13) -- (sheetPolysheet14) -- cycle;',
+      '(sheetPolySheet2p0) -- (sheetPolySheet2p1) -- (sheetPolySheet2p2) -- (sheetPolySheet2p3) -- (sheetPolySheet2p4) -- cycle;',
     ),
     true,
   )

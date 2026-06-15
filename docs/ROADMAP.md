@@ -188,6 +188,8 @@ This should be done before more advanced geometry features, because later phases
 
 ### Phase 9A: User-controlled coordinate-name stems
 
+Status: implemented
+
 Current issue:
 
 Generated TikZ coordinate names use patterns such as:

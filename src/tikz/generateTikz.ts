@@ -51,13 +51,13 @@ export function generateTikz2D(diagram: Diagram): string {
       (stratum): stratum is CurveStratum =>
         stratum.geometricKind === 'curve' && stratum.codim === 1,
     ),
-  ).flatMap((curve) => emitCurve(curve, context))
+  ).flatMap((curve, index) => emitCurve(curve, index, context))
   const points = sortByLayer(
     diagram.strata.filter(
       (stratum): stratum is PointStratum =>
         stratum.geometricKind === 'point' && stratum.codim === 2,
     ),
-  ).flatMap((point) => emitPoint(point, context))
+  ).flatMap((point, index) => emitPoint(point, index, context))
   const labels = sortByLayer(diagram.labels).flatMap((label) =>
     emitLabel(label, context),
   )
@@ -80,19 +80,19 @@ export function generateTikz3D(diagram: Diagram): string {
       (stratum): stratum is SheetStratum =>
         stratum.geometricKind === 'sheet' && stratum.codim === 1,
     ),
-  ).flatMap((sheet) => emitSheet(sheet, context))
+  ).flatMap((sheet, index) => emitSheet(sheet, index, context))
   const curves = sortByLayer(
     diagram.strata.filter(
       (stratum): stratum is CurveStratum =>
         stratum.geometricKind === 'curve' && stratum.codim === 2,
     ),
-  ).flatMap((curve) => emitCurve(curve, context))
+  ).flatMap((curve, index) => emitCurve(curve, index, context))
   const points = sortByLayer(
     diagram.strata.filter(
       (stratum): stratum is PointStratum =>
         stratum.geometricKind === 'point' && stratum.codim === 3,
     ),
-  ).flatMap((point) => emitPoint(point, context))
+  ).flatMap((point, index) => emitPoint(point, index, context))
   const labels = sortByLayer(diagram.labels).flatMap((label) =>
     emitLabel(label, context),
   )
@@ -120,6 +120,14 @@ export function lineStyleToTikzOption(lineStyle: LineStyle): string | null {
     case 'denselyDotted':
       return 'densely dotted'
   }
+}
+
+export function sanitizeTikzNameStem(name: string, fallback: string): string {
+  const fallbackStem = sanitizeTikzNameStemPart(fallback) || 'coord'
+  const stem = sanitizeTikzNameStemPart(name)
+  const safeStem = stem.length === 0 ? fallbackStem : stem
+
+  return /^[a-zA-Z]/.test(safeStem) ? safeStem : `${fallbackStem}${safeStem}`
 }
 
 function createContext(mode: TikzMode): GenerateContext {
@@ -188,7 +196,11 @@ function emitCoordinateDefinitions(context: GenerateContext): string[] {
   )
 }
 
-function emitSheet(sheet: SheetStratum, context: GenerateContext): string[] {
+function emitSheet(
+  sheet: SheetStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
   const fillColor = context.colors.define(
     `Sheet${sheet.id}Fill`,
     sheet.style.fillColor,
@@ -198,7 +210,11 @@ function emitSheet(sheet: SheetStratum, context: GenerateContext): string[] {
     sheet.style.strokeColor,
   )
   const coordinates = sheetVertices(sheet).map((vertex, index) =>
-    context.coordinates.define(sheetCoordinateBaseName(sheet), index, vertex),
+    context.coordinates.define(
+      sheetCoordinateBaseName(sheet, elementIndex),
+      index,
+      vertex,
+    ),
   )
 
   return [
@@ -213,19 +229,32 @@ function emitSheet(sheet: SheetStratum, context: GenerateContext): string[] {
   ]
 }
 
-function sheetCoordinateBaseName(sheet: SheetStratum): string {
+function sheetCoordinateBaseName(
+  sheet: SheetStratum,
+  elementIndex: number,
+): string {
+  const stem = sanitizeTikzNameStem(sheet.name, 'sheet')
+
   return sheet.kind === 'polygonSheet'
-    ? `sheetPoly${sheet.id}`
-    : `sheet${sheet.id}`
+    ? `sheetPoly${stem}${elementIndex}`
+    : `sheetQuad${stem}${elementIndex}`
 }
 
-function emitCurve(curve: CurveStratum, context: GenerateContext): string[] {
+function emitCurve(
+  curve: CurveStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
   const strokeColor = context.colors.define(
     `Curve${curve.id}Stroke`,
     curve.style.strokeColor,
   )
   const coordinates = curve.points.map((point, index) =>
-    context.coordinates.define(curveCoordinateBaseName(curve), index, point),
+    context.coordinates.define(
+      curveCoordinateBaseName(curve, elementIndex),
+      index,
+      point,
+    ),
   )
   const lineStyleOption = lineStyleToTikzOption(curve.style.lineStyle)
   const options = [
@@ -244,16 +273,25 @@ function emitCurve(curve: CurveStratum, context: GenerateContext): string[] {
   ]
 }
 
-function curveCoordinateBaseName(curve: CurveStratum): string {
+function curveCoordinateBaseName(
+  curve: CurveStratum,
+  elementIndex: number,
+): string {
+  const stem = sanitizeTikzNameStem(curve.name, 'curve')
+
   return curve.kind === 'cubicBezier'
-    ? `curveBezier${curve.id}`
-    : `curvePoly${curve.id}`
+    ? `curveBezier${stem}${elementIndex}`
+    : `curvePoly${stem}${elementIndex}`
 }
 
-function emitPoint(point: PointStratum, context: GenerateContext): string[] {
+function emitPoint(
+  point: PointStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
   const pointColor = context.colors.define(`Point${point.id}`, point.style.color)
   const coordinate = context.coordinates.define(
-    `point${point.id}`,
+    pointCoordinateBaseName(point, elementIndex),
     0,
     point.position,
   )
@@ -271,6 +309,13 @@ function emitPoint(point: PointStratum, context: GenerateContext): string[] {
     `] at (${coordinate}) {};`,
     '',
   ]
+}
+
+function pointCoordinateBaseName(
+  point: PointStratum,
+  elementIndex: number,
+): string {
+  return `point${sanitizeTikzNameStem(point.name, 'point')}${elementIndex}`
 }
 
 function emitLabel(label: TextLabel, context: GenerateContext): string[] {
@@ -438,7 +483,7 @@ class CoordinateRegistry {
   private readonly usedNames = new Set<string>()
 
   define(baseName: string, index: number, position: Vec3): string {
-    const base = toIdentifierPart(`${baseName}${index}`, 'p')
+    const base = toIdentifierPart(`${baseName}p${index}`, 'p')
     const name = this.uniqueName(base)
 
     this.definitions.push({ name, position })
@@ -461,6 +506,28 @@ class CoordinateRegistry {
     this.usedNames.add(name)
     return name
   }
+}
+
+function sanitizeTikzNameStemPart(value: string): string {
+  let result = ''
+  let capitalizeNext = false
+
+  for (const character of value.trim()) {
+    if (/^[a-zA-Z0-9]$/.test(character)) {
+      result +=
+        capitalizeNext && /^[a-z]$/.test(character)
+          ? character.toUpperCase()
+          : character
+      capitalizeNext = false
+      continue
+    }
+
+    if (result.length > 0) {
+      capitalizeNext = true
+    }
+  }
+
+  return result
 }
 
 function toIdentifierPart(value: string, fallback: string): string {

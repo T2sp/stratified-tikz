@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { generateTikz } from '../../src/tikz/index.ts'
+import {
+  generateTikz,
+  sanitizeTikzNameStem,
+} from '../../src/tikz/index.ts'
 import type {
   CurveStyle,
   Diagram,
@@ -12,8 +15,8 @@ import type {
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
 
-  assert.match(tikz, /\\coordinate \(curvePolywire0\) at \(0,0\);/)
-  assert.match(tikz, /\\coordinate \(curvePolywire1\) at \(1,2\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p1\) at \(1,2\);/)
   assert.doesNotMatch(tikz, /\(0,0,0\)/)
 })
 
@@ -23,7 +26,7 @@ test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
   assert.match(tikz, /x=\{\(1cm,0cm\)\}/)
   assert.match(tikz, /y=\{\(0\.45cm,0\.25cm\)\}/)
   assert.match(tikz, /z=\{\(0cm,1cm\)\}/)
-  assert.match(tikz, /\\coordinate \(curvePolyline0\) at \(0,0,1\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
 })
 
 test('2D output has codim 1 curves and codim 2 points', () => {
@@ -179,18 +182,169 @@ test('hollow points are emitted with white fill', () => {
 test('curve coordinate names distinguish polyline and cubic Bezier curves', () => {
   const tikz = generateTikz(createCurveNamingDiagram())
 
-  assert.match(tikz, /\\coordinate \(curvePolywire0\) at \(0,0\);/)
-  assert.match(tikz, /\\coordinate \(curvePolywire1\) at \(1,0\);/)
-  assert.match(tikz, /\\coordinate \(curveBezierarc0\) at \(0,1\);/)
-  assert.match(tikz, /\\coordinate \(curveBezierarc1\) at \(1,2\);/)
-  assert.match(tikz, /\\coordinate \(curveBezierarc2\) at \(2,2\);/)
-  assert.match(tikz, /\\coordinate \(curveBezierarc3\) at \(3,1\);/)
-  assert.match(tikz, /\(curvePolywire0\) -- \(curvePolywire1\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p1\) at \(1,0\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p0\) at \(0,1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p1\) at \(1,2\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p2\) at \(2,2\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p3\) at \(3,1\);/)
+  assert.match(tikz, /\(curvePolyWire0p0\) -- \(curvePolyWire0p1\);/)
   assert.match(
     tikz,
-    /\(curveBezierarc0\) \.\. controls \(curveBezierarc1\) and \(curveBezierarc2\) \.\. \(curveBezierarc3\);/,
+    /\(curveBezierArc1p0\) \.\. controls \(curveBezierArc1p1\) and \(curveBezierArc1p2\) \.\. \(curveBezierArc1p3\);/,
   )
   assert.doesNotMatch(tikz, /curvecurve/)
+})
+
+test('TikZ name stem sanitizer keeps readable safe names', () => {
+  assert.equal(sanitizeTikzNameStem('Particle', 'point'), 'Particle')
+  assert.equal(sanitizeTikzNameStem('F line', 'curve'), 'FLine')
+  assert.equal(sanitizeTikzNameStem('alpha-beta', 'curve'), 'alphaBeta')
+  assert.equal(sanitizeTikzNameStem('$F$', 'curve'), 'F')
+})
+
+test('TikZ name stem sanitizer falls back for blank or unsafe names', () => {
+  assert.equal(sanitizeTikzNameStem('  ', 'sheet'), 'sheet')
+  assert.equal(sanitizeTikzNameStem('\\{$%#&_ ^~}', 'curve'), 'curve')
+  assert.equal(sanitizeTikzNameStem('123', 'point'), 'point123')
+})
+
+test('coordinate names include sanitized point, curve, and sheet names', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      id: 'surface',
+      name: 'Surface layer',
+      style: sheetStyle(),
+      vertices: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      layer: 0,
+    },
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'boundary',
+      name: 'Boundary wire',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 1,
+    },
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'cubicBezier',
+      id: 'f-line',
+      name: 'F line',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 2, z: 0 },
+        { x: 2, y: 2, z: 0 },
+        { x: 3, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 2,
+    },
+    {
+      codim: 3,
+      geometricKind: 'point',
+      id: 'particle',
+      name: 'Particle $P$',
+      style: pointStyle(),
+      position: { x: 1, y: 1, z: 0 },
+      layer: 3,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(sheetPolySurfaceLayer0p0\) at \(0,0,0\);/)
+  assert.match(
+    tikz,
+    /\(sheetPolySurfaceLayer0p0\) -- \(sheetPolySurfaceLayer0p1\) -- \(sheetPolySurfaceLayer0p2\) -- cycle;/,
+  )
+  assert.match(tikz, /\\coordinate \(curvePolyBoundaryWire0p0\) at \(0,0,0\);/)
+  assert.match(tikz, /\(curvePolyBoundaryWire0p0\) -- \(curvePolyBoundaryWire0p1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierFLine1p0\) at \(0,1,0\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierFLine1p0\) \.\. controls \(curveBezierFLine1p1\) and \(curveBezierFLine1p2\) \.\. \(curveBezierFLine1p3\);/,
+  )
+  assert.match(tikz, /\\coordinate \(pointParticleP0p0\) at \(1,1,0\);/)
+  assert.match(tikz, /\] at \(pointParticleP0p0\) \{\};/)
+  assert.doesNotMatch(tikz, /curvePolycurve/)
+  assert.doesNotMatch(tikz, /curveBeziercurve/)
+  assert.doesNotMatch(tikz, /sheetPolysheet/)
+})
+
+test('same stratum names still produce unique coordinate names', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'first',
+      name: 'Boundary',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'second',
+      name: 'Boundary',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 1,
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(curvePolyBoundary0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyBoundary1p0\) at \(0,1\);/)
+  assert.equal(new Set(extractCoordinateNames(tikz)).size, 4)
+})
+
+test('changing a stratum name changes only generated coordinate names', () => {
+  const original = createTwoDimensionalDiagram()
+  const renamed: Diagram = {
+    ...original,
+    strata: original.strata.map((stratum) =>
+      stratum.id === 'wire' ? { ...stratum, name: 'Boundary' } : stratum,
+    ),
+  }
+  const originalTikz = generateTikz(original)
+  const renamedTikz = generateTikz(renamed)
+
+  assert.match(originalTikz, /curvePolyWire0p0/)
+  assert.match(renamedTikz, /curvePolyBoundary0p0/)
+  assert.equal(
+    normalizeGeneratedCoordinateNames(originalTikz),
+    normalizeGeneratedCoordinateNames(renamedTikz),
+  )
 })
 
 function assertIncludesSection(tikz: string, title: string): void {
@@ -199,6 +353,23 @@ function assertIncludesSection(tikz: string, title: string): void {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function extractCoordinateNames(tikz: string): string[] {
+  return [...tikz.matchAll(/\\coordinate \(([^)]+)\) at/g)].map(
+    (match) => match[1],
+  )
+}
+
+function normalizeGeneratedCoordinateNames(tikz: string): string {
+  const coordinateNames = extractCoordinateNames(tikz)
+  let normalized = tikz
+
+  coordinateNames.forEach((name, index) => {
+    normalized = normalized.replaceAll(name, `coord${index}`)
+  })
+
+  return normalized
 }
 
 function createCurveNamingDiagram(): Diagram {

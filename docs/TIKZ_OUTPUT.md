@@ -33,6 +33,34 @@ It must not care whether the coordinates were created by direct input or cursor 
 
 Coordinate input mode belongs to the editor state, not to the TikZ output.
 
+## Coordinate names
+
+Generated coordinate names use the current stratum name as a readable stem.
+The stem is sanitized for TikZ coordinate-name safety by keeping ASCII letters
+and digits, removing unsafe TeX characters, and folding separators such as
+spaces or hyphens into camel-case word boundaries. For example, `F line`
+becomes `FLine`.
+
+If a stratum name is blank or sanitizes to nothing, the generator falls back to
+a safe geometric default such as `point`, `curve`, or `sheet`. If a sanitized
+stem starts with a digit, the fallback is prefixed before the digit.
+
+Coordinate names remain deterministic and unique by combining the geometric
+prefix, optional concrete type, sanitized name stem, sorted element index, and
+coordinate index. Examples:
+
+```tex
+\coordinate (pointParticle0p0) at (0,0);
+\coordinate (curvePolyBoundary1p0) at (0,0);
+\coordinate (curvePolyBoundary1p1) at (1,0);
+\coordinate (curveBezierFLine2p0) at (0,1);
+\coordinate (sheetPolySurface0p0) at (0,0,0);
+```
+
+Free text labels are separate diagram objects. Their `name` fields do not
+create coordinate-name stems; labels are emitted directly as TikZ nodes at their
+stored model coordinates.
+
 ## 2D TikZ basis
 
 In 2D mode, use ordinary TikZ coordinates.
