@@ -34,12 +34,18 @@ export type SvgDiagramProps = {
   selectedElement?: SelectedElement
   polylineDraft?: Vec3[]
   cubicBezierDraft?: Vec3[]
+  workPlanePreview?: WorkPlanePreview
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
     svgPoint: Vec2,
     viewportHeight: number,
     camera: Diagram['camera'],
   ) => void
+}
+
+export type WorkPlanePreview = {
+  corners: [Vec3, Vec3, Vec3, Vec3]
+  label?: string
 }
 
 type RenderItem = {
@@ -61,13 +67,17 @@ export function SvgDiagram({
   selectedElement = null,
   polylineDraft,
   cubicBezierDraft,
+  workPlanePreview,
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
-  const extraPointsForFit = [...(polylineDraft ?? []), ...(cubicBezierDraft ?? [])]
+  const extraPointsForFit = [
+    ...(workPlanePreview?.corners ?? []),
+    ...(polylineDraft ?? []),
+    ...(cubicBezierDraft ?? []),
+  ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
-    // TODO: Future 3D work-plane previews can pass their cropped patch points here.
     extraPointsForFit,
   })
   const items = [
@@ -98,6 +108,7 @@ export function SvgDiagram({
       }}
     >
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
+      {renderWorkPlanePreview(workPlanePreview, camera, height)}
       <g>{items.map((item) => item.element)}</g>
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
@@ -388,6 +399,69 @@ function renderLabel(
       </g>
     ),
   }
+}
+
+function renderWorkPlanePreview(
+  preview: WorkPlanePreview | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (preview === undefined) {
+    return null
+  }
+
+  const corners = preview.corners.map((corner) =>
+    projectToSvgPoint(camera, corner, viewportHeight),
+  )
+  const labelPosition = corners[2]
+
+  return (
+    <g key="work-plane-preview" pointerEvents="none" aria-hidden="true">
+      <polygon
+        points={svgPointList(corners)}
+        fill="#4D9DE0"
+        fillOpacity={0.1}
+        stroke="#1D6FA5"
+        strokeOpacity={0.45}
+        strokeWidth={1.4}
+        strokeDasharray="6 4"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d={polylineToSvgPath([corners[0], corners[2]])}
+        fill="none"
+        stroke="#1D6FA5"
+        strokeOpacity={0.22}
+        strokeWidth={1}
+        strokeDasharray="3 5"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d={polylineToSvgPath([corners[1], corners[3]])}
+        fill="none"
+        stroke="#1D6FA5"
+        strokeOpacity={0.22}
+        strokeWidth={1}
+        strokeDasharray="3 5"
+        vectorEffect="non-scaling-stroke"
+      />
+      {preview.label !== undefined && (
+        <text
+          x={labelPosition.x}
+          y={labelPosition.y}
+          dx={8}
+          dy={-8}
+          fill="#1D6FA5"
+          opacity={0.72}
+          fontSize={11}
+          fontWeight={600}
+          dominantBaseline="middle"
+        >
+          {preview.label}
+        </text>
+      )}
+    </g>
+  )
 }
 
 function renderPolylineDraft(

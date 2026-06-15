@@ -5,9 +5,10 @@ import {
   twoDimensionalExample,
 } from './examples'
 import {
+  createWorkPlanePatch,
   normalizePointForAmbientDimension,
   screenToModelOnWorkPlane,
-} from './geometry/projection'
+} from './geometry'
 import type {
   Camera,
   CoordinateInputMode,
@@ -83,6 +84,13 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
+function shouldShowWorkPlanePreview(
+  ambientDimension: Diagram['ambientDimension'],
+  creationTool: CreationTool,
+): boolean {
+  return ambientDimension === 3 && creationTool !== 'select'
+}
+
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
   const [coordinateInputMode, setCoordinateInputMode] =
@@ -110,6 +118,16 @@ function App() {
     () => generateTikz(editableDiagram),
     [editableDiagram],
   )
+  const workPlanePreview = useMemo(() => {
+    if (!shouldShowWorkPlanePreview(editableDiagram.ambientDimension, creationTool)) {
+      return undefined
+    }
+
+    return {
+      ...createWorkPlanePatch(activeWorkPlane),
+      label: `${activeWorkPlane.kind} work plane`,
+    }
+  }, [activeWorkPlane, creationTool, editableDiagram.ambientDimension])
 
   async function copyTikz(): Promise<void> {
     try {
@@ -547,6 +565,7 @@ function App() {
             selectedElement={selectedElement}
             polylineDraft={polylineDraft?.points}
             cubicBezierDraft={cubicBezierDraft?.points}
+            workPlanePreview={workPlanePreview}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }
