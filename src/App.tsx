@@ -522,6 +522,26 @@ function App() {
       return
     }
 
+    const nextCubicBezierPointCount =
+      creationTool === 'createCubicBezier'
+        ? (cubicBezierDraft?.points.length ?? 0) + 1
+        : 0
+    const shouldCommitOnClick =
+      creationTool === 'createPoint' ||
+      creationTool === 'createLabel' ||
+      (creationTool === 'createCubicBezier' && nextCubicBezierPointCount >= 4)
+    const cursorCreationLayer = shouldCommitOnClick
+      ? parseNewElementLayer(
+          creationTool === 'createCubicBezier'
+            ? setCubicBezierStatus
+            : setDirectCreationStatus,
+        )
+      : null
+
+    if (shouldCommitOnClick && cursorCreationLayer === null) {
+      return
+    }
+
     if (creationTool === 'createPolyline') {
       setPolylineStatus(
         `${(polylineDraft?.points.length ?? 0) + 1} vertices in draft.`,
@@ -529,11 +549,10 @@ function App() {
     }
 
     if (creationTool === 'createCubicBezier') {
-      const nextCount = (cubicBezierDraft?.points.length ?? 0) + 1
       setCubicBezierStatus(
-        nextCount >= 4
+        nextCubicBezierPointCount >= 4
           ? 'Cubic Bezier created.'
-          : `${nextCount}/4 Bezier points placed.`,
+          : `${nextCubicBezierPointCount}/4 Bezier points placed.`,
       )
     }
 
@@ -588,6 +607,7 @@ function App() {
         const result = addCubicBezierCurveStratumWithResult(
           current.editableDiagram,
           nextPoints,
+          { layer: cursorCreationLayer ?? undefined },
         )
 
         if (result.id === null) {
@@ -598,18 +618,12 @@ function App() {
           }
         }
 
-        return {
-          editableDiagram: result.diagram,
-          selectedElement: clearSelectionForLayerFilter(
-            result.diagram,
-            { kind: 'stratum', id: result.id },
-            current.layerFilter,
-          ),
-          layerFilter: current.layerFilter,
-          polylineDraft: null,
-          cubicBezierDraft: null,
-          sheetPolygonDraft: null,
-        }
+        return applyCreatedElementToEditorState(
+          current,
+          result.diagram,
+          { kind: 'stratum', id: result.id },
+          cursorCreationLayer ?? 0,
+        )
       }
 
       if (creationTool === 'createSheet') {
@@ -632,36 +646,32 @@ function App() {
       }
 
       if (creationTool === 'createPoint') {
-        const result = addPointStratumWithResult(current.editableDiagram, modelPoint)
+        const result = addPointStratumWithResult(
+          current.editableDiagram,
+          modelPoint,
+          { layer: cursorCreationLayer ?? undefined },
+        )
 
-        return {
-          editableDiagram: result.diagram,
-          selectedElement: clearSelectionForLayerFilter(
-            result.diagram,
-            { kind: 'stratum', id: result.id },
-            current.layerFilter,
-          ),
-          layerFilter: current.layerFilter,
-          polylineDraft: null,
-          cubicBezierDraft: null,
-          sheetPolygonDraft: null,
-        }
-      }
-
-      const result = addTextLabelWithResult(current.editableDiagram, modelPoint)
-
-      return {
-        editableDiagram: result.diagram,
-        selectedElement: clearSelectionForLayerFilter(
+        return applyCreatedElementToEditorState(
+          current,
           result.diagram,
-          { kind: 'label', id: result.id },
-          current.layerFilter,
-        ),
-        layerFilter: current.layerFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        sheetPolygonDraft: null,
+          { kind: 'stratum', id: result.id },
+          cursorCreationLayer ?? 0,
+        )
       }
+
+      const result = addTextLabelWithResult(
+        current.editableDiagram,
+        modelPoint,
+        { layer: cursorCreationLayer ?? undefined },
+      )
+
+      return applyCreatedElementToEditorState(
+        current,
+        result.diagram,
+        { kind: 'label', id: result.id },
+        cursorCreationLayer ?? 0,
+      )
     })
 
     if (creationTool !== 'createPolyline') {
@@ -698,15 +708,32 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function updateNewElementLayerInput(value: string): void {
+    setDirectLayerInput(value)
+    setDirectCreationStatus('')
+  }
+
+  function parseNewElementLayer(
+    setStatus: (message: string) => void,
+  ): number | null {
+    const layer = parseDirectLayerInput(directLayerInput)
+
+    if (layer === null) {
+      setStatus('Layer must be a finite number.')
+      return null
+    }
+
+    return layer
+  }
+
   function createDirectElement(): void {
     if (!isDirectCreationTool(creationTool)) {
       return
     }
 
-    const directLayer = parseDirectLayerInput(directLayerInput)
+    const directLayer = parseNewElementLayer(setDirectCreationStatus)
 
     if (directLayer === null) {
-      setDirectCreationStatus('Layer must be a finite number.')
       return
     }
 
@@ -722,7 +749,7 @@ function App() {
         return
       }
 
-      commitDirectCreatedElement(
+      commitCreatedElement(
         result.diagram,
         { kind: 'stratum', id: result.id },
         directLayer,
@@ -745,7 +772,7 @@ function App() {
         return
       }
 
-      commitDirectCreatedElement(
+      commitCreatedElement(
         result.diagram,
         { kind: 'label', id: result.id },
         directLayer,
@@ -782,7 +809,7 @@ function App() {
         return
       }
 
-      commitDirectCreatedElement(
+      commitCreatedElement(
         result.diagram,
         { kind: 'stratum', id: result.id },
         directLayer,
@@ -805,7 +832,7 @@ function App() {
       return
     }
 
-    commitDirectCreatedElement(
+    commitCreatedElement(
       result.diagram,
       { kind: 'stratum', id: result.id },
       directLayer,
@@ -834,7 +861,7 @@ function App() {
       return
     }
 
-    commitDirectCreatedElement(
+    commitCreatedElement(
       result.diagram,
       { kind: 'stratum', id: result.id },
       directLayer,
@@ -843,26 +870,35 @@ function App() {
     setCopyStatus('idle')
   }
 
-  function commitDirectCreatedElement(
+  function commitCreatedElement(
     diagram: Diagram,
     selection: Exclude<SelectedElement, null>,
     layer: number,
   ): void {
-    setEditorState((current) => {
-      const commit = commitDirectCreationResult(
-        diagram,
-        selection,
-        layer,
-        current.layerFilter,
-      )
+    setEditorState((current) =>
+      applyCreatedElementToEditorState(current, diagram, selection, layer),
+    )
+  }
 
-      return {
-        ...applyDirectCreationCommitToEditorState(current, commit),
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        sheetPolygonDraft: null,
-      }
-    })
+  function applyCreatedElementToEditorState(
+    current: EditableEditorState,
+    diagram: Diagram,
+    selection: Exclude<SelectedElement, null>,
+    layer: number,
+  ): EditableEditorState {
+    const commit = commitDirectCreationResult(
+      diagram,
+      selection,
+      layer,
+      current.layerFilter,
+    )
+
+    return {
+      ...applyDirectCreationCommitToEditorState(current, commit),
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      sheetPolygonDraft: null,
+    }
   }
 
   function directRowsForCreationTool(tool: 'createPolyline' | 'createCubicBezier'): string {
@@ -888,30 +924,36 @@ function App() {
       return
     }
 
-    const result = addPolylineCurveStratumWithResult(
-      editableDiagram,
-      polylineDraft.points,
-    )
+    const creationLayer = parseNewElementLayer(setPolylineStatus)
 
-    if (result.id === null) {
-      setPolylineStatus('A polyline needs at least 2 vertices.')
+    if (creationLayer === null) {
       return
     }
 
-    const createdId = result.id
+    setEditorState((current) => {
+      const draft = current.polylineDraft
 
-    setEditorState((current) => ({
-      ...current,
-      editableDiagram: result.diagram,
-      selectedElement: clearSelectionForLayerFilter(
+      if (draft === null || draft.points.length < 2) {
+        return current
+      }
+
+      const result = addPolylineCurveStratumWithResult(
+        current.editableDiagram,
+        draft.points,
+        { layer: creationLayer },
+      )
+
+      if (result.id === null) {
+        return current
+      }
+
+      return applyCreatedElementToEditorState(
+        current,
         result.diagram,
-        { kind: 'stratum', id: createdId },
-        current.layerFilter,
-      ),
-      polylineDraft: null,
-      cubicBezierDraft: null,
-      sheetPolygonDraft: null,
-    }))
+        { kind: 'stratum', id: result.id },
+        creationLayer,
+      )
+    })
     setPolylineStatus('Polyline created.')
     setCopyStatus('idle')
   }
@@ -956,30 +998,41 @@ function App() {
       return
     }
 
-    const result = addPolygonSheetStratumWithResult(
-      editableDiagram,
-      sheetPolygonDraft.points,
-    )
+    const creationLayer = parseNewElementLayer(setSheetStatus)
 
-    if (result.id === null) {
-      setSheetStatus('A 3D sheet needs at least 3 vertices.')
+    if (creationLayer === null) {
       return
     }
 
-    const createdId = result.id
+    setEditorState((current) => {
+      const draft = current.sheetPolygonDraft
 
-    setEditorState((current) => ({
-      ...current,
-      editableDiagram: result.diagram,
-      selectedElement: clearSelectionForLayerFilter(
+      if (
+        draft === null ||
+        draft.points.length < 3 ||
+        !areFinitePoints(draft.points) ||
+        !arePointsOnWorkPlane(draft.points, draft.workPlane)
+      ) {
+        return current
+      }
+
+      const result = addPolygonSheetStratumWithResult(
+        current.editableDiagram,
+        draft.points,
+        { layer: creationLayer },
+      )
+
+      if (result.id === null) {
+        return current
+      }
+
+      return applyCreatedElementToEditorState(
+        current,
         result.diagram,
-        { kind: 'stratum', id: createdId },
-        current.layerFilter,
-      ),
-      polylineDraft: null,
-      cubicBezierDraft: null,
-      sheetPolygonDraft: null,
-    }))
+        { kind: 'stratum', id: result.id },
+        creationLayer,
+      )
+    })
     setSheetStatus('Sheet created.')
     setCopyStatus('idle')
   }
@@ -1183,6 +1236,25 @@ function App() {
           </div>
         </div>
 
+        <div className="control-group new-element-layer-control">
+          <label className="direct-create-field new-element-layer-field">
+            <span>New element layer</span>
+            <input
+              type="number"
+              step="any"
+              value={directLayerInput}
+              onChange={(event) =>
+                updateNewElementLayerInput(event.currentTarget.value)
+              }
+            />
+          </label>
+          {coordinateInputMode !== 'direct' && directCreationStatus !== '' && (
+            <span className="toolbar-status" role="status">
+              {directCreationStatus}
+            </span>
+          )}
+        </div>
+
         {coordinateInputMode === 'direct' && isDirectCreationTool(creationTool) && (
             <form
               className="control-group direct-create-control"
@@ -1193,18 +1265,6 @@ function App() {
               }}
             >
               <span className="control-label">{directCreationTitle(creationTool)}</span>
-              <label className="direct-create-field">
-                <span>Layer</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={directLayerInput}
-                  onChange={(event) => {
-                    setDirectLayerInput(event.currentTarget.value)
-                    setDirectCreationStatus('')
-                  }}
-                />
-              </label>
               {creationTool === 'createLabel' && (
                 <label className="direct-create-field direct-create-text">
                   <span>Text</span>

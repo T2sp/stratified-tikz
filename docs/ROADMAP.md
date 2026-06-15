@@ -541,12 +541,12 @@ Implemented behavior:
   direct coordinate rows in the toolbar.
 * Polyline and cubic Bezier direct creation are available in 2D and 3D.
 * Polygon sheet direct creation is available only in 3D diagrams.
-* Direct creation has an explicit numeric Layer field shared by direct tools.
-* If a specific layer filter is active, the direct Layer field syncs to that
-  layer by default.
-* If the submitted direct Layer would be hidden by the active filter, the filter
-  switches to the created element's layer so the new element remains visible and
-  selected.
+* Direct and cursor creation share an explicit numeric New element layer field.
+* If a specific layer filter is active, the New element layer field syncs to
+  that layer by default.
+* If the submitted New element layer would be hidden by the active filter, the
+  filter switches to the created element's layer so the new element remains
+  visible and selected.
 * Direct-created paths and sheets are committed as ordinary `Diagram` data using
   the same curve and polygon sheet model shapes as cursor-created elements.
 * Direct form state, selection, and layer filter remain editor-only UI state.

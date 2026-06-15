@@ -133,6 +133,10 @@
   flex: 1 1 420px;
 }
 
+.new-element-layer-control {
+  flex: 0 1 300px;
+}
+
 .direct-create-field {
   display: inline-grid;
   grid-template-columns: auto minmax(70px, 96px);
@@ -141,6 +145,10 @@
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
+}
+
+.new-element-layer-field {
+  grid-template-columns: auto minmax(76px, 96px);
 }
 
 .direct-create-field input {

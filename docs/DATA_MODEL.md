@@ -109,7 +109,9 @@ The editor state is separate from the diagram data.
 
 The diagram data represents the mathematical and geometric content.
 
-The editor state represents temporary UI choices such as selection, coordinate input mode, and active work plane.
+The editor state represents temporary UI choices such as selection, coordinate
+input mode, active work plane, and the current layer used for newly created
+elements.
 
 ```ts
 export type CoordinateInputMode = "direct" | "cursor";
@@ -132,6 +134,11 @@ The layer filter is derived from numeric `layer` values on strata and free text
 labels. It controls preview visibility and click selectability only. It is not
 part of `Diagram`, is reset to all layers when examples or JSON files are
 loaded, and does not affect TikZ generation.
+
+The current "new element layer" control is also UI state. Cursor and direct
+creation use it when committing new strata or free text labels, but the control
+itself is not saved. Once an element is created, its numeric `layer` is ordinary
+diagram data.
 
 ## Work planes
 
