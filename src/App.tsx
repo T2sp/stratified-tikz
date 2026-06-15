@@ -53,6 +53,7 @@ import {
   clearSelectionIfMissing,
   clearSelectionForLayerFilter,
   cloneDiagram,
+  commitDiagramChange,
   commitDirectCreationResult,
   createSheetPolygonDraft,
   defaultJsonDownloadFilename,
@@ -67,6 +68,7 @@ import {
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlanePreview,
+  undoLastDiagramChange,
   updateDiagramGeometryHandle,
   type DirectCoordinateInput,
   type DirectPathCreationError,
@@ -101,6 +103,7 @@ type EditableEditorState = {
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
   sheetPolygonDraft: SheetPolygonDraft | null
+  undoDiagram: Diagram | null
 }
 
 type ExampleOption = {
@@ -182,6 +185,7 @@ function App() {
     defaultJsonDownloadFilename,
   )
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
+  const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -194,6 +198,7 @@ function App() {
     polylineDraft: null,
     cubicBezierDraft: null,
     sheetPolygonDraft: null,
+    undoDiagram: null,
   }))
   const {
     editableDiagram,
@@ -202,6 +207,7 @@ function App() {
     polylineDraft,
     cubicBezierDraft,
     sheetPolygonDraft,
+    undoDiagram,
   } = editorState
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
@@ -256,14 +262,20 @@ function App() {
     if (nextDiagram.ambientDimension === 2 && creationTool === 'createSheet') {
       setCreationTool('select')
     }
-    setEditorState((current) => ({
-      editableDiagram: nextDiagram,
-      selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
-      layerFilter: allLayersFilter,
-      polylineDraft: null,
-      cubicBezierDraft: null,
-      sheetPolygonDraft: null,
-    }))
+    setEditorState((current) =>
+      commitDiagramChange(current, {
+        ...current,
+        editableDiagram: nextDiagram,
+        selectedElement: clearSelectionIfMissing(
+          nextDiagram,
+          current.selectedElement,
+        ),
+        layerFilter: allLayersFilter,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }),
+    )
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
@@ -291,15 +303,32 @@ function App() {
         current.layerFilter,
       )
 
-      return {
+      return commitDiagramChange(current, {
         ...current,
         editableDiagram: nextDiagram,
         selectedElement: nextSelection,
         layerFilter: nextLayerFilter,
-      }
+      })
     })
     setCopyStatus('idle')
   }
+
+  const undoLastChange = useCallback(function undoLastChange(): void {
+    if (undoDiagram === null) {
+      return
+    }
+
+    setSelectedExampleId(undoDiagram.ambientDimension === 2 ? '2d' : '3d')
+    geometryDragUndoDiagramRef.current = null
+    setEditorState((current) => undoLastDiagramChange(current))
+    setCopyStatus('idle')
+    setSaveLoadStatus('idle')
+    setSaveLoadMessage('')
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setSheetStatus('')
+    setDirectCreationStatus('')
+  }, [undoDiagram])
 
   function downloadJson(): void {
     try {
@@ -355,14 +384,17 @@ function App() {
 
     setSelectedExampleId(result.diagram.ambientDimension === 2 ? '2d' : '3d')
     setCreationTool('select')
-    setEditorState({
-      editableDiagram: result.diagram,
-      selectedElement: null,
-      layerFilter: allLayersFilter,
-      polylineDraft: null,
-      cubicBezierDraft: null,
-      sheetPolygonDraft: null,
-    })
+    setEditorState((current) =>
+      commitDiagramChange(current, {
+        ...current,
+        editableDiagram: result.diagram,
+        selectedElement: null,
+        layerFilter: allLayersFilter,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }),
+    )
     setCopyStatus('idle')
     setPolylineStatus('')
     setCubicBezierStatus('')
@@ -406,7 +438,7 @@ function App() {
         return current
       }
 
-      return {
+      return commitDiagramChange(current, {
         ...current,
         editableDiagram: result.diagram,
         selectedElement: result.selectedElement,
@@ -414,7 +446,7 @@ function App() {
         polylineDraft: null,
         cubicBezierDraft: null,
         sheetPolygonDraft: null,
-      }
+      })
     })
     setPolylineStatus('')
     setCubicBezierStatus('')
@@ -449,6 +481,31 @@ function App() {
       window.removeEventListener('keydown', handleRemoveShortcut)
     }
   }, [removeCurrentSelection, selectedElement])
+
+  useEffect(() => {
+    function handleUndoShortcut(event: KeyboardEvent): void {
+      if (
+        event.defaultPrevented ||
+        event.key.toLowerCase() !== 'z' ||
+        event.altKey ||
+        event.shiftKey ||
+        (!event.metaKey && !event.ctrlKey) ||
+        isEditableKeyboardTarget(event.target) ||
+        undoDiagram === null
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      undoLastChange()
+    }
+
+    window.addEventListener('keydown', handleUndoShortcut)
+
+    return () => {
+      window.removeEventListener('keydown', handleUndoShortcut)
+    }
+  }, [undoDiagram, undoLastChange])
 
   function updateLayerFilter(nextFilter: LayerFilter): void {
     setEditorState((current) => {
@@ -636,11 +693,14 @@ function App() {
           }
         }
 
-        return applyCreatedElementToEditorState(
+        return commitDiagramChange(
           current,
-          result.diagram,
-          { kind: 'stratum', id: result.id },
-          cursorCreationLayer ?? 0,
+          applyCreatedElementToEditorState(
+            current,
+            result.diagram,
+            { kind: 'stratum', id: result.id },
+            cursorCreationLayer ?? 0,
+          ),
         )
       }
 
@@ -670,11 +730,14 @@ function App() {
           { layer: cursorCreationLayer ?? undefined },
         )
 
-        return applyCreatedElementToEditorState(
+        return commitDiagramChange(
           current,
-          result.diagram,
-          { kind: 'stratum', id: result.id },
-          cursorCreationLayer ?? 0,
+          applyCreatedElementToEditorState(
+            current,
+            result.diagram,
+            { kind: 'stratum', id: result.id },
+            cursorCreationLayer ?? 0,
+          ),
         )
       }
 
@@ -684,11 +747,14 @@ function App() {
         { layer: cursorCreationLayer ?? undefined },
       )
 
-      return applyCreatedElementToEditorState(
+      return commitDiagramChange(
         current,
-        result.diagram,
-        { kind: 'label', id: result.id },
-        cursorCreationLayer ?? 0,
+        applyCreatedElementToEditorState(
+          current,
+          result.diagram,
+          { kind: 'label', id: result.id },
+          cursorCreationLayer ?? 0,
+        ),
       )
     })
 
@@ -753,24 +819,39 @@ function App() {
         return current
       }
 
-      return {
-        ...current,
-        editableDiagram: nextDiagram,
-        selectedElement: clearSelectionForLayerFilter(
-          nextDiagram,
-          current.selectedElement,
-          current.layerFilter,
-        ),
-        layerFilter: normalizeLayerFilterForDiagram(
-          nextDiagram,
-          current.layerFilter,
-        ),
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        sheetPolygonDraft: null,
-      }
+      return commitDiagramChange(
+        current,
+        {
+          ...current,
+          editableDiagram: nextDiagram,
+          selectedElement: clearSelectionForLayerFilter(
+            nextDiagram,
+            current.selectedElement,
+            current.layerFilter,
+          ),
+          layerFilter: normalizeLayerFilterForDiagram(
+            nextDiagram,
+            current.layerFilter,
+          ),
+          polylineDraft: null,
+          cubicBezierDraft: null,
+          sheetPolygonDraft: null,
+        },
+        {
+          undoSourceDiagram:
+            geometryDragUndoDiagramRef.current ?? current.editableDiagram,
+        },
+      )
     })
     setCopyStatus('idle')
+  }
+
+  function handleGeometryHandleDragStart(): void {
+    geometryDragUndoDiagramRef.current = cloneDiagram(editableDiagram)
+  }
+
+  function handleGeometryHandleDragEnd(): void {
+    geometryDragUndoDiagramRef.current = null
   }
 
   function updateDirectCoordinate(
@@ -970,7 +1051,10 @@ function App() {
     layer: number,
   ): void {
     setEditorState((current) =>
-      applyCreatedElementToEditorState(current, diagram, selection, layer),
+      commitDiagramChange(
+        current,
+        applyCreatedElementToEditorState(current, diagram, selection, layer),
+      ),
     )
   }
 
@@ -1041,11 +1125,14 @@ function App() {
         return current
       }
 
-      return applyCreatedElementToEditorState(
+      return commitDiagramChange(
         current,
-        result.diagram,
-        { kind: 'stratum', id: result.id },
-        creationLayer,
+        applyCreatedElementToEditorState(
+          current,
+          result.diagram,
+          { kind: 'stratum', id: result.id },
+          creationLayer,
+        ),
       )
     })
     setPolylineStatus('Polyline created.')
@@ -1120,11 +1207,14 @@ function App() {
         return current
       }
 
-      return applyCreatedElementToEditorState(
+      return commitDiagramChange(
         current,
-        result.diagram,
-        { kind: 'stratum', id: result.id },
-        creationLayer,
+        applyCreatedElementToEditorState(
+          current,
+          result.diagram,
+          { kind: 'stratum', id: result.id },
+          creationLayer,
+        ),
       )
     })
     setSheetStatus('Sheet created.')
@@ -1445,6 +1535,18 @@ function App() {
           </button>
         </div>
 
+        <div className="control-group">
+          <span className="control-label">History</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={undoDiagram === null}
+            onClick={undoLastChange}
+          >
+            Undo
+          </button>
+        </div>
+
         <div className="control-group file-control">
           <span className="control-label">File</span>
           <label className="filename-field">
@@ -1540,6 +1642,12 @@ function App() {
             }
             onGeometryHandleDrag={
               creationTool === 'select' ? handleGeometryHandleDrag : undefined
+            }
+            onGeometryHandleDragStart={
+              creationTool === 'select' ? handleGeometryHandleDragStart : undefined
+            }
+            onGeometryHandleDragEnd={
+              creationTool === 'select' ? handleGeometryHandleDragEnd : undefined
             }
           />
         </article>
