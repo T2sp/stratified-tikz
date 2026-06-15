@@ -33,6 +33,7 @@ export type SvgDiagramProps = {
   fitToView?: boolean
   selectedElement?: SelectedElement
   polylineDraft?: Vec3[]
+  cubicBezierDraft?: Vec3[]
   onSelectionChange?: (selection: SelectedElement) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -59,13 +60,15 @@ export function SvgDiagram({
   fitToView = false,
   selectedElement = null,
   polylineDraft,
+  cubicBezierDraft,
   onSelectionChange,
   onCanvasClick,
 }: SvgDiagramProps): ReactElement {
+  const extraPointsForFit = [...(polylineDraft ?? []), ...(cubicBezierDraft ?? [])]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
     // TODO: Future 3D work-plane previews can pass their cropped patch points here.
-    extraPointsForFit: polylineDraft ?? [],
+    extraPointsForFit,
   })
   const items = [
     ...diagram.strata
@@ -97,6 +100,7 @@ export function SvgDiagram({
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
       <g>{items.map((item) => item.element)}</g>
       {renderPolylineDraft(polylineDraft, camera, height)}
+      {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
     </svg>
   )
 }
@@ -428,6 +432,70 @@ function renderPolylineDraft(
           vectorEffect="non-scaling-stroke"
         />
       ))}
+    </g>
+  )
+}
+
+function renderCubicBezierDraft(
+  draft: Vec3[] | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (draft === undefined || draft.length === 0) {
+    return null
+  }
+
+  const points = draft.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const pathData = points.length >= 4 ? cubicBezierToSvgPath(points.slice(0, 4)) : ''
+  const guideData = polylineToSvgPath(points)
+
+  return (
+    <g key="cubic-bezier-draft-preview" pointerEvents="none" aria-hidden="true">
+      {points.length >= 2 && (
+        <path
+          d={guideData}
+          fill="none"
+          stroke="#7B8794"
+          strokeOpacity={0.55}
+          strokeWidth={1.4}
+          strokeDasharray="4 5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {points.length >= 4 && (
+        <path
+          d={pathData}
+          fill="none"
+          stroke="#8E44AD"
+          strokeOpacity={0.82}
+          strokeWidth={2.2}
+          strokeDasharray="8 4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {points.map((point, index) => {
+        const isAnchor = index === 0 || index === 3
+
+        return (
+          <circle
+            key={`cubic-bezier-draft-point-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r={isAnchor ? 4.6 : 3.6}
+            fill={isAnchor ? '#ffffff' : '#8E44AD'}
+            stroke={isAnchor ? '#8E44AD' : '#ffffff'}
+            strokeOpacity={0.95}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+        )
+      })}
     </g>
   )
 }

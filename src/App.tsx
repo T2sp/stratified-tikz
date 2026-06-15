@@ -19,6 +19,7 @@ import type {
 import { SvgDiagram } from './rendering'
 import { generateTikz } from './tikz'
 import {
+  addCubicBezierCurveStratumWithResult,
   addPolylineCurveStratumWithResult,
   addPointStratumWithResult,
   addTextLabelWithResult,
@@ -30,8 +31,16 @@ import {
 
 type ExampleId = '2d' | '3d'
 type CopyStatus = 'idle' | 'copied' | 'failed'
-type CreationTool = 'select' | 'createPoint' | 'createLabel' | 'createPolyline'
+type CreationTool =
+  | 'select'
+  | 'createPoint'
+  | 'createLabel'
+  | 'createPolyline'
+  | 'createCubicBezier'
 type PolylineDraft = {
+  points: Vec3[]
+} | null
+type CubicBezierDraft = {
   points: Vec3[]
 } | null
 
@@ -39,6 +48,7 @@ type EditableEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
   polylineDraft: PolylineDraft
+  cubicBezierDraft: CubicBezierDraft
 }
 
 type ExampleOption = {
@@ -69,6 +79,7 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createPoint', label: 'Add point' },
   { id: 'createLabel', label: 'Add label' },
   { id: 'createPolyline', label: 'Add polyline' },
+  { id: 'createCubicBezier', label: 'Add cubic Bezier' },
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
 
@@ -78,6 +89,7 @@ function App() {
     useState<CoordinateInputMode>('cursor')
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
   const [polylineStatus, setPolylineStatus] = useState<string>('')
+  const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -87,8 +99,10 @@ function App() {
     editableDiagram: cloneDiagram(exampleOptions[0].diagram),
     selectedElement: null,
     polylineDraft: null,
+    cubicBezierDraft: null,
   }))
-  const { editableDiagram, selectedElement, polylineDraft } = editorState
+  const { editableDiagram, selectedElement, polylineDraft, cubicBezierDraft } =
+    editorState
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -120,9 +134,11 @@ function App() {
       editableDiagram: nextDiagram,
       selectedElement: clearSelectionIfMissing(nextDiagram, current.selectedElement),
       polylineDraft: null,
+      cubicBezierDraft: null,
     }))
     setCopyStatus('idle')
     setPolylineStatus('')
+    setCubicBezierStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -148,20 +164,35 @@ function App() {
   function updateCreationTool(tool: CreationTool): void {
     setCreationTool(tool)
 
-    if (tool !== 'createPolyline') {
+    if (tool !== 'createPolyline' && tool !== 'createCubicBezier') {
       setEditorState((current) =>
-        current.polylineDraft === null
+        current.polylineDraft === null && current.cubicBezierDraft === null
           ? current
           : {
               ...current,
               polylineDraft: null,
+              cubicBezierDraft: null,
             },
       )
       setPolylineStatus('')
+      setCubicBezierStatus('')
       return
     }
 
-    setPolylineStatus('Click the preview to add vertices.')
+    setEditorState((current) => ({
+      ...current,
+      polylineDraft: tool === 'createPolyline' ? current.polylineDraft : null,
+      cubicBezierDraft:
+        tool === 'createCubicBezier' ? current.cubicBezierDraft : null,
+    }))
+    setPolylineStatus(
+      tool === 'createPolyline' ? 'Click the preview to add vertices.' : '',
+    )
+    setCubicBezierStatus(
+      tool === 'createCubicBezier'
+        ? 'Click Start, Control 1, Control 2, then End.'
+        : '',
+    )
   }
 
   function handlePreviewCreationClick(
@@ -176,6 +207,15 @@ function App() {
     if (creationTool === 'createPolyline') {
       setPolylineStatus(
         `${(polylineDraft?.points.length ?? 0) + 1} vertices in draft.`,
+      )
+    }
+
+    if (creationTool === 'createCubicBezier') {
+      const nextCount = (cubicBezierDraft?.points.length ?? 0) + 1
+      setCubicBezierStatus(
+        nextCount >= 4
+          ? 'Cubic Bezier created.'
+          : `${nextCount}/4 Bezier points placed.`,
       )
     }
 
@@ -197,6 +237,41 @@ function App() {
           polylineDraft: {
             points: [...draftPoints, modelPoint],
           },
+          cubicBezierDraft: null,
+        }
+      }
+
+      if (creationTool === 'createCubicBezier') {
+        const draftPoints = current.cubicBezierDraft?.points ?? []
+        const nextPoints = [...draftPoints, modelPoint]
+
+        if (nextPoints.length < 4) {
+          return {
+            ...current,
+            polylineDraft: null,
+            cubicBezierDraft: {
+              points: nextPoints,
+            },
+          }
+        }
+
+        const result = addCubicBezierCurveStratumWithResult(
+          current.editableDiagram,
+          nextPoints,
+        )
+
+        if (result.id === null) {
+          return {
+            ...current,
+            cubicBezierDraft: null,
+          }
+        }
+
+        return {
+          editableDiagram: result.diagram,
+          selectedElement: { kind: 'stratum', id: result.id },
+          polylineDraft: null,
+          cubicBezierDraft: null,
         }
       }
 
@@ -207,6 +282,7 @@ function App() {
           editableDiagram: result.diagram,
           selectedElement: { kind: 'stratum', id: result.id },
           polylineDraft: null,
+          cubicBezierDraft: null,
         }
       }
 
@@ -216,6 +292,7 @@ function App() {
         editableDiagram: result.diagram,
         selectedElement: { kind: 'label', id: result.id },
         polylineDraft: null,
+        cubicBezierDraft: null,
       }
     })
 
@@ -247,6 +324,7 @@ function App() {
       editableDiagram: result.diagram,
       selectedElement: { kind: 'stratum', id: createdId },
       polylineDraft: null,
+      cubicBezierDraft: null,
     }))
     setPolylineStatus('Polyline created.')
     setCopyStatus('idle')
@@ -262,6 +340,18 @@ function App() {
           },
     )
     setPolylineStatus('Polyline canceled.')
+  }
+
+  function cancelCubicBezierDraft(): void {
+    setEditorState((current) =>
+      current.cubicBezierDraft === null
+        ? current
+        : {
+            ...current,
+            cubicBezierDraft: null,
+          },
+    )
+    setCubicBezierStatus('Cubic Bezier canceled.')
   }
 
   function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
@@ -379,6 +469,22 @@ function App() {
           </div>
         )}
 
+        {creationTool === 'createCubicBezier' && (
+          <div className="control-group polyline-draft-control">
+            <span className="control-label">Cubic Bezier</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={cancelCubicBezierDraft}
+            >
+              Cancel cubic Bezier
+            </button>
+            <span className="toolbar-status" role="status">
+              {cubicBezierStatus}
+            </span>
+          </div>
+        )}
+
         <div className="control-group">
           <span className="control-label">Input</span>
           <div className="segmented-control">
@@ -440,6 +546,7 @@ function App() {
             fitToView
             selectedElement={selectedElement}
             polylineDraft={polylineDraft?.points}
+            cubicBezierDraft={cubicBezierDraft?.points}
             onSelectionChange={
               creationTool === 'select' ? updateSelectedElement : undefined
             }

@@ -124,6 +124,12 @@ export type AddPolylineCurveStratumOptions = {
   layer?: number
 }
 
+export type AddCubicBezierCurveStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+}
+
 export type AddPointStratumResult = {
   diagram: Diagram
   id: string
@@ -135,6 +141,11 @@ export type AddTextLabelResult = {
 }
 
 export type AddPolylineCurveStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
+export type AddCubicBezierCurveStratumResult = {
   diagram: Diagram
   id: string | null
 }
@@ -232,6 +243,37 @@ export function addPolylineCurveStratumWithResult(
   }
 }
 
+export function addCubicBezierCurveStratum(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddCubicBezierCurveStratumOptions = {},
+): Diagram {
+  return addCubicBezierCurveStratumWithResult(diagram, points, options).diagram
+}
+
+export function addCubicBezierCurveStratumWithResult(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddCubicBezierCurveStratumOptions = {},
+): AddCubicBezierCurveStratumResult {
+  if (points.length !== 4) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const curve = createCubicBezierCurveForDiagram(diagram, points, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, curve],
+    },
+    id: curve.id,
+  }
+}
+
 export function updateStratumNameById(
   diagram: Diagram,
   id: string,
@@ -296,6 +338,26 @@ function createPolylineCurveForDiagram(
     kind: 'polyline',
     id: safeOptionalId(diagram, options.id, 'curve'),
     name: safeOptionalName(options.name, 'Curve'),
+    style: cloneCurveStyle(defaultCurveStyle),
+    points: points.map((point) =>
+      normalizePointForAmbientDimension(diagram.ambientDimension, point),
+    ),
+    styleSegments: [],
+    layer: options.layer ?? nextLayer(diagram),
+  }
+}
+
+function createCubicBezierCurveForDiagram(
+  diagram: Diagram,
+  points: Vec3[],
+  options: AddCubicBezierCurveStratumOptions,
+): CurveStratum {
+  return {
+    codim: diagram.ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: safeOptionalId(diagram, options.id, 'curve'),
+    name: safeOptionalName(options.name, 'Cubic Bezier'),
     style: cloneCurveStyle(defaultCurveStyle),
     points: points.map((point) =>
       normalizePointForAmbientDimension(diagram.ambientDimension, point),
