@@ -43,6 +43,7 @@ import {
   addPointStratumFromDirectInput,
   addTextLabelWithResult,
   addTextLabelFromDirectInput,
+  applyDirectCreationCommitToEditorState,
   appendSheetPolygonDraftPoint,
   areFinitePoints,
   arePointsOnWorkPlane,
@@ -847,18 +848,21 @@ function App() {
     selection: Exclude<SelectedElement, null>,
     layer: number,
   ): void {
-    setEditorState((current) => ({
-      ...current,
-      ...commitDirectCreationResult(
+    setEditorState((current) => {
+      const commit = commitDirectCreationResult(
         diagram,
         selection,
         layer,
         current.layerFilter,
-      ),
-      polylineDraft: null,
-      cubicBezierDraft: null,
-      sheetPolygonDraft: null,
-    }))
+      )
+
+      return {
+        ...applyDirectCreationCommitToEditorState(current, commit),
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        sheetPolygonDraft: null,
+      }
+    })
   }
 
   function directRowsForCreationTool(tool: 'createPolyline' | 'createCubicBezier'): string {

@@ -15,11 +15,89 @@ import {
   addPointStratumFromDirectInput,
   addPolygonSheetFromDirectInput,
   addPolylineCurveFromDirectInput,
+  addTextLabelFromDirectInput,
+  applyDirectCreationCommitToEditorState,
   commitDirectCreationResult,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
 } from '../../src/ui/diagramUpdates.ts'
-import { layerFilterIncludesLayer } from '../../src/ui/layerFilter.ts'
+import type { SelectedElement } from '../../src/ui/selection.ts'
+import {
+  layerFilterIncludesLayer,
+  type LayerFilter,
+} from '../../src/ui/layerFilter.ts'
+
+type TestEditorState = {
+  editableDiagram: Diagram
+  selectedElement: SelectedElement
+  layerFilter: LayerFilter
+  draftMarker: string
+}
+
+test('direct point creation commits to editable diagram state', () => {
+  const initialState = createTestEditorState(twoDimensionalExample)
+  const result = addPointStratumFromDirectInput(
+    initialState.editableDiagram,
+    { x: '10', y: '11', z: '99' },
+    { layer: 5 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'stratum',
+    id: result.id,
+  }, 5)
+  const point = committed.editableDiagram.strata.find(
+    (stratum) => stratum.id === result.id,
+  )
+
+  assert.equal(
+    committed.editableDiagram.strata.length,
+    initialState.editableDiagram.strata.length + 1,
+  )
+  assert.equal(point?.geometricKind, 'point')
+  assert.equal(point?.layer, 5)
+  assert.deepEqual(committed.selectedElement, { kind: 'stratum', id: result.id })
+  assert.equal('diagram' in committed, false)
+  assert.match(generateTikz(committed.editableDiagram), /\(10,11\)/)
+})
+
+test('direct label creation commits to editable diagram state', () => {
+  const initialState = createTestEditorState(twoDimensionalExample)
+  const result = addTextLabelFromDirectInput(
+    initialState.editableDiagram,
+    { x: '12', y: '13', z: '99' },
+    '$L$',
+    { layer: 6 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct label creation to succeed.')
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'label',
+    id: result.id,
+  }, 6)
+  const label = committed.editableDiagram.labels.find(
+    (candidate) => candidate.id === result.id,
+  )
+
+  assert.equal(
+    committed.editableDiagram.labels.length,
+    initialState.editableDiagram.labels.length + 1,
+  )
+  assert.equal(label?.text, '$L$')
+  assert.equal(label?.layer, 6)
+  assert.deepEqual(label?.position, { x: 12, y: 13, z: 0 })
+  assert.deepEqual(committed.selectedElement, { kind: 'label', id: result.id })
+  assert.match(generateTikz(committed.editableDiagram), /\$L\$/)
+})
 
 test('direct polyline creation assigns 2D codim, layer, selection, and z normalization', () => {
   const result = addPolylineCurveFromDirectInput(
@@ -58,6 +136,41 @@ test('direct polyline creation assigns 2D codim, layer, selection, and z normali
   })
   assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 7 })
   assert.equal(layerFilterIncludesLayer(committed.layerFilter, curve.layer), true)
+})
+
+test('direct polyline creation commits to editable diagram state', () => {
+  const initialState = createTestEditorState(twoDimensionalExample)
+  const result = addPolylineCurveFromDirectInput(
+    initialState.editableDiagram,
+    [
+      { x: '1', y: '2', z: '99' },
+      { x: '3', y: '4', z: '99' },
+    ],
+    { layer: 7 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'stratum',
+    id: result.id,
+  }, 7)
+  const curve = findCurve(committed.editableDiagram, result.id)
+
+  assert.equal(
+    committed.editableDiagram.strata.length,
+    initialState.editableDiagram.strata.length + 1,
+  )
+  assert.equal(curve.kind, 'polyline')
+  assert.deepEqual(curve.points, [
+    { x: 1, y: 2, z: 0 },
+    { x: 3, y: 4, z: 0 },
+  ])
+  assert.equal(curve.layer, 7)
+  assert.match(generateTikz(committed.editableDiagram), /\(curvePolyCurve\d+p0\) -- \(curvePolyCurve\d+p1\);/)
 })
 
 test('direct polyline creation assigns 3D curve codim and explicit layer', () => {
@@ -122,6 +235,41 @@ test('direct cubic Bezier creation preserves point order and explicit layer', ()
   assert.deepEqual(committed.layerFilter, { kind: 'all' })
 })
 
+test('direct cubic Bezier creation commits to editable diagram state', () => {
+  const initialState = createTestEditorState(twoDimensionalExample)
+  const result = addCubicBezierCurveFromDirectInput(
+    initialState.editableDiagram,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '1', y: '2', z: '0' },
+      { x: '3', y: '4', z: '0' },
+      { x: '5', y: '6', z: '0' },
+    ],
+    { layer: 8 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'stratum',
+    id: result.id,
+  }, 8)
+  const curve = findCurve(committed.editableDiagram, result.id)
+
+  assert.equal(curve.kind, 'cubicBezier')
+  assert.deepEqual(curve.points, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 2, z: 0 },
+    { x: 3, y: 4, z: 0 },
+    { x: 5, y: 6, z: 0 },
+  ])
+  assert.equal(curve.layer, 8)
+  assert.match(generateTikz(committed.editableDiagram), /\.\. controls/)
+})
+
 test('direct cubic Bezier creation rejects invalid and non-finite input', () => {
   const result = addCubicBezierCurveFromDirectInput(twoDimensionalExample, [
     { x: '0', y: '0', z: '0' },
@@ -172,6 +320,68 @@ test('direct 3D polygon sheet creation commits ordinary sheet data on the select
   })
   assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 6 })
   assert.equal(layerFilterIncludesLayer(committed.layerFilter, sheet.layer), true)
+})
+
+test('direct polygon sheet creation commits to editable diagram state', () => {
+  const initialState = createTestEditorState(threeDimensionalExample)
+  const result = addPolygonSheetFromDirectInput(
+    initialState.editableDiagram,
+    [
+      { x: '0', y: '0', z: '2' },
+      { x: '1', y: '0', z: '2' },
+      { x: '0', y: '1', z: '2' },
+    ],
+    { layer: 9 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'stratum',
+    id: result.id,
+  }, 9)
+  const sheet = findPolygonSheet(committed.editableDiagram, result.id)
+
+  assert.equal(
+    committed.editableDiagram.strata.length,
+    initialState.editableDiagram.strata.length + 1,
+  )
+  assert.deepEqual(sheet.vertices, [
+    { x: 0, y: 0, z: 2 },
+    { x: 1, y: 0, z: 2 },
+    { x: 0, y: 1, z: 2 },
+  ])
+  assert.equal(sheet.layer, 9)
+  assert.match(generateTikz(committed.editableDiagram), /-- cycle;/)
+})
+
+test('direct creation on a hidden layer updates the filter and keeps selection visible', () => {
+  const initialState = createTestEditorState(twoDimensionalExample, {
+    kind: 'layer',
+    layer: 0,
+  })
+  const result = addPointStratumFromDirectInput(
+    initialState.editableDiagram,
+    { x: '1', y: '2', z: '99' },
+    { layer: 42 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct point creation to succeed.')
+  }
+
+  const committed = commitDirectCreationToTestState(initialState, result, {
+    kind: 'stratum',
+    id: result.id,
+  }, 42)
+
+  assert.deepEqual(committed.selectedElement, { kind: 'stratum', id: result.id })
+  assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 42 })
+  assert.equal(layerFilterIncludesLayer(committed.layerFilter, 42), true)
 })
 
 test('direct polygon sheet creation is unavailable in 2D and rejects invalid input', () => {
@@ -260,4 +470,33 @@ function findPolygonSheet(
   }
 
   return stratum
+}
+
+function createTestEditorState(
+  diagram: Diagram,
+  layerFilter: LayerFilter = { kind: 'all' },
+): TestEditorState {
+  return {
+    editableDiagram: diagram,
+    selectedElement: null,
+    layerFilter,
+    draftMarker: 'preserve unrelated editor state',
+  }
+}
+
+function commitDirectCreationToTestState(
+  state: TestEditorState,
+  result: { diagram: Diagram },
+  selectedElement: Exclude<SelectedElement, null>,
+  createdLayer: number,
+): TestEditorState {
+  return applyDirectCreationCommitToEditorState(
+    state,
+    commitDirectCreationResult(
+      result.diagram,
+      selectedElement,
+      createdLayer,
+      state.layerFilter,
+    ),
+  )
 }

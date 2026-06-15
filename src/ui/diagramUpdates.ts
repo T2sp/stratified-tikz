@@ -297,6 +297,12 @@ export type DirectCreationCommitResult = {
   layerFilter: LayerFilter
 }
 
+export type DirectCreationEditorState = {
+  editableDiagram: Diagram
+  selectedElement: SelectedElement
+  layerFilter: LayerFilter
+}
+
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
   const existingIds = new Set([
     ...diagram.strata.map((stratum) => stratum.id),
@@ -667,6 +673,17 @@ export function commitDirectCreationResult(
     layerFilter: layerFilterIncludesLayer(layerFilter, createdLayer)
       ? layerFilter
       : { kind: 'layer', layer: createdLayer },
+  }
+}
+
+export function applyDirectCreationCommitToEditorState<
+  T extends DirectCreationEditorState,
+>(state: T, result: DirectCreationCommitResult): T {
+  return {
+    ...state,
+    editableDiagram: result.diagram,
+    selectedElement: result.selectedElement,
+    layerFilter: result.layerFilter,
   }
 }
 
