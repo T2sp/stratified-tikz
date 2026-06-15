@@ -218,7 +218,7 @@ function emitCurve(curve: CurveStratum, context: GenerateContext): string[] {
     curve.style.strokeColor,
   )
   const coordinates = curve.points.map((point, index) =>
-    context.coordinates.define(`curve${curve.id}`, index, point),
+    context.coordinates.define(curveCoordinateBaseName(curve), index, point),
   )
   const lineStyleOption = lineStyleToTikzOption(curve.style.lineStyle)
   const options = [
@@ -235,6 +235,12 @@ function emitCurve(curve: CurveStratum, context: GenerateContext): string[] {
     `  ${formatCurvePath(curve, coordinates)};`,
     '',
   ]
+}
+
+function curveCoordinateBaseName(curve: CurveStratum): string {
+  return curve.kind === 'cubicBezier'
+    ? `curveBezier${curve.id}`
+    : `curvePoly${curve.id}`
 }
 
 function emitPoint(point: PointStratum, context: GenerateContext): string[] {

@@ -827,7 +827,7 @@ test('generated TikZ includes newly added polyline curve', () => {
   )
   const tikz = generateTikz(updated)
 
-  assert.equal(tikz.includes('\\coordinate (curvecurve1'), true)
+  assert.equal(tikz.includes('\\coordinate (curvePolycurve1'), true)
   assert.equal(tikz.includes('(7,8)'), true)
   assert.equal(tikz.includes('(9,10)'), true)
   assert.equal(tikz.includes('\\draw['), true)
@@ -846,9 +846,9 @@ test('generated TikZ includes newly added cubic Bezier curve', () => {
   )
   const tikz = generateTikz(updated)
 
-  assert.equal(tikz.includes('\\coordinate (curvecurve1'), true)
+  assert.equal(tikz.includes('\\coordinate (curveBeziercurve1'), true)
   assert.equal(
-    tikz.includes('(curvecurve10) .. controls (curvecurve11) and (curvecurve12) .. (curvecurve13);'),
+    tikz.includes('(curveBeziercurve10) .. controls (curveBeziercurve11) and (curveBeziercurve12) .. (curveBeziercurve13);'),
     true,
   )
   assert.equal(tikz.includes('(1,2)'), true)

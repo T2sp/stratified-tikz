@@ -12,8 +12,8 @@ import type {
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
 
-  assert.match(tikz, /\\coordinate \(curvewire0\) at \(0,0\);/)
-  assert.match(tikz, /\\coordinate \(curvewire1\) at \(1,2\);/)
+  assert.match(tikz, /\\coordinate \(curvePolywire0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolywire1\) at \(1,2\);/)
   assert.doesNotMatch(tikz, /\(0,0,0\)/)
 })
 
@@ -23,7 +23,7 @@ test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
   assert.match(tikz, /x=\{\(1cm,0cm\)\}/)
   assert.match(tikz, /y=\{\(0\.45cm,0\.25cm\)\}/)
   assert.match(tikz, /z=\{\(0cm,1cm\)\}/)
-  assert.match(tikz, /\\coordinate \(curveline0\) at \(0,0,1\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyline0\) at \(0,0,1\);/)
 })
 
 test('2D output has codim 1 curves and codim 2 points', () => {
@@ -176,12 +176,67 @@ test('hollow points are emitted with white fill', () => {
   assert.match(tikz, /fill=white/)
 })
 
+test('curve coordinate names distinguish polyline and cubic Bezier curves', () => {
+  const tikz = generateTikz(createCurveNamingDiagram())
+
+  assert.match(tikz, /\\coordinate \(curvePolywire0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePolywire1\) at \(1,0\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierarc0\) at \(0,1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierarc1\) at \(1,2\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierarc2\) at \(2,2\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierarc3\) at \(3,1\);/)
+  assert.match(tikz, /\(curvePolywire0\) -- \(curvePolywire1\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierarc0\) \.\. controls \(curveBezierarc1\) and \(curveBezierarc2\) \.\. \(curveBezierarc3\);/,
+  )
+  assert.doesNotMatch(tikz, /curvecurve/)
+})
+
 function assertIncludesSection(tikz: string, title: string): void {
   assert.match(tikz, new RegExp(`% ${escapeRegExp(title)}`))
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function createCurveNamingDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'wire',
+      name: 'Wire',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'cubicBezier',
+      id: 'arc',
+      name: 'Arc',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 2, z: 0 },
+        { x: 2, y: 2, z: 0 },
+        { x: 3, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 1,
+    },
+  )
+
+  return diagram
 }
 
 function createTwoDimensionalDiagram(): Diagram {
