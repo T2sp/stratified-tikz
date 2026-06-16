@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { absoluteCubicBezierPointsFromControlMode } from '../../src/geometry/bezierControls.ts'
 import {
   cubicBezierToSvgPath,
   polylineToSvgPath,
@@ -8,7 +9,7 @@ import {
 } from '../../src/rendering/svgPath.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import type { Diagram } from '../../src/model/types.ts'
+import type { CubicBezierControlMode, Diagram } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
 import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
@@ -44,6 +45,44 @@ test('cubicBezierToSvgPath emits a cubic SVG path for four points', () => {
     ]),
     'M 0,0 C 1,2 3,2 4,0',
   )
+})
+
+test('cubic Bezier SVG path uses stored absolute points rather than control metadata', () => {
+  const absolutePoints = [
+    { x: 0, y: 0, z: 0 },
+    { x: 99, y: 0, z: 1 },
+    { x: 2, y: 0, z: 2 },
+    { x: 3, y: 0, z: 3 },
+  ]
+  const metadata: CubicBezierControlMode = {
+    kind: 'workPlaneRelativeCartesian',
+    frame: {
+      origin: { x: 0, y: 0, z: 0 },
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 0, z: 1 },
+      normal: { x: 0, y: -1, z: 0 },
+    },
+    localStart: { a: 0, b: 0 },
+    localEnd: { a: 3, b: 3 },
+    firstControlOffset: { dx: 1, dy: 1 },
+    secondControlOffset: { dx: -1, dy: -1 },
+    secondOffsetReference: 'end',
+  }
+  const metadataPoints = absoluteCubicBezierPointsFromControlMode(
+    3,
+    absolutePoints[0],
+    absolutePoints[3],
+    metadata,
+  )
+  const pathFromStoredPoints = cubicBezierToSvgPath(
+    absolutePoints.map((point) => ({ x: point.x, y: point.z })),
+  )
+  const pathFromMetadata = cubicBezierToSvgPath(
+    (metadataPoints ?? []).map((point) => ({ x: point.x, y: point.z })),
+  )
+
+  assert.equal(pathFromStoredPoints, 'M 0,0 C 99,1 2,2 3,3')
+  assert.notEqual(pathFromStoredPoints, pathFromMetadata)
 })
 
 test('line styles map to SVG dash arrays', () => {

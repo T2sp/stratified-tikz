@@ -644,7 +644,7 @@ test('plane-local polyline direct creation converts every vertex', () => {
 
 test('plane-local cubic Bezier direct creation converts absolute point-like inputs', () => {
   const result = addCubicBezierCurveFromDirectInput(
-    threeDimensionalExample,
+    emptyThreeDimensionalDiagram,
     [
       { x: '0', y: '0', z: '0' },
       { x: '1', y: '2', z: '0' },
@@ -669,6 +669,138 @@ test('plane-local cubic Bezier direct creation converts absolute point-like inpu
     { x: 13, y: 20, z: 34 },
     { x: 15, y: 20, z: 36 },
   ])
+})
+
+test('plane-local relative Cartesian cubic Bezier creation stores frame metadata and absolute controls', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: '2', y: '3', z: '0' },
+      { x: '6', y: '7', z: '0' },
+      { x: '2', y: '-1', z: '0' },
+      { x: '-3', y: '4', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+      directControlMode: 'relativeCartesian',
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, result.id)
+
+  assert.deepEqual(curve.points, [
+    { x: 12, y: 20, z: 33 },
+    { x: 14, y: 20, z: 32 },
+    { x: 13, y: 20, z: 41 },
+    { x: 16, y: 20, z: 37 },
+  ])
+  assert.deepEqual(curve.bezierControls, {
+    kind: 'workPlaneRelativeCartesian',
+    frame: expectedFrameSnapshot,
+    localStart: { a: 2, b: 3 },
+    localEnd: { a: 6, b: 7 },
+    firstControlOffset: { dx: 2, dy: -1 },
+    secondControlOffset: { dx: -3, dy: 4 },
+    secondOffsetReference: 'end',
+  })
+})
+
+test('plane-local relative polar cubic Bezier creation stores frame metadata and angle-radius controls', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    threeDimensionalExample,
+    [
+      { x: '1', y: '2', z: '0' },
+      { x: '5', y: '6', z: '0' },
+      { x: '0', y: '2', z: '0' },
+      { x: '90', y: '3', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+      directControlMode: 'relativePolar',
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, result.id)
+
+  assert.equal(curve.bezierControls?.kind, 'workPlaneRelativePolar')
+  assert.deepEqual(curve.points[1], { x: 13, y: 20, z: 32 })
+  assert.ok(Math.abs(curve.points[2].x - 15) < 1e-9)
+  assert.ok(Math.abs(curve.points[2].y - 20) < 1e-9)
+  assert.ok(Math.abs(curve.points[2].z - 39) < 1e-9)
+  assert.deepEqual(curve.bezierControls, {
+    kind: 'workPlaneRelativePolar',
+    frame: expectedFrameSnapshot,
+    localStart: { a: 1, b: 2 },
+    localEnd: { a: 5, b: 6 },
+    firstControl: { angleDegrees: 0, radius: 2 },
+    secondControl: { angleDegrees: 90, radius: 3 },
+    secondOffsetReference: 'end',
+  })
+})
+
+test('plane-local relative Bezier metadata does not depend on later active work-plane changes', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: '1', y: '2', z: '0' },
+      { x: '5', y: '6', z: '0' },
+      { x: '0', y: '2', z: '0' },
+      { x: '90', y: '3', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+      directControlMode: 'relativePolar',
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const laterActiveWorkPlane: WorkPlane = {
+    kind: 'axisAligned',
+    plane: 'xy',
+    offset: 999,
+  }
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(laterActiveWorkPlane.offset, 999)
+  assert.match(tikz, /\\coordinate \(curveBezierCubicBezier0p1\) at \(13,20,32\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierCubicBezier0p2\) at \(15,20,39\);/)
+  assert.doesNotMatch(tikz, /\+\(0:2\)/)
+})
+
+test('global 3D relative polar cubic Bezier creation remains unsupported', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    threeDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '1', y: '0', z: '0' },
+      { x: '0', y: '2', z: '0' },
+      { x: '90', y: '3', z: '0' },
+    ],
+    { directControlMode: 'relativePolar' },
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected global 3D relative polar creation to be rejected.')
+  }
+  assert.equal(result.error, 'unsupportedAmbientDimension')
 })
 
 test('plane-local sheet direct creation converts vertices onto the plane', () => {
@@ -1307,6 +1439,13 @@ const testCustomWorkPlane: WorkPlane = {
   v: { x: 0, y: 0, z: 1 },
   normal: { x: 0, y: -1, z: 0 },
   source: { kind: 'originNormal' },
+}
+
+const expectedFrameSnapshot = {
+  origin: { x: 10, y: 20, z: 30 },
+  u: { x: 1, y: 0, z: 0 },
+  v: { x: 0, y: 0, z: 1 },
+  normal: { x: 0, y: -1, z: 0 },
 }
 
 function findCurve(diagram: Diagram, id: string): CurveStratum {

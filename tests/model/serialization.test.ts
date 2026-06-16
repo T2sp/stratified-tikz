@@ -252,6 +252,54 @@ test('diagram serialization round trips relative Bezier control metadata', () =>
   assert.deepEqual(result.diagram, diagramWithRelativeBezier)
 })
 
+test('diagram serialization round trips work-plane-local Bezier control metadata', () => {
+  const diagramWithLocalBezier: Diagram = {
+    ...threeDimensionalExample,
+    strata: [
+      ...threeDimensionalExample.strata,
+      {
+        codim: 2,
+        geometricKind: 'curve',
+        kind: 'cubicBezier',
+        id: 'local-relative-round-trip',
+        name: 'Local relative round trip',
+        style: {
+          kind: 'curveStyle',
+          strokeColor: '#000000',
+          strokeOpacity: 1,
+          lineWidth: 1.2,
+          lineStyle: 'solid',
+        },
+        points: [
+          { x: 12, y: 20, z: 33 },
+          { x: 14, y: 20, z: 32 },
+          { x: 13, y: 20, z: 41 },
+          { x: 16, y: 20, z: 37 },
+        ],
+        bezierControls: {
+          kind: 'workPlaneRelativeCartesian',
+          frame: localBezierFrame,
+          localStart: { a: 2, b: 3 },
+          localEnd: { a: 6, b: 7 },
+          firstControlOffset: { dx: 2, dy: -1 },
+          secondControlOffset: { dx: -3, dy: 4 },
+          secondOffsetReference: 'end',
+        },
+        styleSegments: [],
+        layer: 3,
+      },
+    ],
+  }
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagramWithLocalBezier))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram, diagramWithLocalBezier)
+})
+
 test('parseSavedDiagramJson rejects invalid relative Bezier metadata', () => {
   const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
     diagram: Diagram
@@ -292,6 +340,99 @@ test('parseSavedDiagramJson rejects invalid relative Bezier metadata', () => {
     throw new Error('Expected invalid relative Bezier metadata to fail.')
   }
   assert.match(result.error, /radius/)
+})
+
+test('parseSavedDiagramJson rejects invalid work-plane-local Bezier metadata', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'invalid-local-relative',
+    name: 'Invalid local relative',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+    points: [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 32 },
+      { x: 13, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    bezierControls: {
+      kind: 'workPlaneRelativeCartesian',
+      frame: {
+        ...localBezierFrame,
+        u: { x: 2, y: 0, z: 0 },
+      },
+      localStart: { a: 2, b: 3 },
+      localEnd: { a: 6, b: 7 },
+      firstControlOffset: { dx: 2, dy: -1 },
+      secondControlOffset: { dx: -3, dy: 4 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected invalid local relative Bezier metadata to fail.')
+  }
+  assert.match(result.error, /frame/)
+})
+
+test('parseSavedDiagramJson rejects inconsistent work-plane-local Bezier endpoint metadata', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'invalid-local-endpoint',
+    name: 'Invalid local endpoint',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+    points: [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 32 },
+      { x: 13, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    bezierControls: {
+      kind: 'workPlaneRelativeCartesian',
+      frame: localBezierFrame,
+      localStart: { a: 99, b: 3 },
+      localEnd: { a: 6, b: 7 },
+      firstControlOffset: { dx: 2, dy: -1 },
+      secondControlOffset: { dx: -3, dy: 4 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected inconsistent endpoint metadata to fail.')
+  }
+  assert.match(result.error, /localStart/)
 })
 
 test('parseSavedDiagramJson rejects non-string path labels', () => {
@@ -353,3 +494,10 @@ test('serializeDiagram excludes active custom work-plane UI state', () => {
   assert.equal(serialized.includes('camera-leak-p0'), false)
   assert.equal(serialized.includes('existingPointStrata'), false)
 })
+
+const localBezierFrame = {
+  origin: { x: 10, y: 20, z: 30 },
+  u: { x: 1, y: 0, z: 0 },
+  v: { x: 0, y: 0, z: 1 },
+  normal: { x: 0, y: -1, z: 0 },
+}

@@ -1,5 +1,6 @@
 import {
   absoluteCubicBezierPointsFromControlMode,
+  cubicBezierControlModeLabel,
   relativeCartesianControlModeFromPoints,
   relativePolarControlModeFromPoints,
 } from '../../geometry/bezierControls.ts'
@@ -25,7 +26,10 @@ import {
 import { formatSelectedGeometry } from './geometryPreview.ts'
 import type { DiagramChangeHandler } from './types.ts'
 
-type InspectorBezierControlMode = CubicBezierControlMode['kind']
+type InspectorBezierControlMode =
+  | 'absolute'
+  | 'relativeCartesian'
+  | 'relativePolar'
 
 export type CurveGeometryEditorProps = {
   diagram: Diagram
@@ -38,14 +42,22 @@ export function CurveGeometryEditor({
   curve,
   onDiagramChange,
 }: CurveGeometryEditorProps) {
-  const bezierControlMode = curve.bezierControls?.kind ?? 'absolute'
+  const bezierControlMode = editableInspectorBezierControlMode(
+    curve.bezierControls,
+  )
 
   return (
     <section className="inspector-section">
       <h3>Geometry</h3>
       <div className="inspector-form">
         <ReadOnlyField label="Curve kind" value={curve.kind} />
-        {curve.kind === 'cubicBezier' && (
+        {curve.kind === 'cubicBezier' && bezierControlMode === null && (
+          <ReadOnlyField
+            label="Bezier control mode"
+            value={cubicBezierControlModeLabel(curve.bezierControls)}
+          />
+        )}
+        {curve.kind === 'cubicBezier' && bezierControlMode !== null && (
           <EditableSelectField
             label="Bezier control mode"
             value={bezierControlMode}
@@ -470,4 +482,20 @@ function bezierControlModeOptions(
   return ambientDimension === 2
     ? ['absolute', 'relativeCartesian', 'relativePolar']
     : ['absolute', 'relativeCartesian']
+}
+
+function editableInspectorBezierControlMode(
+  controlMode: CubicBezierControlMode | undefined,
+): InspectorBezierControlMode | null {
+  switch (controlMode?.kind ?? 'absolute') {
+    case 'absolute':
+      return 'absolute'
+    case 'relativeCartesian':
+      return 'relativeCartesian'
+    case 'relativePolar':
+      return 'relativePolar'
+    case 'workPlaneRelativeCartesian':
+    case 'workPlaneRelativePolar':
+      return null
+  }
 }

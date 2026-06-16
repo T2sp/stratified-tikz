@@ -140,6 +140,15 @@ P = origin + a u + b v
 The created point is committed as an ordinary model-space `Vec3`. The active
 work plane remains editor/UI state and is not saved as diagram data.
 
+For cubic Bézier direct creation, absolute controls are ordinary point rows.
+Relative Cartesian controls use start, end, first offset, and second offset
+rows, with the second offset relative to the end point. Relative polar controls
+use start, end, first angle/radius, and second angle/radius rows. Global 3D
+relative polar creation is not supported; in 3D, polar relative controls are
+available only in active work-plane local mode. In that mode, the committed
+curve still stores absolute `Vec3` Bézier points for rendering and editing, and
+also stores curve-level work-plane frame metadata for later local TikZ export.
+
 Direct input is the canonical precise input method.
 
 ### Cursor input mode
