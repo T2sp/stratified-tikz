@@ -45,6 +45,7 @@ const phaseSlugs = {
   "10D": "cursor-drag-handle-editing",
   "10E": "multi-step-undo-and-redo",
   "11": "improve-control-points",
+  "11C": "relative-bezier-tikz-export",
 };
 
 function makePhaseSpec(phase) {
