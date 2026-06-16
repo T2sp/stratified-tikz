@@ -60,6 +60,12 @@ const phaseSlugs = {
   "13B": "inspector-layout-stabilization",
   "13C": "workplane-toolbar-reorganization",
   "13D": "coordinate-source-highlighting",
+  "13E": "orthographic-camera-model",
+    "13F": "camera-controls-ui",
+    "13G": "camera-aware-creation-dragging",
+    "13H": "camera-presets-save-load",
+    "13I": "tikz-camera-export-alignment",
+    "13J": "perspective-projection-hardening",
 };
 
 function makePhaseSpec(phase) {
