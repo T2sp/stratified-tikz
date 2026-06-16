@@ -103,6 +103,26 @@ export type CurveStyleSegment = {
   style: PartialCurveStyle
 }
 
+export type CubicBezierPolarControl = {
+  angleDegrees: number
+  radius: number
+}
+
+export type CubicBezierControlMode =
+  | { kind: 'absolute' }
+  | {
+      kind: 'relativeCartesian'
+      firstControlOffset: Vec3
+      secondControlOffset: Vec3
+      secondOffsetReference: 'end'
+    }
+  | {
+      kind: 'relativePolar'
+      firstControl: CubicBezierPolarControl
+      secondControl: CubicBezierPolarControl
+      secondOffsetReference: 'end'
+    }
+
 export type PointStyle = {
   kind: 'pointStyle'
   color: HexColor
@@ -172,6 +192,7 @@ export type CurveStratum = {
   pathLabel?: string
   style: CurveStyle
   points: Vec3[]
+  bezierControls?: CubicBezierControlMode
   styleSegments: CurveStyleSegment[]
   layer: number
 }

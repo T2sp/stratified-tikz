@@ -10,6 +10,7 @@ import type {
   TextLabel,
   Vec3,
 } from '../model/types'
+import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import { findSelectedElement, type SelectedElement } from './selection.ts'
 
@@ -143,6 +144,14 @@ function createCurveGeometrySection(
     title: 'Geometry',
     fields: [
       { label: 'Curve kind', value: curve.kind },
+      ...(curve.kind === 'cubicBezier'
+        ? [
+            {
+              label: 'Bezier control mode',
+              value: cubicBezierControlModeLabel(curve.bezierControls),
+            },
+          ]
+        : []),
       { label: 'Style segments', value: String(curve.styleSegments.length) },
       ...describeCurvePoints(curve).map((description) => ({
         label: description.label,

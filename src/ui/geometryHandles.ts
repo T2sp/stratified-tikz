@@ -96,12 +96,16 @@ function updateCurvePoint(
     }
 
     changed = true
-    return {
+    const updatedStratum = {
       ...stratum,
       points: stratum.points.map((point, index) =>
         index === pointIndex ? position : point,
       ),
     }
+
+    return stratum.kind === 'cubicBezier'
+      ? { ...updatedStratum, bezierControls: { kind: 'absolute' as const } }
+      : updatedStratum
   })
 
   return changed ? { ...diagram, strata } : diagram

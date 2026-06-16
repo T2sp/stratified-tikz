@@ -17,6 +17,7 @@ import type {
   Camera2D,
   Camera3D,
   CoordinateInputMode,
+  CubicBezierControlMode,
   CurveKind,
   CurveStratum,
   CurveStyle,
@@ -80,6 +81,7 @@ export type CreateCurveStratumInput = {
   pathLabel?: string
   style?: CurveStyle
   points: Vec3[]
+  bezierControls?: CubicBezierControlMode
   styleSegments?: CurveStyleSegment[]
   layer?: number
 }
@@ -219,6 +221,7 @@ export function createCurveStratum({
   pathLabel,
   style = defaultCurveStyle,
   points,
+  bezierControls,
   styleSegments = [],
   layer = 0,
 }: CreateCurveStratumInput): CurveStratum {
@@ -234,6 +237,10 @@ export function createCurveStratum({
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
     layer,
+  }
+
+  if (bezierControls !== undefined) {
+    curve.bezierControls = cloneCubicBezierControlMode(bezierControls)
   }
 
   if (pathLabel !== undefined) {
@@ -294,6 +301,29 @@ function cloneCurveStyleSegment(segment: CurveStyleSegment): CurveStyleSegment {
   return {
     ...segment,
     style: { ...segment.style },
+  }
+}
+
+function cloneCubicBezierControlMode(
+  controlMode: CubicBezierControlMode,
+): CubicBezierControlMode {
+  switch (controlMode.kind) {
+    case 'absolute':
+      return { kind: 'absolute' }
+    case 'relativeCartesian':
+      return {
+        kind: 'relativeCartesian',
+        firstControlOffset: cloneVec3(controlMode.firstControlOffset),
+        secondControlOffset: cloneVec3(controlMode.secondControlOffset),
+        secondOffsetReference: controlMode.secondOffsetReference,
+      }
+    case 'relativePolar':
+      return {
+        kind: 'relativePolar',
+        firstControl: { ...controlMode.firstControl },
+        secondControl: { ...controlMode.secondControl },
+        secondOffsetReference: controlMode.secondOffsetReference,
+      }
   }
 }
 

@@ -1,3 +1,4 @@
+import { absoluteCubicBezierPointsFromControlMode } from '../geometry/bezierControls.ts'
 import {
   isHexColor,
   isLabelAnchor,
@@ -10,6 +11,7 @@ import {
 import { sheetVertices } from './sheets.ts'
 import type {
   Camera,
+  CubicBezierControlMode,
   CurveStratum,
   CurveStyle,
   CurveStyleSegment,
@@ -222,6 +224,13 @@ function validateCurveStratum(
     )
   }
 
+  validateCubicBezierControlMode(
+    stratum,
+    ambientDimension,
+    `${path}.bezierControls`,
+    errors,
+  )
+
   validateCurveStyle(stratum.style, `${path}.style`, errors)
   validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
   stratum.points.forEach((point, index) => {
@@ -233,6 +242,157 @@ function validateCurveStratum(
     )
   })
   validateCurveStyleSegments(stratum.styleSegments, `${path}.styleSegments`, errors)
+}
+
+function validateCubicBezierControlMode(
+  stratum: CurveStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  const controlMode = stratum.bezierControls
+
+  if (controlMode === undefined) {
+    return
+  }
+
+  if (stratum.kind !== 'cubicBezier') {
+    pushError(errors, path, 'Bezier control metadata is valid only on cubic Bezier curves.')
+    return
+  }
+
+  switch (controlMode.kind) {
+    case 'absolute':
+      return
+    case 'relativeCartesian':
+      validateRelativeCartesianControlMode(controlMode, ambientDimension, path, errors)
+      validateRelativeControlModeMatchesPoints(
+        stratum,
+        ambientDimension,
+        controlMode,
+        path,
+        errors,
+      )
+      return
+    case 'relativePolar':
+      validateRelativePolarControlMode(controlMode, ambientDimension, path, errors)
+      validateRelativeControlModeMatchesPoints(
+        stratum,
+        ambientDimension,
+        controlMode,
+        path,
+        errors,
+      )
+      return
+    default:
+      pushError(errors, `${path}.kind`, 'Bezier control mode is not supported.')
+  }
+}
+
+function validateRelativeCartesianControlMode(
+  controlMode: Extract<CubicBezierControlMode, { kind: 'relativeCartesian' }>,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (controlMode.secondOffsetReference !== 'end') {
+    pushError(
+      errors,
+      `${path}.secondOffsetReference`,
+      'Second relative Bezier control offset must be relative to the end point.',
+    )
+  }
+
+  validateVec3ForAmbient(
+    controlMode.firstControlOffset,
+    ambientDimension,
+    `${path}.firstControlOffset`,
+    errors,
+  )
+  validateVec3ForAmbient(
+    controlMode.secondControlOffset,
+    ambientDimension,
+    `${path}.secondControlOffset`,
+    errors,
+  )
+}
+
+function validateRelativePolarControlMode(
+  controlMode: Extract<CubicBezierControlMode, { kind: 'relativePolar' }>,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 2) {
+    pushError(
+      errors,
+      path,
+      'Relative polar Bezier controls are supported only in 2D diagrams.',
+    )
+  }
+
+  if (controlMode.secondOffsetReference !== 'end') {
+    pushError(
+      errors,
+      `${path}.secondOffsetReference`,
+      'Second relative Bezier polar control must be relative to the end point.',
+    )
+  }
+
+  validatePolarControl(controlMode.firstControl, `${path}.firstControl`, errors)
+  validatePolarControl(controlMode.secondControl, `${path}.secondControl`, errors)
+}
+
+function validatePolarControl(
+  control: { angleDegrees: number; radius: number },
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateFinite(control.angleDegrees, `${path}.angleDegrees`, errors)
+  validateFinite(control.radius, `${path}.radius`, errors)
+
+  if (Number.isFinite(control.radius) && control.radius < 0) {
+    pushError(errors, `${path}.radius`, 'Bezier polar control radius must be non-negative.')
+  }
+}
+
+function validateRelativeControlModeMatchesPoints(
+  stratum: CurveStratum,
+  ambientDimension: 2 | 3,
+  controlMode: CubicBezierControlMode,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (stratum.points.length !== 4) {
+    return
+  }
+
+  const expectedPoints = absoluteCubicBezierPointsFromControlMode(
+    ambientDimension,
+    stratum.points[0],
+    stratum.points[3],
+    controlMode,
+  )
+
+  if (expectedPoints === null) {
+    return
+  }
+
+  if (!pointsApproximatelyEqual(stratum.points[1], expectedPoints[1])) {
+    pushError(
+      errors,
+      `${path}.firstControl`,
+      'Bezier relative first control metadata must match the stored absolute control point.',
+    )
+  }
+
+  if (!pointsApproximatelyEqual(stratum.points[2], expectedPoints[2])) {
+    pushError(
+      errors,
+      `${path}.secondControl`,
+      'Bezier relative second control metadata must match the stored absolute control point.',
+    )
+  }
 }
 
 function validatePointStratum(
@@ -600,6 +760,16 @@ function validateLayer(
   errors: DiagramValidationIssue[],
 ): void {
   validateFinite(layer, path, errors)
+}
+
+function pointsApproximatelyEqual(first: Vec3, second: Vec3): boolean {
+  const epsilon = 1e-9
+
+  return (
+    Math.abs(first.x - second.x) <= epsilon &&
+    Math.abs(first.y - second.y) <= epsilon &&
+    Math.abs(first.z - second.z) <= epsilon
+  )
 }
 
 function pushError(

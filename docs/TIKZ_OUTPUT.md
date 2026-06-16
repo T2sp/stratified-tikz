@@ -226,6 +226,43 @@ Coordinates should be emitted as:
 \coordinate (p2) at (1,0,1);
 ```
 
+## Cubic Bézier controls
+
+Absolute cubic Bézier curves export as before: start, both control points, and
+end may be declared as named coordinates, and the path uses those names:
+
+```tex
+\draw (p0) .. controls (p1) and (p2) .. (p3);
+```
+
+When a cubic Bézier curve stores relative Cartesian control metadata, only the
+start and end coordinates need to be declared for that path. The controls are
+emitted inline using TikZ relative control syntax:
+
+```tex
+\draw (p0) .. controls +(dx1,dy1) and +(dx2,dy2) .. (p3);
+```
+
+In 3D diagrams, relative Cartesian controls use the same coordinate arity as
+the rest of the 3D output:
+
+```tex
+\draw (p0) .. controls +(dx1,dy1,dz1) and +(dx2,dy2,dz2) .. (p3);
+```
+
+When a 2D cubic Bézier curve stores relative polar control metadata, the
+controls are emitted as:
+
+```tex
+\draw (p0) .. controls +(angle1:radius1) and +(angle2:radius2) .. (p3);
+```
+
+Relative control modes generally do not emit independent `\coordinate`
+declarations for the two control points. SVG rendering still uses the stored
+absolute control-point coordinates. Relative polar TikZ export is intentionally
+limited to 2D diagrams; arbitrary 3D polar controls need an explicit local
+plane basis before they can be exported without ambiguity.
+
 ## Output sections in 2D mode
 
 In 2D mode, group output as:

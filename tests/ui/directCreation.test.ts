@@ -285,6 +285,95 @@ test('direct cubic Bezier creation rejects invalid and non-finite input', () => 
   assert.equal(result.error, 'invalidCoordinates')
 })
 
+test('direct relative Cartesian cubic Bezier creation stores metadata and absolute controls', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    twoDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '10', y: '10', z: '0' },
+      { x: '1', y: '2', z: '0' },
+      { x: '-3', y: '4', z: '0' },
+    ],
+    { directControlMode: 'relativeCartesian', layer: 6 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, result.id)
+
+  assert.equal(curve.kind, 'cubicBezier')
+  assert.deepEqual(curve.points, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 2, z: 0 },
+    { x: 7, y: 14, z: 0 },
+    { x: 10, y: 10, z: 0 },
+  ])
+  assert.deepEqual(curve.bezierControls, {
+    kind: 'relativeCartesian',
+    firstControlOffset: { x: 1, y: 2, z: 0 },
+    secondControlOffset: { x: -3, y: 4, z: 0 },
+    secondOffsetReference: 'end',
+  })
+  assert.match(
+    generateTikz(result.diagram),
+    /\.\. controls \+\(1,2\) and \+\(-3,4\) \.\./,
+  )
+})
+
+test('direct relative polar cubic Bezier creation stores metadata and uses polar export', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    twoDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '5', y: '5', z: '0' },
+      { x: '0', y: '2', z: '0' },
+      { x: '90', y: '3', z: '0' },
+    ],
+    { directControlMode: 'relativePolar', layer: 6 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, result.id)
+
+  assert.equal(curve.kind, 'cubicBezier')
+  assert.deepEqual(curve.bezierControls, {
+    kind: 'relativePolar',
+    firstControl: { angleDegrees: 0, radius: 2 },
+    secondControl: { angleDegrees: 90, radius: 3 },
+    secondOffsetReference: 'end',
+  })
+  assert.match(
+    generateTikz(result.diagram),
+    /\.\. controls \+\(0:2\) and \+\(90:3\) \.\./,
+  )
+})
+
+test('direct relative polar cubic Bezier creation rejects negative radii', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    twoDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '5', y: '5', z: '0' },
+      { x: '0', y: '-2', z: '0' },
+      { x: '90', y: '3', z: '0' },
+    ],
+    { directControlMode: 'relativePolar' },
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected negative radius to be rejected.')
+  }
+  assert.equal(result.error, 'invalidCoordinates')
+})
+
 test('direct 3D polygon sheet creation commits ordinary sheet data on the selected layer', () => {
   const result = addPolygonSheetFromDirectInput(
     threeDimensionalExample,
