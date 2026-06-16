@@ -11,7 +11,10 @@ import { pointOnWorkPlane, workPlaneToBasis } from './workPlane.ts'
 
 type BasisVector2D = Vec2
 
-export function projectVec3(camera: Camera, point: Vec3): Vec2 {
+// Projection is deliberately separate from work-plane geometry. Work planes live
+// in model space; camera/projection data only maps model points to screen
+// coordinates and screen coordinates back onto a chosen model-space plane.
+export function projectModelToScreen(point: Vec3, camera: Camera): Vec2 {
   if (camera.mode === '2d') {
     return {
       x: camera.origin.x + camera.scale * point.x,
@@ -35,6 +38,10 @@ export function projectVec3(camera: Camera, point: Vec3): Vec2 {
   }
 }
 
+export function projectVec3(camera: Camera, point: Vec3): Vec2 {
+  return projectModelToScreen(point, camera)
+}
+
 export function screenToModel2D(camera: Camera2D, screenPoint: Vec2): Vec3 {
   assertUsableScale(camera.scale)
 
@@ -46,10 +53,32 @@ export function screenToModel2D(camera: Camera2D, screenPoint: Vec2): Vec3 {
 }
 
 export function screenToModelOnWorkPlane(
+  screenPoint: Vec2,
+  workPlane: WorkPlane,
+  camera: Camera,
+): Vec3
+export function screenToModelOnWorkPlane(
   camera: Camera,
   screenPoint: Vec2,
   workPlane: WorkPlane,
+): Vec3
+export function screenToModelOnWorkPlane(
+  first: Camera | Vec2,
+  second: Vec2 | WorkPlane,
+  third: WorkPlane | Camera,
 ): Vec3 {
+  const { camera, screenPoint, workPlane } = isCamera(first)
+    ? {
+        camera: first,
+        screenPoint: second as Vec2,
+        workPlane: third as WorkPlane,
+      }
+    : {
+        camera: third as Camera,
+        screenPoint: first,
+        workPlane: second as WorkPlane,
+      }
+
   if (camera.mode === '2d') {
     return screenToModel2D(camera, screenPoint)
   }
@@ -127,4 +156,8 @@ function assertUsableScale(scale: number): void {
   if (!Number.isFinite(scale) || scale === 0) {
     throw new Error('Camera scale must be a finite nonzero number.')
   }
+}
+
+function isCamera(value: Camera | Vec2): value is Camera {
+  return 'mode' in value
 }

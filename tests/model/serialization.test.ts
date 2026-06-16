@@ -10,7 +10,7 @@ import {
   savedDiagramVersion,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
-import type { Diagram } from '../../src/model/types.ts'
+import type { Diagram, WorkPlane } from '../../src/model/types.ts'
 
 test('serializeDiagram includes format, version, and diagram data', () => {
   const serialized = serializeDiagram(twoDimensionalExample)
@@ -294,4 +294,27 @@ test('serializeDiagram does not include editor-only state', () => {
   assert.equal(serialized.includes('future'), false)
   assert.equal(serialized.includes('undoDiagram'), false)
   assert.equal(serialized.includes('copyStatus'), false)
+})
+
+test('serializeDiagram excludes active custom work-plane UI state', () => {
+  const activeWorkPlane: WorkPlane = {
+    kind: 'custom',
+    id: 'camera-leak-sentinel-plane',
+    name: 'Camera Leak Sentinel',
+    origin: { x: 91, y: 92, z: 93 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+    source: {
+      kind: 'existingPointStrata',
+      pointIds: ['camera-leak-p0', 'camera-leak-p1', 'camera-leak-p2'],
+    },
+  }
+  const serialized = serializeDiagram(twoDimensionalExample)
+
+  assert.equal(activeWorkPlane.kind, 'custom')
+  assert.equal(serialized.includes('camera-leak-sentinel-plane'), false)
+  assert.equal(serialized.includes('Camera Leak Sentinel'), false)
+  assert.equal(serialized.includes('camera-leak-p0'), false)
+  assert.equal(serialized.includes('existingPointStrata'), false)
 })

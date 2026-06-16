@@ -420,6 +420,33 @@ export function normalizeActiveWorkPlaneForAmbientDimension(
   return validateWorkPlane(workPlane).valid ? workPlane : { kind: 'xy', z: 0 }
 }
 
+export function normalizeActiveWorkPlaneForDiagram(
+  diagram: Diagram,
+  workPlane: WorkPlane,
+): WorkPlane {
+  const normalized = normalizeActiveWorkPlaneForAmbientDimension(
+    diagram.ambientDimension,
+    workPlane,
+  )
+
+  if (
+    normalized.kind !== 'custom' ||
+    normalized.source.kind !== 'existingPointStrata'
+  ) {
+    return normalized
+  }
+
+  const availablePointIds = new Set(
+    diagram.strata
+      .filter((stratum): stratum is PointStratum => stratum.geometricKind === 'point')
+      .map((point) => point.id),
+  )
+
+  return normalized.source.pointIds.every((id) => availablePointIds.has(id))
+    ? normalized
+    : { kind: 'xy', z: 0 }
+}
+
 export function shouldShowWorkPlaneControls(
   ambientDimension: AmbientDimension,
 ): boolean {

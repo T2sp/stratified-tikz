@@ -200,6 +200,16 @@ generation except through committed model coordinates. Work-plane controls are
 hidden in 2D mode, and entering 2D mode resets the active work plane to the
 ordinary xy-plane at `z = 0`.
 
+Projection/camera state is separate from work-plane geometry. The editor maps a
+model point to screen coordinates through camera/projection data, and maps a
+screen point back to model space by intersecting it with the currently active
+model-space work plane. Work-plane definitions must not store camera-specific
+assumptions. Saving/loading diagrams and TikZ export use committed diagram
+coordinates only, never transient active work-plane or point-picking state.
+Loading a diagram resets active work-plane UI state; undo/redo validates or
+clears point-picking and active custom-plane source IDs when the referenced
+point strata no longer exist.
+
 When a custom work plane is active in 3D, the canvas shows a preview-only guide
 with a translucent plane patch, outline, origin marker, direction indicators for
 `u` and `v`, a normal indicator, and a `custom work plane` label. The guide is

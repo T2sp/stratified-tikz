@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { twoDimensionalExample } from '../../src/examples/index.ts'
+import {
+  projectModelToScreen,
+  screenToModelOnWorkPlane,
+} from '../../src/geometry/projection.ts'
+import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
+import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
-import type { Diagram, Vec3 } from '../../src/model/types.ts'
+import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
 import {
   addPointStratumWithResult,
   addPolylineCurveStratumWithResult,
@@ -28,6 +34,7 @@ type TestEditorState = UndoableEditorState & {
   cubicBezierDraft: null | { points: Vec3[] }
   sheetPolygonDraft: null | { points: Vec3[] }
   directFormText: string
+  activeWorkPlane: WorkPlane
 }
 
 test('multi-step undo restores previous diagrams in reverse order', () => {
@@ -114,6 +121,22 @@ test('UI-only state changes do not create history entries', () => {
   assert.equal(canUndoDiagramChange(committed.history), false)
 })
 
+test('changing active work plane does not create a diagram history entry', () => {
+  const initial = createUndoState(createNamedPointDiagram('A'))
+  const customWorkPlane = constructWorkPlaneFromThreePoints(
+    { x: 0, y: 0, z: 1 },
+    { x: 1, y: 0, z: 1 },
+    { x: 0, y: 1, z: 1 },
+  )
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    activeWorkPlane: customWorkPlane,
+  })
+
+  assert.deepEqual(committed.activeWorkPlane, customWorkPlane)
+  assert.equal(canUndoDiagramChange(committed.history), false)
+})
+
 test('creation undo removes point and redo restores it', () => {
   const initial = createUndoState(createEmptyExampleDiagram())
   const result = addPointStratumWithResult(
@@ -134,6 +157,38 @@ test('creation undo removes point and redo restores it', () => {
 
   assert.equal(hasStratum(undone.editableDiagram, result.id), false)
   assert.equal(undone.selectedElement, null)
+  assert.equal(hasStratum(redone.editableDiagram, result.id), true)
+})
+
+test('geometry created on a custom plane remains ordinary undoable diagram data', () => {
+  const initial = createUndoState(createEmptyDiagram({ ambientDimension: 3 }))
+  const customWorkPlane = constructWorkPlaneFromThreePoints(
+    { x: 0, y: 0, z: 2 },
+    { x: 1, y: 0, z: 2 },
+    { x: 0, y: 1, z: 2 },
+  )
+  const committedModelPoint = screenToModelOnWorkPlane(
+    projectModelToScreen({ x: 1, y: 1, z: 2 }, camera3D),
+    customWorkPlane,
+    camera3D,
+  )
+  const result = addPointStratumWithResult(
+    initial.editableDiagram,
+    committedModelPoint,
+    { id: 'custom-plane-point', layer: 0 },
+  )
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'stratum', id: result.id },
+    activeWorkPlane: customWorkPlane,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.deepEqual(committedModelPoint, { x: 1, y: 1, z: 2 })
+  assert.equal(hasStratum(committed.editableDiagram, result.id), true)
+  assert.equal(hasStratum(undone.editableDiagram, result.id), false)
   assert.equal(hasStratum(redone.editableDiagram, result.id), true)
 })
 
@@ -276,8 +331,19 @@ function createUndoState(
     cubicBezierDraft: null,
     sheetPolygonDraft: null,
     directFormText: '',
+    activeWorkPlane: { kind: 'xy', z: 0 },
     history: createDiagramHistory(editableDiagram),
   }
+}
+
+const camera3D: Camera3D = {
+  mode: '3d',
+  projection: 'orthographic',
+  xVector: [1, 0],
+  yVector: [0.5, 0.25],
+  zVector: [0, 1],
+  scale: 10,
+  origin: { x: 100, y: 50 },
 }
 
 function createNamedPointDiagram(name: string): Diagram {

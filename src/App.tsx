@@ -67,6 +67,7 @@ import {
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
+  normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
@@ -339,6 +340,12 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setActiveWorkPlane(
+      normalizeActiveWorkPlaneForAmbientDimension(nextDiagram.ambientDimension, {
+        kind: 'xy',
+        z: 0,
+      }),
+    )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
   }
@@ -377,6 +384,7 @@ function App() {
     setSelectedExampleId(previousDiagram.ambientDimension === 2 ? '2d' : '3d')
     geometryDragUndoDiagramRef.current = null
     setEditorState((current) => undoLastDiagramChange(current))
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
@@ -397,6 +405,7 @@ function App() {
     setSelectedExampleId(nextDiagram.ambientDimension === 2 ? '2d' : '3d')
     geometryDragUndoDiagramRef.current = null
     setEditorState((current) => redoLastDiagramChange(current))
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
@@ -482,6 +491,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
     setSaveLoadStatus('loaded')
@@ -542,8 +552,8 @@ function App() {
 
   useEffect(() => {
     setActiveWorkPlane((current) =>
-      normalizeActiveWorkPlaneForAmbientDimension(
-        editableDiagram.ambientDimension,
+      normalizeActiveWorkPlaneForDiagram(
+        editableDiagram,
         current,
       ),
     )
@@ -770,9 +780,9 @@ function App() {
         modelPoint = normalizePointForAmbientDimension(
           current.editableDiagram.ambientDimension,
           screenToModelOnWorkPlane(
-            previewCamera,
             { x: svgPoint.x, y: viewportHeight - svgPoint.y },
             placementWorkPlane,
+            previewCamera,
           ),
         )
       } catch {
@@ -928,9 +938,9 @@ function App() {
         modelPoint = normalizePointForAmbientDimension(
           current.editableDiagram.ambientDimension,
           screenToModelOnWorkPlane(
-            previewCamera,
             { x: svgPoint.x, y: viewportHeight - svgPoint.y },
             activeWorkPlane,
+            previewCamera,
           ),
         )
       } catch {
