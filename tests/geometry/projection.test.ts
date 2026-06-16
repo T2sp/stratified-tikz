@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   normalizePointForAmbientDimension,
+  projectModelToScreen,
   projectVec3,
   screenToModel2D,
   screenToModelOnWorkPlane,
@@ -39,6 +40,13 @@ test('projects Vec3 with a 3D orthographic camera', () => {
   )
 })
 
+test('projectModelToScreen maps model points without work-plane input', () => {
+  assertVec2AlmostEqual(
+    projectModelToScreen({ x: 2, y: 4, z: 3 }, camera3D),
+    { x: 140, y: 90 },
+  )
+})
+
 test('converts screen coordinates to model coordinates in 2D', () => {
   assertVec3AlmostEqual(
     screenToModel2D(camera2D, { x: 120, y: 20 }),
@@ -51,7 +59,7 @@ test('converts cursor input on an xy work plane', () => {
   const screenPoint = projectVec3(camera3D, modelPoint)
 
   assertVec3AlmostEqual(
-    screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'xy', z: 3 }),
+    screenToModelOnWorkPlane(screenPoint, { kind: 'xy', z: 3 }, camera3D),
     modelPoint,
   )
 })
@@ -61,7 +69,7 @@ test('converts cursor input on an xz work plane', () => {
   const screenPoint = projectVec3(camera3D, modelPoint)
 
   assertVec3AlmostEqual(
-    screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'xz', y: 4 }),
+    screenToModelOnWorkPlane(screenPoint, { kind: 'xz', y: 4 }, camera3D),
     modelPoint,
   )
 })
@@ -71,7 +79,7 @@ test('converts cursor input on a yz work plane', () => {
   const screenPoint = projectVec3(camera3D, modelPoint)
 
   assertVec3AlmostEqual(
-    screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'yz', x: 2 }),
+    screenToModelOnWorkPlane(screenPoint, { kind: 'yz', x: 2 }, camera3D),
     modelPoint,
   )
 })
@@ -86,15 +94,25 @@ test('converts cursor input on a custom work plane', () => {
   const screenPoint = projectVec3(camera3D, modelPoint)
 
   assertVec3AlmostEqual(
-    screenToModelOnWorkPlane(camera3D, screenPoint, workPlane),
+    screenToModelOnWorkPlane(screenPoint, workPlane, camera3D),
     modelPoint,
   )
 })
 
 test('converts cursor input with a 2D camera to z = 0', () => {
   assertVec3AlmostEqual(
-    screenToModelOnWorkPlane(camera2D, { x: 120, y: 20 }, { kind: 'xy', z: 12 }),
+    screenToModelOnWorkPlane({ x: 120, y: 20 }, { kind: 'xy', z: 12 }, camera2D),
     { x: 2, y: -3, z: 0 },
+  )
+})
+
+test('keeps legacy camera-first work-plane projection calls compatible', () => {
+  const modelPoint = { x: 2, y: 4, z: 3 }
+  const screenPoint = projectVec3(camera3D, modelPoint)
+
+  assertVec3AlmostEqual(
+    screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'xy', z: 3 }),
+    modelPoint,
   )
 })
 

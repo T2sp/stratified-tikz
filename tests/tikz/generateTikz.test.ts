@@ -13,6 +13,7 @@ import type {
   PointStratum,
   PointStyle,
   SheetStyle,
+  WorkPlane,
 } from '../../src/model/types.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
@@ -30,6 +31,26 @@ test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
   assert.match(tikz, /y=\{\(0\.45cm,0\.25cm\)\}/)
   assert.match(tikz, /z=\{\(0cm,1cm\)\}/)
   assert.match(tikz, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
+})
+
+test('TikZ export excludes active work-plane guide and UI state', () => {
+  const activeWorkPlane: WorkPlane = {
+    kind: 'custom',
+    id: 'tikz-leak-sentinel-plane',
+    name: 'TikZ Leak Sentinel',
+    origin: { x: 10, y: 20, z: 30 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+    source: { kind: 'threePoints' },
+  }
+  const tikz = generateTikz(createThreeDimensionalDiagram())
+
+  assert.equal(activeWorkPlane.kind, 'custom')
+  assert.doesNotMatch(tikz, /tikz-leak-sentinel-plane/)
+  assert.doesNotMatch(tikz, /TikZ Leak Sentinel/)
+  assert.doesNotMatch(tikz, /work-plane-preview/)
+  assert.doesNotMatch(tikz, /custom work plane/)
 })
 
 test('2D output has codim 1 curves and codim 2 points', () => {

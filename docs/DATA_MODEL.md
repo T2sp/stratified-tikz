@@ -78,6 +78,9 @@ saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
+Loading a diagram resets transient work-plane UI state to the default xy-plane
+at `z = 0`; subsequent editor updates may validate the active work plane against
+the loaded diagram, but no active work-plane data is read from the JSON file.
 
 ## Camera
 
@@ -151,6 +154,11 @@ limit of 100 past states. Undo moves backward through committed diagrams; redo
 cancels undo by moving forward through the future stack. Selection, layer
 filter, coordinate input mode, active work plane, direct form values, and draft
 geometry are not stored in history, and history is never saved to JSON.
+Changing the active work plane does not create a history entry. Geometry created
+through cursor input on a work plane is committed as ordinary `Vec3` diagram
+data, so undo/redo treats it the same as direct-coordinate creation. Undo and
+redo clear work-plane point-picking state and validate the remaining active
+work plane against the current diagram.
 
 ## Work planes
 
@@ -210,11 +218,30 @@ uses their current `Vec3` positions to construct the active custom plane. The
 constructed plane may carry `source.kind: "existingPointStrata"` metadata in
 editor state, but neither the active work plane nor the picker state is part of
 `Diagram` serialization or TikZ export.
+If an active custom plane carries existing-point source IDs and any referenced
+point stratum is removed by load, undo/redo, or editing, the editor resets the
+active plane to the default xy-plane rather than keeping stale IDs.
 
 Cursor-created points, free text labels, polylines, cubic Bezier curves, and
 polygon sheets use the active custom plane in 3D. Canvas clicks are projected
 onto that plane, then committed as ordinary global `Vec3` coordinates in the
 diagram model. Direct-input creation remains global-coordinate based.
+
+## Projection and camera separation
+
+Work planes are model-space geometry. Cameras/projections are mappings between
+model coordinates and screen coordinates. The intended helper boundary is:
+
+```ts
+projectModelToScreen(point, cameraOrProjection);
+screenToModelOnWorkPlane(screenPoint, workPlane, cameraOrProjection);
+```
+
+The current 3D projection remains orthographic and simple, but custom work-plane
+data must not encode camera assumptions. A custom plane stores only model-space
+`Vec3` origin, basis, normal, and optional editor-source metadata. Future camera
+orbit, pan, or zoom work should change projection data and rendering helpers
+without changing the saved diagram or work-plane model.
 
 ## Strata
 

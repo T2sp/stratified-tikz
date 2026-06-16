@@ -32,6 +32,11 @@ The TikZ generator must use the model coordinates stored in the diagram.
 It must not care whether the coordinates were created by direct input or cursor input.
 
 Coordinate input mode belongs to the editor state, not to the TikZ output.
+Active work-plane state also belongs to the editor state. Axis-aligned work
+planes, custom work planes, work-plane point-picking state, camera preview
+guides, and work-plane labels are never exported. They affect TikZ only
+indirectly when cursor-created geometry has already been committed to the
+diagram as ordinary model coordinates.
 
 ## Coordinate names
 

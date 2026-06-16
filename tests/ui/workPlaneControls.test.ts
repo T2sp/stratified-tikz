@@ -6,6 +6,7 @@ import {
   applyCustomThreePointWorkPlaneInput,
   cancelWorkPlanePointPicking,
   inactiveWorkPlanePointPickingState,
+  normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
@@ -198,6 +199,74 @@ test('switching to 2D resets active work plane to xy at z equals 0', () => {
   assert.equal(customResult.ok, true)
   assert.deepEqual(
     normalizeActiveWorkPlaneForAmbientDimension(2, customResult.workPlane),
+    { kind: 'xy', z: 0 },
+  )
+})
+
+test('loading a diagram can reset active custom work-plane UI state', () => {
+  const diagram = createPointPickingDiagram()
+  const activeWorkPlane = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 0 },
+    3,
+    diagram,
+    { active: true, pickedPointIds: ['p0', 'p1', 'p2'] },
+  ).workPlane
+  const loadedDiagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  assert.deepEqual(
+    normalizeActiveWorkPlaneForDiagram(loadedDiagram, activeWorkPlane),
+    { kind: 'xy', z: 0 },
+  )
+})
+
+test('active custom planes from existing points are valid only while source points exist', () => {
+  const diagram = createPointPickingDiagram()
+  const activeWorkPlane = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 0 },
+    3,
+    diagram,
+    { active: true, pickedPointIds: ['p0', 'p1', 'p2'] },
+  ).workPlane
+
+  assert.strictEqual(
+    normalizeActiveWorkPlaneForDiagram(diagram, activeWorkPlane),
+    activeWorkPlane,
+  )
+
+  assert.deepEqual(
+    normalizeActiveWorkPlaneForDiagram(
+      {
+        ...diagram,
+        strata: diagram.strata.filter((stratum) => stratum.id !== 'p1'),
+      },
+      activeWorkPlane,
+    ),
+    { kind: 'xy', z: 0 },
+  )
+})
+
+test('active custom planes from existing points reset through undo and redo diagram changes', () => {
+  const diagramWithSourcePoints = createPointPickingDiagram()
+  const activeWorkPlane = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 0 },
+    3,
+    diagramWithSourcePoints,
+    { active: true, pickedPointIds: ['p0', 'p1', 'p2'] },
+  ).workPlane
+  const diagramAfterUndoingSourcePoint: Diagram = {
+    ...diagramWithSourcePoints,
+    strata: diagramWithSourcePoints.strata.filter(
+      (stratum) => stratum.id !== 'p2',
+    ),
+  }
+  const resetWorkPlane = normalizeActiveWorkPlaneForDiagram(
+    diagramAfterUndoingSourcePoint,
+    activeWorkPlane,
+  )
+
+  assert.deepEqual(resetWorkPlane, { kind: 'xy', z: 0 })
+  assert.deepEqual(
+    normalizeActiveWorkPlaneForDiagram(diagramWithSourcePoints, resetWorkPlane),
     { kind: 'xy', z: 0 },
   )
 })
