@@ -7,6 +7,7 @@ import {
   cross,
   dot,
   norm,
+  normalizeVector,
   pointOnWorkPlane,
   projectPointToWorkPlaneCoordinates,
   validateWorkPlane,
@@ -109,6 +110,105 @@ test('constructed custom work planes have an approximate orthonormal basis', () 
   assertVec3AlmostEqual(cross(plane.u, plane.v), plane.normal)
 })
 
+test('normalizeVector rejects invalid epsilon values', () => {
+  assertNormalizeRejectsInvalidEpsilon(Number.NaN)
+  assertNormalizeRejectsInvalidEpsilon(Number.POSITIVE_INFINITY)
+  assertNormalizeRejectsInvalidEpsilon(Number.NEGATIVE_INFINITY)
+  assertNormalizeRejectsInvalidEpsilon(0)
+  assertNormalizeRejectsInvalidEpsilon(-1)
+})
+
+test('normalizeVector supports default and finite positive epsilon values', () => {
+  assertVec3AlmostEqual(normalizeVector({ x: 0, y: 3, z: 4 }), {
+    x: 0,
+    y: 0.6,
+    z: 0.8,
+  })
+  assertVec3AlmostEqual(normalizeVector({ x: 10, y: 0, z: 0 }, 1e-12), {
+    x: 1,
+    y: 0,
+    z: 0,
+  })
+})
+
+test('work plane constructors reject invalid epsilon values', () => {
+  for (const epsilon of invalidEpsilonValues) {
+    assert.throws(
+      () =>
+        constructWorkPlaneFromOriginNormal(
+          { x: 0, y: 0, z: 0 },
+          { x: 0, y: 0, z: 1 },
+          { epsilon },
+        ),
+      /epsilon must be a finite positive number/,
+    )
+    assert.throws(
+      () =>
+        constructWorkPlaneFromThreePoints(
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+          { x: 0, y: 1, z: 0 },
+          { epsilon },
+        ),
+      /epsilon must be a finite positive number/,
+    )
+  }
+})
+
+test('validateWorkPlane rejects invalid epsilon values before validation checks', () => {
+  const validPlane = constructWorkPlaneFromOriginNormal(
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 1 },
+  )
+
+  for (const epsilon of invalidEpsilonValues) {
+    assert.throws(
+      () => validateWorkPlane(validPlane, epsilon),
+      /epsilon must be a finite positive number/,
+    )
+  }
+})
+
+test('validateWorkPlane cannot pass malformed bases with invalid epsilon', () => {
+  const invalidPlane: WorkPlane = {
+    kind: 'custom',
+    id: 'bad-plane',
+    name: 'Bad plane',
+    origin: { x: 0, y: 0, z: 0 },
+    u: { x: 2, y: 0, z: 0 },
+    v: { x: 1, y: 0, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+    source: { kind: 'originNormal' },
+  }
+
+  assert.throws(
+    () => validateWorkPlane(invalidPlane, Number.POSITIVE_INFINITY),
+    /epsilon must be a finite positive number/,
+  )
+  assert.throws(
+    () => validateWorkPlane(invalidPlane, Number.NaN),
+    /epsilon must be a finite positive number/,
+  )
+  assert.equal(validateWorkPlane(invalidPlane).valid, false)
+})
+
+test('work plane helpers support valid finite positive epsilon values', () => {
+  const originNormalPlane = constructWorkPlaneFromOriginNormal(
+    { x: 0, y: 0, z: 2 },
+    { x: 0, y: 0, z: 8 },
+    { epsilon: 1e-8 },
+  )
+  const threePointPlane = constructWorkPlaneFromThreePoints(
+    { x: 0, y: 0, z: 2 },
+    { x: 1, y: 0, z: 2 },
+    { x: 0, y: 1, z: 2 },
+    { epsilon: 1e-8 },
+  )
+
+  assert.equal(validateWorkPlane(originNormalPlane, 1e-8).valid, true)
+  assert.equal(validateWorkPlane(threePointPlane, 1e-8).valid, true)
+})
+
 test('axis-aligned work planes preserve legacy coordinate behavior', () => {
   assertVec3AlmostEqual(
     pointOnWorkPlane({ kind: 'xy', z: 3 }, 2, 4),
@@ -155,6 +255,26 @@ test('validateWorkPlane rejects invalid custom bases without producing coordinat
   assert.match(validation.errors.map((error) => error.message).join('\n'), /normalized/)
   assert.throws(() => workPlaneToBasis(invalidPlane), /Invalid work plane/)
 })
+
+const invalidEpsilonValues = [
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+  Number.NEGATIVE_INFINITY,
+  0,
+  -1,
+] as const
+
+function assertNormalizeRejectsInvalidEpsilon(epsilon: number): void {
+  let normalized: Vec3 | null = null
+
+  assert.throws(
+    () => {
+      normalized = normalizeVector({ x: 0, y: 0, z: 0 }, epsilon)
+    },
+    /epsilon must be a finite positive number/,
+  )
+  assert.equal(normalized, null)
+}
 
 function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
   assertAlmostEqual(actual.x, expected.x)

@@ -1,4 +1,4 @@
-# Phase 12A Fix Prompt: Validate WorkPlane epsilon inputs
+Phase 12A Fix Prompt: Validate malformed axis-aligned work-plane names
 
 Environment
 
@@ -30,25 +30,24 @@ Review result:
 
 Medium issue:
 
-* src/geometry/workPlane.ts exports geometry helpers that accept optional epsilon.
-* These helpers do not validate epsilon.
-* With epsilon = NaN, normalizeVector({ x: 0, y: 0, z: 0 }, NaN) returns { x: NaN, y: NaN, z: NaN } instead of rejecting.
-* With epsilon = Infinity or epsilon = NaN, validateWorkPlane can disable normalized/orthogonal/handedness checks.
+* src/geometry/workPlane.ts has an AxisAlignedWorkPlane shape.
+* validateWorkPlane accepts malformed axis-aligned planes when plane is not one of:
+    * "xy";
+    * "xz";
+    * "yz".
+* It only validates offset.
+* Then workPlaneToBasis calls axisAlignedBasis with the invalid name.
+* axisAlignedBasis returns undefined rather than a rejected validation result.
 * This violates Phase 12A requirements:
     * invalid inputs must be rejected;
-    * helpers must not produce NaN or infinite geometry;
-    * validation must not silently pass invalid work-plane data.
+    * exported geometry helpers should not silently accept malformed work-plane data;
+    * coordinate/basis helpers should not run on invalid axis-aligned plane names.
 
 Goal
 
-Validate WorkPlane epsilon inputs everywhere they are accepted.
+Add runtime validation for AxisAlignedWorkPlane.plane.
 
-Invalid epsilon values must not allow:
-
-* NaN vectors;
-* infinite vectors;
-* false-positive validation;
-* disabled normalization/orthogonality/handedness checks.
+Malformed axis-aligned work-plane names must be rejected before workPlaneToBasis or coordinate helpers run.
 
 This is a targeted Phase 12A fix.
 
@@ -69,8 +68,8 @@ Do not implement:
 Do not change:
 
 * WorkPlane model shape unless absolutely necessary;
-* existing valid work-plane construction behavior;
-* axis-aligned work-plane behavior;
+* valid axis-aligned work-plane behavior;
+* valid custom work-plane behavior;
 * TikZ output;
 * save/load;
 * diagram data model.
@@ -80,78 +79,93 @@ Required fix
 Inspect:
 
 * src/geometry/workPlane.ts;
-* normalizeVector;
-* origin+normal work-plane constructor;
-* three-point work-plane constructor;
+* AxisAlignedWorkPlane;
+* axisAlignedWorkPlane;
+* axisAlignedBasis;
 * validateWorkPlane;
-* any other exported WorkPlane geometry helper that accepts an optional epsilon.
+* workPlaneToBasis;
+* coordinate conversion helpers using axis-aligned planes.
 
-Add centralized epsilon validation.
+Add a runtime validator for axis-aligned plane names.
 
-Preferred helper:
+Allowed values:
 
-function validateEpsilon(epsilon: number): number {
-  if (!Number.isFinite(epsilon) || epsilon <= 0) {
-    throw new Error("epsilon must be a finite positive number.");
-  }
-  return epsilon;
+"xy" | "xz" | "yz"
+
+Suggested helper:
+
+function isAxisAlignedPlaneName(value: unknown): value is "xy" | "xz" | "yz" {
+  return value === "xy" || value === "xz" || value === "yz";
 }
 
-The exact name can differ.
+or:
 
-Requirements:
+function assertAxisAlignedPlaneName(value: unknown): "xy" | "xz" | "yz" {
+  if (value !== "xy" && value !== "xz" && value !== "yz") {
+    throw new Error("Axis-aligned work-plane name must be one of xy, xz, or yz.");
+  }
+  return value;
+}
 
-1. epsilon = NaN is rejected.
-2. epsilon = Infinity is rejected.
-3. epsilon = -Infinity is rejected.
-4. epsilon = 0 is rejected.
-5. negative epsilon is rejected.
-6. valid finite positive epsilon still works.
-7. default epsilon still works.
-8. normalizeVector must never return a vector containing NaN or Infinity.
-9. constructors must not accept invalid epsilon.
-10. validateWorkPlane must not accept invalid epsilon or use it to bypass normalized/orthogonal/handedness checks.
-11. invalid epsilon should fail loudly and consistently, preferably by throwing, if that matches the existing validation style.
+Use whichever style is consistent with existing validation.
 
-Specific cases to fix
+Required behavior
 
-normalizeVector
+axisAlignedWorkPlane
 
-Current bad behavior:
+If axisAlignedWorkPlane is exported or can receive runtime values, validate its plane argument.
 
-normalizeVector({ x: 0, y: 0, z: 0 }, NaN)
+Required:
 
-may return:
-
-{ x: NaN, y: NaN, z: NaN }
-
-Required behavior:
-
-* reject invalid epsilon before comparing norms;
-* reject zero vector correctly;
-* never return non-finite components.
-
-WorkPlane constructors
-
-Both construction paths should validate epsilon:
-
-* constructWorkPlaneFromOriginNormal(..., epsilon?);
-* constructWorkPlaneFromThreePoints(..., epsilon?);
-* any options object carrying epsilon.
-
-Invalid epsilon should prevent construction.
+* axisAlignedWorkPlane("xy", offset) works;
+* axisAlignedWorkPlane("xz", offset) works;
+* axisAlignedWorkPlane("yz", offset) works;
+* malformed values such as "zy", "abc", "", null, undefined, or a number are rejected at runtime;
+* non-finite offset continues to be rejected.
 
 validateWorkPlane
 
-validateWorkPlane(plane, epsilon) or equivalent must validate epsilon before using it.
+For axis-aligned planes, validate both:
 
-Invalid epsilon must not make checks vacuous.
+* plane.plane;
+* plane.offset.
 
-In particular:
+Required:
 
-* epsilon = Infinity must not make every norm/dot/cross check pass;
-* epsilon = NaN must not accidentally bypass checks;
-* invalid epsilon should throw or return validation failure consistently with existing style.
+* valid axis-aligned planes pass;
+* malformed axis-aligned plane names fail validation or throw according to existing validation style;
+* invalid plane names must not be treated as valid merely because offset is finite.
+
+If validateWorkPlane currently returns boolean, return false for malformed axis-aligned names.
+
+If validateWorkPlane currently throws for invalid inputs, throw consistently.
+
+axisAlignedBasis
+
+Ensure axisAlignedBasis cannot silently return undefined for invalid names in a way that later helpers treat as acceptable.
+
+Acceptable approaches:
+
+1. make axisAlignedBasis validate and throw on invalid plane names;
+2. make it return an explicit failure result;
+3. make callers validate before calling and still guard defensively.
+
+Preferred:
+
+* centralize validation and throw clearly for invalid runtime values.
+
+workPlaneToBasis
+
+Ensure workPlaneToBasis rejects malformed axis-aligned planes before returning basis data.
+
+Required:
+
+* no undefined basis is returned;
+* no downstream helper receives an invalid plane name silently.
+
+Coordinate helpers
+
+If there are helpers converting points to/from work-plane coordinates, ensure malformed axis-aligned plane names are rejected before use.
 
 Tests
 
@@ -159,18 +173,20 @@ Add focused regression tests.
 
 Required tests:
 
-1. normalizeVector rejects NaN epsilon.
-2. normalizeVector rejects Infinity epsilon.
-3. normalizeVector rejects -Infinity epsilon.
-4. normalizeVector rejects zero epsilon.
-5. normalizeVector rejects negative epsilon.
-6. normalizeVector with invalid epsilon never returns non-finite vector components.
-7. constructWorkPlaneFromOriginNormal rejects invalid epsilon.
-8. constructWorkPlaneFromThreePoints rejects invalid epsilon.
-9. validateWorkPlane rejects invalid epsilon.
-10. validateWorkPlane does not pass malformed/non-orthonormal planes under epsilon = Infinity or NaN.
-11. Valid finite positive epsilon still works.
-12. Default epsilon still works.
+1. axisAlignedWorkPlane("xy", finiteOffset) succeeds.
+2. axisAlignedWorkPlane("xz", finiteOffset) succeeds.
+3. axisAlignedWorkPlane("yz", finiteOffset) succeeds.
+4. axisAlignedWorkPlane("zy" as any, finiteOffset) is rejected.
+5. axisAlignedWorkPlane("abc" as any, finiteOffset) is rejected.
+6. axisAlignedWorkPlane("" as any, finiteOffset) is rejected.
+7. axisAlignedWorkPlane(null as any, finiteOffset) is rejected if TypeScript/runtime path allows testing it.
+8. axisAlignedWorkPlane(undefined as any, finiteOffset) is rejected if practical.
+9. validateWorkPlane rejects an axis-aligned object with malformed plane.
+10. workPlaneToBasis rejects an axis-aligned object with malformed plane.
+11. Coordinate conversion helpers reject malformed axis-aligned plane names if applicable.
+12. Existing valid xy, xz, yz tests still pass.
+
+Use as any in tests where needed to simulate malformed runtime data that bypasses TypeScript.
 
 Also ensure existing Phase 12A tests still pass:
 
@@ -179,15 +195,15 @@ Also ensure existing Phase 12A tests still pass:
 * axis-aligned compatibility;
 * local/global coordinate conversion;
 * invalid point/vector cases;
+* invalid epsilon tests;
 * patch finiteness tests.
 
 Documentation / comments
 
-If useful, add a short comment near the epsilon helper:
+If useful, add a short comment near the axis-aligned validation helper:
 
-* epsilon must be finite and positive;
-* invalid epsilon is treated as invalid input;
-* geometry helpers should not use invalid tolerance values.
+* runtime validation is needed because malformed objects may come from parsed JSON, tests, or unsafe casts;
+* valid axis-aligned plane names are exactly "xy", "xz", and "yz".
 
 Do not add large unrelated documentation.
 
@@ -195,14 +211,15 @@ Preserve existing behavior
 
 Do not regress:
 
+* valid xy, xz, yz work planes;
 * custom WorkPlane model;
 * origin+normal construction;
 * three-point construction;
 * finite basis validation;
 * handedness;
-* axis-aligned xy, xz, yz compatibility;
 * local-to-global and global-to-local coordinate conversion;
-* createWorkPlanePatch size validation/finiteness behavior from the previous fix;
+* createWorkPlanePatch size validation/finiteness behavior;
+* epsilon validation behavior;
 * existing tests.
 
 Verification
@@ -217,11 +234,11 @@ Report after implementation
 Please report:
 
 * files modified;
-* root cause of the epsilon validation issue;
-* centralized epsilon validation policy;
-* which helpers now validate epsilon;
-* how normalizeVector is prevented from returning non-finite vectors;
-* how validateWorkPlane avoids false positives under invalid epsilon;
+* root cause of the malformed axis-aligned validation issue;
+* runtime validation policy for axis-aligned plane names;
+* which helpers now validate axis-aligned plane names;
+* how axisAlignedBasis avoids returning undefined silently;
+* how workPlaneToBasis rejects malformed axis-aligned planes;
 * tests added/updated;
 * test results;
 * build results;

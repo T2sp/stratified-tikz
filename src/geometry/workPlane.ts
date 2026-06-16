@@ -52,17 +52,25 @@ export function normalizeVector(
   vector: Vec3,
   epsilon = DEFAULT_WORK_PLANE_EPSILON,
 ): Vec3 {
+  const tolerance = validateEpsilon(epsilon)
+
   if (!isFiniteVec3(vector)) {
     throw new Error('Cannot normalize a non-finite vector.')
   }
 
   const length = norm(vector)
 
-  if (!Number.isFinite(length) || length <= epsilon) {
+  if (!Number.isFinite(length) || length <= tolerance) {
     throw new Error('Cannot normalize a zero-length vector.')
   }
 
-  return scaleVec3(vector, 1 / length)
+  const normalized = scaleVec3(vector, 1 / length)
+
+  if (!isFiniteVec3(normalized)) {
+    throw new Error('Normalized vector must have finite coordinates.')
+  }
+
+  return normalized
 }
 
 export function addVec3(first: Vec3, second: Vec3): Vec3 {
@@ -102,7 +110,7 @@ export function constructWorkPlaneFromOriginNormal(
   normal: Vec3,
   options: WorkPlaneConstructionOptions = {},
 ): CustomWorkPlane {
-  const epsilon = options.epsilon ?? DEFAULT_WORK_PLANE_EPSILON
+  const epsilon = validateEpsilon(options.epsilon ?? DEFAULT_WORK_PLANE_EPSILON)
 
   assertFiniteVec3(origin, 'origin')
   assertFiniteVec3(normal, 'normal')
@@ -140,7 +148,7 @@ export function constructWorkPlaneFromThreePoints(
   p2: Vec3,
   options: WorkPlaneConstructionOptions = {},
 ): CustomWorkPlane {
-  const epsilon = options.epsilon ?? DEFAULT_WORK_PLANE_EPSILON
+  const epsilon = validateEpsilon(options.epsilon ?? DEFAULT_WORK_PLANE_EPSILON)
 
   assertFiniteVec3(p0, 'p0')
   assertFiniteVec3(p1, 'p1')
@@ -171,6 +179,7 @@ export function validateWorkPlane(
   workPlane: WorkPlane,
   epsilon = DEFAULT_WORK_PLANE_EPSILON,
 ): WorkPlaneValidationResult {
+  const tolerance = validateEpsilon(epsilon)
   const errors: WorkPlaneValidationIssue[] = []
 
   if (isLegacyAxisAlignedWorkPlane(workPlane)) {
@@ -192,16 +201,16 @@ export function validateWorkPlane(
     return validationResult(errors)
   }
 
-  validateUnitVector(workPlane.u, 'u', epsilon, errors)
-  validateUnitVector(workPlane.v, 'v', epsilon, errors)
-  validateUnitVector(workPlane.normal, 'normal', epsilon, errors)
-  validateOrthogonal(workPlane.u, workPlane.v, 'u', 'v', epsilon, errors)
-  validateOrthogonal(workPlane.u, workPlane.normal, 'u', 'normal', epsilon, errors)
-  validateOrthogonal(workPlane.v, workPlane.normal, 'v', 'normal', epsilon, errors)
+  validateUnitVector(workPlane.u, 'u', tolerance, errors)
+  validateUnitVector(workPlane.v, 'v', tolerance, errors)
+  validateUnitVector(workPlane.normal, 'normal', tolerance, errors)
+  validateOrthogonal(workPlane.u, workPlane.v, 'u', 'v', tolerance, errors)
+  validateOrthogonal(workPlane.u, workPlane.normal, 'u', 'normal', tolerance, errors)
+  validateOrthogonal(workPlane.v, workPlane.normal, 'v', 'normal', tolerance, errors)
 
   const handednessError = norm(subtractVec3(cross(workPlane.u, workPlane.v), workPlane.normal))
 
-  if (!Number.isFinite(handednessError) || handednessError > epsilon) {
+  if (!Number.isFinite(handednessError) || handednessError > tolerance) {
     errors.push({
       path: 'normal',
       message: 'Work plane basis must be right-handed: cross(u, v) must equal normal.',
@@ -399,6 +408,15 @@ function validateFiniteNumber(
   if (!Number.isFinite(value)) {
     errors.push({ path, message: 'Value must be finite.' })
   }
+}
+
+function validateEpsilon(epsilon: number): number {
+  // Epsilon is trusted by geometric checks, so invalid tolerances are invalid input.
+  if (!Number.isFinite(epsilon) || epsilon <= 0) {
+    throw new Error('epsilon must be a finite positive number.')
+  }
+
+  return epsilon
 }
 
 function validateFiniteVec3(
