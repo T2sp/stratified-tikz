@@ -106,6 +106,7 @@ export type Camera3D = {
   phiDeg: number;
   zoom: number;
   pan: Vec2;
+  // Deprecated legacy metadata.
   projectionBasis?: {
     xVector: [number, number];
     yVector: [number, number];
@@ -134,10 +135,10 @@ The 3D camera uses the same public angle names as `tikz-3dplot`:
 
 so the model fields are `thetaDeg` and `phiDeg`. The projection is
 orthographic; `zoom` is a positive finite scale factor, and `pan` is a finite
-2D view offset. The resettable `INITIAL_CAMERA_3D` preset matches the previous
-default SVG display. That preset carries an explicit `projectionBasis` for the
-old oblique preview basis (`x = (1,0)`, `y = (0.45,0.25)`, `z = (0,1)`), while
-ordinary angle cameras derive their basis from `thetaDeg` and `phiDeg`.
+2D view offset. `thetaDeg` and `phiDeg` are the source of truth for 3D camera
+orientation. The resettable `INITIAL_CAMERA_3D` preset is derived from those
+angles, and deprecated `projectionBasis` data from old files is not used to
+override preview or export orientation.
 
 For persistence, the 3D camera is saved as diagram-level view metadata:
 

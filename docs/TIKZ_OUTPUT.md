@@ -47,7 +47,9 @@ angles with `\tdplotsetmaincoords{theta}{phi}`. The app may pass the current
 unsaved camera to the generator so the TikZ source matches the live SVG preview
 orientation. If no current camera is passed, the generator uses
 `diagram.view.camera3d`, then the diagram camera, then the initial 3D camera as
-a fallback.
+a fallback. `thetaDeg` and `phiDeg` are the source of truth for 3D orientation;
+deprecated legacy `projectionBasis` metadata is ignored by preview and export
+when those angle fields are present.
 
 Only camera orientation is exported. Zoom and pan remain SVG-view-only and do
 not silently scale or translate TikZ geometry. Resetting the app camera to the

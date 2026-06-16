@@ -224,7 +224,7 @@ test('geometry created on a custom plane remains ordinary undoable diagram data'
   const undone = undoLastDiagramChange(committed)
   const redone = redoLastDiagramChange(undone)
 
-  assert.deepEqual(committedModelPoint, { x: 1, y: 1, z: 2 })
+  assertVec3AlmostEqual(committedModelPoint, { x: 1, y: 1, z: 2 })
   assert.equal(hasStratum(committed.editableDiagram, result.id), true)
   assert.equal(hasStratum(undone.editableDiagram, result.id), false)
   assert.equal(hasStratum(redone.editableDiagram, result.id), true)
@@ -438,6 +438,17 @@ function pointLayer(diagram: Diagram): number {
 function updatePointPosition(diagram: Diagram, position: Vec3): Diagram {
   return updateStratumById(diagram, 'undo-point', (stratum) =>
     stratum.geometricKind === 'point' ? { ...stratum, position } : stratum,
+  )
+}
+
+function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
+  assert.ok(
+    Math.abs(actual.x - expected.x) < 1e-10 &&
+      Math.abs(actual.y - expected.y) < 1e-10 &&
+      Math.abs(actual.z - expected.z) < 1e-10,
+    `Expected ${JSON.stringify(actual)} to be approximately ${JSON.stringify(
+      expected,
+    )}.`,
   )
 }
 

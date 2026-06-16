@@ -57,10 +57,36 @@ test('initial 3D camera exists and validates', () => {
   assert.equal(validateCamera3D(INITIAL_CAMERA_3D).valid, true)
 })
 
-test('initial 3D camera reproduces the previous default projection', () => {
+test('initial 3D camera preview aligns with exported tikz-3dplot angles', () => {
+  const camera = createInitialCamera3D()
+  const point = { x: 2, y: 4, z: 3 }
+
+  assert.equal(camera.projectionBasis, undefined)
   assertVec2AlmostEqual(
-    projectVec3WithCamera({ x: 2, y: 4, z: 3 }, createInitialCamera3D()),
-    { x: 3.8, y: 4 },
+    projectVec3WithCamera(point, camera),
+    projectWithTikz3dplotCamera(camera, point),
+  )
+})
+
+test('deprecated projectionBasis does not override theta and phi projection', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 9,
+    pan: { x: 12, y: -8 },
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.5, 0.25],
+      zVector: [0, 1],
+    },
+  }
+  const point = { x: 2, y: 4, z: 3 }
+
+  assertVec2AlmostEqual(
+    projectVec3(camera, point),
+    projectWithTikz3dplotCamera(camera, point),
   )
 })
 
@@ -138,13 +164,25 @@ test('invalid 3D camera values are rejected', () => {
 })
 
 test('reset helper returns the initial 3D camera', () => {
+  const changedCamera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 80,
+    phiDeg: 120,
+  }
   const resetCamera = resetCameraToInitial()
+  const point = { x: 2, y: 4, z: 3 }
 
+  assert.notDeepEqual(
+    projectVec3(changedCamera, point),
+    projectVec3(resetCamera, point),
+  )
   assert.deepEqual(resetCamera, createInitialCamera3D())
   assert.notEqual(resetCamera, INITIAL_CAMERA_3D)
-  assert.ok(resetCamera.projectionBasis !== undefined)
-  assert.deepEqual(resetCamera.projectionBasis, INITIAL_CAMERA_3D.projectionBasis)
-  assert.notEqual(resetCamera.projectionBasis, INITIAL_CAMERA_3D.projectionBasis)
+  assert.equal(resetCamera.projectionBasis, undefined)
+  assertVec2AlmostEqual(
+    projectVec3(resetCamera, point),
+    projectWithTikz3dplotCamera(resetCamera, point),
+  )
 })
 
 test('projects Vec3 with a 2D camera', () => {
@@ -155,16 +193,20 @@ test('projects Vec3 with a 2D camera', () => {
 })
 
 test('projects Vec3 with a 3D orthographic camera', () => {
+  const point = { x: 2, y: 4, z: 3 }
+
   assertVec2AlmostEqual(
-    projectVec3(camera3D, { x: 2, y: 4, z: 3 }),
-    { x: 140, y: 90 },
+    projectVec3(camera3D, point),
+    projectWithTikz3dplotCamera(camera3D, point),
   )
 })
 
 test('projectModelToScreen maps model points without work-plane input', () => {
+  const point = { x: 2, y: 4, z: 3 }
+
   assertVec2AlmostEqual(
-    projectModelToScreen({ x: 2, y: 4, z: 3 }, camera3D),
-    { x: 140, y: 90 },
+    projectModelToScreen(point, camera3D),
+    projectWithTikz3dplotCamera(camera3D, point),
   )
 })
 
@@ -346,6 +388,25 @@ function assertBasisVectorAlmostEqual(
 ): void {
   assertAlmostEqual(actual[0], expected[0])
   assertAlmostEqual(actual[1], expected[1])
+}
+
+function projectWithTikz3dplotCamera(camera: Camera3D, point: Vec3): Vec2 {
+  const basis = cameraBasisFromTikz3dplotAngles(camera.thetaDeg, camera.phiDeg)
+
+  return {
+    x:
+      camera.pan.x +
+      camera.zoom *
+        (point.x * basis.xVector[0] +
+          point.y * basis.yVector[0] +
+          point.z * basis.zVector[0]),
+    y:
+      camera.pan.y +
+      camera.zoom *
+        (point.x * basis.xVector[1] +
+          point.y * basis.yVector[1] +
+          point.z * basis.zVector[1]),
+  }
 }
 
 function assertAlmostEqual(actual: number, expected: number): void {

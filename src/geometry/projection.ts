@@ -99,6 +99,8 @@ export function validateCamera3D(camera: unknown): Camera3DValidationResult {
   validatePositiveFiniteNumber(camera.zoom, 'zoom', errors)
   validateVec2Like(camera.pan, 'pan', errors)
 
+  // Deprecated legacy bases are accepted for old saved data, but thetaDeg and
+  // phiDeg remain the source of truth for projection and TikZ export.
   if (camera.projectionBasis !== undefined) {
     validateProjectionBasis(camera.projectionBasis, 'projectionBasis', errors)
   }
@@ -108,7 +110,6 @@ export function validateCamera3D(camera: unknown): Camera3DValidationResult {
 
   if (
     errors.length === 0 &&
-    camera.projectionBasis === undefined &&
     typeof thetaDeg === 'number' &&
     typeof phiDeg === 'number' &&
     Number.isFinite(thetaDeg) &&
@@ -334,7 +335,7 @@ function projectVec3ToCameraUnits(camera: Camera3D, point: Vec3): Vec2 {
 }
 
 function projectionBasisFromCamera(camera: Camera3D): Camera3DProjectionBasis {
-  return camera.projectionBasis ?? cameraBasisFromTikz3dplotAngles(
+  return cameraBasisFromTikz3dplotAngles(
     camera.thetaDeg,
     camera.phiDeg,
   )

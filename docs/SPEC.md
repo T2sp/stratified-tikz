@@ -296,6 +296,8 @@ type Camera3D = {
   phiDeg: number;
   zoom: number;
   pan: Vec2;
+  // Deprecated legacy metadata.
+  projectionBasis?: Camera3DProjectionBasis;
 };
 ```
 
@@ -311,10 +313,11 @@ Inverse cursor workflows are structured as:
 screen/SVG point -> orthographic camera ray -> active work-plane intersection
 ```
 
-The resettable initial 3D camera matches the previous/default SVG display. This
-initial preset keeps the old oblique projected basis internally so existing 3D
-examples, axes, work-plane guides, and selected highlights render as before.
-Camera/view state remains separate from work-plane model geometry.
+The resettable initial 3D camera is tikz-3dplot-aligned: its preview basis is
+derived from the same `thetaDeg` and `phiDeg` values exported to TikZ.
+Deprecated `projectionBasis` metadata may appear in old saved data, but it does
+not override the angle-derived preview/export orientation. Camera/view state
+remains separate from work-plane model geometry.
 
 The persisted 3D camera is diagram-level view metadata, stored as
 `diagram.view.camera3d` when present. It is not a stratum and is not work-plane
