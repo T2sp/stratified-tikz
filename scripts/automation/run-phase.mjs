@@ -151,7 +151,7 @@ function runCodex(promptFile, logFile) {
     "--sandbox",
     "workspace-write",
     "-c",
-    "model_reasoning_effort=xhigh",
+    "model_reasoning_effort=high",
     prompt,
   ];
 
