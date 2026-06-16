@@ -1,4 +1,4 @@
-# Phase 12G Review Prompt: Plane-local direct creation
+# Phase 12J Review Prompt: TikZ 3d-library scope export for work-plane-local Béziers
 
 ## Environment
 
@@ -108,40 +108,52 @@ Rules:
 
 ## Goal under review
 
-Phase 12G should implement 3D direct creation using active work-plane local 2D coordinates `(a,b)`, interpreted as:
-
-```ts
-P = origin + a * u + b * v
-```
-
-It should not silently project global `Vec3` inputs. It should provide a distinct direct creation coordinate mode.
+Phase 12J should export eligible 3D work-plane-local relative Bézier curves using TikZ's `3d` library `canvas is plane` scope, with 2D-style relative controls inside the scope.
 
 ## Review checklist
 
-Check:
+For relative polar export, check:
 
-- 3D direct creation forms have a coordinate mode selector for global vs active work-plane local coordinates;
-- global mode preserves existing behavior;
-- plane-local mode uses `(a,b)` inputs, not `(x,y,z)`;
-- conversion uses the active WorkPlane basis helpers;
-- custom plane conversion follows `P = origin + a u + b v`;
-- axis-aligned `xy`, `xz`, `yz` mappings are correct;
-- point, label, polyline, cubic Bézier absolute controls, and sheet direct creation are supported;
-- non-finite `a,b` are rejected;
-- invalid active work plane is rejected;
-- resulting `Vec3` is finite;
-- committed geometry is ordinary diagram data;
-- active work-plane state is not stored in diagram data;
-- layer/filter/selection behavior is preserved;
-- undo/redo behavior is preserved if present;
-- 2D direct creation remains simple and is not confused by 3D work-plane controls.
+- generated TikZ includes `\usetikzlibrary{3d}` when needed;
+- generated TikZ contains a scope with:
+  - `plane origin`;
+  - `plane x`;
+  - `plane y`;
+  - `canvas is plane`;
+- inside the scope, the path uses `.. controls +(q1:r1) and +(q2:r2) ..`;
+- independent `\coordinate` declarations for relative control points are not emitted;
+- start/end coordinates are valid local 2D coordinates;
+- no dangling references.
 
-Medium issues include:
+For relative Cartesian export, check:
 
-- implementing silent global projection instead of local `(a,b)` input;
-- missing support for major direct creation forms;
-- invalid inputs creating geometry;
-- using stale/invalid active work planes;
-- breaking global direct creation.
+- generated TikZ contains a `canvas is plane` scope;
+- path uses `.. controls +(dx1,dy1) and +(dx2,dy2) ..`;
+- independent control coordinate declarations are not emitted.
+
+Fallback behavior:
+
+- 3D absolute Béziers without work-plane-local metadata still use existing absolute 3D syntax;
+- arbitrary 3D curves not representable in one work-plane frame do not get misleading scoped relative export;
+- no plain `+(q:r)` outside `canvas is plane` for arbitrary 3D work-plane-local polar controls;
+- 2D relative export unchanged;
+- non-Bézier export unchanged.
+
+Layer/style behavior:
+
+- layer-aware output preserved;
+- styles preserved;
+- Phase 9A coordinate names preserved where applicable;
+- no dangling coordinate comments/sections.
+
+Library inclusion:
+
+- `\usetikzlibrary{3d}` emitted when needed;
+- always emitting it is Low unless it breaks existing output;
+- missing it when `canvas is plane` is used is Medium or Critical depending on generated TikZ validity.
+
+Tests should cover scoped relative export, omission of control-point coordinates, fallback, 2D regression, and layer-aware output.
+
+Invalid TikZ scope syntax is Critical or Medium depending on severity.
 
 Run verification commands and report results.

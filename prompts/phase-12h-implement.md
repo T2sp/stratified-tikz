@@ -1,4 +1,4 @@
-# Phase 12H Implementation Prompt: TikZ 3d-library scope export for work-plane-local Béziers
+# Phase 12H Implementation Prompt: Existing coordinate sources for direct creation
 
 ## Environment
 
@@ -19,125 +19,418 @@ PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 ```
 
-
 ## Project context
 
 You are working on the StratifiedTikZ project.
 
 Important conventions:
 
-- An n-stratum means codimension n, not dimension.
+- An `n`-stratum means codimension `n`, not dimension.
 - Internally all coordinates are `Vec3`.
 - In 2D, `z` is hidden/locked/ignored and should stay `0`.
-- Active work-plane state is editor/UI state, not `Diagram`.
+- Work-plane state is editor/UI state, not `Diagram`.
 - Work planes are drawing aids, not committed diagram elements.
 - Geometry created on a work plane is committed as ordinary `Vec3` diagram data.
 - Work-plane guides/previews must not be exported to TikZ.
-- Generated TikZ should not depend on transient active UI state.
-- Existing axis-aligned 3D work planes (`xy`, `xz`, `yz`) must keep working.
+- Existing axis-aligned 3D work planes `xy`, `xz`, and `yz` must keep working.
 - Preserve Phase 9A coordinate naming and Phase 9B layer-aware TikZ output.
-
+- Preserve save/load and undo/redo behavior.
 
 ## Goal
 
-Export eligible 3D work-plane-local relative Bézier curves using TikZ's `3d` library `canvas is plane` scope, with 2D-style relative controls inside the scope.
+Implement existing coordinate sources for direct creation.
 
-## Prerequisite
+When directly creating polyline, cubic Bézier, or polygon sheet geometry, users should be able to choose existing coordinates already present in the diagram as sources for starts, ends, breakpoints, vertices, or point-like control inputs.
+
+Supported coordinate sources should include:
+
+- point stratum positions;
+- existing polyline vertices, in both 2D and 3D;
+- existing polygon sheet vertices, in 3D.
+
+If easy and consistent with the current model, cubic Bézier points may also be offered as coordinate sources:
+
+- start;
+- control point 1;
+- control point 2;
+- end.
+
+However, the required sources for this phase are:
+
+- point strata;
+- polyline vertices;
+- polygon sheet vertices.
+
+Initial policy: **copy-on-create, not live linking**.
+
+That means:
+
+- selecting an existing coordinate source copies its current coordinate into the newly created geometry;
+- the new curve/sheet does not remain linked to the source;
+- moving or deleting the original point/polyline/sheet later does not automatically update the newly created geometry.
+
+Do not implement linked/anchored vertices in this phase.
+
+## Prerequisites
 
 Phases 12A-12G are complete.
 
-## Scope
+Plane-local direct creation exists and direct creation forms can use either:
 
-Implement TikZ export for eligible work-plane-local cubic Bézier curves.
+- global coordinates;
+- active work-plane local coordinates.
+
+## Scope
 
 Do not implement:
 
-- new work-plane UI;
-- full camera controls;
-- TikZ import;
-- new curve types.
+- live point references;
+- anchored vertices;
+- automatic updates when source points move;
+- curve/sheet vertex dependencies;
+- TikZ reference-based export;
+- general multi-selection;
+- new curve types;
+- broad UI redesign;
+- new dependencies.
 
-## Required implementation
+Do not change:
 
-When a 3D cubic Bézier curve has relative Cartesian or relative polar metadata in a known work-plane-local frame, export it using TikZ's `3d` library canvas-plane mechanism.
+- coordinate-based direct creation behavior;
+- plane-local direct creation behavior;
+- cursor creation behavior;
+- TikZ export semantics;
+- save/load file format;
+- diagram data model unless absolutely necessary.
 
-Add:
+## Coordinate source model
 
-```tex
-\usetikzlibrary{3d}
+Add a small UI/editor-level representation for coordinate sources.
+
+Suggested shape:
+
+```ts
+type ExistingCoordinateSource =
+  | {
+      kind: "pointStratum";
+      stratumId: string;
+    }
+  | {
+      kind: "polylineVertex";
+      curveId: string;
+      vertexIndex: number;
+    }
+  | {
+      kind: "sheetVertex";
+      sheetId: string;
+      vertexIndex: number;
+    }
+  | {
+      kind: "cubicBezierPoint";
+      curveId: string;
+      pointRole: "start" | "control1" | "control2" | "end";
+    };
 ```
 
-only when needed.
+The `cubicBezierPoint` case is optional if it would make the implementation too large.
 
-Expected export form:
+Coordinate source state belongs to UI/editor state, not to `Diagram`.
 
-```tex
-\begin{scope}[
-  plane origin={(Ox,Oy,Oz)},
-  plane x={(Ox+ux,Oy+uy,Oz+uz)},
-  plane y={(Ox+vx,Oy+vy,Oz+vz)},
-  canvas is plane
-]
-  \draw[<style>]
-    (sx,sy) .. controls +(q1:r1) and +(q2:r2) .. (ex,ey);
-\end{scope}
+Do not store coordinate-source references inside created geometry.
+
+Created geometry should store copied `Vec3` coordinates only.
+
+## Source labels in the UI
+
+The direct creation UI should show human-readable source labels.
+
+Examples:
+
+```text
+Point: P
+Polyline: Boundary / Vertex 1
+Polyline: Boundary / Vertex 2
+Sheet: Surface / Vertex 1
+Sheet: Surface / Vertex 2
 ```
 
-For relative Cartesian controls:
+If cubic Bézier points are supported:
 
-```tex
-.. controls +(dx1,dy1) and +(dx2,dy2) ..
+```text
+Bézier: FLine / Start
+Bézier: FLine / Control point 1
+Bézier: FLine / Control point 2
+Bézier: FLine / End
 ```
 
-For relative polar controls:
+Use one-based labels for user-facing vertex numbers.
 
-```tex
-.. controls +(q1:r1) and +(q2:r2) ..
+Internal indices may remain zero-based.
+
+## Required UI behavior
+
+For point-like fields in direct creation forms, allow the user to choose either:
+
+```text
+Input source:
+  - Coordinates
+  - Existing coordinate
 ```
 
-Coordinate declaration policy:
+Equivalent UI is fine.
 
-- do not emit independent `\coordinate` declarations for relative control points in this mode;
-- local start/end coordinates may be inline inside the scope;
-- if start/end coordinates are named, names must be local or collision-safe;
-- avoid dangling references.
+Required direct creation targets:
 
-Fallback rule:
+In 2D diagrams:
 
-- if a 3D Bézier curve lacks a known work-plane-local frame, export using existing absolute 3D Bézier control syntax;
-- if the curve cannot be represented consistently in one plane, use absolute fallback;
-- never export arbitrary 3D work-plane-local polar controls as plain TikZ `+(q:r)` outside a `canvas is plane` scope.
+- polyline vertices;
+- cubic Bézier start point;
+- cubic Bézier end point;
+- cubic Bézier control points, if the direct UI treats them as absolute point-like controls.
 
-Preserve:
+In 3D diagrams:
 
-- absolute 3D Bézier export;
-- 2D relative Cartesian/polar export;
-- Phase 9A coordinate names;
-- Phase 9B layer-aware output;
-- style output.
+- polyline vertices;
+- cubic Bézier start point;
+- cubic Bézier end point;
+- cubic Bézier control points, if the direct UI treats them as absolute point-like controls;
+- polygon sheet vertices.
+
+For relative Cartesian/polar cubic Bézier controls, existing coordinate sources are optional and may be restricted to start/end in the first implementation.
+
+## 2D behavior
+
+This feature must work in 2D diagrams.
+
+In 2D mode, existing coordinate sources should be available for direct creation of:
+
+- polyline vertices;
+- cubic Bézier start point;
+- cubic Bézier end point;
+- cubic Bézier control points, if the direct UI treats them as point-like absolute controls.
+
+When an existing coordinate source is selected in 2D:
+
+- copy its `x` and `y` coordinates;
+- normalize or preserve `z = 0`;
+- do not expose 3D work-plane-local controls;
+- do not create 3D sheet geometry.
+
+The created curve should be ordinary 2D curve data:
+
+- polyline curves have codim 1;
+- cubic Bézier curves have codim 1;
+- all internal points remain `Vec3`;
+- all internal `z` values should be `0`.
+
+If an existing 2D source somehow has nonzero `z`, normalize it to `0` or reject it consistently with existing 2D validation behavior.
+
+## Copy-on-create behavior
+
+When the user chooses an existing coordinate source:
+
+1. Resolve the source to a current model-space `Vec3`.
+2. Validate that the coordinate is finite.
+3. Apply the current coordinate mode policy.
+4. Commit the copied coordinate into the newly created geometry.
+5. Do not store a reference to the source.
+
+After creation:
+
+- moving the source point does not move the created curve/sheet;
+- editing the source polyline vertex does not move the created curve/sheet;
+- editing the source sheet vertex does not move the created curve/sheet;
+- deleting the source object does not invalidate the created curve/sheet.
+
+This is copy-on-create only.
+
+## Coordinate mode policy
+
+This feature must respect the direct creation coordinate mode.
+
+### Global coordinate mode
+
+If the direct creation form is in global coordinate mode:
+
+- choosing an existing point stratum copies its model-space `Vec3`;
+- choosing an existing polyline vertex copies that vertex’s model-space `Vec3`;
+- choosing an existing sheet vertex copies that vertex’s model-space `Vec3`.
+
+The copied coordinate is used directly.
+
+### Active work-plane local coordinate mode
+
+If the direct creation form is in active work-plane local mode:
+
+Preferred initial policy:
+
+- the selected existing coordinate source is allowed only if it lies on the active work plane within tolerance;
+- the app computes the source coordinate’s local `(a,b)` coordinates in the active work-plane basis;
+- creation then uses those local `(a,b)` coordinates;
+- if the source coordinate is off-plane, reject it with a clear message.
+
+Do not silently project off-plane existing coordinates.
+
+Alternative acceptable policy:
+
+- provide an explicit option such as `Project selected source to active work plane`;
+- if enabled, off-plane sources are orthogonally projected to the active work plane;
+- projection must be explicit, not silent.
+
+For the first implementation, prefer rejecting off-plane sources.
+
+## Source resolution helper
+
+Add a pure helper if useful.
+
+Suggested helper:
+
+```ts
+resolveExistingCoordinateSource(diagram, source): Vec3 | null
+```
+
+or a result-style equivalent.
+
+It should support:
+
+- point stratum position;
+- polyline vertex;
+- polygon sheet vertex;
+- optionally cubic Bézier start/control/end points.
+
+It should reject:
+
+- missing source id;
+- invalid vertex index;
+- non-point source used as point stratum;
+- non-polyline curve used as polyline vertex source;
+- non-sheet source used as sheet vertex source;
+- non-finite coordinates.
+
+Do not throw uncaught errors from UI paths.
+
+## Validation
+
+Required:
+
+- only valid existing coordinate sources may be selected;
+- missing/deleted source IDs are rejected;
+- out-of-range vertex indices are rejected;
+- source coordinates must be finite;
+- plane-local mode validates on-plane condition within tolerance;
+- invalid sources do not create geometry;
+- invalid sources do not partially update the diagram.
+
+## Layer, selection, undo/redo
+
+Preserve existing behavior:
+
+- new geometry uses the selected creation layer;
+- layer filter does not unexpectedly hide created geometry;
+- created geometry is selected according to existing behavior;
+- creation is undoable if undo/redo exists;
+- changing coordinate-source UI fields should not create undo history entries.
 
 ## Tests
 
-Add TikZ tests:
+Add focused tests.
 
-- work-plane-local 3D relative polar Bézier exports with `\usetikzlibrary{3d}`;
-- output contains `scope`, `plane origin`, `plane x`, `plane y`, `canvas is plane`;
-- path inside scope uses `.. controls +(q1:r1) and +(q2:r2) ..`;
-- no independent control-point coordinate declarations for relative controls;
-- work-plane-local 3D relative Cartesian Bézier uses `.. controls +(dx1,dy1) and +(dx2,dy2) ..`;
-- absolute 3D Bézier fallback still works;
-- 2D relative export unchanged;
-- layer-aware output preserved.
+Required tests:
+
+1. Point source:
+   - direct creation using a point stratum copies that point’s position.
+
+2. 2D polyline vertex source:
+   - direct creation using an existing 2D polyline vertex copies its coordinate;
+   - copied coordinate has `z = 0`.
+
+3. 3D polyline vertex source:
+   - direct creation using an existing 3D polyline vertex copies its `Vec3`.
+
+4. 3D sheet vertex source:
+   - direct creation using an existing polygon sheet vertex copies its `Vec3`.
+
+5. Copy-on-create behavior:
+   - after creation, moving the source point/polyline/sheet vertex does not change the created curve/sheet.
+
+6. Global coordinate mode:
+   - source model-space `Vec3` is copied exactly.
+
+7. Plane-local mode:
+   - source coordinate on the active work plane can be used;
+   - local coordinates are computed correctly;
+   - off-plane source is rejected unless explicit projection is implemented.
+
+8. Missing/deleted source IDs are rejected.
+
+9. Invalid vertex indices are rejected.
+
+10. Non-finite source coordinates are rejected.
+
+11. No live source references are stored in created geometry.
+
+12. Non-point strata cannot be used as point-stratum sources.
+
+13. Non-polyline curves cannot be used as polyline vertex sources.
+
+14. Non-sheet strata cannot be used as sheet vertex sources.
+
+If cubic Bézier points are supported as coordinate sources, add tests for:
+
+- start;
+- control point 1;
+- control point 2;
+- end.
 
 ## Documentation
 
-Update `docs/TIKZ_OUTPUT.md`:
+Update docs briefly:
 
-- describe TikZ `3d` scope export;
-- describe fallback behavior;
-- describe no independent control coordinate declarations for scoped relative controls;
-- mention `\usetikzlibrary{3d}` is emitted only when needed.
+- direct creation can use existing coordinate sources;
+- supported sources:
+  - point positions;
+  - polyline vertices;
+  - polygon sheet vertices;
+- source coordinates are copy-on-create;
+- no live linking in this phase;
+- plane-local mode requires source coordinates to lie on the active work plane unless explicit projection is enabled.
 
-## Report
+## Preserve existing behavior
 
-Report files modified, export implementation, library inclusion policy, fallback behavior, coordinate declaration policy, tests, test results, build results, and limitations.
+Do not regress:
+
+- coordinate-based direct creation;
+- plane-local direct creation;
+- cursor creation;
+- layer/filter/selection behavior;
+- inspector editing;
+- save/load;
+- undo/redo;
+- SVG preview;
+- TikZ export.
+
+## Verification
+
+Run:
+
+```bash
+PATH=/opt/homebrew/bin:$PATH npm test
+PATH=/opt/homebrew/bin:$PATH npm run build
+```
+
+## Report after implementation
+
+Please report:
+
+- files modified;
+- UI design for existing coordinate sources;
+- supported source kinds;
+- supported direct creation targets;
+- copy-on-create implementation;
+- plane-local mode policy;
+- whether cubic Bézier points are supported as sources;
+- validation behavior;
+- tests added/updated;
+- test results;
+- build results;
+- remaining limitations.

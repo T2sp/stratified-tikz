@@ -1,4 +1,4 @@
-# Phase 12G Review Prompt: Plane-local direct creation
+# Phase 12I Review Prompt: Work-plane-local cubic Bézier metadata
 
 ## Environment
 
@@ -108,40 +108,34 @@ Rules:
 
 ## Goal under review
 
-Phase 12G should implement 3D direct creation using active work-plane local 2D coordinates `(a,b)`, interpreted as:
-
-```ts
-P = origin + a * u + b * v
-```
-
-It should not silently project global `Vec3` inputs. It should provide a distinct direct creation coordinate mode.
+Phase 12I should persist enough curve-level metadata so eligible 3D relative Cartesian/polar Bézier controls can later be exported in their work-plane-local 2D frame, without relying on current active UI work-plane state.
 
 ## Review checklist
 
 Check:
 
-- 3D direct creation forms have a coordinate mode selector for global vs active work-plane local coordinates;
-- global mode preserves existing behavior;
-- plane-local mode uses `(a,b)` inputs, not `(x,y,z)`;
-- conversion uses the active WorkPlane basis helpers;
-- custom plane conversion follows `P = origin + a u + b v`;
-- axis-aligned `xy`, `xz`, `yz` mappings are correct;
-- point, label, polyline, cubic Bézier absolute controls, and sheet direct creation are supported;
-- non-finite `a,b` are rejected;
-- invalid active work plane is rejected;
-- resulting `Vec3` is finite;
-- committed geometry is ordinary diagram data;
-- active work-plane state is not stored in diagram data;
-- layer/filter/selection behavior is preserved;
-- undo/redo behavior is preserved if present;
-- 2D direct creation remains simple and is not confused by 3D work-plane controls.
+- metadata distinguishes absolute / work-plane-local relative Cartesian / work-plane-local relative polar modes;
+- absolute `Vec3` controls remain available for rendering/editing;
+- work-plane-local metadata includes frame snapshot: origin, `u`, `v`, normal;
+- relative Cartesian offsets are stored and interpreted correctly;
+- relative polar angle/radius values are stored and interpreted correctly;
+- first control is relative to start;
+- second control is relative to end;
+- local start/end coordinates are computed or stored consistently;
+- active work-plane changes do not change existing curve meaning;
+- active UI work-plane state is not globally serialized as diagram state;
+- old saved diagrams without metadata load as absolute;
+- metadata round-trips through save/load;
+- invalid metadata handled safely;
+- SVG rendering and handle positions remain correct;
+- handle dragging policy is implemented/documented.
 
 Medium issues include:
 
-- implementing silent global projection instead of local `(a,b)` input;
-- missing support for major direct creation forms;
-- invalid inputs creating geometry;
-- using stale/invalid active work planes;
-- breaking global direct creation.
+- export meaning depending on current active work plane;
+- missing frame snapshot for work-plane-local modes;
+- second control incorrectly relative to start;
+- save/load breaking old diagrams;
+- metadata breaking rendering.
 
 Run verification commands and report results.
