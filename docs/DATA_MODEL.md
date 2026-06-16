@@ -188,10 +188,13 @@ plane is editor/UI state, not part of `Diagram`; work-plane guides, previews,
 and source metadata are drawing aids and are not exported to TikZ.
 
 The current editor UI can apply a 3D-only custom plane from numeric origin and
-normal inputs. All six coordinates must be finite, and the normal must be
-nonzero; invalid input leaves the previous active work plane unchanged. When
-the editable diagram enters 2D mode, the active work plane is normalized back to
-`{ kind: "xy", z: 0 }`, and the custom work-plane controls are hidden.
+normal inputs, or from three numeric points. Origin and normal inputs must be
+finite, and the normal must be nonzero. Three-point inputs must be finite,
+distinct, and non-collinear; `P0` becomes the origin and `P1 - P0` determines
+the preferred `u` direction. Invalid input leaves the previous active work
+plane unchanged. When the editable diagram enters 2D mode, the active work
+plane is normalized back to `{ kind: "xy", z: 0 }`, and the custom work-plane
+controls are hidden.
 
 ## Strata
 

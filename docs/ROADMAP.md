@@ -805,16 +805,18 @@ Out of scope:
 
 Goal:
 
-Allow creation and editing using local work-plane coordinates.
+Allow custom work-plane creation from direct numeric input.
 
-Local coordinate interpretation:
+Implemented direct input:
 
-origin + a * u + b * v
+* Three finite numeric points define a custom 3D work plane.
+* `P0` is the origin.
+* `P1 - P0` determines the preferred `u` direction.
+* Coincident, collinear, and non-finite inputs are rejected without changing the
+  previous active work plane.
 
 Requirements:
 
-* Allow local coordinates (a,b).
-* Convert local coordinates to world coordinates.
 * Coexist with absolute 3D coordinate editing.
 * Validate all inputs.
 

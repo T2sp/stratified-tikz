@@ -158,19 +158,27 @@ means that cursor input creates or moves points in the plane z = 0.
 The inspector should show the active work plane and its fixed coordinate.
 
 The 3D toolbar also supports a custom work plane by numeric origin and normal
-vector:
+vector, and by three numeric points:
 
 ```text
 Custom plane by origin + normal
 Origin: x, y, z
 Normal: nx, ny, nz
 Apply
+
+Custom plane by 3 points
+P0: x, y, z
+P1: x, y, z
+P2: x, y, z
+Apply
 ```
 
 The inputs must be finite numbers, and the normal vector must be nonzero. A
 successful apply creates an active custom work plane named "Custom plane" from
-the origin and normalized normal. Invalid input reports a concise status and
-leaves the previous active work plane unchanged.
+the origin and normalized normal. For the three-point form, the points must be
+finite, distinct, and non-collinear; `P0` is the origin and `P1 - P0` determines
+the preferred `u` direction. Invalid input reports a concise status and leaves
+the previous active work plane unchanged.
 
 Custom 3D work planes are represented internally by ordinary `Vec3` model
 coordinates: an `origin`, normalized in-plane basis vectors `u` and `v`, and a
