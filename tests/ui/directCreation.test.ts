@@ -779,9 +779,16 @@ test('plane-local relative Bezier metadata does not depend on later active work-
   const tikz = generateTikz(result.diagram)
 
   assert.equal(laterActiveWorkPlane.offset, 999)
-  assert.match(tikz, /\\coordinate \(curveBezierCubicBezier0p1\) at \(13,20,32\);/)
-  assert.match(tikz, /\\coordinate \(curveBezierCubicBezier0p2\) at \(15,20,39\);/)
-  assert.doesNotMatch(tikz, /\+\(0:2\)/)
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /plane origin=\{\(10,20,30\)\}/)
+  assert.match(tikz, /plane x=\{\(11,20,30\)\}/)
+  assert.match(tikz, /plane y=\{\(10,20,31\)\}/)
+  assert.match(
+    tikz,
+    /\(1,2\) \.\. controls \+\(0:2\) and \+\(90:3\) \.\. \(5,6\);/,
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierCubicBezier0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierCubicBezier0p2\)/)
 })
 
 test('global 3D relative polar cubic Bezier creation remains unsupported', () => {

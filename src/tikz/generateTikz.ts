@@ -10,8 +10,15 @@ import type {
   SheetStratum,
   TextLabel,
   Vec3,
+  WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinate,
+  WorkPlaneLocalOffset,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
+import {
+  absoluteCubicBezierPointsFromControlMode,
+  pointFromWorkPlaneLocalCoordinate,
+} from '../geometry/bezierControls.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
   kind: 'labelStyle',
@@ -44,6 +51,7 @@ type GenerateContext = {
   colors: ColorRegistry
   coordinates: CoordinateRegistry
   hasSavedPaths: boolean
+  requiresTikz3dLibrary: boolean
 }
 
 export function generateTikz(diagram: Diagram): string {
@@ -196,6 +204,7 @@ function createContext(mode: TikzMode): GenerateContext {
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
     hasSavedPaths: false,
+    requiresTikz3dLibrary: false,
   }
 }
 
@@ -255,6 +264,10 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
       '% \\usetikzlibrary{spath3}',
       '',
     )
+  }
+
+  if (context.requiresTikz3dLibrary) {
+    lines.push('\\usetikzlibrary{3d}', '')
   }
 
   return lines
@@ -344,7 +357,6 @@ function emitCurve(
     `Curve${curve.id}Stroke`,
     curve.style.strokeColor,
   )
-  const coordinates = defineCurveCoordinates(curve, elementIndex, context)
   const lineStyleOption = lineStyleToTikzOption(curve.style.lineStyle)
   const options = [
     `draw=${strokeColor}`,
@@ -353,12 +365,58 @@ function emitCurve(
     ...(lineStyleOption === null ? [] : [lineStyleOption]),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
+  const scopedCurve = emitScopedWorkPlaneRelativeBezierCurve(
+    curve,
+    options,
+    context,
+  )
+
+  if (scopedCurve !== null) {
+    return scopedCurve
+  }
+
+  const coordinates = defineCurveCoordinates(curve, elementIndex, context)
 
   return [
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
     `  ${formatCurvePath(curve, coordinates, context.mode)};`,
+    '',
+  ]
+}
+
+function emitScopedWorkPlaneRelativeBezierCurve(
+  curve: CurveStratum,
+  options: string[],
+  context: GenerateContext,
+): string[] | null {
+  const scopedPath = formatScopedWorkPlaneRelativeBezierPath(curve, context.mode)
+
+  if (scopedPath === null) {
+    return null
+  }
+
+  context.requiresTikz3dLibrary = true
+
+  return [
+    '\\begin{scope}[',
+    `  plane origin={${formatCoordinate(scopedPath.frame.origin, '3d')}},`,
+    `  plane x={${formatCoordinate(
+      addVec3(scopedPath.frame.origin, scopedPath.frame.u),
+      '3d',
+    )}},`,
+    `  plane y={${formatCoordinate(
+      addVec3(scopedPath.frame.origin, scopedPath.frame.v),
+      '3d',
+    )}},`,
+    '  canvas is plane',
+    ']',
+    '  \\draw[',
+    ...formatTikzOptions(options).map((line) => `  ${line}`),
+    '  ]',
+    `    ${scopedPath.path};`,
+    '\\end{scope}',
     '',
   ]
 }
@@ -577,6 +635,117 @@ function formatCurvePath(
   return coordinates.map((name) => `(${name})`).join(' -- ')
 }
 
+type ScopedWorkPlaneRelativeBezierPath = {
+  frame: WorkPlaneFrameSnapshot
+  path: string
+}
+
+function formatScopedWorkPlaneRelativeBezierPath(
+  curve: CurveStratum,
+  mode: TikzMode,
+): ScopedWorkPlaneRelativeBezierPath | null {
+  if (
+    mode !== '3d' ||
+    curve.kind !== 'cubicBezier' ||
+    curve.points.length !== 4
+  ) {
+    return null
+  }
+
+  const controlMode = curve.bezierControls
+
+  if (
+    controlMode?.kind !== 'workPlaneRelativeCartesian' &&
+    controlMode?.kind !== 'workPlaneRelativePolar'
+  ) {
+    return null
+  }
+
+  if (!isConsistentWorkPlaneRelativeBezierCurve(curve, controlMode)) {
+    return null
+  }
+
+  const start = formatWorkPlaneLocalCoordinate(controlMode.localStart)
+  const end = formatWorkPlaneLocalCoordinate(controlMode.localEnd)
+  const controls =
+    controlMode.kind === 'workPlaneRelativeCartesian'
+      ? formatWorkPlaneRelativeCartesianControls(
+          controlMode.firstControlOffset,
+          controlMode.secondControlOffset,
+        )
+      : formatWorkPlaneRelativePolarControls(
+          controlMode.firstControl,
+          controlMode.secondControl,
+        )
+
+  return {
+    frame: controlMode.frame,
+    path: `${start} ${controls} ${end}`,
+  }
+}
+
+function isConsistentWorkPlaneRelativeBezierCurve(
+  curve: CurveStratum,
+  controlMode: Extract<
+    CubicBezierControlMode,
+    { kind: 'workPlaneRelativeCartesian' | 'workPlaneRelativePolar' }
+  >,
+): boolean {
+  const expectedPoints = absoluteCubicBezierPointsFromControlMode(
+    3,
+    curve.points[0],
+    curve.points[3],
+    controlMode,
+  )
+
+  if (expectedPoints === null) {
+    return false
+  }
+
+  const expectedStart = pointFromWorkPlaneLocalCoordinate(
+    controlMode.frame,
+    controlMode.localStart,
+  )
+  const expectedEnd = pointFromWorkPlaneLocalCoordinate(
+    controlMode.frame,
+    controlMode.localEnd,
+  )
+
+  return (
+    vec3ApproximatelyEqual(expectedStart, curve.points[0]) &&
+    vec3ApproximatelyEqual(expectedEnd, curve.points[3]) &&
+    expectedPoints.every((point, index) =>
+      vec3ApproximatelyEqual(point, curve.points[index]),
+    )
+  )
+}
+
+function formatWorkPlaneRelativeCartesianControls(
+  firstControlOffset: WorkPlaneLocalOffset,
+  secondControlOffset: WorkPlaneLocalOffset,
+): string {
+  return `.. controls +${formatWorkPlaneLocalOffset(
+    firstControlOffset,
+  )} and +${formatWorkPlaneLocalOffset(secondControlOffset)} ..`
+}
+
+function formatWorkPlaneRelativePolarControls(
+  firstControl: Extract<
+    CubicBezierControlMode,
+    { kind: 'workPlaneRelativePolar' }
+  >['firstControl'],
+  secondControl: Extract<
+    CubicBezierControlMode,
+    { kind: 'workPlaneRelativePolar' }
+  >['secondControl'],
+): string {
+  return `.. controls +(${formatNumber(
+    firstControl.angleDegrees,
+  )}:${formatNumber(firstControl.radius)}) and +(${formatNumber(
+    secondControl.angleDegrees,
+  )}:${formatNumber(secondControl.radius)}) ..`
+}
+
 function usesRelativeBezierControls(
   curve: CurveStratum,
   mode: TikzMode | undefined,
@@ -661,6 +830,34 @@ function formatCoordinate(point: Vec3, mode: TikzMode): string {
   return `(${formatNumber(point.x)},${formatNumber(point.y)},${formatNumber(
     point.z,
   )})`
+}
+
+function formatWorkPlaneLocalCoordinate(
+  coordinate: WorkPlaneLocalCoordinate,
+): string {
+  return `(${formatNumber(coordinate.a)},${formatNumber(coordinate.b)})`
+}
+
+function formatWorkPlaneLocalOffset(offset: WorkPlaneLocalOffset): string {
+  return `(${formatNumber(offset.dx)},${formatNumber(offset.dy)})`
+}
+
+function addVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
+}
+
+function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
+  const epsilon = 1e-6
+
+  return (
+    Math.abs(first.x - second.x) <= epsilon &&
+    Math.abs(first.y - second.y) <= epsilon &&
+    Math.abs(first.z - second.z) <= epsilon
+  )
 }
 
 function formatNumber(value: number): string {
