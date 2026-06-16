@@ -68,7 +68,7 @@ This roadmap reflects the current staged plan for StratifiedTikZ.
 - 11B: optional TikZ relative-control export for 2D Béziers.
 - 11C: preserve relative Bézier intent in TikZ output where possible.
 
-## Phase 12: Custom work planes and work-plane-local export
+### Phase 12: Custom work planes and work-plane-local export
 
 Phase 12 is split into subphases and should be run as `12A`, `12B`, ..., not as one monolithic `12`.
 
@@ -87,136 +87,140 @@ Recommended `phaseSlugs` entries:
 "12J": "tikz-3d-scope-bezier-export",
 ```
 
-### Phase 12A: WorkPlane model and geometry utilities
+Phase 12 adds custom work planes, plane-local direct creation, existing coordinate sources, and work-plane-local TikZ export for eligible 3D relative Béziers.
 
-- Add robust `WorkPlane` model.
-- Custom work planes use `origin`, normalized `u`, normalized `v`, and normalized `normal`.
-- Add helpers for construction, validation, local/global coordinate conversion, and axis-aligned compatibility.
+## Phase 13: Editor usability and preview guides
 
-### Phase 12B: Custom plane from origin + normal
+Phase 13 improves editing usability before moving into more advanced geometric constructions.
 
-- Add 3D-only UI to construct a custom work plane from:
-  - origin `(x,y,z)`;
-  - normal `(nx,ny,nz)`.
+It should be run as subphases `13A`, `13B`, `13C`, and `13D`.
 
-### Phase 12C: Custom plane from three numeric points
+Recommended `phaseSlugs` entries:
 
-- Add 3D-only UI to construct a custom work plane from three finite non-collinear numeric points.
-- Use `P0` as origin and `P1-P0` as preferred local x-axis.
+```js
+"13A": "3d-coordinate-axes-guide",
+"13B": "inspector-layout-stabilization",
+"13C": "workplane-toolbar-reorganization",
+"13D": "coordinate-source-highlighting",
+```
 
-### Phase 12D: Custom plane from three existing point strata
+### Phase 13A: 3D coordinate axes guide
 
-- Add a picking workflow to select three existing point strata and define a work plane from them.
-- Initial scope: point strata only, not curve/sheet vertices.
+- Show a faint default `x`, `y`, `z` coordinate guide in 3D SVG preview.
+- Hide it in 2D.
+- The guide is preview-only, non-selectable, and does not intercept pointer events.
+- Add a user option to include/exclude this guide in TikZ output.
+- TikZ export should not include axes by default.
 
-### Phase 12E: Custom work-plane preview and creation integration
+### Phase 13B: Inspector layout stabilization
 
-- Render a non-exported, non-interactive custom work-plane guide.
-- Cursor creation for points, labels, polylines, cubic Béziers, and polygon sheets works on the active custom plane.
+- Selecting or creating elements should not expand a huge inspector body by default.
+- Inspector should start compact/collapsed after selection/creation.
+- User can expand the inspector for detailed coordinate/style editing.
+- SVG preview should not jump downward dramatically when inspector content changes.
 
-### Phase 12F: Camera-ready projection/export separation
+### Phase 13C: Work-plane toolbar reorganization
 
-- Harden separation between:
-  - model-space work planes;
-  - screen projection/camera;
-  - committed diagram data;
-  - transient UI state;
-  - TikZ export.
-- Active work-plane UI state is not saved/exported.
-- Geometry created on work planes remains ordinary `Vec3` diagram data.
+- Reorganize work-plane controls into readable grouped/collapsible sections.
+- Keep active work-plane summary visible in 3D.
+- Organize:
+  - preset axis-aligned planes;
+  - custom origin+normal;
+  - custom three-point input;
+  - pick 3 existing points.
+- Hide or minimize 3D work-plane controls in 2D.
+- Do not change work-plane semantics.
 
-### Phase 12G: Plane-local direct creation
+### Phase 13D: Coordinate source highlighting
 
-- Direct creation forms in 3D can use active work-plane local coordinates.
-- Plane-local input `(a,b)` means:
-  - `P = origin + a u + b v`.
-- This is not silent projection of global `(x,y,z)` input.
-- Supported targets:
-  - point;
-  - label;
+- Highlight selected coordinate sources in SVG preview.
+- Apply to direct creation source selections:
+  - point sources;
   - polyline vertices;
-  - cubic Bézier point-like inputs;
-  - polygon sheet vertices.
+  - sheet vertices;
+  - optional Bézier points.
+- Apply to Pick 3 points for work plane.
+- Highlights are preview-only and not exported to TikZ or saved to JSON.
 
-## Phase 12H: Existing coordinate sources for direct and cursor creation
+## Phase 14: Concatenated paths
 
-Direct creation forms can use existing diagram coordinates as sources. Cursor
-creation can use existing point strata as coordinate sources by clicking the
-point while a creation tool is active.
+- 14A: data model for paths made from line and cubic Bézier segments.
+- 14B: same-work-plane concatenated path creation.
+- 14C: editing concatenated paths.
+- 14D: cross-work-plane concatenated paths.
 
-Supported source types:
+## Phase 15: Regions and curved 3D surface strata
 
-- point stratum positions;
-- polyline vertices, in both 2D and 3D;
-- polygon sheet vertices, in 3D;
-- optionally cubic Bézier start/control/end points.
+Phase 15 prioritizes diagrammatic surfaces needed for 3-categorical graphical calculus, including 2D filled regions and 3D curved colored surfaces such as hemispheres and saddle patches.
 
-Initial policy:
+### Phase 15A: 2D codim-0 region model
 
-- copy-on-create;
-- no live linking;
-- no anchored vertices.
+- Add 2D `RegionStratum`.
+- Boundary is a closed path.
+- Style includes fill and stroke options.
 
-This means:
+### Phase 15B: 2D closed-boundary validation
 
-- selecting an existing coordinate source copies its current coordinate into the new geometry;
-- clicking an existing point source during cursor creation copies its current coordinate into the draft;
-- the new curve/sheet does not remain linked to the source;
-- moving or deleting the original source later does not update or invalidate the newly created geometry.
+- Validate closed paths.
+- Check endpoint matching, finite coordinates, and `z = 0`.
 
-Source labels include source kind, stratum name, id disambiguator, vertex/control role when applicable, and formatted coordinates.
+### Phase 15C: 2D filled region creation and editing
 
-Coordinate mode behavior:
+- Create and edit 2D codim-0 filled regions.
+- Export to SVG/TikZ as filled closed paths.
 
-- In global coordinate mode, the source model-space `Vec3` is copied exactly.
-- In active work-plane local mode and 3D cursor creation, the source coordinate should lie on the active work plane, unless an explicit projection option is later added.
-- Off-plane sources should not be silently projected.
+### Phase 15D: 3D curved surface primitive data model
 
-This phase should not implement live linked vertices. Linked/anchored vertices are a later feature.
+- Add model support for 3D curved sheet primitives.
+- Initial primitives may include:
+  - hemisphere patches;
+  - saddle patches;
+  - parametric rectangular patches.
+- These are codim-1 sheet-like strata in 3D.
 
-### Phase 12I: Work-plane-local cubic Bézier metadata
+### Phase 15E: Colored hemispheres
 
-- Store enough curve-level metadata for eligible 3D relative Cartesian/polar Béziers to remember their work-plane-local frame.
-- Metadata includes a frame snapshot:
-  - origin;
-  - `u`;
-  - `v`;
-  - normal.
-- Absolute `Vec3` controls remain available for rendering/editing.
-- Export meaning does not depend on the currently active UI work plane.
+- Create/render/export colored hemisphere surface patches.
+- Support fill/stroke/opacity and layer behavior.
+- Keep initial parameterization simple.
 
-### Phase 12J: TikZ `3d` library scope export for work-plane-local Béziers
+### Phase 15F: Saddle patches
 
-- Eligible 3D work-plane-local relative Béziers export using TikZ's `3d` library:
-  - `plane origin`;
-  - `plane x`;
-  - `plane y`;
-  - `canvas is plane`.
-- Inside the scope, use 2D-style relative controls:
-  - `+(dx,dy)` for relative Cartesian;
-  - `+(angle:radius)` for relative polar.
-- Do not emit independent control-point `\coordinate` declarations for scoped relative controls.
-- Fallback to absolute 3D Bézier export when no reliable work-plane-local frame exists.
+- Create/render/export saddle-like surface patches.
+- Support fill/stroke/opacity and layer behavior.
+- Keep initial parameterization simple.
 
-## Phase 13: Concatenated paths
+### Phase 15G: General 3D curved-boundary sheets
 
-- 13A: data model for paths made from line and cubic Bézier segments.
-- 13B: same-work-plane concatenated path creation.
-- 13C: editing concatenated paths.
-- 13D: cross-work-plane concatenated paths.
+- Extend 3D sheets to support planar closed boundaries made from line and cubic Bézier segments.
+- Render as projected filled paths or approximated patches.
+- Export to TikZ readably.
 
-## Phase 14: 2D codimension-0 regions
+## Phase 16: Layer manager
 
-- 14A: 2D `RegionStratum` data model.
-- 14B: closed-boundary validation.
-- 14C: filled region creation.
-- 14D: region editing.
+Layer manager is postponed until after editor usability and core surface features.
 
-## Phase 15: General 3D curved-boundary sheets
+Planned features:
 
-- 15A: 3D planar closed-boundary sheet model.
-- 15B: 3D curved-boundary sheet creation.
-- 15C: advanced 3D sheet boundary editing.
+- layer rename;
+- layer swap/reorder;
+- layer duplicate;
+- delete a layer and all elements on it;
+- translate all elements on a layer while preserving relative positions;
+- optional layer visibility/locking.
+
+## Phase 17: Multi-selection and batch editing
+
+Multi-selection is postponed until after layer manager.
+
+Planned features:
+
+- multi-select model/UI;
+- same-geometric-kind batch style editing;
+- batch layer changes;
+- batch deletion;
+- box selection;
+- later duplicate/affine transform of selected groups.
 
 ## Later phases
 
