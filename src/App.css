@@ -79,7 +79,8 @@
 .toolbar-text-input,
 .direct-create-field input,
 .direct-coordinate-list textarea,
-.work-plane-fixed input {
+.work-plane-fixed input,
+.custom-work-plane-field input {
   min-height: 34px;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -109,7 +110,7 @@
 }
 
 .work-plane-control {
-  flex: 1 1 260px;
+  flex: 1 1 640px;
   justify-content: flex-start;
 }
 
@@ -124,6 +125,49 @@
 }
 
 .work-plane-fixed input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--mono);
+}
+
+.custom-work-plane-form {
+  display: flex;
+  align-items: center;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.custom-work-plane-vector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.custom-work-plane-vector legend {
+  float: left;
+  margin-right: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.custom-work-plane-field {
+  display: inline-grid;
+  grid-template-columns: auto 64px;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.custom-work-plane-field input {
   min-width: 0;
   padding: 6px 8px;
   font-family: var(--mono);
@@ -607,7 +651,16 @@
   }
 
   .work-plane-control {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .custom-work-plane-form {
+    display: grid;
+    grid-column: 1 / -1;
+  }
+
+  .custom-work-plane-vector {
+    flex-wrap: wrap;
   }
 
   .segmented-control {
@@ -655,6 +708,11 @@
 
   .work-plane-fixed {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .custom-work-plane-field {
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
   }
 
   .inspector-field {

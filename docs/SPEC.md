@@ -157,11 +157,28 @@ means that cursor input creates or moves points in the plane z = 0.
 
 The inspector should show the active work plane and its fixed coordinate.
 
-Later custom 3D work planes are represented internally by ordinary `Vec3`
-model coordinates: an `origin`, normalized in-plane basis vectors `u` and `v`,
-and a normalized `normal` with `normal = cross(u, v)`. This active work-plane
-state is a cursor-input drawing aid, not diagram content, and must not affect
-TikZ generation except through committed model coordinates.
+The 3D toolbar also supports a custom work plane by numeric origin and normal
+vector:
+
+```text
+Custom plane by origin + normal
+Origin: x, y, z
+Normal: nx, ny, nz
+Apply
+```
+
+The inputs must be finite numbers, and the normal vector must be nonzero. A
+successful apply creates an active custom work plane named "Custom plane" from
+the origin and normalized normal. Invalid input reports a concise status and
+leaves the previous active work plane unchanged.
+
+Custom 3D work planes are represented internally by ordinary `Vec3` model
+coordinates: an `origin`, normalized in-plane basis vectors `u` and `v`, and a
+normalized `normal` with `normal = cross(u, v)`. This active work-plane state is
+a cursor-input drawing aid, not diagram content, and must not affect TikZ
+generation except through committed model coordinates. Work-plane controls are
+hidden in 2D mode, and entering 2D mode resets the active work plane to the
+ordinary xy-plane at `z = 0`.
 
 ### Hybrid editing
 
