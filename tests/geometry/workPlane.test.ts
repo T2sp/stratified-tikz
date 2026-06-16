@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   axisAlignedWorkPlane,
+  axisAlignedWorkPlaneToLegacy,
   constructWorkPlaneFromOriginNormal,
   constructWorkPlaneFromThreePoints,
   cross,
@@ -224,6 +225,94 @@ test('axis-aligned work planes preserve legacy coordinate behavior', () => {
   )
 })
 
+test('axisAlignedWorkPlane accepts valid axis-aligned plane names', () => {
+  assert.deepEqual(axisAlignedWorkPlane('xy', 1), {
+    kind: 'axisAligned',
+    plane: 'xy',
+    offset: 1,
+  })
+  assert.deepEqual(axisAlignedWorkPlane('xz', 2), {
+    kind: 'axisAligned',
+    plane: 'xz',
+    offset: 2,
+  })
+  assert.deepEqual(axisAlignedWorkPlane('yz', 3), {
+    kind: 'axisAligned',
+    plane: 'yz',
+    offset: 3,
+  })
+})
+
+test('axisAlignedWorkPlane rejects malformed axis-aligned plane names at runtime', () => {
+  for (const planeName of malformedAxisAlignedPlaneNames) {
+    assert.throws(
+      () => axisAlignedWorkPlane(planeName as any, 0),
+      /Axis-aligned work-plane name must be one of xy, xz, or yz/,
+    )
+  }
+})
+
+test('axisAlignedWorkPlaneToLegacy rejects malformed axis-aligned plane names', () => {
+  assert.throws(
+    () =>
+      axisAlignedWorkPlaneToLegacy({
+        kind: 'axisAligned',
+        plane: 'zy',
+        offset: 0,
+      } as any),
+    /Axis-aligned work-plane name must be one of xy, xz, or yz/,
+  )
+})
+
+test('validateWorkPlane rejects malformed axis-aligned plane names', () => {
+  for (const planeName of malformedAxisAlignedPlaneNames) {
+    const validation = validateWorkPlane({
+      kind: 'axisAligned',
+      plane: planeName,
+      offset: 0,
+    } as any)
+
+    assert.equal(validation.valid, false)
+    assert.match(
+      validation.errors.map((error) => `${error.path}: ${error.message}`).join('\n'),
+      /plane: Axis-aligned work-plane name must be one of xy, xz, or yz/,
+    )
+  }
+})
+
+test('workPlaneToBasis rejects malformed axis-aligned plane names', () => {
+  assert.throws(
+    () =>
+      workPlaneToBasis({
+        kind: 'axisAligned',
+        plane: 'zy',
+        offset: 0,
+      } as any),
+    /Invalid work plane: plane Axis-aligned work-plane name must be one of xy, xz, or yz/,
+  )
+})
+
+test('coordinate helpers reject malformed axis-aligned plane names', () => {
+  const malformedWorkPlane = {
+    kind: 'axisAligned',
+    plane: 'abc',
+    offset: 0,
+  } as any
+
+  assert.throws(
+    () => pointOnWorkPlane(malformedWorkPlane, 1, 2),
+    /Invalid work plane: plane Axis-aligned work-plane name must be one of xy, xz, or yz/,
+  )
+  assert.throws(
+    () =>
+      projectPointToWorkPlaneCoordinates(
+        { x: 1, y: 2, z: 3 },
+        malformedWorkPlane,
+      ),
+    /Invalid work plane: plane Axis-aligned work-plane name must be one of xy, xz, or yz/,
+  )
+})
+
 test('local-to-global and global-to-local work plane conversion round-trips', () => {
   const plane = constructWorkPlaneFromOriginNormal(
     { x: 1, y: -2, z: 3 },
@@ -262,6 +351,15 @@ const invalidEpsilonValues = [
   Number.NEGATIVE_INFINITY,
   0,
   -1,
+] as const
+
+const malformedAxisAlignedPlaneNames = [
+  'zy',
+  'abc',
+  '',
+  null,
+  undefined,
+  42,
 ] as const
 
 function assertNormalizeRejectsInvalidEpsilon(epsilon: number): void {

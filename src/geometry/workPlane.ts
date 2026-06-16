@@ -188,6 +188,7 @@ export function validateWorkPlane(
   }
 
   if (workPlane.kind === 'axisAligned') {
+    validateAxisAlignedPlaneName(workPlane.plane, 'plane', errors)
     validateFiniteNumber(workPlane.offset, 'offset', errors)
     return validationResult(errors)
   }
@@ -264,11 +265,13 @@ export function axisAlignedWorkPlane(
   plane: AxisAlignedWorkPlaneName,
   offset: number,
 ): AxisAlignedWorkPlane {
+  const planeName = assertAxisAlignedPlaneName(plane)
+
   assertFiniteNumber(offset, 'offset')
 
   return {
     kind: 'axisAligned',
-    plane,
+    plane: planeName,
     offset,
   }
 }
@@ -276,7 +279,9 @@ export function axisAlignedWorkPlane(
 export function axisAlignedWorkPlaneToLegacy(
   workPlane: AxisAlignedWorkPlane,
 ): LegacyAxisAlignedWorkPlane {
-  switch (workPlane.plane) {
+  const planeName = assertAxisAlignedPlaneName(workPlane.plane)
+
+  switch (planeName) {
     case 'xy':
       return { kind: 'xy', z: workPlane.offset }
     case 'xz':
@@ -364,7 +369,9 @@ function axisAlignedBasis(
   plane: AxisAlignedWorkPlaneName,
   offset: number,
 ): WorkPlaneBasis {
-  switch (plane) {
+  const planeName = assertAxisAlignedPlaneName(plane)
+
+  switch (planeName) {
     case 'xy':
       return {
         origin: { x: 0, y: 0, z: offset },
@@ -386,6 +393,37 @@ function axisAlignedBasis(
         v: { x: 0, y: 0, z: 1 },
         normal: { x: 1, y: 0, z: 0 },
       }
+  }
+}
+
+function isAxisAlignedPlaneName(
+  value: unknown,
+): value is AxisAlignedWorkPlaneName {
+  // Runtime validation is needed for parsed JSON, tests, and unsafe casts.
+  // Valid axis-aligned work-plane names are exactly "xy", "xz", and "yz".
+  return value === 'xy' || value === 'xz' || value === 'yz'
+}
+
+function assertAxisAlignedPlaneName(
+  value: unknown,
+): AxisAlignedWorkPlaneName {
+  if (!isAxisAlignedPlaneName(value)) {
+    throw new Error('Axis-aligned work-plane name must be one of xy, xz, or yz.')
+  }
+
+  return value
+}
+
+function validateAxisAlignedPlaneName(
+  value: unknown,
+  path: string,
+  errors: WorkPlaneValidationIssue[],
+): void {
+  if (!isAxisAlignedPlaneName(value)) {
+    errors.push({
+      path,
+      message: 'Axis-aligned work-plane name must be one of xy, xz, or yz.',
+    })
   }
 }
 
