@@ -453,6 +453,13 @@ export function shouldShowWorkPlaneControls(
   return ambientDimension === 3
 }
 
+export function shouldShowWorkPlaneDetails(
+  ambientDimension: AmbientDimension,
+  expanded: boolean,
+): boolean {
+  return shouldShowWorkPlaneControls(ambientDimension) && expanded
+}
+
 export function workPlaneSelectValue(
   workPlane: WorkPlane,
 ): WorkPlaneSelectValue {
@@ -465,6 +472,23 @@ export function workPlaneSelectValue(
       return workPlane.plane
     case 'custom':
       return 'custom'
+  }
+}
+
+export function workPlaneSummaryLabel(workPlane: WorkPlane): string {
+  switch (workPlane.kind) {
+    case 'xy':
+      return `xy plane at z = ${String(workPlane.z)}`
+    case 'xz':
+      return `xz plane at y = ${String(workPlane.y)}`
+    case 'yz':
+      return `yz plane at x = ${String(workPlane.x)}`
+    case 'axisAligned':
+      return `${workPlane.plane} plane at ${workPlaneFixedCoordinate(
+        workPlane.plane,
+      )} = ${String(workPlane.offset)}`
+    case 'custom':
+      return workPlane.name
   }
 }
 
@@ -487,6 +511,17 @@ export function workPlanePointPickingStatus(
   state: WorkPlanePointPickingState,
 ): string {
   return `Picked ${state.pickedPointIds.length}/3 points.`
+}
+
+function workPlaneFixedCoordinate(plane: AxisAlignedWorkPlaneName): 'x' | 'y' | 'z' {
+  switch (plane) {
+    case 'xy':
+      return 'z'
+    case 'xz':
+      return 'y'
+    case 'yz':
+      return 'x'
+  }
 }
 
 function parseWorkPlaneVectorInput(input: WorkPlaneVectorInput): Vec3 | null {

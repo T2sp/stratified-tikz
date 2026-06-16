@@ -11,11 +11,13 @@ import {
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   shouldBlockCreationForWorkPlanePointPicking,
+  shouldShowWorkPlaneDetails,
   shouldShowWorkPlaneControls,
   startWorkPlanePointPicking,
   validateWorkPlanePointPickingState,
   workPlaneDisplayName,
   workPlaneSelectValue,
+  workPlaneSummaryLabel,
 } from '../../src/ui/workPlaneControls.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import type { Diagram, WorkPlane } from '../../src/model/types.ts'
@@ -184,6 +186,18 @@ test('three-point custom work planes are rejected outside 3D mode', () => {
 test('work plane controls are hidden outside 3D mode', () => {
   assert.equal(shouldShowWorkPlaneControls(2), false)
   assert.equal(shouldShowWorkPlaneControls(3), true)
+})
+
+test('work plane details expand only in 3D mode', () => {
+  assert.equal(shouldShowWorkPlaneDetails(3, true), true)
+  assert.equal(shouldShowWorkPlaneDetails(3, false), false)
+  assert.equal(shouldShowWorkPlaneDetails(2, true), false)
+})
+
+test('active work plane summary names the fixed coordinate in 3D', () => {
+  assert.equal(workPlaneSummaryLabel({ kind: 'xy', z: 0 }), 'xy plane at z = 0')
+  assert.equal(workPlaneSummaryLabel({ kind: 'xz', y: -2 }), 'xz plane at y = -2')
+  assert.equal(workPlaneSummaryLabel({ kind: 'yz', x: 4 }), 'yz plane at x = 4')
 })
 
 test('switching to 2D resets active work plane to xy at z equals 0', () => {
