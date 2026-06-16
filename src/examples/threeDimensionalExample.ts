@@ -5,6 +5,9 @@ export const threeDimensionalExample: Diagram = {
   version: 1,
   ambientDimension: 3,
   camera: createInitialCamera3D(),
+  view: {
+    camera3d: createInitialCamera3D(),
+  },
   strata: [
     {
       id: 'blueSheet',

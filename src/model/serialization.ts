@@ -1,37 +1,79 @@
+import { validateCamera3D } from '../geometry/projection.ts'
+import {
+  cloneCamera3D,
+  createInitialCamera3D,
+} from './camera.ts'
+import { createDefaultCamera2D } from './constructors.ts'
 import type {
+  AmbientDimension,
   Camera,
+  Camera2D,
   Camera3D,
   Camera3DProjectionBasis,
   Diagram,
   DiagramValidationResult,
+  DiagramViewOptions,
+  Stratum,
+  TextLabel,
 } from './types.ts'
-import { createInitialCamera3D } from './camera.ts'
 import { validateDiagram } from './validation.ts'
 
 export const savedDiagramFormat = 'stratified-tikz-diagram'
 export const savedDiagramVersion = 1
 
+export type PersistentDiagram = {
+  version: 1
+  ambientDimension: AmbientDimension
+  camera?: Camera
+  view?: DiagramViewOptions
+  strata: Stratum[]
+  labels: TextLabel[]
+}
+
 export type SavedDiagramFile = {
   format: typeof savedDiagramFormat
   version: typeof savedDiagramVersion
-  diagram: Diagram
+  diagram: PersistentDiagram
+}
+
+export type SerializeDiagramOptions = {
+  camera3d?: Camera3D
+  showCoordinateAxesInTikz?: boolean
 }
 
 export type ParseSavedDiagramResult =
   | {
       ok: true
       diagram: Diagram
+      warnings: string[]
     }
   | {
       ok: false
       error: string
     }
 
-export function serializeDiagram(diagram: Diagram): string {
+type SavedDiagramInput = {
+  version: 1
+  ambientDimension: AmbientDimension
+  camera?: unknown
+  view?: unknown
+  strata: unknown[]
+  labels: unknown[]
+}
+
+type LoadedDiagramNormalization = {
+  diagram: Diagram
+  warnings: string[]
+}
+
+export function serializeDiagram(
+  diagram: Diagram,
+  options: SerializeDiagramOptions = {},
+): string {
   const savedFile: SavedDiagramFile = {
     format: savedDiagramFormat,
     version: savedDiagramVersion,
-    diagram: toPersistentDiagram(diagram),
+    diagram: toPersistentDiagram(diagram, options),
   }
 
   return `${JSON.stringify(savedFile, null, 2)}\n`
@@ -77,7 +119,8 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  const diagram = toPersistentDiagram(parsed.diagram as Diagram)
+  const normalization = normalizeLoadedDiagram(parsed.diagram)
+  const diagram = normalization.diagram
   let validation: DiagramValidationResult
 
   try {
@@ -104,65 +147,253 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
   return {
     ok: true,
     diagram,
+    warnings: normalization.warnings,
   }
 }
 
-function isDiagramLike(value: unknown): boolean {
-  if (!isRecord(value)) {
-    return false
-  }
+function toPersistentDiagram(
+  diagram: Diagram,
+  options: SerializeDiagramOptions,
+): PersistentDiagram {
+  const view = normalizePersistentView(diagram, options)
 
-  return (
-    value.version === 1 &&
-    (value.ambientDimension === 2 || value.ambientDimension === 3) &&
-    isRecord(value.camera) &&
-    Array.isArray(value.strata) &&
-    value.strata.every(isRecord) &&
-    Array.isArray(value.labels) &&
-    value.labels.every(isRecord)
-  )
-}
-
-function toPersistentDiagram(diagram: Diagram): Diagram {
   return {
     version: diagram.version,
     ambientDimension: diagram.ambientDimension,
-    camera: normalizePersistentCamera(diagram),
+    ...(view === undefined ? {} : { view }),
     strata: diagram.strata,
     labels: diagram.labels,
   }
 }
 
-function normalizePersistentCamera(diagram: Diagram): Camera {
-  if (diagram.ambientDimension !== 3) {
-    return diagram.camera
+function normalizePersistentView(
+  diagram: Diagram,
+  options: SerializeDiagramOptions,
+): DiagramViewOptions | undefined {
+  const view: DiagramViewOptions = {}
+
+  if (diagram.ambientDimension === 3) {
+    const sourceCamera =
+      options.camera3d ??
+      diagram.view?.camera3d ??
+      (diagram.camera.mode === '3d' ? diagram.camera : undefined)
+
+    view.camera3d = normalizeCamera3DForPersistence(sourceCamera)
   }
 
-  const camera = diagram.camera as unknown
+  const showCoordinateAxesInTikz =
+    options.showCoordinateAxesInTikz ?? diagram.view?.showCoordinateAxesInTikz
 
-  if (isCamera3D(camera)) {
+  if (showCoordinateAxesInTikz !== undefined) {
+    view.showCoordinateAxesInTikz = showCoordinateAxesInTikz
+  }
+
+  return Object.keys(view).length === 0 ? undefined : view
+}
+
+function normalizeCamera3DForPersistence(
+  camera: Camera3D | undefined,
+): Camera3D {
+  if (camera === undefined || !validateCamera3D(camera).valid) {
+    return createInitialCamera3D()
+  }
+
+  return cloneCamera3D(camera)
+}
+
+function normalizeLoadedDiagram(
+  savedDiagram: SavedDiagramInput,
+): LoadedDiagramNormalization {
+  const warnings: string[] = []
+  const camera = normalizeLoadedCamera(savedDiagram, warnings)
+  const view = normalizeLoadedView(savedDiagram, camera, warnings)
+  const diagram: Diagram = {
+    version: savedDiagram.version,
+    ambientDimension: savedDiagram.ambientDimension,
+    camera,
+    ...(view === undefined ? {} : { view }),
+    strata: savedDiagram.strata as Stratum[],
+    labels: savedDiagram.labels as TextLabel[],
+  }
+
+  return { diagram, warnings }
+}
+
+function normalizeLoadedCamera(
+  savedDiagram: SavedDiagramInput,
+  warnings: string[],
+): Camera {
+  if (savedDiagram.ambientDimension === 2) {
+    return normalizeLoadedCamera2D(savedDiagram, warnings)
+  }
+
+  return normalizeLoadedCamera3D(savedDiagram, warnings)
+}
+
+function normalizeLoadedCamera2D(
+  savedDiagram: SavedDiagramInput,
+  warnings: string[],
+): Camera2D {
+  if (savedDiagram.camera === undefined) {
+    return createDefaultCamera2D()
+  }
+
+  const camera = camera2DFromPersistent(savedDiagram.camera)
+
+  if (camera !== null) {
     return camera
   }
 
-  const legacyCamera = cameraFromLegacyProjection(camera)
-
-  if (legacyCamera !== null) {
-    return legacyCamera
-  }
-
-  return diagram.camera
+  warnings.push('Saved 2D camera is invalid; using the initial camera.')
+  return createDefaultCamera2D()
 }
 
-function isCamera3D(value: unknown): value is Camera3D {
-  return (
-    isRecord(value) &&
-    value.mode === '3d' &&
-    value.kind === 'orthographic' &&
-    typeof value.thetaDeg === 'number' &&
-    typeof value.phiDeg === 'number' &&
-    typeof value.zoom === 'number' &&
-    isRecord(value.pan)
-  )
+function normalizeLoadedCamera3D(
+  savedDiagram: SavedDiagramInput,
+  warnings: string[],
+): Camera3D {
+  const view = savedDiagram.view
+
+  if (isRecord(view) && 'camera3d' in view) {
+    const camera = camera3DFromPersistent(view.camera3d)
+
+    if (camera !== null) {
+      return camera
+    }
+
+    warnings.push('Saved 3D camera metadata is invalid; using the initial camera.')
+    return createInitialCamera3D()
+  }
+
+  if (view !== undefined && !isRecord(view)) {
+    warnings.push('Saved view metadata is invalid; using default view options.')
+  }
+
+  if (savedDiagram.camera === undefined) {
+    return createInitialCamera3D()
+  }
+
+  const camera =
+    camera3DFromPersistent(savedDiagram.camera) ??
+    cameraFromLegacyProjection(savedDiagram.camera)
+
+  if (camera !== null) {
+    return camera
+  }
+
+  warnings.push('Saved 3D camera is invalid; using the initial camera.')
+  return createInitialCamera3D()
+}
+
+function normalizeLoadedView(
+  savedDiagram: SavedDiagramInput,
+  camera: Camera,
+  warnings: string[],
+): DiagramViewOptions | undefined {
+  const view: DiagramViewOptions = {}
+
+  if (camera.mode === '3d') {
+    view.camera3d = cloneCamera3D(camera)
+  }
+
+  const savedView = savedDiagram.view
+
+  if (savedView !== undefined && !isRecord(savedView)) {
+    return Object.keys(view).length === 0 ? undefined : view
+  }
+
+  if (isRecord(savedView) && 'showCoordinateAxesInTikz' in savedView) {
+    if (typeof savedView.showCoordinateAxesInTikz === 'boolean') {
+      view.showCoordinateAxesInTikz = savedView.showCoordinateAxesInTikz
+    } else {
+      warnings.push(
+        'Saved coordinate axes TikZ option is invalid; using the default.',
+      )
+    }
+  }
+
+  return Object.keys(view).length === 0 ? undefined : view
+}
+
+function camera2DFromPersistent(value: unknown): Camera2D | null {
+  if (
+    !isRecord(value) ||
+    value.mode !== '2d' ||
+    !Number.isFinite(value.scale) ||
+    typeof value.scale !== 'number' ||
+    value.scale <= 0 ||
+    !isFiniteVec2Record(value.origin)
+  ) {
+    return null
+  }
+
+  return {
+    mode: '2d',
+    scale: value.scale,
+    origin: {
+      x: value.origin.x,
+      y: value.origin.y,
+    },
+  }
+}
+
+function camera3DFromPersistent(value: unknown): Camera3D | null {
+  if (
+    !isRecord(value) ||
+    value.mode !== '3d' ||
+    value.kind !== 'orthographic' ||
+    typeof value.thetaDeg !== 'number' ||
+    typeof value.phiDeg !== 'number' ||
+    typeof value.zoom !== 'number' ||
+    !isFiniteVec2Record(value.pan)
+  ) {
+    return null
+  }
+
+  let projectionBasis: Camera3DProjectionBasis | undefined
+
+  if (value.projectionBasis !== undefined) {
+    const parsedProjectionBasis = projectionBasisFromPersistent(
+      value.projectionBasis,
+    )
+
+    if (parsedProjectionBasis === null) {
+      return null
+    }
+
+    projectionBasis = parsedProjectionBasis
+  }
+
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: value.thetaDeg,
+    phiDeg: value.phiDeg,
+    zoom: value.zoom,
+    pan: { x: value.pan.x, y: value.pan.y },
+    ...(projectionBasis === undefined ? {} : { projectionBasis }),
+  }
+
+  return validateCamera3D(camera).valid ? camera : null
+}
+
+function projectionBasisFromPersistent(
+  value: unknown,
+): Camera3DProjectionBasis | null {
+  if (
+    !isRecord(value) ||
+    !isBasisVector(value.xVector) ||
+    !isBasisVector(value.yVector) ||
+    !isBasisVector(value.zVector)
+  ) {
+    return null
+  }
+
+  return {
+    xVector: [value.xVector[0], value.xVector[1]],
+    yVector: [value.yVector[0], value.yVector[1]],
+    zVector: [value.zVector[0], value.zVector[1]],
+  }
 }
 
 function cameraFromLegacyProjection(value: unknown): Camera3D | null {
@@ -178,6 +409,7 @@ function cameraFromLegacyProjection(value: unknown): Camera3D | null {
     !isBasisVector(value.zVector) ||
     typeof legacyScale !== 'number' ||
     !Number.isFinite(legacyScale) ||
+    legacyScale <= 0 ||
     !isFiniteVec2Record(legacyOrigin)
   ) {
     return null
@@ -189,13 +421,29 @@ function cameraFromLegacyProjection(value: unknown): Camera3D | null {
     zVector: [value.zVector[0], value.zVector[1]],
   }
   const initialCamera = createInitialCamera3D()
-
-  return {
+  const camera: Camera3D = {
     ...initialCamera,
     zoom: legacyScale,
     pan: { x: legacyOrigin.x, y: legacyOrigin.y },
     projectionBasis,
   }
+
+  return validateCamera3D(camera).valid ? camera : null
+}
+
+function isDiagramLike(value: unknown): value is SavedDiagramInput {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return (
+    value.version === 1 &&
+    (value.ambientDimension === 2 || value.ambientDimension === 3) &&
+    Array.isArray(value.strata) &&
+    value.strata.every(isRecord) &&
+    Array.isArray(value.labels) &&
+    value.labels.every(isRecord)
+  )
 }
 
 function isBasisVector(value: unknown): value is [number, number] {

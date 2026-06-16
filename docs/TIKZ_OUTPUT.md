@@ -40,6 +40,13 @@ only when the user enables the coordinate axes TikZ export option. These editor
 aids affect TikZ only indirectly when cursor-created geometry has already been
 committed to the diagram as ordinary model coordinates.
 
+The 3D camera is persisted, when present, as diagram-level view metadata at
+`diagram.view.camera3d`. It uses `tikz-3dplot`-compatible `thetaDeg` and
+`phiDeg` notation for the preview camera, but this phase does not export the
+camera to TikZ. TikZ camera alignment, including `\tdplotsetmaincoords{theta}{phi}`,
+is Phase 13I work. Camera changes are view operations and do not create geometry
+undo entries.
+
 ## Coordinate names
 
 Generated coordinate names use the current stratum name as a readable stem.

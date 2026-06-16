@@ -152,6 +152,29 @@ test('changing editor-view camera does not create a diagram history entry', () =
   assert.equal(canUndoDiagramChange(committed.history), false)
 })
 
+test('geometry creation under a changed camera creates a diagram history entry', () => {
+  const initial = {
+    ...createUndoState(createEmptyDiagram({ ambientDimension: 3 })),
+    viewCamera: createCameraPresetCamera('isometric'),
+  }
+  const result = addPointStratumWithResult(
+    initial.editableDiagram,
+    { x: 1, y: 2, z: 3 },
+    { id: 'camera-created-point', layer: 0 },
+  )
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'stratum', id: result.id },
+  })
+  const undone = undoLastDiagramChange(committed)
+
+  assert.equal(canUndoDiagramChange(committed.history), true)
+  assert.equal(hasStratum(committed.editableDiagram, result.id), true)
+  assert.equal(hasStratum(undone.editableDiagram, result.id), false)
+  assert.deepEqual(committed.viewCamera, initial.viewCamera)
+})
+
 test('creation undo removes point and redo restores it', () => {
   const initial = createUndoState(createEmptyExampleDiagram())
   const result = addPointStratumWithResult(

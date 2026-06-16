@@ -4,25 +4,64 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import { createInitialCamera3D } from '../../src/model/camera.ts'
 import {
   parseSavedDiagramJson,
   savedDiagramFormat,
   savedDiagramVersion,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
-import type { Diagram, WorkPlane } from '../../src/model/types.ts'
+import type { Camera3D, Diagram, WorkPlane } from '../../src/model/types.ts'
 
 test('serializeDiagram includes format, version, and diagram data', () => {
   const serialized = serializeDiagram(twoDimensionalExample)
   const parsed = JSON.parse(serialized) as {
     format: unknown
     version: unknown
-    diagram: unknown
+    diagram: {
+      version?: unknown
+      ambientDimension?: unknown
+      camera?: unknown
+      strata?: unknown
+      labels?: unknown
+    }
   }
 
   assert.equal(parsed.format, savedDiagramFormat)
   assert.equal(parsed.version, savedDiagramVersion)
-  assert.deepEqual(parsed.diagram, twoDimensionalExample)
+  assert.equal(parsed.diagram.version, twoDimensionalExample.version)
+  assert.equal(parsed.diagram.ambientDimension, twoDimensionalExample.ambientDimension)
+  assert.equal('camera' in parsed.diagram, false)
+  assert.deepEqual(parsed.diagram.strata, twoDimensionalExample.strata)
+  assert.deepEqual(parsed.diagram.labels, twoDimensionalExample.labels)
+})
+
+test('serializeDiagram writes 3D camera as view metadata', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 1.75,
+    pan: { x: 4, y: -3 },
+  }
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    camera3d: camera,
+    showCoordinateAxesInTikz: true,
+  })
+  const parsed = JSON.parse(serialized) as {
+    diagram: {
+      camera?: unknown
+      view?: {
+        camera3d?: unknown
+        showCoordinateAxesInTikz?: unknown
+      }
+    }
+  }
+
+  assert.equal('camera' in parsed.diagram, false)
+  assert.deepEqual(parsed.diagram.view?.camera3d, camera)
+  assert.equal(parsed.diagram.view?.showCoordinateAxesInTikz, true)
 })
 
 test('parseSavedDiagramJson returns a valid saved diagram', () => {
@@ -42,19 +81,22 @@ test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {
     yVector: [0.45, 0.25] as [number, number],
     zVector: [0, 1] as [number, number],
   }
+  const savedDiagram = JSON.parse(JSON.stringify(threeDimensionalExample)) as {
+    camera?: unknown
+    view?: unknown
+  }
+  delete savedDiagram.view
+  savedDiagram.camera = {
+    mode: '3d',
+    projection: 'orthographic',
+    ...legacyProjectionBasis,
+    scale: 2,
+    origin: { x: 30, y: 40 },
+  }
   const saved = {
     format: savedDiagramFormat,
     version: savedDiagramVersion,
-    diagram: {
-      ...threeDimensionalExample,
-      camera: {
-        mode: '3d',
-        projection: 'orthographic',
-        ...legacyProjectionBasis,
-        scale: 2,
-        origin: { x: 30, y: 40 },
-      },
-    },
+    diagram: savedDiagram,
   }
 
   const result = parseSavedDiagramJson(JSON.stringify(saved))
@@ -75,6 +117,51 @@ test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {
     result.diagram.camera.projectionBasis,
     legacyProjectionBasis,
   )
+  assert.deepEqual(result.diagram.view?.camera3d, result.diagram.camera)
+})
+
+test('parseSavedDiagramJson defaults a missing 3D camera to initial view metadata', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: {
+      camera?: unknown
+      view?: unknown
+    }
+  }
+  delete saved.diagram.camera
+  delete saved.diagram.view
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram.camera, createInitialCamera3D())
+  assert.deepEqual(result.diagram.view?.camera3d, createInitialCamera3D())
+  assert.deepEqual(result.warnings, [])
+})
+
+test('parseSavedDiagramJson falls back safely for invalid 3D camera metadata', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: {
+      view: {
+        camera3d: {
+          zoom: unknown
+        }
+      }
+    }
+  }
+  saved.diagram.view.camera3d.zoom = 0
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram.camera, createInitialCamera3D())
+  assert.deepEqual(result.diagram.view?.camera3d, createInitialCamera3D())
+  assert.match(result.warnings.join(' '), /camera metadata is invalid/)
 })
 
 test('parseSavedDiagramJson rejects malformed JSON', () => {

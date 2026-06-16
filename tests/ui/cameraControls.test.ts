@@ -2,11 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { validateCamera3D } from '../../src/geometry/projection.ts'
 import {
+  areCamera3DEqual,
   applyCameraNumericInput,
+  cameraControlStateFromDiagramView,
   cameraControlFieldValue,
   cameraOrientationForPreview,
   cameraPresetIdForCamera,
   cameraPresetIds,
+  cameraPresetOptions,
   cameraViewAdjustmentFromControls,
   createCameraPresetCamera,
   createInitialCameraControlState,
@@ -16,6 +19,7 @@ import {
   type CameraControlField,
 } from '../../src/ui/cameraControls.ts'
 import type { Camera3D } from '../../src/model/types.ts'
+import { createEmptyDiagram } from '../../src/model/constructors.ts'
 
 test('camera control input updates camera values', () => {
   let camera = createInitialCameraControlState()
@@ -95,6 +99,17 @@ test('camera presets produce valid camera states', () => {
   })
 })
 
+test('camera preset options provide stable names for every preset', () => {
+  assert.deepEqual(
+    cameraPresetOptions.map((preset) => preset.id),
+    cameraPresetIds,
+  )
+  assert.deepEqual(
+    cameraPresetOptions.map((preset) => preset.label),
+    ['Initial', 'Top (xy)', 'Front (xz)', 'Side (yz)', 'Isometric'],
+  )
+})
+
 test('angle camera presets use tikz-3dplot axis views', () => {
   const anglePresets = [
     { presetId: 'top', thetaDeg: 0, phiDeg: 0 },
@@ -130,6 +145,21 @@ test('camera controls expose orientation and view adjustment separately', () => 
   assert.equal(orientation.zoom, 1)
   assert.deepEqual(orientation.pan, { x: 0, y: 0 })
   assert.deepEqual(adjustment, { zoom: 1.25, pan: { x: 7, y: -4 } })
+})
+
+test('camera control state prefers diagram view camera metadata', () => {
+  const viewCamera = createCameraPresetCamera('isometric')
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    view: {
+      camera3d: viewCamera,
+    },
+  }
+  const camera = cameraControlStateFromDiagramView(diagram)
+
+  assert.deepEqual(camera, viewCamera)
+  assert.notEqual(camera, viewCamera)
+  assert.equal(areCamera3DEqual(camera, viewCamera), true)
 })
 
 test('2D mode hides camera controls and 3D mode shows them', () => {

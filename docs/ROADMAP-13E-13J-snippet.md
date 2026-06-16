@@ -37,10 +37,15 @@ Append or replace the camera-related portion of Phase 13 with the following.
 
 ## Phase 13H: Camera presets, persistence, and reset policy
 
-- Decide and implement camera persistence as view metadata.
+- Decide and implement camera persistence as view metadata:
+  - new JSON writes 3D camera metadata under `diagram.view.camera3d`;
+  - legacy top-level camera data still loads;
+  - missing or invalid camera metadata falls back to the initial camera.
 - Missing/invalid camera data falls back to initial camera.
 - Camera reset-to-initial remains always available.
+- Reset-to-saved may be offered for the last saved/loaded 3D camera.
 - Camera changes do not create geometry undo history entries.
+- Geometry edits performed under the current camera remain undoable.
 
 ## Phase 13I: TikZ camera/export alignment with tikz-3dplot
 

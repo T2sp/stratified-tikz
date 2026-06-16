@@ -35,6 +35,11 @@ export type Camera3D = {
 
 export type Camera = Camera2D | Camera3D
 
+export type DiagramViewOptions = {
+  camera3d?: Camera3D
+  showCoordinateAxesInTikz?: boolean
+}
+
 export type CoordinateInputMode = 'direct' | 'cursor'
 
 export type AxisAlignedWorkPlaneName = 'xy' | 'xz' | 'yz'
@@ -298,6 +303,7 @@ export type Diagram = {
   version: 1
   ambientDimension: AmbientDimension
   camera: Camera
+  view?: DiagramViewOptions
   strata: Stratum[]
   labels: TextLabel[]
 }
