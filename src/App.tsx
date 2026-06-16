@@ -58,6 +58,7 @@ import {
   commitDirectCreationResult,
   createDiagramHistory,
   createSheetPolygonDraft,
+  defaultCustomOriginNormalWorkPlaneInput,
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
   EditableInspector,
@@ -65,14 +66,20 @@ import {
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
+  normalizeActiveWorkPlaneForAmbientDimension,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
   redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
+  shouldShowWorkPlaneControls,
   shouldShowWorkPlanePreview,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
+  applyCustomOriginNormalWorkPlaneInput,
+  workPlaneDisplayName,
+  workPlaneSelectValue,
+  type CustomOriginNormalWorkPlaneInput,
   type DirectCoordinateInput,
   type DirectCubicBezierControlMode,
   type DirectPathCreationError,
@@ -81,6 +88,7 @@ import {
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
+  type WorkPlaneSelectValue,
   type WorkPlanePreviewTool,
 } from './ui'
 
@@ -160,6 +168,8 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createSheet', label: 'Add sheet' },
 ]
 const workPlaneKinds: AxisAlignedWorkPlaneName[] = ['xy', 'xz', 'yz']
+const workPlaneVectorAxes: Array<keyof CustomOriginNormalWorkPlaneInput['origin']> =
+  ['x', 'y', 'z']
 const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'absolute',
   'relativeCartesian',
@@ -202,6 +212,11 @@ function App() {
     kind: 'xy',
     z: 0,
   })
+  const [customWorkPlaneInput, setCustomWorkPlaneInput] =
+    useState<CustomOriginNormalWorkPlaneInput>(
+      defaultCustomOriginNormalWorkPlaneInput,
+    )
+  const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [editorState, setEditorState] = useState<EditableEditorState>(() => {
     const initialDiagram = cloneDiagram(exampleOptions[0].diagram)
@@ -248,8 +263,8 @@ function App() {
       ...createWorkPlanePatch(previewWorkPlane),
       label:
         sheetPolygonDraft === null
-          ? `active ${previewWorkPlane.kind} plane`
-          : `sheet draft ${previewWorkPlane.kind} plane`,
+          ? `active ${workPlaneDisplayName(previewWorkPlane)}`
+          : `sheet draft ${workPlaneDisplayName(previewWorkPlane)}`,
     }
   }, [
     creationTool,
@@ -306,6 +321,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setWorkPlaneStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -349,6 +365,7 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setWorkPlaneStatus('')
   }, [canUndo, history.past])
 
   const redoLastChange = useCallback(function redoLastChange(): void {
@@ -368,6 +385,7 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setWorkPlaneStatus('')
   }, [canRedo, history.future])
 
   function downloadJson(): void {
@@ -445,6 +463,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setWorkPlaneStatus('')
     setSaveLoadStatus('loaded')
     setSaveLoadMessage('JSON loaded.')
   }
@@ -500,6 +519,19 @@ function App() {
       setDirectLayerInput(String(layerFilter.layer))
     }
   }, [layerFilter])
+
+  useEffect(() => {
+    setActiveWorkPlane((current) =>
+      normalizeActiveWorkPlaneForAmbientDimension(
+        editableDiagram.ambientDimension,
+        current,
+      ),
+    )
+
+    if (editableDiagram.ambientDimension === 2) {
+      setWorkPlaneStatus('')
+    }
+  }, [editableDiagram.ambientDimension])
 
   useEffect(() => {
     function handleRemoveShortcut(event: KeyboardEvent): void {
@@ -1302,9 +1334,11 @@ function App() {
   function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
     if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
       setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
       return
     }
 
+    setWorkPlaneStatus('')
     setActiveWorkPlane((current) => {
       const fixedValue = workPlaneFixedValue(current)
 
@@ -1322,15 +1356,18 @@ function App() {
   function updateWorkPlaneFixedValue(rawValue: string): void {
     if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
       setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
       return
     }
 
     const fixedValue = Number(rawValue)
 
     if (!Number.isFinite(fixedValue)) {
+      setWorkPlaneStatus('Fixed coordinate must be finite.')
       return
     }
 
+    setWorkPlaneStatus('')
     setActiveWorkPlane((current) => {
       switch (current.kind) {
         case 'xy':
@@ -1345,6 +1382,41 @@ function App() {
           return current
       }
     })
+  }
+
+  function updateCustomWorkPlaneVectorInput(
+    vector: keyof CustomOriginNormalWorkPlaneInput,
+    axis: keyof CustomOriginNormalWorkPlaneInput['origin'],
+    value: string,
+  ): void {
+    setCustomWorkPlaneInput((current) => ({
+      ...current,
+      [vector]: {
+        ...current[vector],
+        [axis]: value,
+      },
+    }))
+    setWorkPlaneStatus('')
+  }
+
+  function applyCustomWorkPlane(): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
+    const result = applyCustomOriginNormalWorkPlaneInput(
+      activeWorkPlane,
+      editableDiagram.ambientDimension,
+      customWorkPlaneInput,
+    )
+
+    setWorkPlaneStatus(result.status)
+
+    if (result.ok) {
+      setActiveWorkPlane(result.workPlane)
+    }
   }
 
   return (
@@ -1697,35 +1769,100 @@ function App() {
           </span>
         </div>
 
-        {editableDiagram.ambientDimension === 3 && (
+        {shouldShowWorkPlaneControls(editableDiagram.ambientDimension) && (
           <div className="control-group work-plane-control">
             <span className="control-label">Work plane</span>
             <select
               className="toolbar-select"
-              value={activeWorkPlane.kind}
-              onChange={(event) =>
-                updateWorkPlaneKind(
-                  event.currentTarget.value as AxisAlignedWorkPlaneName,
-                )
-              }
+              value={workPlaneSelectValue(activeWorkPlane)}
+              onChange={(event) => {
+                const value = event.currentTarget.value as WorkPlaneSelectValue
+
+                if (value !== 'custom') {
+                  updateWorkPlaneKind(value)
+                }
+              }}
             >
+              {activeWorkPlane.kind === 'custom' && (
+                <option value="custom">{activeWorkPlane.name}</option>
+              )}
               {workPlaneKinds.map((kind) => (
                 <option key={kind} value={kind}>
                   {workPlaneLabel(kind)}
                 </option>
               ))}
             </select>
-            <label className="work-plane-fixed">
-              <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
-              <input
-                type="number"
-                step="any"
-                value={String(workPlaneFixedValue(activeWorkPlane))}
-                onChange={(event) =>
-                  updateWorkPlaneFixedValue(event.currentTarget.value)
-                }
-              />
-            </label>
+            {activeWorkPlane.kind !== 'custom' && (
+              <label className="work-plane-fixed">
+                <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={String(workPlaneFixedValue(activeWorkPlane))}
+                  onChange={(event) =>
+                    updateWorkPlaneFixedValue(event.currentTarget.value)
+                  }
+                />
+              </label>
+            )}
+            <form
+              className="custom-work-plane-form"
+              aria-label="Custom plane by origin and normal"
+              onSubmit={(event) => {
+                event.preventDefault()
+                applyCustomWorkPlane()
+              }}
+            >
+              <span className="control-label">
+                Custom plane by origin + normal
+              </span>
+              <fieldset className="custom-work-plane-vector">
+                <legend>Origin</legend>
+                {workPlaneVectorAxes.map((axis) => (
+                  <label key={axis} className="custom-work-plane-field">
+                    <span>{axis}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={customWorkPlaneInput.origin[axis]}
+                      onChange={(event) =>
+                        updateCustomWorkPlaneVectorInput(
+                          'origin',
+                          axis,
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset className="custom-work-plane-vector">
+                <legend>Normal</legend>
+                {workPlaneVectorAxes.map((axis) => (
+                  <label key={axis} className="custom-work-plane-field">
+                    <span>{axis}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={customWorkPlaneInput.normal[axis]}
+                      onChange={(event) =>
+                        updateCustomWorkPlaneVectorInput(
+                          'normal',
+                          axis,
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </fieldset>
+              <button type="submit" className="toolbar-button">
+                Apply
+              </button>
+              <span className="toolbar-status" role="status">
+                {workPlaneStatus}
+              </span>
+            </form>
           </div>
         )}
       </section>
