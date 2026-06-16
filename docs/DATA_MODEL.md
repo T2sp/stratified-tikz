@@ -158,10 +158,11 @@ undoable. Reset to the initial/default display is always available. Reset to the
 last saved/loaded camera may also be offered when it differs from the current
 view.
 
-TikZ export alignment with the current 3D camera, including
-`tikz-3dplot`-style `\tdplotsetmaincoords{theta}{phi}` output, is deferred to
-Phase 13I. Until then, camera metadata affects the SVG preview and cursor
-workflows, not generated TikZ camera setup.
+TikZ export aligns with the current 3D camera orientation by emitting
+`tikz-3dplot`-style `\tdplotsetmaincoords{theta}{phi}` from `thetaDeg` and
+`phiDeg`, then using `tdplot_main_coords` on the `tikzpicture`. Camera metadata
+is still view state, not geometry: model coordinates remain 3D in the output,
+and zoom/pan are not exported.
 
 ## Editor state
 

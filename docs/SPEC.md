@@ -328,9 +328,11 @@ ordinary model coordinates and remains undoable. Reset to the initial/default
 display must always be available; reset to the last saved/loaded camera may be
 offered when applicable.
 
-Generated TikZ camera alignment with `tikz-3dplot`, including emitted
-`\tdplotsetmaincoords{theta}{phi}`, is planned for Phase 13I. The current phase
-keeps TikZ output based on model coordinates and existing export policy.
+Generated 3D TikZ aligns with the current camera orientation using
+`tikz-3dplot`: the exporter emits `\tdplotsetmaincoords{theta}{phi}` from the
+camera `thetaDeg` and `phiDeg`, and uses `tdplot_main_coords` on the
+`tikzpicture`. Geometry remains model-space 3D coordinates; zoom and pan remain
+SVG-view-only.
 
 ## TikZ output principle
 

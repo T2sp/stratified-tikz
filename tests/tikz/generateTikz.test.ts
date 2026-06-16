@@ -15,7 +15,10 @@ import type {
   SheetStyle,
   WorkPlane,
 } from '../../src/model/types.ts'
-import { createInitialCamera3D } from '../../src/model/camera.ts'
+import {
+  createInitialCamera3D,
+  resetCameraToInitial,
+} from '../../src/model/camera.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -25,13 +28,88 @@ test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   assert.doesNotMatch(tikz, /\(0,0,0\)/)
 })
 
-test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
-  const tikz = generateTikz(createThreeDimensionalDiagram())
+test('3D TikZ output uses tikz-3dplot camera setup and 3D coordinates', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const tikz = generateTikz(createThreeDimensionalDiagram(), { camera3d: camera })
 
-  assert.match(tikz, /x=\{\(1cm,0cm\)\}/)
-  assert.match(tikz, /y=\{\(0\.45cm,0\.25cm\)\}/)
-  assert.match(tikz, /z=\{\(0cm,1cm\)\}/)
+  assert.match(tikz, /% Requires \\usepackage\{tikz-3dplot\}/)
+  assert.match(tikz, /\\tdplotsetmaincoords\{70\}\{110\}/)
+  assert.match(tikz, /tdplot_main_coords/)
   assert.match(tikz, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
+  assert.doesNotMatch(tikz, /x=\{\(1cm,0cm\)\}/)
+  assert.doesNotMatch(tikz, /y=\{\(0\.45cm,0\.25cm\)\}/)
+  assert.doesNotMatch(tikz, /z=\{\(0cm,1cm\)\}/)
+  assert.ok(
+    tikz.indexOf('\\tdplotsetmaincoords{70}{110}') <
+      tikz.indexOf('\\begin{tikzpicture}['),
+  )
+})
+
+test('3D TikZ output uses diagram view camera metadata by default', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 41,
+    phiDeg: -82,
+  }
+  const diagram: Diagram = {
+    ...createThreeDimensionalDiagram(),
+    view: { camera3d: camera },
+  }
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\tdplotsetmaincoords\{41\}\{-82\}/)
+})
+
+test('current camera option overrides saved diagram camera metadata', () => {
+  const savedCamera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 20,
+    phiDeg: 30,
+  }
+  const currentCamera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 75,
+    phiDeg: 125,
+  }
+  const diagram: Diagram = {
+    ...createThreeDimensionalDiagram(),
+    view: { camera3d: savedCamera },
+  }
+  const tikz = generateTikz(diagram, { camera3d: currentCamera })
+
+  assert.match(tikz, /\\tdplotsetmaincoords\{75\}\{125\}/)
+  assert.doesNotMatch(tikz, /\\tdplotsetmaincoords\{20\}\{30\}/)
+})
+
+test('changing camera theta and phi changes generated TikZ camera setup', () => {
+  const diagram = createThreeDimensionalDiagram()
+  const first = generateTikz(diagram, {
+    camera3d: { ...createInitialCamera3D(), thetaDeg: 25, phiDeg: 35 },
+  })
+  const second = generateTikz(diagram, {
+    camera3d: { ...createInitialCamera3D(), thetaDeg: 80, phiDeg: 120 },
+  })
+
+  assert.equal(extractMainCoords(first), '\\tdplotsetmaincoords{25}{35}')
+  assert.equal(extractMainCoords(second), '\\tdplotsetmaincoords{80}{120}')
+  assert.notEqual(extractMainCoords(first), extractMainCoords(second))
+})
+
+test('reset to initial camera restores initial TikZ camera values', () => {
+  const diagram = createThreeDimensionalDiagram()
+  const changed = generateTikz(diagram, {
+    camera3d: { ...createInitialCamera3D(), thetaDeg: 80, phiDeg: 120 },
+  })
+  const reset = generateTikz(diagram, {
+    camera3d: resetCameraToInitial(),
+  })
+
+  assert.match(changed, /\\tdplotsetmaincoords\{80\}\{120\}/)
+  assert.match(reset, /\\tdplotsetmaincoords\{13\}\{-23\}/)
 })
 
 test('TikZ output excludes coordinate axes by default', () => {
@@ -47,18 +125,30 @@ test('TikZ output excludes coordinate axes by default', () => {
 test('2D TikZ output ignores the 3D coordinate axes export option', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram(), {
     includeCoordinateAxes: true,
+    camera3d: createInitialCamera3D(),
   })
 
   assert.doesNotMatch(tikz, /Coordinate axes guide/)
   assert.doesNotMatch(tikz, /stratifiedGuideLayer/)
   assert.doesNotMatch(tikz, /\{\$x\$\}/)
+  assert.doesNotMatch(tikz, /tikz-3dplot/)
+  assert.doesNotMatch(tikz, /\\tdplotsetmaincoords/)
+  assert.doesNotMatch(tikz, /tdplot_main_coords/)
 })
 
 test('TikZ output includes a guide layer when coordinate axes export is enabled', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
   const tikz = generateTikz(createThreeDimensionalDiagram(), {
     includeCoordinateAxes: true,
+    camera3d: camera,
   })
 
+  assert.match(tikz, /\\tdplotsetmaincoords\{70\}\{110\}/)
+  assert.match(tikz, /tdplot_main_coords/)
   assert.match(tikz, /\\definecolor\{stzCoordinateAxesGuide\}\{HTML\}\{64748B\}/)
   assert.match(tikz, /\\pgfdeclarelayer\{stratifiedGuideLayer\}/)
   assert.match(
@@ -76,6 +166,10 @@ test('TikZ output includes a guide layer when coordinate axes export is enabled'
   assert.match(tikz, /\] at \(2\.75,0,0\) \{\$x\$\};/)
   assert.match(tikz, /\] at \(0,2\.75,0\) \{\$y\$\};/)
   assert.match(tikz, /\] at \(0,0,2\.75\) \{\$z\$\};/)
+  assert.ok(
+    tikz.indexOf('\\begin{tikzpicture}[') <
+      tikz.indexOf('% Coordinate axes guide'),
+  )
 })
 
 test('coordinate axes export does not affect ordinary strata or labels', () => {
@@ -634,6 +728,9 @@ test('relative polar cubic Bezier export uses TikZ polar control syntax', () => 
 test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scope', () => {
   const tikz = generateTikz(createWorkPlaneRelativePolarBezierDiagram())
 
+  assert.match(tikz, /% Requires \\usepackage\{tikz-3dplot\}/)
+  assert.match(tikz, /\\tdplotsetmaincoords\{13\}\{-23\}/)
+  assert.match(tikz, /tdplot_main_coords/)
   assert.match(tikz, /\\usetikzlibrary\{3d\}/)
   assert.match(tikz, /\\begin\{scope\}\[/)
   assert.match(tikz, /plane origin=\{\(10,20,30\)\}/)
@@ -646,6 +743,9 @@ test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scop
   )
   assert.doesNotMatch(tikz, /\\coordinate \(curveBezierLocalRelativePolar0p1\)/)
   assert.doesNotMatch(tikz, /\\coordinate \(curveBezierLocalRelativePolar0p2\)/)
+  assert.ok(
+    tikz.indexOf('tdplot_main_coords') < tikz.indexOf('canvas is plane'),
+  )
 })
 
 test('work-plane-local relative Cartesian 3D Bezier uses local relative controls', () => {
@@ -937,6 +1037,14 @@ function extractCoordinateNames(tikz: string): string[] {
   return [...tikz.matchAll(/\\coordinate \(([^)]+)\) at/g)].map(
     (match) => match[1],
   )
+}
+
+function extractMainCoords(tikz: string): string {
+  const match = tikz.match(/\\tdplotsetmaincoords\{[^}]+\}\{[^}]+\}/)
+
+  assert.notEqual(match, null)
+
+  return match[0]
 }
 
 function extractLayerBlock(tikz: string, layerName: string): string {
