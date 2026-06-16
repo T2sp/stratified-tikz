@@ -17,6 +17,7 @@ import {
 import { sheetVertices } from './sheets.ts'
 import type {
   Camera,
+  DiagramViewOptions,
   CubicBezierControlMode,
   CurveStratum,
   CurveStyle,
@@ -56,6 +57,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   }
 
   validateCamera(diagram.camera, diagram.ambientDimension, 'camera', errors)
+  validateDiagramView(diagram.view, diagram.ambientDimension, 'view', errors)
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -80,6 +82,51 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     valid: errors.length === 0,
     errors,
   }
+}
+
+function validateDiagramView(
+  view: DiagramViewOptions | undefined,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (view === undefined) {
+    return
+  }
+
+  if (
+    typeof view.showCoordinateAxesInTikz !== 'boolean' &&
+    view.showCoordinateAxesInTikz !== undefined
+  ) {
+    pushError(
+      errors,
+      `${path}.showCoordinateAxesInTikz`,
+      'Coordinate axes TikZ export option must be a boolean.',
+    )
+  }
+
+  if (view.camera3d === undefined) {
+    return
+  }
+
+  if (ambientDimension !== 3) {
+    pushError(
+      errors,
+      `${path}.camera3d`,
+      '3D camera view metadata is valid only in 3D diagrams.',
+    )
+    return
+  }
+
+  validateCamera3D(view.camera3d).errors.forEach((issue) => {
+    pushError(
+      errors,
+      issue.path.length === 0
+        ? `${path}.camera3d`
+        : `${path}.camera3d.${issue.path}`,
+      issue.message,
+    )
+  })
 }
 
 function validateCamera(

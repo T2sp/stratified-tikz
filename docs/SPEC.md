@@ -316,6 +316,22 @@ initial preset keeps the old oblique projected basis internally so existing 3D
 examples, axes, work-plane guides, and selected highlights render as before.
 Camera/view state remains separate from work-plane model geometry.
 
+The persisted 3D camera is diagram-level view metadata, stored as
+`diagram.view.camera3d` when present. It is not a stratum and is not work-plane
+geometry. If a saved file omits camera metadata, loading uses the initial camera.
+If saved camera metadata is invalid, loading falls back to the initial camera and
+may surface a warning in the file-load status.
+
+Camera controls are view operations and do not create geometry undo entries.
+Geometry created or edited under the current camera is still committed as
+ordinary model coordinates and remains undoable. Reset to the initial/default
+display must always be available; reset to the last saved/loaded camera may be
+offered when applicable.
+
+Generated TikZ camera alignment with `tikz-3dplot`, including emitted
+`\tdplotsetmaincoords{theta}{phi}`, is planned for Phase 13I. The current phase
+keeps TikZ output based on model coordinates and existing export policy.
+
 ## TikZ output principle
 
 Generated TikZ must be readable and editable by humans.

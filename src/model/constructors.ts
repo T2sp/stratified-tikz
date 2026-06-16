@@ -10,7 +10,7 @@ import {
   defaultRegionStyle,
   defaultSheetStyle,
 } from './styles.ts'
-import { createInitialCamera3D } from './camera.ts'
+import { cloneCamera3D, createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type {
   AmbientDimension,
@@ -113,10 +113,13 @@ export type CreateTextLabelInput = {
 export function createEmptyDiagram({
   ambientDimension,
 }: CreateEmptyDiagramInput): Diagram {
+  const camera = createDefaultCamera(ambientDimension)
+
   return {
     version: 1,
     ambientDimension,
-    camera: createDefaultCamera(ambientDimension),
+    camera,
+    ...(camera.mode === '3d' ? { view: { camera3d: cloneCamera3D(camera) } } : {}),
     strata: [],
     labels: [],
   }

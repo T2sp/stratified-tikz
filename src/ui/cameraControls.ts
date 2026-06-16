@@ -3,7 +3,12 @@ import {
   cloneCamera3D,
   createInitialCamera3D,
 } from '../model/camera.ts'
-import type { AmbientDimension, Camera3D, Vec2 } from '../model/types.ts'
+import type {
+  AmbientDimension,
+  Camera3D,
+  Diagram,
+  Vec2,
+} from '../model/types.ts'
 
 export const cameraPresetIds = [
   'initial',
@@ -38,11 +43,11 @@ export type CameraViewAdjustment = {
 }
 
 export const cameraPresetOptions: CameraPresetOption[] = [
-  { id: 'initial', label: 'initial' },
-  { id: 'top', label: 'top' },
-  { id: 'front', label: 'front' },
-  { id: 'side', label: 'side' },
-  { id: 'isometric', label: 'isometric' },
+  { id: 'initial', label: 'Initial' },
+  { id: 'top', label: 'Top (xy)' },
+  { id: 'front', label: 'Front (xz)' },
+  { id: 'side', label: 'Side (yz)' },
+  { id: 'isometric', label: 'Isometric' },
 ]
 
 export function shouldShowCameraControls(
@@ -57,6 +62,20 @@ export function createInitialCameraControlState(): Camera3D {
 
 export function resetCameraControlState(): Camera3D {
   return createInitialCameraControlState()
+}
+
+export function cameraControlStateFromDiagramView(diagram: Diagram): Camera3D {
+  if (diagram.ambientDimension !== 3) {
+    return createInitialCameraControlState()
+  }
+
+  if (diagram.view?.camera3d !== undefined) {
+    return cloneCamera3D(diagram.view.camera3d)
+  }
+
+  return diagram.camera.mode === '3d'
+    ? cloneCamera3D(diagram.camera)
+    : createInitialCameraControlState()
 }
 
 export function fitCameraControlState(camera: Camera3D): Camera3D {
@@ -244,6 +263,6 @@ function formatCameraNumber(value: number): string {
   return String(Number(value.toPrecision(12)))
 }
 
-function areCamera3DEqual(left: Camera3D, right: Camera3D): boolean {
+export function areCamera3DEqual(left: Camera3D, right: Camera3D): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }

@@ -45,6 +45,7 @@ import {
   addTextLabelFromDirectInput,
   applyDirectCreationCommitToEditorState,
   appendSheetPolygonDraftPoint,
+  areCamera3DEqual,
   areFinitePoints,
   arePointsOnWorkPlane,
   allLayersFilter,
@@ -54,6 +55,7 @@ import {
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  cameraControlStateFromDiagramView,
   cameraControlFieldValue,
   cameraOrientationForPreview,
   cameraPresetIdForCamera,
@@ -294,6 +296,9 @@ function App() {
   const [cameraControl, setCameraControl] = useState<Camera3D>(() =>
     createInitialCameraControlState(),
   )
+  const [savedCameraControl, setSavedCameraControl] = useState<Camera3D>(() =>
+    createInitialCameraControlState(),
+  )
   const [isCameraDetailsExpanded, setIsCameraDetailsExpanded] =
     useState<boolean>(false)
   const [cameraStatus, setCameraStatus] = useState<string>('')
@@ -441,6 +446,8 @@ function App() {
   )
   const showCameraDetails = showCameraControls && isCameraDetailsExpanded
   const activeCameraPresetId = cameraPresetIdForCamera(cameraControl)
+  const canResetCameraToSaved =
+    showCameraControls && !areCamera3DEqual(cameraControl, savedCameraControl)
   const previewCameraOverride = showCameraControls
     ? cameraOrientationForPreview(cameraControl)
     : undefined
@@ -484,6 +491,11 @@ function App() {
   function resetCameraViewToInitial(): void {
     setCameraControl(resetCameraControlState())
     setCameraStatus('Camera reset to initial.')
+  }
+
+  function resetCameraViewToSaved(): void {
+    setCameraControl(savedCameraControl)
+    setCameraStatus('Camera reset to saved.')
   }
 
   function fitCameraView(): void {
@@ -545,7 +557,10 @@ function App() {
     )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
-    setCameraControl(resetCameraControlState())
+    const nextCamera = cameraControlStateFromDiagramView(nextDiagram)
+
+    setCameraControl(nextCamera)
+    setSavedCameraControl(nextCamera)
     setIsCameraDetailsExpanded(false)
     setCameraStatus('')
   }
@@ -618,9 +633,14 @@ function App() {
 
   function downloadJson(): void {
     try {
-      const blob = new Blob([serializeDiagram(editableDiagram)], {
-        type: 'application/json',
+      const serialized = serializeDiagram(editableDiagram, {
+        camera3d: showCameraControls ? cameraControl : undefined,
+        showCoordinateAxesInTikz:
+          editableDiagram.ambientDimension === 3
+            ? includeCoordinateAxesInTikz
+            : undefined,
       })
+      const blob = new Blob([serialized], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
 
@@ -630,6 +650,9 @@ function App() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
+      if (showCameraControls) {
+        setSavedCameraControl(cameraControl)
+      }
       setSaveLoadStatus('saved')
       setSaveLoadMessage('JSON downloaded.')
     } catch {
@@ -696,11 +719,23 @@ function App() {
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
-    setCameraControl(resetCameraControlState())
+    const loadedCamera = cameraControlStateFromDiagramView(result.diagram)
+
+    setCameraControl(loadedCamera)
+    setSavedCameraControl(loadedCamera)
     setIsCameraDetailsExpanded(false)
     setCameraStatus('')
+    setIncludeCoordinateAxesInTikz(
+      result.diagram.ambientDimension === 3
+        ? result.diagram.view?.showCoordinateAxesInTikz ?? false
+        : false,
+    )
     setSaveLoadStatus('loaded')
-    setSaveLoadMessage('JSON loaded.')
+    setSaveLoadMessage(
+      result.warnings.length === 0
+        ? 'JSON loaded.'
+        : `JSON loaded. ${result.warnings.join(' ')}`,
+    )
   }
 
   function updateSelectedElement(selection: SelectedElement): void {
@@ -2516,6 +2551,14 @@ function App() {
                 onClick={resetCameraViewToInitial}
               >
                 Reset to initial
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!canResetCameraToSaved}
+                onClick={resetCameraViewToSaved}
+              >
+                Reset to saved
               </button>
               <button
                 type="button"

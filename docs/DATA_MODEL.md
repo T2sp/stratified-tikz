@@ -71,16 +71,22 @@ export type SavedDiagramFile = {
 };
 ```
 
-Only `diagram` data is persisted. UI/editor state such as the selected element,
-active creation tool, coordinate input mode, active work plane, draft geometry,
-layer filter, copy status, undo/redo history, and temporary preview state is not
-saved.
+Only `diagram` data is persisted. Mathematical geometry is stored as strata and
+free labels. Diagram-level view metadata may also be stored under
+`diagram.view`, but it is not geometry. UI/editor state such as the selected
+element, active creation tool, coordinate input mode, active work plane, draft
+geometry, layer filter, copy status, undo/redo history, and temporary preview
+state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
 Loading a diagram resets transient work-plane UI state to the default xy-plane
 at `z = 0`; subsequent editor updates may validate the active work plane against
 the loaded diagram, but no active work-plane data is read from the JSON file.
+Saved files that omit camera metadata load with the initial/default camera.
+Invalid saved camera metadata is ignored and replaced with the initial/default
+camera; load UI may report this as a warning while still accepting valid
+geometry.
 
 ## Camera
 
@@ -106,6 +112,11 @@ export type Camera3D = {
     zVector: [number, number];
   };
 };
+
+export type DiagramViewOptions = {
+  camera3d?: Camera3D;
+  showCoordinateAxesInTikz?: boolean;
+};
 ```
 
 A valid diagram must satisfy:
@@ -127,6 +138,30 @@ orthographic; `zoom` is a positive finite scale factor, and `pan` is a finite
 default SVG display. That preset carries an explicit `projectionBasis` for the
 old oblique preview basis (`x = (1,0)`, `y = (0.45,0.25)`, `z = (0,1)`), while
 ordinary angle cameras derive their basis from `thetaDeg` and `phiDeg`.
+
+For persistence, the 3D camera is saved as diagram-level view metadata:
+
+```ts
+diagram.view?.camera3d
+```
+
+This metadata is separate from strata and labels. It is not a stratum, not
+work-plane geometry, and not exported to TikZ in the current phase. The runtime
+`diagram.camera` field remains the validated camera used by preview/rendering
+helpers and by legacy saved files. New JSON writes the persisted 3D camera under
+`diagram.view.camera3d`; old JSON with a top-level `camera` still loads.
+
+Camera controls are view operations. Orbiting, panning, zooming, choosing a
+preset, and resetting the camera do not create geometry undo entries. Geometry
+created or edited while a camera is active remains ordinary diagram data and is
+undoable. Reset to the initial/default display is always available. Reset to the
+last saved/loaded camera may also be offered when it differs from the current
+view.
+
+TikZ export alignment with the current 3D camera, including
+`tikz-3dplot`-style `\tdplotsetmaincoords{theta}{phi}` output, is deferred to
+Phase 13I. Until then, camera metadata affects the SVG preview and cursor
+workflows, not generated TikZ camera setup.
 
 ## Editor state
 
