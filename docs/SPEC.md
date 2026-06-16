@@ -236,13 +236,20 @@ ordinary `Vec3` diagram data.
 Direct creation for path-like geometry can also use existing diagram
 coordinates as sources. Supported sources are point stratum positions, existing
 polyline vertices in 2D and 3D, polygon sheet vertices in 3D, and cubic Bezier
-start/control/end points. This is copy-on-create only: choosing a source copies
-the source's current model-space `Vec3` into the new curve or sheet, and the
-created geometry stores no live reference to the original source. Moving,
-editing, or deleting the source later does not update or invalidate the created
-geometry. In active work-plane local mode, an existing source must already lie
-on the active work plane within tolerance; off-plane sources are rejected rather
-than silently projected.
+start/control/end points. Source labels include the source kind, stratum name,
+id disambiguator, vertex/control role when applicable, and formatted
+coordinates, so duplicate default names remain distinguishable.
+
+Cursor creation can also use existing point strata as coordinate sources for
+polylines, cubic Bezier curves, and polygon sheets: clicking an existing point
+while a creation tool is active copies that point's current coordinate into the
+draft. This is copy-on-create only for both direct and cursor workflows: choosing
+or clicking a source copies the source's current model-space `Vec3` into the new
+geometry, and the created geometry stores no live reference to the original
+source. Moving, editing, or deleting the source later does not update or
+invalidate the created geometry. In active work-plane local mode and in 3D cursor
+creation, an existing source must already lie on the active work plane within
+tolerance; off-plane sources are rejected rather than silently projected.
 
 ### Hybrid editing
 

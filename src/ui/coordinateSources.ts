@@ -10,6 +10,7 @@ import {
 } from '../geometry/workPlane.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type { AmbientDimension, Diagram, Vec3, WorkPlane } from '../model/types.ts'
+import { formatVec3 } from './inspectorSummary.ts'
 
 export type ExistingCoordinateSource =
   | {
@@ -37,6 +38,18 @@ export type ExistingCoordinateSourceOption = {
   label: string
   source: ExistingCoordinateSource
 }
+
+export type CursorPointCoordinateSourceResult =
+  | {
+      ok: true
+      point: Vec3
+      source: ExistingCoordinateSource
+    }
+  | {
+      ok: false
+      reason: 'missingSource' | 'offPlaneOrInvalid'
+      source: ExistingCoordinateSource
+    }
 
 type CubicBezierPointRole = Extract<
   ExistingCoordinateSource,
@@ -138,14 +151,65 @@ export function resolveExistingCoordinateForDirectCreation(
   }
 }
 
+export function resolvePointStratumCoordinateForCursorCreation(
+  diagram: Diagram,
+  pointId: string,
+  options: {
+    workPlane: WorkPlane
+    epsilon?: number
+  },
+): CursorPointCoordinateSourceResult {
+  const source: ExistingCoordinateSource = {
+    kind: 'pointStratum',
+    stratumId: pointId,
+  }
+  const point = resolveExistingCoordinateSource(diagram, source)
+
+  if (point === null) {
+    return {
+      ok: false,
+      reason: 'missingSource',
+      source,
+    }
+  }
+
+  const normalizedPoint = normalizePointForAmbientDimension(
+    diagram.ambientDimension,
+    point,
+  )
+
+  if (!isFiniteVec3(normalizedPoint)) {
+    return {
+      ok: false,
+      reason: 'offPlaneOrInvalid',
+      source,
+    }
+  }
+
+  if (
+    diagram.ambientDimension === 3 &&
+    !isPointOnWorkPlane(normalizedPoint, options.workPlane, options.epsilon)
+  ) {
+    return {
+      ok: false,
+      reason: 'offPlaneOrInvalid',
+      source,
+    }
+  }
+
+  return {
+    ok: true,
+    point: { ...normalizedPoint },
+    source,
+  }
+}
+
 export function createExistingCoordinateSourceOptions(
   diagram: Diagram,
 ): ExistingCoordinateSourceOption[] {
   const options: ExistingCoordinateSourceOption[] = []
 
   for (const stratum of diagram.strata) {
-    const stratumName = sourceObjectName(stratum.name, stratum.id)
-
     if (stratum.geometricKind === 'point') {
       const source: ExistingCoordinateSource = {
         kind: 'pointStratum',
@@ -154,7 +218,11 @@ export function createExistingCoordinateSourceOptions(
 
       options.push({
         key: existingCoordinateSourceKey(source),
-        label: `Point: ${stratumName}`,
+        label: formatExistingCoordinateSourceLabel(
+          diagram,
+          source,
+          diagram.ambientDimension,
+        ),
         source,
       })
       continue
@@ -170,7 +238,11 @@ export function createExistingCoordinateSourceOptions(
 
         options.push({
           key: existingCoordinateSourceKey(source),
-          label: `Polyline: ${stratumName} / Vertex ${index + 1}`,
+          label: formatExistingCoordinateSourceLabel(
+            diagram,
+            source,
+            diagram.ambientDimension,
+          ),
           source,
         })
       })
@@ -187,7 +259,11 @@ export function createExistingCoordinateSourceOptions(
 
         options.push({
           key: existingCoordinateSourceKey(source),
-          label: `Bezier: ${stratumName} / ${cubicBezierPointRoleLabel(pointRole)}`,
+          label: formatExistingCoordinateSourceLabel(
+            diagram,
+            source,
+            diagram.ambientDimension,
+          ),
           source,
         })
       })
@@ -204,7 +280,11 @@ export function createExistingCoordinateSourceOptions(
 
         options.push({
           key: existingCoordinateSourceKey(source),
-          label: `Sheet: ${stratumName} / Vertex ${index + 1}`,
+          label: formatExistingCoordinateSourceLabel(
+            diagram,
+            source,
+            diagram.ambientDimension,
+          ),
           source,
         })
       })
@@ -212,6 +292,79 @@ export function createExistingCoordinateSourceOptions(
   }
 
   return options
+}
+
+export function formatExistingCoordinateSourceLabel(
+  diagram: Diagram,
+  source: ExistingCoordinateSource,
+  ambientDimension: AmbientDimension,
+): string {
+  try {
+    switch (source.kind) {
+      case 'pointStratum': {
+        const stratum = diagram.strata.find(
+          (candidate) => candidate.id === source.stratumId,
+        )
+        const point = resolveExistingCoordinateSource(diagram, source)
+
+        if (stratum?.geometricKind !== 'point' || point === null) {
+          return `Missing source: ${source.stratumId}`
+        }
+
+        return `Point: ${sourceObjectName(stratum.name, stratum.id)} [${shortSourceId(stratum.id)}] @ ${formatVec3(point, ambientDimension)}`
+      }
+      case 'polylineVertex': {
+        const stratum = diagram.strata.find(
+          (candidate) => candidate.id === source.curveId,
+        )
+        const point = resolveExistingCoordinateSource(diagram, source)
+
+        if (
+          stratum?.geometricKind !== 'curve' ||
+          stratum.kind !== 'polyline' ||
+          point === null
+        ) {
+          return `Missing source: ${source.curveId}`
+        }
+
+        return `Polyline: ${sourceObjectName(stratum.name, stratum.id)} [${shortSourceId(stratum.id)}] / Vertex ${source.vertexIndex + 1} @ ${formatVec3(point, ambientDimension)}`
+      }
+      case 'sheetVertex': {
+        const stratum = diagram.strata.find(
+          (candidate) => candidate.id === source.sheetId,
+        )
+        const point = resolveExistingCoordinateSource(diagram, source)
+
+        if (
+          stratum?.geometricKind !== 'sheet' ||
+          stratum.kind !== 'polygonSheet' ||
+          point === null
+        ) {
+          return `Missing source: ${source.sheetId}`
+        }
+
+        return `Sheet: ${sourceObjectName(stratum.name, stratum.id)} [${shortSourceId(stratum.id)}] / Vertex ${source.vertexIndex + 1} @ ${formatVec3(point, ambientDimension)}`
+      }
+      case 'cubicBezierPoint': {
+        const stratum = diagram.strata.find(
+          (candidate) => candidate.id === source.curveId,
+        )
+        const point = resolveExistingCoordinateSource(diagram, source)
+
+        if (
+          stratum?.geometricKind !== 'curve' ||
+          stratum.kind !== 'cubicBezier' ||
+          point === null
+        ) {
+          return `Missing source: ${source.curveId}`
+        }
+
+        return `Bezier: ${sourceObjectName(stratum.name, stratum.id)} [${shortSourceId(stratum.id)}] / ${cubicBezierPointRoleLabel(source.pointRole)} @ ${formatVec3(point, ambientDimension)}`
+      }
+    }
+  } catch {
+    return `Missing source: ${sourceIdForLabelFallback(source)}`
+  }
 }
 
 export function existingCoordinateSourceKey(
@@ -298,4 +451,27 @@ function sourceObjectName(name: string, id: string): string {
   const trimmedName = name.trim()
 
   return trimmedName.length === 0 ? id : trimmedName
+}
+
+function shortSourceId(id: string): string {
+  const trimmedId = id.trim()
+
+  if (trimmedId.length <= 16) {
+    return trimmedId
+  }
+
+  return `${trimmedId.slice(0, 8)}...${trimmedId.slice(-5)}`
+}
+
+function sourceIdForLabelFallback(source: ExistingCoordinateSource): string {
+  switch (source.kind) {
+    case 'pointStratum':
+      return source.stratumId
+    case 'polylineVertex':
+      return source.curveId
+    case 'sheetVertex':
+      return source.sheetId
+    case 'cubicBezierPoint':
+      return source.curveId
+  }
 }
