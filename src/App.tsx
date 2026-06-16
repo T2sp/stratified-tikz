@@ -26,6 +26,7 @@ import type {
   AmbientDimension,
   AxisAlignedWorkPlaneName,
   Camera,
+  Camera3D,
   CoordinateInputMode,
   Diagram,
   Vec2,
@@ -50,11 +51,20 @@ import {
   areFinitePoints,
   arePointsOnWorkPlane,
   allLayersFilter,
+  applyCameraNumericInput,
   clearSelectionIfMissing,
   clearSelectionForLayerFilter,
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  cameraControlFieldValue,
+  cameraOrientationForPreview,
+  cameraPresetIdForCamera,
+  cameraPresetOptions,
+  cameraSummaryLabel,
+  cameraViewAdjustmentFromControls,
+  createCameraPresetCamera,
+  createInitialCameraControlState,
   createExistingCoordinateSourceOptions,
   createDirectCoordinateSourceHighlights,
   createWorkPlanePointPickingHighlights,
@@ -69,6 +79,7 @@ import {
   existingCoordinateSourceKey,
   findSelectedElement,
   formatExistingCoordinateSourceLabel,
+  fitCameraControlState,
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
@@ -78,7 +89,9 @@ import {
   parseDirectLayerInput,
   redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
+  resetCameraControlState,
   sheetDraftBlocksWorkPlaneChange,
+  shouldShowCameraControls,
   shouldShowWorkPlaneControls,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
@@ -110,6 +123,8 @@ import {
   type DiagramHistory,
   type ExistingCoordinateSource,
   type ExistingCoordinateSourceOption,
+  type CameraControlField,
+  type CameraPresetId,
   type CoordinateSourceHighlight,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
@@ -206,6 +221,13 @@ const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'relativeCartesian',
   'relativePolar',
 ]
+const cameraNumericFields: Array<{ field: CameraControlField; label: string }> = [
+  { field: 'thetaDeg', label: 'theta' },
+  { field: 'phiDeg', label: 'phi' },
+  { field: 'zoom', label: 'zoom' },
+  { field: 'panX', label: 'pan x' },
+  { field: 'panY', label: 'pan y' },
+]
 
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
@@ -272,6 +294,12 @@ function App() {
     useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
+  const [cameraControl, setCameraControl] = useState<Camera3D>(() =>
+    createInitialCameraControlState(),
+  )
+  const [isCameraDetailsExpanded, setIsCameraDetailsExpanded] =
+    useState<boolean>(false)
+  const [cameraStatus, setCameraStatus] = useState<string>('')
   const [editorState, setEditorState] = useState<EditableEditorState>(() => {
     const initialDiagram = cloneDiagram(exampleOptions[0].diagram)
 
@@ -411,6 +439,17 @@ function App() {
     editableDiagram.ambientDimension,
     isWorkPlaneDetailsExpanded,
   )
+  const showCameraControls = shouldShowCameraControls(
+    editableDiagram.ambientDimension,
+  )
+  const showCameraDetails = showCameraControls && isCameraDetailsExpanded
+  const activeCameraPresetId = cameraPresetIdForCamera(cameraControl)
+  const previewCameraOverride = showCameraControls
+    ? cameraOrientationForPreview(cameraControl)
+    : undefined
+  const previewCameraAdjustment = showCameraControls
+    ? cameraViewAdjustmentFromControls(cameraControl)
+    : undefined
 
   async function copyTikz(): Promise<void> {
     try {
@@ -428,6 +467,40 @@ function App() {
   function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
     setIncludeCoordinateAxesInTikz(includeAxes)
     setCopyStatus('idle')
+  }
+
+  function updateCameraNumericField(
+    field: CameraControlField,
+    rawValue: string,
+  ): void {
+    const result = applyCameraNumericInput(cameraControl, field, rawValue)
+
+    if (!result.ok) {
+      setCameraStatus(result.message)
+      return
+    }
+
+    setCameraControl(result.camera)
+    setCameraStatus('')
+  }
+
+  function resetCameraViewToInitial(): void {
+    setCameraControl(resetCameraControlState())
+    setCameraStatus('Camera reset to initial.')
+  }
+
+  function fitCameraView(): void {
+    setCameraControl((current) => fitCameraControlState(current))
+    setCameraStatus('Camera fit to view.')
+  }
+
+  function updateCameraPreset(presetId: CameraPresetId | 'custom'): void {
+    if (presetId === 'custom') {
+      return
+    }
+
+    setCameraControl(createCameraPresetCamera(presetId))
+    setCameraStatus('')
   }
 
   function selectExample(exampleId: ExampleId): void {
@@ -475,6 +548,9 @@ function App() {
     )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
+    setCameraControl(resetCameraControlState())
+    setIsCameraDetailsExpanded(false)
+    setCameraStatus('')
   }
 
   function updateEditableDiagram(update: SetStateAction<Diagram>): void {
@@ -623,6 +699,9 @@ function App() {
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
+    setCameraControl(resetCameraControlState())
+    setIsCameraDetailsExpanded(false)
+    setCameraStatus('')
     setSaveLoadStatus('loaded')
     setSaveLoadMessage('JSON loaded.')
   }
@@ -702,6 +781,8 @@ function App() {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
       setIsWorkPlaneDetailsExpanded(false)
       setWorkPlaneStatus('')
+      setIsCameraDetailsExpanded(false)
+      setCameraStatus('')
     }
   }, [editableDiagram.ambientDimension])
 
@@ -2407,6 +2488,96 @@ function App() {
           </span>
         </div>
 
+        {showCameraControls && (
+          <section className="camera-control" aria-labelledby="camera-heading">
+            <div className="camera-summary-row">
+              <button
+                type="button"
+                className="camera-summary-toggle"
+                aria-expanded={showCameraDetails}
+                aria-controls="camera-details"
+                onClick={() =>
+                  setIsCameraDetailsExpanded((expanded) => !expanded)
+                }
+              >
+                <span className="camera-disclosure" aria-hidden="true">
+                  {showCameraDetails ? 'v' : '>'}
+                </span>
+                <span id="camera-heading" className="control-label">
+                  Camera
+                </span>
+                <span className="camera-summary">
+                  {cameraSummaryLabel(cameraControl)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={resetCameraViewToInitial}
+              >
+                Reset to initial
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={fitCameraView}
+              >
+                Fit
+              </button>
+              {cameraStatus !== '' && (
+                <span className="toolbar-status camera-status" role="status">
+                  {cameraStatus}
+                </span>
+              )}
+            </div>
+
+            {showCameraDetails && (
+              <div id="camera-details" className="camera-details">
+                <div className="camera-field-grid">
+                  {cameraNumericFields.map((field) => (
+                    <label key={field.field} className="camera-field">
+                      <span>{field.label}</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={cameraControlFieldValue(
+                          cameraControl,
+                          field.field,
+                        )}
+                        onChange={(event) =>
+                          updateCameraNumericField(
+                            field.field,
+                            event.currentTarget.value,
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label className="camera-preset-field">
+                  <span>Preset</span>
+                  <select
+                    className="toolbar-select"
+                    value={activeCameraPresetId ?? 'custom'}
+                    onChange={(event) =>
+                      updateCameraPreset(
+                        event.currentTarget.value as CameraPresetId | 'custom',
+                      )
+                    }
+                  >
+                    <option value="custom">custom</option>
+                    {cameraPresetOptions.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </section>
+        )}
+
         {shouldShowWorkPlaneControls(editableDiagram.ambientDimension) && (
           <section className="work-plane-control" aria-labelledby="work-plane-heading">
             <div className="work-plane-summary-row">
@@ -2653,6 +2824,8 @@ function App() {
           <SvgDiagram
             diagram={editableDiagram}
             fitToView
+            cameraOverride={previewCameraOverride}
+            cameraViewAdjustment={previewCameraAdjustment}
             selectedElement={selectedElement}
             polylineDraft={polylineDraft?.points}
             cubicBezierDraft={cubicBezierDraft?.points}

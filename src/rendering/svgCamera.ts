@@ -2,10 +2,17 @@ import { projectVec3 } from '../geometry/projection.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
 
+export type CameraViewAdjustment = {
+  zoom: number
+  pan: Vec2
+}
+
 export type ResolveSvgCameraOptions = {
   fitToView?: boolean
   padding?: number
   extraPointsForFit?: readonly Vec3[]
+  cameraOverride?: Camera
+  viewAdjustment?: CameraViewAdjustment
 }
 
 const defaultPreviewPadding = 36
@@ -16,17 +23,57 @@ export function resolveSvgCamera(
   height: number,
   options: ResolveSvgCameraOptions = {},
 ): Camera {
-  if (!options.fitToView) {
-    return diagram.camera
+  const baseDiagram =
+    options.cameraOverride === undefined
+      ? diagram
+      : { ...diagram, camera: options.cameraOverride }
+  const resolvedCamera = options.fitToView
+    ? fitCameraToDiagram(
+        baseDiagram,
+        width,
+        height,
+        options.padding ?? defaultPreviewPadding,
+        options.extraPointsForFit ?? [],
+      )
+    : baseDiagram.camera
+
+  return options.viewAdjustment === undefined
+    ? resolvedCamera
+    : applyCameraViewAdjustment(resolvedCamera, options.viewAdjustment)
+}
+
+export function applyCameraViewAdjustment(
+  camera: Camera,
+  adjustment: CameraViewAdjustment,
+): Camera {
+  if (
+    !Number.isFinite(adjustment.zoom) ||
+    adjustment.zoom <= 0 ||
+    !Number.isFinite(adjustment.pan.x) ||
+    !Number.isFinite(adjustment.pan.y)
+  ) {
+    throw new Error('Camera view adjustment must be finite with positive zoom.')
   }
 
-  return fitCameraToDiagram(
-    diagram,
-    width,
-    height,
-    options.padding ?? defaultPreviewPadding,
-    options.extraPointsForFit ?? [],
-  )
+  if (camera.mode === '2d') {
+    return {
+      ...camera,
+      scale: camera.scale * adjustment.zoom,
+      origin: {
+        x: camera.origin.x + adjustment.pan.x,
+        y: camera.origin.y + adjustment.pan.y,
+      },
+    }
+  }
+
+  return {
+    ...camera,
+    zoom: camera.zoom * adjustment.zoom,
+    pan: {
+      x: camera.pan.x + adjustment.pan.x,
+      y: camera.pan.y + adjustment.pan.y,
+    },
+  }
 }
 
 export function fitCameraToDiagram(
