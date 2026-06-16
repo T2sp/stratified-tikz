@@ -17,6 +17,7 @@ import type {
   WorkPlaneDirectionIndicator,
   WorkPlanePreview,
 } from '../ui/workPlanePreview'
+import type { CoordinateSourceHighlight } from '../ui/coordinateSourceHighlights'
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
@@ -57,6 +58,7 @@ export type SvgDiagramProps = {
   cubicBezierDraft?: Vec3[]
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
+  coordinateSourceHighlights?: CoordinateSourceHighlight[]
   layerFilter?: LayerFilter
   showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
@@ -106,6 +108,7 @@ export function SvgDiagram({
   cubicBezierDraft,
   sheetDraft,
   workPlanePreview,
+  coordinateSourceHighlights,
   layerFilter = allLayersFilter,
   showGeometryHandles = false,
   onSelectionChange,
@@ -124,6 +127,7 @@ export function SvgDiagram({
     ...(sheetDraft ?? []),
     ...(polylineDraft ?? []),
     ...(cubicBezierDraft ?? []),
+    ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
@@ -215,6 +219,11 @@ export function SvgDiagram({
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
+      {renderCoordinateSourceHighlights(
+        coordinateSourceHighlights,
+        camera,
+        height,
+      )}
       {shouldRenderSvgGeometryHandles(
         showGeometryHandles,
         onGeometryHandleDrag !== undefined,
@@ -236,6 +245,118 @@ export function SvgDiagram({
           )
         : null}
     </svg>
+  )
+}
+
+function renderCoordinateSourceHighlights(
+  highlights: CoordinateSourceHighlight[] | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (highlights === undefined || highlights.length === 0) {
+    return null
+  }
+
+  return (
+    <g
+      key="coordinate-source-highlights"
+      className="svg-coordinate-source-highlights"
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      {highlights.map((highlight) =>
+        renderCoordinateSourceHighlight(highlight, camera, viewportHeight),
+      )}
+    </g>
+  )
+}
+
+function renderCoordinateSourceHighlight(
+  highlight: CoordinateSourceHighlight,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement {
+  const center = projectToSvgPoint(camera, highlight.position, viewportHeight)
+
+  if (highlight.kind === 'workPlanePick') {
+    const color = '#0F766E'
+
+    return (
+      <g key={highlight.id}>
+        <circle
+          cx={center.x}
+          cy={center.y}
+          r={12}
+          fill="none"
+          stroke={color}
+          strokeOpacity={0.9}
+          strokeWidth={2.2}
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle
+          cx={center.x}
+          cy={center.y}
+          r={6.2}
+          fill={color}
+          fillOpacity={0.92}
+          stroke="#ffffff"
+          strokeWidth={1.4}
+          vectorEffect="non-scaling-stroke"
+        />
+        <text
+          x={center.x}
+          y={center.y}
+          fill="#ffffff"
+          fontSize={8.5}
+          fontWeight={750}
+          textAnchor="middle"
+          dominantBaseline="central"
+        >
+          {highlight.label}
+        </text>
+      </g>
+    )
+  }
+
+  const color = '#C026D3'
+
+  return (
+    <g key={highlight.id}>
+      <circle
+        cx={center.x}
+        cy={center.y}
+        r={9.5}
+        fill="none"
+        stroke={color}
+        strokeOpacity={0.88}
+        strokeWidth={2.1}
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={center.x}
+        cy={center.y}
+        r={3}
+        fill={color}
+        fillOpacity={0.95}
+      />
+      {highlight.label !== undefined && (
+        <text
+          x={center.x}
+          y={center.y}
+          dx={10}
+          dy={-9}
+          fill={color}
+          stroke="#ffffff"
+          strokeWidth={3}
+          paintOrder="stroke"
+          fontSize={10}
+          fontWeight={700}
+          dominantBaseline="middle"
+        >
+          {highlight.label}
+        </text>
+      )}
+    </g>
   )
 }
 

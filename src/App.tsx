@@ -56,6 +56,8 @@ import {
   commitDiagramChange,
   commitDirectCreationResult,
   createExistingCoordinateSourceOptions,
+  createDirectCoordinateSourceHighlights,
+  createWorkPlanePointPickingHighlights,
   createCustomWorkPlanePreview,
   createDiagramHistory,
   createSheetPolygonDraft,
@@ -108,6 +110,7 @@ import {
   type DiagramHistory,
   type ExistingCoordinateSource,
   type ExistingCoordinateSourceOption,
+  type CoordinateSourceHighlight,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
   type LayerFilter,
@@ -339,6 +342,71 @@ function App() {
     previewWorkPlane,
     sheetPolygonDraft,
   ])
+  const directCoordinateSourceHighlights = useMemo(() => {
+    if (
+      coordinateInputMode !== 'direct' ||
+      !isDirectCreationTool(creationTool) ||
+      !isDirectPathCreationTool(creationTool)
+    ) {
+      return []
+    }
+
+    const activeSources =
+      creationTool === 'createPolyline'
+        ? directPolylineSources
+        : creationTool === 'createCubicBezier'
+          ? directCubicBezierSources
+          : directSheetSources
+    const sourceRequests = activeSources.flatMap((source, index) =>
+      source === null
+        ? []
+        : [
+            {
+              source,
+              label: `row ${index + 1}`,
+            },
+          ],
+    )
+    const selectedSource = existingCoordinateSourceOptions.find(
+      (option) => option.key === directSourceKey,
+    )?.source
+
+    return createDirectCoordinateSourceHighlights(editableDiagram, [
+      ...sourceRequests,
+      ...(selectedSource === undefined
+        ? []
+        : [
+            {
+              source: selectedSource,
+              label: 'selected',
+            },
+          ]),
+    ])
+  }, [
+    coordinateInputMode,
+    creationTool,
+    directCubicBezierSources,
+    directPolylineSources,
+    directSheetSources,
+    directSourceKey,
+    editableDiagram,
+    existingCoordinateSourceOptions,
+  ])
+  const workPlaneCoordinateSourceHighlights = useMemo(
+    () =>
+      createWorkPlanePointPickingHighlights(
+        editableDiagram,
+        workPlanePointPickingState,
+      ),
+    [editableDiagram, workPlanePointPickingState],
+  )
+  const coordinateSourceHighlights = useMemo<CoordinateSourceHighlight[]>(
+    () => [
+      ...directCoordinateSourceHighlights,
+      ...workPlaneCoordinateSourceHighlights,
+    ],
+    [directCoordinateSourceHighlights, workPlaneCoordinateSourceHighlights],
+  )
   const showWorkPlaneDetails = shouldShowWorkPlaneDetails(
     editableDiagram.ambientDimension,
     isWorkPlaneDetailsExpanded,
@@ -2590,6 +2658,7 @@ function App() {
             cubicBezierDraft={cubicBezierDraft?.points}
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
+            coordinateSourceHighlights={coordinateSourceHighlights}
             layerFilter={layerFilter}
             showGeometryHandles={
               creationTool === 'select' && !workPlanePointPickingState.active
