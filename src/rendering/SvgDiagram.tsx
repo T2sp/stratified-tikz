@@ -51,6 +51,7 @@ export type SvgDiagramProps = {
   layerFilter?: LayerFilter
   showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
+  onPointStratumClick?: (pointId: string) => void
   onCanvasClick?: (
     svgPoint: Vec2,
     viewportHeight: number,
@@ -98,6 +99,7 @@ export function SvgDiagram({
   layerFilter = allLayersFilter,
   showGeometryHandles = false,
   onSelectionChange,
+  onPointStratumClick,
   onCanvasClick,
   onGeometryHandleDrag,
   onGeometryHandleDragStart,
@@ -126,6 +128,7 @@ export function SvgDiagram({
           selectedElement,
           layerFilter,
           onSelectionChange,
+          onPointStratumClick,
         ),
       ),
     ...diagram.labels.map((label) =>
@@ -230,6 +233,7 @@ function renderStratum(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
 ): RenderItem {
   switch (stratum.geometricKind) {
     case 'region':
@@ -264,6 +268,7 @@ function renderStratum(
         selectedElement,
         layerFilter,
         onSelectionChange,
+        onPointStratumClick,
       )
   }
 }
@@ -388,6 +393,7 @@ function renderPoint(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
 ): RenderItem {
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
@@ -417,7 +423,12 @@ function renderPoint(
             key={point.id}
             {...groupProps}
             onClick={(event) =>
-              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+              selectPointElement(
+                event,
+                point.id,
+                onSelectionChange,
+                onPointStratumClick,
+              )
             }
           >
             {renderPointHighlight(center, radius, isSelected)}
@@ -434,7 +445,12 @@ function renderPoint(
             key={point.id}
             {...groupProps}
             onClick={(event) =>
-              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+              selectPointElement(
+                event,
+                point.id,
+                onSelectionChange,
+                onPointStratumClick,
+              )
             }
           >
             {renderPointHighlight(center, radius, isSelected)}
@@ -456,7 +472,12 @@ function renderPoint(
             key={point.id}
             {...groupProps}
             onClick={(event) =>
-              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+              selectPointElement(
+                event,
+                point.id,
+                onSelectionChange,
+                onPointStratumClick,
+              )
             }
           >
             {renderPointHighlight(center, radius, isSelected)}
@@ -478,7 +499,12 @@ function renderPoint(
             key={point.id}
             {...groupProps}
             onClick={(event) =>
-              selectElement(event, { kind: 'stratum', id: point.id }, onSelectionChange)
+              selectPointElement(
+                event,
+                point.id,
+                onSelectionChange,
+                onPointStratumClick,
+              )
             }
           >
             {renderPointHighlight(center, radius, isSelected)}
@@ -952,6 +978,21 @@ function selectElement(
 
   event.stopPropagation()
   onSelectionChange(selection)
+}
+
+function selectPointElement(
+  event: MouseEvent<SVGGElement>,
+  pointId: string,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
+): void {
+  if (onPointStratumClick !== undefined) {
+    event.stopPropagation()
+    onPointStratumClick(pointId)
+    return
+  }
+
+  selectElement(event, { kind: 'stratum', id: pointId }, onSelectionChange)
 }
 
 function svgPointFromMouseEvent(

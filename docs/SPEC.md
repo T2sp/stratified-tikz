@@ -171,6 +171,10 @@ P0: x, y, z
 P1: x, y, z
 P2: x, y, z
 Apply
+
+Pick 3 points for work plane
+Picked 0/3 points
+Reset / Cancel / Apply
 ```
 
 The inputs must be finite numbers, and the normal vector must be nonzero. A
@@ -179,6 +183,14 @@ the origin and normalized normal. For the three-point form, the points must be
 finite, distinct, and non-collinear; `P0` is the origin and `P1 - P0` determines
 the preferred `u` direction. Invalid input reports a concise status and leaves
 the previous active work plane unchanged.
+
+The existing-point workflow is also 3D-only. Activating it starts an editor-only
+point-picking mode: clicking visible point strata records their IDs without
+changing ordinary selection and without creating geometry. The picker requires
+three distinct point strata, rejects duplicate picks, and applies a custom plane
+from the current point positions. If picked point strata disappear while picking,
+the unavailable IDs are removed from the picker state. Work-plane picking state
+and previews are not part of the diagram and are not exported to TikZ.
 
 Custom 3D work planes are represented internally by ordinary `Vec3` model
 coordinates: an `origin`, normalized in-plane basis vectors `u` and `v`, and a
