@@ -1,14 +1,17 @@
 import {
   absoluteCubicBezierPointsFromControlMode,
   isValidPolarControl,
+  isValidWorkPlaneFrameSnapshot,
+  pointFromWorkPlaneLocalCoordinate,
+  workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
   isFiniteVec3,
   projectPointToWorkPlaneCoordinates,
   pointOnWorkPlane,
-  subtractVec3,
   validateWorkPlane,
+  workPlaneToBasis,
 } from '../geometry/workPlane.ts'
 import {
   layerFilterIncludesLayer,
@@ -27,6 +30,7 @@ import {
 } from '../model/styles.ts'
 import type {
   AmbientDimension,
+  CubicBezierPolarControl,
   CubicBezierControlMode,
   CurveStratum,
   Diagram,
@@ -38,6 +42,9 @@ import type {
   TextLabel,
   Vec3,
   WorkPlane,
+  WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinate,
+  WorkPlaneLocalOffset,
 } from '../model/types.ts'
 import type { SelectedElement } from './selection.ts'
 import { areFinitePoints } from './sheetDraft.ts'
@@ -611,8 +618,16 @@ export function addCubicBezierCurveFromDirectInput(
   }
 
   const directControlMode = options.directControlMode ?? 'absolute'
+  const parseOptions = directCoordinateParseOptionsForDiagram(diagram, options)
+  const usesWorkPlaneLocalCoordinates =
+    diagram.ambientDimension === 3 &&
+    parseOptions.coordinateMode === 'workPlaneLocal'
 
-  if (directControlMode === 'relativePolar' && diagram.ambientDimension !== 2) {
+  if (
+    directControlMode === 'relativePolar' &&
+    diagram.ambientDimension === 3 &&
+    !usesWorkPlaneLocalCoordinates
+  ) {
     return {
       ok: false,
       diagram,
@@ -620,25 +635,11 @@ export function addCubicBezierCurveFromDirectInput(
     }
   }
 
-  const points = parseDirectCubicBezierCoordinateInputs(
-    coordinates,
-    diagram.ambientDimension,
-    directControlMode,
-    directCoordinateParseOptionsForDiagram(diagram, options),
-  )
-
-  if (points === null) {
-    return {
-      ok: false,
-      diagram,
-      error: 'invalidCoordinates',
-    }
-  }
-
   const bezierInput = directCubicBezierInputToPoints(
     diagram.ambientDimension,
-    points,
+    coordinates,
     directControlMode,
+    parseOptions,
   )
 
   if (bezierInput === null) {
@@ -675,63 +676,174 @@ export function addCubicBezierCurveFromDirectInput(
 
 function directCubicBezierInputToPoints(
   ambientDimension: AmbientDimension,
-  points: Vec3[],
+  coordinates: DirectCoordinateInput[],
   directControlMode: DirectCubicBezierControlMode,
+  options: DirectCoordinateParseOptions,
 ): { points: Vec3[]; bezierControls: CubicBezierControlMode } | null {
   if (directControlMode === 'absolute') {
+    const points = parseDirectCoordinateInputs(
+      coordinates,
+      ambientDimension,
+      options,
+    )
+
+    if (points === null) {
+      return null
+    }
+
     return {
       points,
       bezierControls: { kind: 'absolute' },
     }
   }
 
+  const start = parseDirectCoordinateInput(coordinates[0], ambientDimension, options)
+  const end = parseDirectCoordinateInput(coordinates[1], ambientDimension, options)
+
+  if (start === null || end === null) {
+    return null
+  }
+
   if (directControlMode === 'relativeCartesian') {
+    if (
+      ambientDimension === 3 &&
+      options.coordinateMode === 'workPlaneLocal'
+    ) {
+      const frame = workPlaneFrameSnapshotFromWorkPlane(options.workPlane)
+      const firstControlOffset = parseWorkPlaneLocalOffsetInput(coordinates[2])
+      const secondControlOffset = parseWorkPlaneLocalOffsetInput(coordinates[3])
+
+      if (
+        frame === null ||
+        firstControlOffset === null ||
+        secondControlOffset === null
+      ) {
+        return null
+      }
+
+      const localStart = workPlaneLocalCoordinateForPoint(frame, start)
+      const localEnd = workPlaneLocalCoordinateForPoint(frame, end)
+
+      if (localStart === null || localEnd === null) {
+        return null
+      }
+
+      const bezierControls: CubicBezierControlMode = {
+        kind: 'workPlaneRelativeCartesian',
+        frame,
+        localStart,
+        localEnd,
+        firstControlOffset,
+        secondControlOffset,
+        secondOffsetReference: 'end',
+      }
+      const absolutePoints = absoluteCubicBezierPointsFromControlMode(
+        ambientDimension,
+        start,
+        end,
+        bezierControls,
+      )
+
+      return absolutePoints === null || !areFinitePoints(absolutePoints)
+        ? null
+        : { points: absolutePoints, bezierControls }
+    }
+
+    const firstControlOffset = parseNumericDirectCoordinateInput(
+      coordinates[2],
+      ambientDimension,
+      options,
+    )
+    const secondControlOffset = parseNumericDirectCoordinateInput(
+      coordinates[3],
+      ambientDimension,
+      options,
+    )
+
+    if (firstControlOffset === null || secondControlOffset === null) {
+      return null
+    }
+
     const bezierControls: CubicBezierControlMode = {
       kind: 'relativeCartesian',
-      firstControlOffset: points[2],
-      secondControlOffset: points[3],
+      firstControlOffset,
+      secondControlOffset,
       secondOffsetReference: 'end',
     }
     const absolutePoints = absoluteCubicBezierPointsFromControlMode(
       ambientDimension,
-      points[0],
-      points[1],
+      start,
+      end,
       bezierControls,
     )
 
-    return absolutePoints === null
+    return absolutePoints === null || !areFinitePoints(absolutePoints)
+      ? null
+      : { points: absolutePoints, bezierControls }
+  }
+
+  const firstControl = parseDirectPolarControlInput(coordinates[2])
+  const secondControl = parseDirectPolarControlInput(coordinates[3])
+
+  if (firstControl === null || secondControl === null) {
+    return null
+  }
+
+  if (
+    ambientDimension === 3 &&
+    options.coordinateMode === 'workPlaneLocal'
+  ) {
+    const frame = workPlaneFrameSnapshotFromWorkPlane(options.workPlane)
+
+    if (frame === null) {
+      return null
+    }
+
+    const localStart = workPlaneLocalCoordinateForPoint(frame, start)
+    const localEnd = workPlaneLocalCoordinateForPoint(frame, end)
+
+    if (localStart === null || localEnd === null) {
+      return null
+    }
+
+    const bezierControls: CubicBezierControlMode = {
+      kind: 'workPlaneRelativePolar',
+      frame,
+      localStart,
+      localEnd,
+      firstControl,
+      secondControl,
+      secondOffsetReference: 'end',
+    }
+    const absolutePoints = absoluteCubicBezierPointsFromControlMode(
+      ambientDimension,
+      start,
+      end,
+      bezierControls,
+    )
+
+    return absolutePoints === null || !areFinitePoints(absolutePoints)
       ? null
       : { points: absolutePoints, bezierControls }
   }
 
   const bezierControls: CubicBezierControlMode = {
     kind: 'relativePolar',
-    firstControl: {
-      angleDegrees: points[2].x,
-      radius: points[2].y,
-    },
-    secondControl: {
-      angleDegrees: points[3].x,
-      radius: points[3].y,
-    },
+    firstControl,
+    secondControl,
     secondOffsetReference: 'end',
-  }
-
-  if (
-    !isValidPolarControl(bezierControls.firstControl) ||
-    !isValidPolarControl(bezierControls.secondControl)
-  ) {
-    return null
   }
 
   const absolutePoints = absoluteCubicBezierPointsFromControlMode(
     ambientDimension,
-    points[0],
-    points[1],
+    start,
+    end,
     bezierControls,
   )
 
-  return absolutePoints === null ? null : { points: absolutePoints, bezierControls }
+  return absolutePoints === null || !areFinitePoints(absolutePoints)
+    ? null
+    : { points: absolutePoints, bezierControls }
 }
 
 export function addPolygonSheetFromDirectInput(
@@ -1097,76 +1209,6 @@ export function parseDirectCoordinateRows(
   return coordinates.length === 0 ? null : coordinates
 }
 
-function parseDirectCubicBezierCoordinateInputs(
-  coordinates: DirectCoordinateInput[],
-  ambientDimension: AmbientDimension,
-  directControlMode: DirectCubicBezierControlMode,
-  options: DirectCoordinateParseOptions,
-): Vec3[] | null {
-  if (directControlMode === 'absolute') {
-    return parseDirectCoordinateInputs(coordinates, ambientDimension, options)
-  }
-
-  const start = parseDirectCoordinateInput(
-    coordinates[0],
-    ambientDimension,
-    options,
-  )
-  const end = parseDirectCoordinateInput(coordinates[1], ambientDimension, options)
-
-  if (directControlMode === 'relativePolar') {
-    const firstControl = parseNumericDirectCoordinateInput(
-      coordinates[2],
-      ambientDimension,
-      options,
-    )
-    const secondControl = parseNumericDirectCoordinateInput(
-      coordinates[3],
-      ambientDimension,
-      options,
-    )
-
-    if (
-      start === null ||
-      end === null ||
-      firstControl === null ||
-      secondControl === null
-    ) {
-      return null
-    }
-
-    return [start, end, firstControl, secondControl]
-  }
-
-  const firstControlOffset =
-    ambientDimension === 3 && options.coordinateMode === 'workPlaneLocal'
-      ? parseWorkPlaneLocalCoordinateOffset(coordinates[2], options.workPlane)
-      : parseNumericDirectCoordinateInput(
-          coordinates[2],
-          ambientDimension,
-          options,
-        )
-  const secondControlOffset =
-    ambientDimension === 3 && options.coordinateMode === 'workPlaneLocal'
-      ? parseWorkPlaneLocalCoordinateOffset(coordinates[3], options.workPlane)
-      : parseNumericDirectCoordinateInput(
-          coordinates[3],
-          ambientDimension,
-          options,
-        )
-
-  if (
-    start === null ||
-    end === null ||
-    firstControlOffset === null ||
-    secondControlOffset === null
-  ) {
-    return null
-  }
-
-  return [start, end, firstControlOffset, secondControlOffset]
-}
-
 function parseNumericDirectCoordinateInput(
   coordinates: DirectCoordinateInput,
   ambientDimension: AmbientDimension,
@@ -1204,35 +1246,89 @@ function parseWorkPlaneLocalCoordinateInput(
   }
 }
 
-function parseWorkPlaneLocalCoordinateOffset(
+function parseWorkPlaneLocalOffsetInput(
   coordinates: DirectCoordinateInput,
+): WorkPlaneLocalOffset | null {
+  if (coordinates.source !== undefined) {
+    return null
+  }
+
+  const dx = parseFiniteNumber(coordinates.x)
+  const dy = parseFiniteNumber(coordinates.y)
+
+  return dx === null || dy === null ? null : { dx, dy }
+}
+
+function parseDirectPolarControlInput(
+  coordinates: DirectCoordinateInput,
+): CubicBezierPolarControl | null {
+  if (coordinates.source !== undefined) {
+    return null
+  }
+
+  const angleDegrees = parseFiniteNumber(coordinates.x)
+  const radius = parseFiniteNumber(coordinates.y)
+
+  if (angleDegrees === null || radius === null) {
+    return null
+  }
+
+  const control = { angleDegrees, radius }
+
+  return isValidPolarControl(control) ? control : null
+}
+
+function workPlaneFrameSnapshotFromWorkPlane(
   workPlane: WorkPlane | undefined,
-): Vec3 | null {
-  if (coordinates.source !== undefined || workPlane === undefined) {
+): WorkPlaneFrameSnapshot | null {
+  if (workPlane === undefined) {
+    return null
+  }
+
+  const validation = validateWorkPlane(workPlane)
+
+  if (!validation.valid) {
     return null
   }
 
   try {
-    const a = parseFiniteNumber(coordinates.x)
-    const b = parseFiniteNumber(coordinates.y)
-
-    if (a === null || b === null) {
-      return null
+    const basis = workPlaneToBasis(workPlane)
+    const frame: WorkPlaneFrameSnapshot = {
+      origin: { ...basis.origin },
+      u: { ...basis.u },
+      v: { ...basis.v },
+      normal: { ...basis.normal },
     }
 
-    const validation = validateWorkPlane(workPlane)
-
-    if (!validation.valid) {
-      return null
-    }
-
-    const localPoint = pointOnWorkPlane(workPlane, a, b)
-    const origin = pointOnWorkPlane(workPlane, 0, 0)
-    const offset = subtractVec3(localPoint, origin)
-    return isFiniteVec3(offset) ? offset : null
+    return isValidWorkPlaneFrameSnapshot(frame) ? frame : null
   } catch {
     return null
   }
+}
+
+function workPlaneLocalCoordinateForPoint(
+  frame: WorkPlaneFrameSnapshot,
+  point: Vec3,
+): WorkPlaneLocalCoordinate | null {
+  const local = workPlaneLocalCoordinateFromPoint(frame, point)
+
+  if (!Number.isFinite(local.a) || !Number.isFinite(local.b)) {
+    return null
+  }
+
+  return pointsApproximatelyEqual(pointFromWorkPlaneLocalCoordinate(frame, local), point)
+    ? local
+    : null
+}
+
+function pointsApproximatelyEqual(first: Vec3, second: Vec3): boolean {
+  const epsilon = 1e-9
+
+  return (
+    Math.abs(first.x - second.x) <= epsilon &&
+    Math.abs(first.y - second.y) <= epsilon &&
+    Math.abs(first.z - second.z) <= epsilon
+  )
 }
 
 export function localDirectCoordinateInputFromExistingSource(

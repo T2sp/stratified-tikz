@@ -407,6 +407,23 @@ testing, dragging, and validation. Cubic Bézier curves may also carry optional
 control metadata for TikZ export:
 
 ```ts
+type WorkPlaneFrameSnapshot = {
+  origin: Vec3;
+  u: Vec3;
+  v: Vec3;
+  normal: Vec3;
+};
+
+type WorkPlaneLocalCoordinate = {
+  a: number;
+  b: number;
+};
+
+type WorkPlaneLocalOffset = {
+  dx: number;
+  dy: number;
+};
+
 type CubicBezierControlMode =
   | { kind: "absolute" }
   | {
@@ -420,6 +437,24 @@ type CubicBezierControlMode =
       firstControl: { angleDegrees: number; radius: number };
       secondControl: { angleDegrees: number; radius: number };
       secondOffsetReference: "end";
+    }
+  | {
+      kind: "workPlaneRelativeCartesian";
+      frame: WorkPlaneFrameSnapshot;
+      localStart: WorkPlaneLocalCoordinate;
+      localEnd: WorkPlaneLocalCoordinate;
+      firstControlOffset: WorkPlaneLocalOffset;
+      secondControlOffset: WorkPlaneLocalOffset;
+      secondOffsetReference: "end";
+    }
+  | {
+      kind: "workPlaneRelativePolar";
+      frame: WorkPlaneFrameSnapshot;
+      localStart: WorkPlaneLocalCoordinate;
+      localEnd: WorkPlaneLocalCoordinate;
+      firstControl: { angleDegrees: number; radius: number };
+      secondControl: { angleDegrees: number; radius: number };
+      secondOffsetReference: "end";
     };
 ```
 
@@ -428,6 +463,51 @@ with existing saved diagrams. In relative Cartesian mode, the first offset is
 from `start` and the second offset is from `end`, matching TikZ's
 `.. controls +(dx,dy) and +(dx,dy) ..` convention. Relative polar metadata is
 2D-only; angles must be finite and radii must be finite and non-negative.
+
+For 3D direct creation in active work-plane local mode, relative Cartesian and
+relative polar controls use the explicit work-plane-local variants. These
+variants store a snapshot of the curve's local export frame on the curve itself:
+`origin`, unit `u`, unit `v`, and unit `normal`, with `normal = cross(u, v)`.
+This is persistent curve-level export metadata. It is not the transient active
+work-plane UI state and does not make work planes committed diagram elements.
+Changing the active work plane later must not change the saved meaning of an
+existing curve.
+
+The local start/end coordinates are stored as `(a, b)` in the saved frame and
+must match the absolute endpoints in `points[0]` and `points[3]`:
+
+```text
+P = origin + a u + b v
+```
+
+For work-plane-local relative Cartesian metadata:
+
+```text
+offset = dx u + dy v
+c1 = start + offset1
+c2 = end + offset2
+```
+
+For work-plane-local relative polar metadata:
+
+```text
+offset = r cos(q) u + r sin(q) v
+c1 = start + offset1
+c2 = end + offset2
+```
+
+The second control is always relative to the end point. The stored absolute
+`points` remain authoritative for SVG rendering, hit testing, selection, and
+handle display. The metadata must validate against those absolute points so
+save/load can reject malformed or inconsistent metadata safely. Direct handle
+dragging of any cubic Bézier point switches the curve to
+`{ kind: "absolute" }`; this keeps handle editing predictable until local-frame
+metadata recomputation is implemented.
+
+Before Phase 12J, TikZ export uses work-plane-local metadata only as saved data;
+the generator still emits ordinary absolute 3D Bézier coordinates for these
+curves. Phase 12J will use the saved frame snapshot to export eligible curves in
+a TikZ `3d` scope.
 
 Validity condition:
 

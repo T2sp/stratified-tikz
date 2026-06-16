@@ -1,4 +1,9 @@
-import { absoluteCubicBezierPointsFromControlMode } from '../geometry/bezierControls.ts'
+import {
+  absoluteCubicBezierPointsFromControlMode,
+  isFiniteVec3,
+  isValidWorkPlaneFrameSnapshot,
+  pointFromWorkPlaneLocalCoordinate,
+} from '../geometry/bezierControls.ts'
 import {
   isHexColor,
   isLabelAnchor,
@@ -29,6 +34,9 @@ import type {
   TextLabel,
   Vec2,
   Vec3,
+  WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinate,
+  WorkPlaneLocalOffset,
 } from './types'
 
 export function validateDiagram(diagram: Diagram): DiagramValidationResult {
@@ -284,6 +292,52 @@ function validateCubicBezierControlMode(
         errors,
       )
       return
+    case 'workPlaneRelativeCartesian':
+      validateWorkPlaneRelativeCartesianControlMode(
+        controlMode,
+        ambientDimension,
+        path,
+        errors,
+      )
+      validateWorkPlaneRelativeControlModeMatchesEndpoints(
+        stratum,
+        controlMode.frame,
+        controlMode.localStart,
+        controlMode.localEnd,
+        path,
+        errors,
+      )
+      validateRelativeControlModeMatchesPoints(
+        stratum,
+        ambientDimension,
+        controlMode,
+        path,
+        errors,
+      )
+      return
+    case 'workPlaneRelativePolar':
+      validateWorkPlaneRelativePolarControlMode(
+        controlMode,
+        ambientDimension,
+        path,
+        errors,
+      )
+      validateWorkPlaneRelativeControlModeMatchesEndpoints(
+        stratum,
+        controlMode.frame,
+        controlMode.localStart,
+        controlMode.localEnd,
+        path,
+        errors,
+      )
+      validateRelativeControlModeMatchesPoints(
+        stratum,
+        ambientDimension,
+        controlMode,
+        path,
+        errors,
+      )
+      return
     default:
       pushError(errors, `${path}.kind`, 'Bezier control mode is not supported.')
   }
@@ -343,6 +397,134 @@ function validateRelativePolarControlMode(
   validatePolarControl(controlMode.secondControl, `${path}.secondControl`, errors)
 }
 
+function validateWorkPlaneRelativeCartesianControlMode(
+  controlMode: Extract<
+    CubicBezierControlMode,
+    { kind: 'workPlaneRelativeCartesian' }
+  >,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3) {
+    pushError(
+      errors,
+      path,
+      'Work-plane-local relative Cartesian Bezier controls are supported only in 3D diagrams.',
+    )
+  }
+
+  validateWorkPlaneFrameSnapshot(controlMode.frame, `${path}.frame`, errors)
+  validateWorkPlaneLocalCoordinate(
+    controlMode.localStart,
+    `${path}.localStart`,
+    errors,
+  )
+  validateWorkPlaneLocalCoordinate(
+    controlMode.localEnd,
+    `${path}.localEnd`,
+    errors,
+  )
+  validateWorkPlaneLocalOffset(
+    controlMode.firstControlOffset,
+    `${path}.firstControlOffset`,
+    errors,
+  )
+  validateWorkPlaneLocalOffset(
+    controlMode.secondControlOffset,
+    `${path}.secondControlOffset`,
+    errors,
+  )
+
+  if (controlMode.secondOffsetReference !== 'end') {
+    pushError(
+      errors,
+      `${path}.secondOffsetReference`,
+      'Second work-plane-local Bezier control offset must be relative to the end point.',
+    )
+  }
+}
+
+function validateWorkPlaneRelativePolarControlMode(
+  controlMode: Extract<CubicBezierControlMode, { kind: 'workPlaneRelativePolar' }>,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3) {
+    pushError(
+      errors,
+      path,
+      'Work-plane-local relative polar Bezier controls are supported only in 3D diagrams.',
+    )
+  }
+
+  validateWorkPlaneFrameSnapshot(controlMode.frame, `${path}.frame`, errors)
+  validateWorkPlaneLocalCoordinate(
+    controlMode.localStart,
+    `${path}.localStart`,
+    errors,
+  )
+  validateWorkPlaneLocalCoordinate(
+    controlMode.localEnd,
+    `${path}.localEnd`,
+    errors,
+  )
+  validatePolarControl(controlMode.firstControl, `${path}.firstControl`, errors)
+  validatePolarControl(controlMode.secondControl, `${path}.secondControl`, errors)
+
+  if (controlMode.secondOffsetReference !== 'end') {
+    pushError(
+      errors,
+      `${path}.secondOffsetReference`,
+      'Second work-plane-local Bezier polar control must be relative to the end point.',
+    )
+  }
+}
+
+function validateWorkPlaneFrameSnapshot(
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateVec3ForAmbient(frame.origin, 3, `${path}.origin`, errors)
+  validateVec3ForAmbient(frame.u, 3, `${path}.u`, errors)
+  validateVec3ForAmbient(frame.v, 3, `${path}.v`, errors)
+  validateVec3ForAmbient(frame.normal, 3, `${path}.normal`, errors)
+
+  if (
+    isFiniteVec3(frame.origin) &&
+    isFiniteVec3(frame.u) &&
+    isFiniteVec3(frame.v) &&
+    isFiniteVec3(frame.normal) &&
+    !isValidWorkPlaneFrameSnapshot(frame)
+  ) {
+    pushError(
+      errors,
+      path,
+      'Work-plane-local Bezier frame must be an orthonormal right-handed frame.',
+    )
+  }
+}
+
+function validateWorkPlaneLocalCoordinate(
+  coordinate: WorkPlaneLocalCoordinate,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateFinite(coordinate.a, `${path}.a`, errors)
+  validateFinite(coordinate.b, `${path}.b`, errors)
+}
+
+function validateWorkPlaneLocalOffset(
+  offset: WorkPlaneLocalOffset,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateFinite(offset.dx, `${path}.dx`, errors)
+  validateFinite(offset.dy, `${path}.dy`, errors)
+}
+
 function validatePolarControl(
   control: { angleDegrees: number; radius: number },
   path: string,
@@ -353,6 +535,52 @@ function validatePolarControl(
 
   if (Number.isFinite(control.radius) && control.radius < 0) {
     pushError(errors, `${path}.radius`, 'Bezier polar control radius must be non-negative.')
+  }
+}
+
+function validateWorkPlaneRelativeControlModeMatchesEndpoints(
+  stratum: CurveStratum,
+  frame: WorkPlaneFrameSnapshot,
+  localStart: WorkPlaneLocalCoordinate,
+  localEnd: WorkPlaneLocalCoordinate,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (
+    stratum.points.length !== 4 ||
+    !isValidWorkPlaneFrameSnapshot(frame) ||
+    !Number.isFinite(localStart.a) ||
+    !Number.isFinite(localStart.b) ||
+    !Number.isFinite(localEnd.a) ||
+    !Number.isFinite(localEnd.b)
+  ) {
+    return
+  }
+
+  if (
+    !pointsApproximatelyEqual(
+      stratum.points[0],
+      pointFromWorkPlaneLocalCoordinate(frame, localStart),
+    )
+  ) {
+    pushError(
+      errors,
+      `${path}.localStart`,
+      'Bezier local start coordinates must match the stored absolute start point.',
+    )
+  }
+
+  if (
+    !pointsApproximatelyEqual(
+      stratum.points[3],
+      pointFromWorkPlaneLocalCoordinate(frame, localEnd),
+    )
+  ) {
+    pushError(
+      errors,
+      `${path}.localEnd`,
+      'Bezier local end coordinates must match the stored absolute end point.',
+    )
   }
 }
 

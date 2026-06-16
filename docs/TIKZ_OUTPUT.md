@@ -268,6 +268,14 @@ absolute control-point coordinates. Relative polar TikZ export is intentionally
 limited to 2D diagrams; arbitrary 3D polar controls need an explicit local
 plane basis before they can be exported without ambiguity.
 
+3D work-plane-local relative Cartesian and relative polar curves now store that
+local basis as curve-level metadata: a frame snapshot with `origin`, `u`, `v`,
+and `normal`, plus local start/end coordinates and either `dx`/`dy` offsets or
+angle/radius values. This metadata is persistent diagram data for the curve; it
+is separate from the transient active work-plane UI state. Until Phase 12J adds
+TikZ `3d` scope export, these curves continue to export with ordinary absolute
+3D Bézier control coordinates.
+
 ## Output sections in 2D mode
 
 In 2D mode, group output as:

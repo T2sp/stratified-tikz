@@ -1128,20 +1128,25 @@ function App() {
   function updateDirectCubicBezierControlMode(
     mode: DirectCubicBezierControlMode,
   ): void {
+    const coordinateMode = effectiveDirectCoordinateMode(
+      editableDiagram.ambientDimension,
+      directCoordinateMode,
+    )
     const nextMode =
-      editableDiagram.ambientDimension === 3 && mode === 'relativePolar'
-        ? 'absolute'
-        : mode
+      isDirectCubicBezierControlModeAvailable(
+        editableDiagram.ambientDimension,
+        coordinateMode,
+        mode,
+      )
+        ? mode
+        : 'absolute'
 
     setDirectCubicBezierControlMode(nextMode)
     setDirectCubicBezierRows(
       defaultDirectCubicBezierRows(
         editableDiagram.ambientDimension,
         nextMode,
-        effectiveDirectCoordinateMode(
-          editableDiagram.ambientDimension,
-          directCoordinateMode,
-        ),
+        coordinateMode,
       ),
     )
     setDirectCubicBezierSources([])
@@ -1153,15 +1158,24 @@ function App() {
       editableDiagram.ambientDimension,
       mode,
     )
+    const nextCubicBezierControlMode =
+      isDirectCubicBezierControlModeAvailable(
+        editableDiagram.ambientDimension,
+        nextMode,
+        directCubicBezierControlMode,
+      )
+        ? directCubicBezierControlMode
+        : 'absolute'
 
     setDirectCoordinateMode(nextMode)
+    setDirectCubicBezierControlMode(nextCubicBezierControlMode)
     setDirectPolylineRows(
       defaultDirectPolylineRows(editableDiagram.ambientDimension, nextMode),
     )
     setDirectCubicBezierRows(
       defaultDirectCubicBezierRows(
         editableDiagram.ambientDimension,
-        directCubicBezierControlMode,
+        nextCubicBezierControlMode,
         nextMode,
       ),
     )
@@ -2093,6 +2107,10 @@ function App() {
                       >
                         {directCubicBezierControlModeOptions(
                           editableDiagram.ambientDimension,
+                          effectiveDirectCoordinateMode(
+                            editableDiagram.ambientDimension,
+                            directCoordinateMode,
+                          ),
                         ).map((mode) => (
                           <option key={mode} value={mode}>
                             {directCubicBezierControlModeLabel(mode)}
@@ -2641,7 +2659,9 @@ function directCreationErrorMessage(
     case 'wrongPointCount':
       return 'A cubic Bezier needs exactly 4 points.'
     case 'unsupportedAmbientDimension':
-      return 'Sheets are available only in 3D.'
+      return kind === 'sheet'
+        ? 'Sheets are available only in 3D.'
+        : 'This cubic Bezier control mode requires 2D coordinates or 3D active work-plane local coordinates.'
   }
 }
 
@@ -2787,10 +2807,27 @@ function defaultDirectCubicBezierRows(
 
 function directCubicBezierControlModeOptions(
   ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode,
 ): DirectCubicBezierControlMode[] {
-  return ambientDimension === 2
-    ? directCubicBezierControlModes
-    : directCubicBezierControlModes.filter((mode) => mode !== 'relativePolar')
+  return directCubicBezierControlModes.filter((mode) =>
+    isDirectCubicBezierControlModeAvailable(
+      ambientDimension,
+      coordinateMode,
+      mode,
+    ),
+  )
+}
+
+function isDirectCubicBezierControlModeAvailable(
+  ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode,
+  controlMode: DirectCubicBezierControlMode,
+): boolean {
+  return (
+    controlMode !== 'relativePolar' ||
+    ambientDimension === 2 ||
+    coordinateMode === 'workPlaneLocal'
+  )
 }
 
 function directCubicBezierControlModeLabel(

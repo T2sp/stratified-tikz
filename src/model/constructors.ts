@@ -35,6 +35,9 @@ import type {
   TextLabel,
   Vec2,
   Vec3,
+  WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinate,
+  WorkPlaneLocalOffset,
   WorkPlane,
 } from './types.ts'
 
@@ -324,7 +327,54 @@ function cloneCubicBezierControlMode(
         secondControl: { ...controlMode.secondControl },
         secondOffsetReference: controlMode.secondOffsetReference,
       }
+    case 'workPlaneRelativeCartesian':
+      return {
+        kind: 'workPlaneRelativeCartesian',
+        frame: cloneWorkPlaneFrameSnapshot(controlMode.frame),
+        localStart: cloneWorkPlaneLocalCoordinate(controlMode.localStart),
+        localEnd: cloneWorkPlaneLocalCoordinate(controlMode.localEnd),
+        firstControlOffset: cloneWorkPlaneLocalOffset(
+          controlMode.firstControlOffset,
+        ),
+        secondControlOffset: cloneWorkPlaneLocalOffset(
+          controlMode.secondControlOffset,
+        ),
+        secondOffsetReference: controlMode.secondOffsetReference,
+      }
+    case 'workPlaneRelativePolar':
+      return {
+        kind: 'workPlaneRelativePolar',
+        frame: cloneWorkPlaneFrameSnapshot(controlMode.frame),
+        localStart: cloneWorkPlaneLocalCoordinate(controlMode.localStart),
+        localEnd: cloneWorkPlaneLocalCoordinate(controlMode.localEnd),
+        firstControl: { ...controlMode.firstControl },
+        secondControl: { ...controlMode.secondControl },
+        secondOffsetReference: controlMode.secondOffsetReference,
+      }
   }
+}
+
+function cloneWorkPlaneFrameSnapshot(
+  frame: WorkPlaneFrameSnapshot,
+): WorkPlaneFrameSnapshot {
+  return {
+    origin: cloneVec3(frame.origin),
+    u: cloneVec3(frame.u),
+    v: cloneVec3(frame.v),
+    normal: cloneVec3(frame.normal),
+  }
+}
+
+function cloneWorkPlaneLocalCoordinate(
+  coordinate: WorkPlaneLocalCoordinate,
+): WorkPlaneLocalCoordinate {
+  return { ...coordinate }
+}
+
+function cloneWorkPlaneLocalOffset(
+  offset: WorkPlaneLocalOffset,
+): WorkPlaneLocalOffset {
+  return { ...offset }
 }
 
 function withOptionalLabel<T extends { label?: string }>(

@@ -137,6 +137,23 @@ export type CubicBezierPolarControl = {
   radius: number
 }
 
+export type WorkPlaneFrameSnapshot = {
+  origin: Vec3
+  u: Vec3
+  v: Vec3
+  normal: Vec3
+}
+
+export type WorkPlaneLocalCoordinate = {
+  a: number
+  b: number
+}
+
+export type WorkPlaneLocalOffset = {
+  dx: number
+  dy: number
+}
+
 export type CubicBezierControlMode =
   | { kind: 'absolute' }
   | {
@@ -147,6 +164,24 @@ export type CubicBezierControlMode =
     }
   | {
       kind: 'relativePolar'
+      firstControl: CubicBezierPolarControl
+      secondControl: CubicBezierPolarControl
+      secondOffsetReference: 'end'
+    }
+  | {
+      kind: 'workPlaneRelativeCartesian'
+      frame: WorkPlaneFrameSnapshot
+      localStart: WorkPlaneLocalCoordinate
+      localEnd: WorkPlaneLocalCoordinate
+      firstControlOffset: WorkPlaneLocalOffset
+      secondControlOffset: WorkPlaneLocalOffset
+      secondOffsetReference: 'end'
+    }
+  | {
+      kind: 'workPlaneRelativePolar'
+      frame: WorkPlaneFrameSnapshot
+      localStart: WorkPlaneLocalCoordinate
+      localEnd: WorkPlaneLocalCoordinate
       firstControl: CubicBezierPolarControl
       secondControl: CubicBezierPolarControl
       secondOffsetReference: 'end'

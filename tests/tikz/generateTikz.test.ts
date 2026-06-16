@@ -538,6 +538,56 @@ test('relative polar cubic Bezier export uses TikZ polar control syntax', () => 
   assert.doesNotMatch(tikz, /curveBezierRelativePolar0p2/)
 })
 
+test('work-plane-local cubic Bezier metadata currently exports as absolute 3D controls', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'local-relative',
+    name: 'Local Relative',
+    style: curveStyle(),
+    points: [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 32 },
+      { x: 13, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    bezierControls: {
+      kind: 'workPlaneRelativeCartesian',
+      frame: {
+        origin: { x: 10, y: 20, z: 30 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 0, z: 1 },
+        normal: { x: 0, y: -1, z: 0 },
+      },
+      localStart: { a: 2, b: 3 },
+      localEnd: { a: 6, b: 7 },
+      firstControlOffset: { dx: 2, dy: -1 },
+      secondControlOffset: { dx: -3, dy: 4 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierLocalRelative0p1\) at \(14,20,32\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierLocalRelative0p2\) at \(13,20,41\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierLocalRelative0p0\) \.\. controls \(curveBezierLocalRelative0p1\) and \(curveBezierLocalRelative0p2\) \.\. \(curveBezierLocalRelative0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\+\(2,-1\)/)
+})
+
 test('absolute cubic Bezier export keeps control-point coordinate declarations', () => {
   const tikz = generateTikz(createCurveNamingDiagram())
 

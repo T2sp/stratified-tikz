@@ -168,6 +168,47 @@ test('geometry handle update converts relative cubic Bezier controls to absolute
   assert.deepEqual(curve.bezierControls, { kind: 'absolute' })
 })
 
+test('geometry handle update converts work-plane-local cubic Bezier controls to absolute mode', () => {
+  const result = addCubicBezierCurveStratumWithResult(
+    threeDimensionalExample,
+    [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 32 },
+      { x: 13, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    {
+      id: 'drag-local-relative-bezier',
+      layer: 7,
+      bezierControls: {
+        kind: 'workPlaneRelativeCartesian',
+        frame: localBezierFrame,
+        localStart: { a: 2, b: 3 },
+        localEnd: { a: 6, b: 7 },
+        firstControlOffset: { dx: 2, dy: -1 },
+        secondControlOffset: { dx: -3, dy: 4 },
+        secondOffsetReference: 'end',
+      },
+    },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected cubic Bezier creation to succeed.')
+  }
+
+  const updated = updateDiagramGeometryHandle(
+    result.diagram,
+    { kind: 'curvePoint', stratumId: result.id, pointIndex: 2 },
+    { x: 17, y: 18, z: 19 },
+  )
+  const curve = findCurve(updated, result.id)
+
+  assert.equal(curve.kind, 'cubicBezier')
+  assert.deepEqual(curve.points[2], { x: 17, y: 18, z: 19 })
+  assert.deepEqual(curve.bezierControls, { kind: 'absolute' })
+})
+
 test('geometry handle update moves polygon sheet vertices preserving order', () => {
   const result = addPolygonSheetStratumWithResult(
     threeDimensionalExample,
@@ -267,4 +308,11 @@ function findLabel(diagram: Diagram, id: string): TextLabel {
   }
 
   return label
+}
+
+const localBezierFrame = {
+  origin: { x: 10, y: 20, z: 30 },
+  u: { x: 1, y: 0, z: 0 },
+  v: { x: 0, y: 0, z: 1 },
+  normal: { x: 0, y: -1, z: 0 },
 }
