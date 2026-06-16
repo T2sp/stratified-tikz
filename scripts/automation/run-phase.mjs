@@ -56,6 +56,10 @@ const phaseSlugs = {
   "12H": "direct-creation-existing-point-sources",
   "12I": "workplane-local-bezier-metadata",
   "12J": "tikz-3d-scope-bezier-export",
+  "13A": "3d-coordinate-axes-guide",
+  "13B": "inspector-layout-stabilization",
+  "13C": "workplane-toolbar-reorganization",
+  "13D": "coordinate-source-highlighting",
 };
 
 function makePhaseSpec(phase) {
