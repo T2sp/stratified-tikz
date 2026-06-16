@@ -264,17 +264,64 @@ controls are emitted as:
 
 Relative control modes generally do not emit independent `\coordinate`
 declarations for the two control points. SVG rendering still uses the stored
-absolute control-point coordinates. Relative polar TikZ export is intentionally
-limited to 2D diagrams; arbitrary 3D polar controls need an explicit local
-plane basis before they can be exported without ambiguity.
+absolute control-point coordinates. Plain relative polar TikZ export is
+intentionally limited to 2D diagrams; arbitrary 3D polar controls must not be
+exported as `+(angle:radius)` unless the path is inside an explicit local
+canvas plane.
 
 3D work-plane-local relative Cartesian and relative polar curves now store that
 local basis as curve-level metadata: a frame snapshot with `origin`, `u`, `v`,
 and `normal`, plus local start/end coordinates and either `dx`/`dy` offsets or
 angle/radius values. This metadata is persistent diagram data for the curve; it
-is separate from the transient active work-plane UI state. Until Phase 12J adds
-TikZ `3d` scope export, these curves continue to export with ordinary absolute
-3D Bézier control coordinates.
+is separate from the transient active work-plane UI state.
+
+When a 3D work-plane-local relative curve is consistent with its saved frame,
+the generator emits it inside a TikZ `3d` library canvas-plane scope:
+
+```tex
+\usetikzlibrary{3d}
+
+\begin{scope}[
+  plane origin={(10,20,30)},
+  plane x={(11,20,30)},
+  plane y={(10,20,31)},
+  canvas is plane
+]
+  \draw[
+    draw=stzCurveLocalStroke,
+    draw opacity=1,
+    line width=1.2pt
+  ]
+    (2,3) .. controls +(0:2) and +(90:4) .. (6,7);
+\end{scope}
+```
+
+`plane origin` is the saved frame origin. `plane x` is `origin + u`, and
+`plane y` is `origin + v`. The Bézier start and end are emitted as local 2D
+coordinates inside the scope. Relative Cartesian controls are emitted as
+`+(dx,dy)`, and relative polar controls are emitted as `+(angle:radius)` in
+that local plane.
+
+Scoped work-plane-local relative export does not emit independent coordinate
+declarations for the two relative control points. The local start/end
+coordinates are emitted inline in the scoped path, avoiding dangling references
+to omitted controls.
+
+If a 3D cubic Bézier curve has no work-plane-local relative metadata, has an
+invalid frame, or its saved local metadata does not match the stored absolute
+points, the generator falls back to ordinary absolute 3D Bézier output:
+
+```tex
+\coordinate (p0) at (0,0,0);
+\coordinate (p1) at (1,0,1);
+\coordinate (p2) at (2,1,1);
+\coordinate (p3) at (3,1,0);
+
+\draw (p0) .. controls (p1) and (p2) .. (p3);
+```
+
+`\usetikzlibrary{3d}` is emitted only when at least one scoped
+work-plane-local relative 3D Bézier path is generated.
 
 ## Output sections in 2D mode
 
@@ -557,7 +604,8 @@ The exact conversion should be documented in the implementation.
 
 Non-circular point styles may require TikZ libraries.
 
-The generator should include a comment listing required TikZ libraries if needed.
+The generator should include a comment listing point-shape TikZ libraries if
+needed.
 
 Example:
 
@@ -577,6 +625,16 @@ For star point shapes, the output may require:
 ```tex
 \usetikzlibrary{shapes.geometric,shapes.symbols}
 ```
+
+For scoped 3D work-plane-local relative Bézier export, the generator emits the
+required TikZ `3d` library directly:
+
+```tex
+\usetikzlibrary{3d}
+```
+
+This line is conditional: it is omitted when no scoped 3D work-plane-local
+relative Bézier path appears in the generated output.
 
 The generated TikZ body should remain readable even when custom styles are used.
 

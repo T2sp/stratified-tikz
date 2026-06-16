@@ -33,6 +33,12 @@ test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
   assert.match(tikz, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
 })
 
+test('TikZ 3d library is not emitted when no scoped 3D export is used', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram())
+
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{3d\}/)
+})
+
 test('TikZ export excludes active work-plane guide and UI state', () => {
   const activeWorkPlane: WorkPlane = {
     kind: 'custom',
@@ -538,54 +544,95 @@ test('relative polar cubic Bezier export uses TikZ polar control syntax', () => 
   assert.doesNotMatch(tikz, /curveBezierRelativePolar0p2/)
 })
 
-test('work-plane-local cubic Bezier metadata currently exports as absolute 3D controls', () => {
-  const diagram = createEmptyDiagram({ ambientDimension: 3 })
-  diagram.strata.push({
-    codim: 2,
-    geometricKind: 'curve',
-    kind: 'cubicBezier',
-    id: 'local-relative',
-    name: 'Local Relative',
-    style: curveStyle(),
-    points: [
-      { x: 12, y: 20, z: 33 },
-      { x: 14, y: 20, z: 32 },
-      { x: 13, y: 20, z: 41 },
-      { x: 16, y: 20, z: 37 },
-    ],
-    bezierControls: {
-      kind: 'workPlaneRelativeCartesian',
-      frame: {
-        origin: { x: 10, y: 20, z: 30 },
-        u: { x: 1, y: 0, z: 0 },
-        v: { x: 0, y: 0, z: 1 },
-        normal: { x: 0, y: -1, z: 0 },
-      },
-      localStart: { a: 2, b: 3 },
-      localEnd: { a: 6, b: 7 },
-      firstControlOffset: { dx: 2, dy: -1 },
-      secondControlOffset: { dx: -3, dy: 4 },
-      secondOffsetReference: 'end',
-    },
-    styleSegments: [],
-    layer: 0,
-  })
+test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scope', () => {
+  const tikz = generateTikz(createWorkPlaneRelativePolarBezierDiagram())
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /\\begin\{scope\}\[/)
+  assert.match(tikz, /plane origin=\{\(10,20,30\)\}/)
+  assert.match(tikz, /plane x=\{\(11,20,30\)\}/)
+  assert.match(tikz, /plane y=\{\(10,20,31\)\}/)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(
+    tikz,
+    /\(2,3\) \.\. controls \+\(0:2\) and \+\(90:4\) \.\. \(6,7\);/,
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierLocalRelativePolar0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierLocalRelativePolar0p2\)/)
+})
+
+test('work-plane-local relative Cartesian 3D Bezier uses local relative controls', () => {
+  const tikz = generateTikz(createWorkPlaneRelativeCartesianBezierDiagram())
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(
+    tikz,
+    /\(2,3\) \.\. controls \+\(2,-1\) and \+\(-3,4\) \.\. \(6,7\);/,
+  )
+  assert.doesNotMatch(
+    tikz,
+    /\\coordinate \(curveBezierLocalRelativeCartesian0p1\)/,
+  )
+  assert.doesNotMatch(
+    tikz,
+    /\\coordinate \(curveBezierLocalRelativeCartesian0p2\)/,
+  )
+})
+
+test('work-plane-local 3D Bezier scope remains inside the curve layer block', () => {
+  const tikz = generateTikz(createWorkPlaneRelativePolarBezierDiagram({ layer: 4 }))
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer4')
+
+  assert.match(layerBlock, /\\begin\{scope\}\[/)
+  assert.match(
+    layerBlock,
+    /\(2,3\) \.\. controls \+\(0:2\) and \+\(90:4\) \.\. \(6,7\);/,
+  )
+})
+
+test('absolute 3D cubic Bezier fallback keeps control-point coordinate declarations', () => {
+  const tikz = generateTikz(createAbsoluteThreeDimensionalBezierDiagram())
+
+  assert.match(tikz, /\\coordinate \(curveBezierAbsoluteArc0p0\) at \(0,0,0\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierAbsoluteArc0p1\) at \(1,0,1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierAbsoluteArc0p2\) at \(2,1,1\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierAbsoluteArc0p3\) at \(3,1,0\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierAbsoluteArc0p0\) \.\. controls \(curveBezierAbsoluteArc0p1\) and \(curveBezierAbsoluteArc0p2\) \.\. \(curveBezierAbsoluteArc0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{3d\}/)
+})
+
+test('inconsistent work-plane-local 3D Bezier metadata falls back to absolute controls', () => {
+  const diagram = createWorkPlaneRelativeCartesianBezierDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve' || curve.kind !== 'cubicBezier') {
+    throw new Error('Expected a cubic Bezier curve.')
+  }
+
+  if (curve.bezierControls?.kind !== 'workPlaneRelativeCartesian') {
+    throw new Error('Expected work-plane-relative Cartesian controls.')
+  }
+
+  curve.bezierControls = {
+    ...curve.bezierControls,
+    localStart: { a: 20, b: 30 },
+  }
 
   const tikz = generateTikz(diagram)
 
   assert.match(
     tikz,
-    /\\coordinate \(curveBezierLocalRelative0p1\) at \(14,20,32\);/,
+    /\\coordinate \(curveBezierLocalRelativeCartesian0p1\) at \(14,20,32\);/,
   )
   assert.match(
     tikz,
-    /\\coordinate \(curveBezierLocalRelative0p2\) at \(13,20,41\);/,
+    /\(curveBezierLocalRelativeCartesian0p0\) \.\. controls \(curveBezierLocalRelativeCartesian0p1\) and \(curveBezierLocalRelativeCartesian0p2\) \.\. \(curveBezierLocalRelativeCartesian0p3\);/,
   )
-  assert.match(
-    tikz,
-    /\(curveBezierLocalRelative0p0\) \.\. controls \(curveBezierLocalRelative0p1\) and \(curveBezierLocalRelative0p2\) \.\. \(curveBezierLocalRelative0p3\);/,
-  )
-  assert.doesNotMatch(tikz, /\+\(2,-1\)/)
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
 })
 
 test('absolute cubic Bezier export keeps control-point coordinate declarations', () => {
@@ -1051,6 +1098,108 @@ function createThreeDimensionalDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createWorkPlaneRelativeCartesianBezierDiagram({
+  layer = 0,
+}: {
+  layer?: number
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'local-relative-cartesian',
+    name: 'Local Relative Cartesian',
+    style: curveStyle(),
+    points: [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 32 },
+      { x: 13, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    bezierControls: {
+      kind: 'workPlaneRelativeCartesian',
+      frame: {
+        origin: { x: 10, y: 20, z: 30 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 0, z: 1 },
+        normal: { x: 0, y: -1, z: 0 },
+      },
+      localStart: { a: 2, b: 3 },
+      localEnd: { a: 6, b: 7 },
+      firstControlOffset: { dx: 2, dy: -1 },
+      secondControlOffset: { dx: -3, dy: 4 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer,
+  })
+
+  return diagram
+}
+
+function createWorkPlaneRelativePolarBezierDiagram({
+  layer = 0,
+}: {
+  layer?: number
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'local-relative-polar',
+    name: 'Local Relative Polar',
+    style: curveStyle(),
+    points: [
+      { x: 12, y: 20, z: 33 },
+      { x: 14, y: 20, z: 33 },
+      { x: 16, y: 20, z: 41 },
+      { x: 16, y: 20, z: 37 },
+    ],
+    bezierControls: {
+      kind: 'workPlaneRelativePolar',
+      frame: {
+        origin: { x: 10, y: 20, z: 30 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 0, z: 1 },
+        normal: { x: 0, y: -1, z: 0 },
+      },
+      localStart: { a: 2, b: 3 },
+      localEnd: { a: 6, b: 7 },
+      firstControl: { angleDegrees: 0, radius: 2 },
+      secondControl: { angleDegrees: 90, radius: 4 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer,
+  })
+
+  return diagram
+}
+
+function createAbsoluteThreeDimensionalBezierDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'absolute-arc',
+    name: 'Absolute Arc',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 1 },
+      { x: 2, y: 1, z: 1 },
+      { x: 3, y: 1, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
 
   return diagram
 }
