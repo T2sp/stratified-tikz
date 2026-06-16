@@ -15,6 +15,7 @@ import type {
   SheetStyle,
   WorkPlane,
 } from '../../src/model/types.ts'
+import { createInitialCamera3D } from '../../src/model/camera.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -1321,15 +1322,7 @@ function createEmptyDiagram({
     camera:
       ambientDimension === 2
         ? { mode: '2d', scale: 1, origin: { x: 0, y: 0 } }
-        : {
-            mode: '3d',
-            projection: 'orthographic',
-            xVector: [1, 0],
-            yVector: [0.45, 0.25],
-            zVector: [0, 1],
-            scale: 1,
-            origin: { x: 0, y: 0 },
-          },
+        : createInitialCamera3D(),
     strata: [],
     labels: [],
   }

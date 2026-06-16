@@ -17,14 +17,20 @@ export type Camera2D = {
   origin: Vec2
 }
 
-export type Camera3D = {
-  mode: '3d'
-  projection: 'orthographic'
+export type Camera3DProjectionBasis = {
   xVector: [number, number]
   yVector: [number, number]
   zVector: [number, number]
-  scale: number
-  origin: Vec2
+}
+
+export type Camera3D = {
+  mode: '3d'
+  kind: 'orthographic'
+  thetaDeg: number
+  phiDeg: number
+  zoom: number
+  pan: Vec2
+  projectionBasis?: Camera3DProjectionBasis
 }
 
 export type Camera = Camera2D | Camera3D

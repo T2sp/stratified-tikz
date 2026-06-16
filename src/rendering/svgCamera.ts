@@ -20,7 +20,7 @@ export function resolveSvgCamera(
     return diagram.camera
   }
 
-  return createFittedCamera(
+  return fitCameraToDiagram(
     diagram,
     width,
     height,
@@ -29,7 +29,7 @@ export function resolveSvgCamera(
   )
 }
 
-function createFittedCamera(
+export function fitCameraToDiagram(
   diagram: Diagram,
   width: number,
   height: number,
@@ -37,11 +37,7 @@ function createFittedCamera(
   extraPointsForFit: readonly Vec3[],
 ): Camera {
   const modelPoints = [...collectDiagramPoints(diagram), ...extraPointsForFit]
-  const unitCamera = {
-    ...diagram.camera,
-    scale: 1,
-    origin: { x: 0, y: 0 },
-  }
+  const unitCamera = cameraWithUnitView(diagram.camera)
   const projectedPoints = modelPoints.map((point) => projectVec3(unitCamera, point))
   const bounds = getBounds(projectedPoints)
   const spanX = Math.max(bounds.maxX - bounds.minX, 1)
@@ -52,13 +48,41 @@ function createFittedCamera(
   const usedWidth = spanX * scale
   const usedHeight = spanY * scale
 
+  return cameraWithView(diagram.camera, scale, {
+    x: padding + (availableWidth - usedWidth) / 2 - bounds.minX * scale,
+    y: padding + (availableHeight - usedHeight) / 2 - bounds.minY * scale,
+  })
+}
+
+function cameraWithUnitView(camera: Camera): Camera {
+  if (camera.mode === '2d') {
+    return {
+      ...camera,
+      scale: 1,
+      origin: { x: 0, y: 0 },
+    }
+  }
+
   return {
-    ...diagram.camera,
-    scale,
-    origin: {
-      x: padding + (availableWidth - usedWidth) / 2 - bounds.minX * scale,
-      y: padding + (availableHeight - usedHeight) / 2 - bounds.minY * scale,
-    },
+    ...camera,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+  }
+}
+
+function cameraWithView(camera: Camera, scale: number, origin: Vec2): Camera {
+  if (camera.mode === '2d') {
+    return {
+      ...camera,
+      scale,
+      origin,
+    }
+  }
+
+  return {
+    ...camera,
+    zoom: scale,
+    pan: origin,
   }
 }
 

@@ -278,24 +278,43 @@ The data model should not distinguish permanently between points created by curs
 
 In 2D mode, the preview uses ordinary 2D coordinates.
 
-In 3D mode, the preview uses an orthographic 2.5D projection.
+In 3D mode, the preview uses an orthographic camera model aligned with
+`tikz-3dplot` main-coordinate notation:
 
-The 3D camera is represented by projected basis vectors:
+```tex
+\tdplotsetmaincoords{theta}{phi}
+```
+
+The public/model angle fields are therefore named `thetaDeg` and `phiDeg`, not
+ambiguous yaw/pitch labels. A 3D camera has:
 
 ```ts
-xVector: [number, number]
-yVector: [number, number]
-zVector: [number, number]
+type Camera3D = {
+  mode: "3d";
+  kind: "orthographic";
+  thetaDeg: number;
+  phiDeg: number;
+  zoom: number;
+  pan: Vec2;
+};
 ```
 
-A 3D point `(x,y,z)` is projected to:
+Forward projection follows:
 
 ```text
-origin
-  + scale * x * xVector
-  + scale * y * yVector
-  + scale * z * zVector
+model-space Vec3 -> camera projection -> SVG point
 ```
+
+Inverse cursor workflows are structured as:
+
+```text
+screen/SVG point -> orthographic camera ray -> active work-plane intersection
+```
+
+The resettable initial 3D camera matches the previous/default SVG display. This
+initial preset keeps the old oblique projected basis internally so existing 3D
+examples, axes, work-plane guides, and selected highlights render as before.
+Camera/view state remains separate from work-plane model geometry.
 
 ## TikZ output principle
 

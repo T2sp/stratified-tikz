@@ -95,12 +95,16 @@ export type Camera2D = {
 
 export type Camera3D = {
   mode: "3d";
-  projection: "orthographic";
-  xVector: [number, number];
-  yVector: [number, number];
-  zVector: [number, number];
-  scale: number;
-  origin: Vec2;
+  kind: "orthographic";
+  thetaDeg: number;
+  phiDeg: number;
+  zoom: number;
+  pan: Vec2;
+  projectionBasis?: {
+    xVector: [number, number];
+    yVector: [number, number];
+    zVector: [number, number];
+  };
 };
 ```
 
@@ -110,6 +114,19 @@ A valid diagram must satisfy:
 diagram.ambientDimension === 2 implies diagram.camera.mode === "2d"
 diagram.ambientDimension === 3 implies diagram.camera.mode === "3d"
 ```
+
+The 3D camera uses the same public angle names as `tikz-3dplot`:
+
+```tex
+\tdplotsetmaincoords{theta}{phi}
+```
+
+so the model fields are `thetaDeg` and `phiDeg`. The projection is
+orthographic; `zoom` is a positive finite scale factor, and `pan` is a finite
+2D view offset. The resettable `INITIAL_CAMERA_3D` preset matches the previous
+default SVG display. That preset carries an explicit `projectionBasis` for the
+old oblique preview basis (`x = (1,0)`, `y = (0.45,0.25)`, `z = (0,1)`), while
+ordinary angle cameras derive their basis from `thetaDeg` and `phiDeg`.
 
 ## Editor state
 
@@ -237,18 +254,30 @@ diagram model. Direct-input creation remains global-coordinate based.
 ## Projection and camera separation
 
 Work planes are model-space geometry. Cameras/projections are mappings between
-model coordinates and screen coordinates. The intended helper boundary is:
+model coordinates and screen coordinates. A camera is not a stratum, and work
+planes do not store camera state. The intended helper boundary is:
 
 ```ts
 projectModelToScreen(point, cameraOrProjection);
 screenToModelOnWorkPlane(screenPoint, workPlane, cameraOrProjection);
 ```
 
-The current 3D projection remains orthographic and simple, but custom work-plane
-data must not encode camera assumptions. A custom plane stores only model-space
-`Vec3` origin, basis, normal, and optional editor-source metadata. Future camera
-orbit, pan, or zoom work should change projection data and rendering helpers
-without changing the saved diagram or work-plane model.
+The 3D projection remains orthographic. Forward projection uses:
+
+```text
+model-space point -> camera projection -> screen/SVG point
+```
+
+Inverse cursor workflows use:
+
+```text
+screen/SVG point -> camera ray -> active model-space work-plane intersection
+```
+
+Custom work-plane data must not encode camera assumptions. A custom plane stores
+only model-space `Vec3` origin, basis, normal, and optional editor-source
+metadata. Camera reset-to-initial must remain available independently of active
+work-plane choices.
 
 ## Strata
 

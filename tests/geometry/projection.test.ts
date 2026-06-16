@@ -1,13 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  cameraBasisFromTikz3dplotAngles,
+  intersectCameraRayWithWorkPlane,
   normalizePointForAmbientDimension,
   projectModelToScreen,
+  projectVec3WithCamera,
   projectVec3,
+  screenRayFromCameraPoint,
   screenToModel2D,
   screenToModelOnWorkPlane,
+  validateCamera3D,
 } from '../../src/geometry/projection.ts'
-import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
+import {
+  constructWorkPlaneFromThreePoints,
+  dot,
+  norm,
+} from '../../src/geometry/workPlane.ts'
+import {
+  createInitialCamera3D,
+  INITIAL_CAMERA_3D,
+  resetCameraToInitial,
+} from '../../src/model/camera.ts'
 import type { Camera2D, Camera3D, Vec2, Vec3 } from '../../src/model/types.ts'
 
 const camera2D: Camera2D = {
@@ -18,13 +32,98 @@ const camera2D: Camera2D = {
 
 const camera3D: Camera3D = {
   mode: '3d',
-  projection: 'orthographic',
-  xVector: [1, 0],
-  yVector: [0.5, 0.25],
-  zVector: [0, 1],
-  scale: 10,
-  origin: { x: 100, y: 50 },
+  kind: 'orthographic',
+  thetaDeg: 13,
+  phiDeg: -23,
+  zoom: 10,
+  pan: { x: 100, y: 50 },
+  projectionBasis: {
+    xVector: [1, 0],
+    yVector: [0.5, 0.25],
+    zVector: [0, 1],
+  },
 }
+
+test('initial 3D camera exists and validates', () => {
+  assert.equal(validateCamera3D(INITIAL_CAMERA_3D).valid, true)
+})
+
+test('initial 3D camera reproduces the previous default projection', () => {
+  assertVec2AlmostEqual(
+    projectVec3WithCamera({ x: 2, y: 4, z: 3 }, createInitialCamera3D()),
+    { x: 3.8, y: 4 },
+  )
+})
+
+test('tikz-3dplot thetaDeg and phiDeg produce finite basis vectors', () => {
+  const basis = cameraBasisFromTikz3dplotAngles(70, 110)
+  const vectors = [
+    basis.right,
+    basis.up,
+    basis.forward,
+    { x: basis.xVector[0], y: basis.xVector[1], z: 0 },
+    { x: basis.yVector[0], y: basis.yVector[1], z: 0 },
+    { x: basis.zVector[0], y: basis.zVector[1], z: 0 },
+  ]
+
+  assert.equal(
+    vectors.every(
+      (vector) =>
+        Number.isFinite(vector.x) &&
+        Number.isFinite(vector.y) &&
+        Number.isFinite(vector.z),
+    ),
+    true,
+  )
+})
+
+test('tikz-3dplot camera basis is orthonormal in model space', () => {
+  const basis = cameraBasisFromTikz3dplotAngles(70, 110)
+
+  assertAlmostEqual(norm(basis.right), 1)
+  assertAlmostEqual(norm(basis.up), 1)
+  assertAlmostEqual(norm(basis.forward), 1)
+  assertAlmostEqual(dot(basis.right, basis.up), 0)
+  assertAlmostEqual(dot(basis.right, basis.forward), 0)
+  assertAlmostEqual(dot(basis.up, basis.forward), 0)
+})
+
+test('projection of finite Vec3 with a valid 3D camera is finite', () => {
+  const projected = projectVec3WithCamera(
+    { x: 1.5, y: -2.25, z: 3.75 },
+    {
+      mode: '3d',
+      kind: 'orthographic',
+      thetaDeg: 70,
+      phiDeg: 110,
+      zoom: 12,
+      pan: { x: 100, y: 50 },
+    },
+  )
+
+  assert.equal(Number.isFinite(projected.x), true)
+  assert.equal(Number.isFinite(projected.y), true)
+})
+
+test('invalid 3D camera values are rejected', () => {
+  const valid = createInitialCamera3D()
+  const invalidCameras: Camera3D[] = [
+    { ...valid, thetaDeg: Number.NaN },
+    { ...valid, phiDeg: Number.POSITIVE_INFINITY },
+    { ...valid, zoom: 0 },
+    { ...valid, zoom: -1 },
+    { ...valid, pan: { x: Number.NaN, y: 0 } },
+  ]
+
+  invalidCameras.forEach((camera) => {
+    assert.equal(validateCamera3D(camera).valid, false)
+  })
+})
+
+test('reset helper returns the initial 3D camera', () => {
+  assert.deepEqual(resetCameraToInitial(), createInitialCamera3D())
+  assert.notEqual(resetCameraToInitial(), INITIAL_CAMERA_3D)
+})
 
 test('projects Vec3 with a 2D camera', () => {
   assertVec2AlmostEqual(
@@ -95,6 +194,20 @@ test('converts cursor input on a custom work plane', () => {
 
   assertVec3AlmostEqual(
     screenToModelOnWorkPlane(screenPoint, workPlane, camera3D),
+    modelPoint,
+  )
+})
+
+test('camera ray intersects a work plane at the projected model point', () => {
+  const workPlane = { kind: 'xy' as const, z: 3 }
+  const modelPoint = { x: 2, y: 4, z: 3 }
+  const screenPoint = projectVec3(camera3D, modelPoint)
+
+  assertVec3AlmostEqual(
+    intersectCameraRayWithWorkPlane(
+      screenRayFromCameraPoint(screenPoint, camera3D),
+      workPlane,
+    ),
     modelPoint,
   )
 })

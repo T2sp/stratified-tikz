@@ -338,12 +338,16 @@ function createUndoState(
 
 const camera3D: Camera3D = {
   mode: '3d',
-  projection: 'orthographic',
-  xVector: [1, 0],
-  yVector: [0.5, 0.25],
-  zVector: [0, 1],
-  scale: 10,
-  origin: { x: 100, y: 50 },
+  kind: 'orthographic',
+  thetaDeg: 13,
+  phiDeg: -23,
+  zoom: 10,
+  pan: { x: 100, y: 50 },
+  projectionBasis: {
+    xVector: [1, 0],
+    yVector: [0.5, 0.25],
+    zVector: [0, 1],
+  },
 }
 
 function createNamedPointDiagram(name: string): Diagram {
