@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  emptyThreeDimensionalDiagram,
+  emptyTwoDimensionalDiagram,
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
@@ -16,15 +18,25 @@ import type {
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addCubicBezierCurveFromDirectInput,
+  addCubicBezierCurveStratumWithResult,
   addPointStratumFromDirectInput,
+  addPointStratumWithResult,
   addPolygonSheetFromDirectInput,
+  addPolygonSheetStratumWithResult,
   addPolylineCurveFromDirectInput,
+  addPolylineCurveStratumWithResult,
   addTextLabelFromDirectInput,
   applyDirectCreationCommitToEditorState,
   commitDirectCreationResult,
+  localDirectCoordinateInputFromExistingSource,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
+  updateStratumById,
 } from '../../src/ui/diagramUpdates.ts'
+import {
+  resolveExistingCoordinateSource,
+  type ExistingCoordinateSource,
+} from '../../src/ui/coordinateSources.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   layerFilterIncludesLayer,
@@ -763,6 +775,409 @@ test('global 3D direct creation remains unchanged when coordinate mode is global
   })
 })
 
+test('existing point coordinate source copies the current point position', () => {
+  const pointResult = addPointStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    { x: 2, y: 3, z: 0 },
+    { id: 'source-point', name: 'P' },
+  )
+  const result = addPolylineCurveFromDirectInput(
+    pointResult.diagram,
+    [
+      sourceInput({ kind: 'pointStratum', stratumId: 'source-point' }),
+      { x: '4', y: '5', z: '0' },
+    ],
+    { id: 'copied-from-point' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points[0], {
+    x: 2,
+    y: 3,
+    z: 0,
+  })
+})
+
+test('existing 2D polyline vertex source copies the vertex with z normalized to zero', () => {
+  const sourceResult = addPolylineCurveStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 9 },
+      { x: 6, y: 7, z: 9 },
+    ],
+    { id: 'source-polyline-2d', name: 'Boundary' },
+  )
+  assert.notEqual(sourceResult.id, null)
+
+  const result = addPolylineCurveFromDirectInput(
+    sourceResult.diagram,
+    [
+      sourceInput({
+        kind: 'polylineVertex',
+        curveId: 'source-polyline-2d',
+        vertexIndex: 1,
+      }),
+      { x: '8', y: '9', z: '0' },
+    ],
+    { id: 'copied-from-2d-polyline' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points[0], {
+    x: 6,
+    y: 7,
+    z: 0,
+  })
+})
+
+test('existing 3D polyline vertex source copies the full Vec3', () => {
+  const sourceResult = addPolylineCurveStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 3, z: 4 },
+    ],
+    { id: 'source-polyline-3d' },
+  )
+  assert.notEqual(sourceResult.id, null)
+
+  const result = addPolylineCurveFromDirectInput(
+    sourceResult.diagram,
+    [
+      sourceInput({
+        kind: 'polylineVertex',
+        curveId: 'source-polyline-3d',
+        vertexIndex: 1,
+      }),
+      { x: '5', y: '6', z: '7' },
+    ],
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points[0], {
+    x: 2,
+    y: 3,
+    z: 4,
+  })
+})
+
+test('existing 3D polygon sheet vertex source copies the full Vec3', () => {
+  const sourceResult = addPolygonSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 3, y: 4, z: 5 },
+      { x: 0, y: 2, z: 0 },
+    ],
+    { id: 'source-sheet', name: 'Surface' },
+  )
+  assert.notEqual(sourceResult.id, null)
+
+  const result = addPolygonSheetFromDirectInput(
+    sourceResult.diagram,
+    [
+      sourceInput({ kind: 'sheetVertex', sheetId: 'source-sheet', vertexIndex: 1 }),
+      { x: '6', y: '4', z: '5' },
+      { x: '3', y: '8', z: '5' },
+    ],
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findPolygonSheet(result.diagram, result.id).vertices[0], {
+    x: 3,
+    y: 4,
+    z: 5,
+  })
+})
+
+test('existing coordinate sources are copy-on-create and do not store live references', () => {
+  const pointResult = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 1, y: 2, z: 3 },
+    { id: 'anchor-point' },
+  )
+  const result = addPolylineCurveFromDirectInput(
+    pointResult.diagram,
+    [
+      sourceInput({ kind: 'pointStratum', stratumId: 'anchor-point' }),
+      { x: '4', y: '5', z: '6' },
+    ],
+    { id: 'copied-curve' },
+  )
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const moved = updateStratumById(result.diagram, 'anchor-point', (stratum) =>
+    stratum.geometricKind === 'point'
+      ? { ...stratum, position: { x: 9, y: 9, z: 9 } }
+      : stratum,
+  )
+  const copiedCurve = findCurve(moved, result.id)
+
+  assert.deepEqual(copiedCurve.points[0], { x: 1, y: 2, z: 3 })
+  assert.equal('source' in copiedCurve.points[0], false)
+  assert.equal(JSON.stringify(copiedCurve).includes('anchor-point'), false)
+})
+
+test('global coordinate mode copies source model-space Vec3 exactly', () => {
+  const pointResult = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: -1, y: 2.5, z: 8 },
+    { id: 'global-source' },
+  )
+  const result = addPolylineCurveFromDirectInput(
+    pointResult.diagram,
+    [
+      sourceInput({ kind: 'pointStratum', stratumId: 'global-source' }),
+      { x: '0', y: '0', z: '0' },
+    ],
+    { coordinateMode: 'global', workPlane: testCustomWorkPlane },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points[0], {
+    x: -1,
+    y: 2.5,
+    z: 8,
+  })
+})
+
+test('plane-local existing coordinate sources require on-plane coordinates and compute local coordinates', () => {
+  const onPlaneResult = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 12, y: 20, z: 33 },
+    { id: 'on-plane-source' },
+  )
+  const source: ExistingCoordinateSource = {
+    kind: 'pointStratum',
+    stratumId: 'on-plane-source',
+  }
+  const localInput = localDirectCoordinateInputFromExistingSource(
+    onPlaneResult.diagram,
+    source,
+    testCustomWorkPlane,
+  )
+
+  assert.deepEqual(localInput, {
+    x: '2',
+    y: '3',
+    z: '0',
+    source,
+  })
+
+  const onPlaneCreation = addPolylineCurveFromDirectInput(
+    onPlaneResult.diagram,
+    [sourceInput(source), { x: '0', y: '0', z: '0' }],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(onPlaneCreation.ok, true)
+  if (!onPlaneCreation.ok) {
+    throw new Error(onPlaneCreation.error)
+  }
+  assert.deepEqual(findCurve(onPlaneCreation.diagram, onPlaneCreation.id).points[0], {
+    x: 12,
+    y: 20,
+    z: 33,
+  })
+
+  const offPlaneResult = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 12, y: 21, z: 33 },
+    { id: 'off-plane-source' },
+  )
+  const offPlaneCreation = addPolylineCurveFromDirectInput(
+    offPlaneResult.diagram,
+    [
+      sourceInput({ kind: 'pointStratum', stratumId: 'off-plane-source' }),
+      { x: '0', y: '0', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(offPlaneCreation.ok, false)
+  if (offPlaneCreation.ok) {
+    throw new Error('Expected off-plane source to be rejected.')
+  }
+  assert.equal(offPlaneCreation.error, 'invalidCoordinates')
+  assert.strictEqual(offPlaneCreation.diagram, offPlaneResult.diagram)
+})
+
+test('missing, invalid-index, and non-finite existing coordinate sources are rejected', () => {
+  const sourceResult = addPolylineCurveStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 1, z: 1 },
+    ],
+    { id: 'valid-polyline-source' },
+  )
+  assert.notEqual(sourceResult.id, null)
+
+  const missing = addPolylineCurveFromDirectInput(sourceResult.diagram, [
+    sourceInput({ kind: 'pointStratum', stratumId: 'missing-point' }),
+    { x: '0', y: '0', z: '0' },
+  ])
+  assert.equal(missing.ok, false)
+  if (missing.ok) {
+    throw new Error('Expected missing source to be rejected.')
+  }
+  assert.equal(missing.error, 'invalidCoordinates')
+  assert.strictEqual(missing.diagram, sourceResult.diagram)
+
+  const invalidIndex = addPolylineCurveFromDirectInput(sourceResult.diagram, [
+    sourceInput({
+      kind: 'polylineVertex',
+      curveId: 'valid-polyline-source',
+      vertexIndex: 9,
+    }),
+    { x: '0', y: '0', z: '0' },
+  ])
+  assert.equal(invalidIndex.ok, false)
+
+  const nonFiniteDiagram: Diagram = {
+    ...sourceResult.diagram,
+    strata: sourceResult.diagram.strata.map((stratum) =>
+      stratum.id === 'valid-polyline-source' && stratum.geometricKind === 'curve'
+        ? {
+            ...stratum,
+            points: [
+              { x: Number.POSITIVE_INFINITY, y: 0, z: 0 },
+              ...stratum.points.slice(1),
+            ],
+          }
+        : stratum,
+    ),
+  }
+  const nonFinite = addPolylineCurveFromDirectInput(nonFiniteDiagram, [
+    sourceInput({
+      kind: 'polylineVertex',
+      curveId: 'valid-polyline-source',
+      vertexIndex: 0,
+    }),
+    { x: '0', y: '0', z: '0' },
+  ])
+  assert.equal(nonFinite.ok, false)
+})
+
+test('source kind validation rejects mismatched stratum kinds', () => {
+  const pointResult = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { id: 'point-source-kind' },
+  )
+  const cubicResult = addCubicBezierCurveStratumWithResult(
+    pointResult.diagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+      { x: 3, y: 0, z: 0 },
+    ],
+    { id: 'cubic-source-kind' },
+  )
+  assert.notEqual(cubicResult.id, null)
+
+  assert.equal(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'pointStratum',
+      stratumId: 'cubic-source-kind',
+    }),
+    null,
+  )
+  assert.equal(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'polylineVertex',
+      curveId: 'cubic-source-kind',
+      vertexIndex: 0,
+    }),
+    null,
+  )
+  assert.equal(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'sheetVertex',
+      sheetId: 'point-source-kind',
+      vertexIndex: 0,
+    }),
+    null,
+  )
+})
+
+test('cubic Bezier points can be used as existing coordinate sources', () => {
+  const cubicResult = addCubicBezierCurveStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 0 },
+      { x: 3, y: 4, z: 0 },
+      { x: 5, y: 6, z: 0 },
+    ],
+    { id: 'source-bezier', name: 'FLine' },
+  )
+  assert.notEqual(cubicResult.id, null)
+
+  assert.deepEqual(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'cubicBezierPoint',
+      curveId: 'source-bezier',
+      pointRole: 'start',
+    }),
+    { x: 0, y: 0, z: 0 },
+  )
+  assert.deepEqual(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'cubicBezierPoint',
+      curveId: 'source-bezier',
+      pointRole: 'control1',
+    }),
+    { x: 1, y: 2, z: 0 },
+  )
+  assert.deepEqual(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'cubicBezierPoint',
+      curveId: 'source-bezier',
+      pointRole: 'control2',
+    }),
+    { x: 3, y: 4, z: 0 },
+  )
+  assert.deepEqual(
+    resolveExistingCoordinateSource(cubicResult.diagram, {
+      kind: 'cubicBezierPoint',
+      curveId: 'source-bezier',
+      pointRole: 'end',
+    }),
+    { x: 5, y: 6, z: 0 },
+  )
+})
+
 const testCustomWorkPlane: WorkPlane = {
   kind: 'custom',
   id: 'test-custom-plane',
@@ -835,6 +1250,20 @@ function createPlaneLocalPoint(
   }
 
   return findPoint(result.diagram, result.id).position
+}
+
+function sourceInput(source: ExistingCoordinateSource): {
+  x: string
+  y: string
+  z: string
+  source: ExistingCoordinateSource
+} {
+  return {
+    x: '0',
+    y: '0',
+    z: '0',
+    source,
+  }
 }
 
 function createTestEditorState(
