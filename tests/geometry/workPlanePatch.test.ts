@@ -4,6 +4,7 @@ import {
   createWorkPlanePatch,
   DEFAULT_WORK_PLANE_PATCH_SIZE,
 } from '../../src/geometry/workPlanePatch.ts'
+import { isFiniteVec3 } from '../../src/geometry/workPlane.ts'
 import type { WorkPlane } from '../../src/model/types.ts'
 
 test('xy work plane patch has four corners with fixed z', () => {
@@ -71,4 +72,58 @@ test('work plane patch generation is independent of diagram data', () => {
   const second = createWorkPlanePatch({ kind: 'xy', z: 0 })
 
   assert.deepEqual(first, second)
+})
+
+test('work plane patch rejects non-finite sizes', () => {
+  assert.throws(
+    () => createWorkPlanePatch({ kind: 'xy', z: 0 }, { size: Number.NaN }),
+    /finite positive number/,
+  )
+  assert.throws(
+    () =>
+      createWorkPlanePatch(
+        { kind: 'xy', z: 0 },
+        { size: Number.POSITIVE_INFINITY },
+      ),
+    /finite positive number/,
+  )
+  assert.throws(
+    () =>
+      createWorkPlanePatch(
+        { kind: 'xy', z: 0 },
+        { size: Number.NEGATIVE_INFINITY },
+      ),
+    /finite positive number/,
+  )
+})
+
+test('work plane patch rejects zero and negative sizes', () => {
+  assert.throws(
+    () => createWorkPlanePatch({ kind: 'xy', z: 0 }, { size: 0 }),
+    /finite positive number/,
+  )
+  assert.throws(
+    () => createWorkPlanePatch({ kind: 'xy', z: 0 }, { size: -1 }),
+    /finite positive number/,
+  )
+})
+
+test('work plane patch rejects finite sizes that overflow corners', () => {
+  assert.throws(
+    () =>
+      createWorkPlanePatch(
+        { kind: 'xy', z: 0 },
+        {
+          center: { x: Number.MAX_VALUE, y: 0, z: 0 },
+          size: Number.MAX_VALUE,
+        },
+      ),
+    /non-finite corners/,
+  )
+})
+
+test('work plane patch returns finite corners for valid finite positive size', () => {
+  const patch = createWorkPlanePatch({ kind: 'xy', z: 0 }, { size: 1 })
+
+  assert.equal(patch.corners.every(isFiniteVec3), true)
 })

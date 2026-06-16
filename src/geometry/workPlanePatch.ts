@@ -1,5 +1,6 @@
 import type { Vec3, WorkPlane } from '../model/types'
 import {
+  isFiniteVec3,
   projectPointToWorkPlaneCoordinates,
   workPlaneToBasis,
 } from './workPlane.ts'
@@ -16,12 +17,16 @@ export type WorkPlanePatchOptions = {
 export const DEFAULT_WORK_PLANE_PATCH_SIZE = 4
 
 // Work-plane previews are derived from editor state and must stay independent
-// from diagram data and TikZ export.
+// from diagram data and TikZ export. Size must be finite and positive; successful
+// calls guarantee finite patch corners.
 export function createWorkPlanePatch(
   workPlane: WorkPlane,
   options: WorkPlanePatchOptions = {},
 ): WorkPlanePatch {
-  const halfSize = (options.size ?? DEFAULT_WORK_PLANE_PATCH_SIZE) / 2
+  const size = assertFinitePositiveSize(
+    options.size ?? DEFAULT_WORK_PLANE_PATCH_SIZE,
+  )
+  const halfSize = size / 2
   const basis = workPlaneToBasis(workPlane)
   const centerCoordinates =
     options.center === undefined
@@ -33,12 +38,25 @@ export function createWorkPlanePatch(
     [centerCoordinates.a + halfSize, centerCoordinates.b + halfSize],
     [centerCoordinates.a - halfSize, centerCoordinates.b + halfSize],
   ]
+  const corners = cornerCoordinates.map(([a, b]) =>
+    addBasisOffset(basis.origin, a, basis.u, b, basis.v),
+  ) as [Vec3, Vec3, Vec3, Vec3]
+
+  if (!corners.every(isFiniteVec3)) {
+    throw new Error('Work-plane patch produced non-finite corners.')
+  }
 
   return {
-    corners: cornerCoordinates.map(([a, b]) =>
-      addBasisOffset(basis.origin, a, basis.u, b, basis.v),
-    ) as [Vec3, Vec3, Vec3, Vec3],
+    corners,
   }
+}
+
+function assertFinitePositiveSize(size: number): number {
+  if (!Number.isFinite(size) || size <= 0) {
+    throw new Error('Work-plane patch size must be a finite positive number.')
+  }
+
+  return size
 }
 
 function addBasisOffset(
