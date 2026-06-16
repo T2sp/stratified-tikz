@@ -10,6 +10,8 @@ import {
 import type {
   AmbientDimension,
   AxisAlignedWorkPlaneName,
+  Diagram,
+  PointStratum,
   Vec3,
   WorkPlane,
 } from '../model/types.ts'
@@ -44,6 +46,26 @@ export type CustomWorkPlaneApplyResult =
     }
 
 export type WorkPlaneSelectValue = AxisAlignedWorkPlaneName | 'custom'
+
+export type WorkPlanePointPickingState = {
+  active: boolean
+  pickedPointIds: string[]
+}
+
+export type WorkPlanePointPickResult = {
+  state: WorkPlanePointPickingState
+  status: string
+}
+
+export type WorkPlanePointPickingValidationResult = {
+  state: WorkPlanePointPickingState
+  removedStalePointIds: string[]
+}
+
+export const inactiveWorkPlanePointPickingState: WorkPlanePointPickingState = {
+  active: false,
+  pickedPointIds: [],
+}
 
 export const defaultCustomOriginNormalWorkPlaneInput: CustomOriginNormalWorkPlaneInput =
   {
@@ -180,6 +202,213 @@ export function applyCustomThreePointWorkPlaneInput(
   }
 }
 
+export function startWorkPlanePointPicking(
+  ambientDimension: AmbientDimension,
+): WorkPlanePointPickResult {
+  if (ambientDimension !== 3) {
+    return {
+      state: inactiveWorkPlanePointPickingState,
+      status: 'Point picking for work planes is available only in 3D.',
+    }
+  }
+
+  const state = { active: true, pickedPointIds: [] }
+
+  return {
+    state,
+    status: workPlanePointPickingStatus(state),
+  }
+}
+
+export function cancelWorkPlanePointPicking(): WorkPlanePointPickResult {
+  return {
+    state: inactiveWorkPlanePointPickingState,
+    status: 'Point picking canceled.',
+  }
+}
+
+export function resetWorkPlanePointPicking(): WorkPlanePointPickResult {
+  const state = { active: true, pickedPointIds: [] }
+
+  return {
+    state,
+    status: workPlanePointPickingStatus(state),
+  }
+}
+
+export function pickWorkPlanePointStratum(
+  state: WorkPlanePointPickingState,
+  pointId: string,
+): WorkPlanePointPickResult {
+  if (!state.active) {
+    return {
+      state,
+      status: 'Point picking is not active.',
+    }
+  }
+
+  if (state.pickedPointIds.includes(pointId)) {
+    return {
+      state,
+      status: 'Point already picked.',
+    }
+  }
+
+  if (state.pickedPointIds.length >= 3) {
+    return {
+      state,
+      status: 'Already picked 3/3 points.',
+    }
+  }
+
+  const nextState = {
+    active: true,
+    pickedPointIds: [...state.pickedPointIds, pointId],
+  }
+
+  return {
+    state: nextState,
+    status: workPlanePointPickingStatus(nextState),
+  }
+}
+
+export function validateWorkPlanePointPickingState(
+  diagram: Diagram,
+  state: WorkPlanePointPickingState,
+): WorkPlanePointPickingValidationResult {
+  if (!state.active || state.pickedPointIds.length === 0) {
+    return {
+      state,
+      removedStalePointIds: [],
+    }
+  }
+
+  const availablePointIds = new Set(
+    diagram.strata
+      .filter((stratum): stratum is PointStratum => stratum.geometricKind === 'point')
+      .map((point) => point.id),
+  )
+  const pickedPointIds = state.pickedPointIds.filter((id) =>
+    availablePointIds.has(id),
+  )
+  const removedStalePointIds = state.pickedPointIds.filter(
+    (id) => !availablePointIds.has(id),
+  )
+
+  return {
+    state:
+      removedStalePointIds.length === 0
+        ? state
+        : { ...state, pickedPointIds },
+    removedStalePointIds,
+  }
+}
+
+export function applyPickedPointWorkPlane(
+  currentWorkPlane: WorkPlane,
+  ambientDimension: AmbientDimension,
+  diagram: Diagram,
+  state: WorkPlanePointPickingState,
+): CustomWorkPlaneApplyResult {
+  if (ambientDimension !== 3) {
+    return {
+      ok: false,
+      workPlane: normalizeActiveWorkPlaneForAmbientDimension(
+        ambientDimension,
+        currentWorkPlane,
+      ),
+      status: 'Custom work planes are available only in 3D.',
+    }
+  }
+
+  if (!state.active) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Point picking is not active.',
+    }
+  }
+
+  if (new Set(state.pickedPointIds).size !== state.pickedPointIds.length) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Plane points must be distinct.',
+    }
+  }
+
+  if (state.pickedPointIds.length !== 3) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: workPlanePointPickingStatus(state),
+    }
+  }
+
+  const points = state.pickedPointIds.map((id) =>
+    diagram.strata.find(
+      (stratum): stratum is PointStratum =>
+        stratum.id === id && stratum.geometricKind === 'point',
+    ),
+  )
+
+  if (points.some((point) => point === undefined)) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Picked points are no longer available.',
+    }
+  }
+
+  const [p0, p1, p2] = points as [PointStratum, PointStratum, PointStratum]
+  const firstEdge = subtractVec3(p1.position, p0.position)
+  const secondEdge = subtractVec3(p2.position, p0.position)
+
+  if (norm(cross(firstEdge, secondEdge)) <= DEFAULT_WORK_PLANE_EPSILON) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Plane points must not be collinear.',
+    }
+  }
+
+  try {
+    const workPlane = constructWorkPlaneFromThreePoints(
+      p0.position,
+      p1.position,
+      p2.position,
+      {
+        id: 'custom-existing-points-work-plane',
+        name: 'Custom plane',
+      },
+    )
+
+    return {
+      ok: true,
+      workPlane: {
+        ...workPlane,
+        source: {
+          kind: 'existingPointStrata',
+          pointIds: [p0.id, p1.id, p2.id],
+        },
+      },
+      status: 'Custom plane applied from picked points.',
+    }
+  } catch {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Custom plane inputs are invalid.',
+    }
+  }
+}
+
+export function shouldBlockCreationForWorkPlanePointPicking(
+  state: WorkPlanePointPickingState,
+): boolean {
+  return state.active
+}
+
 export function normalizeActiveWorkPlaneForAmbientDimension(
   ambientDimension: AmbientDimension,
   workPlane: WorkPlane,
@@ -225,6 +454,12 @@ export function workPlaneDisplayName(workPlane: WorkPlane): string {
     case 'custom':
       return workPlane.name
   }
+}
+
+export function workPlanePointPickingStatus(
+  state: WorkPlanePointPickingState,
+): string {
+  return `Picked ${state.pickedPointIds.length}/3 points.`
 }
 
 function parseWorkPlaneVectorInput(input: WorkPlaneVectorInput): Vec3 | null {

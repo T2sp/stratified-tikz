@@ -79,6 +79,15 @@ import {
   updateDiagramGeometryHandle,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
+  applyPickedPointWorkPlane,
+  cancelWorkPlanePointPicking,
+  inactiveWorkPlanePointPickingState,
+  pickWorkPlanePointStratum,
+  resetWorkPlanePointPicking,
+  shouldBlockCreationForWorkPlanePointPicking,
+  startWorkPlanePointPicking,
+  validateWorkPlanePointPickingState,
+  workPlanePointPickingStatus,
   workPlaneDisplayName,
   workPlaneSelectValue,
   type CustomOriginNormalWorkPlaneInput,
@@ -91,6 +100,7 @@ import {
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
+  type WorkPlanePointPickingState,
   type WorkPlaneSelectValue,
   type WorkPlanePreviewTool,
 } from './ui'
@@ -223,6 +233,8 @@ function App() {
     useState<CustomThreePointWorkPlaneInput>(
       defaultCustomThreePointWorkPlaneInput,
     )
+  const [workPlanePointPickingState, setWorkPlanePointPickingState] =
+    useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [editorState, setEditorState] = useState<EditableEditorState>(() => {
@@ -328,6 +340,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
   }
 
@@ -470,6 +483,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
     setSaveLoadStatus('loaded')
     setSaveLoadMessage('JSON loaded.')
@@ -536,9 +550,27 @@ function App() {
     )
 
     if (editableDiagram.ambientDimension === 2) {
+      setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
       setWorkPlaneStatus('')
     }
   }, [editableDiagram.ambientDimension])
+
+  useEffect(() => {
+    setWorkPlanePointPickingState((current) => {
+      const validation = validateWorkPlanePointPickingState(
+        editableDiagram,
+        current,
+      )
+
+      if (validation.removedStalePointIds.length > 0) {
+        setWorkPlaneStatus(
+          `${workPlanePointPickingStatus(validation.state)} Removed unavailable points.`,
+        )
+      }
+
+      return validation.state
+    })
+  }, [editableDiagram])
 
   useEffect(() => {
     function handleRemoveShortcut(event: KeyboardEvent): void {
@@ -673,6 +705,10 @@ function App() {
     viewportHeight: number,
     previewCamera: Camera,
   ): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      return
+    }
+
     if (creationTool === 'select') {
       return
     }
@@ -1007,6 +1043,11 @@ function App() {
   }
 
   function createDirectElement(): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setDirectCreationStatus('Finish or cancel point picking first.')
+      return
+    }
+
     if (!isDirectCreationTool(creationTool)) {
       return
     }
@@ -1202,6 +1243,11 @@ function App() {
   }
 
   function finishPolylineDraft(): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setPolylineStatus('Finish or cancel point picking first.')
+      return
+    }
+
     if (polylineDraft === null || polylineDraft.points.length < 2) {
       setPolylineStatus('A polyline needs at least 2 vertices.')
       return
@@ -1269,6 +1315,11 @@ function App() {
   }
 
   function finishSheetDraft(): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setSheetStatus('Finish or cancel point picking first.')
+      return
+    }
+
     if (sheetPolygonDraft === null || sheetPolygonDraft.points.length < 3) {
       setSheetStatus('A sheet needs at least 3 vertices.')
       return
@@ -1458,6 +1509,64 @@ function App() {
 
     if (result.ok) {
       setActiveWorkPlane(result.workPlane)
+    }
+  }
+
+  function startExistingPointWorkPlanePicking(): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
+    const result = startWorkPlanePointPicking(editableDiagram.ambientDimension)
+
+    setWorkPlanePointPickingState(result.state)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function pickExistingPointForWorkPlane(pointId: string): void {
+    setWorkPlanePointPickingState((current) => {
+      const result = pickWorkPlanePointStratum(current, pointId)
+
+      setWorkPlaneStatus(result.status)
+      return result.state
+    })
+  }
+
+  function resetExistingPointWorkPlanePicking(): void {
+    const result = resetWorkPlanePointPicking()
+
+    setWorkPlanePointPickingState(result.state)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function cancelExistingPointWorkPlanePicking(): void {
+    const result = cancelWorkPlanePointPicking()
+
+    setWorkPlanePointPickingState(result.state)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function applyExistingPointWorkPlane(): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
+    const result = applyPickedPointWorkPlane(
+      activeWorkPlane,
+      editableDiagram.ambientDimension,
+      editableDiagram,
+      workPlanePointPickingState,
+    )
+
+    setWorkPlaneStatus(result.status)
+
+    if (result.ok) {
+      setActiveWorkPlane(result.workPlane)
+      setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     }
   }
 
@@ -1937,6 +2046,52 @@ function App() {
                 Apply
               </button>
             </form>
+            <div
+              className="custom-work-plane-form work-plane-point-picker"
+              aria-label="Custom plane from existing point strata"
+            >
+              <span className="control-label">Pick 3 points for work plane</span>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={workPlanePointPickingState.active}
+                onClick={startExistingPointWorkPlanePicking}
+              >
+                Pick points
+              </button>
+              <span className="toolbar-status" role="status">
+                {workPlanePointPickingState.active
+                  ? workPlanePointPickingStatus(workPlanePointPickingState)
+                  : ''}
+              </span>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!workPlanePointPickingState.active}
+                onClick={resetExistingPointWorkPlanePicking}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!workPlanePointPickingState.active}
+                onClick={cancelExistingPointWorkPlanePicking}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={
+                  !workPlanePointPickingState.active ||
+                  workPlanePointPickingState.pickedPointIds.length !== 3
+                }
+                onClick={applyExistingPointWorkPlane}
+              >
+                Apply
+              </button>
+            </div>
             <span className="toolbar-status" role="status">
               {workPlaneStatus}
             </span>
@@ -1961,21 +2116,38 @@ function App() {
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
             layerFilter={layerFilter}
-            showGeometryHandles={creationTool === 'select'}
+            showGeometryHandles={
+              creationTool === 'select' && !workPlanePointPickingState.active
+            }
             onSelectionChange={
-              creationTool === 'select' ? updateSelectedElement : undefined
+              creationTool === 'select' && !workPlanePointPickingState.active
+                ? updateSelectedElement
+                : undefined
             }
             onCanvasClick={
-              creationTool === 'select' ? undefined : handlePreviewCreationClick
+              creationTool === 'select' || workPlanePointPickingState.active
+                ? undefined
+                : handlePreviewCreationClick
+            }
+            onPointStratumClick={
+              workPlanePointPickingState.active
+                ? pickExistingPointForWorkPlane
+                : undefined
             }
             onGeometryHandleDrag={
-              creationTool === 'select' ? handleGeometryHandleDrag : undefined
+              creationTool === 'select' && !workPlanePointPickingState.active
+                ? handleGeometryHandleDrag
+                : undefined
             }
             onGeometryHandleDragStart={
-              creationTool === 'select' ? handleGeometryHandleDragStart : undefined
+              creationTool === 'select' && !workPlanePointPickingState.active
+                ? handleGeometryHandleDragStart
+                : undefined
             }
             onGeometryHandleDragEnd={
-              creationTool === 'select' ? handleGeometryHandleDragEnd : undefined
+              creationTool === 'select' && !workPlanePointPickingState.active
+                ? handleGeometryHandleDragEnd
+                : undefined
             }
           />
         </article>

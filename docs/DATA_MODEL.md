@@ -196,6 +196,14 @@ plane unchanged. When the editable diagram enters 2D mode, the active work
 plane is normalized back to `{ kind: "xy", z: 0 }`, and the custom work-plane
 controls are hidden.
 
+The editor can also enter a 3D-only point-picking mode for custom work-plane
+construction. The picker stores up to three existing point stratum IDs in UI
+state, rejects duplicate IDs, validates that the picked strata still exist, and
+uses their current `Vec3` positions to construct the active custom plane. The
+constructed plane may carry `source.kind: "existingPointStrata"` metadata in
+editor state, but neither the active work plane nor the picker state is part of
+`Diagram` serialization or TikZ export.
+
 ## Strata
 
 ```ts

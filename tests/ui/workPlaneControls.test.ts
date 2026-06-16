@@ -1,14 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  applyPickedPointWorkPlane,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
+  cancelWorkPlanePointPicking,
+  inactiveWorkPlanePointPickingState,
   normalizeActiveWorkPlaneForAmbientDimension,
+  pickWorkPlanePointStratum,
+  resetWorkPlanePointPicking,
+  shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneControls,
+  startWorkPlanePointPicking,
+  validateWorkPlanePointPickingState,
   workPlaneDisplayName,
   workPlaneSelectValue,
 } from '../../src/ui/workPlaneControls.ts'
-import type { WorkPlane } from '../../src/model/types.ts'
+import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
+import type { Diagram, WorkPlane } from '../../src/model/types.ts'
 
 test('valid origin and normal input applies a custom work plane in 3D', () => {
   const previous: WorkPlane = { kind: 'xy', z: 5 }
@@ -192,3 +201,119 @@ test('switching to 2D resets active work plane to xy at z equals 0', () => {
     { kind: 'xy', z: 0 },
   )
 })
+
+test('picking three distinct point strata creates a custom work plane', () => {
+  const diagram = createPointPickingDiagram()
+  const started = startWorkPlanePointPicking(3)
+  const first = pickWorkPlanePointStratum(started.state, 'p0')
+  const second = pickWorkPlanePointStratum(first.state, 'p1')
+  const third = pickWorkPlanePointStratum(second.state, 'p2')
+  const result = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 5 },
+    3,
+    diagram,
+    third.state,
+  )
+
+  assert.equal(result.ok, true)
+  assert.equal(result.status, 'Custom plane applied from picked points.')
+  assert.equal(result.workPlane.kind, 'custom')
+
+  if (result.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assert.equal(result.workPlane.source.kind, 'existingPointStrata')
+
+  if (result.workPlane.source.kind !== 'existingPointStrata') {
+    throw new Error('Expected existing point stratum source metadata.')
+  }
+
+  assert.deepEqual(result.workPlane.source.pointIds, ['p0', 'p1', 'p2'])
+  assert.deepEqual(result.workPlane.origin, { x: 0, y: 0, z: 0 })
+  assert.deepEqual(result.workPlane.u, { x: 1, y: 0, z: 0 })
+})
+
+test('duplicate point picks are rejected', () => {
+  const started = startWorkPlanePointPicking(3)
+  const first = pickWorkPlanePointStratum(started.state, 'p0')
+  const duplicate = pickWorkPlanePointStratum(first.state, 'p0')
+
+  assert.equal(duplicate.status, 'Point already picked.')
+  assert.deepEqual(duplicate.state.pickedPointIds, ['p0'])
+})
+
+test('collinear picked point positions are rejected without changing active plane', () => {
+  const previous: WorkPlane = { kind: 'yz', x: 4 }
+  const diagram = createPointPickingDiagram([
+    { id: 'p0', position: { x: 0, y: 0, z: 0 } },
+    { id: 'p1', position: { x: 1, y: 1, z: 1 } },
+    { id: 'p2', position: { x: 2, y: 2, z: 2 } },
+  ])
+  const result = applyPickedPointWorkPlane(previous, 3, diagram, {
+    active: true,
+    pickedPointIds: ['p0', 'p1', 'p2'],
+  })
+
+  assert.equal(result.ok, false)
+  assert.equal(result.status, 'Plane points must not be collinear.')
+  assert.strictEqual(result.workPlane, previous)
+})
+
+test('cancel and reset clear work-plane point picking state', () => {
+  const picked = pickWorkPlanePointStratum(startWorkPlanePointPicking(3).state, 'p0')
+  const reset = resetWorkPlanePointPicking()
+  const canceled = cancelWorkPlanePointPicking()
+
+  assert.deepEqual(picked.state.pickedPointIds, ['p0'])
+  assert.equal(reset.state.active, true)
+  assert.deepEqual(reset.state.pickedPointIds, [])
+  assert.deepEqual(canceled.state, inactiveWorkPlanePointPickingState)
+})
+
+test('active work-plane point picking blocks ordinary geometry creation', () => {
+  assert.equal(
+    shouldBlockCreationForWorkPlanePointPicking({ active: true, pickedPointIds: [] }),
+    true,
+  )
+  assert.equal(
+    shouldBlockCreationForWorkPlanePointPicking(inactiveWorkPlanePointPickingState),
+    false,
+  )
+})
+
+test('stale picked point ids are cleared when point strata disappear', () => {
+  const diagram = createPointPickingDiagram()
+  const deletedDiagram: Diagram = {
+    ...diagram,
+    strata: diagram.strata.filter((stratum) => stratum.id !== 'p1'),
+  }
+  const validation = validateWorkPlanePointPickingState(deletedDiagram, {
+    active: true,
+    pickedPointIds: ['p0', 'p1', 'p2'],
+  })
+
+  assert.deepEqual(validation.removedStalePointIds, ['p1'])
+  assert.deepEqual(validation.state.pickedPointIds, ['p0', 'p2'])
+})
+
+function createPointPickingDiagram(
+  points: Array<{ id: string; position: { x: number; y: number; z: number } }> = [
+    { id: 'p0', position: { x: 0, y: 0, z: 0 } },
+    { id: 'p1', position: { x: 1, y: 0, z: 0 } },
+    { id: 'p2', position: { x: 0, y: 1, z: 0 } },
+  ],
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  return {
+    ...diagram,
+    strata: points.map((point) =>
+      createPointStratum({
+        ambientDimension: 3,
+        id: point.id,
+        position: point.position,
+      }),
+    ),
+  }
+}
