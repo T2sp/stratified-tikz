@@ -77,6 +77,14 @@ test('tikz-3dplot thetaDeg and phiDeg produce finite basis vectors', () => {
   )
 })
 
+test('tikz-3dplot basis matches formulas for non-axis-aligned angles', () => {
+  assertTikz3dplotBasis(60, 30)
+})
+
+test('tikz-3dplot basis matches formulas for simple axis angles', () => {
+  assertTikz3dplotBasis(90, 0)
+})
+
 test('tikz-3dplot camera basis is orthonormal in model space', () => {
   const basis = cameraBasisFromTikz3dplotAngles(70, 110)
 
@@ -121,8 +129,13 @@ test('invalid 3D camera values are rejected', () => {
 })
 
 test('reset helper returns the initial 3D camera', () => {
-  assert.deepEqual(resetCameraToInitial(), createInitialCamera3D())
-  assert.notEqual(resetCameraToInitial(), INITIAL_CAMERA_3D)
+  const resetCamera = resetCameraToInitial()
+
+  assert.deepEqual(resetCamera, createInitialCamera3D())
+  assert.notEqual(resetCamera, INITIAL_CAMERA_3D)
+  assert.ok(resetCamera.projectionBasis !== undefined)
+  assert.deepEqual(resetCamera.projectionBasis, INITIAL_CAMERA_3D.projectionBasis)
+  assert.notEqual(resetCamera.projectionBasis, INITIAL_CAMERA_3D.projectionBasis)
 })
 
 test('projects Vec3 with a 2D camera', () => {
@@ -254,9 +267,51 @@ function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
   assertAlmostEqual(actual.z, expected.z)
 }
 
+function assertTikz3dplotBasis(thetaDeg: number, phiDeg: number): void {
+  const theta = degreesToRadians(thetaDeg)
+  const phi = degreesToRadians(phiDeg)
+  const cosTheta = Math.cos(theta)
+  const sinTheta = Math.sin(theta)
+  const cosPhi = Math.cos(phi)
+  const sinPhi = Math.sin(phi)
+  const basis = cameraBasisFromTikz3dplotAngles(thetaDeg, phiDeg)
+
+  assertBasisVectorAlmostEqual(basis.xVector, [
+    cosPhi,
+    -cosTheta * sinPhi,
+  ])
+  assertBasisVectorAlmostEqual(basis.yVector, [
+    sinPhi,
+    cosTheta * cosPhi,
+  ])
+  assertBasisVectorAlmostEqual(basis.zVector, [0, sinTheta])
+  assertVec3AlmostEqual(basis.right, {
+    x: cosPhi,
+    y: sinPhi,
+    z: 0,
+  })
+  assertVec3AlmostEqual(basis.up, {
+    x: -cosTheta * sinPhi,
+    y: cosTheta * cosPhi,
+    z: sinTheta,
+  })
+}
+
+function assertBasisVectorAlmostEqual(
+  actual: [number, number],
+  expected: [number, number],
+): void {
+  assertAlmostEqual(actual[0], expected[0])
+  assertAlmostEqual(actual[1], expected[1])
+}
+
 function assertAlmostEqual(actual: number, expected: number): void {
   assert.ok(
     Math.abs(actual - expected) < 1e-10,
     `Expected ${actual} to be approximately ${expected}.`,
   )
+}
+
+function degreesToRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180
 }

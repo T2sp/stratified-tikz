@@ -118,6 +118,119 @@
   min-width: 0;
 }
 
+.camera-control {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--control-bg);
+}
+
+.camera-summary-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.camera-summary-toggle {
+  display: flex;
+  align-items: center;
+  flex: 1 1 300px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.camera-summary-toggle:hover {
+  background: var(--button-hover);
+}
+
+.camera-summary-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.camera-disclosure {
+  width: 1ch;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.camera-summary {
+  min-width: 0;
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.camera-status {
+  flex: 1 1 220px;
+}
+
+.camera-details {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-width: 0;
+}
+
+.camera-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  flex: 1 1 560px;
+  gap: 8px 10px;
+  min-width: min(560px, 100%);
+}
+
+.camera-field,
+.camera-preset-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.camera-field input,
+.camera-preset-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 6px;
+  color: var(--text-h);
+  background: #ffffff;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.camera-preset-field {
+  grid-template-columns: auto minmax(130px, 180px);
+  flex: 0 1 260px;
+}
+
 .work-plane-control {
   display: grid;
   flex: 1 1 100%;
@@ -933,6 +1046,14 @@
     grid-template-columns: 1fr;
   }
 
+  .camera-summary-toggle {
+    flex: 1 1 100%;
+  }
+
+  .camera-field-grid {
+    min-width: 0;
+  }
+
   .work-plane-summary-toggle {
     flex: 1 1 100%;
   }
@@ -987,6 +1108,12 @@
 
   .work-plane-fixed {
     grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .camera-field,
+  .camera-preset-field {
+    grid-template-columns: 1fr;
     width: 100%;
   }
 

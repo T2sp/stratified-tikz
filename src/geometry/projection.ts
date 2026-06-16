@@ -148,8 +148,13 @@ export function cameraBasisFromTikz3dplotAngles(
   const cosTheta = Math.cos(theta)
   const sinPhi = Math.sin(phi)
   const cosPhi = Math.cos(phi)
-  const right = createVec3(cosPhi, -sinPhi, 0)
-  const up = createVec3(sinPhi * sinTheta, cosPhi * sinTheta, cosTheta)
+
+  // Match tikz-3dplot main-coordinate projection:
+  // x = (cos phi, -cos theta sin phi)
+  // y = (sin phi,  cos theta cos phi)
+  // z = (0,        sin theta)
+  const right = createVec3(cosPhi, sinPhi, 0)
+  const up = createVec3(-cosTheta * sinPhi, cosTheta * cosPhi, sinTheta)
   const forward = normalizeVector(cross(right, up))
   const basis: Camera3DBasis = {
     right,

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { absoluteCubicBezierPointsFromControlMode } from '../../src/geometry/bezierControls.ts'
+import { threeDimensionalExample } from '../../src/examples/index.ts'
 import {
   cubicBezierToSvgPath,
   polylineToSvgPath,
@@ -13,6 +14,7 @@ import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import type { CubicBezierControlMode, Diagram } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
   lineStyleToStrokeDasharray,
@@ -197,6 +199,22 @@ test('resolveSvgCamera uses fitted camera only when explicitly requested', () =>
 
   assert.deepEqual(defaultCamera, diagram.camera)
   assert.notDeepEqual(fittedCamera, diagram.camera)
+})
+
+test('resolveSvgCamera camera override changes preview without mutating diagram', () => {
+  const before = JSON.stringify(threeDimensionalExample)
+  const camera = resolveSvgCamera(threeDimensionalExample, 200, 120, {
+    fitToView: true,
+    cameraOverride: createCameraPresetCamera('isometric'),
+    viewAdjustment: {
+      zoom: 1.25,
+      pan: { x: 8, y: -6 },
+    },
+  })
+
+  assert.equal(camera.mode, '3d')
+  assert.notDeepEqual(camera, threeDimensionalExample.camera)
+  assert.equal(JSON.stringify(threeDimensionalExample), before)
 })
 
 test('resolveSvgCamera fitted bounds include optional extra fit points', () => {

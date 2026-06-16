@@ -47,12 +47,15 @@ import {
   layerFilterIncludesLayer,
   type LayerFilter,
 } from '../ui/layerFilter'
+import type { CameraViewAdjustment } from './svgCamera'
 
 export type SvgDiagramProps = {
   diagram: Diagram
   width?: number
   height?: number
   fitToView?: boolean
+  cameraOverride?: Diagram['camera']
+  cameraViewAdjustment?: CameraViewAdjustment
   selectedElement?: SelectedElement
   polylineDraft?: Vec3[]
   cubicBezierDraft?: Vec3[]
@@ -103,6 +106,8 @@ export function SvgDiagram({
   width = defaultWidth,
   height = defaultHeight,
   fitToView = false,
+  cameraOverride,
+  cameraViewAdjustment,
   selectedElement = null,
   polylineDraft,
   cubicBezierDraft,
@@ -131,6 +136,8 @@ export function SvgDiagram({
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
+    cameraOverride,
+    viewAdjustment: cameraViewAdjustment,
     extraPointsForFit,
   })
   const items = [

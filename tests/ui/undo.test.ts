@@ -9,6 +9,7 @@ import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
+import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import {
   addPointStratumWithResult,
   addPolylineCurveStratumWithResult,
@@ -35,6 +36,7 @@ type TestEditorState = UndoableEditorState & {
   sheetPolygonDraft: null | { points: Vec3[] }
   directFormText: string
   activeWorkPlane: WorkPlane
+  viewCamera: Camera3D
 }
 
 test('multi-step undo restores previous diagrams in reverse order', () => {
@@ -134,6 +136,19 @@ test('changing active work plane does not create a diagram history entry', () =>
   })
 
   assert.deepEqual(committed.activeWorkPlane, customWorkPlane)
+  assert.equal(canUndoDiagramChange(committed.history), false)
+})
+
+test('changing editor-view camera does not create a diagram history entry', () => {
+  const initial = createUndoState(createNamedPointDiagram('A'))
+  const nextCamera = createCameraPresetCamera('isometric')
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    viewCamera: nextCamera,
+  })
+
+  assert.deepEqual(committed.viewCamera, nextCamera)
+  assert.deepEqual(committed.editableDiagram, initial.editableDiagram)
   assert.equal(canUndoDiagramChange(committed.history), false)
 })
 
@@ -332,6 +347,7 @@ function createUndoState(
     sheetPolygonDraft: null,
     directFormText: '',
     activeWorkPlane: { kind: 'xy', z: 0 },
+    viewCamera: createCameraPresetCamera('initial'),
     history: createDiagramHistory(editableDiagram),
   }
 }
