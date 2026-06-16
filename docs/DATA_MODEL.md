@@ -307,6 +307,7 @@ export type CurveStratum = {
   pathLabel?: string;
   style: CurveStyle;
   points: Vec3[];
+  bezierControls?: CubicBezierControlMode;
   styleSegments: CurveStyleSegment[];
   layer: number;
 };
@@ -319,6 +320,33 @@ For `kind: "cubicBezier"`, `points` should contain four points:
 ```ts
 [start, control1, control2, end]
 ```
+
+The four `points` remain the absolute geometry used for SVG rendering, hit
+testing, dragging, and validation. Cubic Bézier curves may also carry optional
+control metadata for TikZ export:
+
+```ts
+type CubicBezierControlMode =
+  | { kind: "absolute" }
+  | {
+      kind: "relativeCartesian";
+      firstControlOffset: Vec3;
+      secondControlOffset: Vec3;
+      secondOffsetReference: "end";
+    }
+  | {
+      kind: "relativePolar";
+      firstControl: { angleDegrees: number; radius: number };
+      secondControl: { angleDegrees: number; radius: number };
+      secondOffsetReference: "end";
+    };
+```
+
+Missing `bezierControls` is treated as `{ kind: "absolute" }` for compatibility
+with existing saved diagrams. In relative Cartesian mode, the first offset is
+from `start` and the second offset is from `end`, matching TikZ's
+`.. controls +(dx,dy) and +(dx,dy) ..` convention. Relative polar metadata is
+2D-only; angles must be finite and radii must be finite and non-negative.
 
 Validity condition:
 

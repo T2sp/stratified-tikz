@@ -130,6 +130,44 @@ test('geometry handle update moves a cubic Bezier control point preserving roles
   ])
 })
 
+test('geometry handle update converts relative cubic Bezier controls to absolute mode', () => {
+  const result = addCubicBezierCurveStratumWithResult(
+    twoDimensionalExample,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 0 },
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    {
+      id: 'drag-relative-bezier',
+      layer: 7,
+      bezierControls: {
+        kind: 'relativeCartesian',
+        firstControlOffset: { x: 1, y: 2, z: 0 },
+        secondControlOffset: { x: -3, y: 4, z: 0 },
+        secondOffsetReference: 'end',
+      },
+    },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected cubic Bezier creation to succeed.')
+  }
+
+  const updated = updateDiagramGeometryHandle(
+    result.diagram,
+    { kind: 'curvePoint', stratumId: result.id, pointIndex: 1 },
+    { x: 2, y: 3, z: 0 },
+  )
+  const curve = findCurve(updated, result.id)
+
+  assert.equal(curve.kind, 'cubicBezier')
+  assert.deepEqual(curve.points[1], { x: 2, y: 3, z: 0 })
+  assert.deepEqual(curve.bezierControls, { kind: 'absolute' })
+})
+
 test('geometry handle update moves polygon sheet vertices preserving order', () => {
   const result = addPolygonSheetStratumWithResult(
     threeDimensionalExample,

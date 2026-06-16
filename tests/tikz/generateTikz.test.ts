@@ -445,6 +445,123 @@ test('curve coordinate names distinguish polyline and cubic Bezier curves', () =
   assert.doesNotMatch(tikz, /curvecurve/)
 })
 
+test('relative Cartesian cubic Bezier export uses TikZ relative control syntax', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'relative-cartesian',
+    name: 'Relative Cartesian',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 0 },
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(curveBezierRelativeCartesian0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierRelativeCartesian0p3\) at \(10,10\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierRelativeCartesian0p0\) \.\. controls \+\(1,2\) and \+\(-3,4\) \.\. \(curveBezierRelativeCartesian0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /curveBezierRelativeCartesian0p1/)
+  assert.doesNotMatch(tikz, /curveBezierRelativeCartesian0p2/)
+})
+
+test('relative polar cubic Bezier export uses TikZ polar control syntax', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'relative-polar',
+    name: 'Relative Polar',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+      { x: 5, y: 8, z: 0 },
+      { x: 5, y: 5, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativePolar',
+      firstControl: { angleDegrees: 0, radius: 2 },
+      secondControl: { angleDegrees: 90, radius: 3 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\(curveBezierRelativePolar0p0\) \.\. controls \+\(0:2\) and \+\(90:3\) \.\. \(curveBezierRelativePolar0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /curveBezierRelativePolar0p1/)
+  assert.doesNotMatch(tikz, /curveBezierRelativePolar0p2/)
+})
+
+test('absolute cubic Bezier export keeps control-point coordinate declarations', () => {
+  const tikz = generateTikz(createCurveNamingDiagram())
+
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p1\) at \(1,2\);/)
+  assert.match(tikz, /\\coordinate \(curveBezierArc1p2\) at \(2,2\);/)
+  assert.match(
+    tikz,
+    /\(curveBezierArc1p0\) \.\. controls \(curveBezierArc1p1\) and \(curveBezierArc1p2\) \.\. \(curveBezierArc1p3\);/,
+  )
+})
+
+test('layer-aware output keeps relative Bezier curves in their layer block', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'layered-relative',
+    name: 'Layered Relative',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 0 },
+      { x: 2, y: 2, z: 0 },
+      { x: 3, y: 0, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -1, y: 2, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 4,
+  })
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer4')
+
+  assert.match(
+    layerBlock,
+    /\(curveBezierLayeredRelative0p0\) \.\. controls \+\(1,2\) and \+\(-1,2\) \.\. \(curveBezierLayeredRelative0p3\);/,
+  )
+})
+
 test('TikZ name stem sanitizer keeps readable safe names', () => {
   assert.equal(sanitizeTikzNameStem('Particle', 'point'), 'Particle')
   assert.equal(sanitizeTikzNameStem('F line', 'curve'), 'FLine')

@@ -1,4 +1,5 @@
 import type {
+  CubicBezierControlMode,
   CurveStratum,
   Diagram,
   HexColor,
@@ -343,13 +344,7 @@ function emitCurve(
     `Curve${curve.id}Stroke`,
     curve.style.strokeColor,
   )
-  const coordinates = curve.points.map((point, index) =>
-    context.coordinates.define(
-      curveCoordinateBaseName(curve, elementIndex),
-      index,
-      point,
-    ),
-  )
+  const coordinates = defineCurveCoordinates(curve, elementIndex, context)
   const lineStyleOption = lineStyleToTikzOption(curve.style.lineStyle)
   const options = [
     `draw=${strokeColor}`,
@@ -363,7 +358,7 @@ function emitCurve(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    `  ${formatCurvePath(curve, coordinates)};`,
+    `  ${formatCurvePath(curve, coordinates, context.mode)};`,
     '',
   ]
 }
@@ -543,12 +538,87 @@ function pointShapeOptions(
   }
 }
 
-function formatCurvePath(curve: CurveStratum, coordinates: string[]): string {
+function defineCurveCoordinates(
+  curve: CurveStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  const baseName = curveCoordinateBaseName(curve, elementIndex)
+
+  if (usesRelativeBezierControls(curve, context.mode)) {
+    return [
+      context.coordinates.define(baseName, 0, curve.points[0]),
+      context.coordinates.define(baseName, 3, curve.points[3]),
+    ]
+  }
+
+  return curve.points.map((point, index) =>
+    context.coordinates.define(baseName, index, point),
+  )
+}
+
+function formatCurvePath(
+  curve: CurveStratum,
+  coordinates: string[],
+  mode: TikzMode,
+): string {
+  if (usesRelativeBezierControls(curve, mode) && coordinates.length === 2) {
+    const controlPath = formatRelativeBezierControls(curve.bezierControls, mode)
+
+    if (controlPath !== null) {
+      return `(${coordinates[0]}) ${controlPath} (${coordinates[1]})`
+    }
+  }
+
   if (curve.kind === 'cubicBezier' && coordinates.length === 4) {
     return `(${coordinates[0]}) .. controls (${coordinates[1]}) and (${coordinates[2]}) .. (${coordinates[3]})`
   }
 
   return coordinates.map((name) => `(${name})`).join(' -- ')
+}
+
+function usesRelativeBezierControls(
+  curve: CurveStratum,
+  mode: TikzMode | undefined,
+): boolean {
+  if (
+    curve.kind !== 'cubicBezier' ||
+    curve.points.length !== 4 ||
+    curve.bezierControls === undefined
+  ) {
+    return false
+  }
+
+  if (curve.bezierControls.kind === 'relativeCartesian') {
+    return true
+  }
+
+  return curve.bezierControls.kind === 'relativePolar' && mode !== '3d'
+}
+
+function formatRelativeBezierControls(
+  controlMode: CubicBezierControlMode | undefined,
+  mode: TikzMode,
+): string | null {
+  if (controlMode?.kind === 'relativeCartesian') {
+    return `.. controls +${formatCoordinate(
+      controlMode.firstControlOffset,
+      mode,
+    )} and +${formatCoordinate(
+      controlMode.secondControlOffset,
+      mode,
+    )} ..`
+  }
+
+  if (controlMode?.kind === 'relativePolar') {
+    return `.. controls +(${formatNumber(
+      controlMode.firstControl.angleDegrees,
+    )}:${formatNumber(controlMode.firstControl.radius)}) and +(${formatNumber(
+      controlMode.secondControl.angleDegrees,
+    )}:${formatNumber(controlMode.secondControl.radius)}) ..`
+  }
+
+  return null
 }
 
 function spathSaveOptions(

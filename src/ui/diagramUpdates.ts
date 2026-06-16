@@ -1,3 +1,7 @@
+import {
+  absoluteCubicBezierPointsFromControlMode,
+  isValidPolarControl,
+} from '../geometry/bezierControls.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
   layerFilterIncludesLayer,
@@ -16,6 +20,7 @@ import {
 } from '../model/styles.ts'
 import type {
   AmbientDimension,
+  CubicBezierControlMode,
   CurveStratum,
   Diagram,
   LabelStyle,
@@ -208,6 +213,8 @@ export type AddCubicBezierCurveStratumOptions = {
   id?: string
   name?: string
   layer?: number
+  bezierControls?: CubicBezierControlMode
+  directControlMode?: DirectCubicBezierControlMode
 }
 
 export type AddPolygonSheetStratumOptions = {
@@ -246,6 +253,11 @@ export type DirectCoordinateInput = {
   y: string
   z: string
 }
+
+export type DirectCubicBezierControlMode =
+  | 'absolute'
+  | 'relativeCartesian'
+  | 'relativePolar'
 
 export type DirectPointCreationResult =
   | {
@@ -574,6 +586,16 @@ export function addCubicBezierCurveFromDirectInput(
     }
   }
 
+  const directControlMode = options.directControlMode ?? 'absolute'
+
+  if (directControlMode === 'relativePolar' && diagram.ambientDimension !== 2) {
+    return {
+      ok: false,
+      diagram,
+      error: 'unsupportedAmbientDimension',
+    }
+  }
+
   const points = parseDirectCoordinateInputs(
     coordinates,
     diagram.ambientDimension,
@@ -587,7 +609,28 @@ export function addCubicBezierCurveFromDirectInput(
     }
   }
 
-  const result = addCubicBezierCurveStratumWithResult(diagram, points, options)
+  const bezierInput = directCubicBezierInputToPoints(
+    diagram.ambientDimension,
+    points,
+    directControlMode,
+  )
+
+  if (bezierInput === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addCubicBezierCurveStratumWithResult(
+    diagram,
+    bezierInput.points,
+    {
+      ...options,
+      bezierControls: bezierInput.bezierControls,
+    },
+  )
 
   if (result.id === null) {
     return {
@@ -602,6 +645,67 @@ export function addCubicBezierCurveFromDirectInput(
     diagram: result.diagram,
     id: result.id,
   }
+}
+
+function directCubicBezierInputToPoints(
+  ambientDimension: AmbientDimension,
+  points: Vec3[],
+  directControlMode: DirectCubicBezierControlMode,
+): { points: Vec3[]; bezierControls: CubicBezierControlMode } | null {
+  if (directControlMode === 'absolute') {
+    return {
+      points,
+      bezierControls: { kind: 'absolute' },
+    }
+  }
+
+  if (directControlMode === 'relativeCartesian') {
+    const bezierControls: CubicBezierControlMode = {
+      kind: 'relativeCartesian',
+      firstControlOffset: points[2],
+      secondControlOffset: points[3],
+      secondOffsetReference: 'end',
+    }
+    const absolutePoints = absoluteCubicBezierPointsFromControlMode(
+      ambientDimension,
+      points[0],
+      points[1],
+      bezierControls,
+    )
+
+    return absolutePoints === null
+      ? null
+      : { points: absolutePoints, bezierControls }
+  }
+
+  const bezierControls: CubicBezierControlMode = {
+    kind: 'relativePolar',
+    firstControl: {
+      angleDegrees: points[2].x,
+      radius: points[2].y,
+    },
+    secondControl: {
+      angleDegrees: points[3].x,
+      radius: points[3].y,
+    },
+    secondOffsetReference: 'end',
+  }
+
+  if (
+    !isValidPolarControl(bezierControls.firstControl) ||
+    !isValidPolarControl(bezierControls.secondControl)
+  ) {
+    return null
+  }
+
+  const absolutePoints = absoluteCubicBezierPointsFromControlMode(
+    ambientDimension,
+    points[0],
+    points[1],
+    bezierControls,
+  )
+
+  return absolutePoints === null ? null : { points: absolutePoints, bezierControls }
 }
 
 export function addPolygonSheetFromDirectInput(
@@ -765,7 +869,7 @@ function createCubicBezierCurveForDiagram(
   points: Vec3[],
   options: AddCubicBezierCurveStratumOptions,
 ): CurveStratum {
-  return {
+  const curve: CurveStratum = {
     codim: diagram.ambientDimension === 2 ? 1 : 2,
     geometricKind: 'curve',
     kind: 'cubicBezier',
@@ -778,6 +882,12 @@ function createCubicBezierCurveForDiagram(
     styleSegments: [],
     layer: options.layer ?? nextLayer(diagram),
   }
+
+  if (options.bezierControls !== undefined) {
+    curve.bezierControls = options.bezierControls
+  }
+
+  return curve
 }
 
 function createPolygonSheetForDiagram(

@@ -73,6 +73,7 @@ import {
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
   type DirectCoordinateInput,
+  type DirectCubicBezierControlMode,
   type DirectPathCreationError,
   type DiagramHistory,
   type GeometryHandleTarget,
@@ -158,6 +159,11 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createSheet', label: 'Add sheet' },
 ]
 const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
+const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
+  'absolute',
+  'relativeCartesian',
+  'relativePolar',
+]
 
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
@@ -179,6 +185,8 @@ function App() {
   const [directCubicBezierRows, setDirectCubicBezierRows] = useState<string>(
     defaultDirectCubicBezierRows(2),
   )
+  const [directCubicBezierControlMode, setDirectCubicBezierControlMode] =
+    useState<DirectCubicBezierControlMode>('absolute')
   const [directSheetRows, setDirectSheetRows] = useState<string>(
     defaultDirectSheetRows(),
   )
@@ -294,6 +302,7 @@ function App() {
     setDirectCreationStatus('')
     setDirectLayerInput('0')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
+    setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
   }
@@ -432,6 +441,7 @@ function App() {
     setDirectCreationStatus('')
     setDirectLayerInput('0')
     setDirectPolylineRows(defaultDirectPolylineRows(result.diagram.ambientDimension))
+    setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
     setSaveLoadStatus('loaded')
@@ -920,6 +930,24 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function updateDirectCubicBezierControlMode(
+    mode: DirectCubicBezierControlMode,
+  ): void {
+    const nextMode =
+      editableDiagram.ambientDimension === 3 && mode === 'relativePolar'
+        ? 'absolute'
+        : mode
+
+    setDirectCubicBezierControlMode(nextMode)
+    setDirectCubicBezierRows(
+      defaultDirectCubicBezierRows(
+        editableDiagram.ambientDimension,
+        nextMode,
+      ),
+    )
+    setDirectCreationStatus('')
+  }
+
   function updateNewElementLayerInput(value: string): void {
     setDirectLayerInput(value)
     setDirectCreationStatus('')
@@ -1034,7 +1062,7 @@ function App() {
     const result = addCubicBezierCurveFromDirectInput(
       editableDiagram,
       coordinateRows,
-      { layer: directLayer },
+      { layer: directLayer, directControlMode: directCubicBezierControlMode },
     )
 
     if (!result.ok) {
@@ -1515,23 +1543,55 @@ function App() {
                   </label>
                 ))}
               {isDirectPathCreationTool(creationTool) && (
-                <label className="direct-create-field direct-coordinate-list">
-                  <span>Vertices</span>
-                  <textarea
-                    value={directRowsForCreationToolValue(creationTool)}
-                    rows={directCoordinateRowsTextAreaRows(creationTool)}
-                    spellCheck={false}
-                    placeholder={directCoordinateRowsPlaceholder(
-                      editableDiagram.ambientDimension,
-                    )}
-                    onChange={(event) =>
-                      updateDirectRowsForCreationTool(
+                <>
+                  {creationTool === 'createCubicBezier' && (
+                    <label className="direct-create-field">
+                      <span>Controls</span>
+                      <select
+                        value={directCubicBezierControlMode}
+                        onChange={(event) =>
+                          updateDirectCubicBezierControlMode(
+                            event.currentTarget
+                              .value as DirectCubicBezierControlMode,
+                          )
+                        }
+                      >
+                        {directCubicBezierControlModeOptions(
+                          editableDiagram.ambientDimension,
+                        ).map((mode) => (
+                          <option key={mode} value={mode}>
+                            {directCubicBezierControlModeLabel(mode)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="direct-create-field direct-coordinate-list">
+                    <span>
+                      {directRowsLabel(
                         creationTool,
-                        event.currentTarget.value,
-                      )
-                    }
-                  />
-                </label>
+                        directCubicBezierControlMode,
+                      )}
+                    </span>
+                    <textarea
+                      value={directRowsForCreationToolValue(creationTool)}
+                      rows={directCoordinateRowsTextAreaRows(creationTool)}
+                      spellCheck={false}
+                      placeholder={directCoordinateRowsPlaceholder(
+                        editableDiagram.ambientDimension,
+                        creationTool === 'createCubicBezier'
+                          ? directCubicBezierControlMode
+                          : 'absolute',
+                      )}
+                      onChange={(event) =>
+                        updateDirectRowsForCreationTool(
+                          creationTool,
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                </>
               )}
               <button type="submit" className="toolbar-button">
                 Create
@@ -1826,7 +1886,12 @@ function directCreationErrorMessage(
 
 function directCoordinateRowsPlaceholder(
   ambientDimension: AmbientDimension,
+  controlMode: DirectCubicBezierControlMode = 'absolute',
 ): string {
+  if (controlMode === 'relativePolar') {
+    return '0 0\n1 0\n60 0.7\n120 0.7'
+  }
+
   return ambientDimension === 2 ? '0 0\n1 0' : '0 0 0\n1 0 0'
 }
 
@@ -1851,10 +1916,60 @@ function defaultDirectPolylineRows(
 
 function defaultDirectCubicBezierRows(
   ambientDimension: AmbientDimension,
+  controlMode: DirectCubicBezierControlMode = 'absolute',
 ): string {
+  if (controlMode === 'relativeCartesian') {
+    return ambientDimension === 2
+      ? '0 0\n1 0\n0.3 0.6\n-0.3 0.6'
+      : '0 0 0\n1 0 0\n0.3 0.6 0\n-0.3 0.6 0'
+  }
+
+  if (controlMode === 'relativePolar') {
+    return '0 0\n1 0\n60 0.7\n120 0.7'
+  }
+
   return ambientDimension === 2
     ? '0 0\n0.3 0.6\n0.7 0.6\n1 0'
     : '0 0 0\n0.3 0.6 0\n0.7 0.6 0\n1 0 0'
+}
+
+function directCubicBezierControlModeOptions(
+  ambientDimension: AmbientDimension,
+): DirectCubicBezierControlMode[] {
+  return ambientDimension === 2
+    ? directCubicBezierControlModes
+    : directCubicBezierControlModes.filter((mode) => mode !== 'relativePolar')
+}
+
+function directCubicBezierControlModeLabel(
+  controlMode: DirectCubicBezierControlMode,
+): string {
+  switch (controlMode) {
+    case 'absolute':
+      return 'Absolute'
+    case 'relativeCartesian':
+      return 'Relative Cartesian'
+    case 'relativePolar':
+      return 'Relative polar'
+  }
+}
+
+function directRowsLabel(
+  tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+  controlMode: DirectCubicBezierControlMode,
+): string {
+  if (tool !== 'createCubicBezier') {
+    return 'Vertices'
+  }
+
+  switch (controlMode) {
+    case 'absolute':
+      return 'Points'
+    case 'relativeCartesian':
+      return 'Start, end, offsets'
+    case 'relativePolar':
+      return 'Start, end, polar'
+  }
 }
 
 function defaultDirectSheetRows(): string {
