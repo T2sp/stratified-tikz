@@ -342,8 +342,10 @@ function App() {
     () =>
       generateTikz(editableDiagram, {
         includeCoordinateAxes: includeCoordinateAxesInTikz,
+        camera3d:
+          editableDiagram.ambientDimension === 3 ? cameraControl : undefined,
       }),
-    [editableDiagram, includeCoordinateAxesInTikz],
+    [cameraControl, editableDiagram, includeCoordinateAxesInTikz],
   )
   const availableLayers = useMemo(
     () => deriveAvailableLayers(editableDiagram),
@@ -486,21 +488,25 @@ function App() {
 
     setCameraControl(result.camera)
     setCameraStatus('')
+    setCopyStatus('idle')
   }
 
   function resetCameraViewToInitial(): void {
     setCameraControl(resetCameraControlState())
     setCameraStatus('Camera reset to initial.')
+    setCopyStatus('idle')
   }
 
   function resetCameraViewToSaved(): void {
     setCameraControl(savedCameraControl)
     setCameraStatus('Camera reset to saved.')
+    setCopyStatus('idle')
   }
 
   function fitCameraView(): void {
     setCameraControl((current) => fitCameraControlState(current))
     setCameraStatus('Camera fit to view.')
+    setCopyStatus('idle')
   }
 
   function updateCameraPreset(presetId: CameraPresetId | 'custom'): void {
@@ -510,6 +516,7 @@ function App() {
 
     setCameraControl(createCameraPresetCamera(presetId))
     setCameraStatus('')
+    setCopyStatus('idle')
   }
 
   function selectExample(exampleId: ExampleId): void {

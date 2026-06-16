@@ -64,6 +64,41 @@ test('serializeDiagram writes 3D camera as view metadata', () => {
   assert.equal(parsed.diagram.view?.showCoordinateAxesInTikz, true)
 })
 
+test('serializeDiagram omits deprecated 3D projectionBasis metadata', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 41,
+    phiDeg: -82,
+    zoom: 1.5,
+    pan: { x: 7, y: -4 },
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.5, 0.25],
+      zVector: [0, 1],
+    },
+  }
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    camera3d: camera,
+  })
+  const parsed = JSON.parse(serialized) as {
+    diagram: {
+      view?: {
+        camera3d?: Camera3D
+      }
+    }
+  }
+
+  assert.deepEqual(parsed.diagram.view?.camera3d, {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 41,
+    phiDeg: -82,
+    zoom: 1.5,
+    pan: { x: 7, y: -4 },
+  })
+})
+
 test('parseSavedDiagramJson returns a valid saved diagram', () => {
   const result = parseSavedDiagramJson(serializeDiagram(threeDimensionalExample))
 
@@ -113,10 +148,48 @@ test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {
   assert.equal(result.diagram.camera.kind, 'orthographic')
   assert.equal(result.diagram.camera.zoom, 2)
   assert.deepEqual(result.diagram.camera.pan, { x: 30, y: 40 })
-  assert.deepEqual(
-    result.diagram.camera.projectionBasis,
-    legacyProjectionBasis,
-  )
+  assert.equal(result.diagram.camera.projectionBasis, undefined)
+  assert.deepEqual(result.diagram.view?.camera3d, result.diagram.camera)
+})
+
+test('parseSavedDiagramJson drops deprecated 3D projectionBasis metadata', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: {
+      view: {
+        camera3d: Camera3D & {
+          projectionBasis?: {
+            xVector: [number, number]
+            yVector: [number, number]
+            zVector: [number, number]
+          }
+        }
+      }
+    }
+  }
+  saved.diagram.view.camera3d = {
+    ...saved.diagram.view.camera3d,
+    thetaDeg: 41,
+    phiDeg: -82,
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.5, 0.25],
+      zVector: [0, 1],
+    },
+  }
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.equal(result.diagram.camera.mode, '3d')
+  if (result.diagram.camera.mode !== '3d') {
+    throw new Error('Expected 3D camera.')
+  }
+  assert.equal(result.diagram.camera.thetaDeg, 41)
+  assert.equal(result.diagram.camera.phiDeg, -82)
+  assert.equal(result.diagram.camera.projectionBasis, undefined)
   assert.deepEqual(result.diagram.view?.camera3d, result.diagram.camera)
 })
 

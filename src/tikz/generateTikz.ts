@@ -1,5 +1,6 @@
 import type {
   CubicBezierControlMode,
+  Camera3D,
   CurveStratum,
   Diagram,
   HexColor,
@@ -15,6 +16,7 @@ import type {
   WorkPlaneLocalOffset,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
+import { createInitialCamera3D } from '../model/camera.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   pointFromWorkPlaneLocalCoordinate,
@@ -48,10 +50,12 @@ type LayeredTikzCommand = {
 
 export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
+  camera3d?: Camera3D
 }
 
 type GenerateContext = {
   mode: TikzMode
+  camera3d?: Camera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
   hasSavedPaths: boolean
@@ -126,7 +130,7 @@ export function generateTikz3D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
-  const context = createContext('3d', options)
+  const context = createContext('3d', options, resolveTikzCamera3D(diagram, options))
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
   const curveSectionTitle = 'Codimension 2 strata: curves'
   const pointSectionTitle = 'Codimension 3 strata: points'
@@ -224,9 +228,11 @@ export function layerToTikzLayerName(layer: number): string {
 function createContext(
   mode: TikzMode,
   options: GenerateTikzOptions,
+  camera3d?: Camera3D,
 ): GenerateContext {
   return {
     mode,
+    ...(mode === '3d' && camera3d !== undefined ? { camera3d } : {}),
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
     hasSavedPaths: false,
@@ -234,6 +240,21 @@ function createContext(
     includeCoordinateAxes:
       mode === '3d' && options.includeCoordinateAxes === true,
   }
+}
+
+function resolveTikzCamera3D(
+  diagram: Diagram,
+  options: GenerateTikzOptions,
+): Camera3D {
+  if (options.camera3d !== undefined) {
+    return options.camera3d
+  }
+
+  if (diagram.view?.camera3d !== undefined) {
+    return diagram.view.camera3d
+  }
+
+  return diagram.camera.mode === '3d' ? diagram.camera : createInitialCamera3D()
 }
 
 function assembleTikz({
@@ -250,7 +271,8 @@ function assembleTikz({
       ...emitRequiredLibraryComment(context),
       ...context.colors.emitDefinitions(),
       ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
-      ...emitTikzPictureStart(context.mode),
+      ...emitTikzCameraSetup(context),
+      ...emitTikzPictureStart(context),
     ]),
     ...bodySections.flat(),
     '\\end{tikzpicture}',
@@ -259,24 +281,39 @@ function assembleTikz({
   return `${lines.join('\n')}\n`
 }
 
-function emitTikzPictureStart(mode: TikzMode): string[] {
-  if (mode === '2d') {
+function emitTikzPictureStart(context: GenerateContext): string[] {
+  if (context.mode === '2d') {
     return ['\\begin{tikzpicture}[', '  line cap=round,', '  line join=round', ']']
   }
 
   return [
     '\\begin{tikzpicture}[',
-    '  x={(1cm,0cm)},',
-    '  y={(0.45cm,0.25cm)},',
-    '  z={(0cm,1cm)},',
+    '  tdplot_main_coords,',
     '  line cap=round,',
     '  line join=round',
     ']',
   ]
 }
 
+function emitTikzCameraSetup(context: GenerateContext): string[] {
+  if (context.mode !== '3d' || context.camera3d === undefined) {
+    return []
+  }
+
+  return [
+    `\\tdplotsetmaincoords{${formatNumber(
+      context.camera3d.thetaDeg,
+    )}}{${formatNumber(context.camera3d.phiDeg)}}`,
+    '',
+  ]
+}
+
 function emitRequiredLibraryComment(context: GenerateContext): string[] {
   const lines: string[] = []
+
+  if (context.mode === '3d' && context.camera3d !== undefined) {
+    lines.push('% Requires \\usepackage{tikz-3dplot}', '')
+  }
 
   if (context.coordinates.hasNonCircularPointShape) {
     lines.push(

@@ -264,5 +264,13 @@ function formatCameraNumber(value: number): string {
 }
 
 export function areCamera3DEqual(left: Camera3D, right: Camera3D): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return (
+    left.mode === right.mode &&
+    left.kind === right.kind &&
+    left.thetaDeg === right.thetaDeg &&
+    left.phiDeg === right.phiDeg &&
+    left.zoom === right.zoom &&
+    left.pan.x === right.pan.x &&
+    left.pan.y === right.pan.y
+  )
 }

@@ -42,10 +42,19 @@ committed to the diagram as ordinary model coordinates.
 
 The 3D camera is persisted, when present, as diagram-level view metadata at
 `diagram.view.camera3d`. It uses `tikz-3dplot`-compatible `thetaDeg` and
-`phiDeg` notation for the preview camera, but this phase does not export the
-camera to TikZ. TikZ camera alignment, including `\tdplotsetmaincoords{theta}{phi}`,
-is Phase 13I work. Camera changes are view operations and do not create geometry
-undo entries.
+`phiDeg` notation for the preview camera, and generated 3D TikZ exports those
+angles with `\tdplotsetmaincoords{theta}{phi}`. The app may pass the current
+unsaved camera to the generator so the TikZ source matches the live SVG preview
+orientation. If no current camera is passed, the generator uses
+`diagram.view.camera3d`, then the diagram camera, then the initial 3D camera as
+a fallback. `thetaDeg` and `phiDeg` are the source of truth for 3D orientation;
+deprecated legacy `projectionBasis` metadata is ignored by preview and export
+when those angle fields are present.
+
+Only camera orientation is exported. Zoom and pan remain SVG-view-only and do
+not silently scale or translate TikZ geometry. Resetting the app camera to the
+initial/default display restores the initial exported TikZ camera values.
+Camera changes are view operations and do not create geometry undo entries.
 
 ## Coordinate names
 
@@ -245,17 +254,19 @@ Coordinates should be emitted as:
 \coordinate (p1) at (1,0);
 ```
 
-## 3D TikZ basis
+## 3D TikZ camera
 
-In 3D mode, use a 2.5D TikZ basis.
+In 3D mode, use `tikz-3dplot` main-coordinate camera notation rather than a
+manual 2.5D `x=...`, `y=...`, `z=...` basis. The output is still a standalone
+TikZ snippet, so the header documents the package requirement as a comment:
 
 Example style block:
 
 ```tex
+% Requires \usepackage{tikz-3dplot}
+\tdplotsetmaincoords{70}{110}
 \begin{tikzpicture}[
-  x={(1cm,0cm)},
-  y={(0.45cm,0.25cm)},
-  z={(0cm,1cm)},
+  tdplot_main_coords,
   line cap=round,
   line join=round,
   codim one sheet/.style={opacity=.35, draw=black},
@@ -273,6 +284,18 @@ Coordinates should be emitted as:
 \coordinate (p1) at (1,0,0);
 \coordinate (p2) at (1,0,1);
 ```
+
+The `theta` and `phi` values come from the current 3D camera's `thetaDeg` and
+`phiDeg`. `\tdplotsetmaincoords` controls the view orientation on the TikZ
+side; the generator does not pre-project model geometry into 2D coordinates.
+Coordinate axes guide export, when enabled, uses the same outer
+`tdplot_main_coords` picture and therefore the same camera view.
+
+3D work-plane-local relative Bézier export remains a separate scoped feature.
+The outer picture uses `tdplot_main_coords`; an eligible curve may still emit a
+TikZ `3d` library scope with `plane origin`, `plane x`, `plane y`, and
+`canvas is plane` for its local 2D path. The saved work-plane frame is model
+geometry and is not replaced by camera data.
 
 ## Cubic Bézier controls
 

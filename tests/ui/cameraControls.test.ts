@@ -99,6 +99,23 @@ test('camera presets produce valid camera states', () => {
   })
 })
 
+test('deprecated projectionBasis does not affect camera preset matching', () => {
+  const camera: Camera3D = {
+    ...createCameraPresetCamera('initial'),
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.5, 0.25],
+      zVector: [0, 1],
+    },
+  }
+
+  assert.equal(
+    areCamera3DEqual(camera, createCameraPresetCamera('initial')),
+    true,
+  )
+  assert.equal(cameraPresetIdForCamera(camera), 'initial')
+})
+
 test('camera preset options provide stable names for every preset', () => {
   assert.deepEqual(
     cameraPresetOptions.map((preset) => preset.id),

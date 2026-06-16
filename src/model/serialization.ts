@@ -9,7 +9,6 @@ import type {
   Camera,
   Camera2D,
   Camera3D,
-  Camera3DProjectionBasis,
   Diagram,
   DiagramValidationResult,
   DiagramViewOptions,
@@ -198,7 +197,7 @@ function normalizeCamera3DForPersistence(
     return createInitialCamera3D()
   }
 
-  return cloneCamera3D(camera)
+  return cloneCamera3DWithoutProjectionBasis(camera)
 }
 
 function normalizeLoadedDiagram(
@@ -350,20 +349,6 @@ function camera3DFromPersistent(value: unknown): Camera3D | null {
     return null
   }
 
-  let projectionBasis: Camera3DProjectionBasis | undefined
-
-  if (value.projectionBasis !== undefined) {
-    const parsedProjectionBasis = projectionBasisFromPersistent(
-      value.projectionBasis,
-    )
-
-    if (parsedProjectionBasis === null) {
-      return null
-    }
-
-    projectionBasis = parsedProjectionBasis
-  }
-
   const camera: Camera3D = {
     mode: '3d',
     kind: 'orthographic',
@@ -371,29 +356,9 @@ function camera3DFromPersistent(value: unknown): Camera3D | null {
     phiDeg: value.phiDeg,
     zoom: value.zoom,
     pan: { x: value.pan.x, y: value.pan.y },
-    ...(projectionBasis === undefined ? {} : { projectionBasis }),
   }
 
   return validateCamera3D(camera).valid ? camera : null
-}
-
-function projectionBasisFromPersistent(
-  value: unknown,
-): Camera3DProjectionBasis | null {
-  if (
-    !isRecord(value) ||
-    !isBasisVector(value.xVector) ||
-    !isBasisVector(value.yVector) ||
-    !isBasisVector(value.zVector)
-  ) {
-    return null
-  }
-
-  return {
-    xVector: [value.xVector[0], value.xVector[1]],
-    yVector: [value.yVector[0], value.yVector[1]],
-    zVector: [value.zVector[0], value.zVector[1]],
-  }
 }
 
 function cameraFromLegacyProjection(value: unknown): Camera3D | null {
@@ -415,20 +380,25 @@ function cameraFromLegacyProjection(value: unknown): Camera3D | null {
     return null
   }
 
-  const projectionBasis: Camera3DProjectionBasis = {
-    xVector: [value.xVector[0], value.xVector[1]],
-    yVector: [value.yVector[0], value.yVector[1]],
-    zVector: [value.zVector[0], value.zVector[1]],
-  }
   const initialCamera = createInitialCamera3D()
   const camera: Camera3D = {
     ...initialCamera,
     zoom: legacyScale,
     pan: { x: legacyOrigin.x, y: legacyOrigin.y },
-    projectionBasis,
   }
 
   return validateCamera3D(camera).valid ? camera : null
+}
+
+function cloneCamera3DWithoutProjectionBasis(camera: Camera3D): Camera3D {
+  return {
+    mode: camera.mode,
+    kind: camera.kind,
+    thetaDeg: camera.thetaDeg,
+    phiDeg: camera.phiDeg,
+    zoom: camera.zoom,
+    pan: { ...camera.pan },
+  }
 }
 
 function isDiagramLike(value: unknown): value is SavedDiagramInput {
