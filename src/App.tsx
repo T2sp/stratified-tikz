@@ -85,11 +85,14 @@ import {
   applyPickedPointWorkPlane,
   cancelWorkPlanePointPicking,
   inactiveWorkPlanePointPickingState,
+  nextInspectorDisclosureStateForSelection,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   resolvePointStratumCoordinateForCursorCreation,
   shouldBlockCreationForWorkPlanePointPicking,
   startWorkPlanePointPicking,
+  selectedElementDisclosureKey,
+  setInspectorDisclosureExpanded,
   validateWorkPlanePointPickingState,
   workPlanePointPickingStatus,
   workPlaneDisplayName,
@@ -104,6 +107,7 @@ import {
   type ExistingCoordinateSource,
   type ExistingCoordinateSourceOption,
   type GeometryHandleTarget,
+  type InspectorDisclosureState,
   type LayerFilter,
   type SelectedElement,
   type SheetPolygonDraft,
@@ -283,6 +287,15 @@ function App() {
     sheetPolygonDraft,
     history,
   } = editorState
+  const [inspectorDisclosure, setInspectorDisclosure] =
+    useState<InspectorDisclosureState>({
+      selectionKey: selectedElementDisclosureKey(null),
+      expanded: false,
+    })
+  const selectedInspectorKey = selectedElementDisclosureKey(selectedElement)
+  const isInspectorExpanded =
+    inspectorDisclosure.selectionKey === selectedInspectorKey &&
+    inspectorDisclosure.expanded
   const canUndo = history.past.length > 0
   const canRedo = history.future.length > 0
   const selectedExample =
@@ -545,6 +558,12 @@ function App() {
     }))
   }
 
+  function updateInspectorExpanded(expanded: boolean): void {
+    setInspectorDisclosure((current) =>
+      setInspectorDisclosureExpanded(current, selectedElement, expanded),
+    )
+  }
+
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
     if (selectedElement === null) {
       return
@@ -582,6 +601,12 @@ function App() {
     setCubicBezierStatus('')
     setSheetStatus('')
     setCopyStatus('idle')
+  }, [selectedElement])
+
+  useEffect(() => {
+    setInspectorDisclosure((current) =>
+      nextInspectorDisclosureStateForSelection(current, selectedElement),
+    )
   }, [selectedElement])
 
   useEffect(() => {
@@ -2559,6 +2584,8 @@ function App() {
             diagram={editableDiagram}
             selectedElement={selectedElement}
             onDiagramChange={updateEditableDiagram}
+            expanded={isInspectorExpanded}
+            onExpandedChange={updateInspectorExpanded}
           />
         </article>
 

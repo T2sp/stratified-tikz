@@ -24,6 +24,12 @@ export type InspectorSection = {
   fields: InspectorField[]
 }
 
+export type InspectorCompactSummary = {
+  title: string
+  layer: string
+  detail: string | null
+}
+
 export type CurvePointDescription = {
   label: string
   point: Vec3
@@ -42,6 +48,37 @@ export function createInspectorSections(
   return selected.kind === 'stratum'
     ? createStratumSections(selected.element, diagram.ambientDimension)
     : createLabelSections(selected.element, diagram.ambientDimension)
+}
+
+export function createInspectorCompactSummary(
+  diagram: Diagram,
+  selection: SelectedElement,
+): InspectorCompactSummary | null {
+  const selected = findSelectedElement(diagram, selection)
+
+  if (selected === null) {
+    return null
+  }
+
+  if (selected.kind === 'stratum') {
+    const stratum = selected.element
+
+    return {
+      title: `${stratumKindLabel(stratum)}: ${stratum.name} [${stratum.id}]`,
+      layer: formatNumber(stratum.layer),
+      detail: `codim ${stratum.codim}`,
+    }
+  }
+
+  const label = selected.element
+  const titleText =
+    label.text.trim().length === 0 ? label.name : compactSummaryText(label.text)
+
+  return {
+    title: `Label: ${titleText} [${label.id}]`,
+    layer: formatNumber(label.layer),
+    detail: `position ${formatVec3(label.position, diagram.ambientDimension)}`,
+  }
 }
 
 export function formatVec3(
@@ -238,6 +275,28 @@ export function formatLabelStyleSummary(style: LabelStyle): string {
     formatStyleNumber('font', style.fontSize, 'pt'),
     `anchor: ${style.anchor}`,
   ])
+}
+
+function stratumKindLabel(stratum: Stratum): string {
+  switch (stratum.geometricKind) {
+    case 'region':
+      return 'Region'
+    case 'sheet':
+      return 'Sheet'
+    case 'curve':
+      return 'Curve'
+    case 'point':
+      return 'Point'
+  }
+}
+
+function compactSummaryText(text: string): string {
+  const normalizedText = text.replace(/\s+/g, ' ').trim()
+  const maxLength = 48
+
+  return normalizedText.length <= maxLength
+    ? normalizedText
+    : `${normalizedText.slice(0, maxLength - 3)}...`
 }
 
 function joinStyleSummary(parts: Array<string | null>): string {
