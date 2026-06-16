@@ -31,7 +31,9 @@ import {
   applyDirectCreationCommitToEditorState,
   commitDirectCreationResult,
   parseDirectLayerInput,
+  updateStratumById,
 } from '../../src/ui/diagramUpdates.ts'
+import { resolvePointStratumCoordinateForCursorCreation } from '../../src/ui/coordinateSources.ts'
 import type { LayerFilter } from '../../src/ui/layerFilter.ts'
 import { layerFilterIncludesLayer } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
@@ -343,6 +345,198 @@ test('cursor polygon sheet creation commits vertices on an active custom work pl
     true,
   )
   assert.match(generateTikz(committed.editableDiagram), /-- cycle;/)
+})
+
+test('cursor polyline creation can copy an existing point stratum as a vertex source', () => {
+  const pointResult = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    { x: 2, y: 3, z: 99 },
+    { id: 'cursor-source-point' },
+  )
+  const source = resolvePointStratumCoordinateForCursorCreation(
+    pointResult.diagram,
+    'cursor-source-point',
+    { workPlane: { kind: 'xy', z: 0 } },
+  )
+
+  assert.equal(source.ok, true)
+  if (!source.ok) {
+    throw new Error('Expected cursor source resolution to succeed.')
+  }
+
+  const result = addPolylineCurveStratumWithResult(
+    pointResult.diagram,
+    [source.point, { x: 4, y: 5, z: 0 }],
+    { id: 'cursor-copied-polyline' },
+  )
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected polyline creation to succeed.')
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points[0], {
+    x: 2,
+    y: 3,
+    z: 0,
+  })
+})
+
+test('cursor cubic Bezier creation can copy existing point strata for draft points', () => {
+  const sourceDiagram = [
+    { id: 'bezier-source-start', position: { x: 0, y: 0, z: 0 } },
+    { id: 'bezier-source-control-1', position: { x: 1, y: 2, z: 0 } },
+    { id: 'bezier-source-control-2', position: { x: 3, y: 2, z: 0 } },
+    { id: 'bezier-source-end', position: { x: 4, y: 0, z: 0 } },
+  ].reduce(
+    (diagram, source) =>
+      addPointStratumWithResult(diagram, source.position, {
+        id: source.id,
+      }).diagram,
+    createEmptyDiagram({ ambientDimension: 2 }),
+  )
+  const points = [
+    'bezier-source-start',
+    'bezier-source-control-1',
+    'bezier-source-control-2',
+    'bezier-source-end',
+  ].map((id) => {
+    const result = resolvePointStratumCoordinateForCursorCreation(
+      sourceDiagram,
+      id,
+      { workPlane: { kind: 'xy', z: 0 } },
+    )
+
+    if (!result.ok) {
+      throw new Error(`Expected ${id} to resolve as a cursor source.`)
+    }
+
+    return result.point
+  })
+  const result = addCubicBezierCurveStratumWithResult(sourceDiagram, points, {
+    id: 'cursor-copied-bezier',
+  })
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected cubic Bezier creation to succeed.')
+  }
+  assert.deepEqual(findCurve(result.diagram, result.id).points, points)
+})
+
+test('cursor polygon sheet creation can copy existing point strata on the active work plane', () => {
+  const workPlane: WorkPlane = { kind: 'xy', z: 2 }
+  const sourceDiagram = [
+    { id: 'sheet-source-a', position: { x: 0, y: 0, z: 2 } },
+    { id: 'sheet-source-b', position: { x: 1, y: 0, z: 2 } },
+    { id: 'sheet-source-c', position: { x: 0, y: 1, z: 2 } },
+  ].reduce(
+    (diagram, source) =>
+      addPointStratumWithResult(diagram, source.position, {
+        id: source.id,
+      }).diagram,
+    createEmptyDiagram({ ambientDimension: 3 }),
+  )
+  const vertices = ['sheet-source-a', 'sheet-source-b', 'sheet-source-c'].map(
+    (id) => {
+      const result = resolvePointStratumCoordinateForCursorCreation(
+        sourceDiagram,
+        id,
+        { workPlane },
+      )
+
+      if (!result.ok) {
+        throw new Error(`Expected ${id} to resolve as a cursor source.`)
+      }
+
+      return result.point
+    },
+  )
+  const result = addPolygonSheetStratumWithResult(sourceDiagram, vertices, {
+    id: 'cursor-copied-sheet',
+  })
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected polygon sheet creation to succeed.')
+  }
+  assert.deepEqual(findPolygonSheet(result.diagram, result.id).vertices, vertices)
+})
+
+test('cursor point source creation is copy-on-create after source points move', () => {
+  const pointResult = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 3 }),
+    { x: 1, y: 2, z: 0 },
+    { id: 'movable-source' },
+  )
+  const source = resolvePointStratumCoordinateForCursorCreation(
+    pointResult.diagram,
+    'movable-source',
+    { workPlane: { kind: 'xy', z: 0 } },
+  )
+
+  assert.equal(source.ok, true)
+  if (!source.ok) {
+    throw new Error('Expected cursor source resolution to succeed.')
+  }
+
+  const created = addPolylineCurveStratumWithResult(
+    pointResult.diagram,
+    [source.point, { x: 3, y: 4, z: 0 }],
+    { id: 'copy-on-create-polyline' },
+  )
+  assert.notEqual(created.id, null)
+  if (created.id === null) {
+    throw new Error('Expected polyline creation to succeed.')
+  }
+
+  const moved = updateStratumById(created.diagram, 'movable-source', (stratum) =>
+    stratum.geometricKind === 'point'
+      ? { ...stratum, position: { x: 9, y: 9, z: 0 } }
+      : stratum,
+  )
+
+  assert.deepEqual(findCurve(moved, created.id).points[0], {
+    x: 1,
+    y: 2,
+    z: 0,
+  })
+  assert.equal(JSON.stringify(findCurve(moved, created.id)).includes('movable-source'), false)
+})
+
+test('cursor point sources normalize 2D z and reject off-plane 3D points', () => {
+  const twoDimensionalPoint = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    { x: 1, y: 2, z: 7 },
+    { id: 'two-dimensional-source' },
+  )
+  const normalized = resolvePointStratumCoordinateForCursorCreation(
+    twoDimensionalPoint.diagram,
+    'two-dimensional-source',
+    { workPlane: { kind: 'xy', z: 0 } },
+  )
+
+  assert.equal(normalized.ok, true)
+  if (!normalized.ok) {
+    throw new Error('Expected 2D cursor source resolution to succeed.')
+  }
+  assert.deepEqual(normalized.point, { x: 1, y: 2, z: 0 })
+
+  const offPlanePoint = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 3 }),
+    { x: 1, y: 2, z: 3 },
+    { id: 'off-plane-source' },
+  )
+  const rejected = resolvePointStratumCoordinateForCursorCreation(
+    offPlanePoint.diagram,
+    'off-plane-source',
+    { workPlane: { kind: 'xy', z: 0 } },
+  )
+
+  assert.deepEqual(rejected, {
+    ok: false,
+    reason: 'offPlaneOrInvalid',
+    source: { kind: 'pointStratum', stratumId: 'off-plane-source' },
+  })
 })
 
 test('cursor point creation still works on an axis-aligned work plane', () => {

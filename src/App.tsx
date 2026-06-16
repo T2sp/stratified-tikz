@@ -66,6 +66,7 @@ import {
   EditableInspector,
   existingCoordinateSourceKey,
   findSelectedElement,
+  formatExistingCoordinateSourceLabel,
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
@@ -86,6 +87,7 @@ import {
   inactiveWorkPlanePointPickingState,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
+  resolvePointStratumCoordinateForCursorCreation,
   shouldBlockCreationForWorkPlanePointPicking,
   startWorkPlanePointPicking,
   validateWorkPlanePointPickingState,
@@ -756,6 +758,76 @@ function App() {
       return
     }
 
+    const placementWorkPlane =
+      creationTool === 'createSheet' && sheetPolygonDraft !== null
+        ? sheetPolygonDraft.workPlane
+        : activeWorkPlane
+    let modelPoint: Vec3
+
+    try {
+      modelPoint = normalizePointForAmbientDimension(
+        editableDiagram.ambientDimension,
+        screenToModelOnWorkPlane(
+          { x: svgPoint.x, y: viewportHeight - svgPoint.y },
+          placementWorkPlane,
+          previewCamera,
+        ),
+      )
+    } catch {
+      return
+    }
+
+    applyCursorCreationPoint(modelPoint)
+  }
+
+  function handleExistingPointSourceCreationClick(pointId: string): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      return
+    }
+
+    if (creationTool === 'select') {
+      return
+    }
+
+    if (
+      coordinateInputMode === 'direct' &&
+      (creationTool === 'createPoint' || creationTool === 'createLabel')
+    ) {
+      return
+    }
+
+    const placementWorkPlane =
+      creationTool === 'createSheet' && sheetPolygonDraft !== null
+        ? sheetPolygonDraft.workPlane
+        : activeWorkPlane
+    const sourceResult = resolvePointStratumCoordinateForCursorCreation(
+      editableDiagram,
+      pointId,
+      {
+        workPlane: placementWorkPlane,
+      },
+    )
+
+    if (!sourceResult.ok) {
+      setCursorCreationSourceStatus(
+        sourceResult.reason === 'missingSource'
+          ? 'Existing point source is unavailable.'
+          : 'Existing point source is off the active work plane.',
+      )
+      return
+    }
+
+    applyCursorCreationPoint(sourceResult.point)
+    setCursorCreationSourceStatus(
+      `Copied ${formatExistingCoordinateSourceLabel(
+        editableDiagram,
+        sourceResult.source,
+        editableDiagram.ambientDimension,
+      )}.`,
+    )
+  }
+
+  function applyCursorCreationPoint(modelPoint: Vec3): void {
     const nextCubicBezierPointCount =
       creationTool === 'createCubicBezier'
         ? (cubicBezierDraft?.points.length ?? 0) + 1
@@ -797,25 +869,6 @@ function App() {
     }
 
     setEditorState((current) => {
-      const placementWorkPlane =
-        creationTool === 'createSheet' && current.sheetPolygonDraft !== null
-          ? current.sheetPolygonDraft.workPlane
-          : activeWorkPlane
-      let modelPoint: Vec3
-
-      try {
-        modelPoint = normalizePointForAmbientDimension(
-          current.editableDiagram.ambientDimension,
-          screenToModelOnWorkPlane(
-            { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-            placementWorkPlane,
-            previewCamera,
-          ),
-        )
-      } catch {
-        return current
-      }
-
       if (creationTool === 'createPolyline') {
         const draftPoints = current.polylineDraft?.points ?? []
 
@@ -925,6 +978,25 @@ function App() {
 
     if (creationTool !== 'createPolyline') {
       setCopyStatus('idle')
+    }
+  }
+
+  function setCursorCreationSourceStatus(message: string): void {
+    switch (creationTool) {
+      case 'createPolyline':
+        setPolylineStatus(message)
+        break
+      case 'createCubicBezier':
+        setCubicBezierStatus(message)
+        break
+      case 'createSheet':
+        setSheetStatus(message)
+        break
+      case 'createPoint':
+      case 'createLabel':
+      case 'select':
+        setDirectCreationStatus(message)
+        break
     }
   }
 
@@ -2409,7 +2481,9 @@ function App() {
             onPointStratumClick={
               workPlanePointPickingState.active
                 ? pickExistingPointForWorkPlane
-                : undefined
+                : creationTool === 'select'
+                  ? undefined
+                  : handleExistingPointSourceCreationClick
             }
             onGeometryHandleDrag={
               creationTool === 'select' && !workPlanePointPickingState.active

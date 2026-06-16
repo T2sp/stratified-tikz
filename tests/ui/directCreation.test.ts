@@ -34,6 +34,8 @@ import {
   updateStratumById,
 } from '../../src/ui/diagramUpdates.ts'
 import {
+  createExistingCoordinateSourceOptions,
+  formatExistingCoordinateSourceLabel,
   resolveExistingCoordinateSource,
   type ExistingCoordinateSource,
 } from '../../src/ui/coordinateSources.ts'
@@ -800,6 +802,124 @@ test('existing point coordinate source copies the current point position', () =>
     y: 3,
     z: 0,
   })
+})
+
+test('existing coordinate source labels disambiguate duplicate point names', () => {
+  const firstPointResult = addPointStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    { x: 1.2, y: 0.5, z: 9 },
+    { id: 'pt-3', name: 'point' },
+  )
+  const secondPointResult = addPointStratumWithResult(
+    firstPointResult.diagram,
+    { x: -1, y: 2, z: 9 },
+    { id: 'p-left', name: 'point' },
+  )
+  const options = createExistingCoordinateSourceOptions(secondPointResult.diagram)
+  const labels = options
+    .filter((option) => option.source.kind === 'pointStratum')
+    .map((option) => option.label)
+
+  assert.deepEqual(labels, [
+    'Point: point [pt-3] @ (1.2, 0.5)',
+    'Point: point [p-left] @ (-1, 2)',
+  ])
+  assert.equal(new Set(labels).size, labels.length)
+})
+
+test('existing coordinate source labels include roles, ids, and formatted coordinates', () => {
+  const polylineResult = addPolylineCurveStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 3, y: 4, z: 5 },
+    ],
+    { id: 'curve-main', name: 'Boundary' },
+  )
+  assert.notEqual(polylineResult.id, null)
+
+  const sheetResult = addPolygonSheetStratumWithResult(
+    polylineResult.diagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 3 },
+      { x: 4, y: 5, z: 6 },
+    ],
+    { id: 'sheet-top', name: 'Surface' },
+  )
+  assert.notEqual(sheetResult.id, null)
+
+  const cubicResult = addCubicBezierCurveStratumWithResult(
+    sheetResult.diagram,
+    [
+      { x: 0, y: 1, z: 2 },
+      { x: 3, y: 4, z: 5 },
+      { x: 6, y: 7, z: 8 },
+      { x: 9, y: 10, z: 11 },
+    ],
+    { id: 'bezier-arc', name: 'FLine' },
+  )
+  assert.notEqual(cubicResult.id, null)
+
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'polylineVertex', curveId: 'curve-main', vertexIndex: 1 },
+      3,
+    ),
+    'Polyline: Boundary [curve-main] / Vertex 2 @ (3, 4, 5)',
+  )
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'sheetVertex', sheetId: 'sheet-top', vertexIndex: 1 },
+      3,
+    ),
+    'Sheet: Surface [sheet-top] / Vertex 2 @ (1, 2, 3)',
+  )
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'cubicBezierPoint', curveId: 'bezier-arc', pointRole: 'start' },
+      3,
+    ),
+    'Bezier: FLine [bezier-arc] / Start @ (0, 1, 2)',
+  )
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'cubicBezierPoint', curveId: 'bezier-arc', pointRole: 'control1' },
+      3,
+    ),
+    'Bezier: FLine [bezier-arc] / Control point 1 @ (3, 4, 5)',
+  )
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'cubicBezierPoint', curveId: 'bezier-arc', pointRole: 'control2' },
+      3,
+    ),
+    'Bezier: FLine [bezier-arc] / Control point 2 @ (6, 7, 8)',
+  )
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      cubicResult.diagram,
+      { kind: 'cubicBezierPoint', curveId: 'bezier-arc', pointRole: 'end' },
+      3,
+    ),
+    'Bezier: FLine [bezier-arc] / End @ (9, 10, 11)',
+  )
+})
+
+test('existing coordinate source labels handle missing sources gracefully', () => {
+  assert.equal(
+    formatExistingCoordinateSourceLabel(
+      emptyTwoDimensionalDiagram,
+      { kind: 'pointStratum', stratumId: 'deleted-point' },
+      2,
+    ),
+    'Missing source: deleted-point',
+  )
 })
 
 test('existing 2D polyline vertex source copies the vertex with z normalized to zero', () => {
