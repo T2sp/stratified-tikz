@@ -95,6 +95,23 @@ test('camera presets produce valid camera states', () => {
   })
 })
 
+test('angle camera presets use tikz-3dplot axis views', () => {
+  const anglePresets = [
+    { presetId: 'top', thetaDeg: 0, phiDeg: 0 },
+    { presetId: 'front', thetaDeg: 90, phiDeg: 0 },
+    { presetId: 'side', thetaDeg: 90, phiDeg: 90 },
+    { presetId: 'isometric', thetaDeg: 70, phiDeg: 110 },
+  ] as const
+
+  anglePresets.forEach(({ presetId, thetaDeg, phiDeg }) => {
+    const camera = createCameraPresetCamera(presetId)
+
+    assert.equal(camera.thetaDeg, thetaDeg)
+    assert.equal(camera.phiDeg, phiDeg)
+    assert.equal(camera.projectionBasis, undefined)
+  })
+})
+
 test('camera controls expose orientation and view adjustment separately', () => {
   const camera = expectCameraInputOk(
     expectCameraInputOk(

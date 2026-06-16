@@ -89,11 +89,11 @@ export function createCameraPresetCamera(presetId: CameraPresetId): Camera3D {
     case 'initial':
       return createInitialCameraControlState()
     case 'top':
-      return createAngleCamera(90, 0)
-    case 'front':
       return createAngleCamera(0, 0)
+    case 'front':
+      return createAngleCamera(90, 0)
     case 'side':
-      return createAngleCamera(0, 90)
+      return createAngleCamera(90, 90)
     case 'isometric':
       return createAngleCamera(70, 110)
   }
