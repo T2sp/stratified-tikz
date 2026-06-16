@@ -11,9 +11,17 @@ import {
 import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import type { CubicBezierControlMode, Diagram } from '../../src/model/types.ts'
+import type {
+  Camera3D,
+  CubicBezierControlMode,
+  Diagram,
+  Vec3,
+} from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
-import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import {
+  projectToSvgPoint,
+  svgPointToModelOnWorkPlane,
+} from '../../src/rendering/svgProjection.ts'
 import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
@@ -355,6 +363,63 @@ test('projectToSvgPoint keeps positive x right and makes positive y appear upwar
   assert.ok(upper.y < lower.y)
 })
 
+test('svgPointToModelOnWorkPlane preserves initial-camera cursor placement', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 13,
+    phiDeg: -23,
+    zoom: 18,
+    pan: { x: 110, y: 65 },
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.45, 0.25],
+      zVector: [0, 1],
+    },
+  }
+  const modelPoint = { x: 2, y: 4, z: 0 }
+  const svgPoint = projectToSvgPoint(camera, modelPoint, 160)
+
+  assertVec3AlmostEqual(
+    svgPointToModelOnWorkPlane(camera, svgPoint, 160, { kind: 'xy', z: 0 }),
+    modelPoint,
+  )
+})
+
+test('svgPointToModelOnWorkPlane uses changed camera angles for 3D cursor placement', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 14,
+    pan: { x: 90, y: 40 },
+  }
+  const workPlane = { kind: 'yz' as const, x: 1.25 }
+  const modelPoint = { x: 1.25, y: -2, z: 3.5 }
+  const svgPoint = projectToSvgPoint(camera, modelPoint, 160)
+
+  assertVec3AlmostEqual(
+    svgPointToModelOnWorkPlane(camera, svgPoint, 160, workPlane),
+    modelPoint,
+  )
+})
+
+test('svgPointToModelOnWorkPlane keeps 2D inverse behavior unchanged', () => {
+  const camera = {
+    mode: '2d' as const,
+    scale: 12,
+    origin: { x: 10, y: 15 },
+  }
+  const modelPoint = { x: 2, y: -3, z: 99 }
+  const svgPoint = projectToSvgPoint(camera, modelPoint, 120)
+
+  assert.deepEqual(
+    svgPointToModelOnWorkPlane(camera, svgPoint, 120, { kind: 'xy', z: 4 }),
+    { x: 2, y: -3, z: 0 },
+  )
+})
+
 test('mapClientPointToViewBox is unchanged when aspect ratios match', () => {
   assert.deepEqual(
     mapClientPointToViewBox(
@@ -473,4 +538,17 @@ function createCameraTestDiagram(): Diagram {
     ],
     labels: [],
   }
+}
+
+function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
+  assertAlmostEqual(actual.x, expected.x)
+  assertAlmostEqual(actual.y, expected.y)
+  assertAlmostEqual(actual.z, expected.z)
+}
+
+function assertAlmostEqual(actual: number, expected: number): void {
+  assert.ok(
+    Math.abs(actual - expected) < 1e-10,
+    `Expected ${actual} to be approximately ${expected}.`,
+  )
 }

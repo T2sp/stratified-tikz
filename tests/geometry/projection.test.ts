@@ -44,6 +44,15 @@ const camera3D: Camera3D = {
   },
 }
 
+const changedAngleCamera3D: Camera3D = {
+  mode: '3d',
+  kind: 'orthographic',
+  thetaDeg: 70,
+  phiDeg: 110,
+  zoom: 14,
+  pan: { x: 80, y: 45 },
+}
+
 test('initial 3D camera exists and validates', () => {
   assert.equal(validateCamera3D(INITIAL_CAMERA_3D).valid, true)
 })
@@ -239,6 +248,40 @@ test('keeps legacy camera-first work-plane projection calls compatible', () => {
   assertVec3AlmostEqual(
     screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'xy', z: 3 }),
     modelPoint,
+  )
+})
+
+test('changed camera angles still invert screen input onto the active work plane', () => {
+  const workPlane = { kind: 'xz' as const, y: -2 }
+  const modelPoint = { x: 1.25, y: -2, z: 3.5 }
+  const screenPoint = projectVec3(changedAngleCamera3D, modelPoint)
+  const inverted = screenToModelOnWorkPlane(
+    screenPoint,
+    workPlane,
+    changedAngleCamera3D,
+  )
+
+  assertVec3AlmostEqual(inverted, modelPoint)
+})
+
+test('parallel camera ray and work plane intersection is rejected', () => {
+  const frontCamera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 90,
+    phiDeg: 0,
+    zoom: 10,
+    pan: { x: 100, y: 50 },
+  }
+
+  assert.throws(
+    () =>
+      screenToModelOnWorkPlane(
+        projectVec3(frontCamera, { x: 1, y: 2, z: 0 }),
+        { kind: 'xy', z: 0 },
+        frontCamera,
+      ),
+    /Camera ray is parallel to the work plane/,
   )
 })
 

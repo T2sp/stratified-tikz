@@ -21,6 +21,10 @@ import type {
   Vec3,
   WorkPlane,
 } from '../../src/model/types.ts'
+import {
+  projectToSvgPoint,
+  svgPointToModelOnWorkPlane,
+} from '../../src/rendering/svgProjection.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addCubicBezierCurveStratumWithResult,
@@ -58,6 +62,17 @@ const cursorTestCamera: Camera3D = {
     zVector: [0, 1],
   },
 }
+
+const changedCursorTestCamera: Camera3D = {
+  mode: '3d',
+  kind: 'orthographic',
+  thetaDeg: 70,
+  phiDeg: 110,
+  zoom: 14,
+  pan: { x: 80, y: 45 },
+}
+
+const cursorTestViewportHeight = 360
 
 test('cursor point creation uses the selected creation layer', () => {
   const state = createState(twoDimensionalExample)
@@ -254,6 +269,37 @@ test('cursor label creation projects clicks to an active custom work plane', () 
   assert.match(generateTikz(committed.editableDiagram), /\\node at/)
 })
 
+test('camera-aware cursor point creation after camera changes uses the active work plane', () => {
+  const state = createState(createEmptyDiagram({ ambientDimension: 3 }))
+  const workPlane: WorkPlane = { kind: 'xz', y: -2 }
+  const position = cameraAwareCursorPointFromModelPoint(
+    { x: 1.5, y: -2, z: 3 },
+    workPlane,
+  )
+  const result = addPointStratumWithResult(state.editableDiagram, position, {
+    layer: 2,
+  })
+  const committed = commitCursorCreation(state, result.diagram, {
+    kind: 'stratum',
+    id: result.id,
+  }, 2)
+  const point = committed.editableDiagram.strata.find(
+    (candidate) => candidate.id === result.id,
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+  assert.equal(
+    point?.geometricKind === 'point' &&
+      isPointOnWorkPlane(point.position, workPlane),
+    true,
+  )
+  assert.equal(
+    point?.geometricKind === 'point' &&
+      areFinitePointCoordinates(point.position),
+    true,
+  )
+})
+
 test('cursor polyline creation commits vertices on an active custom work plane', () => {
   const state = createState(createEmptyDiagram({ ambientDimension: 3 }))
   const workPlane = createCustomPlaneForCursorTests()
@@ -283,6 +329,68 @@ test('cursor polyline creation commits vertices on an active custom work plane',
     true,
   )
   assert.match(generateTikz(committed.editableDiagram), /--/)
+})
+
+test('camera-aware polyline, cubic Bezier, and sheet draft points lie on the active work plane', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const state = createState(diagram)
+  const workPlane: WorkPlane = { kind: 'xy', z: 2 }
+  const draftPoints = [
+    { x: -1, y: 0, z: 2 },
+    { x: 0, y: 1, z: 2 },
+    { x: 1.5, y: 0.75, z: 2 },
+    { x: 2, y: -0.5, z: 2 },
+  ].map((point) => cameraAwareCursorPointFromModelPoint(point, workPlane))
+
+  assert.equal(
+    draftPoints.every(
+      (point) =>
+        areFinitePointCoordinates(point) && isPointOnWorkPlane(point, workPlane),
+    ),
+    true,
+  )
+
+  const polyline = addPolylineCurveStratumWithResult(
+    state.editableDiagram,
+    draftPoints.slice(0, 3),
+    { layer: 3 },
+  )
+  const cubicBezier = addCubicBezierCurveStratumWithResult(
+    state.editableDiagram,
+    draftPoints,
+    { layer: 4 },
+  )
+  const sheet = addPolygonSheetStratumWithResult(
+    state.editableDiagram,
+    draftPoints.slice(0, 3),
+    { layer: 5 },
+  )
+
+  assert.notEqual(polyline.id, null)
+  assert.notEqual(cubicBezier.id, null)
+  assert.notEqual(sheet.id, null)
+  if (polyline.id === null || cubicBezier.id === null || sheet.id === null) {
+    throw new Error('Expected camera-aware cursor drafts to create geometry.')
+  }
+
+  assert.equal(
+    findCurve(polyline.diagram, polyline.id).points.every((point) =>
+      isPointOnWorkPlane(point, workPlane),
+    ),
+    true,
+  )
+  assert.equal(
+    findCurve(cubicBezier.diagram, cubicBezier.id).points.every((point) =>
+      isPointOnWorkPlane(point, workPlane),
+    ),
+    true,
+  )
+  assert.equal(
+    findPolygonSheet(sheet.diagram, sheet.id).vertices.every((point) =>
+      isPointOnWorkPlane(point, workPlane),
+    ),
+    true,
+  )
 })
 
 test('cursor cubic Bezier creation commits controls on an active custom work plane', () => {
@@ -627,6 +735,32 @@ function cursorPointFromModelPoint(
   const screenPoint = projectVec3(cursorTestCamera, modelPoint)
 
   return screenToModelOnWorkPlane(cursorTestCamera, screenPoint, workPlane)
+}
+
+function cameraAwareCursorPointFromModelPoint(
+  modelPoint: Vec3,
+  workPlane: WorkPlane,
+): Vec3 {
+  const svgPoint = projectToSvgPoint(
+    changedCursorTestCamera,
+    modelPoint,
+    cursorTestViewportHeight,
+  )
+
+  return svgPointToModelOnWorkPlane(
+    changedCursorTestCamera,
+    svgPoint,
+    cursorTestViewportHeight,
+    workPlane,
+  )
+}
+
+function areFinitePointCoordinates(point: Vec3): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    Number.isFinite(point.z)
+  )
 }
 
 function findCurve(diagram: Diagram, id: string): CurveStratum {

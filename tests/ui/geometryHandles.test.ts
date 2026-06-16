@@ -5,11 +5,13 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import type {
+  Camera3D,
   CurveStratum,
   Diagram,
   PointStratum,
   PolygonSheetStratum,
   TextLabel,
+  WorkPlane,
 } from '../../src/model/types.ts'
 import {
   addCubicBezierCurveStratumWithResult,
@@ -19,6 +21,11 @@ import {
   addTextLabelWithResult,
 } from '../../src/ui/diagramUpdates.ts'
 import { updateDiagramGeometryHandle } from '../../src/ui/geometryHandles.ts'
+import {
+  projectToSvgPoint,
+  svgPointToModelOnWorkPlane,
+} from '../../src/rendering/svgProjection.ts'
+import { isPointOnWorkPlane } from '../../src/ui/sheetDraft.ts'
 
 test('geometry handle update moves a point stratum position immutably', () => {
   const result = addPointStratumWithResult(
@@ -252,6 +259,45 @@ test('geometry handle update preserves 3D coordinates on finite updates', () => 
   )
 
   assert.deepEqual(findLabel(updated, result.id).position, { x: 1, y: 2, z: 3 })
+})
+
+test('camera-aware drag update after camera change stays on the active work plane', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 16,
+    pan: { x: 90, y: 40 },
+  }
+  const workPlane: WorkPlane = { kind: 'yz', x: 4 }
+  const targetPoint = { x: 4, y: -1.5, z: 2.25 }
+  const svgPoint = projectToSvgPoint(camera, targetPoint, 360)
+  const modelPoint = svgPointToModelOnWorkPlane(
+    camera,
+    svgPoint,
+    360,
+    workPlane,
+  )
+  const result = addPointStratumWithResult(
+    threeDimensionalExample,
+    { x: 4, y: 0, z: 0 },
+    { id: 'camera-drag-point' },
+  )
+  const updated = updateDiagramGeometryHandle(
+    result.diagram,
+    { kind: 'pointPosition', stratumId: result.id },
+    modelPoint,
+  )
+  const point = findPoint(updated, result.id)
+
+  assert.equal(isPointOnWorkPlane(point.position, workPlane), true)
+  assert.equal(
+    Number.isFinite(point.position.x) &&
+      Number.isFinite(point.position.y) &&
+      Number.isFinite(point.position.z),
+    true,
+  )
 })
 
 test('geometry handle update rejects non-finite coordinates without changing diagram', () => {
