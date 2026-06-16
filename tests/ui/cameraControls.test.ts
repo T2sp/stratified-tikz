@@ -18,7 +18,7 @@ import {
   shouldShowCameraControls,
   type CameraControlField,
 } from '../../src/ui/cameraControls.ts'
-import type { Camera3D } from '../../src/model/types.ts'
+import type { Camera3D, PerspectiveCamera3D } from '../../src/model/types.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 
 test('camera control input updates camera values', () => {
@@ -177,6 +177,30 @@ test('camera control state prefers diagram view camera metadata', () => {
   assert.deepEqual(camera, viewCamera)
   assert.notEqual(camera, viewCamera)
   assert.equal(areCamera3DEqual(camera, viewCamera), true)
+})
+
+test('camera control state disables unsupported perspective camera metadata', () => {
+  const perspectiveCamera: PerspectiveCamera3D = {
+    mode: '3d',
+    kind: 'perspective',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    target: { x: 0, y: 0, z: 0 },
+    distance: 8,
+    fieldOfViewDeg: 45,
+  }
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    view: {
+      camera3d: perspectiveCamera,
+    },
+  }
+  const camera = cameraControlStateFromDiagramView(diagram)
+
+  assert.deepEqual(camera, createInitialCameraControlState())
+  assert.equal(camera.kind, 'orthographic')
 })
 
 test('2D mode hides camera controls and 3D mode shows them', () => {

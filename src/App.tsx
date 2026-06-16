@@ -23,9 +23,9 @@ import type {
   AmbientDimension,
   AxisAlignedWorkPlaneName,
   Camera,
-  Camera3D,
   CoordinateInputMode,
   Diagram,
+  OrthographicCamera3D,
   Vec2,
   Vec3,
   WorkPlane,
@@ -293,12 +293,11 @@ function App() {
     useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
-  const [cameraControl, setCameraControl] = useState<Camera3D>(() =>
+  const [cameraControl, setCameraControl] = useState<OrthographicCamera3D>(() =>
     createInitialCameraControlState(),
   )
-  const [savedCameraControl, setSavedCameraControl] = useState<Camera3D>(() =>
-    createInitialCameraControlState(),
-  )
+  const [savedCameraControl, setSavedCameraControl] =
+    useState<OrthographicCamera3D>(() => createInitialCameraControlState())
   const [isCameraDetailsExpanded, setIsCameraDetailsExpanded] =
     useState<boolean>(false)
   const [cameraStatus, setCameraStatus] = useState<string>('')

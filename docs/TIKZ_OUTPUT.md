@@ -51,6 +51,12 @@ a fallback. `thetaDeg` and `phiDeg` are the source of truth for 3D orientation;
 deprecated legacy `projectionBasis` metadata is ignored by preview and export
 when those angle fields are present.
 
+The current production camera is orthographic. A hidden perspective camera type
+may be recognized by the model for future work, but perspective rendering,
+work-plane picking, and TikZ export are not supported. TikZ export rejects
+perspective cameras explicitly rather than emitting misleading
+`tikz-3dplot` output.
+
 Only camera orientation is exported. Zoom and pan remain SVG-view-only and do
 not silently scale or translate TikZ geometry. Resetting the app camera to the
 initial/default display restores the initial exported TikZ camera values.
@@ -290,6 +296,10 @@ The `theta` and `phi` values come from the current 3D camera's `thetaDeg` and
 side; the generator does not pre-project model geometry into 2D coordinates.
 Coordinate axes guide export, when enabled, uses the same outer
 `tdplot_main_coords` picture and therefore the same camera view.
+
+This camera export is a `tikz-3dplot`-compatible orthographic orientation, not
+perspective projection. Future perspective export may require different PGF/TikZ
+settings or a fallback to orthographic output with an explicit warning.
 
 3D work-plane-local relative Bézier export remains a separate scoped feature.
 The outer picture uses `tdplot_main_coords`; an eligible curve may still emit a

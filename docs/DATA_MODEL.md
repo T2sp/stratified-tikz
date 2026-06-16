@@ -99,7 +99,7 @@ export type Camera2D = {
   origin: Vec2;
 };
 
-export type Camera3D = {
+export type OrthographicCamera3D = {
   mode: "3d";
   kind: "orthographic";
   thetaDeg: number;
@@ -113,6 +113,20 @@ export type Camera3D = {
     zVector: [number, number];
   };
 };
+
+export type PerspectiveCamera3D = {
+  mode: "3d";
+  kind: "perspective";
+  thetaDeg: number;
+  phiDeg: number;
+  zoom: number;
+  pan: Vec2;
+  target: Vec3;
+  distance: number;
+  fieldOfViewDeg: number;
+};
+
+export type Camera3D = OrthographicCamera3D | PerspectiveCamera3D;
 
 export type DiagramViewOptions = {
   camera3d?: Camera3D;
@@ -133,12 +147,18 @@ The 3D camera uses the same public angle names as `tikz-3dplot`:
 \tdplotsetmaincoords{theta}{phi}
 ```
 
-so the model fields are `thetaDeg` and `phiDeg`. The projection is
+so the model fields are `thetaDeg` and `phiDeg`. The production projection is
 orthographic; `zoom` is a positive finite scale factor, and `pan` is a finite
 2D view offset. `thetaDeg` and `phiDeg` are the source of truth for 3D camera
 orientation. The resettable `INITIAL_CAMERA_3D` preset is derived from those
 angles, and deprecated `projectionBasis` data from old files is not used to
 override preview or export orientation.
+
+`PerspectiveCamera3D` is a hidden scaffold for future work. Validation can
+recognize its structural fields, but perspective cameras are unsupported in the
+current editor. The UI camera controls expose only orthographic cameras, loaded
+perspective metadata is not activated, and projection, work-plane picking, and
+TikZ export reject perspective cameras with explicit errors.
 
 For persistence, the 3D camera is saved as diagram-level view metadata:
 
@@ -163,7 +183,9 @@ TikZ export aligns with the current 3D camera orientation by emitting
 `tikz-3dplot`-style `\tdplotsetmaincoords{theta}{phi}` from `thetaDeg` and
 `phiDeg`, then using `tdplot_main_coords` on the `tikzpicture`. Camera metadata
 is still view state, not geometry: model coordinates remain 3D in the output,
-and zoom/pan are not exported.
+and zoom/pan are not exported. This export path is tikz-3dplot-compatible
+orthographic orientation, not perspective projection. Perspective TikZ export
+is future work and may require different PGF/TikZ settings or a fallback policy.
 
 ## Editor state
 

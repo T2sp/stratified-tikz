@@ -286,10 +286,11 @@ In 3D mode, the preview uses an orthographic camera model aligned with
 ```
 
 The public/model angle fields are therefore named `thetaDeg` and `phiDeg`, not
-ambiguous yaw/pitch labels. A 3D camera has:
+ambiguous yaw/pitch labels. The only supported production 3D camera is
+orthographic:
 
 ```ts
-type Camera3D = {
+type OrthographicCamera3D = {
   mode: "3d";
   kind: "orthographic";
   thetaDeg: number;
@@ -301,6 +302,18 @@ type Camera3D = {
 };
 ```
 
+The type model reserves a hidden scaffold for future perspective work:
+
+```ts
+type Camera3D = OrthographicCamera3D | PerspectiveCamera3D;
+```
+
+Perspective camera metadata may be structurally recognized by validation, but
+it is not supported by the UI, SVG projection, work-plane picking, save/load
+activation, or TikZ export in the current phase. Unsupported perspective
+operations must fail clearly instead of silently falling back to an
+orthographic interpretation.
+
 Forward projection follows:
 
 ```text
@@ -310,8 +323,13 @@ model-space Vec3 -> camera projection -> SVG point
 Inverse cursor workflows are structured as:
 
 ```text
-screen/SVG point -> orthographic camera ray -> active work-plane intersection
+screen/SVG point -> camera ray -> active work-plane intersection
 ```
+
+For the current orthographic camera, all screen points produce parallel rays.
+Future perspective picking should replace the camera-ray step with rays from
+the camera origin through the screen point, while keeping work-plane geometry in
+model space.
 
 The resettable initial 3D camera is tikz-3dplot-aligned: its preview basis is
 derived from the same `thetaDeg` and `phiDeg` values exported to TikZ.
@@ -335,7 +353,10 @@ Generated 3D TikZ aligns with the current camera orientation using
 `tikz-3dplot`: the exporter emits `\tdplotsetmaincoords{theta}{phi}` from the
 camera `thetaDeg` and `phiDeg`, and uses `tdplot_main_coords` on the
 `tikzpicture`. Geometry remains model-space 3D coordinates; zoom and pan remain
-SVG-view-only.
+SVG-view-only. This is an orthographic-like `tikz-3dplot` orientation, not
+perspective projection. Future perspective export may require different PGF/TikZ
+settings or a documented fallback. Reset to the initial/default camera remains
+available.
 
 ## TikZ output principle
 

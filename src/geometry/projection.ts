@@ -4,6 +4,7 @@ import type {
   Camera2D,
   Camera3D,
   Camera3DProjectionBasis,
+  OrthographicCamera3D,
   Vec2,
   Vec3,
   WorkPlane,
@@ -26,6 +27,9 @@ export type Camera3DValidationIssue = {
 
 export type Camera3DValidationResult = {
   valid: boolean
+  structurallyValid: boolean
+  supported: boolean
+  kind: Camera3D['kind'] | 'unknown' | null
   errors: Camera3DValidationIssue[]
 }
 
@@ -70,46 +74,65 @@ export function projectVec3(camera: Camera, point: Vec3): Vec2 {
 }
 
 export function validateCamera3D(camera: unknown): Camera3DValidationResult {
-  const errors: Camera3DValidationIssue[] = []
+  const structuralErrors: Camera3DValidationIssue[] = []
+  const supportErrors: Camera3DValidationIssue[] = []
 
   if (!isRecord(camera)) {
-    errors.push({
+    structuralErrors.push({
       path: '',
       message: '3D camera must be an object.',
     })
-    return validationResult(errors)
+    return validationResult(structuralErrors, supportErrors, null, false)
   }
 
   if (camera.mode !== '3d') {
-    errors.push({
+    structuralErrors.push({
       path: 'mode',
       message: '3D camera mode must be 3d.',
     })
   }
 
-  if (camera.kind !== 'orthographic') {
-    errors.push({
+  const kind = camera3DKind(camera.kind)
+
+  if (kind === null) {
+    structuralErrors.push({
       path: 'kind',
-      message: '3D camera kind must be orthographic.',
+      message: '3D camera kind must be orthographic or perspective.',
     })
+    return validationResult(structuralErrors, supportErrors, 'unknown', false)
   }
 
-  validateFiniteNumber(camera.thetaDeg, 'thetaDeg', errors)
-  validateFiniteNumber(camera.phiDeg, 'phiDeg', errors)
-  validatePositiveFiniteNumber(camera.zoom, 'zoom', errors)
-  validateVec2Like(camera.pan, 'pan', errors)
+  validateFiniteNumber(camera.thetaDeg, 'thetaDeg', structuralErrors)
+  validateFiniteNumber(camera.phiDeg, 'phiDeg', structuralErrors)
+  validatePositiveFiniteNumber(camera.zoom, 'zoom', structuralErrors)
+  validateVec2Like(camera.pan, 'pan', structuralErrors)
 
-  // Deprecated legacy bases are accepted for old saved data, but thetaDeg and
-  // phiDeg remain the source of truth for projection and TikZ export.
-  if (camera.projectionBasis !== undefined) {
-    validateProjectionBasis(camera.projectionBasis, 'projectionBasis', errors)
+  if (kind === 'orthographic') {
+    // Deprecated legacy bases are accepted for old saved data, but thetaDeg and
+    // phiDeg remain the source of truth for projection and TikZ export.
+    if (camera.projectionBasis !== undefined) {
+      validateProjectionBasis(
+        camera.projectionBasis,
+        'projectionBasis',
+        structuralErrors,
+      )
+    }
+  } else {
+    validateVec3Like(camera.target, 'target', structuralErrors)
+    validatePositiveFiniteNumber(camera.distance, 'distance', structuralErrors)
+    validateFieldOfView(camera.fieldOfViewDeg, 'fieldOfViewDeg', structuralErrors)
+    supportErrors.push({
+      path: 'kind',
+      message:
+        'Perspective 3D cameras are recognized but not supported yet; use an orthographic 3D camera.',
+    })
   }
 
   const thetaDeg = camera.thetaDeg
   const phiDeg = camera.phiDeg
 
   if (
-    errors.length === 0 &&
+    structuralErrors.length === 0 &&
     typeof thetaDeg === 'number' &&
     typeof phiDeg === 'number' &&
     Number.isFinite(thetaDeg) &&
@@ -118,7 +141,7 @@ export function validateCamera3D(camera: unknown): Camera3DValidationResult {
     try {
       cameraBasisFromTikz3dplotAngles(thetaDeg, phiDeg)
     } catch (error) {
-      errors.push({
+      structuralErrors.push({
         path: '',
         message:
           error instanceof Error
@@ -128,7 +151,12 @@ export function validateCamera3D(camera: unknown): Camera3DValidationResult {
     }
   }
 
-  return validationResult(errors)
+  return validationResult(
+    structuralErrors,
+    supportErrors,
+    kind,
+    kind === 'orthographic',
+  )
 }
 
 export function cameraBasisFromTikz3dplotAngles(
@@ -180,7 +208,7 @@ export function cameraBasisFromTikz3dplotAngles(
 
 export function projectVec3WithCamera(point: Vec3, camera: Camera3D): Vec2 {
   assertFiniteVec3(point, 'point')
-  assertValidCamera3D(camera)
+  assertSupportedOrthographicCamera3D(camera, 'SVG projection')
 
   const projected = projectVec3ToCameraUnits(camera, point)
   const screenPoint = {
@@ -199,7 +227,7 @@ export function screenRayFromCameraPoint(
   projectionInfo: ScreenRayProjectionInfo = {},
 ): CameraRay {
   assertFiniteVec2(screenPoint, 'screenPoint')
-  assertValidCamera3D(camera)
+  assertSupportedOrthographicCamera3D(camera, 'work-plane picking')
 
   const viewPoint = normalizeScreenPointForProjection(screenPoint, projectionInfo)
   const cameraUnits = screenToCameraUnits(camera, viewPoint)
@@ -220,6 +248,9 @@ export function screenRayFromCameraPoint(
   const second =
     (rowDotXX * cameraUnits.y - rowDotXY * cameraUnits.x) / determinant
   const origin = addVec3(scaleVec3(rowX, first), scaleVec3(rowY, second))
+  // Orthographic picking uses parallel rays through the screen-projected model
+  // point. A future perspective camera should construct this ray from the
+  // camera origin through the normalized screen point.
   const direction = normalizeVector(cross(rowX, rowY))
   const ray = { origin, direction }
 
@@ -312,14 +343,20 @@ export function normalizePointForAmbientDimension(
   return ambientDimension === 2 ? { ...point, z: 0 } : { ...point }
 }
 
-function screenToCameraUnits(camera: Camera3D, screenPoint: Vec2): Vec2 {
+function screenToCameraUnits(
+  camera: OrthographicCamera3D,
+  screenPoint: Vec2,
+): Vec2 {
   return {
     x: (screenPoint.x - camera.pan.x) / camera.zoom,
     y: (screenPoint.y - camera.pan.y) / camera.zoom,
   }
 }
 
-function projectVec3ToCameraUnits(camera: Camera3D, point: Vec3): Vec2 {
+function projectVec3ToCameraUnits(
+  camera: OrthographicCamera3D,
+  point: Vec3,
+): Vec2 {
   const basis = projectionBasisFromCamera(camera)
 
   return {
@@ -334,7 +371,9 @@ function projectVec3ToCameraUnits(camera: Camera3D, point: Vec3): Vec2 {
   }
 }
 
-function projectionBasisFromCamera(camera: Camera3D): Camera3DProjectionBasis {
+function projectionBasisFromCamera(
+  camera: OrthographicCamera3D,
+): Camera3DProjectionBasis {
   return cameraBasisFromTikz3dplotAngles(
     camera.thetaDeg,
     camera.phiDeg,
@@ -451,6 +490,24 @@ function validateVec2Like(
   validateFiniteNumber(value.y, `${path}.y`, errors)
 }
 
+function validateVec3Like(
+  value: unknown,
+  path: string,
+  errors: Camera3DValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    errors.push({
+      path,
+      message: 'Camera target must be an object with finite x, y, and z values.',
+    })
+    return
+  }
+
+  validateFiniteNumber(value.x, `${path}.x`, errors)
+  validateFiniteNumber(value.y, `${path}.y`, errors)
+  validateFiniteNumber(value.z, `${path}.z`, errors)
+}
+
 function validateFiniteNumber(
   value: unknown,
   path: string,
@@ -485,17 +542,55 @@ function validatePositiveFiniteNumber(
   }
 }
 
-function validationResult(
+function validateFieldOfView(
+  value: unknown,
+  path: string,
   errors: Camera3DValidationIssue[],
+): void {
+  if (!Number.isFinite(value)) {
+    errors.push({
+      path,
+      message: 'Value must be a finite number.',
+    })
+    return
+  }
+
+  if (typeof value === 'number' && (value <= 0 || value >= 180)) {
+    errors.push({
+      path,
+      message: 'Field of view must be greater than 0 and less than 180 degrees.',
+    })
+  }
+}
+
+function validationResult(
+  structuralErrors: Camera3DValidationIssue[],
+  supportErrors: Camera3DValidationIssue[],
+  kind: Camera3DValidationResult['kind'],
+  supported: boolean,
 ): Camera3DValidationResult {
+  const errors = [...structuralErrors, ...supportErrors]
+
   return {
     valid: errors.length === 0,
+    structurallyValid: structuralErrors.length === 0,
+    supported,
+    kind,
     errors,
   }
 }
 
-function assertValidCamera3D(camera: Camera3D): void {
+function assertSupportedOrthographicCamera3D(
+  camera: Camera3D,
+  operation: string,
+): asserts camera is OrthographicCamera3D {
   const validation = validateCamera3D(camera)
+
+  if (validation.kind === 'perspective') {
+    throw new Error(
+      `${operation} supports only orthographic 3D cameras; perspective projection is future work.`,
+    )
+  }
 
   if (!validation.valid) {
     throw new Error(
@@ -548,6 +643,10 @@ function isFiniteProjectionBasis(basis: Camera3DProjectionBasis): boolean {
 
 function isFiniteBasisVector(vector: [number, number]): boolean {
   return Number.isFinite(vector[0]) && Number.isFinite(vector[1])
+}
+
+function camera3DKind(value: unknown): Camera3D['kind'] | null {
+  return value === 'orthographic' || value === 'perspective' ? value : null
 }
 
 function degreesToRadians(degrees: number): number {

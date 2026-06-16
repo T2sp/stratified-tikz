@@ -23,7 +23,7 @@ export type Camera3DProjectionBasis = {
   zVector: [number, number]
 }
 
-export type Camera3D = {
+export type OrthographicCamera3D = {
   mode: '3d'
   kind: 'orthographic'
   thetaDeg: number
@@ -32,6 +32,21 @@ export type Camera3D = {
   pan: Vec2
   projectionBasis?: Camera3DProjectionBasis
 }
+
+export type PerspectiveCamera3D = {
+  mode: '3d'
+  kind: 'perspective'
+  thetaDeg: number
+  phiDeg: number
+  zoom: number
+  pan: Vec2
+  target: Vec3
+  distance: number
+  fieldOfViewDeg: number
+  projectionBasis?: never
+}
+
+export type Camera3D = OrthographicCamera3D | PerspectiveCamera3D
 
 export type Camera = Camera2D | Camera3D
 

@@ -2,6 +2,7 @@ import { validateCamera3D } from '../geometry/projection.ts'
 import {
   cloneCamera3D,
   createInitialCamera3D,
+  isOrthographicCamera3D,
 } from './camera.ts'
 import { createDefaultCamera2D } from './constructors.ts'
 import type {
@@ -12,6 +13,7 @@ import type {
   Diagram,
   DiagramValidationResult,
   DiagramViewOptions,
+  OrthographicCamera3D,
   Stratum,
   TextLabel,
 } from './types.ts'
@@ -192,8 +194,12 @@ function normalizePersistentView(
 
 function normalizeCamera3DForPersistence(
   camera: Camera3D | undefined,
-): Camera3D {
-  if (camera === undefined || !validateCamera3D(camera).valid) {
+): OrthographicCamera3D {
+  if (
+    camera === undefined ||
+    !isOrthographicCamera3D(camera) ||
+    !validateCamera3D(camera).valid
+  ) {
     return createInitialCamera3D()
   }
 
@@ -260,7 +266,7 @@ function normalizeLoadedCamera3D(
       return camera
     }
 
-    warnings.push('Saved 3D camera metadata is invalid; using the initial camera.')
+    warnings.push(saved3DCameraWarning(view.camera3d, 'metadata'))
     return createInitialCamera3D()
   }
 
@@ -280,7 +286,7 @@ function normalizeLoadedCamera3D(
     return camera
   }
 
-  warnings.push('Saved 3D camera is invalid; using the initial camera.')
+  warnings.push(saved3DCameraWarning(savedDiagram.camera, ''))
   return createInitialCamera3D()
 }
 
@@ -361,7 +367,7 @@ function camera3DFromPersistent(value: unknown): Camera3D | null {
   return validateCamera3D(camera).valid ? camera : null
 }
 
-function cameraFromLegacyProjection(value: unknown): Camera3D | null {
+function cameraFromLegacyProjection(value: unknown): OrthographicCamera3D | null {
   const legacyScale = isRecord(value) ? value.scale : undefined
   const legacyOrigin = isRecord(value) ? value.origin : undefined
 
@@ -390,7 +396,9 @@ function cameraFromLegacyProjection(value: unknown): Camera3D | null {
   return validateCamera3D(camera).valid ? camera : null
 }
 
-function cloneCamera3DWithoutProjectionBasis(camera: Camera3D): Camera3D {
+function cloneCamera3DWithoutProjectionBasis(
+  camera: OrthographicCamera3D,
+): OrthographicCamera3D {
   return {
     mode: camera.mode,
     kind: camera.kind,
@@ -399,6 +407,16 @@ function cloneCamera3DWithoutProjectionBasis(camera: Camera3D): Camera3D {
     zoom: camera.zoom,
     pan: { ...camera.pan },
   }
+}
+
+function saved3DCameraWarning(value: unknown, label: 'metadata' | ''): string {
+  const subject = label.length === 0 ? 'camera' : `camera ${label}`
+
+  if (isRecord(value) && value.mode === '3d' && value.kind === 'perspective') {
+    return `Saved perspective 3D ${subject} is unsupported; using the initial camera.`
+  }
+
+  return `Saved 3D ${subject} is invalid; using the initial camera.`
 }
 
 function isDiagramLike(value: unknown): value is SavedDiagramInput {
