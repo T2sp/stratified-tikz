@@ -164,10 +164,28 @@ In 3D mode, cursor input requires an explicitly selected work plane.
 export type WorkPlane =
   | { kind: "xy"; z: number }
   | { kind: "xz"; y: number }
-  | { kind: "yz"; x: number };
+  | { kind: "yz"; x: number }
+  | { kind: "axisAligned"; plane: "xy" | "xz" | "yz"; offset: number }
+  | {
+      kind: "custom";
+      id: string;
+      name: string;
+      origin: Vec3;
+      u: Vec3;
+      v: Vec3;
+      normal: Vec3;
+      source:
+        | { kind: "originNormal" }
+        | { kind: "threePoints" }
+        | { kind: "existingPointStrata"; pointIds: [string, string, string] };
+    };
 ```
 
-For MVP, arbitrary oblique work planes are not required.
+Axis-aligned planes remain available for the current 3D cursor workflow.
+Custom work planes are represented by an origin and an orthonormal right-handed
+basis: `u` and `v` span the plane, and `normal = cross(u, v)`. The active work
+plane is editor/UI state, not part of `Diagram`; work-plane guides, previews,
+and source metadata are drawing aids and are not exported to TikZ.
 
 ## Strata
 

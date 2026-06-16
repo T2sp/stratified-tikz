@@ -157,6 +157,12 @@ means that cursor input creates or moves points in the plane z = 0.
 
 The inspector should show the active work plane and its fixed coordinate.
 
+Later custom 3D work planes are represented internally by ordinary `Vec3`
+model coordinates: an `origin`, normalized in-plane basis vectors `u` and `v`,
+and a normalized `normal` with `normal = cross(u, v)`. This active work-plane
+state is a cursor-input drawing aid, not diagram content, and must not affect
+TikZ generation except through committed model coordinates.
+
 ### Hybrid editing
 
 The user may create a point by cursor input and later refine it by direct input.
