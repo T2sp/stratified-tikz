@@ -10,6 +10,7 @@ import {
   defaultRegionStyle,
   defaultSheetStyle,
 } from './styles.ts'
+import { createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type {
   AmbientDimension,
@@ -152,15 +153,7 @@ export function createDefaultCamera2D(): Camera2D {
 }
 
 export function createDefaultCamera3D(): Camera3D {
-  return {
-    mode: '3d',
-    projection: 'orthographic',
-    xVector: [1, 0],
-    yVector: [0.45, 0.25],
-    zVector: [0, 1],
-    scale: 1,
-    origin: createVec2(0, 0),
-  }
+  return createInitialCamera3D()
 }
 
 export function createVec2(x: number, y: number): Vec2 {

@@ -4,6 +4,7 @@ import {
   isValidWorkPlaneFrameSnapshot,
   pointFromWorkPlaneLocalCoordinate,
 } from '../geometry/bezierControls.ts'
+import { validateCamera3D } from '../geometry/projection.ts'
 import {
   isHexColor,
   isLabelAnchor,
@@ -95,21 +96,19 @@ function validateCamera(
     pushError(errors, `${path}.mode`, '3D diagrams must use a 3D camera.')
   }
 
-  validatePositiveFinite(camera.scale, `${path}.scale`, errors)
-  validateVec2(camera.origin, `${path}.origin`, errors)
+  if (camera.mode === '2d') {
+    validatePositiveFinite(camera.scale, `${path}.scale`, errors)
+    validateVec2(camera.origin, `${path}.origin`, errors)
+  }
 
   if (camera.mode === '3d') {
-    if (camera.projection !== 'orthographic') {
+    validateCamera3D(camera).errors.forEach((issue) => {
       pushError(
         errors,
-        `${path}.projection`,
-        '3D camera projection must be orthographic.',
+        issue.path.length === 0 ? path : `${path}.${issue.path}`,
+        issue.message,
       )
-    }
-
-    validateBasisVector(camera.xVector, `${path}.xVector`, errors)
-    validateBasisVector(camera.yVector, `${path}.yVector`, errors)
-    validateBasisVector(camera.zVector, `${path}.zVector`, errors)
+    })
   }
 }
 
@@ -901,15 +900,6 @@ function validateVec3ForAmbient(
   if (ambientDimension === 2 && point.z !== 0) {
     pushError(errors, `${path}.z`, '2D diagram coordinates must have z = 0.')
   }
-}
-
-function validateBasisVector(
-  vector: [number, number],
-  path: string,
-  errors: DiagramValidationIssue[],
-): void {
-  validateFinite(vector[0], `${path}[0]`, errors)
-  validateFinite(vector[1], `${path}[1]`, errors)
 }
 
 function validateColor(

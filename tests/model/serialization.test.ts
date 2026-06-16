@@ -36,6 +36,47 @@ test('parseSavedDiagramJson returns a valid saved diagram', () => {
   assert.deepEqual(result.diagram, threeDimensionalExample)
 })
 
+test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {
+  const legacyProjectionBasis = {
+    xVector: [1, 0] as [number, number],
+    yVector: [0.45, 0.25] as [number, number],
+    zVector: [0, 1] as [number, number],
+  }
+  const saved = {
+    format: savedDiagramFormat,
+    version: savedDiagramVersion,
+    diagram: {
+      ...threeDimensionalExample,
+      camera: {
+        mode: '3d',
+        projection: 'orthographic',
+        ...legacyProjectionBasis,
+        scale: 2,
+        origin: { x: 30, y: 40 },
+      },
+    },
+  }
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.camera.mode, '3d')
+  if (result.diagram.camera.mode !== '3d') {
+    throw new Error('Expected migrated 3D camera.')
+  }
+  assert.equal(result.diagram.camera.kind, 'orthographic')
+  assert.equal(result.diagram.camera.zoom, 2)
+  assert.deepEqual(result.diagram.camera.pan, { x: 30, y: 40 })
+  assert.deepEqual(
+    result.diagram.camera.projectionBasis,
+    legacyProjectionBasis,
+  )
+})
+
 test('parseSavedDiagramJson rejects malformed JSON', () => {
   const result = parseSavedDiagramJson('{not json')
 

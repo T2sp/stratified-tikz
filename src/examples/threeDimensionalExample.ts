@@ -1,17 +1,10 @@
 import type { Diagram } from '../model/types'
+import { createInitialCamera3D } from '../model/camera.ts'
 
 export const threeDimensionalExample: Diagram = {
   version: 1,
   ambientDimension: 3,
-  camera: {
-    mode: '3d',
-    projection: 'orthographic',
-    xVector: [1, 0],
-    yVector: [0.45, 0.25],
-    zVector: [0, 1],
-    scale: 1,
-    origin: { x: 0, y: 0 },
-  },
+  camera: createInitialCamera3D(),
   strata: [
     {
       id: 'blueSheet',

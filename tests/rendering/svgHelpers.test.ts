@@ -253,7 +253,7 @@ test('resolveSvgCamera returns a safe fitted camera for empty diagrams', () => {
   assert.equal(empty2dCamera.mode, '2d')
   assert.equal(empty3dCamera.mode, '3d')
   assert.equal(Number.isFinite(empty2dCamera.scale), true)
-  assert.equal(Number.isFinite(empty3dCamera.scale), true)
+  assert.equal(Number.isFinite(empty3dCamera.zoom), true)
   assert.deepEqual(origin, { x: 100, y: 60 })
 })
 
