@@ -129,7 +129,16 @@ z: 0.0
 
 In 2D mode, the z field should either be hidden or locked to 0.
 
-In 3D mode, all x, y, z fields are editable.
+In 3D mode, direct creation forms support a coordinate mode selector. Global
+mode keeps ordinary `(x, y, z)` input. Active work-plane local mode takes
+2-coordinate input `(a, b)` in the active plane basis:
+
+```text
+P = origin + a u + b v
+```
+
+The created point is committed as an ordinary model-space `Vec3`. The active
+work plane remains editor/UI state and is not saved as diagram data.
 
 Direct input is the canonical precise input method.
 
@@ -220,8 +229,9 @@ cursor placement without using this custom guide.
 Cursor creation on an active custom plane applies to points, free text labels,
 polylines, cubic Bezier curves, and polygon sheets. The click position is
 projected onto the active custom plane and the result is committed as ordinary
-global `Vec3` diagram coordinates. Direct creation continues to use global
-numeric coordinates.
+global `Vec3` diagram coordinates. Direct creation can also use active
+work-plane local `(a, b)` coefficients, but the committed geometry is still
+ordinary `Vec3` diagram data.
 
 ### Hybrid editing
 

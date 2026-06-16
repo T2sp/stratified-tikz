@@ -4,6 +4,12 @@ import {
 } from '../geometry/bezierControls.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
+  isFiniteVec3,
+  pointOnWorkPlane,
+  subtractVec3,
+  validateWorkPlane,
+} from '../geometry/workPlane.ts'
+import {
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   type LayerFilter,
@@ -30,6 +36,7 @@ import type {
   StratumStyle,
   TextLabel,
   Vec3,
+  WorkPlane,
 } from '../model/types.ts'
 import type { SelectedElement } from './selection.ts'
 import { areFinitePoints } from './sheetDraft.ts'
@@ -252,6 +259,13 @@ export type DirectCoordinateInput = {
   x: string
   y: string
   z: string
+}
+
+export type DirectCoordinateMode = 'global' | 'workPlaneLocal'
+
+export type DirectCoordinateParseOptions = {
+  coordinateMode?: DirectCoordinateMode
+  workPlane?: WorkPlane
 }
 
 export type DirectCubicBezierControlMode =
@@ -477,11 +491,12 @@ export function addPolygonSheetStratumWithResult(
 export function addPointStratumFromDirectInput(
   diagram: Diagram,
   coordinates: DirectCoordinateInput,
-  options: AddPointStratumOptions = {},
+  options: AddPointStratumOptions & DirectCoordinateParseOptions = {},
 ): DirectPointCreationResult {
   const position = parseDirectCoordinateInput(
     coordinates,
     diagram.ambientDimension,
+    options,
   )
 
   if (position === null) {
@@ -504,11 +519,12 @@ export function addTextLabelFromDirectInput(
   diagram: Diagram,
   coordinates: DirectCoordinateInput,
   text: string,
-  options: AddTextLabelOptions = {},
+  options: AddTextLabelOptions & DirectCoordinateParseOptions = {},
 ): DirectLabelCreationResult {
   const position = parseDirectCoordinateInput(
     coordinates,
     diagram.ambientDimension,
+    options,
   )
 
   if (position === null) {
@@ -533,7 +549,7 @@ export function addTextLabelFromDirectInput(
 export function addPolylineCurveFromDirectInput(
   diagram: Diagram,
   coordinates: DirectCoordinateInput[],
-  options: AddPolylineCurveStratumOptions = {},
+  options: AddPolylineCurveStratumOptions & DirectCoordinateParseOptions = {},
 ): DirectPathCreationResult {
   if (coordinates.length < 2) {
     return {
@@ -546,6 +562,7 @@ export function addPolylineCurveFromDirectInput(
   const points = parseDirectCoordinateInputs(
     coordinates,
     diagram.ambientDimension,
+    options,
   )
 
   if (points === null) {
@@ -576,7 +593,7 @@ export function addPolylineCurveFromDirectInput(
 export function addCubicBezierCurveFromDirectInput(
   diagram: Diagram,
   coordinates: DirectCoordinateInput[],
-  options: AddCubicBezierCurveStratumOptions = {},
+  options: AddCubicBezierCurveStratumOptions & DirectCoordinateParseOptions = {},
 ): DirectPathCreationResult {
   if (coordinates.length !== 4) {
     return {
@@ -596,9 +613,11 @@ export function addCubicBezierCurveFromDirectInput(
     }
   }
 
-  const points = parseDirectCoordinateInputs(
+  const points = parseDirectCubicBezierCoordinateInputs(
     coordinates,
     diagram.ambientDimension,
+    directControlMode,
+    options,
   )
 
   if (points === null) {
@@ -711,7 +730,7 @@ function directCubicBezierInputToPoints(
 export function addPolygonSheetFromDirectInput(
   diagram: Diagram,
   coordinates: DirectCoordinateInput[],
-  options: AddPolygonSheetStratumOptions = {},
+  options: AddPolygonSheetStratumOptions & DirectCoordinateParseOptions = {},
 ): DirectPathCreationResult {
   if (diagram.ambientDimension !== 3) {
     return {
@@ -732,6 +751,7 @@ export function addPolygonSheetFromDirectInput(
   const vertices = parseDirectCoordinateInputs(
     coordinates,
     diagram.ambientDimension,
+    options,
   )
 
   if (vertices === null) {
@@ -982,7 +1002,15 @@ export function updateVec3Coordinate(
 export function parseDirectCoordinateInput(
   coordinates: DirectCoordinateInput,
   ambientDimension: AmbientDimension,
+  options: DirectCoordinateParseOptions = {},
 ): Vec3 | null {
+  if (
+    ambientDimension === 3 &&
+    options.coordinateMode === 'workPlaneLocal'
+  ) {
+    return parseWorkPlaneLocalCoordinateInput(coordinates, options.workPlane)
+  }
+
   const x = parseFiniteNumber(coordinates.x)
   const y = parseFiniteNumber(coordinates.y)
   const z = ambientDimension === 2 ? 0 : parseFiniteNumber(coordinates.z)
@@ -997,9 +1025,10 @@ export function parseDirectCoordinateInput(
 export function parseDirectCoordinateInputs(
   coordinates: DirectCoordinateInput[],
   ambientDimension: AmbientDimension,
+  options: DirectCoordinateParseOptions = {},
 ): Vec3[] | null {
   const points = coordinates.map((coordinate) =>
-    parseDirectCoordinateInput(coordinate, ambientDimension),
+    parseDirectCoordinateInput(coordinate, ambientDimension, options),
   )
 
   return points.every((point): point is Vec3 => point !== null) ? points : null
@@ -1008,8 +1037,12 @@ export function parseDirectCoordinateInputs(
 export function parseDirectCoordinateRows(
   rows: string,
   ambientDimension: AmbientDimension,
+  options: Pick<DirectCoordinateParseOptions, 'coordinateMode'> = {},
 ): DirectCoordinateInput[] | null {
-  const axisCount = ambientDimension === 2 ? 2 : 3
+  const axisCount =
+    ambientDimension === 3 && options.coordinateMode === 'workPlaneLocal'
+      ? 2
+      : ambientDimension
   const trimmedRows = rows.trim()
 
   if (trimmedRows.length === 0) {
@@ -1034,11 +1067,95 @@ export function parseDirectCoordinateRows(
     coordinates.push({
       x: parts[0],
       y: parts[1],
-      z: ambientDimension === 2 ? '0' : parts[2],
+      z: axisCount === 2 ? '0' : parts[2],
     })
   }
 
   return coordinates.length === 0 ? null : coordinates
+}
+
+function parseDirectCubicBezierCoordinateInputs(
+  coordinates: DirectCoordinateInput[],
+  ambientDimension: AmbientDimension,
+  directControlMode: DirectCubicBezierControlMode,
+  options: DirectCoordinateParseOptions,
+): Vec3[] | null {
+  if (
+    ambientDimension !== 3 ||
+    options.coordinateMode !== 'workPlaneLocal' ||
+    directControlMode !== 'relativeCartesian'
+  ) {
+    return parseDirectCoordinateInputs(coordinates, ambientDimension, options)
+  }
+
+  const start = parseDirectCoordinateInput(
+    coordinates[0],
+    ambientDimension,
+    options,
+  )
+  const end = parseDirectCoordinateInput(coordinates[1], ambientDimension, options)
+  const firstControlOffset = parseWorkPlaneLocalCoordinateOffset(
+    coordinates[2],
+    options.workPlane,
+  )
+  const secondControlOffset = parseWorkPlaneLocalCoordinateOffset(
+    coordinates[3],
+    options.workPlane,
+  )
+
+  if (
+    start === null ||
+    end === null ||
+    firstControlOffset === null ||
+    secondControlOffset === null
+  ) {
+    return null
+  }
+
+  return [start, end, firstControlOffset, secondControlOffset]
+}
+
+function parseWorkPlaneLocalCoordinateInput(
+  coordinates: DirectCoordinateInput,
+  workPlane: WorkPlane | undefined,
+): Vec3 | null {
+  const a = parseFiniteNumber(coordinates.x)
+  const b = parseFiniteNumber(coordinates.y)
+
+  if (a === null || b === null || workPlane === undefined) {
+    return null
+  }
+
+  const validation = validateWorkPlane(workPlane)
+
+  if (!validation.valid) {
+    return null
+  }
+
+  try {
+    const point = pointOnWorkPlane(workPlane, a, b)
+    return isFiniteVec3(point) ? point : null
+  } catch {
+    return null
+  }
+}
+
+function parseWorkPlaneLocalCoordinateOffset(
+  coordinates: DirectCoordinateInput,
+  workPlane: WorkPlane | undefined,
+): Vec3 | null {
+  const point = parseWorkPlaneLocalCoordinateInput(coordinates, workPlane)
+
+  if (point === null || workPlane === undefined) {
+    return null
+  }
+
+  try {
+    const offset = subtractVec3(point, pointOnWorkPlane(workPlane, 0, 0))
+    return isFiniteVec3(offset) ? offset : null
+  } catch {
+    return null
+  }
 }
 
 export function normalizeDirectLabelText(text: string): string {

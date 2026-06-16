@@ -78,6 +78,7 @@
 .toolbar-select,
 .toolbar-text-input,
 .direct-create-field input,
+.direct-create-field select,
 .direct-coordinate-list textarea,
 .work-plane-fixed input,
 .custom-work-plane-field input {
@@ -201,8 +202,17 @@
   font-family: var(--mono);
 }
 
+.direct-create-field select {
+  min-width: 0;
+  padding: 6px 28px 6px 10px;
+}
+
 .direct-create-text {
   grid-template-columns: auto minmax(140px, 220px);
+}
+
+.direct-coordinate-mode-field {
+  grid-template-columns: auto minmax(180px, 260px);
 }
 
 .direct-coordinate-list {

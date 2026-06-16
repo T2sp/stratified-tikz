@@ -156,9 +156,11 @@ filter, coordinate input mode, active work plane, direct form values, and draft
 geometry are not stored in history, and history is never saved to JSON.
 Changing the active work plane does not create a history entry. Geometry created
 through cursor input on a work plane is committed as ordinary `Vec3` diagram
-data, so undo/redo treats it the same as direct-coordinate creation. Undo and
-redo clear work-plane point-picking state and validate the remaining active
-work plane against the current diagram.
+data. In 3D direct creation, active work-plane local input `(a, b)` is converted
+through `P = origin + a u + b v` before commit, so those results are also
+ordinary `Vec3` diagram data. Undo/redo treats both workflows like any other
+diagram creation. Undo and redo clear work-plane point-picking state and
+validate the remaining active work plane against the current diagram.
 
 ## Work planes
 
@@ -194,6 +196,11 @@ Custom work planes are represented by an origin and an orthonormal right-handed
 basis: `u` and `v` span the plane, and `normal = cross(u, v)`. The active work
 plane is editor/UI state, not part of `Diagram`; work-plane guides, previews,
 and source metadata are drawing aids and are not exported to TikZ.
+
+For 3D direct creation, a form may interpret numeric input as active work-plane
+local coefficients rather than global coordinates. The local coefficients are
+not stored; only the converted model-space `Vec3` coordinates are committed to
+strata or labels.
 
 When a custom work plane is active in a 3D cursor workflow, the canvas may show
 a preview-only guide: a translucent patch, outline, origin marker, and

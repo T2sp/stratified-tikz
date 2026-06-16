@@ -7,7 +7,11 @@ import {
 import type {
   CurveStratum,
   Diagram,
+  PointStratum,
   PolygonSheetStratum,
+  TextLabel,
+  Vec3,
+  WorkPlane,
 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -535,8 +539,240 @@ test('direct coordinate rows parse only exposed axes for the ambient dimension',
     { x: '0', y: '1', z: '2' },
     { x: '3', y: '4', z: '5' },
   ])
+  assert.deepEqual(
+    parseDirectCoordinateRows('0 1\n2,3', 3, {
+      coordinateMode: 'workPlaneLocal',
+    }),
+    [
+      { x: '0', y: '1', z: '0' },
+      { x: '2', y: '3', z: '0' },
+    ],
+  )
   assert.equal(parseDirectCoordinateRows('0 1 2', 2), null)
+  assert.equal(
+    parseDirectCoordinateRows('0 1 2', 3, {
+      coordinateMode: 'workPlaneLocal',
+    }),
+    null,
+  )
 })
+
+test('plane-local point direct creation converts input through a custom work plane', () => {
+  const result = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    { x: '2', y: '3', z: '99' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected plane-local point creation to succeed.')
+  }
+
+  assert.deepEqual(findPoint(result.diagram, result.id).position, {
+    x: 12,
+    y: 20,
+    z: 33,
+  })
+})
+
+test('plane-local label direct creation converts the label position', () => {
+  const result = addTextLabelFromDirectInput(
+    threeDimensionalExample,
+    { x: '-4', y: '5', z: '99' },
+    '$F$',
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected plane-local label creation to succeed.')
+  }
+
+  assert.deepEqual(findLabel(result.diagram, result.id).position, {
+    x: 6,
+    y: 20,
+    z: 35,
+  })
+})
+
+test('plane-local polyline direct creation converts every vertex', () => {
+  const result = addPolylineCurveFromDirectInput(
+    threeDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '1', y: '2', z: '0' },
+      { x: '-3', y: '4', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points, [
+    { x: 10, y: 20, z: 30 },
+    { x: 11, y: 20, z: 32 },
+    { x: 7, y: 20, z: 34 },
+  ])
+})
+
+test('plane-local cubic Bezier direct creation converts absolute point-like inputs', () => {
+  const result = addCubicBezierCurveFromDirectInput(
+    threeDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '1', y: '2', z: '0' },
+      { x: '3', y: '4', z: '0' },
+      { x: '5', y: '6', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+      directControlMode: 'absolute',
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findCurve(result.diagram, result.id).points, [
+    { x: 10, y: 20, z: 30 },
+    { x: 11, y: 20, z: 32 },
+    { x: 13, y: 20, z: 34 },
+    { x: 15, y: 20, z: 36 },
+  ])
+})
+
+test('plane-local sheet direct creation converts vertices onto the plane', () => {
+  const result = addPolygonSheetFromDirectInput(
+    threeDimensionalExample,
+    [
+      { x: '0', y: '0', z: '0' },
+      { x: '2', y: '0', z: '0' },
+      { x: '0', y: '2', z: '0' },
+    ],
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const sheet = findPolygonSheet(result.diagram, result.id)
+  assert.deepEqual(sheet.vertices, [
+    { x: 10, y: 20, z: 30 },
+    { x: 12, y: 20, z: 30 },
+    { x: 10, y: 20, z: 32 },
+  ])
+  assert.equal(sheet.vertices.every((vertex) => vertex.y === 20), true)
+})
+
+test('axis-aligned work-plane local direct input uses existing basis mappings', () => {
+  assert.deepEqual(
+    createPlaneLocalPoint({ kind: 'xy', z: 7 }, { x: '1', y: '2', z: '0' }),
+    { x: 1, y: 2, z: 7 },
+  )
+  assert.deepEqual(
+    createPlaneLocalPoint({ kind: 'xz', y: 4 }, { x: '1', y: '2', z: '0' }),
+    { x: 1, y: 4, z: 2 },
+  )
+  assert.deepEqual(
+    createPlaneLocalPoint({ kind: 'yz', x: 9 }, { x: '1', y: '2', z: '0' }),
+    { x: 9, y: 1, z: 2 },
+  )
+})
+
+test('plane-local direct creation rejects non-finite input, invalid planes, and non-finite results', () => {
+  const nonFiniteInput = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    { x: 'Infinity', y: '0', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+  assert.equal(nonFiniteInput.ok, false)
+
+  const invalidPlane = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    { x: '1', y: '0', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: {
+        ...testCustomWorkPlane,
+        u: { x: 2, y: 0, z: 0 },
+      },
+    },
+  )
+  assert.equal(invalidPlane.ok, false)
+
+  const nonFiniteResult = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    { x: String(Number.MAX_VALUE), y: '0', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: {
+        ...testCustomWorkPlane,
+        origin: { x: Number.MAX_VALUE, y: 0, z: 0 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+  )
+  assert.equal(nonFiniteResult.ok, false)
+})
+
+test('global 3D direct creation remains unchanged when coordinate mode is global', () => {
+  const result = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    { x: '1', y: '2', z: '3' },
+    {
+      coordinateMode: 'global',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected global direct point creation to succeed.')
+  }
+
+  assert.deepEqual(findPoint(result.diagram, result.id).position, {
+    x: 1,
+    y: 2,
+    z: 3,
+  })
+})
+
+const testCustomWorkPlane: WorkPlane = {
+  kind: 'custom',
+  id: 'test-custom-plane',
+  name: 'Test custom plane',
+  origin: { x: 10, y: 20, z: 30 },
+  u: { x: 1, y: 0, z: 0 },
+  v: { x: 0, y: 0, z: 1 },
+  normal: { x: 0, y: -1, z: 0 },
+  source: { kind: 'originNormal' },
+}
 
 function findCurve(diagram: Diagram, id: string): CurveStratum {
   const stratum = diagram.strata.find((candidate) => candidate.id === id)
@@ -559,6 +795,46 @@ function findPolygonSheet(
   }
 
   return stratum
+}
+
+function findPoint(diagram: Diagram, id: string): PointStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum?.geometricKind !== 'point') {
+    throw new Error(`Point ${id} was not created.`)
+  }
+
+  return stratum
+}
+
+function findLabel(diagram: Diagram, id: string): TextLabel {
+  const label = diagram.labels.find((candidate) => candidate.id === id)
+
+  if (label === undefined) {
+    throw new Error(`Label ${id} was not created.`)
+  }
+
+  return label
+}
+
+function createPlaneLocalPoint(
+  workPlane: WorkPlane,
+  coordinates: { x: string; y: string; z: string },
+): Vec3 {
+  const result = addPointStratumFromDirectInput(
+    threeDimensionalExample,
+    coordinates,
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane,
+    },
+  )
+
+  if (!result.ok) {
+    throw new Error('Expected axis-aligned plane-local point creation to succeed.')
+  }
+
+  return findPoint(result.diagram, result.id).position
 }
 
 function createTestEditorState(
