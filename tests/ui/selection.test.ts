@@ -6,12 +6,18 @@ import {
 } from '../../src/examples/index.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import {
+  createInspectorCompactSummary,
   createInspectorSections,
   describeCurvePoints,
   formatLabelStyleSummary,
   formatStratumStyleSummary,
   formatVec3,
 } from '../../src/ui/inspectorSummary.ts'
+import {
+  nextInspectorDisclosureStateForSelection,
+  selectedElementDisclosureKey,
+  setInspectorDisclosureExpanded,
+} from '../../src/ui/inspectorDisclosure.ts'
 import type { AmbientDimension, CurveStyle, Diagram } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -291,6 +297,69 @@ test('createInspectorSections reports free text label content', () => {
       .some((field) => field.label === 'Text' && field.value === '$F^{(1)}L$'),
     true,
   )
+})
+
+test('createInspectorCompactSummary identifies selected strata compactly', () => {
+  const summary = createInspectorCompactSummary(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'visibleWire',
+  })
+
+  assert.notEqual(summary, null)
+  assert.equal(summary?.title, 'Curve: Visible wire [visibleWire]')
+  assert.equal(summary?.layer, '0')
+  assert.equal(summary?.detail, 'codim 1')
+})
+
+test('createInspectorCompactSummary identifies selected free text labels compactly', () => {
+  const summary = createInspectorCompactSummary(twoDimensionalExample, {
+    kind: 'label',
+    id: 'mathMorphismLabel',
+  })
+
+  assert.notEqual(summary, null)
+  assert.equal(summary?.title, 'Label: $F^{(1)}L$ [mathMorphismLabel]')
+  assert.equal(summary?.layer, '11')
+  assert.equal(summary?.detail, 'position (0.15, 1.75)')
+})
+
+test('inspector disclosure collapses only when the selection key changes', () => {
+  const selectedWire: SelectedElement = {
+    kind: 'stratum',
+    id: 'visibleWire',
+  }
+  const selectedPoint: SelectedElement = {
+    kind: 'stratum',
+    id: 'circlePoint',
+  }
+  const expanded = setInspectorDisclosureExpanded(
+    {
+      selectionKey: selectedElementDisclosureKey(selectedWire),
+      expanded: false,
+    },
+    selectedWire,
+    true,
+  )
+
+  assert.equal(expanded.expanded, true)
+  assert.equal(
+    nextInspectorDisclosureStateForSelection(expanded, {
+      kind: 'stratum',
+      id: 'visibleWire',
+    }),
+    expanded,
+  )
+  assert.deepEqual(
+    nextInspectorDisclosureStateForSelection(expanded, selectedPoint),
+    {
+      selectionKey: selectedElementDisclosureKey(selectedPoint),
+      expanded: false,
+    },
+  )
+  assert.deepEqual(nextInspectorDisclosureStateForSelection(expanded, null), {
+    selectionKey: null,
+    expanded: false,
+  })
 })
 
 test('style summaries display opacity with readable labels', () => {
