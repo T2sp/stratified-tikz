@@ -13,6 +13,10 @@ import type {
 import { sheetVertices } from '../model/sheets.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import type { SelectedElement } from '../ui/selection'
+import type {
+  WorkPlaneDirectionIndicator,
+  WorkPlanePreview,
+} from '../ui/workPlanePreview'
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
@@ -67,15 +71,16 @@ export type SvgDiagramProps = {
   onGeometryHandleDragEnd?: () => void
 }
 
-export type WorkPlanePreview = {
-  corners: [Vec3, Vec3, Vec3, Vec3]
-  label?: string
-}
-
 type RenderItem = {
   id: string
   layer: number
   element: ReactElement
+}
+
+type SvgWorkPlaneDirectionIndicator = {
+  from: Vec2
+  to: Vec2
+  label: string
 }
 
 const defaultWidth = 520
@@ -590,14 +595,27 @@ function renderWorkPlanePreview(
   const corners = preview.corners.map((corner) =>
     projectToSvgPoint(camera, corner, viewportHeight),
   )
+  const origin = projectToSvgPoint(camera, preview.origin, viewportHeight)
+  const uIndicator = projectIndicator(preview.uIndicator, camera, viewportHeight)
+  const vIndicator = projectIndicator(preview.vIndicator, camera, viewportHeight)
+  const normalIndicator = projectIndicator(
+    preview.normalIndicator,
+    camera,
+    viewportHeight,
+  )
   const labelPosition = corners[2]
 
   return (
-    <g key="work-plane-preview" pointerEvents="none" aria-hidden="true">
+    <g
+      key="work-plane-preview"
+      pointerEvents={preview.pointerEvents}
+      aria-hidden="true"
+      data-selectable={String(preview.selectable)}
+    >
       <polygon
         points={svgPointList(corners)}
         fill="#F59E0B"
-        fillOpacity={0.035}
+        fillOpacity={0.055}
         stroke="#B45309"
         strokeOpacity={0.88}
         strokeWidth={2.1}
@@ -622,21 +640,83 @@ function renderWorkPlanePreview(
         strokeDasharray="2 7"
         vectorEffect="non-scaling-stroke"
       />
-      {preview.label !== undefined && (
-        <text
-          x={labelPosition.x}
-          y={labelPosition.y}
-          dx={8}
-          dy={-8}
-          fill="#92400E"
-          opacity={0.9}
-          fontSize={11}
-          fontWeight={600}
-          dominantBaseline="middle"
-        >
-          {preview.label}
-        </text>
-      )}
+      {renderWorkPlaneIndicator(uIndicator, '#2563EB')}
+      {renderWorkPlaneIndicator(vIndicator, '#059669')}
+      {renderWorkPlaneIndicator(normalIndicator, '#DC2626')}
+      <circle
+        cx={origin.x}
+        cy={origin.y}
+        r={4.6}
+        fill="#ffffff"
+        stroke="#92400E"
+        strokeOpacity={0.95}
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      />
+      <text
+        x={labelPosition.x}
+        y={labelPosition.y}
+        dx={8}
+        dy={-8}
+        fill="#92400E"
+        opacity={0.9}
+        fontSize={11}
+        fontWeight={600}
+        dominantBaseline="middle"
+      >
+        {preview.label}
+      </text>
+    </g>
+  )
+}
+
+function projectIndicator(
+  indicator: WorkPlaneDirectionIndicator,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): SvgWorkPlaneDirectionIndicator {
+  return {
+    label: indicator.label,
+    from: projectToSvgPoint(camera, indicator.from, viewportHeight),
+    to: projectToSvgPoint(camera, indicator.to, viewportHeight),
+  }
+}
+
+function renderWorkPlaneIndicator(
+  indicator: SvgWorkPlaneDirectionIndicator,
+  color: string,
+): ReactElement {
+  return (
+    <g key={`work-plane-${indicator.label}-indicator`}>
+      <path
+        d={polylineToSvgPath([indicator.from, indicator.to])}
+        fill="none"
+        stroke={color}
+        strokeOpacity={0.9}
+        strokeWidth={2}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={indicator.to.x}
+        cy={indicator.to.y}
+        r={3.2}
+        fill={color}
+        opacity={0.9}
+      />
+      <text
+        x={indicator.to.x}
+        y={indicator.to.y}
+        dx={6}
+        dy={-6}
+        fill={color}
+        opacity={0.95}
+        fontSize={10}
+        fontWeight={700}
+        dominantBaseline="middle"
+      >
+        {indicator.label}
+      </text>
     </g>
   )
 }

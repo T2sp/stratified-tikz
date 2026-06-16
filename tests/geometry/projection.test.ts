@@ -6,6 +6,7 @@ import {
   screenToModel2D,
   screenToModelOnWorkPlane,
 } from '../../src/geometry/projection.ts'
+import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
 import type { Camera2D, Camera3D, Vec2, Vec3 } from '../../src/model/types.ts'
 
 const camera2D: Camera2D = {
@@ -71,6 +72,21 @@ test('converts cursor input on a yz work plane', () => {
 
   assertVec3AlmostEqual(
     screenToModelOnWorkPlane(camera3D, screenPoint, { kind: 'yz', x: 2 }),
+    modelPoint,
+  )
+})
+
+test('converts cursor input on a custom work plane', () => {
+  const workPlane = constructWorkPlaneFromThreePoints(
+    { x: 1, y: 0, z: 1 },
+    { x: 3, y: 0, z: 1 },
+    { x: 1, y: 2, z: 3 },
+  )
+  const modelPoint = { x: 2.5, y: 1.25, z: 2.25 }
+  const screenPoint = projectVec3(camera3D, modelPoint)
+
+  assertVec3AlmostEqual(
+    screenToModelOnWorkPlane(camera3D, screenPoint, workPlane),
     modelPoint,
   )
 })

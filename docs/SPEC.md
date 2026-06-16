@@ -200,6 +200,19 @@ generation except through committed model coordinates. Work-plane controls are
 hidden in 2D mode, and entering 2D mode resets the active work plane to the
 ordinary xy-plane at `z = 0`.
 
+When a custom work plane is active in 3D, the canvas shows a preview-only guide
+with a translucent plane patch, outline, origin marker, direction indicators for
+`u` and `v`, a normal indicator, and a `custom work plane` label. The guide is
+not selectable, does not intercept pointer events, is not saved in the diagram,
+and is not exported to TikZ. Axis-aligned work planes remain available for
+cursor placement without using this custom guide.
+
+Cursor creation on an active custom plane applies to points, free text labels,
+polylines, cubic Bezier curves, and polygon sheets. The click position is
+projected onto the active custom plane and the result is committed as ordinary
+global `Vec3` diagram coordinates. Direct creation continues to use global
+numeric coordinates.
+
 ### Hybrid editing
 
 The user may create a point by cursor input and later refine it by direct input.
