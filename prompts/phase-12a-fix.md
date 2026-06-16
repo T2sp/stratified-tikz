@@ -1,4 +1,4 @@
-Phase 12A Fix Prompt: Validate malformed axis-aligned work-plane names
+# Phase 12A Fix Prompt: Validate malformed axis-aligned work-plane names
 
 Environment
 
