@@ -93,6 +93,7 @@ import {
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectCoordinateInput,
+  type DirectCoordinateMode,
   type DirectCubicBezierControlMode,
   type DirectPathCreationError,
   type DiagramHistory,
@@ -167,6 +168,7 @@ const exampleOptions: ExampleOption[] = [
 ]
 
 const coordinateInputModes: CoordinateInputMode[] = ['cursor', 'direct']
+const directCoordinateModes: DirectCoordinateMode[] = ['global', 'workPlaneLocal']
 const defaultDirectCoordinates: DirectCoordinateInput = {
   x: '0',
   y: '0',
@@ -201,6 +203,8 @@ function App() {
   const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
     defaultDirectCoordinates,
   )
+  const [directCoordinateMode, setDirectCoordinateMode] =
+    useState<DirectCoordinateMode>('global')
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
   const [directLayerInput, setDirectLayerInput] = useState<string>('0')
   const [directPolylineRows, setDirectPolylineRows] = useState<string>(
@@ -336,6 +340,7 @@ function App() {
     setSheetStatus('')
     setDirectCreationStatus('')
     setDirectLayerInput('0')
+    setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
@@ -487,6 +492,7 @@ function App() {
     setSheetStatus('')
     setDirectCreationStatus('')
     setDirectLayerInput('0')
+    setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(result.diagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
@@ -1033,8 +1039,33 @@ function App() {
       defaultDirectCubicBezierRows(
         editableDiagram.ambientDimension,
         nextMode,
+        effectiveDirectCoordinateMode(
+          editableDiagram.ambientDimension,
+          directCoordinateMode,
+        ),
       ),
     )
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectCoordinateMode(mode: DirectCoordinateMode): void {
+    const nextMode = effectiveDirectCoordinateMode(
+      editableDiagram.ambientDimension,
+      mode,
+    )
+
+    setDirectCoordinateMode(nextMode)
+    setDirectPolylineRows(
+      defaultDirectPolylineRows(editableDiagram.ambientDimension, nextMode),
+    )
+    setDirectCubicBezierRows(
+      defaultDirectCubicBezierRows(
+        editableDiagram.ambientDimension,
+        directCubicBezierControlMode,
+        nextMode,
+      ),
+    )
+    setDirectSheetRows(defaultDirectSheetRows(nextMode))
     setDirectCreationStatus('')
   }
 
@@ -1076,7 +1107,7 @@ function App() {
       const result = addPointStratumFromDirectInput(
         editableDiagram,
         directCoordinates,
-        { layer: directLayer },
+        directCreationCoordinateOptions({ layer: directLayer }),
       )
 
       if (!result.ok) {
@@ -1099,7 +1130,7 @@ function App() {
         editableDiagram,
         directCoordinates,
         directLabelText,
-        { layer: directLayer },
+        directCreationCoordinateOptions({ layer: directLayer }),
       )
 
       if (!result.ok) {
@@ -1125,6 +1156,12 @@ function App() {
     const coordinateRows = parseDirectCoordinateRows(
       directRowsForCreationTool(creationTool),
       editableDiagram.ambientDimension,
+      {
+        coordinateMode: effectiveDirectCoordinateMode(
+          editableDiagram.ambientDimension,
+          directCoordinateMode,
+        ),
+      },
     )
 
     if (coordinateRows === null) {
@@ -1136,7 +1173,7 @@ function App() {
       const result = addPolylineCurveFromDirectInput(
         editableDiagram,
         coordinateRows,
-        { layer: directLayer },
+        directCreationCoordinateOptions({ layer: directLayer }),
       )
 
       if (!result.ok) {
@@ -1157,7 +1194,10 @@ function App() {
     const result = addCubicBezierCurveFromDirectInput(
       editableDiagram,
       coordinateRows,
-      { layer: directLayer, directControlMode: directCubicBezierControlMode },
+      directCreationCoordinateOptions({
+        layer: directLayer,
+        directControlMode: directCubicBezierControlMode,
+      }),
     )
 
     if (!result.ok) {
@@ -1180,6 +1220,12 @@ function App() {
     const coordinateRows = parseDirectCoordinateRows(
       directSheetRows,
       editableDiagram.ambientDimension,
+      {
+        coordinateMode: effectiveDirectCoordinateMode(
+          editableDiagram.ambientDimension,
+          directCoordinateMode,
+        ),
+      },
     )
 
     if (coordinateRows === null) {
@@ -1187,9 +1233,11 @@ function App() {
       return
     }
 
-    const result = addPolygonSheetFromDirectInput(editableDiagram, coordinateRows, {
-      layer: directLayer,
-    })
+    const result = addPolygonSheetFromDirectInput(
+      editableDiagram,
+      coordinateRows,
+      directCreationCoordinateOptions({ layer: directLayer }),
+    )
 
     if (!result.ok) {
       setDirectCreationStatus(directCreationErrorMessage(result.error, 'sheet'))
@@ -1241,6 +1289,20 @@ function App() {
 
   function directRowsForCreationTool(tool: 'createPolyline' | 'createCubicBezier'): string {
     return tool === 'createPolyline' ? directPolylineRows : directCubicBezierRows
+  }
+
+  function directCreationCoordinateOptions<T extends object>(options: T): T & {
+    coordinateMode: DirectCoordinateMode
+    workPlane: WorkPlane
+  } {
+    return {
+      ...options,
+      coordinateMode: effectiveDirectCoordinateMode(
+        editableDiagram.ambientDimension,
+        directCoordinateMode,
+      ),
+      workPlane: activeWorkPlane,
+    }
   }
 
   function directRowsForCreationToolValue(
@@ -1756,6 +1818,25 @@ function App() {
               }}
             >
               <span className="control-label">{directCreationTitle(creationTool)}</span>
+              {editableDiagram.ambientDimension === 3 && (
+                <label className="direct-create-field direct-coordinate-mode-field">
+                  <span>Coordinate mode</span>
+                  <select
+                    value={directCoordinateMode}
+                    onChange={(event) =>
+                      updateDirectCoordinateMode(
+                        event.currentTarget.value as DirectCoordinateMode,
+                      )
+                    }
+                  >
+                    {directCoordinateModes.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {directCoordinateModeLabel(mode)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {creationTool === 'createLabel' && (
                 <label className="direct-create-field direct-create-text">
                   <span>Text</span>
@@ -1771,9 +1852,21 @@ function App() {
                 </label>
               )}
               {(creationTool === 'createPoint' || creationTool === 'createLabel') &&
-                directCoordinateAxes(editableDiagram.ambientDimension).map((axis) => (
+                directCoordinateAxes(
+                  editableDiagram.ambientDimension,
+                  effectiveDirectCoordinateMode(
+                    editableDiagram.ambientDimension,
+                    directCoordinateMode,
+                  ),
+                ).map((axis) => (
                   <label key={axis} className="direct-create-field">
-                    <span>{axis}</span>
+                    <span>
+                      {directCoordinateAxisLabel(
+                        axis,
+                        editableDiagram.ambientDimension,
+                        directCoordinateMode,
+                      )}
+                    </span>
                     <input
                       type="number"
                       step="any"
@@ -1824,6 +1917,10 @@ function App() {
                         creationTool === 'createCubicBezier'
                           ? directCubicBezierControlMode
                           : 'absolute',
+                        effectiveDirectCoordinateMode(
+                          editableDiagram.ambientDimension,
+                          directCoordinateMode,
+                        ),
                       )}
                       onChange={(event) =>
                         updateDirectRowsForCreationTool(
@@ -2294,9 +2391,17 @@ function directCreationErrorMessage(
 function directCoordinateRowsPlaceholder(
   ambientDimension: AmbientDimension,
   controlMode: DirectCubicBezierControlMode = 'absolute',
+  coordinateMode: DirectCoordinateMode = 'global',
 ): string {
   if (controlMode === 'relativePolar') {
     return '0 0\n1 0\n60 0.7\n120 0.7'
+  }
+
+  if (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal'
+  ) {
+    return '0 0\n1 0'
   }
 
   return ambientDimension === 2 ? '0 0\n1 0' : '0 0 0\n1 0 0'
@@ -2317,15 +2422,31 @@ function directCoordinateRowsTextAreaRows(
 
 function defaultDirectPolylineRows(
   ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode = 'global',
 ): string {
+  if (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal'
+  ) {
+    return '0 0\n1 0'
+  }
+
   return ambientDimension === 2 ? '0 0\n1 0' : '0 0 0\n1 0 0'
 }
 
 function defaultDirectCubicBezierRows(
   ambientDimension: AmbientDimension,
   controlMode: DirectCubicBezierControlMode = 'absolute',
+  coordinateMode: DirectCoordinateMode = 'global',
 ): string {
   if (controlMode === 'relativeCartesian') {
+    if (
+      ambientDimension === 3 &&
+      coordinateMode === 'workPlaneLocal'
+    ) {
+      return '0 0\n1 0\n0.3 0.6\n-0.3 0.6'
+    }
+
     return ambientDimension === 2
       ? '0 0\n1 0\n0.3 0.6\n-0.3 0.6'
       : '0 0 0\n1 0 0\n0.3 0.6 0\n-0.3 0.6 0'
@@ -2333,6 +2454,13 @@ function defaultDirectCubicBezierRows(
 
   if (controlMode === 'relativePolar') {
     return '0 0\n1 0\n60 0.7\n120 0.7'
+  }
+
+  if (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal'
+  ) {
+    return '0 0\n0.3 0.6\n0.7 0.6\n1 0'
   }
 
   return ambientDimension === 2
@@ -2361,6 +2489,15 @@ function directCubicBezierControlModeLabel(
   }
 }
 
+function directCoordinateModeLabel(mode: DirectCoordinateMode): string {
+  switch (mode) {
+    case 'global':
+      return 'Global 3D coordinates'
+    case 'workPlaneLocal':
+      return 'Active work-plane local coordinates'
+  }
+}
+
 function directRowsLabel(
   tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
   controlMode: DirectCubicBezierControlMode,
@@ -2379,7 +2516,13 @@ function directRowsLabel(
   }
 }
 
-function defaultDirectSheetRows(): string {
+function defaultDirectSheetRows(
+  coordinateMode: DirectCoordinateMode = 'global',
+): string {
+  if (coordinateMode === 'workPlaneLocal') {
+    return '0 0\n1 0\n0 1'
+  }
+
   return '0 0 0\n1 0 0\n0 1 0'
 }
 
@@ -2430,8 +2573,38 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
 
 function directCoordinateAxes(
   ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode = 'global',
 ): Array<keyof DirectCoordinateInput> {
+  if (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal'
+  ) {
+    return ['x', 'y']
+  }
+
   return ambientDimension === 2 ? ['x', 'y'] : ['x', 'y', 'z']
+}
+
+function directCoordinateAxisLabel(
+  axis: keyof DirectCoordinateInput,
+  ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode,
+): string {
+  if (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal'
+  ) {
+    return axis === 'x' ? 'a' : 'b'
+  }
+
+  return axis
+}
+
+function effectiveDirectCoordinateMode(
+  ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode,
+): DirectCoordinateMode {
+  return ambientDimension === 3 ? coordinateMode : 'global'
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
