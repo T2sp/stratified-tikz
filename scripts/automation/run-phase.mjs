@@ -46,6 +46,14 @@ const phaseSlugs = {
   "10E": "multi-step-undo-and-redo",
   "11": "improve-control-points",
   "11C": "relative-bezier-tikz-export",
+  "12A": "workplane-model-geometry",
+  "12B": "workplane-origin-normal",
+  "12C": "workplane-three-numeric-points",
+  "12D": "workplane-existing-point-strata",
+  "12E": "workplane-preview-creation",
+  "12F": "workplane-camera-export-separation",
+  "12G": "workplane-local-bezier-metadata",
+  "12H": "tikz-3d-scope-bezier-export",
 };
 
 function makePhaseSpec(phase) {
