@@ -15,7 +15,6 @@ import {
   twoDimensionalExample,
 } from './examples'
 import {
-  createWorkPlanePatch,
   normalizePointForAmbientDimension,
   screenToModelOnWorkPlane,
 } from './geometry'
@@ -56,6 +55,7 @@ import {
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  createCustomWorkPlanePreview,
   createDiagramHistory,
   createSheetPolygonDraft,
   defaultCustomOriginNormalWorkPlaneInput,
@@ -74,7 +74,6 @@ import {
   removeSelectedElementWithLayerFilter,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowWorkPlaneControls,
-  shouldShowWorkPlanePreview,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
   applyCustomOriginNormalWorkPlaneInput,
@@ -274,17 +273,17 @@ function App() {
   )
   const previewWorkPlane = sheetPolygonDraft?.workPlane ?? activeWorkPlane
   const workPlanePreview = useMemo(() => {
-    if (!shouldShowWorkPlanePreview(editableDiagram.ambientDimension, creationTool)) {
-      return undefined
-    }
-
-    return {
-      ...createWorkPlanePatch(previewWorkPlane),
-      label:
-        sheetPolygonDraft === null
-          ? `active ${workPlaneDisplayName(previewWorkPlane)}`
-          : `sheet draft ${workPlaneDisplayName(previewWorkPlane)}`,
-    }
+    return createCustomWorkPlanePreview(
+      editableDiagram.ambientDimension,
+      creationTool,
+      previewWorkPlane,
+      {
+        label:
+          sheetPolygonDraft === null
+            ? 'custom work plane'
+            : `sheet draft ${workPlaneDisplayName(previewWorkPlane)}`,
+      },
+    )
   }, [
     creationTool,
     editableDiagram.ambientDimension,
@@ -765,14 +764,20 @@ function App() {
         creationTool === 'createSheet' && current.sheetPolygonDraft !== null
           ? current.sheetPolygonDraft.workPlane
           : activeWorkPlane
-      const modelPoint = normalizePointForAmbientDimension(
-        current.editableDiagram.ambientDimension,
-        screenToModelOnWorkPlane(
-          previewCamera,
-          { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-          placementWorkPlane,
-        ),
-      )
+      let modelPoint: Vec3
+
+      try {
+        modelPoint = normalizePointForAmbientDimension(
+          current.editableDiagram.ambientDimension,
+          screenToModelOnWorkPlane(
+            previewCamera,
+            { x: svgPoint.x, y: viewportHeight - svgPoint.y },
+            placementWorkPlane,
+          ),
+        )
+      } catch {
+        return current
+      }
 
       if (creationTool === 'createPolyline') {
         const draftPoints = current.polylineDraft?.points ?? []

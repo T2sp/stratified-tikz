@@ -187,6 +187,13 @@ basis: `u` and `v` span the plane, and `normal = cross(u, v)`. The active work
 plane is editor/UI state, not part of `Diagram`; work-plane guides, previews,
 and source metadata are drawing aids and are not exported to TikZ.
 
+When a custom work plane is active in a 3D cursor workflow, the canvas may show
+a preview-only guide: a translucent patch, outline, origin marker, and
+`u`/`v`/normal direction indicators. The guide is not selectable, does not
+receive pointer events, is not stored in `Diagram`, and is omitted from TikZ
+output. Axis-aligned planes continue to define cursor placement, but the custom
+guide is shown only for active custom planes.
+
 The current editor UI can apply a 3D-only custom plane from numeric origin and
 normal inputs, or from three numeric points. Origin and normal inputs must be
 finite, and the normal must be nonzero. Three-point inputs must be finite,
@@ -203,6 +210,11 @@ uses their current `Vec3` positions to construct the active custom plane. The
 constructed plane may carry `source.kind: "existingPointStrata"` metadata in
 editor state, but neither the active work plane nor the picker state is part of
 `Diagram` serialization or TikZ export.
+
+Cursor-created points, free text labels, polylines, cubic Bezier curves, and
+polygon sheets use the active custom plane in 3D. Canvas clicks are projected
+onto that plane, then committed as ordinary global `Vec3` coordinates in the
+diagram model. Direct-input creation remains global-coordinate based.
 
 ## Strata
 

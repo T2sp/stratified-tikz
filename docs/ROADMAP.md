@@ -828,6 +828,29 @@ Out of scope:
 
 ⸻
 
+### Phase 12E: Custom work-plane preview and creation integration
+
+Implemented:
+
+* Active custom 3D work planes render as preview-only canvas guides with a
+  translucent patch, outline, origin marker, `u`/`v` indicators, normal
+  indicator, and label.
+* The guide is editor UI state only: it is not selectable, does not receive
+  pointer events, is not stored in `Diagram`, and is not exported to TikZ.
+* Cursor creation for points, free text labels, polylines, cubic Bezier curves,
+  and polygon sheets projects clicks onto the active custom plane and commits
+  ordinary global `Vec3` coordinates.
+* Existing axis-aligned work-plane cursor placement and direct global-coordinate
+  creation continue to work.
+
+Out of scope:
+
+* TikZ `3d` scope export.
+* Full camera controls.
+* Plane-local direct-coordinate entry.
+
+⸻
+
 ## Phase 13: Concatenated paths
 
 ⸻
