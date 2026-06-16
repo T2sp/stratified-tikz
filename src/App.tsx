@@ -1967,6 +1967,28 @@ function App() {
           </div>
         </div>
 
+        <div className="control-group history-control">
+          <span className="control-label">History</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={!canUndo}
+            onClick={undoLastChange}
+            title="Undo last diagram change"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={!canRedo}
+            onClick={redoLastChange}
+            title="Redo the last undone diagram change"
+          >
+            Redo
+          </button>
+        </div>
+
         <div className="control-group new-element-layer-control">
           <label className="direct-create-field new-element-layer-field">
             <span>New element layer</span>
@@ -2108,8 +2130,14 @@ function App() {
                       }
                     />
                   </label>
-                  <div className="direct-coordinate-source-control">
-                    <span className="control-label">Existing coordinate</span>
+                  <div
+                    className="direct-coordinate-source-control"
+                    role="group"
+                    aria-label="Copy coordinates from existing element"
+                  >
+                    <span className="control-label">
+                      Copy from existing element
+                    </span>
                     <label className="direct-create-field">
                       <span>Row</span>
                       <select
@@ -2130,7 +2158,7 @@ function App() {
                       </select>
                     </label>
                     <label className="direct-create-field direct-coordinate-source-field">
-                      <span>Source</span>
+                      <span>Use coordinates from</span>
                       <select
                         value={directSourceKey}
                         onChange={(event) => {
@@ -2152,7 +2180,7 @@ function App() {
                       disabled={existingCoordinateSourceOptions.length === 0}
                       onClick={applyExistingSourceToDirectRow}
                     >
-                      Use source
+                      Use selected coordinates
                     </button>
                     <button
                       type="button"
@@ -2209,58 +2237,38 @@ function App() {
           </button>
         </div>
 
-        <div className="control-group">
-          <span className="control-label">History</span>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canUndo}
-            onClick={undoLastChange}
-            title="Undo last diagram change"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canRedo}
-            onClick={redoLastChange}
-            title="Redo the last undone diagram change"
-          >
-            Redo
-          </button>
-        </div>
-
         <div className="control-group file-control">
           <span className="control-label">File</span>
-          <label className="filename-field">
-            <span className="control-label">Name</span>
+          <div className="file-action-strip">
+            <label className="filename-field">
+              <span className="control-label">Name</span>
+              <input
+                className="toolbar-text-input"
+                type="text"
+                value={jsonDownloadFilename}
+                onChange={(event) =>
+                  setJsonDownloadFilename(event.currentTarget.value)
+                }
+              />
+            </label>
+            <button type="button" className="toolbar-button" onClick={downloadJson}>
+              Download JSON
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={openLoadJsonPicker}
+            >
+              Load JSON
+            </button>
             <input
-              className="toolbar-text-input"
-              type="text"
-              value={jsonDownloadFilename}
-              onChange={(event) =>
-                setJsonDownloadFilename(event.currentTarget.value)
-              }
+              ref={loadFileInputRef}
+              className="file-input"
+              type="file"
+              accept="application/json,.json"
+              onChange={loadJsonFile}
             />
-          </label>
-          <button type="button" className="toolbar-button" onClick={downloadJson}>
-            Download JSON
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={openLoadJsonPicker}
-          >
-            Load JSON
-          </button>
-          <input
-            ref={loadFileInputRef}
-            className="file-input"
-            type="file"
-            accept="application/json,.json"
-            onChange={loadJsonFile}
-          />
+          </div>
           <span
             className={`toolbar-status file-status file-status-${saveLoadStatus}`}
             role="status"
@@ -2270,41 +2278,50 @@ function App() {
         </div>
 
         {shouldShowWorkPlaneControls(editableDiagram.ambientDimension) && (
-          <div className="control-group work-plane-control">
-            <span className="control-label">Work plane</span>
-            <select
-              className="toolbar-select"
-              value={workPlaneSelectValue(activeWorkPlane)}
-              onChange={(event) => {
-                const value = event.currentTarget.value as WorkPlaneSelectValue
+          <div
+            className="control-group work-plane-control"
+            role="group"
+            aria-label="Work plane"
+          >
+            <span className="control-label work-plane-title">Work plane</span>
+            <div className="work-plane-preset-row">
+              <label className="work-plane-preset-field">
+                <span>Preset</span>
+                <select
+                  className="toolbar-select"
+                  value={workPlaneSelectValue(activeWorkPlane)}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value as WorkPlaneSelectValue
 
-                if (value !== 'custom') {
-                  updateWorkPlaneKind(value)
-                }
-              }}
-            >
-              {activeWorkPlane.kind === 'custom' && (
-                <option value="custom">{activeWorkPlane.name}</option>
-              )}
-              {workPlaneKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {workPlaneLabel(kind)}
-                </option>
-              ))}
-            </select>
-            {activeWorkPlane.kind !== 'custom' && (
-              <label className="work-plane-fixed">
-                <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={String(workPlaneFixedValue(activeWorkPlane))}
-                  onChange={(event) =>
-                    updateWorkPlaneFixedValue(event.currentTarget.value)
-                  }
-                />
+                    if (value !== 'custom') {
+                      updateWorkPlaneKind(value)
+                    }
+                  }}
+                >
+                  {activeWorkPlane.kind === 'custom' && (
+                    <option value="custom">{activeWorkPlane.name}</option>
+                  )}
+                  {workPlaneKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {workPlaneLabel(kind)}
+                    </option>
+                  ))}
+                </select>
               </label>
-            )}
+              {activeWorkPlane.kind !== 'custom' && (
+                <label className="work-plane-fixed">
+                  <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={String(workPlaneFixedValue(activeWorkPlane))}
+                    onChange={(event) =>
+                      updateWorkPlaneFixedValue(event.currentTarget.value)
+                    }
+                  />
+                </label>
+              )}
+            </div>
             <form
               className="custom-work-plane-form"
               aria-label="Custom plane by origin and normal"

@@ -110,14 +110,55 @@
   min-width: 0;
 }
 
+.file-action-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
 .work-plane-control {
-  flex: 1 1 640px;
+  flex: 1 1 720px;
+  align-items: flex-start;
   justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--control-bg);
+}
+
+.work-plane-title {
+  padding-top: 7px;
+}
+
+.work-plane-preset-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.work-plane-preset-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(120px, 160px);
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.work-plane-preset-field .toolbar-select {
+  width: 100%;
+  max-width: none;
 }
 
 .work-plane-fixed {
   display: inline-grid;
-  grid-template-columns: auto 74px;
+  grid-template-columns: auto 60px;
   align-items: center;
   gap: 6px;
   color: var(--muted);
@@ -127,7 +168,8 @@
 
 .work-plane-fixed input {
   min-width: 0;
-  padding: 6px 8px;
+  min-height: 30px;
+  padding: 5px 6px;
   font-family: var(--mono);
 }
 
@@ -136,14 +178,14 @@
   align-items: center;
   flex: 1 1 420px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .custom-work-plane-vector {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -160,9 +202,9 @@
 
 .custom-work-plane-field {
   display: inline-grid;
-  grid-template-columns: auto 64px;
+  grid-template-columns: auto 56px;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
@@ -170,7 +212,8 @@
 
 .custom-work-plane-field input {
   min-width: 0;
-  padding: 6px 8px;
+  min-height: 30px;
+  padding: 5px 6px;
   font-family: var(--mono);
 }
 
@@ -233,6 +276,14 @@
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--control-bg);
+}
+
+.direct-coordinate-source-control > .control-label {
+  flex: 0 0 auto;
 }
 
 .direct-coordinate-source-field {
@@ -386,6 +437,10 @@
   flex: 1 1 320px;
 }
 
+.history-control {
+  flex: 0 0 auto;
+}
+
 .toolbar-status {
   min-width: 150px;
   color: var(--muted);
@@ -394,7 +449,7 @@
 }
 
 .file-control {
-  flex: 1 1 320px;
+  flex: 1 1 440px;
 }
 
 .layer-filter-control {
