@@ -55,6 +55,7 @@ import {
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  createExistingCoordinateSourceOptions,
   createCustomWorkPlanePreview,
   createDiagramHistory,
   createSheetPolygonDraft,
@@ -63,6 +64,7 @@ import {
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
   EditableInspector,
+  existingCoordinateSourceKey,
   findSelectedElement,
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
@@ -97,6 +99,8 @@ import {
   type DirectCubicBezierControlMode,
   type DirectPathCreationError,
   type DiagramHistory,
+  type ExistingCoordinateSource,
+  type ExistingCoordinateSourceOption,
   type GeometryHandleTarget,
   type LayerFilter,
   type SelectedElement,
@@ -116,6 +120,7 @@ type DirectCreationTool =
   | 'createPolyline'
   | 'createCubicBezier'
   | 'createSheet'
+type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -218,6 +223,17 @@ function App() {
   const [directSheetRows, setDirectSheetRows] = useState<string>(
     defaultDirectSheetRows(),
   )
+  const [directPolylineSources, setDirectPolylineSources] = useState<
+    Array<ExistingCoordinateSource | null>
+  >([])
+  const [directCubicBezierSources, setDirectCubicBezierSources] = useState<
+    Array<ExistingCoordinateSource | null>
+  >([])
+  const [directSheetSources, setDirectSheetSources] = useState<
+    Array<ExistingCoordinateSource | null>
+  >([])
+  const [directSourceTargetRow, setDirectSourceTargetRow] = useState<string>('1')
+  const [directSourceKey, setDirectSourceKey] = useState<string>('')
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
@@ -274,6 +290,10 @@ function App() {
   )
   const availableLayers = useMemo(
     () => deriveAvailableLayers(editableDiagram),
+    [editableDiagram],
+  )
+  const existingCoordinateSourceOptions = useMemo(
+    () => createExistingCoordinateSourceOptions(editableDiagram),
     [editableDiagram],
   )
   const previewWorkPlane = sheetPolygonDraft?.workPlane ?? activeWorkPlane
@@ -345,6 +365,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    resetDirectCoordinateSources()
     setActiveWorkPlane(
       normalizeActiveWorkPlaneForAmbientDimension(nextDiagram.ambientDimension, {
         kind: 'xy',
@@ -497,6 +518,7 @@ function App() {
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
+    resetDirectCoordinateSources()
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
@@ -997,10 +1019,7 @@ function App() {
     geometryDragUndoDiagramRef.current = null
   }
 
-  function updateDirectCoordinate(
-    axis: keyof DirectCoordinateInput,
-    value: string,
-  ): void {
+  function updateDirectCoordinate(axis: DirectCoordinateAxis, value: string): void {
     setDirectCoordinates((current) => ({
       ...current,
       [axis]: value,
@@ -1026,6 +1045,14 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function resetDirectCoordinateSources(): void {
+    setDirectPolylineSources([])
+    setDirectCubicBezierSources([])
+    setDirectSheetSources([])
+    setDirectSourceTargetRow('1')
+    setDirectSourceKey('')
+  }
+
   function updateDirectCubicBezierControlMode(
     mode: DirectCubicBezierControlMode,
   ): void {
@@ -1045,6 +1072,7 @@ function App() {
         ),
       ),
     )
+    setDirectCubicBezierSources([])
     setDirectCreationStatus('')
   }
 
@@ -1066,6 +1094,7 @@ function App() {
       ),
     )
     setDirectSheetRows(defaultDirectSheetRows(nextMode))
+    resetDirectCoordinateSources()
     setDirectCreationStatus('')
   }
 
@@ -1170,9 +1199,13 @@ function App() {
     }
 
     if (creationTool === 'createPolyline') {
+      const sourcedRows = applyDirectCoordinateSources(
+        coordinateRows,
+        directPolylineSources,
+      )
       const result = addPolylineCurveFromDirectInput(
         editableDiagram,
-        coordinateRows,
+        sourcedRows,
         directCreationCoordinateOptions({ layer: directLayer }),
       )
 
@@ -1193,7 +1226,7 @@ function App() {
 
     const result = addCubicBezierCurveFromDirectInput(
       editableDiagram,
-      coordinateRows,
+      applyDirectCoordinateSources(coordinateRows, directCubicBezierSources),
       directCreationCoordinateOptions({
         layer: directLayer,
         directControlMode: directCubicBezierControlMode,
@@ -1235,7 +1268,7 @@ function App() {
 
     const result = addPolygonSheetFromDirectInput(
       editableDiagram,
-      coordinateRows,
+      applyDirectCoordinateSources(coordinateRows, directSheetSources),
       directCreationCoordinateOptions({ layer: directLayer }),
     )
 
@@ -1305,6 +1338,66 @@ function App() {
     }
   }
 
+  function applyExistingSourceToDirectRow(): void {
+    if (!isDirectCreationTool(creationTool) || !isDirectPathCreationTool(creationTool)) {
+      return
+    }
+
+    const sourceOption = existingCoordinateSourceOptions.find(
+      (option) => option.key === directSourceKey,
+    )
+    const targetRow = Number(directSourceTargetRow)
+
+    if (sourceOption === undefined || !Number.isInteger(targetRow) || targetRow < 1) {
+      setDirectCreationStatus('Choose a valid existing coordinate source.')
+      return
+    }
+
+    updateDirectSourceForTool(creationTool, targetRow - 1, sourceOption.source)
+    setDirectCreationStatus(`Row ${targetRow} uses ${sourceOption.label}.`)
+  }
+
+  function clearExistingSourceFromDirectRow(): void {
+    if (!isDirectCreationTool(creationTool) || !isDirectPathCreationTool(creationTool)) {
+      return
+    }
+
+    const targetRow = Number(directSourceTargetRow)
+
+    if (!Number.isInteger(targetRow) || targetRow < 1) {
+      return
+    }
+
+    updateDirectSourceForTool(creationTool, targetRow - 1, null)
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectSourceForTool(
+    tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+    rowIndex: number,
+    source: ExistingCoordinateSource | null,
+  ): void {
+    const updateSources = (
+      sources: Array<ExistingCoordinateSource | null>,
+    ): Array<ExistingCoordinateSource | null> => {
+      const nextSources = [...sources]
+      nextSources[rowIndex] = source
+      return nextSources
+    }
+
+    switch (tool) {
+      case 'createPolyline':
+        setDirectPolylineSources(updateSources)
+        break
+      case 'createCubicBezier':
+        setDirectCubicBezierSources(updateSources)
+        break
+      case 'createSheet':
+        setDirectSheetSources(updateSources)
+        break
+    }
+  }
+
   function directRowsForCreationToolValue(
     tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
   ): string {
@@ -1315,6 +1408,19 @@ function App() {
         return directCubicBezierRows
       case 'createSheet':
         return directSheetRows
+    }
+  }
+
+  function directSourcesForCreationToolValue(
+    tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+  ): Array<ExistingCoordinateSource | null> {
+    switch (tool) {
+      case 'createPolyline':
+        return directPolylineSources
+      case 'createCubicBezier':
+        return directCubicBezierSources
+      case 'createSheet':
+        return directSheetSources
     }
   }
 
@@ -1930,6 +2036,66 @@ function App() {
                       }
                     />
                   </label>
+                  <div className="direct-coordinate-source-control">
+                    <span className="control-label">Existing coordinate</span>
+                    <label className="direct-create-field">
+                      <span>Row</span>
+                      <select
+                        value={directSourceTargetRow}
+                        onChange={(event) => {
+                          setDirectSourceTargetRow(event.currentTarget.value)
+                          setDirectCreationStatus('')
+                        }}
+                      >
+                        {directSourceTargetRows(
+                          directRowsForCreationToolValue(creationTool),
+                          creationTool,
+                        ).map((row) => (
+                          <option key={row} value={String(row)}>
+                            {row}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="direct-create-field direct-coordinate-source-field">
+                      <span>Source</span>
+                      <select
+                        value={directSourceKey}
+                        onChange={(event) => {
+                          setDirectSourceKey(event.currentTarget.value)
+                          setDirectCreationStatus('')
+                        }}
+                      >
+                        <option value="">Choose source</option>
+                        {existingCoordinateSourceOptions.map((option) => (
+                          <option key={option.key} value={option.key}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="toolbar-button"
+                      disabled={existingCoordinateSourceOptions.length === 0}
+                      onClick={applyExistingSourceToDirectRow}
+                    >
+                      Use source
+                    </button>
+                    <button
+                      type="button"
+                      className="toolbar-button"
+                      onClick={clearExistingSourceFromDirectRow}
+                    >
+                      Clear row
+                    </button>
+                    <span className="direct-source-summary">
+                      {directSourceSummary(
+                        directSourcesForCreationToolValue(creationTool),
+                        existingCoordinateSourceOptions,
+                      )}
+                    </span>
+                  </div>
                 </>
               )}
               <button type="submit" className="toolbar-button">
@@ -2420,6 +2586,66 @@ function directCoordinateRowsTextAreaRows(
   }
 }
 
+function applyDirectCoordinateSources(
+  rows: DirectCoordinateInput[],
+  sources: Array<ExistingCoordinateSource | null>,
+): DirectCoordinateInput[] {
+  return rows.map((row, index) => {
+    const source = sources[index]
+
+    return source === undefined || source === null ? row : { ...row, source }
+  })
+}
+
+function directSourceTargetRows(
+  rows: string,
+  tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+): number[] {
+  const rowCount = Math.max(countDirectCoordinateRows(rows), directMinimumRowCount(tool))
+
+  return Array.from({ length: rowCount }, (_value, index) => index + 1)
+}
+
+function directSourceSummary(
+  sources: Array<ExistingCoordinateSource | null>,
+  options: ExistingCoordinateSourceOption[],
+): string {
+  const labels = sources.flatMap((source, index) => {
+    if (source === null) {
+      return []
+    }
+
+    const key = existingCoordinateSourceKey(source)
+    const option = options.find((candidate) => candidate.key === key)
+    return [`Row ${index + 1}: ${option?.label ?? 'Unavailable source'}`]
+  })
+
+  return labels.length === 0 ? 'No source rows.' : labels.join('; ')
+}
+
+function countDirectCoordinateRows(rows: string): number {
+  const trimmedRows = rows.trim()
+
+  if (trimmedRows.length === 0) {
+    return 0
+  }
+
+  return trimmedRows.split(/\r?\n/u).filter((row) => row.trim().length > 0).length
+}
+
+function directMinimumRowCount(
+  tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
+): number {
+  switch (tool) {
+    case 'createPolyline':
+      return 2
+    case 'createCubicBezier':
+      return 4
+    case 'createSheet':
+      return 3
+  }
+}
+
 function defaultDirectPolylineRows(
   ambientDimension: AmbientDimension,
   coordinateMode: DirectCoordinateMode = 'global',
@@ -2574,7 +2800,7 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
 function directCoordinateAxes(
   ambientDimension: AmbientDimension,
   coordinateMode: DirectCoordinateMode = 'global',
-): Array<keyof DirectCoordinateInput> {
+): DirectCoordinateAxis[] {
   if (
     ambientDimension === 3 &&
     coordinateMode === 'workPlaneLocal'
@@ -2586,7 +2812,7 @@ function directCoordinateAxes(
 }
 
 function directCoordinateAxisLabel(
-  axis: keyof DirectCoordinateInput,
+  axis: DirectCoordinateAxis,
   ambientDimension: AmbientDimension,
   coordinateMode: DirectCoordinateMode,
 ): string {

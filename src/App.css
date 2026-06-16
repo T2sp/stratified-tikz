@@ -226,6 +226,27 @@
   resize: vertical;
 }
 
+.direct-coordinate-source-control {
+  display: flex;
+  align-items: center;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.direct-coordinate-source-field {
+  grid-template-columns: auto minmax(220px, 320px);
+}
+
+.direct-source-summary {
+  flex: 1 1 260px;
+  min-width: min(260px, 100%);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .toolbar-note {
   color: var(--muted);
   font-size: 12px;

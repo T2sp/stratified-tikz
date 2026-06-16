@@ -233,6 +233,17 @@ global `Vec3` diagram coordinates. Direct creation can also use active
 work-plane local `(a, b)` coefficients, but the committed geometry is still
 ordinary `Vec3` diagram data.
 
+Direct creation for path-like geometry can also use existing diagram
+coordinates as sources. Supported sources are point stratum positions, existing
+polyline vertices in 2D and 3D, polygon sheet vertices in 3D, and cubic Bezier
+start/control/end points. This is copy-on-create only: choosing a source copies
+the source's current model-space `Vec3` into the new curve or sheet, and the
+created geometry stores no live reference to the original source. Moving,
+editing, or deleting the source later does not update or invalidate the created
+geometry. In active work-plane local mode, an existing source must already lie
+on the active work plane within tolerance; off-plane sources are rejected rather
+than silently projected.
+
 ### Hybrid editing
 
 The user may create a point by cursor input and later refine it by direct input.
