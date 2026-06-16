@@ -1,5 +1,6 @@
 export * from './diagramUpdates.ts'
 export * from './coordinateSources.ts'
+export * from './coordinateSourceHighlights.ts'
 export * from './EditableInspector.tsx'
 export * from './geometryHandles.ts'
 export * from './inspectorDisclosure.ts'
