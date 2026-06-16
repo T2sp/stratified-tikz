@@ -25,6 +25,7 @@ import {
 } from './model/serialization.ts'
 import type {
   AmbientDimension,
+  AxisAlignedWorkPlaneName,
   Camera,
   CoordinateInputMode,
   Diagram,
@@ -158,7 +159,7 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createCubicBezier', label: 'Add cubic Bezier' },
   { id: 'createSheet', label: 'Add sheet' },
 ]
-const workPlaneKinds: WorkPlane['kind'][] = ['xy', 'xz', 'yz']
+const workPlaneKinds: AxisAlignedWorkPlaneName[] = ['xy', 'xz', 'yz']
 const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'absolute',
   'relativeCartesian',
@@ -1298,7 +1299,7 @@ function App() {
     setSheetStatus('Sheet canceled.')
   }
 
-  function updateWorkPlaneKind(kind: WorkPlane['kind']): void {
+  function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
     if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
       setSheetStatus('Finish or cancel the sheet before changing work plane.')
       return
@@ -1338,6 +1339,10 @@ function App() {
           return { ...current, y: fixedValue }
         case 'yz':
           return { ...current, x: fixedValue }
+        case 'axisAligned':
+          return { ...current, offset: fixedValue }
+        case 'custom':
+          return current
       }
     })
   }
@@ -1699,7 +1704,9 @@ function App() {
               className="toolbar-select"
               value={activeWorkPlane.kind}
               onChange={(event) =>
-                updateWorkPlaneKind(event.currentTarget.value as WorkPlane['kind'])
+                updateWorkPlaneKind(
+                  event.currentTarget.value as AxisAlignedWorkPlaneName,
+                )
               }
             >
               {workPlaneKinds.map((kind) => (
@@ -1802,7 +1809,7 @@ function App() {
   )
 }
 
-function workPlaneLabel(kind: WorkPlane['kind']): string {
+function workPlaneLabel(kind: AxisAlignedWorkPlaneName): string {
   switch (kind) {
     case 'xy':
       return 'xy plane'
@@ -1977,13 +1984,18 @@ function defaultDirectSheetRows(): string {
 }
 
 function workPlaneFixedAxis(workPlane: WorkPlane): string {
-  switch (workPlane.kind) {
+  const kind =
+    workPlane.kind === 'axisAligned' ? workPlane.plane : workPlane.kind
+
+  switch (kind) {
     case 'xy':
       return 'z'
     case 'xz':
       return 'y'
     case 'yz':
       return 'x'
+    case 'custom':
+      return 'offset'
   }
 }
 
@@ -1995,6 +2007,10 @@ function workPlaneFixedValue(workPlane: WorkPlane): number {
       return workPlane.y
     case 'yz':
       return workPlane.x
+    case 'axisAligned':
+      return workPlane.offset
+    case 'custom':
+      return 0
   }
 }
 

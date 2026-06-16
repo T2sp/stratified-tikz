@@ -31,10 +31,39 @@ export type Camera = Camera2D | Camera3D
 
 export type CoordinateInputMode = 'direct' | 'cursor'
 
-export type WorkPlane =
+export type AxisAlignedWorkPlaneName = 'xy' | 'xz' | 'yz'
+
+export type LegacyAxisAlignedWorkPlane =
   | { kind: 'xy'; z: number }
   | { kind: 'xz'; y: number }
   | { kind: 'yz'; x: number }
+
+export type AxisAlignedWorkPlane = {
+  kind: 'axisAligned'
+  plane: AxisAlignedWorkPlaneName
+  offset: number
+}
+
+export type CustomWorkPlaneSource =
+  | { kind: 'originNormal' }
+  | { kind: 'threePoints' }
+  | { kind: 'existingPointStrata'; pointIds: [string, string, string] }
+
+export type CustomWorkPlane = {
+  kind: 'custom'
+  id: string
+  name: string
+  origin: Vec3
+  u: Vec3
+  v: Vec3
+  normal: Vec3
+  source: CustomWorkPlaneSource
+}
+
+export type WorkPlane =
+  | LegacyAxisAlignedWorkPlane
+  | AxisAlignedWorkPlane
+  | CustomWorkPlane
 
 export type EditorState = {
   selectedId: string | null
