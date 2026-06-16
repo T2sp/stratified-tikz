@@ -412,7 +412,30 @@
   display: grid;
   justify-items: end;
   gap: 6px;
-  min-width: 118px;
+  min-width: 180px;
+}
+
+.tikz-export-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: end;
+  gap: 7px;
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.tikz-export-checkbox input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--focus);
+}
+
+.tikz-export-checkbox:has(input:disabled) {
+  opacity: 0.58;
 }
 
 .copy-button {

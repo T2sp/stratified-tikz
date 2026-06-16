@@ -235,6 +235,12 @@ not selectable, does not intercept pointer events, is not saved in the diagram,
 and is not exported to TikZ. Axis-aligned work planes remain available for
 cursor placement without using this custom guide.
 
+In 3D mode, the SVG preview also shows a faint xyz coordinate axes guide by
+default. This guide is centered at the model origin, is not a stratum, is not
+selectable, does not intercept pointer events, and exists only as editor/display
+state. It is separate from the active work-plane preview. TikZ export includes
+this axes guide only when the user enables the TikZ axes export option.
+
 Cursor creation on an active custom plane applies to points, free text labels,
 polylines, cubic Bezier curves, and polygon sheets. The click position is
 projected onto the active custom plane and the result is committed as ordinary

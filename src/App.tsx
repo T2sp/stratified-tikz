@@ -241,6 +241,8 @@ function App() {
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
     defaultJsonDownloadFilename,
   )
+  const [includeCoordinateAxesInTikz, setIncludeCoordinateAxesInTikz] =
+    useState<boolean>(false)
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
@@ -287,8 +289,11 @@ function App() {
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
   const tikzSource = useMemo(
-    () => generateTikz(editableDiagram),
-    [editableDiagram],
+    () =>
+      generateTikz(editableDiagram, {
+        includeCoordinateAxes: includeCoordinateAxesInTikz,
+      }),
+    [editableDiagram, includeCoordinateAxesInTikz],
   )
   const availableLayers = useMemo(
     () => deriveAvailableLayers(editableDiagram),
@@ -329,6 +334,11 @@ function App() {
     } catch {
       setCopyStatus('failed')
     }
+  }
+
+  function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
+    setIncludeCoordinateAxesInTikz(includeAxes)
+    setCopyStatus('idle')
   }
 
   function selectExample(exampleId: ExampleId): void {
@@ -2559,6 +2569,20 @@ function App() {
               <span>read-only source</span>
             </div>
             <div className="copy-controls">
+              <label className="tikz-export-checkbox">
+                <input
+                  type="checkbox"
+                  checked={
+                    editableDiagram.ambientDimension === 3 &&
+                    includeCoordinateAxesInTikz
+                  }
+                  disabled={editableDiagram.ambientDimension !== 3}
+                  onChange={(event) =>
+                    updateCoordinateAxesTikzExport(event.currentTarget.checked)
+                  }
+                />
+                <span>Show xyz axes in TikZ output</span>
+              </label>
               <button type="button" className="copy-button" onClick={copyTikz}>
                 Copy TikZ
               </button>

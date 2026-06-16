@@ -37,6 +37,11 @@ import {
   vertexHandleLabel,
 } from './svgGeometryHandles'
 import {
+  createCoordinateAxesGuide,
+  type CoordinateAxesGuide,
+  type CoordinateAxisGuide,
+} from './coordinateAxesGuide'
+import {
   allLayersFilter,
   layerFilterIncludesLayer,
   type LayerFilter,
@@ -112,7 +117,9 @@ export function SvgDiagram({
 }: SvgDiagramProps): ReactElement {
   const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
+  const coordinateAxesGuide = createCoordinateAxesGuide(diagram.ambientDimension)
   const extraPointsForFit = [
+    ...(coordinateAxesGuide?.fitPoints ?? []),
     ...(workPlanePreview?.corners ?? []),
     ...(sheetDraft ?? []),
     ...(polylineDraft ?? []),
@@ -202,6 +209,7 @@ export function SvgDiagram({
       }}
     >
       <rect width={width} height={height} fill="currentColor" opacity="0.04" />
+      {renderCoordinateAxesGuide(coordinateAxesGuide, camera, height)}
       {renderWorkPlanePreview(workPlanePreview, camera, height)}
       <g>{items.map((item) => item.element)}</g>
       {renderSheetDraft(sheetDraft, camera, height)}
@@ -228,6 +236,72 @@ export function SvgDiagram({
           )
         : null}
     </svg>
+  )
+}
+
+function renderCoordinateAxesGuide(
+  guide: CoordinateAxesGuide | null,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (guide === null) {
+    return null
+  }
+
+  return (
+    <g
+      key="coordinate-axes-guide"
+      className="svg-coordinate-axes-guide"
+      pointerEvents={guide.pointerEvents}
+      aria-hidden="true"
+      data-selectable={String(guide.selectable)}
+    >
+      {guide.axes.map((axis) =>
+        renderCoordinateAxisGuide(axis, camera, viewportHeight),
+      )}
+    </g>
+  )
+}
+
+function renderCoordinateAxisGuide(
+  axis: CoordinateAxisGuide,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement {
+  const from = projectToSvgPoint(camera, axis.from, viewportHeight)
+  const to = projectToSvgPoint(camera, axis.to, viewportHeight)
+  const labelPosition = projectToSvgPoint(
+    camera,
+    axis.labelPosition,
+    viewportHeight,
+  )
+  const axisColor = '#64748B'
+
+  return (
+    <g key={`coordinate-axis-${axis.axis}`}>
+      <path
+        d={polylineToSvgPath([from, to])}
+        fill="none"
+        stroke={axisColor}
+        strokeOpacity={0.38}
+        strokeWidth={1.15}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={to.x} cy={to.y} r={2.4} fill={axisColor} opacity={0.32} />
+      <text
+        x={labelPosition.x}
+        y={labelPosition.y}
+        fill={axisColor}
+        opacity={0.58}
+        fontSize={10}
+        fontWeight={650}
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {axis.label}
+      </text>
+    </g>
   )
 }
 
