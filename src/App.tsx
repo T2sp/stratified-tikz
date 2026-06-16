@@ -59,6 +59,7 @@ import {
   createDiagramHistory,
   createSheetPolygonDraft,
   defaultCustomOriginNormalWorkPlaneInput,
+  defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
   deriveAvailableLayers,
   EditableInspector,
@@ -77,9 +78,11 @@ import {
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
   applyCustomOriginNormalWorkPlaneInput,
+  applyCustomThreePointWorkPlaneInput,
   workPlaneDisplayName,
   workPlaneSelectValue,
   type CustomOriginNormalWorkPlaneInput,
+  type CustomThreePointWorkPlaneInput,
   type DirectCoordinateInput,
   type DirectCubicBezierControlMode,
   type DirectPathCreationError,
@@ -215,6 +218,10 @@ function App() {
   const [customWorkPlaneInput, setCustomWorkPlaneInput] =
     useState<CustomOriginNormalWorkPlaneInput>(
       defaultCustomOriginNormalWorkPlaneInput,
+    )
+  const [customThreePointWorkPlaneInput, setCustomThreePointWorkPlaneInput] =
+    useState<CustomThreePointWorkPlaneInput>(
+      defaultCustomThreePointWorkPlaneInput,
     )
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
@@ -1399,7 +1406,22 @@ function App() {
     setWorkPlaneStatus('')
   }
 
-  function applyCustomWorkPlane(): void {
+  function updateCustomThreePointWorkPlaneVectorInput(
+    point: keyof CustomThreePointWorkPlaneInput,
+    axis: keyof CustomThreePointWorkPlaneInput['p0'],
+    value: string,
+  ): void {
+    setCustomThreePointWorkPlaneInput((current) => ({
+      ...current,
+      [point]: {
+        ...current[point],
+        [axis]: value,
+      },
+    }))
+    setWorkPlaneStatus('')
+  }
+
+  function applyCustomOriginNormalWorkPlane(): void {
     if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
       setSheetStatus('Finish or cancel the sheet before changing work plane.')
       setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
@@ -1410,6 +1432,26 @@ function App() {
       activeWorkPlane,
       editableDiagram.ambientDimension,
       customWorkPlaneInput,
+    )
+
+    setWorkPlaneStatus(result.status)
+
+    if (result.ok) {
+      setActiveWorkPlane(result.workPlane)
+    }
+  }
+
+  function applyCustomThreePointWorkPlane(): void {
+    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
+      setSheetStatus('Finish or cancel the sheet before changing work plane.')
+      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+      return
+    }
+
+    const result = applyCustomThreePointWorkPlaneInput(
+      activeWorkPlane,
+      editableDiagram.ambientDimension,
+      customThreePointWorkPlaneInput,
     )
 
     setWorkPlaneStatus(result.status)
@@ -1810,7 +1852,7 @@ function App() {
               aria-label="Custom plane by origin and normal"
               onSubmit={(event) => {
                 event.preventDefault()
-                applyCustomWorkPlane()
+                applyCustomOriginNormalWorkPlane()
               }}
             >
               <span className="control-label">
@@ -1859,10 +1901,45 @@ function App() {
               <button type="submit" className="toolbar-button">
                 Apply
               </button>
-              <span className="toolbar-status" role="status">
-                {workPlaneStatus}
-              </span>
             </form>
+            <form
+              className="custom-work-plane-form"
+              aria-label="Custom plane by three points"
+              onSubmit={(event) => {
+                event.preventDefault()
+                applyCustomThreePointWorkPlane()
+              }}
+            >
+              <span className="control-label">Custom plane by 3 points</span>
+              {(['p0', 'p1', 'p2'] as const).map((point) => (
+                <fieldset key={point} className="custom-work-plane-vector">
+                  <legend>{point.toUpperCase()}</legend>
+                  {workPlaneVectorAxes.map((axis) => (
+                    <label key={axis} className="custom-work-plane-field">
+                      <span>{axis}</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={customThreePointWorkPlaneInput[point][axis]}
+                        onChange={(event) =>
+                          updateCustomThreePointWorkPlaneVectorInput(
+                            point,
+                            axis,
+                            event.currentTarget.value,
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                </fieldset>
+              ))}
+              <button type="submit" className="toolbar-button">
+                Apply
+              </button>
+            </form>
+            <span className="toolbar-status" role="status">
+              {workPlaneStatus}
+            </span>
           </div>
         )}
       </section>
