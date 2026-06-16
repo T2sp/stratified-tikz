@@ -552,12 +552,11 @@ function App() {
 
   useEffect(() => {
     setActiveWorkPlane((current) =>
-      normalizeActiveWorkPlaneForDiagram(
-        editableDiagram,
-        current,
-      ),
+      normalizeActiveWorkPlaneForDiagram(editableDiagram, current),
     )
+  }, [editableDiagram])
 
+  useEffect(() => {
     if (editableDiagram.ambientDimension === 2) {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
       setWorkPlaneStatus('')

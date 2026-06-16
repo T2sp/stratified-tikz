@@ -156,6 +156,41 @@ test('parseSavedDiagramJson accepts missing optional path labels', () => {
   assert.equal(result.ok, true)
 })
 
+test('parseSavedDiagramJson strips editor-only active work-plane state before round-trip', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: Diagram & {
+      activeWorkPlane?: WorkPlane
+    }
+  }
+  saved.diagram.activeWorkPlane = {
+    kind: 'custom',
+    id: 'loaded-editor-only-plane',
+    name: 'Loaded editor-only plane',
+    origin: { x: 1, y: 2, z: 3 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+    source: {
+      kind: 'existingPointStrata',
+      pointIds: ['p0', 'p1', 'p2'],
+    },
+  }
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal('activeWorkPlane' in result.diagram, false)
+  assert.equal(serializeDiagram(result.diagram).includes('activeWorkPlane'), false)
+  assert.equal(
+    serializeDiagram(result.diagram).includes('loaded-editor-only-plane'),
+    false,
+  )
+})
+
 test('parseSavedDiagramJson accepts cubic Bezier curves without control metadata as absolute', () => {
   const result = parseSavedDiagramJson(serializeDiagram(twoDimensionalExample))
 

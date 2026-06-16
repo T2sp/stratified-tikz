@@ -24,7 +24,7 @@ export function serializeDiagram(diagram: Diagram): string {
   const savedFile: SavedDiagramFile = {
     format: savedDiagramFormat,
     version: savedDiagramVersion,
-    diagram,
+    diagram: toPersistentDiagram(diagram),
   }
 
   return `${JSON.stringify(savedFile, null, 2)}\n`
@@ -70,7 +70,7 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  const diagram = parsed.diagram as Diagram
+  const diagram = toPersistentDiagram(parsed.diagram as Diagram)
   let validation: DiagramValidationResult
 
   try {
@@ -114,6 +114,16 @@ function isDiagramLike(value: unknown): boolean {
     Array.isArray(value.labels) &&
     value.labels.every(isRecord)
   )
+}
+
+function toPersistentDiagram(diagram: Diagram): Diagram {
+  return {
+    version: diagram.version,
+    ambientDimension: diagram.ambientDimension,
+    camera: diagram.camera,
+    strata: diagram.strata,
+    labels: diagram.labels,
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

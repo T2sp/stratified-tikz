@@ -245,6 +245,32 @@ test('active custom planes from existing points are valid only while source poin
   )
 })
 
+test('active custom planes from existing points reset through undo and redo diagram changes', () => {
+  const diagramWithSourcePoints = createPointPickingDiagram()
+  const activeWorkPlane = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 0 },
+    3,
+    diagramWithSourcePoints,
+    { active: true, pickedPointIds: ['p0', 'p1', 'p2'] },
+  ).workPlane
+  const diagramAfterUndoingSourcePoint: Diagram = {
+    ...diagramWithSourcePoints,
+    strata: diagramWithSourcePoints.strata.filter(
+      (stratum) => stratum.id !== 'p2',
+    ),
+  }
+  const resetWorkPlane = normalizeActiveWorkPlaneForDiagram(
+    diagramAfterUndoingSourcePoint,
+    activeWorkPlane,
+  )
+
+  assert.deepEqual(resetWorkPlane, { kind: 'xy', z: 0 })
+  assert.deepEqual(
+    normalizeActiveWorkPlaneForDiagram(diagramWithSourcePoints, resetWorkPlane),
+    { kind: 'xy', z: 0 },
+  )
+})
+
 test('picking three distinct point strata creates a custom work plane', () => {
   const diagram = createPointPickingDiagram()
   const started = startWorkPlanePointPicking(3)
