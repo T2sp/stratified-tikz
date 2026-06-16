@@ -10,13 +10,17 @@ import type {
   PointStratum,
   SheetStratum,
   TextLabel,
+  OrthographicCamera3D,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
-import { createInitialCamera3D } from '../model/camera.ts'
+import {
+  createInitialCamera3D,
+  isOrthographicCamera3D,
+} from '../model/camera.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   pointFromWorkPlaneLocalCoordinate,
@@ -55,7 +59,7 @@ export type GenerateTikzOptions = {
 
 type GenerateContext = {
   mode: TikzMode
-  camera3d?: Camera3D
+  camera3d?: OrthographicCamera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
   hasSavedPaths: boolean
@@ -228,7 +232,7 @@ export function layerToTikzLayerName(layer: number): string {
 function createContext(
   mode: TikzMode,
   options: GenerateTikzOptions,
-  camera3d?: Camera3D,
+  camera3d?: OrthographicCamera3D,
 ): GenerateContext {
   return {
     mode,
@@ -245,16 +249,30 @@ function createContext(
 function resolveTikzCamera3D(
   diagram: Diagram,
   options: GenerateTikzOptions,
-): Camera3D {
+): OrthographicCamera3D {
   if (options.camera3d !== undefined) {
-    return options.camera3d
+    return supportedTikzCamera3D(options.camera3d)
   }
 
   if (diagram.view?.camera3d !== undefined) {
-    return diagram.view.camera3d
+    return supportedTikzCamera3D(diagram.view.camera3d)
   }
 
-  return diagram.camera.mode === '3d' ? diagram.camera : createInitialCamera3D()
+  if (diagram.camera.mode === '3d') {
+    return supportedTikzCamera3D(diagram.camera)
+  }
+
+  return createInitialCamera3D()
+}
+
+function supportedTikzCamera3D(camera: Camera3D): OrthographicCamera3D {
+  if (isOrthographicCamera3D(camera)) {
+    return camera
+  }
+
+  throw new Error(
+    'Perspective TikZ export is not supported; 3D TikZ export uses tikz-3dplot orthographic theta/phi.',
+  )
 }
 
 function assembleTikz({

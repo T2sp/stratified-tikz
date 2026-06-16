@@ -2,11 +2,12 @@ import { validateCamera3D } from '../geometry/projection.ts'
 import {
   cloneCamera3D,
   createInitialCamera3D,
+  isOrthographicCamera3D,
 } from '../model/camera.ts'
 import type {
   AmbientDimension,
-  Camera3D,
   Diagram,
+  OrthographicCamera3D,
   Vec2,
 } from '../model/types.ts'
 
@@ -29,11 +30,11 @@ export type CameraPresetOption = {
 export type CameraInputResult =
   | {
       ok: true
-      camera: Camera3D
+      camera: OrthographicCamera3D
     }
   | {
       ok: false
-      camera: Camera3D
+      camera: OrthographicCamera3D
       message: string
     }
 
@@ -56,29 +57,36 @@ export function shouldShowCameraControls(
   return ambientDimension === 3
 }
 
-export function createInitialCameraControlState(): Camera3D {
+export function createInitialCameraControlState(): OrthographicCamera3D {
   return createInitialCamera3D()
 }
 
-export function resetCameraControlState(): Camera3D {
+export function resetCameraControlState(): OrthographicCamera3D {
   return createInitialCameraControlState()
 }
 
-export function cameraControlStateFromDiagramView(diagram: Diagram): Camera3D {
+export function cameraControlStateFromDiagramView(
+  diagram: Diagram,
+): OrthographicCamera3D {
   if (diagram.ambientDimension !== 3) {
     return createInitialCameraControlState()
   }
 
-  if (diagram.view?.camera3d !== undefined) {
+  if (
+    diagram.view?.camera3d !== undefined &&
+    isOrthographicCamera3D(diagram.view.camera3d)
+  ) {
     return cloneCamera3D(diagram.view.camera3d)
   }
 
-  return diagram.camera.mode === '3d'
+  return diagram.camera.mode === '3d' && isOrthographicCamera3D(diagram.camera)
     ? cloneCamera3D(diagram.camera)
     : createInitialCameraControlState()
 }
 
-export function fitCameraControlState(camera: Camera3D): Camera3D {
+export function fitCameraControlState(
+  camera: OrthographicCamera3D,
+): OrthographicCamera3D {
   return {
     ...cloneCamera3D(camera),
     zoom: 1,
@@ -86,7 +94,9 @@ export function fitCameraControlState(camera: Camera3D): Camera3D {
   }
 }
 
-export function cameraOrientationForPreview(camera: Camera3D): Camera3D {
+export function cameraOrientationForPreview(
+  camera: OrthographicCamera3D,
+): OrthographicCamera3D {
   return {
     ...cloneCamera3D(camera),
     zoom: 1,
@@ -95,7 +105,7 @@ export function cameraOrientationForPreview(camera: Camera3D): Camera3D {
 }
 
 export function cameraViewAdjustmentFromControls(
-  camera: Camera3D,
+  camera: OrthographicCamera3D,
 ): CameraViewAdjustment {
   return {
     zoom: camera.zoom,
@@ -103,7 +113,9 @@ export function cameraViewAdjustmentFromControls(
   }
 }
 
-export function createCameraPresetCamera(presetId: CameraPresetId): Camera3D {
+export function createCameraPresetCamera(
+  presetId: CameraPresetId,
+): OrthographicCamera3D {
   switch (presetId) {
     case 'initial':
       return createInitialCameraControlState()
@@ -123,7 +135,7 @@ export function isCameraPresetId(value: string): value is CameraPresetId {
 }
 
 export function applyCameraNumericInput(
-  camera: Camera3D,
+  camera: OrthographicCamera3D,
   field: CameraControlField,
   rawValue: string,
 ): CameraInputResult {
@@ -175,7 +187,7 @@ export function applyCameraNumericInput(
 }
 
 export function cameraControlFieldValue(
-  camera: Camera3D,
+  camera: OrthographicCamera3D,
   field: CameraControlField,
 ): string {
   switch (field) {
@@ -192,14 +204,14 @@ export function cameraControlFieldValue(
   }
 }
 
-export function cameraSummaryLabel(camera: Camera3D): string {
+export function cameraSummaryLabel(camera: OrthographicCamera3D): string {
   return `theta ${formatCameraNumber(camera.thetaDeg)}, phi ${formatCameraNumber(
     camera.phiDeg,
   )}, zoom ${formatCameraNumber(camera.zoom)}`
 }
 
 export function cameraPresetIdForCamera(
-  camera: Camera3D,
+  camera: OrthographicCamera3D,
 ): CameraPresetId | null {
   return (
     cameraPresetIds.find((presetId) =>
@@ -208,7 +220,10 @@ export function cameraPresetIdForCamera(
   )
 }
 
-function createAngleCamera(thetaDeg: number, phiDeg: number): Camera3D {
+function createAngleCamera(
+  thetaDeg: number,
+  phiDeg: number,
+): OrthographicCamera3D {
   return {
     mode: '3d',
     kind: 'orthographic',
@@ -230,7 +245,7 @@ function parseFiniteInput(rawValue: string): number | null {
 }
 
 function invalidCameraInput(
-  camera: Camera3D,
+  camera: OrthographicCamera3D,
   message: string,
 ): CameraInputResult {
   return {
@@ -263,7 +278,10 @@ function formatCameraNumber(value: number): string {
   return String(Number(value.toPrecision(12)))
 }
 
-export function areCamera3DEqual(left: Camera3D, right: Camera3D): boolean {
+export function areCamera3DEqual(
+  left: OrthographicCamera3D,
+  right: OrthographicCamera3D,
+): boolean {
   return (
     left.mode === right.mode &&
     left.kind === right.kind &&

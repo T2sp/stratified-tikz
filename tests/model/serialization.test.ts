@@ -11,7 +11,12 @@ import {
   savedDiagramVersion,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
-import type { Camera3D, Diagram, WorkPlane } from '../../src/model/types.ts'
+import type {
+  Camera3D,
+  Diagram,
+  PerspectiveCamera3D,
+  WorkPlane,
+} from '../../src/model/types.ts'
 
 test('serializeDiagram includes format, version, and diagram data', () => {
   const serialized = serializeDiagram(twoDimensionalExample)
@@ -235,6 +240,38 @@ test('parseSavedDiagramJson falls back safely for invalid 3D camera metadata', (
   assert.deepEqual(result.diagram.camera, createInitialCamera3D())
   assert.deepEqual(result.diagram.view?.camera3d, createInitialCamera3D())
   assert.match(result.warnings.join(' '), /camera metadata is invalid/)
+})
+
+test('parseSavedDiagramJson rejects unsupported perspective camera metadata', () => {
+  const perspectiveCamera: PerspectiveCamera3D = {
+    mode: '3d',
+    kind: 'perspective',
+    thetaDeg: 13,
+    phiDeg: -23,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    target: { x: 0, y: 0, z: 0 },
+    distance: 8,
+    fieldOfViewDeg: 45,
+  }
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: {
+      view: {
+        camera3d: Camera3D
+      }
+    }
+  }
+  saved.diagram.view.camera3d = perspectiveCamera
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram.camera, createInitialCamera3D())
+  assert.deepEqual(result.diagram.view?.camera3d, createInitialCamera3D())
+  assert.match(result.warnings.join(' '), /perspective 3D camera metadata is unsupported/)
 })
 
 test('parseSavedDiagramJson rejects malformed JSON', () => {

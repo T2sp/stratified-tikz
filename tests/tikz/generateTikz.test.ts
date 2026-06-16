@@ -9,6 +9,7 @@ import {
 import type {
   CurveStyle,
   Diagram,
+  PerspectiveCamera3D,
   PointShape,
   PointStratum,
   PointStyle,
@@ -110,6 +111,25 @@ test('reset to initial camera restores initial TikZ camera values', () => {
 
   assert.match(changed, /\\tdplotsetmaincoords\{80\}\{120\}/)
   assert.match(reset, /\\tdplotsetmaincoords\{13\}\{-23\}/)
+})
+
+test('3D TikZ export rejects unsupported perspective cameras', () => {
+  const camera: PerspectiveCamera3D = {
+    mode: '3d',
+    kind: 'perspective',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    target: { x: 0, y: 0, z: 0 },
+    distance: 8,
+    fieldOfViewDeg: 45,
+  }
+
+  assert.throws(
+    () => generateTikz(createThreeDimensionalDiagram(), { camera3d: camera }),
+    /Perspective TikZ export is not supported/,
+  )
 })
 
 test('TikZ output excludes coordinate axes by default', () => {

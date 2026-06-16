@@ -22,7 +22,13 @@ import {
   INITIAL_CAMERA_3D,
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
-import type { Camera2D, Camera3D, Vec2, Vec3 } from '../../src/model/types.ts'
+import type {
+  Camera2D,
+  Camera3D,
+  PerspectiveCamera3D,
+  Vec2,
+  Vec3,
+} from '../../src/model/types.ts'
 
 const camera2D: Camera2D = {
   mode: '2d',
@@ -53,8 +59,25 @@ const changedAngleCamera3D: Camera3D = {
   pan: { x: 80, y: 45 },
 }
 
+const perspectiveCamera3D: PerspectiveCamera3D = {
+  mode: '3d',
+  kind: 'perspective',
+  thetaDeg: 13,
+  phiDeg: -23,
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+  target: { x: 0, y: 0, z: 0 },
+  distance: 8,
+  fieldOfViewDeg: 45,
+}
+
 test('initial 3D camera exists and validates', () => {
-  assert.equal(validateCamera3D(INITIAL_CAMERA_3D).valid, true)
+  const validation = validateCamera3D(INITIAL_CAMERA_3D)
+
+  assert.equal(validation.valid, true)
+  assert.equal(validation.structurallyValid, true)
+  assert.equal(validation.supported, true)
+  assert.equal(validation.kind, 'orthographic')
 })
 
 test('initial 3D camera preview aligns with exported tikz-3dplot angles', () => {
@@ -161,6 +184,41 @@ test('invalid 3D camera values are rejected', () => {
   invalidCameras.forEach((camera) => {
     assert.equal(validateCamera3D(camera).valid, false)
   })
+})
+
+test('perspective 3D camera scaffold validates structurally but is unsupported', () => {
+  const validation = validateCamera3D(perspectiveCamera3D)
+
+  assert.equal(validation.kind, 'perspective')
+  assert.equal(validation.structurallyValid, true)
+  assert.equal(validation.supported, false)
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map((error) => error.message).join(' '),
+    /Perspective 3D cameras are recognized but not supported yet/,
+  )
+})
+
+test('perspective 3D camera scaffold validates perspective-specific fields', () => {
+  const validation = validateCamera3D({
+    ...perspectiveCamera3D,
+    fieldOfViewDeg: 180,
+  })
+
+  assert.equal(validation.kind, 'perspective')
+  assert.equal(validation.structurallyValid, false)
+  assert.equal(validation.supported, false)
+  assert.match(
+    validation.errors.map((error) => error.message).join(' '),
+    /Field of view must be greater than 0 and less than 180 degrees/,
+  )
+})
+
+test('unsupported perspective projection fails clearly', () => {
+  assert.throws(
+    () => projectVec3WithCamera({ x: 1, y: 2, z: 3 }, perspectiveCamera3D),
+    /SVG projection supports only orthographic 3D cameras/,
+  )
 })
 
 test('reset helper returns the initial 3D camera', () => {
@@ -273,6 +331,20 @@ test('camera ray intersects a work plane at the projected model point', () => {
       workPlane,
     ),
     modelPoint,
+  )
+})
+
+test('orthographic camera rays are parallel across screen points', () => {
+  const firstRay = screenRayFromCameraPoint({ x: 10, y: 20 }, camera3D)
+  const secondRay = screenRayFromCameraPoint({ x: 120, y: -40 }, camera3D)
+
+  assertVec3AlmostEqual(firstRay.direction, secondRay.direction)
+})
+
+test('unsupported perspective work-plane picking fails clearly', () => {
+  assert.throws(
+    () => screenRayFromCameraPoint({ x: 0, y: 0 }, perspectiveCamera3D),
+    /work-plane picking supports only orthographic 3D cameras/,
   )
 })
 
