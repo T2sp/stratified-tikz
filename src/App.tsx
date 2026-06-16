@@ -14,10 +14,7 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from './examples'
-import {
-  normalizePointForAmbientDimension,
-  screenToModelOnWorkPlane,
-} from './geometry'
+import { normalizePointForAmbientDimension } from './geometry'
 import {
   parseSavedDiagramJson,
   serializeDiagram,
@@ -33,7 +30,7 @@ import type {
   Vec3,
   WorkPlane,
 } from './model/types'
-import { SvgDiagram } from './rendering'
+import { SvgDiagram, svgPointToModelOnWorkPlane } from './rendering'
 import { generateTikz } from './tikz'
 import {
   addCubicBezierCurveFromDirectInput,
@@ -960,13 +957,15 @@ function App() {
     try {
       modelPoint = normalizePointForAmbientDimension(
         editableDiagram.ambientDimension,
-        screenToModelOnWorkPlane(
-          { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-          placementWorkPlane,
+        svgPointToModelOnWorkPlane(
           previewCamera,
+          svgPoint,
+          viewportHeight,
+          placementWorkPlane,
         ),
       )
     } catch {
+      setCursorCreationSourceStatus('Click did not intersect the active work plane.')
       return
     }
 
@@ -1229,10 +1228,11 @@ function App() {
       try {
         modelPoint = normalizePointForAmbientDimension(
           current.editableDiagram.ambientDimension,
-          screenToModelOnWorkPlane(
-            { x: svgPoint.x, y: viewportHeight - svgPoint.y },
-            activeWorkPlane,
+          svgPointToModelOnWorkPlane(
             previewCamera,
+            svgPoint,
+            viewportHeight,
+            activeWorkPlane,
           ),
         )
       } catch {
