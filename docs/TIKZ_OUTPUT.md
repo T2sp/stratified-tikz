@@ -34,9 +34,11 @@ It must not care whether the coordinates were created by direct input or cursor 
 Coordinate input mode belongs to the editor state, not to the TikZ output.
 Active work-plane state also belongs to the editor state. Axis-aligned work
 planes, custom work planes, work-plane point-picking state, camera preview
-guides, and work-plane labels are never exported. They affect TikZ only
-indirectly when cursor-created geometry has already been committed to the
-diagram as ordinary model coordinates.
+guides, and work-plane labels are never exported. The 3D SVG coordinate axes
+preview guide is also editor/display state, not diagram geometry; it is exported
+only when the user enables the coordinate axes TikZ export option. These editor
+aids affect TikZ only indirectly when cursor-created geometry has already been
+committed to the diagram as ordinary model coordinates.
 
 ## Coordinate names
 
@@ -134,6 +136,40 @@ Lower numeric layer values are listed before higher numeric layer values, so
 they render behind higher layers. The `main` layer is retained in
 `\pgfsetlayers` for compatibility, although exported diagram elements are placed
 on explicit `stratifiedLayer...` layers.
+
+If optional 3D coordinate axes export is enabled, the generator also declares a
+`stratifiedGuideLayer` before ordinary diagram layers. The axes guide is not a
+stratum and is emitted in its own documented block so it remains visually behind
+ordinary diagram geometry:
+
+```tex
+\pgfdeclarelayer{stratifiedGuideLayer}
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfsetlayers{stratifiedGuideLayer,stratifiedLayer0,main}
+
+% ----------------------------------------------------------------------------
+% Coordinate axes guide
+% ----------------------------------------------------------------------------
+
+% Optional 3D coordinate axes guide. This is not a stratum.
+\begin{pgfonlayer}{stratifiedGuideLayer}
+  \draw[
+    draw=stzCoordinateAxesGuide,
+    draw opacity=0.35,
+    line width=0.4pt,
+    ->
+  ]
+    (0,0,0) -- (2.5,0,0);
+  \node[
+    text=stzCoordinateAxesGuide,
+    opacity=0.55,
+    font=\scriptsize
+  ] at (2.75,0,0) {$x$};
+\end{pgfonlayer}
+```
+
+The y and z axes are emitted similarly, with labels `$y$` and `$z$`. The option
+is disabled by default so ordinary TikZ output remains clean.
 
 Drawing commands for sheets, curves, points, and free text labels are wrapped in
 `pgfonlayer` blocks:

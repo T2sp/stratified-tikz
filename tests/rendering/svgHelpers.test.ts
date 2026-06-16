@@ -7,6 +7,7 @@ import {
   regularPolygonPoints,
   starPolygonPoints,
 } from '../../src/rendering/svgPath.ts'
+import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import type { CubicBezierControlMode, Diagram } from '../../src/model/types.ts'
@@ -254,6 +255,74 @@ test('resolveSvgCamera returns a safe fitted camera for empty diagrams', () => {
   assert.equal(Number.isFinite(empty2dCamera.scale), true)
   assert.equal(Number.isFinite(empty3dCamera.scale), true)
   assert.deepEqual(origin, { x: 100, y: 60 })
+})
+
+test('3D coordinate axes guide data is available for preview rendering', () => {
+  const guide = createCoordinateAxesGuide(3)
+
+  assert.notEqual(guide, null)
+  if (guide === null) {
+    throw new Error('Expected a 3D coordinate axes guide.')
+  }
+
+  assert.deepEqual(
+    guide.axes.map((axis) => axis.axis),
+    ['x', 'y', 'z'],
+  )
+  assert.deepEqual(guide.axes[0].from, { x: 0, y: 0, z: 0 })
+  assert.deepEqual(guide.axes[0].to, { x: 2.5, y: 0, z: 0 })
+  assert.equal(guide.fitPoints.length, 9)
+})
+
+test('2D diagrams do not create a 3D coordinate axes guide', () => {
+  assert.equal(createCoordinateAxesGuide(2), null)
+})
+
+test('coordinate axes guide is preview-only and not selectable', () => {
+  const guide = createCoordinateAxesGuide(3)
+
+  assert.notEqual(guide, null)
+  if (guide === null) {
+    throw new Error('Expected a 3D coordinate axes guide.')
+  }
+
+  assert.equal(guide.pointerEvents, 'none')
+  assert.equal(guide.selectable, false)
+})
+
+test('empty 3D coordinate axes guide projects with the SVG camera', () => {
+  const guide = createCoordinateAxesGuide(3)
+
+  assert.notEqual(guide, null)
+  if (guide === null) {
+    throw new Error('Expected a 3D coordinate axes guide.')
+  }
+
+  const camera = resolveSvgCamera(
+    createEmptyDiagram({ ambientDimension: 3 }),
+    200,
+    120,
+    {
+      fitToView: true,
+      extraPointsForFit: guide.fitPoints,
+    },
+  )
+  const projectedPoints = guide.fitPoints.map((point) =>
+    projectToSvgPoint(camera, point, 120),
+  )
+
+  assert.equal(camera.mode, '3d')
+  assert.ok(
+    projectedPoints.every(
+      (point) =>
+        Number.isFinite(point.x) &&
+        Number.isFinite(point.y) &&
+        point.x >= 0 &&
+        point.x <= 200 &&
+        point.y >= 0 &&
+        point.y <= 120,
+    ),
+  )
 })
 
 test('projectToSvgPoint keeps positive x right and makes positive y appear upward', () => {

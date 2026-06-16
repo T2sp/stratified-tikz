@@ -46,22 +46,38 @@ type LayeredTikzCommand = {
   lines: string[]
 }
 
+export type GenerateTikzOptions = {
+  includeCoordinateAxes?: boolean
+}
+
 type GenerateContext = {
   mode: TikzMode
   colors: ColorRegistry
   coordinates: CoordinateRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
+  includeCoordinateAxes: boolean
 }
 
-export function generateTikz(diagram: Diagram): string {
+const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
+const coordinateAxesGuideColor: HexColor = '#64748B'
+const coordinateAxesGuideLength = 2.5
+const coordinateAxesGuideLabelOffset = 0.25
+
+export function generateTikz(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
   return diagram.ambientDimension === 2
-    ? generateTikz2D(diagram)
-    : generateTikz3D(diagram)
+    ? generateTikz2D(diagram, options)
+    : generateTikz3D(diagram, options)
 }
 
-export function generateTikz2D(diagram: Diagram): string {
-  const context = createContext('2d')
+export function generateTikz2D(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
+  const context = createContext('2d', options)
   const curveSectionTitle = 'Codimension 1 strata: curves'
   const pointSectionTitle = 'Codimension 2 strata: points'
   const labelSectionTitle = 'Labels'
@@ -106,8 +122,11 @@ export function generateTikz2D(diagram: Diagram): string {
   })
 }
 
-export function generateTikz3D(diagram: Diagram): string {
-  const context = createContext('3d')
+export function generateTikz3D(
+  diagram: Diagram,
+  options: GenerateTikzOptions = {},
+): string {
+  const context = createContext('3d', options)
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
   const curveSectionTitle = 'Codimension 2 strata: curves'
   const pointSectionTitle = 'Codimension 3 strata: points'
@@ -147,6 +166,7 @@ export function generateTikz3D(diagram: Diagram): string {
       emitLabel(label, context),
     ),
   ]
+  const coordinateAxesGuide = emitCoordinateAxesGuide(context)
   const layers = collectUsedLayers(drawingCommands)
 
   return assembleTikz({
@@ -154,6 +174,9 @@ export function generateTikz3D(diagram: Diagram): string {
     layers,
     bodySections: [
       section('Coordinates', emitCoordinateDefinitions(context)),
+      ...(coordinateAxesGuide.length === 0
+        ? []
+        : [section('Coordinate axes guide', coordinateAxesGuide)]),
       section(
         'Layered drawing commands',
         emitLayeredCommands(drawingCommands, sectionTitles),
@@ -198,13 +221,18 @@ export function layerToTikzLayerName(layer: number): string {
   return `stratifiedLayer${suffix}`
 }
 
-function createContext(mode: TikzMode): GenerateContext {
+function createContext(
+  mode: TikzMode,
+  options: GenerateTikzOptions,
+): GenerateContext {
   return {
     mode,
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
+    includeCoordinateAxes:
+      mode === '3d' && options.includeCoordinateAxes === true,
   }
 }
 
@@ -221,7 +249,7 @@ function assembleTikz({
     ...section('Styles and colors', [
       ...emitRequiredLibraryComment(context),
       ...context.colors.emitDefinitions(),
-      ...emitTikzLayerDeclarations(layers),
+      ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
       ...emitTikzPictureStart(context.mode),
     ]),
     ...bodySections.flat(),
@@ -273,12 +301,18 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
   return lines
 }
 
-function emitTikzLayerDeclarations(layers: number[]): string[] {
-  if (layers.length === 0) {
+function emitTikzLayerDeclarations(
+  layers: number[],
+  includeCoordinateAxesGuideLayer: boolean,
+): string[] {
+  if (layers.length === 0 && !includeCoordinateAxesGuideLayer) {
     return []
   }
 
-  const layerNames = layers.map(layerToTikzLayerName)
+  const layerNames = [
+    ...(includeCoordinateAxesGuideLayer ? [coordinateAxesGuideLayerName] : []),
+    ...layers.map(layerToTikzLayerName),
+  ]
 
   return [
     ...layerNames.map((layerName) => `\\pgfdeclarelayer{${layerName}}`),
@@ -295,6 +329,91 @@ function emitCoordinateDefinitions(context: GenerateContext): string[] {
         context.mode,
       )};`,
   )
+}
+
+function emitCoordinateAxesGuide(context: GenerateContext): string[] {
+  if (!context.includeCoordinateAxes || context.mode !== '3d') {
+    return []
+  }
+
+  const axisColor = context.colors.define(
+    'CoordinateAxesGuide',
+    coordinateAxesGuideColor,
+  )
+  const axisDefinitions = [
+    {
+      label: 'x',
+      end: { x: coordinateAxesGuideLength, y: 0, z: 0 },
+      labelPosition: {
+        x: coordinateAxesGuideLength + coordinateAxesGuideLabelOffset,
+        y: 0,
+        z: 0,
+      },
+    },
+    {
+      label: 'y',
+      end: { x: 0, y: coordinateAxesGuideLength, z: 0 },
+      labelPosition: {
+        x: 0,
+        y: coordinateAxesGuideLength + coordinateAxesGuideLabelOffset,
+        z: 0,
+      },
+    },
+    {
+      label: 'z',
+      end: { x: 0, y: 0, z: coordinateAxesGuideLength },
+      labelPosition: {
+        x: 0,
+        y: 0,
+        z: coordinateAxesGuideLength + coordinateAxesGuideLabelOffset,
+      },
+    },
+  ] satisfies Array<{
+    label: 'x' | 'y' | 'z'
+    end: Vec3
+    labelPosition: Vec3
+  }>
+
+  return [
+    '% Optional 3D coordinate axes guide. This is not a stratum.',
+    `\\begin{pgfonlayer}{${coordinateAxesGuideLayerName}}`,
+    ...indentLines(
+      axisDefinitions.flatMap((axis) =>
+        emitCoordinateAxisGuide(axis.label, axis.end, axis.labelPosition, axisColor),
+      ),
+    ),
+    '\\end{pgfonlayer}',
+  ]
+}
+
+function emitCoordinateAxisGuide(
+  label: 'x' | 'y' | 'z',
+  end: Vec3,
+  labelPosition: Vec3,
+  axisColor: string,
+): string[] {
+  return [
+    '\\draw[',
+    ...formatTikzOptions([
+      `draw=${axisColor}`,
+      'draw opacity=0.35',
+      'line width=0.4pt',
+      '->',
+    ]),
+    ']',
+    `  ${formatCoordinate({ x: 0, y: 0, z: 0 }, '3d')} -- ${formatCoordinate(
+      end,
+      '3d',
+    )};`,
+    '\\node[',
+    ...formatTikzOptions([
+      `text=${axisColor}`,
+      'opacity=0.55',
+      'font=\\scriptsize',
+    ]),
+    `] at ${formatCoordinate(labelPosition, '3d')} {$${label}$};`,
+    '',
+  ]
 }
 
 function emitSheet(

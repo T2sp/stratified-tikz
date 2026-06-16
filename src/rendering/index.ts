@@ -1,4 +1,5 @@
 export * from './SvgDiagram.tsx'
+export * from './coordinateAxesGuide.ts'
 export * from './svgCamera.ts'
 export * from './svgPath.ts'
 export * from './svgProjection.ts'

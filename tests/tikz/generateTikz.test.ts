@@ -33,6 +33,92 @@ test('3D TikZ output uses (x,y,z) coordinates and a 2.5D basis', () => {
   assert.match(tikz, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
 })
 
+test('TikZ output excludes coordinate axes by default', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram())
+
+  assert.doesNotMatch(tikz, /Coordinate axes guide/)
+  assert.doesNotMatch(tikz, /stratifiedGuideLayer/)
+  assert.doesNotMatch(tikz, /\{\$x\$\}/)
+  assert.doesNotMatch(tikz, /\{\$y\$\}/)
+  assert.doesNotMatch(tikz, /\{\$z\$\}/)
+})
+
+test('2D TikZ output ignores the 3D coordinate axes export option', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram(), {
+    includeCoordinateAxes: true,
+  })
+
+  assert.doesNotMatch(tikz, /Coordinate axes guide/)
+  assert.doesNotMatch(tikz, /stratifiedGuideLayer/)
+  assert.doesNotMatch(tikz, /\{\$x\$\}/)
+})
+
+test('TikZ output includes a guide layer when coordinate axes export is enabled', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    includeCoordinateAxes: true,
+  })
+
+  assert.match(tikz, /\\definecolor\{stzCoordinateAxesGuide\}\{HTML\}\{64748B\}/)
+  assert.match(tikz, /\\pgfdeclarelayer\{stratifiedGuideLayer\}/)
+  assert.match(
+    tikz,
+    /\\pgfsetlayers\{stratifiedGuideLayer,stratifiedLayer0,main\}/,
+  )
+  assert.match(tikz, /% Coordinate axes guide/)
+  assert.match(
+    tikz,
+    /% Optional 3D coordinate axes guide\. This is not a stratum\./,
+  )
+  assert.match(tikz, /\(0,0,0\) -- \(2\.5,0,0\);/)
+  assert.match(tikz, /\(0,0,0\) -- \(0,2\.5,0\);/)
+  assert.match(tikz, /\(0,0,0\) -- \(0,0,2\.5\);/)
+  assert.match(tikz, /\] at \(2\.75,0,0\) \{\$x\$\};/)
+  assert.match(tikz, /\] at \(0,2\.75,0\) \{\$y\$\};/)
+  assert.match(tikz, /\] at \(0,0,2\.75\) \{\$z\$\};/)
+})
+
+test('coordinate axes export does not affect ordinary strata or labels', () => {
+  const diagram = createThreeDimensionalDiagram()
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'ordinary-label',
+    name: 'Ordinary label',
+    text: '$L$',
+    position: { x: 2, y: 2, z: 2 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 0,
+  })
+
+  const withoutAxes = generateTikz(diagram)
+  const withAxes = generateTikz(diagram, { includeCoordinateAxes: true })
+
+  assert.deepEqual(
+    extractCoordinateNames(withAxes),
+    extractCoordinateNames(withoutAxes),
+  )
+  assert.match(withAxes, /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/)
+  assert.match(withAxes, /\\node at \(2,2,2\) \{\$L\$\};/)
+})
+
+test('empty 3D TikZ output includes only axes when the option is enabled', () => {
+  const tikz = generateTikz(createEmptyDiagram({ ambientDimension: 3 }), {
+    includeCoordinateAxes: true,
+  })
+
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedGuideLayer,main\}/)
+  assert.match(tikz, /\(0,0,0\) -- \(2\.5,0,0\);/)
+  assert.match(tikz, /\] at \(0,0,2\.75\) \{\$z\$\};/)
+  assert.doesNotMatch(tikz, /\\coordinate /)
+  assert.match(tikz, /% Codimension 1 strata: sheets/)
+  assert.match(tikz, /% Labels/)
+})
+
 test('TikZ 3d library is not emitted when no scoped 3D export is used', () => {
   const tikz = generateTikz(createThreeDimensionalDiagram())
 
