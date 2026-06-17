@@ -11,7 +11,9 @@ import {
   normalizeLayerMetadataForDiagram,
   renameLayer,
   swapLayers,
+  translateLayer,
 } from '../../src/model/layers.ts'
+import { createArcPathSegmentFromAngles } from '../../src/model/paths.ts'
 import {
   createConcatenatedPathStratum,
   createCurveStratum,
@@ -31,6 +33,7 @@ import {
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import { defaultCurveStyle, defaultSheetStyle } from '../../src/model/styles.ts'
+import { polylineToSvgPath } from '../../src/rendering/svgPath.ts'
 import type {
   ClosedPathBoundary,
   CurveStratum,
@@ -491,6 +494,281 @@ test('TikZ output reflects duplicated and deleted layer contents', () => {
   assert.match(deletedTikz, /stratifiedLayer5/)
 })
 
+test('translating a layer moves points and labels while preserving identity and other layers', () => {
+  const diagram = createLayerTranslationDiagram()
+  const original = structuredClone(diagram) as Diagram
+  const translation = { x: 10, y: -2, z: 5 }
+  const translated = translateLayer(diagram, 5, translation)
+  const movedPoint = findPoint(translated, 'translate-point')
+  const movedLabel = findLabel(translated, 'translate-label')
+
+  assert.deepEqual(
+    movedPoint.position,
+    addVec3(findPoint(diagram, 'translate-point').position, translation),
+  )
+  assert.deepEqual(
+    movedLabel.position,
+    addVec3(findLabel(diagram, 'translate-label').position, translation),
+  )
+  assert.equal(movedPoint.id, 'translate-point')
+  assert.equal(movedPoint.name, 'Movable point')
+  assert.equal(movedPoint.layer, 5)
+  assert.deepEqual(movedPoint.style, findPoint(diagram, 'translate-point').style)
+  assert.deepEqual(findPoint(translated, 'other-point'), findPoint(diagram, 'other-point'))
+  assert.deepEqual(findLabel(translated, 'other-label'), findLabel(diagram, 'other-label'))
+  assert.deepEqual(diagram, original)
+})
+
+test('translating a layer moves polylines, cubic Beziers, and curve frame snapshots', () => {
+  const diagram = createLayerTranslationDiagram()
+  const translation = { x: 10, y: -2, z: 5 }
+  const translated = translateLayer(diagram, 5, translation)
+  const sourcePolyline = findCurve(diagram, 'translate-polyline')
+  const movedPolyline = findCurve(translated, 'translate-polyline')
+  const sourceCubic = findCubicBezierCurve(diagram, 'translate-cubic')
+  const movedCubic = findCubicBezierCurve(translated, 'translate-cubic')
+
+  if (sourcePolyline.kind !== 'polyline' || movedPolyline.kind !== 'polyline') {
+    throw new Error('Expected polyline curves.')
+  }
+
+  assert.deepEqual(
+    movedPolyline.points,
+    sourcePolyline.points.map((point) => addVec3(point, translation)),
+  )
+  assert.equal(movedPolyline.pathLabel, sourcePolyline.pathLabel)
+  assert.deepEqual(
+    movedCubic.points,
+    sourceCubic.points.map((point) => addVec3(point, translation)),
+  )
+
+  if (
+    sourceCubic.bezierControls?.kind !== 'workPlaneRelativeCartesian' ||
+    movedCubic.bezierControls?.kind !== 'workPlaneRelativeCartesian'
+  ) {
+    throw new Error('Expected work-plane-local cubic Bezier metadata.')
+  }
+
+  assert.deepEqual(
+    movedCubic.bezierControls.frame.origin,
+    addVec3(sourceCubic.bezierControls.frame.origin, translation),
+  )
+  assert.deepEqual(movedCubic.bezierControls.frame.u, sourceCubic.bezierControls.frame.u)
+  assert.deepEqual(movedCubic.bezierControls.frame.v, sourceCubic.bezierControls.frame.v)
+  assert.deepEqual(
+    movedCubic.bezierControls.frame.normal,
+    sourceCubic.bezierControls.frame.normal,
+  )
+  assert.deepEqual(movedCubic.bezierControls.localStart, sourceCubic.bezierControls.localStart)
+  assert.deepEqual(movedCubic.bezierControls.localEnd, sourceCubic.bezierControls.localEnd)
+})
+
+test('translating a layer moves concatenated paths, arcs, and circle and ellipse templates', () => {
+  const diagram = createLayerTranslationDiagram()
+  const translation = { x: 10, y: -2, z: 5 }
+  const translated = translateLayer(diagram, 5, translation)
+  const sourcePath = findConcatenatedPath(diagram, 'translate-path')
+  const movedPath = findConcatenatedPath(translated, 'translate-path')
+  const sourceCircle = findTemplatePath(diagram, 'translate-circle-template')
+  const movedCircle = findTemplatePath(translated, 'translate-circle-template')
+  const sourceEllipse = findTemplatePath(diagram, 'translate-ellipse-template')
+  const movedEllipse = findTemplatePath(translated, 'translate-ellipse-template')
+
+  assert.equal(movedPath.pathLabel, sourcePath.pathLabel)
+  assert.equal(movedPath.segments.length, 3)
+  assert.deepEqual(movedPath.segments[0].start, addVec3(sourcePath.segments[0].start, translation))
+  assert.deepEqual(movedPath.segments[0].end, addVec3(sourcePath.segments[0].end, translation))
+
+  const sourceCubic = sourcePath.segments[1]
+  const movedCubic = movedPath.segments[1]
+  if (
+    sourceCubic.kind !== 'cubicBezier' ||
+    movedCubic.kind !== 'cubicBezier' ||
+    sourceCubic.controlMode?.kind !== 'workPlaneRelativePolar' ||
+    movedCubic.controlMode?.kind !== 'workPlaneRelativePolar'
+  ) {
+    throw new Error('Expected a work-plane-local cubic path segment.')
+  }
+  assert.deepEqual(movedCubic.control1, addVec3(sourceCubic.control1, translation))
+  assert.deepEqual(movedCubic.control2, addVec3(sourceCubic.control2, translation))
+  assert.deepEqual(
+    movedCubic.controlMode.frame.origin,
+    addVec3(sourceCubic.controlMode.frame.origin, translation),
+  )
+  assert.deepEqual(movedCubic.controlMode.frame.u, sourceCubic.controlMode.frame.u)
+  assert.deepEqual(movedCubic.controlMode.localStart, sourceCubic.controlMode.localStart)
+
+  const sourceArc = sourcePath.segments[2]
+  const movedArc = movedPath.segments[2]
+  if (sourceArc.kind !== 'arc' || movedArc.kind !== 'arc' || sourceArc.frame === undefined || movedArc.frame === undefined) {
+    throw new Error('Expected an arc segment with a frame.')
+  }
+  assert.deepEqual(movedArc.start, addVec3(sourceArc.start, translation))
+  assert.deepEqual(movedArc.end, addVec3(sourceArc.end, translation))
+  assert.deepEqual(movedArc.center, addVec3(sourceArc.center, translation))
+  assert.deepEqual(movedArc.frame.origin, addVec3(sourceArc.frame.origin, translation))
+  assert.deepEqual(movedArc.frame.u, sourceArc.frame.u)
+  assert.equal(movedArc.radius, sourceArc.radius)
+  assert.equal(movedArc.startAngleDeg, sourceArc.startAngleDeg)
+  assert.equal(movedArc.endAngleDeg, sourceArc.endAngleDeg)
+
+  assert.deepEqual(movedCircle.template.center, addVec3(sourceCircle.template.center, translation))
+  assert.deepEqual(movedEllipse.template.center, addVec3(sourceEllipse.template.center, translation))
+  assertTemplateFrameTranslated(sourceCircle, movedCircle, translation)
+  assertTemplateFrameTranslated(sourceEllipse, movedEllipse, translation)
+})
+
+test('translating a layer moves polygon sheets, filled objects, and curved sheet primitives', () => {
+  const diagram = createLayerTranslationDiagram()
+  const translation = { x: 10, y: -2, z: 5 }
+  const translated = translateLayer(diagram, 5, translation)
+  const sourcePolygon = findPolygonSheet(diagram, 'translate-polygon-sheet')
+  const movedPolygon = findPolygonSheet(translated, 'translate-polygon-sheet')
+  const sourceQuad = findQuadSheet(diagram, 'translate-quad-sheet')
+  const movedQuad = findQuadSheet(translated, 'translate-quad-sheet')
+  const sourceFilledSheet = findWorkPlaneFilledSheet(diagram, 'translate-filled-sheet')
+  const movedFilledSheet = findWorkPlaneFilledSheet(translated, 'translate-filled-sheet')
+  const sourceHemisphere = findCurvedSheet(diagram, 'translate-hemisphere')
+  const movedHemisphere = findCurvedSheet(translated, 'translate-hemisphere')
+  const sourceSaddle = findCurvedSheet(diagram, 'translate-saddle')
+  const movedSaddle = findCurvedSheet(translated, 'translate-saddle')
+
+  assert.deepEqual(
+    movedPolygon.vertices,
+    sourcePolygon.vertices.map((vertex) => addVec3(vertex, translation)),
+  )
+  assert.equal(movedPolygon.pathLabel, sourcePolygon.pathLabel)
+  assert.deepEqual(
+    movedQuad.corners,
+    sourceQuad.corners.map((corner) => addVec3(corner, translation)),
+  )
+  assert.deepEqual(
+    movedFilledSheet.planeFrame.origin,
+    addVec3(sourceFilledSheet.planeFrame.origin, translation),
+  )
+  assert.deepEqual(movedFilledSheet.planeFrame.u, sourceFilledSheet.planeFrame.u)
+  assert.deepEqual(
+    movedFilledSheet.boundaries[0]?.segments[0]?.start,
+    addVec3(sourceFilledSheet.boundaries[0]?.segments[0]?.start ?? zeroVec3(), translation),
+  )
+
+  if (
+    sourceHemisphere.primitive.kind !== 'hemisphere' ||
+    movedHemisphere.primitive.kind !== 'hemisphere' ||
+    sourceSaddle.primitive.kind !== 'saddle' ||
+    movedSaddle.primitive.kind !== 'saddle'
+  ) {
+    throw new Error('Expected hemisphere and saddle primitives.')
+  }
+
+  assert.deepEqual(
+    movedHemisphere.primitive.center,
+    addVec3(sourceHemisphere.primitive.center, translation),
+  )
+  assert.deepEqual(
+    movedHemisphere.primitive.frame.origin,
+    addVec3(sourceHemisphere.primitive.frame.origin, translation),
+  )
+  assert.deepEqual(movedHemisphere.primitive.frame.u, sourceHemisphere.primitive.frame.u)
+  assert.deepEqual(
+    movedSaddle.primitive.frame.origin,
+    addVec3(sourceSaddle.primitive.frame.origin, translation),
+  )
+  assert.deepEqual(movedSaddle.primitive.frame.v, sourceSaddle.primitive.frame.v)
+  assert.equal(validateDiagram(translated).valid, true)
+})
+
+test('translating a 2D layer moves filled regions and keeps z locked to zero', () => {
+  const diagram = createTwoDimensionalLayerTranslationDiagram()
+  const original = structuredClone(diagram) as Diagram
+  const translated = translateLayer(diagram, 2, { x: 3, y: -1, z: 0 })
+  const point = findPoint(translated, 'translate-2d-point')
+  const label = findLabel(translated, 'translate-2d-label')
+  const region = findFilledRegion(translated, 'translate-2d-filled-region')
+
+  assert.deepEqual(point.position, { x: 4, y: 1, z: 0 })
+  assert.deepEqual(label.position, { x: 5, y: 2, z: 0 })
+  assert.equal(
+    region.boundaries.every((boundary) =>
+      boundary.segments.every((segment) =>
+        segment.start.z === 0 && segment.end.z === 0,
+      ),
+    ),
+    true,
+  )
+  assert.throws(
+    () => translateLayer(diagram, 2, { x: 0, y: 0, z: 1 }),
+    /2D layer translation does not allow dz/,
+  )
+  assert.deepEqual(diagram, original)
+})
+
+test('non-finite layer translation input and results are rejected without mutation', () => {
+  const diagram = createLayerTranslationDiagram()
+  const original = structuredClone(diagram) as Diagram
+
+  assert.throws(
+    () => translateLayer(diagram, 5, { x: Number.NaN, y: 0, z: 0 }),
+    /finite/,
+  )
+  assert.deepEqual(diagram, original)
+
+  const overflowDiagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [
+      createPointStratum({
+        ambientDimension: 3,
+        id: 'overflow-point',
+        position: { x: Number.MAX_VALUE, y: 0, z: 0 },
+        layer: 5,
+      }),
+    ],
+  }
+
+  assert.throws(
+    () =>
+      translateLayer(overflowDiagram, 5, {
+        x: Number.MAX_VALUE,
+        y: 0,
+        z: 0,
+      }),
+    /non-finite coordinate/,
+  )
+})
+
+test('SVG path data and TikZ output reflect layer translation', () => {
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    strata: [
+      createCurveStratum({
+        ambientDimension: 2,
+        id: 'translate-output-polyline',
+        points: [
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        layer: 4,
+      }),
+    ],
+  }
+  const translated = translateLayer(diagram, 4, { x: 2, y: 3, z: 0 })
+  const curve = findCurve(translated, 'translate-output-polyline')
+
+  if (curve.kind !== 'polyline') {
+    throw new Error('Expected translated output curve to be a polyline.')
+  }
+
+  const svgPath = polylineToSvgPath(
+    curve.points.map((point) => ({ x: point.x, y: point.y })),
+  )
+  const tikz = generateTikz(translated)
+
+  assert.equal(svgPath, 'M 2,3 L 3,3')
+  assert.notEqual(tikz, generateTikz(diagram))
+  assert.match(tikz, /\\coordinate \([^)]+\) at \(2,3\);/)
+  assert.match(tikz, /\\coordinate \([^)]+\) at \(3,3\);/)
+})
+
 function createLayerTestDiagram(): Diagram {
   const diagram = withoutLayerMetadata(twoDimensionalExample)
 
@@ -717,6 +995,259 @@ function createFilledRegionLayerDiagram(): Diagram {
   }
 }
 
+function createLayerTranslationDiagram(): Diagram {
+  const sourceLayer = 5
+  const otherLayer = 1
+  const pathFrame = xyFrame(1)
+  const cubicFrame: WorkPlaneFrameSnapshot = {
+    origin: { x: 0, y: 1, z: 0 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+  const arcSegment = createTranslatedArcSegment()
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  return {
+    ...diagram,
+    layers: [
+      { value: otherLayer, name: 'Other' },
+      { value: sourceLayer, name: 'Translate me' },
+    ],
+    strata: [
+      createPointStratum({
+        ambientDimension: 3,
+        id: 'translate-point',
+        name: 'Movable point',
+        position: { x: 1, y: 2, z: 3 },
+        layer: sourceLayer,
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'translate-polyline',
+        name: 'Movable polyline',
+        pathLabel: 'movable polyline',
+        points: [
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        layer: sourceLayer,
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'translate-cubic',
+        kind: 'cubicBezier',
+        name: 'Movable cubic',
+        points: [
+          { x: 0, y: 1, z: 0 },
+          { x: 1, y: 1.5, z: 0 },
+          { x: 2, y: 1.5, z: 0 },
+          { x: 3, y: 1, z: 0 },
+        ],
+        bezierControls: {
+          kind: 'workPlaneRelativeCartesian',
+          frame: cubicFrame,
+          localStart: { a: 0, b: 0 },
+          localEnd: { a: 3, b: 0 },
+          firstControlOffset: { dx: 1, dy: 0.5 },
+          secondControlOffset: { dx: -1, dy: 0.5 },
+          secondOffsetReference: 'end',
+        },
+        layer: sourceLayer,
+      }),
+      createConcatenatedPathStratum({
+        ambientDimension: 3,
+        id: 'translate-path',
+        name: 'Movable path',
+        pathLabel: 'movable path',
+        segments: [
+          {
+            kind: 'line',
+            start: { x: 0, y: 0, z: 1 },
+            end: { x: 1, y: 0, z: 1 },
+          },
+          {
+            kind: 'cubicBezier',
+            start: { x: 1, y: 0, z: 1 },
+            control1: { x: 1.5, y: 0.5, z: 1 },
+            control2: { x: 2.5, y: 0.5, z: 1 },
+            end: { x: 3, y: 0, z: 1 },
+            controlMode: {
+              kind: 'workPlaneRelativePolar',
+              frame: pathFrame,
+              localStart: { a: 1, b: 0 },
+              localEnd: { a: 3, b: 0 },
+              firstControl: {
+                angleDegrees: 45,
+                radius: Math.SQRT1_2,
+              },
+              secondControl: {
+                angleDegrees: 135,
+                radius: Math.SQRT1_2,
+              },
+              secondOffsetReference: 'end',
+            },
+          },
+          arcSegment,
+        ],
+        layer: sourceLayer,
+      }),
+      createTemplatePathStratum({
+        ambientDimension: 3,
+        id: 'translate-circle-template',
+        name: 'Movable circle template',
+        template: {
+          kind: 'circleTemplate',
+          center: { x: 2, y: 2, z: 1 },
+          radius: 0.5,
+          frame: pathFrame,
+        },
+        layer: sourceLayer,
+      }),
+      createTemplatePathStratum({
+        ambientDimension: 3,
+        id: 'translate-ellipse-template',
+        name: 'Movable ellipse template',
+        template: {
+          kind: 'ellipseTemplate',
+          center: { x: 3, y: 2, z: 1 },
+          radiusX: 1,
+          radiusY: 0.5,
+          rotationDeg: 20,
+          frame: pathFrame,
+        },
+        layer: sourceLayer,
+      }),
+      {
+        id: 'translate-polygon-sheet',
+        codim: 1,
+        geometricKind: 'sheet',
+        kind: 'polygonSheet',
+        name: 'Movable polygon sheet',
+        style: { ...defaultSheetStyle },
+        vertices: [
+          { x: 0, y: 0, z: 3 },
+          { x: 1, y: 0, z: 3 },
+          { x: 0, y: 1, z: 3 },
+        ],
+        pathLabel: 'movable sheet',
+        layer: sourceLayer,
+      },
+      createSheetStratum({
+        ambientDimension: 3,
+        id: 'translate-quad-sheet',
+        corners: [
+          { x: 0, y: 0, z: 4 },
+          { x: 1, y: 0, z: 4 },
+          { x: 1, y: 1, z: 4 },
+          { x: 0, y: 1, z: 4 },
+        ],
+        layer: sourceLayer,
+      }),
+      createWorkPlaneFilledSheet3DStratum({
+        id: 'translate-filled-sheet',
+        planeFrame: xyFrame(2),
+        boundaries: [squareBoundary3D('translate-sheet-boundary', 2)],
+        layer: sourceLayer,
+      }),
+      createCurvedSheetStratum({
+        id: 'translate-hemisphere',
+        primitive: {
+          kind: 'hemisphere',
+          center: { x: 0, y: 0, z: 2 },
+          radius: 1,
+          frame: xyFrame(2),
+          hemisphereSide: 'positive',
+          sampling: { uSegments: 4, vSegments: 2 },
+        },
+        layer: sourceLayer,
+      }),
+      createCurvedSheetStratum({
+        id: 'translate-saddle',
+        primitive: {
+          kind: 'saddle',
+          frame: xyFrame(3),
+          width: 2,
+          depth: 2,
+          height: 0.5,
+          sampling: { uSegments: 4, vSegments: 3 },
+        },
+        layer: sourceLayer,
+      }),
+      createPointStratum({
+        ambientDimension: 3,
+        id: 'other-point',
+        position: { x: 9, y: 9, z: 9 },
+        layer: otherLayer,
+      }),
+    ],
+    labels: [
+      createTextLabel({
+        ambientDimension: 3,
+        id: 'translate-label',
+        text: 'move me',
+        position: { x: 4, y: 5, z: 6 },
+        layer: sourceLayer,
+      }),
+      createTextLabel({
+        ambientDimension: 3,
+        id: 'other-label',
+        text: 'do not move',
+        position: { x: -1, y: -1, z: -1 },
+        layer: otherLayer,
+      }),
+    ],
+  }
+}
+
+function createTwoDimensionalLayerTranslationDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  return {
+    ...diagram,
+    strata: [
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'translate-2d-point',
+        position: { x: 1, y: 2, z: 0 },
+        layer: 2,
+      }),
+      createFilledRegion2DStratum({
+        id: 'translate-2d-filled-region',
+        boundaries: [squareBoundary2D('translate-2d-boundary')],
+        layer: 2,
+      }),
+    ],
+    labels: [
+      createTextLabel({
+        ambientDimension: 2,
+        id: 'translate-2d-label',
+        text: '2d label',
+        position: { x: 2, y: 3, z: 0 },
+        layer: 2,
+      }),
+    ],
+  }
+}
+
+function createTranslatedArcSegment(): NonNullable<ReturnType<typeof createArcPathSegmentFromAngles>> {
+  const segment = createArcPathSegmentFromAngles({
+    center: { x: 3, y: 1, z: 1 },
+    radius: 1,
+    startAngleDeg: 270,
+    endAngleDeg: 360,
+    direction: 'counterclockwise',
+    frame: xyFrame(1),
+    ambientDimension: 3,
+  })
+
+  if (segment === null) {
+    throw new Error('Expected arc segment fixture to be valid.')
+  }
+
+  return segment
+}
+
 function createSourcePolygonSheet(layer: number): PolygonSheetStratum {
   return {
     id: 'source-polygon-sheet',
@@ -829,6 +1360,45 @@ function findCurve(diagram: Diagram, id: string): CurveStratum {
   return stratum
 }
 
+function findCubicBezierCurve(
+  diagram: Diagram,
+  id: string,
+): Extract<CurveStratum, { kind: 'cubicBezier' }> {
+  const curve = findCurve(diagram, id)
+
+  if (curve.kind !== 'cubicBezier') {
+    throw new Error(`Expected cubic Bezier curve ${id} to exist.`)
+  }
+
+  return curve
+}
+
+function findConcatenatedPath(
+  diagram: Diagram,
+  id: string,
+): Extract<CurveStratum, { kind: 'concatenatedPath' }> {
+  const curve = findCurve(diagram, id)
+
+  if (curve.kind !== 'concatenatedPath') {
+    throw new Error(`Expected concatenated path ${id} to exist.`)
+  }
+
+  return curve
+}
+
+function findTemplatePath(
+  diagram: Diagram,
+  id: string,
+): Extract<CurveStratum, { kind: 'templatePath' }> {
+  const curve = findCurve(diagram, id)
+
+  if (curve.kind !== 'templatePath') {
+    throw new Error(`Expected template path ${id} to exist.`)
+  }
+
+  return curve
+}
+
 function findPolygonSheet(diagram: Diagram, id: string): PolygonSheetStratum {
   const stratum = diagram.strata.find((candidate) => candidate.id === id)
 
@@ -838,6 +1408,23 @@ function findPolygonSheet(diagram: Diagram, id: string): PolygonSheetStratum {
     stratum.kind !== 'polygonSheet'
   ) {
     throw new Error(`Expected polygon sheet ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findQuadSheet(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { kind: 'quadSheet' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'sheet' ||
+    stratum.kind !== 'quadSheet'
+  ) {
+    throw new Error(`Expected quad sheet ${id} to exist.`)
   }
 
   return stratum
@@ -877,6 +1464,23 @@ function findCurvedSheet(
   return stratum
 }
 
+function findFilledRegion(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { kind: 'filledRegion' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'region' ||
+    stratum.kind !== 'filledRegion'
+  ) {
+    throw new Error(`Expected filled region ${id} to exist.`)
+  }
+
+  return stratum
+}
+
 function findLabel(diagram: Diagram, id: string): TextLabel {
   const label = diagram.labels.find((candidate) => candidate.id === id)
 
@@ -885,6 +1489,39 @@ function findLabel(diagram: Diagram, id: string): TextLabel {
   }
 
   return label
+}
+
+function assertTemplateFrameTranslated(
+  source: Extract<CurveStratum, { kind: 'templatePath' }>,
+  moved: Extract<CurveStratum, { kind: 'templatePath' }>,
+  translation: WorkPlaneFrameSnapshot['origin'],
+): void {
+  const sourceFrame = source.template.frame
+  const movedFrame = moved.template.frame
+
+  if (sourceFrame === undefined || movedFrame === undefined) {
+    throw new Error('Expected template paths to store frame snapshots.')
+  }
+
+  assert.deepEqual(movedFrame.origin, addVec3(sourceFrame.origin, translation))
+  assert.deepEqual(movedFrame.u, sourceFrame.u)
+  assert.deepEqual(movedFrame.v, sourceFrame.v)
+  assert.deepEqual(movedFrame.normal, sourceFrame.normal)
+}
+
+function addVec3(
+  point: WorkPlaneFrameSnapshot['origin'],
+  translation: WorkPlaneFrameSnapshot['origin'],
+): WorkPlaneFrameSnapshot['origin'] {
+  return {
+    x: point.x + translation.x,
+    y: point.y + translation.y,
+    z: point.z + translation.z,
+  }
+}
+
+function zeroVec3(): WorkPlaneFrameSnapshot['origin'] {
+  return { x: 0, y: 0, z: 0 }
 }
 
 function tikzLayerBlock(tikz: string, layerName: string): string {

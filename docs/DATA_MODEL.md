@@ -109,6 +109,17 @@ guide layers, is left unchanged. The editor clears stale selection, drafts, and
 source-picking UI state around this diagram edit, but those cleanup fields are
 not persisted in `Diagram`.
 
+Translating a layer is an ordinary diagram edit and is undoable as one step. It
+adds a finite global vector to every absolute coordinate stored by strata and
+free text labels on the selected numeric layer: point and label positions,
+polyline and cubic Bezier points, concatenated path segment coordinates,
+arc/template centers, polygon and quad sheet vertices, filled-boundary
+segments, work-plane-filled sheet boundary points and plane-frame origins, and
+curved sheet primitive centers/origins. Stored work-plane frame basis vectors
+and local/relative coordinates are not rotated, scaled, or otherwise changed;
+only frame origins are translated. In 2D, only `dx` and `dy` are accepted and
+all translated coordinates remain on `z = 0`.
+
 ## Saved diagram file
 
 Phase 8A saves and loads diagrams using a small versioned JSON wrapper:

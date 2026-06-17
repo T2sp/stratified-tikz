@@ -30,6 +30,7 @@ import {
   normalizeLayerValue,
   renameLayer,
   swapLayers,
+  translateLayer,
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
@@ -928,6 +929,28 @@ function App() {
           nextLayerFilter,
         ),
         layerFilter: nextLayerFilter,
+      })
+    })
+    setCopyStatus('idle')
+  }
+
+  function translateDiagramLayer(layerValue: number, translation: Vec3): void {
+    setEditorState((current) => {
+      let nextDiagram: Diagram
+
+      try {
+        nextDiagram = translateLayer(
+          current.editableDiagram,
+          layerValue,
+          translation,
+        )
+      } catch {
+        return current
+      }
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: nextDiagram,
       })
     })
     setCopyStatus('idle')
@@ -4966,6 +4989,7 @@ function App() {
             onRenameLayer={renameDiagramLayer}
             onSwapLayers={swapDiagramLayers}
             onDuplicateLayer={duplicateDiagramLayer}
+            onTranslateLayer={translateDiagramLayer}
             onDeleteLayer={deleteDiagramLayer}
           />
           <EditableInspector

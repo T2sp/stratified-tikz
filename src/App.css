@@ -894,7 +894,8 @@
 
 .layer-manager-name-form,
 .layer-manager-swap-form,
-.layer-manager-duplicate-form {
+.layer-manager-duplicate-form,
+.layer-manager-translate-form {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -907,9 +908,25 @@
   min-width: 0;
 }
 
+.layer-manager-translate-form {
+  flex-wrap: wrap;
+}
+
+.layer-manager-translation-field {
+  display: flex;
+  flex: 1 1 64px;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
 .layer-manager-name-input,
 .layer-manager-swap-select,
-.layer-manager-layer-input {
+.layer-manager-layer-input,
+.layer-manager-translation-input {
   min-width: 0;
   min-height: 30px;
   border: 1px solid var(--border);
@@ -935,9 +952,17 @@
   font-family: var(--mono);
 }
 
+.layer-manager-translation-input {
+  flex: 1 1 38px;
+  width: 38px;
+  padding: 5px 6px;
+  font-family: var(--mono);
+}
+
 .layer-manager-name-form .toolbar-button,
 .layer-manager-swap-form .toolbar-button,
 .layer-manager-duplicate-form .toolbar-button,
+.layer-manager-translate-form .toolbar-button,
 .layer-manager-delete-button {
   min-height: 30px;
   padding: 5px 8px;
