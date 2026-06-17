@@ -5,7 +5,7 @@ import {
   getLayerMetadata,
   nextUnusedLayerValue,
 } from '../model/layers.ts'
-import type { Diagram } from '../model/types.ts'
+import type { Diagram, Vec3 } from '../model/types.ts'
 import type { LayerFilter } from './layerFilter.ts'
 
 export type LayerManagerProps = {
@@ -15,6 +15,7 @@ export type LayerManagerProps = {
   onRenameLayer: (layerValue: number, name: string) => void
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
+  onTranslateLayer: (layerValue: number, translation: Vec3) => void
   onDeleteLayer: (layerValue: number) => void
 }
 
@@ -25,6 +26,7 @@ export function LayerManager({
   onRenameLayer,
   onSwapLayers,
   onDuplicateLayer,
+  onTranslateLayer,
   onDeleteLayer,
 }: LayerManagerProps) {
   const layers = getLayerMetadata(diagram)
@@ -95,6 +97,57 @@ export function LayerManager({
                 <span role="cell">{layerKey}</span>
                 <span role="cell">{counts.get(layer.value) ?? 0}</span>
                 <div className="layer-manager-actions" role="cell">
+                  <form
+                    className="layer-manager-translate-form"
+                    onSubmit={(event) =>
+                      submitLayerTranslate(
+                        event,
+                        layer.value,
+                        diagram.ambientDimension,
+                        onTranslateLayer,
+                      )
+                    }
+                  >
+                    <label className="layer-manager-translation-field">
+                      <span>dx</span>
+                      <input
+                        name="dx"
+                        className="layer-manager-translation-input"
+                        aria-label={`Translate layer ${layerKey} by dx`}
+                        defaultValue="0"
+                        inputMode="decimal"
+                      />
+                    </label>
+                    <label className="layer-manager-translation-field">
+                      <span>dy</span>
+                      <input
+                        name="dy"
+                        className="layer-manager-translation-input"
+                        aria-label={`Translate layer ${layerKey} by dy`}
+                        defaultValue="0"
+                        inputMode="decimal"
+                      />
+                    </label>
+                    {diagram.ambientDimension === 3 && (
+                      <label className="layer-manager-translation-field">
+                        <span>dz</span>
+                        <input
+                          name="dz"
+                          className="layer-manager-translation-input"
+                          aria-label={`Translate layer ${layerKey} by dz`}
+                          defaultValue="0"
+                          inputMode="decimal"
+                        />
+                      </label>
+                    )}
+                    <button
+                      type="submit"
+                      className="toolbar-button"
+                      aria-label={`Translate layer ${layerKey}`}
+                    >
+                      Translate layer
+                    </button>
+                  </form>
                   <form
                     className="layer-manager-duplicate-form"
                     onSubmit={(event) =>
@@ -170,6 +223,27 @@ export function LayerManager({
   )
 }
 
+function submitLayerTranslate(
+  event: FormEvent<HTMLFormElement>,
+  layerValue: number,
+  ambientDimension: Diagram['ambientDimension'],
+  onTranslateLayer: (layerValue: number, translation: Vec3) => void,
+): void {
+  event.preventDefault()
+
+  const formData = new FormData(event.currentTarget)
+  const dx = parseFiniteFormNumber(formData.get('dx'))
+  const dy = parseFiniteFormNumber(formData.get('dy'))
+  const dz =
+    ambientDimension === 2 ? 0 : parseFiniteFormNumber(formData.get('dz'))
+
+  if (dx === null || dy === null || dz === null) {
+    return
+  }
+
+  onTranslateLayer(layerValue, { x: dx, y: dy, z: dz })
+}
+
 function submitLayerDuplicate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
@@ -224,6 +298,16 @@ function submitLayerSwap(
   }
 
   onSwapLayers(layerValue, targetLayer)
+}
+
+function parseFiniteFormNumber(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null
+  }
+
+  const number = Number(value)
+
+  return Number.isFinite(number) ? number : null
 }
 
 function layerFilterLabel(layerFilter: LayerFilter): string {

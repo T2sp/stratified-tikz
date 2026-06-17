@@ -7,7 +7,12 @@ import {
 } from '../../src/geometry/projection.ts'
 import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import { deleteLayer, duplicateLayer, swapLayers } from '../../src/model/layers.ts'
+import {
+  deleteLayer,
+  duplicateLayer,
+  swapLayers,
+  translateLayer,
+} from '../../src/model/layers.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
 import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
@@ -335,6 +340,26 @@ test('layer swaps undo and redo as one diagram operation', () => {
   assert.equal(pointLayer(committed.editableDiagram), 1)
   assert.equal(pointLayer(undone.editableDiagram), 0)
   assert.equal(pointLayer(redone.editableDiagram), 1)
+})
+
+test('layer translation undo and redo restore the whole layer move', () => {
+  const initial = createUndoState(createNamedPointDiagram('A'))
+  const translated = translateLayer(initial.editableDiagram, 0, {
+    x: 2,
+    y: 3,
+    z: 0,
+  })
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: translated,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(committed.history.past.length, 1)
+  assert.deepEqual(pointPosition(committed.editableDiagram), { x: 2, y: 3, z: 0 })
+  assert.deepEqual(pointPosition(undone.editableDiagram), { x: 0, y: 0, z: 0 })
+  assert.deepEqual(pointPosition(redone.editableDiagram), { x: 2, y: 3, z: 0 })
 })
 
 test('layer duplicate undo removes copied layer and redo restores it', () => {
