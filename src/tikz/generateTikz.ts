@@ -1,4 +1,6 @@
 import type {
+  ConcatenatedPathStratum,
+  CubicBezierCurveStratum,
   CubicBezierControlMode,
   Camera3D,
   CurveStratum,
@@ -11,6 +13,7 @@ import type {
   SheetStratum,
   TextLabel,
   OrthographicCamera3D,
+  PathSegment,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
@@ -51,6 +54,22 @@ type LayeredTikzCommand = {
   sectionTitle: string
   lines: string[]
 }
+
+type PointCurveStratum = Exclude<CurveStratum, ConcatenatedPathStratum>
+
+type PathSegmentCoordinateNames =
+  | {
+      kind: 'line'
+      start: string
+      end: string
+    }
+  | {
+      kind: 'cubicBezier'
+      start: string
+      control1: string
+      control2: string
+      end: string
+    }
 
 export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
@@ -549,6 +568,22 @@ function emitCurve(
     return scopedCurve
   }
 
+  if (curve.kind === 'concatenatedPath') {
+    const coordinates = defineConcatenatedPathCoordinates(
+      curve,
+      elementIndex,
+      context,
+    )
+
+    return [
+      '\\draw[',
+      ...formatTikzOptions(options),
+      ']',
+      `  ${formatConcatenatedPath(coordinates)};`,
+      '',
+    ]
+  }
+
   const coordinates = defineCurveCoordinates(curve, elementIndex, context)
 
   return [
@@ -601,9 +636,14 @@ function curveCoordinateBaseName(
 ): string {
   const stem = sanitizeTikzNameStem(curve.name, 'curve')
 
-  return curve.kind === 'cubicBezier'
-    ? `curveBezier${stem}${elementIndex}`
-    : `curvePoly${stem}${elementIndex}`
+  switch (curve.kind) {
+    case 'cubicBezier':
+      return `curveBezier${stem}${elementIndex}`
+    case 'concatenatedPath':
+      return `curvePath${stem}${elementIndex}`
+    case 'polyline':
+      return `curvePoly${stem}${elementIndex}`
+  }
 }
 
 function emitPoint(
@@ -771,7 +811,7 @@ function pointShapeOptions(
 }
 
 function defineCurveCoordinates(
-  curve: CurveStratum,
+  curve: PointCurveStratum,
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
@@ -789,12 +829,82 @@ function defineCurveCoordinates(
   )
 }
 
+function defineConcatenatedPathCoordinates(
+  path: ConcatenatedPathStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): PathSegmentCoordinateNames[] {
+  const baseName = curveCoordinateBaseName(path, elementIndex)
+  let pointIndex = 0
+  let previousEnd: string | null = null
+
+  return path.segments.map((segment) => {
+    const start =
+      previousEnd ??
+      context.coordinates.define(baseName, pointIndex, segment.start)
+
+    if (previousEnd === null) {
+      pointIndex += 1
+    }
+
+    const names = definePathSegmentCoordinateNames(
+      segment,
+      start,
+      baseName,
+      pointIndex,
+      context,
+    )
+
+    pointIndex += segment.kind === 'line' ? 1 : 3
+    previousEnd = names.end
+
+    return names
+  })
+}
+
+function definePathSegmentCoordinateNames(
+  segment: PathSegment,
+  start: string,
+  baseName: string,
+  pointIndex: number,
+  context: GenerateContext,
+): PathSegmentCoordinateNames {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start,
+        end: context.coordinates.define(baseName, pointIndex, segment.end),
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start,
+        control1: context.coordinates.define(
+          baseName,
+          pointIndex,
+          segment.control1,
+        ),
+        control2: context.coordinates.define(
+          baseName,
+          pointIndex + 1,
+          segment.control2,
+        ),
+        end: context.coordinates.define(baseName, pointIndex + 2, segment.end),
+      }
+  }
+}
+
 function formatCurvePath(
-  curve: CurveStratum,
+  curve: PointCurveStratum,
   coordinates: string[],
   mode: TikzMode,
 ): string {
-  if (usesRelativeBezierControls(curve, mode) && coordinates.length === 2) {
+  if (
+    curve.kind === 'cubicBezier' &&
+    usesRelativeBezierControls(curve, mode) &&
+    coordinates.length === 2
+  ) {
     const controlPath = formatRelativeBezierControls(curve.bezierControls, mode)
 
     if (controlPath !== null) {
@@ -807,6 +917,31 @@ function formatCurvePath(
   }
 
   return coordinates.map((name) => `(${name})`).join(' -- ')
+}
+
+function formatConcatenatedPath(
+  coordinates: readonly PathSegmentCoordinateNames[],
+): string {
+  if (coordinates.length === 0) {
+    return ''
+  }
+
+  const [firstSegment, ...restSegments] = coordinates
+
+  return [
+    `(${firstSegment.start})`,
+    formatPathSegmentCommand(firstSegment),
+    ...restSegments.map(formatPathSegmentCommand),
+  ].join(' ')
+}
+
+function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
+  switch (segment.kind) {
+    case 'line':
+      return `-- (${segment.end})`
+    case 'cubicBezier':
+      return `.. controls (${segment.control1}) and (${segment.control2}) .. (${segment.end})`
+  }
 }
 
 type ScopedWorkPlaneRelativeBezierPath = {
@@ -859,7 +994,7 @@ function formatScopedWorkPlaneRelativeBezierPath(
 }
 
 function isConsistentWorkPlaneRelativeBezierCurve(
-  curve: CurveStratum,
+  curve: CubicBezierCurveStratum,
   controlMode: Extract<
     CubicBezierControlMode,
     { kind: 'workPlaneRelativeCartesian' | 'workPlaneRelativePolar' }

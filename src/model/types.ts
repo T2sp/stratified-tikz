@@ -270,22 +270,58 @@ export type PolygonSheetStratum = SheetStratumBase & {
 
 export type SheetStratum = QuadSheetStratum | PolygonSheetStratum
 
-export type CurveKind = 'polyline' | 'cubicBezier'
+export type LinePathSegment = {
+  kind: 'line'
+  start: Vec3
+  end: Vec3
+}
 
-export type CurveStratum = {
+export type CubicBezierPathSegment = {
+  kind: 'cubicBezier'
+  start: Vec3
+  control1: Vec3
+  control2: Vec3
+  end: Vec3
+  controlMode?: CubicBezierControlMode
+}
+
+export type PathSegment = LinePathSegment | CubicBezierPathSegment
+
+export type PointCurveKind = 'polyline' | 'cubicBezier'
+export type CurveKind = PointCurveKind | 'concatenatedPath'
+
+type CurveStratumBase = {
   id: string
   codim: 1 | 2
   geometricKind: 'curve'
-  kind: CurveKind
   name: string
   label?: string
   pathLabel?: string
   style: CurveStyle
-  points: Vec3[]
-  bezierControls?: CubicBezierControlMode
   styleSegments: CurveStyleSegment[]
   layer: number
 }
+
+export type PolylineCurveStratum = CurveStratumBase & {
+  kind: 'polyline'
+  points: Vec3[]
+}
+
+export type CubicBezierCurveStratum = CurveStratumBase & {
+  kind: 'cubicBezier'
+  points: Vec3[]
+  bezierControls?: CubicBezierControlMode
+}
+
+export type ConcatenatedPathStratum = CurveStratumBase & {
+  kind: 'concatenatedPath'
+  segments: PathSegment[]
+}
+
+export type CurveStratum =
+  | PolylineCurveStratum
+  | CubicBezierCurveStratum
+  | ConcatenatedPathStratum
 
 export type PointStratum = {
   id: string

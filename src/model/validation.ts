@@ -15,8 +15,14 @@ import {
   isPositiveFiniteNumber,
 } from './styles.ts'
 import { sheetVertices } from './sheets.ts'
+import {
+  pathSegmentEnd,
+  pathSegmentStart,
+  pathEndpointEpsilon,
+} from './paths.ts'
 import type {
   Camera,
+  CubicBezierCurveStratum,
   DiagramViewOptions,
   CubicBezierControlMode,
   CurveStratum,
@@ -27,6 +33,7 @@ import type {
   DiagramValidationResult,
   LabelStyle,
   PartialCurveStyle,
+  PathSegment,
   PointStratum,
   PointStyle,
   RegionStyle,
@@ -254,15 +261,46 @@ function validateCurveStratum(
     )
   }
 
-  if (stratum.kind !== 'polyline' && stratum.kind !== 'cubicBezier') {
+  if (
+    stratum.kind !== 'polyline' &&
+    stratum.kind !== 'cubicBezier' &&
+    stratum.kind !== 'concatenatedPath'
+  ) {
     pushError(
       errors,
       `${path}.kind`,
-      'Curve kind must be polyline or cubicBezier.',
+      'Curve kind must be polyline, cubicBezier, or concatenatedPath.',
     )
   }
 
-  if (stratum.kind === 'polyline' && stratum.points.length < 2) {
+  validateCurveStyle(stratum.style, `${path}.style`, errors)
+  validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
+  validateCurveStyleSegments(stratum.styleSegments, `${path}.styleSegments`, errors)
+
+  switch (stratum.kind) {
+    case 'polyline':
+      validatePolylineCurve(stratum, ambientDimension, path, errors)
+      return
+    case 'cubicBezier':
+      validateCubicBezierCurve(stratum, ambientDimension, path, errors)
+      return
+    case 'concatenatedPath':
+      validateConcatenatedPathCurve(stratum, ambientDimension, path, errors)
+      return
+  }
+}
+
+function validatePolylineCurve(
+  stratum: CurveStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (stratum.kind !== 'polyline') {
+    return
+  }
+
+  if (stratum.points.length < 2) {
     pushError(
       errors,
       `${path}.points`,
@@ -270,23 +308,6 @@ function validateCurveStratum(
     )
   }
 
-  if (stratum.kind === 'cubicBezier' && stratum.points.length !== 4) {
-    pushError(
-      errors,
-      `${path}.points`,
-      'Cubic Bezier curves must have exactly four points.',
-    )
-  }
-
-  validateCubicBezierControlMode(
-    stratum,
-    ambientDimension,
-    `${path}.bezierControls`,
-    errors,
-  )
-
-  validateCurveStyle(stratum.style, `${path}.style`, errors)
-  validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
   stratum.points.forEach((point, index) => {
     validateVec3ForAmbient(
       point,
@@ -295,23 +316,139 @@ function validateCurveStratum(
       errors,
     )
   })
-  validateCurveStyleSegments(stratum.styleSegments, `${path}.styleSegments`, errors)
 }
 
-function validateCubicBezierControlMode(
+function validateCubicBezierCurve(
+  stratum: CubicBezierCurveStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (stratum.points.length !== 4) {
+    pushError(
+      errors,
+      `${path}.points`,
+      'Cubic Bezier curves must have exactly four points.',
+    )
+  }
+
+  stratum.points.forEach((point, index) => {
+    validateVec3ForAmbient(
+      point,
+      ambientDimension,
+      `${path}.points[${index}]`,
+      errors,
+    )
+  })
+
+  validateCubicBezierControlMode(
+    stratum.points,
+    stratum.bezierControls,
+    ambientDimension,
+    `${path}.bezierControls`,
+    errors,
+  )
+}
+
+function validateConcatenatedPathCurve(
   stratum: CurveStratum,
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
 ): void {
-  const controlMode = stratum.bezierControls
-
-  if (controlMode === undefined) {
+  if (stratum.kind !== 'concatenatedPath') {
     return
   }
 
-  if (stratum.kind !== 'cubicBezier') {
-    pushError(errors, path, 'Bezier control metadata is valid only on cubic Bezier curves.')
+  if (stratum.segments.length < 1) {
+    pushError(
+      errors,
+      `${path}.segments`,
+      'Concatenated paths must have at least one segment.',
+    )
+  }
+
+  stratum.segments.forEach((segment, index) => {
+    validatePathSegment(
+      segment,
+      ambientDimension,
+      `${path}.segments[${index}]`,
+      errors,
+    )
+  })
+
+  validateAdjacentPathSegmentEndpoints(stratum.segments, `${path}.segments`, errors)
+}
+
+function validatePathSegment(
+  segment: PathSegment,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  switch (segment.kind) {
+    case 'line':
+      validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
+      validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
+      return
+    case 'cubicBezier':
+      validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
+      validateVec3ForAmbient(
+        segment.control1,
+        ambientDimension,
+        `${path}.control1`,
+        errors,
+      )
+      validateVec3ForAmbient(
+        segment.control2,
+        ambientDimension,
+        `${path}.control2`,
+        errors,
+      )
+      validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
+      validateCubicBezierControlMode(
+        [segment.start, segment.control1, segment.control2, segment.end],
+        segment.controlMode,
+        ambientDimension,
+        `${path}.controlMode`,
+        errors,
+      )
+      return
+    default:
+      pushError(errors, `${path}.kind`, 'Path segment kind must be line or cubicBezier.')
+  }
+}
+
+function validateAdjacentPathSegmentEndpoints(
+  segments: PathSegment[],
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  for (let index = 1; index < segments.length; index += 1) {
+    if (
+      !pointsApproximatelyEqual(
+        pathSegmentEnd(segments[index - 1]),
+        pathSegmentStart(segments[index]),
+        pathEndpointEpsilon,
+      )
+    ) {
+      pushError(
+        errors,
+        `${path}[${index}].start`,
+        `Path segment start must match ${path}[${index - 1}].end.`,
+      )
+    }
+  }
+}
+
+function validateCubicBezierControlMode(
+  points: readonly Vec3[],
+  controlMode: CubicBezierControlMode | undefined,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (controlMode === undefined) {
     return
   }
 
@@ -321,7 +458,7 @@ function validateCubicBezierControlMode(
     case 'relativeCartesian':
       validateRelativeCartesianControlMode(controlMode, ambientDimension, path, errors)
       validateRelativeControlModeMatchesPoints(
-        stratum,
+        points,
         ambientDimension,
         controlMode,
         path,
@@ -331,7 +468,7 @@ function validateCubicBezierControlMode(
     case 'relativePolar':
       validateRelativePolarControlMode(controlMode, ambientDimension, path, errors)
       validateRelativeControlModeMatchesPoints(
-        stratum,
+        points,
         ambientDimension,
         controlMode,
         path,
@@ -346,7 +483,7 @@ function validateCubicBezierControlMode(
         errors,
       )
       validateWorkPlaneRelativeControlModeMatchesEndpoints(
-        stratum,
+        points,
         controlMode.frame,
         controlMode.localStart,
         controlMode.localEnd,
@@ -354,7 +491,7 @@ function validateCubicBezierControlMode(
         errors,
       )
       validateRelativeControlModeMatchesPoints(
-        stratum,
+        points,
         ambientDimension,
         controlMode,
         path,
@@ -369,7 +506,7 @@ function validateCubicBezierControlMode(
         errors,
       )
       validateWorkPlaneRelativeControlModeMatchesEndpoints(
-        stratum,
+        points,
         controlMode.frame,
         controlMode.localStart,
         controlMode.localEnd,
@@ -377,7 +514,7 @@ function validateCubicBezierControlMode(
         errors,
       )
       validateRelativeControlModeMatchesPoints(
-        stratum,
+        points,
         ambientDimension,
         controlMode,
         path,
@@ -585,7 +722,7 @@ function validatePolarControl(
 }
 
 function validateWorkPlaneRelativeControlModeMatchesEndpoints(
-  stratum: CurveStratum,
+  points: readonly Vec3[],
   frame: WorkPlaneFrameSnapshot,
   localStart: WorkPlaneLocalCoordinate,
   localEnd: WorkPlaneLocalCoordinate,
@@ -593,7 +730,7 @@ function validateWorkPlaneRelativeControlModeMatchesEndpoints(
   errors: DiagramValidationIssue[],
 ): void {
   if (
-    stratum.points.length !== 4 ||
+    points.length !== 4 ||
     !isValidWorkPlaneFrameSnapshot(frame) ||
     !Number.isFinite(localStart.a) ||
     !Number.isFinite(localStart.b) ||
@@ -605,7 +742,7 @@ function validateWorkPlaneRelativeControlModeMatchesEndpoints(
 
   if (
     !pointsApproximatelyEqual(
-      stratum.points[0],
+      points[0],
       pointFromWorkPlaneLocalCoordinate(frame, localStart),
     )
   ) {
@@ -618,7 +755,7 @@ function validateWorkPlaneRelativeControlModeMatchesEndpoints(
 
   if (
     !pointsApproximatelyEqual(
-      stratum.points[3],
+      points[3],
       pointFromWorkPlaneLocalCoordinate(frame, localEnd),
     )
   ) {
@@ -631,20 +768,20 @@ function validateWorkPlaneRelativeControlModeMatchesEndpoints(
 }
 
 function validateRelativeControlModeMatchesPoints(
-  stratum: CurveStratum,
+  points: readonly Vec3[],
   ambientDimension: 2 | 3,
   controlMode: CubicBezierControlMode,
   path: string,
   errors: DiagramValidationIssue[],
 ): void {
-  if (stratum.points.length !== 4) {
+  if (points.length !== 4) {
     return
   }
 
   const expectedPoints = absoluteCubicBezierPointsFromControlMode(
     ambientDimension,
-    stratum.points[0],
-    stratum.points[3],
+    points[0],
+    points[3],
     controlMode,
   )
 
@@ -652,7 +789,7 @@ function validateRelativeControlModeMatchesPoints(
     return
   }
 
-  if (!pointsApproximatelyEqual(stratum.points[1], expectedPoints[1])) {
+  if (!pointsApproximatelyEqual(points[1], expectedPoints[1])) {
     pushError(
       errors,
       `${path}.firstControl`,
@@ -660,7 +797,7 @@ function validateRelativeControlModeMatchesPoints(
     )
   }
 
-  if (!pointsApproximatelyEqual(stratum.points[2], expectedPoints[2])) {
+  if (!pointsApproximatelyEqual(points[2], expectedPoints[2])) {
     pushError(
       errors,
       `${path}.secondControl`,
@@ -1027,9 +1164,11 @@ function validateLayer(
   validateFinite(layer, path, errors)
 }
 
-function pointsApproximatelyEqual(first: Vec3, second: Vec3): boolean {
-  const epsilon = 1e-9
-
+function pointsApproximatelyEqual(
+  first: Vec3,
+  second: Vec3,
+  epsilon = 1e-9,
+): boolean {
   return (
     Math.abs(first.x - second.x) <= epsilon &&
     Math.abs(first.y - second.y) <= epsilon &&

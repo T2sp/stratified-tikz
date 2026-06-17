@@ -1,5 +1,23 @@
 import type { Vec2 } from '../model/types'
 
+export type SvgLinePathSegment = {
+  kind: 'line'
+  start: Vec2
+  end: Vec2
+}
+
+export type SvgCubicBezierPathSegment = {
+  kind: 'cubicBezier'
+  start: Vec2
+  control1: Vec2
+  control2: Vec2
+  end: Vec2
+}
+
+export type SvgPathSegment =
+  | SvgLinePathSegment
+  | SvgCubicBezierPathSegment
+
 export function formatSvgNumber(value: number): string {
   if (Object.is(value, -0)) {
     return '0'
@@ -40,6 +58,23 @@ export function cubicBezierToSvgPath(points: readonly Vec2[]): string {
   ].join(' ')
 }
 
+export function pathSegmentsToSvgPath(
+  segments: readonly SvgPathSegment[],
+): string {
+  if (segments.length === 0) {
+    return ''
+  }
+
+  const [firstSegment, ...restSegments] = segments
+  const commands = [
+    `M ${svgPoint(firstSegment.start)}`,
+    svgCommandForPathSegment(firstSegment),
+    ...restSegments.map(svgCommandForPathSegment),
+  ]
+
+  return commands.join(' ')
+}
+
 export function regularPolygonPoints(
   center: Vec2,
   radius: number,
@@ -53,6 +88,17 @@ export function regularPolygonPoints(
       y: center.y + radius * Math.sin(angle),
     }
   })
+}
+
+function svgCommandForPathSegment(segment: SvgPathSegment): string {
+  switch (segment.kind) {
+    case 'line':
+      return `L ${svgPoint(segment.end)}`
+    case 'cubicBezier':
+      return `C ${svgPoint(segment.control1)} ${svgPoint(
+        segment.control2,
+      )} ${svgPoint(segment.end)}`
+  }
 }
 
 export function starPolygonPoints(

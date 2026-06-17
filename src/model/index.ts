@@ -1,5 +1,6 @@
 export * from './camera.ts'
 export * from './constructors.ts'
+export * from './paths.ts'
 export * from './serialization.ts'
 export * from './sheets.ts'
 export * from './styles.ts'

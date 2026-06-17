@@ -16,6 +16,10 @@ export function curveHandleLabel(kind: CurveStratum['kind'], index: number): str
     return vertexHandleLabel(index)
   }
 
+  if (kind === 'concatenatedPath') {
+    return `Path point ${index + 1}`
+  }
+
   switch (index) {
     case 0:
       return 'Start'

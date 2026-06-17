@@ -437,7 +437,7 @@ emit `spath/save=<name>` for eligible path-like output.
 
 Currently, `pathLabel` applies to:
 
-- `CurveStratum` for both `polyline` and `cubicBezier`
+- `CurveStratum` for `polyline`, `cubicBezier`, and `concatenatedPath`
 - `PolygonSheetStratum` for the exported polygon sheet path
 
 It does not apply to `PointStratum`, and it is independent from free text labels
@@ -466,20 +466,33 @@ In 3D mode:
 - it represents a 2-morphism line defect
 
 ```ts
-export type CurveStratum = {
+type CurveStratumBase = {
   id: string;
   codim: 1 | 2;
   geometricKind: "curve";
-  kind: "polyline" | "cubicBezier";
   name: string;
   label?: string;
   pathLabel?: string;
   style: CurveStyle;
-  points: Vec3[];
-  bezierControls?: CubicBezierControlMode;
   styleSegments: CurveStyleSegment[];
   layer: number;
 };
+
+export type PolylineCurveStratum = CurveStratumBase & {
+  kind: "polyline";
+  points: Vec3[];
+};
+
+export type CubicBezierCurveStratum = CurveStratumBase & {
+  kind: "cubicBezier";
+  points: Vec3[];
+  bezierControls?: CubicBezierControlMode;
+};
+
+export type CurveStratum =
+  | PolylineCurveStratum
+  | CubicBezierCurveStratum
+  | ConcatenatedPathStratum;
 ```
 
 For `kind: "polyline"`, `points` is a list of vertices.
@@ -490,9 +503,50 @@ For `kind: "cubicBezier"`, `points` should contain four points:
 [start, control1, control2, end]
 ```
 
-The four `points` remain the absolute geometry used for SVG rendering, hit
-testing, dragging, and validation. Cubic Bézier curves may also carry optional
-control metadata for TikZ export:
+For `kind: "concatenatedPath"`, the curve stores an explicit sequence of path
+segments instead of a flat `points` array:
+
+```ts
+type PathSegment =
+  | {
+      kind: "line";
+      start: Vec3;
+      end: Vec3;
+    }
+  | {
+      kind: "cubicBezier";
+      start: Vec3;
+      control1: Vec3;
+      control2: Vec3;
+      end: Vec3;
+      controlMode?: CubicBezierControlMode;
+    };
+
+export type ConcatenatedPathStratum = CurveStratumBase & {
+  kind: "concatenatedPath";
+  segments: PathSegment[];
+};
+```
+
+Segment endpoints are stored explicitly on each segment. A path is composable
+only when every segment start after the first matches the previous segment end
+within the model endpoint tolerance, currently `1e-9`. This duplicate-endpoint
+representation is intentionally simple for JSON round-tripping and future
+segment-level editing. Helpers such as `pathSegmentsFromPolyline`,
+`pathSegmentsFromCubicBezier`, `pathEndpoints`, `areSegmentsComposable`, and
+`normalizePathForAmbientDimension` provide the pure conversion and validation
+building blocks.
+
+Concatenated paths support line segments and cubic Bézier segments in both 2D
+and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
+helpers normalize to that policy, while import validation rejects nonzero saved
+`z` values. Closed-path validation is not required yet. Closed 2D regions, 3D
+curved-boundary sheets, live linked vertices, snapping, cross-work-plane
+creation, and segment-level style overrides are later phases.
+
+For cubic Bézier curves, the four `points` remain the absolute geometry used for
+SVG rendering, hit testing, dragging, and validation. Cubic Bézier curves may
+also carry optional control metadata for TikZ export:
 
 ```ts
 type WorkPlaneFrameSnapshot = {
@@ -847,21 +901,17 @@ Later versions may add:
 
 ## Updated curve stratum
 
-Replace `visibilitySegments` with `styleSegments`.
+All curve stratum variants carry `styleSegments`.
 
 ```ts
-export type CurveStratum = {
-  id: string;
-  codim: 1 | 2;
-  geometricKind: "curve";
-  kind: "polyline" | "cubicBezier";
-  name: string;
-  label?: string;
-  style: CurveStyle;
-  points: Vec3[];
+type CurveStratumBase = {
   styleSegments: CurveStyleSegment[];
-  layer: number;
 };
+
+export type CurveStratum =
+  | PolylineCurveStratum
+  | CubicBezierCurveStratum
+  | ConcatenatedPathStratum;
 ```
 
 For MVP, `styleSegments` may simply be an empty array.
