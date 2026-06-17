@@ -465,11 +465,17 @@ export type TextLabel = {
   layer: number
 }
 
+export type DiagramLayer = {
+  value: number
+  name: string
+}
+
 export type Diagram = {
   version: 1
   ambientDimension: AmbientDimension
   camera: Camera
   view?: DiagramViewOptions
+  layers?: DiagramLayer[]
   strata: Stratum[]
   labels: TextLabel[]
 }

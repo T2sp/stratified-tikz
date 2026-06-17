@@ -106,6 +106,7 @@ import {
   formatExistingCoordinateSourceLabel,
   fitCameraControlState,
   layerFilterIncludesLayer,
+  LayerManager,
   maxCurvedSheetSamplingSegments,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
@@ -4830,6 +4831,11 @@ function App() {
               <span>basic fields and coordinates</span>
             </div>
           </div>
+          <LayerManager
+            diagram={editableDiagram}
+            layerFilter={layerFilter}
+            creationLayerInput={directLayerInput}
+          />
           <EditableInspector
             diagram={editableDiagram}
             selectedElement={selectedElement}

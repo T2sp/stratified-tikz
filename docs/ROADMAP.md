@@ -345,6 +345,7 @@ Phase 16 implements layer-level editing and management operations.
 - Existing numeric `layer` fields remain the source of element membership.
 - Old diagrams without layer metadata derive default names.
 - Add a Layer Manager list showing layer values, names, and element counts.
+- Keep filter and creation-layer controls as UI state, not layer metadata.
 
 ### Phase 16B: Layer rename and layer swap/reorder
 

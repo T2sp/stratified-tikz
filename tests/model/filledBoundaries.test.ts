@@ -10,6 +10,7 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
+import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
   defaultRegionStyle,
   defaultSheetStyle,
@@ -227,7 +228,7 @@ test('filled region save/load round-trips through JSON', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagram)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagram))
 })
 
 test('work-plane filled sheet save/load round-trips through JSON', () => {
@@ -249,7 +250,7 @@ test('work-plane filled sheet save/load round-trips through JSON', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagram)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagram))
 })
 
 test('existing polygon sheet and concatenated path validation still pass', () => {

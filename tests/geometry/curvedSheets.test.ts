@@ -19,6 +19,7 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
+import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   Diagram,
@@ -142,7 +143,7 @@ test('curved sheet stratum save/load round-trips through JSON', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagram)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagram))
 })
 
 test('curved sheet stratum rejects invalid saved primitive data', () => {

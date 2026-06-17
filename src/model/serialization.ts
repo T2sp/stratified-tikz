@@ -11,12 +11,14 @@ import type {
   Camera2D,
   Camera3D,
   Diagram,
+  DiagramLayer,
   DiagramValidationResult,
   DiagramViewOptions,
   OrthographicCamera3D,
   Stratum,
   TextLabel,
 } from './types.ts'
+import { getLayerMetadata, normalizeLayerMetadataForDiagram } from './layers.ts'
 import { validateDiagram } from './validation.ts'
 
 export const savedDiagramFormat = 'stratified-tikz-diagram'
@@ -27,6 +29,7 @@ export type PersistentDiagram = {
   ambientDimension: AmbientDimension
   camera?: Camera
   view?: DiagramViewOptions
+  layers?: DiagramLayer[]
   strata: Stratum[]
   labels: TextLabel[]
 }
@@ -58,6 +61,7 @@ type SavedDiagramInput = {
   ambientDimension: AmbientDimension
   camera?: unknown
   view?: unknown
+  layers?: unknown
   strata: unknown[]
   labels: unknown[]
 }
@@ -65,6 +69,7 @@ type SavedDiagramInput = {
 type LoadedDiagramNormalization = {
   diagram: Diagram
   warnings: string[]
+  errors: string[]
 }
 
 export function serializeDiagram(
@@ -121,6 +126,13 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
   }
 
   const normalization = normalizeLoadedDiagram(parsed.diagram)
+  if (normalization.errors.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${normalization.errors[0]}`,
+    }
+  }
+
   const diagram = normalization.diagram
   let validation: DiagramValidationResult
 
@@ -157,14 +169,28 @@ function toPersistentDiagram(
   options: SerializeDiagramOptions,
 ): PersistentDiagram {
   const view = normalizePersistentView(diagram, options)
+  const layers = normalizePersistentLayers(diagram)
 
   return {
     version: diagram.version,
     ambientDimension: diagram.ambientDimension,
     ...(view === undefined ? {} : { view }),
+    ...(layers === undefined ? {} : { layers }),
     strata: diagram.strata,
     labels: diagram.labels,
   }
+}
+
+function normalizePersistentLayers(diagram: Diagram): DiagramLayer[] | undefined {
+  const normalization = normalizeLayerMetadataForDiagram(diagram)
+
+  if (normalization.errors.length > 0) {
+    throw new Error(normalization.errors[0])
+  }
+
+  return normalization.layers.length === 0 && diagram.layers === undefined
+    ? undefined
+    : normalization.layers
 }
 
 function normalizePersistentView(
@@ -212,7 +238,7 @@ function normalizeLoadedDiagram(
   const warnings: string[] = []
   const camera = normalizeLoadedCamera(savedDiagram, warnings)
   const view = normalizeLoadedView(savedDiagram, camera, warnings)
-  const diagram: Diagram = {
+  const diagramWithoutLayers: Diagram = {
     version: savedDiagram.version,
     ambientDimension: savedDiagram.ambientDimension,
     camera,
@@ -220,8 +246,75 @@ function normalizeLoadedDiagram(
     strata: savedDiagram.strata as Stratum[],
     labels: savedDiagram.labels as TextLabel[],
   }
+  const layerNormalization = normalizeLoadedLayers(
+    diagramWithoutLayers,
+    savedDiagram.layers,
+  )
+  warnings.push(...layerNormalization.warnings)
 
-  return { diagram, warnings }
+  const diagram: Diagram = {
+    ...diagramWithoutLayers,
+    ...(layerNormalization.layers === undefined
+      ? {}
+      : { layers: layerNormalization.layers }),
+  }
+
+  return {
+    diagram,
+    warnings,
+    errors: layerNormalization.errors,
+  }
+}
+
+function normalizeLoadedLayers(
+  diagramWithoutLayers: Diagram,
+  savedLayers: unknown,
+): {
+  layers?: DiagramLayer[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedLayers === undefined) {
+    const layers = getLayerMetadata(diagramWithoutLayers)
+
+    return {
+      layers: layers.length === 0 ? undefined : layers,
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedLayers)) {
+    return {
+      warnings: [],
+      errors: ['layers must be an array when present.'],
+    }
+  }
+
+  const errors: string[] = []
+  const layerRecords = savedLayers.flatMap((layer, index): DiagramLayer[] => {
+    if (!isRecord(layer)) {
+      errors.push(`layers[${index}] must be a layer metadata object.`)
+      return []
+    }
+
+    return [
+      {
+        value: layer.value as number,
+        name: layer.name as string,
+      },
+    ]
+  })
+  const normalization = normalizeLayerMetadataForDiagram({
+    ...diagramWithoutLayers,
+    layers: layerRecords,
+  })
+
+  return {
+    layers: normalization.layers,
+    warnings: normalization.warnings,
+    errors: [...errors, ...normalization.errors],
+  }
 }
 
 function normalizeLoadedCamera(
