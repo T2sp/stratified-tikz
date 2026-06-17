@@ -447,7 +447,6 @@ function LayerNameEditor({
   return (
     <form
       className="layer-manager-name-form"
-      role="cell"
       onSubmit={(event) => {
         event.preventDefault()
         commitRename()

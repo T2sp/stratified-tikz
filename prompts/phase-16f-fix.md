@@ -1,4 +1,4 @@
-# Phase 16F Fix Prompt: Functional updater layer operations and ARIA cleanup
+# Phase 16F Fix Prompt: Make nextUnusedLayerValue terminate for huge layer values
 
 ## Environment
 
@@ -19,6 +19,12 @@ PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 ```
 
+Also run if available:
+
+```bash
+git diff --check
+```
+
 ## Context
 
 You are working on the StratifiedTikZ project.
@@ -31,60 +37,55 @@ Review result:
 - Build passes.
 - No Critical issues.
 - One Medium issue remains.
-- One Low-priority issue remains.
 
 ## Medium issue
 
-In `src/App.tsx`, the App-level layer operation handlers compute `result` / `nextDiagram` from the render-captured `editableDiagram` before entering `setEditorState`.
+`src/model/layers.ts` has a helper `nextUnusedLayerValue`.
 
-Affected operations include:
+Current problem:
 
-- `duplicateDiagramLayer`;
-- `swapDiagramLayers`;
-- `translateDiagramLayer`;
-- `deleteDiagramLayer`.
+- `nextUnusedLayerValue` can loop forever for large finite layer values.
+- Example layer value:
 
-Problem:
+```ts
+9007199254740992
+```
 
-- If layer operations are queued in the same React batch, or invoked from a stale render, the later operation can overwrite a newer `current.editableDiagram`.
-- This can drop prior layer edits.
-- This can record history from the wrong base diagram.
-- This directly violates the Phase 16F combined-operation hardening goal.
+- This is finite, but in JavaScript:
 
-Required fix:
+```ts
+9007199254740992 + 1 === 9007199254740992
+```
 
-- Compute diagram changes inside the functional `setEditorState` updater from `current.editableDiagram`.
-- Preserve status messages from the actual committed result.
-- Add focused test/helper coverage for queued or sequential combined layer operations.
+- Therefore, if `candidate = sourceLayer + 1` and `usedLayers.has(candidate)` remains true, `candidate` never advances.
+- `src/ui/LayerManager.tsx` calls this helper during render for the duplicate target default.
+- Loading or creating such a layer can freeze the Layer Manager render path.
 
-## Low-priority issue
-
-In `src/ui/LayerManager.tsx`, `LayerNameEditor` still renders `role="cell"` even though the Layer Manager changed from a table to a list.
-
-Problem:
-
-- This leaves an invalid ARIA role hierarchy.
-- Remove the stale role or restore a proper table/grid structure.
-
-Preferred fix:
-
-- Remove the stale `role="cell"` unless there is a proper parent table/grid role.
-- Keep accessibility semantics simple and valid.
+This violates Phase 16F's robustness goal.
 
 ## Goal
 
-Fix Phase 16F so that App-level layer operation handlers are safe under React batching/stale renders, and clean up the stale ARIA role.
+Fix `nextUnusedLayerValue` so it always terminates for finite layer values.
 
-This is a targeted Phase 16F fix.
+Layer Manager duplicate default computation must never freeze during render.
+
+If no safe next finite/progressing layer can be derived, the duplicate target default should be rejected, omitted, or disabled safely.
+
+Add regression tests for huge finite layer values such as:
+
+```ts
+9007199254740992
+```
 
 ## Scope
 
+This is a targeted Phase 16F robustness fix.
+
 Implement:
 
-- functional-updater-safe App-level handlers for duplicate/swap/translate/delete layer operations;
-- safe status propagation from the actual committed operation result;
-- tests or helper coverage for queued/sequential layer operations;
-- ARIA cleanup for `LayerNameEditor`.
+- termination-safe `nextUnusedLayerValue`;
+- safe UI behavior when no default duplicate target can be derived;
+- tests for huge finite layer values.
 
 Do not implement:
 
@@ -98,267 +99,233 @@ Do not implement:
 
 Do not change:
 
-- layer operation semantics;
-- layer metadata model;
-- duplicate ID strategy;
-- swap semantics;
-- translate semantics;
-- delete semantics;
+- layer metadata model unless absolutely necessary;
+- normal duplicate/delete/swap/translate semantics;
 - TikZ layer output semantics;
-- save/load format;
+- save/load format unless absolutely necessary;
 - SVG rendering semantics;
 - geometry model.
 
-## 1. Inspect current App-level layer operation handlers
+## 1. Fix nextUnusedLayerValue termination
 
-Inspect `src/App.tsx` around the layer operation handlers.
+Inspect:
 
-Look for patterns like:
+- `src/model/layers.ts`;
+- `nextUnusedLayerValue`;
+- any layer value validation helpers;
+- duplicate layer helper;
+- Layer Manager duplicate target default logic.
+
+Update `nextUnusedLayerValue` so it cannot loop forever.
+
+Requirements:
+
+1. The helper must always terminate.
+2. It must not rely on `candidate += 1` if that operation stops changing the number.
+3. It must reject or return no result when it cannot find a safe finite candidate.
+4. It must not return `NaN` or `Infinity`.
+5. It must not return a candidate that is already used.
+6. It must preserve normal behavior for ordinary layer values such as:
+   - `-1`;
+   - `0`;
+   - `1`;
+   - `2`;
+   - sparse layers like `0`, `10`;
+   - decimal layer values if the project currently supports them.
+
+Acceptable implementation options:
+
+### Option A: Result/nullable helper
+
+Change the helper to return:
 
 ```ts
-const result = duplicateDiagramLayer(editableDiagram, ...);
+number | null
+```
 
-setEditorState((current) => {
-  return {
-    ...current,
-    editableDiagram: result.diagram,
-    ...
-  };
-});
+or a result object:
+
+```ts
+{ ok: true; value: number } | { ok: false; reason: string }
+```
+
+When no safe next value can be found, return `null` or failure.
+
+### Option B: Bounded search
+
+Keep returning `number`, but use a bounded search and throw a clear error if no candidate can be found.
+
+This is acceptable for model helpers, but UI render paths must catch or avoid throwing during render.
+
+### Option C: Safe integer policy for generated defaults
+
+For default duplication targets, search within safe integer layer values only.
+
+Example:
+
+- try `sourceLayer + 1` only if it produces a finite value and progresses;
+- otherwise search a bounded range of safe integer candidates such as `0, 1, 2, ...`;
+- if no candidate found, return `null` / failure.
+
+Choose the smallest safe option consistent with existing code style.
+
+## 2. Detect non-progressing numeric increments
+
+If the helper uses incremental candidate search, explicitly detect non-progressing increments.
+
+Example:
+
+```ts
+const next = candidate + 1;
+if (next === candidate || !Number.isFinite(next)) {
+  return null;
+}
+candidate = next;
+```
+
+or use a different bounded strategy.
+
+Do not allow a `while (usedLayers.has(candidate))` loop without a guaranteed progress condition.
+
+## 3. Layer Manager duplicate default behavior
+
+Inspect `src/ui/LayerManager.tsx` around duplicate target default computation.
+
+Current issue:
+
+- `nextUnusedLayerValue` is called during render.
+- If it loops, the UI freezes.
+
+Required behavior:
+
+- Layer Manager render must never call a potentially non-terminating function.
+- If no safe default duplicate target exists:
+  - disable duplicate controls for that layer; or
+  - show a concise message; or
+  - leave the target field empty and require manual input.
+- The UI must remain responsive.
+- The user must not be able to commit duplicate to an invalid target layer.
+- The duplicate operation helper must still validate the target layer at commit time.
+
+Suggested UI text:
+
+```text
+No safe default target layer
 ```
 
 or:
 
-```ts
-const nextDiagram = deleteDiagramLayer(editableDiagram, ...);
-
-setEditorState((current) => ({
-  ...current,
-  editableDiagram: nextDiagram,
-}));
+```text
+Choose target layer manually
 ```
 
-These are unsafe because `editableDiagram` is captured from the render, not from the latest `current.editableDiagram`.
+If manual target input exists, allow the user to enter a valid finite target layer.
 
-## 2. Compute layer operation results inside functional updater
+## 4. Validation policy
 
-Update each affected handler so that diagram-changing layer operations are computed inside the `setEditorState` functional updater.
+Do not broaden or tighten the global layer-value policy unnecessarily.
 
-Required operations:
+If the existing model allows any finite numeric layer value, keep that unless the project already decided to require safe integers.
 
-- duplicate layer;
-- swap layers;
-- translate layer;
-- delete layer.
+However, generated defaults must be safe.
 
-Preferred shape:
+If you decide to reject unsafe layer values globally, that is a larger behavioral change and must be justified, tested, and save/load compatibility must be considered.
 
-```ts
-setEditorState((current) => {
-  const result = duplicateDiagramLayer(current.editableDiagram, args);
+Preferred targeted policy:
 
-  return {
-    ...current,
-    editableDiagram: result.diagram,
-    selectedElement: clearSelectionIfNeeded(result.diagram, current.selectedElement),
-    // other state updates derived from result/current
-  };
-});
-```
+- existing finite layer values can continue to exist if the model currently permits them;
+- automatic default generation refuses unsafe/non-progressing candidates;
+- UI duplicate default disables or asks for manual target when needed.
 
-Requirements:
+## 5. Tests
 
-- Use `current.editableDiagram` as the base diagram.
-- Do not compute `result` from render-captured `editableDiagram`.
-- Preserve undo/redo history behavior.
-- Preserve selection clearing/validation behavior.
-- Preserve layer filter validation behavior.
-- Preserve status messages from the actual operation result.
-- Preserve existing operation semantics.
+Add focused tests.
 
-If an operation can fail, handle failure inside the functional updater safely.
+Required tests for `nextUnusedLayerValue`:
 
-## 3. Preserve status messages from committed results
-
-Some layer helpers may return status data such as:
-
-- created target layer;
-- number of duplicated elements;
-- deleted element count;
-- translated element count;
-- error message;
-- warning message.
-
-Because results are now computed inside the updater, status messages must come from the actual result computed from `current.editableDiagram`.
-
-Acceptable approaches:
-
-### Option A: Store status inside editor state
-
-If status is part of `EditorState`, set it inside the functional updater.
-
-### Option B: Capture status in a local variable carefully
-
-For example:
+1. Ordinary source layer works:
 
 ```ts
-let nextStatus: string | null = null;
-
-setEditorState((current) => {
-  const result = operation(current.editableDiagram);
-  nextStatus = result.status;
-  return nextState;
-});
-
-if (nextStatus !== null) {
-  setStatus(nextStatus);
-}
+used = new Set([0])
+nextUnusedLayerValue(0, used) === 1
 ```
 
-However, be careful with React Strict Mode or repeated updater calls. Prefer storing status in state if existing architecture allows it.
+or equivalent.
 
-### Option C: Use a helper that returns a complete editor-state patch
-
-Extract a helper such as:
+2. Sparse layer values work:
 
 ```ts
-applyLayerOperationToEditorState(current, operationArgs): EditorState
+used = new Set([0, 1, 2, 10])
+source = 2
+result is finite and unused
 ```
 
-This can be easier to test.
+3. Negative layer values work if currently supported:
 
-Choose the simplest safe approach consistent with existing App state architecture.
+```ts
+used = new Set([-1, 0])
+source = -1
+result is finite and unused
+```
 
-## 4. Preserve undo/redo history
+4. Huge finite layer value does not loop:
 
-Layer operations are diagram edits and must remain undoable.
-
-Required:
-
-- duplicate layer creates one undoable history entry;
-- swap layer creates one undoable history entry;
-- translate layer creates one undoable history entry;
-- delete layer creates one undoable history entry;
-- undo restores previous diagram;
-- redo reapplies operation;
-- history base must be the actual previous `current.editableDiagram`, not a stale captured diagram.
-
-Do not push history entries for UI-only state changes.
-
-## 5. Preserve selection and filter safety
-
-After each operation:
-
-### Duplicate layer
-
-- existing selection can remain if still valid.
-- if created duplicated layer is selected by operation, preserve existing behavior.
-- layer filter should not hide newly selected duplicated items unless existing behavior intentionally does so.
-
-### Swap layer
-
-- selected element remains selected if it still exists.
-- selected element layer may change.
-- validate selection against layer filter / visibility / locking rules.
-
-### Translate layer
-
-- selected element remains selected if it still exists.
-- geometry updates should be based on current diagram.
-
-### Delete layer
-
-- if selected element was deleted, clear selection.
-- if layer filter targets deleted layer, validate or reset according to existing behavior.
-- clear/validate stale draft/source/highlight state if existing code already does this.
-
-Do not introduce stale selections.
-
-## 6. Add focused tests / helper coverage
-
-Add tests that would catch this stale-state bug.
-
-If direct React batching tests are hard, extract pure helpers for applying layer operations to editor state and test those.
-
-Required or strongly preferred tests:
-
-### A. Sequential duplicate + translate uses latest diagram
-
-Simulate two operations applied in sequence to editor state:
-
-1. duplicate layer;
-2. translate the duplicated or original layer.
+```ts
+source = 9007199254740992
+used = new Set([9007199254740992])
+```
 
 Expected:
 
-- translate sees the diagram after duplicate;
-- duplicated elements are not lost;
-- translation applies to the intended current diagram.
+- helper returns `null` / failure / safe fallback; or
+- throws a clear bounded error outside render path.
 
-### B. Swap + delete uses latest diagram
+It must not hang.
 
-Simulate:
+5. Huge finite layer with `source + 1 === source` is handled explicitly.
 
-1. swap layers;
-2. delete one of the swapped layers.
+6. `Infinity`, `-Infinity`, and `NaN` source values are rejected if the helper accepts runtime inputs.
 
-Expected:
+7. Candidate collision loop has a bound/progress check.
 
-- delete operates on the post-swap diagram;
-- no elements from stale pre-swap state reappear;
-- metadata remains coherent.
+Required UI/helper tests:
 
-### C. Duplicate + delete does not resurrect stale state
+8. Layer Manager duplicate default does not hang for a layer value like `9007199254740992`.
 
-Simulate:
+9. Duplicate button is disabled or target is empty when no safe default can be derived.
 
-1. duplicate a layer;
-2. delete the original or duplicated layer.
+10. Duplicate commit rejects invalid target layer.
 
-Expected:
+Regression tests:
 
-- result reflects both operations;
-- no duplicated elements are lost or resurrected incorrectly.
+11. Normal duplicate layer behavior still works.
 
-### D. Undo history base is correct
+12. Duplicate still creates new IDs and correct target layer for ordinary values.
 
-If history helpers are testable:
+13. Existing combined-operation tests still pass.
 
-- apply a layer operation;
-- apply another layer operation;
-- undo once;
-- verify the diagram returns to the state after the first operation, not to an unrelated stale state.
+## 6. Avoid render-path hazards
 
-### E. Status comes from actual committed result
+Do not put expensive or unbounded searches directly in render.
 
-If status helpers are testable:
+If duplicate defaults are computed during render:
 
-- ensure status message reflects the result computed from the current diagram.
+- make the computation bounded;
+- memoize if needed;
+- handle failure without throwing;
+- avoid loops over enormous ranges.
 
-Existing model-level tests for duplicate/swap/translate/delete should continue to pass.
+Do not scan from `Number.MIN_SAFE_INTEGER` to `Number.MAX_SAFE_INTEGER`.
 
-## 7. ARIA cleanup
+## 7. Documentation/comments
 
-Inspect `src/ui/LayerManager.tsx`, especially `LayerNameEditor`.
+Add a small comment near `nextUnusedLayerValue` explaining:
 
-Current low-priority issue:
+- JavaScript numbers can stop progressing at large magnitudes;
+- the helper must be bounded/progress-safe;
+- failure is possible when no safe default can be derived.
 
-- `LayerNameEditor` renders `role="cell"` even though the Layer Manager changed from a table to a list.
-
-Fix:
-
-- remove `role="cell"` from `LayerNameEditor`; or
-- restore a proper parent role hierarchy if the UI is intended to be a table/grid.
-
-Preferred:
-
-- remove the stale role.
-- Use native semantics where possible.
-- Keep labels/inputs accessible.
-
-Do not make broad accessibility redesigns.
-
-Add a small test only if existing UI tests support it.
+Update docs only if the user-facing duplicate behavior changes.
 
 ## 8. Preserve existing behavior
 
@@ -367,7 +334,7 @@ Do not regress:
 - layer metadata derivation;
 - layer rename;
 - layer swap;
-- layer duplicate;
+- layer duplicate for normal layer values;
 - layer delete;
 - layer translation;
 - layer visibility/locking;
@@ -379,7 +346,7 @@ Do not regress:
 - SVG preview;
 - TikZ layer output;
 - all geometry rendering;
-- Layer Manager layout/scrolling fixes.
+- previous Phase 16F functional-updater fixes.
 
 ## 9. Manual verification checklist
 
@@ -389,26 +356,22 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Verify:
+Verify ordinary behavior:
 
 1. Open Layer Manager.
-2. Duplicate a layer.
-3. Immediately translate the duplicated layer.
-4. Confirm duplicate remains and translation applies.
-5. Swap two layers.
-6. Delete one swapped layer.
-7. Confirm result matches the current post-swap state.
-8. Undo once.
-9. Confirm only the last operation is undone.
-10. Redo.
-11. Confirm it reapplies correctly.
-12. Rename a layer.
-13. Confirm rename still works.
-14. Delete a layer with selected element.
-15. Confirm stale selection is cleared.
-16. Generate TikZ.
-17. Confirm TikZ reflects the final layer state.
-18. Inspect Layer Manager accessibility if possible and confirm no stale `role="cell"` warning from obvious markup.
+2. Duplicate a normal layer, e.g. layer `0`.
+3. Confirm duplicate works.
+4. Delete/swap/translate still work.
+5. Undo/redo still work.
+
+Verify large layer behavior if practical:
+
+6. Load or construct a diagram with a layer value `9007199254740992`.
+7. Open Layer Manager.
+8. Confirm the UI does not freeze.
+9. Confirm duplicate target default is disabled, empty, or safely handled.
+10. Confirm invalid duplicate target cannot be committed.
+11. Confirm manual valid target works if manual input is supported.
 
 ## 10. Verification
 
@@ -417,11 +380,6 @@ Run:
 ```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
-```
-
-Also run if available:
-
-```bash
 git diff --check
 ```
 
@@ -430,13 +388,12 @@ git diff --check
 Please report:
 
 - files modified;
-- root cause of stale-state risk;
-- which App handlers were changed;
-- how each layer operation now uses `current.editableDiagram`;
-- how status messages are preserved;
-- how undo/redo base state is preserved;
-- tests added/updated for queued/sequential operations;
-- ARIA cleanup performed;
+- root cause of the infinite-loop risk;
+- new `nextUnusedLayerValue` behavior;
+- whether helper returns `null`, result object, or throws on failure;
+- how non-progressing increments are detected;
+- how Layer Manager handles missing default duplicate target;
+- tests added/updated;
 - test results;
 - build results;
 - remaining limitations.

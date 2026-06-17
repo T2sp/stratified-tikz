@@ -24,17 +24,12 @@ import {
   serializeDiagram,
 } from './model/serialization.ts'
 import {
-  deleteLayer,
-  duplicateLayer,
   elementsOnLayer,
   isLayerLocked,
   isLayerVisible,
-  normalizeLayerValue,
   renameLayer,
   setLayerLock,
   setLayerVisibility,
-  swapLayers,
-  translateLayer,
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
@@ -75,6 +70,10 @@ import {
   addTextLabelWithResult,
   addTextLabelFromDirectInput,
   applyDirectCreationCommitToEditorState,
+  applyDeleteLayerToEditorState,
+  applyDuplicateLayerToEditorState,
+  applySwapLayersToEditorState,
+  applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
   appendSheetPolygonDraftPoint,
   areCamera3DEqual,
@@ -248,6 +247,7 @@ type EditableEditorState = {
   cubicBezierDraft: CubicBezierDraft
   pathDraft: ConcatenatedPathDraft | null
   sheetPolygonDraft: SheetPolygonDraft | null
+  layerOperationStatus: string
   history: DiagramHistory
 }
 
@@ -409,7 +409,6 @@ function App() {
     String(defaultSaddleCreationParameters.sampling.vSegments),
   )
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
-  const [layerOperationStatus, setLayerOperationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
   const [fillStatus, setFillStatus] = useState<string>('')
@@ -528,6 +527,7 @@ function App() {
       cubicBezierDraft: null,
       pathDraft: null,
       sheetPolygonDraft: null,
+      layerOperationStatus: '',
       history: createDiagramHistory(initialDiagram),
     }
   })
@@ -539,8 +539,17 @@ function App() {
     cubicBezierDraft,
     pathDraft,
     sheetPolygonDraft,
+    layerOperationStatus,
     history,
   } = editorState
+
+  function setLayerOperationStatus(message: string): void {
+    setEditorState((current) => ({
+      ...current,
+      layerOperationStatus: message,
+    }))
+  }
+
   const [inspectorDisclosure, setInspectorDisclosure] =
     useState<InspectorDisclosureState>({
       selectionKey: selectedElementDisclosureKey(null),
@@ -899,42 +908,12 @@ function App() {
     sourceLayerValue: number,
     targetLayerValue?: number,
   ): void {
-    let result: ReturnType<typeof duplicateLayer>
-
-    try {
-      result = duplicateLayer(editableDiagram, sourceLayerValue, {
-        ...(targetLayerValue === undefined ? {} : { targetLayerValue }),
-      })
-    } catch (error) {
-      setLayerOperationStatus(
-        layerOperationErrorMessage(error, 'Duplicate layer failed.'),
+    setEditorState((current) =>
+      applyDuplicateLayerToEditorState(
+        current,
+        sourceLayerValue,
+        targetLayerValue,
       )
-      return
-    }
-
-    setEditorState((current) => {
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        result.diagram,
-        current.layerFilter,
-      )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: result.diagram,
-        selectedElement: clearSelectionForLayerFilter(
-          result.diagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-      })
-    })
-    setLayerOperationStatus(
-      `Duplicated layer ${formatLayerValue(
-        result.sourceLayer,
-      )} to layer ${formatLayerValue(result.targetLayer)} (${layerElementCountLabel(
-        result.duplicatedStrata + result.duplicatedLabels,
-      )}).`,
     )
     setCopyStatus('idle')
   }
@@ -943,71 +922,15 @@ function App() {
     leftLayerValue: number,
     rightLayerValue: number,
   ): void {
-    if (
-      normalizeLayerValue(leftLayerValue) ===
-      normalizeLayerValue(rightLayerValue)
-    ) {
-      setLayerOperationStatus('Choose two different layers to swap.')
-      return
-    }
-
-    const nextDiagram = swapLayers(
-      editableDiagram,
-      leftLayerValue,
-      rightLayerValue,
-    )
-
-    setEditorState((current) => {
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        nextDiagram,
-        swapLayerFilterForLayerSwap(
-          current.layerFilter,
-          leftLayerValue,
-          rightLayerValue,
-        ),
-      )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-        selectedElement: clearSelectionForLayerFilter(
-          nextDiagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-      })
-    })
-    setLayerOperationStatus(
-      `Swapped layers ${formatLayerValue(leftLayerValue)} and ${formatLayerValue(
-        rightLayerValue,
-      )}.`,
+    setEditorState((current) =>
+      applySwapLayersToEditorState(current, leftLayerValue, rightLayerValue),
     )
     setCopyStatus('idle')
   }
 
   function translateDiagramLayer(layerValue: number, translation: Vec3): void {
-    let nextDiagram: Diagram
-
-    try {
-      nextDiagram = translateLayer(editableDiagram, layerValue, translation)
-    } catch (error) {
-      setLayerOperationStatus(
-        layerOperationErrorMessage(error, 'Translate layer failed.'),
-      )
-      return
-    }
-
-    setEditorState((current) => {
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-      })
-    })
-    setLayerOperationStatus(
-      nextDiagram === editableDiagram
-        ? `Layer ${formatLayerValue(layerValue)} was not moved.`
-        : `Translated layer ${formatLayerValue(layerValue)} by (${translation.x}, ${translation.y}, ${translation.z}).`,
+    setEditorState((current) =>
+      applyTranslateLayerToEditorState(current, layerValue, translation),
     )
     setCopyStatus('idle')
   }
@@ -1026,29 +949,9 @@ function App() {
       return
     }
 
-    const nextDiagram = deleteLayer(editableDiagram, layerValue)
-
-    setEditorState((current) => {
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        nextDiagram,
-        current.layerFilter,
-      )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-        selectedElement: clearSelectionForLayerFilter(
-          nextDiagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        pathDraft: null,
-        sheetPolygonDraft: null,
-      })
-    })
+    setEditorState((current) =>
+      applyDeleteLayerToEditorState(current, layerValue),
+    )
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -1060,9 +963,6 @@ function App() {
     resetDirectCoordinateSources()
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
-    setLayerOperationStatus(
-      `Deleted layer ${layerLabel} (${layerElementCountLabel(elementCount)}).`,
-    )
     setCopyStatus('idle')
   }
 
@@ -5860,34 +5760,6 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
   return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
 }
 
-function swapLayerFilterForLayerSwap(
-  layerFilter: LayerFilter,
-  leftLayerValue: number,
-  rightLayerValue: number,
-): LayerFilter {
-  if (
-    layerFilter.kind === 'all' ||
-    !Number.isFinite(leftLayerValue) ||
-    !Number.isFinite(rightLayerValue)
-  ) {
-    return layerFilter
-  }
-
-  const layer = normalizeLayerValue(layerFilter.layer)
-  const leftLayer = normalizeLayerValue(leftLayerValue)
-  const rightLayer = normalizeLayerValue(rightLayerValue)
-
-  if (layer === leftLayer) {
-    return { kind: 'layer', layer: rightLayer }
-  }
-
-  if (layer === rightLayer) {
-    return { kind: 'layer', layer: leftLayer }
-  }
-
-  return layerFilter
-}
-
 function directCoordinateAxes(
   ambientDimension: AmbientDimension,
   coordinateMode: DirectCoordinateMode = 'global',
@@ -5945,14 +5817,6 @@ function layerFilterStatusLabel(layerFilter: LayerFilter): string {
 
 function pickedPathCountLabel(count: number): string {
   return `Picked ${count} ${count === 1 ? 'path' : 'paths'}`
-}
-
-function layerElementCountLabel(count: number): string {
-  return `${count} ${count === 1 ? 'element' : 'elements'}`
-}
-
-function layerOperationErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback
 }
 
 function fillRuleLabel(fillRule: FillRule): string {
