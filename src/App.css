@@ -468,6 +468,15 @@
   grid-template-columns: auto minmax(140px, 220px);
 }
 
+.curved-sheet-parameter-grid {
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
 .direct-coordinate-mode-field {
   grid-template-columns: auto minmax(180px, 260px);
 }

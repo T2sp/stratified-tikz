@@ -5,6 +5,10 @@ import {
   pointFromWorkPlaneLocalCoordinate,
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
+import {
+  MAX_CURVED_SHEET_SAMPLING_SEGMENTS,
+  validateCurvedSheetPrimitive,
+} from '../geometry/curvedSheets.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import {
   isFiniteVec3,
@@ -38,13 +42,18 @@ import type {
   CubicBezierPolarControl,
   CubicBezierControlMode,
   CurveStratum,
+  CurvedSheetPrimitive,
+  CurvedSheetStratum,
   Diagram,
+  HemisphereSide,
   LabelStyle,
   PathSegment,
   PointStratum,
   PolygonSheetStratum,
+  SheetStyle,
   Stratum,
   StratumStyle,
+  SurfaceSampling,
   TextLabel,
   Vec3,
   WorkPlane,
@@ -254,6 +263,34 @@ export type AddPolygonSheetStratumOptions = {
   layer?: number
 }
 
+export type AddCurvedSheetStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+  style?: SheetStyle
+}
+
+export type CurvedSheetCreationKind = CurvedSheetPrimitive['kind']
+
+export type HemisphereCreationParameters = {
+  kind: 'hemisphere'
+  radius: number
+  hemisphereSide: HemisphereSide
+  sampling: SurfaceSampling
+}
+
+export type SaddleCreationParameters = {
+  kind: 'saddle'
+  width: number
+  depth: number
+  height: number
+  sampling: SurfaceSampling
+}
+
+export type CurvedSheetCreationParameters =
+  | HemisphereCreationParameters
+  | SaddleCreationParameters
+
 export type AddPointStratumResult = {
   diagram: Diagram
   id: string
@@ -280,6 +317,11 @@ export type AddConcatenatedPathStratumResult = {
 }
 
 export type AddPolygonSheetStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
+export type AddCurvedSheetStratumResult = {
   diagram: Diagram
   id: string | null
 }
@@ -373,6 +415,33 @@ export function makeUniqueId(diagram: Diagram, prefix: string): string {
 
   return `${prefix}-${index}`
 }
+
+export const defaultHemisphereSampling: SurfaceSampling = {
+  uSegments: 8,
+  vSegments: 4,
+}
+
+export const defaultSaddleSampling: SurfaceSampling = {
+  uSegments: 6,
+  vSegments: 5,
+}
+
+export const defaultHemisphereCreationParameters: HemisphereCreationParameters = {
+  kind: 'hemisphere',
+  radius: 1,
+  hemisphereSide: 'positive',
+  sampling: defaultHemisphereSampling,
+}
+
+export const defaultSaddleCreationParameters: SaddleCreationParameters = {
+  kind: 'saddle',
+  width: 2,
+  depth: 2,
+  height: 0.75,
+  sampling: defaultSaddleSampling,
+}
+
+export const maxCurvedSheetSamplingSegments = MAX_CURVED_SHEET_SAMPLING_SEGMENTS
 
 export function addPointStratum(
   diagram: Diagram,
@@ -552,6 +621,85 @@ export function addPolygonSheetStratumWithResult(
     },
     id: sheet.id,
   }
+}
+
+export function addCurvedSheetStratumWithResult(
+  diagram: Diagram,
+  anchorPoint: Vec3,
+  workPlane: WorkPlane,
+  parameters: CurvedSheetCreationParameters,
+  options: AddCurvedSheetStratumOptions = {},
+): AddCurvedSheetStratumResult {
+  if (diagram.ambientDimension !== 3 || !isFiniteVec3(anchorPoint)) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const frame = workPlaneFrameSnapshotFromWorkPlane(workPlane, anchorPoint)
+
+  if (frame === null) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const primitive = curvedSheetPrimitiveFromCreationParameters(
+    anchorPoint,
+    frame,
+    parameters,
+  )
+
+  if (!validateCurvedSheetPrimitive(primitive).valid) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const sheet = createCurvedSheetForDiagram(diagram, primitive, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, sheet],
+    },
+    id: sheet.id,
+  }
+}
+
+export function addHemisphereSheetStratumWithResult(
+  diagram: Diagram,
+  center: Vec3,
+  workPlane: WorkPlane,
+  parameters: Omit<HemisphereCreationParameters, 'kind'>,
+  options: AddCurvedSheetStratumOptions = {},
+): AddCurvedSheetStratumResult {
+  return addCurvedSheetStratumWithResult(
+    diagram,
+    center,
+    workPlane,
+    { kind: 'hemisphere', ...parameters },
+    options,
+  )
+}
+
+export function addSaddleSheetStratumWithResult(
+  diagram: Diagram,
+  origin: Vec3,
+  workPlane: WorkPlane,
+  parameters: Omit<SaddleCreationParameters, 'kind'>,
+  options: AddCurvedSheetStratumOptions = {},
+): AddCurvedSheetStratumResult {
+  return addCurvedSheetStratumWithResult(
+    diagram,
+    origin,
+    workPlane,
+    { kind: 'saddle', ...parameters },
+    options,
+  )
 }
 
 export function addPointStratumFromDirectInput(
@@ -994,6 +1142,27 @@ export function updateStratumNameById(
   return updateStratumById(diagram, id, (stratum) => ({ ...stratum, name }))
 }
 
+export function updateCurvedSheetPrimitiveById(
+  diagram: Diagram,
+  id: string,
+  updater: (primitive: CurvedSheetPrimitive) => CurvedSheetPrimitive,
+): Diagram {
+  return updateStratumById(diagram, id, (stratum) => {
+    if (stratum.geometricKind !== 'sheet' || stratum.kind !== 'curvedSheet') {
+      return stratum
+    }
+
+    const primitive = updater(stratum.primitive)
+
+    return validateCurvedSheetPrimitive(primitive).valid
+      ? {
+          ...stratum,
+          primitive,
+        }
+      : stratum
+  })
+}
+
 function nextLayer(diagram: Diagram): number {
   const layers = [
     ...diagram.strata.map((stratum) => stratum.layer),
@@ -1119,6 +1288,63 @@ function createPolygonSheetForDiagram(
     ),
     layer: options.layer ?? nextLayer(diagram),
   }
+}
+
+function createCurvedSheetForDiagram(
+  diagram: Diagram,
+  primitive: CurvedSheetPrimitive,
+  options: AddCurvedSheetStratumOptions,
+): CurvedSheetStratum {
+  return {
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    id: safeOptionalId(diagram, options.id, 'sheet'),
+    name: safeOptionalName(options.name, curvedSheetDefaultName(primitive.kind)),
+    style: cloneSheetStyle(options.style ?? defaultSheetStyle),
+    primitive: cloneDiagramValue(primitive),
+    layer: options.layer ?? nextLayer(diagram),
+  }
+}
+
+function curvedSheetDefaultName(kind: CurvedSheetCreationKind): string {
+  switch (kind) {
+    case 'hemisphere':
+      return 'Hemisphere'
+    case 'saddle':
+      return 'Saddle'
+  }
+}
+
+function curvedSheetPrimitiveFromCreationParameters(
+  anchorPoint: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+  parameters: CurvedSheetCreationParameters,
+): CurvedSheetPrimitive {
+  switch (parameters.kind) {
+    case 'hemisphere':
+      return {
+        kind: 'hemisphere',
+        center: normalizePointForAmbientDimension(3, anchorPoint),
+        radius: parameters.radius,
+        frame,
+        hemisphereSide: parameters.hemisphereSide,
+        sampling: { ...parameters.sampling },
+      }
+    case 'saddle':
+      return {
+        kind: 'saddle',
+        frame,
+        width: parameters.width,
+        depth: parameters.depth,
+        height: parameters.height,
+        sampling: { ...parameters.sampling },
+      }
+  }
+}
+
+function cloneDiagramValue<T>(value: T): T {
+  return structuredClone(value) as T
 }
 
 function safeOptionalId(
@@ -1351,8 +1577,9 @@ function parseDirectPolarControlInput(
   return isValidPolarControl(control) ? control : null
 }
 
-function workPlaneFrameSnapshotFromWorkPlane(
+export function workPlaneFrameSnapshotFromWorkPlane(
   workPlane: WorkPlane | undefined,
+  originOverride?: Vec3,
 ): WorkPlaneFrameSnapshot | null {
   if (workPlane === undefined) {
     return null
@@ -1367,7 +1594,8 @@ function workPlaneFrameSnapshotFromWorkPlane(
   try {
     const basis = workPlaneToBasis(workPlane)
     const frame: WorkPlaneFrameSnapshot = {
-      origin: { ...basis.origin },
+      origin:
+        originOverride === undefined ? { ...basis.origin } : { ...originOverride },
       u: { ...basis.u },
       v: { ...basis.v },
       normal: { ...basis.normal },

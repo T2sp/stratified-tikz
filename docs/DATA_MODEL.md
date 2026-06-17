@@ -533,7 +533,28 @@ Both segment counts must be positive integers and are capped by the geometry
 helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. The sampler returns a
 finite quad mesh and boundary polylines, but it is an approximation only:
 adaptive tessellation, hidden-surface sorting, boolean operations, advanced
-surface editing, and full SVG/TikZ mesh rendering are deferred.
+surface editing, and true smooth vector surface export are deferred.
+
+Editor workflow:
+
+- Choose `Add sheet`, then select `Hemisphere` or `Saddle`.
+- In cursor input mode, one click on the active work plane creates the curved
+  sheet. For hemispheres the click is the center; for saddles it is the frame
+  origin.
+- In direct input mode, enter the same center/origin coordinates numerically.
+  In 3D work-plane-local mode these coordinates are interpreted using the
+  active work plane.
+- The active work plane supplies the initial orientation frame. The primitive
+  stores that explicit frame snapshot, so later TikZ export does not depend on
+  UI state.
+- The inspector edits name, layer, style, center/origin, radius or saddle
+  dimensions, hemisphere side, and bounded sampling. Invalid edits are rejected
+  and leave the saved `Diagram` unchanged.
+
+Current limitations: inspector editing does not yet rotate or replace the saved
+surface frame; create a new primitive on the desired work plane when a different
+orientation is needed. The saved model also does not support arbitrary symbolic
+parametric surfaces, boolean operations, or mesh sculpting.
 
 ## Closed path boundaries
 
@@ -1304,9 +1325,8 @@ primitive, including an explicit finite orthonormal surface frame and capped
 positive-integer sampling counts. SVG preview and TikZ export currently use the
 sampled finite quad mesh approximation: each sampled face is rendered/exported
 as a flat polygon with the sheet style. This is a display/export approximation,
-not a new saved mesh representation. Editor creation, advanced editing,
-hidden-surface sorting, boolean operations, and true smooth vector surface
-export are deferred.
+not a new saved mesh representation. Advanced frame editing, hidden-surface
+sorting, boolean operations, and true smooth vector surface export are deferred.
 
 ### Curve stratum
 
