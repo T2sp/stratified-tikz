@@ -133,8 +133,8 @@ section includes a comment documenting the required TikZ library:
 ## Layer-aware output
 
 Generated TikZ uses PGF layers so that diagram `layer` values affect drawing
-order. Every numeric layer value used by an exported sheet, curve, point, or
-free text label is mapped to a deterministic TikZ-safe layer name:
+order. Every numeric layer value used by an exported region, sheet, curve,
+point, or free text label is mapped to a deterministic TikZ-safe layer name:
 
 ```text
 0  -> stratifiedLayer0
@@ -397,8 +397,29 @@ points, the generator falls back to ordinary absolute 3D Bézier output:
 \draw (p0) .. controls (p1) and (p2) .. (p3);
 ```
 
-`\usetikzlibrary{3d}` is emitted only when at least one scoped
-work-plane-local relative 3D Bézier path is generated.
+`\usetikzlibrary{3d}` is emitted when at least one scoped work-plane-local
+relative 3D Bézier path or work-plane-filled sheet is generated.
+
+## Filled closed-boundary strata
+
+In 2D mode, `kind: "filledRegion"` exports as a codimension 0 filled closed
+path. The generator emits one `\filldraw` command containing all copied boundary
+components. Boundary segments preserve their stored order, support line and
+cubic Bézier syntax, and each component closes with `-- cycle`.
+
+In 3D mode, `kind: "workPlaneFilledSheet"` exports as a codimension 1 filled
+closed path. When the stored plane frame is valid, output is placed in a TikZ
+`3d` library scope using `plane origin`, `plane x`, `plane y`, and
+`canvas is plane`; boundary points and controls are written as local `(a,b)`
+coordinates inside that scope. If the stored frame is unavailable, the fallback
+is a valid absolute 3D filled path using model coordinates.
+
+Multiple boundary components are emitted as subpaths in the same fill command.
+For `fillRule: "evenOdd"`, the TikZ options include `even odd rule`; for
+`fillRule: "nonzero"`, the default TikZ fill rule is used. Fill color, fill
+opacity, stroke color, and stroke opacity are preserved through named
+`\definecolor` entries and readable `fill=`, `fill opacity=`, `draw=`, and
+`draw opacity=` options.
 
 ## Output sections in 2D mode
 
@@ -415,9 +436,9 @@ In 2D mode, group output as:
 ```
 
 Layer blocks include comments for the contained codimension sections, such as
-`Codimension 1 strata: curves`, `Codimension 2 strata: points`, and `Labels`.
-Each in-layer section comment is surrounded by `%-----` separator comments for
-readability.
+`Codimension 0 strata: regions`, `Codimension 1 strata: curves`,
+`Codimension 2 strata: points`, and `Labels`. Each in-layer section comment is
+surrounded by `%-----` separator comments for readability.
 
 ## Output sections in 3D mode
 

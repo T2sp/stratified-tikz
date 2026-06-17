@@ -1,4 +1,5 @@
 import type {
+  ClosedPathBoundary,
   ConcatenatedPathStratum,
   CubicBezierCurveStratum,
   CubicBezierControlMode,
@@ -6,11 +7,14 @@ import type {
   CurveStyle,
   CurveStratum,
   Diagram,
+  FilledRegion2DStratum,
   HexColor,
   LabelStyle,
   LineStyle,
   PointShape,
   PointStratum,
+  RegionStyle,
+  SheetStyle,
   SheetStratum,
   TextLabel,
   OrthographicCamera3D,
@@ -28,7 +32,9 @@ import {
 } from '../model/camera.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
+  isValidWorkPlaneFrameSnapshot,
   pointFromWorkPlaneLocalCoordinate,
+  workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
@@ -107,15 +113,28 @@ export function generateTikz2D(
   options: GenerateTikzOptions = {},
 ): string {
   const context = createContext('2d', options)
+  const regionSectionTitle = 'Codimension 0 strata: regions'
   const curveSectionTitle = 'Codimension 1 strata: curves'
   const pointSectionTitle = 'Codimension 2 strata: points'
   const labelSectionTitle = 'Labels'
   const sectionTitles = [
+    regionSectionTitle,
     curveSectionTitle,
     pointSectionTitle,
     labelSectionTitle,
   ]
   const drawingCommands = [
+    ...emitLayeredItems(
+      regionSectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is FilledRegion2DStratum =>
+          stratum.geometricKind === 'region' &&
+          stratum.codim === 0 &&
+          stratum.kind === 'filledRegion' &&
+          stratum.visible,
+      ),
+      (region, index) => emitFilledRegion(region, index, context),
+    ),
     ...emitLayeredItems(
       curveSectionTitle,
       diagram.strata.filter(
@@ -498,11 +517,7 @@ function emitSheet(
   context: GenerateContext,
 ): string[] {
   if (sheet.kind === 'workPlaneFilledSheet') {
-    return [
-      `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] is stored as closed-boundary data.`,
-      '% TikZ fill output for this sheet kind is deferred to the fill rendering phase.',
-      '',
-    ]
+    return emitWorkPlaneFilledSheet(sheet, elementIndex, context)
   }
 
   const fillColor = context.colors.define(
@@ -538,6 +553,79 @@ function emitSheet(
     `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
     '',
   ]
+}
+
+function emitFilledRegion(
+  region: FilledRegion2DStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  const coordinates = defineClosedBoundariesCoordinateNames(
+    region.boundaries,
+    filledRegionCoordinateBaseName(region, elementIndex),
+    context,
+  )
+  const options = [
+    ...filledSurfaceStyleTikzOptions(region.style, `Region${region.id}`, context),
+    ...fillRuleTikzOptions(region.fillRule),
+  ]
+
+  return emitFillDrawClosedBoundaries(coordinates, options)
+}
+
+function emitWorkPlaneFilledSheet(
+  sheet: Extract<SheetStratum, { kind: 'workPlaneFilledSheet' }>,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  const options = [
+    ...filledSurfaceStyleTikzOptions(sheet.style, `Sheet${sheet.id}`, context),
+    ...fillRuleTikzOptions(sheet.fillRule),
+  ]
+  const scopedPath = formatWorkPlaneFilledSheetLocalPath(sheet)
+
+  if (scopedPath !== null) {
+    context.requiresTikz3dLibrary = true
+
+    return [
+      '\\begin{scope}[',
+      `  plane origin={${formatCoordinate(sheet.planeFrame.origin, '3d')}},`,
+      `  plane x={${formatCoordinate(
+        addVec3(sheet.planeFrame.origin, sheet.planeFrame.u),
+        '3d',
+      )}},`,
+      `  plane y={${formatCoordinate(
+        addVec3(sheet.planeFrame.origin, sheet.planeFrame.v),
+        '3d',
+      )}},`,
+      '  canvas is plane',
+      ']',
+      '  \\filldraw[',
+      ...formatTikzOptions(options).map((line) => `  ${line}`),
+      '  ]',
+      ...formatClosedBoundaryPathLines(scopedPath).map((line) => `  ${line}`),
+      '\\end{scope}',
+      '',
+    ]
+  }
+
+  const coordinates = defineClosedBoundariesCoordinateNames(
+    sheet.boundaries,
+    sheetCoordinateBaseName(sheet, elementIndex),
+    context,
+  )
+
+  return [
+    `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its stored frame is unavailable.`,
+    ...emitFillDrawClosedBoundaries(coordinates, options),
+  ]
+}
+
+function filledRegionCoordinateBaseName(
+  region: FilledRegion2DStratum,
+  elementIndex: number,
+): string {
+  return `regionFilled${sanitizeTikzNameStem(region.name, 'region')}${elementIndex}`
 }
 
 function sheetCoordinateBaseName(
@@ -905,6 +993,29 @@ function curveStyleTikzOptions(
   ]
 }
 
+function filledSurfaceStyleTikzOptions(
+  style: RegionStyle | SheetStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const fillColor = context.colors.define(`${colorBaseName}Fill`, style.fillColor)
+  const strokeColor = context.colors.define(
+    `${colorBaseName}Stroke`,
+    style.strokeColor,
+  )
+
+  return [
+    `fill=${fillColor}`,
+    `fill opacity=${formatNumber(style.fillOpacity)}`,
+    `draw=${strokeColor}`,
+    `draw opacity=${formatNumber(style.strokeOpacity)}`,
+  ]
+}
+
+function fillRuleTikzOptions(fillRule: 'nonzero' | 'evenOdd'): string[] {
+  return fillRule === 'evenOdd' ? ['even odd rule'] : []
+}
+
 function pointShapeOptions(
   shape: PointShape,
   context: GenerateContext,
@@ -954,6 +1065,52 @@ function defineConcatenatedPathCoordinates(
   let previousEnd: string | null = null
 
   return path.segments.map((segment) => {
+    const start =
+      previousEnd ??
+      context.coordinates.define(baseName, pointIndex, segment.start)
+
+    if (previousEnd === null) {
+      pointIndex += 1
+    }
+
+    const names = definePathSegmentCoordinateNames(
+      segment,
+      start,
+      baseName,
+      pointIndex,
+      context,
+    )
+
+    pointIndex += segment.kind === 'line' ? 1 : 3
+    previousEnd = names.end
+
+    return names
+  })
+}
+
+function defineClosedBoundariesCoordinateNames(
+  boundaries: readonly ClosedPathBoundary[],
+  baseName: string,
+  context: GenerateContext,
+): PathSegmentCoordinateNames[][] {
+  return boundaries.map((boundary, boundaryIndex) =>
+    defineClosedBoundaryCoordinateNames(
+      boundary,
+      `${baseName}b${boundaryIndex}`,
+      context,
+    ),
+  )
+}
+
+function defineClosedBoundaryCoordinateNames(
+  boundary: ClosedPathBoundary,
+  baseName: string,
+  context: GenerateContext,
+): PathSegmentCoordinateNames[] {
+  let pointIndex = 0
+  let previousEnd: string | null = null
+
+  return boundary.segments.map((segment) => {
     const start =
       previousEnd ??
       context.coordinates.define(baseName, pointIndex, segment.start)
@@ -1050,6 +1207,41 @@ function formatConcatenatedPath(
   ].join(' ')
 }
 
+function emitFillDrawClosedBoundaries(
+  boundaries: readonly PathSegmentCoordinateNames[][],
+  options: string[],
+): string[] {
+  const paths = boundaries
+    .map(formatClosedBoundaryPath)
+    .filter((path) => path.length > 0)
+
+  if (paths.length === 0) {
+    return []
+  }
+
+  return [
+    '\\filldraw[',
+    ...formatTikzOptions(options),
+    ']',
+    ...formatClosedBoundaryPathLines(paths),
+    '',
+  ]
+}
+
+function formatClosedBoundaryPathLines(paths: readonly string[]): string[] {
+  return paths.map((path, index) =>
+    index === paths.length - 1 ? `  ${path};` : `  ${path}`,
+  )
+}
+
+function formatClosedBoundaryPath(
+  coordinates: readonly PathSegmentCoordinateNames[],
+): string {
+  const openPath = formatConcatenatedPath(coordinates)
+
+  return openPath.length === 0 ? '' : `${openPath} -- cycle`
+}
+
 function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
   switch (segment.kind) {
     case 'line':
@@ -1057,6 +1249,93 @@ function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
     case 'cubicBezier':
       return `.. controls (${segment.control1}) and (${segment.control2}) .. (${segment.end})`
   }
+}
+
+function formatWorkPlaneFilledSheetLocalPath(
+  sheet: Extract<SheetStratum, { kind: 'workPlaneFilledSheet' }>,
+): string[] | null {
+  if (!isValidWorkPlaneFrameSnapshot(sheet.planeFrame)) {
+    return null
+  }
+
+  const paths: string[] = []
+
+  for (const boundary of sheet.boundaries) {
+    const path = formatClosedBoundaryLocalPath(boundary, sheet.planeFrame)
+
+    if (path === null) {
+      return null
+    }
+
+    paths.push(path)
+  }
+
+  return paths
+}
+
+function formatClosedBoundaryLocalPath(
+  boundary: ClosedPathBoundary,
+  frame: WorkPlaneFrameSnapshot,
+): string | null {
+  if (boundary.segments.length === 0) {
+    return null
+  }
+
+  const start = formatLocalCoordinateForPoint(boundary.segments[0].start, frame)
+
+  if (start === null) {
+    return null
+  }
+
+  const commands = [start]
+
+  for (const segment of boundary.segments) {
+    switch (segment.kind) {
+      case 'line': {
+        const end = formatLocalCoordinateForPoint(segment.end, frame)
+
+        if (end === null) {
+          return null
+        }
+
+        commands.push(`-- ${end}`)
+        break
+      }
+      case 'cubicBezier': {
+        const control1 = formatLocalCoordinateForPoint(segment.control1, frame)
+        const control2 = formatLocalCoordinateForPoint(segment.control2, frame)
+        const end = formatLocalCoordinateForPoint(segment.end, frame)
+
+        if (control1 === null || control2 === null || end === null) {
+          return null
+        }
+
+        commands.push(`.. controls ${control1} and ${control2} .. ${end}`)
+        break
+      }
+    }
+  }
+
+  commands.push('-- cycle')
+
+  return commands.join(' ')
+}
+
+function formatLocalCoordinateForPoint(
+  point: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+): string | null {
+  const localCoordinate = workPlaneLocalCoordinateFromPoint(frame, point)
+
+  if (
+    !Number.isFinite(localCoordinate.a) ||
+    !Number.isFinite(localCoordinate.b) ||
+    !vec3ApproximatelyEqual(pointFromWorkPlaneLocalCoordinate(frame, localCoordinate), point)
+  ) {
+    return null
+  }
+
+  return formatWorkPlaneLocalCoordinate(localCoordinate)
 }
 
 type ScopedWorkPlaneRelativeBezierPath = {

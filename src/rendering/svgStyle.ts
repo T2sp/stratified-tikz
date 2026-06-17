@@ -1,10 +1,24 @@
-import type { CurveStyle, LabelAnchor, LineStyle } from '../model/types'
+import type {
+  CurveStyle,
+  LabelAnchor,
+  LineStyle,
+  RegionStyle,
+  SheetStyle,
+} from '../model/types'
 
 export type SvgCurveStrokeAttributes = {
   stroke: string
   strokeOpacity: number
   strokeWidth: number
   strokeDasharray?: string
+}
+
+export type SvgFilledSurfaceAttributes = {
+  fill: string
+  fillOpacity: number
+  stroke: string
+  strokeOpacity: number
+  strokeWidth: number
 }
 
 export type SvgLabelAnchorPlacement = {
@@ -39,6 +53,19 @@ export function curveStyleToSvgStrokeAttributes(
     strokeOpacity: style.strokeOpacity,
     strokeWidth: style.lineWidth,
     ...(strokeDasharray === undefined ? {} : { strokeDasharray }),
+  }
+}
+
+export function filledSurfaceStyleToSvgAttributes(
+  style: RegionStyle | SheetStyle,
+  strokeWidth = 1.5,
+): SvgFilledSurfaceAttributes {
+  return {
+    fill: style.fillColor,
+    fillOpacity: style.fillOpacity,
+    stroke: style.strokeColor,
+    strokeOpacity: style.strokeOpacity,
+    strokeWidth,
   }
 }
 

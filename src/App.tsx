@@ -25,6 +25,7 @@ import type {
   Camera,
   CoordinateInputMode,
   Diagram,
+  FillRule,
   OrthographicCamera3D,
   Vec2,
   Vec3,
@@ -68,6 +69,8 @@ import {
   createInitialCameraControlState,
   createExistingCoordinateSourceOptions,
   createDirectCoordinateSourceHighlights,
+  createFillFromClosedPaths,
+  createFillFromClosedPathsErrorMessage,
   createWorkPlanePointPickingHighlights,
   createCustomWorkPlanePreview,
   createConcatenatedPathDraft,
@@ -247,6 +250,7 @@ const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'relativeCartesian',
   'relativePolar',
 ]
+const fillRuleOptions: FillRule[] = ['nonzero', 'evenOdd']
 const cameraNumericFields: Array<{ field: CameraControlField; label: string }> = [
   { field: 'thetaDeg', label: 'theta' },
   { field: 'phiDeg', label: 'phi' },
@@ -269,6 +273,9 @@ function App() {
     useState<ConcatenatedPathWorkPlaneMode>('sameWorkPlane')
   const [sheetStatus, setSheetStatus] = useState<string>('')
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
+  const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
+  const [fillRule, setFillRule] = useState<FillRule>('nonzero')
+  const [fillStatus, setFillStatus] = useState<string>('')
   const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
     defaultDirectCoordinates,
   )
@@ -495,6 +502,9 @@ function App() {
   const previewCameraAdjustment = showCameraControls
     ? cameraViewAdjustmentFromControls(cameraControl)
     : undefined
+  const fillBoundaryStatus = `${pickedPathCountLabel(fillBoundaryPathIds.length)}${
+    fillStatus.length === 0 ? '' : ` - ${fillStatus}`
+  }`
 
   async function copyTikz(): Promise<void> {
     try {
@@ -590,6 +600,9 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setFillBoundaryPathIds([])
+    setFillRule('nonzero')
+    setFillStatus('')
     setDirectLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
@@ -656,6 +669,8 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setFillBoundaryPathIds([])
+    setFillStatus('')
     setWorkPlaneStatus('')
   }, [canUndo, history.past])
 
@@ -678,6 +693,8 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setFillBoundaryPathIds([])
+    setFillStatus('')
     setWorkPlaneStatus('')
   }, [canRedo, history.future])
 
@@ -761,6 +778,9 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setFillBoundaryPathIds([])
+    setFillRule('nonzero')
+    setFillStatus('')
     setDirectLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(result.diagram.ambientDimension))
@@ -845,6 +865,80 @@ function App() {
     setCopyStatus('idle')
   }, [selectedElement])
 
+  function pickSelectedFillBoundaryPath(): void {
+    const selected = findSelectedElement(editableDiagram, selectedElement)
+
+    if (
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      selected.element.geometricKind !== 'curve' ||
+      selected.element.kind !== 'concatenatedPath'
+    ) {
+      setFillStatus('Select a concatenated path first.')
+      return
+    }
+
+    const pathId = selected.element.id
+
+    if (fillBoundaryPathIds.includes(pathId)) {
+      setFillStatus('Path already picked.')
+      return
+    }
+
+    setFillBoundaryPathIds((current) => [...current, pathId])
+    setFillStatus(`Picked ${selected.element.name}.`)
+  }
+
+  function resetFillBoundaryPathPicking(): void {
+    setFillBoundaryPathIds([])
+    setFillStatus('Picked paths reset.')
+  }
+
+  function cancelFillBoundaryPathPicking(): void {
+    setFillBoundaryPathIds([])
+    setFillStatus('Fill creation canceled.')
+  }
+
+  function createFillFromPickedPaths(): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setFillStatus('Finish or cancel point picking first.')
+      return
+    }
+
+    const creationLayer = parseNewElementLayer(setFillStatus)
+
+    if (creationLayer === null) {
+      return
+    }
+
+    const result = createFillFromClosedPaths(
+      editableDiagram,
+      fillBoundaryPathIds,
+      {
+        fillRule,
+        activeWorkPlane,
+        layer: creationLayer,
+      },
+    )
+
+    if (!result.ok) {
+      setFillStatus(createFillFromClosedPathsErrorMessage(result.error))
+      return
+    }
+
+    commitCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      creationLayer,
+    )
+    setFillBoundaryPathIds([])
+    setCreationTool('select')
+    setFillStatus(
+      `${result.kind === 'filledRegion' ? 'Filled region' : 'Filled sheet'} created.`,
+    )
+    setCopyStatus('idle')
+  }
+
   useEffect(() => {
     setInspectorDisclosure((current) =>
       nextInspectorDisclosureStateForSelection(current, selectedElement),
@@ -887,6 +981,27 @@ function App() {
       }
 
       return validation.state
+    })
+  }, [editableDiagram])
+
+  useEffect(() => {
+    setFillBoundaryPathIds((current) => {
+      const next = current.filter((pathId) =>
+        editableDiagram.strata.some(
+          (stratum) =>
+            stratum.id === pathId &&
+            stratum.geometricKind === 'curve' &&
+            stratum.kind === 'concatenatedPath',
+        ),
+      )
+
+      if (next.length === current.length) {
+        return current
+      }
+
+      setFillStatus('Removed unavailable picked paths.')
+
+      return next
     })
   }, [editableDiagram])
 
@@ -2768,6 +2883,60 @@ function App() {
           </button>
         </div>
 
+        <div className="control-group fill-from-path-control">
+          <span className="control-label">Fill paths</span>
+          <div className="segmented-control fill-rule-control">
+            {fillRuleOptions.map((rule) => (
+              <button
+                key={rule}
+                type="button"
+                className={fillRule === rule ? 'is-selected' : undefined}
+                aria-pressed={fillRule === rule}
+                onClick={() => {
+                  setFillRule(rule)
+                  setFillStatus('')
+                }}
+              >
+                {fillRuleLabel(rule)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={pickSelectedFillBoundaryPath}
+          >
+            Pick selected path
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={fillBoundaryPathIds.length === 0}
+            onClick={resetFillBoundaryPathPicking}
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={fillBoundaryPathIds.length === 0}
+            onClick={cancelFillBoundaryPathPicking}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={fillBoundaryPathIds.length === 0}
+            onClick={createFillFromPickedPaths}
+          >
+            Create fill
+          </button>
+          <span className="toolbar-status fill-path-status" role="status">
+            {fillBoundaryStatus}
+          </span>
+        </div>
+
         <div className="control-group file-control">
           <span className="control-label">File</span>
           <div className="file-action-strip">
@@ -3684,6 +3853,19 @@ function layerFilterStatusLabel(layerFilter: LayerFilter): string {
   return layerFilter.kind === 'all'
     ? 'all layers'
     : `layer ${formatLayerValue(layerFilter.layer)}`
+}
+
+function pickedPathCountLabel(count: number): string {
+  return `Picked ${count} ${count === 1 ? 'path' : 'paths'}`
+}
+
+function fillRuleLabel(fillRule: FillRule): string {
+  switch (fillRule) {
+    case 'nonzero':
+      return 'Nonzero'
+    case 'evenOdd':
+      return 'Even-odd'
+  }
 }
 
 function formatLayerValue(layer: number): string {

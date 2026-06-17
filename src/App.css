@@ -589,6 +589,18 @@
   line-height: 1.2;
 }
 
+.fill-from-path-control {
+  flex: 1 1 560px;
+}
+
+.fill-rule-control {
+  grid-auto-columns: minmax(88px, max-content);
+}
+
+.fill-path-status {
+  flex: 1 1 240px;
+}
+
 .workspace {
   display: grid;
   grid-template-columns:

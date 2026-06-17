@@ -3,14 +3,17 @@ import test from 'node:test'
 import { absoluteCubicBezierPointsFromControlMode } from '../../src/geometry/bezierControls.ts'
 import { threeDimensionalExample } from '../../src/examples/index.ts'
 import {
+  closedBoundariesToSvgPathData,
   cubicBezierToSvgPath,
   pathSegmentsToSvgPath,
   polylineToSvgPath,
   regularPolygonPoints,
   starPolygonPoints,
+  svgFillRuleValue,
 } from '../../src/rendering/svgPath.ts'
 import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
+import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import {
   pathSegmentStyleRuns,
@@ -18,10 +21,13 @@ import {
 } from '../../src/model/paths.ts'
 import type {
   Camera3D,
+  ClosedPathBoundary,
   CurveStyle,
   CubicBezierControlMode,
   Diagram,
   PathSegment,
+  RegionStyle,
+  SheetStyle,
   Vec3,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
@@ -33,6 +39,7 @@ import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
   curveStyleToSvgStrokeAttributes,
+  filledSurfaceStyleToSvgAttributes,
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
@@ -122,6 +129,124 @@ test('pathSegmentsToSvgPath emits a continuous line and cubic path', () => {
     ]),
     'M 0,0 L 1,0 C 1.5,1 2.5,1 3,0',
   )
+})
+
+test('2D filled-region boundaries produce non-empty closed SVG path data', () => {
+  const pathData = closedBoundariesToSvgPathData(
+    [squareBoundary2D('outer')],
+    (point) => ({ x: point.x, y: point.y }),
+  )
+
+  assert.equal(pathData, 'M 0,0 L 2,0 L 2,2 L 0,2 L 0,0 Z')
+  assert.notEqual(pathData, '')
+})
+
+test('closed boundary SVG path data supports cubic Bezier segments', () => {
+  const pathData = closedBoundariesToSvgPathData(
+    [
+      {
+        id: 'cubic-loop',
+        segments: [
+          {
+            kind: 'cubicBezier',
+            start: { x: 0, y: 0, z: 0 },
+            control1: { x: 0.5, y: 1, z: 0 },
+            control2: { x: 1.5, y: 1, z: 0 },
+            end: { x: 2, y: 0, z: 0 },
+          },
+          {
+            kind: 'line',
+            start: { x: 2, y: 0, z: 0 },
+            end: { x: 0, y: 0, z: 0 },
+          },
+        ],
+      },
+    ],
+    (point) => ({ x: point.x, y: point.y }),
+  )
+
+  assert.equal(pathData, 'M 0,0 C 0.5,1 1.5,1 2,0 L 0,0 Z')
+})
+
+test('2D filled-region multiple boundaries use compound path data and even-odd fill rule', () => {
+  const pathData = closedBoundariesToSvgPathData(
+    [squareBoundary2D('outer', 0, 0, 4), squareBoundary2D('inner', 1, 1, 1)],
+    (point) => ({ x: point.x, y: point.y }),
+  )
+
+  assert.equal((pathData.match(/M /g) ?? []).length, 2)
+  assert.equal(svgFillRuleValue('evenOdd'), 'evenodd')
+  assert.equal(svgFillRuleValue('nonzero'), 'nonzero')
+})
+
+test('3D work-plane-filled sheet boundaries produce projected SVG path data', () => {
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 13,
+    phiDeg: -23,
+    zoom: 18,
+    pan: { x: 110, y: 65 },
+    projectionBasis: {
+      xVector: [1, 0],
+      yVector: [0.45, 0.25],
+      zVector: [0, 1],
+    },
+  }
+  const pathData = closedBoundariesToSvgPathData(
+    [squareBoundary3D('sheet-boundary', 2)],
+    (point) => projectToSvgPoint(camera, point, 160),
+  )
+
+  assert.notEqual(pathData, '')
+  assert.match(pathData, /^M /)
+  assert.match(pathData, / Z$/)
+})
+
+test('3D work-plane-filled sheet multiple boundaries use compound path data and even-odd fill rule', () => {
+  const camera = createInitialCamera3D()
+  const pathData = closedBoundariesToSvgPathData(
+    [
+      squareBoundary3D('outer', 2, 0, 0, 4),
+      squareBoundary3D('inner', 2, 1, 1, 1),
+    ],
+    (point) => projectToSvgPoint(camera, point, 160),
+  )
+
+  assert.equal((pathData.match(/M /g) ?? []).length, 2)
+  assert.equal(svgFillRuleValue('evenOdd'), 'evenodd')
+})
+
+test('filled surface SVG attributes preserve fill and stroke style values', () => {
+  const regionStyle: RegionStyle = {
+    kind: 'regionStyle',
+    fillColor: '#112233',
+    fillOpacity: 0.42,
+    strokeColor: '#445566',
+    strokeOpacity: 0.73,
+  }
+  const sheetStyle: SheetStyle = {
+    kind: 'sheetStyle',
+    fillColor: '#AABBCC',
+    fillOpacity: 0.35,
+    strokeColor: '#DDEEFF',
+    strokeOpacity: 0.9,
+  }
+
+  assert.deepEqual(filledSurfaceStyleToSvgAttributes(regionStyle), {
+    fill: '#112233',
+    fillOpacity: 0.42,
+    stroke: '#445566',
+    strokeOpacity: 0.73,
+    strokeWidth: 1.5,
+  })
+  assert.deepEqual(filledSurfaceStyleToSvgAttributes(sheetStyle, 2), {
+    fill: '#AABBCC',
+    fillOpacity: 0.35,
+    stroke: '#DDEEFF',
+    strokeOpacity: 0.9,
+    strokeWidth: 2,
+  })
 })
 
 test('line styles map to SVG dash arrays', () => {
@@ -632,6 +757,50 @@ function createCameraTestDiagram(): Diagram {
       },
     ],
     labels: [],
+  }
+}
+
+function squareBoundary2D(
+  id: string,
+  x = 0,
+  y = 0,
+  size = 2,
+): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x, y, z: 0 },
+    { x: x + size, y, z: 0 },
+    { x: x + size, y: y + size, z: 0 },
+    { x, y: y + size, z: 0 },
+  ])
+}
+
+function squareBoundary3D(
+  id: string,
+  z: number,
+  x = 0,
+  y = 0,
+  size = 2,
+): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x, y, z },
+    { x: x + size, y, z },
+    { x: x + size, y: y + size, z },
+    { x, y: y + size, z },
+  ])
+}
+
+function squareBoundaryFromPoints(
+  id: string,
+  points: [Vec3, Vec3, Vec3, Vec3],
+): ClosedPathBoundary {
+  return {
+    id,
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
   }
 }
 

@@ -287,6 +287,18 @@ filled regions, and 3D work-plane filled sheet boundary points that do not lie
 on the stored plane. Self-intersection and boolean cleanup are intentionally
 deferred.
 
+The editor can create a filled object from picked closed concatenated paths.
+Because ordinary selection is currently single-selection, the fill workflow
+keeps a UI-only list of picked path IDs: select a concatenated path, pick it as
+a boundary, repeat for additional boundaries, choose `nonzero` or `evenOdd`,
+then create the fill. Creating the fill copies the selected path segments into
+the filled stratum; it does not store live references to the source paths, so
+later source-path edits do not change the fill. In 2D this creates a codim 0
+`filledRegion` with `z = 0` boundary coordinates. In 3D this creates a codim 1
+`workPlaneFilledSheet` only when all picked boundaries lie on one reliable
+plane, preferring the active work plane when applicable and otherwise deriving a
+plane from non-collinear boundary points. Non-coplanar 3D picks are rejected.
+
 ### Concatenated path editing
 
 Concatenated path cursor creation has two 3D modes. Same-work-plane mode keeps
