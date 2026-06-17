@@ -595,6 +595,10 @@ function renderSheet(
     )
   }
 
+  if (sheet.kind === 'curvedSheet') {
+    return renderCurvedSheet(sheet, layerFilter)
+  }
+
   const points = sheetVertices(sheet).map((vertex) =>
     projectToSvgPoint(camera, vertex, viewportHeight),
   )
@@ -635,6 +639,27 @@ function renderSheet(
           vectorEffect="non-scaling-stroke"
         />
       </g>
+    ),
+  }
+}
+
+function renderCurvedSheet(
+  sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>,
+  layerFilter: LayerFilter,
+): RenderItem {
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
+
+  return {
+    id: sheet.id,
+    layer: sheet.layer,
+    element: (
+      <g
+        key={sheet.id}
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents="none"
+        data-curved-sheet-primitive={sheet.primitive.kind}
+      />
     ),
   }
 }

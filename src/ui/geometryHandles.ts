@@ -204,6 +204,8 @@ function sheetVertexCount(sheet: SheetStratum): number {
       return sheet.vertices.length
     case 'workPlaneFilledSheet':
       return 0
+    case 'curvedSheet':
+      return 0
   }
 }
 

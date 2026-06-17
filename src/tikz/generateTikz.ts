@@ -521,6 +521,10 @@ function emitSheet(
     return emitWorkPlaneFilledSheet(sheet, elementIndex, context)
   }
 
+  if (sheet.kind === 'curvedSheet') {
+    return emitCurvedSheet(sheet)
+  }
+
   const fillColor = context.colors.define(
     `Sheet${sheet.id}Fill`,
     sheet.style.fillColor,
@@ -552,6 +556,14 @@ function emitSheet(
     ...formatTikzOptions(options),
     `]`,
     `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
+    '',
+  ]
+}
+
+function emitCurvedSheet(sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>): string[] {
+  return [
+    `% Curved sheet "${sheet.name}" [${sheet.id}] omitted: curved surface TikZ mesh export is not implemented yet.`,
+    `% Primitive: ${sheet.primitive.kind}.`,
     '',
   ]
 }
@@ -656,6 +668,8 @@ function sheetCoordinateBaseName(
       return `sheetQuad${stem}${elementIndex}`
     case 'workPlaneFilledSheet':
       return `sheetFilled${stem}${elementIndex}`
+    case 'curvedSheet':
+      return `sheetCurved${stem}${elementIndex}`
   }
 }
 

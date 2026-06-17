@@ -172,6 +172,24 @@ function StratumGeometrySection({
         )
       }
 
+      if (stratum.kind === 'curvedSheet') {
+        return (
+          <section className="inspector-section">
+            <h3>Geometry</h3>
+            <div className="inspector-form">
+              <ReadOnlyField
+                label="Primitive"
+                value={stratum.primitive.kind}
+              />
+              <ReadOnlyField
+                label="Sampling"
+                value={`${stratum.primitive.sampling.uSegments} x ${stratum.primitive.sampling.vSegments}`}
+              />
+            </div>
+          </section>
+        )
+      }
+
       return (
         <SheetGeometryEditor
           diagram={diagram}

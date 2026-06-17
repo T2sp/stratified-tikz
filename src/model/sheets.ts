@@ -1,7 +1,10 @@
 import type {
+  CurvedSheetPrimitive,
   PolygonSheetStratum,
   QuadSheetStratum,
+  SurfaceFrame,
   SheetStratum,
+  SurfaceSampling,
   Vec3,
 } from './types.ts'
 
@@ -14,6 +17,8 @@ export function sheetVertices(sheet: SheetStratum): readonly Vec3[] {
     case 'polygonSheet':
       return sheet.vertices
     case 'workPlaneFilledSheet':
+      return []
+    case 'curvedSheet':
       return []
   }
 }
@@ -36,10 +41,56 @@ export function updateSheetVertex(
     return sheet
   }
 
+  if (sheet.kind === 'curvedSheet') {
+    return sheet
+  }
+
   return {
     ...sheet,
     vertices: sheet.vertices.map((vertex, index) =>
       index === vertexIndex ? updater(vertex) : vertex,
     ),
   }
+}
+
+export function cloneCurvedSheetPrimitive(
+  primitive: CurvedSheetPrimitive,
+): CurvedSheetPrimitive {
+  switch (primitive.kind) {
+    case 'hemisphere':
+      return {
+        kind: 'hemisphere',
+        center: cloneVec3(primitive.center),
+        radius: primitive.radius,
+        frame: cloneSurfaceFrame(primitive.frame),
+        hemisphereSide: primitive.hemisphereSide,
+        sampling: cloneSurfaceSampling(primitive.sampling),
+      }
+    case 'saddle':
+      return {
+        kind: 'saddle',
+        frame: cloneSurfaceFrame(primitive.frame),
+        width: primitive.width,
+        depth: primitive.depth,
+        height: primitive.height,
+        sampling: cloneSurfaceSampling(primitive.sampling),
+      }
+  }
+}
+
+export function cloneSurfaceFrame(frame: SurfaceFrame): SurfaceFrame {
+  return {
+    origin: cloneVec3(frame.origin),
+    u: cloneVec3(frame.u),
+    v: cloneVec3(frame.v),
+    normal: cloneVec3(frame.normal),
+  }
+}
+
+function cloneSurfaceSampling(sampling: SurfaceSampling): SurfaceSampling {
+  return { ...sampling }
+}
+
+function cloneVec3(point: Vec3): Vec3 {
+  return { ...point }
 }

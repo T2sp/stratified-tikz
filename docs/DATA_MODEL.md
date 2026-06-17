@@ -418,7 +418,8 @@ It represents codim 1 geometry in R^3.
 export type SheetStratum =
   | QuadSheetStratum
   | PolygonSheetStratum
-  | WorkPlaneFilledSheet3DStratum;
+  | WorkPlaneFilledSheet3DStratum
+  | CurvedSheetStratum;
 
 export type QuadSheetStratum = {
   id: string;
@@ -458,6 +459,48 @@ export type WorkPlaneFilledSheet3DStratum = {
   fillRule: FillRule;
   layer: number;
 };
+
+export type SurfaceFrame = {
+  origin: Vec3;
+  u: Vec3;
+  v: Vec3;
+  normal: Vec3;
+};
+
+export type SurfaceSampling = {
+  uSegments: number;
+  vSegments: number;
+};
+
+export type CurvedSheetPrimitive =
+  | {
+      kind: "hemisphere";
+      center: Vec3;
+      radius: number;
+      frame: SurfaceFrame;
+      hemisphereSide: "positive" | "negative";
+      sampling: SurfaceSampling;
+    }
+  | {
+      kind: "saddle";
+      frame: SurfaceFrame;
+      width: number;
+      depth: number;
+      height: number;
+      sampling: SurfaceSampling;
+    };
+
+export type CurvedSheetStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "curvedSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  primitive: CurvedSheetPrimitive;
+  layer: number;
+};
 ```
 
 Quad sheets use four cyclically ordered `corners`.
@@ -475,8 +518,22 @@ coordinates through the current camera. TikZ export prefers a `canvas is plane`
 scope using the stored frame and local `(a,b)` coordinates, with absolute 3D
 coordinate output reserved as a fallback for unusable existing frame data.
 
-Curved surface primitives such as hemispheres and saddles are not implemented
-yet.
+`curvedSheet` is the committed model for specialized non-planar 3D codim 1
+sheet primitives. A `SurfaceFrame` is the local orientation frame for a
+primitive and must be finite, orthonormal, and right-handed. A hemisphere uses
+angular parameters: `u` runs around the equator from `0` to `2*pi`, and `v`
+runs from the pole to the equator from `0` to `pi/2`. `hemisphereSide` chooses
+whether the pole is in the positive or negative `normal` direction. A saddle
+uses rectangular local frame coordinates with `u` in `[-width/2, width/2]` and
+`v` in `[-depth/2, depth/2]`; its current sampler uses the hyperbolic patch
+`normalOffset = height * normalizedU * normalizedV`.
+
+`SurfaceSampling` stores the mesh resolution used by preview/export helpers.
+Both segment counts must be positive integers and are capped by the geometry
+helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. The sampler returns a
+finite quad mesh and boundary polylines, but it is an approximation only:
+adaptive tessellation, hidden-surface sorting, boolean operations, advanced
+surface editing, and full SVG/TikZ mesh rendering are deferred.
 
 ## Closed path boundaries
 
@@ -1181,7 +1238,8 @@ not source path references.
 export type SheetStratum =
   | QuadSheetStratum
   | PolygonSheetStratum
-  | WorkPlaneFilledSheet3DStratum;
+  | WorkPlaneFilledSheet3DStratum
+  | CurvedSheetStratum;
 
 export type QuadSheetStratum = {
   id: string;
@@ -1221,6 +1279,18 @@ export type WorkPlaneFilledSheet3DStratum = {
   fillRule: FillRule;
   layer: number;
 };
+
+export type CurvedSheetStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "curvedSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  primitive: CurvedSheetPrimitive;
+  layer: number;
+};
 ```
 
 In 3D mode, sheets are codimension 1. `quadSheet` remains supported for
@@ -1229,8 +1299,12 @@ polygonal region as cyclically ordered `vertices` and requires at least three
 vertices. `workPlaneFilledSheet` stores one or more copied closed path
 boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
 stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
-local `(a,b)` coordinates. Curved surface primitives are deferred to a later
-phase.
+local `(a,b)` coordinates. `curvedSheet` stores a hemisphere or saddle
+primitive, including an explicit finite orthonormal surface frame and capped
+positive-integer sampling counts. Curved surface sampling currently produces a
+finite quad mesh approximation for geometry helpers; editor creation, advanced
+editing, hidden-surface sorting, boolean operations, and full TikZ/SVG mesh
+rendering are deferred.
 
 ### Curve stratum
 

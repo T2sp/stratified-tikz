@@ -4,6 +4,7 @@ import {
   isValidWorkPlaneFrameSnapshot,
   pointFromWorkPlaneLocalCoordinate,
 } from '../geometry/bezierControls.ts'
+import { validateCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
 import {
   closedPathBoundaryCoordinates,
@@ -30,6 +31,7 @@ import {
 import type {
   Camera,
   ClosedPathBoundary,
+  CurvedSheetStratum,
   CubicBezierCurveStratum,
   DiagramViewOptions,
   CubicBezierControlMode,
@@ -283,11 +285,14 @@ function validateSheetStratum(
   }
 
   if (stratum.kind !== 'quadSheet' && stratum.kind !== 'polygonSheet') {
-    if (stratum.kind !== 'workPlaneFilledSheet') {
+    if (
+      stratum.kind !== 'workPlaneFilledSheet' &&
+      stratum.kind !== 'curvedSheet'
+    ) {
       pushError(
         errors,
         `${path}.kind`,
-        'Sheet kind must be quadSheet, polygonSheet, or workPlaneFilledSheet.',
+        'Sheet kind must be quadSheet, polygonSheet, workPlaneFilledSheet, or curvedSheet.',
       )
     }
   }
@@ -315,6 +320,11 @@ function validateSheetStratum(
     return
   }
 
+  if (stratum.kind === 'curvedSheet') {
+    validateCurvedSheetStratum(stratum, ambientDimension, path, errors)
+    return
+  }
+
   sheetVertices(stratum).forEach((vertex, index) => {
     validateVec3ForAmbient(
       vertex,
@@ -323,6 +333,27 @@ function validateSheetStratum(
       errors,
     )
   })
+}
+
+function validateCurvedSheetStratum(
+  stratum: CurvedSheetStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3) {
+    pushError(errors, path, 'Curved sheet strata are valid only in 3D diagrams.')
+  }
+
+  if (stratum.codim !== 1) {
+    pushError(errors, `${path}.codim`, 'Curved sheets must have codimension 1.')
+  }
+
+  validateCurvedSheetPrimitive(stratum.primitive, `${path}.primitive`).errors.forEach(
+    (issue) => {
+      pushError(errors, issue.path, issue.message)
+    },
+  )
 }
 
 function validateWorkPlaneFilledSheet3DStratum(

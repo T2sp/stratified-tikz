@@ -14,6 +14,7 @@ import { cloneCamera3D, createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { normalizeClosedPathBoundariesForAmbientDimension } from './filledBoundaries.ts'
 import { normalizePathSegmentsForAmbientDimension } from './paths.ts'
+import { cloneCurvedSheetPrimitive } from './sheets.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -21,6 +22,8 @@ import type {
   Camera3D,
   ClosedPathBoundary,
   ConcatenatedPathStratum,
+  CurvedSheetPrimitive,
+  CurvedSheetStratum,
   CoordinateInputMode,
   CubicBezierCurveStratum,
   CubicBezierControlMode,
@@ -105,6 +108,15 @@ export type CreateWorkPlaneFilledSheet3DStratumInput = {
   planeFrame: WorkPlaneFrameSnapshot
   boundaries: ClosedPathBoundary[]
   fillRule?: FillRule
+  layer?: number
+}
+
+export type CreateCurvedSheetStratumInput = {
+  id: string
+  name?: string
+  label?: string
+  style?: SheetStyle
+  primitive: CurvedSheetPrimitive
   layer?: number
 }
 
@@ -302,6 +314,28 @@ export function createWorkPlaneFilledSheet3DStratum({
     planeFrame: cloneWorkPlaneFrameSnapshot(planeFrame),
     boundaries: normalizeClosedPathBoundariesForAmbientDimension(boundaries, 3),
     fillRule,
+    layer,
+  }
+
+  return withOptionalLabel(sheet, label)
+}
+
+export function createCurvedSheetStratum({
+  id,
+  name = 'Curved sheet',
+  label,
+  style = defaultSheetStyle,
+  primitive,
+  layer = 0,
+}: CreateCurvedSheetStratumInput): CurvedSheetStratum {
+  const sheet: Omit<CurvedSheetStratum, 'label'> = {
+    id,
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name,
+    style: cloneSheetStyle(style),
+    primitive: cloneCurvedSheetPrimitive(primitive),
     layer,
   }
 

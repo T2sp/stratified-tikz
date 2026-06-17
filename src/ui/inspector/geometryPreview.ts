@@ -13,6 +13,10 @@ export function formatSelectedGeometry(
 ): string {
   switch (stratum.geometricKind) {
     case 'sheet':
+      if (stratum.kind === 'curvedSheet') {
+        return `${stratum.primitive.kind}; sampling ${stratum.primitive.sampling.uSegments} x ${stratum.primitive.sampling.vSegments}`
+      }
+
       return sheetVertices(stratum)
         .map(
           (vertex, index) =>
