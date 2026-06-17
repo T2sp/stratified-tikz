@@ -1,5 +1,9 @@
 import { lineStyles } from '../../model/types.ts'
 import type { CurveStratum, HexColor, LineStyle } from '../../model/types.ts'
+import {
+  cloneStylePreset,
+  curveStylePresets,
+} from '../../model/styles.ts'
 import { updateStratumStyleById } from '../diagramUpdates.ts'
 import {
   EditableColorField,
@@ -22,6 +26,29 @@ export function CurveStyleEditor({
     <section className="inspector-section">
       <h3>Style</h3>
       <div className="inspector-form">
+        <div className="inspector-field">
+          <span className="inspector-field-label">Preset</span>
+          <div className="style-preset-buttons">
+            {curveStylePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="style-preset-button"
+                onClick={() =>
+                  onDiagramChange((diagram) =>
+                    updateStratumStyleById(diagram, curve.id, (style) =>
+                      style.kind === 'curveStyle'
+                        ? cloneStylePreset(preset)
+                        : style,
+                    ),
+                  )
+                }
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <EditableColorField
           label="Stroke color"
           value={curve.style.strokeColor}

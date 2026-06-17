@@ -11,7 +11,11 @@ import './App.css'
 import {
   emptyThreeDimensionalDiagram,
   emptyTwoDimensionalDiagram,
+  evenOddFilledBoundaryExample,
+  hemispherePatchExample,
+  saddlePatchExample,
   threeDimensionalExample,
+  translucentFilledStrataExample,
   twoDimensionalExample,
 } from './examples'
 import { normalizePointForAmbientDimension } from './geometry'
@@ -157,7 +161,15 @@ import {
   type WorkPlanePreviewTool,
 } from './ui'
 
-type ExampleId = 'empty2d' | 'empty3d' | '2d' | '3d'
+type ExampleId =
+  | 'empty2d'
+  | 'empty3d'
+  | '2d'
+  | '3d'
+  | 'referenceFilled'
+  | 'hemispherePatch'
+  | 'saddlePatch'
+  | 'evenOddBoundary'
 type CopyStatus = 'idle' | 'copied' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type CreationTool = WorkPlanePreviewTool
@@ -206,6 +218,30 @@ const exampleOptions: ExampleOption[] = [
     name: '3D example',
     summary: 'codim 1 sheets, codim 2 curves, codim 3 points',
     diagram: threeDimensionalExample,
+  },
+  {
+    id: 'referenceFilled',
+    name: 'Reference fills',
+    summary: 'translucent filled regions with solid and dotted curves',
+    diagram: translucentFilledStrataExample,
+  },
+  {
+    id: 'hemispherePatch',
+    name: 'Hemisphere patch',
+    summary: 'sampled sheet with paths, points, and labels',
+    diagram: hemispherePatchExample,
+  },
+  {
+    id: 'saddlePatch',
+    name: 'Saddle patch',
+    summary: 'sampled saddle with crossing paths and labels',
+    diagram: saddlePatchExample,
+  },
+  {
+    id: 'evenOddBoundary',
+    name: 'Even-odd boundary',
+    summary: 'compound filled boundary using the even-odd rule',
+    diagram: evenOddFilledBoundaryExample,
   },
   {
     id: 'empty2d',

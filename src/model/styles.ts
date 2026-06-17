@@ -19,6 +19,12 @@ import type {
   SheetStyle,
 } from './types.ts'
 
+export type StylePreset<TStyle> = {
+  id: string
+  name: string
+  style: TStyle
+}
+
 export const defaultRegionStyle: RegionStyle = {
   kind: 'regionStyle',
   fillColor: '#FFFFFF',
@@ -58,6 +64,138 @@ export const defaultLabelStyle: LabelStyle = {
   opacity: 1,
   fontSize: 10,
   anchor: 'center',
+}
+
+export const regionStylePresets: readonly StylePreset<RegionStyle>[] = [
+  {
+    id: 'blueTranslucentRegion',
+    name: 'Blue translucent',
+    style: {
+      kind: 'regionStyle',
+      fillColor: '#4D9DE0',
+      fillOpacity: 0.35,
+      strokeColor: '#4D9DE0',
+      strokeOpacity: 1,
+    },
+  },
+  {
+    id: 'redTranslucentRegion',
+    name: 'Red translucent',
+    style: {
+      kind: 'regionStyle',
+      fillColor: '#E76F51',
+      fillOpacity: 0.28,
+      strokeColor: '#C44536',
+      strokeOpacity: 0.9,
+    },
+  },
+] as const
+
+export const sheetStylePresets: readonly StylePreset<SheetStyle>[] = [
+  {
+    id: 'blueTranslucentSheet',
+    name: 'Blue translucent',
+    style: {
+      kind: 'sheetStyle',
+      fillColor: '#4D9DE0',
+      fillOpacity: 0.35,
+      strokeColor: '#4D9DE0',
+      strokeOpacity: 1,
+    },
+  },
+  {
+    id: 'redTranslucentSheet',
+    name: 'Red translucent',
+    style: {
+      kind: 'sheetStyle',
+      fillColor: '#E76F51',
+      fillOpacity: 0.28,
+      strokeColor: '#C44536',
+      strokeOpacity: 0.9,
+    },
+  },
+] as const
+
+export const curveStylePresets: readonly StylePreset<CurveStyle>[] = [
+  {
+    id: 'blackSolidCurve',
+    name: 'Black solid',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+  },
+  {
+    id: 'blackDenselyDottedCurve',
+    name: 'Black densely dotted',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'denselyDotted',
+    },
+  },
+] as const
+
+export const pointStylePresets: readonly StylePreset<PointStyle>[] = [
+  {
+    id: 'blackFilledCirclePoint',
+    name: 'Black filled circle',
+    style: {
+      kind: 'pointStyle',
+      color: '#000000',
+      opacity: 1,
+      shape: 'circle',
+      fill: 'filled',
+      size: 3,
+    },
+  },
+  {
+    id: 'blackHollowCirclePoint',
+    name: 'Black hollow circle',
+    style: {
+      kind: 'pointStyle',
+      color: '#000000',
+      opacity: 1,
+      shape: 'circle',
+      fill: 'hollow',
+      size: 3,
+    },
+  },
+  {
+    id: 'blackFilledSquarePoint',
+    name: 'Black filled square',
+    style: {
+      kind: 'pointStyle',
+      color: '#000000',
+      opacity: 1,
+      shape: 'square',
+      fill: 'filled',
+      size: 3.5,
+    },
+  },
+  {
+    id: 'blackHollowSquarePoint',
+    name: 'Black hollow square',
+    style: {
+      kind: 'pointStyle',
+      color: '#000000',
+      opacity: 1,
+      shape: 'square',
+      fill: 'hollow',
+      size: 3.5,
+    },
+  },
+] as const
+
+export function cloneStylePreset<TStyle extends object>(preset: {
+  readonly style: TStyle
+}): TStyle {
+  return { ...preset.style }
 }
 
 export function cloneRegionStyle(style: RegionStyle): RegionStyle {

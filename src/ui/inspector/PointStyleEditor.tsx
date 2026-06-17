@@ -5,6 +5,10 @@ import type {
   PointShape,
   PointStratum,
 } from '../../model/types.ts'
+import {
+  cloneStylePreset,
+  pointStylePresets,
+} from '../../model/styles.ts'
 import { updateStratumStyleById } from '../diagramUpdates.ts'
 import {
   EditableColorField,
@@ -27,6 +31,29 @@ export function PointStyleEditor({
     <section className="inspector-section">
       <h3>Style</h3>
       <div className="inspector-form">
+        <div className="inspector-field">
+          <span className="inspector-field-label">Preset</span>
+          <div className="style-preset-buttons">
+            {pointStylePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="style-preset-button"
+                onClick={() =>
+                  onDiagramChange((diagram) =>
+                    updateStratumStyleById(diagram, point.id, (style) =>
+                      style.kind === 'pointStyle'
+                        ? cloneStylePreset(preset)
+                        : style,
+                    ),
+                  )
+                }
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <EditableColorField
           label="Color"
           value={point.style.color}
