@@ -148,6 +148,26 @@
   backdrop-filter: blur(7px);
 }
 
+.camera-control-aside {
+  top: auto;
+  bottom: 12px;
+  width: min(230px, calc(100% - 24px));
+}
+
+.camera-control-aside .camera-summary {
+  display: none;
+}
+
+.camera-control-aside .camera-summary-toggle {
+  flex: 0 0 auto;
+}
+
+.camera-control-aside .camera-details,
+.camera-control-aside .camera-help,
+.camera-control-aside .camera-status {
+  display: none;
+}
+
 .camera-summary-row {
   display: flex;
   align-items: center;

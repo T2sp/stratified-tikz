@@ -419,6 +419,7 @@ function App() {
     useState<OrthographicCamera3D>(() => createInitialCameraControlState())
   const [isCameraDetailsExpanded, setIsCameraDetailsExpanded] =
     useState<boolean>(false)
+  const [isCameraPanelAside, setIsCameraPanelAside] = useState<boolean>(false)
   const [cameraStatus, setCameraStatus] = useState<string>('')
   const [editorState, setEditorState] = useState<EditableEditorState>(() => {
     const initialDiagram = cloneDiagram(exampleOptions[0].diagram)
@@ -647,6 +648,10 @@ function App() {
     setCameraControl(createCameraPresetCamera(presetId))
     setCameraStatus('')
     setCopyStatus('idle')
+  }
+
+  function toggleCameraPanelAside(): void {
+    setIsCameraPanelAside((isAside) => !isAside)
   }
 
   function handleCameraDrag(delta: Vec2, mode: CameraDragMode): void {
@@ -3710,7 +3715,11 @@ function App() {
 
             {showCameraControls && (
               <section
-                className="camera-control"
+                className={
+                  isCameraPanelAside
+                    ? 'camera-control camera-control-aside'
+                    : 'camera-control'
+                }
                 aria-labelledby="camera-heading"
                 onClick={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
@@ -3756,6 +3765,13 @@ function App() {
                     onClick={fitCameraView}
                   >
                     Fit
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button camera-aside-button"
+                    onClick={toggleCameraPanelAside}
+                  >
+                    {isCameraPanelAside ? 'Restore' : 'Aside'}
                   </button>
                 </div>
 
