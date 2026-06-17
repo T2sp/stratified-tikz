@@ -158,6 +158,8 @@ export type CurveStyleSegment = {
   style: PartialCurveStyle
 }
 
+export type PathSegmentStyleOverride = Partial<CurveStyle>
+
 export type CubicBezierPolarControl = {
   angleDegrees: number
   radius: number
@@ -270,13 +272,17 @@ export type PolygonSheetStratum = SheetStratumBase & {
 
 export type SheetStratum = QuadSheetStratum | PolygonSheetStratum
 
-export type LinePathSegment = {
+type PathSegmentBase = {
+  styleOverride?: PathSegmentStyleOverride
+}
+
+export type LinePathSegment = PathSegmentBase & {
   kind: 'line'
   start: Vec3
   end: Vec3
 }
 
-export type CubicBezierPathSegment = {
+export type CubicBezierPathSegment = PathSegmentBase & {
   kind: 'cubicBezier'
   start: Vec3
   control1: Vec3

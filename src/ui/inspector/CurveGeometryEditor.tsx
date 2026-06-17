@@ -11,9 +11,13 @@ import type {
   CubicBezierControlMode,
   CurveStratum,
   Diagram,
+  HexColor,
+  LineStyle,
   PathSegment,
   Vec3,
 } from '../../model/types.ts'
+import { hasCurveStyleOverride, resolveCurveStyle } from '../../model/styles.ts'
+import { lineStyles } from '../../model/types.ts'
 import {
   type CoordinateAxis,
   updateStratumById,
@@ -22,7 +26,10 @@ import {
 import { describeCurvePoints } from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import {
+  EditableColorField,
   EditableNumberField,
+  EditableOpacityField,
+  EditablePositiveNumberField,
   EditableSelectField,
   ReadOnlyField,
 } from './InspectorField.tsx'
@@ -32,15 +39,18 @@ import {
   appendCubicSegmentToConcatenatedPath,
   appendLineSegmentToConcatenatedPath,
   bezierControlModeOptions as pathBezierControlModeOptions,
+  clearConcatenatedPathSegmentStyleOverride,
   describeConcatenatedPathSegments,
   removeLastSegmentFromConcatenatedPath,
   updateConcatenatedPathCoordinate,
   updateConcatenatedPathCubicControlMode,
   updateConcatenatedPathRelativeCartesianOffset,
   updateConcatenatedPathRelativePolarControl,
+  updateConcatenatedPathSegmentStyleOverrideField,
   type ConcatenatedPathPointDescription,
   type ConcatenatedPathSegmentDescription,
   type InspectorBezierControlMode as PathInspectorBezierControlMode,
+  type PathSegmentStyleOverrideField,
 } from '../pathEditing.ts'
 
 type InspectorBezierControlMode =
@@ -366,13 +376,13 @@ function ConcatenatedPathSegmentEditor({
   onDiagramChange: DiagramChangeHandler
 }) {
   const pathSegment = path.segments[segment.segmentIndex]
+  const effectiveStyle = resolveCurveStyle(path.style, pathSegment.styleOverride)
 
   return (
-    <div className="path-segment-editor">
-      <ReadOnlyField
-        label={`Segment ${segment.segmentNumber}`}
-        value={segment.kindLabel}
-      />
+    <details className="path-segment-editor" open={segment.segmentIndex === 0}>
+      <summary>
+        Segment {segment.segmentNumber} - {segment.kindLabel}
+      </summary>
       {pathSegment.kind === 'cubicBezier' &&
         renderPathCubicControlModeEditor(
           diagram,
@@ -387,7 +397,113 @@ function ConcatenatedPathSegmentEditor({
         segment,
         onDiagramChange,
       )}
+      {renderPathSegmentStyleOverrideEditor(
+        path,
+        segment.segmentIndex,
+        effectiveStyle,
+        hasCurveStyleOverride(pathSegment.styleOverride),
+        onDiagramChange,
+      )}
+    </details>
+  )
+}
+
+function renderPathSegmentStyleOverrideEditor(
+  path: ConcatenatedPathStratum,
+  segmentIndex: number,
+  effectiveStyle: ConcatenatedPathStratum['style'],
+  hasOverride: boolean,
+  onDiagramChange: DiagramChangeHandler,
+) {
+  return (
+    <div className="path-segment-style-editor">
+      <ReadOnlyField
+        label="Segment style"
+        value={hasOverride ? 'Override' : 'Inherit path'}
+      />
+      <EditableColorField
+        label="Stroke color"
+        value={effectiveStyle.strokeColor}
+        onChange={(strokeColor) =>
+          updatePathSegmentStyleOverrideField(
+            path,
+            segmentIndex,
+            'strokeColor',
+            strokeColor as HexColor,
+            onDiagramChange,
+          )
+        }
+      />
+      <EditableOpacityField
+        label="Stroke opacity"
+        value={effectiveStyle.strokeOpacity}
+        onChange={(strokeOpacity) =>
+          updatePathSegmentStyleOverrideField(
+            path,
+            segmentIndex,
+            'strokeOpacity',
+            strokeOpacity,
+            onDiagramChange,
+          )
+        }
+      />
+      <EditablePositiveNumberField
+        label="Line width"
+        value={effectiveStyle.lineWidth}
+        onChange={(lineWidth) =>
+          updatePathSegmentStyleOverrideField(
+            path,
+            segmentIndex,
+            'lineWidth',
+            lineWidth,
+            onDiagramChange,
+          )
+        }
+      />
+      <EditableSelectField<LineStyle>
+        label="Line style"
+        value={effectiveStyle.lineStyle}
+        options={lineStyles}
+        onChange={(lineStyle) =>
+          updatePathSegmentStyleOverrideField(
+            path,
+            segmentIndex,
+            'lineStyle',
+            lineStyle,
+            onDiagramChange,
+          )
+        }
+      />
+      <button
+        type="button"
+        className="toolbar-button path-segment-clear-style"
+        disabled={!hasOverride}
+        onClick={() =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            clearConcatenatedPathSegmentStyleOverride(current, segmentIndex),
+          )
+        }
+      >
+        Clear override
+      </button>
     </div>
+  )
+}
+
+function updatePathSegmentStyleOverrideField(
+  path: ConcatenatedPathStratum,
+  segmentIndex: number,
+  field: PathSegmentStyleOverrideField,
+  value: HexColor | number | LineStyle,
+  onDiagramChange: DiagramChangeHandler,
+): void {
+  updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+    updateConcatenatedPathSegmentStyleOverrideField(
+      current,
+      segmentIndex,
+      field,
+      value,
+    ),
   )
 }
 

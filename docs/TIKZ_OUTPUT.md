@@ -110,8 +110,9 @@ option on the exported path:
 
 If `pathLabel` is missing, empty, or only whitespace after trimming, no
 `spath/save` option is emitted. Saved path labels are currently exported for
-polyline curves, cubic Bézier curves, and polygon sheet paths. They are not
-emitted for point strata or for free text labels in `diagram.labels`.
+polyline curves, cubic Bézier curves, concatenated paths, and polygon sheet
+paths. They are not emitted for point strata or for free text labels in
+`diagram.labels`.
 
 Saved path names are sanitized for TikZ safety by the same deterministic
 ASCII-letter-and-digit rules used for coordinate name stems: unsafe characters
@@ -899,6 +900,43 @@ The supported line style mapping should include:
 | `dashed` | `dashed` |
 | `dotted` | `dotted` |
 | `denselyDotted` | `densely dotted` |
+
+## Concatenated path segment style overrides
+
+For `kind: "concatenatedPath"`, each stored segment may define a partial
+`styleOverride`. Export resolves each segment style by applying the override to
+the path-level `CurveStyle`.
+
+If every segment resolves to the same style, the generator emits one continuous
+`\draw` command. If adjacent segments resolve to different styles, the
+generator groups consecutive same-style segments and emits one readable
+`\draw` command per group, preserving the original segment order and reusing
+the shared endpoint coordinate names:
+
+```tex
+% Segment style overrides split this concatenated path by resolved style.
+% Segment 1
+\draw[
+  draw=stzCurveA,
+  draw opacity=1,
+  line width=1.2pt
+]
+  (p0) -- (p1);
+
+% Segment 2
+\draw[
+  draw=stzCurveASegment2,
+  draw opacity=1,
+  line width=1.2pt,
+  densely dotted
+]
+  (p1) -- (p2);
+```
+
+When a mixed-style concatenated path also has `pathLabel`, export emits one
+non-drawing `\path[spath/save=...]` command for the full continuous path before
+the styled draw commands. This preserves the saved path while keeping visual
+styles split into maintainable draw blocks.
 
 ## MVP behavior
 

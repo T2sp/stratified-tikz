@@ -9,15 +9,22 @@ import {
   areSegmentsComposable,
   normalizePathForAmbientDimension,
   pathEndpoints,
+  pathSegmentStyleRuns,
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
+  resolvePathSegmentStyle,
 } from '../../src/model/paths.ts'
 import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
-import type { CurveStratum, Diagram, PathSegment } from '../../src/model/types.ts'
+import type {
+  CurveStratum,
+  Diagram,
+  PathSegment,
+  PathSegmentStyleOverride,
+} from '../../src/model/types.ts'
 
 test('valid 2D concatenated path with line and cubic segment validates', () => {
   const diagram = createTwoDimensionalPathDiagram()
@@ -53,11 +60,89 @@ test('valid 3D concatenated path validates', () => {
   assert.equal(validateDiagram(diagram).valid, true)
 })
 
+test('concatenated path segment without override inherits path style', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'inherited-style-path',
+    name: 'Inherited Style Path',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#336699',
+      strokeOpacity: 0.7,
+      lineWidth: 2.5,
+      lineStyle: 'dashed',
+    },
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+    ],
+  })
+
+  assert.deepEqual(resolvePathSegmentStyle(path.style, path.segments[0]), path.style)
+})
+
+test('concatenated path segment style override resolves against path style', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'overridden-style-path',
+    name: 'Overridden Style Path',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+        styleOverride: {
+          strokeColor: '#AA0000',
+          strokeOpacity: 0.45,
+          lineWidth: 2,
+          lineStyle: 'denselyDotted',
+        },
+      },
+    ],
+  })
+
+  assert.deepEqual(resolvePathSegmentStyle(path.style, path.segments[0]), {
+    kind: 'curveStyle',
+    strokeColor: '#AA0000',
+    strokeOpacity: 0.45,
+    lineWidth: 2,
+    lineStyle: 'denselyDotted',
+  })
+})
+
 test('empty concatenated path segment list is rejected', () => {
   const validation = validateDiagram(diagramWithPathSegments([]))
 
   assert.equal(validation.valid, false)
   assert.match(joinValidationMessages(validation.errors), /at least one segment/)
+})
+
+test('invalid concatenated path segment style override is rejected', () => {
+  const validation = validateDiagram(
+    diagramWithPathSegments([
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+        styleOverride: {
+          lineStyle: 'dashDot' as PathSegmentStyleOverride['lineStyle'],
+        },
+      },
+    ]),
+  )
+
+  assert.equal(validation.valid, false)
+  assert.match(joinValidationMessages(validation.errors), /solid, dashed, dotted/)
 })
 
 test('non-finite concatenated path coordinates are rejected', () => {
@@ -158,6 +243,9 @@ test('concatenated paths normalize for ambient dimension without mutating input'
         kind: 'line',
         start: { x: 0, y: 0, z: 3 },
         end: { x: 1, y: 0, z: 4 },
+        styleOverride: {
+          lineStyle: 'dotted',
+        },
       },
     ],
   })
@@ -169,13 +257,65 @@ test('concatenated paths normalize for ambient dimension without mutating input'
     kind: 'line',
     start: { x: 0, y: 0, z: 0 },
     end: { x: 1, y: 0, z: 0 },
+    styleOverride: {
+      lineStyle: 'dotted',
+    },
   })
   assert.equal(path.codim, 2)
   assert.deepEqual(path.segments[0], {
     kind: 'line',
     start: { x: 0, y: 0, z: 3 },
     end: { x: 1, y: 0, z: 4 },
+    styleOverride: {
+      lineStyle: 'dotted',
+    },
   })
+})
+
+test('path segment style runs preserve segment order', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'style-run-path',
+    name: 'Style Run Path',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'dotted' },
+      },
+      {
+        kind: 'line',
+        start: { x: 2, y: 0, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'dotted' },
+      },
+      {
+        kind: 'line',
+        start: { x: 3, y: 0, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+      },
+    ],
+  })
+
+  assert.deepEqual(
+    pathSegmentStyleRuns(path.segments, path.style).map((run) => ({
+      startIndex: run.startIndex,
+      segmentCount: run.segments.length,
+      lineStyle: run.style.lineStyle,
+      startX: run.segments[0].start.x,
+    })),
+    [
+      { startIndex: 0, segmentCount: 1, lineStyle: 'solid', startX: 0 },
+      { startIndex: 1, segmentCount: 2, lineStyle: 'dotted', startX: 1 },
+      { startIndex: 3, segmentCount: 1, lineStyle: 'solid', startX: 3 },
+    ],
+  )
 })
 
 test('concatenated path save/load round-trips through JSON', () => {

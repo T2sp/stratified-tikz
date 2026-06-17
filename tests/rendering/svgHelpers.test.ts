@@ -12,10 +12,16 @@ import {
 import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import {
+  pathSegmentStyleRuns,
+  resolvePathSegmentStyle,
+} from '../../src/model/paths.ts'
 import type {
   Camera3D,
+  CurveStyle,
   CubicBezierControlMode,
   Diagram,
+  PathSegment,
   Vec3,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
@@ -26,6 +32,7 @@ import {
 import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
+  curveStyleToSvgStrokeAttributes,
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
@@ -122,6 +129,73 @@ test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('dashed'), '8 5')
   assert.equal(lineStyleToStrokeDasharray('dotted'), '1 5')
   assert.equal(lineStyleToStrokeDasharray('denselyDotted'), '1 2')
+})
+
+test('segment style override changes resolved SVG stroke attributes', () => {
+  const pathStyle: CurveStyle = {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+  }
+  const segment: PathSegment = {
+    kind: 'line',
+    start: { x: 0, y: 0, z: 0 },
+    end: { x: 1, y: 0, z: 0 },
+    styleOverride: {
+      strokeColor: '#AA0033',
+      strokeOpacity: 0.5,
+      lineWidth: 2.4,
+      lineStyle: 'denselyDotted',
+    },
+  }
+
+  assert.deepEqual(
+    curveStyleToSvgStrokeAttributes(resolvePathSegmentStyle(pathStyle, segment)),
+    {
+      stroke: '#AA0033',
+      strokeOpacity: 0.5,
+      strokeWidth: 2.4,
+      strokeDasharray: '1 2',
+    },
+  )
+})
+
+test('SVG style runs split adjacent concatenated path segments by resolved style', () => {
+  const pathStyle: CurveStyle = {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+  }
+  const segments: PathSegment[] = [
+    {
+      kind: 'line',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 1, y: 0, z: 0 },
+    },
+    {
+      kind: 'line',
+      start: { x: 1, y: 0, z: 0 },
+      end: { x: 2, y: 0, z: 0 },
+      styleOverride: { lineStyle: 'dotted' },
+    },
+  ]
+  const runs = pathSegmentStyleRuns(segments, pathStyle)
+
+  assert.deepEqual(
+    runs.map((run) => ({
+      startIndex: run.startIndex,
+      lineStyle: run.style.lineStyle,
+      segmentCount: run.segments.length,
+    })),
+    [
+      { startIndex: 0, lineStyle: 'solid', segmentCount: 1 },
+      { startIndex: 1, lineStyle: 'dotted', segmentCount: 1 },
+    ],
+  )
 })
 
 test('label anchor placement maps every supported anchor to TikZ-like SVG placement', () => {

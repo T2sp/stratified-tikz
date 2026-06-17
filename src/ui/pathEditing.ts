@@ -6,12 +6,21 @@ import {
 } from '../geometry/bezierControls.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { pathSegmentEnd } from '../model/paths.ts'
+import {
+  isHexColor,
+  isLineStyle,
+  isOpacity,
+  isPositiveFiniteNumber,
+} from '../model/styles.ts'
 import type {
   AmbientDimension,
   ConcatenatedPathStratum,
   CubicBezierControlMode,
   CubicBezierPathSegment,
+  HexColor,
+  LineStyle,
   PathSegment,
+  PathSegmentStyleOverride,
   Vec3,
 } from '../model/types.ts'
 import { updateVec3Coordinate, type CoordinateAxis } from './diagramUpdates.ts'
@@ -31,6 +40,14 @@ export type InspectorBezierControlMode =
   | 'absolute'
   | 'relativeCartesian'
   | 'relativePolar'
+
+export type PathSegmentStyleOverrideField =
+  | 'strokeColor'
+  | 'strokeOpacity'
+  | 'lineWidth'
+  | 'lineStyle'
+
+type PathSegmentStyleOverrideValue = HexColor | number | LineStyle
 
 export type ConcatenatedPathPointDescription = {
   target: ConcatenatedPathPointTarget
@@ -240,6 +257,50 @@ export function updateConcatenatedPathRelativePolarControl(
     segmentIndex,
     segment,
     controlMode,
+  )
+}
+
+export function updateConcatenatedPathSegmentStyleOverrideField(
+  path: ConcatenatedPathStratum,
+  segmentIndex: number,
+  field: PathSegmentStyleOverrideField,
+  value: PathSegmentStyleOverrideValue,
+): ConcatenatedPathStratum {
+  const segment = path.segments[segmentIndex]
+
+  if (
+    segment === undefined ||
+    !isValidPathSegmentStyleOverrideValue(field, value)
+  ) {
+    return path
+  }
+
+  const styleOverride: PathSegmentStyleOverride = {
+    ...(segment.styleOverride ?? {}),
+    [field]: value,
+  }
+
+  return updatePathSegment(
+    path,
+    segmentIndex,
+    withPathSegmentStyleOverride(segment, styleOverride),
+  )
+}
+
+export function clearConcatenatedPathSegmentStyleOverride(
+  path: ConcatenatedPathStratum,
+  segmentIndex: number,
+): ConcatenatedPathStratum {
+  const segment = path.segments[segmentIndex]
+
+  if (segment === undefined || segment.styleOverride === undefined) {
+    return path
+  }
+
+  return updatePathSegment(
+    path,
+    segmentIndex,
+    withoutPathSegmentStyleOverride(segment),
   )
 }
 
@@ -551,6 +612,54 @@ function updatePathSegment(
     segments: path.segments.map((currentSegment, index) =>
       index === segmentIndex ? segment : currentSegment,
     ),
+  }
+}
+
+function withPathSegmentStyleOverride(
+  segment: PathSegment,
+  styleOverride: PathSegmentStyleOverride,
+): PathSegment {
+  return {
+    ...segment,
+    styleOverride,
+  }
+}
+
+function withoutPathSegmentStyleOverride(segment: PathSegment): PathSegment {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: segment.start,
+        end: segment.end,
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: segment.start,
+        control1: segment.control1,
+        control2: segment.control2,
+        end: segment.end,
+        ...(segment.controlMode === undefined
+          ? {}
+          : { controlMode: segment.controlMode }),
+      }
+  }
+}
+
+function isValidPathSegmentStyleOverrideValue(
+  field: PathSegmentStyleOverrideField,
+  value: PathSegmentStyleOverrideValue,
+): boolean {
+  switch (field) {
+    case 'strokeColor':
+      return typeof value === 'string' && isHexColor(value)
+    case 'strokeOpacity':
+      return typeof value === 'number' && isOpacity(value)
+    case 'lineWidth':
+      return typeof value === 'number' && isPositiveFiniteNumber(value)
+    case 'lineStyle':
+      return typeof value === 'string' && isLineStyle(value)
   }
 }
 

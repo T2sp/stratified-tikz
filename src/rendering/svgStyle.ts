@@ -1,4 +1,11 @@
-import type { LabelAnchor, LineStyle } from '../model/types'
+import type { CurveStyle, LabelAnchor, LineStyle } from '../model/types'
+
+export type SvgCurveStrokeAttributes = {
+  stroke: string
+  strokeOpacity: number
+  strokeWidth: number
+  strokeDasharray?: string
+}
 
 export type SvgLabelAnchorPlacement = {
   textAnchor: 'start' | 'middle' | 'end'
@@ -19,6 +26,19 @@ export function lineStyleToStrokeDasharray(
       return '1 5'
     case 'denselyDotted':
       return '1 2'
+  }
+}
+
+export function curveStyleToSvgStrokeAttributes(
+  style: CurveStyle,
+): SvgCurveStrokeAttributes {
+  const strokeDasharray = lineStyleToStrokeDasharray(style.lineStyle)
+
+  return {
+    stroke: style.strokeColor,
+    strokeOpacity: style.strokeOpacity,
+    strokeWidth: style.lineWidth,
+    ...(strokeDasharray === undefined ? {} : { strokeDasharray }),
   }
 }
 

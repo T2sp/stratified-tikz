@@ -386,6 +386,12 @@ function validatePathSegment(
   path: string,
   errors: DiagramValidationIssue[],
 ): void {
+  validatePathSegmentStyleOverride(
+    segment.styleOverride,
+    `${path}.styleOverride`,
+    errors,
+  )
+
   switch (segment.kind) {
     case 'line':
       validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
@@ -417,6 +423,23 @@ function validatePathSegment(
     default:
       pushError(errors, `${path}.kind`, 'Path segment kind must be line or cubicBezier.')
   }
+}
+
+function validatePathSegmentStyleOverride(
+  style: PartialCurveStyle | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (style === undefined) {
+    return
+  }
+
+  if (typeof style !== 'object' || style === null || Array.isArray(style)) {
+    pushError(errors, path, 'Path segment style override must be an object.')
+    return
+  }
+
+  validatePartialCurveStyle(style, path, errors)
 }
 
 function validateAdjacentPathSegmentEndpoints(
