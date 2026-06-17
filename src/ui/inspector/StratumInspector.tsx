@@ -14,6 +14,7 @@ import {
   EditableTextField,
   ReadOnlyField,
 } from './InspectorField.tsx'
+import { FilledBoundaryGeometryEditor } from './FilledBoundaryGeometryEditor.tsx'
 import { PointGeometryEditor } from './PointGeometryEditor.tsx'
 import { SheetGeometryEditor } from './SheetGeometryEditor.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
@@ -139,6 +140,16 @@ function StratumGeometrySection({
 }: StratumInspectorProps) {
   switch (stratum.geometricKind) {
     case 'region':
+      if (stratum.kind === 'filledRegion') {
+        return (
+          <FilledBoundaryGeometryEditor
+            diagram={diagram}
+            stratum={stratum}
+            onDiagramChange={onDiagramChange}
+          />
+        )
+      }
+
       return (
         <section className="inspector-section">
           <h3>Geometry</h3>
@@ -151,6 +162,16 @@ function StratumGeometrySection({
         </section>
       )
     case 'sheet':
+      if (stratum.kind === 'workPlaneFilledSheet') {
+        return (
+          <FilledBoundaryGeometryEditor
+            diagram={diagram}
+            stratum={stratum}
+            onDiagramChange={onDiagramChange}
+          />
+        )
+      }
+
       return (
         <SheetGeometryEditor
           diagram={diagram}

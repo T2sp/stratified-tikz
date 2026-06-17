@@ -1,8 +1,7 @@
 import type { Stratum } from '../../model/types.ts'
-import { formatStratumStyleSummary } from '../inspectorSummary.ts'
 import { CurveStyleEditor } from './CurveStyleEditor.tsx'
-import { ReadOnlyField } from './InspectorField.tsx'
 import { PointStyleEditor } from './PointStyleEditor.tsx'
+import { RegionStyleEditor } from './RegionStyleEditor.tsx'
 import { SheetStyleEditor } from './SheetStyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
@@ -23,16 +22,6 @@ export function StyleEditor({
     case 'point':
       return <PointStyleEditor point={stratum} onDiagramChange={onDiagramChange} />
     case 'region':
-      return (
-        <section className="inspector-section">
-          <h3>Style</h3>
-          <div className="inspector-form">
-            <ReadOnlyField
-              label={stratum.style.kind}
-              value={formatStratumStyleSummary(stratum.style)}
-            />
-          </div>
-        </section>
-      )
+      return <RegionStyleEditor region={stratum} onDiagramChange={onDiagramChange} />
   }
 }
