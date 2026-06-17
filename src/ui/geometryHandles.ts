@@ -197,7 +197,14 @@ function updateSheetVertexPosition(
 }
 
 function sheetVertexCount(sheet: SheetStratum): number {
-  return sheet.kind === 'quadSheet' ? sheet.corners.length : sheet.vertices.length
+  switch (sheet.kind) {
+    case 'quadSheet':
+      return sheet.corners.length
+    case 'polygonSheet':
+      return sheet.vertices.length
+    case 'workPlaneFilledSheet':
+      return 0
+  }
 }
 
 function isFiniteVec3(point: Vec3): boolean {

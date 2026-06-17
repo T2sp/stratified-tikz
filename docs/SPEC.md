@@ -55,6 +55,7 @@ It is a diagram editor optimized for mathematical graphical calculus and readabl
 The MVP should support:
 
 - 2D and 3D ambient modes
+- codim 0 filled regions in 2D mode
 - codim 1 curves in 2D mode
 - codim 2 points in 2D mode
 - codim 1 sheets in 3D mode
@@ -268,6 +269,23 @@ within tolerance; off-plane sources are rejected rather than silently projected.
 The exception is cross-work-plane concatenated path creation, where an existing
 point source may be copied as its finite absolute `Vec3` because the active work
 plane is an editing aid rather than a path-wide constraint.
+
+### Closed-boundary fills
+
+The model supports filled objects whose boundary is one or more closed paths.
+In 2D, a filled object is a codim 0 `filledRegion`. In 3D, a planar filled
+object is a codim 1 `workPlaneFilledSheet` with a stored orthonormal work-plane
+frame snapshot. A boundary is committed `PathSegment[]` geometry made from line
+and cubic Bézier segments; it is copied at creation time and is not a live
+reference to source paths.
+
+Each filled object stores `fillRule: "nonzero" | "evenOdd"`. Multiple boundary
+components are allowed, and `evenOdd` is supported for holes and nested
+components. The saved model rejects empty boundary lists, open boundaries,
+non-finite coordinates, invalid fill rules, nonzero `z` coordinates in 2D
+filled regions, and 3D work-plane filled sheet boundary points that do not lie
+on the stored plane. Self-intersection and boolean cleanup are intentionally
+deferred.
 
 ### Concatenated path editing
 

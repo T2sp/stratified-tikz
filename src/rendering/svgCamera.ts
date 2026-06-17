@@ -1,4 +1,5 @@
 import { projectVec3 } from '../geometry/projection.ts'
+import { closedPathBoundaryCoordinates } from '../model/filledBoundaries.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import { pathCoordinates } from '../model/paths.ts'
 import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
@@ -138,9 +139,13 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
   const stratumPoints = diagram.strata.flatMap((stratum) => {
     switch (stratum.geometricKind) {
       case 'region':
-        return []
+        return stratum.kind === 'filledRegion'
+          ? stratum.boundaries.flatMap(closedPathBoundaryCoordinates)
+          : []
       case 'sheet':
-        return [...sheetVertices(stratum)]
+        return stratum.kind === 'workPlaneFilledSheet'
+          ? stratum.boundaries.flatMap(closedPathBoundaryCoordinates)
+          : [...sheetVertices(stratum)]
       case 'curve':
         return stratum.kind === 'concatenatedPath'
           ? pathCoordinates(stratum.segments)

@@ -12,12 +12,14 @@ import {
 } from './styles.ts'
 import { cloneCamera3D, createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import { normalizeClosedPathBoundariesForAmbientDimension } from './filledBoundaries.ts'
 import { normalizePathSegmentsForAmbientDimension } from './paths.ts'
 import type {
   AmbientDimension,
   Camera,
   Camera2D,
   Camera3D,
+  ClosedPathBoundary,
   ConcatenatedPathStratum,
   CoordinateInputMode,
   CubicBezierCurveStratum,
@@ -27,6 +29,8 @@ import type {
   CurveStyleSegment,
   Diagram,
   EditorState,
+  FilledRegion2DStratum,
+  FillRule,
   LabelStyle,
   PointStratum,
   PointStyle,
@@ -42,6 +46,7 @@ import type {
   Vec2,
   Vec3,
   WorkPlaneFrameSnapshot,
+  WorkPlaneFilledSheet3DStratum,
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
   WorkPlane,
@@ -71,6 +76,17 @@ export type CreateRegionStratumInput = {
   layer?: number
 }
 
+export type CreateFilledRegion2DStratumInput = {
+  id: string
+  name?: string
+  label?: string
+  visible?: boolean
+  style?: RegionStyle
+  boundaries: ClosedPathBoundary[]
+  fillRule?: FillRule
+  layer?: number
+}
+
 export type CreateSheetStratumInput = {
   ambientDimension: 3
   id: string
@@ -78,6 +94,17 @@ export type CreateSheetStratumInput = {
   label?: string
   style?: SheetStyle
   corners: [Vec3, Vec3, Vec3, Vec3]
+  layer?: number
+}
+
+export type CreateWorkPlaneFilledSheet3DStratumInput = {
+  id: string
+  name?: string
+  label?: string
+  style?: SheetStyle
+  planeFrame: WorkPlaneFrameSnapshot
+  boundaries: ClosedPathBoundary[]
+  fillRule?: FillRule
   layer?: number
 }
 
@@ -206,6 +233,33 @@ export function createRegionStratum({
   )
 }
 
+export function createFilledRegion2DStratum({
+  id,
+  name = 'Filled region',
+  label,
+  visible = true,
+  style = defaultRegionStyle,
+  boundaries,
+  fillRule = 'nonzero',
+  layer = 0,
+}: CreateFilledRegion2DStratumInput): FilledRegion2DStratum {
+  return withOptionalLabel(
+    {
+      id,
+      codim: 0,
+      geometricKind: 'region',
+      kind: 'filledRegion',
+      name,
+      visible,
+      style: cloneRegionStyle(style),
+      boundaries: normalizeClosedPathBoundariesForAmbientDimension(boundaries, 2),
+      fillRule,
+      layer,
+    },
+    label,
+  )
+}
+
 export function createSheetStratum({
   id,
   name = 'Sheet',
@@ -222,6 +276,32 @@ export function createSheetStratum({
     name,
     style: cloneSheetStyle(style),
     corners: corners.map(cloneVec3) as [Vec3, Vec3, Vec3, Vec3],
+    layer,
+  }
+
+  return withOptionalLabel(sheet, label)
+}
+
+export function createWorkPlaneFilledSheet3DStratum({
+  id,
+  name = 'Filled sheet',
+  label,
+  style = defaultSheetStyle,
+  planeFrame,
+  boundaries,
+  fillRule = 'nonzero',
+  layer = 0,
+}: CreateWorkPlaneFilledSheet3DStratumInput): WorkPlaneFilledSheet3DStratum {
+  const sheet: Omit<WorkPlaneFilledSheet3DStratum, 'label'> = {
+    id,
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'workPlaneFilledSheet',
+    name,
+    style: cloneSheetStyle(style),
+    planeFrame: cloneWorkPlaneFrameSnapshot(planeFrame),
+    boundaries: normalizeClosedPathBoundariesForAmbientDimension(boundaries, 3),
+    fillRule,
     layer,
   }
 

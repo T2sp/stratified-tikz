@@ -1,7 +1,21 @@
-import type { QuadSheetStratum, SheetStratum, Vec3 } from './types.ts'
+import type {
+  PolygonSheetStratum,
+  QuadSheetStratum,
+  SheetStratum,
+  Vec3,
+} from './types.ts'
+
+export type VertexSheetStratum = QuadSheetStratum | PolygonSheetStratum
 
 export function sheetVertices(sheet: SheetStratum): readonly Vec3[] {
-  return sheet.kind === 'quadSheet' ? sheet.corners : sheet.vertices
+  switch (sheet.kind) {
+    case 'quadSheet':
+      return sheet.corners
+    case 'polygonSheet':
+      return sheet.vertices
+    case 'workPlaneFilledSheet':
+      return []
+  }
 }
 
 export function updateSheetVertex(
@@ -16,6 +30,10 @@ export function updateSheetVertex(
         index === vertexIndex ? updater(corner) : corner,
       ) as QuadSheetStratum['corners'],
     }
+  }
+
+  if (sheet.kind === 'workPlaneFilledSheet') {
+    return sheet
   }
 
   return {

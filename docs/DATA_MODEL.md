@@ -372,20 +372,39 @@ are valid.
 A codim 0 stratum represents a region.
 
 ```ts
-export type RegionStratum = {
+type RegionStratumBase = {
   id: string;
   codim: 0;
   geometricKind: "region";
   name: string;
   label?: string;
   visible: boolean;
+  style: RegionStyle;
   layer: number;
 };
+
+export type AmbientRegionStratum = RegionStratumBase & {
+  kind?: "ambientRegion";
+};
+
+export type FilledRegion2DStratum = RegionStratumBase & {
+  kind: "filledRegion";
+  boundaries: ClosedPathBoundary[];
+  fillRule: FillRule;
+};
+
+export type RegionStratum =
+  | AmbientRegionStratum
+  | FilledRegion2DStratum;
 ```
 
 In 2D mode this is a 2-dimensional region.
 
 In 3D mode this is a 3-dimensional region.
+
+`filledRegion` is the committed closed-boundary fill representation for a 2D
+codim 0 region. It is valid only when `diagram.ambientDimension === 2`; all
+boundary coordinates must have `z = 0` in saved/imported data.
 
 ## Sheet stratum
 
@@ -394,7 +413,10 @@ A sheet stratum is valid only in 3D mode.
 It represents codim 1 geometry in R^3.
 
 ```ts
-export type SheetStratum = QuadSheetStratum | PolygonSheetStratum;
+export type SheetStratum =
+  | QuadSheetStratum
+  | PolygonSheetStratum
+  | WorkPlaneFilledSheet3DStratum;
 
 export type QuadSheetStratum = {
   id: string;
@@ -420,6 +442,20 @@ export type PolygonSheetStratum = {
   vertices: Vec3[];
   layer: number;
 };
+
+export type WorkPlaneFilledSheet3DStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "workPlaneFilledSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  planeFrame: WorkPlaneFrameSnapshot;
+  boundaries: ClosedPathBoundary[];
+  fillRule: FillRule;
+  layer: number;
+};
 ```
 
 Quad sheets use four cyclically ordered `corners`.
@@ -427,7 +463,43 @@ Quad sheets use four cyclically ordered `corners`.
 Polygon sheets use cyclically ordered `vertices` and represent filled closed
 polygonal regions. A polygon sheet must have at least three vertices.
 
-Curved-boundary sheets and Bézier-boundary sheets are not implemented yet.
+`workPlaneFilledSheet` is the committed closed-boundary fill representation for
+a 3D codim 1 sheet. It stores a snapshot of the work-plane frame used at commit
+time, not a live reference to editor work-plane state. The boundary geometry is
+ordinary copied `PathSegment` data in model coordinates. All segment points and
+cubic controls must lie on the stored plane, and finite local `(a, b)` plane
+coordinates must be computable for them.
+
+Curved surface primitives such as hemispheres and saddles are not implemented
+yet.
+
+## Closed path boundaries
+
+Filled regions and work-plane filled sheets use a reusable closed-boundary
+model.
+
+```ts
+export type FillRule = "nonzero" | "evenOdd";
+
+export type ClosedPathBoundary = {
+  id: string;
+  name?: string;
+  segments: PathSegment[];
+};
+```
+
+A filled stratum must have at least one boundary, and each boundary must have
+at least one segment. Boundaries support line and cubic Bézier segments through
+the existing `PathSegment` model. Adjacent segment endpoints must match within
+the model endpoint tolerance, and the final endpoint must match the initial
+endpoint within the same tolerance. Coordinates must be finite.
+
+Multiple boundaries are supported. `fillRule: "evenOdd"` is available for holes
+and nested components; `fillRule: "nonzero"` remains the other valid value.
+
+Boundary data is committed geometry. Creating a fill from selected paths should
+copy the selected path segments into `ClosedPathBoundary[]`; filled strata do
+not store live references back to source paths.
 
 ## Saved path labels
 
@@ -545,9 +617,11 @@ Concatenated paths support line segments and cubic Bézier segments in both 2D
 and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
 helpers normalize to that policy, while import validation rejects nonzero saved
 `z` values. In 3D, segment points are ordinary absolute `Vec3` coordinates and
-are not required to lie on one work plane. Closed-path validation is not
-required yet. Closed 2D regions, 3D curved-boundary sheets, live linked
-vertices, snapping, and automatic intersection analysis are later phases.
+are not required to lie on one work plane. A standalone concatenated path may
+be open or closed; closed-boundary validation applies when segments are copied
+into `ClosedPathBoundary[]` for a filled stratum. Live linked vertices,
+snapping, self-intersection resolution, and boolean operations are later
+phases.
 
 Cursor creation for concatenated paths is editor state until Finish. The draft
 stores completed `segments`, the current `anchor`, any `pendingPoints` for the
@@ -1045,7 +1119,7 @@ Replace `styleId` fields with `style`.
 ### Region stratum
 
 ```ts
-export type RegionStratum = {
+type RegionStratumBase = {
   id: string;
   codim: 0;
   geometricKind: "region";
@@ -1055,12 +1129,31 @@ export type RegionStratum = {
   style: RegionStyle;
   layer: number;
 };
+
+export type AmbientRegionStratum = RegionStratumBase & {
+  kind?: "ambientRegion";
+};
+
+export type FilledRegion2DStratum = RegionStratumBase & {
+  kind: "filledRegion";
+  boundaries: ClosedPathBoundary[];
+  fillRule: FillRule;
+};
+
+export type RegionStratum =
+  | AmbientRegionStratum
+  | FilledRegion2DStratum;
 ```
+
+`filledRegion` is valid only in 2D and stores copied closed-boundary geometry.
 
 ### Sheet stratum
 
 ```ts
-export type SheetStratum = QuadSheetStratum | PolygonSheetStratum;
+export type SheetStratum =
+  | QuadSheetStratum
+  | PolygonSheetStratum
+  | WorkPlaneFilledSheet3DStratum;
 
 export type QuadSheetStratum = {
   id: string;
@@ -1086,12 +1179,28 @@ export type PolygonSheetStratum = {
   vertices: Vec3[];
   layer: number;
 };
+
+export type WorkPlaneFilledSheet3DStratum = {
+  id: string;
+  codim: 1;
+  geometricKind: "sheet";
+  kind: "workPlaneFilledSheet";
+  name: string;
+  label?: string;
+  style: SheetStyle;
+  planeFrame: WorkPlaneFrameSnapshot;
+  boundaries: ClosedPathBoundary[];
+  fillRule: FillRule;
+  layer: number;
+};
 ```
 
 In 3D mode, sheets are codimension 1. `quadSheet` remains supported for
 four-corner examples and templates. `polygonSheet` stores a filled closed
 polygonal region as cyclically ordered `vertices` and requires at least three
-vertices. Curved-boundary sheets are deferred to a later phase.
+vertices. `workPlaneFilledSheet` stores one or more copied closed path
+boundaries on a finite orthonormal plane-frame snapshot. Curved surface
+primitives are deferred to a later phase.
 
 ### Curve stratum
 
