@@ -19,13 +19,20 @@ import type {
   TextLabel,
   OrthographicCamera3D,
   PathSegment,
+  PathTemplate,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
-import { pathSegmentStyleRuns, type PathSegmentStyleRun } from '../model/paths.ts'
+import {
+  arcSegmentToCubicBezierSegments,
+  pathSegmentStyleRuns,
+  templatePathCoordinates,
+  templatePathFrame,
+  type PathSegmentStyleRun,
+} from '../model/paths.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import {
   createInitialCamera3D,
@@ -65,7 +72,10 @@ type LayeredTikzCommand = {
   lines: string[]
 }
 
-type PointCurveStratum = Exclude<CurveStratum, ConcatenatedPathStratum>
+type PointCurveStratum = Exclude<
+  CurveStratum,
+  ConcatenatedPathStratum | Extract<CurveStratum, { kind: 'templatePath' }>
+>
 
 type PathSegmentCoordinateNames =
   | {
@@ -79,6 +89,25 @@ type PathSegmentCoordinateNames =
       control1: string
       control2: string
       end: string
+    }
+  | {
+      kind: 'arc'
+      start: string
+      end: string
+      radius: number
+      startAngleDeg: number
+      endAngleDeg: number
+      direction: 'counterclockwise' | 'clockwise'
+    }
+  | {
+      kind: 'arcCubicApproximation'
+      start: string
+      end: string
+      cubics: Array<{
+        control1: string
+        control2: string
+        end: string
+      }>
     }
 
 export type GenerateTikzOptions = {
@@ -753,6 +782,10 @@ function emitCurve(
     ]
   }
 
+  if (curve.kind === 'templatePath') {
+    return emitTemplatePath(curve, elementIndex, context)
+  }
+
   if (curve.kind === 'concatenatedPath') {
     const coordinates = defineConcatenatedPathCoordinates(
       curve,
@@ -825,6 +858,146 @@ function emitMixedStyleConcatenatedPath(
     '% Segment style overrides split this concatenated path by resolved style.',
     ...drawCommands,
   ]
+}
+
+function emitTemplatePath(
+  curve: Extract<CurveStratum, { kind: 'templatePath' }>,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  const options = [
+    ...curveStyleTikzOptions(curve.style, `Curve${curve.id}`, context),
+    ...spathSaveOptions(curve.pathLabel, context),
+  ]
+
+  if (context.mode === '3d') {
+    return emitTemplatePath3D(curve, options, context)
+  }
+
+  const center = context.coordinates.define(
+    curveCoordinateBaseName(curve, elementIndex),
+    0,
+    curve.template.center,
+  )
+  const drawCommand = formatTemplatePathCommand(
+    curve.template,
+    `(${center})`,
+  )
+
+  if (drawCommand === null) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because its template data is invalid.`,
+      '',
+    ]
+  }
+
+  if (
+    curve.template.kind === 'ellipseTemplate' &&
+    (curve.template.rotationDeg ?? 0) !== 0
+  ) {
+    return [
+      `\\begin{scope}[rotate around={${formatNumber(
+        curve.template.rotationDeg ?? 0,
+      )}:(${center})}]`,
+      '\\draw[',
+      ...formatTikzOptions(options),
+      ']',
+      `  ${drawCommand};`,
+      '\\end{scope}',
+      '',
+    ]
+  }
+
+  return [
+    '\\draw[',
+    ...formatTikzOptions(options),
+    ']',
+    `  ${drawCommand};`,
+    '',
+  ]
+}
+
+function emitTemplatePath3D(
+  curve: Extract<CurveStratum, { kind: 'templatePath' }>,
+  options: string[],
+  context: GenerateContext,
+): string[] {
+  if (curve.template.frame === undefined) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because 3D templates require a stored frame.`,
+      '',
+    ]
+  }
+
+  const frame = templatePathFrame(curve.template)
+  const localCenter = workPlaneLocalCoordinateFromPoint(frame, curve.template.center)
+  const drawCommand = formatTemplatePathCommand(
+    curve.template,
+    `(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})`,
+  )
+
+  if (drawCommand === null) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because its template data is invalid.`,
+      '',
+    ]
+  }
+
+  context.requiresTikz3dLibrary = true
+
+  const drawLines =
+    curve.template.kind === 'ellipseTemplate' &&
+    (curve.template.rotationDeg ?? 0) !== 0
+      ? [
+          `  \\begin{scope}[rotate around={${formatNumber(
+            curve.template.rotationDeg ?? 0,
+          )}:(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})}]`,
+          '    \\draw[',
+          ...formatTikzOptions(options).map((line) => `    ${line}`),
+          '    ]',
+          `      ${drawCommand};`,
+          '  \\end{scope}',
+        ]
+      : [
+          '  \\draw[',
+          ...formatTikzOptions(options).map((line) => `  ${line}`),
+          '  ]',
+          `    ${drawCommand};`,
+        ]
+
+  return [
+    `% Template path "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope.`,
+    '\\begin{scope}[',
+    `  plane origin={${formatCoordinate(frame.origin, '3d')}},`,
+    `  plane x={${formatCoordinate(addVec3(frame.origin, frame.u), '3d')}},`,
+    `  plane y={${formatCoordinate(addVec3(frame.origin, frame.v), '3d')}},`,
+    '  canvas is plane',
+    ']',
+    ...drawLines,
+    '\\end{scope}',
+    '',
+  ]
+}
+
+function formatTemplatePathCommand(
+  template: PathTemplate,
+  center: string,
+): string | null {
+  switch (template.kind) {
+    case 'circleTemplate':
+      return Number.isFinite(template.radius) && template.radius > 0
+        ? `${center} circle[radius=${formatNumber(template.radius)}]`
+        : null
+    case 'ellipseTemplate':
+      return Number.isFinite(template.radiusX) &&
+        Number.isFinite(template.radiusY) &&
+        template.radiusX > 0 &&
+        template.radiusY > 0
+        ? `${center} ellipse[x radius=${formatNumber(
+            template.radiusX,
+          )}, y radius=${formatNumber(template.radiusY)}]`
+        : null
+  }
 }
 
 function emitSavedConcatenatedPath(
@@ -929,6 +1102,8 @@ function curveCoordinateBaseName(
       return `curveBezier${stem}${elementIndex}`
     case 'concatenatedPath':
       return `curvePath${stem}${elementIndex}`
+    case 'templatePath':
+      return `curveTemplate${stem}${elementIndex}`
     case 'polyline':
       return `curvePoly${stem}${elementIndex}`
   }
@@ -1199,7 +1374,7 @@ function defineConcatenatedPathCoordinates(
       context,
     )
 
-    pointIndex += segment.kind === 'line' ? 1 : 3
+    pointIndex += pathSegmentCoordinateNameCount(names)
     previousEnd = names.end
 
     return names
@@ -1245,7 +1420,7 @@ function defineClosedBoundaryCoordinateNames(
       context,
     )
 
-    pointIndex += segment.kind === 'line' ? 1 : 3
+    pointIndex += pathSegmentCoordinateNameCount(names)
     previousEnd = names.end
 
     return names
@@ -1282,6 +1457,75 @@ function definePathSegmentCoordinateNames(
         ),
         end: context.coordinates.define(baseName, pointIndex + 2, segment.end),
       }
+    case 'arc':
+      if (context.mode === '2d') {
+        return {
+          kind: 'arc',
+          start,
+          end: context.coordinates.define(baseName, pointIndex, segment.end),
+          radius: segment.radius,
+          startAngleDeg: segment.startAngleDeg,
+          endAngleDeg: segment.endAngleDeg,
+          direction: segment.direction,
+        }
+      }
+
+      return defineArcCubicApproximationCoordinateNames(
+        segment,
+        start,
+        baseName,
+        pointIndex,
+        context,
+      )
+  }
+}
+
+function defineArcCubicApproximationCoordinateNames(
+  segment: Extract<PathSegment, { kind: 'arc' }>,
+  start: string,
+  baseName: string,
+  pointIndex: number,
+  context: GenerateContext,
+): PathSegmentCoordinateNames {
+  const cubicSegments = arcSegmentToCubicBezierSegments(segment, 3) ?? []
+  let nextPointIndex = pointIndex
+  const cubics = cubicSegments.map((cubic) => {
+    const names = {
+      control1: context.coordinates.define(
+        baseName,
+        nextPointIndex,
+        cubic.control1,
+      ),
+      control2: context.coordinates.define(
+        baseName,
+        nextPointIndex + 1,
+        cubic.control2,
+      ),
+      end: context.coordinates.define(baseName, nextPointIndex + 2, cubic.end),
+    }
+    nextPointIndex += 3
+    return names
+  })
+
+  return {
+    kind: 'arcCubicApproximation',
+    start,
+    end: cubics[cubics.length - 1]?.end ?? start,
+    cubics,
+  }
+}
+
+function pathSegmentCoordinateNameCount(
+  segment: PathSegmentCoordinateNames,
+): number {
+  switch (segment.kind) {
+    case 'line':
+    case 'arc':
+      return 1
+    case 'cubicBezier':
+      return 3
+    case 'arcCubicApproximation':
+      return segment.cubics.length * 3
   }
 }
 
@@ -1304,6 +1548,15 @@ function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
         isFiniteVec3(segment.control2) &&
         isFiniteVec3(segment.end)
       )
+    case 'arc':
+      return (
+        isFiniteVec3(segment.start) &&
+        isFiniteVec3(segment.end) &&
+        isFiniteVec3(segment.center) &&
+        Number.isFinite(segment.radius) &&
+        Number.isFinite(segment.startAngleDeg) &&
+        Number.isFinite(segment.endAngleDeg)
+      )
   }
 }
 
@@ -1314,6 +1567,26 @@ function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
       return curve.points.every(isFiniteVec3)
     case 'concatenatedPath':
       return curve.segments.every(pathSegmentHasFiniteCoordinates)
+    case 'templatePath':
+      return (
+        templatePathCoordinates(curve.template).every(isFiniteVec3) &&
+        templatePathHasFiniteParameters(curve.template)
+      )
+  }
+}
+
+function templatePathHasFiniteParameters(template: PathTemplate): boolean {
+  switch (template.kind) {
+    case 'circleTemplate':
+      return Number.isFinite(template.radius) && template.radius > 0
+    case 'ellipseTemplate':
+      return (
+        Number.isFinite(template.radiusX) &&
+        Number.isFinite(template.radiusY) &&
+        template.radiusX > 0 &&
+        template.radiusY > 0 &&
+        (template.rotationDeg === undefined || Number.isFinite(template.rotationDeg))
+      )
   }
 }
 
@@ -1398,7 +1671,32 @@ function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
       return `-- (${segment.end})`
     case 'cubicBezier':
       return `.. controls (${segment.control1}) and (${segment.control2}) .. (${segment.end})`
+    case 'arc':
+      return `arc[start angle=${formatNumber(
+        segment.startAngleDeg,
+      )}, end angle=${formatNumber(
+        arcEndAngleForDirection(segment),
+      )}, radius=${formatNumber(segment.radius)}]`
+    case 'arcCubicApproximation':
+      return segment.cubics
+        .map(
+          (cubic) =>
+            `.. controls (${cubic.control1}) and (${cubic.control2}) .. (${cubic.end})`,
+        )
+        .join(' ')
   }
+}
+
+function arcEndAngleForDirection(
+  segment: Extract<PathSegmentCoordinateNames, { kind: 'arc' }>,
+): number {
+  if (segment.direction === 'counterclockwise') {
+    return segment.endAngleDeg
+  }
+
+  return segment.endAngleDeg >= segment.startAngleDeg
+    ? segment.endAngleDeg - 360
+    : segment.endAngleDeg
 }
 
 function formatWorkPlaneFilledSheetLocalPath(
@@ -1461,6 +1759,26 @@ function formatClosedBoundaryLocalPath(
         }
 
         commands.push(`.. controls ${control1} and ${control2} .. ${end}`)
+        break
+      }
+      case 'arc': {
+        const cubics = arcSegmentToCubicBezierSegments(segment, 3)
+
+        if (cubics === null) {
+          return null
+        }
+
+        for (const cubic of cubics) {
+          const control1 = formatLocalCoordinateForPoint(cubic.control1, frame)
+          const control2 = formatLocalCoordinateForPoint(cubic.control2, frame)
+          const end = formatLocalCoordinateForPoint(cubic.end, frame)
+
+          if (control1 === null || control2 === null || end === null) {
+            return null
+          }
+
+          commands.push(`.. controls ${control1} and ${control2} .. ${end}`)
+        }
         break
       }
     }

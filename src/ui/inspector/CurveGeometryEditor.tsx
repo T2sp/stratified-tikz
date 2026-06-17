@@ -129,6 +129,16 @@ function renderCurveCoordinateEditors(
   diagram: Diagram,
   onDiagramChange: DiagramChangeHandler,
 ) {
+  if (curve.kind === 'templatePath') {
+    return (
+      <TemplatePathGeometryEditor
+        diagram={diagram}
+        path={curve}
+        onDiagramChange={onDiagramChange}
+      />
+    )
+  }
+
   if (curve.kind === 'concatenatedPath') {
     return (
       <ConcatenatedPathGeometryEditor
@@ -294,6 +304,149 @@ function renderCurveCoordinateEditors(
       onDiagramChange={onDiagramChange}
     />
   ))
+}
+
+function TemplatePathGeometryEditor({
+  diagram,
+  path,
+  onDiagramChange,
+}: {
+  diagram: Diagram
+  path: Extract<CurveStratum, { kind: 'templatePath' }>
+  onDiagramChange: DiagramChangeHandler
+}) {
+  const template = path.template
+
+  return (
+    <>
+      <CoordinateEditor
+        label="Center"
+        point={template.center}
+        ambientDimension={diagram.ambientDimension}
+        onCoordinateChange={(axis, value) =>
+          updateTemplatePathInDiagram(path.id, onDiagramChange, (current) => {
+            const center = updateVec3Coordinate(
+                current.template.center,
+                axis,
+                value,
+                diagram.ambientDimension,
+              )
+
+            return {
+              ...current,
+              template: {
+                ...current.template,
+                center,
+                ...(current.template.frame === undefined
+                  ? {}
+                  : {
+                      frame: {
+                        ...current.template.frame,
+                        origin: center,
+                      },
+                    }),
+              },
+            }
+          })
+        }
+      />
+      {template.kind === 'circleTemplate' && (
+        <EditablePositiveNumberField
+          label="Radius"
+          value={template.radius}
+          onChange={(value) =>
+            updateTemplatePathInDiagram(path.id, onDiagramChange, (current) =>
+              current.template.kind === 'circleTemplate'
+                ? {
+                    ...current,
+                    template: {
+                      ...current.template,
+                      radius: value,
+                    },
+                  }
+                : current,
+            )
+          }
+        />
+      )}
+      {template.kind === 'ellipseTemplate' && (
+        <>
+          <EditablePositiveNumberField
+            label="Radius x"
+            value={template.radiusX}
+            onChange={(value) =>
+              updateTemplatePathInDiagram(path.id, onDiagramChange, (current) =>
+                current.template.kind === 'ellipseTemplate'
+                  ? {
+                      ...current,
+                      template: {
+                        ...current.template,
+                        radiusX: value,
+                      },
+                    }
+                  : current,
+              )
+            }
+          />
+          <EditablePositiveNumberField
+            label="Radius y"
+            value={template.radiusY}
+            onChange={(value) =>
+              updateTemplatePathInDiagram(path.id, onDiagramChange, (current) =>
+                current.template.kind === 'ellipseTemplate'
+                  ? {
+                      ...current,
+                      template: {
+                        ...current.template,
+                        radiusY: value,
+                      },
+                    }
+                  : current,
+              )
+            }
+          />
+          <EditableNumberField
+            label="Rotation"
+            value={template.rotationDeg ?? 0}
+            onChange={(value) =>
+              updateTemplatePathInDiagram(path.id, onDiagramChange, (current) =>
+                current.template.kind === 'ellipseTemplate'
+                  ? {
+                      ...current,
+                      template: {
+                        ...current.template,
+                        rotationDeg: value,
+                      },
+                    }
+                  : current,
+              )
+            }
+          />
+        </>
+      )}
+    </>
+  )
+}
+
+function updateTemplatePathInDiagram(
+  pathId: string,
+  onDiagramChange: DiagramChangeHandler,
+  updater: (
+    path: Extract<CurveStratum, { kind: 'templatePath' }>,
+  ) => Extract<CurveStratum, { kind: 'templatePath' }>,
+): void {
+  onDiagramChange((currentDiagram) =>
+    updateStratumById(currentDiagram, pathId, (current) => {
+      if (
+        current.geometricKind !== 'curve' ||
+        current.kind !== 'templatePath'
+      ) {
+        return current
+      }
+
+      return updater(current)
+    }),
+  )
 }
 
 function ConcatenatedPathGeometryEditor({
@@ -779,7 +932,8 @@ function AbsoluteCurvePointEditor({
           updateStratumById(currentDiagram, curve.id, (current) => {
             if (
               current.geometricKind !== 'curve' ||
-              current.kind === 'concatenatedPath'
+              current.kind === 'concatenatedPath' ||
+              current.kind === 'templatePath'
             ) {
               return current
             }

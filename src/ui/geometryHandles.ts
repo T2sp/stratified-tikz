@@ -1,4 +1,8 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import {
+  updateCircleTemplateRadiusFromPoint,
+  updateEllipseTemplateRadiusFromPoint,
+} from '../model/paths.ts'
 import { updateSheetVertex } from '../model/sheets.ts'
 import type { Diagram, SheetStratum, Vec3 } from '../model/types.ts'
 import { updateLabelById } from './diagramUpdates.ts'
@@ -17,6 +21,9 @@ export type GeometryHandleTarget =
       segmentIndex: number
       role: ConcatenatedPathPointRole
     }
+  | { kind: 'circleTemplateRadius'; stratumId: string }
+  | { kind: 'ellipseTemplateRadiusX'; stratumId: string }
+  | { kind: 'ellipseTemplateRadiusY'; stratumId: string }
   | { kind: 'sheetVertex'; stratumId: string; vertexIndex: number }
 
 export function updateDiagramGeometryHandle(
@@ -53,6 +60,27 @@ export function updateDiagramGeometryHandle(
         target.role,
         normalizedPosition,
       )
+    case 'circleTemplateRadius':
+      return updateTemplatePathRadius(
+        diagram,
+        target.stratumId,
+        'circle',
+        normalizedPosition,
+      )
+    case 'ellipseTemplateRadiusX':
+      return updateTemplatePathRadius(
+        diagram,
+        target.stratumId,
+        'ellipseX',
+        normalizedPosition,
+      )
+    case 'ellipseTemplateRadiusY':
+      return updateTemplatePathRadius(
+        diagram,
+        target.stratumId,
+        'ellipseY',
+        normalizedPosition,
+      )
     case 'sheetVertex':
       return updateSheetVertexPosition(
         diagram,
@@ -61,6 +89,66 @@ export function updateDiagramGeometryHandle(
         normalizedPosition,
       )
   }
+}
+
+function updateTemplatePathRadius(
+  diagram: Diagram,
+  stratumId: string,
+  radiusKind: 'circle' | 'ellipseX' | 'ellipseY',
+  position: Vec3,
+): Diagram {
+  let changed = false
+  const strata = diagram.strata.map((stratum) => {
+    if (
+      stratum.id !== stratumId ||
+      stratum.geometricKind !== 'curve' ||
+      stratum.kind !== 'templatePath'
+    ) {
+      return stratum
+    }
+
+    if (stratum.template.kind === 'circleTemplate' && radiusKind === 'circle') {
+      const template = updateCircleTemplateRadiusFromPoint(
+        stratum.template,
+        diagram.ambientDimension,
+        position,
+      )
+
+      if (template === stratum.template || template.radius === stratum.template.radius) {
+        return stratum
+      }
+
+      changed = true
+      return { ...stratum, template }
+    }
+
+    if (
+      stratum.template.kind === 'ellipseTemplate' &&
+      (radiusKind === 'ellipseX' || radiusKind === 'ellipseY')
+    ) {
+      const axis = radiusKind === 'ellipseX' ? 'radiusX' : 'radiusY'
+      const template = updateEllipseTemplateRadiusFromPoint(
+        stratum.template,
+        diagram.ambientDimension,
+        axis,
+        position,
+      )
+
+      if (
+        template === stratum.template ||
+        template[axis] === stratum.template[axis]
+      ) {
+        return stratum
+      }
+
+      changed = true
+      return { ...stratum, template }
+    }
+
+    return stratum
+  })
+
+  return changed ? { ...diagram, strata } : diagram
 }
 
 function updatePointPosition(
@@ -108,6 +196,7 @@ function updateCurvePoint(
       stratum.id !== stratumId ||
       stratum.geometricKind !== 'curve' ||
       stratum.kind === 'concatenatedPath' ||
+      stratum.kind === 'templatePath' ||
       pointIndex >= stratum.points.length ||
       (stratum.kind === 'cubicBezier' && stratum.points.length !== 4)
     ) {

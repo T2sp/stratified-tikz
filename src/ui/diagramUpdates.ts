@@ -19,8 +19,11 @@ import {
 } from '../geometry/workPlane.ts'
 import {
   areSegmentsComposable,
+  createArcPathSegmentFromAngles,
   normalizePathSegmentsForAmbientDimension,
+  normalizeTemplatePathForAmbientDimension,
   pathCoordinates,
+  pathEndpointEpsilon,
 } from '../model/paths.ts'
 import {
   layerFilterIncludesLayer,
@@ -39,6 +42,7 @@ import {
 } from '../model/styles.ts'
 import type {
   AmbientDimension,
+  ArcDirection,
   CubicBezierPolarControl,
   CubicBezierControlMode,
   CubicBezierPathSegment,
@@ -49,6 +53,7 @@ import type {
   Diagram,
   HemisphereSide,
   LabelStyle,
+  PathTemplate,
   PathSegment,
   PointStratum,
   PolygonSheetStratum,
@@ -320,6 +325,11 @@ export type AddConcatenatedPathStratumResult = {
   id: string | null
 }
 
+export type AddTemplatePathStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
 export type AddPolygonSheetStratumResult = {
   diagram: Diagram
   id: string | null
@@ -360,6 +370,13 @@ export type DirectConcatenatedPathManualSegmentInput =
       control1: DirectCoordinateInput
       control2: DirectCoordinateInput
       end: DirectCoordinateInput
+    }
+  | {
+      kind: 'arc'
+      center: DirectCoordinateInput
+      radius: string
+      endAngleDeg: string
+      direction: ArcDirection
     }
 
 export type DirectConcatenatedPathManualInput = {
@@ -621,6 +638,29 @@ export function addConcatenatedPathStratumWithResult(
   }
 
   const path = createConcatenatedPathForDiagram(diagram, segments, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, path],
+    },
+    id: path.id,
+  }
+}
+
+export function addTemplatePathStratumWithResult(
+  diagram: Diagram,
+  template: PathTemplate,
+  options: AddConcatenatedPathStratumOptions = {},
+): AddTemplatePathStratumResult {
+  if (!isValidTemplatePathForDiagram(diagram, template)) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const path = createTemplatePathForDiagram(diagram, template, options)
 
   return {
     diagram: {
@@ -982,14 +1022,16 @@ export function addCirclePathFromDirectInput(
     }
   }
 
-  const segments = createCirclePathSegments(
-    centerResult.center,
-    radius,
-    centerResult.frame,
-    diagram.ambientDimension,
+  return addTemplatePath(
+    diagram,
+    {
+      kind: 'circleTemplate',
+      center: centerResult.center,
+      radius,
+      ...(diagram.ambientDimension === 3 ? { frame: centerResult.frame } : {}),
+    },
+    options,
   )
-
-  return addTemplatePathSegments(diagram, segments, options)
 }
 
 export function addEllipsePathFromDirectInput(
@@ -1027,16 +1069,18 @@ export function addEllipsePathFromDirectInput(
     }
   }
 
-  const segments = createEllipsePathSegments(
-    centerResult.center,
-    radiusX,
-    radiusY,
-    rotationDeg,
-    centerResult.frame,
-    diagram.ambientDimension,
+  return addTemplatePath(
+    diagram,
+    {
+      kind: 'ellipseTemplate',
+      center: centerResult.center,
+      radiusX,
+      radiusY,
+      rotationDeg,
+      ...(diagram.ambientDimension === 3 ? { frame: centerResult.frame } : {}),
+    },
+    options,
   )
-
-  return addTemplatePathSegments(diagram, segments, options)
 }
 
 export function addArcPathFromDirectInput(
@@ -1130,6 +1174,60 @@ export function manualDirectPathInputToSegments(
         end,
       })
       anchor = end
+      continue
+    }
+
+    if (segmentInput.kind === 'arc') {
+      const center = parseDirectCoordinateInput(
+        segmentInput.center,
+        diagram.ambientDimension,
+        parseOptions,
+      )
+      const radius = parsePositiveFiniteNumber(segmentInput.radius)
+      const endAngleDeg = parseFiniteNumber(segmentInput.endAngleDeg)
+      const frame =
+        diagram.ambientDimension === 2
+          ? xyTemplateFrame(center ?? { x: 0, y: 0, z: 0 })
+          : parseOptions.workPlane === undefined ||
+              center === null ||
+              !arePointsOnWorkPlane([anchor, center], parseOptions.workPlane)
+            ? null
+            : workPlaneFrameSnapshotFromWorkPlane(parseOptions.workPlane, center)
+
+      if (
+        center === null ||
+        radius === null ||
+        endAngleDeg === null ||
+        frame === null
+      ) {
+        return null
+      }
+
+      const startPolar = localPolarCoordinateForPoint(anchor, center, frame)
+
+      if (
+        startPolar === null ||
+        Math.abs(startPolar.radius - radius) > pathEndpointEpsilon
+      ) {
+        return null
+      }
+
+      const segment = createArcPathSegmentFromAngles({
+        center,
+        radius,
+        startAngleDeg: startPolar.angleDeg,
+        endAngleDeg,
+        direction: segmentInput.direction,
+        frame,
+        ambientDimension: diagram.ambientDimension,
+      })
+
+      if (segment === null) {
+        return null
+      }
+
+      segments.push(segment)
+      anchor = segment.end
       continue
     }
 
@@ -1235,16 +1333,17 @@ export function createArcPathSegments(
     return null
   }
 
-  return createEllipticArcPathSegments(
+  const segment = createArcPathSegmentFromAngles({
     center,
     radius,
-    radius,
-    0,
     startAngleDeg,
     endAngleDeg,
+    direction: 'counterclockwise',
     frame,
     ambientDimension,
-  )
+  })
+
+  return segment === null ? null : [segment]
 }
 
 function directCubicBezierInputToPoints(
@@ -1514,6 +1613,28 @@ function addTemplatePathSegments(
   }
 }
 
+function addTemplatePath(
+  diagram: Diagram,
+  template: PathTemplate,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions,
+): DirectPathCreationResult {
+  const result = addTemplatePathStratumWithResult(diagram, template, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
 function createEllipticArcPathSegments(
   center: Vec3,
   radiusX: number,
@@ -1685,11 +1806,35 @@ function xyTemplateFrame(origin: Vec3): WorkPlaneFrameSnapshot {
   }
 }
 
+function localPolarCoordinateForPoint(
+  point: Vec3,
+  center: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+): { radius: number; angleDeg: number } | null {
+  const delta = subtractPoints(point, center)
+  const localX = dotPoints(delta, frame.u)
+  const localY = dotPoints(delta, frame.v)
+  const radius = Math.hypot(localX, localY)
+  const angleDeg = radiansToDegrees(Math.atan2(localY, localX))
+
+  return Number.isFinite(radius) && Number.isFinite(angleDeg)
+    ? { radius, angleDeg }
+    : null
+}
+
 function addPoints(first: Vec3, second: Vec3): Vec3 {
   return {
     x: first.x + second.x,
     y: first.y + second.y,
     z: first.z + second.z,
+  }
+}
+
+function subtractPoints(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x - second.x,
+    y: first.y - second.y,
+    z: first.z - second.z,
   }
 }
 
@@ -1701,8 +1846,16 @@ function scalePoint(point: Vec3, scalar: number): Vec3 {
   }
 }
 
+function dotPoints(first: Vec3, second: Vec3): number {
+  return first.x * second.x + first.y * second.y + first.z * second.z
+}
+
 function degreesToRadians(degrees: number): number {
   return (degrees * Math.PI) / 180
+}
+
+function radiansToDegrees(radians: number): number {
+  return (radians * 180) / Math.PI
 }
 
 function isZeroNetArcSweep(startAngleDeg: number, endAngleDeg: number): boolean {
@@ -1943,6 +2096,69 @@ function createConcatenatedPathForDiagram(
   }
 
   return path
+}
+
+function createTemplatePathForDiagram(
+  diagram: Diagram,
+  template: PathTemplate,
+  options: AddConcatenatedPathStratumOptions,
+): CurveStratum {
+  const path: CurveStratum = {
+    codim: diagram.ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: safeOptionalId(diagram, options.id, 'curve'),
+    name: safeOptionalName(options.name, 'Path template'),
+    style: cloneCurveStyle(options.style ?? defaultCurveStyle),
+    template: normalizeTemplatePathForAmbientDimension(
+      template,
+      diagram.ambientDimension,
+    ),
+    styleSegments: [],
+    layer: options.layer ?? nextLayer(diagram),
+  }
+
+  const pathLabel = options.pathLabel?.trim()
+
+  if (pathLabel !== undefined && pathLabel.length > 0) {
+    path.pathLabel = pathLabel
+  }
+
+  return path
+}
+
+function isValidTemplatePathForDiagram(
+  diagram: Diagram,
+  template: PathTemplate,
+): boolean {
+  if (!isFiniteVec3(template.center)) {
+    return false
+  }
+
+  if (diagram.ambientDimension === 2 && template.center.z !== 0) {
+    return false
+  }
+
+  if (diagram.ambientDimension === 3 && template.frame === undefined) {
+    return false
+  }
+
+  if (template.frame !== undefined && !isValidWorkPlaneFrameSnapshot(template.frame)) {
+    return false
+  }
+
+  switch (template.kind) {
+    case 'circleTemplate':
+      return Number.isFinite(template.radius) && template.radius > 0
+    case 'ellipseTemplate':
+      return (
+        Number.isFinite(template.radiusX) &&
+        Number.isFinite(template.radiusY) &&
+        template.radiusX > 0 &&
+        template.radiusY > 0 &&
+        (template.rotationDeg === undefined || Number.isFinite(template.rotationDeg))
+      )
+  }
 }
 
 function createPolygonSheetForDiagram(

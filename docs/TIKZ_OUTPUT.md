@@ -1020,9 +1020,41 @@ styles split into maintainable draw blocks.
 coordinates. Same-work-plane and cross-work-plane creation modes do not change
 TikZ syntax after the path is committed: segment order is preserved, shared
 endpoint coordinate names are reused, and no work-plane-local 2D relative syntax
-or `canvas is plane` scope is emitted unless a future segment carries valid
-persistent metadata for that purpose. This keeps free 3D paths readable and
-prevents transient active work-plane UI state from affecting export.
+or `canvas is plane` scope is emitted for ordinary free 3D concatenated paths.
+This keeps free 3D paths readable and prevents transient active work-plane UI
+state from affecting export.
+
+Circular arc path segments are preserved in the model. In 2D, arc segments
+export with readable TikZ `arc[start angle=..., end angle=..., radius=...]`
+syntax. In 3D, an arc segment stores its local work-plane frame; when a
+concatenated path is exported in global 3D coordinates, the generator may fall
+back to cubic Bézier controls for that segment rather than emitting misleading
+2D arc syntax outside a local plane scope.
+
+Circle and ellipse templates are stored as template path strata and export with
+native TikZ template syntax instead of cubic expansion:
+
+```tex
+\draw[<style>] (centerCoord) circle[radius=<r>];
+\draw[<style>] (centerCoord) ellipse[x radius=<rx>, y radius=<ry>];
+```
+
+For 3D templates with a stored work-plane frame, export uses the TikZ `3d`
+library and a `canvas is plane` scope:
+
+```tex
+\begin{scope}[
+  plane origin={(Ox,Oy,Oz)},
+  plane x={(Ox+ux,Oy+uy,Oz+uz)},
+  plane y={(Ox+vx,Oy+vy,Oz+vz)},
+  canvas is plane
+]
+  \draw[<style>] (cx,cy) circle[radius=<r>];
+\end{scope}
+```
+
+Template radius handles are editor-only SVG preview affordances. They are not
+exported to TikZ.
 
 ## MVP behavior
 

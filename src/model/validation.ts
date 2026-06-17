@@ -23,12 +23,17 @@ import {
 } from './styles.ts'
 import { sheetVertices } from './sheets.ts'
 import {
+  arcSegmentExpectedEnd,
+  arcSegmentExpectedStart,
   pathSegmentEnd,
   pathSegmentStart,
   pathEndpointEpsilon,
   pathEndpoints,
+  templatePathCoordinates,
+  templatePathFrame,
 } from './paths.ts'
 import type {
+  ArcPathSegment,
   Camera,
   ClosedPathBoundary,
   CurvedSheetStratum,
@@ -45,6 +50,7 @@ import type {
   LabelStyle,
   PartialCurveStyle,
   PathSegment,
+  PathTemplate,
   PointStratum,
   PointStyle,
   RegionStratum,
@@ -417,12 +423,13 @@ function validateCurveStratum(
   if (
     stratum.kind !== 'polyline' &&
     stratum.kind !== 'cubicBezier' &&
-    stratum.kind !== 'concatenatedPath'
+    stratum.kind !== 'concatenatedPath' &&
+    stratum.kind !== 'templatePath'
   ) {
     pushError(
       errors,
       `${path}.kind`,
-      'Curve kind must be polyline, cubicBezier, or concatenatedPath.',
+      'Curve kind must be polyline, cubicBezier, concatenatedPath, or templatePath.',
     )
   }
 
@@ -439,6 +446,9 @@ function validateCurveStratum(
       return
     case 'concatenatedPath':
       validateConcatenatedPathCurve(stratum, ambientDimension, path, errors)
+      return
+    case 'templatePath':
+      validateTemplatePathCurve(stratum, ambientDimension, path, errors)
       return
   }
 }
@@ -531,6 +541,19 @@ function validateConcatenatedPathCurve(
   })
 
   validateAdjacentPathSegmentEndpoints(stratum.segments, `${path}.segments`, errors)
+}
+
+function validateTemplatePathCurve(
+  stratum: CurveStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (stratum.kind !== 'templatePath') {
+    return
+  }
+
+  validatePathTemplate(stratum.template, ambientDimension, `${path}.template`, errors)
 }
 
 function validateClosedPathBoundaries(
@@ -720,8 +743,181 @@ function validatePathSegment(
         errors,
       )
       return
+    case 'arc':
+      validateArcPathSegment(segment, ambientDimension, path, errors)
+      return
     default:
-      pushError(errors, `${path}.kind`, 'Path segment kind must be line or cubicBezier.')
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Path segment kind must be line, cubicBezier, or arc.',
+      )
+  }
+}
+
+function validateArcPathSegment(
+  segment: ArcPathSegment,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
+  validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
+  validateVec3ForAmbient(segment.center, ambientDimension, `${path}.center`, errors)
+  validateFinite(segment.radius, `${path}.radius`, errors)
+  validateFinite(segment.startAngleDeg, `${path}.startAngleDeg`, errors)
+  validateFinite(segment.endAngleDeg, `${path}.endAngleDeg`, errors)
+
+  if (Number.isFinite(segment.radius) && segment.radius <= 0) {
+    pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
+  }
+
+  if (
+    segment.direction !== 'counterclockwise' &&
+    segment.direction !== 'clockwise'
+  ) {
+    pushError(
+      errors,
+      `${path}.direction`,
+      'Arc direction must be counterclockwise or clockwise.',
+    )
+  }
+
+  if (ambientDimension === 3) {
+    if (segment.frame === undefined) {
+      pushError(errors, `${path}.frame`, '3D arc segments must store a work-plane frame.')
+    } else {
+      validateWorkPlaneFrameSnapshot(segment.frame, `${path}.frame`, errors)
+      validatePointOnFrame(segment.center, segment.frame, `${path}.center`, errors)
+      validatePointOnFrame(segment.start, segment.frame, `${path}.start`, errors)
+      validatePointOnFrame(segment.end, segment.frame, `${path}.end`, errors)
+    }
+  } else if (segment.frame !== undefined) {
+    validateWorkPlaneFrameSnapshot(segment.frame, `${path}.frame`, errors)
+  }
+
+  if (
+    isFiniteVec3(segment.start) &&
+    isFiniteVec3(segment.end) &&
+    isFiniteVec3(segment.center) &&
+    Number.isFinite(segment.radius) &&
+    Number.isFinite(segment.startAngleDeg) &&
+    Number.isFinite(segment.endAngleDeg) &&
+    segment.radius > 0
+  ) {
+    const expectedStart = arcSegmentExpectedStart(segment, ambientDimension)
+    const expectedEnd = arcSegmentExpectedEnd(segment, ambientDimension)
+
+    if (!pointsApproximatelyEqual(segment.start, expectedStart, pathEndpointEpsilon)) {
+      pushError(
+        errors,
+        `${path}.start`,
+        'Arc start must match center, radius, and start angle.',
+      )
+    }
+
+    if (!pointsApproximatelyEqual(segment.end, expectedEnd, pathEndpointEpsilon)) {
+      pushError(
+        errors,
+        `${path}.end`,
+        'Arc end must match center, radius, and end angle.',
+      )
+    }
+  }
+}
+
+function validatePathTemplate(
+  template: PathTemplate,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  switch (template.kind) {
+    case 'circleTemplate':
+      validateVec3ForAmbient(
+        template.center,
+        ambientDimension,
+        `${path}.center`,
+        errors,
+      )
+      validateFinite(template.radius, `${path}.radius`, errors)
+
+      if (Number.isFinite(template.radius) && template.radius <= 0) {
+        pushError(errors, `${path}.radius`, 'Circle radius must be positive.')
+      }
+
+      validateTemplateFrame(template, ambientDimension, path, errors)
+      return
+    case 'ellipseTemplate':
+      validateVec3ForAmbient(
+        template.center,
+        ambientDimension,
+        `${path}.center`,
+        errors,
+      )
+      validateFinite(template.radiusX, `${path}.radiusX`, errors)
+      validateFinite(template.radiusY, `${path}.radiusY`, errors)
+
+      if (Number.isFinite(template.radiusX) && template.radiusX <= 0) {
+        pushError(errors, `${path}.radiusX`, 'Ellipse radiusX must be positive.')
+      }
+
+      if (Number.isFinite(template.radiusY) && template.radiusY <= 0) {
+        pushError(errors, `${path}.radiusY`, 'Ellipse radiusY must be positive.')
+      }
+
+      if (template.rotationDeg !== undefined) {
+        validateFinite(template.rotationDeg, `${path}.rotationDeg`, errors)
+      }
+
+      validateTemplateFrame(template, ambientDimension, path, errors)
+      return
+    default:
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Template path kind must be circleTemplate or ellipseTemplate.',
+      )
+  }
+}
+
+function validateTemplateFrame(
+  template: PathTemplate,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension === 3 && template.frame === undefined) {
+    pushError(
+      errors,
+      `${path}.frame`,
+      '3D template paths must store a work-plane frame.',
+    )
+    return
+  }
+
+  if (template.frame === undefined) {
+    return
+  }
+
+  validateWorkPlaneFrameSnapshot(template.frame, `${path}.frame`, errors)
+  templatePathCoordinates(template).forEach((point, index) => {
+    validatePointOnFrame(point, templatePathFrame(template), `${path}.points[${index}]`, errors)
+  })
+}
+
+function validatePointOnFrame(
+  point: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (
+    isFiniteVec3(point) &&
+    isValidWorkPlaneFrameSnapshot(frame) &&
+    !isPointOnWorkPlaneFrame(point, frame, pathEndpointEpsilon)
+  ) {
+    pushError(errors, path, 'Point must lie on the stored work-plane frame.')
   }
 }
 

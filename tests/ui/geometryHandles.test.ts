@@ -390,6 +390,101 @@ test('camera-aware drag update after camera change stays on the active work plan
   )
 })
 
+test('geometry handle update adjusts circle template radius', () => {
+  const diagram: Diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      ...twoDimensionalExample.strata,
+      {
+        codim: 1,
+        geometricKind: 'curve',
+        kind: 'templatePath',
+        id: 'circle-template-handle',
+        name: 'Circle Template',
+        style: {
+          kind: 'curveStyle',
+          strokeColor: '#000000',
+          strokeOpacity: 1,
+          lineWidth: 1,
+          lineStyle: 'solid',
+        },
+        styleSegments: [],
+        layer: 0,
+        template: {
+          kind: 'circleTemplate',
+          center: { x: 0, y: 0, z: 0 },
+          radius: 1,
+        },
+      },
+    ],
+  }
+
+  const updated = updateDiagramGeometryHandle(
+    diagram,
+    { kind: 'circleTemplateRadius', stratumId: 'circle-template-handle' },
+    { x: 3, y: 4, z: 99 },
+  )
+  const curve = findCurve(updated, 'circle-template-handle')
+
+  assert.equal(curve.kind, 'templatePath')
+  if (curve.kind !== 'templatePath' || curve.template.kind !== 'circleTemplate') {
+    throw new Error('Expected circle template path.')
+  }
+  assert.equal(curve.template.radius, 5)
+  assert.equal(curve.template.center.z, 0)
+})
+
+test('geometry handle update adjusts ellipse template radii independently', () => {
+  const diagram: Diagram = {
+    ...twoDimensionalExample,
+    strata: [
+      ...twoDimensionalExample.strata,
+      {
+        codim: 1,
+        geometricKind: 'curve',
+        kind: 'templatePath',
+        id: 'ellipse-template-handle',
+        name: 'Ellipse Template',
+        style: {
+          kind: 'curveStyle',
+          strokeColor: '#000000',
+          strokeOpacity: 1,
+          lineWidth: 1,
+          lineStyle: 'solid',
+        },
+        styleSegments: [],
+        layer: 0,
+        template: {
+          kind: 'ellipseTemplate',
+          center: { x: 0, y: 0, z: 0 },
+          radiusX: 1,
+          radiusY: 2,
+          rotationDeg: 0,
+        },
+      },
+    ],
+  }
+
+  const updatedX = updateDiagramGeometryHandle(
+    diagram,
+    { kind: 'ellipseTemplateRadiusX', stratumId: 'ellipse-template-handle' },
+    { x: 4, y: 0, z: 0 },
+  )
+  const updatedY = updateDiagramGeometryHandle(
+    updatedX,
+    { kind: 'ellipseTemplateRadiusY', stratumId: 'ellipse-template-handle' },
+    { x: 0, y: -3, z: 0 },
+  )
+  const curve = findCurve(updatedY, 'ellipse-template-handle')
+
+  assert.equal(curve.kind, 'templatePath')
+  if (curve.kind !== 'templatePath' || curve.template.kind !== 'ellipseTemplate') {
+    throw new Error('Expected ellipse template path.')
+  }
+  assert.equal(curve.template.radiusX, 4)
+  assert.equal(curve.template.radiusY, 3)
+})
+
 test('geometry handle update rejects non-finite coordinates without changing diagram', () => {
   const result = addPointStratumWithResult(
     threeDimensionalExample,

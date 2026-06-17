@@ -13,7 +13,13 @@ import type {
   Vec2,
   Vec3,
 } from '../model/types'
-import { pathSegmentStyleRuns } from '../model/paths.ts'
+import {
+  arcSegmentToCubicBezierSegments,
+  circleTemplateRadiusHandlePoint,
+  ellipseTemplateRadiusHandlePoints,
+  pathSegmentStyleRuns,
+  sampleTemplatePathPoints,
+} from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import type { SelectedElement } from '../ui/selection'
@@ -335,7 +341,12 @@ export function SvgDiagram({
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
-      {renderConcatenatedPathDraft(pathDraft, camera, height)}
+      {renderConcatenatedPathDraft(
+        pathDraft,
+        camera,
+        height,
+        diagram.ambientDimension,
+      )}
       {renderCoordinateSourceHighlights(
         coordinateSourceHighlights,
         camera,
@@ -936,9 +947,23 @@ function curveToSvgPathData(
 ): string {
   if (curve.kind === 'concatenatedPath') {
     return pathSegmentsToSvgPath(
-      curve.segments.map((segment) =>
-        pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+      curve.segments.flatMap((segment) =>
+        pathSegmentToSvgPathSegments(
+          segment,
+          camera,
+          viewportHeight,
+          curve.codim === 1 ? 2 : 3,
+        ),
       ),
+    )
+  }
+
+  if (curve.kind === 'templatePath') {
+    return polylineToSvgPath(
+      sampleTemplatePathPoints(
+        curve.template,
+        curve.codim === 1 ? 2 : 3,
+      ).map((point) => projectToSvgPoint(camera, point, viewportHeight)),
     )
   }
 
@@ -969,8 +994,13 @@ function curveToSvgPathRuns(
   return pathSegmentStyleRuns(curve.segments, curve.style).map((run) => ({
     key: `${curve.id}-segment-run-${run.startIndex}`,
     pathData: pathSegmentsToSvgPath(
-      run.segments.map((segment) =>
-        pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+      run.segments.flatMap((segment) =>
+        pathSegmentToSvgPathSegments(
+          segment,
+          camera,
+          viewportHeight,
+          curve.codim === 1 ? 2 : 3,
+        ),
       ),
     ),
     ...curveStyleToSvgStrokeAttributes(run.style),
@@ -1479,13 +1509,19 @@ function renderConcatenatedPathDraft(
   draft: ConcatenatedPathDraft | undefined,
   camera: Diagram['camera'],
   viewportHeight: number,
+  ambientDimension: 2 | 3,
 ): ReactElement | null {
   if (draft === undefined) {
     return null
   }
 
-  const completedSegments = draft.segments.map((segment) =>
-    pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+  const completedSegments = draft.segments.flatMap((segment) =>
+    pathSegmentToSvgPathSegments(
+      segment,
+      camera,
+      viewportHeight,
+      ambientDimension,
+    ),
   )
   const completedPathData = pathSegmentsToSvgPath(completedSegments)
   const anchor = projectToSvgPoint(camera, draft.anchor, viewportHeight)
@@ -1637,26 +1673,44 @@ function renderPointHighlight(
   )
 }
 
-function pathSegmentToSvgPathSegment(
+function pathSegmentToSvgPathSegments(
   segment: PathSegment,
   camera: Diagram['camera'],
   viewportHeight: number,
-): SvgPathSegment {
+  ambientDimension: 2 | 3,
+): SvgPathSegment[] {
   switch (segment.kind) {
     case 'line':
-      return {
+      return [{
         kind: 'line',
         start: projectToSvgPoint(camera, segment.start, viewportHeight),
         end: projectToSvgPoint(camera, segment.end, viewportHeight),
-      }
+      }]
     case 'cubicBezier':
-      return {
+      return [{
         kind: 'cubicBezier',
         start: projectToSvgPoint(camera, segment.start, viewportHeight),
         control1: projectToSvgPoint(camera, segment.control1, viewportHeight),
         control2: projectToSvgPoint(camera, segment.control2, viewportHeight),
         end: projectToSvgPoint(camera, segment.end, viewportHeight),
-      }
+      }]
+    case 'arc': {
+      const cubicSegments = arcSegmentToCubicBezierSegments(
+        segment,
+        ambientDimension,
+      )
+
+      return cubicSegments === null
+        ? []
+        : cubicSegments.flatMap((cubicSegment) =>
+            pathSegmentToSvgPathSegments(
+              cubicSegment,
+              camera,
+              viewportHeight,
+              ambientDimension,
+            ),
+          )
+    }
   }
 }
 
@@ -1740,6 +1794,29 @@ function renderSelectedGeometryHandles(
         </g>
       )
     case 'curve':
+      if (stratum.kind === 'templatePath') {
+        const handles = templatePathHandleDescriptions(
+          stratum,
+          diagram.ambientDimension,
+        )
+
+        return (
+          <g
+            key="selected-template-path-handles"
+            aria-label="Selected template path drag handles"
+          >
+            {handles.map((handle) =>
+              renderHandleCircle(
+                projectToSvgPoint(camera, handle.point, viewportHeight),
+                handle.target,
+                handle.label,
+                onPointerDown,
+              ),
+            )}
+          </g>
+        )
+      }
+
       if (stratum.kind === 'concatenatedPath') {
         const handles = concatenatedPathHandleDescriptions(stratum)
 
@@ -1826,6 +1903,12 @@ type ConcatenatedPathHandleDescription = {
   label: string
 }
 
+type TemplatePathHandleDescription = {
+  target: GeometryHandleTarget
+  point: Vec3
+  label: string
+}
+
 function concatenatedPathHandleDescriptions(
   path: ConcatenatedPathStratum,
 ): ConcatenatedPathHandleDescription[] {
@@ -1843,6 +1926,44 @@ function concatenatedPathHandleDescriptions(
   )
 }
 
+function templatePathHandleDescriptions(
+  path: Extract<CurveStratum, { kind: 'templatePath' }>,
+  ambientDimension: 2 | 3,
+): TemplatePathHandleDescription[] {
+  switch (path.template.kind) {
+    case 'circleTemplate':
+      return [
+        {
+          target: { kind: 'circleTemplateRadius', stratumId: path.id },
+          point: circleTemplateRadiusHandlePoint(
+            path.template,
+            ambientDimension,
+          ),
+          label: `${path.name} radius`,
+        },
+      ]
+    case 'ellipseTemplate': {
+      const handles = ellipseTemplateRadiusHandlePoints(
+        path.template,
+        ambientDimension,
+      )
+
+      return [
+        {
+          target: { kind: 'ellipseTemplateRadiusX', stratumId: path.id },
+          point: handles.radiusX,
+          label: `${path.name} radius x`,
+        },
+        {
+          target: { kind: 'ellipseTemplateRadiusY', stratumId: path.id },
+          point: handles.radiusY,
+          label: `${path.name} radius y`,
+        },
+      ]
+    }
+  }
+}
+
 function geometryHandleKey(target: GeometryHandleTarget): string {
   switch (target.kind) {
     case 'pointPosition':
@@ -1853,6 +1974,12 @@ function geometryHandleKey(target: GeometryHandleTarget): string {
       return `curve-handle-${target.stratumId}-${target.pointIndex}`
     case 'pathSegmentPoint':
       return `path-handle-${target.stratumId}-${target.segmentIndex}-${target.role}`
+    case 'circleTemplateRadius':
+      return `template-circle-radius-handle-${target.stratumId}`
+    case 'ellipseTemplateRadiusX':
+      return `template-ellipse-radius-x-handle-${target.stratumId}`
+    case 'ellipseTemplateRadiusY':
+      return `template-ellipse-radius-y-handle-${target.stratumId}`
     case 'sheetVertex':
       return `sheet-handle-${target.stratumId}-${target.vertexIndex}`
   }

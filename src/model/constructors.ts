@@ -13,7 +13,10 @@ import {
 import { cloneCamera3D, createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { normalizeClosedPathBoundariesForAmbientDimension } from './filledBoundaries.ts'
-import { normalizePathSegmentsForAmbientDimension } from './paths.ts'
+import {
+  normalizePathSegmentsForAmbientDimension,
+  normalizeTemplatePathForAmbientDimension,
+} from './paths.ts'
 import { cloneCurvedSheetPrimitive } from './sheets.ts'
 import type {
   AmbientDimension,
@@ -40,12 +43,14 @@ import type {
   PointCurveKind,
   PolylineCurveStratum,
   PathSegment,
+  PathTemplate,
   QuadSheetStratum,
   RegionStratum,
   RegionStyle,
   SheetStratum,
   SheetStyle,
   TextLabel,
+  TemplatePathStratum,
   Vec2,
   Vec3,
   WorkPlaneFrameSnapshot,
@@ -142,6 +147,18 @@ export type CreateConcatenatedPathStratumInput = {
   pathLabel?: string
   style?: CurveStyle
   segments: PathSegment[]
+  styleSegments?: CurveStyleSegment[]
+  layer?: number
+}
+
+export type CreateTemplatePathStratumInput = {
+  ambientDimension: AmbientDimension
+  id: string
+  name?: string
+  label?: string
+  pathLabel?: string
+  style?: CurveStyle
+  template: PathTemplate
   styleSegments?: CurveStyleSegment[]
   layer?: number
 }
@@ -422,6 +439,39 @@ export function createConcatenatedPathStratum({
     style: cloneCurveStyle(style),
     segments: normalizePathSegmentsForAmbientDimension(
       segments,
+      ambientDimension,
+    ),
+    styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    layer,
+  }
+
+  if (pathLabel !== undefined) {
+    path.pathLabel = pathLabel
+  }
+
+  return withOptionalLabel(path, label)
+}
+
+export function createTemplatePathStratum({
+  ambientDimension,
+  id,
+  name = 'Path template',
+  label,
+  pathLabel,
+  style = defaultCurveStyle,
+  template,
+  styleSegments = [],
+  layer = 0,
+}: CreateTemplatePathStratumInput): TemplatePathStratum {
+  const path: Omit<TemplatePathStratum, 'label'> = {
+    id,
+    codim: ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    name,
+    style: cloneCurveStyle(style),
+    template: normalizeTemplatePathForAmbientDimension(
+      template,
       ambientDimension,
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),

@@ -399,6 +399,10 @@ function describePathSegmentPoints(
     ]
   }
 
+  if (segment.kind === 'arc') {
+    return []
+  }
+
   return [
     pointDescription(segmentIndex, 'start', 'Start', segment.start),
     pointDescription(
@@ -436,6 +440,8 @@ function pathSegmentKindLabel(kind: PathSegment['kind']): string {
       return 'Line'
     case 'cubicBezier':
       return 'Cubic Bezier'
+    case 'arc':
+      return 'Arc'
   }
 }
 
@@ -643,6 +649,18 @@ function withoutPathSegmentStyleOverride(segment: PathSegment): PathSegment {
         ...(segment.controlMode === undefined
           ? {}
           : { controlMode: segment.controlMode }),
+      }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: segment.start,
+        end: segment.end,
+        center: segment.center,
+        radius: segment.radius,
+        startAngleDeg: segment.startAngleDeg,
+        endAngleDeg: segment.endAngleDeg,
+        direction: segment.direction,
+        ...(segment.frame === undefined ? {} : { frame: segment.frame }),
       }
   }
 }

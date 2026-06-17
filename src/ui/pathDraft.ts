@@ -1,11 +1,17 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import { workPlaneToBasis } from '../geometry/workPlane.ts'
 import type {
   AmbientDimension,
   PathSegment,
   Vec3,
   WorkPlane,
+  WorkPlaneFrameSnapshot,
 } from '../model/types.ts'
-import { pathCoordinates } from '../model/paths.ts'
+import {
+  createArcPathSegmentFromAngles,
+  pathCoordinates,
+  pathEndpointEpsilon,
+} from '../model/paths.ts'
 import {
   arePointsOnWorkPlane,
   isFinitePoint,
@@ -144,6 +150,47 @@ export function appendConcatenatedPathDraftPoint(
 
   const pendingPoints = [...draft.pendingPoints, normalizedPoint]
 
+  if (draft.currentSegmentKind === 'arc') {
+    if (pendingPoints.length < 2) {
+      return {
+        ok: true,
+        draft: {
+          ...draft,
+          pendingPoints,
+        },
+        completedSegment: false,
+      }
+    }
+
+    const [center, endpointHint] = pendingPoints
+    const nextSegment = createArcDraftSegment(
+      draft.anchor,
+      center,
+      endpointHint,
+      draft.workPlane,
+      ambientDimension,
+    )
+
+    if (nextSegment === null) {
+      return {
+        ok: false,
+        draft,
+        reason: 'nonFinitePoint',
+      }
+    }
+
+    return {
+      ok: true,
+      draft: {
+        ...draft,
+        segments: [...draft.segments, nextSegment],
+        anchor: nextSegment.end,
+        pendingPoints: [],
+      },
+      completedSegment: true,
+    }
+  }
+
   if (pendingPoints.length < 3) {
     return {
       ok: true,
@@ -234,6 +281,10 @@ export function concatenatedPathDraftNextPointLabel(
     return 'endpoint'
   }
 
+  if (draft.currentSegmentKind === 'arc') {
+    return draft.pendingPoints.length === 0 ? 'center' : 'endpoint direction'
+  }
+
   switch (draft.pendingPoints.length) {
     case 0:
       return 'control 1'
@@ -273,4 +324,84 @@ function validatePathDraftPoint(
 
 function cloneWorkPlane(workPlane: WorkPlane): WorkPlane {
   return structuredClone(workPlane) as WorkPlane
+}
+
+function createArcDraftSegment(
+  start: Vec3,
+  center: Vec3,
+  endpointHint: Vec3,
+  workPlane: WorkPlane,
+  ambientDimension: AmbientDimension,
+): PathSegment | null {
+  const frame =
+    ambientDimension === 2
+      ? xyFrame(center)
+      : workPlaneFrameFromWorkPlane(workPlane, center)
+  const startPolar = localPolarCoordinateForPoint(start, center, frame)
+  const endPolar = localPolarCoordinateForPoint(endpointHint, center, frame)
+
+  if (
+    startPolar === null ||
+    endPolar === null ||
+    startPolar.radius <= pathEndpointEpsilon
+  ) {
+    return null
+  }
+
+  return createArcPathSegmentFromAngles({
+    center,
+    radius: startPolar.radius,
+    startAngleDeg: startPolar.angleDeg,
+    endAngleDeg: endPolar.angleDeg,
+    direction: 'counterclockwise',
+    ...(ambientDimension === 3 ? { frame } : {}),
+    ambientDimension,
+  })
+}
+
+function workPlaneFrameFromWorkPlane(
+  workPlane: WorkPlane,
+  center: Vec3,
+): WorkPlaneFrameSnapshot {
+  const basis = workPlaneToBasis(workPlane)
+
+  return {
+    origin: center,
+    u: basis.u,
+    v: basis.v,
+    normal: basis.normal,
+  }
+}
+
+function xyFrame(origin: Vec3): WorkPlaneFrameSnapshot {
+  return {
+    origin,
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function localPolarCoordinateForPoint(
+  point: Vec3,
+  center: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+): { radius: number; angleDeg: number } | null {
+  const delta = {
+    x: point.x - center.x,
+    y: point.y - center.y,
+    z: point.z - center.z,
+  }
+  const localX = dotVec3(delta, frame.u)
+  const localY = dotVec3(delta, frame.v)
+  const radius = Math.hypot(localX, localY)
+  const angleDeg = (Math.atan2(localY, localX) * 180) / Math.PI
+
+  return Number.isFinite(radius) && Number.isFinite(angleDeg)
+    ? { radius, angleDeg }
+    : null
+}
+
+function dotVec3(first: Vec3, second: Vec3): number {
+  return first.x * second.x + first.y * second.y + first.z * second.z
 }

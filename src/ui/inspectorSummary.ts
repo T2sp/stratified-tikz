@@ -4,6 +4,7 @@ import type {
   CurveStratum,
   Diagram,
   LabelStyle,
+  PathTemplate,
   PathSegment,
   PointStratum,
   SheetStratum,
@@ -125,8 +126,18 @@ export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[
             { label: `${segmentLabel} control point 2`, point: segment.control2 },
             { label: `${segmentLabel} end`, point: segment.end },
           ]
+        case 'arc':
+          return [
+            { label: `${segmentLabel} start`, point: segment.start },
+            { label: `${segmentLabel} center`, point: segment.center },
+            { label: `${segmentLabel} end`, point: segment.end },
+          ]
       }
     })
+  }
+
+  if (curve.kind === 'templatePath') {
+    return [{ label: 'Center', point: curve.template.center }]
   }
 
   return curve.points.map((point, index) => ({
@@ -308,6 +319,9 @@ function createCurveGeometrySection(
       ...(curve.kind === 'concatenatedPath'
         ? [{ label: 'Segments', value: String(curve.segments.length) }]
         : []),
+      ...(curve.kind === 'templatePath'
+        ? templatePathSummaryFields(curve.template)
+        : []),
       ...(curve.kind === 'cubicBezier'
         ? [
             {
@@ -322,6 +336,23 @@ function createCurveGeometrySection(
         value: formatVec3(description.point, ambientDimension),
       })),
     ],
+  }
+}
+
+function templatePathSummaryFields(template: PathTemplate): InspectorField[] {
+  switch (template.kind) {
+    case 'circleTemplate':
+      return [
+        { label: 'Template', value: 'circle' },
+        { label: 'Radius', value: formatNumber(template.radius) },
+      ]
+    case 'ellipseTemplate':
+      return [
+        { label: 'Template', value: 'ellipse' },
+        { label: 'Radius x', value: formatNumber(template.radiusX) },
+        { label: 'Radius y', value: formatNumber(template.radiusY) },
+        { label: 'Rotation', value: formatNumber(template.rotationDeg ?? 0) },
+      ]
   }
 }
 

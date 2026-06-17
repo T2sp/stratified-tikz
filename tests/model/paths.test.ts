@@ -4,6 +4,7 @@ import {
   createConcatenatedPathStratum,
   createCurveStratum,
   createEmptyDiagram,
+  createTemplatePathStratum,
 } from '../../src/model/constructors.ts'
 import {
   areSegmentsComposable,
@@ -58,6 +59,89 @@ test('valid 3D concatenated path validates', () => {
   )
 
   assert.equal(validateDiagram(diagram).valid, true)
+})
+
+test('valid circle and ellipse template paths validate', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    createTemplatePathStratum({
+      ambientDimension: 2,
+      id: 'circle-template',
+      name: 'Circle template',
+      template: {
+        kind: 'circleTemplate',
+        center: { x: 1, y: 2, z: 0 },
+        radius: 2,
+      },
+    }),
+    createTemplatePathStratum({
+      ambientDimension: 2,
+      id: 'ellipse-template',
+      name: 'Ellipse template',
+      template: {
+        kind: 'ellipseTemplate',
+        center: { x: -1, y: 0, z: 0 },
+        radiusX: 2,
+        radiusY: 0.75,
+        rotationDeg: 15,
+      },
+    }),
+  )
+
+  assert.equal(validateDiagram(diagram).valid, true)
+})
+
+test('template path validation rejects invalid radii and missing 3D frames', () => {
+  const invalidCircle = createEmptyDiagram({ ambientDimension: 2 })
+  invalidCircle.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'bad-circle',
+    name: 'Bad Circle',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1,
+      lineStyle: 'solid',
+    },
+    styleSegments: [],
+    layer: 0,
+    template: {
+      kind: 'circleTemplate',
+      center: { x: 0, y: 0, z: 0 },
+      radius: 0,
+    },
+  })
+
+  assert.equal(validateDiagram(invalidCircle).valid, false)
+
+  const missingFrame = createEmptyDiagram({ ambientDimension: 3 })
+  missingFrame.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'bad-ellipse',
+    name: 'Bad Ellipse',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1,
+      lineStyle: 'solid',
+    },
+    styleSegments: [],
+    layer: 0,
+    template: {
+      kind: 'ellipseTemplate',
+      center: { x: 0, y: 0, z: 0 },
+      radiusX: 1,
+      radiusY: 1,
+    },
+  })
+
+  assert.equal(validateDiagram(missingFrame).valid, false)
 })
 
 test('cross-work-plane 3D concatenated path validates with absolute segment coordinates', () => {

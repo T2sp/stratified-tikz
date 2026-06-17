@@ -1,4 +1,5 @@
 import type { ClosedPathBoundary, FillRule, Vec2, Vec3 } from '../model/types'
+import { arcSegmentToCubicBezierSegments } from '../model/paths.ts'
 
 export type SvgLinePathSegment = {
   kind: 'line'
@@ -159,6 +160,35 @@ function closedBoundaryToSvgPathData(
         commands.push(
           `C ${svgPoint(control1)} ${svgPoint(control2)} ${svgPoint(end)}`,
         )
+        break
+      }
+      case 'arc': {
+        const cubics = arcSegmentToCubicBezierSegments(
+          segment,
+          segment.frame === undefined ? 2 : 3,
+        )
+
+        if (cubics === null) {
+          return null
+        }
+
+        for (const cubic of cubics) {
+          const control1 = project(cubic.control1)
+          const control2 = project(cubic.control2)
+          const end = project(cubic.end)
+
+          if (
+            !isFiniteVec2(control1) ||
+            !isFiniteVec2(control2) ||
+            !isFiniteVec2(end)
+          ) {
+            return null
+          }
+
+          commands.push(
+            `C ${svgPoint(control1)} ${svgPoint(control2)} ${svgPoint(end)}`,
+          )
+        }
         break
       }
     }

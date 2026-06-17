@@ -698,6 +698,18 @@ type PathSegment =
       end: Vec3;
       controlMode?: CubicBezierControlMode;
       styleOverride?: PathSegmentStyleOverride;
+    }
+  | {
+      kind: "arc";
+      start: Vec3;
+      end: Vec3;
+      center: Vec3;
+      radius: number;
+      startAngleDeg: number;
+      endAngleDeg: number;
+      direction: "counterclockwise" | "clockwise";
+      frame?: WorkPlaneFrameSnapshot;
+      styleOverride?: PathSegmentStyleOverride;
     };
 
 type PathSegmentStyleOverride = Partial<CurveStyle>;
@@ -705,6 +717,27 @@ type PathSegmentStyleOverride = Partial<CurveStyle>;
 export type ConcatenatedPathStratum = CurveStratumBase & {
   kind: "concatenatedPath";
   segments: PathSegment[];
+};
+
+type CircleTemplatePath = {
+  kind: "circleTemplate";
+  center: Vec3;
+  radius: number;
+  frame?: WorkPlaneFrameSnapshot;
+};
+
+type EllipseTemplatePath = {
+  kind: "ellipseTemplate";
+  center: Vec3;
+  radiusX: number;
+  radiusY: number;
+  rotationDeg?: number;
+  frame?: WorkPlaneFrameSnapshot;
+};
+
+export type TemplatePathStratum = CurveStratumBase & {
+  kind: "templatePath";
+  template: CircleTemplatePath | EllipseTemplatePath;
 };
 ```
 
@@ -717,15 +750,24 @@ segment-level editing. Helpers such as `pathSegmentsFromPolyline`,
 `normalizePathForAmbientDimension` provide the pure conversion and validation
 building blocks.
 
-Concatenated paths support line segments and cubic Bézier segments in both 2D
-and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
+Concatenated paths support line segments, cubic Bézier segments, and circular
+arc segments in both 2D and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
 helpers normalize to that policy, while import validation rejects nonzero saved
-`z` values. In 3D, segment points are ordinary absolute `Vec3` coordinates and
-are not required to lie on one work plane. A standalone concatenated path may
-be open or closed; closed-boundary validation applies when segments are copied
-into `ClosedPathBoundary[]` for a filled stratum. Live linked vertices,
+`z` values. In 3D, line and cubic segment points are ordinary absolute `Vec3`
+coordinates and are not required to lie on one work plane. Arc segments store a
+work-plane frame snapshot so their circular local-plane meaning does not depend
+on the editor's current active work plane. A standalone concatenated path may be
+open or closed; closed-boundary validation applies when segments are copied into
+`ClosedPathBoundary[]` for a filled stratum. Live linked vertices,
 snapping, self-intersection resolution, and boolean operations are later
 phases.
+
+Circle and ellipse direct templates are stored as `kind: "templatePath"` curve
+strata instead of being expanded into cubic Bézier segments. A 2D template uses
+its model-plane center and radii with `z = 0`. A 3D template stores the active
+work-plane frame at creation time; circle radii are measured in the local `u/v`
+plane, and ellipse `radiusX` / `radiusY` lie along the stored local axes after
+the optional `rotationDeg`.
 
 Cursor creation for concatenated paths is editor state until Finish. The draft
 stores completed `segments`, the current `anchor`, any `pendingPoints` for the

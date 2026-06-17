@@ -14,6 +14,7 @@ import type {
   PointStratum,
   PolygonSheetStratum,
   SheetStyle,
+  TemplatePathStratum,
   TextLabel,
   Vec3,
   WorkPlane,
@@ -488,7 +489,7 @@ test('plane-local direct manual path maps coordinates through the active work pl
   assert.deepEqual(path.segments[0].end, { x: 11, y: 20, z: 32 })
 })
 
-test('direct circle template creates a closed finite cubic path', () => {
+test('direct circle template creates a persistent circle template path', () => {
   const result = addCirclePathFromDirectInput(
     emptyTwoDimensionalDiagram,
     {
@@ -503,15 +504,12 @@ test('direct circle template creates a closed finite cubic path', () => {
     throw new Error(result.error)
   }
 
-  const path = findConcatenatedPath(result.diagram, result.id)
-  assert.equal(path.segments.length, 4)
-  assert.equal(
-    path.segments.every((segment) => segment.kind === 'cubicBezier'),
-    true,
-  )
-  assert.equal(path.segments.every((segment) => segment.start.z === 0), true)
-  assertVec3ApproximatelyEqual(path.segments[0].start, path.segments[3].end)
-  assert.match(generateTikz(result.diagram), /\.\. controls/)
+  const path = findTemplatePath(result.diagram, result.id)
+  assert.equal(path.template.kind, 'circleTemplate')
+  assert.deepEqual(path.template.center, { x: 0, y: 0, z: 0 })
+  assert.equal(path.template.radius, 2)
+  assert.match(generateTikz(result.diagram), /circle\[radius=2\]/)
+  assert.doesNotMatch(generateTikz(result.diagram), /\.\. controls/)
 })
 
 test('direct circle template rejects non-positive radius', () => {
@@ -545,16 +543,21 @@ test('3D direct circle template lies in the active work plane', () => {
     throw new Error(result.error)
   }
 
-  const path = findConcatenatedPath(result.diagram, result.id)
-  assert.equal(
-    path.segments.every((segment) =>
-      [segment.start, segment.end].every((point) => point.y === 20),
-    ),
-    true,
-  )
+  const path = findTemplatePath(result.diagram, result.id)
+  assert.equal(path.template.kind, 'circleTemplate')
+  assert.deepEqual(path.template.center, { x: 12, y: 20, z: 33 })
+  assert.deepEqual(path.template.frame, {
+    origin: { x: 12, y: 20, z: 33 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 0, z: 1 },
+    normal: { x: 0, y: -1, z: 0 },
+  })
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /circle\[radius=1\]/)
 })
 
-test('direct ellipse template creates a rotated closed cubic path', () => {
+test('direct ellipse template creates a persistent rotated ellipse template path', () => {
   const result = addEllipsePathFromDirectInput(emptyTwoDimensionalDiagram, {
     center: { x: '0', y: '0', z: '9' },
     radiusX: '2',
@@ -567,10 +570,15 @@ test('direct ellipse template creates a rotated closed cubic path', () => {
     throw new Error(result.error)
   }
 
-  const path = findConcatenatedPath(result.diagram, result.id)
-  assert.equal(path.segments.length, 4)
-  assertVec3ApproximatelyEqual(path.segments[0].start, { x: 0, y: 2, z: 0 })
-  assertVec3ApproximatelyEqual(path.segments[0].start, path.segments[3].end)
+  const path = findTemplatePath(result.diagram, result.id)
+  assert.equal(path.template.kind, 'ellipseTemplate')
+  assert.deepEqual(path.template.center, { x: 0, y: 0, z: 0 })
+  assert.equal(path.template.radiusX, 2)
+  assert.equal(path.template.radiusY, 1)
+  assert.equal(path.template.rotationDeg, 90)
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /ellipse\[x radius=2, y radius=1\]/)
+  assert.doesNotMatch(tikz, /\.\. controls/)
 })
 
 test('direct ellipse template rejects invalid radii and angle input', () => {
@@ -619,19 +627,21 @@ test('3D direct ellipse template vertices lie in the active work plane', () => {
     throw new Error(result.error)
   }
 
-  const path = findConcatenatedPath(result.diagram, result.id)
-  assert.equal(
-    path.segments.every((segment) =>
-      segment.kind === 'cubicBezier' &&
-      [segment.start, segment.control1, segment.control2, segment.end].every(
-        (point) => approximatelyEqual(point.y, 20),
-      ),
-    ),
-    true,
-  )
+  const path = findTemplatePath(result.diagram, result.id)
+  assert.equal(path.template.kind, 'ellipseTemplate')
+  assert.deepEqual(path.template.center, { x: 11, y: 20, z: 31 })
+  assert.deepEqual(path.template.frame, {
+    origin: { x: 11, y: 20, z: 31 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 0, z: 1 },
+    normal: { x: 0, y: -1, z: 0 },
+  })
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /ellipse\[x radius=2, y radius=0\.5\]/)
 })
 
-test('direct arc template creates an open path split into safe cubic spans', () => {
+test('direct arc template creates an open first-class arc segment', () => {
   const result = addArcPathFromDirectInput(emptyTwoDimensionalDiagram, {
     center: { x: '0', y: '0', z: '0' },
     radius: '1',
@@ -645,10 +655,12 @@ test('direct arc template creates an open path split into safe cubic spans', () 
   }
 
   const path = findConcatenatedPath(result.diagram, result.id)
-  assert.equal(path.segments.length, 3)
+  assert.equal(path.segments.length, 1)
+  assert.equal(path.segments[0].kind, 'arc')
   assertVec3ApproximatelyEqual(path.segments[0].start, { x: 1, y: 0, z: 0 })
-  assertVec3ApproximatelyEqual(path.segments[2].end, { x: 0, y: -1, z: 0 })
-  assert.notDeepEqual(path.segments[0].start, path.segments[2].end)
+  assertVec3ApproximatelyEqual(path.segments[0].end, { x: 0, y: -1, z: 0 })
+  assert.notDeepEqual(path.segments[0].start, path.segments[0].end)
+  assert.match(generateTikz(result.diagram), /arc\[start angle=0, end angle=270, radius=1\]/)
 })
 
 test('direct arc template rejects invalid radius and equal angles', () => {
@@ -2111,6 +2123,19 @@ function findConcatenatedPath(
 
   if (stratum.kind !== 'concatenatedPath') {
     throw new Error(`Concatenated path ${id} was not created.`)
+  }
+
+  return stratum
+}
+
+function findTemplatePath(
+  diagram: Diagram,
+  id: string,
+): TemplatePathStratum {
+  const stratum = findCurve(diagram, id)
+
+  if (stratum.kind !== 'templatePath') {
+    throw new Error(`Template path ${id} was not created.`)
   }
 
   return stratum

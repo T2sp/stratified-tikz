@@ -353,7 +353,24 @@ export type CubicBezierPathSegment = PathSegmentBase & {
   controlMode?: CubicBezierControlMode
 }
 
-export type PathSegment = LinePathSegment | CubicBezierPathSegment
+export type ArcDirection = 'counterclockwise' | 'clockwise'
+
+export type ArcPathSegment = PathSegmentBase & {
+  kind: 'arc'
+  start: Vec3
+  end: Vec3
+  center: Vec3
+  radius: number
+  startAngleDeg: number
+  endAngleDeg: number
+  direction: ArcDirection
+  frame?: WorkPlaneFrameSnapshot
+}
+
+export type PathSegment =
+  | LinePathSegment
+  | CubicBezierPathSegment
+  | ArcPathSegment
 
 export type ClosedPathBoundary = {
   id: string
@@ -362,7 +379,7 @@ export type ClosedPathBoundary = {
 }
 
 export type PointCurveKind = 'polyline' | 'cubicBezier'
-export type CurveKind = PointCurveKind | 'concatenatedPath'
+export type CurveKind = PointCurveKind | 'concatenatedPath' | 'templatePath'
 
 type CurveStratumBase = {
   id: string
@@ -392,10 +409,34 @@ export type ConcatenatedPathStratum = CurveStratumBase & {
   segments: PathSegment[]
 }
 
+export type CircleTemplatePath = {
+  kind: 'circleTemplate'
+  center: Vec3
+  radius: number
+  frame?: WorkPlaneFrameSnapshot
+}
+
+export type EllipseTemplatePath = {
+  kind: 'ellipseTemplate'
+  center: Vec3
+  radiusX: number
+  radiusY: number
+  rotationDeg?: number
+  frame?: WorkPlaneFrameSnapshot
+}
+
+export type PathTemplate = CircleTemplatePath | EllipseTemplatePath
+
+export type TemplatePathStratum = CurveStratumBase & {
+  kind: 'templatePath'
+  template: PathTemplate
+}
+
 export type CurveStratum =
   | PolylineCurveStratum
   | CubicBezierCurveStratum
   | ConcatenatedPathStratum
+  | TemplatePathStratum
 
 export type PointStratum = {
   id: string

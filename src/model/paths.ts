@@ -2,17 +2,25 @@ import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { curveStylesEqual, resolveCurveStyle } from './styles.ts'
 import type {
   AmbientDimension,
+  ArcDirection,
+  ArcPathSegment,
+  CircleTemplatePath,
   ConcatenatedPathStratum,
   CurveStyle,
   CubicBezierControlMode,
   CubicBezierPathSegment,
+  EllipseTemplatePath,
   LinePathSegment,
+  PathTemplate,
   PathSegment,
   PathSegmentStyleOverride,
   Vec3,
+  WorkPlaneFrameSnapshot,
 } from './types.ts'
 
 export const pathEndpointEpsilon = 1e-9
+const fullTurnDegrees = 360
+const maxArcCubicSweepDegrees = 90
 
 export type PathEndpointPair = {
   start: Vec3
@@ -128,6 +136,8 @@ export function pathSegmentCoordinates(segment: PathSegment): Vec3[] {
       return [segment.start, segment.end]
     case 'cubicBezier':
       return [segment.start, segment.control1, segment.control2, segment.end]
+    case 'arc':
+      return [segment.start, segment.center, segment.end]
   }
 }
 
@@ -167,6 +177,276 @@ export function pathSegmentStyleRuns(
   return runs
 }
 
+export function normalizeTemplatePathForAmbientDimension(
+  template: PathTemplate,
+  ambientDimension: AmbientDimension,
+): PathTemplate {
+  switch (template.kind) {
+    case 'circleTemplate':
+      return {
+        kind: 'circleTemplate',
+        center: normalizePointForAmbientDimension(ambientDimension, template.center),
+        radius: template.radius,
+        ...(template.frame === undefined
+          ? {}
+          : {
+              frame: normalizeFrameForAmbientDimension(
+                template.frame,
+                ambientDimension,
+              ),
+            }),
+      }
+    case 'ellipseTemplate':
+      return {
+        kind: 'ellipseTemplate',
+        center: normalizePointForAmbientDimension(ambientDimension, template.center),
+        radiusX: template.radiusX,
+        radiusY: template.radiusY,
+        ...(template.rotationDeg === undefined
+          ? {}
+          : { rotationDeg: template.rotationDeg }),
+        ...(template.frame === undefined
+          ? {}
+          : {
+              frame: normalizeFrameForAmbientDimension(
+                template.frame,
+                ambientDimension,
+              ),
+            }),
+      }
+  }
+}
+
+export function templatePathCoordinates(template: PathTemplate): Vec3[] {
+  return [template.center]
+}
+
+export function templatePathFrame(template: PathTemplate): WorkPlaneFrameSnapshot {
+  return template.frame === undefined
+    ? xyTemplateFrame(template.center)
+    : cloneWorkPlaneFrameSnapshot(template.frame)
+}
+
+export function circleTemplateRadiusHandlePoint(
+  template: CircleTemplatePath,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  return pointFromFrameLocal(
+    template.center,
+    template.radius,
+    0,
+    0,
+    templatePathFrame(template),
+    ambientDimension,
+  )
+}
+
+export function ellipseTemplateRadiusHandlePoints(
+  template: EllipseTemplatePath,
+  ambientDimension: AmbientDimension,
+): { radiusX: Vec3; radiusY: Vec3 } {
+  return {
+    radiusX: pointFromFrameLocal(
+      template.center,
+      template.radiusX,
+      0,
+      template.rotationDeg ?? 0,
+      templatePathFrame(template),
+      ambientDimension,
+    ),
+    radiusY: pointFromFrameLocal(
+      template.center,
+      0,
+      template.radiusY,
+      template.rotationDeg ?? 0,
+      templatePathFrame(template),
+      ambientDimension,
+    ),
+  }
+}
+
+export function updateCircleTemplateRadiusFromPoint(
+  template: CircleTemplatePath,
+  ambientDimension: AmbientDimension,
+  point: Vec3,
+): CircleTemplatePath {
+  const local = localCoordinatesInFrame(
+    template.center,
+    point,
+    templatePathFrame(template),
+  )
+  const radius = Math.hypot(local.x, local.y)
+
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return template
+  }
+
+  return normalizeTemplatePathForAmbientDimension(
+    {
+      ...template,
+      radius,
+    },
+    ambientDimension,
+  ) as CircleTemplatePath
+}
+
+export function updateEllipseTemplateRadiusFromPoint(
+  template: EllipseTemplatePath,
+  ambientDimension: AmbientDimension,
+  axis: 'radiusX' | 'radiusY',
+  point: Vec3,
+): EllipseTemplatePath {
+  const local = localCoordinatesInFrame(
+    template.center,
+    point,
+    templatePathFrame(template),
+  )
+  const rotation = degreesToRadians(template.rotationDeg ?? 0)
+  const unrotatedX = local.x * Math.cos(rotation) + local.y * Math.sin(rotation)
+  const unrotatedY = -local.x * Math.sin(rotation) + local.y * Math.cos(rotation)
+  const radius = Math.abs(axis === 'radiusX' ? unrotatedX : unrotatedY)
+
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return template
+  }
+
+  return normalizeTemplatePathForAmbientDimension(
+    {
+      ...template,
+      [axis]: radius,
+    },
+    ambientDimension,
+  ) as EllipseTemplatePath
+}
+
+export function sampleTemplatePathPoints(
+  template: PathTemplate,
+  ambientDimension: AmbientDimension,
+  sampleCount = 64,
+): Vec3[] {
+  const count = Math.max(8, Math.floor(sampleCount))
+  const points: Vec3[] = []
+
+  for (let index = 0; index <= count; index += 1) {
+    const angleDeg = (index / count) * fullTurnDegrees
+    points.push(templatePointAtAngle(template, angleDeg, ambientDimension))
+  }
+
+  return points
+}
+
+export function arcSegmentExpectedStart(
+  segment: ArcPathSegment,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  return arcPointAtAngle(segment, segment.startAngleDeg, ambientDimension)
+}
+
+export function arcSegmentExpectedEnd(
+  segment: ArcPathSegment,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  return arcPointAtAngle(segment, segment.endAngleDeg, ambientDimension)
+}
+
+export function arcSegmentToCubicBezierSegments(
+  segment: ArcPathSegment,
+  ambientDimension: AmbientDimension,
+): CubicBezierPathSegment[] | null {
+  if (
+    !Number.isFinite(segment.radius) ||
+    segment.radius <= 0 ||
+    !Number.isFinite(segment.startAngleDeg) ||
+    !Number.isFinite(segment.endAngleDeg)
+  ) {
+    return null
+  }
+
+  const sweepDegrees = arcSweepDegrees(segment)
+
+  if (sweepDegrees === null || sweepDegrees === 0) {
+    return null
+  }
+
+  const segmentCount = Math.max(
+    1,
+    Math.ceil(Math.abs(sweepDegrees) / maxArcCubicSweepDegrees),
+  )
+  const sweepPerSegment = sweepDegrees / segmentCount
+  const cubicSegments: CubicBezierPathSegment[] = []
+  let start = normalizePointForAmbientDimension(ambientDimension, segment.start)
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const angle0 = segment.startAngleDeg + sweepPerSegment * index
+    const angle1 = angle0 + sweepPerSegment
+    const cubic = circularArcCubicSegment(
+      segment,
+      angle0,
+      angle1,
+      start,
+      ambientDimension,
+    )
+
+    if (cubic === null) {
+      return null
+    }
+
+    cubicSegments.push(cubic)
+    start = cubic.end
+  }
+
+  return cubicSegments
+}
+
+export function createArcPathSegmentFromAngles({
+  center,
+  radius,
+  startAngleDeg,
+  endAngleDeg,
+  direction,
+  frame,
+  ambientDimension,
+  styleOverride,
+}: {
+  center: Vec3
+  radius: number
+  startAngleDeg: number
+  endAngleDeg: number
+  direction: ArcDirection
+  frame?: WorkPlaneFrameSnapshot
+  ambientDimension: AmbientDimension
+  styleOverride?: PathSegmentStyleOverride
+}): ArcPathSegment | null {
+  if (
+    !Number.isFinite(radius) ||
+    radius <= 0 ||
+    !Number.isFinite(startAngleDeg) ||
+    !Number.isFinite(endAngleDeg) ||
+    (direction !== 'counterclockwise' && direction !== 'clockwise')
+  ) {
+    return null
+  }
+
+  const arc: ArcPathSegment = {
+    kind: 'arc',
+    center: normalizePointForAmbientDimension(ambientDimension, center),
+    radius,
+    startAngleDeg,
+    endAngleDeg,
+    direction,
+    start: { x: 0, y: 0, z: 0 },
+    end: { x: 0, y: 0, z: 0 },
+    ...(frame === undefined
+      ? {}
+      : { frame: normalizeFrameForAmbientDimension(frame, ambientDimension) }),
+    ...(styleOverride === undefined ? {} : { styleOverride }),
+  }
+  arc.start = arcSegmentExpectedStart(arc, ambientDimension)
+  arc.end = arcSegmentExpectedEnd(arc, ambientDimension)
+
+  return arc
+}
+
 function normalizePathSegment(
   segment: PathSegment,
   ambientDimension: AmbientDimension,
@@ -199,11 +479,254 @@ function normalizePathSegment(
           : { controlMode: cloneCubicBezierControlMode(segment.controlMode) }),
         ...(styleOverride === undefined ? {} : { styleOverride }),
       }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: normalizePointForAmbientDimension(ambientDimension, segment.start),
+        end: normalizePointForAmbientDimension(ambientDimension, segment.end),
+        center: normalizePointForAmbientDimension(
+          ambientDimension,
+          segment.center,
+        ),
+        radius: segment.radius,
+        startAngleDeg: segment.startAngleDeg,
+        endAngleDeg: segment.endAngleDeg,
+        direction: segment.direction,
+        ...(segment.frame === undefined
+          ? {}
+          : {
+              frame: normalizeFrameForAmbientDimension(
+                segment.frame,
+                ambientDimension,
+              ),
+            }),
+        ...(styleOverride === undefined ? {} : { styleOverride }),
+      }
   }
 }
 
 function cloneVec3(point: Vec3): Vec3 {
   return { ...point }
+}
+
+function cloneWorkPlaneFrameSnapshot(
+  frame: WorkPlaneFrameSnapshot,
+): WorkPlaneFrameSnapshot {
+  return {
+    origin: cloneVec3(frame.origin),
+    u: cloneVec3(frame.u),
+    v: cloneVec3(frame.v),
+    normal: cloneVec3(frame.normal),
+  }
+}
+
+function normalizeFrameForAmbientDimension(
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): WorkPlaneFrameSnapshot {
+  return ambientDimension === 2
+    ? xyTemplateFrame(normalizePointForAmbientDimension(ambientDimension, frame.origin))
+    : cloneWorkPlaneFrameSnapshot(frame)
+}
+
+function xyTemplateFrame(origin: Vec3): WorkPlaneFrameSnapshot {
+  return {
+    origin: normalizePointForAmbientDimension(2, origin),
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function templatePointAtAngle(
+  template: PathTemplate,
+  angleDeg: number,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  switch (template.kind) {
+    case 'circleTemplate':
+      return pointFromFrameLocal(
+        template.center,
+        template.radius * Math.cos(degreesToRadians(angleDeg)),
+        template.radius * Math.sin(degreesToRadians(angleDeg)),
+        0,
+        templatePathFrame(template),
+        ambientDimension,
+      )
+    case 'ellipseTemplate':
+      return pointFromFrameLocal(
+        template.center,
+        template.radiusX * Math.cos(degreesToRadians(angleDeg)),
+        template.radiusY * Math.sin(degreesToRadians(angleDeg)),
+        template.rotationDeg ?? 0,
+        templatePathFrame(template),
+        ambientDimension,
+      )
+  }
+}
+
+function arcPointAtAngle(
+  segment: ArcPathSegment,
+  angleDeg: number,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  return pointFromFrameLocal(
+    segment.center,
+    segment.radius * Math.cos(degreesToRadians(angleDeg)),
+    segment.radius * Math.sin(degreesToRadians(angleDeg)),
+    0,
+    segment.frame ?? xyTemplateFrame(segment.center),
+    ambientDimension,
+  )
+}
+
+function circularArcCubicSegment(
+  segment: ArcPathSegment,
+  startAngleDeg: number,
+  endAngleDeg: number,
+  start: Vec3,
+  ambientDimension: AmbientDimension,
+): CubicBezierPathSegment | null {
+  const startAngle = degreesToRadians(startAngleDeg)
+  const endAngle = degreesToRadians(endAngleDeg)
+  const sweep = endAngle - startAngle
+  const controlScale = (4 / 3) * Math.tan(sweep / 4)
+  const end = arcPointAtAngle(segment, endAngleDeg, ambientDimension)
+  const frame = segment.frame ?? xyTemplateFrame(segment.center)
+  const control1 = pointFromFrameLocal(
+    segment.center,
+    segment.radius * (Math.cos(startAngle) - controlScale * Math.sin(startAngle)),
+    segment.radius * (Math.sin(startAngle) + controlScale * Math.cos(startAngle)),
+    0,
+    frame,
+    ambientDimension,
+  )
+  const control2 = pointFromFrameLocal(
+    segment.center,
+    segment.radius * (Math.cos(endAngle) + controlScale * Math.sin(endAngle)),
+    segment.radius * (Math.sin(endAngle) - controlScale * Math.cos(endAngle)),
+    0,
+    frame,
+    ambientDimension,
+  )
+
+  if (
+    !isFiniteVec3(start) ||
+    !isFiniteVec3(control1) ||
+    !isFiniteVec3(control2) ||
+    !isFiniteVec3(end)
+  ) {
+    return null
+  }
+
+  return {
+    kind: 'cubicBezier',
+    start,
+    control1,
+    control2,
+    end,
+    ...(segment.styleOverride === undefined
+      ? {}
+      : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+  }
+}
+
+function arcSweepDegrees(segment: ArcPathSegment): number | null {
+  if (
+    segment.direction !== 'counterclockwise' &&
+    segment.direction !== 'clockwise'
+  ) {
+    return null
+  }
+
+  const rawSweep =
+    segment.direction === 'counterclockwise'
+      ? segment.endAngleDeg - segment.startAngleDeg
+      : segment.startAngleDeg - segment.endAngleDeg
+  const normalizedSweep = positiveModulo(rawSweep, fullTurnDegrees)
+
+  if (normalizedSweep === 0) {
+    return null
+  }
+
+  return segment.direction === 'counterclockwise'
+    ? normalizedSweep
+    : -normalizedSweep
+}
+
+function pointFromFrameLocal(
+  center: Vec3,
+  localX: number,
+  localY: number,
+  rotationDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  const rotation = degreesToRadians(rotationDeg)
+  const rotatedX = localX * Math.cos(rotation) - localY * Math.sin(rotation)
+  const rotatedY = localX * Math.sin(rotation) + localY * Math.cos(rotation)
+
+  return normalizePointForAmbientDimension(
+    ambientDimension,
+    addVec3(center, addVec3(scaleVec3(frame.u, rotatedX), scaleVec3(frame.v, rotatedY))),
+  )
+}
+
+function localCoordinatesInFrame(
+  center: Vec3,
+  point: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+): { x: number; y: number } {
+  const delta = subtractVec3(point, center)
+
+  return {
+    x: dotVec3(delta, frame.u),
+    y: dotVec3(delta, frame.v),
+  }
+}
+
+function addVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
+}
+
+function subtractVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x - second.x,
+    y: first.y - second.y,
+    z: first.z - second.z,
+  }
+}
+
+function scaleVec3(point: Vec3, scalar: number): Vec3 {
+  return {
+    x: point.x * scalar,
+    y: point.y * scalar,
+    z: point.z * scalar,
+  }
+}
+
+function dotVec3(first: Vec3, second: Vec3): number {
+  return first.x * second.x + first.y * second.y + first.z * second.z
+}
+
+function isFiniteVec3(point: Vec3): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    Number.isFinite(point.z)
+  )
+}
+
+function positiveModulo(value: number, modulus: number): number {
+  return ((value % modulus) + modulus) % modulus
+}
+
+function degreesToRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180
 }
 
 function clonePathSegmentStyleOverride(

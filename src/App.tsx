@@ -26,6 +26,7 @@ import {
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
   AmbientDimension,
+  ArcDirection,
   AxisAlignedWorkPlaneName,
   Camera,
   CoordinateInputMode,
@@ -35,6 +36,7 @@ import type {
   HexColor,
   LineStyle,
   OrthographicCamera3D,
+  Stratum,
   Vec2,
   Vec3,
   WorkPlane,
@@ -198,12 +200,16 @@ type DirectCreationTool =
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type SheetCreationKind = 'polygon' | CurvedSheetCreationKind
 type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
-type DirectPathManualCoordinateRole = 'control1' | 'control2' | 'end'
+type DirectPathManualCoordinateRole = 'center' | 'control1' | 'control2' | 'end'
 type DirectPathManualSegmentDraft = {
   kind: ConcatenatedPathSegmentKind
+  center: DirectCoordinateInput
   control1: DirectCoordinateInput
   control2: DirectCoordinateInput
   end: DirectCoordinateInput
+  radius: string
+  endAngleDeg: string
+  direction: ArcDirection
 }
 type DirectPathCoordinateSourceTarget =
   | { kind: 'manualStart' }
@@ -316,6 +322,7 @@ const concatenatedPathSegmentKinds: Array<{
 }> = [
   { id: 'line', label: 'Line' },
   { id: 'cubicBezier', label: 'Cubic Bezier' },
+  { id: 'arc', label: 'Arc' },
 ]
 const concatenatedPathWorkPlaneModes: Array<{
   id: ConcatenatedPathWorkPlaneMode
@@ -1750,6 +1757,11 @@ function App() {
       }
 
       let modelPoint: Vec3
+      const handleWorkPlane =
+        selected.element.geometricKind === 'label'
+          ? activeWorkPlane
+          : geometryHandleWorkPlaneForTarget(target, selected.element) ??
+            activeWorkPlane
 
       try {
         modelPoint = normalizePointForAmbientDimension(
@@ -1758,7 +1770,7 @@ function App() {
             previewCamera,
             svgPoint,
             viewportHeight,
-            activeWorkPlane,
+            handleWorkPlane,
           ),
         )
       } catch {
@@ -1875,6 +1887,41 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function updateDirectPathSegmentText(
+    segmentIndex: number,
+    field: 'radius' | 'endAngleDeg',
+    value: string,
+  ): void {
+    setDirectPathSegments((current) =>
+      current.map((segment, index) =>
+        index === segmentIndex
+          ? {
+              ...segment,
+              [field]: value,
+            }
+          : segment,
+      ),
+    )
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectPathSegmentDirection(
+    segmentIndex: number,
+    direction: ArcDirection,
+  ): void {
+    setDirectPathSegments((current) =>
+      current.map((segment, index) =>
+        index === segmentIndex
+          ? {
+              ...segment,
+              direction,
+            }
+          : segment,
+      ),
+    )
+    setDirectCreationStatus('')
+  }
+
   function applyExistingSourceToDirectPathCoordinate(): void {
     const sourceOption = existingCoordinateSourceOptions.find(
       (option) => option.key === directSourceKey,
@@ -1943,7 +1990,9 @@ function App() {
       ...current,
       kind === 'line'
         ? defaultDirectPathLineSegment()
-        : defaultDirectPathCubicSegment(),
+        : kind === 'cubicBezier'
+          ? defaultDirectPathCubicSegment()
+          : defaultDirectPathArcSegment(),
     ])
     setDirectCreationStatus('')
   }
@@ -2841,18 +2890,80 @@ function App() {
                   )}
                 </>
               )}
-              {renderDirectPathCoordinateGroup(
-                'End',
-                segment.end,
-                (axis, value) =>
-                  updateDirectPathSegmentCoordinate(
-                    segmentIndex,
-                    'end',
-                    axis,
-                    value,
-                  ),
-                axes,
+              {segment.kind === 'arc' && (
+                <>
+                  {renderDirectPathCoordinateGroup(
+                    'Center',
+                    segment.center,
+                    (axis, value) =>
+                      updateDirectPathSegmentCoordinate(
+                        segmentIndex,
+                        'center',
+                        axis,
+                        value,
+                      ),
+                    axes,
+                  )}
+                  <label className="direct-create-field">
+                    <span>Radius</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={segment.radius}
+                      onChange={(event) =>
+                        updateDirectPathSegmentText(
+                          segmentIndex,
+                          'radius',
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="direct-create-field">
+                    <span>End angle</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={segment.endAngleDeg}
+                      onChange={(event) =>
+                        updateDirectPathSegmentText(
+                          segmentIndex,
+                          'endAngleDeg',
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="direct-create-field">
+                    <span>Direction</span>
+                    <select
+                      value={segment.direction}
+                      onChange={(event) =>
+                        updateDirectPathSegmentDirection(
+                          segmentIndex,
+                          event.currentTarget.value as ArcDirection,
+                        )
+                      }
+                    >
+                      <option value="counterclockwise">Counterclockwise</option>
+                      <option value="clockwise">Clockwise</option>
+                    </select>
+                  </label>
+                </>
               )}
+              {segment.kind !== 'arc' &&
+                renderDirectPathCoordinateGroup(
+                  'End',
+                  segment.end,
+                  (axis, value) =>
+                    updateDirectPathSegmentCoordinate(
+                      segmentIndex,
+                      'end',
+                      axis,
+                      value,
+                    ),
+                  axes,
+                )}
             </fieldset>
           ))}
         </div>
@@ -2870,6 +2981,13 @@ function App() {
             onClick={() => addDirectPathSegment('cubicBezier')}
           >
             Add cubic Bezier segment
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => addDirectPathSegment('arc')}
+          >
+            Add arc segment
           </button>
           <button
             type="button"
@@ -3039,6 +3157,14 @@ function App() {
     return [
       { key: 'manual-start', label: 'Start' },
       ...directPathSegments.flatMap((segment, segmentIndex) => [
+        ...(segment.kind === 'arc'
+          ? [
+              {
+                key: directPathSegmentSourceTargetKey(segmentIndex, 'center'),
+                label: `Segment ${segmentIndex + 1} center`,
+              },
+            ]
+          : []),
         ...(segment.kind === 'cubicBezier'
           ? [
               {
@@ -3057,10 +3183,14 @@ function App() {
               },
             ]
           : []),
-        {
-          key: directPathSegmentSourceTargetKey(segmentIndex, 'end'),
-          label: `Segment ${segmentIndex + 1} end`,
-        },
+        ...(segment.kind === 'arc'
+          ? []
+          : [
+              {
+                key: directPathSegmentSourceTargetKey(segmentIndex, 'end'),
+                label: `Segment ${segmentIndex + 1} end`,
+              },
+            ]),
       ]),
     ]
   }
@@ -4775,6 +4905,9 @@ function geometryHandleTargetsSelection(
     case 'pointPosition':
     case 'curvePoint':
     case 'pathSegmentPoint':
+    case 'circleTemplateRadius':
+    case 'ellipseTemplateRadiusX':
+    case 'ellipseTemplateRadiusY':
     case 'sheetVertex':
       return (
         selectedElement.kind === 'stratum' &&
@@ -4785,6 +4918,38 @@ function geometryHandleTargetsSelection(
         selectedElement.kind === 'label' &&
         selectedElement.id === target.labelId
       )
+  }
+}
+
+function geometryHandleWorkPlaneForTarget(
+  target: GeometryHandleTarget,
+  stratum: Stratum,
+): WorkPlane | null {
+  if (
+    target.kind !== 'circleTemplateRadius' &&
+    target.kind !== 'ellipseTemplateRadiusX' &&
+    target.kind !== 'ellipseTemplateRadiusY'
+  ) {
+    return null
+  }
+
+  if (
+    stratum.geometricKind !== 'curve' ||
+    stratum.kind !== 'templatePath' ||
+    stratum.template.frame === undefined
+  ) {
+    return null
+  }
+
+  return {
+    kind: 'custom',
+    id: `${stratum.id}-template-plane`,
+    name: `${stratum.name} template plane`,
+    origin: stratum.template.frame.origin,
+    u: stratum.template.frame.u,
+    v: stratum.template.frame.v,
+    normal: stratum.template.frame.normal,
+    source: { kind: 'originNormal' },
   }
 }
 
@@ -5119,18 +5284,39 @@ function defaultDirectCubicBezierRows(
 function defaultDirectPathLineSegment(): DirectPathManualSegmentDraft {
   return {
     kind: 'line',
+    center: directCoordinateInput('0', '0', '0'),
     control1: directCoordinateInput('0.3', '0.6', '0'),
     control2: directCoordinateInput('0.7', '0.6', '0'),
     end: directCoordinateInput('1', '0', '0'),
+    radius: '1',
+    endAngleDeg: '90',
+    direction: 'counterclockwise',
   }
 }
 
 function defaultDirectPathCubicSegment(): DirectPathManualSegmentDraft {
   return {
     kind: 'cubicBezier',
+    center: directCoordinateInput('0', '0', '0'),
     control1: directCoordinateInput('0.3', '0.6', '0'),
     control2: directCoordinateInput('0.7', '0.6', '0'),
     end: directCoordinateInput('1', '0', '0'),
+    radius: '1',
+    endAngleDeg: '90',
+    direction: 'counterclockwise',
+  }
+}
+
+function defaultDirectPathArcSegment(): DirectPathManualSegmentDraft {
+  return {
+    kind: 'arc',
+    center: directCoordinateInput('0', '0', '0'),
+    control1: directCoordinateInput('0.3', '0.6', '0'),
+    control2: directCoordinateInput('0.7', '0.6', '0'),
+    end: directCoordinateInput('1', '0', '0'),
+    radius: '1',
+    endAngleDeg: '90',
+    direction: 'counterclockwise',
   }
 }
 
@@ -5145,17 +5331,28 @@ function directCoordinateInput(
 function directPathSegmentInputFromDraft(
   segment: DirectPathManualSegmentDraft,
 ): DirectConcatenatedPathManualSegmentInput {
-  return segment.kind === 'line'
-    ? {
+  switch (segment.kind) {
+    case 'line':
+      return {
         kind: 'line',
         end: segment.end,
       }
-    : {
+    case 'cubicBezier':
+      return {
         kind: 'cubicBezier',
         control1: segment.control1,
         control2: segment.control2,
         end: segment.end,
       }
+    case 'arc':
+      return {
+        kind: 'arc',
+        center: segment.center,
+        radius: segment.radius,
+        endAngleDeg: segment.endAngleDeg,
+        direction: segment.direction,
+      }
+  }
 }
 
 function directCoordinateInputWithSource(
@@ -5180,6 +5377,14 @@ function directPathSegmentSourceRequests(
   segmentIndex: number,
 ): Array<{ source: ExistingCoordinateSource; label: string }> {
   return [
+    ...(segment.kind === 'arc'
+      ? [
+          directPathCoordinateSourceRequest(
+            segment.center,
+            `segment ${segmentIndex + 1} center`,
+          ),
+        ]
+      : []),
     ...(segment.kind === 'cubicBezier'
       ? [
           directPathCoordinateSourceRequest(
@@ -5192,10 +5397,14 @@ function directPathSegmentSourceRequests(
           ),
         ]
       : []),
-    directPathCoordinateSourceRequest(
-      segment.end,
-      `segment ${segmentIndex + 1} end`,
-    ),
+    ...(segment.kind === 'arc'
+      ? []
+      : [
+          directPathCoordinateSourceRequest(
+            segment.end,
+            `segment ${segmentIndex + 1} end`,
+          ),
+        ]),
   ].filter(
     (
       request,
@@ -5229,7 +5438,7 @@ function directPathCoordinateSourceTargetFromKey(
     return { kind: 'templateCenter' }
   }
 
-  const match = /^manual-segment-(\d+)-(control1|control2|end)$/u.exec(key)
+  const match = /^manual-segment-(\d+)-(center|control1|control2|end)$/u.exec(key)
 
   if (match === null) {
     return null
@@ -5265,6 +5474,8 @@ function directPathCoordinateRoleLabel(
   role: DirectPathManualCoordinateRole,
 ): string {
   switch (role) {
+    case 'center':
+      return 'center'
     case 'control1':
       return 'control point 1'
     case 'control2':

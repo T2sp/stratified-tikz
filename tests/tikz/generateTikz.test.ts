@@ -554,6 +554,111 @@ test('concatenated path exports as a continuous TikZ path', () => {
   assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 1)
 })
 
+test('template paths export using native 2D TikZ circle and ellipse syntax', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'templatePath',
+      id: 'circle-template',
+      name: 'Circle Template',
+      style: curveStyle(),
+      styleSegments: [],
+      layer: 0,
+      template: {
+        kind: 'circleTemplate',
+        center: { x: 0, y: 0, z: 0 },
+        radius: 1.5,
+      },
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'templatePath',
+      id: 'ellipse-template',
+      name: 'Ellipse Template',
+      style: curveStyle(),
+      styleSegments: [],
+      layer: 0,
+      template: {
+        kind: 'ellipseTemplate',
+        center: { x: 2, y: 0, z: 0 },
+        radiusX: 2,
+        radiusY: 0.5,
+      },
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /circle\[radius=1\.5\]/)
+  assert.match(tikz, /ellipse\[x radius=2, y radius=0\.5\]/)
+  assert.doesNotMatch(tikz, /\.\. controls/)
+})
+
+test('3D template paths export in a TikZ canvas-is-plane scope', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'circle-template-3d',
+    name: 'Circle Template 3D',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    template: {
+      kind: 'circleTemplate',
+      center: { x: 1, y: 2, z: 3 },
+      radius: 2,
+      frame: {
+        origin: { x: 1, y: 2, z: 3 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /\(0,0\) circle\[radius=2\]/)
+})
+
+test('2D arc path segment exports using readable TikZ arc syntax', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'arc-segment-path',
+    name: 'Arc Segment Path',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+  })
+
+  assert.match(
+    generateTikz(diagram),
+    /arc\[start angle=0, end angle=90, radius=1\]/,
+  )
+})
+
 test('3D cross-work-plane concatenated path exports absolute coordinates in segment order', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.strata.push({
