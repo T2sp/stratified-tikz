@@ -77,6 +77,8 @@ only a naming/management layer:
 export type DiagramLayer = {
   value: number;
   name: string;
+  visible?: boolean;
+  locked?: boolean;
 };
 ```
 
@@ -85,6 +87,15 @@ the editor derives default metadata from the finite numeric layer values used by
 strata and free text labels, using names such as `Layer 0`, `Layer 1`, and
 `Layer -1`. Metadata may also name currently empty layers; those entries have a
 zero element count until strata or labels use their numeric value.
+
+Layer `visible` and `locked` are persisted layer metadata. Both fields are
+optional for backward compatibility: missing `visible` means the layer is shown
+in the SVG preview, and missing `locked` means the layer is editable. A hidden
+layer is not rendered in the SVG preview and its elements cannot be selected
+from the preview. A locked layer remains visible but its elements cannot be
+selected or edited through normal canvas/inspector operations. Layer Manager
+operations are explicit layer-level edits and may still rename, unlock,
+translate, duplicate, swap, or delete locked layers.
 
 Layer metadata values must be finite numbers. Duplicate metadata values and
 blank names are normalized during load where possible: the first duplicate name
@@ -133,12 +144,12 @@ export type SavedDiagramFile = {
 ```
 
 Only `diagram` data is persisted. Mathematical geometry is stored as strata and
-free labels. Diagram-level layer names may be stored under `diagram.layers`.
-Diagram-level view metadata may also be stored under `diagram.view`, but it is
-not geometry. UI/editor state such as the selected element, active creation
-tool, coordinate input mode, active work plane, draft geometry, current layer
-filter, expanded/collapsed panels, copy status, undo/redo history, and
-temporary preview state is not saved.
+free labels. Diagram-level layer names, visibility, and locking may be stored
+under `diagram.layers`. Diagram-level view metadata may also be stored under
+`diagram.view`, but it is not geometry. UI/editor state such as the selected
+element, active creation tool, coordinate input mode, active work plane, draft
+geometry, current layer filter, expanded/collapsed panels, copy status,
+undo/redo history, and transient preview state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
@@ -278,14 +289,20 @@ export type EditorState = {
 ```
 
 The layer filter is derived from numeric `layer` values on strata and free text
-labels. It controls preview visibility and click selectability only. It is not
+labels. It combines with persisted layer visibility and locking to control SVG
+preview selectability: hidden layers are not rendered, filtered-out visible
+layers are dimmed and not selectable, and locked visible layers are rendered
+but not selectable. The current filter itself is not
 stored in `Diagram` or in layer metadata, is reset to all layers when examples
 or JSON files are loaded, and does not affect TikZ generation.
 
 The current "new element layer" control is also UI state. Cursor and direct
 creation use it when committing new strata or free text labels, but the control
 itself is not saved in `Diagram` or in layer metadata. Once an element is
-created, its numeric `layer` is ordinary diagram data.
+created, its numeric `layer` is ordinary diagram data. If creation targets a
+hidden layer, the editor makes that layer visible as part of the same diagram
+edit so the newly selected element remains inspectable. Creation into a locked
+layer is rejected until the layer is explicitly unlocked.
 
 Undo/redo history is editor state rather than diagram data. It is represented as
 bounded committed diagram snapshots with `past`, `present`, and `future`, with a

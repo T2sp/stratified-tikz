@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { twoDimensionalExample } from '../../src/examples/index.ts'
+import { setLayerLock, setLayerVisibility } from '../../src/model/layers.ts'
 import type { Diagram } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import { addPointStratumWithResult } from '../../src/ui/diagramUpdates.ts'
 import {
   clearSelectionForLayerFilter,
   deriveAvailableLayers,
+  isLayerSelectableByLayerFilter,
+  isStratumSelectableInEditor,
+  isTextLabelSelectableInEditor,
   isStratumSelectableByLayerFilter,
   isTextLabelSelectableByLayerFilter,
   normalizeLayerFilterForDiagram,
@@ -63,6 +67,62 @@ test('clearSelectionForLayerFilter clears incompatible selections', () => {
     ),
     null,
   )
+})
+
+test('hidden layers are not selectable and clear selected elements', () => {
+  const diagram = setLayerVisibility(createLayerFilterDiagram(), 2, false)
+  const layerTwoFilter: LayerFilter = { kind: 'layer', layer: 2 }
+
+  assert.equal(isLayerSelectableByLayerFilter(diagram, layerTwoFilter, 2), false)
+  assert.equal(
+    isStratumSelectableInEditor(diagram, diagram.strata[0], layerTwoFilter),
+    false,
+  )
+  assert.equal(
+    isTextLabelSelectableInEditor(diagram, diagram.labels[1], layerTwoFilter),
+    false,
+  )
+  assert.equal(
+    clearSelectionForLayerFilter(
+      diagram,
+      { kind: 'label', id: 'layer-two-label' },
+      layerTwoFilter,
+    ),
+    null,
+  )
+})
+
+test('locked layers remain filter-visible but are not selectable', () => {
+  const diagram = setLayerLock(createLayerFilterDiagram(), 2, true)
+  const layerTwoFilter: LayerFilter = { kind: 'layer', layer: 2 }
+
+  assert.equal(layerTwoFilter.layer, 2)
+  assert.equal(isStratumSelectableByLayerFilter(diagram.strata[0], layerTwoFilter), true)
+  assert.equal(isLayerSelectableByLayerFilter(diagram, layerTwoFilter, 2), false)
+  assert.equal(
+    clearSelectionForLayerFilter(
+      diagram,
+      { kind: 'stratum', id: 'layer-two-stratum' },
+      layerTwoFilter,
+    ),
+    null,
+  )
+})
+
+test('layer filter and visibility combine before lock selectability', () => {
+  const diagram = setLayerLock(
+    setLayerVisibility(createLayerFilterDiagram(), -1, false),
+    2,
+    true,
+  )
+
+  assert.equal(isLayerSelectableByLayerFilter(diagram, { kind: 'all' }, -1), false)
+  assert.equal(isLayerSelectableByLayerFilter(diagram, { kind: 'all' }, 2), false)
+  assert.equal(
+    isLayerSelectableByLayerFilter(diagram, { kind: 'layer', layer: -1 }, 2),
+    false,
+  )
+  assert.equal(isLayerSelectableByLayerFilter(diagram, { kind: 'all' }, 0), true)
 })
 
 test('normalizeLayerFilterForDiagram resets missing specific layers to all layers', () => {

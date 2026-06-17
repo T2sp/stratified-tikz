@@ -878,7 +878,7 @@
   display: grid;
   grid-template-columns:
     minmax(0, 1fr) minmax(54px, max-content)
-    minmax(72px, max-content);
+    minmax(72px, max-content) minmax(128px, max-content);
   gap: 10px;
   align-items: start;
   min-width: 0;
@@ -902,7 +902,8 @@
 .layer-manager-name-form,
 .layer-manager-swap-form,
 .layer-manager-duplicate-form,
-.layer-manager-translate-form {
+.layer-manager-translate-form,
+.layer-manager-state-controls {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -923,6 +924,10 @@
 }
 
 .layer-manager-translate-form {
+  flex-wrap: wrap;
+}
+
+.layer-manager-state-controls {
   flex-wrap: wrap;
 }
 
@@ -977,10 +982,16 @@
 .layer-manager-swap-form .toolbar-button,
 .layer-manager-duplicate-form .toolbar-button,
 .layer-manager-translate-form .toolbar-button,
+.layer-manager-state-controls .toolbar-button,
 .layer-manager-delete-button {
   min-height: 30px;
   padding: 5px 8px;
   font-size: 12px;
+}
+
+.layer-manager-state-controls .toolbar-button[aria-pressed='false'] {
+  color: var(--muted);
+  background: var(--control-bg);
 }
 
 .layer-manager-delete-button {

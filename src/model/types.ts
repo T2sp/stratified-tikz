@@ -468,6 +468,8 @@ export type TextLabel = {
 export type DiagramLayer = {
   value: number
   name: string
+  visible?: boolean
+  locked?: boolean
 }
 
 export type Diagram = {

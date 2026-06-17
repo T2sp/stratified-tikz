@@ -134,6 +134,66 @@ export function ensureLayerMetadata(diagram: Diagram): Diagram {
   }
 }
 
+export function isLayerVisible(diagram: Diagram, layerValue: number): boolean {
+  if (!Number.isFinite(layerValue)) {
+    return false
+  }
+
+  const value = normalizeLayerValue(layerValue)
+  const layer = getLayerMetadata(diagram).find(
+    (candidate) => candidate.value === value,
+  )
+
+  return layer?.visible !== false
+}
+
+export function isLayerLocked(diagram: Diagram, layerValue: number): boolean {
+  if (!Number.isFinite(layerValue)) {
+    return false
+  }
+
+  const value = normalizeLayerValue(layerValue)
+  const layer = getLayerMetadata(diagram).find(
+    (candidate) => candidate.value === value,
+  )
+
+  return layer?.locked === true
+}
+
+export function setLayerVisibility(
+  diagram: Diagram,
+  layerValue: number,
+  visible: boolean,
+): Diagram {
+  const value = normalizedFiniteLayerValue(layerValue, 'layerValue')
+
+  return {
+    ...diagram,
+    layers: layerMetadataIncluding(diagram, [value]).map((layer) =>
+      layer.value === value
+        ? normalizedLayerState({ ...layer, visible })
+        : layer,
+    ),
+  }
+}
+
+export function setLayerLock(
+  diagram: Diagram,
+  layerValue: number,
+  locked: boolean,
+): Diagram {
+  const value = normalizedFiniteLayerValue(layerValue, 'layerValue')
+
+  return {
+    ...diagram,
+    layers: layerMetadataIncluding(diagram, [value]).map((layer) =>
+      layer.value === value
+        ? normalizedLayerState({ ...layer, locked })
+        : layer,
+    ),
+  }
+}
+
 export function renameLayer(
   diagram: Diagram,
   layerValue: number,
@@ -165,26 +225,28 @@ export function swapLayers(
     return diagram
   }
 
-  const layerNameByValue = new Map(
+  const layerByValue = new Map(
     layerMetadataIncluding(diagram, [leftLayer, rightLayer]).map((layer) => [
       layer.value,
-      layer.name,
+      layer,
     ]),
   )
   const layers = layerMetadataIncluding(diagram, [leftLayer, rightLayer]).map(
     (layer) => {
       if (layer.value === leftLayer) {
-        return {
-          ...layer,
-          name: layerNameByValue.get(rightLayer) ?? defaultLayerName(rightLayer),
-        }
+        return swappedLayerMetadata(
+          layer,
+          layerByValue.get(rightLayer),
+          rightLayer,
+        )
       }
 
       if (layer.value === rightLayer) {
-        return {
-          ...layer,
-          name: layerNameByValue.get(leftLayer) ?? defaultLayerName(leftLayer),
-        }
+        return swappedLayerMetadata(
+          layer,
+          layerByValue.get(leftLayer),
+          leftLayer,
+        )
       }
 
       return layer
@@ -412,10 +474,14 @@ export function normalizeLayerMetadataForDiagram(
       }
 
       seen.add(value)
-      layers.push({
-        value,
-        name: normalizedLayerName(layer.name, value, index, warnings),
-      })
+      layers.push(
+        normalizedLayerState({
+          value,
+          name: normalizedLayerName(layer.name, value, index, warnings),
+          ...normalizedLayerVisibility(layer.visible, index, errors),
+          ...normalizedLayerLock(layer.locked, index, errors),
+        }),
+      )
     })
   }
 
@@ -451,6 +517,62 @@ function normalizedLayerName(
   }
 
   return rawName
+}
+
+function normalizedLayerVisibility(
+  rawVisible: unknown,
+  index: number,
+  errors: string[],
+): Pick<DiagramLayer, 'visible'> {
+  if (rawVisible === undefined) {
+    return {}
+  }
+
+  if (typeof rawVisible !== 'boolean') {
+    errors.push(`layers[${index}].visible must be a boolean when present.`)
+    return {}
+  }
+
+  return rawVisible ? {} : { visible: false }
+}
+
+function normalizedLayerLock(
+  rawLocked: unknown,
+  index: number,
+  errors: string[],
+): Pick<DiagramLayer, 'locked'> {
+  if (rawLocked === undefined) {
+    return {}
+  }
+
+  if (typeof rawLocked !== 'boolean') {
+    errors.push(`layers[${index}].locked must be a boolean when present.`)
+    return {}
+  }
+
+  return rawLocked ? { locked: true } : {}
+}
+
+function normalizedLayerState(layer: DiagramLayer): DiagramLayer {
+  return {
+    value: layer.value,
+    name: layer.name,
+    ...(layer.visible === false ? { visible: false } : {}),
+    ...(layer.locked === true ? { locked: true } : {}),
+  }
+}
+
+function swappedLayerMetadata(
+  target: DiagramLayer,
+  source: DiagramLayer | undefined,
+  sourceValue: number,
+): DiagramLayer {
+  return normalizedLayerState({
+    value: target.value,
+    name: source?.name ?? defaultLayerName(sourceValue),
+    visible: source?.visible,
+    locked: source?.locked,
+  })
 }
 
 function layerMetadataIncluding(

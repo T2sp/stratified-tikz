@@ -10,6 +10,8 @@ import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import {
   deleteLayer,
   duplicateLayer,
+  isLayerVisible,
+  setLayerVisibility,
   swapLayers,
   translateLayer,
 } from '../../src/model/layers.ts'
@@ -446,6 +448,20 @@ test('loading a replacement diagram is undoable', () => {
 
   assert.equal(pointName(committed.editableDiagram), 'Loaded')
   assert.equal(pointName(undoLastDiagramChange(committed).editableDiagram), 'A')
+})
+
+test('layer visibility metadata changes are undoable and redoable', () => {
+  const initial = createUndoState(createNamedPointDiagram('A'))
+  const hidden = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: setLayerVisibility(initial.editableDiagram, 0, false),
+  })
+  const undone = undoLastDiagramChange(hidden)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(isLayerVisible(hidden.editableDiagram, 0), false)
+  assert.equal(isLayerVisible(undone.editableDiagram, 0), true)
+  assert.equal(isLayerVisible(redone.editableDiagram, 0), false)
 })
 
 test('save serialization excludes undo and redo history', () => {

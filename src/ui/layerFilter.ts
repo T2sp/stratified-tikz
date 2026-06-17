@@ -1,5 +1,9 @@
 import type { Diagram, Stratum, TextLabel } from '../model/types'
-import { getUsedLayerValues } from '../model/layers.ts'
+import {
+  getUsedLayerValues,
+  isLayerLocked,
+  isLayerVisible,
+} from '../model/layers.ts'
 import {
   findSelectedElement,
   type SelectedElement,
@@ -22,6 +26,25 @@ export function layerFilterIncludesLayer(
   return filter.kind === 'all' || filter.layer === layer
 }
 
+export function layerFilterAndVisibilityIncludeLayer(
+  diagram: Diagram,
+  filter: LayerFilter,
+  layer: number,
+): boolean {
+  return layerFilterIncludesLayer(filter, layer) && isLayerVisible(diagram, layer)
+}
+
+export function isLayerSelectableByLayerFilter(
+  diagram: Diagram,
+  filter: LayerFilter,
+  layer: number,
+): boolean {
+  return (
+    layerFilterAndVisibilityIncludeLayer(diagram, filter, layer) &&
+    !isLayerLocked(diagram, layer)
+  )
+}
+
 export function isStratumSelectableByLayerFilter(
   stratum: Stratum,
   filter: LayerFilter,
@@ -34,6 +57,22 @@ export function isTextLabelSelectableByLayerFilter(
   filter: LayerFilter,
 ): boolean {
   return layerFilterIncludesLayer(filter, label.layer)
+}
+
+export function isStratumSelectableInEditor(
+  diagram: Diagram,
+  stratum: Stratum,
+  filter: LayerFilter,
+): boolean {
+  return isLayerSelectableByLayerFilter(diagram, filter, stratum.layer)
+}
+
+export function isTextLabelSelectableInEditor(
+  diagram: Diagram,
+  label: TextLabel,
+  filter: LayerFilter,
+): boolean {
+  return isLayerSelectableByLayerFilter(diagram, filter, label.layer)
 }
 
 export function normalizeLayerFilterForDiagram(
@@ -61,8 +100,8 @@ export function isSelectionCompatibleWithLayerFilter(
   }
 
   return selected.kind === 'stratum'
-    ? isStratumSelectableByLayerFilter(selected.element, filter)
-    : isTextLabelSelectableByLayerFilter(selected.element, filter)
+    ? isStratumSelectableInEditor(diagram, selected.element, filter)
+    : isTextLabelSelectableInEditor(diagram, selected.element, filter)
 }
 
 export function clearSelectionForLayerFilter(

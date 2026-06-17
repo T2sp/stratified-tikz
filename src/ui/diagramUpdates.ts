@@ -26,6 +26,7 @@ import {
   pathEndpointEpsilon,
 } from '../model/paths.ts'
 import {
+  isSelectionCompatibleWithLayerFilter,
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   type LayerFilter,
@@ -185,6 +186,15 @@ export function removeSelectedElementWithLayerFilter(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
 ): RemoveSelectedElementWithLayerFilterResult {
+  if (!isSelectionCompatibleWithLayerFilter(diagram, selectedElement, layerFilter)) {
+    return {
+      diagram,
+      selectedElement: null,
+      removed: false,
+      layerFilter: normalizeLayerFilterForDiagram(diagram, layerFilter),
+    }
+  }
+
   const result = removeSelectedElement(diagram, selectedElement)
 
   return {

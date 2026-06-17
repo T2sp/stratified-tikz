@@ -17,6 +17,8 @@ export type LayerManagerProps = {
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
   onTranslateLayer: (layerValue: number, translation: Vec3) => void
+  onSetLayerVisibility: (layerValue: number, visible: boolean) => void
+  onSetLayerLock: (layerValue: number, locked: boolean) => void
   onDeleteLayer: (layerValue: number) => void
 }
 
@@ -28,6 +30,8 @@ export function LayerManager({
   onSwapLayers,
   onDuplicateLayer,
   onTranslateLayer,
+  onSetLayerVisibility,
+  onSetLayerLock,
   onDeleteLayer,
 }: LayerManagerProps) {
   const layers = getLayerMetadata(diagram)
@@ -62,6 +66,7 @@ export function LayerManager({
             <span role="columnheader">Name</span>
             <span role="columnheader">Value</span>
             <span role="columnheader">Elements</span>
+            <span role="columnheader">State</span>
             <span role="columnheader">Operations</span>
           </div>
           {layers.map((layer) => {
@@ -74,6 +79,8 @@ export function LayerManager({
               diagram,
               layer.value,
             )
+            const isVisible = layer.visible !== false
+            const isLocked = layer.locked === true
 
             return (
               <div key={layerKey} className="layer-manager-row" role="row">
@@ -85,6 +92,28 @@ export function LayerManager({
                 />
                 <span role="cell">{layerKey}</span>
                 <span role="cell">{counts.get(layer.value) ?? 0}</span>
+                <div
+                  className="layer-manager-state-controls"
+                  role="cell"
+                  aria-label={`State for layer ${layerKey}`}
+                >
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    aria-pressed={isVisible}
+                    onClick={() => onSetLayerVisibility(layer.value, !isVisible)}
+                  >
+                    {isVisible ? 'Visible' : 'Hidden'}
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    aria-pressed={isLocked}
+                    onClick={() => onSetLayerLock(layer.value, !isLocked)}
+                  >
+                    {isLocked ? 'Locked' : 'Unlocked'}
+                  </button>
+                </div>
                 <div className="layer-manager-actions" role="cell">
                   <form
                     className="layer-manager-translate-form"

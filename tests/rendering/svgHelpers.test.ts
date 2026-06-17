@@ -14,7 +14,12 @@ import {
 import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
-import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import {
+  createEmptyDiagram,
+  createPointStratum,
+  createTextLabel,
+} from '../../src/model/constructors.ts'
+import { setLayerVisibility } from '../../src/model/layers.ts'
 import {
   pathSegmentStyleRuns,
   resolvePathSegmentStyle,
@@ -52,6 +57,10 @@ import {
   shouldRenderSvgGeometryHandles,
   vertexHandleLabel,
 } from '../../src/rendering/svgGeometryHandles.ts'
+import {
+  shouldRenderStratumInSvgPreview,
+  shouldRenderTextLabelInSvgPreview,
+} from '../../src/rendering/svgPreviewPolicy.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -800,6 +809,32 @@ test('geometry handles render only when visible and draggable', () => {
   assert.equal(shouldRenderSvgGeometryHandles(false, true), false)
   assert.equal(shouldRenderSvgGeometryHandles(true, false), false)
   assert.equal(shouldRenderSvgGeometryHandles(false, false), false)
+})
+
+test('SVG preview policy omits hidden layer strata and labels', () => {
+  const point = createPointStratum({
+    ambientDimension: 2,
+    id: 'preview-hidden-point',
+    position: { x: 0, y: 0, z: 0 },
+    layer: 3,
+  })
+  const label = createTextLabel({
+    ambientDimension: 2,
+    id: 'preview-hidden-label',
+    position: { x: 1, y: 0, z: 0 },
+    layer: 3,
+  })
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    strata: [point],
+    labels: [label],
+  }
+  const hidden = setLayerVisibility(diagram, 3, false)
+
+  assert.equal(shouldRenderStratumInSvgPreview(diagram, point), true)
+  assert.equal(shouldRenderTextLabelInSvgPreview(diagram, label), true)
+  assert.equal(shouldRenderStratumInSvgPreview(hidden, point), false)
+  assert.equal(shouldRenderTextLabelInSvgPreview(hidden, label), false)
 })
 
 test('geometry handle user-facing vertex labels are one-based', () => {

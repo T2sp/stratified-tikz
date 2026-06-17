@@ -4,6 +4,7 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import { setLayerLock } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import {
   createInspectorCompactSummary,
@@ -631,6 +632,36 @@ test('removeSelectedElementWithLayerFilter resets a stale layer filter after del
     remainingStratum === undefined
       ? false
       : layerFilterIncludesLayer(result.layerFilter, remainingStratum.layer),
+    true,
+  )
+})
+
+test('removeSelectedElementWithLayerFilter does not remove locked layer elements', () => {
+  const diagram = setLayerLock(
+    {
+      ...twoDimensionalExample,
+      strata: [
+        {
+          ...twoDimensionalExample.strata[0],
+          id: 'locked-layer-stratum',
+          layer: 7,
+        },
+      ],
+      labels: [],
+    },
+    7,
+    true,
+  )
+  const result = removeSelectedElementWithLayerFilter(
+    diagram,
+    { kind: 'stratum', id: 'locked-layer-stratum' },
+    { kind: 'layer', layer: 7 },
+  )
+
+  assert.equal(result.removed, false)
+  assert.equal(result.selectedElement, null)
+  assert.equal(
+    result.diagram.strata.some((stratum) => stratum.id === 'locked-layer-stratum'),
     true,
   )
 })
