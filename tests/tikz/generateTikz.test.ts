@@ -920,43 +920,75 @@ test('3D workPlaneFilledSheet TikZ stays inside the correct layer block', () => 
   assert.match(layerBlock, /\\filldraw\[/)
 })
 
-test('3D curvedSheet emits a readable placeholder inside the sheet layer', () => {
-  const diagram = createEmptyDiagram({ ambientDimension: 3 })
-  diagram.strata.push({
-    id: 'curved-hemisphere',
-    codim: 1,
-    geometricKind: 'sheet',
-    kind: 'curvedSheet',
-    name: 'Curved Hemisphere',
-    style: sheetStyle(),
-    primitive: {
-      kind: 'hemisphere',
-      center: { x: 0, y: 0, z: 0 },
-      radius: 1,
-      frame: xyPlaneFrameAtZ(0),
-      hemisphereSide: 'positive',
-      sampling: { uSegments: 8, vSegments: 4 },
-    },
-    layer: 8,
-  })
-
-  const tikz = generateTikz(diagram)
+test('3D curvedSheet hemisphere exports sampled mesh faces inside the sheet layer', () => {
+  const tikz = generateTikz(createCurvedHemisphereSheetDiagram({ layer: 8 }))
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer8')
 
   assert.match(layerBlock, /% Codimension 1 strata: sheets/)
   assert.match(
     layerBlock,
-    /Curved sheet "Curved Hemisphere" \[curved-hemisphere\] omitted/,
+    /Curved sheet "Curved Hemisphere" \[curved-hemisphere\] sampled mesh export/,
   )
-  assert.match(layerBlock, /Primitive: hemisphere/)
-  assert.doesNotMatch(layerBlock, /\\path\[/)
+  assert.match(layerBlock, /Primitive: hemisphere; sampling: u=8, v=4; faces=32/)
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetCurvedCurvedHemisphere0p0\) at \(0,0,1\);/,
+  )
+  assert.match(layerBlock, /\\begin\{scope\}\[/)
+  assert.equal((layerBlock.match(/\\filldraw/g) ?? []).length, 32)
   assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('3D curvedSheet saddle export preserves style and layer', () => {
+  const tikz = generateTikz(
+    createCurvedSaddleSheetDiagram({
+      layer: 5,
+      style: sheetStyle({
+        fillColor: '#ABCDEF',
+        fillOpacity: 0.28,
+        strokeColor: '#123ABC',
+        strokeOpacity: 0.66,
+      }),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer5')
+
+  assert.match(layerBlock, /Primitive: saddle; sampling: u=6, v=5; faces=30/)
+  assert.equal((layerBlock.match(/\\filldraw/g) ?? []).length, 30)
+  assert.match(tikz, /\{HTML\}\{ABCDEF\}/)
+  assert.match(tikz, /\{HTML\}\{123ABC\}/)
+  assert.match(layerBlock, /fill opacity=0\.28/)
+  assert.match(layerBlock, /draw opacity=0\.66/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer5,main\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('3D curvedSheet default sampled TikZ output remains bounded', () => {
+  const tikz = generateTikz(createCurvedHemisphereSheetDiagram())
+
+  assert.ok(tikz.length < 16000)
+  assert.equal((tikz.match(/\\filldraw/g) ?? []).length, 32)
+  assert.doesNotMatch(tikz, /omitted/)
+})
+
+test('existing 3D vertex sheet export remains a single closed path', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram())
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\path\[/)
+  assert.match(
+    layerBlock,
+    /\(sheetQuadPage0p0\) -- \(sheetQuadPage0p1\) -- \(sheetQuadPage0p2\) -- \(sheetQuadPage0p3\) -- cycle;/,
+  )
+  assert.doesNotMatch(layerBlock, /sampled mesh export/)
 })
 
 test('filled-object TikZ output has no NaN or Infinity values', () => {
   const tikz = [
     generateTikz(createFilledRegionDiagram()),
     generateTikz(createWorkPlaneFilledSheetDiagram()),
+    generateTikz(createCurvedHemisphereSheetDiagram()),
+    generateTikz(createCurvedSaddleSheetDiagram()),
   ].join('\n')
 
   assert.doesNotMatch(tikz, /NaN/)
@@ -1921,6 +1953,64 @@ function createWorkPlaneFilledSheetDiagram({
     planeFrame: xyPlaneFrameAtZ(2),
     boundaries,
     fillRule,
+    layer,
+  })
+
+  return diagram
+}
+
+function createCurvedHemisphereSheetDiagram({
+  layer = 0,
+  style = sheetStyle(),
+}: {
+  layer?: number
+  style?: SheetStyle
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    id: 'curved-hemisphere',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Curved Hemisphere',
+    style,
+    primitive: {
+      kind: 'hemisphere',
+      center: { x: 0, y: 0, z: 0 },
+      radius: 1,
+      frame: xyPlaneFrameAtZ(0),
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 8, vSegments: 4 },
+    },
+    layer,
+  })
+
+  return diagram
+}
+
+function createCurvedSaddleSheetDiagram({
+  layer = 0,
+  style = sheetStyle(),
+}: {
+  layer?: number
+  style?: SheetStyle
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    id: 'curved-saddle',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Curved Saddle',
+    style,
+    primitive: {
+      kind: 'saddle',
+      frame: xyPlaneFrameAtZ(0),
+      width: 4,
+      depth: 3,
+      height: 1.5,
+      sampling: { uSegments: 6, vSegments: 5 },
+    },
     layer,
   })
 

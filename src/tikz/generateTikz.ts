@@ -26,6 +26,7 @@ import type {
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
 import { pathSegmentStyleRuns, type PathSegmentStyleRun } from '../model/paths.ts'
+import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import {
   createInitialCamera3D,
   isOrthographicCamera3D,
@@ -522,7 +523,7 @@ function emitSheet(
   }
 
   if (sheet.kind === 'curvedSheet') {
-    return emitCurvedSheet(sheet)
+    return emitCurvedSheet(sheet, elementIndex, context)
   }
 
   const fillColor = context.colors.define(
@@ -560,10 +561,52 @@ function emitSheet(
   ]
 }
 
-function emitCurvedSheet(sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>): string[] {
+function emitCurvedSheet(
+  sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  let mesh: ReturnType<typeof sampleCurvedSheetPrimitive>
+
+  try {
+    mesh = sampleCurvedSheetPrimitive(sheet.primitive)
+  } catch (error) {
+    return [
+      `% Curved sheet "${sheet.name}" [${sheet.id}] omitted because sampled mesh generation failed.`,
+      `% ${error instanceof Error ? error.message : 'Unknown curved sheet sampling error.'}`,
+      '',
+    ]
+  }
+
+  if (!mesh.vertices.every(isFiniteVec3)) {
+    return [
+      `% Curved sheet "${sheet.name}" [${sheet.id}] omitted because its sampled mesh contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
+  const coordinateBaseName = sheetCoordinateBaseName(sheet, elementIndex)
+  const coordinates = mesh.vertices.map((vertex, index) =>
+    context.coordinates.define(coordinateBaseName, index, vertex),
+  )
+  const options = filledSurfaceStyleTikzOptions(
+    sheet.style,
+    `Sheet${sheet.id}`,
+    context,
+  )
+  const faceLines = mesh.faces.map(
+    (face) =>
+      `  \\filldraw ${face.map((vertexIndex) => `(${coordinates[vertexIndex]})`).join(' -- ')} -- cycle;`,
+  )
+
   return [
-    `% Curved sheet "${sheet.name}" [${sheet.id}] omitted: curved surface TikZ mesh export is not implemented yet.`,
-    `% Primitive: ${sheet.primitive.kind}.`,
+    `% Curved sheet "${sheet.name}" [${sheet.id}] sampled mesh export.`,
+    `% Primitive: ${sheet.primitive.kind}; sampling: u=${mesh.uSegments}, v=${mesh.vSegments}; faces=${mesh.faces.length}.`,
+    '\\begin{scope}[',
+    ...formatTikzOptions(options),
+    ']',
+    ...faceLines,
+    '\\end{scope}',
     '',
   ]
 }

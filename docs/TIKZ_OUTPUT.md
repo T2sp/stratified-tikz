@@ -426,10 +426,21 @@ opacity, stroke color, and stroke opacity are preserved through named
 `draw opacity=` options.
 
 In 3D mode, `kind: "curvedSheet"` is persisted and validated as a codimension 1
-sheet primitive, but full TikZ mesh export is not implemented yet. The current
-generator emits a readable layer-local comment identifying the omitted curved
-sheet and primitive kind rather than writing an invalid path. Mesh sampling is
-available through geometry helpers for future rendering phases.
+sheet primitive. TikZ export samples the primitive into a finite quad mesh using
+the stratum's explicit `sampling.uSegments` and `sampling.vSegments` values. The
+generator emits one named coordinate per sampled mesh vertex, then writes one
+`\filldraw` polygon per sampled face inside the sheet's layer block. A short
+comment identifies the curved sheet, primitive kind, sampling counts, and face
+count.
+
+The sampled mesh export preserves fill color, fill opacity, stroke color, stroke
+opacity, and layer ordering through the same named-color and `pgfonlayer`
+machinery as planar sheets. It is intentionally an approximation: faces are
+flat quads, there is no hidden-surface sorting, and the output size grows with
+`uSegments * vSegments`. The default examples use modest sampling counts so the
+TikZ source remains readable. If sampling fails or would produce non-finite
+coordinates, the generator omits that curved sheet and emits a readable comment
+rather than writing `NaN` or `Infinity`.
 
 ## Output sections in 2D mode
 

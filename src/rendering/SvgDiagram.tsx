@@ -48,6 +48,7 @@ import {
   filledSurfaceStyleToSvgAttributes,
   svgLabelAnchorPlacement,
 } from './svgStyle'
+import { curvedSheetToSvgMesh } from './curvedSheetMesh.ts'
 import { mapClientPointToViewBox } from './svgViewBox'
 import {
   curveHandleLabel,
@@ -596,7 +597,14 @@ function renderSheet(
   }
 
   if (sheet.kind === 'curvedSheet') {
-    return renderCurvedSheet(sheet, layerFilter)
+    return renderCurvedSheet(
+      sheet,
+      camera,
+      viewportHeight,
+      selectedElement,
+      layerFilter,
+      onSelectionChange,
+    )
   }
 
   const points = sheetVertices(sheet).map((vertex) =>
@@ -645,22 +653,87 @@ function renderSheet(
 
 function renderCurvedSheet(
   sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, sheet.id)
+  const surfaceAttributes = filledSurfaceStyleToSvgAttributes(sheet.style, 0.85)
 
-  return {
-    id: sheet.id,
-    layer: sheet.layer,
-    element: (
-      <g
-        key={sheet.id}
-        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
-        opacity={previewElementOpacity(isIncludedByFilter)}
-        pointerEvents="none"
-        data-curved-sheet-primitive={sheet.primitive.kind}
-      />
-    ),
+  try {
+    const mesh = curvedSheetToSvgMesh(sheet, camera, viewportHeight)
+
+    return {
+      id: sheet.id,
+      layer: sheet.layer,
+      element: (
+        <g
+          key={sheet.id}
+          className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+          opacity={previewElementOpacity(isIncludedByFilter)}
+          pointerEvents={isIncludedByFilter ? undefined : 'none'}
+          data-curved-sheet-primitive={mesh.primitiveKind}
+          data-curved-sheet-u-segments={mesh.uSegments}
+          data-curved-sheet-v-segments={mesh.vSegments}
+          onClick={(event) =>
+            selectElement(event, { kind: 'stratum', id: sheet.id }, onSelectionChange)
+          }
+        >
+          {isSelected &&
+            mesh.faces.map((face) => (
+              <polygon
+                key={`${face.key}-highlight-fill`}
+                points={face.points}
+                fill={highlightColor}
+                fillOpacity={0.1}
+                stroke="none"
+                pointerEvents="none"
+              />
+            ))}
+          {mesh.faces.map((face) => (
+            <polygon
+              key={face.key}
+              points={face.points}
+              vectorEffect="non-scaling-stroke"
+              {...surfaceAttributes}
+            />
+          ))}
+          {isSelected &&
+            mesh.boundaryPathData.map((pathData, index) => (
+              <path
+                key={`${sheet.id}-curved-boundary-highlight-${index}`}
+                d={pathData}
+                fill="none"
+                stroke={highlightColor}
+                strokeOpacity={0.9}
+                strokeWidth={5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            ))}
+        </g>
+      ),
+    }
+  } catch {
+    return {
+      id: sheet.id,
+      layer: sheet.layer,
+      element: (
+        <g
+          key={sheet.id}
+          className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+          opacity={previewElementOpacity(isIncludedByFilter)}
+          pointerEvents="none"
+          data-curved-sheet-primitive={sheet.primitive.kind}
+          data-curved-sheet-render-error="true"
+        />
+      ),
+    }
   }
 }
 

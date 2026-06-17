@@ -23,14 +23,17 @@ import type {
   Camera3D,
   ClosedPathBoundary,
   CurveStyle,
+  CurvedSheetStratum,
   CubicBezierControlMode,
   Diagram,
   PathSegment,
   RegionStyle,
   SheetStyle,
+  SurfaceFrame,
   Vec3,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import {
   projectToSvgPoint,
   svgPointToModelOnWorkPlane,
@@ -237,6 +240,41 @@ test('3D work-plane-filled sheet multiple boundaries use compound path data and 
 
   assert.equal((pathData.match(/M /g) ?? []).length, 2)
   assert.equal(svgFillRuleValue('evenOdd'), 'evenodd')
+})
+
+test('hemisphere curved sheet projects to deterministic SVG mesh polygons', () => {
+  const sheet = curvedHemisphereSheet()
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.primitiveKind, 'hemisphere')
+  assert.equal(mesh.uSegments, 8)
+  assert.equal(mesh.vSegments, 4)
+  assert.equal(mesh.faces.length, 32)
+  assert.equal(mesh.boundaryPathData.length, 1)
+  assert.match(mesh.boundaryPathData[0], /^M /)
+  assert.equal(mesh.faces[0].points.split(' ').length, 4)
+  assert.doesNotMatch(
+    mesh.faces.map((face) => face.points).join('\n'),
+    /NaN|Infinity/,
+  )
+})
+
+test('saddle curved sheet projects to one SVG polygon per sampled face', () => {
+  const sheet = curvedSaddleSheet()
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.primitiveKind, 'saddle')
+  assert.equal(mesh.uSegments, 6)
+  assert.equal(mesh.vSegments, 5)
+  assert.equal(mesh.faces.length, 30)
+  assert.equal(mesh.boundaryPathData.length, 1)
+  assert.doesNotMatch(
+    [
+      ...mesh.faces.map((face) => face.points),
+      ...mesh.boundaryPathData,
+    ].join('\n'),
+    /NaN|Infinity/,
+  )
 })
 
 test('filled surface SVG attributes preserve fill and stroke style values', () => {
@@ -480,6 +518,31 @@ test('resolveSvgCamera fitted bounds include optional extra fit points', () => {
   assert.ok(projectToSvgPoint(withoutExtra, extraPoint, 120).x > 200)
   assert.ok(projectToSvgPoint(withExtra, extraPoint, 120).x <= 200)
   assert.deepEqual(diagram, createCameraTestDiagram())
+})
+
+test('resolveSvgCamera fitted bounds include curved sheet sampled vertices', () => {
+  const diagram = createThreeDimensionalCurvedSheetDiagram()
+  const camera = resolveSvgCamera(diagram, 200, 120, { fitToView: true })
+  const mesh = curvedSheetToSvgMesh(diagram.strata[0] as CurvedSheetStratum, camera, 120)
+  const coordinates = mesh.faces.flatMap((face) =>
+    face.points.split(' ').map((point) => point.split(',').map(Number)),
+  )
+
+  assert.ok(coordinates.length > 0)
+  assert.equal(
+    coordinates.every(
+      ([x, y]) =>
+        x !== undefined &&
+        y !== undefined &&
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        x >= 0 &&
+        x <= 200 &&
+        y >= 0 &&
+        y <= 120,
+    ),
+    true,
+  )
 })
 
 test('resolveSvgCamera matches draft and committed polyline framing', () => {
@@ -779,6 +842,81 @@ function createCameraTestDiagram(): Diagram {
       },
     ],
     labels: [],
+  }
+}
+
+function createThreeDimensionalCurvedSheetDiagram(): Diagram {
+  return {
+    version: 1,
+    ambientDimension: 3,
+    camera: createInitialCamera3D(),
+    strata: [curvedHemisphereSheet()],
+    labels: [],
+  }
+}
+
+function curvedHemisphereSheet(): CurvedSheetStratum {
+  return {
+    id: 'svg-hemisphere',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'SVG Hemisphere',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'hemisphere',
+      center: { x: 0, y: 0, z: 0 },
+      radius: 2,
+      frame: xyPlaneFrameAtZ(0),
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 8, vSegments: 4 },
+    },
+    layer: 0,
+  }
+}
+
+function curvedSaddleSheet(): CurvedSheetStratum {
+  return {
+    id: 'svg-saddle',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'SVG Saddle',
+    style: sheetStyle({
+      fillColor: '#55AAEE',
+      fillOpacity: 0.41,
+      strokeColor: '#114477',
+      strokeOpacity: 0.88,
+    }),
+    primitive: {
+      kind: 'saddle',
+      frame: xyPlaneFrameAtZ(0),
+      width: 4,
+      depth: 3,
+      height: 1.5,
+      sampling: { uSegments: 6, vSegments: 5 },
+    },
+    layer: 0,
+  }
+}
+
+function sheetStyle(overrides: Partial<SheetStyle> = {}): SheetStyle {
+  return {
+    kind: 'sheetStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#4D9DE0',
+    strokeOpacity: 1,
+    ...overrides,
+  }
+}
+
+function xyPlaneFrameAtZ(z: number): SurfaceFrame {
+  return {
+    origin: { x: 0, y: 0, z },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
   }
 }
 
