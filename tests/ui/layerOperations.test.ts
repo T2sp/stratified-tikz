@@ -14,6 +14,11 @@ import {
   applyTranslateLayerToEditorState,
   type LayerOperationEditorState,
 } from '../../src/ui/layerOperations.ts'
+import {
+  canSubmitLayerDuplicateTarget,
+  duplicateLayerTargetInput,
+  resolveDuplicateLayerTarget,
+} from '../../src/ui/layerDuplicateTarget.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
@@ -97,6 +102,73 @@ test('sequential duplicate then delete does not resurrect stale state', () => {
   assert.equal(hasLabel(undone.editableDiagram, 'source-label-copy'), true)
 })
 
+test('duplicate target helper disables blank submits when no default exists', () => {
+  const sourceLayer = 9_007_199_254_740_992
+  const defaultTarget = null
+
+  assert.equal(duplicateLayerTargetInput(defaultTarget), '')
+  assert.equal(canSubmitLayerDuplicateTarget(sourceLayer, '', defaultTarget), false)
+  assert.deepEqual(resolveDuplicateLayerTarget(sourceLayer, '', defaultTarget), {
+    ok: false,
+    message: 'Choose target layer manually.',
+  })
+  assert.equal(canSubmitLayerDuplicateTarget(sourceLayer, '0', defaultTarget), true)
+  assert.deepEqual(resolveDuplicateLayerTarget(sourceLayer, '0', defaultTarget), {
+    ok: true,
+    targetLayerValue: 0,
+  })
+})
+
+test('duplicate target helper rejects invalid and same-layer manual targets', () => {
+  assert.deepEqual(resolveDuplicateLayerTarget(0, 'Infinity', 1), {
+    ok: false,
+    message: 'Enter a finite target layer.',
+  })
+  assert.deepEqual(resolveDuplicateLayerTarget(0, '0', 1), {
+    ok: false,
+    message: 'Duplicate target must differ from the source layer.',
+  })
+})
+
+test('duplicate operation reports missing huge-layer default without mutation', () => {
+  const state = createLayerOperationState(createHugeLayerDiagram())
+  const next = applyDuplicateLayerToEditorState(state, 9_007_199_254_740_992)
+
+  assert.equal(next.editableDiagram, state.editableDiagram)
+  assert.equal(next.history.past.length, 0)
+  assert.equal(next.layerOperationStatus, 'No safe default target layer is available.')
+  assert.equal(hasStratum(next.editableDiagram, 'huge-point-copy'), false)
+})
+
+test('duplicate operation accepts a manual target for a huge finite layer', () => {
+  const state = createLayerOperationState(createHugeLayerDiagram())
+  const next = applyDuplicateLayerToEditorState(
+    state,
+    9_007_199_254_740_992,
+    0,
+  )
+
+  assert.equal(findPoint(next.editableDiagram, 'huge-point-copy').layer, 0)
+  assert.equal(next.history.past.length, 1)
+  assert.equal(
+    next.layerOperationStatus,
+    'Duplicated layer 9007199254740992 to layer 0 (1 element).',
+  )
+})
+
+test('duplicate operation rejects invalid manual target layer', () => {
+  const state = createLayerOperationState(createTwoLayerDiagram())
+  const next = applyDuplicateLayerToEditorState(
+    state,
+    0,
+    Number.POSITIVE_INFINITY,
+  )
+
+  assert.equal(next.editableDiagram, state.editableDiagram)
+  assert.equal(next.history.past.length, 0)
+  assert.equal(next.layerOperationStatus, 'targetLayerValue must be a finite number.')
+})
+
 function createLayerOperationState(
   editableDiagram: Diagram,
   selectedElement: SelectedElement = null,
@@ -132,6 +204,18 @@ function createTwoLayerDiagram(): Diagram {
     withSourceLabel,
     { x: -1, y: -2, z: 0 },
     { id: 'other-point', name: 'Other', layer: 1 },
+  ).diagram
+}
+
+function createHugeLayerDiagram(): Diagram {
+  return addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    { x: 0, y: 0, z: 0 },
+    {
+      id: 'huge-point',
+      name: 'Huge point',
+      layer: 9_007_199_254_740_992,
+    },
   ).diagram
 }
 

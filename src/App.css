@@ -1011,6 +1011,10 @@
   flex-wrap: wrap;
 }
 
+.layer-manager-duplicate-form {
+  flex-wrap: wrap;
+}
+
 .layer-manager-state-controls {
   flex-wrap: wrap;
 }
@@ -1060,6 +1064,13 @@
   width: 38px;
   padding: 5px 6px;
   font-family: var(--mono);
+}
+
+.layer-manager-inline-status {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .layer-manager-name-form .toolbar-button,

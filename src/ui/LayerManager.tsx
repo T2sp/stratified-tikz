@@ -7,6 +7,12 @@ import {
   nextUnusedLayerValue,
 } from '../model/layers.ts'
 import type { Diagram, DiagramLayer, Vec3 } from '../model/types.ts'
+import {
+  canSubmitLayerDuplicateTarget,
+  duplicateLayerTargetInput,
+  resolveDuplicateLayerTarget,
+  type DuplicateLayerTargetResolution,
+} from './layerDuplicateTarget.ts'
 import type { LayerFilter } from './layerFilter.ts'
 import { committedLayerNameDraft } from './layerRenameDraft.ts'
 
@@ -140,10 +146,13 @@ function LayerManagerRow({
   )
   const defaultSwapTarget = swappableLayers[0]?.value
   const defaultDuplicateTarget = nextUnusedLayerValue(diagram, layer.value)
+  const defaultDuplicateTargetInput = duplicateLayerTargetInput(
+    defaultDuplicateTarget,
+  )
   const isVisible = layer.visible !== false
   const isLocked = layer.locked === true
   const [duplicateTargetInput, setDuplicateTargetInput] = useState(
-    String(defaultDuplicateTarget),
+    defaultDuplicateTargetInput,
   )
   const [swapTargetInput, setSwapTargetInput] = useState(
     defaultSwapTarget === undefined ? '' : String(defaultSwapTarget),
@@ -151,15 +160,21 @@ function LayerManagerRow({
   const [dxInput, setDxInput] = useState('0')
   const [dyInput, setDyInput] = useState('0')
   const [dzInput, setDzInput] = useState('0')
-  const duplicateTarget = parseOptionalLayerValue(duplicateTargetInput)
+  const duplicateTargetResolution = resolveDuplicateLayerTarget(
+    layer.value,
+    duplicateTargetInput,
+    defaultDuplicateTarget,
+  )
   const swapTarget = parseOptionalLayerValue(swapTargetInput)
   const dx = parseRequiredFiniteNumber(dxInput)
   const dy = parseRequiredFiniteNumber(dyInput)
   const dz =
     diagram.ambientDimension === 2 ? 0 : parseRequiredFiniteNumber(dzInput)
-  const canDuplicate =
-    duplicateTargetInput.trim().length === 0 ||
-    (duplicateTarget !== null && duplicateTarget !== layer.value)
+  const canDuplicate = canSubmitLayerDuplicateTarget(
+    layer.value,
+    duplicateTargetInput,
+    defaultDuplicateTarget,
+  )
   const canSwap = swapTarget !== null && swapTarget !== layer.value
   const canTranslate =
     elementCount > 0 &&
@@ -169,8 +184,8 @@ function LayerManagerRow({
     !isZeroTranslation({ x: dx, y: dy, z: dz })
 
   useEffect(() => {
-    setDuplicateTargetInput(String(defaultDuplicateTarget))
-  }, [defaultDuplicateTarget, layer.value])
+    setDuplicateTargetInput(defaultDuplicateTargetInput)
+  }, [defaultDuplicateTargetInput, layer.value])
 
   useEffect(() => {
     setSwapTargetInput(
@@ -331,8 +346,7 @@ function LayerManagerRow({
               submitLayerDuplicate(
                 event,
                 layer.value,
-                duplicateTarget,
-                duplicateTargetInput,
+                duplicateTargetResolution,
                 onDuplicateLayer,
                 onStatusMessage,
               )
@@ -346,6 +360,11 @@ function LayerManagerRow({
               aria-label={`Duplicate layer ${layerKey} to target layer`}
               aria-invalid={!canDuplicate}
               value={duplicateTargetInput}
+              placeholder={
+                defaultDuplicateTarget === null
+                  ? 'Choose target layer manually'
+                  : undefined
+              }
               inputMode="decimal"
               onChange={(event) =>
                 setDuplicateTargetInput(event.currentTarget.value)
@@ -356,9 +375,20 @@ function LayerManagerRow({
               className="toolbar-button"
               aria-label={`Duplicate layer ${layerKey}`}
               disabled={!canDuplicate}
+              title={
+                duplicateTargetResolution.ok
+                  ? undefined
+                  : duplicateTargetResolution.message
+              }
             >
               Duplicate
             </button>
+            {defaultDuplicateTarget === null &&
+              duplicateTargetInput.trim().length === 0 && (
+                <span className="layer-manager-inline-status">
+                  Choose target layer manually
+                </span>
+              )}
           </form>
           <form
             className="layer-manager-swap-form"
@@ -504,29 +534,18 @@ function submitLayerTranslate(
 function submitLayerDuplicate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
-  targetLayer: number | null,
-  targetLayerInput: string,
+  targetLayer: DuplicateLayerTargetResolution,
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void,
   onStatusMessage: (message: string) => void,
 ): void {
   event.preventDefault()
 
-  if (targetLayerInput.trim().length === 0) {
-    onDuplicateLayer(layerValue)
+  if (!targetLayer.ok) {
+    onStatusMessage(targetLayer.message)
     return
   }
 
-  if (targetLayer === null) {
-    onStatusMessage('Enter a finite target layer.')
-    return
-  }
-
-  if (targetLayer === layerValue) {
-    onStatusMessage('Duplicate target must differ from the source layer.')
-    return
-  }
-
-  onDuplicateLayer(layerValue, targetLayer)
+  onDuplicateLayer(layerValue, targetLayer.targetLayerValue)
 }
 
 function submitLayerSwap(

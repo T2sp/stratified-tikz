@@ -268,7 +268,7 @@ export function swapLayers(
 export function nextUnusedLayerValue(
   diagram: Diagram,
   sourceLayerValue: number,
-): number {
+): number | null {
   const sourceLayer = normalizedFiniteLayerValue(
     sourceLayerValue,
     'sourceLayerValue',
@@ -278,11 +278,31 @@ export function nextUnusedLayerValue(
   )
   let candidate = normalizeLayerValue(sourceLayer + 1)
 
-  while (usedLayers.has(candidate)) {
-    candidate = normalizeLayerValue(candidate + 1)
+  // JavaScript numbers stop progressing at large magnitudes: for example,
+  // 2^53 + 1 === 2^53. Keep this search bounded and return null when no
+  // finite, progressing default can be derived.
+  if (candidate === sourceLayer) {
+    return null
   }
 
-  return candidate
+  for (let attempt = 0; attempt <= usedLayers.size; attempt += 1) {
+    if (!isAutomaticLayerDefault(candidate)) {
+      return null
+    }
+
+    if (!usedLayers.has(candidate)) {
+      return candidate
+    }
+
+    const next = normalizeLayerValue(candidate + 1)
+    if (next === candidate || !isAutomaticLayerDefault(next)) {
+      return null
+    }
+
+    candidate = next
+  }
+
+  return null
 }
 
 export function duplicateLayer(
@@ -296,7 +316,7 @@ export function duplicateLayer(
   )
   const targetLayer =
     options.targetLayerValue === undefined
-      ? nextUnusedLayerValue(diagram, sourceLayer)
+      ? defaultDuplicateTargetLayer(diagram, sourceLayer)
       : normalizedFiniteLayerValue(options.targetLayerValue, 'targetLayerValue')
 
   if (targetLayer === sourceLayer) {
@@ -601,6 +621,20 @@ function layerMetadataIncluding(
 
 function safeLayerName(rawName: string, value: number): string {
   return rawName.trim().length === 0 ? defaultLayerName(value) : rawName
+}
+
+function defaultDuplicateTargetLayer(diagram: Diagram, sourceLayer: number): number {
+  const targetLayer = nextUnusedLayerValue(diagram, sourceLayer)
+
+  if (targetLayer === null) {
+    throw new Error('No safe default target layer is available.')
+  }
+
+  return targetLayer
+}
+
+function isAutomaticLayerDefault(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER
 }
 
 function normalizedFiniteLayerValue(value: number, label: string): number {

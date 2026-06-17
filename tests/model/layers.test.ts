@@ -524,6 +524,57 @@ test('duplicating a layer creates target metadata with the default unused layer 
   assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
+test('next unused layer defaults preserve ordinary, sparse, negative, and decimal behavior', () => {
+  assert.equal(nextUnusedLayerValue(createLayerMetadataDiagram([0]), 0), 1)
+  assert.equal(nextUnusedLayerValue(createLayerMetadataDiagram([0, 1, 2, 10]), 2), 3)
+  assert.equal(nextUnusedLayerValue(createLayerMetadataDiagram([-1, 0]), -1), 1)
+  assert.equal(nextUnusedLayerValue(createLayerMetadataDiagram([1.5]), 1.5), 2.5)
+})
+
+test('next unused layer defaults return null for non-progressing huge values', () => {
+  const hugeLayer = 9_007_199_254_740_992
+  const diagram = createLayerMetadataDiagram([hugeLayer])
+
+  assert.equal(Number.isFinite(hugeLayer), true)
+  assert.equal(hugeLayer + 1, hugeLayer)
+  assert.equal(nextUnusedLayerValue(diagram, hugeLayer), null)
+})
+
+test('next unused layer defaults reject non-finite sources and unsafe collision tails', () => {
+  const diagram = createLayerMetadataDiagram([0])
+
+  assert.throws(
+    () => nextUnusedLayerValue(diagram, Number.POSITIVE_INFINITY),
+    /finite/,
+  )
+  assert.throws(
+    () => nextUnusedLayerValue(diagram, Number.NEGATIVE_INFINITY),
+    /finite/,
+  )
+  assert.throws(() => nextUnusedLayerValue(diagram, Number.NaN), /finite/)
+
+  const lastProgressingSource = Number.MAX_SAFE_INTEGER - 1
+  const collisionDiagram = createLayerMetadataDiagram([
+    lastProgressingSource,
+    Number.MAX_SAFE_INTEGER,
+  ])
+
+  assert.equal(nextUnusedLayerValue(collisionDiagram, lastProgressingSource), null)
+})
+
+test('duplicating a huge finite layer requires an explicit safe target', () => {
+  const hugeLayer = 9_007_199_254_740_992
+  const diagram = createHugeLayerDiagram(hugeLayer)
+
+  assert.throws(() => duplicateLayer(diagram, hugeLayer), /No safe default/)
+
+  const result = duplicateLayer(diagram, hugeLayer, { targetLayerValue: 0 })
+
+  assert.equal(result.targetLayer, 0)
+  assert.equal(findPoint(result.diagram, 'huge-point-copy').layer, 0)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
 test('deleting a layer removes its strata, labels, and metadata only', () => {
   const deleted = deleteLayer(createLayerOperationDiagram(), 5)
 
@@ -1139,6 +1190,31 @@ function createNamedLayerSwapTestDiagram(): Diagram {
       { value: 0, name: 'Middle' },
       { value: 2, name: 'Foreground' },
       { value: 99, name: 'Empty guide layer' },
+    ],
+  }
+}
+
+function createLayerMetadataDiagram(layerValues: number[]): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    layers: layerValues.map((value) => ({
+      value,
+      name: `Layer ${value}`,
+    })),
+  }
+}
+
+function createHugeLayerDiagram(layer: number): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    layers: [{ value: layer, name: 'Huge layer' }],
+    strata: [
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'huge-point',
+        position: { x: 0, y: 0, z: 0 },
+        layer,
+      }),
     ],
   }
 }
