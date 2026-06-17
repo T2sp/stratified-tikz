@@ -292,17 +292,36 @@ function normalizeLoadedLayers(
   }
 
   const errors: string[] = []
+  const warnings: string[] = []
   const layerRecords = savedLayers.flatMap((layer, index): DiagramLayer[] => {
     if (!isRecord(layer)) {
       errors.push(`layers[${index}] must be a layer metadata object.`)
       return []
     }
 
+    const record: DiagramLayer = {
+      value: layer.value as number,
+      name: layer.name as string,
+    }
+
+    if ('visible' in layer) {
+      if (typeof layer.visible === 'boolean') {
+        record.visible = layer.visible
+      } else {
+        warnings.push(`layers[${index}].visible is invalid; using visible.`)
+      }
+    }
+
+    if ('locked' in layer) {
+      if (typeof layer.locked === 'boolean') {
+        record.locked = layer.locked
+      } else {
+        warnings.push(`layers[${index}].locked is invalid; using unlocked.`)
+      }
+    }
+
     return [
-      {
-        value: layer.value as number,
-        name: layer.name as string,
-      },
+      record,
     ]
   })
   const normalization = normalizeLayerMetadataForDiagram({
@@ -312,7 +331,7 @@ function normalizeLoadedLayers(
 
   return {
     layers: normalization.layers,
-    warnings: normalization.warnings,
+    warnings: [...warnings, ...normalization.warnings],
     errors: [...errors, ...normalization.errors],
   }
 }

@@ -7,9 +7,13 @@ import {
   duplicateLayer,
   getLayerMetadata,
   getUsedLayerValues,
+  isLayerLocked,
+  isLayerVisible,
   nextUnusedLayerValue,
   normalizeLayerMetadataForDiagram,
   renameLayer,
+  setLayerLock,
+  setLayerVisibility,
   swapLayers,
   translateLayer,
 } from '../../src/model/layers.ts'
@@ -202,6 +206,46 @@ test('save and load preserves layer names', () => {
   ])
 })
 
+test('layer visibility defaults visible and persists when hidden', () => {
+  const hidden = setLayerVisibility(createNamedLayerTestDiagram(), 2, false)
+  const result = parseSavedDiagramJson(serializeDiagram(hidden))
+
+  assert.equal(isLayerVisible(createNamedLayerTestDiagram(), 2), true)
+  assert.equal(isLayerVisible(hidden, 2), false)
+  assert.deepEqual(
+    hidden.layers?.find((layer) => layer.value === 2),
+    { value: 2, name: 'Foreground', visible: false },
+  )
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(
+    result.diagram.layers?.find((layer) => layer.value === 2),
+    { value: 2, name: 'Foreground', visible: false },
+  )
+})
+
+test('layer locking defaults unlocked and persists when locked', () => {
+  const locked = setLayerLock(createNamedLayerTestDiagram(), -1, true)
+  const result = parseSavedDiagramJson(serializeDiagram(locked))
+
+  assert.equal(isLayerLocked(createNamedLayerTestDiagram(), -1), false)
+  assert.equal(isLayerLocked(locked, -1), true)
+  assert.deepEqual(
+    locked.layers?.find((layer) => layer.value === -1),
+    { value: -1, name: 'Background', locked: true },
+  )
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(
+    result.diagram.layers?.find((layer) => layer.value === -1),
+    { value: -1, name: 'Background', locked: true },
+  )
+})
+
 test('existing diagrams without layer metadata still validate and load', () => {
   const oldDiagram = withoutLayerMetadata(createLayerTestDiagram())
   const validation = validateDiagram(oldDiagram)
@@ -237,6 +281,28 @@ test('TikZ output is unchanged by metadata-only layer names', () => {
   }
 
   assert.equal(generateTikz(withMetadata), generateTikz(diagram))
+})
+
+test('hidden and locked layer metadata does not affect TikZ export by default', () => {
+  const diagram = createLayerSwapTestDiagram()
+  const hiddenAndLocked = setLayerLock(
+    setLayerVisibility(
+      {
+        ...diagram,
+        layers: getLayerMetadata(diagram),
+      },
+      2,
+      false,
+    ),
+    2,
+    true,
+  )
+  const tikz = generateTikz(hiddenAndLocked)
+  const layerTwoBlock = tikzLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.notEqual(generateTikz(hiddenAndLocked), '')
+  assert.match(layerTwoBlock, /stzCurvelayertwostratumStroke/)
+  assert.match(layerTwoBlock, /front label/)
 })
 
 test('swapping layers updates strata and labels on both layers only', () => {

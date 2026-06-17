@@ -27,8 +27,12 @@ import {
   deleteLayer,
   duplicateLayer,
   elementsOnLayer,
+  isLayerLocked,
+  isLayerVisible,
   normalizeLayerValue,
   renameLayer,
+  setLayerLock,
+  setLayerVisibility,
   swapLayers,
   translateLayer,
 } from './model/layers.ts'
@@ -114,7 +118,7 @@ import {
   findSelectedElement,
   formatExistingCoordinateSourceLabel,
   fitCameraControlState,
-  layerFilterIncludesLayer,
+  isLayerSelectableByLayerFilter,
   LayerManager,
   maxCurvedSheetSamplingSegments,
   normalizeLayerFilterForDiagram,
@@ -843,14 +847,14 @@ function App() {
     setEditorState((current) => {
       const nextDiagram =
         typeof update === 'function' ? update(current.editableDiagram) : update
-      const nextSelection = clearSelectionForLayerFilter(
-        nextDiagram,
-        current.selectedElement,
-        current.layerFilter,
-      )
       const nextLayerFilter = normalizeLayerFilterForDiagram(
         nextDiagram,
         current.layerFilter,
+      )
+      const nextSelection = clearSelectionForLayerFilter(
+        nextDiagram,
+        current.selectedElement,
+        nextLayerFilter,
       )
 
       return commitDiagramChange(current, {
@@ -861,6 +865,19 @@ function App() {
       })
     })
     setCopyStatus('idle')
+  }
+
+  function setDiagramLayerVisibility(
+    layerValue: number,
+    visible: boolean,
+  ): void {
+    updateEditableDiagram((diagram) =>
+      setLayerVisibility(diagram, layerValue, visible),
+    )
+  }
+
+  function setDiagramLayerLock(layerValue: number, locked: boolean): void {
+    updateEditableDiagram((diagram) => setLayerLock(diagram, layerValue, locked))
   }
 
   function renameDiagramLayer(layerValue: number, name: string): void {
@@ -1168,7 +1185,11 @@ function App() {
   function updateSelectedElement(selection: SelectedElement): void {
     setEditorState((current) => ({
       ...current,
-      selectedElement: selection,
+      selectedElement: clearSelectionForLayerFilter(
+        current.editableDiagram,
+        selection,
+        current.layerFilter,
+      ),
     }))
   }
 
@@ -1904,7 +1925,13 @@ function App() {
         }
       }
 
-      if (!layerFilterIncludesLayer(current.layerFilter, selected.element.layer)) {
+      if (
+        !isLayerSelectableByLayerFilter(
+          current.editableDiagram,
+          current.layerFilter,
+          selected.element.layer,
+        )
+      ) {
         return current
       }
 
@@ -2274,6 +2301,11 @@ function App() {
 
     if (layer === null) {
       setStatus('Layer must be a finite number.')
+      return null
+    }
+
+    if (isLayerLocked(editableDiagram, layer)) {
+      setStatus('Layer is locked. Unlock it before creating on this layer.')
       return null
     }
 
@@ -2675,8 +2707,11 @@ function App() {
     selection: Exclude<SelectedElement, null>,
     layer: number,
   ): EditableEditorState {
+    const visibleDiagram = isLayerVisible(diagram, layer)
+      ? diagram
+      : setLayerVisibility(diagram, layer, true)
     const commit = commitDirectCreationResult(
-      diagram,
+      visibleDiagram,
       selection,
       layer,
       current.layerFilter,
@@ -4990,6 +5025,8 @@ function App() {
             onSwapLayers={swapDiagramLayers}
             onDuplicateLayer={duplicateDiagramLayer}
             onTranslateLayer={translateDiagramLayer}
+            onSetLayerVisibility={setDiagramLayerVisibility}
+            onSetLayerLock={setDiagramLayerLock}
             onDeleteLayer={deleteDiagramLayer}
           />
           <EditableInspector

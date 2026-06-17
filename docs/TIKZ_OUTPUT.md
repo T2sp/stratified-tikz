@@ -177,9 +177,11 @@ in diagram data, are converted with a readable safe suffix such as
 `stratifiedLayer1Point5`.
 
 Diagram-level `layers` metadata may assign human-readable names to numeric
-layer values for the editor's Layer Manager. TikZ export does not use those
-metadata names. This keeps Phase 9B layer-aware output stable: only element
-`layer` values determine emitted PGF layers and drawing order.
+layer values for the editor's Layer Manager. It may also store editor preview
+state such as layer visibility and locking. TikZ export does not use these
+metadata names or preview/editing flags. This keeps Phase 9B layer-aware output
+stable: only element `layer` values determine emitted PGF layers and drawing
+order.
 
 Renaming a layer changes only this metadata and therefore does not change TikZ
 layer membership. Swapping two layers updates the numeric `layer` values stored
@@ -282,8 +284,10 @@ For example, curves and points on the same layer may be grouped into separate co
 
 Free text labels are emitted in their configured layer and are grouped consistently with the layer output format.
 
-Selection, preview highlighting, the current layer filter, and Layer Manager UI
-state are not exported.
+Selection, preview highlighting, hidden/locked Layer Manager state, and the
+current layer filter are not exported. Hidden layers are still emitted by
+default because visibility is an editor preview control, not a deletion or
+export-visible-only command.
 
 ## 2D TikZ basis
 

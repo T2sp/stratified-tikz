@@ -1,4 +1,5 @@
 export * from './SvgDiagram.tsx'
+export * from './svgPreviewPolicy.ts'
 export * from './coordinateAxesGuide.ts'
 export * from './curvedSheetMesh.ts'
 export * from './svgCamera.ts'

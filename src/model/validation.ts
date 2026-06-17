@@ -142,6 +142,22 @@ function validateDiagramLayers(
       pushError(errors, `${layerPath}.name`, 'Layer name must be non-empty.')
     }
 
+    if (layer.visible !== undefined && typeof layer.visible !== 'boolean') {
+      pushError(
+        errors,
+        `${layerPath}.visible`,
+        'Layer visibility must be a boolean when present.',
+      )
+    }
+
+    if (layer.locked !== undefined && typeof layer.locked !== 'boolean') {
+      pushError(
+        errors,
+        `${layerPath}.locked`,
+        'Layer lock must be a boolean when present.',
+      )
+    }
+
     if (!Number.isFinite(layer.value)) {
       return
     }
