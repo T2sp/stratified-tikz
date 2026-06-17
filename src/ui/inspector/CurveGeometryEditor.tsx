@@ -6,10 +6,12 @@ import {
 } from '../../geometry/bezierControls.ts'
 import type {
   AmbientDimension,
+  ConcatenatedPathStratum,
   CubicBezierCurveStratum,
   CubicBezierControlMode,
   CurveStratum,
   Diagram,
+  PathSegment,
   Vec3,
 } from '../../model/types.ts'
 import {
@@ -18,7 +20,6 @@ import {
   updateVec3Coordinate,
 } from '../diagramUpdates.ts'
 import { describeCurvePoints } from '../inspectorSummary.ts'
-import { formatVec3 } from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import {
   EditableNumberField,
@@ -27,6 +28,20 @@ import {
 } from './InspectorField.tsx'
 import { formatSelectedGeometry } from './geometryPreview.ts'
 import type { DiagramChangeHandler } from './types.ts'
+import {
+  appendCubicSegmentToConcatenatedPath,
+  appendLineSegmentToConcatenatedPath,
+  bezierControlModeOptions as pathBezierControlModeOptions,
+  describeConcatenatedPathSegments,
+  removeLastSegmentFromConcatenatedPath,
+  updateConcatenatedPathCoordinate,
+  updateConcatenatedPathCubicControlMode,
+  updateConcatenatedPathRelativeCartesianOffset,
+  updateConcatenatedPathRelativePolarControl,
+  type ConcatenatedPathPointDescription,
+  type ConcatenatedPathSegmentDescription,
+  type InspectorBezierControlMode as PathInspectorBezierControlMode,
+} from '../pathEditing.ts'
 
 type InspectorBezierControlMode =
   | 'absolute'
@@ -105,13 +120,13 @@ function renderCurveCoordinateEditors(
   onDiagramChange: DiagramChangeHandler,
 ) {
   if (curve.kind === 'concatenatedPath') {
-    return describeCurvePoints(curve).map((description, pointIndex) => (
-      <ReadOnlyField
-        key={`${description.label}-${pointIndex}`}
-        label={description.label}
-        value={formatVec3(description.point, diagram.ambientDimension)}
+    return (
+      <ConcatenatedPathGeometryEditor
+        diagram={diagram}
+        path={curve}
+        onDiagramChange={onDiagramChange}
       />
-    ))
+    )
   }
 
   if (curve.kind !== 'cubicBezier' || curve.points.length !== 4) {
@@ -269,6 +284,358 @@ function renderCurveCoordinateEditors(
       onDiagramChange={onDiagramChange}
     />
   ))
+}
+
+function ConcatenatedPathGeometryEditor({
+  diagram,
+  path,
+  onDiagramChange,
+}: {
+  diagram: Diagram
+  path: ConcatenatedPathStratum
+  onDiagramChange: DiagramChangeHandler
+}) {
+  const segmentDescriptions = describeConcatenatedPathSegments(path)
+
+  return (
+    <>
+      <div className="path-segment-operations">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() =>
+            updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+              appendLineSegmentToConcatenatedPath(
+                current,
+                diagram.ambientDimension,
+              ),
+            )
+          }
+        >
+          Append line
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() =>
+            updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+              appendCubicSegmentToConcatenatedPath(
+                current,
+                diagram.ambientDimension,
+              ),
+            )
+          }
+        >
+          Append cubic
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          disabled={path.segments.length <= 1}
+          onClick={() =>
+            updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+              removeLastSegmentFromConcatenatedPath(current),
+            )
+          }
+        >
+          Remove last
+        </button>
+      </div>
+      {segmentDescriptions.map((segment) => (
+        <ConcatenatedPathSegmentEditor
+          key={`path-segment-${segment.segmentIndex}`}
+          diagram={diagram}
+          path={path}
+          segment={segment}
+          onDiagramChange={onDiagramChange}
+        />
+      ))}
+    </>
+  )
+}
+
+function ConcatenatedPathSegmentEditor({
+  diagram,
+  path,
+  segment,
+  onDiagramChange,
+}: {
+  diagram: Diagram
+  path: ConcatenatedPathStratum
+  segment: ConcatenatedPathSegmentDescription
+  onDiagramChange: DiagramChangeHandler
+}) {
+  const pathSegment = path.segments[segment.segmentIndex]
+
+  return (
+    <div className="path-segment-editor">
+      <ReadOnlyField
+        label={`Segment ${segment.segmentNumber}`}
+        value={segment.kindLabel}
+      />
+      {pathSegment.kind === 'cubicBezier' &&
+        renderPathCubicControlModeEditor(
+          diagram,
+          path,
+          segment,
+          onDiagramChange,
+        )}
+      {renderPathSegmentPointEditors(
+        diagram,
+        path,
+        pathSegment,
+        segment,
+        onDiagramChange,
+      )}
+    </div>
+  )
+}
+
+function renderPathCubicControlModeEditor(
+  diagram: Diagram,
+  path: ConcatenatedPathStratum,
+  segment: ConcatenatedPathSegmentDescription,
+  onDiagramChange: DiagramChangeHandler,
+) {
+  if (segment.bezierControlMode === null) {
+    return (
+      <ReadOnlyField
+        label="Bezier controls"
+        value={segment.bezierControlModeLabel ?? 'unknown'}
+      />
+    )
+  }
+
+  return (
+    <EditableSelectField<PathInspectorBezierControlMode>
+      label="Bezier controls"
+      value={segment.bezierControlMode}
+      options={pathBezierControlModeOptions(diagram.ambientDimension)}
+      onChange={(mode) =>
+        updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+          updateConcatenatedPathCubicControlMode(
+            current,
+            diagram.ambientDimension,
+            segment.segmentIndex,
+            mode,
+          ),
+        )
+      }
+    />
+  )
+}
+
+function renderPathSegmentPointEditors(
+  diagram: Diagram,
+  path: ConcatenatedPathStratum,
+  pathSegment: PathSegment,
+  segment: ConcatenatedPathSegmentDescription,
+  onDiagramChange: DiagramChangeHandler,
+) {
+  if (
+    pathSegment.kind === 'cubicBezier' &&
+    pathSegment.controlMode?.kind === 'relativeCartesian'
+  ) {
+    return [
+      renderPathPointCoordinateEditor(
+        diagram,
+        path,
+        segment.points[0],
+        segment.segmentNumber,
+        onDiagramChange,
+      ),
+      <CoordinateEditor
+        key="control-1-offset"
+        label={`Segment ${segment.segmentNumber} Control 1 offset`}
+        point={pathSegment.controlMode.firstControlOffset}
+        ambientDimension={diagram.ambientDimension}
+        onCoordinateChange={(axis, value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativeCartesianOffset(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'firstControlOffset',
+              axis,
+              value,
+            ),
+          )
+        }
+      />,
+      <CoordinateEditor
+        key="control-2-offset"
+        label={`Segment ${segment.segmentNumber} Control 2 offset`}
+        point={pathSegment.controlMode.secondControlOffset}
+        ambientDimension={diagram.ambientDimension}
+        onCoordinateChange={(axis, value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativeCartesianOffset(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'secondControlOffset',
+              axis,
+              value,
+            ),
+          )
+        }
+      />,
+      renderPathPointCoordinateEditor(
+        diagram,
+        path,
+        segment.points[3],
+        segment.segmentNumber,
+        onDiagramChange,
+      ),
+    ]
+  }
+
+  if (
+    pathSegment.kind === 'cubicBezier' &&
+    pathSegment.controlMode?.kind === 'relativePolar'
+  ) {
+    return [
+      renderPathPointCoordinateEditor(
+        diagram,
+        path,
+        segment.points[0],
+        segment.segmentNumber,
+        onDiagramChange,
+      ),
+      <EditableNumberField
+        key="control-1-angle"
+        label={`Segment ${segment.segmentNumber} Control 1 angle`}
+        value={pathSegment.controlMode.firstControl.angleDegrees}
+        onChange={(value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativePolarControl(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'firstControl',
+              'angleDegrees',
+              value,
+            ),
+          )
+        }
+      />,
+      <EditableNumberField
+        key="control-1-radius"
+        label={`Segment ${segment.segmentNumber} Control 1 radius`}
+        value={pathSegment.controlMode.firstControl.radius}
+        onChange={(value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativePolarControl(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'firstControl',
+              'radius',
+              value,
+            ),
+          )
+        }
+      />,
+      <EditableNumberField
+        key="control-2-angle"
+        label={`Segment ${segment.segmentNumber} Control 2 angle`}
+        value={pathSegment.controlMode.secondControl.angleDegrees}
+        onChange={(value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativePolarControl(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'secondControl',
+              'angleDegrees',
+              value,
+            ),
+          )
+        }
+      />,
+      <EditableNumberField
+        key="control-2-radius"
+        label={`Segment ${segment.segmentNumber} Control 2 radius`}
+        value={pathSegment.controlMode.secondControl.radius}
+        onChange={(value) =>
+          updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+            updateConcatenatedPathRelativePolarControl(
+              current,
+              diagram.ambientDimension,
+              segment.segmentIndex,
+              'secondControl',
+              'radius',
+              value,
+            ),
+          )
+        }
+      />,
+      renderPathPointCoordinateEditor(
+        diagram,
+        path,
+        segment.points[3],
+        segment.segmentNumber,
+        onDiagramChange,
+      ),
+    ]
+  }
+
+  return segment.points.map((point) =>
+    renderPathPointCoordinateEditor(
+      diagram,
+      path,
+      point,
+      segment.segmentNumber,
+      onDiagramChange,
+    ),
+  )
+}
+
+function renderPathPointCoordinateEditor(
+  diagram: Diagram,
+  path: ConcatenatedPathStratum,
+  point: ConcatenatedPathPointDescription,
+  segmentNumber: number,
+  onDiagramChange: DiagramChangeHandler,
+) {
+  return (
+    <CoordinateEditor
+      key={`${point.target.segmentIndex}-${point.target.role}`}
+      label={`Segment ${segmentNumber} ${point.label}`}
+      point={point.point}
+      ambientDimension={diagram.ambientDimension}
+      onCoordinateChange={(axis, value) =>
+        updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
+          updateConcatenatedPathCoordinate(
+            current,
+            diagram.ambientDimension,
+            point.target,
+            axis,
+            value,
+          ),
+        )
+      }
+    />
+  )
+}
+
+function updateConcatenatedPathInDiagram(
+  pathId: string,
+  onDiagramChange: DiagramChangeHandler,
+  updater: (path: ConcatenatedPathStratum) => ConcatenatedPathStratum,
+): void {
+  onDiagramChange((currentDiagram) =>
+    updateStratumById(currentDiagram, pathId, (current) => {
+      if (
+        current.geometricKind !== 'curve' ||
+        current.kind !== 'concatenatedPath'
+      ) {
+        return current
+      }
+
+      return updater(current)
+    }),
+  )
 }
 
 function AbsoluteCurvePointEditor({

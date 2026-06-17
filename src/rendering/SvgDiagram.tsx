@@ -1,6 +1,7 @@
 import { useRef, type ReactElement } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import type {
+  ConcatenatedPathStratum,
   CurveStratum,
   Diagram,
   PathSegment,
@@ -23,6 +24,10 @@ import {
   concatenatedPathDraftCoordinates,
   type ConcatenatedPathDraft,
 } from '../ui/pathDraft'
+import {
+  describeConcatenatedPathSegments,
+  type ConcatenatedPathPointTarget,
+} from '../ui/pathEditing'
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
@@ -1384,7 +1389,28 @@ function renderSelectedGeometryHandles(
       )
     case 'curve':
       if (stratum.kind === 'concatenatedPath') {
-        return null
+        const handles = concatenatedPathHandleDescriptions(stratum)
+
+        return (
+          <g
+            key="selected-path-handles"
+            aria-label="Selected path drag handles"
+          >
+            {handles.map((handle) =>
+              renderHandleCircle(
+                projectToSvgPoint(camera, handle.point, viewportHeight),
+                {
+                  kind: 'pathSegmentPoint',
+                  stratumId: stratum.id,
+                  segmentIndex: handle.target.segmentIndex,
+                  role: handle.target.role,
+                },
+                handle.label,
+                onPointerDown,
+              ),
+            )}
+          </g>
+        )
       }
 
       return (
@@ -1442,6 +1468,29 @@ function renderHandleCircle(
   )
 }
 
+type ConcatenatedPathHandleDescription = {
+  target: ConcatenatedPathPointTarget
+  point: Vec3
+  label: string
+}
+
+function concatenatedPathHandleDescriptions(
+  path: ConcatenatedPathStratum,
+): ConcatenatedPathHandleDescription[] {
+  return describeConcatenatedPathSegments(path).flatMap((segment) =>
+    segment.points
+      .filter(
+        (point) =>
+          point.target.role !== 'start' || point.target.segmentIndex === 0,
+      )
+      .map((point) => ({
+        target: point.target,
+        point: point.point,
+        label: `Segment ${segment.segmentNumber} ${point.label}`,
+      })),
+  )
+}
+
 function geometryHandleKey(target: GeometryHandleTarget): string {
   switch (target.kind) {
     case 'pointPosition':
@@ -1450,6 +1499,8 @@ function geometryHandleKey(target: GeometryHandleTarget): string {
       return `label-handle-${target.labelId}`
     case 'curvePoint':
       return `curve-handle-${target.stratumId}-${target.pointIndex}`
+    case 'pathSegmentPoint':
+      return `path-handle-${target.stratumId}-${target.segmentIndex}-${target.role}`
     case 'sheetVertex':
       return `sheet-handle-${target.stratumId}-${target.vertexIndex}`
   }

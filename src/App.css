@@ -903,6 +903,22 @@
   line-height: 1.35;
 }
 
+.path-segment-operations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.path-segment-editor {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  background: var(--border);
+}
+
 .inspector-input {
   width: 100%;
   min-width: 0;

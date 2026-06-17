@@ -266,6 +266,48 @@ invalidate the created geometry. In active work-plane local mode and in 3D curso
 creation, an existing source must already lie on the active work plane within
 tolerance; off-plane sources are rejected rather than silently projected.
 
+### Concatenated path editing
+
+Committed concatenated paths are editable after selection. The inspector shows
+segments in order with one-based user-facing segment numbers:
+
+```text
+Segment 1: Line
+  Start
+  End
+
+Segment 2: Cubic Bezier
+  Start
+  Control point 1
+  Control point 2
+  End
+```
+
+Inspector coordinate fields reject invalid numeric input. In 2D mode the `z`
+coordinate is hidden and edited points stay on `z = 0`; in 3D mode all three
+coordinates are editable. When an endpoint is shared between adjacent segments,
+editing either copy updates both stored endpoints. The editor must never commit
+a concatenated path whose adjacent endpoints disagree.
+
+Selected concatenated paths show SVG drag handles for path vertices and cubic
+Bézier control points. Shared joins are rendered as one draggable vertex handle;
+dragging the join updates the previous segment end and next segment start
+together. In 2D, drags keep `z = 0`. In 3D, drags are projected through the
+active work plane unless future path-local work-plane metadata supplies a more
+specific editing plane. Drag handles are UI state only and are not saved or
+exported.
+
+Cubic path segments may use absolute controls, relative Cartesian controls, or
+2D relative polar controls where the existing Bézier control infrastructure
+supports those modes. Editing endpoints preserves supported relative controls by
+recomputing absolute control points from the stored offsets. Directly editing or
+dragging a control point converts that cubic segment to absolute controls.
+
+The current segment operations are append line segment, append cubic Bézier
+segment, and remove last segment. Appended segments begin at the existing final
+endpoint. Removing the last remaining segment is blocked to keep the path valid;
+users can delete the whole selected path stratum instead.
+
 ### Hybrid editing
 
 The user may create a point by cursor input and later refine it by direct input.

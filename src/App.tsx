@@ -3228,6 +3228,7 @@ function geometryHandleTargetsSelection(
   switch (target.kind) {
     case 'pointPosition':
     case 'curvePoint':
+    case 'pathSegmentPoint':
     case 'sheetVertex':
       return (
         selectedElement.kind === 'stratum' &&
