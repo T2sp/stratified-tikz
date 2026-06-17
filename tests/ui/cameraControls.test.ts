@@ -3,9 +3,12 @@ import test from 'node:test'
 import { validateCamera3D } from '../../src/geometry/projection.ts'
 import {
   areCamera3DEqual,
+  applyCameraOrbitDrag,
   applyCameraNumericInput,
+  applyCameraPanDrag,
   cameraControlStateFromDiagramView,
   cameraControlFieldValue,
+  cameraDragModeFromPointerInput,
   cameraOrientationForPreview,
   cameraPresetIdForCamera,
   cameraPresetIds,
@@ -214,6 +217,84 @@ test('camera control field values use theta and phi camera state', () => {
   assert.equal(cameraControlFieldValue(camera, 'thetaDeg'), '70')
   assert.equal(cameraControlFieldValue(camera, 'phiDeg'), '110')
   assert.equal(cameraControlFieldValue(camera, 'zoom'), '1')
+})
+
+test('camera orbit drag updates theta and phi without changing zoom or pan', () => {
+  const camera = createCameraPresetCamera('isometric')
+  const dragged = applyCameraOrbitDrag(camera, { x: 20, y: -10 })
+
+  assert.equal(dragged.phiDeg, 117)
+  assert.equal(dragged.thetaDeg, 66.5)
+  assert.equal(dragged.zoom, camera.zoom)
+  assert.deepEqual(dragged.pan, camera.pan)
+  assert.equal(dragged.projectionBasis, undefined)
+  assert.equal(validateCamera3D(dragged).valid, true)
+})
+
+test('camera orbit drag rejects non-finite deltas without mutating camera', () => {
+  const camera = createCameraPresetCamera('isometric')
+
+  assert.deepEqual(applyCameraOrbitDrag(camera, { x: Number.NaN, y: 2 }), camera)
+  assert.notEqual(applyCameraOrbitDrag(camera, { x: Number.NaN, y: 2 }), camera)
+})
+
+test('camera pan drag updates pan without changing orientation or zoom', () => {
+  const camera = createCameraPresetCamera('isometric')
+  const dragged = applyCameraPanDrag(camera, { x: 12, y: -8 })
+
+  assert.equal(dragged.thetaDeg, camera.thetaDeg)
+  assert.equal(dragged.phiDeg, camera.phiDeg)
+  assert.equal(dragged.zoom, camera.zoom)
+  assert.deepEqual(dragged.pan, { x: 12, y: -8 })
+  assert.equal(validateCamera3D(dragged).valid, true)
+})
+
+test('camera drag mode starts only for enabled background pointer gestures', () => {
+  assert.equal(
+    cameraDragModeFromPointerInput({
+      cameraDragEnabled: true,
+      isBackgroundTarget: true,
+      button: 0,
+      shiftKey: false,
+    }),
+    'orbit',
+  )
+  assert.equal(
+    cameraDragModeFromPointerInput({
+      cameraDragEnabled: true,
+      isBackgroundTarget: true,
+      button: 0,
+      shiftKey: true,
+    }),
+    'pan',
+  )
+  assert.equal(
+    cameraDragModeFromPointerInput({
+      cameraDragEnabled: true,
+      isBackgroundTarget: true,
+      button: 1,
+      shiftKey: false,
+    }),
+    'pan',
+  )
+  assert.equal(
+    cameraDragModeFromPointerInput({
+      cameraDragEnabled: false,
+      isBackgroundTarget: true,
+      button: 0,
+      shiftKey: false,
+    }),
+    null,
+  )
+  assert.equal(
+    cameraDragModeFromPointerInput({
+      cameraDragEnabled: true,
+      isBackgroundTarget: false,
+      button: 0,
+      shiftKey: false,
+    }),
+    null,
+  )
 })
 
 function expectCameraInputOk(

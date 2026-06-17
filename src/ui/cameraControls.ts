@@ -21,6 +21,14 @@ export const cameraPresetIds = [
 
 export type CameraPresetId = (typeof cameraPresetIds)[number]
 export type CameraControlField = 'thetaDeg' | 'phiDeg' | 'zoom' | 'panX' | 'panY'
+export type CameraDragMode = 'orbit' | 'pan'
+
+export type CameraDragStartInput = {
+  cameraDragEnabled: boolean
+  isBackgroundTarget: boolean
+  button: number
+  shiftKey: boolean
+}
 
 export type CameraPresetOption = {
   id: CameraPresetId
@@ -42,6 +50,9 @@ export type CameraViewAdjustment = {
   zoom: number
   pan: Vec2
 }
+
+const defaultOrbitSensitivityDegPerPixel = 0.35
+const defaultPanSensitivity = 1
 
 export const cameraPresetOptions: CameraPresetOption[] = [
   { id: 'initial', label: 'Initial' },
@@ -186,6 +197,62 @@ export function applyCameraNumericInput(
   }
 }
 
+export function applyCameraOrbitDrag(
+  camera: OrthographicCamera3D,
+  delta: Vec2,
+  sensitivityDegPerPixel = defaultOrbitSensitivityDegPerPixel,
+): OrthographicCamera3D {
+  if (!isFiniteDelta(delta) || !isPositiveFinite(sensitivityDegPerPixel)) {
+    return cloneCamera3D(camera)
+  }
+
+  const nextCamera = {
+    ...cloneCamera3D(camera),
+    thetaDeg: camera.thetaDeg + delta.y * sensitivityDegPerPixel,
+    phiDeg: camera.phiDeg + delta.x * sensitivityDegPerPixel,
+  }
+  delete nextCamera.projectionBasis
+
+  return validateCamera3D(nextCamera).valid ? nextCamera : cloneCamera3D(camera)
+}
+
+export function applyCameraPanDrag(
+  camera: OrthographicCamera3D,
+  delta: Vec2,
+  sensitivity = defaultPanSensitivity,
+): OrthographicCamera3D {
+  if (!isFiniteDelta(delta) || !isPositiveFinite(sensitivity)) {
+    return cloneCamera3D(camera)
+  }
+
+  const nextCamera = {
+    ...cloneCamera3D(camera),
+    pan: {
+      x: camera.pan.x + delta.x * sensitivity,
+      y: camera.pan.y + delta.y * sensitivity,
+    },
+  }
+
+  return validateCamera3D(nextCamera).valid ? nextCamera : cloneCamera3D(camera)
+}
+
+export function cameraDragModeFromPointerInput({
+  cameraDragEnabled,
+  isBackgroundTarget,
+  button,
+  shiftKey,
+}: CameraDragStartInput): CameraDragMode | null {
+  if (!cameraDragEnabled || !isBackgroundTarget) {
+    return null
+  }
+
+  if (shiftKey || button === 1) {
+    return 'pan'
+  }
+
+  return button === 0 ? 'orbit' : null
+}
+
 export function cameraControlFieldValue(
   camera: OrthographicCamera3D,
   field: CameraControlField,
@@ -242,6 +309,14 @@ function parseFiniteInput(rawValue: string): number | null {
   const value = Number(rawValue)
 
   return Number.isFinite(value) ? value : null
+}
+
+function isFiniteDelta(delta: Vec2): boolean {
+  return Number.isFinite(delta.x) && Number.isFinite(delta.y)
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0
 }
 
 function invalidCameraInput(

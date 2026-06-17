@@ -23,6 +23,10 @@ import type {
 } from '../ui/workPlanePreview'
 import type { CoordinateSourceHighlight } from '../ui/coordinateSourceHighlights'
 import {
+  cameraDragModeFromPointerInput,
+  type CameraDragMode,
+} from '../ui/cameraControls'
+import {
   concatenatedPathDraftCoordinates,
   type ConcatenatedPathDraft,
 } from '../ui/pathDraft'
@@ -98,6 +102,7 @@ export type SvgDiagramProps = {
   ) => void
   onGeometryHandleDragStart?: (target: GeometryHandleTarget) => void
   onGeometryHandleDragEnd?: () => void
+  onCameraDrag?: (delta: Vec2, mode: CameraDragMode) => void
 }
 
 type RenderItem = {
@@ -119,6 +124,12 @@ type SvgCurvePathRun = {
   strokeOpacity: number
   strokeWidth: number
   strokeDasharray?: string
+}
+
+type ActiveCameraDrag = {
+  mode: CameraDragMode
+  lastClientPoint: Vec2
+  moved: boolean
 }
 
 const defaultWidth = 520
@@ -151,8 +162,10 @@ export function SvgDiagram({
   onGeometryHandleDrag,
   onGeometryHandleDragStart,
   onGeometryHandleDragEnd,
+  onCameraDrag,
 }: SvgDiagramProps): ReactElement {
   const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
+  const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
   const coordinateAxesGuide = createCoordinateAxesGuide(diagram.ambientDimension)
   const extraPointsForFit = [
@@ -203,20 +216,65 @@ export function SvgDiagram({
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
-      onPointerMove={(event) => {
-        const target = activeDragTargetRef.current
+      onPointerDown={(event) => {
+        if (activeDragTargetRef.current !== null || onCameraDrag === undefined) {
+          return
+        }
 
-        if (target === null || onGeometryHandleDrag === undefined) {
+        const mode = cameraDragModeFromPointerInput({
+          cameraDragEnabled: true,
+          isBackgroundTarget: isSvgBackgroundTarget(event.target),
+          button: event.button,
+          shiftKey: event.shiftKey,
+        })
+
+        if (mode === null) {
           return
         }
 
         event.preventDefault()
-        onGeometryHandleDrag(
-          target,
-          svgPointFromPointerEvent(event, width, height),
-          height,
-          camera,
-        )
+        activeCameraDragRef.current = {
+          mode,
+          lastClientPoint: { x: event.clientX, y: event.clientY },
+          moved: false,
+        }
+        event.currentTarget.setPointerCapture(event.pointerId)
+      }}
+      onPointerMove={(event) => {
+        const target = activeDragTargetRef.current
+
+        if (target !== null && onGeometryHandleDrag !== undefined) {
+          event.preventDefault()
+          onGeometryHandleDrag(
+            target,
+            svgPointFromPointerEvent(event, width, height),
+            height,
+            camera,
+          )
+          return
+        }
+
+        const cameraDrag = activeCameraDragRef.current
+
+        if (cameraDrag !== null && onCameraDrag !== undefined) {
+          const nextClientPoint = { x: event.clientX, y: event.clientY }
+          const delta = {
+            x: nextClientPoint.x - cameraDrag.lastClientPoint.x,
+            y: nextClientPoint.y - cameraDrag.lastClientPoint.y,
+          }
+
+          event.preventDefault()
+          activeCameraDragRef.current = {
+            ...cameraDrag,
+            lastClientPoint: nextClientPoint,
+            moved: cameraDrag.moved || delta.x !== 0 || delta.y !== 0,
+          }
+
+          if (delta.x !== 0 || delta.y !== 0) {
+            suppressNextCanvasClickRef.current = true
+            onCameraDrag(delta, cameraDrag.mode)
+          }
+        }
       }}
       onPointerUp={(event) => {
         if (activeDragTargetRef.current !== null) {
@@ -228,9 +286,24 @@ export function SvgDiagram({
             suppressNextCanvasClickRef.current = false
           }, 0)
         }
+
+        const cameraDrag = activeCameraDragRef.current
+
+        if (cameraDrag !== null) {
+          event.preventDefault()
+          activeCameraDragRef.current = null
+          if (cameraDrag.moved) {
+            suppressNextCanvasClickRef.current = true
+            window.setTimeout(() => {
+              suppressNextCanvasClickRef.current = false
+            }, 0)
+          }
+          releasePointerCaptureIfHeld(event)
+        }
       }}
       onPointerCancel={(event) => {
         activeDragTargetRef.current = null
+        activeCameraDragRef.current = null
         suppressNextCanvasClickRef.current = false
         onGeometryHandleDragEnd?.()
         releasePointerCaptureIfHeld(event)
@@ -249,7 +322,13 @@ export function SvgDiagram({
         onSelectionChange?.(null)
       }}
     >
-      <rect width={width} height={height} fill="currentColor" opacity="0.04" />
+      <rect
+        width={width}
+        height={height}
+        fill="currentColor"
+        opacity="0.04"
+        data-svg-background="true"
+      />
       {renderCoordinateAxesGuide(coordinateAxesGuide, camera, height)}
       {renderWorkPlanePreview(workPlanePreview, camera, height)}
       <g>{items.map((item) => item.element)}</g>
@@ -1832,6 +1911,13 @@ function svgPointFromPointerEvent(
     { x: event.clientX, y: event.clientY },
     bounds,
     { width: viewportWidth, height: viewportHeight },
+  )
+}
+
+function isSvgBackgroundTarget(target: EventTarget): boolean {
+  return (
+    target instanceof SVGElement &&
+    target.dataset.svgBackground === 'true'
   )
 }
 

@@ -57,7 +57,9 @@ import {
   areFinitePoints,
   arePointsOnWorkPlane,
   allLayersFilter,
+  applyCameraOrbitDrag,
   applyCameraNumericInput,
+  applyCameraPanDrag,
   clearSelectionIfMissing,
   clearSelectionForLayerFilter,
   cloneDiagram,
@@ -144,6 +146,7 @@ import {
   type ExistingCoordinateSource,
   type ExistingCoordinateSourceOption,
   type CameraControlField,
+  type CameraDragMode,
   type CameraPresetId,
   type ConcatenatedPathDraft,
   type ConcatenatedPathSegmentKind,
@@ -642,6 +645,16 @@ function App() {
     }
 
     setCameraControl(createCameraPresetCamera(presetId))
+    setCameraStatus('')
+    setCopyStatus('idle')
+  }
+
+  function handleCameraDrag(delta: Vec2, mode: CameraDragMode): void {
+    setCameraControl((current) =>
+      mode === 'pan'
+        ? applyCameraPanDrag(current, delta)
+        : applyCameraOrbitDrag(current, delta),
+    )
     setCameraStatus('')
     setCopyStatus('idle')
   }
@@ -3394,104 +3407,6 @@ function App() {
           </span>
         </div>
 
-        {showCameraControls && (
-          <section className="camera-control" aria-labelledby="camera-heading">
-            <div className="camera-summary-row">
-              <button
-                type="button"
-                className="camera-summary-toggle"
-                aria-expanded={showCameraDetails}
-                aria-controls="camera-details"
-                onClick={() =>
-                  setIsCameraDetailsExpanded((expanded) => !expanded)
-                }
-              >
-                <span className="camera-disclosure" aria-hidden="true">
-                  {showCameraDetails ? 'v' : '>'}
-                </span>
-                <span id="camera-heading" className="control-label">
-                  Camera
-                </span>
-                <span className="camera-summary">
-                  {cameraSummaryLabel(cameraControl)}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                onClick={resetCameraViewToInitial}
-              >
-                Reset to initial
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                disabled={!canResetCameraToSaved}
-                onClick={resetCameraViewToSaved}
-              >
-                Reset to saved
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                onClick={fitCameraView}
-              >
-                Fit
-              </button>
-              {cameraStatus !== '' && (
-                <span className="toolbar-status camera-status" role="status">
-                  {cameraStatus}
-                </span>
-              )}
-            </div>
-
-            {showCameraDetails && (
-              <div id="camera-details" className="camera-details">
-                <div className="camera-field-grid">
-                  {cameraNumericFields.map((field) => (
-                    <label key={field.field} className="camera-field">
-                      <span>{field.label}</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={cameraControlFieldValue(
-                          cameraControl,
-                          field.field,
-                        )}
-                        onChange={(event) =>
-                          updateCameraNumericField(
-                            field.field,
-                            event.currentTarget.value,
-                          )
-                        }
-                      />
-                    </label>
-                  ))}
-                </div>
-                <label className="camera-preset-field">
-                  <span>Preset</span>
-                  <select
-                    className="toolbar-select"
-                    value={activeCameraPresetId ?? 'custom'}
-                    onChange={(event) =>
-                      updateCameraPreset(
-                        event.currentTarget.value as CameraPresetId | 'custom',
-                      )
-                    }
-                  >
-                    <option value="custom">custom</option>
-                    {cameraPresetOptions.map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-          </section>
-        )}
-
         {shouldShowWorkPlaneControls(editableDiagram.ambientDimension) && (
           <section className="work-plane-control" aria-labelledby="work-plane-heading">
             <div className="work-plane-summary-row">
@@ -3735,55 +3650,172 @@ function App() {
               <span>{selectedExample.summary}</span>
             </div>
           </div>
-          <SvgDiagram
-            diagram={editableDiagram}
-            fitToView
-            cameraOverride={previewCameraOverride}
-            cameraViewAdjustment={previewCameraAdjustment}
-            selectedElement={selectedElement}
-            polylineDraft={polylineDraft?.points}
-            cubicBezierDraft={cubicBezierDraft?.points}
-            pathDraft={pathDraft ?? undefined}
-            sheetDraft={sheetPolygonDraft?.points}
-            workPlanePreview={workPlanePreview}
-            coordinateSourceHighlights={coordinateSourceHighlights}
-            layerFilter={layerFilter}
-            showGeometryHandles={
-              creationTool === 'select' && !workPlanePointPickingState.active
-            }
-            onSelectionChange={
-              creationTool === 'select' && !workPlanePointPickingState.active
-                ? updateSelectedElement
-                : undefined
-            }
-            onCanvasClick={
-              creationTool === 'select' || workPlanePointPickingState.active
-                ? undefined
-                : handlePreviewCreationClick
-            }
-            onPointStratumClick={
-              workPlanePointPickingState.active
-                ? pickExistingPointForWorkPlane
-                : creationTool === 'select'
+          <div className="preview-stage">
+            <SvgDiagram
+              diagram={editableDiagram}
+              fitToView
+              cameraOverride={previewCameraOverride}
+              cameraViewAdjustment={previewCameraAdjustment}
+              selectedElement={selectedElement}
+              polylineDraft={polylineDraft?.points}
+              cubicBezierDraft={cubicBezierDraft?.points}
+              pathDraft={pathDraft ?? undefined}
+              sheetDraft={sheetPolygonDraft?.points}
+              workPlanePreview={workPlanePreview}
+              coordinateSourceHighlights={coordinateSourceHighlights}
+              layerFilter={layerFilter}
+              showGeometryHandles={
+                creationTool === 'select' && !workPlanePointPickingState.active
+              }
+              onSelectionChange={
+                creationTool === 'select' && !workPlanePointPickingState.active
+                  ? updateSelectedElement
+                  : undefined
+              }
+              onCanvasClick={
+                creationTool === 'select' || workPlanePointPickingState.active
                   ? undefined
-                  : handleExistingPointSourceCreationClick
-            }
-            onGeometryHandleDrag={
-              creationTool === 'select' && !workPlanePointPickingState.active
-                ? handleGeometryHandleDrag
-                : undefined
-            }
-            onGeometryHandleDragStart={
-              creationTool === 'select' && !workPlanePointPickingState.active
-                ? handleGeometryHandleDragStart
-                : undefined
-            }
-            onGeometryHandleDragEnd={
-              creationTool === 'select' && !workPlanePointPickingState.active
-                ? handleGeometryHandleDragEnd
-                : undefined
-            }
-          />
+                  : handlePreviewCreationClick
+              }
+              onPointStratumClick={
+                workPlanePointPickingState.active
+                  ? pickExistingPointForWorkPlane
+                  : creationTool === 'select'
+                    ? undefined
+                    : handleExistingPointSourceCreationClick
+              }
+              onGeometryHandleDrag={
+                creationTool === 'select' && !workPlanePointPickingState.active
+                  ? handleGeometryHandleDrag
+                  : undefined
+              }
+              onGeometryHandleDragStart={
+                creationTool === 'select' && !workPlanePointPickingState.active
+                  ? handleGeometryHandleDragStart
+                  : undefined
+              }
+              onGeometryHandleDragEnd={
+                creationTool === 'select' && !workPlanePointPickingState.active
+                  ? handleGeometryHandleDragEnd
+                  : undefined
+              }
+              onCameraDrag={
+                showCameraControls &&
+                creationTool === 'select' &&
+                !workPlanePointPickingState.active
+                  ? handleCameraDrag
+                  : undefined
+              }
+            />
+
+            {showCameraControls && (
+              <section
+                className="camera-control"
+                aria-labelledby="camera-heading"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <div className="camera-summary-row">
+                  <button
+                    type="button"
+                    className="camera-summary-toggle"
+                    aria-expanded={showCameraDetails}
+                    aria-controls="camera-details"
+                    onClick={() =>
+                      setIsCameraDetailsExpanded((expanded) => !expanded)
+                    }
+                  >
+                    <span className="camera-disclosure" aria-hidden="true">
+                      {showCameraDetails ? 'v' : '>'}
+                    </span>
+                    <span id="camera-heading" className="control-label">
+                      Camera
+                    </span>
+                    <span className="camera-summary">
+                      {cameraSummaryLabel(cameraControl)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    onClick={resetCameraViewToInitial}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    disabled={!canResetCameraToSaved}
+                    onClick={resetCameraViewToSaved}
+                  >
+                    Saved
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    onClick={fitCameraView}
+                  >
+                    Fit
+                  </button>
+                </div>
+
+                {showCameraDetails && (
+                  <div id="camera-details" className="camera-details">
+                    <div className="camera-field-grid">
+                      {cameraNumericFields.map((field) => (
+                        <label key={field.field} className="camera-field">
+                          <span>{field.label}</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={cameraControlFieldValue(
+                              cameraControl,
+                              field.field,
+                            )}
+                            onChange={(event) =>
+                              updateCameraNumericField(
+                                field.field,
+                                event.currentTarget.value,
+                              )
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <label className="camera-preset-field">
+                      <span>Preset</span>
+                      <select
+                        className="toolbar-select"
+                        value={activeCameraPresetId ?? 'custom'}
+                        onChange={(event) =>
+                          updateCameraPreset(
+                            event.currentTarget.value as CameraPresetId | 'custom',
+                          )
+                        }
+                      >
+                        <option value="custom">custom</option>
+                        {cameraPresetOptions.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+
+                <p className="camera-help">
+                  Drag background to orbit. Shift-drag or middle-drag to pan.
+                  Zoom is manual.
+                </p>
+                {cameraStatus !== '' && (
+                  <span className="toolbar-status camera-status" role="status">
+                    {cameraStatus}
+                  </span>
+                )}
+              </section>
+            )}
+          </div>
         </article>
 
         <article className="workspace-panel inspector-panel">
