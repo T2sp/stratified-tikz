@@ -11,7 +11,7 @@ test('generateTikzExamples writes representative TikZ files', async () => {
   try {
     const files = await generateTikzExamples({ outputDir })
 
-    assert.equal(files.length, 2)
+    assert.equal(files.length, 6)
 
     const twoDimensionalSource = await readFile(
       join(outputDir, 'diagram-2d.tex'),
@@ -19,6 +19,22 @@ test('generateTikzExamples writes representative TikZ files', async () => {
     )
     const threeDimensionalSource = await readFile(
       join(outputDir, 'diagram-3d.tex'),
+      'utf8',
+    )
+    const referenceFillsSource = await readFile(
+      join(outputDir, 'reference-fills.tex'),
+      'utf8',
+    )
+    const hemisphereSource = await readFile(
+      join(outputDir, 'hemisphere-patch.tex'),
+      'utf8',
+    )
+    const saddleSource = await readFile(
+      join(outputDir, 'saddle-patch.tex'),
+      'utf8',
+    )
+    const evenOddSource = await readFile(
+      join(outputDir, 'even-odd-boundary.tex'),
       'utf8',
     )
 
@@ -30,6 +46,24 @@ test('generateTikzExamples writes representative TikZ files', async () => {
     assert.match(threeDimensionalSource, /tdplot_main_coords/)
     assert.match(threeDimensionalSource, /\\path\[/)
     assert.match(threeDimensionalSource, /star points=5/)
+    assert.match(referenceFillsSource, /Blue translucent region/)
+    assert.match(referenceFillsSource, /densely dotted/)
+    assert.match(hemisphereSource, /Primitive: hemisphere/)
+    assert.match(hemisphereSource, /faces=32/)
+    assert.match(saddleSource, /Primitive: saddle/)
+    assert.match(saddleSource, /faces=30/)
+    assert.match(evenOddSource, /even odd rule/)
+    assert.doesNotMatch(
+      [
+        twoDimensionalSource,
+        threeDimensionalSource,
+        referenceFillsSource,
+        hemisphereSource,
+        saddleSource,
+        evenOddSource,
+      ].join('\n'),
+      /NaN|Infinity/,
+    )
   } finally {
     await rm(outputDir, { recursive: true, force: true })
   }

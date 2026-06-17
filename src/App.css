@@ -924,6 +924,29 @@
   overflow-wrap: anywhere;
 }
 
+.style-preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.style-preset-button {
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-h);
+  background: #ffffff;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.style-preset-button:hover {
+  background: var(--button-hover);
+}
+
 .readonly-value {
   min-width: 0;
   color: var(--text-h);

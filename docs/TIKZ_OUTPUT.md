@@ -8,6 +8,29 @@ Do not emit one huge unreadable path.
 
 The output should look like code a human might have written.
 
+## Reference examples and presets
+
+The app ships editable reference examples for common export patterns:
+
+- a 2D translucent filled-region diagram with solid and densely dotted curves;
+- a 3D hemisphere patch with paths, point markers, and free labels;
+- a 3D saddle patch with crossing paths, point markers, and free labels;
+- a 2D even-odd compound filled boundary.
+
+The `generate:tikz-examples` script writes these references alongside the base
+2D and 3D examples:
+
+```bash
+npm run generate:tikz-examples
+```
+
+The style inspectors expose lightweight presets for blue/red translucent filled
+regions or sheets, black solid curves, black densely dotted curves, and common
+black point markers. Presets are convenience controls only. Applying a preset
+copies explicit style values into the selected stratum; diagrams do not store a
+`styleId`, so saved JSON and exported TikZ remain stable if preset definitions
+change later.
+
 ## Mathematical convention
 
 The word **n-stratum** means **codimension n**.
@@ -447,6 +470,13 @@ flat quads, there is no hidden-surface sorting, and the output size grows with
 TikZ source remains readable. If sampling fails or would produce non-finite
 coordinates, the generator omits that curved sheet and emits a readable comment
 rather than writing `NaN` or `Infinity`.
+
+TikZ export also caps curved-sheet mesh output at 256 sampled faces. A curved
+sheet above that cap is omitted with a comment asking the user to reduce
+sampling. This keeps generated source readable and prevents accidentally large
+manual edits from producing thousands of `\filldraw` commands. SVG preview and
+model validation still use the model's explicit capped sampling values; the
+256-face limit is an export-readability guard, not a new surface model.
 
 ## Output sections in 2D mode
 

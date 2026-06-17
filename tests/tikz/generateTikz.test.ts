@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   generateTikz,
   layerToTikzLayerName,
+  maxCurvedSheetTikzFaces,
   sanitizeTikzSpathSaveName,
   sanitizeTikzNameStem,
 } from '../../src/tikz/index.ts'
@@ -319,6 +320,8 @@ test('TikZ layer names are deterministic and TikZ-safe', () => {
   assert.equal(layerToTikzLayerName(2), 'stratifiedLayer2')
   assert.equal(layerToTikzLayerName(-1), 'stratifiedLayerMinus1')
   assert.equal(layerToTikzLayerName(1.5), 'stratifiedLayer1Point5')
+  assert.equal(layerToTikzLayerName(Number.NaN), 'stratifiedLayer0')
+  assert.equal(layerToTikzLayerName(Number.POSITIVE_INFINITY), 'stratifiedLayer0')
 })
 
 test('generated TikZ declares used layers in numeric order', () => {
@@ -971,6 +974,30 @@ test('3D curvedSheet default sampled TikZ output remains bounded', () => {
   assert.doesNotMatch(tikz, /omitted/)
 })
 
+test('3D curvedSheet TikZ export omits meshes above the readable face cap', () => {
+  const diagram = createCurvedHemisphereSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'curvedSheet') {
+    throw new Error('Expected a curved sheet.')
+  }
+
+  sheet.primitive = {
+    ...sheet.primitive,
+    sampling: { uSegments: 32, vSegments: 9 },
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /omitted because its sampled mesh has 288 faces/)
+  assert.match(
+    tikz,
+    new RegExp(`Reduce sampling to at most ${maxCurvedSheetTikzFaces} faces`),
+  )
+  assert.doesNotMatch(tikz, /sheetCurvedCurvedHemisphere0p0/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
 test('existing 3D vertex sheet export remains a single closed path', () => {
   const tikz = generateTikz(createThreeDimensionalDiagram())
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
@@ -993,6 +1020,75 @@ test('filled-object TikZ output has no NaN or Infinity values', () => {
 
   assert.doesNotMatch(tikz, /NaN/)
   assert.doesNotMatch(tikz, /Infinity/)
+})
+
+test('ordinary non-finite TikZ geometry is omitted instead of emitting invalid coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'quadSheet',
+      id: 'bad-sheet',
+      name: 'Bad Sheet',
+      style: sheetStyle(),
+      corners: [
+        { x: 0, y: 0, z: 0 },
+        { x: Number.NaN, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ],
+      layer: 0,
+    },
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'bad-curve',
+      name: 'Bad Curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: Number.POSITIVE_INFINITY, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 3,
+      geometricKind: 'point',
+      id: 'bad-point',
+      name: 'Bad Point',
+      style: pointStyle(),
+      position: { x: 0, y: 0, z: Number.NaN },
+      layer: 0,
+    },
+  )
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'bad-label',
+    name: 'Bad Label',
+    text: '$B$',
+    position: { x: Number.NEGATIVE_INFINITY, y: 0, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /Sheet "Bad Sheet" \[bad-sheet\] omitted/)
+  assert.match(tikz, /Curve "Bad Curve" \[bad-curve\] omitted/)
+  assert.match(tikz, /Point "Bad Point" \[bad-point\] omitted/)
+  assert.match(tikz, /Label "Bad Label" \[bad-label\] omitted/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetQuadBadSheet0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePolyBadCurve0p1\)/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 
 test('filled-object TikZ omits non-finite fill boundaries instead of emitting invalid coordinates', () => {

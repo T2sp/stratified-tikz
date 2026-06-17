@@ -100,6 +100,7 @@ const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
 const coordinateAxesGuideColor: HexColor = '#64748B'
 const coordinateAxesGuideLength = 2.5
 const coordinateAxesGuideLabelOffset = 0.25
+export const maxCurvedSheetTikzFaces = 256
 
 export function generateTikz(
   diagram: Diagram,
@@ -261,7 +262,7 @@ export function sanitizeTikzSpathSaveName(pathLabel: string): string {
 }
 
 export function layerToTikzLayerName(layer: number): string {
-  const normalizedLayer = Object.is(layer, -0) ? 0 : layer
+  const normalizedLayer = normalizeLayer(layer)
   const suffix = String(normalizedLayer)
     .replaceAll('-', 'Minus')
     .replaceAll('.', 'Point')
@@ -526,6 +527,13 @@ function emitSheet(
     return emitCurvedSheet(sheet, elementIndex, context)
   }
 
+  if (!sheetVertices(sheet).every(isFiniteVec3)) {
+    return [
+      `% Sheet "${sheet.name}" [${sheet.id}] omitted because its vertices contain non-finite coordinates.`,
+      '',
+    ]
+  }
+
   const fillColor = context.colors.define(
     `Sheet${sheet.id}Fill`,
     sheet.style.fillColor,
@@ -553,6 +561,7 @@ function emitSheet(
   ]
 
   return [
+    `% Filled sheet "${sheet.name}" [${sheet.id}] from stored ${sheet.kind === 'quadSheet' ? 'quad' : 'polygon'} vertices.`,
     `\\path[`,
     ...formatTikzOptions(options),
     `]`,
@@ -585,6 +594,14 @@ function emitCurvedSheet(
     ]
   }
 
+  if (mesh.faces.length > maxCurvedSheetTikzFaces) {
+    return [
+      `% Curved sheet "${sheet.name}" [${sheet.id}] omitted because its sampled mesh has ${mesh.faces.length} faces.`,
+      `% Reduce sampling to at most ${maxCurvedSheetTikzFaces} faces for readable TikZ export.`,
+      '',
+    ]
+  }
+
   const coordinateBaseName = sheetCoordinateBaseName(sheet, elementIndex)
   const coordinates = mesh.vertices.map((vertex, index) =>
     context.coordinates.define(coordinateBaseName, index, vertex),
@@ -602,6 +619,7 @@ function emitCurvedSheet(
   return [
     `% Curved sheet "${sheet.name}" [${sheet.id}] sampled mesh export.`,
     `% Primitive: ${sheet.primitive.kind}; sampling: u=${mesh.uSegments}, v=${mesh.vSegments}; faces=${mesh.faces.length}.`,
+    '% Each sampled face is emitted as one filled polygon; hidden-surface sorting is not applied.',
     '\\begin{scope}[',
     ...formatTikzOptions(options),
     ']',
@@ -633,7 +651,11 @@ function emitFilledRegion(
     ...fillRuleTikzOptions(region.fillRule),
   ]
 
-  return emitFillDrawClosedBoundaries(coordinates, options)
+  return [
+    `% Filled region "${region.name}" [${region.id}] from ${region.boundaries.length} closed boundary path${region.boundaries.length === 1 ? '' : 's'}.`,
+    `% Fill rule: ${region.fillRule}.`,
+    ...emitFillDrawClosedBoundaries(coordinates, options),
+  ]
 }
 
 function emitWorkPlaneFilledSheet(
@@ -658,6 +680,8 @@ function emitWorkPlaneFilledSheet(
     context.requiresTikz3dLibrary = true
 
     return [
+      `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] from ${sheet.boundaries.length} closed boundary path${sheet.boundaries.length === 1 ? '' : 's'}.`,
+      `% Fill rule: ${sheet.fillRule}; exported in a local TikZ 3d plane scope.`,
       '\\begin{scope}[',
       `  plane origin={${formatCoordinate(sheet.planeFrame.origin, '3d')}},`,
       `  plane x={${formatCoordinate(
@@ -687,6 +711,7 @@ function emitWorkPlaneFilledSheet(
 
   return [
     `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
+    `% Fill rule: ${sheet.fillRule}.`,
     ...emitFillDrawClosedBoundaries(coordinates, options),
   ]
 }
@@ -721,6 +746,13 @@ function emitCurve(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (!curveHasFiniteCoordinates(curve)) {
+    return [
+      `% Curve "${curve.name}" [${curve.id}] omitted because its path contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
   if (curve.kind === 'concatenatedPath') {
     const coordinates = defineConcatenatedPathCoordinates(
       curve,
@@ -907,6 +939,13 @@ function emitPoint(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (!isFiniteVec3(point.position)) {
+    return [
+      `% Point "${point.name}" [${point.id}] omitted because its position contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
   const pointColor = context.colors.define(`Point${point.id}`, point.style.color)
   const coordinate = context.coordinates.define(
     pointCoordinateBaseName(point, elementIndex),
@@ -937,6 +976,13 @@ function pointCoordinateBaseName(
 }
 
 function emitLabel(label: TextLabel, context: GenerateContext): string[] {
+  if (!isFiniteVec3(label.position)) {
+    return [
+      `% Label "${label.name}" [${label.id}] omitted because its position contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
   const options = labelStyleOptions(label, context)
   const coordinate = formatCoordinate(label.position, context.mode)
 
@@ -1258,6 +1304,16 @@ function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
         isFiniteVec3(segment.control2) &&
         isFiniteVec3(segment.end)
       )
+  }
+}
+
+function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
+  switch (curve.kind) {
+    case 'polyline':
+    case 'cubicBezier':
+      return curve.points.every(isFiniteVec3)
+    case 'concatenatedPath':
+      return curve.segments.every(pathSegmentHasFiniteCoordinates)
   }
 }
 
@@ -1658,6 +1714,10 @@ function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
 }
 
 function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0'
+  }
+
   if (Object.is(value, -0)) {
     return '0'
   }
@@ -1687,6 +1747,10 @@ function sortByLayer<T extends { layer: number }>(
 }
 
 function normalizeLayer(layer: number): number {
+  if (!Number.isFinite(layer)) {
+    return 0
+  }
+
   return Object.is(layer, -0) ? 0 : layer
 }
 

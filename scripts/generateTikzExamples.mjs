@@ -2,7 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  evenOddFilledBoundaryExample,
+  hemispherePatchExample,
+  saddlePatchExample,
   threeDimensionalExample,
+  translucentFilledStrataExample,
   twoDimensionalExample,
 } from '../src/examples/index.ts'
 import { generateTikz } from '../src/tikz/index.ts'
@@ -22,6 +26,22 @@ export async function generateTikzExamples({
     {
       fileName: 'diagram-3d.tex',
       source: generateTikz(threeDimensionalExample),
+    },
+    {
+      fileName: 'reference-fills.tex',
+      source: generateTikz(translucentFilledStrataExample),
+    },
+    {
+      fileName: 'hemisphere-patch.tex',
+      source: generateTikz(hemispherePatchExample),
+    },
+    {
+      fileName: 'saddle-patch.tex',
+      source: generateTikz(saddlePatchExample),
+    },
+    {
+      fileName: 'even-odd-boundary.tex',
+      source: generateTikz(evenOddFilledBoundaryExample),
     },
   ]
 
