@@ -1,4 +1,5 @@
 import { projectVec3 } from '../geometry/projection.ts'
+import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { closedPathBoundaryCoordinates } from '../model/filledBoundaries.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import { pathCoordinates } from '../model/paths.ts'
@@ -143,9 +144,15 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
           ? stratum.boundaries.flatMap(closedPathBoundaryCoordinates)
           : []
       case 'sheet':
-        return stratum.kind === 'workPlaneFilledSheet'
-          ? stratum.boundaries.flatMap(closedPathBoundaryCoordinates)
-          : [...sheetVertices(stratum)]
+        if (stratum.kind === 'workPlaneFilledSheet') {
+          return stratum.boundaries.flatMap(closedPathBoundaryCoordinates)
+        }
+
+        if (stratum.kind === 'curvedSheet') {
+          return sampleCurvedSheetPrimitive(stratum.primitive).vertices
+        }
+
+        return [...sheetVertices(stratum)]
       case 'curve':
         return stratum.kind === 'concatenatedPath'
           ? pathCoordinates(stratum.segments)

@@ -1301,10 +1301,12 @@ boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
 stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
 local `(a,b)` coordinates. `curvedSheet` stores a hemisphere or saddle
 primitive, including an explicit finite orthonormal surface frame and capped
-positive-integer sampling counts. Curved surface sampling currently produces a
-finite quad mesh approximation for geometry helpers; editor creation, advanced
-editing, hidden-surface sorting, boolean operations, and full TikZ/SVG mesh
-rendering are deferred.
+positive-integer sampling counts. SVG preview and TikZ export currently use the
+sampled finite quad mesh approximation: each sampled face is rendered/exported
+as a flat polygon with the sheet style. This is a display/export approximation,
+not a new saved mesh representation. Editor creation, advanced editing,
+hidden-surface sorting, boolean operations, and true smooth vector surface
+export are deferred.
 
 ### Curve stratum
 
