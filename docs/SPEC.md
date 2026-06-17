@@ -262,11 +262,24 @@ draft. This is copy-on-create only for both direct and cursor workflows: choosin
 or clicking a source copies the source's current model-space `Vec3` into the new
 geometry, and the created geometry stores no live reference to the original
 source. Moving, editing, or deleting the source later does not update or
-invalidate the created geometry. In active work-plane local mode and in 3D cursor
-creation, an existing source must already lie on the active work plane within
-tolerance; off-plane sources are rejected rather than silently projected.
+invalidate the created geometry. In active work-plane local mode and ordinary
+3D cursor creation, an existing source must already lie on the active work plane
+within tolerance; off-plane sources are rejected rather than silently projected.
+The exception is cross-work-plane concatenated path creation, where an existing
+point source may be copied as its finite absolute `Vec3` because the active work
+plane is an editing aid rather than a path-wide constraint.
 
 ### Concatenated path editing
+
+Concatenated path cursor creation has two 3D modes. Same-work-plane mode keeps
+the earlier safety behavior: the draft captures one work plane, rejects points
+off that plane, and blocks active work-plane changes until Finish or Cancel.
+Cross-work-plane mode allows the active work plane to change during path
+creation, so each next point may be placed on the currently active plane while
+the draft remains one concatenated path. In both modes, committed path segment
+points are absolute model-space `Vec3` coordinates, and work-plane choices are
+not stored in `Diagram` unless future persistent segment-local metadata is added
+for a specific export feature.
 
 Committed concatenated paths are editable after selection. The inspector shows
 segments in order with one-based user-facing segment numbers:

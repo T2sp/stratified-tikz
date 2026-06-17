@@ -651,6 +651,28 @@ test('cursor point sources normalize 2D z and reject off-plane 3D points', () =>
   })
 })
 
+test('cursor point sources can opt out of work-plane membership for free 3D paths', () => {
+  const offPlanePoint = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 3 }),
+    { x: 1, y: 2, z: 3 },
+    { id: 'free-path-source' },
+  )
+  const source = resolvePointStratumCoordinateForCursorCreation(
+    offPlanePoint.diagram,
+    'free-path-source',
+    {
+      workPlane: { kind: 'xy', z: 0 },
+      requireWorkPlaneMembership: false,
+    },
+  )
+
+  assert.equal(source.ok, true)
+  if (!source.ok) {
+    throw new Error('Expected off-plane source to resolve for free 3D path use.')
+  }
+  assert.deepEqual(source.point, { x: 1, y: 2, z: 3 })
+})
+
 test('cursor point creation still works on an axis-aligned work plane', () => {
   const state = createState(createEmptyDiagram({ ambientDimension: 3 }))
   const workPlane: WorkPlane = { kind: 'xz', y: 4 }

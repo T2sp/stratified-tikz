@@ -134,6 +134,7 @@ import {
   type CameraPresetId,
   type ConcatenatedPathDraft,
   type ConcatenatedPathSegmentKind,
+  type ConcatenatedPathWorkPlaneMode,
   type CoordinateSourceHighlight,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
@@ -231,6 +232,13 @@ const concatenatedPathSegmentKinds: Array<{
   { id: 'line', label: 'Line' },
   { id: 'cubicBezier', label: 'Cubic Bezier' },
 ]
+const concatenatedPathWorkPlaneModes: Array<{
+  id: ConcatenatedPathWorkPlaneMode
+  label: string
+}> = [
+  { id: 'sameWorkPlane', label: 'Constrain path to one work plane' },
+  { id: 'crossWorkPlane', label: 'Allow cross-work-plane path' },
+]
 const workPlaneKinds: AxisAlignedWorkPlaneName[] = ['xy', 'xz', 'yz']
 const workPlaneVectorAxes: Array<keyof CustomOriginNormalWorkPlaneInput['origin']> =
   ['x', 'y', 'z']
@@ -257,6 +265,8 @@ function App() {
   const [pathStatus, setPathStatus] = useState<string>('')
   const [pathSegmentKind, setPathSegmentKind] =
     useState<ConcatenatedPathSegmentKind>('line')
+  const [pathWorkPlaneMode, setPathWorkPlaneMode] =
+    useState<ConcatenatedPathWorkPlaneMode>('sameWorkPlane')
   const [sheetStatus, setSheetStatus] = useState<string>('')
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
@@ -379,7 +389,9 @@ function App() {
     [editableDiagram],
   )
   const previewWorkPlane =
-    pathDraft?.workPlane ?? sheetPolygonDraft?.workPlane ?? activeWorkPlane
+    pathDraft?.workPlaneMode === 'sameWorkPlane'
+      ? pathDraft.workPlane
+      : sheetPolygonDraft?.workPlane ?? activeWorkPlane
   const workPlanePreview = useMemo(() => {
     return createCustomWorkPlanePreview(
       editableDiagram.ambientDimension,
@@ -1039,7 +1051,9 @@ function App() {
     }
 
     const placementWorkPlane =
-      creationTool === 'createPath' && pathDraft !== null
+      creationTool === 'createPath' &&
+      pathDraft !== null &&
+      pathDraft.workPlaneMode === 'sameWorkPlane'
         ? pathDraft.workPlane
         : creationTool === 'createSheet' && sheetPolygonDraft !== null
           ? sheetPolygonDraft.workPlane
@@ -1081,7 +1095,9 @@ function App() {
     }
 
     const placementWorkPlane =
-      creationTool === 'createPath' && pathDraft !== null
+      creationTool === 'createPath' &&
+      pathDraft !== null &&
+      pathDraft.workPlaneMode === 'sameWorkPlane'
         ? pathDraft.workPlane
         : creationTool === 'createSheet' && sheetPolygonDraft !== null
           ? sheetPolygonDraft.workPlane
@@ -1091,6 +1107,11 @@ function App() {
       pointId,
       {
         workPlane: placementWorkPlane,
+        requireWorkPlaneMembership:
+          creationTool === 'createPath' &&
+          (pathDraft?.workPlaneMode ?? pathWorkPlaneMode) === 'crossWorkPlane'
+            ? false
+            : true,
       },
     )
 
@@ -1142,6 +1163,7 @@ function App() {
               activeWorkPlane,
               pathSegmentKind,
               editableDiagram.ambientDimension,
+              pathWorkPlaneMode,
             )
           : appendConcatenatedPathDraftPoint(
               pathDraft,
@@ -1935,6 +1957,20 @@ function App() {
     setPathStatus(concatenatedPathDraftStatusMessage(result.draft))
   }
 
+  function updatePathWorkPlaneMode(mode: ConcatenatedPathWorkPlaneMode): void {
+    if (pathDraft !== null) {
+      setPathStatus('Finish or cancel the path before changing path constraint.')
+      return
+    }
+
+    setPathWorkPlaneMode(mode)
+    setPathStatus(
+      `Click the preview to place the path ${concatenatedPathDraftNextPointLabel(
+        null,
+      )}.`,
+    )
+  }
+
   function finishPathDraft(): void {
     if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
       setPathStatus('Finish or cancel point picking first.')
@@ -2364,6 +2400,23 @@ function App() {
 
         {creationTool === 'createPath' && (
           <div className="control-group polyline-draft-control">
+            <span className="control-label">Path constraint</span>
+            <div className="segmented-control path-work-plane-mode-control">
+              {concatenatedPathWorkPlaneModes.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  className={
+                    pathWorkPlaneMode === mode.id ? 'is-selected' : undefined
+                  }
+                  aria-pressed={pathWorkPlaneMode === mode.id}
+                  disabled={pathDraft !== null}
+                  onClick={() => updatePathWorkPlaneMode(mode.id)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
             <span className="control-label">Path segment</span>
             <div className="segmented-control">
               {concatenatedPathSegmentKinds.map((kind) => (

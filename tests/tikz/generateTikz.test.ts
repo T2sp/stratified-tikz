@@ -547,6 +547,43 @@ test('concatenated path exports as a continuous TikZ path', () => {
   assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 1)
 })
 
+test('3D cross-work-plane concatenated path exports absolute coordinates in segment order', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'cross-plane-path',
+    name: 'Cross Plane Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 1 },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(curvePathCrossPlanePath0p0\) at \(0,0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePathCrossPlanePath0p1\) at \(1,0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePathCrossPlanePath0p2\) at \(1,0,1\);/)
+  assert.match(
+    tikz,
+    /\(curvePathCrossPlanePath0p0\) -- \(curvePathCrossPlanePath0p1\) -- \(curvePathCrossPlanePath0p2\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+})
+
 test('single concatenated path segment override changes TikZ style', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.strata.push({
@@ -580,6 +617,54 @@ test('single concatenated path segment override changes TikZ style', () => {
   assert.match(tikz, /line width=2\.6pt/)
   assert.match(tikz, /dashed/)
   assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 1)
+})
+
+test('3D cross-work-plane concatenated path preserves segment style overrides', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'cross-plane-style',
+    name: 'Cross Plane Style',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 1 },
+        styleOverride: {
+          strokeColor: '#CC0033',
+          strokeOpacity: 0.45,
+          lineWidth: 2.6,
+          lineStyle: 'denselyDotted',
+        },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const firstSegment =
+    '(curvePathCrossPlaneStyle0p0) -- (curvePathCrossPlaneStyle0p1);'
+  const secondSegment =
+    '(curvePathCrossPlaneStyle0p1) -- (curvePathCrossPlaneStyle0p2);'
+  const splitDrawSection = tikz.slice(
+    tikz.indexOf('% Segment style overrides split this concatenated path'),
+  )
+
+  assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 2)
+  assert.match(tikz, /\{HTML\}\{CC0033\}/)
+  assert.match(tikz, /draw opacity=0\.45/)
+  assert.match(tikz, /line width=2\.6pt/)
+  assert.match(tikz, /densely dotted/)
+  assert.ok(splitDrawSection.indexOf(firstSegment) < splitDrawSection.indexOf(secondSegment))
 })
 
 test('mixed-style concatenated path exports split draw commands in segment order', () => {

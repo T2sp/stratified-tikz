@@ -60,6 +60,61 @@ test('valid 3D concatenated path validates', () => {
   assert.equal(validateDiagram(diagram).valid, true)
 })
 
+test('cross-work-plane 3D concatenated path validates with absolute segment coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push(
+    createConcatenatedPathStratum({
+      ambientDimension: 3,
+      id: 'cross-plane-path',
+      name: 'Cross Plane Path',
+      segments: [
+        {
+          kind: 'line',
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 1, y: 0, z: 0 },
+        },
+        {
+          kind: 'line',
+          start: { x: 1, y: 0, z: 0 },
+          end: { x: 1, y: 0, z: 1 },
+        },
+      ],
+    }),
+  )
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, true, joinValidationMessages(validation.errors))
+})
+
+test('cross-work-plane 3D concatenated path still rejects endpoint gaps', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push(
+    createConcatenatedPathStratum({
+      ambientDimension: 3,
+      id: 'gapped-cross-plane-path',
+      name: 'Gapped Cross Plane Path',
+      segments: [
+        {
+          kind: 'line',
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 1, y: 0, z: 0 },
+        },
+        {
+          kind: 'line',
+          start: { x: 1, y: 0, z: 0.01 },
+          end: { x: 1, y: 0, z: 1 },
+        },
+      ],
+    }),
+  )
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(joinValidationMessages(validation.errors), /must match/)
+})
+
 test('concatenated path segment without override inherits path style', () => {
   const path = createConcatenatedPathStratum({
     ambientDimension: 2,

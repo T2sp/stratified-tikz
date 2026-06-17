@@ -580,6 +580,15 @@
   box-shadow: rgba(30, 34, 44, 0.12) 0 1px 4px;
 }
 
+.path-work-plane-mode-control {
+  grid-auto-columns: minmax(160px, 1fr);
+}
+
+.path-work-plane-mode-control button {
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .workspace {
   display: grid;
   grid-template-columns:
