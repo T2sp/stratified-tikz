@@ -9,6 +9,7 @@ import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
+import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
 import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import {
   addPointStratumWithResult,
@@ -33,6 +34,7 @@ import {
 type TestEditorState = UndoableEditorState & {
   polylineDraft: null | { points: Vec3[] }
   cubicBezierDraft: null | { points: Vec3[] }
+  pathDraft: ConcatenatedPathDraft | null
   sheetPolygonDraft: null | { points: Vec3[] }
   directFormText: string
   activeWorkPlane: WorkPlane
@@ -325,6 +327,7 @@ test('loading a replacement diagram is undoable', () => {
     layerFilter: allLayersFilter,
     polylineDraft: null,
     cubicBezierDraft: null,
+    pathDraft: null,
     sheetPolygonDraft: null,
   })
 
@@ -367,6 +370,7 @@ function createUndoState(
     layerFilter,
     polylineDraft: null,
     cubicBezierDraft: null,
+    pathDraft: null,
     sheetPolygonDraft: null,
     directFormText: '',
     activeWorkPlane: { kind: 'xy', z: 0 },

@@ -14,6 +14,11 @@ import {
   workPlaneToBasis,
 } from '../geometry/workPlane.ts'
 import {
+  areSegmentsComposable,
+  normalizePathSegmentsForAmbientDimension,
+  pathCoordinates,
+} from '../model/paths.ts'
+import {
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
   type LayerFilter,
@@ -35,6 +40,7 @@ import type {
   CurveStratum,
   Diagram,
   LabelStyle,
+  PathSegment,
   PointStratum,
   PolygonSheetStratum,
   Stratum,
@@ -236,6 +242,12 @@ export type AddCubicBezierCurveStratumOptions = {
   directControlMode?: DirectCubicBezierControlMode
 }
 
+export type AddConcatenatedPathStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+}
+
 export type AddPolygonSheetStratumOptions = {
   id?: string
   name?: string
@@ -258,6 +270,11 @@ export type AddPolylineCurveStratumResult = {
 }
 
 export type AddCubicBezierCurveStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
+export type AddConcatenatedPathStratumResult = {
   diagram: Diagram
   id: string | null
 }
@@ -464,6 +481,41 @@ export function addCubicBezierCurveStratumWithResult(
       strata: [...diagram.strata, curve],
     },
     id: curve.id,
+  }
+}
+
+export function addConcatenatedPathStratum(
+  diagram: Diagram,
+  segments: PathSegment[],
+  options: AddConcatenatedPathStratumOptions = {},
+): Diagram {
+  return addConcatenatedPathStratumWithResult(diagram, segments, options).diagram
+}
+
+export function addConcatenatedPathStratumWithResult(
+  diagram: Diagram,
+  segments: PathSegment[],
+  options: AddConcatenatedPathStratumOptions = {},
+): AddConcatenatedPathStratumResult {
+  if (
+    segments.length === 0 ||
+    !areFinitePoints(pathCoordinates(segments)) ||
+    !areSegmentsComposable(segments)
+  ) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  const path = createConcatenatedPathForDiagram(diagram, segments, options)
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, path],
+    },
+    id: path.id,
   }
 }
 
@@ -1027,6 +1079,27 @@ function createCubicBezierCurveForDiagram(
   }
 
   return curve
+}
+
+function createConcatenatedPathForDiagram(
+  diagram: Diagram,
+  segments: PathSegment[],
+  options: AddConcatenatedPathStratumOptions,
+): CurveStratum {
+  return {
+    codim: diagram.ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: safeOptionalId(diagram, options.id, 'curve'),
+    name: safeOptionalName(options.name, 'Path'),
+    style: cloneCurveStyle(defaultCurveStyle),
+    segments: normalizePathSegmentsForAmbientDimension(
+      segments,
+      diagram.ambientDimension,
+    ),
+    styleSegments: [],
+    layer: options.layer ?? nextLayer(diagram),
+  }
 }
 
 function createPolygonSheetForDiagram(

@@ -105,6 +105,7 @@ const allPreviewTools: WorkPlanePreviewTool[] = [
   'createLabel',
   'createPolyline',
   'createCubicBezier',
+  'createPath',
   'createSheet',
 ]
 

@@ -33,6 +33,10 @@ Recommended `phaseSlugs` entries:
 - Support 2D and 3D on one active work plane.
 - Add draft preview, finish, and cancel.
 - Export committed paths to SVG/TikZ.
+- Cursor workflow: first click starts the path, line mode clicks one endpoint,
+  and cubic Bézier mode clicks control 1, control 2, then endpoint.
+- In 3D, a path draft captures the active work plane at start and blocks
+  work-plane changes until Finish or Cancel.
 
 ### Phase 14C: Concatenated path editing
 

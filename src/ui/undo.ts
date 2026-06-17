@@ -20,6 +20,7 @@ export type UndoableEditorState = {
   layerFilter: LayerFilter
   polylineDraft: unknown
   cubicBezierDraft: unknown
+  pathDraft: unknown
   sheetPolygonDraft: unknown
   history: DiagramHistory
 }
@@ -97,6 +98,7 @@ export function undoLastDiagramChange<T extends UndoableEditorState>(
     ),
     polylineDraft: null,
     cubicBezierDraft: null,
+    pathDraft: null,
     sheetPolygonDraft: null,
     history: {
       past,
@@ -126,6 +128,7 @@ export function redoLastDiagramChange<T extends UndoableEditorState>(
     ),
     polylineDraft: null,
     cubicBezierDraft: null,
+    pathDraft: null,
     sheetPolygonDraft: null,
     history: {
       past: appendBoundedPast(current.history.past, current.editableDiagram),

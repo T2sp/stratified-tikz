@@ -33,6 +33,7 @@ import type {
 import { SvgDiagram, svgPointToModelOnWorkPlane } from './rendering'
 import { generateTikz } from './tikz'
 import {
+  addConcatenatedPathStratumWithResult,
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
   addPolygonSheetFromDirectInput,
@@ -44,6 +45,7 @@ import {
   addTextLabelWithResult,
   addTextLabelFromDirectInput,
   applyDirectCreationCommitToEditorState,
+  appendConcatenatedPathDraftPoint,
   appendSheetPolygonDraftPoint,
   areCamera3DEqual,
   areFinitePoints,
@@ -68,6 +70,7 @@ import {
   createDirectCoordinateSourceHighlights,
   createWorkPlanePointPickingHighlights,
   createCustomWorkPlanePreview,
+  createConcatenatedPathDraft,
   createDiagramHistory,
   createSheetPolygonDraft,
   defaultCustomOriginNormalWorkPlaneInput,
@@ -89,6 +92,7 @@ import {
   redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
   resetCameraControlState,
+  setConcatenatedPathDraftSegmentKind,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowCameraControls,
   shouldShowWorkPlaneControls,
@@ -97,7 +101,11 @@ import {
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
   applyPickedPointWorkPlane,
+  cancelConcatenatedPathDraft,
   cancelWorkPlanePointPicking,
+  concatenatedPathDraftBlocksWorkPlaneChange,
+  concatenatedPathDraftCanFinish,
+  concatenatedPathDraftNextPointLabel,
   inactiveWorkPlanePointPickingState,
   nextInspectorDisclosureStateForSelection,
   pickWorkPlanePointStratum,
@@ -124,6 +132,8 @@ import {
   type ExistingCoordinateSourceOption,
   type CameraControlField,
   type CameraPresetId,
+  type ConcatenatedPathDraft,
+  type ConcatenatedPathSegmentKind,
   type CoordinateSourceHighlight,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
@@ -159,6 +169,7 @@ type EditableEditorState = {
   layerFilter: LayerFilter
   polylineDraft: PolylineDraft
   cubicBezierDraft: CubicBezierDraft
+  pathDraft: ConcatenatedPathDraft | null
   sheetPolygonDraft: SheetPolygonDraft | null
   history: DiagramHistory
 }
@@ -210,7 +221,15 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createLabel', label: 'Add label' },
   { id: 'createPolyline', label: 'Add polyline' },
   { id: 'createCubicBezier', label: 'Add cubic Bezier' },
+  { id: 'createPath', label: 'Add path' },
   { id: 'createSheet', label: 'Add sheet' },
+]
+const concatenatedPathSegmentKinds: Array<{
+  id: ConcatenatedPathSegmentKind
+  label: string
+}> = [
+  { id: 'line', label: 'Line' },
+  { id: 'cubicBezier', label: 'Cubic Bezier' },
 ]
 const workPlaneKinds: AxisAlignedWorkPlaneName[] = ['xy', 'xz', 'yz']
 const workPlaneVectorAxes: Array<keyof CustomOriginNormalWorkPlaneInput['origin']> =
@@ -235,6 +254,9 @@ function App() {
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
+  const [pathStatus, setPathStatus] = useState<string>('')
+  const [pathSegmentKind, setPathSegmentKind] =
+    useState<ConcatenatedPathSegmentKind>('line')
   const [sheetStatus, setSheetStatus] = useState<string>('')
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
@@ -310,6 +332,7 @@ function App() {
       layerFilter: allLayersFilter,
       polylineDraft: null,
       cubicBezierDraft: null,
+      pathDraft: null,
       sheetPolygonDraft: null,
       history: createDiagramHistory(initialDiagram),
     }
@@ -320,6 +343,7 @@ function App() {
     layerFilter,
     polylineDraft,
     cubicBezierDraft,
+    pathDraft,
     sheetPolygonDraft,
     history,
   } = editorState
@@ -354,7 +378,8 @@ function App() {
     () => createExistingCoordinateSourceOptions(editableDiagram),
     [editableDiagram],
   )
-  const previewWorkPlane = sheetPolygonDraft?.workPlane ?? activeWorkPlane
+  const previewWorkPlane =
+    pathDraft?.workPlane ?? sheetPolygonDraft?.workPlane ?? activeWorkPlane
   const workPlanePreview = useMemo(() => {
     return createCustomWorkPlanePreview(
       editableDiagram.ambientDimension,
@@ -362,15 +387,18 @@ function App() {
       previewWorkPlane,
       {
         label:
-          sheetPolygonDraft === null
-            ? 'custom work plane'
-            : `sheet draft ${workPlaneDisplayName(previewWorkPlane)}`,
+          pathDraft !== null
+            ? `path draft ${workPlaneDisplayName(previewWorkPlane)}`
+            : sheetPolygonDraft === null
+              ? 'custom work plane'
+              : `sheet draft ${workPlaneDisplayName(previewWorkPlane)}`,
       },
     )
   }, [
     creationTool,
     editableDiagram.ambientDimension,
     previewWorkPlane,
+    pathDraft,
     sheetPolygonDraft,
   ])
   const directCoordinateSourceHighlights = useMemo(() => {
@@ -538,6 +566,7 @@ function App() {
         layerFilter: allLayersFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
+        pathDraft: null,
         sheetPolygonDraft: null,
       }),
     )
@@ -546,6 +575,7 @@ function App() {
     setSaveLoadMessage('')
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
     setDirectLayerInput('0')
@@ -611,6 +641,7 @@ function App() {
     setSaveLoadMessage('')
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
     setWorkPlaneStatus('')
@@ -632,6 +663,7 @@ function App() {
     setSaveLoadMessage('')
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
     setWorkPlaneStatus('')
@@ -707,12 +739,14 @@ function App() {
         layerFilter: allLayersFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
+        pathDraft: null,
         sheetPolygonDraft: null,
       }),
     )
     setCopyStatus('idle')
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
     setDirectLayerInput('0')
@@ -775,6 +809,7 @@ function App() {
         current.layerFilter === result.layerFilter &&
         current.polylineDraft === null &&
         current.cubicBezierDraft === null &&
+        current.pathDraft === null &&
         current.sheetPolygonDraft === null
       ) {
         return current
@@ -787,11 +822,13 @@ function App() {
         layerFilter: result.layerFilter,
         polylineDraft: null,
         cubicBezierDraft: null,
+        pathDraft: null,
         sheetPolygonDraft: null,
       })
     })
     setPolylineStatus('')
     setCubicBezierStatus('')
+    setPathStatus('')
     setSheetStatus('')
     setCopyStatus('idle')
   }, [selectedElement])
@@ -928,22 +965,26 @@ function App() {
     if (
       tool !== 'createPolyline' &&
       tool !== 'createCubicBezier' &&
+      tool !== 'createPath' &&
       tool !== 'createSheet'
     ) {
       setEditorState((current) =>
         current.polylineDraft === null &&
         current.cubicBezierDraft === null &&
+        current.pathDraft === null &&
         current.sheetPolygonDraft === null
           ? current
           : {
               ...current,
               polylineDraft: null,
               cubicBezierDraft: null,
+              pathDraft: null,
               sheetPolygonDraft: null,
             },
       )
       setPolylineStatus('')
       setCubicBezierStatus('')
+      setPathStatus('')
       setSheetStatus('')
       return
     }
@@ -953,6 +994,7 @@ function App() {
       polylineDraft: tool === 'createPolyline' ? current.polylineDraft : null,
       cubicBezierDraft:
         tool === 'createCubicBezier' ? current.cubicBezierDraft : null,
+      pathDraft: tool === 'createPath' ? current.pathDraft : null,
       sheetPolygonDraft:
         tool === 'createSheet' ? current.sheetPolygonDraft : null,
     }))
@@ -962,6 +1004,13 @@ function App() {
     setCubicBezierStatus(
       tool === 'createCubicBezier'
         ? 'Click Start, Control 1, Control 2, then End.'
+        : '',
+    )
+    setPathStatus(
+      tool === 'createPath'
+        ? `Click the preview to place the path ${concatenatedPathDraftNextPointLabel(
+            pathDraft,
+          )}.`
         : '',
     )
     setSheetStatus(
@@ -990,9 +1039,11 @@ function App() {
     }
 
     const placementWorkPlane =
-      creationTool === 'createSheet' && sheetPolygonDraft !== null
-        ? sheetPolygonDraft.workPlane
-        : activeWorkPlane
+      creationTool === 'createPath' && pathDraft !== null
+        ? pathDraft.workPlane
+        : creationTool === 'createSheet' && sheetPolygonDraft !== null
+          ? sheetPolygonDraft.workPlane
+          : activeWorkPlane
     let modelPoint: Vec3
 
     try {
@@ -1030,9 +1081,11 @@ function App() {
     }
 
     const placementWorkPlane =
-      creationTool === 'createSheet' && sheetPolygonDraft !== null
-        ? sheetPolygonDraft.workPlane
-        : activeWorkPlane
+      creationTool === 'createPath' && pathDraft !== null
+        ? pathDraft.workPlane
+        : creationTool === 'createSheet' && sheetPolygonDraft !== null
+          ? sheetPolygonDraft.workPlane
+          : activeWorkPlane
     const sourceResult = resolvePointStratumCoordinateForCursorCreation(
       editableDiagram,
       pointId,
@@ -1081,6 +1134,37 @@ function App() {
       return
     }
 
+    if (creationTool === 'createPath') {
+      const result =
+        pathDraft === null
+          ? createConcatenatedPathDraft(
+              modelPoint,
+              activeWorkPlane,
+              pathSegmentKind,
+              editableDiagram.ambientDimension,
+            )
+          : appendConcatenatedPathDraftPoint(
+              pathDraft,
+              modelPoint,
+              editableDiagram.ambientDimension,
+            )
+
+      if (!result.ok) {
+        setPathStatus(concatenatedPathDraftPointErrorMessage(result.reason))
+        return
+      }
+
+      setEditorState((current) => ({
+        ...current,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        pathDraft: result.draft,
+        sheetPolygonDraft: null,
+      }))
+      setPathStatus(concatenatedPathDraftStatusMessage(result.draft))
+      return
+    }
+
     if (creationTool === 'createPolyline') {
       setPolylineStatus(
         `${(polylineDraft?.points.length ?? 0) + 1} vertices in draft.`,
@@ -1111,6 +1195,7 @@ function App() {
             points: [...draftPoints, modelPoint],
           },
           cubicBezierDraft: null,
+          pathDraft: null,
           sheetPolygonDraft: null,
         }
       }
@@ -1126,6 +1211,7 @@ function App() {
             cubicBezierDraft: {
               points: nextPoints,
             },
+            pathDraft: null,
             sheetPolygonDraft: null,
           }
         }
@@ -1140,6 +1226,7 @@ function App() {
           return {
             ...current,
             cubicBezierDraft: null,
+            pathDraft: null,
             sheetPolygonDraft: null,
           }
         }
@@ -1164,6 +1251,7 @@ function App() {
           ...current,
           polylineDraft: null,
           cubicBezierDraft: null,
+          pathDraft: null,
           sheetPolygonDraft:
             current.sheetPolygonDraft === null
               ? createSheetPolygonDraft(modelPoint, activeWorkPlane)
@@ -1221,6 +1309,9 @@ function App() {
         break
       case 'createCubicBezier':
         setCubicBezierStatus(message)
+        break
+      case 'createPath':
+        setPathStatus(message)
         break
       case 'createSheet':
         setSheetStatus(message)
@@ -1306,6 +1397,7 @@ function App() {
           ),
           polylineDraft: null,
           cubicBezierDraft: null,
+          pathDraft: null,
           sheetPolygonDraft: null,
         },
         {
@@ -1636,6 +1728,7 @@ function App() {
       ...applyDirectCreationCommitToEditorState(current, commit),
       polylineDraft: null,
       cubicBezierDraft: null,
+      pathDraft: null,
       sheetPolygonDraft: null,
     }
   }
@@ -1816,6 +1909,92 @@ function App() {
     setCubicBezierStatus('Cubic Bezier canceled.')
   }
 
+  function updatePathSegmentKind(kind: ConcatenatedPathSegmentKind): void {
+    if (pathDraft === null) {
+      setPathSegmentKind(kind)
+      setPathStatus(
+        `Click the preview to place the path ${concatenatedPathDraftNextPointLabel(
+          null,
+        )}.`,
+      )
+      return
+    }
+
+    const result = setConcatenatedPathDraftSegmentKind(pathDraft, kind)
+
+    if (!result.ok) {
+      setPathStatus('Finish the current cubic segment before changing type.')
+      return
+    }
+
+    setPathSegmentKind(kind)
+    setEditorState((current) => ({
+      ...current,
+      pathDraft: result.draft,
+    }))
+    setPathStatus(concatenatedPathDraftStatusMessage(result.draft))
+  }
+
+  function finishPathDraft(): void {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setPathStatus('Finish or cancel point picking first.')
+      return
+    }
+
+    if (!concatenatedPathDraftCanFinish(pathDraft)) {
+      setPathStatus('A path needs at least one complete segment.')
+      return
+    }
+
+    const creationLayer = parseNewElementLayer(setPathStatus)
+
+    if (creationLayer === null) {
+      return
+    }
+
+    setEditorState((current) => {
+      const draft = current.pathDraft
+
+      if (draft === null || !concatenatedPathDraftCanFinish(draft)) {
+        return current
+      }
+
+      const result = addConcatenatedPathStratumWithResult(
+        current.editableDiagram,
+        draft.segments,
+        { layer: creationLayer },
+      )
+
+      if (result.id === null) {
+        return current
+      }
+
+      return commitDiagramChange(
+        current,
+        applyCreatedElementToEditorState(
+          current,
+          result.diagram,
+          { kind: 'stratum', id: result.id },
+          creationLayer,
+        ),
+      )
+    })
+    setPathStatus('Path created.')
+    setCopyStatus('idle')
+  }
+
+  function cancelPathDraft(): void {
+    setEditorState((current) =>
+      current.pathDraft === null
+        ? current
+        : {
+            ...current,
+            pathDraft: cancelConcatenatedPathDraft(),
+          },
+    )
+    setPathStatus('Path canceled.')
+  }
+
   function finishSheetDraft(): void {
     if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
       setSheetStatus('Finish or cancel point picking first.')
@@ -1891,10 +2070,28 @@ function App() {
     setSheetStatus('Sheet canceled.')
   }
 
-  function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
+  function blockWorkPlaneChangeForDraft(): boolean {
+    if (concatenatedPathDraftBlocksWorkPlaneChange(pathDraft)) {
+      const message = 'Finish or cancel the path before changing work plane.'
+
+      setPathStatus(message)
+      setWorkPlaneStatus(message)
+      return true
+    }
+
     if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+      const message = 'Finish or cancel the sheet before changing work plane.'
+
+      setSheetStatus(message)
+      setWorkPlaneStatus(message)
+      return true
+    }
+
+    return false
+  }
+
+  function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -1914,9 +2111,7 @@ function App() {
   }
 
   function updateWorkPlaneFixedValue(rawValue: string): void {
-    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -1975,9 +2170,7 @@ function App() {
   }
 
   function applyCustomOriginNormalWorkPlane(): void {
-    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -1995,9 +2188,7 @@ function App() {
   }
 
   function applyCustomThreePointWorkPlane(): void {
-    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -2015,9 +2206,7 @@ function App() {
   }
 
   function startExistingPointWorkPlanePicking(): void {
-    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -2051,9 +2240,7 @@ function App() {
   }
 
   function applyExistingPointWorkPlane(): void {
-    if (sheetDraftBlocksWorkPlaneChange(sheetPolygonDraft)) {
-      setSheetStatus('Finish or cancel the sheet before changing work plane.')
-      setWorkPlaneStatus('Finish or cancel the sheet before changing work plane.')
+    if (blockWorkPlaneChangeForDraft()) {
       return
     }
 
@@ -2171,6 +2358,45 @@ function App() {
             </button>
             <span className="toolbar-status" role="status">
               {cubicBezierStatus}
+            </span>
+          </div>
+        )}
+
+        {creationTool === 'createPath' && (
+          <div className="control-group polyline-draft-control">
+            <span className="control-label">Path segment</span>
+            <div className="segmented-control">
+              {concatenatedPathSegmentKinds.map((kind) => (
+                <button
+                  key={kind.id}
+                  type="button"
+                  className={
+                    pathSegmentKind === kind.id ? 'is-selected' : undefined
+                  }
+                  aria-pressed={pathSegmentKind === kind.id}
+                  disabled={(pathDraft?.pendingPoints.length ?? 0) > 0}
+                  onClick={() => updatePathSegmentKind(kind.id)}
+                >
+                  {kind.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={finishPathDraft}
+            >
+              Finish path
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={cancelPathDraft}
+            >
+              Cancel path
+            </button>
+            <span className="toolbar-status" role="status">
+              {pathStatus}
             </span>
           </div>
         )}
@@ -2878,6 +3104,7 @@ function App() {
             selectedElement={selectedElement}
             polylineDraft={polylineDraft?.points}
             cubicBezierDraft={cubicBezierDraft?.points}
+            pathDraft={pathDraft ?? undefined}
             sheetDraft={sheetPolygonDraft?.points}
             workPlanePreview={workPlanePreview}
             coordinateSourceHighlights={coordinateSourceHighlights}
@@ -3015,7 +3242,13 @@ function geometryHandleTargetsSelection(
 }
 
 function isDirectCreationTool(tool: CreationTool): tool is DirectCreationTool {
-  return tool !== 'select'
+  return (
+    tool === 'createPoint' ||
+    tool === 'createLabel' ||
+    tool === 'createPolyline' ||
+    tool === 'createCubicBezier' ||
+    tool === 'createSheet'
+  )
 }
 
 function isDirectPathCreationTool(
@@ -3060,6 +3293,27 @@ function directCreationErrorMessage(
       return kind === 'sheet'
         ? 'Sheets are available only in 3D.'
         : 'This cubic Bezier control mode requires 2D coordinates or 3D active work-plane local coordinates.'
+  }
+}
+
+function concatenatedPathDraftStatusMessage(
+  draft: ConcatenatedPathDraft,
+): string {
+  const nextPoint = concatenatedPathDraftNextPointLabel(draft)
+  const segmentCount = draft.segments.length
+  const segmentWord = segmentCount === 1 ? 'segment' : 'segments'
+
+  return `${segmentCount} complete ${segmentWord}. Next: ${nextPoint}.`
+}
+
+function concatenatedPathDraftPointErrorMessage(
+  reason: 'nonFinitePoint' | 'pointOffWorkPlane',
+): string {
+  switch (reason) {
+    case 'nonFinitePoint':
+      return 'Path points must be finite numbers.'
+    case 'pointOffWorkPlane':
+      return 'Path points must stay on the draft work plane.'
   }
 }
 
