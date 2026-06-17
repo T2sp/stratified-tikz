@@ -50,6 +50,8 @@ export type Diagram = {
   version: 1;
   ambientDimension: AmbientDimension;
   camera: Camera;
+  view?: DiagramViewOptions;
+  layers?: DiagramLayer[];
   strata: Stratum[];
   labels: Label[];
 };
@@ -58,6 +60,37 @@ export type Diagram = {
 An empty canvas is represented by the same `Diagram` shape with `strata: []`
 and `labels: []`. Empty 2D and empty 3D diagrams are valid ordinary diagrams,
 not a separate null or draft state.
+
+## Layer metadata
+
+Element membership in a layer is still stored on each rendered element:
+
+```ts
+layer: number;
+```
+
+This numeric value remains the source of truth for drawing order, filtering,
+selection compatibility, and TikZ layer output. Diagram-level layer metadata is
+only a naming/management layer:
+
+```ts
+export type DiagramLayer = {
+  value: number;
+  name: string;
+};
+```
+
+`diagram.layers` is optional for backward compatibility. When it is missing,
+the editor derives default metadata from the finite numeric layer values used by
+strata and free text labels, using names such as `Layer 0`, `Layer 1`, and
+`Layer -1`. Metadata may also name currently empty layers; those entries have a
+zero element count until strata or labels use their numeric value.
+
+Layer metadata values must be finite numbers. Duplicate metadata values and
+blank names are normalized during load where possible: the first duplicate name
+is kept, and blank names are replaced with the default `Layer <value>` name.
+The raw validator still rejects duplicate values and blank names so invalid
+in-memory diagram data is visible during development.
 
 ## Saved diagram file
 
@@ -72,21 +105,23 @@ export type SavedDiagramFile = {
 ```
 
 Only `diagram` data is persisted. Mathematical geometry is stored as strata and
-free labels. Diagram-level view metadata may also be stored under
-`diagram.view`, but it is not geometry. UI/editor state such as the selected
-element, active creation tool, coordinate input mode, active work plane, draft
-geometry, layer filter, copy status, undo/redo history, and temporary preview
-state is not saved.
+free labels. Diagram-level layer names may be stored under `diagram.layers`.
+Diagram-level view metadata may also be stored under `diagram.view`, but it is
+not geometry. UI/editor state such as the selected element, active creation
+tool, coordinate input mode, active work plane, draft geometry, current layer
+filter, expanded/collapsed panels, copy status, undo/redo history, and
+temporary preview state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
 Loading a diagram resets transient work-plane UI state to the default xy-plane
 at `z = 0`; subsequent editor updates may validate the active work plane against
 the loaded diagram, but no active work-plane data is read from the JSON file.
-Saved files that omit camera metadata load with the initial/default camera.
-Invalid saved camera metadata is ignored and replaced with the initial/default
-camera; load UI may report this as a warning while still accepting valid
-geometry.
+Saved files that omit layer metadata load by deriving default metadata from
+used numeric layer values. Saved files that omit camera metadata load with the
+initial/default camera. Invalid saved camera metadata is ignored and replaced
+with the initial/default camera; load UI may report this as a warning while
+still accepting valid geometry.
 
 ## Camera
 
@@ -216,13 +251,13 @@ export type EditorState = {
 
 The layer filter is derived from numeric `layer` values on strata and free text
 labels. It controls preview visibility and click selectability only. It is not
-part of `Diagram`, is reset to all layers when examples or JSON files are
-loaded, and does not affect TikZ generation.
+stored in `Diagram` or in layer metadata, is reset to all layers when examples
+or JSON files are loaded, and does not affect TikZ generation.
 
 The current "new element layer" control is also UI state. Cursor and direct
 creation use it when committing new strata or free text labels, but the control
-itself is not saved. Once an element is created, its numeric `layer` is ordinary
-diagram data.
+itself is not saved in `Diagram` or in layer metadata. Once an element is
+created, its numeric `layer` is ordinary diagram data.
 
 Undo/redo history is editor state rather than diagram data. It is represented as
 bounded committed diagram snapshots with `past`, `present`, and `future`, with a

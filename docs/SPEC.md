@@ -63,6 +63,7 @@ The MVP should support:
 - codim 3 points in 3D mode
 - labels
 - layer ordering
+- layer names as diagram metadata
 - coordinate editing by direct input
 - coordinate editing by cursor input
 - solid / dashed / dotted line styles
@@ -623,6 +624,24 @@ size: 3
 ```
 
 means 3pt in TikZ output.
+
+## Layer metadata
+
+Every rendered element continues to store numeric `layer` membership. Layer
+names are diagram-level metadata:
+
+```ts
+type DiagramLayer = {
+  value: number;
+  name: string;
+};
+```
+
+Old diagrams may omit `diagram.layers`. The editor derives default metadata from
+used numeric layer values and names them `Layer <value>`. The Layer Manager
+foundation shows the layer name, numeric value, and count of strata plus free
+text labels on that value. The current layer filter, selected creation layer,
+and panel expanded/collapsed state are editor/UI state, not layer metadata.
 
 ## Style presets
 

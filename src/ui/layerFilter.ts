@@ -1,4 +1,5 @@
 import type { Diagram, Stratum, TextLabel } from '../model/types'
+import { getUsedLayerValues } from '../model/layers.ts'
 import {
   findSelectedElement,
   type SelectedElement,
@@ -11,12 +12,7 @@ export type LayerFilter =
 export const allLayersFilter: LayerFilter = { kind: 'all' }
 
 export function deriveAvailableLayers(diagram: Diagram): number[] {
-  return [
-    ...new Set([
-      ...diagram.strata.map((stratum) => stratum.layer),
-      ...diagram.labels.map((label) => label.layer),
-    ]),
-  ].sort((left, right) => left - right)
+  return getUsedLayerValues(diagram)
 }
 
 export function layerFilterIncludesLayer(

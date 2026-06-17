@@ -5,6 +5,7 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
+import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
   parseSavedDiagramJson,
   savedDiagramFormat,
@@ -112,7 +113,7 @@ test('parseSavedDiagramJson returns a valid saved diagram', () => {
     throw new Error(result.error)
   }
 
-  assert.deepEqual(result.diagram, threeDimensionalExample)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(threeDimensionalExample))
 })
 
 test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {
@@ -366,7 +367,7 @@ test('diagram serialization round trips without changing diagram data', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, threeDimensionalExample)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(threeDimensionalExample))
 })
 
 test('diagram serialization preserves optional path labels', () => {
@@ -385,7 +386,7 @@ test('diagram serialization preserves optional path labels', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagramWithPathLabel)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithPathLabel))
 })
 
 test('parseSavedDiagramJson accepts missing optional path labels', () => {
@@ -487,7 +488,7 @@ test('diagram serialization round trips relative Bezier control metadata', () =>
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagramWithRelativeBezier)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithRelativeBezier))
 })
 
 test('diagram serialization round trips work-plane-local Bezier control metadata', () => {
@@ -535,7 +536,7 @@ test('diagram serialization round trips work-plane-local Bezier control metadata
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, diagramWithLocalBezier)
+  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithLocalBezier))
 })
 
 test('parseSavedDiagramJson rejects invalid relative Bezier metadata', () => {

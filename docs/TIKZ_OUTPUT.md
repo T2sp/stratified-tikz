@@ -169,6 +169,11 @@ Sparse and negative layer values are supported. Decimal layer values, if present
 in diagram data, are converted with a readable safe suffix such as
 `stratifiedLayer1Point5`.
 
+Diagram-level `layers` metadata may assign human-readable names to numeric
+layer values for the editor's Layer Manager. TikZ export does not use those
+metadata names. This keeps Phase 9B layer-aware output stable: only element
+`layer` values determine emitted PGF layers and drawing order.
+
 The output declares all used diagram layers and sets their order before the
 `tikzpicture`:
 
@@ -257,8 +262,8 @@ For example, curves and points on the same layer may be grouped into separate co
 
 Free text labels are emitted in their configured layer and are grouped consistently with the layer output format.
 
-Selection and preview highlighting are not exported. Layer filtering and
-layer-based selection UI are not part of this phase.
+Selection, preview highlighting, the current layer filter, and Layer Manager UI
+state are not exported.
 
 ## 2D TikZ basis
 

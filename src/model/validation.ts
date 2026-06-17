@@ -44,6 +44,7 @@ import type {
   CurveStyle,
   CurveStyleSegment,
   Diagram,
+  DiagramLayer,
   DiagramValidationIssue,
   DiagramValidationResult,
   FilledRegion2DStratum,
@@ -84,6 +85,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
 
   validateCamera(diagram.camera, diagram.ambientDimension, 'camera', errors)
   validateDiagramView(diagram.view, diagram.ambientDimension, 'view', errors)
+  validateDiagramLayers(diagram.layers, 'layers', errors)
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -108,6 +110,56 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     valid: errors.length === 0,
     errors,
   }
+}
+
+function validateDiagramLayers(
+  layers: DiagramLayer[] | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (layers === undefined) {
+    return
+  }
+
+  if (!Array.isArray(layers)) {
+    pushError(errors, path, 'Layer metadata must be an array.')
+    return
+  }
+
+  const seen = new Map<number, string>()
+
+  layers.forEach((layer, index) => {
+    const layerPath = `${path}[${index}]`
+
+    if (typeof layer !== 'object' || layer === null || Array.isArray(layer)) {
+      pushError(errors, layerPath, 'Layer metadata must be an object.')
+      return
+    }
+
+    validateLayer(layer.value, `${layerPath}.value`, errors)
+
+    if (typeof layer.name !== 'string' || layer.name.trim().length === 0) {
+      pushError(errors, `${layerPath}.name`, 'Layer name must be non-empty.')
+    }
+
+    if (!Number.isFinite(layer.value)) {
+      return
+    }
+
+    const normalizedValue = Object.is(layer.value, -0) ? 0 : layer.value
+    const previousPath = seen.get(normalizedValue)
+
+    if (previousPath === undefined) {
+      seen.set(normalizedValue, `${layerPath}.value`)
+      return
+    }
+
+    pushError(
+      errors,
+      `${layerPath}.value`,
+      `Layer value must be unique; already used at ${previousPath}.`,
+    )
+  })
 }
 
 function validateDiagramView(
