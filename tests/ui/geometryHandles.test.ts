@@ -14,6 +14,7 @@ import type {
   WorkPlane,
 } from '../../src/model/types.ts'
 import {
+  addConcatenatedPathStratumWithResult,
   addCubicBezierCurveStratumWithResult,
   addPointStratumWithResult,
   addPolygonSheetStratumWithResult,
@@ -135,6 +136,95 @@ test('geometry handle update moves a cubic Bezier control point preserving roles
     { x: -3, y: -4, z: 0 },
     { x: 5, y: 6, z: 0 },
   ])
+})
+
+test('geometry handle update moves a concatenated path endpoint and preserves joins', () => {
+  const result = addConcatenatedPathStratumWithResult(
+    twoDimensionalExample,
+    [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: { x: 1.5, y: 1, z: 0 },
+        control2: { x: 2.5, y: 1, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+      },
+    ],
+    { id: 'drag-path-endpoint', layer: 7 },
+  )
+
+  assert.equal(result.id, 'drag-path-endpoint')
+  if (result.id === null) {
+    throw new Error('Expected path creation to succeed.')
+  }
+
+  const updated = updateDiagramGeometryHandle(
+    result.diagram,
+    {
+      kind: 'pathSegmentPoint',
+      stratumId: result.id,
+      segmentIndex: 0,
+      role: 'end',
+    },
+    { x: 4, y: 5, z: 8 },
+  )
+  const curve = findCurve(updated, result.id)
+
+  assert.equal(curve.kind, 'concatenatedPath')
+  if (curve.kind !== 'concatenatedPath') {
+    throw new Error('Expected a concatenated path.')
+  }
+  assert.deepEqual(curve.segments[0].end, { x: 4, y: 5, z: 0 })
+  assert.deepEqual(curve.segments[1].start, { x: 4, y: 5, z: 0 })
+})
+
+test('geometry handle update moves a concatenated path cubic control point', () => {
+  const result = addConcatenatedPathStratumWithResult(
+    twoDimensionalExample,
+    [
+      {
+        kind: 'cubicBezier',
+        start: { x: 0, y: 0, z: 0 },
+        control1: { x: 1, y: 2, z: 0 },
+        control2: { x: 3, y: 2, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+      },
+    ],
+    { id: 'drag-path-control', layer: 7 },
+  )
+
+  assert.equal(result.id, 'drag-path-control')
+  if (result.id === null) {
+    throw new Error('Expected path creation to succeed.')
+  }
+
+  const updated = updateDiagramGeometryHandle(
+    result.diagram,
+    {
+      kind: 'pathSegmentPoint',
+      stratumId: result.id,
+      segmentIndex: 0,
+      role: 'control1',
+    },
+    { x: -1, y: -2, z: 9 },
+  )
+  const curve = findCurve(updated, result.id)
+
+  assert.equal(curve.kind, 'concatenatedPath')
+  if (curve.kind !== 'concatenatedPath') {
+    throw new Error('Expected a concatenated path.')
+  }
+  assert.equal(curve.segments[0].kind, 'cubicBezier')
+  if (curve.segments[0].kind !== 'cubicBezier') {
+    throw new Error('Expected a cubic path segment.')
+  }
+  assert.deepEqual(curve.segments[0].control1, { x: -1, y: -2, z: 0 })
+  assert.deepEqual(curve.segments[0].controlMode, { kind: 'absolute' })
 })
 
 test('geometry handle update converts relative cubic Bezier controls to absolute mode', () => {

@@ -2,11 +2,21 @@ import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { updateSheetVertex } from '../model/sheets.ts'
 import type { Diagram, SheetStratum, Vec3 } from '../model/types.ts'
 import { updateLabelById } from './diagramUpdates.ts'
+import {
+  updateConcatenatedPathPoint,
+  type ConcatenatedPathPointRole,
+} from './pathEditing.ts'
 
 export type GeometryHandleTarget =
   | { kind: 'pointPosition'; stratumId: string }
   | { kind: 'labelPosition'; labelId: string }
   | { kind: 'curvePoint'; stratumId: string; pointIndex: number }
+  | {
+      kind: 'pathSegmentPoint'
+      stratumId: string
+      segmentIndex: number
+      role: ConcatenatedPathPointRole
+    }
   | { kind: 'sheetVertex'; stratumId: string; vertexIndex: number }
 
 export function updateDiagramGeometryHandle(
@@ -33,6 +43,14 @@ export function updateDiagramGeometryHandle(
         diagram,
         target.stratumId,
         target.pointIndex,
+        normalizedPosition,
+      )
+    case 'pathSegmentPoint':
+      return updatePathSegmentPoint(
+        diagram,
+        target.stratumId,
+        target.segmentIndex,
+        target.role,
         normalizedPosition,
       )
     case 'sheetVertex':
@@ -107,6 +125,45 @@ function updateCurvePoint(
     return stratum.kind === 'cubicBezier'
       ? { ...updatedStratum, bezierControls: { kind: 'absolute' as const } }
       : updatedStratum
+  })
+
+  return changed ? { ...diagram, strata } : diagram
+}
+
+function updatePathSegmentPoint(
+  diagram: Diagram,
+  stratumId: string,
+  segmentIndex: number,
+  role: ConcatenatedPathPointRole,
+  position: Vec3,
+): Diagram {
+  if (!Number.isInteger(segmentIndex) || segmentIndex < 0) {
+    return diagram
+  }
+
+  let changed = false
+  const strata = diagram.strata.map((stratum) => {
+    if (
+      stratum.id !== stratumId ||
+      stratum.geometricKind !== 'curve' ||
+      stratum.kind !== 'concatenatedPath'
+    ) {
+      return stratum
+    }
+
+    const updatedPath = updateConcatenatedPathPoint(
+      stratum,
+      diagram.ambientDimension,
+      { segmentIndex, role },
+      position,
+    )
+
+    if (updatedPath === stratum) {
+      return stratum
+    }
+
+    changed = true
+    return updatedPath
   })
 
   return changed ? { ...diagram, strata } : diagram

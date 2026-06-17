@@ -554,6 +554,30 @@ until the path is finished or canceled. Cancel clears only the draft. Finish
 requires at least one complete segment and commits one `concatenatedPath`
 stratum.
 
+Existing concatenated paths can be edited in the inspector and by SVG drag
+handles. The inspector presents segments in stored order using one-based
+segment numbers. Line segments expose start and end coordinates; cubic Bézier
+segments expose start, control point 1, control point 2, and end. Numeric edits
+reject non-finite input, hide the `z` coordinate in 2D, and normalize edited 2D
+points back to `z = 0`.
+
+The endpoint consistency policy is to update shared adjacent endpoints together.
+Because endpoints are duplicated on neighboring segments, editing segment `i`
+end also updates segment `i + 1` start when that neighbor exists, and editing
+segment `i` start also updates segment `i - 1` end. The editor must not commit a
+path with mismatched adjacent endpoints. Cubic endpoint edits preserve supported
+relative Cartesian or relative polar control metadata by recomputing absolute
+controls from the existing offsets. Directly editing or dragging a cubic control
+point switches that segment to absolute controls. Work-plane-local cubic control
+metadata is treated as persistent export metadata; endpoint/control edits that
+would make it inconsistent convert the edited segment to absolute controls.
+
+The current segment operations are intentionally small: append a line segment,
+append a cubic Bézier segment, and remove the last segment. Appended segments
+start at the current final endpoint. Removing the final remaining segment is
+blocked so the saved path remains valid; deleting the whole stratum is the way
+to remove a one-segment path.
+
 For cubic Bézier curves, the four `points` remain the absolute geometry used for
 SVG rendering, hit testing, dragging, and validation. Cubic Bézier curves may
 also carry optional control metadata for TikZ export:
