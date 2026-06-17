@@ -352,6 +352,7 @@ Phase 16 implements layer-level editing and management operations.
 - Rename layers through metadata.
 - Swap two layer values across all elements on those layers.
 - Preserve save/load, undo/redo, and TikZ layer behavior.
+- MVP display order remains deterministic numeric ascending.
 
 ### Phase 16C: Layer duplicate and layer delete
 

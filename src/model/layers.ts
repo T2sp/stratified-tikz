@@ -89,6 +89,75 @@ export function ensureLayerMetadata(diagram: Diagram): Diagram {
   }
 }
 
+export function renameLayer(
+  diagram: Diagram,
+  layerValue: number,
+  rawName: string,
+): Diagram {
+  const value = normalizedFiniteLayerValue(layerValue, 'layerValue')
+  const nextName = safeLayerName(rawName, value)
+
+  return {
+    ...diagram,
+    layers: layerMetadataIncluding(diagram, [value]).map((layer) =>
+      layer.value === value ? { ...layer, name: nextName } : layer,
+    ),
+  }
+}
+
+export function swapLayers(
+  diagram: Diagram,
+  leftLayerValue: number,
+  rightLayerValue: number,
+): Diagram {
+  const leftLayer = normalizedFiniteLayerValue(leftLayerValue, 'leftLayerValue')
+  const rightLayer = normalizedFiniteLayerValue(
+    rightLayerValue,
+    'rightLayerValue',
+  )
+
+  if (leftLayer === rightLayer) {
+    return diagram
+  }
+
+  const layerNameByValue = new Map(
+    layerMetadataIncluding(diagram, [leftLayer, rightLayer]).map((layer) => [
+      layer.value,
+      layer.name,
+    ]),
+  )
+  const layers = layerMetadataIncluding(diagram, [leftLayer, rightLayer]).map(
+    (layer) => {
+      if (layer.value === leftLayer) {
+        return {
+          ...layer,
+          name: layerNameByValue.get(rightLayer) ?? defaultLayerName(rightLayer),
+        }
+      }
+
+      if (layer.value === rightLayer) {
+        return {
+          ...layer,
+          name: layerNameByValue.get(leftLayer) ?? defaultLayerName(leftLayer),
+        }
+      }
+
+      return layer
+    },
+  )
+
+  return {
+    ...diagram,
+    layers,
+    strata: diagram.strata.map((stratum) =>
+      swapElementLayer(stratum, leftLayer, rightLayer),
+    ),
+    labels: diagram.labels.map((label) =>
+      swapElementLayer(label, leftLayer, rightLayer),
+    ),
+  }
+}
+
 export function normalizeLayerMetadataForDiagram(
   diagram: Diagram,
 ): LayerMetadataNormalizationResult {
@@ -163,6 +232,66 @@ function normalizedLayerName(
   }
 
   return rawName
+}
+
+function layerMetadataIncluding(
+  diagram: Diagram,
+  layerValues: number[],
+): DiagramLayer[] {
+  const layerByValue = new Map<number, DiagramLayer>()
+
+  for (const layer of getLayerMetadata(diagram)) {
+    layerByValue.set(layer.value, layer)
+  }
+
+  for (const value of layerValues) {
+    const normalizedValue = normalizedFiniteLayerValue(value, 'layerValue')
+
+    if (!layerByValue.has(normalizedValue)) {
+      layerByValue.set(normalizedValue, {
+        value: normalizedValue,
+        name: defaultLayerName(normalizedValue),
+      })
+    }
+  }
+
+  return [...layerByValue.values()].sort((left, right) => left.value - right.value)
+}
+
+function safeLayerName(rawName: string, value: number): string {
+  return rawName.trim().length === 0 ? defaultLayerName(value) : rawName
+}
+
+function normalizedFiniteLayerValue(value: number, label: string): number {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number.`)
+  }
+
+  return normalizeLayerValue(value)
+}
+
+function swapElementLayer<T extends { layer: number }>(
+  element: T,
+  leftLayer: number,
+  rightLayer: number,
+): T {
+  const layer = normalizeLayerValue(element.layer)
+
+  if (layer === leftLayer) {
+    return {
+      ...element,
+      layer: rightLayer,
+    }
+  }
+
+  if (layer === rightLayer) {
+    return {
+      ...element,
+      layer: leftLayer,
+    }
+  }
+
+  return element
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

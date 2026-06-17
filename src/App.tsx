@@ -23,6 +23,11 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from './model/serialization.ts'
+import {
+  normalizeLayerValue,
+  renameLayer,
+  swapLayers,
+} from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
   AmbientDimension,
@@ -848,6 +853,43 @@ function App() {
         ...current,
         editableDiagram: nextDiagram,
         selectedElement: nextSelection,
+        layerFilter: nextLayerFilter,
+      })
+    })
+    setCopyStatus('idle')
+  }
+
+  function renameDiagramLayer(layerValue: number, name: string): void {
+    updateEditableDiagram((diagram) => renameLayer(diagram, layerValue, name))
+  }
+
+  function swapDiagramLayers(
+    leftLayerValue: number,
+    rightLayerValue: number,
+  ): void {
+    setEditorState((current) => {
+      const nextDiagram = swapLayers(
+        current.editableDiagram,
+        leftLayerValue,
+        rightLayerValue,
+      )
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        nextDiagram,
+        swapLayerFilterForLayerSwap(
+          current.layerFilter,
+          leftLayerValue,
+          rightLayerValue,
+        ),
+      )
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: nextDiagram,
+        selectedElement: clearSelectionForLayerFilter(
+          nextDiagram,
+          current.selectedElement,
+          nextLayerFilter,
+        ),
         layerFilter: nextLayerFilter,
       })
     })
@@ -4835,6 +4877,8 @@ function App() {
             diagram={editableDiagram}
             layerFilter={layerFilter}
             creationLayerInput={directLayerInput}
+            onRenameLayer={renameDiagramLayer}
+            onSwapLayers={swapDiagramLayers}
           />
           <EditableInspector
             diagram={editableDiagram}
@@ -5616,6 +5660,34 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
   const layer = Number(value)
 
   return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
+}
+
+function swapLayerFilterForLayerSwap(
+  layerFilter: LayerFilter,
+  leftLayerValue: number,
+  rightLayerValue: number,
+): LayerFilter {
+  if (
+    layerFilter.kind === 'all' ||
+    !Number.isFinite(leftLayerValue) ||
+    !Number.isFinite(rightLayerValue)
+  ) {
+    return layerFilter
+  }
+
+  const layer = normalizeLayerValue(layerFilter.layer)
+  const leftLayer = normalizeLayerValue(leftLayerValue)
+  const rightLayer = normalizeLayerValue(rightLayerValue)
+
+  if (layer === leftLayer) {
+    return { kind: 'layer', layer: rightLayer }
+  }
+
+  if (layer === rightLayer) {
+    return { kind: 'layer', layer: leftLayer }
+  }
+
+  return layerFilter
 }
 
 function directCoordinateAxes(
