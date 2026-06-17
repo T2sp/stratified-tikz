@@ -32,6 +32,7 @@ import {
 } from '../model/camera.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
+  isFiniteVec3,
   isValidWorkPlaneFrameSnapshot,
   pointFromWorkPlaneLocalCoordinate,
   workPlaneLocalCoordinateFromPoint,
@@ -560,6 +561,13 @@ function emitFilledRegion(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (!closedBoundariesHaveFiniteCoordinates(region.boundaries)) {
+    return [
+      `% Filled region "${region.name}" [${region.id}] omitted because its boundary contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
   const coordinates = defineClosedBoundariesCoordinateNames(
     region.boundaries,
     filledRegionCoordinateBaseName(region, elementIndex),
@@ -578,6 +586,13 @@ function emitWorkPlaneFilledSheet(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (!closedBoundariesHaveFiniteCoordinates(sheet.boundaries)) {
+    return [
+      `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] omitted because its boundary contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
   const options = [
     ...filledSurfaceStyleTikzOptions(sheet.style, `Sheet${sheet.id}`, context),
     ...fillRuleTikzOptions(sheet.fillRule),
@@ -616,7 +631,7 @@ function emitWorkPlaneFilledSheet(
   )
 
   return [
-    `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its stored frame is unavailable.`,
+    `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
     ...emitFillDrawClosedBoundaries(coordinates, options),
   ]
 }
@@ -1164,6 +1179,28 @@ function definePathSegmentCoordinateNames(
         ),
         end: context.coordinates.define(baseName, pointIndex + 2, segment.end),
       }
+  }
+}
+
+function closedBoundariesHaveFiniteCoordinates(
+  boundaries: readonly ClosedPathBoundary[],
+): boolean {
+  return boundaries.every((boundary) =>
+    boundary.segments.every(pathSegmentHasFiniteCoordinates),
+  )
+}
+
+function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
+  switch (segment.kind) {
+    case 'line':
+      return isFiniteVec3(segment.start) && isFiniteVec3(segment.end)
+    case 'cubicBezier':
+      return (
+        isFiniteVec3(segment.start) &&
+        isFiniteVec3(segment.control1) &&
+        isFiniteVec3(segment.control2) &&
+        isFiniteVec3(segment.end)
+      )
   }
 }
 

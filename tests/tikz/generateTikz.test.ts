@@ -783,6 +783,36 @@ test('2D multi-boundary filledRegion with evenOdd exports even odd rule', () => 
   assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
 })
 
+test('2D filledRegion with nonzero fill rule omits even odd rule', () => {
+  const tikz = generateTikz(
+    createFilledRegionDiagram({
+      fillRule: 'nonzero',
+      boundaries: [
+        squareBoundary2D('outer', 0, 0, 4),
+        squareBoundary2D('inner', 1, 1, 1),
+      ],
+    }),
+  )
+
+  assert.doesNotMatch(tikz, /even odd rule/)
+  assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
+})
+
+test('2D filledRegion exports cubic boundary segments', () => {
+  const tikz = generateTikz(
+    createFilledRegionDiagram({
+      boundaries: [cubicBoundary2D('cubic-loop')],
+    }),
+  )
+
+  assert.match(tikz, /\\coordinate \(regionFilledFilledRegion0b0p1\) at \(0\.5,1\);/)
+  assert.match(tikz, /\\coordinate \(regionFilledFilledRegion0b0p2\) at \(1\.5,1\);/)
+  assert.match(
+    tikz,
+    /\(regionFilledFilledRegion0b0p0\) \.\. controls \(regionFilledFilledRegion0b0p1\) and \(regionFilledFilledRegion0b0p2\) \.\. \(regionFilledFilledRegion0b0p3\) -- \(regionFilledFilledRegion0b0p4\) -- cycle;/,
+  )
+})
+
 test('2D filledRegion TikZ preserves fill and stroke color opacity', () => {
   const tikz = generateTikz(
     createFilledRegionDiagram({
@@ -839,6 +869,30 @@ test('3D multi-boundary workPlaneFilledSheet with evenOdd exports even odd rule'
   assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
 })
 
+test('3D workPlaneFilledSheet falls back to absolute coordinates when local scope is invalid', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+
+  sheet.planeFrame = {
+    ...sheet.planeFrame,
+    u: { x: Number.NaN, y: 0, z: 0 },
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /local plane scope could not be used/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.match(tikz, /\\coordinate \(sheetFilledFilledSheet0b0p0\) at \(0,0,2\);/)
+  assert.match(
+    tikz,
+    /\(sheetFilledFilledSheet0b0p0\) -- \(sheetFilledFilledSheet0b0p1\) -- \(sheetFilledFilledSheet0b0p2\) -- \(sheetFilledFilledSheet0b0p3\) -- \(sheetFilledFilledSheet0b0p4\) -- cycle;/,
+  )
+})
+
 test('3D workPlaneFilledSheet TikZ preserves fill and stroke color opacity', () => {
   const tikz = generateTikz(
     createWorkPlaneFilledSheetDiagram({
@@ -872,6 +926,31 @@ test('filled-object TikZ output has no NaN or Infinity values', () => {
     generateTikz(createWorkPlaneFilledSheetDiagram()),
   ].join('\n')
 
+  assert.doesNotMatch(tikz, /NaN/)
+  assert.doesNotMatch(tikz, /Infinity/)
+})
+
+test('filled-object TikZ omits non-finite fill boundaries instead of emitting invalid coordinates', () => {
+  const tikz = [
+    generateTikz(
+      createFilledRegionDiagram({
+        boundaries: [nonFiniteBoundary2D('bad-region-boundary')],
+      }),
+    ),
+    generateTikz(
+      createWorkPlaneFilledSheetDiagram({
+        boundaries: [nonFiniteBoundary3D('bad-sheet-boundary')],
+      }),
+    ),
+  ].join('\n')
+
+  assert.match(tikz, /Filled region "Filled Region" \[filled-region\] omitted/)
+  assert.match(
+    tikz,
+    /Work-plane filled sheet "Filled Sheet" \[filled-sheet\] omitted/,
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(regionFilledFilledRegion0b0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetFilledFilledSheet0b0p1\)/)
   assert.doesNotMatch(tikz, /NaN/)
   assert.doesNotMatch(tikz, /Infinity/)
 })
@@ -1829,6 +1908,26 @@ function squareBoundary2D(
   ])
 }
 
+function cubicBoundary2D(id: string): ClosedPathBoundary {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'cubicBezier',
+        start: { x: 0, y: 0, z: 0 },
+        control1: { x: 0.5, y: 1, z: 0 },
+        control2: { x: 1.5, y: 1, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 2, y: 0, z: 0 },
+        end: { x: 0, y: 0, z: 0 },
+      },
+    ],
+  }
+}
+
 function squareBoundary3D(
   id: string,
   z: number,
@@ -1841,6 +1940,24 @@ function squareBoundary3D(
     { x: x + size, y, z },
     { x: x + size, y: y + size, z },
     { x, y: y + size, z },
+  ])
+}
+
+function nonFiniteBoundary2D(id: string): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x: 0, y: 0, z: 0 },
+    { x: Number.NaN, y: 0, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  ])
+}
+
+function nonFiniteBoundary3D(id: string): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x: 0, y: 0, z: 2 },
+    { x: Number.POSITIVE_INFINITY, y: 0, z: 2 },
+    { x: 1, y: 1, z: 2 },
+    { x: 0, y: 1, z: 2 },
   ])
 }
 

@@ -179,6 +179,28 @@ test('2D filled-region multiple boundaries use compound path data and even-odd f
   assert.equal(svgFillRuleValue('nonzero'), 'nonzero')
 })
 
+test('closed boundary SVG path data omits non-finite projected output', () => {
+  const pathData = closedBoundariesToSvgPathData(
+    [
+      {
+        ...squareBoundary2D('non-finite'),
+        segments: [
+          {
+            kind: 'line',
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: Number.NaN, y: 1, z: 0 },
+          },
+        ],
+      },
+    ],
+    (point) => ({ x: point.x, y: point.y }),
+  )
+
+  assert.equal(pathData, '')
+  assert.doesNotMatch(pathData, /NaN/)
+  assert.doesNotMatch(pathData, /Infinity/)
+})
+
 test('3D work-plane-filled sheet boundaries produce projected SVG path data', () => {
   const camera: Camera3D = {
     mode: '3d',

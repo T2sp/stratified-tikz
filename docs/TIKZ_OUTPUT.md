@@ -411,8 +411,12 @@ In 3D mode, `kind: "workPlaneFilledSheet"` exports as a codimension 1 filled
 closed path. When the stored plane frame is valid, output is placed in a TikZ
 `3d` library scope using `plane origin`, `plane x`, `plane y`, and
 `canvas is plane`; boundary points and controls are written as local `(a,b)`
-coordinates inside that scope. If the stored frame is unavailable, the fallback
-is a valid absolute 3D filled path using model coordinates.
+coordinates inside that scope. If the stored frame is unavailable or the local
+scope cannot be used safely, the fallback is a valid absolute 3D filled path
+using model coordinates with a short explanatory comment. If a filled
+closed-boundary stratum contains non-finite boundary coordinates, the generator
+omits that filled path and emits a readable comment rather than writing
+`NaN` or `Infinity` into the TikZ source.
 
 Multiple boundary components are emitted as subpaths in the same fill command.
 For `fillRule: "evenOdd"`, the TikZ options include `even odd rule`; for
