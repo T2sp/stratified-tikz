@@ -1,4 +1,4 @@
-import type { Vec2 } from '../model/types'
+import type { ClosedPathBoundary, FillRule, Vec2, Vec3 } from '../model/types'
 
 export type SvgLinePathSegment = {
   kind: 'line'
@@ -75,6 +75,20 @@ export function pathSegmentsToSvgPath(
   return commands.join(' ')
 }
 
+export function closedBoundariesToSvgPathData(
+  boundaries: readonly ClosedPathBoundary[],
+  project: (point: Vec3) => Vec2,
+): string {
+  return boundaries
+    .map((boundary) => closedBoundaryToSvgPathData(boundary, project))
+    .filter((pathData): pathData is string => pathData !== null)
+    .join(' ')
+}
+
+export function svgFillRuleValue(fillRule: FillRule): 'evenodd' | 'nonzero' {
+  return fillRule === 'evenOdd' ? 'evenodd' : 'nonzero'
+}
+
 export function regularPolygonPoints(
   center: Vec2,
   radius: number,
@@ -99,6 +113,64 @@ function svgCommandForPathSegment(segment: SvgPathSegment): string {
         segment.control2,
       )} ${svgPoint(segment.end)}`
   }
+}
+
+function closedBoundaryToSvgPathData(
+  boundary: ClosedPathBoundary,
+  project: (point: Vec3) => Vec2,
+): string | null {
+  if (boundary.segments.length === 0) {
+    return null
+  }
+
+  const firstStart = project(boundary.segments[0].start)
+
+  if (!isFiniteVec2(firstStart)) {
+    return null
+  }
+
+  const commands = [`M ${svgPoint(firstStart)}`]
+
+  for (const segment of boundary.segments) {
+    switch (segment.kind) {
+      case 'line': {
+        const end = project(segment.end)
+
+        if (!isFiniteVec2(end)) {
+          return null
+        }
+
+        commands.push(`L ${svgPoint(end)}`)
+        break
+      }
+      case 'cubicBezier': {
+        const control1 = project(segment.control1)
+        const control2 = project(segment.control2)
+        const end = project(segment.end)
+
+        if (
+          !isFiniteVec2(control1) ||
+          !isFiniteVec2(control2) ||
+          !isFiniteVec2(end)
+        ) {
+          return null
+        }
+
+        commands.push(
+          `C ${svgPoint(control1)} ${svgPoint(control2)} ${svgPoint(end)}`,
+        )
+        break
+      }
+    }
+  }
+
+  commands.push('Z')
+
+  return commands.join(' ')
+}
+
+function isFiniteVec2(point: Vec2): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y)
 }
 
 export function starPolygonPoints(

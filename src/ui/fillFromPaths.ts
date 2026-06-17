@@ -10,6 +10,7 @@ import {
   createFilledRegion2DStratum,
   createWorkPlaneFilledSheet3DStratum,
 } from '../model/constructors.ts'
+import { defaultSheetStyle } from '../model/styles.ts'
 import {
   closedPathBoundaryCoordinates,
   isClosedPathBoundary,
@@ -27,6 +28,7 @@ import type {
   Diagram,
   FillRule,
   PathSegment,
+  RegionStyle,
   Vec3,
   WorkPlane,
   WorkPlaneFrameSnapshot,
@@ -71,6 +73,14 @@ export type CreateFillFromClosedPathsResult =
 type PlaneFrameResult =
   | { ok: true; frame: WorkPlaneFrameSnapshot }
   | { ok: false; error: 'sourceNotCoplanar' | 'sourcePlaneUnreliable' }
+
+const defaultFilledRegionStyle: RegionStyle = {
+  kind: 'regionStyle',
+  fillColor: defaultSheetStyle.fillColor,
+  fillOpacity: defaultSheetStyle.fillOpacity,
+  strokeColor: defaultSheetStyle.strokeColor,
+  strokeOpacity: defaultSheetStyle.strokeOpacity,
+}
 
 export function createFillFromClosedPaths(
   diagram: Diagram,
@@ -162,6 +172,7 @@ export function createFillFromClosedPaths(
     const region = createFilledRegion2DStratum({
       id: safeFillId(diagram, options.id, 'filled-region'),
       name: options.name ?? 'Filled region',
+      style: defaultFilledRegionStyle,
       boundaries,
       fillRule,
       layer,

@@ -7,13 +7,17 @@ import {
   sanitizeTikzNameStem,
 } from '../../src/tikz/index.ts'
 import type {
+  ClosedPathBoundary,
   CurveStyle,
   Diagram,
   PerspectiveCamera3D,
   PointShape,
   PointStratum,
   PointStyle,
+  RegionStyle,
   SheetStyle,
+  Vec3,
+  WorkPlaneFrameSnapshot,
   WorkPlane,
 } from '../../src/model/types.ts'
 import {
@@ -749,6 +753,127 @@ test('polygon sheet with path label emits spath save option', () => {
     tikz,
     /\(sheetPolySurfacePath0p0\) -- \(sheetPolySurfacePath0p1\) -- \(sheetPolySurfacePath0p2\) -- cycle;/,
   )
+})
+
+test('2D one-boundary filledRegion exports as a filled closed path', () => {
+  const tikz = generateTikz(createFilledRegionDiagram())
+
+  assert.match(tikz, /% Codimension 0 strata: regions/)
+  assert.match(tikz, /\\coordinate \(regionFilledFilledRegion0b0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\filldraw\[/)
+  assert.match(
+    tikz,
+    /\(regionFilledFilledRegion0b0p0\) -- \(regionFilledFilledRegion0b0p1\) -- \(regionFilledFilledRegion0b0p2\) -- \(regionFilledFilledRegion0b0p3\) -- \(regionFilledFilledRegion0b0p4\) -- cycle;/,
+  )
+  assert.doesNotMatch(tikz, /deferred/)
+})
+
+test('2D multi-boundary filledRegion with evenOdd exports even odd rule', () => {
+  const tikz = generateTikz(
+    createFilledRegionDiagram({
+      fillRule: 'evenOdd',
+      boundaries: [
+        squareBoundary2D('outer', 0, 0, 4),
+        squareBoundary2D('inner', 1, 1, 1),
+      ],
+    }),
+  )
+
+  assert.match(tikz, /even odd rule/)
+  assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
+})
+
+test('2D filledRegion TikZ preserves fill and stroke color opacity', () => {
+  const tikz = generateTikz(
+    createFilledRegionDiagram({
+      style: regionStyle({
+        fillColor: '#112233',
+        fillOpacity: 0.42,
+        strokeColor: '#445566',
+        strokeOpacity: 0.73,
+      }),
+    }),
+  )
+
+  assert.match(tikz, /\{HTML\}\{112233\}/)
+  assert.match(tikz, /\{HTML\}\{445566\}/)
+  assert.match(tikz, /fill opacity=0\.42/)
+  assert.match(tikz, /draw opacity=0\.73/)
+})
+
+test('2D filledRegion TikZ stays inside the correct layer block', () => {
+  const tikz = generateTikz(createFilledRegionDiagram({ layer: 5 }))
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer5')
+
+  assert.match(layerBlock, /% Codimension 0 strata: regions/)
+  assert.match(layerBlock, /\\filldraw\[/)
+  assert.match(
+    tikz,
+    /\\pgfsetlayers\{stratifiedLayer5,main\}/,
+  )
+})
+
+test('3D one-boundary workPlaneFilledSheet exports a styled filled path', () => {
+  const tikz = generateTikz(createWorkPlaneFilledSheetDiagram())
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /\\begin\{scope\}\[/)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /\\filldraw\[/)
+  assert.match(tikz, /\(0,0\) -- \(2,0\) -- \(2,2\) -- \(0,2\) -- \(0,0\) -- cycle;/)
+  assert.doesNotMatch(tikz, /deferred/)
+})
+
+test('3D multi-boundary workPlaneFilledSheet with evenOdd exports even odd rule', () => {
+  const tikz = generateTikz(
+    createWorkPlaneFilledSheetDiagram({
+      fillRule: 'evenOdd',
+      boundaries: [
+        squareBoundary3D('outer', 2, 0, 0, 4),
+        squareBoundary3D('inner', 2, 1, 1, 1),
+      ],
+    }),
+  )
+
+  assert.match(tikz, /even odd rule/)
+  assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
+})
+
+test('3D workPlaneFilledSheet TikZ preserves fill and stroke color opacity', () => {
+  const tikz = generateTikz(
+    createWorkPlaneFilledSheetDiagram({
+      style: sheetStyle({
+        fillColor: '#ABCDEF',
+        fillOpacity: 0.28,
+        strokeColor: '#123ABC',
+        strokeOpacity: 0.66,
+      }),
+    }),
+  )
+
+  assert.match(tikz, /\{HTML\}\{ABCDEF\}/)
+  assert.match(tikz, /\{HTML\}\{123ABC\}/)
+  assert.match(tikz, /fill opacity=0\.28/)
+  assert.match(tikz, /draw opacity=0\.66/)
+})
+
+test('3D workPlaneFilledSheet TikZ stays inside the correct layer block', () => {
+  const tikz = generateTikz(createWorkPlaneFilledSheetDiagram({ layer: 6 }))
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer6')
+
+  assert.match(layerBlock, /% Codimension 1 strata: sheets/)
+  assert.match(layerBlock, /canvas is plane/)
+  assert.match(layerBlock, /\\filldraw\[/)
+})
+
+test('filled-object TikZ output has no NaN or Infinity values', () => {
+  const tikz = [
+    generateTikz(createFilledRegionDiagram()),
+    generateTikz(createWorkPlaneFilledSheetDiagram()),
+  ].join('\n')
+
+  assert.doesNotMatch(tikz, /NaN/)
+  assert.doesNotMatch(tikz, /Infinity/)
 })
 
 test('point stratum path label is not emitted as spath save option', () => {
@@ -1634,6 +1759,115 @@ function createAbsoluteThreeDimensionalBezierDiagram(): Diagram {
   return diagram
 }
 
+function createFilledRegionDiagram({
+  boundaries = [squareBoundary2D('outer')],
+  fillRule = 'nonzero',
+  layer = 0,
+  style = regionStyle(),
+}: {
+  boundaries?: ClosedPathBoundary[]
+  fillRule?: 'nonzero' | 'evenOdd'
+  layer?: number
+  style?: RegionStyle
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 0,
+    geometricKind: 'region',
+    kind: 'filledRegion',
+    id: 'filled-region',
+    name: 'Filled Region',
+    visible: true,
+    style,
+    boundaries,
+    fillRule,
+    layer,
+  })
+
+  return diagram
+}
+
+function createWorkPlaneFilledSheetDiagram({
+  boundaries = [squareBoundary3D('outer', 2)],
+  fillRule = 'nonzero',
+  layer = 0,
+  style = sheetStyle(),
+}: {
+  boundaries?: ClosedPathBoundary[]
+  fillRule?: 'nonzero' | 'evenOdd'
+  layer?: number
+  style?: SheetStyle
+} = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'workPlaneFilledSheet',
+    id: 'filled-sheet',
+    name: 'Filled Sheet',
+    style,
+    planeFrame: xyPlaneFrameAtZ(2),
+    boundaries,
+    fillRule,
+    layer,
+  })
+
+  return diagram
+}
+
+function squareBoundary2D(
+  id: string,
+  x = 0,
+  y = 0,
+  size = 2,
+): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x, y, z: 0 },
+    { x: x + size, y, z: 0 },
+    { x: x + size, y: y + size, z: 0 },
+    { x, y: y + size, z: 0 },
+  ])
+}
+
+function squareBoundary3D(
+  id: string,
+  z: number,
+  x = 0,
+  y = 0,
+  size = 2,
+): ClosedPathBoundary {
+  return squareBoundaryFromPoints(id, [
+    { x, y, z },
+    { x: x + size, y, z },
+    { x: x + size, y: y + size, z },
+    { x, y: y + size, z },
+  ])
+}
+
+function squareBoundaryFromPoints(
+  id: string,
+  points: [Vec3, Vec3, Vec3, Vec3],
+): ClosedPathBoundary {
+  return {
+    id,
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
+  }
+}
+
+function xyPlaneFrameAtZ(z: number): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 0, y: 0, z },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
 function createPointShapeDiagram(
   shape: PointShape,
   overrides: Partial<PointStyle> = {},
@@ -1671,13 +1905,25 @@ function createEmptyDiagram({
   }
 }
 
-function sheetStyle(): SheetStyle {
+function regionStyle(overrides: Partial<RegionStyle> = {}): RegionStyle {
+  return {
+    kind: 'regionStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#4D9DE0',
+    strokeOpacity: 1,
+    ...overrides,
+  }
+}
+
+function sheetStyle(overrides: Partial<SheetStyle> = {}): SheetStyle {
   return {
     kind: 'sheetStyle',
     fillColor: '#4D9DE0',
     fillOpacity: 0.35,
     strokeColor: '#4D9DE0',
     strokeOpacity: 1,
+    ...overrides,
   }
 }
 

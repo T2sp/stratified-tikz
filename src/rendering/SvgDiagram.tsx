@@ -6,6 +6,7 @@ import type {
   Diagram,
   PathSegment,
   PointStratum,
+  RegionStratum,
   SheetStratum,
   Stratum,
   TextLabel,
@@ -32,16 +33,19 @@ import {
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
+  closedBoundariesToSvgPathData,
   pathSegmentsToSvgPath,
   polylineToSvgPath,
   regularPolygonPoints,
   starPolygonPoints,
+  svgFillRuleValue,
   type SvgPathSegment,
   svgPointList,
 } from './svgPath'
 import { projectToSvgPoint } from './svgProjection'
 import {
   curveStyleToSvgStrokeAttributes,
+  filledSurfaceStyleToSvgAttributes,
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { mapClientPointToViewBox } from './svgViewBox'
@@ -470,11 +474,14 @@ function renderStratum(
 ): RenderItem {
   switch (stratum.geometricKind) {
     case 'region':
-      return {
-        id: stratum.id,
-        layer: stratum.layer,
-        element: <g key={stratum.id} />,
-      }
+      return renderRegion(
+        stratum,
+        camera,
+        viewportHeight,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      )
     case 'sheet':
       return renderSheet(
         stratum,
@@ -506,6 +513,69 @@ function renderStratum(
   }
 }
 
+function renderRegion(
+  region: RegionStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): RenderItem {
+  if (region.kind !== 'filledRegion' || !region.visible) {
+    return {
+      id: region.id,
+      layer: region.layer,
+      element: <g key={region.id} />,
+    }
+  }
+
+  const pathData = closedBoundariesToSvgPathData(region.boundaries, (point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, region.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, region.id)
+  const fillRule = svgFillRuleValue(region.fillRule)
+  const surfaceAttributes = filledSurfaceStyleToSvgAttributes(region.style)
+
+  return {
+    id: region.id,
+    layer: region.layer,
+    element: (
+      <g
+        key={region.id}
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isIncludedByFilter ? undefined : 'none'}
+        onClick={(event) =>
+          selectElement(event, { kind: 'stratum', id: region.id }, onSelectionChange)
+        }
+      >
+        {isSelected && pathData !== '' && (
+          <path
+            d={pathData}
+            fill={highlightColor}
+            fillOpacity={0.14}
+            fillRule={fillRule}
+            stroke={highlightColor}
+            strokeOpacity={0.9}
+            strokeWidth={5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        {pathData !== '' && (
+          <path
+            d={pathData}
+            fillRule={fillRule}
+            vectorEffect="non-scaling-stroke"
+            {...surfaceAttributes}
+          />
+        )}
+      </g>
+    ),
+  }
+}
+
 function renderSheet(
   sheet: SheetStratum,
   camera: Diagram['camera'],
@@ -515,11 +585,14 @@ function renderSheet(
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   if (sheet.kind === 'workPlaneFilledSheet') {
-    return {
-      id: sheet.id,
-      layer: sheet.layer,
-      element: <g key={sheet.id} />,
-    }
+    return renderWorkPlaneFilledSheet(
+      sheet,
+      camera,
+      viewportHeight,
+      selectedElement,
+      layerFilter,
+      onSelectionChange,
+    )
   }
 
   const points = sheetVertices(sheet).map((vertex) =>
@@ -561,6 +634,61 @@ function renderSheet(
           strokeWidth={1.5}
           vectorEffect="non-scaling-stroke"
         />
+      </g>
+    ),
+  }
+}
+
+function renderWorkPlaneFilledSheet(
+  sheet: Extract<SheetStratum, { kind: 'workPlaneFilledSheet' }>,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): RenderItem {
+  const pathData = closedBoundariesToSvgPathData(sheet.boundaries, (point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
+  const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, sheet.id)
+  const fillRule = svgFillRuleValue(sheet.fillRule)
+  const surfaceAttributes = filledSurfaceStyleToSvgAttributes(sheet.style)
+
+  return {
+    id: sheet.id,
+    layer: sheet.layer,
+    element: (
+      <g
+        key={sheet.id}
+        className={isIncludedByFilter ? 'svg-selectable' : 'svg-filtered-out'}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isIncludedByFilter ? undefined : 'none'}
+        onClick={(event) =>
+          selectElement(event, { kind: 'stratum', id: sheet.id }, onSelectionChange)
+        }
+      >
+        {isSelected && pathData !== '' && (
+          <path
+            d={pathData}
+            fill={highlightColor}
+            fillOpacity={0.14}
+            fillRule={fillRule}
+            stroke={highlightColor}
+            strokeOpacity={0.9}
+            strokeWidth={5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        {pathData !== '' && (
+          <path
+            d={pathData}
+            fillRule={fillRule}
+            vectorEffect="non-scaling-stroke"
+            {...surfaceAttributes}
+          />
+        )}
       </g>
     ),
   }
@@ -1632,6 +1760,10 @@ function shouldRenderStratum(
 ): boolean {
   if (ambientDimension === 2) {
     return (
+      (stratum.geometricKind === 'region' &&
+        stratum.codim === 0 &&
+        stratum.kind === 'filledRegion' &&
+        stratum.visible) ||
       (stratum.geometricKind === 'curve' && stratum.codim === 1) ||
       (stratum.geometricKind === 'point' && stratum.codim === 2)
     )

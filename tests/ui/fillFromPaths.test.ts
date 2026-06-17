@@ -59,6 +59,9 @@ test('creates a 2D filled region from one selected closed path', () => {
   assert.equal(region.kind, 'filledRegion')
   assert.equal(region.fillRule, 'nonzero')
   assert.equal(region.layer, 4)
+  assert.equal(region.style.fillColor, '#4D9DE0')
+  assert.equal(region.style.fillOpacity, 0.35)
+  assert.equal(region.style.strokeOpacity, 1)
   assert.deepEqual(
     region.boundaries.map((boundary) => boundary.id),
     ['outer'],

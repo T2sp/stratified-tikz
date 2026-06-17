@@ -404,7 +404,9 @@ In 3D mode this is a 3-dimensional region.
 
 `filledRegion` is the committed closed-boundary fill representation for a 2D
 codim 0 region. It is valid only when `diagram.ambientDimension === 2`; all
-boundary coordinates must have `z = 0` in saved/imported data.
+boundary coordinates must have `z = 0` in saved/imported data. SVG preview and
+TikZ export use the copied boundary geometry and the stored `RegionStyle`; they
+do not reference or re-read the source paths used at creation time.
 
 ## Sheet stratum
 
@@ -468,7 +470,10 @@ a 3D codim 1 sheet. It stores a snapshot of the work-plane frame used at commit
 time, not a live reference to editor work-plane state. The boundary geometry is
 ordinary copied `PathSegment` data in model coordinates. All segment points and
 cubic controls must lie on the stored plane, and finite local `(a, b)` plane
-coordinates must be computable for them.
+coordinates must be computable for them. SVG preview projects the stored model
+coordinates through the current camera. TikZ export prefers a `canvas is plane`
+scope using the stored frame and local `(a,b)` coordinates, with absolute 3D
+coordinate output reserved as a fallback for unusable existing frame data.
 
 Curved surface primitives such as hemispheres and saddles are not implemented
 yet.
@@ -496,6 +501,8 @@ endpoint within the same tolerance. Coordinates must be finite.
 
 Multiple boundaries are supported. `fillRule: "evenOdd"` is available for holes
 and nested components; `fillRule: "nonzero"` remains the other valid value.
+SVG uses the `evenodd` fill rule for `evenOdd`, and TikZ uses the `even odd
+rule` option.
 
 Boundary data is committed geometry. Creating a fill from selected paths should
 copy the selected path segments into `ClosedPathBoundary[]`; filled strata do
@@ -1155,6 +1162,8 @@ export type RegionStratum =
 ```
 
 `filledRegion` is valid only in 2D and stores copied closed-boundary geometry.
+Rendering and TikZ export use the stored boundaries and explicit `RegionStyle`,
+not source path references.
 
 ### Sheet stratum
 
@@ -1208,8 +1217,10 @@ In 3D mode, sheets are codimension 1. `quadSheet` remains supported for
 four-corner examples and templates. `polygonSheet` stores a filled closed
 polygonal region as cyclically ordered `vertices` and requires at least three
 vertices. `workPlaneFilledSheet` stores one or more copied closed path
-boundaries on a finite orthonormal plane-frame snapshot. Curved surface
-primitives are deferred to a later phase.
+boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
+stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
+local `(a,b)` coordinates. Curved surface primitives are deferred to a later
+phase.
 
 ### Curve stratum
 
