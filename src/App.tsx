@@ -24,6 +24,9 @@ import {
   serializeDiagram,
 } from './model/serialization.ts'
 import {
+  deleteLayer,
+  duplicateLayer,
+  elementsOnLayer,
   normalizeLayerValue,
   renameLayer,
   swapLayers,
@@ -863,6 +866,40 @@ function App() {
     updateEditableDiagram((diagram) => renameLayer(diagram, layerValue, name))
   }
 
+  function duplicateDiagramLayer(
+    sourceLayerValue: number,
+    targetLayerValue?: number,
+  ): void {
+    setEditorState((current) => {
+      let result: ReturnType<typeof duplicateLayer>
+
+      try {
+        result = duplicateLayer(current.editableDiagram, sourceLayerValue, {
+          ...(targetLayerValue === undefined ? {} : { targetLayerValue }),
+        })
+      } catch {
+        return current
+      }
+
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        result.diagram,
+        current.layerFilter,
+      )
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: result.diagram,
+        selectedElement: clearSelectionForLayerFilter(
+          result.diagram,
+          current.selectedElement,
+          nextLayerFilter,
+        ),
+        layerFilter: nextLayerFilter,
+      })
+    })
+    setCopyStatus('idle')
+  }
+
   function swapDiagramLayers(
     leftLayerValue: number,
     rightLayerValue: number,
@@ -893,6 +930,55 @@ function App() {
         layerFilter: nextLayerFilter,
       })
     })
+    setCopyStatus('idle')
+  }
+
+  function deleteDiagramLayer(layerValue: number): void {
+    const layerLabel = formatLayerValue(layerValue)
+    const elementCount = elementsOnLayer(editableDiagram, layerValue).length
+    const elementLabel = elementCount === 1 ? 'element' : 'elements'
+
+    if (
+      !window.confirm(
+        `Delete layer ${layerLabel} and ${elementCount} ${elementLabel}? This can be undone.`,
+      )
+    ) {
+      return
+    }
+
+    setEditorState((current) => {
+      const nextDiagram = deleteLayer(current.editableDiagram, layerValue)
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        nextDiagram,
+        current.layerFilter,
+      )
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: nextDiagram,
+        selectedElement: clearSelectionForLayerFilter(
+          nextDiagram,
+          current.selectedElement,
+          nextLayerFilter,
+        ),
+        layerFilter: nextLayerFilter,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        pathDraft: null,
+        sheetPolygonDraft: null,
+      })
+    })
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setSheetStatus('')
+    setDirectCreationStatus('')
+    setFillBoundaryPathIds([])
+    setFillStatus('')
+    resetDirectPathInput()
+    resetDirectCoordinateSources()
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneStatus('')
     setCopyStatus('idle')
   }
 
@@ -4879,6 +4965,8 @@ function App() {
             creationLayerInput={directLayerInput}
             onRenameLayer={renameDiagramLayer}
             onSwapLayers={swapDiagramLayers}
+            onDuplicateLayer={duplicateDiagramLayer}
+            onDeleteLayer={deleteDiagramLayer}
           />
           <EditableInspector
             diagram={editableDiagram}

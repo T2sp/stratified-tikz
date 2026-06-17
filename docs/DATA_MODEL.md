@@ -92,6 +92,23 @@ is kept, and blank names are replaced with the default `Layer <value>` name.
 The raw validator still rejects duplicate values and blank names so invalid
 in-memory diagram data is visible during development.
 
+Layer Manager operations that change element membership are ordinary diagram
+edits and are undoable. Duplicating a layer deep-clones every stratum and free
+text label whose numeric `layer` equals the source value, assigns each copied
+top-level element a new id using the deterministic `<source-id>-copy`,
+`<source-id>-copy-1`, ... policy, and writes the target layer value onto each
+copy. Nested object ids used by filled-boundary data and curve style segments
+are regenerated with the same policy. If the target layer does not already have
+metadata, the duplicate operation creates it with the default name
+`<source layer name> copy`; the default target value is the nearest finite unused
+value above the source layer.
+
+Deleting a layer removes all strata and free text labels on that numeric layer
+and removes that layer's metadata entry. Other layer metadata, including empty
+guide layers, is left unchanged. The editor clears stale selection, drafts, and
+source-picking UI state around this diagram edit, but those cleanup fields are
+not persisted in `Diagram`.
+
 ## Saved diagram file
 
 Phase 8A saves and loads diagrams using a small versioned JSON wrapper:
@@ -661,6 +678,12 @@ name by keeping ASCII letters and digits, folding separators such as spaces or
 hyphens into camel-case word boundaries, and falling back to `savedPath` if the
 result would be empty. If the sanitized name starts with a digit, `savedPath` is
 prefixed before the digit.
+
+When a layer is duplicated, non-empty copied `pathLabel` values are not reused
+verbatim. The copy appends ` copy`, then ` copy 2`, ` copy 3`, and so on until
+the effective sanitized TikZ saved-path name is unused by the diagram. This
+preserves source labels while avoiding duplicate `spath/save` names in exported
+TikZ.
 
 ## Curve stratum
 
