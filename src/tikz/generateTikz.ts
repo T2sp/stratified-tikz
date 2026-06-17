@@ -497,6 +497,14 @@ function emitSheet(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (sheet.kind === 'workPlaneFilledSheet') {
+    return [
+      `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] is stored as closed-boundary data.`,
+      '% TikZ fill output for this sheet kind is deferred to the fill rendering phase.',
+      '',
+    ]
+  }
+
   const fillColor = context.colors.define(
     `Sheet${sheet.id}Fill`,
     sheet.style.fillColor,
@@ -538,9 +546,14 @@ function sheetCoordinateBaseName(
 ): string {
   const stem = sanitizeTikzNameStem(sheet.name, 'sheet')
 
-  return sheet.kind === 'polygonSheet'
-    ? `sheetPoly${stem}${elementIndex}`
-    : `sheetQuad${stem}${elementIndex}`
+  switch (sheet.kind) {
+    case 'polygonSheet':
+      return `sheetPoly${stem}${elementIndex}`
+    case 'quadSheet':
+      return `sheetQuad${stem}${elementIndex}`
+    case 'workPlaneFilledSheet':
+      return `sheetFilled${stem}${elementIndex}`
+  }
 }
 
 function emitCurve(

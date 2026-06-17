@@ -112,6 +112,9 @@ export type PointShape = (typeof pointShapes)[number]
 export const pointFills = ['filled', 'hollow'] as const
 export type PointFill = (typeof pointFills)[number]
 
+export const fillRules = ['nonzero', 'evenOdd'] as const
+export type FillRule = (typeof fillRules)[number]
+
 export const labelAnchors = [
   'center',
   'north',
@@ -238,7 +241,7 @@ export type StratumStyle =
   | CurveStyle
   | PointStyle
 
-export type RegionStratum = {
+type RegionStratumBase = {
   id: string
   codim: 0
   geometricKind: 'region'
@@ -248,6 +251,18 @@ export type RegionStratum = {
   style: RegionStyle
   layer: number
 }
+
+export type AmbientRegionStratum = RegionStratumBase & {
+  kind?: 'ambientRegion'
+}
+
+export type FilledRegion2DStratum = RegionStratumBase & {
+  kind: 'filledRegion'
+  boundaries: ClosedPathBoundary[]
+  fillRule: FillRule
+}
+
+export type RegionStratum = AmbientRegionStratum | FilledRegion2DStratum
 
 type SheetStratumBase = {
   id: string
@@ -270,7 +285,17 @@ export type PolygonSheetStratum = SheetStratumBase & {
   pathLabel?: string
 }
 
-export type SheetStratum = QuadSheetStratum | PolygonSheetStratum
+export type WorkPlaneFilledSheet3DStratum = SheetStratumBase & {
+  kind: 'workPlaneFilledSheet'
+  planeFrame: WorkPlaneFrameSnapshot
+  boundaries: ClosedPathBoundary[]
+  fillRule: FillRule
+}
+
+export type SheetStratum =
+  | QuadSheetStratum
+  | PolygonSheetStratum
+  | WorkPlaneFilledSheet3DStratum
 
 type PathSegmentBase = {
   styleOverride?: PathSegmentStyleOverride
@@ -292,6 +317,12 @@ export type CubicBezierPathSegment = PathSegmentBase & {
 }
 
 export type PathSegment = LinePathSegment | CubicBezierPathSegment
+
+export type ClosedPathBoundary = {
+  id: string
+  name?: string
+  segments: PathSegment[]
+}
 
 export type PointCurveKind = 'polyline' | 'cubicBezier'
 export type CurveKind = PointCurveKind | 'concatenatedPath'

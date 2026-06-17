@@ -514,6 +514,14 @@ function renderSheet(
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
+  if (sheet.kind === 'workPlaneFilledSheet') {
+    return {
+      id: sheet.id,
+      layer: sheet.layer,
+      element: <g key={sheet.id} />,
+    }
+  }
+
   const points = sheetVertices(sheet).map((vertex) =>
     projectToSvgPoint(camera, vertex, viewportHeight),
   )

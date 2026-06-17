@@ -6,6 +6,12 @@ import {
 } from '../geometry/bezierControls.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
 import {
+  closedPathBoundaryCoordinates,
+  isFillRule,
+  isPointOnWorkPlaneFrame,
+  workPlaneLocalCoordinatesForBoundary,
+} from './filledBoundaries.ts'
+import {
   isHexColor,
   isLabelAnchor,
   isLineStyle,
@@ -19,9 +25,11 @@ import {
   pathSegmentEnd,
   pathSegmentStart,
   pathEndpointEpsilon,
+  pathEndpoints,
 } from './paths.ts'
 import type {
   Camera,
+  ClosedPathBoundary,
   CubicBezierCurveStratum,
   DiagramViewOptions,
   CubicBezierControlMode,
@@ -31,11 +39,13 @@ import type {
   Diagram,
   DiagramValidationIssue,
   DiagramValidationResult,
+  FilledRegion2DStratum,
   LabelStyle,
   PartialCurveStyle,
   PathSegment,
   PointStratum,
   PointStyle,
+  RegionStratum,
   RegionStyle,
   SheetStratum,
   SheetStyle,
@@ -44,6 +54,7 @@ import type {
   Vec2,
   Vec3,
   WorkPlaneFrameSnapshot,
+  WorkPlaneFilledSheet3DStratum,
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
 } from './types'
@@ -186,7 +197,7 @@ function validateStratum(
 
   switch (stratum.geometricKind) {
     case 'region':
-      validateRegionStyle(stratum.style, `${path}.style`, errors)
+      validateRegionStratum(stratum, ambientDimension, path, errors)
       break
     case 'sheet':
       validateSheetStratum(stratum, ambientDimension, path, errors)
@@ -198,6 +209,63 @@ function validateStratum(
       validatePointStratum(stratum, ambientDimension, path, errors)
       break
   }
+}
+
+function validateRegionStratum(
+  stratum: RegionStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (stratum.codim !== 0) {
+    pushError(errors, `${path}.codim`, 'Regions must have codimension 0.')
+  }
+
+  validateRegionStyle(stratum.style, `${path}.style`, errors)
+
+  const regionKind = regionStratumKind(stratum)
+
+  if (regionKind === undefined || regionKind === 'ambientRegion') {
+    return
+  }
+
+  if (!isFilledRegion2DStratum(stratum)) {
+    pushError(
+      errors,
+      `${path}.kind`,
+      'Region kind must be ambientRegion or filledRegion when present.',
+    )
+    return
+  }
+
+  validateFilledRegion2DStratum(stratum, ambientDimension, path, errors)
+}
+
+function validateFilledRegion2DStratum(
+  stratum: FilledRegion2DStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 2) {
+    pushError(errors, path, 'Filled region strata are valid only in 2D diagrams.')
+  }
+
+  if (stratum.codim !== 0) {
+    pushError(
+      errors,
+      `${path}.codim`,
+      'Filled regions must have codimension 0.',
+    )
+  }
+
+  validateFillRule(stratum.fillRule, `${path}.fillRule`, errors)
+  validateClosedPathBoundaries(
+    stratum.boundaries,
+    ambientDimension,
+    `${path}.boundaries`,
+    errors,
+  )
 }
 
 function validateSheetStratum(
@@ -215,7 +283,13 @@ function validateSheetStratum(
   }
 
   if (stratum.kind !== 'quadSheet' && stratum.kind !== 'polygonSheet') {
-    pushError(errors, `${path}.kind`, 'Sheet kind must be quadSheet or polygonSheet.')
+    if (stratum.kind !== 'workPlaneFilledSheet') {
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Sheet kind must be quadSheet, polygonSheet, or workPlaneFilledSheet.',
+      )
+    }
   }
 
   if (stratum.kind === 'quadSheet' && stratum.corners.length !== 4) {
@@ -235,6 +309,12 @@ function validateSheetStratum(
   }
 
   validateSheetStyle(stratum.style, `${path}.style`, errors)
+
+  if (stratum.kind === 'workPlaneFilledSheet') {
+    validateWorkPlaneFilledSheet3DStratum(stratum, ambientDimension, path, errors)
+    return
+  }
+
   sheetVertices(stratum).forEach((vertex, index) => {
     validateVec3ForAmbient(
       vertex,
@@ -243,6 +323,48 @@ function validateSheetStratum(
       errors,
     )
   })
+}
+
+function validateWorkPlaneFilledSheet3DStratum(
+  stratum: WorkPlaneFilledSheet3DStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3) {
+    pushError(
+      errors,
+      path,
+      'Work-plane filled sheet strata are valid only in 3D diagrams.',
+    )
+  }
+
+  if (stratum.codim !== 1) {
+    pushError(
+      errors,
+      `${path}.codim`,
+      'Work-plane filled sheets must have codimension 1.',
+    )
+  }
+
+  validateWorkPlaneFrameSnapshot(
+    stratum.planeFrame,
+    `${path}.planeFrame`,
+    errors,
+  )
+  validateFillRule(stratum.fillRule, `${path}.fillRule`, errors)
+  validateClosedPathBoundaries(
+    stratum.boundaries,
+    ambientDimension,
+    `${path}.boundaries`,
+    errors,
+  )
+  validateClosedPathBoundariesOnPlane(
+    stratum.boundaries,
+    stratum.planeFrame,
+    `${path}.boundaries`,
+    errors,
+  )
 }
 
 function validateCurveStratum(
@@ -378,6 +500,153 @@ function validateConcatenatedPathCurve(
   })
 
   validateAdjacentPathSegmentEndpoints(stratum.segments, `${path}.segments`, errors)
+}
+
+function validateClosedPathBoundaries(
+  boundaries: ClosedPathBoundary[],
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Array.isArray(boundaries)) {
+    pushError(errors, path, 'Closed path boundaries must be an array.')
+    return
+  }
+
+  if (boundaries.length < 1) {
+    pushError(errors, path, 'Filled strata must have at least one boundary.')
+  }
+
+  boundaries.forEach((boundary, index) => {
+    validateClosedPathBoundary(
+      boundary,
+      ambientDimension,
+      `${path}[${index}]`,
+      errors,
+    )
+  })
+}
+
+function validateClosedPathBoundary(
+  boundary: ClosedPathBoundary,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateId(boundary.id, `${path}.id`, errors)
+  validateOptionalName(boundary.name, `${path}.name`, errors)
+
+  if (!Array.isArray(boundary.segments)) {
+    pushError(errors, `${path}.segments`, 'Boundary segments must be an array.')
+    return
+  }
+
+  if (boundary.segments.length < 1) {
+    pushError(
+      errors,
+      `${path}.segments`,
+      'Closed path boundaries must have at least one segment.',
+    )
+    return
+  }
+
+  boundary.segments.forEach((segment, index) => {
+    validatePathSegment(
+      segment,
+      ambientDimension,
+      `${path}.segments[${index}]`,
+      errors,
+    )
+  })
+
+  validateAdjacentPathSegmentEndpoints(
+    boundary.segments,
+    `${path}.segments`,
+    errors,
+  )
+  validateClosedPathEndpoint(boundary, `${path}.segments`, errors)
+}
+
+function validateClosedPathEndpoint(
+  boundary: ClosedPathBoundary,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  const endpoints = pathEndpoints(boundary.segments)
+
+  if (endpoints === null) {
+    return
+  }
+
+  if (
+    !pointsApproximatelyEqual(
+      endpoints.start,
+      endpoints.end,
+      pathEndpointEpsilon,
+    )
+  ) {
+    pushError(
+      errors,
+      path,
+      'Closed path boundary final endpoint must match its initial endpoint.',
+    )
+  }
+}
+
+function validateClosedPathBoundariesOnPlane(
+  boundaries: ClosedPathBoundary[],
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Array.isArray(boundaries) || !isValidWorkPlaneFrameSnapshot(frame)) {
+    return
+  }
+
+  boundaries.forEach((boundary, boundaryIndex) => {
+    if (!Array.isArray(boundary.segments)) {
+      return
+    }
+
+    closedPathBoundaryCoordinates(boundary).forEach((point, pointIndex) => {
+      if (!isFiniteVec3(point)) {
+        return
+      }
+
+      if (!isPointOnWorkPlaneFrame(point, frame, pathEndpointEpsilon)) {
+        pushError(
+          errors,
+          `${path}[${boundaryIndex}].points[${pointIndex}]`,
+          'Work-plane filled sheet boundary points must lie on the stored plane.',
+        )
+        return
+      }
+    })
+
+    if (
+      workPlaneLocalCoordinatesForBoundary(
+        boundary,
+        frame,
+        pathEndpointEpsilon,
+      ) === null
+    ) {
+      pushError(
+        errors,
+        `${path}[${boundaryIndex}]`,
+        'Work-plane filled sheet boundary points must have finite local plane coordinates.',
+      )
+    }
+  })
+}
+
+function validateFillRule(
+  fillRule: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isFillRule(fillRule)) {
+    pushError(errors, path, 'Fill rule must be nonzero or evenOdd.')
+  }
 }
 
 function validatePathSegment(
@@ -1169,6 +1438,18 @@ function validateName(
   }
 }
 
+function validateOptionalName(
+  name: string | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (name === undefined) {
+    return
+  }
+
+  validateName(name, path, errors)
+}
+
 function validateOptionalPathLabel(
   pathLabel: string | undefined,
   path: string,
@@ -1205,4 +1486,14 @@ function pushError(
   message: string,
 ): void {
   errors.push({ path, message })
+}
+
+function regionStratumKind(stratum: RegionStratum): unknown {
+  return (stratum as { readonly kind?: unknown }).kind
+}
+
+function isFilledRegion2DStratum(
+  stratum: RegionStratum,
+): stratum is FilledRegion2DStratum {
+  return regionStratumKind(stratum) === 'filledRegion'
 }
