@@ -512,6 +512,7 @@ type PathSegment =
       kind: "line";
       start: Vec3;
       end: Vec3;
+      styleOverride?: PathSegmentStyleOverride;
     }
   | {
       kind: "cubicBezier";
@@ -520,7 +521,10 @@ type PathSegment =
       control2: Vec3;
       end: Vec3;
       controlMode?: CubicBezierControlMode;
+      styleOverride?: PathSegmentStyleOverride;
     };
+
+type PathSegmentStyleOverride = Partial<CurveStyle>;
 
 export type ConcatenatedPathStratum = CurveStratumBase & {
   kind: "concatenatedPath";
@@ -541,8 +545,8 @@ Concatenated paths support line segments and cubic Bézier segments in both 2D
 and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
 helpers normalize to that policy, while import validation rejects nonzero saved
 `z` values. Closed-path validation is not required yet. Closed 2D regions, 3D
-curved-boundary sheets, live linked vertices, snapping, cross-work-plane
-creation, and segment-level style overrides are later phases.
+curved-boundary sheets, live linked vertices, snapping, and cross-work-plane
+creation are later phases.
 
 Cursor creation for concatenated paths is editor state until Finish. The draft
 stores completed `segments`, the current `anchor`, any `pendingPoints` for the
@@ -577,6 +581,14 @@ append a cubic Bézier segment, and remove the last segment. Appended segments
 start at the current final endpoint. Removing the final remaining segment is
 blocked so the saved path remains valid; deleting the whole stratum is the way
 to remove a one-segment path.
+
+Each concatenated path segment may also carry `styleOverride`. The path-level
+`style` remains the default; an absent override means the segment inherits the
+path style. Override fields are partial and may set `strokeColor`,
+`strokeOpacity`, `lineWidth`, and `lineStyle`. Clearing an override removes the
+field from the segment and restores inheritance. Validation applies the same
+color, opacity, positive line width, and supported line-style checks used by
+ordinary curve styles.
 
 For cubic Bézier curves, the four `points` remain the absolute geometry used for
 SVG rendering, hit testing, dragging, and validation. Cubic Bézier curves may
@@ -840,7 +852,8 @@ In 3D mode, curves are codim 2.
 export type LineStyle =
   | "solid"
   | "dashed"
-  | "dotted";
+  | "dotted"
+  | "denselyDotted";
 
 export type CurveStyle = {
   kind: "curveStyle";
@@ -865,13 +878,22 @@ export const defaultCurveStyle: CurveStyle = {
 };
 ```
 
+## Segment-level path style overrides
+
+Concatenated paths support whole-segment overrides through
+`PathSegment.styleOverride`. This is the MVP style mechanism for drawing one
+stored path with solid, dotted, or densely dotted portions without splitting the
+model into several curve strata. It applies only to `kind: "concatenatedPath"`
+segments and does not use a normalized curve parameter.
+
 ## Partial curve style segments
 
 Curves should eventually support partial style overrides along subranges.
 
 This is useful for representing overlaps, under-crossings, and hidden portions of curves.
 
-For the MVP, this feature may be ignored in the UI and TikZ output.
+For the MVP, `styleSegments` may still be ignored in the UI and TikZ output;
+segment-level `styleOverride` is the supported concatenated-path mechanism.
 
 However, the data model should be compatible with it.
 

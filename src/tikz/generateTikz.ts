@@ -3,6 +3,7 @@ import type {
   CubicBezierCurveStratum,
   CubicBezierControlMode,
   Camera3D,
+  CurveStyle,
   CurveStratum,
   Diagram,
   HexColor,
@@ -20,6 +21,7 @@ import type {
   WorkPlaneLocalOffset,
 } from '../model/types'
 import { sheetVertices } from '../model/sheets.ts'
+import { pathSegmentStyleRuns, type PathSegmentStyleRun } from '../model/paths.ts'
 import {
   createInitialCamera3D,
   isOrthographicCamera3D,
@@ -546,16 +548,39 @@ function emitCurve(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
-  const strokeColor = context.colors.define(
-    `Curve${curve.id}Stroke`,
-    curve.style.strokeColor,
-  )
-  const lineStyleOption = lineStyleToTikzOption(curve.style.lineStyle)
+  if (curve.kind === 'concatenatedPath') {
+    const coordinates = defineConcatenatedPathCoordinates(
+      curve,
+      elementIndex,
+      context,
+    )
+    const styleRuns = pathSegmentStyleRuns(curve.segments, curve.style)
+
+    if (styleRuns.length > 1) {
+      return emitMixedStyleConcatenatedPath(
+        curve,
+        coordinates,
+        styleRuns,
+        context,
+      )
+    }
+    const continuousStyle = styleRuns[0]?.style ?? curve.style
+    const continuousOptions = [
+      ...curveStyleTikzOptions(continuousStyle, `Curve${curve.id}`, context),
+      ...spathSaveOptions(curve.pathLabel, context),
+    ]
+
+    return [
+      '\\draw[',
+      ...formatTikzOptions(continuousOptions),
+      ']',
+      `  ${formatConcatenatedPath(coordinates)};`,
+      '',
+    ]
+  }
+
   const options = [
-    `draw=${strokeColor}`,
-    `draw opacity=${formatNumber(curve.style.strokeOpacity)}`,
-    `line width=${formatNumber(curve.style.lineWidth)}pt`,
-    ...(lineStyleOption === null ? [] : [lineStyleOption]),
+    ...curveStyleTikzOptions(curve.style, `Curve${curve.id}`, context),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
   const scopedCurve = emitScopedWorkPlaneRelativeBezierCurve(
@@ -568,22 +593,6 @@ function emitCurve(
     return scopedCurve
   }
 
-  if (curve.kind === 'concatenatedPath') {
-    const coordinates = defineConcatenatedPathCoordinates(
-      curve,
-      elementIndex,
-      context,
-    )
-
-    return [
-      '\\draw[',
-      ...formatTikzOptions(options),
-      ']',
-      `  ${formatConcatenatedPath(coordinates)};`,
-      '',
-    ]
-  }
-
   const coordinates = defineCurveCoordinates(curve, elementIndex, context)
 
   return [
@@ -593,6 +602,80 @@ function emitCurve(
     `  ${formatCurvePath(curve, coordinates, context.mode)};`,
     '',
   ]
+}
+
+function emitMixedStyleConcatenatedPath(
+  curve: ConcatenatedPathStratum,
+  coordinates: PathSegmentCoordinateNames[],
+  styleRuns: PathSegmentStyleRun[],
+  context: GenerateContext,
+): string[] {
+  const savedPath = emitSavedConcatenatedPath(curve.pathLabel, coordinates, context)
+  const drawCommands = styleRuns.flatMap((run) =>
+    emitConcatenatedPathStyleRun(curve, coordinates, run, context),
+  )
+
+  return [
+    ...savedPath,
+    '% Segment style overrides split this concatenated path by resolved style.',
+    ...drawCommands,
+  ]
+}
+
+function emitSavedConcatenatedPath(
+  pathLabel: string | undefined,
+  coordinates: PathSegmentCoordinateNames[],
+  context: GenerateContext,
+): string[] {
+  const options = spathSaveOptions(pathLabel, context)
+
+  if (options.length === 0) {
+    return []
+  }
+
+  return [
+    '% Saved full concatenated path for spath operations.',
+    '\\path[',
+    ...formatTikzOptions(options),
+    ']',
+    `  ${formatConcatenatedPath(coordinates)};`,
+    '',
+  ]
+}
+
+function emitConcatenatedPathStyleRun(
+  curve: ConcatenatedPathStratum,
+  coordinates: PathSegmentCoordinateNames[],
+  run: PathSegmentStyleRun,
+  context: GenerateContext,
+): string[] {
+  const runCoordinates = coordinates.slice(
+    run.startIndex,
+    run.startIndex + run.segments.length,
+  )
+  const options = curveStyleTikzOptions(
+    run.style,
+    `Curve${curve.id}Segment${run.startIndex + 1}`,
+    context,
+  )
+
+  return [
+    `% Segment${run.segments.length === 1 ? '' : 's'} ${formatSegmentRunNumberRange(
+      run,
+    )}`,
+    '\\draw[',
+    ...formatTikzOptions(options),
+    ']',
+    `  ${formatConcatenatedPath(runCoordinates)};`,
+    '',
+  ]
+}
+
+function formatSegmentRunNumberRange(run: PathSegmentStyleRun): string {
+  const first = run.startIndex + 1
+  const last = run.startIndex + run.segments.length
+
+  return first === last ? String(first) : `${first}-${last}`
 }
 
 function emitScopedWorkPlaneRelativeBezierCurve(
@@ -788,6 +871,25 @@ function isDefaultLabelStyle(style: LabelStyle): boolean {
     style.fontSize === defaultLabelStyleValues.fontSize &&
     style.anchor === defaultLabelStyleValues.anchor
   )
+}
+
+function curveStyleTikzOptions(
+  style: CurveStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const strokeColor = context.colors.define(
+    `${colorBaseName}Stroke`,
+    style.strokeColor,
+  )
+  const lineStyleOption = lineStyleToTikzOption(style.lineStyle)
+
+  return [
+    `draw=${strokeColor}`,
+    `draw opacity=${formatNumber(style.strokeOpacity)}`,
+    `line width=${formatNumber(style.lineWidth)}pt`,
+    ...(lineStyleOption === null ? [] : [lineStyleOption]),
+  ]
 }
 
 function pointShapeOptions(

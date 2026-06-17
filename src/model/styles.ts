@@ -11,6 +11,7 @@ import type {
   LabelStyle,
   LineStyle,
   Opacity,
+  PathSegmentStyleOverride,
   PointFill,
   PointShape,
   PointStyle,
@@ -69,6 +70,38 @@ export function cloneSheetStyle(style: SheetStyle): SheetStyle {
 
 export function cloneCurveStyle(style: CurveStyle): CurveStyle {
   return { ...style }
+}
+
+export function resolveCurveStyle(
+  baseStyle: CurveStyle,
+  override: PathSegmentStyleOverride | undefined,
+): CurveStyle {
+  return {
+    ...baseStyle,
+    ...(override ?? {}),
+    kind: 'curveStyle',
+  }
+}
+
+export function curveStylesEqual(first: CurveStyle, second: CurveStyle): boolean {
+  return (
+    first.strokeColor === second.strokeColor &&
+    first.strokeOpacity === second.strokeOpacity &&
+    first.lineWidth === second.lineWidth &&
+    first.lineStyle === second.lineStyle
+  )
+}
+
+export function hasCurveStyleOverride(
+  override: PathSegmentStyleOverride | undefined,
+): boolean {
+  return (
+    override !== undefined &&
+    (override.strokeColor !== undefined ||
+      override.strokeOpacity !== undefined ||
+      override.lineWidth !== undefined ||
+      override.lineStyle !== undefined)
+  )
 }
 
 export function clonePointStyle(style: PointStyle): PointStyle {

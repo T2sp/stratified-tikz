@@ -28,10 +28,12 @@ import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
 import {
   appendCubicSegmentToConcatenatedPath,
   appendLineSegmentToConcatenatedPath,
+  clearConcatenatedPathSegmentStyleOverride,
   describeConcatenatedPathSegments,
   removeLastSegmentFromConcatenatedPath,
   updateConcatenatedPathCoordinate,
   updateConcatenatedPathPoint,
+  updateConcatenatedPathSegmentStyleOverrideField,
 } from '../../src/ui/pathEditing.ts'
 
 type TestEditorState = UndoableEditorState & {
@@ -164,6 +166,23 @@ test('segment operations append line, append cubic, and remove last segment', ()
   assert.equal(withCubic.segments[3].kind, 'cubicBezier')
   assert.equal(removed.segments.length, 3)
   assert.equal(removeLastSegmentFromConcatenatedPath(createSingleSegmentPath()).segments.length, 1)
+})
+
+test('clearing concatenated path segment style override restores inheritance', () => {
+  const path = createTestPath()
+  const overridden = updateConcatenatedPathSegmentStyleOverrideField(
+    path,
+    0,
+    'lineStyle',
+    'dotted',
+  )
+  const cleared = clearConcatenatedPathSegmentStyleOverride(overridden, 0)
+
+  assert.deepEqual(overridden.segments[0].styleOverride, {
+    lineStyle: 'dotted',
+  })
+  assert.equal(cleared.segments[0].styleOverride, undefined)
+  assert.equal(validatePath(cleared).valid, true)
 })
 
 test('TikZ output updates after concatenated path edit', () => {

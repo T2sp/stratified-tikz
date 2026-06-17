@@ -544,6 +544,97 @@ test('concatenated path exports as a continuous TikZ path', () => {
     tikz,
     /\(curvePathCompositePath0p0\) -- \(curvePathCompositePath0p1\) \.\. controls \(curvePathCompositePath0p2\) and \(curvePathCompositePath0p3\) \.\. \(curvePathCompositePath0p4\);/,
   )
+  assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 1)
+})
+
+test('single concatenated path segment override changes TikZ style', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'segment-style',
+    name: 'Segment Style',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+        styleOverride: {
+          strokeColor: '#CC0033',
+          strokeOpacity: 0.45,
+          lineWidth: 2.6,
+          lineStyle: 'dashed',
+        },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\{HTML\}\{CC0033\}/)
+  assert.match(tikz, /draw opacity=0\.45/)
+  assert.match(tikz, /line width=2\.6pt/)
+  assert.match(tikz, /dashed/)
+  assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 1)
+})
+
+test('mixed-style concatenated path exports split draw commands in segment order', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'mixed-style-path',
+    name: 'Mixed Style Path',
+    pathLabel: 'mixed style path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'dotted' },
+      },
+      {
+        kind: 'line',
+        start: { x: 2, y: 0, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'denselyDotted' },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const firstSegment = '(curvePathMixedStylePath0p0) -- (curvePathMixedStylePath0p1);'
+  const secondSegment = '(curvePathMixedStylePath0p1) -- (curvePathMixedStylePath0p2);'
+  const thirdSegment = '(curvePathMixedStylePath0p2) -- (curvePathMixedStylePath0p3);'
+  const splitDrawSection = tikz.slice(
+    tikz.indexOf('% Segment style overrides split this concatenated path'),
+  )
+
+  assert.match(tikz, /% Segment style overrides split this concatenated path/)
+  assert.match(tikz, /% Saved full concatenated path for spath operations\./)
+  assert.match(tikz, /\\path\[[\s\S]*spath\/save=mixedStylePath/)
+  assert.equal((tikz.match(/\\draw\[/g) ?? []).length, 3)
+  assert.match(tikz, /dotted/)
+  assert.match(tikz, /densely dotted/)
+  assert.ok(splitDrawSection.indexOf(firstSegment) < splitDrawSection.indexOf(secondSegment))
+  assert.ok(splitDrawSection.indexOf(secondSegment) < splitDrawSection.indexOf(thirdSegment))
+  assert.match(
+    tikz,
+    /\(curvePathMixedStylePath0p0\) -- \(curvePathMixedStylePath0p1\) -- \(curvePathMixedStylePath0p2\) -- \(curvePathMixedStylePath0p3\);/,
+  )
 })
 
 test('polygon sheet with path label emits spath save option', () => {

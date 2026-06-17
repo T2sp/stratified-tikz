@@ -12,6 +12,7 @@ import type {
   Vec2,
   Vec3,
 } from '../model/types'
+import { pathSegmentStyleRuns } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import type { SelectedElement } from '../ui/selection'
@@ -40,7 +41,7 @@ import {
 } from './svgPath'
 import { projectToSvgPoint } from './svgProjection'
 import {
-  lineStyleToStrokeDasharray,
+  curveStyleToSvgStrokeAttributes,
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { mapClientPointToViewBox } from './svgViewBox'
@@ -104,6 +105,15 @@ type SvgWorkPlaneDirectionIndicator = {
   from: Vec2
   to: Vec2
   label: string
+}
+
+type SvgCurvePathRun = {
+  key: string
+  pathData: string
+  stroke: string
+  strokeOpacity: number
+  strokeWidth: number
+  strokeDasharray?: string
 }
 
 const defaultWidth = 520
@@ -557,7 +567,7 @@ function renderCurve(
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
-  const dashArray = lineStyleToStrokeDasharray(curve.style.lineStyle)
+  const pathRuns = curveToSvgPathRuns(curve, camera, viewportHeight)
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
   const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, curve.id)
 
@@ -587,17 +597,20 @@ function renderCurve(
             pointerEvents="none"
           />
         )}
-        <path
-          d={pathData}
-          fill="none"
-          stroke={curve.style.strokeColor}
-          strokeOpacity={curve.style.strokeOpacity}
-          strokeWidth={curve.style.lineWidth}
-          strokeDasharray={dashArray}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
+        {pathRuns.map((run) => (
+          <path
+            key={run.key}
+            d={run.pathData}
+            fill="none"
+            stroke={run.stroke}
+            strokeOpacity={run.strokeOpacity}
+            strokeWidth={run.strokeWidth}
+            strokeDasharray={run.strokeDasharray}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
       </g>
     ),
   }
@@ -623,6 +636,32 @@ function curveToSvgPathData(
   return curve.kind === 'cubicBezier'
     ? cubicBezierToSvgPath(points)
     : polylineToSvgPath(points)
+}
+
+function curveToSvgPathRuns(
+  curve: CurveStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): SvgCurvePathRun[] {
+  if (curve.kind !== 'concatenatedPath') {
+    return [
+      {
+        key: `${curve.id}-path`,
+        pathData: curveToSvgPathData(curve, camera, viewportHeight),
+        ...curveStyleToSvgStrokeAttributes(curve.style),
+      },
+    ]
+  }
+
+  return pathSegmentStyleRuns(curve.segments, curve.style).map((run) => ({
+    key: `${curve.id}-segment-run-${run.startIndex}`,
+    pathData: pathSegmentsToSvgPath(
+      run.segments.map((segment) =>
+        pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+      ),
+    ),
+    ...curveStyleToSvgStrokeAttributes(run.style),
+  }))
 }
 
 function renderPoint(

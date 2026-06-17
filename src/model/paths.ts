@@ -1,11 +1,14 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import { curveStylesEqual, resolveCurveStyle } from './styles.ts'
 import type {
   AmbientDimension,
   ConcatenatedPathStratum,
+  CurveStyle,
   CubicBezierControlMode,
   CubicBezierPathSegment,
   LinePathSegment,
   PathSegment,
+  PathSegmentStyleOverride,
   Vec3,
 } from './types.ts'
 
@@ -14,6 +17,12 @@ export const pathEndpointEpsilon = 1e-9
 export type PathEndpointPair = {
   start: Vec3
   end: Vec3
+}
+
+export type PathSegmentStyleRun = {
+  startIndex: number
+  segments: PathSegment[]
+  style: CurveStyle
 }
 
 export function pathSegmentsFromPolyline(
@@ -126,16 +135,51 @@ export function pathCoordinates(segments: readonly PathSegment[]): Vec3[] {
   return segments.flatMap(pathSegmentCoordinates)
 }
 
+export function resolvePathSegmentStyle(
+  pathStyle: CurveStyle,
+  segment: PathSegment,
+): CurveStyle {
+  return resolveCurveStyle(pathStyle, segment.styleOverride)
+}
+
+export function pathSegmentStyleRuns(
+  segments: readonly PathSegment[],
+  pathStyle: CurveStyle,
+): PathSegmentStyleRun[] {
+  const runs: PathSegmentStyleRun[] = []
+
+  segments.forEach((segment, index) => {
+    const style = resolvePathSegmentStyle(pathStyle, segment)
+    const currentRun = runs[runs.length - 1]
+
+    if (currentRun !== undefined && curveStylesEqual(currentRun.style, style)) {
+      currentRun.segments.push(segment)
+      return
+    }
+
+    runs.push({
+      startIndex: index,
+      segments: [segment],
+      style,
+    })
+  })
+
+  return runs
+}
+
 function normalizePathSegment(
   segment: PathSegment,
   ambientDimension: AmbientDimension,
 ): PathSegment {
+  const styleOverride = clonePathSegmentStyleOverride(segment.styleOverride)
+
   switch (segment.kind) {
     case 'line':
       return {
         kind: 'line',
         start: normalizePointForAmbientDimension(ambientDimension, segment.start),
         end: normalizePointForAmbientDimension(ambientDimension, segment.end),
+        ...(styleOverride === undefined ? {} : { styleOverride }),
       }
     case 'cubicBezier':
       return {
@@ -153,12 +197,19 @@ function normalizePathSegment(
         ...(segment.controlMode === undefined
           ? {}
           : { controlMode: cloneCubicBezierControlMode(segment.controlMode) }),
+        ...(styleOverride === undefined ? {} : { styleOverride }),
       }
   }
 }
 
 function cloneVec3(point: Vec3): Vec3 {
   return { ...point }
+}
+
+function clonePathSegmentStyleOverride(
+  styleOverride: PathSegmentStyleOverride | undefined,
+): PathSegmentStyleOverride | undefined {
+  return styleOverride === undefined ? undefined : { ...styleOverride }
 }
 
 function cloneCubicBezierControlMode(

@@ -308,6 +308,13 @@ segment, and remove last segment. Appended segments begin at the existing final
 endpoint. Removing the last remaining segment is blocked to keep the path valid;
 users can delete the whole selected path stratum instead.
 
+Each concatenated path segment exposes a segment style override panel in the
+inspector. The fields are stroke color, stroke opacity, line width, and line
+style (`solid`, `dashed`, `dotted`, or `denselyDotted`). Empty overrides inherit
+the path-level curve style. The clear action removes the segment override and
+restores inheritance. Preview rendering and TikZ export both use the resolved
+segment style.
+
 ### Hybrid editing
 
 The user may create a point by cursor input and later refine it by direct input.
