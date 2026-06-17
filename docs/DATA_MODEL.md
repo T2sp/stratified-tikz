@@ -120,6 +120,10 @@ guide layers, is left unchanged. The editor clears stale selection, drafts, and
 source-picking UI state around this diagram edit, but those cleanup fields are
 not persisted in `Diagram`.
 
+The Layer Manager groups low-risk actions such as rename, visibility, and
+locking separately from destructive delete. Delete is confirmed before it
+modifies the diagram. Operation status messages are UI state and are not saved.
+
 Translating a layer is an ordinary diagram edit and is undoable as one step. It
 adds a finite global vector to every absolute coordinate stored by strata and
 free text labels on the selected numeric layer: point and label positions,
@@ -161,6 +165,9 @@ used numeric layer values. Saved files that omit camera metadata load with the
 initial/default camera. Invalid saved camera metadata is ignored and replaced
 with the initial/default camera; load UI may report this as a warning while
 still accepting valid geometry.
+
+For the user-facing layer operation semantics, see
+[Layer Manager](./LAYER_MANAGER.md).
 
 ## Camera
 

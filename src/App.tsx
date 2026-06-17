@@ -24,17 +24,12 @@ import {
   serializeDiagram,
 } from './model/serialization.ts'
 import {
-  deleteLayer,
-  duplicateLayer,
   elementsOnLayer,
   isLayerLocked,
   isLayerVisible,
-  normalizeLayerValue,
   renameLayer,
   setLayerLock,
   setLayerVisibility,
-  swapLayers,
-  translateLayer,
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
@@ -75,6 +70,10 @@ import {
   addTextLabelWithResult,
   addTextLabelFromDirectInput,
   applyDirectCreationCommitToEditorState,
+  applyDeleteLayerToEditorState,
+  applyDuplicateLayerToEditorState,
+  applySwapLayersToEditorState,
+  applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
   appendSheetPolygonDraftPoint,
   areCamera3DEqual,
@@ -248,6 +247,7 @@ type EditableEditorState = {
   cubicBezierDraft: CubicBezierDraft
   pathDraft: ConcatenatedPathDraft | null
   sheetPolygonDraft: SheetPolygonDraft | null
+  layerOperationStatus: string
   history: DiagramHistory
 }
 
@@ -527,6 +527,7 @@ function App() {
       cubicBezierDraft: null,
       pathDraft: null,
       sheetPolygonDraft: null,
+      layerOperationStatus: '',
       history: createDiagramHistory(initialDiagram),
     }
   })
@@ -538,8 +539,17 @@ function App() {
     cubicBezierDraft,
     pathDraft,
     sheetPolygonDraft,
+    layerOperationStatus,
     history,
   } = editorState
+
+  function setLayerOperationStatus(message: string): void {
+    setEditorState((current) => ({
+      ...current,
+      layerOperationStatus: message,
+    }))
+  }
+
   const [inspectorDisclosure, setInspectorDisclosure] =
     useState<InspectorDisclosureState>({
       selectionKey: selectedElementDisclosureKey(null),
@@ -816,6 +826,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
@@ -874,47 +885,36 @@ function App() {
     updateEditableDiagram((diagram) =>
       setLayerVisibility(diagram, layerValue, visible),
     )
+    setLayerOperationStatus(
+      `Layer ${formatLayerValue(layerValue)} ${visible ? 'shown' : 'hidden'}.`,
+    )
   }
 
   function setDiagramLayerLock(layerValue: number, locked: boolean): void {
     updateEditableDiagram((diagram) => setLayerLock(diagram, layerValue, locked))
+    setLayerOperationStatus(
+      `Layer ${formatLayerValue(layerValue)} ${
+        locked ? 'locked' : 'unlocked'
+      }.`,
+    )
   }
 
   function renameDiagramLayer(layerValue: number, name: string): void {
     updateEditableDiagram((diagram) => renameLayer(diagram, layerValue, name))
+    setLayerOperationStatus(`Layer ${formatLayerValue(layerValue)} renamed.`)
   }
 
   function duplicateDiagramLayer(
     sourceLayerValue: number,
     targetLayerValue?: number,
   ): void {
-    setEditorState((current) => {
-      let result: ReturnType<typeof duplicateLayer>
-
-      try {
-        result = duplicateLayer(current.editableDiagram, sourceLayerValue, {
-          ...(targetLayerValue === undefined ? {} : { targetLayerValue }),
-        })
-      } catch {
-        return current
-      }
-
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        result.diagram,
-        current.layerFilter,
+    setEditorState((current) =>
+      applyDuplicateLayerToEditorState(
+        current,
+        sourceLayerValue,
+        targetLayerValue,
       )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: result.diagram,
-        selectedElement: clearSelectionForLayerFilter(
-          result.diagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-      })
-    })
+    )
     setCopyStatus('idle')
   }
 
@@ -922,54 +922,16 @@ function App() {
     leftLayerValue: number,
     rightLayerValue: number,
   ): void {
-    setEditorState((current) => {
-      const nextDiagram = swapLayers(
-        current.editableDiagram,
-        leftLayerValue,
-        rightLayerValue,
-      )
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        nextDiagram,
-        swapLayerFilterForLayerSwap(
-          current.layerFilter,
-          leftLayerValue,
-          rightLayerValue,
-        ),
-      )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-        selectedElement: clearSelectionForLayerFilter(
-          nextDiagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-      })
-    })
+    setEditorState((current) =>
+      applySwapLayersToEditorState(current, leftLayerValue, rightLayerValue),
+    )
     setCopyStatus('idle')
   }
 
   function translateDiagramLayer(layerValue: number, translation: Vec3): void {
-    setEditorState((current) => {
-      let nextDiagram: Diagram
-
-      try {
-        nextDiagram = translateLayer(
-          current.editableDiagram,
-          layerValue,
-          translation,
-        )
-      } catch {
-        return current
-      }
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-      })
-    })
+    setEditorState((current) =>
+      applyTranslateLayerToEditorState(current, layerValue, translation),
+    )
     setCopyStatus('idle')
   }
 
@@ -983,31 +945,13 @@ function App() {
         `Delete layer ${layerLabel} and ${elementCount} ${elementLabel}? This can be undone.`,
       )
     ) {
+      setLayerOperationStatus('Delete canceled.')
       return
     }
 
-    setEditorState((current) => {
-      const nextDiagram = deleteLayer(current.editableDiagram, layerValue)
-      const nextLayerFilter = normalizeLayerFilterForDiagram(
-        nextDiagram,
-        current.layerFilter,
-      )
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: nextDiagram,
-        selectedElement: clearSelectionForLayerFilter(
-          nextDiagram,
-          current.selectedElement,
-          nextLayerFilter,
-        ),
-        layerFilter: nextLayerFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        pathDraft: null,
-        sheetPolygonDraft: null,
-      })
-    })
+    setEditorState((current) =>
+      applyDeleteLayerToEditorState(current, layerValue),
+    )
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -1041,6 +985,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillStatus('')
     setWorkPlaneStatus('')
@@ -1065,6 +1010,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillStatus('')
     setWorkPlaneStatus('')
@@ -1150,6 +1096,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
@@ -5021,6 +4968,7 @@ function App() {
             diagram={editableDiagram}
             layerFilter={layerFilter}
             creationLayerInput={directLayerInput}
+            statusMessage={layerOperationStatus}
             onRenameLayer={renameDiagramLayer}
             onSwapLayers={swapDiagramLayers}
             onDuplicateLayer={duplicateDiagramLayer}
@@ -5028,6 +4976,7 @@ function App() {
             onSetLayerVisibility={setDiagramLayerVisibility}
             onSetLayerLock={setDiagramLayerLock}
             onDeleteLayer={deleteDiagramLayer}
+            onStatusMessage={setLayerOperationStatus}
           />
           <EditableInspector
             diagram={editableDiagram}
@@ -5809,34 +5758,6 @@ function parseLayerFilterSelectValue(value: string): LayerFilter {
   const layer = Number(value)
 
   return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
-}
-
-function swapLayerFilterForLayerSwap(
-  layerFilter: LayerFilter,
-  leftLayerValue: number,
-  rightLayerValue: number,
-): LayerFilter {
-  if (
-    layerFilter.kind === 'all' ||
-    !Number.isFinite(leftLayerValue) ||
-    !Number.isFinite(rightLayerValue)
-  ) {
-    return layerFilter
-  }
-
-  const layer = normalizeLayerValue(layerFilter.layer)
-  const leftLayer = normalizeLayerValue(leftLayerValue)
-  const rightLayer = normalizeLayerValue(rightLayerValue)
-
-  if (layer === leftLayer) {
-    return { kind: 'layer', layer: rightLayer }
-  }
-
-  if (layer === rightLayer) {
-    return { kind: 'layer', layer: leftLayer }
-  }
-
-  return layerFilter
 }
 
 function directCoordinateAxes(

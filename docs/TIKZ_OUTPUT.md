@@ -196,6 +196,11 @@ commands in the target `pgfonlayer` block. Deleting a layer removes its strata
 and free text labels from diagram data, so export no longer emits commands for
 that layer unless other elements still use the same numeric value.
 
+Translating a layer changes model coordinates on the affected elements, so TikZ
+coordinate definitions and path commands reflect the translated positions.
+Translation does not introduce a TikZ transform wrapper; export remains based on
+the stored model coordinates.
+
 The output declares all used diagram layers and sets their order before the
 `tikzpicture`:
 
