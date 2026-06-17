@@ -174,6 +174,13 @@ layer values for the editor's Layer Manager. TikZ export does not use those
 metadata names. This keeps Phase 9B layer-aware output stable: only element
 `layer` values determine emitted PGF layers and drawing order.
 
+Renaming a layer changes only this metadata and therefore does not change TikZ
+layer membership. Swapping two layers updates the numeric `layer` values stored
+on strata and free text labels, so the affected elements move to the opposite
+PGF layer in exported TikZ. The metadata names swap with those contents in the
+editor, but the emitted TikZ layer identifiers remain based only on numeric
+values such as `stratifiedLayer0`.
+
 The output declares all used diagram layers and sets their order before the
 `tikzpicture`:
 

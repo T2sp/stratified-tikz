@@ -7,6 +7,7 @@ import {
 } from '../../src/geometry/projection.ts'
 import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import { swapLayers } from '../../src/model/layers.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
 import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
@@ -318,6 +319,22 @@ test('inspector-style edits undo and redo committed diagram data', () => {
   assert.equal(pointLayer(undone.editableDiagram), 0)
   assert.deepEqual(pointPosition(redone.editableDiagram), { x: 3, y: 4, z: 0 })
   assert.equal(pointLayer(redone.editableDiagram), 7)
+})
+
+test('layer swaps undo and redo as one diagram operation', () => {
+  const initial = createUndoState(createNamedPointDiagram('A'))
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: swapLayers(initial.editableDiagram, 0, 1),
+    selectedElement: { kind: 'stratum', id: 'undo-point' },
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(committed.history.past.length, 1)
+  assert.equal(pointLayer(committed.editableDiagram), 1)
+  assert.equal(pointLayer(undone.editableDiagram), 0)
+  assert.equal(pointLayer(redone.editableDiagram), 1)
 })
 
 test('drag-style commits group repeated pointer updates into one undo step', () => {

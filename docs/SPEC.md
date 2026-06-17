@@ -643,6 +643,24 @@ foundation shows the layer name, numeric value, and count of strata plus free
 text labels on that value. The current layer filter, selected creation layer,
 and panel expanded/collapsed state are editor/UI state, not layer metadata.
 
+Layer names may be edited without changing any element's numeric `layer` value.
+Blank edited names are normalized to the safe default `Layer <value>`.
+Duplicate layer names are allowed; the Layer Manager always shows the numeric
+value beside the name for disambiguation.
+
+Swapping two layers exchanges element membership by numeric value for all strata
+and free text labels:
+
+```text
+if layer === A, set layer = B
+if layer === B, set layer = A
+```
+
+Layer metadata names are swapped at the same time, so the named visual layer
+identity follows the moved contents. Display order remains deterministic numeric
+ascending by `DiagramLayer.value`; display order alone never changes element
+membership or TikZ ordering.
+
 ## Style presets
 
 The app may provide style presets for convenience, but the user must not be restricted to presets.
