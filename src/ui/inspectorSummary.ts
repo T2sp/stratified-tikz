@@ -103,6 +103,27 @@ export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[
     }))
   }
 
+  if (curve.kind === 'concatenatedPath') {
+    return curve.segments.flatMap((segment, index) => {
+      const segmentLabel = `Segment ${index + 1}`
+
+      switch (segment.kind) {
+        case 'line':
+          return [
+            { label: `${segmentLabel} start`, point: segment.start },
+            { label: `${segmentLabel} end`, point: segment.end },
+          ]
+        case 'cubicBezier':
+          return [
+            { label: `${segmentLabel} start`, point: segment.start },
+            { label: `${segmentLabel} control point 1`, point: segment.control1 },
+            { label: `${segmentLabel} control point 2`, point: segment.control2 },
+            { label: `${segmentLabel} end`, point: segment.end },
+          ]
+      }
+    })
+  }
+
   return curve.points.map((point, index) => ({
     label: `Vertex ${index}`,
     point,
@@ -181,6 +202,9 @@ function createCurveGeometrySection(
     title: 'Geometry',
     fields: [
       { label: 'Curve kind', value: curve.kind },
+      ...(curve.kind === 'concatenatedPath'
+        ? [{ label: 'Segments', value: String(curve.segments.length) }]
+        : []),
       ...(curve.kind === 'cubicBezier'
         ? [
             {

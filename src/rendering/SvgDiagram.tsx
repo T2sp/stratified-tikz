@@ -21,9 +21,11 @@ import type { CoordinateSourceHighlight } from '../ui/coordinateSourceHighlights
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
+  pathSegmentsToSvgPath,
   polylineToSvgPath,
   regularPolygonPoints,
   starPolygonPoints,
+  type SvgPathSegment,
   svgPointList,
 } from './svgPath'
 import { projectToSvgPoint } from './svgProjection'
@@ -540,13 +542,7 @@ function renderCurve(
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItem {
-  const points = curve.points.map((point) =>
-    projectToSvgPoint(camera, point, viewportHeight),
-  )
-  const pathData =
-    curve.kind === 'cubicBezier'
-      ? cubicBezierToSvgPath(points)
-      : polylineToSvgPath(points)
+  const pathData = curveToSvgPathData(curve, camera, viewportHeight)
   const dashArray = lineStyleToStrokeDasharray(curve.style.lineStyle)
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
   const isSelected = isIncludedByFilter && isSelectedStratum(selectedElement, curve.id)
@@ -591,6 +587,51 @@ function renderCurve(
       </g>
     ),
   }
+}
+
+function curveToSvgPathData(
+  curve: CurveStratum,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): string {
+  if (curve.kind === 'concatenatedPath') {
+    return pathSegmentsToSvgPath(
+      curve.segments.map((segment): SvgPathSegment => {
+        switch (segment.kind) {
+          case 'line':
+            return {
+              kind: 'line',
+              start: projectToSvgPoint(camera, segment.start, viewportHeight),
+              end: projectToSvgPoint(camera, segment.end, viewportHeight),
+            }
+          case 'cubicBezier':
+            return {
+              kind: 'cubicBezier',
+              start: projectToSvgPoint(camera, segment.start, viewportHeight),
+              control1: projectToSvgPoint(
+                camera,
+                segment.control1,
+                viewportHeight,
+              ),
+              control2: projectToSvgPoint(
+                camera,
+                segment.control2,
+                viewportHeight,
+              ),
+              end: projectToSvgPoint(camera, segment.end, viewportHeight),
+            }
+        }
+      }),
+    )
+  }
+
+  const points = curve.points.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+
+  return curve.kind === 'cubicBezier'
+    ? cubicBezierToSvgPath(points)
+    : polylineToSvgPath(points)
 }
 
 function renderPoint(
@@ -1181,6 +1222,10 @@ function renderSelectedGeometryHandles(
         </g>
       )
     case 'curve':
+      if (stratum.kind === 'concatenatedPath') {
+        return null
+      }
+
       return (
         <g key="selected-curve-handles" aria-label="Selected curve drag handles">
           {stratum.points.map((point, index) =>

@@ -1,5 +1,6 @@
 import { projectVec3 } from '../geometry/projection.ts'
 import { sheetVertices } from '../model/sheets.ts'
+import { pathCoordinates } from '../model/paths.ts'
 import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
 
 export type CameraViewAdjustment = {
@@ -141,7 +142,9 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
       case 'sheet':
         return [...sheetVertices(stratum)]
       case 'curve':
-        return [...stratum.points]
+        return stratum.kind === 'concatenatedPath'
+          ? pathCoordinates(stratum.segments)
+          : [...stratum.points]
       case 'point':
         return [stratum.position]
     }

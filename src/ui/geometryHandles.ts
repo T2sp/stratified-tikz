@@ -89,6 +89,7 @@ function updateCurvePoint(
     if (
       stratum.id !== stratumId ||
       stratum.geometricKind !== 'curve' ||
+      stratum.kind === 'concatenatedPath' ||
       pointIndex >= stratum.points.length ||
       (stratum.kind === 'cubicBezier' && stratum.points.length !== 4)
     ) {

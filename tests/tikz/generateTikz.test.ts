@@ -507,6 +507,45 @@ test('cubic Bezier curve with path label emits spath save option', () => {
   )
 })
 
+test('concatenated path exports as a continuous TikZ path', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'composite-path',
+    name: 'Composite Path',
+    pathLabel: 'composite path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: { x: 1.5, y: 1, z: 0 },
+        control2: { x: 2.5, y: 1, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /spath\/save=compositePath/)
+  assert.match(tikz, /\\coordinate \(curvePathCompositePath0p0\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(curvePathCompositePath0p4\) at \(3,0\);/)
+  assert.match(
+    tikz,
+    /\(curvePathCompositePath0p0\) -- \(curvePathCompositePath0p1\) \.\. controls \(curvePathCompositePath0p2\) and \(curvePathCompositePath0p3\) \.\. \(curvePathCompositePath0p4\);/,
+  )
+})
+
 test('polygon sheet with path label emits spath save option', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.strata.push(

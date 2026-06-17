@@ -12,14 +12,16 @@ import {
 } from './styles.ts'
 import { cloneCamera3D, createInitialCamera3D } from './camera.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import { normalizePathSegmentsForAmbientDimension } from './paths.ts'
 import type {
   AmbientDimension,
   Camera,
   Camera2D,
   Camera3D,
+  ConcatenatedPathStratum,
   CoordinateInputMode,
+  CubicBezierCurveStratum,
   CubicBezierControlMode,
-  CurveKind,
   CurveStratum,
   CurveStyle,
   CurveStyleSegment,
@@ -28,6 +30,9 @@ import type {
   LabelStyle,
   PointStratum,
   PointStyle,
+  PointCurveKind,
+  PolylineCurveStratum,
+  PathSegment,
   QuadSheetStratum,
   RegionStratum,
   RegionStyle,
@@ -79,13 +84,25 @@ export type CreateSheetStratumInput = {
 export type CreateCurveStratumInput = {
   ambientDimension: AmbientDimension
   id: string
-  kind?: CurveKind
+  kind?: PointCurveKind
   name?: string
   label?: string
   pathLabel?: string
   style?: CurveStyle
   points: Vec3[]
   bezierControls?: CubicBezierControlMode
+  styleSegments?: CurveStyleSegment[]
+  layer?: number
+}
+
+export type CreateConcatenatedPathStratumInput = {
+  ambientDimension: AmbientDimension
+  id: string
+  name?: string
+  label?: string
+  pathLabel?: string
+  style?: CurveStyle
+  segments: PathSegment[]
   styleSegments?: CurveStyleSegment[]
   layer?: number
 }
@@ -224,7 +241,33 @@ export function createCurveStratum({
   styleSegments = [],
   layer = 0,
 }: CreateCurveStratumInput): CurveStratum {
-  const curve: Omit<CurveStratum, 'label'> = {
+  if (kind === 'cubicBezier') {
+    const curve: Omit<CubicBezierCurveStratum, 'label'> = {
+      id,
+      codim: ambientDimension === 2 ? 1 : 2,
+      geometricKind: 'curve',
+      kind,
+      name,
+      style: cloneCurveStyle(style),
+      points: points.map((point) =>
+        normalizePointForAmbientDimension(ambientDimension, point),
+      ),
+      styleSegments: styleSegments.map(cloneCurveStyleSegment),
+      layer,
+    }
+
+    if (bezierControls !== undefined) {
+      curve.bezierControls = cloneCubicBezierControlMode(bezierControls)
+    }
+
+    if (pathLabel !== undefined) {
+      curve.pathLabel = pathLabel
+    }
+
+    return withOptionalLabel(curve, label)
+  }
+
+  const curve: Omit<PolylineCurveStratum, 'label'> = {
     id,
     codim: ambientDimension === 2 ? 1 : 2,
     geometricKind: 'curve',
@@ -238,15 +281,44 @@ export function createCurveStratum({
     layer,
   }
 
-  if (bezierControls !== undefined) {
-    curve.bezierControls = cloneCubicBezierControlMode(bezierControls)
-  }
-
   if (pathLabel !== undefined) {
     curve.pathLabel = pathLabel
   }
 
   return withOptionalLabel(curve, label)
+}
+
+export function createConcatenatedPathStratum({
+  ambientDimension,
+  id,
+  name = 'Path',
+  label,
+  pathLabel,
+  style = defaultCurveStyle,
+  segments,
+  styleSegments = [],
+  layer = 0,
+}: CreateConcatenatedPathStratumInput): ConcatenatedPathStratum {
+  const path: Omit<ConcatenatedPathStratum, 'label'> = {
+    id,
+    codim: ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    name,
+    style: cloneCurveStyle(style),
+    segments: normalizePathSegmentsForAmbientDimension(
+      segments,
+      ambientDimension,
+    ),
+    styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    layer,
+  }
+
+  if (pathLabel !== undefined) {
+    path.pathLabel = pathLabel
+  }
+
+  return withOptionalLabel(path, label)
 }
 
 export function createPointStratum({

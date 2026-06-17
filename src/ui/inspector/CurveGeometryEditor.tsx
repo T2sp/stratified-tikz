@@ -6,6 +6,7 @@ import {
 } from '../../geometry/bezierControls.ts'
 import type {
   AmbientDimension,
+  CubicBezierCurveStratum,
   CubicBezierControlMode,
   CurveStratum,
   Diagram,
@@ -17,6 +18,7 @@ import {
   updateVec3Coordinate,
 } from '../diagramUpdates.ts'
 import { describeCurvePoints } from '../inspectorSummary.ts'
+import { formatVec3 } from '../inspectorSummary.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import {
   EditableNumberField,
@@ -42,9 +44,10 @@ export function CurveGeometryEditor({
   curve,
   onDiagramChange,
 }: CurveGeometryEditorProps) {
-  const bezierControlMode = editableInspectorBezierControlMode(
-    curve.bezierControls,
-  )
+  const bezierControlMode =
+    curve.kind === 'cubicBezier'
+      ? editableInspectorBezierControlMode(curve.bezierControls)
+      : null
 
   return (
     <section className="inspector-section">
@@ -101,6 +104,16 @@ function renderCurveCoordinateEditors(
   diagram: Diagram,
   onDiagramChange: DiagramChangeHandler,
 ) {
+  if (curve.kind === 'concatenatedPath') {
+    return describeCurvePoints(curve).map((description, pointIndex) => (
+      <ReadOnlyField
+        key={`${description.label}-${pointIndex}`}
+        label={description.label}
+        value={formatVec3(description.point, diagram.ambientDimension)}
+      />
+    ))
+  }
+
   if (curve.kind !== 'cubicBezier' || curve.points.length !== 4) {
     return describeCurvePoints(curve).map((description, pointIndex) => (
       <AbsoluteCurvePointEditor
@@ -281,7 +294,10 @@ function AbsoluteCurvePointEditor({
       onCoordinateChange={(axis, value) =>
         onDiagramChange((currentDiagram) =>
           updateStratumById(currentDiagram, curve.id, (current) => {
-            if (current.geometricKind !== 'curve') {
+            if (
+              current.geometricKind !== 'curve' ||
+              current.kind === 'concatenatedPath'
+            ) {
               return current
             }
 
@@ -315,7 +331,7 @@ function RelativeEndpointEditor({
   onDiagramChange,
 }: {
   diagram: Diagram
-  curve: CurveStratum
+  curve: CubicBezierCurveStratum
   label: string
   pointIndex: 0 | 3
   onDiagramChange: DiagramChangeHandler
@@ -350,10 +366,10 @@ function RelativeEndpointEditor({
 }
 
 function updateCubicBezierControlMode(
-  curve: CurveStratum,
+  curve: CubicBezierCurveStratum,
   ambientDimension: AmbientDimension,
   mode: InspectorBezierControlMode,
-): CurveStratum {
+): CubicBezierCurveStratum {
   if (mode === 'absolute') {
     return { ...curve, bezierControls: { kind: 'absolute' } }
   }
@@ -367,12 +383,12 @@ function updateCubicBezierControlMode(
 }
 
 function updateRelativeCubicBezierEndpoint(
-  curve: CurveStratum,
+  curve: CubicBezierCurveStratum,
   ambientDimension: AmbientDimension,
   pointIndex: 0 | 3,
   axis: CoordinateAxis,
   value: number,
-): CurveStratum {
+): CubicBezierCurveStratum {
   const bezierControls = curve.bezierControls
 
   if (

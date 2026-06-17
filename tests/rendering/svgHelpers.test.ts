@@ -4,6 +4,7 @@ import { absoluteCubicBezierPointsFromControlMode } from '../../src/geometry/bez
 import { threeDimensionalExample } from '../../src/examples/index.ts'
 import {
   cubicBezierToSvgPath,
+  pathSegmentsToSvgPath,
   polylineToSvgPath,
   regularPolygonPoints,
   starPolygonPoints,
@@ -94,6 +95,26 @@ test('cubic Bezier SVG path uses stored absolute points rather than control meta
 
   assert.equal(pathFromStoredPoints, 'M 0,0 C 99,1 2,2 3,3')
   assert.notEqual(pathFromStoredPoints, pathFromMetadata)
+})
+
+test('pathSegmentsToSvgPath emits a continuous line and cubic path', () => {
+  assert.equal(
+    pathSegmentsToSvgPath([
+      {
+        kind: 'line',
+        start: { x: 0, y: 0 },
+        end: { x: 1, y: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0 },
+        control1: { x: 1.5, y: 1 },
+        control2: { x: 2.5, y: 1 },
+        end: { x: 3, y: 0 },
+      },
+    ]),
+    'M 0,0 L 1,0 C 1.5,1 2.5,1 3,0',
+  )
 })
 
 test('line styles map to SVG dash arrays', () => {
