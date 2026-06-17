@@ -501,6 +501,15 @@ Boundary data is committed geometry. Creating a fill from selected paths should
 copy the selected path segments into `ClosedPathBoundary[]`; filled strata do
 not store live references back to source paths.
 
+The current editor creates these filled strata through a UI-only boundary
+picking workflow rather than general multi-selection. Picked path IDs are not
+saved in `Diagram`. On commit, the selected closed `concatenatedPath` segments
+are copied in picked order, the chosen `fillRule` is stored explicitly, and the
+source path strata are left unchanged. For 3D creation, the filled sheet stores
+a finite plane-frame snapshot: the active work plane is reused when every
+boundary point lies on it, otherwise a reliable plane is derived from
+non-collinear boundary coordinates. Non-coplanar 3D boundaries are rejected.
+
 ## Saved path labels
 
 Path-like strata may store an optional `pathLabel` string. This is not a visual
