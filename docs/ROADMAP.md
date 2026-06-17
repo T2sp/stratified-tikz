@@ -267,52 +267,66 @@ Recommended `phaseSlugs` entries:
 - Export committed paths as ordinary absolute 3D path geometry while preserving
   segment order and segment-level style overrides.
 
-## Phase 15: Regions and curved 3D surface strata
+## Phase 15: Filled closed boundaries and 3D curved surface strata
 
-Phase 15 prioritizes diagrammatic surfaces needed for 3-categorical graphical calculus, including 2D filled regions and 3D curved colored surfaces such as hemispheres and saddle patches.
+Phase 15 focuses on filling closed paths in 2D and 3D, then adding curved 3D sheet primitives.
 
-### Phase 15A: 2D codim-0 region model
+The target includes diagrams with translucent colored regions/sheets, solid/dotted 1-strata, point markers, labels, coordinate axes, and readable TikZ output.
 
-- Add 2D `RegionStratum`.
-- Boundary is a closed path.
-- Style includes fill and stroke options.
+### Phase 15A: Closed-boundary fill data model
 
-### Phase 15B: 2D closed-boundary validation
+- Add 2D codim-0 filled regions.
+- Add 3D codim-1 work-plane-local filled sheets.
+- Support multiple closed boundaries.
+- Support fill rules:
+  - nonzero;
+  - evenOdd.
 
-- Validate closed paths.
-- Check endpoint matching, finite coordinates, and `z = 0`.
+### Phase 15B: Create filled regions/sheets from selected closed paths
 
-### Phase 15C: 2D filled region creation and editing
+- Select one or more closed paths.
+- Create a 2D filled region in 2D.
+- Create a 3D planar/work-plane-local filled sheet in 3D.
+- Copy boundary geometry at creation time.
+- Support even-odd fill rule for multiple boundaries.
 
-- Create and edit 2D codim-0 filled regions.
-- Export to SVG/TikZ as filled closed paths.
+### Phase 15C: SVG and TikZ fill output with even-odd rule
 
-### Phase 15D: 3D curved surface primitive data model
+- Render filled regions/sheets in SVG.
+- Export to TikZ.
+- Use SVG `fill-rule="evenodd"` and TikZ `even odd rule` where appropriate.
+- For 3D work-plane-local sheets, prefer TikZ `canvas is plane` scope when available.
 
-- Add model support for 3D curved sheet primitives.
-- Initial primitives may include:
-  - hemisphere patches;
-  - saddle patches;
-  - parametric rectangular patches.
-- These are codim-1 sheet-like strata in 3D.
+### Phase 15D: Filled region/sheet editing
 
-### Phase 15E: Colored hemispheres
+- Inspector editing for fill rule, style, layer, and boundary summary.
+- Optional boundary coordinate editing or boundary replacement workflow.
+- Preserve save/load and undo/redo.
 
-- Create/render/export colored hemisphere surface patches.
-- Support fill/stroke/opacity and layer behavior.
-- Keep initial parameterization simple.
+### Phase 15E: Curved sheet primitive model and sampling utilities
 
-### Phase 15F: Saddle patches
+- Add 3D curved sheet primitives:
+  - hemisphere / spherical-cap patches;
+  - saddle patches.
+- Add sampling/mesh helpers and validation.
 
-- Create/render/export saddle-like surface patches.
-- Support fill/stroke/opacity and layer behavior.
-- Keep initial parameterization simple.
+### Phase 15F: SVG and TikZ export for curved sheet primitives
 
-### Phase 15G: General 3D curved-boundary sheets
+- Render curved sheets as sampled meshes.
+- Export curved sheets to TikZ as sampled filled faces.
+- Preserve style, opacity, layer, and readability.
 
-- Extend 3D sheets to support planar closed boundaries made from line and cubic Bézier segments.
-- Render as projected filled paths or approximated patches.
-- Export to TikZ readably.
+### Phase 15G: Hemisphere and saddle creation/editing
+
+- Add user-facing creation/editing for hemisphere and saddle patches.
+- Use active work-plane/frame orientation where appropriate.
+- Support style/layer/sampling controls.
+
+### Phase 15H: Reference-diagram presets and export hardening
+
+- Add reference-style examples/templates.
+- Add lightweight style presets for translucent sheets and solid/dotted curves.
+- Harden TikZ output readability and default sampling.
 
 ## Phase 16: Layer manager
 
