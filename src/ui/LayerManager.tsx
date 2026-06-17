@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   countElementsByLayer,
   formatLayerValue,
@@ -7,6 +7,7 @@ import {
 } from '../model/layers.ts'
 import type { Diagram, Vec3 } from '../model/types.ts'
 import type { LayerFilter } from './layerFilter.ts'
+import { committedLayerNameDraft } from './layerRenameDraft.ts'
 
 export type LayerManagerProps = {
   diagram: Diagram
@@ -76,24 +77,12 @@ export function LayerManager({
 
             return (
               <div key={layerKey} className="layer-manager-row" role="row">
-                <form
-                  className="layer-manager-name-form"
-                  role="cell"
-                  onSubmit={(event) =>
-                    submitLayerRename(event, layer.value, onRenameLayer)
-                  }
-                >
-                  <input
-                    key={`${layerKey}:${layer.name}`}
-                    name="layerName"
-                    className="layer-manager-name-input"
-                    aria-label={`Name for layer ${layerKey}`}
-                    defaultValue={layer.name}
-                  />
-                  <button type="submit" className="toolbar-button">
-                    Rename
-                  </button>
-                </form>
+                <LayerNameEditor
+                  layerValue={layer.value}
+                  layerKey={layerKey}
+                  name={layer.name}
+                  onRenameLayer={onRenameLayer}
+                />
                 <span role="cell">{layerKey}</span>
                 <span role="cell">{counts.get(layer.value) ?? 0}</span>
                 <div className="layer-manager-actions" role="cell">
@@ -223,6 +212,65 @@ export function LayerManager({
   )
 }
 
+type LayerNameEditorProps = {
+  layerValue: number
+  layerKey: string
+  name: string
+  onRenameLayer: (layerValue: number, name: string) => void
+}
+
+function LayerNameEditor({
+  layerValue,
+  layerKey,
+  name,
+  onRenameLayer,
+}: LayerNameEditorProps) {
+  const [draftName, setDraftName] = useState(name)
+
+  useEffect(() => {
+    setDraftName(name)
+  }, [layerValue, name])
+
+  function commitRename(): void {
+    const committedName = committedLayerNameDraft(layerValue, draftName)
+
+    setDraftName(committedName)
+
+    if (committedName !== name) {
+      onRenameLayer(layerValue, draftName)
+    }
+  }
+
+  return (
+    <form
+      className="layer-manager-name-form"
+      role="cell"
+      onSubmit={(event) => {
+        event.preventDefault()
+        commitRename()
+      }}
+    >
+      <input
+        name="layerName"
+        className="layer-manager-name-input"
+        aria-label={`Name for layer ${layerKey}`}
+        value={draftName}
+        onChange={(event) => setDraftName(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            setDraftName(name)
+            event.currentTarget.blur()
+          }
+        }}
+      />
+      <button type="submit" className="toolbar-button">
+        Rename
+      </button>
+    </form>
+  )
+}
+
 function submitLayerTranslate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
@@ -266,19 +314,6 @@ function submitLayerDuplicate(
   }
 
   onDuplicateLayer(layerValue, targetLayer)
-}
-
-function submitLayerRename(
-  event: FormEvent<HTMLFormElement>,
-  layerValue: number,
-  onRenameLayer: (layerValue: number, name: string) => void,
-): void {
-  event.preventDefault()
-
-  const formData = new FormData(event.currentTarget)
-  const rawName = formData.get('layerName')
-
-  onRenameLayer(layerValue, typeof rawName === 'string' ? rawName : '')
 }
 
 function submitLayerSwap(
