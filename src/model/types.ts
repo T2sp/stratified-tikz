@@ -175,6 +175,37 @@ export type WorkPlaneFrameSnapshot = {
   normal: Vec3
 }
 
+export type SurfaceFrame = WorkPlaneFrameSnapshot
+
+export type SurfaceSampling = {
+  uSegments: number
+  vSegments: number
+}
+
+export type HemisphereSide = 'positive' | 'negative'
+
+export type HemisphereCurvedSheetPrimitive = {
+  kind: 'hemisphere'
+  center: Vec3
+  radius: number
+  frame: SurfaceFrame
+  hemisphereSide: HemisphereSide
+  sampling: SurfaceSampling
+}
+
+export type SaddleCurvedSheetPrimitive = {
+  kind: 'saddle'
+  frame: SurfaceFrame
+  width: number
+  depth: number
+  height: number
+  sampling: SurfaceSampling
+}
+
+export type CurvedSheetPrimitive =
+  | HemisphereCurvedSheetPrimitive
+  | SaddleCurvedSheetPrimitive
+
 export type WorkPlaneLocalCoordinate = {
   a: number
   b: number
@@ -292,10 +323,16 @@ export type WorkPlaneFilledSheet3DStratum = SheetStratumBase & {
   fillRule: FillRule
 }
 
+export type CurvedSheetStratum = SheetStratumBase & {
+  kind: 'curvedSheet'
+  primitive: CurvedSheetPrimitive
+}
+
 export type SheetStratum =
   | QuadSheetStratum
   | PolygonSheetStratum
   | WorkPlaneFilledSheet3DStratum
+  | CurvedSheetStratum
 
 type PathSegmentBase = {
   styleOverride?: PathSegmentStyleOverride

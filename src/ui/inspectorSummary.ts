@@ -198,6 +198,19 @@ function createSheetGeometrySection(
     return createFilledBoundaryGeometrySection(sheet, ambientDimension)
   }
 
+  if (sheet.kind === 'curvedSheet') {
+    return {
+      title: 'Geometry',
+      fields: [
+        { label: 'Primitive', value: sheet.primitive.kind },
+        {
+          label: 'Sampling',
+          value: `${sheet.primitive.sampling.uSegments} x ${sheet.primitive.sampling.vSegments}`,
+        },
+      ],
+    }
+  }
+
   return {
     title: 'Geometry',
     fields: sheetVertices(sheet).map((vertex, index) => ({
@@ -401,6 +414,10 @@ function stratumKindLabel(stratum: Stratum): string {
     stratum.kind === 'workPlaneFilledSheet'
   ) {
     return 'Work-plane filled sheet'
+  }
+
+  if (stratum.geometricKind === 'sheet' && stratum.kind === 'curvedSheet') {
+    return 'Curved sheet'
   }
 
   switch (stratum.geometricKind) {

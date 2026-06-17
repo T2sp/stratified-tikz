@@ -920,6 +920,39 @@ test('3D workPlaneFilledSheet TikZ stays inside the correct layer block', () => 
   assert.match(layerBlock, /\\filldraw\[/)
 })
 
+test('3D curvedSheet emits a readable placeholder inside the sheet layer', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    id: 'curved-hemisphere',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Curved Hemisphere',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'hemisphere',
+      center: { x: 0, y: 0, z: 0 },
+      radius: 1,
+      frame: xyPlaneFrameAtZ(0),
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 8, vSegments: 4 },
+    },
+    layer: 8,
+  })
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer8')
+
+  assert.match(layerBlock, /% Codimension 1 strata: sheets/)
+  assert.match(
+    layerBlock,
+    /Curved sheet "Curved Hemisphere" \[curved-hemisphere\] omitted/,
+  )
+  assert.match(layerBlock, /Primitive: hemisphere/)
+  assert.doesNotMatch(layerBlock, /\\path\[/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
 test('filled-object TikZ output has no NaN or Infinity values', () => {
   const tikz = [
     generateTikz(createFilledRegionDiagram()),

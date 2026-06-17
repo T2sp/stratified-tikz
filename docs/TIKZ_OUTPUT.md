@@ -425,6 +425,12 @@ opacity, stroke color, and stroke opacity are preserved through named
 `\definecolor` entries and readable `fill=`, `fill opacity=`, `draw=`, and
 `draw opacity=` options.
 
+In 3D mode, `kind: "curvedSheet"` is persisted and validated as a codimension 1
+sheet primitive, but full TikZ mesh export is not implemented yet. The current
+generator emits a readable layer-local comment identifying the omitted curved
+sheet and primitive kind rather than writing an invalid path. Mesh sampling is
+available through geometry helpers for future rendering phases.
+
 ## Output sections in 2D mode
 
 In 2D mode, group output as:
