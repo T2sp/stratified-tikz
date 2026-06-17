@@ -7,16 +7,25 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import type {
+  CurvedSheetStratum,
   CurveStratum,
   Diagram,
   PointStratum,
   PolygonSheetStratum,
+  SheetStyle,
   TextLabel,
   Vec3,
   WorkPlane,
 } from '../../src/model/types.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
+import { createInitialCamera3D } from '../../src/model/camera.ts'
+import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  addCurvedSheetStratumWithResult,
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
   addPointStratumFromDirectInput,
@@ -31,7 +40,9 @@ import {
   localDirectCoordinateInputFromExistingSource,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
+  updateCurvedSheetPrimitiveById,
   updateStratumById,
+  updateStratumStyleById,
 } from '../../src/ui/diagramUpdates.ts'
 import {
   createExistingCoordinateSourceOptions,
@@ -516,6 +527,225 @@ test('direct polygon sheet creation is unavailable in 2D and rejects invalid inp
     throw new Error('Expected invalid sheet coordinates to be rejected.')
   }
   assert.equal(invalidResult.error, 'invalidCoordinates')
+})
+
+test('curved hemisphere sheet creation preserves work-plane frame, style, layer, SVG, TikZ, and save/load', () => {
+  const style = sheetStyle({
+    fillColor: '#112233',
+    fillOpacity: 0.42,
+    strokeColor: '#445566',
+    strokeOpacity: 0.77,
+  })
+  const center = { x: 1, y: 20, z: 3 }
+  const result = addCurvedSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    center,
+    testCustomWorkPlane,
+    {
+      kind: 'hemisphere',
+      radius: 1.5,
+      hemisphereSide: 'negative',
+      sampling: { uSegments: 4, vSegments: 2 },
+    },
+    {
+      id: 'ui-hemisphere',
+      name: 'UI Hemisphere',
+      layer: 9,
+      style,
+    },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected hemisphere creation to succeed.')
+  }
+
+  const sheet = findCurvedSheet(result.diagram, result.id)
+  assert.equal(sheet.codim, 1)
+  assert.equal(sheet.layer, 9)
+  assert.deepEqual(sheet.style, style)
+  assert.equal(sheet.primitive.kind, 'hemisphere')
+  assert.deepEqual(sheet.primitive.center, center)
+  assert.deepEqual(sheet.primitive.frame, {
+    ...expectedFrameSnapshot,
+    origin: center,
+  })
+  assert.equal(sheet.primitive.hemisphereSide, 'negative')
+
+  const mesh = curvedSheetToSvgMesh(
+    sheet,
+    createInitialCamera3D(),
+    240,
+  )
+  assert.equal(mesh.primitiveKind, 'hemisphere')
+  assert.equal(mesh.faces.length, 8)
+  assert.equal(mesh.boundaryPathData.length, 1)
+
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /Primitive: hemisphere; sampling: u=4, v=2; faces=8/)
+  assert.match(tikz, /\{HTML\}\{112233\}/)
+  assert.match(tikz, /\{HTML\}\{445566\}/)
+  assert.match(tikz, /fill opacity=0\.42/)
+  assert.match(tikz, /draw opacity=0\.77/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer9,main\}/)
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
+})
+
+test('curved saddle sheet editing accepts valid primitive updates and rejects invalid parameters', () => {
+  const result = addCurvedSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { kind: 'xy', z: 0 },
+    {
+      kind: 'saddle',
+      width: 2,
+      depth: 3,
+      height: 0.5,
+      sampling: { uSegments: 3, vSegments: 2 },
+    },
+    { id: 'ui-saddle', layer: -3 },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected saddle creation to succeed.')
+  }
+
+  const invalidWidth = updateCurvedSheetPrimitiveById(
+    result.diagram,
+    result.id,
+    (primitive) =>
+      primitive.kind === 'saddle' ? { ...primitive, width: 0 } : primitive,
+  )
+  assert.deepEqual(findCurvedSheet(invalidWidth, result.id), findCurvedSheet(result.diagram, result.id))
+
+  const invalidSampling = updateCurvedSheetPrimitiveById(
+    result.diagram,
+    result.id,
+    (primitive) => ({
+      ...primitive,
+      sampling: { ...primitive.sampling, uSegments: 65 },
+    }),
+  )
+  assert.deepEqual(
+    findCurvedSheet(invalidSampling, result.id),
+    findCurvedSheet(result.diagram, result.id),
+  )
+
+  const edited = updateCurvedSheetPrimitiveById(
+    result.diagram,
+    result.id,
+    (primitive) =>
+      primitive.kind === 'saddle'
+        ? {
+            ...primitive,
+            height: -1.25,
+            sampling: { uSegments: 4, vSegments: 3 },
+          }
+        : primitive,
+  )
+  const sheet = findCurvedSheet(edited, result.id)
+
+  assert.equal(sheet.primitive.kind, 'saddle')
+  assert.equal(sheet.primitive.height, -1.25)
+  assert.deepEqual(sheet.primitive.sampling, { uSegments: 4, vSegments: 3 })
+  assert.match(
+    generateTikz(edited),
+    /Primitive: saddle; sampling: u=4, v=3; faces=12/,
+  )
+})
+
+test('curved sheet layer and style edits update TikZ output', () => {
+  const result = addCurvedSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { kind: 'xy', z: 0 },
+    {
+      kind: 'saddle',
+      width: 2,
+      depth: 2,
+      height: 1,
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+    { id: 'style-layer-saddle', layer: 0 },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected curved sheet creation to succeed.')
+  }
+
+  const editedLayer = updateStratumById(result.diagram, result.id, (stratum) => ({
+    ...stratum,
+    layer: 7,
+  }))
+  const editedStyle = updateStratumStyleById(editedLayer, result.id, (style) =>
+    style.kind === 'sheetStyle'
+      ? {
+          ...style,
+          fillColor: '#AA5500',
+          fillOpacity: 0.31,
+          strokeColor: '#0055AA',
+          strokeOpacity: 0.64,
+        }
+      : style,
+  )
+  const tikz = generateTikz(editedStyle)
+
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer7,main\}/)
+  assert.match(tikz, /\{HTML\}\{AA5500\}/)
+  assert.match(tikz, /\{HTML\}\{0055AA\}/)
+  assert.match(tikz, /fill opacity=0\.31/)
+  assert.match(tikz, /draw opacity=0\.64/)
+})
+
+test('curved sheet creation rejects unsupported ambient dimension and invalid primitive parameters', () => {
+  const twoDimensionalResult = addCurvedSheetStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { kind: 'xy', z: 0 },
+    {
+      kind: 'hemisphere',
+      radius: 1,
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 4, vSegments: 2 },
+    },
+  )
+  assert.equal(twoDimensionalResult.id, null)
+  assert.equal(twoDimensionalResult.diagram, emptyTwoDimensionalDiagram)
+
+  const invalidRadius = addCurvedSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { kind: 'xy', z: 0 },
+    {
+      kind: 'hemisphere',
+      radius: 0,
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 4, vSegments: 2 },
+    },
+  )
+  assert.equal(invalidRadius.id, null)
+
+  const invalidSampling = addCurvedSheetStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { kind: 'xy', z: 0 },
+    {
+      kind: 'saddle',
+      width: 2,
+      depth: 2,
+      height: 1,
+      sampling: { uSegments: 2.5, vSegments: 2 },
+    },
+  )
+  assert.equal(invalidSampling.id, null)
 })
 
 test('direct creation layer helpers reject invalid layer input and keep TikZ UI-state independent', () => {
@@ -1478,6 +1708,16 @@ function findPolygonSheet(
   return stratum
 }
 
+function findCurvedSheet(diagram: Diagram, id: string): CurvedSheetStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum?.geometricKind !== 'sheet' || stratum.kind !== 'curvedSheet') {
+    throw new Error(`Curved sheet ${id} was not created.`)
+  }
+
+  return stratum
+}
+
 function findPoint(diagram: Diagram, id: string): PointStratum {
   const stratum = diagram.strata.find((candidate) => candidate.id === id)
 
@@ -1529,6 +1769,17 @@ function sourceInput(source: ExistingCoordinateSource): {
     y: '0',
     z: '0',
     source,
+  }
+}
+
+function sheetStyle(overrides: Partial<SheetStyle> = {}): SheetStyle {
+  return {
+    kind: 'sheetStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#2F80C0',
+    strokeOpacity: 1,
+    ...overrides,
   }
 }
 

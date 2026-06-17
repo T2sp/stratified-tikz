@@ -37,6 +37,7 @@ import {
   addConcatenatedPathStratumWithResult,
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
+  addCurvedSheetStratumWithResult,
   addPolygonSheetFromDirectInput,
   addPolygonSheetStratumWithResult,
   addPolylineCurveFromDirectInput,
@@ -76,6 +77,8 @@ import {
   createConcatenatedPathDraft,
   createDiagramHistory,
   createSheetPolygonDraft,
+  defaultHemisphereCreationParameters,
+  defaultSaddleCreationParameters,
   defaultCustomOriginNormalWorkPlaneInput,
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
@@ -86,11 +89,14 @@ import {
   formatExistingCoordinateSourceLabel,
   fitCameraControlState,
   layerFilterIncludesLayer,
+  maxCurvedSheetSamplingSegments,
   normalizeLayerFilterForDiagram,
   normalizeJsonDownloadFilename,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
+  parseDirectCoordinateInput,
   parseDirectCoordinateRows,
+  parseFiniteNumber,
   parseDirectLayerInput,
   redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
@@ -139,6 +145,8 @@ import {
   type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
   type CoordinateSourceHighlight,
+  type CurvedSheetCreationKind,
+  type CurvedSheetCreationParameters,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
   type LayerFilter,
@@ -160,6 +168,7 @@ type DirectCreationTool =
   | 'createCubicBezier'
   | 'createSheet'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
+type SheetCreationKind = 'polygon' | CurvedSheetCreationKind
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -228,6 +237,11 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createPath', label: 'Add path' },
   { id: 'createSheet', label: 'Add sheet' },
 ]
+const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
+  { id: 'polygon', label: 'Polygon' },
+  { id: 'hemisphere', label: 'Hemisphere' },
+  { id: 'saddle', label: 'Saddle' },
+]
 const concatenatedPathSegmentKinds: Array<{
   id: ConcatenatedPathSegmentKind
   label: string
@@ -272,6 +286,33 @@ function App() {
   const [pathWorkPlaneMode, setPathWorkPlaneMode] =
     useState<ConcatenatedPathWorkPlaneMode>('sameWorkPlane')
   const [sheetStatus, setSheetStatus] = useState<string>('')
+  const [sheetCreationKind, setSheetCreationKind] =
+    useState<SheetCreationKind>('polygon')
+  const [hemisphereRadiusInput, setHemisphereRadiusInput] = useState<string>(
+    String(defaultHemisphereCreationParameters.radius),
+  )
+  const [hemisphereSide, setHemisphereSide] = useState(
+    defaultHemisphereCreationParameters.hemisphereSide,
+  )
+  const [hemisphereUSegmentsInput, setHemisphereUSegmentsInput] =
+    useState<string>(String(defaultHemisphereCreationParameters.sampling.uSegments))
+  const [hemisphereVSegmentsInput, setHemisphereVSegmentsInput] =
+    useState<string>(String(defaultHemisphereCreationParameters.sampling.vSegments))
+  const [saddleWidthInput, setSaddleWidthInput] = useState<string>(
+    String(defaultSaddleCreationParameters.width),
+  )
+  const [saddleDepthInput, setSaddleDepthInput] = useState<string>(
+    String(defaultSaddleCreationParameters.depth),
+  )
+  const [saddleHeightInput, setSaddleHeightInput] = useState<string>(
+    String(defaultSaddleCreationParameters.height),
+  )
+  const [saddleUSegmentsInput, setSaddleUSegmentsInput] = useState<string>(
+    String(defaultSaddleCreationParameters.sampling.uSegments),
+  )
+  const [saddleVSegmentsInput, setSaddleVSegmentsInput] = useState<string>(
+    String(defaultSaddleCreationParameters.sampling.vSegments),
+  )
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
@@ -424,7 +465,7 @@ function App() {
     if (
       coordinateInputMode !== 'direct' ||
       !isDirectCreationTool(creationTool) ||
-      !isDirectPathCreationTool(creationTool)
+      !usesDirectCoordinateRows(creationTool, sheetCreationKind)
     ) {
       return []
     }
@@ -469,6 +510,7 @@ function App() {
     directSourceKey,
     editableDiagram,
     existingCoordinateSourceOptions,
+    sheetCreationKind,
   ])
   const workPlaneCoordinateSourceHighlights = useMemo(
     () =>
@@ -1141,8 +1183,27 @@ function App() {
         : '',
     )
     setSheetStatus(
-      tool === 'createSheet' ? 'Click the preview to add sheet vertices.' : '',
+      tool === 'createSheet' ? sheetCreationStatusPrompt(sheetCreationKind) : '',
     )
+  }
+
+  function updateSheetCreationKind(kind: SheetCreationKind): void {
+    setSheetCreationKind(kind)
+    setDirectCreationStatus('')
+    if (kind !== 'polygon') {
+      setDirectSheetSources([])
+      setDirectSourceTargetRow('1')
+      setDirectSourceKey('')
+    }
+    setEditorState((current) =>
+      kind === 'polygon' || current.sheetPolygonDraft === null
+        ? current
+        : {
+            ...current,
+            sheetPolygonDraft: null,
+          },
+    )
+    setSheetStatus(sheetCreationStatusPrompt(kind))
   }
 
   function handlePreviewCreationClick(
@@ -1257,16 +1318,32 @@ function App() {
     const shouldCommitOnClick =
       creationTool === 'createPoint' ||
       creationTool === 'createLabel' ||
-      (creationTool === 'createCubicBezier' && nextCubicBezierPointCount >= 4)
+      (creationTool === 'createCubicBezier' && nextCubicBezierPointCount >= 4) ||
+      (creationTool === 'createSheet' && sheetCreationKind !== 'polygon')
     const cursorCreationLayer = shouldCommitOnClick
       ? parseNewElementLayer(
           creationTool === 'createCubicBezier'
             ? setCubicBezierStatus
+            : creationTool === 'createSheet'
+              ? setSheetStatus
             : setDirectCreationStatus,
         )
       : null
 
     if (shouldCommitOnClick && cursorCreationLayer === null) {
+      return
+    }
+
+    const curvedSheetParameters =
+      creationTool === 'createSheet' && sheetCreationKind !== 'polygon'
+        ? parseCurvedSheetCreationParameters(setSheetStatus)
+        : null
+
+    if (
+      creationTool === 'createSheet' &&
+      sheetCreationKind !== 'polygon' &&
+      curvedSheetParameters === null
+    ) {
       return
     }
 
@@ -1318,7 +1395,9 @@ function App() {
 
     if (creationTool === 'createSheet') {
       setSheetStatus(
-        `${(sheetPolygonDraft?.points.length ?? 0) + 1} sheet vertices in draft.`,
+        sheetCreationKind === 'polygon'
+          ? `${(sheetPolygonDraft?.points.length ?? 0) + 1} sheet vertices in draft.`
+          : `${sheetCreationKindLabel(sheetCreationKind)} created.`,
       )
     }
 
@@ -1382,6 +1461,30 @@ function App() {
       if (creationTool === 'createSheet') {
         if (current.editableDiagram.ambientDimension !== 3) {
           return current
+        }
+
+        if (curvedSheetParameters !== null) {
+          const result = addCurvedSheetStratumWithResult(
+            current.editableDiagram,
+            modelPoint,
+            activeWorkPlane,
+            curvedSheetParameters,
+            { layer: cursorCreationLayer ?? undefined },
+          )
+
+          if (result.id === null) {
+            return current
+          }
+
+          return commitDiagramChange(
+            current,
+            applyCreatedElementToEditorState(
+              current,
+              result.diagram,
+              { kind: 'stratum', id: result.id },
+              cursorCreationLayer ?? 0,
+            ),
+          )
         }
 
         return {
@@ -1665,6 +1768,69 @@ function App() {
     return layer
   }
 
+  function parseCurvedSheetCreationParameters(
+    setStatus: (message: string) => void,
+  ): CurvedSheetCreationParameters | null {
+    if (sheetCreationKind === 'polygon') {
+      return null
+    }
+
+    if (sheetCreationKind === 'hemisphere') {
+      const radius = parsePositiveInput(
+        hemisphereRadiusInput,
+        'Hemisphere radius',
+        setStatus,
+      )
+      const uSegments = parseSamplingInput(
+        hemisphereUSegmentsInput,
+        'Hemisphere u segments',
+        setStatus,
+      )
+      const vSegments = parseSamplingInput(
+        hemisphereVSegmentsInput,
+        'Hemisphere v segments',
+        setStatus,
+      )
+
+      return radius === null || uSegments === null || vSegments === null
+        ? null
+        : {
+            kind: 'hemisphere',
+            radius,
+            hemisphereSide,
+            sampling: { uSegments, vSegments },
+          }
+    }
+
+    const width = parsePositiveInput(saddleWidthInput, 'Saddle width', setStatus)
+    const depth = parsePositiveInput(saddleDepthInput, 'Saddle depth', setStatus)
+    const height = parseFiniteInput(saddleHeightInput, 'Saddle height', setStatus)
+    const uSegments = parseSamplingInput(
+      saddleUSegmentsInput,
+      'Saddle u segments',
+      setStatus,
+    )
+    const vSegments = parseSamplingInput(
+      saddleVSegmentsInput,
+      'Saddle v segments',
+      setStatus,
+    )
+
+    return width === null ||
+      depth === null ||
+      height === null ||
+      uSegments === null ||
+      vSegments === null
+      ? null
+      : {
+          kind: 'saddle',
+          width,
+          depth,
+          height,
+          sampling: { uSegments, vSegments },
+        }
+  }
+
   function createDirectElement(): void {
     if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
       setDirectCreationStatus('Finish or cancel point picking first.')
@@ -1799,6 +1965,46 @@ function App() {
   }
 
   function createDirectSheet(directLayer: number): void {
+    if (sheetCreationKind !== 'polygon') {
+      const anchorPoint = parseDirectCoordinateInput(
+        directCoordinates,
+        editableDiagram.ambientDimension,
+        directCreationCoordinateOptions({}),
+      )
+      const parameters = parseCurvedSheetCreationParameters(setDirectCreationStatus)
+
+      if (anchorPoint === null) {
+        setDirectCreationStatus('Coordinates must be finite numbers.')
+        return
+      }
+
+      if (parameters === null) {
+        return
+      }
+
+      const result = addCurvedSheetStratumWithResult(
+        editableDiagram,
+        anchorPoint,
+        activeWorkPlane,
+        parameters,
+        { layer: directLayer },
+      )
+
+      if (result.id === null) {
+        setDirectCreationStatus('Curved sheet parameters must be valid.')
+        return
+      }
+
+      commitCreatedElement(
+        result.diagram,
+        { kind: 'stratum', id: result.id },
+        directLayer,
+      )
+      setDirectCreationStatus(`${sheetCreationKindLabel(sheetCreationKind)} created.`)
+      setCopyStatus('idle')
+      return
+    }
+
     const coordinateRows = parseDirectCoordinateRows(
       directSheetRows,
       editableDiagram.ambientDimension,
@@ -1889,7 +2095,10 @@ function App() {
   }
 
   function applyExistingSourceToDirectRow(): void {
-    if (!isDirectCreationTool(creationTool) || !isDirectPathCreationTool(creationTool)) {
+    if (
+      !isDirectCreationTool(creationTool) ||
+      !usesDirectCoordinateRows(creationTool, sheetCreationKind)
+    ) {
       return
     }
 
@@ -1908,7 +2117,10 @@ function App() {
   }
 
   function clearExistingSourceFromDirectRow(): void {
-    if (!isDirectCreationTool(creationTool) || !isDirectPathCreationTool(creationTool)) {
+    if (
+      !isDirectCreationTool(creationTool) ||
+      !usesDirectCoordinateRows(creationTool, sheetCreationKind)
+    ) {
       return
     }
 
@@ -2572,20 +2784,180 @@ function App() {
         {creationTool === 'createSheet' && editableDiagram.ambientDimension === 3 && (
           <div className="control-group polyline-draft-control">
             <span className="control-label">Sheet</span>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={finishSheetDraft}
-            >
-              Finish sheet
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={cancelSheetDraft}
-            >
-              Cancel sheet
-            </button>
+            <div className="segmented-control">
+              {sheetCreationKinds.map((kind) => (
+                <button
+                  key={kind.id}
+                  type="button"
+                  className={
+                    sheetCreationKind === kind.id ? 'is-selected' : undefined
+                  }
+                  aria-pressed={sheetCreationKind === kind.id}
+                  onClick={() => updateSheetCreationKind(kind.id)}
+                >
+                  {kind.label}
+                </button>
+              ))}
+            </div>
+            {sheetCreationKind === 'polygon' ? (
+              <>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={finishSheetDraft}
+                >
+                  Finish sheet
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={cancelSheetDraft}
+                >
+                  Cancel sheet
+                </button>
+              </>
+            ) : (
+              <div className="curved-sheet-parameter-grid">
+                {sheetCreationKind === 'hemisphere' ? (
+                  <>
+                    <label className="direct-create-field">
+                      <span>Radius</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={hemisphereRadiusInput}
+                        onChange={(event) => {
+                          setHemisphereRadiusInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>Side</span>
+                      <select
+                        value={hemisphereSide}
+                        onChange={(event) => {
+                          setHemisphereSide(
+                            event.currentTarget.value as typeof hemisphereSide,
+                          )
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      >
+                        <option value="positive">positive</option>
+                        <option value="negative">negative</option>
+                      </select>
+                    </label>
+                    <label className="direct-create-field">
+                      <span>U segments</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxCurvedSheetSamplingSegments}
+                        step="1"
+                        value={hemisphereUSegmentsInput}
+                        onChange={(event) => {
+                          setHemisphereUSegmentsInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>V segments</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxCurvedSheetSamplingSegments}
+                        step="1"
+                        value={hemisphereVSegmentsInput}
+                        onChange={(event) => {
+                          setHemisphereVSegmentsInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="direct-create-field">
+                      <span>Width</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={saddleWidthInput}
+                        onChange={(event) => {
+                          setSaddleWidthInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>Depth</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={saddleDepthInput}
+                        onChange={(event) => {
+                          setSaddleDepthInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>Height</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={saddleHeightInput}
+                        onChange={(event) => {
+                          setSaddleHeightInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>U segments</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxCurvedSheetSamplingSegments}
+                        step="1"
+                        value={saddleUSegmentsInput}
+                        onChange={(event) => {
+                          setSaddleUSegmentsInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                    <label className="direct-create-field">
+                      <span>V segments</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxCurvedSheetSamplingSegments}
+                        step="1"
+                        value={saddleVSegmentsInput}
+                        onChange={(event) => {
+                          setSaddleVSegmentsInput(event.currentTarget.value)
+                          setSheetStatus('')
+                          setDirectCreationStatus('')
+                        }}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+            )}
             <span className="toolbar-status" role="status">
               {sheetStatus}
             </span>
@@ -2693,7 +3065,10 @@ function App() {
                   />
                 </label>
               )}
-              {(creationTool === 'createPoint' || creationTool === 'createLabel') &&
+              {(creationTool === 'createPoint' ||
+                creationTool === 'createLabel' ||
+                (creationTool === 'createSheet' &&
+                  sheetCreationKind !== 'polygon')) &&
                 directCoordinateAxes(
                   editableDiagram.ambientDimension,
                   effectiveDirectCoordinateMode(
@@ -2707,7 +3082,11 @@ function App() {
                         axis,
                         editableDiagram.ambientDimension,
                         directCoordinateMode,
-                      )}
+                      )}{' '}
+                      {creationTool === 'createSheet' &&
+                        sheetCreationKind !== 'polygon' &&
+                        axis === 'x' &&
+                        `(${curvedSheetAnchorLabel(sheetCreationKind)})`}
                     </span>
                     <input
                       type="number"
@@ -2719,7 +3098,9 @@ function App() {
                     />
                   </label>
                 ))}
-              {isDirectPathCreationTool(creationTool) && (
+              {isDirectPathCreationTool(creationTool) &&
+                (creationTool !== 'createSheet' ||
+                  sheetCreationKind === 'polygon') && (
                 <>
                   {creationTool === 'createCubicBezier' && (
                     <label className="direct-create-field">
@@ -3484,6 +3865,16 @@ function isDirectPathCreationTool(
   )
 }
 
+function usesDirectCoordinateRows(
+  tool: DirectCreationTool,
+  sheetCreationKind: SheetCreationKind,
+): tool is 'createPolyline' | 'createCubicBezier' | 'createSheet' {
+  return (
+    isDirectPathCreationTool(tool) &&
+    (tool !== 'createSheet' || sheetCreationKind === 'polygon')
+  )
+}
+
 function directCreationTitle(tool: DirectCreationTool): string {
   switch (tool) {
     case 'createPoint':
@@ -3517,6 +3908,97 @@ function directCreationErrorMessage(
         ? 'Sheets are available only in 3D.'
         : 'This cubic Bezier control mode requires 2D coordinates or 3D active work-plane local coordinates.'
   }
+}
+
+function sheetCreationStatusPrompt(kind: SheetCreationKind): string {
+  switch (kind) {
+    case 'polygon':
+      return 'Click the preview to add sheet vertices.'
+    case 'hemisphere':
+      return 'Click the preview to place the hemisphere center.'
+    case 'saddle':
+      return 'Click the preview to place the saddle origin.'
+  }
+}
+
+function sheetCreationKindLabel(kind: SheetCreationKind): string {
+  switch (kind) {
+    case 'polygon':
+      return 'Sheet'
+    case 'hemisphere':
+      return 'Hemisphere'
+    case 'saddle':
+      return 'Saddle'
+  }
+}
+
+function curvedSheetAnchorLabel(kind: Exclude<SheetCreationKind, 'polygon'>): string {
+  switch (kind) {
+    case 'hemisphere':
+      return 'center'
+    case 'saddle':
+      return 'origin'
+  }
+}
+
+function parseFiniteInput(
+  rawValue: string,
+  label: string,
+  setStatus: (message: string) => void,
+): number | null {
+  const value = parseFiniteNumber(rawValue)
+
+  if (value === null) {
+    setStatus(`${label} must be finite.`)
+    return null
+  }
+
+  return value
+}
+
+function parsePositiveInput(
+  rawValue: string,
+  label: string,
+  setStatus: (message: string) => void,
+): number | null {
+  const value = parseFiniteInput(rawValue, label, setStatus)
+
+  if (value === null) {
+    return null
+  }
+
+  if (value <= 0) {
+    setStatus(`${label} must be positive.`)
+    return null
+  }
+
+  return value
+}
+
+function parseSamplingInput(
+  rawValue: string,
+  label: string,
+  setStatus: (message: string) => void,
+): number | null {
+  const value = parseFiniteInput(rawValue, label, setStatus)
+
+  if (value === null) {
+    return null
+  }
+
+  if (!Number.isInteger(value) || value <= 0) {
+    setStatus(`${label} must be a positive integer.`)
+    return null
+  }
+
+  if (value > maxCurvedSheetSamplingSegments) {
+    setStatus(
+      `${label} must be at most ${maxCurvedSheetSamplingSegments}.`,
+    )
+    return null
+  }
+
+  return value
 }
 
 function concatenatedPathDraftStatusMessage(

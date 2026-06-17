@@ -433,6 +433,12 @@ generator emits one named coordinate per sampled mesh vertex, then writes one
 comment identifies the curved sheet, primitive kind, sampling counts, and face
 count.
 
+Hemisphere and saddle sheets created in the editor store the active work-plane
+frame at creation time. The exporter uses only the saved primitive coordinates,
+frame, style, layer, and sampling values; it does not consult preview-only UI
+state. Inspector edits to radius, dimensions, side, center/origin, style, layer,
+and sampling are reflected directly in the generated mesh output.
+
 The sampled mesh export preserves fill color, fill opacity, stroke color, stroke
 opacity, and layer ordering through the same named-color and `pgfonlayer`
 machinery as planar sheets. It is intentionally an approximation: faces are

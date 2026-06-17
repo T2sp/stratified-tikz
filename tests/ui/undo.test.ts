@@ -12,6 +12,7 @@ import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.t
 import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
 import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import {
+  addCurvedSheetStratumWithResult,
   addPointStratumWithResult,
   addPolylineCurveStratumWithResult,
   cloneDiagram,
@@ -198,6 +199,43 @@ test('creation undo removes point and redo restores it', () => {
   assert.equal(hasStratum(undone.editableDiagram, result.id), false)
   assert.equal(undone.selectedElement, null)
   assert.equal(hasStratum(redone.editableDiagram, result.id), true)
+})
+
+test('creation undo removes curved sheet and redo restores primitive data', () => {
+  const initial = createUndoState(createEmptyDiagram({ ambientDimension: 3 }))
+  const result = addCurvedSheetStratumWithResult(
+    initial.editableDiagram,
+    { x: 1, y: 2, z: 3 },
+    { kind: 'xy', z: 3 },
+    {
+      kind: 'hemisphere',
+      radius: 1.25,
+      hemisphereSide: 'positive',
+      sampling: { uSegments: 4, vSegments: 2 },
+    },
+    { id: 'created-hemisphere', layer: 4 },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected curved sheet creation to succeed.')
+  }
+
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'stratum', id: result.id },
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasStratum(committed.editableDiagram, result.id), true)
+  assert.equal(hasStratum(undone.editableDiagram, result.id), false)
+  assert.equal(undone.selectedElement, null)
+  assert.deepEqual(
+    redone.editableDiagram.strata.find((stratum) => stratum.id === result.id),
+    committed.editableDiagram.strata.find((stratum) => stratum.id === result.id),
+  )
 })
 
 test('geometry created on a custom plane remains ordinary undoable diagram data', () => {

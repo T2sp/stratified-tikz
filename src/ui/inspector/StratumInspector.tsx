@@ -9,6 +9,7 @@ import {
   updateStratumNameById,
 } from '../diagramUpdates.ts'
 import { CurveGeometryEditor } from './CurveGeometryEditor.tsx'
+import { CurvedSheetGeometryEditor } from './CurvedSheetGeometryEditor.tsx'
 import {
   EditableNumberField,
   EditableTextField,
@@ -174,19 +175,11 @@ function StratumGeometrySection({
 
       if (stratum.kind === 'curvedSheet') {
         return (
-          <section className="inspector-section">
-            <h3>Geometry</h3>
-            <div className="inspector-form">
-              <ReadOnlyField
-                label="Primitive"
-                value={stratum.primitive.kind}
-              />
-              <ReadOnlyField
-                label="Sampling"
-                value={`${stratum.primitive.sampling.uSegments} x ${stratum.primitive.sampling.vSegments}`}
-              />
-            </div>
-          </section>
+          <CurvedSheetGeometryEditor
+            diagram={diagram}
+            sheet={stratum}
+            onDiagramChange={onDiagramChange}
+          />
         )
       }
 
