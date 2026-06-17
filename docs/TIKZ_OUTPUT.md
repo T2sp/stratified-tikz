@@ -938,6 +938,14 @@ non-drawing `\path[spath/save=...]` command for the full continuous path before
 the styled draw commands. This preserves the saved path while keeping visual
 styles split into maintainable draw blocks.
 
+3D concatenated paths export from their stored absolute `Vec3` segment
+coordinates. Same-work-plane and cross-work-plane creation modes do not change
+TikZ syntax after the path is committed: segment order is preserved, shared
+endpoint coordinate names are reused, and no work-plane-local 2D relative syntax
+or `canvas is plane` scope is emitted unless a future segment carries valid
+persistent metadata for that purpose. This keeps free 3D paths readable and
+prevents transient active work-plane UI state from affecting export.
+
 ## MVP behavior
 
 For the MVP, the generator may ignore `styleSegments` and render each curve with a single global style.

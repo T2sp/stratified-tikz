@@ -157,6 +157,7 @@ export function resolvePointStratumCoordinateForCursorCreation(
   options: {
     workPlane: WorkPlane
     epsilon?: number
+    requireWorkPlaneMembership?: boolean
   },
 ): CursorPointCoordinateSourceResult {
   const source: ExistingCoordinateSource = {
@@ -188,6 +189,7 @@ export function resolvePointStratumCoordinateForCursorCreation(
 
   if (
     diagram.ambientDimension === 3 &&
+    options.requireWorkPlaneMembership !== false &&
     !isPointOnWorkPlane(normalizedPoint, options.workPlane, options.epsilon)
   ) {
     return {

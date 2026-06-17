@@ -58,6 +58,8 @@ Recommended `phaseSlugs` entries:
 ### Phase 14E: Cross-work-plane and free 3D concatenated paths
 
 - Allow paths whose segments are not restricted to a single work plane.
-- Work planes become editing aids rather than global path constraints.
-- Preserve same-work-plane mode for safety.
-- Export as ordinary 3D path geometry.
+- Treat work planes as editing aids in cross-work-plane mode rather than global
+  path constraints.
+- Preserve same-work-plane mode for safety, including mixed-plane rejection.
+- Export committed paths as ordinary absolute 3D path geometry while preserving
+  segment order and segment-level style overrides.

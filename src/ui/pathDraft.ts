@@ -13,12 +13,17 @@ import {
 
 export type ConcatenatedPathSegmentKind = PathSegment['kind']
 
+export type ConcatenatedPathWorkPlaneMode =
+  | 'sameWorkPlane'
+  | 'crossWorkPlane'
+
 export type ConcatenatedPathDraft = {
   segments: PathSegment[]
   anchor: Vec3
   pendingPoints: Vec3[]
   currentSegmentKind: ConcatenatedPathSegmentKind
   workPlane: WorkPlane
+  workPlaneMode: ConcatenatedPathWorkPlaneMode
 }
 
 export type ConcatenatedPathDraftPointError =
@@ -65,6 +70,7 @@ export function createConcatenatedPathDraft(
   workPlane: WorkPlane,
   segmentKind: ConcatenatedPathSegmentKind,
   ambientDimension: AmbientDimension,
+  workPlaneMode: ConcatenatedPathWorkPlaneMode = 'sameWorkPlane',
 ): CreateConcatenatedPathDraftResult {
   const normalizedPoint = normalizePointForAmbientDimension(
     ambientDimension,
@@ -74,6 +80,7 @@ export function createConcatenatedPathDraft(
     normalizedPoint,
     workPlane,
     ambientDimension,
+    workPlaneMode,
   )
 
   if (validation !== null) {
@@ -88,6 +95,7 @@ export function createConcatenatedPathDraft(
       pendingPoints: [],
       currentSegmentKind: segmentKind,
       workPlane: cloneWorkPlane(workPlane),
+      workPlaneMode,
     },
   }
 }
@@ -105,6 +113,7 @@ export function appendConcatenatedPathDraftPoint(
     normalizedPoint,
     draft.workPlane,
     ambientDimension,
+    draft.workPlaneMode,
   )
 
   if (validation !== null) {
@@ -201,7 +210,7 @@ export function cancelConcatenatedPathDraft(): null {
 export function concatenatedPathDraftBlocksWorkPlaneChange(
   draft: ConcatenatedPathDraft | null,
 ): boolean {
-  return draft !== null
+  return draft !== null && draft.workPlaneMode === 'sameWorkPlane'
 }
 
 export function concatenatedPathDraftCoordinates(
@@ -239,6 +248,7 @@ function validatePathDraftPoint(
   point: Vec3,
   workPlane: WorkPlane,
   ambientDimension: AmbientDimension,
+  workPlaneMode: ConcatenatedPathWorkPlaneMode,
 ): { ok: false; reason: ConcatenatedPathDraftPointError } | null {
   if (!isFinitePoint(point)) {
     return {
@@ -248,6 +258,10 @@ function validatePathDraftPoint(
   }
 
   if (ambientDimension === 3 && !arePointsOnWorkPlane([point], workPlane)) {
+    if (workPlaneMode === 'crossWorkPlane') {
+      return null
+    }
+
     return {
       ok: false,
       reason: 'pointOffWorkPlane',

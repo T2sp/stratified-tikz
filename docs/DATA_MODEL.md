@@ -544,19 +544,25 @@ building blocks.
 Concatenated paths support line segments and cubic Bézier segments in both 2D
 and 3D. In 2D, all segment coordinates must validate with `z = 0`; creation
 helpers normalize to that policy, while import validation rejects nonzero saved
-`z` values. Closed-path validation is not required yet. Closed 2D regions, 3D
-curved-boundary sheets, live linked vertices, snapping, and cross-work-plane
-creation are later phases.
+`z` values. In 3D, segment points are ordinary absolute `Vec3` coordinates and
+are not required to lie on one work plane. Closed-path validation is not
+required yet. Closed 2D regions, 3D curved-boundary sheets, live linked
+vertices, snapping, and automatic intersection analysis are later phases.
 
 Cursor creation for concatenated paths is editor state until Finish. The draft
 stores completed `segments`, the current `anchor`, any `pendingPoints` for the
 active segment, the `currentSegmentKind` (`"line"` or `"cubicBezier"`), and the
-captured `workPlane`. In 2D, cursor points are normalized to `(x, y, 0)`. In 3D,
-the first click captures the active work plane; subsequent cursor or copied
-point inputs must lie on that same plane, and work-plane changes are blocked
-until the path is finished or canceled. Cancel clears only the draft. Finish
+captured `workPlane` plus a UI-only work-plane mode. In 2D, cursor points are
+normalized to `(x, y, 0)`. In 3D same-work-plane mode, the first click captures
+the active work plane; subsequent cursor or copied point inputs must lie on that
+same plane, and work-plane changes are blocked until the path is finished or
+canceled. In 3D cross-work-plane mode, the active work plane is only the editing
+surface for the next cursor placement. The user may change work plane between
+placements, and the draft remains one concatenated path as long as coordinates
+are finite and adjacent endpoints match. Cancel clears only the draft. Finish
 requires at least one complete segment and commits one `concatenatedPath`
-stratum.
+stratum with absolute segment coordinates; the path work-plane mode itself is
+not saved in `Diagram`.
 
 Existing concatenated paths can be edited in the inspector and by SVG drag
 handles. The inspector presents segments in stored order using one-based

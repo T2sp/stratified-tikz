@@ -16,6 +16,7 @@ import {
   createConcatenatedPathDraft,
   setConcatenatedPathDraftSegmentKind,
   type ConcatenatedPathDraft,
+  type ConcatenatedPathWorkPlaneMode,
 } from '../../src/ui/pathDraft.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
@@ -27,6 +28,7 @@ import {
   type DiagramHistory,
   type UndoableEditorState,
 } from '../../src/ui/undo.ts'
+import { arePointsOnWorkPlane } from '../../src/ui/sheetDraft.ts'
 import { pathSegmentsToSvgPath, type SvgPathSegment } from '../../src/rendering/svgPath.ts'
 
 type TestEditorState = UndoableEditorState & {
@@ -41,6 +43,7 @@ type TestEditorState = UndoableEditorState & {
 }
 
 const xyPlane: WorkPlane = { kind: 'xy', z: 0 }
+const xzPlaneAtY0: WorkPlane = { kind: 'xz', y: 0 }
 const xzPlaneAtY2: WorkPlane = { kind: 'xz', y: 2 }
 
 test('2D path draft creates a line followed by a cubic segment', () => {
@@ -96,7 +99,7 @@ test('3D path draft accepts segments on one captured work plane', () => {
   assert.equal(path?.layer, 4)
 })
 
-test('3D path draft rejects points from a different work plane', () => {
+test('3D same-work-plane path draft rejects points from a different work plane', () => {
   const draft = mustCreateDraft({ x: 0, y: 0, z: 0 }, xyPlane, 'line', 3)
   const result = appendConcatenatedPathDraftPoint(
     draft,
@@ -111,6 +114,74 @@ test('3D path draft rejects points from a different work plane', () => {
   assert.equal(result.reason, 'pointOffWorkPlane')
   assert.equal(result.draft, draft)
   assert.equal(concatenatedPathDraftBlocksWorkPlaneChange(draft), true)
+})
+
+test('3D cross-work-plane path draft allows mixed-plane segments', () => {
+  let draft = mustCreateDraft(
+    { x: 0, y: 0, z: 0 },
+    xyPlane,
+    'line',
+    3,
+    'crossWorkPlane',
+  )
+  draft = mustAppendPoint(draft, { x: 1, y: 0, z: 0 }, 3)
+  draft = mustAppendPoint(draft, { x: 1, y: 0, z: 1 }, 3)
+
+  assert.equal(draft.workPlaneMode, 'crossWorkPlane')
+  assert.equal(concatenatedPathDraftBlocksWorkPlaneChange(draft), false)
+  assert.deepEqual(draft.segments, [
+    {
+      kind: 'line',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 1, y: 0, z: 0 },
+    },
+    {
+      kind: 'line',
+      start: { x: 1, y: 0, z: 0 },
+      end: { x: 1, y: 0, z: 1 },
+    },
+  ])
+})
+
+test('cross-work-plane path draft still requires finite coordinates', () => {
+  const draft = mustCreateDraft(
+    { x: 0, y: 0, z: 0 },
+    xyPlane,
+    'line',
+    3,
+    'crossWorkPlane',
+  )
+  const result = appendConcatenatedPathDraftPoint(
+    draft,
+    { x: 1, y: Number.NaN, z: 1 },
+    3,
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected non-finite cross-work-plane point to be rejected.')
+  }
+  assert.equal(result.reason, 'nonFinitePoint')
+  assert.equal(result.draft, draft)
+})
+
+test('work-plane switching during cross-work-plane path creation keeps one draft', () => {
+  let draft = mustCreateDraft(
+    { x: 0, y: 0, z: 0 },
+    xyPlane,
+    'line',
+    3,
+    'crossWorkPlane',
+  )
+
+  assert.equal(arePointsOnWorkPlane([draft.anchor], xyPlane), true)
+  draft = mustAppendPoint(draft, { x: 1, y: 0, z: 0 }, 3)
+  assert.equal(arePointsOnWorkPlane([draft.anchor], xzPlaneAtY0), true)
+  draft = mustAppendPoint(draft, { x: 1, y: 0, z: 1 }, 3)
+
+  assert.equal(draft.segments.length, 2)
+  assert.deepEqual(draft.segments[0].end, draft.segments[1].start)
+  assert.equal(concatenatedPathDraftCanFinish(draft), true)
 })
 
 test('finishing a path draft commits one selected concatenated path', () => {
@@ -252,12 +323,14 @@ function mustCreateDraft(
   workPlane: WorkPlane,
   segmentKind: 'line' | 'cubicBezier',
   ambientDimension: 2 | 3,
+  workPlaneMode: ConcatenatedPathWorkPlaneMode = 'sameWorkPlane',
 ): ConcatenatedPathDraft {
   const result = createConcatenatedPathDraft(
     point,
     workPlane,
     segmentKind,
     ambientDimension,
+    workPlaneMode,
   )
 
   if (!result.ok) {
