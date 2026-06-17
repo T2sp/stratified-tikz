@@ -79,6 +79,12 @@ const phaseSlugs = {
   "15F": "curved-sheet-render-export",
   "15G": "hemisphere-saddle-creation",
   "15H": "reference-diagram-presets-export",
+  "16A": "layer-metadata-manager-foundation",
+  "16B": "layer-rename-swap",
+  "16C": "layer-duplicate-delete",
+  "16D": "layer-translation",
+  "16E": "layer-visibility-locking",
+  "16F": "layer-manager-polish",
 };
 
 function makePhaseSpec(phase) {

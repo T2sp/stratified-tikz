@@ -335,18 +335,50 @@ The target includes diagrams with translucent colored regions/sheets, solid/dott
 - Add lightweight style presets for translucent sheets and solid/dotted curves.
 - Harden TikZ output readability and default sampling.
 
-## Phase 16: Layer manager
+## Phase 16: Layer Manager
 
-Layer manager is postponed until after editor usability and core surface features.
+Phase 16 implements layer-level editing and management operations.
 
-Planned features:
+### Phase 16A: Layer metadata and Layer Manager foundation
 
-- layer rename;
-- layer swap/reorder;
-- layer duplicate;
-- delete a layer and all elements on it;
-- translate all elements on a layer while preserving relative positions;
-- optional layer visibility/locking.
+- Add diagram-level layer metadata.
+- Existing numeric `layer` fields remain the source of element membership.
+- Old diagrams without layer metadata derive default names.
+- Add a Layer Manager list showing layer values, names, and element counts.
+
+### Phase 16B: Layer rename and layer swap/reorder
+
+- Rename layers through metadata.
+- Swap two layer values across all elements on those layers.
+- Preserve save/load, undo/redo, and TikZ layer behavior.
+
+### Phase 16C: Layer duplicate and layer delete
+
+- Duplicate all elements on a layer to a new layer with new IDs.
+- Delete a layer and all elements on it.
+- Clear/validate stale selection/filter/drafts.
+- Preserve undo/redo.
+
+### Phase 16D: Layer translation
+
+- Translate all elements on a layer by a vector.
+- 2D: dx/dy and z remains 0.
+- 3D: dx/dy/dz.
+- Preserve relative positions, ids, styles, names, and layer values.
+- Update frame origins and absolute coordinates consistently.
+
+### Phase 16E: Layer visibility, locking, and filter integration
+
+- Add preview/editor visibility toggles.
+- Optionally add locking.
+- Hidden layers are not selectable in SVG preview.
+- TikZ export policy should be clear; default is to export all layers unless explicitly changed.
+
+### Phase 16F: Layer Manager polish and regression hardening
+
+- Add UI polish, status messages, confirmations, disabled states.
+- Add combined-operation regression tests.
+- Update docs.
 
 ## Phase 17: Multi-selection and batch editing
 
