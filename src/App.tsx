@@ -2676,10 +2676,10 @@ function App() {
       </header>
 
       <section className="toolbar" aria-label="Diagram controls">
-        <div className="control-stack">
-          <div className="control-group">
+        <div className="control-stack example-control-stack">
+          <div className="control-group example-control-group">
             <span className="control-label">Example</span>
-            <div className="segmented-control">
+            <div className="segmented-control example-segmented-control">
               {exampleOptions.map((example) => (
                 <button
                   key={example.id}
