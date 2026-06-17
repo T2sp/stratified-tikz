@@ -23,24 +23,33 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from './model/serialization.ts'
+import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import type {
   AmbientDimension,
   AxisAlignedWorkPlaneName,
   Camera,
   CoordinateInputMode,
+  CurveStyle,
   Diagram,
   FillRule,
+  HexColor,
+  LineStyle,
   OrthographicCamera3D,
   Vec2,
   Vec3,
   WorkPlane,
 } from './model/types'
+import { lineStyles } from './model/types'
 import { SvgDiagram, svgPointToModelOnWorkPlane } from './rendering'
 import { generateTikz } from './tikz'
 import {
   addConcatenatedPathStratumWithResult,
+  addArcPathFromDirectInput,
+  addCirclePathFromDirectInput,
+  addConcatenatedPathFromDirectInput,
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
+  addEllipsePathFromDirectInput,
   addCurvedSheetStratumWithResult,
   addPolygonSheetFromDirectInput,
   addPolygonSheetStratumWithResult,
@@ -103,6 +112,8 @@ import {
   parseDirectCoordinateInput,
   parseDirectCoordinateRows,
   parseFiniteNumber,
+  parseOpacity,
+  parsePositiveFiniteNumber,
   parseDirectLayerInput,
   redoLastDiagramChange,
   removeSelectedElementWithLayerFilter,
@@ -138,6 +149,7 @@ import {
   workPlaneSummaryLabel,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
+  type DirectConcatenatedPathManualSegmentInput,
   type DirectCoordinateInput,
   type DirectCoordinateMode,
   type DirectCubicBezierControlMode,
@@ -181,9 +193,26 @@ type DirectCreationTool =
   | 'createLabel'
   | 'createPolyline'
   | 'createCubicBezier'
+  | 'createPath'
   | 'createSheet'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type SheetCreationKind = 'polygon' | CurvedSheetCreationKind
+type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
+type DirectPathManualCoordinateRole = 'control1' | 'control2' | 'end'
+type DirectPathManualSegmentDraft = {
+  kind: ConcatenatedPathSegmentKind
+  control1: DirectCoordinateInput
+  control2: DirectCoordinateInput
+  end: DirectCoordinateInput
+}
+type DirectPathCoordinateSourceTarget =
+  | { kind: 'manualStart' }
+  | {
+      kind: 'manualSegment'
+      segmentIndex: number
+      role: DirectPathManualCoordinateRole
+    }
+  | { kind: 'templateCenter' }
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -303,6 +332,12 @@ const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'relativeCartesian',
   'relativePolar',
 ]
+const directPathInputModes: Array<{ id: DirectPathInputMode; label: string }> = [
+  { id: 'manual', label: 'Manual segments' },
+  { id: 'circle', label: 'Circle' },
+  { id: 'ellipse', label: 'Ellipse' },
+  { id: 'arc', label: 'Arc' },
+]
 const fillRuleOptions: FillRule[] = ['nonzero', 'evenOdd']
 const cameraNumericFields: Array<{ field: CameraControlField; label: string }> = [
   { field: 'thetaDeg', label: 'theta' },
@@ -371,6 +406,45 @@ function App() {
   )
   const [directCubicBezierControlMode, setDirectCubicBezierControlMode] =
     useState<DirectCubicBezierControlMode>('absolute')
+  const [directPathInputMode, setDirectPathInputMode] =
+    useState<DirectPathInputMode>('manual')
+  const [directPathName, setDirectPathName] = useState<string>('Path')
+  const [directPathLabel, setDirectPathLabel] = useState<string>('')
+  const [directPathStrokeColor, setDirectPathStrokeColor] = useState<string>(
+    defaultCurveStyle.strokeColor,
+  )
+  const [directPathStrokeOpacity, setDirectPathStrokeOpacity] = useState<string>(
+    String(defaultCurveStyle.strokeOpacity),
+  )
+  const [directPathLineWidth, setDirectPathLineWidth] = useState<string>(
+    String(defaultCurveStyle.lineWidth),
+  )
+  const [directPathLineStyle, setDirectPathLineStyle] = useState<LineStyle>(
+    defaultCurveStyle.lineStyle,
+  )
+  const [directPathStart, setDirectPathStart] = useState<DirectCoordinateInput>(
+    defaultDirectCoordinates,
+  )
+  const [directPathSegments, setDirectPathSegments] = useState<
+    DirectPathManualSegmentDraft[]
+  >([defaultDirectPathLineSegment()])
+  const [directPathTemplateCenter, setDirectPathTemplateCenter] =
+    useState<DirectCoordinateInput>(defaultDirectCoordinates)
+  const [directPathCircleRadius, setDirectPathCircleRadius] =
+    useState<string>('1')
+  const [directPathEllipseRadiusX, setDirectPathEllipseRadiusX] =
+    useState<string>('1.5')
+  const [directPathEllipseRadiusY, setDirectPathEllipseRadiusY] =
+    useState<string>('0.75')
+  const [directPathEllipseRotationDeg, setDirectPathEllipseRotationDeg] =
+    useState<string>('0')
+  const [directPathArcRadius, setDirectPathArcRadius] = useState<string>('1')
+  const [directPathArcStartAngleDeg, setDirectPathArcStartAngleDeg] =
+    useState<string>('0')
+  const [directPathArcEndAngleDeg, setDirectPathArcEndAngleDeg] =
+    useState<string>('90')
+  const [directPathSourceTargetKey, setDirectPathSourceTargetKey] =
+    useState<string>('manual-start')
   const [directSheetRows, setDirectSheetRows] = useState<string>(
     defaultDirectSheetRows(),
   )
@@ -504,9 +578,30 @@ function App() {
   const directCoordinateSourceHighlights = useMemo(() => {
     if (
       coordinateInputMode !== 'direct' ||
-      !isDirectCreationTool(creationTool) ||
-      !usesDirectCoordinateRows(creationTool, sheetCreationKind)
+      !isDirectCreationTool(creationTool)
     ) {
+      return []
+    }
+
+    if (creationTool === 'createPath') {
+      const selectedSource = existingCoordinateSourceOptions.find(
+        (option) => option.key === directSourceKey,
+      )?.source
+
+      return createDirectCoordinateSourceHighlights(editableDiagram, [
+        ...directPathCoordinateSourceRequests(),
+        ...(selectedSource === undefined
+          ? []
+          : [
+              {
+                source: selectedSource,
+                label: 'selected',
+              },
+            ]),
+      ])
+    }
+
+    if (!usesDirectCoordinateRows(creationTool, sheetCreationKind)) {
       return []
     }
 
@@ -546,6 +641,10 @@ function App() {
     creationTool,
     directCubicBezierSources,
     directPolylineSources,
+    directPathInputMode,
+    directPathSegments,
+    directPathStart,
+    directPathTemplateCenter,
     directSheetSources,
     directSourceKey,
     editableDiagram,
@@ -704,6 +803,7 @@ function App() {
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
+    resetDirectPathInput()
     setDirectSheetRows(defaultDirectSheetRows())
     resetDirectCoordinateSources()
     setActiveWorkPlane(
@@ -1719,6 +1819,163 @@ function App() {
     setDirectCreationStatus('')
   }
 
+  function updateDirectPathStartCoordinate(
+    axis: DirectCoordinateAxis,
+    value: string,
+  ): void {
+    setDirectPathStart((current) => ({
+      ...current,
+      [axis]: value,
+    }))
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectPathTemplateCenterCoordinate(
+    axis: DirectCoordinateAxis,
+    value: string,
+  ): void {
+    setDirectPathTemplateCenter((current) => ({
+      ...current,
+      [axis]: value,
+    }))
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectPathSegmentKind(
+    segmentIndex: number,
+    kind: ConcatenatedPathSegmentKind,
+  ): void {
+    setDirectPathSegments((current) =>
+      current.map((segment, index) =>
+        index === segmentIndex ? { ...segment, kind } : segment,
+      ),
+    )
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectPathSegmentCoordinate(
+    segmentIndex: number,
+    role: DirectPathManualCoordinateRole,
+    axis: DirectCoordinateAxis,
+    value: string,
+  ): void {
+    setDirectPathSegments((current) =>
+      current.map((segment, index) =>
+        index === segmentIndex
+          ? {
+              ...segment,
+              [role]: {
+                ...segment[role],
+                [axis]: value,
+              },
+            }
+          : segment,
+      ),
+    )
+    setDirectCreationStatus('')
+  }
+
+  function applyExistingSourceToDirectPathCoordinate(): void {
+    const sourceOption = existingCoordinateSourceOptions.find(
+      (option) => option.key === directSourceKey,
+    )
+    const target = directPathCoordinateSourceTargetFromKey(
+      directPathSourceTargetKey,
+    )
+
+    if (sourceOption === undefined || target === null) {
+      setDirectCreationStatus('Choose a valid existing coordinate source.')
+      return
+    }
+
+    updateDirectPathCoordinateSource(target, sourceOption.source)
+    setDirectCreationStatus(
+      `${directPathCoordinateSourceTargetLabel(target)} uses ${sourceOption.label}.`,
+    )
+  }
+
+  function clearExistingSourceFromDirectPathCoordinate(): void {
+    const target = directPathCoordinateSourceTargetFromKey(
+      directPathSourceTargetKey,
+    )
+
+    if (target === null) {
+      return
+    }
+
+    updateDirectPathCoordinateSource(target, null)
+    setDirectCreationStatus('')
+  }
+
+  function updateDirectPathCoordinateSource(
+    target: DirectPathCoordinateSourceTarget,
+    source: ExistingCoordinateSource | null,
+  ): void {
+    switch (target.kind) {
+      case 'manualStart':
+        setDirectPathStart((current) => directCoordinateInputWithSource(current, source))
+        return
+      case 'templateCenter':
+        setDirectPathTemplateCenter((current) =>
+          directCoordinateInputWithSource(current, source),
+        )
+        return
+      case 'manualSegment':
+        setDirectPathSegments((current) =>
+          current.map((segment, index) =>
+            index === target.segmentIndex
+              ? {
+                  ...segment,
+                  [target.role]: directCoordinateInputWithSource(
+                    segment[target.role],
+                    source,
+                  ),
+                }
+              : segment,
+          ),
+        )
+        return
+    }
+  }
+
+  function addDirectPathSegment(kind: ConcatenatedPathSegmentKind): void {
+    setDirectPathSegments((current) => [
+      ...current,
+      kind === 'line'
+        ? defaultDirectPathLineSegment()
+        : defaultDirectPathCubicSegment(),
+    ])
+    setDirectCreationStatus('')
+  }
+
+  function removeLastDirectPathSegment(): void {
+    setDirectPathSegments((current) =>
+      current.length <= 1 ? current : current.slice(0, -1),
+    )
+    setDirectCreationStatus('')
+  }
+
+  function resetDirectPathInput(): void {
+    setDirectPathInputMode('manual')
+    setDirectPathName('Path')
+    setDirectPathLabel('')
+    setDirectPathStrokeColor(defaultCurveStyle.strokeColor)
+    setDirectPathStrokeOpacity(String(defaultCurveStyle.strokeOpacity))
+    setDirectPathLineWidth(String(defaultCurveStyle.lineWidth))
+    setDirectPathLineStyle(defaultCurveStyle.lineStyle)
+    setDirectPathStart(defaultDirectCoordinates)
+    setDirectPathSegments([defaultDirectPathLineSegment()])
+    setDirectPathTemplateCenter(defaultDirectCoordinates)
+    setDirectPathCircleRadius('1')
+    setDirectPathEllipseRadiusX('1.5')
+    setDirectPathEllipseRadiusY('0.75')
+    setDirectPathEllipseRotationDeg('0')
+    setDirectPathArcRadius('1')
+    setDirectPathArcStartAngleDeg('0')
+    setDirectPathArcEndAngleDeg('90')
+    setDirectPathSourceTargetKey('manual-start')
+  }
+
   function updateDirectRowsForCreationTool(
     tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
     value: string,
@@ -1946,6 +2203,11 @@ function App() {
       return
     }
 
+    if (creationTool === 'createPath') {
+      createDirectPath(directLayer)
+      return
+    }
+
     if (creationTool === 'createSheet') {
       createDirectSheet(directLayer)
       return
@@ -2016,6 +2278,104 @@ function App() {
     )
     setDirectCreationStatus('Cubic Bezier created.')
     setCopyStatus('idle')
+  }
+
+  function createDirectPath(directLayer: number): void {
+    const style = parseDirectPathStyle()
+
+    if (style === null) {
+      return
+    }
+
+    const options = directCreationCoordinateOptions({
+      layer: directLayer,
+      name: directPathName,
+      pathLabel: directPathLabel,
+      style,
+    })
+    const result =
+      directPathInputMode === 'manual'
+        ? addConcatenatedPathFromDirectInput(
+            editableDiagram,
+            {
+              start: directPathStart,
+              segments: directPathSegments.map(directPathSegmentInputFromDraft),
+            },
+            options,
+          )
+        : directPathInputMode === 'circle'
+          ? addCirclePathFromDirectInput(
+              editableDiagram,
+              {
+                center: directPathTemplateCenter,
+                radius: directPathCircleRadius,
+              },
+              options,
+            )
+          : directPathInputMode === 'ellipse'
+            ? addEllipsePathFromDirectInput(
+                editableDiagram,
+                {
+                  center: directPathTemplateCenter,
+                  radiusX: directPathEllipseRadiusX,
+                  radiusY: directPathEllipseRadiusY,
+                  rotationDeg: directPathEllipseRotationDeg,
+                },
+                options,
+              )
+            : addArcPathFromDirectInput(
+                editableDiagram,
+                {
+                  center: directPathTemplateCenter,
+                  radius: directPathArcRadius,
+                  startAngleDeg: directPathArcStartAngleDeg,
+                  endAngleDeg: directPathArcEndAngleDeg,
+                },
+                options,
+              )
+
+    if (!result.ok) {
+      setDirectCreationStatus(directCreationErrorMessage(result.error, 'path'))
+      return
+    }
+
+    commitCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      directLayer,
+    )
+    setDirectCreationStatus('Path created.')
+    setPathStatus('')
+    setCopyStatus('idle')
+  }
+
+  function parseDirectPathStyle(): CurveStyle | null {
+    if (!isHexColor(directPathStrokeColor)) {
+      setDirectCreationStatus('Path stroke color must be a #RRGGBB hex color.')
+      return null
+    }
+
+    const strokeOpacity = parseOpacity(directPathStrokeOpacity)
+
+    if (strokeOpacity === null) {
+      setDirectCreationStatus('Path stroke opacity must be between 0 and 1.')
+      return null
+    }
+
+    const lineWidth = parsePositiveFiniteNumber(directPathLineWidth)
+
+    if (lineWidth === null) {
+      setDirectCreationStatus('Path line width must be positive.')
+      return null
+    }
+
+    return {
+      kind: 'curveStyle',
+      strokeColor: directPathStrokeColor as HexColor,
+      strokeOpacity,
+      lineWidth,
+      lineStyle: directPathLineStyle,
+    }
   }
 
   function createDirectSheet(directLayer: number): void {
@@ -2238,6 +2598,504 @@ function App() {
       case 'createSheet':
         return directSheetSources
     }
+  }
+
+  function renderDirectPathControls() {
+    const axes = directCoordinateAxes(
+      editableDiagram.ambientDimension,
+      effectiveDirectCoordinateMode(
+        editableDiagram.ambientDimension,
+        directCoordinateMode,
+      ),
+    )
+
+    return (
+      <div className="direct-path-form">
+        <label className="direct-create-field direct-path-name-field">
+          <span>Path name</span>
+          <input
+            type="text"
+            value={directPathName}
+            onChange={(event) => {
+              setDirectPathName(event.currentTarget.value)
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <label className="direct-create-field direct-path-name-field">
+          <span>Saved path label</span>
+          <input
+            type="text"
+            value={directPathLabel}
+            placeholder="optional"
+            onChange={(event) => {
+              setDirectPathLabel(event.currentTarget.value)
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <div className="direct-path-style-grid" role="group" aria-label="Path style">
+          <label className="direct-create-field">
+            <span>Stroke</span>
+            <input
+              type="text"
+              value={directPathStrokeColor}
+              onChange={(event) => {
+                setDirectPathStrokeColor(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Opacity</span>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              max="1"
+              value={directPathStrokeOpacity}
+              onChange={(event) => {
+                setDirectPathStrokeOpacity(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Width</span>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={directPathLineWidth}
+              onChange={(event) => {
+                setDirectPathLineWidth(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Line style</span>
+            <select
+              value={directPathLineStyle}
+              onChange={(event) => {
+                setDirectPathLineStyle(event.currentTarget.value as LineStyle)
+                setDirectCreationStatus('')
+              }}
+            >
+              {lineStyles.map((lineStyle) => (
+                <option key={lineStyle} value={lineStyle}>
+                  {lineStyle}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="segmented-control direct-path-mode-control" role="group">
+          {directPathInputModes.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              className={directPathInputMode === mode.id ? 'is-selected' : undefined}
+              aria-pressed={directPathInputMode === mode.id}
+              onClick={() => {
+                setDirectPathInputMode(mode.id)
+                setDirectPathSourceTargetKey(
+                  mode.id === 'manual' ? 'manual-start' : 'template-center',
+                )
+                setDirectCreationStatus('')
+              }}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+        {directPathInputMode === 'manual'
+          ? renderDirectManualPathControls(axes)
+          : renderDirectPathTemplateControls(axes)}
+        {renderDirectPathSourceControl()}
+      </div>
+    )
+  }
+
+  function renderDirectPathSourceControl() {
+    const targetOptions = directPathCoordinateSourceTargetOptions()
+
+    return (
+      <div
+        className="direct-coordinate-source-control"
+        role="group"
+        aria-label="Copy direct path coordinates from existing element"
+      >
+        <span className="control-label">Copy from existing element</span>
+        <label className="direct-create-field direct-path-source-target-field">
+          <span>Coordinate</span>
+          <select
+            value={directPathSourceTargetKey}
+            onChange={(event) => {
+              setDirectPathSourceTargetKey(event.currentTarget.value)
+              setDirectCreationStatus('')
+            }}
+          >
+            {targetOptions.map((target) => (
+              <option key={target.key} value={target.key}>
+                {target.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="direct-create-field direct-coordinate-source-field">
+          <span>Use coordinates from</span>
+          <select
+            value={directSourceKey}
+            onChange={(event) => {
+              setDirectSourceKey(event.currentTarget.value)
+              setDirectCreationStatus('')
+            }}
+          >
+            <option value="">Choose source</option>
+            {existingCoordinateSourceOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="toolbar-button"
+          disabled={existingCoordinateSourceOptions.length === 0}
+          onClick={applyExistingSourceToDirectPathCoordinate}
+        >
+          Use selected coordinates
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={clearExistingSourceFromDirectPathCoordinate}
+        >
+          Clear coordinate
+        </button>
+        <span className="direct-source-summary">
+          {directPathSourceSummary()}
+        </span>
+      </div>
+    )
+  }
+
+  function renderDirectManualPathControls(axes: DirectCoordinateAxis[]) {
+    return (
+      <div className="direct-path-manual-form">
+        {renderDirectPathCoordinateGroup(
+          'Start',
+          directPathStart,
+          updateDirectPathStartCoordinate,
+          axes,
+        )}
+        <div className="direct-path-segment-list">
+          {directPathSegments.map((segment, segmentIndex) => (
+            <fieldset key={segmentIndex} className="direct-path-segment-card">
+              <legend>Segment {segmentIndex + 1}</legend>
+              <label className="direct-create-field">
+                <span>Type</span>
+                <select
+                  value={segment.kind}
+                  onChange={(event) =>
+                    updateDirectPathSegmentKind(
+                      segmentIndex,
+                      event.currentTarget.value as ConcatenatedPathSegmentKind,
+                    )
+                  }
+                >
+                  {concatenatedPathSegmentKinds.map((kind) => (
+                    <option key={kind.id} value={kind.id}>
+                      {kind.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {segment.kind === 'cubicBezier' && (
+                <>
+                  {renderDirectPathCoordinateGroup(
+                    'Control point 1',
+                    segment.control1,
+                    (axis, value) =>
+                      updateDirectPathSegmentCoordinate(
+                        segmentIndex,
+                        'control1',
+                        axis,
+                        value,
+                      ),
+                    axes,
+                  )}
+                  {renderDirectPathCoordinateGroup(
+                    'Control point 2',
+                    segment.control2,
+                    (axis, value) =>
+                      updateDirectPathSegmentCoordinate(
+                        segmentIndex,
+                        'control2',
+                        axis,
+                        value,
+                      ),
+                    axes,
+                  )}
+                </>
+              )}
+              {renderDirectPathCoordinateGroup(
+                'End',
+                segment.end,
+                (axis, value) =>
+                  updateDirectPathSegmentCoordinate(
+                    segmentIndex,
+                    'end',
+                    axis,
+                    value,
+                  ),
+                axes,
+              )}
+            </fieldset>
+          ))}
+        </div>
+        <div className="direct-path-segment-actions">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => addDirectPathSegment('line')}
+          >
+            Add line segment
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => addDirectPathSegment('cubicBezier')}
+          >
+            Add cubic Bezier segment
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={directPathSegments.length <= 1}
+            onClick={removeLastDirectPathSegment}
+          >
+            Remove last segment
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  function renderDirectPathTemplateControls(axes: DirectCoordinateAxis[]) {
+    return (
+      <div className="direct-path-template-form">
+        {renderDirectPathCoordinateGroup(
+          'Center',
+          directPathTemplateCenter,
+          updateDirectPathTemplateCenterCoordinate,
+          axes,
+        )}
+        {directPathInputMode === 'circle' && (
+          <label className="direct-create-field">
+            <span>Radius</span>
+            <input
+              type="number"
+              step="any"
+              value={directPathCircleRadius}
+              onChange={(event) => {
+                setDirectPathCircleRadius(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+        )}
+        {directPathInputMode === 'ellipse' && (
+          <>
+            <label className="direct-create-field">
+              <span>Radius x</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathEllipseRadiusX}
+                onChange={(event) => {
+                  setDirectPathEllipseRadiusX(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <label className="direct-create-field">
+              <span>Radius y</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathEllipseRadiusY}
+                onChange={(event) => {
+                  setDirectPathEllipseRadiusY(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <label className="direct-create-field">
+              <span>Rotation</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathEllipseRotationDeg}
+                onChange={(event) => {
+                  setDirectPathEllipseRotationDeg(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+          </>
+        )}
+        {directPathInputMode === 'arc' && (
+          <>
+            <label className="direct-create-field">
+              <span>Radius</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathArcRadius}
+                onChange={(event) => {
+                  setDirectPathArcRadius(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <label className="direct-create-field">
+              <span>Start angle</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathArcStartAngleDeg}
+                onChange={(event) => {
+                  setDirectPathArcStartAngleDeg(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <label className="direct-create-field">
+              <span>End angle</span>
+              <input
+                type="number"
+                step="any"
+                value={directPathArcEndAngleDeg}
+                onChange={(event) => {
+                  setDirectPathArcEndAngleDeg(event.currentTarget.value)
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+          </>
+        )}
+        {editableDiagram.ambientDimension === 3 && (
+          <span className="toolbar-note">
+            Templates use the active work-plane orientation.
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  function renderDirectPathCoordinateGroup(
+    label: string,
+    coordinates: DirectCoordinateInput,
+    onCoordinateChange: (axis: DirectCoordinateAxis, value: string) => void,
+    axes: DirectCoordinateAxis[],
+  ) {
+    return (
+      <fieldset className="direct-path-coordinate-group">
+        <legend>{label}</legend>
+        {axes.map((axis) => (
+          <label key={axis} className="direct-create-field">
+            <span>
+              {directCoordinateAxisLabel(
+                axis,
+                editableDiagram.ambientDimension,
+                directCoordinateMode,
+              )}
+            </span>
+            <input
+              type="number"
+              step="any"
+              value={coordinates[axis]}
+              onChange={(event) =>
+                onCoordinateChange(axis, event.currentTarget.value)
+              }
+            />
+          </label>
+        ))}
+      </fieldset>
+    )
+  }
+
+  function directPathCoordinateSourceTargetOptions(): Array<{
+    key: string
+    label: string
+  }> {
+    if (directPathInputMode !== 'manual') {
+      return [{ key: 'template-center', label: 'Center' }]
+    }
+
+    return [
+      { key: 'manual-start', label: 'Start' },
+      ...directPathSegments.flatMap((segment, segmentIndex) => [
+        ...(segment.kind === 'cubicBezier'
+          ? [
+              {
+                key: directPathSegmentSourceTargetKey(
+                  segmentIndex,
+                  'control1',
+                ),
+                label: `Segment ${segmentIndex + 1} control point 1`,
+              },
+              {
+                key: directPathSegmentSourceTargetKey(
+                  segmentIndex,
+                  'control2',
+                ),
+                label: `Segment ${segmentIndex + 1} control point 2`,
+              },
+            ]
+          : []),
+        {
+          key: directPathSegmentSourceTargetKey(segmentIndex, 'end'),
+          label: `Segment ${segmentIndex + 1} end`,
+        },
+      ]),
+    ]
+  }
+
+  function directPathCoordinateSourceRequests(): Array<{
+    source: ExistingCoordinateSource
+    label: string
+  }> {
+    if (directPathInputMode !== 'manual') {
+      return directPathTemplateCenter.source === undefined
+        ? []
+        : [{ source: directPathTemplateCenter.source, label: 'center' }]
+    }
+
+    return [
+      ...(directPathStart.source === undefined
+        ? []
+        : [{ source: directPathStart.source, label: 'start' }]),
+      ...directPathSegments.flatMap((segment, segmentIndex) =>
+        directPathSegmentSourceRequests(segment, segmentIndex),
+      ),
+    ]
+  }
+
+  function directPathSourceSummary(): string {
+    const labels = directPathCoordinateSourceRequests().map((request) => {
+      const key = existingCoordinateSourceKey(request.source)
+      const option = existingCoordinateSourceOptions.find(
+        (candidate) => candidate.key === key,
+      )
+
+      return `${request.label}: ${option?.label ?? 'Unavailable source'}`
+    })
+
+    return labels.length === 0 ? 'No copied path coordinates.' : labels.join('; ')
   }
 
   function finishPolylineDraft(): void {
@@ -3152,6 +4010,7 @@ function App() {
                     />
                   </label>
                 ))}
+              {creationTool === 'createPath' && renderDirectPathControls()}
               {isDirectPathCreationTool(creationTool) &&
                 (creationTool !== 'createSheet' ||
                   sheetCreationKind === 'polygon') && (
@@ -3935,6 +4794,7 @@ function isDirectCreationTool(tool: CreationTool): tool is DirectCreationTool {
     tool === 'createLabel' ||
     tool === 'createPolyline' ||
     tool === 'createCubicBezier' ||
+    tool === 'createPath' ||
     tool === 'createSheet'
   )
 }
@@ -3969,6 +4829,8 @@ function directCreationTitle(tool: DirectCreationTool): string {
       return 'Polyline'
     case 'createCubicBezier':
       return 'Cubic Bezier'
+    case 'createPath':
+      return 'Path'
     case 'createSheet':
       return 'Sheet'
   }
@@ -3976,13 +4838,21 @@ function directCreationTitle(tool: DirectCreationTool): string {
 
 function directCreationErrorMessage(
   error: DirectPathCreationError,
-  kind: 'polyline' | 'cubicBezier' | 'sheet',
+  kind: 'polyline' | 'cubicBezier' | 'path' | 'sheet',
 ): string {
   switch (error) {
     case 'invalidCoordinates':
       return 'Coordinates must be finite numbers.'
+    case 'invalidRadius':
+      return 'Radii must be positive finite numbers.'
+    case 'invalidAngle':
+      return 'Angles must be finite, and arc start and end angles must differ.'
+    case 'invalidWorkPlane':
+      return 'The active work plane must be valid, and 3D template centers must lie on it.'
     case 'tooFewPoints':
-      return kind === 'sheet'
+      return kind === 'path'
+        ? 'A path needs at least one segment.'
+        : kind === 'sheet'
         ? 'A sheet needs at least 3 vertices.'
         : 'A polyline needs at least 2 vertices.'
     case 'wrongPointCount':
@@ -4244,6 +5114,171 @@ function defaultDirectCubicBezierRows(
   return ambientDimension === 2
     ? '0 0\n0.3 0.6\n0.7 0.6\n1 0'
     : '0 0 0\n0.3 0.6 0\n0.7 0.6 0\n1 0 0'
+}
+
+function defaultDirectPathLineSegment(): DirectPathManualSegmentDraft {
+  return {
+    kind: 'line',
+    control1: directCoordinateInput('0.3', '0.6', '0'),
+    control2: directCoordinateInput('0.7', '0.6', '0'),
+    end: directCoordinateInput('1', '0', '0'),
+  }
+}
+
+function defaultDirectPathCubicSegment(): DirectPathManualSegmentDraft {
+  return {
+    kind: 'cubicBezier',
+    control1: directCoordinateInput('0.3', '0.6', '0'),
+    control2: directCoordinateInput('0.7', '0.6', '0'),
+    end: directCoordinateInput('1', '0', '0'),
+  }
+}
+
+function directCoordinateInput(
+  x: string,
+  y: string,
+  z: string,
+): DirectCoordinateInput {
+  return { x, y, z }
+}
+
+function directPathSegmentInputFromDraft(
+  segment: DirectPathManualSegmentDraft,
+): DirectConcatenatedPathManualSegmentInput {
+  return segment.kind === 'line'
+    ? {
+        kind: 'line',
+        end: segment.end,
+      }
+    : {
+        kind: 'cubicBezier',
+        control1: segment.control1,
+        control2: segment.control2,
+        end: segment.end,
+      }
+}
+
+function directCoordinateInputWithSource(
+  coordinates: DirectCoordinateInput,
+  source: ExistingCoordinateSource | null,
+): DirectCoordinateInput {
+  const nextCoordinates: DirectCoordinateInput = { ...coordinates }
+
+  if (source === null) {
+    delete nextCoordinates.source
+    return nextCoordinates
+  }
+
+  return {
+    ...nextCoordinates,
+    source,
+  }
+}
+
+function directPathSegmentSourceRequests(
+  segment: DirectPathManualSegmentDraft,
+  segmentIndex: number,
+): Array<{ source: ExistingCoordinateSource; label: string }> {
+  return [
+    ...(segment.kind === 'cubicBezier'
+      ? [
+          directPathCoordinateSourceRequest(
+            segment.control1,
+            `segment ${segmentIndex + 1} control 1`,
+          ),
+          directPathCoordinateSourceRequest(
+            segment.control2,
+            `segment ${segmentIndex + 1} control 2`,
+          ),
+        ]
+      : []),
+    directPathCoordinateSourceRequest(
+      segment.end,
+      `segment ${segmentIndex + 1} end`,
+    ),
+  ].filter(
+    (
+      request,
+    ): request is {
+      source: ExistingCoordinateSource
+      label: string
+    } => request !== null,
+  )
+}
+
+function directPathCoordinateSourceRequest(
+  coordinates: DirectCoordinateInput,
+  label: string,
+): { source: ExistingCoordinateSource; label: string } | null {
+  return coordinates.source === undefined
+    ? null
+    : {
+        source: coordinates.source,
+        label,
+      }
+}
+
+function directPathCoordinateSourceTargetFromKey(
+  key: string,
+): DirectPathCoordinateSourceTarget | null {
+  if (key === 'manual-start') {
+    return { kind: 'manualStart' }
+  }
+
+  if (key === 'template-center') {
+    return { kind: 'templateCenter' }
+  }
+
+  const match = /^manual-segment-(\d+)-(control1|control2|end)$/u.exec(key)
+
+  if (match === null) {
+    return null
+  }
+
+  const segmentIndex = Number(match[1])
+
+  return Number.isInteger(segmentIndex) && segmentIndex >= 0
+    ? {
+        kind: 'manualSegment',
+        segmentIndex,
+        role: match[2] as DirectPathManualCoordinateRole,
+      }
+    : null
+}
+
+function directPathCoordinateSourceTargetLabel(
+  target: DirectPathCoordinateSourceTarget,
+): string {
+  switch (target.kind) {
+    case 'manualStart':
+      return 'Start'
+    case 'templateCenter':
+      return 'Center'
+    case 'manualSegment':
+      return `Segment ${target.segmentIndex + 1} ${directPathCoordinateRoleLabel(
+        target.role,
+      )}`
+  }
+}
+
+function directPathCoordinateRoleLabel(
+  role: DirectPathManualCoordinateRole,
+): string {
+  switch (role) {
+    case 'control1':
+      return 'control point 1'
+    case 'control2':
+      return 'control point 2'
+    case 'end':
+      return 'end'
+  }
+}
+
+function directPathSegmentSourceTargetKey(
+  segmentIndex: number,
+  role: DirectPathManualCoordinateRole,
+): string {
+  return `manual-segment-${segmentIndex}-${role}`
 }
 
 function directCubicBezierControlModeOptions(

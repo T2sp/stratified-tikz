@@ -7,6 +7,7 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import type {
+  ConcatenatedPathStratum,
   CurvedSheetStratum,
   CurveStratum,
   Diagram,
@@ -25,9 +26,13 @@ import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  addArcPathFromDirectInput,
+  addCirclePathFromDirectInput,
+  addConcatenatedPathFromDirectInput,
   addCurvedSheetStratumWithResult,
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
+  addEllipsePathFromDirectInput,
   addPointStratumFromDirectInput,
   addPointStratumWithResult,
   addPolygonSheetFromDirectInput,
@@ -312,6 +317,409 @@ test('direct cubic Bezier creation rejects invalid and non-finite input', () => 
     throw new Error('Expected non-finite input to be rejected.')
   }
   assert.equal(result.error, 'invalidCoordinates')
+})
+
+test('direct manual line path creates a concatenated path and normalizes 2D z', () => {
+  const result = addConcatenatedPathFromDirectInput(
+    twoDimensionalExample,
+    {
+      start: { x: '0', y: '0', z: '9' },
+      segments: [{ kind: 'line', end: { x: '2', y: '3', z: '9' } }],
+    },
+    {
+      layer: 5,
+      name: 'Manual path',
+      pathLabel: 'manual path',
+      style: {
+        kind: 'curveStyle',
+        strokeColor: '#123456',
+        strokeOpacity: 0.5,
+        lineWidth: 2,
+        lineStyle: 'denselyDotted',
+      },
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(path.codim, 1)
+  assert.equal(path.layer, 5)
+  assert.equal(path.name, 'Manual path')
+  assert.equal(path.pathLabel, 'manual path')
+  assert.deepEqual(path.style, {
+    kind: 'curveStyle',
+    strokeColor: '#123456',
+    strokeOpacity: 0.5,
+    lineWidth: 2,
+    lineStyle: 'denselyDotted',
+  })
+  assert.deepEqual(path.segments, [
+    {
+      kind: 'line',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 2, y: 3, z: 0 },
+    },
+  ])
+
+  const committed = commitDirectCreationResult(
+    result.diagram,
+    { kind: 'stratum', id: result.id },
+    5,
+    { kind: 'all' },
+  )
+  assert.deepEqual(committed.selectedElement, {
+    kind: 'stratum',
+    id: result.id,
+  })
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /--/)
+  assert.match(tikz, /\{HTML\}\{123456\}/)
+  assert.match(tikz, /draw opacity=0\.5/)
+  assert.match(tikz, /line width=2pt/)
+  assert.match(tikz, /densely dotted/)
+})
+
+test('direct manual line+cubic path preserves segment order and adjacency', () => {
+  const result = addConcatenatedPathFromDirectInput(twoDimensionalExample, {
+    start: { x: '0', y: '0', z: '0' },
+    segments: [
+      { kind: 'line', end: { x: '1', y: '0', z: '0' } },
+      {
+        kind: 'cubicBezier',
+        control1: { x: '1.2', y: '0.5', z: '0' },
+        control2: { x: '1.8', y: '0.5', z: '0' },
+        end: { x: '2', y: '0', z: '0' },
+      },
+    ],
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.deepEqual(
+    path.segments.map((segment) => segment.kind),
+    ['line', 'cubicBezier'],
+  )
+  assert.deepEqual(path.segments[0].end, path.segments[1].start)
+  assert.match(generateTikz(result.diagram), /\.\. controls/)
+})
+
+test('direct manual path can copy existing coordinate sources', () => {
+  const pointResult = addPointStratumWithResult(
+    emptyTwoDimensionalDiagram,
+    { x: 4, y: 5, z: 9 },
+    { id: 'path-source-point', name: 'Source point' },
+  )
+  const result = addConcatenatedPathFromDirectInput(pointResult.diagram, {
+    start: sourceInput({
+      kind: 'pointStratum',
+      stratumId: 'path-source-point',
+    }),
+    segments: [{ kind: 'line', end: { x: '6', y: '7', z: '9' } }],
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.deepEqual(path.segments[0].start, { x: 4, y: 5, z: 0 })
+  assert.deepEqual(path.segments[0].end, { x: 6, y: 7, z: 0 })
+})
+
+test('direct manual path rejects empty and incomplete segment input', () => {
+  const emptyResult = addConcatenatedPathFromDirectInput(twoDimensionalExample, {
+    start: { x: '0', y: '0', z: '0' },
+    segments: [],
+  })
+  assert.equal(emptyResult.ok, false)
+  if (emptyResult.ok) {
+    throw new Error('Expected empty path input to be rejected.')
+  }
+  assert.equal(emptyResult.error, 'tooFewPoints')
+
+  const incompleteResult = addConcatenatedPathFromDirectInput(twoDimensionalExample, {
+    start: { x: '0', y: '0', z: '0' },
+    segments: [
+      {
+        kind: 'cubicBezier',
+        control1: { x: '', y: '1', z: '0' },
+        control2: { x: '2', y: '1', z: '0' },
+        end: { x: '3', y: '0', z: '0' },
+      },
+    ],
+  })
+  assert.equal(incompleteResult.ok, false)
+  if (incompleteResult.ok) {
+    throw new Error('Expected incomplete path input to be rejected.')
+  }
+  assert.equal(incompleteResult.error, 'invalidCoordinates')
+})
+
+test('plane-local direct manual path maps coordinates through the active work plane', () => {
+  const result = addConcatenatedPathFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      start: { x: '0', y: '0', z: '0' },
+      segments: [{ kind: 'line', end: { x: '1', y: '2', z: '0' } }],
+    },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(path.codim, 2)
+  assert.deepEqual(path.segments[0].start, { x: 10, y: 20, z: 30 })
+  assert.deepEqual(path.segments[0].end, { x: 11, y: 20, z: 32 })
+})
+
+test('direct circle template creates a closed finite cubic path', () => {
+  const result = addCirclePathFromDirectInput(
+    emptyTwoDimensionalDiagram,
+    {
+      center: { x: '0', y: '0', z: '9' },
+      radius: '2',
+    },
+    { pathLabel: 'circle template' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(path.segments.length, 4)
+  assert.equal(
+    path.segments.every((segment) => segment.kind === 'cubicBezier'),
+    true,
+  )
+  assert.equal(path.segments.every((segment) => segment.start.z === 0), true)
+  assertVec3ApproximatelyEqual(path.segments[0].start, path.segments[3].end)
+  assert.match(generateTikz(result.diagram), /\.\. controls/)
+})
+
+test('direct circle template rejects non-positive radius', () => {
+  const result = addCirclePathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radius: '0',
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected invalid circle radius to be rejected.')
+  }
+  assert.equal(result.error, 'invalidRadius')
+})
+
+test('3D direct circle template lies in the active work plane', () => {
+  const result = addCirclePathFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      center: { x: '2', y: '3', z: '0' },
+      radius: '1',
+    },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(
+    path.segments.every((segment) =>
+      [segment.start, segment.end].every((point) => point.y === 20),
+    ),
+    true,
+  )
+})
+
+test('direct ellipse template creates a rotated closed cubic path', () => {
+  const result = addEllipsePathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '9' },
+    radiusX: '2',
+    radiusY: '1',
+    rotationDeg: '90',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(path.segments.length, 4)
+  assertVec3ApproximatelyEqual(path.segments[0].start, { x: 0, y: 2, z: 0 })
+  assertVec3ApproximatelyEqual(path.segments[0].start, path.segments[3].end)
+})
+
+test('direct ellipse template rejects invalid radii and angle input', () => {
+  const invalidRadius = addEllipsePathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radiusX: '-1',
+    radiusY: '1',
+    rotationDeg: '0',
+  })
+  assert.equal(invalidRadius.ok, false)
+  if (invalidRadius.ok) {
+    throw new Error('Expected invalid ellipse radius to be rejected.')
+  }
+  assert.equal(invalidRadius.error, 'invalidRadius')
+
+  const invalidAngle = addEllipsePathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radiusX: '1',
+    radiusY: '1',
+    rotationDeg: 'NaN',
+  })
+  assert.equal(invalidAngle.ok, false)
+  if (invalidAngle.ok) {
+    throw new Error('Expected invalid ellipse rotation to be rejected.')
+  }
+  assert.equal(invalidAngle.error, 'invalidAngle')
+})
+
+test('3D direct ellipse template vertices lie in the active work plane', () => {
+  const result = addEllipsePathFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      center: { x: '1', y: '1', z: '0' },
+      radiusX: '2',
+      radiusY: '0.5',
+      rotationDeg: '30',
+    },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(
+    path.segments.every((segment) =>
+      segment.kind === 'cubicBezier' &&
+      [segment.start, segment.control1, segment.control2, segment.end].every(
+        (point) => approximatelyEqual(point.y, 20),
+      ),
+    ),
+    true,
+  )
+})
+
+test('direct arc template creates an open path split into safe cubic spans', () => {
+  const result = addArcPathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radius: '1',
+    startAngleDeg: '0',
+    endAngleDeg: '270',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assert.equal(path.segments.length, 3)
+  assertVec3ApproximatelyEqual(path.segments[0].start, { x: 1, y: 0, z: 0 })
+  assertVec3ApproximatelyEqual(path.segments[2].end, { x: 0, y: -1, z: 0 })
+  assert.notDeepEqual(path.segments[0].start, path.segments[2].end)
+})
+
+test('direct arc template rejects invalid radius and equal angles', () => {
+  const invalidRadius = addArcPathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radius: '-1',
+    startAngleDeg: '0',
+    endAngleDeg: '90',
+  })
+  assert.equal(invalidRadius.ok, false)
+  if (invalidRadius.ok) {
+    throw new Error('Expected invalid arc radius to be rejected.')
+  }
+  assert.equal(invalidRadius.error, 'invalidRadius')
+
+  const equalAngles = addArcPathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radius: '1',
+    startAngleDeg: '45',
+    endAngleDeg: '45',
+  })
+  assert.equal(equalAngles.ok, false)
+  if (equalAngles.ok) {
+    throw new Error('Expected equal arc angles to be rejected.')
+  }
+  assert.equal(equalAngles.error, 'invalidAngle')
+
+  const fullSweep = addArcPathFromDirectInput(emptyTwoDimensionalDiagram, {
+    center: { x: '0', y: '0', z: '0' },
+    radius: '1',
+    startAngleDeg: '0',
+    endAngleDeg: '360',
+  })
+  assert.equal(fullSweep.ok, false)
+  if (fullSweep.ok) {
+    throw new Error('Expected full-sweep arc input to be rejected.')
+  }
+  assert.equal(fullSweep.error, 'invalidAngle')
+})
+
+test('direct arc template preserves direction and 3D work-plane placement', () => {
+  const result = addArcPathFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      center: { x: '0', y: '0', z: '0' },
+      radius: '1',
+      startAngleDeg: '90',
+      endAngleDeg: '0',
+    },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = findConcatenatedPath(result.diagram, result.id)
+  assertVec3ApproximatelyEqual(path.segments[0].start, {
+    x: 10,
+    y: 20,
+    z: 31,
+  })
+  assertVec3ApproximatelyEqual(path.segments[0].end, {
+    x: 11,
+    y: 20,
+    z: 30,
+  })
 })
 
 test('direct relative Cartesian cubic Bezier creation stores metadata and absolute controls', () => {
@@ -1695,6 +2103,19 @@ function findCurve(diagram: Diagram, id: string): CurveStratum {
   return stratum
 }
 
+function findConcatenatedPath(
+  diagram: Diagram,
+  id: string,
+): ConcatenatedPathStratum {
+  const stratum = findCurve(diagram, id)
+
+  if (stratum.kind !== 'concatenatedPath') {
+    throw new Error(`Concatenated path ${id} was not created.`)
+  }
+
+  return stratum
+}
+
 function findPolygonSheet(
   diagram: Diagram,
   id: string,
@@ -1736,6 +2157,24 @@ function findLabel(diagram: Diagram, id: string): TextLabel {
   }
 
   return label
+}
+
+function assertVec3ApproximatelyEqual(
+  actual: Vec3,
+  expected: Vec3,
+  epsilon = 1e-9,
+): void {
+  assert.equal(approximatelyEqual(actual.x, expected.x, epsilon), true)
+  assert.equal(approximatelyEqual(actual.y, expected.y, epsilon), true)
+  assert.equal(approximatelyEqual(actual.z, expected.z, epsilon), true)
+}
+
+function approximatelyEqual(
+  actual: number,
+  expected: number,
+  epsilon = 1e-9,
+): boolean {
+  return Math.abs(actual - expected) <= epsilon
 }
 
 function createPlaneLocalPoint(

@@ -41,6 +41,8 @@ import type {
   AmbientDimension,
   CubicBezierPolarControl,
   CubicBezierControlMode,
+  CubicBezierPathSegment,
+  CurveStyle,
   CurveStratum,
   CurvedSheetPrimitive,
   CurvedSheetStratum,
@@ -62,7 +64,7 @@ import type {
   WorkPlaneLocalOffset,
 } from '../model/types.ts'
 import type { SelectedElement } from './selection.ts'
-import { areFinitePoints } from './sheetDraft.ts'
+import { areFinitePoints, arePointsOnWorkPlane } from './sheetDraft.ts'
 import {
   resolveExistingCoordinateForDirectCreation,
   type ExistingCoordinateSource,
@@ -254,6 +256,8 @@ export type AddCubicBezierCurveStratumOptions = {
 export type AddConcatenatedPathStratumOptions = {
   id?: string
   name?: string
+  pathLabel?: string
+  style?: CurveStyle
   layer?: number
 }
 
@@ -346,6 +350,42 @@ export type DirectCubicBezierControlMode =
   | 'relativeCartesian'
   | 'relativePolar'
 
+export type DirectConcatenatedPathManualSegmentInput =
+  | {
+      kind: 'line'
+      end: DirectCoordinateInput
+    }
+  | {
+      kind: 'cubicBezier'
+      control1: DirectCoordinateInput
+      control2: DirectCoordinateInput
+      end: DirectCoordinateInput
+    }
+
+export type DirectConcatenatedPathManualInput = {
+  start: DirectCoordinateInput
+  segments: DirectConcatenatedPathManualSegmentInput[]
+}
+
+export type DirectCirclePathInput = {
+  center: DirectCoordinateInput
+  radius: string
+}
+
+export type DirectEllipsePathInput = {
+  center: DirectCoordinateInput
+  radiusX: string
+  radiusY: string
+  rotationDeg: string
+}
+
+export type DirectArcPathInput = {
+  center: DirectCoordinateInput
+  radius: string
+  startAngleDeg: string
+  endAngleDeg: string
+}
+
 export type DirectPointCreationResult =
   | {
       ok: true
@@ -370,6 +410,9 @@ export type DirectLabelCreationResult =
 
 export type DirectPathCreationError =
   | 'invalidCoordinates'
+  | 'invalidRadius'
+  | 'invalidAngle'
+  | 'invalidWorkPlane'
   | 'tooFewPoints'
   | 'wrongPointCount'
   | 'unsupportedAmbientDimension'
@@ -874,6 +917,336 @@ export function addCubicBezierCurveFromDirectInput(
   }
 }
 
+export function addConcatenatedPathFromDirectInput(
+  diagram: Diagram,
+  input: DirectConcatenatedPathManualInput,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions = {},
+): DirectPathCreationResult {
+  if (input.segments.length === 0) {
+    return {
+      ok: false,
+      diagram,
+      error: 'tooFewPoints',
+    }
+  }
+
+  const segments = manualDirectPathInputToSegments(diagram, input, options)
+
+  if (segments === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addConcatenatedPathStratumWithResult(diagram, segments, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addCirclePathFromDirectInput(
+  diagram: Diagram,
+  input: DirectCirclePathInput,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions = {},
+): DirectPathCreationResult {
+  const centerResult = parseDirectTemplateCenter(diagram, input.center, options)
+
+  if (!centerResult.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: centerResult.error,
+    }
+  }
+
+  const radius = parsePositiveFiniteNumber(input.radius)
+
+  if (radius === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidRadius',
+    }
+  }
+
+  const segments = createCirclePathSegments(
+    centerResult.center,
+    radius,
+    centerResult.frame,
+    diagram.ambientDimension,
+  )
+
+  return addTemplatePathSegments(diagram, segments, options)
+}
+
+export function addEllipsePathFromDirectInput(
+  diagram: Diagram,
+  input: DirectEllipsePathInput,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions = {},
+): DirectPathCreationResult {
+  const centerResult = parseDirectTemplateCenter(diagram, input.center, options)
+
+  if (!centerResult.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: centerResult.error,
+    }
+  }
+
+  const radiusX = parsePositiveFiniteNumber(input.radiusX)
+  const radiusY = parsePositiveFiniteNumber(input.radiusY)
+  const rotationDeg = parseFiniteNumber(input.rotationDeg)
+
+  if (radiusX === null || radiusY === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidRadius',
+    }
+  }
+
+  if (rotationDeg === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidAngle',
+    }
+  }
+
+  const segments = createEllipsePathSegments(
+    centerResult.center,
+    radiusX,
+    radiusY,
+    rotationDeg,
+    centerResult.frame,
+    diagram.ambientDimension,
+  )
+
+  return addTemplatePathSegments(diagram, segments, options)
+}
+
+export function addArcPathFromDirectInput(
+  diagram: Diagram,
+  input: DirectArcPathInput,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions = {},
+): DirectPathCreationResult {
+  const centerResult = parseDirectTemplateCenter(diagram, input.center, options)
+
+  if (!centerResult.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: centerResult.error,
+    }
+  }
+
+  const radius = parsePositiveFiniteNumber(input.radius)
+  const startAngleDeg = parseFiniteNumber(input.startAngleDeg)
+  const endAngleDeg = parseFiniteNumber(input.endAngleDeg)
+
+  if (radius === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidRadius',
+    }
+  }
+
+  if (
+    startAngleDeg === null ||
+    endAngleDeg === null ||
+    isZeroNetArcSweep(startAngleDeg, endAngleDeg)
+  ) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidAngle',
+    }
+  }
+
+  const segments = createArcPathSegments(
+    centerResult.center,
+    radius,
+    startAngleDeg,
+    endAngleDeg,
+    centerResult.frame,
+    diagram.ambientDimension,
+  )
+
+  return addTemplatePathSegments(diagram, segments, options)
+}
+
+export function manualDirectPathInputToSegments(
+  diagram: Diagram,
+  input: DirectConcatenatedPathManualInput,
+  options: DirectCoordinateParseOptions = {},
+): PathSegment[] | null {
+  if (input.segments.length === 0) {
+    return null
+  }
+
+  const parseOptions = directCoordinateParseOptionsForDiagram(diagram, options)
+  let anchor = parseDirectCoordinateInput(
+    input.start,
+    diagram.ambientDimension,
+    parseOptions,
+  )
+
+  if (anchor === null) {
+    return null
+  }
+
+  const segments: PathSegment[] = []
+
+  for (const segmentInput of input.segments) {
+    if (segmentInput.kind === 'line') {
+      const end = parseDirectCoordinateInput(
+        segmentInput.end,
+        diagram.ambientDimension,
+        parseOptions,
+      )
+
+      if (end === null) {
+        return null
+      }
+
+      segments.push({
+        kind: 'line',
+        start: anchor,
+        end,
+      })
+      anchor = end
+      continue
+    }
+
+    const control1 = parseDirectCoordinateInput(
+      segmentInput.control1,
+      diagram.ambientDimension,
+      parseOptions,
+    )
+    const control2 = parseDirectCoordinateInput(
+      segmentInput.control2,
+      diagram.ambientDimension,
+      parseOptions,
+    )
+    const end = parseDirectCoordinateInput(
+      segmentInput.end,
+      diagram.ambientDimension,
+      parseOptions,
+    )
+
+    if (control1 === null || control2 === null || end === null) {
+      return null
+    }
+
+    segments.push({
+      kind: 'cubicBezier',
+      start: anchor,
+      control1,
+      control2,
+      end,
+    })
+    anchor = end
+  }
+
+  return normalizePathSegmentsForAmbientDimension(
+    segments,
+    diagram.ambientDimension,
+  )
+}
+
+export function createCirclePathSegments(
+  center: Vec3,
+  radius: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): PathSegment[] | null {
+  return createEllipsePathSegments(
+    center,
+    radius,
+    radius,
+    0,
+    frame,
+    ambientDimension,
+  )
+}
+
+export function createEllipsePathSegments(
+  center: Vec3,
+  radiusX: number,
+  radiusY: number,
+  rotationDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): PathSegment[] | null {
+  if (
+    !isFiniteVec3(center) ||
+    !isValidWorkPlaneFrameSnapshot(frame) ||
+    !Number.isFinite(radiusX) ||
+    !Number.isFinite(radiusY) ||
+    !Number.isFinite(rotationDeg) ||
+    radiusX <= 0 ||
+    radiusY <= 0
+  ) {
+    return null
+  }
+
+  return createEllipticArcPathSegments(
+    center,
+    radiusX,
+    radiusY,
+    rotationDeg,
+    0,
+    360,
+    frame,
+    ambientDimension,
+  )
+}
+
+export function createArcPathSegments(
+  center: Vec3,
+  radius: number,
+  startAngleDeg: number,
+  endAngleDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): PathSegment[] | null {
+  if (
+    !Number.isFinite(radius) ||
+    radius <= 0 ||
+    !Number.isFinite(startAngleDeg) ||
+    !Number.isFinite(endAngleDeg) ||
+    isZeroNetArcSweep(startAngleDeg, endAngleDeg)
+  ) {
+    return null
+  }
+
+  return createEllipticArcPathSegments(
+    center,
+    radius,
+    radius,
+    0,
+    startAngleDeg,
+    endAngleDeg,
+    frame,
+    ambientDimension,
+  )
+}
+
 function directCubicBezierInputToPoints(
   ambientDimension: AmbientDimension,
   coordinates: DirectCoordinateInput[],
@@ -1044,6 +1417,299 @@ function directCubicBezierInputToPoints(
   return absolutePoints === null || !areFinitePoints(absolutePoints)
     ? null
     : { points: absolutePoints, bezierControls }
+}
+
+type DirectTemplateCenterResult =
+  | {
+      ok: true
+      center: Vec3
+      frame: WorkPlaneFrameSnapshot
+    }
+  | {
+      ok: false
+      error: 'invalidCoordinates' | 'invalidWorkPlane'
+    }
+
+function parseDirectTemplateCenter(
+  diagram: Diagram,
+  centerInput: DirectCoordinateInput,
+  options: DirectCoordinateParseOptions,
+): DirectTemplateCenterResult {
+  const parseOptions = directCoordinateParseOptionsForDiagram(diagram, options)
+  const center = parseDirectCoordinateInput(
+    centerInput,
+    diagram.ambientDimension,
+    parseOptions,
+  )
+
+  if (center === null) {
+    return {
+      ok: false,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  if (diagram.ambientDimension === 2) {
+    return {
+      ok: true,
+      center,
+      frame: xyTemplateFrame(center),
+    }
+  }
+
+  if (
+    parseOptions.workPlane === undefined ||
+    !arePointsOnWorkPlane([center], parseOptions.workPlane)
+  ) {
+    return {
+      ok: false,
+      error: 'invalidWorkPlane',
+    }
+  }
+
+  const frame = workPlaneFrameSnapshotFromWorkPlane(
+    parseOptions.workPlane,
+    center,
+  )
+
+  return frame === null
+    ? {
+        ok: false,
+        error: 'invalidWorkPlane',
+      }
+    : {
+        ok: true,
+        center,
+        frame,
+      }
+}
+
+function addTemplatePathSegments(
+  diagram: Diagram,
+  segments: PathSegment[] | null,
+  options: AddConcatenatedPathStratumOptions & DirectCoordinateParseOptions,
+): DirectPathCreationResult {
+  if (segments === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  const result = addConcatenatedPathStratumWithResult(diagram, segments, options)
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+function createEllipticArcPathSegments(
+  center: Vec3,
+  radiusX: number,
+  radiusY: number,
+  rotationDeg: number,
+  startAngleDeg: number,
+  endAngleDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): PathSegment[] | null {
+  if (
+    !isFiniteVec3(center) ||
+    !isValidWorkPlaneFrameSnapshot(frame) ||
+    !Number.isFinite(radiusX) ||
+    !Number.isFinite(radiusY) ||
+    !Number.isFinite(rotationDeg) ||
+    !Number.isFinite(startAngleDeg) ||
+    !Number.isFinite(endAngleDeg) ||
+    radiusX <= 0 ||
+    radiusY <= 0 ||
+    startAngleDeg === endAngleDeg
+  ) {
+    return null
+  }
+
+  const totalSweepDeg = endAngleDeg - startAngleDeg
+  const segmentCount = Math.max(1, Math.ceil(Math.abs(totalSweepDeg) / 90))
+  const sweepPerSegmentDeg = totalSweepDeg / segmentCount
+  const segments: CubicBezierPathSegment[] = []
+  let start = ellipticPointOnFrame(
+    center,
+    radiusX,
+    radiusY,
+    rotationDeg,
+    startAngleDeg,
+    frame,
+    ambientDimension,
+  )
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const angle0 = startAngleDeg + sweepPerSegmentDeg * index
+    const angle1 = angle0 + sweepPerSegmentDeg
+    const segment = ellipticArcSegmentOnFrame(
+      center,
+      radiusX,
+      radiusY,
+      rotationDeg,
+      angle0,
+      angle1,
+      start,
+      frame,
+      ambientDimension,
+    )
+
+    if (segment === null) {
+      return null
+    }
+
+    segments.push(segment)
+    start = segment.end
+  }
+
+  return areFinitePoints(pathCoordinates(segments)) &&
+    areSegmentsComposable(segments)
+    ? segments
+    : null
+}
+
+function ellipticArcSegmentOnFrame(
+  center: Vec3,
+  radiusX: number,
+  radiusY: number,
+  rotationDeg: number,
+  startAngleDeg: number,
+  endAngleDeg: number,
+  start: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): CubicBezierPathSegment | null {
+  const startAngle = degreesToRadians(startAngleDeg)
+  const endAngle = degreesToRadians(endAngleDeg)
+  const sweep = endAngle - startAngle
+  const controlScale = (4 / 3) * Math.tan(sweep / 4)
+  const end = ellipticPointOnFrame(
+    center,
+    radiusX,
+    radiusY,
+    rotationDeg,
+    endAngleDeg,
+    frame,
+    ambientDimension,
+  )
+  const control1 = pointFromFrameLocal(
+    center,
+    radiusX * (Math.cos(startAngle) - controlScale * Math.sin(startAngle)),
+    radiusY * (Math.sin(startAngle) + controlScale * Math.cos(startAngle)),
+    rotationDeg,
+    frame,
+    ambientDimension,
+  )
+  const control2 = pointFromFrameLocal(
+    center,
+    radiusX * (Math.cos(endAngle) + controlScale * Math.sin(endAngle)),
+    radiusY * (Math.sin(endAngle) - controlScale * Math.cos(endAngle)),
+    rotationDeg,
+    frame,
+    ambientDimension,
+  )
+
+  const coordinates = [start, control1, control2, end]
+
+  if (!areFinitePoints(coordinates)) {
+    return null
+  }
+
+  return {
+    kind: 'cubicBezier',
+    start,
+    control1,
+    control2,
+    end,
+  }
+}
+
+function ellipticPointOnFrame(
+  center: Vec3,
+  radiusX: number,
+  radiusY: number,
+  rotationDeg: number,
+  angleDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  const angle = degreesToRadians(angleDeg)
+  return pointFromFrameLocal(
+    center,
+    radiusX * Math.cos(angle),
+    radiusY * Math.sin(angle),
+    rotationDeg,
+    frame,
+    ambientDimension,
+  )
+}
+
+function pointFromFrameLocal(
+  center: Vec3,
+  localX: number,
+  localY: number,
+  rotationDeg: number,
+  frame: WorkPlaneFrameSnapshot,
+  ambientDimension: AmbientDimension,
+): Vec3 {
+  const rotation = degreesToRadians(rotationDeg)
+  const rotatedX = localX * Math.cos(rotation) - localY * Math.sin(rotation)
+  const rotatedY = localX * Math.sin(rotation) + localY * Math.cos(rotation)
+
+  return normalizePointForAmbientDimension(
+    ambientDimension,
+    addPoints(center, addPoints(scalePoint(frame.u, rotatedX), scalePoint(frame.v, rotatedY))),
+  )
+}
+
+function xyTemplateFrame(origin: Vec3): WorkPlaneFrameSnapshot {
+  return {
+    origin,
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function addPoints(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
+}
+
+function scalePoint(point: Vec3, scalar: number): Vec3 {
+  return {
+    x: point.x * scalar,
+    y: point.y * scalar,
+    z: point.z * scalar,
+  }
+}
+
+function degreesToRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180
+}
+
+function isZeroNetArcSweep(startAngleDeg: number, endAngleDeg: number): boolean {
+  const sweep = endAngleDeg - startAngleDeg
+  const normalizedSweep = ((sweep % 360) + 360) % 360
+
+  return normalizedSweep === 0
 }
 
 export function addPolygonSheetFromDirectInput(
@@ -1255,13 +1921,13 @@ function createConcatenatedPathForDiagram(
   segments: PathSegment[],
   options: AddConcatenatedPathStratumOptions,
 ): CurveStratum {
-  return {
+  const path: CurveStratum = {
     codim: diagram.ambientDimension === 2 ? 1 : 2,
     geometricKind: 'curve',
     kind: 'concatenatedPath',
     id: safeOptionalId(diagram, options.id, 'curve'),
     name: safeOptionalName(options.name, 'Path'),
-    style: cloneCurveStyle(defaultCurveStyle),
+    style: cloneCurveStyle(options.style ?? defaultCurveStyle),
     segments: normalizePathSegmentsForAmbientDimension(
       segments,
       diagram.ambientDimension,
@@ -1269,6 +1935,14 @@ function createConcatenatedPathForDiagram(
     styleSegments: [],
     layer: options.layer ?? nextLayer(diagram),
   }
+
+  const pathLabel = options.pathLabel?.trim()
+
+  if (pathLabel !== undefined && pathLabel.length > 0) {
+    path.pathLabel = pathLabel
+  }
+
+  return path
 }
 
 function createPolygonSheetForDiagram(

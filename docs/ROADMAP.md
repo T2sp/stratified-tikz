@@ -240,6 +240,11 @@ Recommended `phaseSlugs` entries:
   and cubic Bézier mode clicks control 1, control 2, then endpoint.
 - In 3D, a path draft captures the active work plane at start and blocks
   work-plane changes until Finish or Cancel.
+- Direct workflow: users can enter manual line/cubic segment data, or create
+  circle, ellipse, and arc templates.
+- Circle, ellipse, and arc templates expand to ordinary concatenated path
+  strata. In 3D, templates use the active work plane; template UI state is not
+  exported.
 
 ### Phase 14C: Concatenated path editing
 

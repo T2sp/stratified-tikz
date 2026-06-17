@@ -560,6 +560,91 @@
   grid-template-columns: auto minmax(220px, 320px);
 }
 
+.direct-path-form {
+  display: flex;
+  flex: 1 1 640px;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--control-bg);
+}
+
+.direct-path-name-field {
+  grid-template-columns: auto minmax(150px, 220px);
+}
+
+.direct-path-mode-control {
+  flex: 1 1 360px;
+  min-width: min(360px, 100%);
+}
+
+.direct-path-style-grid {
+  display: flex;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.direct-path-manual-form,
+.direct-path-template-form {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.direct-path-segment-list {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.direct-path-coordinate-group,
+.direct-path-segment-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.direct-path-segment-card {
+  align-items: start;
+}
+
+.direct-path-coordinate-group legend,
+.direct-path-segment-card legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.direct-path-segment-actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.direct-path-source-target-field {
+  grid-template-columns: auto minmax(180px, 260px);
+}
+
 .direct-source-summary {
   flex: 1 1 260px;
   min-width: min(260px, 100%);
