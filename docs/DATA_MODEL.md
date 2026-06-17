@@ -508,6 +508,16 @@ Boundary data is committed geometry. Creating a fill from selected paths should
 copy the selected path segments into `ClosedPathBoundary[]`; filled strata do
 not store live references back to source paths.
 
+The Phase 15D inspector treats these copied boundaries as read-only geometry.
+Users can edit the filled object's name, layer, fill rule, and explicit
+fill/stroke style values, and can inspect a boundary summary with segment counts
+and endpoints. Direct boundary coordinate editing, live linked boundaries,
+boolean operations, arbitrary non-planar sheet repair, and curved surface
+primitive editing are intentionally outside this MVP. Any future boundary
+replacement UI must reject open boundaries, non-finite coordinates, nonzero `z`
+coordinates in 2D, and 3D sheet boundaries that do not lie on the stored
+work-plane frame.
+
 The current editor creates these filled strata through a UI-only boundary
 picking workflow rather than general multi-selection. Picked path IDs are not
 saved in `Diagram`. On commit, the selected closed `concatenatedPath` segments

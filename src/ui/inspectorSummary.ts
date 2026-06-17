@@ -1,8 +1,10 @@
 import type {
   AmbientDimension,
+  ClosedPathBoundary,
   CurveStratum,
   Diagram,
   LabelStyle,
+  PathSegment,
   PointStratum,
   SheetStratum,
   Stratum,
@@ -11,7 +13,10 @@ import type {
   Vec3,
 } from '../model/types'
 import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
+import { isClosedPathBoundary } from '../model/filledBoundaries.ts'
+import { pathCoordinates, pathEndpoints } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
+import type { FilledBoundaryStratum } from './filledStratumEditing.ts'
 import { findSelectedElement, type SelectedElement } from './selection.ts'
 
 export type InspectorField = {
@@ -166,6 +171,10 @@ function createGeometrySections(
 ): InspectorSection[] {
   switch (stratum.geometricKind) {
     case 'region':
+      if (stratum.kind === 'filledRegion') {
+        return [createFilledBoundaryGeometrySection(stratum, ambientDimension)]
+      }
+
       return [
         {
           title: 'Geometry',
@@ -185,6 +194,10 @@ function createSheetGeometrySection(
   sheet: SheetStratum,
   ambientDimension: AmbientDimension,
 ): InspectorSection {
+  if (sheet.kind === 'workPlaneFilledSheet') {
+    return createFilledBoundaryGeometrySection(sheet, ambientDimension)
+  }
+
   return {
     title: 'Geometry',
     fields: sheetVertices(sheet).map((vertex, index) => ({
@@ -192,6 +205,83 @@ function createSheetGeometrySection(
       value: formatVec3(vertex, ambientDimension),
     })),
   }
+}
+
+export function createFilledBoundaryGeometryFields(
+  stratum: FilledBoundaryStratum,
+  ambientDimension: AmbientDimension,
+): InspectorField[] {
+  return [
+    { label: 'Object kind', value: filledBoundaryObjectKindLabel(stratum) },
+    { label: 'Boundaries', value: String(stratum.boundaries.length) },
+    { label: 'Fill rule', value: stratum.fillRule },
+    { label: 'Boundary coordinates', value: 'read-only' },
+    ...stratum.boundaries.map((boundary, index) => ({
+      label: `Boundary ${index + 1}`,
+      value: formatClosedPathBoundarySummary(boundary, ambientDimension),
+    })),
+  ]
+}
+
+export function filledBoundaryObjectKindLabel(
+  stratum: FilledBoundaryStratum,
+): 'Filled region' | 'Work-plane filled sheet' {
+  return stratum.kind === 'filledRegion'
+    ? 'Filled region'
+    : 'Work-plane filled sheet'
+}
+
+export function formatClosedPathBoundarySummary(
+  boundary: ClosedPathBoundary,
+  ambientDimension: AmbientDimension,
+): string {
+  const endpoints = pathEndpoints(boundary.segments)
+  const lineSegmentCount = countPathSegments(boundary.segments, 'line')
+  const cubicSegmentCount = countPathSegments(boundary.segments, 'cubicBezier')
+  const coordinateCount = pathCoordinates(boundary.segments).length
+  const boundaryName =
+    boundary.name === undefined || boundary.name.trim().length === 0
+      ? `[${boundary.id}]`
+      : `${boundary.name} [${boundary.id}]`
+  const endpointSummary =
+    endpoints === null
+      ? 'no endpoints'
+      : `${formatVec3(endpoints.start, ambientDimension)} to ${formatVec3(
+          endpoints.end,
+          ambientDimension,
+        )}`
+  const closureSummary = isClosedPathBoundary(boundary) ? 'closed' : 'open'
+
+  return [
+    boundaryName,
+    `${formatCount(boundary.segments.length, 'segment')}`,
+    `${formatCount(lineSegmentCount, 'line')}`,
+    `${formatCount(cubicSegmentCount, 'cubic')}`,
+    `${formatCount(coordinateCount, 'coordinate')}`,
+    closureSummary,
+    endpointSummary,
+  ].join('; ')
+}
+
+function createFilledBoundaryGeometrySection(
+  stratum: FilledBoundaryStratum,
+  ambientDimension: AmbientDimension,
+): InspectorSection {
+  return {
+    title: 'Geometry',
+    fields: createFilledBoundaryGeometryFields(stratum, ambientDimension),
+  }
+}
+
+function countPathSegments(
+  segments: readonly PathSegment[],
+  kind: PathSegment['kind'],
+): number {
+  return segments.filter((segment) => segment.kind === kind).length
+}
+
+function formatCount(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? '' : 's'}`
 }
 
 function createCurveGeometrySection(
@@ -302,6 +392,17 @@ export function formatLabelStyleSummary(style: LabelStyle): string {
 }
 
 function stratumKindLabel(stratum: Stratum): string {
+  if (stratum.geometricKind === 'region' && stratum.kind === 'filledRegion') {
+    return 'Filled region'
+  }
+
+  if (
+    stratum.geometricKind === 'sheet' &&
+    stratum.kind === 'workPlaneFilledSheet'
+  ) {
+    return 'Work-plane filled sheet'
+  }
+
   switch (stratum.geometricKind) {
     case 'region':
       return 'Region'
