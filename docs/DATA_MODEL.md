@@ -544,6 +544,16 @@ helpers normalize to that policy, while import validation rejects nonzero saved
 curved-boundary sheets, live linked vertices, snapping, cross-work-plane
 creation, and segment-level style overrides are later phases.
 
+Cursor creation for concatenated paths is editor state until Finish. The draft
+stores completed `segments`, the current `anchor`, any `pendingPoints` for the
+active segment, the `currentSegmentKind` (`"line"` or `"cubicBezier"`), and the
+captured `workPlane`. In 2D, cursor points are normalized to `(x, y, 0)`. In 3D,
+the first click captures the active work plane; subsequent cursor or copied
+point inputs must lie on that same plane, and work-plane changes are blocked
+until the path is finished or canceled. Cancel clears only the draft. Finish
+requires at least one complete segment and commits one `concatenatedPath`
+stratum.
+
 For cubic Bézier curves, the four `points` remain the absolute geometry used for
 SVG rendering, hit testing, dragging, and validation. Cubic Bézier curves may
 also carry optional control metadata for TikZ export:

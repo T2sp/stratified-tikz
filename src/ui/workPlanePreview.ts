@@ -8,6 +8,7 @@ export type WorkPlanePreviewTool =
   | 'createLabel'
   | 'createPolyline'
   | 'createCubicBezier'
+  | 'createPath'
   | 'createSheet'
 
 export type WorkPlaneDirectionIndicator = {
@@ -44,6 +45,7 @@ export function shouldShowWorkPlanePreview(
     case 'createLabel':
     case 'createPolyline':
     case 'createCubicBezier':
+    case 'createPath':
     case 'createSheet':
       return ambientDimension === 3
   }

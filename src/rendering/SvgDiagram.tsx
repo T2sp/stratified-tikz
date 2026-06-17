@@ -3,6 +3,7 @@ import type { MouseEvent, PointerEvent } from 'react'
 import type {
   CurveStratum,
   Diagram,
+  PathSegment,
   PointStratum,
   SheetStratum,
   Stratum,
@@ -18,6 +19,10 @@ import type {
   WorkPlanePreview,
 } from '../ui/workPlanePreview'
 import type { CoordinateSourceHighlight } from '../ui/coordinateSourceHighlights'
+import {
+  concatenatedPathDraftCoordinates,
+  type ConcatenatedPathDraft,
+} from '../ui/pathDraft'
 import { resolveSvgCamera } from './svgCamera'
 import {
   cubicBezierToSvgPath,
@@ -61,6 +66,7 @@ export type SvgDiagramProps = {
   selectedElement?: SelectedElement
   polylineDraft?: Vec3[]
   cubicBezierDraft?: Vec3[]
+  pathDraft?: ConcatenatedPathDraft
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
   coordinateSourceHighlights?: CoordinateSourceHighlight[]
@@ -113,6 +119,7 @@ export function SvgDiagram({
   selectedElement = null,
   polylineDraft,
   cubicBezierDraft,
+  pathDraft,
   sheetDraft,
   workPlanePreview,
   coordinateSourceHighlights,
@@ -134,6 +141,7 @@ export function SvgDiagram({
     ...(sheetDraft ?? []),
     ...(polylineDraft ?? []),
     ...(cubicBezierDraft ?? []),
+    ...(pathDraft === undefined ? [] : concatenatedPathDraftCoordinates(pathDraft)),
     ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
@@ -228,6 +236,7 @@ export function SvgDiagram({
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
+      {renderConcatenatedPathDraft(pathDraft, camera, height)}
       {renderCoordinateSourceHighlights(
         coordinateSourceHighlights,
         camera,
@@ -596,32 +605,9 @@ function curveToSvgPathData(
 ): string {
   if (curve.kind === 'concatenatedPath') {
     return pathSegmentsToSvgPath(
-      curve.segments.map((segment): SvgPathSegment => {
-        switch (segment.kind) {
-          case 'line':
-            return {
-              kind: 'line',
-              start: projectToSvgPoint(camera, segment.start, viewportHeight),
-              end: projectToSvgPoint(camera, segment.end, viewportHeight),
-            }
-          case 'cubicBezier':
-            return {
-              kind: 'cubicBezier',
-              start: projectToSvgPoint(camera, segment.start, viewportHeight),
-              control1: projectToSvgPoint(
-                camera,
-                segment.control1,
-                viewportHeight,
-              ),
-              control2: projectToSvgPoint(
-                camera,
-                segment.control2,
-                viewportHeight,
-              ),
-              end: projectToSvgPoint(camera, segment.end, viewportHeight),
-            }
-        }
-      }),
+      curve.segments.map((segment) =>
+        pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+      ),
     )
   }
 
@@ -1132,6 +1118,144 @@ function renderCubicBezierDraft(
   )
 }
 
+function renderConcatenatedPathDraft(
+  draft: ConcatenatedPathDraft | undefined,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): ReactElement | null {
+  if (draft === undefined) {
+    return null
+  }
+
+  const completedSegments = draft.segments.map((segment) =>
+    pathSegmentToSvgPathSegment(segment, camera, viewportHeight),
+  )
+  const completedPathData = pathSegmentsToSvgPath(completedSegments)
+  const anchor = projectToSvgPoint(camera, draft.anchor, viewportHeight)
+  const pendingPoints = draft.pendingPoints.map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const pendingGuideData =
+    pendingPoints.length === 0 ? '' : polylineToSvgPath([anchor, ...pendingPoints])
+  const endpoints = pathDraftEndpointMarkers(draft).map((point) =>
+    projectToSvgPoint(camera, point, viewportHeight),
+  )
+  const completedControlGuides = draft.segments.flatMap((segment, index) =>
+    segment.kind === 'cubicBezier'
+      ? [
+          {
+            key: `path-draft-cubic-guide-a-${index}`,
+            points: [
+              projectToSvgPoint(camera, segment.start, viewportHeight),
+              projectToSvgPoint(camera, segment.control1, viewportHeight),
+            ],
+          },
+          {
+            key: `path-draft-cubic-guide-b-${index}`,
+            points: [
+              projectToSvgPoint(camera, segment.control2, viewportHeight),
+              projectToSvgPoint(camera, segment.end, viewportHeight),
+            ],
+          },
+        ]
+      : [],
+  )
+  const completedControls = draft.segments.flatMap((segment) =>
+    segment.kind === 'cubicBezier'
+      ? [
+          projectToSvgPoint(camera, segment.control1, viewportHeight),
+          projectToSvgPoint(camera, segment.control2, viewportHeight),
+        ]
+      : [],
+  )
+
+  return (
+    <g
+      key="concatenated-path-draft"
+      className="svg-path-draft"
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      {completedPathData !== '' && (
+        <path
+          d={completedPathData}
+          fill="none"
+          stroke="#7C3AED"
+          strokeOpacity={0.8}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {completedControlGuides.map((guide) => (
+        <path
+          key={guide.key}
+          d={polylineToSvgPath(guide.points)}
+          fill="none"
+          stroke="#7C3AED"
+          strokeOpacity={0.34}
+          strokeWidth={1.25}
+          strokeDasharray="4 4"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      {pendingGuideData !== '' && (
+        <path
+          d={pendingGuideData}
+          fill="none"
+          stroke="#0F766E"
+          strokeOpacity={0.75}
+          strokeWidth={1.7}
+          strokeDasharray="5 4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+      {endpoints.map((point, index) => (
+        <circle
+          key={`path-draft-endpoint-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={index === endpoints.length - 1 ? 4.7 : 3.6}
+          fill="#ffffff"
+          stroke="#7C3AED"
+          strokeOpacity={0.95}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      {completedControls.map((point, index) => (
+        <circle
+          key={`path-draft-control-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={3.2}
+          fill="#7C3AED"
+          fillOpacity={0.56}
+          stroke="#ffffff"
+          strokeWidth={1.2}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      {pendingPoints.map((point, index) => (
+        <circle
+          key={`path-draft-pending-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={3.7}
+          fill="#0F766E"
+          fillOpacity={0.82}
+          stroke="#ffffff"
+          strokeWidth={1.3}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  )
+}
+
 function renderPointHighlight(
   center: Vec2,
   radius: number,
@@ -1154,6 +1278,43 @@ function renderPointHighlight(
       pointerEvents="none"
     />
   )
+}
+
+function pathSegmentToSvgPathSegment(
+  segment: PathSegment,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+): SvgPathSegment {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: projectToSvgPoint(camera, segment.start, viewportHeight),
+        end: projectToSvgPoint(camera, segment.end, viewportHeight),
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: projectToSvgPoint(camera, segment.start, viewportHeight),
+        control1: projectToSvgPoint(camera, segment.control1, viewportHeight),
+        control2: projectToSvgPoint(camera, segment.control2, viewportHeight),
+        end: projectToSvgPoint(camera, segment.end, viewportHeight),
+      }
+  }
+}
+
+function pathDraftEndpointMarkers(draft: ConcatenatedPathDraft): Vec3[] {
+  if (draft.segments.length === 0) {
+    return [draft.anchor]
+  }
+
+  const [firstSegment, ...restSegments] = draft.segments
+
+  return [
+    firstSegment.start,
+    firstSegment.end,
+    ...restSegments.map((segment) => segment.end),
+  ]
 }
 
 function renderSelectedGeometryHandles(

@@ -701,6 +701,7 @@ test('serializeDiagram does not include editor-only state', () => {
   assert.equal(serialized.includes('activeWorkPlane'), false)
   assert.equal(serialized.includes('polylineDraft'), false)
   assert.equal(serialized.includes('cubicBezierDraft'), false)
+  assert.equal(serialized.includes('pathDraft'), false)
   assert.equal(serialized.includes('sheetPolygonDraft'), false)
   assert.equal(serialized.includes('history'), false)
   assert.equal(serialized.includes('past'), false)
