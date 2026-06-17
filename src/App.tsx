@@ -409,6 +409,7 @@ function App() {
     String(defaultSaddleCreationParameters.sampling.vSegments),
   )
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
+  const [layerOperationStatus, setLayerOperationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
   const [fillStatus, setFillStatus] = useState<string>('')
@@ -816,6 +817,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
@@ -874,31 +876,43 @@ function App() {
     updateEditableDiagram((diagram) =>
       setLayerVisibility(diagram, layerValue, visible),
     )
+    setLayerOperationStatus(
+      `Layer ${formatLayerValue(layerValue)} ${visible ? 'shown' : 'hidden'}.`,
+    )
   }
 
   function setDiagramLayerLock(layerValue: number, locked: boolean): void {
     updateEditableDiagram((diagram) => setLayerLock(diagram, layerValue, locked))
+    setLayerOperationStatus(
+      `Layer ${formatLayerValue(layerValue)} ${
+        locked ? 'locked' : 'unlocked'
+      }.`,
+    )
   }
 
   function renameDiagramLayer(layerValue: number, name: string): void {
     updateEditableDiagram((diagram) => renameLayer(diagram, layerValue, name))
+    setLayerOperationStatus(`Layer ${formatLayerValue(layerValue)} renamed.`)
   }
 
   function duplicateDiagramLayer(
     sourceLayerValue: number,
     targetLayerValue?: number,
   ): void {
+    let result: ReturnType<typeof duplicateLayer>
+
+    try {
+      result = duplicateLayer(editableDiagram, sourceLayerValue, {
+        ...(targetLayerValue === undefined ? {} : { targetLayerValue }),
+      })
+    } catch (error) {
+      setLayerOperationStatus(
+        layerOperationErrorMessage(error, 'Duplicate layer failed.'),
+      )
+      return
+    }
+
     setEditorState((current) => {
-      let result: ReturnType<typeof duplicateLayer>
-
-      try {
-        result = duplicateLayer(current.editableDiagram, sourceLayerValue, {
-          ...(targetLayerValue === undefined ? {} : { targetLayerValue }),
-        })
-      } catch {
-        return current
-      }
-
       const nextLayerFilter = normalizeLayerFilterForDiagram(
         result.diagram,
         current.layerFilter,
@@ -915,6 +929,13 @@ function App() {
         layerFilter: nextLayerFilter,
       })
     })
+    setLayerOperationStatus(
+      `Duplicated layer ${formatLayerValue(
+        result.sourceLayer,
+      )} to layer ${formatLayerValue(result.targetLayer)} (${layerElementCountLabel(
+        result.duplicatedStrata + result.duplicatedLabels,
+      )}).`,
+    )
     setCopyStatus('idle')
   }
 
@@ -922,12 +943,21 @@ function App() {
     leftLayerValue: number,
     rightLayerValue: number,
   ): void {
+    if (
+      normalizeLayerValue(leftLayerValue) ===
+      normalizeLayerValue(rightLayerValue)
+    ) {
+      setLayerOperationStatus('Choose two different layers to swap.')
+      return
+    }
+
+    const nextDiagram = swapLayers(
+      editableDiagram,
+      leftLayerValue,
+      rightLayerValue,
+    )
+
     setEditorState((current) => {
-      const nextDiagram = swapLayers(
-        current.editableDiagram,
-        leftLayerValue,
-        rightLayerValue,
-      )
       const nextLayerFilter = normalizeLayerFilterForDiagram(
         nextDiagram,
         swapLayerFilterForLayerSwap(
@@ -948,28 +978,37 @@ function App() {
         layerFilter: nextLayerFilter,
       })
     })
+    setLayerOperationStatus(
+      `Swapped layers ${formatLayerValue(leftLayerValue)} and ${formatLayerValue(
+        rightLayerValue,
+      )}.`,
+    )
     setCopyStatus('idle')
   }
 
   function translateDiagramLayer(layerValue: number, translation: Vec3): void {
+    let nextDiagram: Diagram
+
+    try {
+      nextDiagram = translateLayer(editableDiagram, layerValue, translation)
+    } catch (error) {
+      setLayerOperationStatus(
+        layerOperationErrorMessage(error, 'Translate layer failed.'),
+      )
+      return
+    }
+
     setEditorState((current) => {
-      let nextDiagram: Diagram
-
-      try {
-        nextDiagram = translateLayer(
-          current.editableDiagram,
-          layerValue,
-          translation,
-        )
-      } catch {
-        return current
-      }
-
       return commitDiagramChange(current, {
         ...current,
         editableDiagram: nextDiagram,
       })
     })
+    setLayerOperationStatus(
+      nextDiagram === editableDiagram
+        ? `Layer ${formatLayerValue(layerValue)} was not moved.`
+        : `Translated layer ${formatLayerValue(layerValue)} by (${translation.x}, ${translation.y}, ${translation.z}).`,
+    )
     setCopyStatus('idle')
   }
 
@@ -983,11 +1022,13 @@ function App() {
         `Delete layer ${layerLabel} and ${elementCount} ${elementLabel}? This can be undone.`,
       )
     ) {
+      setLayerOperationStatus('Delete canceled.')
       return
     }
 
+    const nextDiagram = deleteLayer(editableDiagram, layerValue)
+
     setEditorState((current) => {
-      const nextDiagram = deleteLayer(current.editableDiagram, layerValue)
       const nextLayerFilter = normalizeLayerFilterForDiagram(
         nextDiagram,
         current.layerFilter,
@@ -1019,6 +1060,9 @@ function App() {
     resetDirectCoordinateSources()
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
+    setLayerOperationStatus(
+      `Deleted layer ${layerLabel} (${layerElementCountLabel(elementCount)}).`,
+    )
     setCopyStatus('idle')
   }
 
@@ -1041,6 +1085,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillStatus('')
     setWorkPlaneStatus('')
@@ -1065,6 +1110,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillStatus('')
     setWorkPlaneStatus('')
@@ -1150,6 +1196,7 @@ function App() {
     setPathStatus('')
     setSheetStatus('')
     setDirectCreationStatus('')
+    setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
@@ -5021,6 +5068,7 @@ function App() {
             diagram={editableDiagram}
             layerFilter={layerFilter}
             creationLayerInput={directLayerInput}
+            statusMessage={layerOperationStatus}
             onRenameLayer={renameDiagramLayer}
             onSwapLayers={swapDiagramLayers}
             onDuplicateLayer={duplicateDiagramLayer}
@@ -5028,6 +5076,7 @@ function App() {
             onSetLayerVisibility={setDiagramLayerVisibility}
             onSetLayerLock={setDiagramLayerLock}
             onDeleteLayer={deleteDiagramLayer}
+            onStatusMessage={setLayerOperationStatus}
           />
           <EditableInspector
             diagram={editableDiagram}
@@ -5896,6 +5945,14 @@ function layerFilterStatusLabel(layerFilter: LayerFilter): string {
 
 function pickedPathCountLabel(count: number): string {
   return `Picked ${count} ${count === 1 ? 'path' : 'paths'}`
+}
+
+function layerElementCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'element' : 'elements'}`
+}
+
+function layerOperationErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
 }
 
 function fillRuleLabel(fillRule: FillRule): string {

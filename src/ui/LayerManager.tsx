@@ -3,9 +3,10 @@ import {
   countElementsByLayer,
   formatLayerValue,
   getLayerMetadata,
+  normalizeLayerValue,
   nextUnusedLayerValue,
 } from '../model/layers.ts'
-import type { Diagram, Vec3 } from '../model/types.ts'
+import type { Diagram, DiagramLayer, Vec3 } from '../model/types.ts'
 import type { LayerFilter } from './layerFilter.ts'
 import { committedLayerNameDraft } from './layerRenameDraft.ts'
 
@@ -13,6 +14,7 @@ export type LayerManagerProps = {
   diagram: Diagram
   layerFilter: LayerFilter
   creationLayerInput: string
+  statusMessage: string
   onRenameLayer: (layerValue: number, name: string) => void
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
@@ -20,12 +22,14 @@ export type LayerManagerProps = {
   onSetLayerVisibility: (layerValue: number, visible: boolean) => void
   onSetLayerLock: (layerValue: number, locked: boolean) => void
   onDeleteLayer: (layerValue: number) => void
+  onStatusMessage: (message: string) => void
 }
 
 export function LayerManager({
   diagram,
   layerFilter,
   creationLayerInput,
+  statusMessage,
   onRenameLayer,
   onSwapLayers,
   onDuplicateLayer,
@@ -33,9 +37,11 @@ export function LayerManager({
   onSetLayerVisibility,
   onSetLayerLock,
   onDeleteLayer,
+  onStatusMessage,
 }: LayerManagerProps) {
   const layers = getLayerMetadata(diagram)
   const counts = countElementsByLayer(diagram)
+  const creationLayer = parseOptionalLayerValue(creationLayerInput)
 
   return (
     <section className="layer-manager" aria-labelledby="layer-manager-heading">
@@ -57,186 +63,354 @@ export function LayerManager({
           </div>
         </dl>
       </div>
+      {statusMessage !== '' && (
+        <p className="layer-manager-status" role="status" aria-live="polite">
+          {statusMessage}
+        </p>
+      )}
 
       {layers.length === 0 ? (
         <p className="layer-manager-empty">No layer metadata yet.</p>
       ) : (
-        <div className="layer-manager-list" role="table">
-          <div className="layer-manager-row layer-manager-header" role="row">
-            <span role="columnheader">Name</span>
-            <span role="columnheader">Value</span>
-            <span role="columnheader">Elements</span>
-            <span role="columnheader">State</span>
-            <span role="columnheader">Operations</span>
-          </div>
-          {layers.map((layer) => {
-            const layerKey = formatLayerValue(layer.value)
-            const swappableLayers = layers.filter(
-              (targetLayer) => targetLayer.value !== layer.value,
-            )
-            const defaultSwapTarget = swappableLayers[0]?.value
-            const defaultDuplicateTarget = nextUnusedLayerValue(
-              diagram,
-              layer.value,
-            )
-            const isVisible = layer.visible !== false
-            const isLocked = layer.locked === true
-
-            return (
-              <div key={layerKey} className="layer-manager-row" role="row">
-                <LayerNameEditor
-                  layerValue={layer.value}
-                  layerKey={layerKey}
-                  name={layer.name}
-                  onRenameLayer={onRenameLayer}
-                />
-                <span role="cell">{layerKey}</span>
-                <span role="cell">{counts.get(layer.value) ?? 0}</span>
-                <div
-                  className="layer-manager-state-controls"
-                  role="cell"
-                  aria-label={`State for layer ${layerKey}`}
-                >
-                  <button
-                    type="button"
-                    className="toolbar-button"
-                    aria-pressed={isVisible}
-                    onClick={() => onSetLayerVisibility(layer.value, !isVisible)}
-                  >
-                    {isVisible ? 'Visible' : 'Hidden'}
-                  </button>
-                  <button
-                    type="button"
-                    className="toolbar-button"
-                    aria-pressed={isLocked}
-                    onClick={() => onSetLayerLock(layer.value, !isLocked)}
-                  >
-                    {isLocked ? 'Locked' : 'Unlocked'}
-                  </button>
-                </div>
-                <div className="layer-manager-actions" role="cell">
-                  <form
-                    className="layer-manager-translate-form"
-                    onSubmit={(event) =>
-                      submitLayerTranslate(
-                        event,
-                        layer.value,
-                        diagram.ambientDimension,
-                        onTranslateLayer,
-                      )
-                    }
-                  >
-                    <label className="layer-manager-translation-field">
-                      <span>dx</span>
-                      <input
-                        name="dx"
-                        className="layer-manager-translation-input"
-                        aria-label={`Translate layer ${layerKey} by dx`}
-                        defaultValue="0"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <label className="layer-manager-translation-field">
-                      <span>dy</span>
-                      <input
-                        name="dy"
-                        className="layer-manager-translation-input"
-                        aria-label={`Translate layer ${layerKey} by dy`}
-                        defaultValue="0"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    {diagram.ambientDimension === 3 && (
-                      <label className="layer-manager-translation-field">
-                        <span>dz</span>
-                        <input
-                          name="dz"
-                          className="layer-manager-translation-input"
-                          aria-label={`Translate layer ${layerKey} by dz`}
-                          defaultValue="0"
-                          inputMode="decimal"
-                        />
-                      </label>
-                    )}
-                    <button
-                      type="submit"
-                      className="toolbar-button"
-                      aria-label={`Translate layer ${layerKey}`}
-                    >
-                      Translate layer
-                    </button>
-                  </form>
-                  <form
-                    className="layer-manager-duplicate-form"
-                    onSubmit={(event) =>
-                      submitLayerDuplicate(event, layer.value, onDuplicateLayer)
-                    }
-                  >
-                    <input
-                      key={`${layerKey}:duplicate:${defaultDuplicateTarget}`}
-                      name="targetLayer"
-                      className="layer-manager-layer-input"
-                      aria-label={`Duplicate layer ${layerKey} to target layer`}
-                      defaultValue={String(defaultDuplicateTarget)}
-                      inputMode="decimal"
-                    />
-                    <button
-                      type="submit"
-                      className="toolbar-button"
-                      aria-label={`Duplicate layer ${layerKey}`}
-                    >
-                      Duplicate
-                    </button>
-                  </form>
-                  <form
-                    className="layer-manager-swap-form"
-                    onSubmit={(event) =>
-                      submitLayerSwap(event, layer.value, onSwapLayers)
-                    }
-                  >
-                    <select
-                      key={`${layerKey}:swap:${layers.length}`}
-                      name="targetLayer"
-                      className="layer-manager-swap-select"
-                      aria-label={`Swap layer ${layerKey} with`}
-                      defaultValue={
-                        defaultSwapTarget === undefined
-                          ? ''
-                          : String(defaultSwapTarget)
-                      }
-                      disabled={defaultSwapTarget === undefined}
-                    >
-                      {swappableLayers.map((targetLayer) => (
-                        <option
-                          key={formatLayerValue(targetLayer.value)}
-                          value={String(targetLayer.value)}
-                        >
-                          {formatLayerValue(targetLayer.value)}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      className="toolbar-button"
-                      disabled={defaultSwapTarget === undefined}
-                    >
-                      Swap
-                    </button>
-                  </form>
-                  <button
-                    type="button"
-                    className="toolbar-button layer-manager-delete-button"
-                    aria-label={`Delete layer ${layerKey} and elements`}
-                    onClick={() => onDeleteLayer(layer.value)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+        <div className="layer-manager-list" role="list">
+          {layers.map((layer) => (
+            <LayerManagerRow
+              key={formatLayerValue(layer.value)}
+              diagram={diagram}
+              layer={layer}
+              layers={layers}
+              elementCount={counts.get(layer.value) ?? 0}
+              isFilterActive={
+                layerFilter.kind === 'layer' &&
+                normalizeLayerValue(layerFilter.layer) === layer.value
+              }
+              isCreationLayer={creationLayer === layer.value}
+              onRenameLayer={onRenameLayer}
+              onSwapLayers={onSwapLayers}
+              onDuplicateLayer={onDuplicateLayer}
+              onTranslateLayer={onTranslateLayer}
+              onSetLayerVisibility={onSetLayerVisibility}
+              onSetLayerLock={onSetLayerLock}
+              onDeleteLayer={onDeleteLayer}
+              onStatusMessage={onStatusMessage}
+            />
+          ))}
         </div>
       )}
+    </section>
+  )
+}
+
+type LayerManagerRowProps = {
+  diagram: Diagram
+  layer: DiagramLayer
+  layers: DiagramLayer[]
+  elementCount: number
+  isFilterActive: boolean
+  isCreationLayer: boolean
+  onRenameLayer: (layerValue: number, name: string) => void
+  onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
+  onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
+  onTranslateLayer: (layerValue: number, translation: Vec3) => void
+  onSetLayerVisibility: (layerValue: number, visible: boolean) => void
+  onSetLayerLock: (layerValue: number, locked: boolean) => void
+  onDeleteLayer: (layerValue: number) => void
+  onStatusMessage: (message: string) => void
+}
+
+function LayerManagerRow({
+  diagram,
+  layer,
+  layers,
+  elementCount,
+  isFilterActive,
+  isCreationLayer,
+  onRenameLayer,
+  onSwapLayers,
+  onDuplicateLayer,
+  onTranslateLayer,
+  onSetLayerVisibility,
+  onSetLayerLock,
+  onDeleteLayer,
+  onStatusMessage,
+}: LayerManagerRowProps) {
+  const layerKey = formatLayerValue(layer.value)
+  const swappableLayers = layers.filter(
+    (targetLayer) => targetLayer.value !== layer.value,
+  )
+  const defaultSwapTarget = swappableLayers[0]?.value
+  const defaultDuplicateTarget = nextUnusedLayerValue(diagram, layer.value)
+  const isVisible = layer.visible !== false
+  const isLocked = layer.locked === true
+  const [duplicateTargetInput, setDuplicateTargetInput] = useState(
+    String(defaultDuplicateTarget),
+  )
+  const [swapTargetInput, setSwapTargetInput] = useState(
+    defaultSwapTarget === undefined ? '' : String(defaultSwapTarget),
+  )
+  const [dxInput, setDxInput] = useState('0')
+  const [dyInput, setDyInput] = useState('0')
+  const [dzInput, setDzInput] = useState('0')
+  const duplicateTarget = parseOptionalLayerValue(duplicateTargetInput)
+  const swapTarget = parseOptionalLayerValue(swapTargetInput)
+  const dx = parseRequiredFiniteNumber(dxInput)
+  const dy = parseRequiredFiniteNumber(dyInput)
+  const dz =
+    diagram.ambientDimension === 2 ? 0 : parseRequiredFiniteNumber(dzInput)
+  const canDuplicate =
+    duplicateTargetInput.trim().length === 0 ||
+    (duplicateTarget !== null && duplicateTarget !== layer.value)
+  const canSwap = swapTarget !== null && swapTarget !== layer.value
+  const canTranslate =
+    elementCount > 0 &&
+    dx !== null &&
+    dy !== null &&
+    dz !== null &&
+    !isZeroTranslation({ x: dx, y: dy, z: dz })
+
+  useEffect(() => {
+    setDuplicateTargetInput(String(defaultDuplicateTarget))
+  }, [defaultDuplicateTarget, layer.value])
+
+  useEffect(() => {
+    setSwapTargetInput(
+      defaultSwapTarget === undefined ? '' : String(defaultSwapTarget),
+    )
+  }, [defaultSwapTarget, layer.value])
+
+  return (
+    <section
+      className={[
+        'layer-manager-row',
+        isFilterActive || isCreationLayer ? 'is-active-layer' : '',
+        isVisible ? '' : 'is-hidden-layer',
+        isLocked ? 'is-locked-layer' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      role="listitem"
+      aria-label={`Layer ${layerKey}`}
+    >
+      <div className="layer-manager-row-summary">
+        <div className="layer-manager-row-title">
+          <span className="layer-manager-layer-name">{layer.name}</span>
+          <span className="layer-manager-layer-value">Layer {layerKey}</span>
+        </div>
+        <span className="layer-manager-count">
+          {elementCount} {elementCount === 1 ? 'element' : 'elements'}
+        </span>
+        <div className="layer-manager-badges" aria-label="Layer status">
+          {isFilterActive && (
+            <span className="layer-manager-badge layer-manager-badge-active">
+              Filter
+            </span>
+          )}
+          {isCreationLayer && (
+            <span className="layer-manager-badge layer-manager-badge-active">
+              New
+            </span>
+          )}
+          {!isVisible && (
+            <span className="layer-manager-badge">Hidden</span>
+          )}
+          {isLocked && <span className="layer-manager-badge">Locked</span>}
+        </div>
+      </div>
+
+      <div className="layer-manager-action-groups">
+        <div className="layer-manager-action-group">
+          <span className="layer-manager-action-heading">Safe</span>
+          <LayerNameEditor
+            layerValue={layer.value}
+            layerKey={layerKey}
+            name={layer.name}
+            onRenameLayer={onRenameLayer}
+          />
+          <div
+            className="layer-manager-state-controls"
+            aria-label={`State for layer ${layerKey}`}
+          >
+            <button
+              type="button"
+              className="toolbar-button"
+              aria-pressed={isVisible}
+              onClick={() => onSetLayerVisibility(layer.value, !isVisible)}
+            >
+              {isVisible ? 'Visible' : 'Hidden'}
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              aria-pressed={isLocked}
+              onClick={() => onSetLayerLock(layer.value, !isLocked)}
+            >
+              {isLocked ? 'Locked' : 'Unlocked'}
+            </button>
+          </div>
+        </div>
+
+        <div className="layer-manager-action-group">
+          <span className="layer-manager-action-heading">Move</span>
+          <form
+            className="layer-manager-translate-form"
+            onSubmit={(event) =>
+              submitLayerTranslate(
+                event,
+                layer.value,
+                { dx, dy, dz },
+                onTranslateLayer,
+                onStatusMessage,
+              )
+            }
+          >
+            <label className="layer-manager-translation-field">
+              <span>dx</span>
+              <input
+                name="dx"
+                type="number"
+                step="any"
+                className="layer-manager-translation-input"
+                aria-label={`Translate layer ${layerKey} by dx`}
+                aria-invalid={dx === null}
+                value={dxInput}
+                inputMode="decimal"
+                onChange={(event) => setDxInput(event.currentTarget.value)}
+              />
+            </label>
+            <label className="layer-manager-translation-field">
+              <span>dy</span>
+              <input
+                name="dy"
+                type="number"
+                step="any"
+                className="layer-manager-translation-input"
+                aria-label={`Translate layer ${layerKey} by dy`}
+                aria-invalid={dy === null}
+                value={dyInput}
+                inputMode="decimal"
+                onChange={(event) => setDyInput(event.currentTarget.value)}
+              />
+            </label>
+            {diagram.ambientDimension === 3 && (
+              <label className="layer-manager-translation-field">
+                <span>dz</span>
+                <input
+                  name="dz"
+                  type="number"
+                  step="any"
+                  className="layer-manager-translation-input"
+                  aria-label={`Translate layer ${layerKey} by dz`}
+                  aria-invalid={dz === null}
+                  value={dzInput}
+                  inputMode="decimal"
+                  onChange={(event) => setDzInput(event.currentTarget.value)}
+                />
+              </label>
+            )}
+            <button
+              type="submit"
+              className="toolbar-button"
+              aria-label={`Translate layer ${layerKey}`}
+              disabled={!canTranslate}
+              title={
+                elementCount === 0
+                  ? 'No elements on this layer.'
+                  : 'Enter a non-zero finite translation.'
+              }
+            >
+              Translate
+            </button>
+          </form>
+        </div>
+
+        <div className="layer-manager-action-group">
+          <span className="layer-manager-action-heading">Copy/Reorder</span>
+          <form
+            className="layer-manager-duplicate-form"
+            onSubmit={(event) =>
+              submitLayerDuplicate(
+                event,
+                layer.value,
+                duplicateTarget,
+                duplicateTargetInput,
+                onDuplicateLayer,
+                onStatusMessage,
+              )
+            }
+          >
+            <input
+              name="targetLayer"
+              type="number"
+              step="any"
+              className="layer-manager-layer-input"
+              aria-label={`Duplicate layer ${layerKey} to target layer`}
+              aria-invalid={!canDuplicate}
+              value={duplicateTargetInput}
+              inputMode="decimal"
+              onChange={(event) =>
+                setDuplicateTargetInput(event.currentTarget.value)
+              }
+            />
+            <button
+              type="submit"
+              className="toolbar-button"
+              aria-label={`Duplicate layer ${layerKey}`}
+              disabled={!canDuplicate}
+            >
+              Duplicate
+            </button>
+          </form>
+          <form
+            className="layer-manager-swap-form"
+            onSubmit={(event) =>
+              submitLayerSwap(
+                event,
+                layer.value,
+                swapTarget,
+                onSwapLayers,
+                onStatusMessage,
+              )
+            }
+          >
+            <select
+              name="targetLayer"
+              className="layer-manager-swap-select"
+              aria-label={`Swap layer ${layerKey} with`}
+              value={swapTargetInput}
+              disabled={defaultSwapTarget === undefined}
+              onChange={(event) => setSwapTargetInput(event.currentTarget.value)}
+            >
+              {swappableLayers.map((targetLayer) => (
+                <option
+                  key={formatLayerValue(targetLayer.value)}
+                  value={String(targetLayer.value)}
+                >
+                  {formatLayerValue(targetLayer.value)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="toolbar-button"
+              disabled={!canSwap}
+            >
+              Swap
+            </button>
+          </form>
+        </div>
+
+        <div className="layer-manager-action-group layer-manager-danger-group">
+          <span className="layer-manager-action-heading">Destructive</span>
+          <button
+            type="button"
+            className="toolbar-button layer-manager-delete-button"
+            aria-label={`Delete layer ${layerKey} and elements`}
+            onClick={() => onDeleteLayer(layer.value)}
+          >
+            Delete...
+          </button>
+        </div>
+      </div>
     </section>
   )
 }
@@ -303,18 +477,25 @@ function LayerNameEditor({
 function submitLayerTranslate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
-  ambientDimension: Diagram['ambientDimension'],
+  parsed: {
+    dx: number | null
+    dy: number | null
+    dz: number | null
+  },
   onTranslateLayer: (layerValue: number, translation: Vec3) => void,
+  onStatusMessage: (message: string) => void,
 ): void {
   event.preventDefault()
 
-  const formData = new FormData(event.currentTarget)
-  const dx = parseFiniteFormNumber(formData.get('dx'))
-  const dy = parseFiniteFormNumber(formData.get('dy'))
-  const dz =
-    ambientDimension === 2 ? 0 : parseFiniteFormNumber(formData.get('dz'))
+  const { dx, dy, dz } = parsed
 
   if (dx === null || dy === null || dz === null) {
+    onStatusMessage('Enter a finite translation vector.')
+    return
+  }
+
+  if (isZeroTranslation({ x: dx, y: dy, z: dz })) {
+    onStatusMessage('Enter a non-zero translation vector.')
     return
   }
 
@@ -324,21 +505,25 @@ function submitLayerTranslate(
 function submitLayerDuplicate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
+  targetLayer: number | null,
+  targetLayerInput: string,
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void,
+  onStatusMessage: (message: string) => void,
 ): void {
   event.preventDefault()
 
-  const formData = new FormData(event.currentTarget)
-  const rawTargetLayer = formData.get('targetLayer')
-
-  if (typeof rawTargetLayer !== 'string' || rawTargetLayer.trim().length === 0) {
+  if (targetLayerInput.trim().length === 0) {
     onDuplicateLayer(layerValue)
     return
   }
 
-  const targetLayer = Number(rawTargetLayer)
+  if (targetLayer === null) {
+    onStatusMessage('Enter a finite target layer.')
+    return
+  }
 
-  if (!Number.isFinite(targetLayer)) {
+  if (targetLayer === layerValue) {
+    onStatusMessage('Duplicate target must differ from the source layer.')
     return
   }
 
@@ -348,30 +533,42 @@ function submitLayerDuplicate(
 function submitLayerSwap(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
+  targetLayer: number | null,
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void,
+  onStatusMessage: (message: string) => void,
 ): void {
   event.preventDefault()
 
-  const formData = new FormData(event.currentTarget)
-  const rawTargetLayer = formData.get('targetLayer')
-  const targetLayer =
-    typeof rawTargetLayer === 'string' ? Number(rawTargetLayer) : Number.NaN
-
-  if (!Number.isFinite(targetLayer)) {
+  if (targetLayer === null) {
+    onStatusMessage('Choose a layer to swap with.')
     return
   }
 
   onSwapLayers(layerValue, targetLayer)
 }
 
-function parseFiniteFormNumber(value: FormDataEntryValue | null): number | null {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+function parseRequiredFiniteNumber(value: string): number | null {
+  if (value.trim().length === 0) {
     return null
   }
 
   const number = Number(value)
 
   return Number.isFinite(number) ? number : null
+}
+
+function parseOptionalLayerValue(value: string): number | null {
+  if (value.trim().length === 0) {
+    return null
+  }
+
+  const number = Number(value)
+
+  return Number.isFinite(number) ? normalizeLayerValue(number) : null
+}
+
+function isZeroTranslation(translation: Vec3): boolean {
+  return translation.x === 0 && translation.y === 0 && translation.z === 0
 }
 
 function layerFilterLabel(layerFilter: LayerFilter): string {

@@ -634,6 +634,8 @@ names are diagram-level metadata:
 type DiagramLayer = {
   value: number;
   name: string;
+  visible?: boolean;
+  locked?: boolean;
 };
 ```
 
@@ -647,6 +649,13 @@ Layer names may be edited without changing any element's numeric `layer` value.
 Blank edited names are normalized to the safe default `Layer <value>`.
 Duplicate layer names are allowed; the Layer Manager always shows the numeric
 value beside the name for disambiguation.
+
+Layer visibility is persisted metadata. Hidden layers are not rendered in the
+SVG preview and cannot remain selected, but they are still exported to TikZ by
+default. Layer locking is also persisted metadata. Locked layers remain visible
+but are not selectable or editable through ordinary preview/inspector actions.
+Layer Manager operations may still unlock, rename, swap, duplicate, translate,
+or delete locked layers.
 
 Swapping two layers exchanges element membership by numeric value for all strata
 and free text labels:
@@ -676,6 +685,14 @@ removes the layer metadata entry. Other layers, including empty metadata-only
 layers, are unchanged. The operation is undoable; the editor clears stale
 selection, layer filters, drafts, and coordinate-source selections that refer to
 deleted elements.
+
+Translating a layer moves all absolute coordinates stored by strata and free
+text labels on that numeric layer. In 2D, only `dx` and `dy` are accepted and
+coordinates remain at `z = 0`. In 3D, `dx`, `dy`, and `dz` are accepted. The
+operation is one undoable diagram edit and must reject non-finite inputs or
+results.
+
+See [Layer Manager](./LAYER_MANAGER.md) for the user-facing operation summary.
 
 ## Style presets
 

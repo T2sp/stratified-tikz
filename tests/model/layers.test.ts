@@ -50,9 +50,18 @@ import type {
 import { validateDiagram } from '../../src/model/validation.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  allLayersFilter,
   clearSelectionForLayerFilter,
   normalizeLayerFilterForDiagram,
 } from '../../src/ui/layerFilter.ts'
+import type { SelectedElement } from '../../src/ui/selection.ts'
+import {
+  commitDiagramChange,
+  createDiagramHistory,
+  redoLastDiagramChange,
+  undoLastDiagramChange,
+  type UndoableEditorState,
+} from '../../src/ui/undo.ts'
 
 test('used layer values are enumerated from strata and labels', () => {
   assert.deepEqual(getUsedLayerValues(createLayerTestDiagram()), [-1, 0, 2])
@@ -834,6 +843,221 @@ test('SVG path data and TikZ output reflect layer translation', () => {
   assert.match(tikz, /\\coordinate \([^)]+\) at \(2,3\);/)
   assert.match(tikz, /\\coordinate \([^)]+\) at \(3,3\);/)
 })
+
+test('combined layer operation: rename then save/load preserves metadata', () => {
+  const renamed = renameLayer(createNamedLayerTestDiagram(), 2, 'Presentation')
+  const loaded = saveAndLoadDiagram(renamed)
+
+  assert.deepEqual(
+    loaded.layers?.find((layer) => layer.value === 2),
+    { value: 2, name: 'Presentation' },
+  )
+  assertLayerOperationInvariants(loaded)
+})
+
+test('combined layer operation: duplicate then translate duplicated layer', () => {
+  const duplicated = duplicateLayer(createLayerOperationDiagram(), 5, {
+    targetLayerValue: 6,
+  }).diagram
+  const translated = translateLayer(duplicated, 6, { x: 10, y: 0, z: -1 })
+  const sourcePoint = findPoint(translated, 'source-point')
+  const copiedPoint = findPoint(translated, 'source-point-copy')
+  const copiedLabel = findLabel(translated, 'source-label-copy')
+
+  assert.deepEqual(sourcePoint.position, { x: 1, y: 2, z: 3 })
+  assert.deepEqual(copiedPoint.position, { x: 11, y: 2, z: 2 })
+  assert.deepEqual(copiedLabel.position, { x: 12, y: 0, z: -1 })
+  assertLayerOperationInvariants(translated)
+})
+
+test('combined layer operation: swap then delete one layer', () => {
+  const swapped = swapLayers(createLayerOperationDiagram(), 1, 5)
+  const deleted = deleteLayer(swapped, 1)
+
+  assert.equal(deleted.strata.some((stratum) => stratum.layer === 1), false)
+  assert.equal(deleted.labels.some((label) => label.layer === 1), false)
+  assert.equal(getLayerMetadata(deleted).some((layer) => layer.value === 1), false)
+  assert.equal(findCurve(deleted, 'other-curve').layer, 5)
+  assert.equal(findLabel(deleted, 'other-label').layer, 5)
+  assertLayerOperationInvariants(deleted)
+})
+
+test('combined layer operation: hide clears selection on that layer', () => {
+  const hidden = setLayerVisibility(createLayerOperationDiagram(), 5, false)
+  const selection = clearSelectionForLayerFilter(
+    hidden,
+    { kind: 'stratum', id: 'source-point' },
+    { kind: 'all' },
+  )
+
+  assert.equal(selection, null)
+  assertLayerOperationInvariants(hidden, selection)
+})
+
+test('combined layer operation: duplicate is reflected in TikZ output', () => {
+  const duplicated = duplicateLayer(createLayerOperationDiagram(), 5, {
+    targetLayerValue: 6,
+  }).diagram
+  const tikz = generateTikz(duplicated)
+  const layerSixBlock = tikzLayerBlock(tikz, 'stratifiedLayer6')
+
+  assert.match(layerSixBlock, /source label/)
+  assert.match(layerSixBlock, /stzPointsourcepointcopy/)
+  assert.match(layerSixBlock, /spath\/save=sharedPathCopy2/)
+  assertLayerOperationInvariants(duplicated)
+})
+
+test('combined layer operation: translate undo and redo restore layer coordinates', () => {
+  const initial = createLayerOperationEditorState(createLayerTranslationDiagram())
+  const translated = translateLayer(initial.editableDiagram, 5, {
+    x: 4,
+    y: -1,
+    z: 2,
+  })
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: translated,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.deepEqual(
+    findPoint(undone.editableDiagram, 'translate-point').position,
+    { x: 1, y: 2, z: 3 },
+  )
+  assert.deepEqual(
+    findPoint(redone.editableDiagram, 'translate-point').position,
+    { x: 5, y: 1, z: 5 },
+  )
+  assertLayerOperationInvariants(undone.editableDiagram)
+  assertLayerOperationInvariants(redone.editableDiagram)
+})
+
+test('combined layer operation: delete undo then save/load restores layer data', () => {
+  const initial = createLayerOperationEditorState(createLayerOperationDiagram())
+  const deleted = deleteLayer(initial.editableDiagram, 5)
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: deleted,
+    selectedElement: null,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const loaded = saveAndLoadDiagram(undone.editableDiagram)
+
+  assert.equal(findPoint(loaded, 'source-point').layer, 5)
+  assert.equal(findLabel(loaded, 'source-label').layer, 5)
+  assert.deepEqual(
+    loaded.layers?.find((layer) => layer.value === 5),
+    { value: 5, name: 'Foreground' },
+  )
+  assertLayerOperationInvariants(loaded, { kind: 'stratum', id: 'source-point' })
+})
+
+function saveAndLoadDiagram(diagram: Diagram): Diagram {
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  return result.diagram
+}
+
+function createLayerOperationEditorState(
+  editableDiagram: Diagram,
+): UndoableEditorState {
+  return {
+    editableDiagram,
+    selectedElement: null,
+    layerFilter: allLayersFilter,
+    polylineDraft: null,
+    cubicBezierDraft: null,
+    pathDraft: null,
+    sheetPolygonDraft: null,
+    history: createDiagramHistory(editableDiagram),
+  }
+}
+
+function assertLayerOperationInvariants(
+  diagram: Diagram,
+  selection: SelectedElement = null,
+): void {
+  const validation = validateDiagram(diagram)
+
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors
+      .map((issue) => `${issue.path}: ${issue.message}`)
+      .join('\n'),
+  )
+  assertNoDuplicateTopLevelElementIds(diagram)
+  assertNoNonFiniteCoordinates(diagram)
+  assertSelectionAvailableAndVisible(diagram, selection)
+  assert.doesNotThrow(() => generateTikz(diagram))
+}
+
+function assertNoDuplicateTopLevelElementIds(diagram: Diagram): void {
+  const ids = [
+    ...diagram.strata.map((stratum) => stratum.id),
+    ...diagram.labels.map((label) => label.id),
+  ]
+
+  assert.equal(new Set(ids).size, ids.length, 'Expected unique element ids.')
+}
+
+function assertSelectionAvailableAndVisible(
+  diagram: Diagram,
+  selection: SelectedElement,
+): void {
+  if (selection === null) {
+    return
+  }
+
+  const selected =
+    selection.kind === 'stratum'
+      ? diagram.strata.find((stratum) => stratum.id === selection.id)
+      : diagram.labels.find((label) => label.id === selection.id)
+
+  assert.notEqual(selected, undefined, 'Expected selected element to exist.')
+  if (selected === undefined) {
+    return
+  }
+
+  assert.equal(
+    isLayerVisible(diagram, selected.layer),
+    true,
+    'Expected selected element layer to be visible.',
+  )
+}
+
+function assertNoNonFiniteCoordinates(value: unknown): void {
+  if (Array.isArray(value)) {
+    value.forEach(assertNoNonFiniteCoordinates)
+    return
+  }
+
+  if (!isRecord(value)) {
+    return
+  }
+
+  if (
+    typeof value.x === 'number' &&
+    typeof value.y === 'number' &&
+    typeof value.z === 'number'
+  ) {
+    assert.equal(Number.isFinite(value.x), true, 'Expected finite x coordinate.')
+    assert.equal(Number.isFinite(value.y), true, 'Expected finite y coordinate.')
+    assert.equal(Number.isFinite(value.z), true, 'Expected finite z coordinate.')
+  }
+
+  Object.values(value).forEach(assertNoNonFiniteCoordinates)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 
 function createLayerTestDiagram(): Diagram {
   const diagram = withoutLayerMetadata(twoDimensionalExample)
