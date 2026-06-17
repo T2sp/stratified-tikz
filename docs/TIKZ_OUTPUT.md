@@ -145,6 +145,13 @@ If the sanitized name starts with a digit, `savedPath` is prefixed before the
 digit. For example, `my path` becomes `myPath`, `$F_{1}$` becomes `F1`, and
 `123` becomes `savedPath123`.
 
+Layer duplication does not reuse non-empty `pathLabel` strings verbatim on the
+copies. The copied value appends ` copy`, then ` copy 2`, ` copy 3`, and so on
+until the sanitized saved-path name is unused by the current diagram. For
+example, copying `my path` normally creates `my path copy`, emitted as
+`spath/save=myPathCopy`; if that sanitized name already exists, the next copy is
+`my path copy 2`.
+
 When at least one `spath/save` option is emitted, the generated style/header
 section includes a comment documenting the required TikZ library:
 
@@ -180,6 +187,12 @@ on strata and free text labels, so the affected elements move to the opposite
 PGF layer in exported TikZ. The metadata names swap with those contents in the
 editor, but the emitted TikZ layer identifiers remain based only on numeric
 values such as `stratifiedLayer0`.
+
+Duplicating a layer creates copied strata and free text labels with new element
+ids and the target numeric `layer` value. TikZ export therefore emits the copied
+commands in the target `pgfonlayer` block. Deleting a layer removes its strata
+and free text labels from diagram data, so export no longer emits commands for
+that layer unless other elements still use the same numeric value.
 
 The output declares all used diagram layers and sets their order before the
 `tikzpicture`:

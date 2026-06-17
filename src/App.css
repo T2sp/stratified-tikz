@@ -871,7 +871,7 @@
   display: grid;
   grid-template-columns:
     minmax(0, 1fr) minmax(48px, 0.18fr) minmax(64px, 0.24fr)
-    minmax(0, 0.84fr);
+    minmax(220px, 1.12fr);
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -893,15 +893,23 @@
 }
 
 .layer-manager-name-form,
-.layer-manager-swap-form {
+.layer-manager-swap-form,
+.layer-manager-duplicate-form {
   display: flex;
   gap: 6px;
   align-items: center;
   min-width: 0;
 }
 
+.layer-manager-actions {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .layer-manager-name-input,
-.layer-manager-swap-select {
+.layer-manager-swap-select,
+.layer-manager-layer-input {
   min-width: 0;
   min-height: 30px;
   border: 1px solid var(--border);
@@ -921,11 +929,26 @@
   padding: 5px 22px 5px 8px;
 }
 
+.layer-manager-layer-input {
+  flex: 1 1 68px;
+  padding: 5px 8px;
+  font-family: var(--mono);
+}
+
 .layer-manager-name-form .toolbar-button,
-.layer-manager-swap-form .toolbar-button {
+.layer-manager-swap-form .toolbar-button,
+.layer-manager-duplicate-form .toolbar-button,
+.layer-manager-delete-button {
   min-height: 30px;
   padding: 5px 8px;
   font-size: 12px;
+}
+
+.layer-manager-delete-button {
+  width: 100%;
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fff5f5;
 }
 
 .layer-manager-row span:nth-child(2),

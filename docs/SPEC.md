@@ -661,6 +661,22 @@ identity follows the moved contents. Display order remains deterministic numeric
 ascending by `DiagramLayer.value`; display order alone never changes element
 membership or TikZ ordering.
 
+Duplicating a layer copies every stratum and free text label on the source
+numeric layer to a target numeric layer. The default target is the nearest
+finite unused value above the source, and the default target metadata name is
+`<source name> copy`. The user may provide a finite target value; if that value
+already has metadata, its existing name is preserved. Copied top-level elements
+receive deterministic new ids by appending `-copy`, `-copy-1`, and so on. Nested
+boundary ids and curve style segment ids are regenerated too. Non-empty copied
+path labels append ` copy`, then ` copy 2`, etc. until the sanitized TikZ
+`spath/save` name is unused.
+
+Deleting a layer removes all strata and free text labels on that layer and
+removes the layer metadata entry. Other layers, including empty metadata-only
+layers, are unchanged. The operation is undoable; the editor clears stale
+selection, layer filters, drafts, and coordinate-source selections that refer to
+deleted elements.
+
 ## Style presets
 
 The app may provide style presets for convenience, but the user must not be restricted to presets.

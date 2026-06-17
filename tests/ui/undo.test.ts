@@ -7,7 +7,7 @@ import {
 } from '../../src/geometry/projection.ts'
 import { constructWorkPlaneFromThreePoints } from '../../src/geometry/workPlane.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import { swapLayers } from '../../src/model/layers.ts'
+import { deleteLayer, duplicateLayer, swapLayers } from '../../src/model/layers.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
 import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
@@ -335,6 +335,39 @@ test('layer swaps undo and redo as one diagram operation', () => {
   assert.equal(pointLayer(committed.editableDiagram), 1)
   assert.equal(pointLayer(undone.editableDiagram), 0)
   assert.equal(pointLayer(redone.editableDiagram), 1)
+})
+
+test('layer duplicate undo removes copied layer and redo restores it', () => {
+  const initial = createUndoState(createNamedPointDiagram('Layer source'))
+  const duplicate = duplicateLayer(initial.editableDiagram, 0, {
+    targetLayerValue: 1,
+  })
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: duplicate.diagram,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasStratum(committed.editableDiagram, 'undo-point-copy'), true)
+  assert.equal(hasStratum(undone.editableDiagram, 'undo-point-copy'), false)
+  assert.equal(hasStratum(redone.editableDiagram, 'undo-point-copy'), true)
+})
+
+test('layer delete undo restores deleted elements and redo removes them again', () => {
+  const initial = createUndoState(createNamedPointDiagram('Layer source'))
+  const deleted = deleteLayer(initial.editableDiagram, 0)
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: deleted,
+    selectedElement: null,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasStratum(committed.editableDiagram, 'undo-point'), false)
+  assert.equal(hasStratum(undone.editableDiagram, 'undo-point'), true)
+  assert.equal(hasStratum(redone.editableDiagram, 'undo-point'), false)
 })
 
 test('drag-style commits group repeated pointer updates into one undo step', () => {

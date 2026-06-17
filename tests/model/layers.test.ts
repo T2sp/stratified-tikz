@@ -3,21 +3,49 @@ import test from 'node:test'
 import { twoDimensionalExample } from '../../src/examples/index.ts'
 import {
   countElementsByLayer,
+  deleteLayer,
+  duplicateLayer,
   getLayerMetadata,
   getUsedLayerValues,
+  nextUnusedLayerValue,
   normalizeLayerMetadataForDiagram,
   renameLayer,
   swapLayers,
 } from '../../src/model/layers.ts'
+import {
+  createConcatenatedPathStratum,
+  createCurveStratum,
+  createCurvedSheetStratum,
+  createEmptyDiagram,
+  createFilledRegion2DStratum,
+  createPointStratum,
+  createSheetStratum,
+  createTemplatePathStratum,
+  createTextLabel,
+  createWorkPlaneFilledSheet3DStratum,
+} from '../../src/model/constructors.ts'
 import {
   parseSavedDiagramJson,
   savedDiagramFormat,
   savedDiagramVersion,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
-import type { Diagram } from '../../src/model/types.ts'
+import { defaultCurveStyle, defaultSheetStyle } from '../../src/model/styles.ts'
+import type {
+  ClosedPathBoundary,
+  CurveStratum,
+  Diagram,
+  PointStratum,
+  PolygonSheetStratum,
+  TextLabel,
+  WorkPlaneFrameSnapshot,
+} from '../../src/model/types.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
+import {
+  clearSelectionForLayerFilter,
+  normalizeLayerFilterForDiagram,
+} from '../../src/ui/layerFilter.ts'
 
 test('used layer values are enumerated from strata and labels', () => {
   assert.deepEqual(getUsedLayerValues(createLayerTestDiagram()), [-1, 0, 2])
@@ -271,6 +299,198 @@ test('layer metadata display order is deterministic by numeric value', () => {
   )
 })
 
+test('duplicating a layer copies point strata and labels with new ids on the target layer', () => {
+  const diagram = createLayerOperationDiagram()
+  const original = structuredClone(diagram) as Diagram
+  const result = duplicateLayer(diagram, 5, { targetLayerValue: 6 })
+  const copiedPoint = findPoint(result.diagram, 'source-point-copy')
+  const copiedLabel = findLabel(result.diagram, 'source-label-copy')
+
+  assert.equal(result.duplicatedStrata, 8)
+  assert.equal(result.duplicatedLabels, 1)
+  assert.deepEqual(diagram, original)
+  assert.equal(copiedPoint.layer, 6)
+  assert.equal(copiedLabel.layer, 6)
+  assert.notEqual(copiedPoint.id, 'source-point')
+  assert.notEqual(copiedLabel.id, 'source-label')
+  assert.deepEqual(copiedPoint.position, findPoint(diagram, 'source-point').position)
+  assert.deepEqual(copiedLabel.position, findLabel(diagram, 'source-label').position)
+  assert.equal(findPoint(result.diagram, 'source-point').layer, 5)
+  assert.equal(findLabel(result.diagram, 'source-label').layer, 5)
+})
+
+test('duplicating a layer deep-clones curve/path geometry and disambiguates path labels', () => {
+  const result = duplicateLayer(createLayerOperationDiagram(), 5, {
+    targetLayerValue: 6,
+  })
+  const sourcePolyline = findCurve(result.diagram, 'source-polyline')
+  const copiedPolyline = findCurve(result.diagram, 'source-polyline-copy')
+  const sourcePath = findCurve(result.diagram, 'source-path')
+  const copiedPath = findCurve(result.diagram, 'source-path-copy')
+  const sourceTemplate = findCurve(result.diagram, 'source-circle-template')
+  const copiedTemplate = findCurve(result.diagram, 'source-circle-template-copy')
+
+  assert.equal(copiedPolyline.layer, 6)
+  assert.equal(copiedPath.layer, 6)
+  assert.equal(copiedTemplate.layer, 6)
+  assert.equal(copiedPolyline.pathLabel, 'shared path copy 2')
+  assert.deepEqual(result.pathLabelChanges, [
+    { sourcePathLabel: 'shared path', copiedPathLabel: 'shared path copy 2' },
+    { sourcePathLabel: 'source path', copiedPathLabel: 'source path copy' },
+    { sourcePathLabel: 'circle path', copiedPathLabel: 'circle path copy' },
+    { sourcePathLabel: 'sheet path', copiedPathLabel: 'sheet path copy' },
+  ])
+
+  if (sourcePolyline.kind !== 'polyline' || copiedPolyline.kind !== 'polyline') {
+    throw new Error('Expected polyline strata.')
+  }
+  if (sourcePath.kind !== 'concatenatedPath' || copiedPath.kind !== 'concatenatedPath') {
+    throw new Error('Expected concatenated path strata.')
+  }
+  if (sourceTemplate.kind !== 'templatePath' || copiedTemplate.kind !== 'templatePath') {
+    throw new Error('Expected template path strata.')
+  }
+
+  assert.notEqual(copiedPolyline.points, sourcePolyline.points)
+  assert.notEqual(copiedPath.segments, sourcePath.segments)
+  assert.notEqual(copiedTemplate.template, sourceTemplate.template)
+  copiedPolyline.points[0].x = 99
+  copiedPath.segments[0].start.x = 88
+  copiedTemplate.template.center.x = 77
+  assert.equal(sourcePolyline.points[0].x, 0)
+  assert.equal(sourcePath.segments[0].start.x, 0)
+  assert.equal(sourceTemplate.template.center.x, 1.5)
+  assert.equal(copiedPolyline.styleSegments[0]?.id, 'source-run-copy')
+})
+
+test('duplicating a layer copies sheets, filled objects, and curved sheet primitives', () => {
+  const result3D = duplicateLayer(createLayerOperationDiagram(), 5, {
+    targetLayerValue: 6,
+  })
+  const copiedQuad = result3D.diagram.strata.find(
+    (stratum) => stratum.id === 'source-quad-sheet-copy',
+  )
+  const copiedPolygon = findPolygonSheet(
+    result3D.diagram,
+    'source-polygon-sheet-copy',
+  )
+  const copiedFilledSheet = result3D.diagram.strata.find(
+    (stratum) => stratum.id === 'source-filled-sheet-copy',
+  )
+  const copiedCurved = result3D.diagram.strata.find(
+    (stratum) => stratum.id === 'source-curved-sheet-copy',
+  )
+  const result2D = duplicateLayer(createFilledRegionLayerDiagram(), 2, {
+    targetLayerValue: 3,
+  })
+  const sourceRegion = result2D.diagram.strata.find(
+    (stratum) => stratum.id === 'source-filled-region',
+  )
+  const copiedRegion = result2D.diagram.strata.find(
+    (stratum) => stratum.id === 'source-filled-region-copy',
+  )
+
+  assert.equal(copiedQuad?.layer, 6)
+  assert.equal(copiedPolygon.layer, 6)
+  assert.equal(copiedFilledSheet?.layer, 6)
+  assert.equal(copiedCurved?.layer, 6)
+  assert.equal(copiedPolygon.pathLabel, 'sheet path copy')
+
+  if (
+    copiedFilledSheet === undefined ||
+    copiedFilledSheet.geometricKind !== 'sheet' ||
+    copiedFilledSheet.kind !== 'workPlaneFilledSheet'
+  ) {
+    throw new Error('Expected copied work-plane filled sheet.')
+  }
+  if (
+    copiedCurved === undefined ||
+    copiedCurved.geometricKind !== 'sheet' ||
+    copiedCurved.kind !== 'curvedSheet'
+  ) {
+    throw new Error('Expected copied curved sheet.')
+  }
+  if (
+    sourceRegion === undefined ||
+    sourceRegion.geometricKind !== 'region' ||
+    sourceRegion.kind !== 'filledRegion' ||
+    copiedRegion === undefined ||
+    copiedRegion.geometricKind !== 'region' ||
+    copiedRegion.kind !== 'filledRegion'
+  ) {
+    throw new Error('Expected source and copied filled regions.')
+  }
+
+  assert.notEqual(copiedFilledSheet.boundaries, findWorkPlaneFilledSheet(result3D.diagram, 'source-filled-sheet').boundaries)
+  assert.notEqual(copiedFilledSheet.boundaries[0]?.id, 'sheet-boundary')
+  assert.notEqual(copiedCurved.primitive, findCurvedSheet(result3D.diagram, 'source-curved-sheet').primitive)
+  assert.equal(copiedRegion.layer, 3)
+  assert.notEqual(copiedRegion.boundaries, sourceRegion.boundaries)
+  assert.notEqual(copiedRegion.boundaries[0]?.id, 'region-boundary')
+})
+
+test('duplicating a layer creates target metadata with the default unused layer policy', () => {
+  const diagram = createLayerOperationDiagram()
+  const result = duplicateLayer(diagram, 5)
+
+  assert.equal(nextUnusedLayerValue(diagram, 5), 6)
+  assert.equal(result.targetLayer, 6)
+  assert.deepEqual(
+    result.diagram.layers?.find((layer) => layer.value === 6),
+    { value: 6, name: 'Foreground copy' },
+  )
+  assert.deepEqual(
+    result.diagram.layers?.find((layer) => layer.value === 5),
+    { value: 5, name: 'Foreground' },
+  )
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('deleting a layer removes its strata, labels, and metadata only', () => {
+  const deleted = deleteLayer(createLayerOperationDiagram(), 5)
+
+  assert.equal(deleted.strata.some((stratum) => stratum.layer === 5), false)
+  assert.equal(deleted.labels.some((label) => label.layer === 5), false)
+  assert.equal(deleted.strata.some((stratum) => stratum.id === 'other-curve'), true)
+  assert.equal(deleted.labels.some((label) => label.id === 'other-label'), true)
+  assert.deepEqual(deleted.layers, [
+    { value: 1, name: 'Other' },
+    { value: 99, name: 'Empty guide layer' },
+  ])
+  assert.equal(validateDiagram(deleted).valid, true)
+})
+
+test('deleting a layer clears stale selection and validates a deleted layer filter', () => {
+  const deleted = deleteLayer(createLayerOperationDiagram(), 5)
+  const nextFilter = normalizeLayerFilterForDiagram(deleted, {
+    kind: 'layer',
+    layer: 5,
+  })
+  const nextSelection = clearSelectionForLayerFilter(
+    deleted,
+    { kind: 'stratum', id: 'source-point' },
+    nextFilter,
+  )
+
+  assert.deepEqual(nextFilter, { kind: 'all' })
+  assert.equal(nextSelection, null)
+})
+
+test('TikZ output reflects duplicated and deleted layer contents', () => {
+  const duplicated = duplicateLayer(createLayerOperationDiagram(), 5, {
+    targetLayerValue: 6,
+  }).diagram
+  const duplicatedTikz = generateTikz(duplicated)
+  const targetLayerBlock = tikzLayerBlock(duplicatedTikz, 'stratifiedLayer6')
+  const deleted = deleteLayer(duplicated, 6)
+  const deletedTikz = generateTikz(deleted)
+
+  assert.match(targetLayerBlock, /source label/)
+  assert.match(targetLayerBlock, /spath\/save=sharedPathCopy2/)
+  assert.doesNotMatch(deletedTikz, /stratifiedLayer6/)
+  assert.match(deletedTikz, /stratifiedLayer5/)
+})
+
 function createLayerTestDiagram(): Diagram {
   const diagram = withoutLayerMetadata(twoDimensionalExample)
 
@@ -355,6 +575,214 @@ function createNamedLayerSwapTestDiagram(): Diagram {
   }
 }
 
+function createLayerOperationDiagram(): Diagram {
+  const frame = xyFrame(0)
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const sourceLayer = 5
+
+  return {
+    ...diagram,
+    layers: [
+      { value: 1, name: 'Other' },
+      { value: sourceLayer, name: 'Foreground' },
+      { value: 99, name: 'Empty guide layer' },
+    ],
+    strata: [
+      createPointStratum({
+        ambientDimension: 3,
+        id: 'source-point',
+        position: { x: 1, y: 2, z: 3 },
+        layer: sourceLayer,
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'source-polyline',
+        name: 'Source polyline',
+        pathLabel: 'shared path',
+        points: [
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        styleSegments: [
+          {
+            id: 'source-run',
+            from: 0,
+            to: 1,
+            style: { lineStyle: 'dashed' },
+          },
+        ],
+        layer: sourceLayer,
+      }),
+      createConcatenatedPathStratum({
+        ambientDimension: 3,
+        id: 'source-path',
+        name: 'Source path',
+        pathLabel: 'source path',
+        segments: [
+          {
+            kind: 'line',
+            start: { x: 0, y: 1, z: 0 },
+            end: { x: 1, y: 1, z: 0 },
+            styleOverride: { lineStyle: 'dotted' },
+          },
+        ],
+        layer: sourceLayer,
+      }),
+      createTemplatePathStratum({
+        ambientDimension: 3,
+        id: 'source-circle-template',
+        name: 'Source circle template',
+        pathLabel: 'circle path',
+        template: {
+          kind: 'circleTemplate',
+          center: { x: 1.5, y: 1.5, z: 0 },
+          radius: 0.5,
+          frame,
+        },
+        layer: sourceLayer,
+      }),
+      createSourcePolygonSheet(sourceLayer),
+      createSheetStratum({
+        ambientDimension: 3,
+        id: 'source-quad-sheet',
+        corners: [
+          { x: 0, y: 0, z: 1 },
+          { x: 1, y: 0, z: 1 },
+          { x: 1, y: 1, z: 1 },
+          { x: 0, y: 1, z: 1 },
+        ],
+        layer: sourceLayer,
+      }),
+      createWorkPlaneFilledSheet3DStratum({
+        id: 'source-filled-sheet',
+        planeFrame: xyFrame(2),
+        boundaries: [squareBoundary3D('sheet-boundary', 2)],
+        layer: sourceLayer,
+      }),
+      createCurvedSheetStratum({
+        id: 'source-curved-sheet',
+        primitive: {
+          kind: 'hemisphere',
+          center: { x: 0, y: 0, z: 2 },
+          radius: 1,
+          frame: xyFrame(2),
+          hemisphereSide: 'positive',
+          sampling: { uSegments: 4, vSegments: 2 },
+        },
+        layer: sourceLayer,
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'other-curve',
+        pathLabel: 'shared-path-copy',
+        points: [
+          { x: 0, y: 0, z: 1 },
+          { x: 1, y: 0, z: 1 },
+        ],
+        layer: 1,
+      }),
+    ],
+    labels: [
+      createTextLabel({
+        ambientDimension: 3,
+        id: 'source-label',
+        text: 'source label',
+        position: { x: 2, y: 0, z: 0 },
+        layer: sourceLayer,
+      }),
+      createTextLabel({
+        ambientDimension: 3,
+        id: 'other-label',
+        text: 'other label',
+        position: { x: -1, y: 0, z: 0 },
+        layer: 1,
+      }),
+    ],
+  }
+}
+
+function createFilledRegionLayerDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  return {
+    ...diagram,
+    layers: [{ value: 2, name: 'Filled regions' }],
+    strata: [
+      createFilledRegion2DStratum({
+        id: 'source-filled-region',
+        boundaries: [squareBoundary2D('region-boundary')],
+        layer: 2,
+      }),
+    ],
+  }
+}
+
+function createSourcePolygonSheet(layer: number): PolygonSheetStratum {
+  return {
+    id: 'source-polygon-sheet',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    name: 'Source polygon sheet',
+    style: { ...defaultSheetStyle },
+    vertices: [
+      { x: 0, y: 0, z: 3 },
+      { x: 1, y: 0, z: 3 },
+      { x: 0, y: 1, z: 3 },
+    ],
+    pathLabel: 'sheet path',
+    layer,
+  }
+}
+
+function squareBoundary2D(id: string): ClosedPathBoundary {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 1, y: 1, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 1, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 0, y: 1, z: 0 },
+        end: { x: 0, y: 0, z: 0 },
+      },
+    ],
+  }
+}
+
+function squareBoundary3D(id: string, z: number): ClosedPathBoundary {
+  return {
+    id,
+    segments: squareBoundary2D(id).segments.map((segment) => ({
+      ...segment,
+      start: { ...segment.start, z },
+      end: { ...segment.end, z },
+    })),
+  }
+}
+
+function xyFrame(z: number): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 0, y: 0, z },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
 function withoutLayerMetadata(diagram: Diagram): Diagram {
   const clone = structuredClone(diagram) as Diagram
   delete clone.layers
@@ -379,6 +807,84 @@ function labelLayer(diagram: Diagram, id: string): number {
   }
 
   return label.layer
+}
+
+function findPoint(diagram: Diagram, id: string): PointStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum === undefined || stratum.geometricKind !== 'point') {
+    throw new Error(`Expected point ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findCurve(diagram: Diagram, id: string): CurveStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum === undefined || stratum.geometricKind !== 'curve') {
+    throw new Error(`Expected curve ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findPolygonSheet(diagram: Diagram, id: string): PolygonSheetStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'sheet' ||
+    stratum.kind !== 'polygonSheet'
+  ) {
+    throw new Error(`Expected polygon sheet ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findWorkPlaneFilledSheet(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { kind: 'workPlaneFilledSheet' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'sheet' ||
+    stratum.kind !== 'workPlaneFilledSheet'
+  ) {
+    throw new Error(`Expected work-plane filled sheet ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findCurvedSheet(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { kind: 'curvedSheet' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'sheet' ||
+    stratum.kind !== 'curvedSheet'
+  ) {
+    throw new Error(`Expected curved sheet ${id} to exist.`)
+  }
+
+  return stratum
+}
+
+function findLabel(diagram: Diagram, id: string): TextLabel {
+  const label = diagram.labels.find((candidate) => candidate.id === id)
+
+  if (label === undefined) {
+    throw new Error(`Expected label ${id} to exist.`)
+  }
+
+  return label
 }
 
 function tikzLayerBlock(tikz: string, layerName: string): string {

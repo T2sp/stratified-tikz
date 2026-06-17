@@ -3,6 +3,7 @@ import {
   countElementsByLayer,
   formatLayerValue,
   getLayerMetadata,
+  nextUnusedLayerValue,
 } from '../model/layers.ts'
 import type { Diagram } from '../model/types.ts'
 import type { LayerFilter } from './layerFilter.ts'
@@ -13,6 +14,8 @@ export type LayerManagerProps = {
   creationLayerInput: string
   onRenameLayer: (layerValue: number, name: string) => void
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
+  onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
+  onDeleteLayer: (layerValue: number) => void
 }
 
 export function LayerManager({
@@ -21,6 +24,8 @@ export function LayerManager({
   creationLayerInput,
   onRenameLayer,
   onSwapLayers,
+  onDuplicateLayer,
+  onDeleteLayer,
 }: LayerManagerProps) {
   const layers = getLayerMetadata(diagram)
   const counts = countElementsByLayer(diagram)
@@ -54,7 +59,7 @@ export function LayerManager({
             <span role="columnheader">Name</span>
             <span role="columnheader">Value</span>
             <span role="columnheader">Elements</span>
-            <span role="columnheader">Swap</span>
+            <span role="columnheader">Operations</span>
           </div>
           {layers.map((layer) => {
             const layerKey = formatLayerValue(layer.value)
@@ -62,6 +67,10 @@ export function LayerManager({
               (targetLayer) => targetLayer.value !== layer.value,
             )
             const defaultSwapTarget = swappableLayers[0]?.value
+            const defaultDuplicateTarget = nextUnusedLayerValue(
+              diagram,
+              layer.value,
+            )
 
             return (
               <div key={layerKey} className="layer-manager-row" role="row">
@@ -85,42 +94,73 @@ export function LayerManager({
                 </form>
                 <span role="cell">{layerKey}</span>
                 <span role="cell">{counts.get(layer.value) ?? 0}</span>
-                <form
-                  className="layer-manager-swap-form"
-                  role="cell"
-                  onSubmit={(event) =>
-                    submitLayerSwap(event, layer.value, onSwapLayers)
-                  }
-                >
-                  <select
-                    key={`${layerKey}:swap:${layers.length}`}
-                    name="targetLayer"
-                    className="layer-manager-swap-select"
-                    aria-label={`Swap layer ${layerKey} with`}
-                    defaultValue={
-                      defaultSwapTarget === undefined
-                        ? ''
-                        : String(defaultSwapTarget)
+                <div className="layer-manager-actions" role="cell">
+                  <form
+                    className="layer-manager-duplicate-form"
+                    onSubmit={(event) =>
+                      submitLayerDuplicate(event, layer.value, onDuplicateLayer)
                     }
-                    disabled={defaultSwapTarget === undefined}
                   >
-                    {swappableLayers.map((targetLayer) => (
-                      <option
-                        key={formatLayerValue(targetLayer.value)}
-                        value={String(targetLayer.value)}
-                      >
-                        {formatLayerValue(targetLayer.value)}
-                      </option>
-                    ))}
-                  </select>
+                    <input
+                      key={`${layerKey}:duplicate:${defaultDuplicateTarget}`}
+                      name="targetLayer"
+                      className="layer-manager-layer-input"
+                      aria-label={`Duplicate layer ${layerKey} to target layer`}
+                      defaultValue={String(defaultDuplicateTarget)}
+                      inputMode="decimal"
+                    />
+                    <button
+                      type="submit"
+                      className="toolbar-button"
+                      aria-label={`Duplicate layer ${layerKey}`}
+                    >
+                      Duplicate
+                    </button>
+                  </form>
+                  <form
+                    className="layer-manager-swap-form"
+                    onSubmit={(event) =>
+                      submitLayerSwap(event, layer.value, onSwapLayers)
+                    }
+                  >
+                    <select
+                      key={`${layerKey}:swap:${layers.length}`}
+                      name="targetLayer"
+                      className="layer-manager-swap-select"
+                      aria-label={`Swap layer ${layerKey} with`}
+                      defaultValue={
+                        defaultSwapTarget === undefined
+                          ? ''
+                          : String(defaultSwapTarget)
+                      }
+                      disabled={defaultSwapTarget === undefined}
+                    >
+                      {swappableLayers.map((targetLayer) => (
+                        <option
+                          key={formatLayerValue(targetLayer.value)}
+                          value={String(targetLayer.value)}
+                        >
+                          {formatLayerValue(targetLayer.value)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="toolbar-button"
+                      disabled={defaultSwapTarget === undefined}
+                    >
+                      Swap
+                    </button>
+                  </form>
                   <button
-                    type="submit"
-                    className="toolbar-button"
-                    disabled={defaultSwapTarget === undefined}
+                    type="button"
+                    className="toolbar-button layer-manager-delete-button"
+                    aria-label={`Delete layer ${layerKey} and elements`}
+                    onClick={() => onDeleteLayer(layer.value)}
                   >
-                    Swap
+                    Delete
                   </button>
-                </form>
+                </div>
               </div>
             )
           })}
@@ -128,6 +168,30 @@ export function LayerManager({
       )}
     </section>
   )
+}
+
+function submitLayerDuplicate(
+  event: FormEvent<HTMLFormElement>,
+  layerValue: number,
+  onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void,
+): void {
+  event.preventDefault()
+
+  const formData = new FormData(event.currentTarget)
+  const rawTargetLayer = formData.get('targetLayer')
+
+  if (typeof rawTargetLayer !== 'string' || rawTargetLayer.trim().length === 0) {
+    onDuplicateLayer(layerValue)
+    return
+  }
+
+  const targetLayer = Number(rawTargetLayer)
+
+  if (!Number.isFinite(targetLayer)) {
+    return
+  }
+
+  onDuplicateLayer(layerValue, targetLayer)
 }
 
 function submitLayerRename(
