@@ -58,6 +58,147 @@ test('inline math export mode reaches the generator', () => {
   assert.match(tikz, /TikZ export mode: inline math/)
 })
 
+test('inline math output starts with the baseline tikzpicture option', () => {
+  const baseline = 'baseline={([yshift=-.5ex]current bounding box.center)}'
+  const outputs = [
+    generateTikz(createTwoDimensionalDiagram(), { exportMode: 'inlineMath' }),
+    generateTikz(createThreeDimensionalDiagram(), { exportMode: 'inlineMath' }),
+    generateTikz(createEmptyDiagram({ ambientDimension: 2 }), {
+      exportMode: 'inlineMath',
+    }),
+    generateTikz(createEmptyDiagram({ ambientDimension: 3 }), {
+      exportMode: 'inlineMath',
+    }),
+  ]
+
+  for (const tikz of outputs) {
+    assert.ok(tikz.startsWith(`\\begin{tikzpicture}[${baseline}`))
+    assert.equal(countMatches(tikz, new RegExp(escapeRegExp(baseline), 'g')), 1)
+  }
+})
+
+test('inline math output emits no active setup before tikzpicture begin', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+    includeCoordinateAxes: true,
+  })
+  const beforeBegin = tikz.slice(0, tikz.indexOf('\\begin{tikzpicture}'))
+
+  assert.equal(beforeBegin.trim(), '')
+})
+
+test('inline math output places color definitions inside the tikzpicture', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const colorIndex = tikz.indexOf('\\definecolor{stzSheetpageFill}{HTML}{4D9DE0}')
+  const endIndex = tikz.indexOf('\\end{tikzpicture}')
+
+  assert.ok(beginIndex < colorIndex)
+  assert.ok(colorIndex < endIndex)
+})
+
+test('inline math output emits user presets with local tikzset inside the picture', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Inline curve',
+    {
+      ...curve.style,
+      strokeColor: '#000000',
+      lineWidth: 0.8,
+    },
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const tikz = generateTikz(withPreset, { exportMode: 'inlineMath' })
+  const beginLine = tikz.slice(0, tikz.indexOf('\n'))
+  const colorIndex = tikz.indexOf('\\definecolor')
+  const tikzsetIndex = tikz.indexOf('\\tikzset{')
+  const styleDefinition = 'stratifiedStyleInlineCurve/.style='
+
+  assert.ok(colorIndex < tikzsetIndex)
+  assert.match(tikz, /\\tikzset\{[\s\S]*stratifiedStyleInlineCurve\/\.style=\{draw=stzStyleusercurveinlinecurveStroke, draw opacity=1, line width=0\.8pt\}[\s\S]*\}/)
+  assert.doesNotMatch(beginLine, /stratifiedStyleInlineCurve\/\.style=/)
+  assert.ok(tikz.indexOf(styleDefinition) > tikz.indexOf('\\begin{tikzpicture}'))
+  assert.ok(tikz.indexOf(styleDefinition) < tikz.indexOf('% Coordinates'))
+})
+
+test('inline math output places layer setup inside the picture before scopes', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const declareIndex = tikz.indexOf('\\pgfdeclarelayer{stratifiedLayer0}')
+  const setLayersIndex = tikz.indexOf('\\pgfsetlayers{stratifiedLayer0,main}')
+  const tdplotScopeIndex = tikz.indexOf('\\begin{scope}[tdplot_main_coords]')
+  const endIndex = tikz.indexOf('\\end{tikzpicture}')
+
+  assert.ok(beginIndex < declareIndex)
+  assert.ok(declareIndex < setLayersIndex)
+  assert.ok(setLayersIndex < tdplotScopeIndex)
+  assert.ok(tdplotScopeIndex < endIndex)
+})
+
+test('inline 3D output keeps camera setup inside the picture and scopes content', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    camera3d: camera,
+    exportMode: 'inlineMath',
+  })
+  const beginLine = tikz.slice(0, tikz.indexOf('\n'))
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const cameraIndex = tikz.indexOf('\\tdplotsetmaincoords{70}{110}')
+  const scopeIndex = tikz.indexOf('\\begin{scope}[tdplot_main_coords]')
+  const coordinateIndex = tikz.indexOf('\\coordinate (curvePolyLine0p0) at (0,0,1);')
+  const scopeEndIndex = tikz.indexOf('\\end{scope}', scopeIndex)
+
+  assert.doesNotMatch(beginLine, /tdplot_main_coords/)
+  assert.ok(beginIndex < cameraIndex)
+  assert.ok(cameraIndex < scopeIndex)
+  assert.ok(scopeIndex < coordinateIndex)
+  assert.ok(coordinateIndex < scopeEndIndex)
+})
+
+test('inline math output keeps imported style comments inside without inlining imports', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'wire'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-draw' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const commentIndex = tikz.indexOf('% External TikZ styles referenced below.')
+  const keyIndex = tikz.indexOf('3cat/phys/1strata/color/x')
+
+  assert.ok(beginIndex < commentIndex)
+  assert.ok(commentIndex < keyIndex)
+  assert.doesNotMatch(tikz, /\\tikzset\{/)
+  assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
+})
+
 test('3D TikZ output uses tikz-3dplot camera setup and 3D coordinates', () => {
   const camera = {
     ...createInitialCamera3D(),
