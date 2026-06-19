@@ -31,6 +31,14 @@ presets for regions, sheets, curves, points, and free text labels. User presets
 can be created from the selected element style, renamed, edited, deleted, and
 applied to compatible elements.
 
+The Inspector groups preset controls by origin. Built-in presets are read-only
+shortcut buttons. Saved presets are split into user presets and imported presets,
+with a filterable, scrollable list for large imported style files. User presets
+show explicit rename and delete actions. Imported presets show the imported TikZ
+key, external source, load hint, preview options when available, and editable
+target tags such as `draw`, `filldraw`, `node`, `curve`, `sheet`, `point`,
+`label`, and `region`.
+
 Built-in presets remain convenience controls: applying one copies explicit style
 values into the selected element. User presets are saved in
 `diagram.userStylePresets`; applying one copies explicit style values and records
@@ -48,6 +56,11 @@ presets for points and labels. The Inspector preview uses an approximate subset
 of TikZ options, including named colors, simple `red!60` xcolor mixes, opacity,
 fill/draw opacity, dashed/dotted/densely dotted, `thick`, `thin`, and simple
 `line width=<...>` values. Unsupported options are ignored for preview.
+The UI warns that SVG preview is approximate and that the external style file
+must be loaded by the user in LaTeX; StratifiedTikZ does not embed the file.
+If an imported reference is missing its external source or its target tags are
+incompatible with the selected preset kind, the Inspector reports that status
+instead of silently treating the imported key as reliable.
 
 Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
 
@@ -113,6 +126,9 @@ but generated TikZ still emits only the external-load comments and imported
 option keys; it never inlines the parsed `\tikzset` definitions. Unsupported
 preview options are therefore preserved for export by the external style key,
 not by copying the option body into generated TikZ.
+Duplicate imported keys are reported and imported once using the later parsed
+definition. Files without supported `\tikzset` style entries report a failed
+import rather than changing the diagram.
 
 ## Mathematical convention
 

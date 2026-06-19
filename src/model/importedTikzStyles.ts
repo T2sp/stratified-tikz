@@ -112,6 +112,64 @@ export function isTikzStyleTarget(value: string): value is TikzStyleTarget {
   return tikzStyleTargets.includes(value as TikzStyleTarget)
 }
 
+export function importedTikzStyleTargetsForPresetKind(
+  kind: StylePresetKind,
+): readonly TikzStyleTarget[] {
+  switch (kind) {
+    case 'region':
+      return ['region', 'filldraw']
+    case 'sheet':
+      return ['sheet', 'filldraw']
+    case 'curve':
+      return ['curve', 'draw']
+    case 'point':
+      return ['point', 'node']
+    case 'label':
+      return ['label', 'node']
+  }
+}
+
+export function importedTikzStyleTargetsMatchPresetKind(
+  targets: readonly TikzStyleTarget[],
+  kind: StylePresetKind,
+): boolean {
+  const expectedTargets = importedTikzStyleTargetsForPresetKind(kind)
+
+  return targets.some((target) => expectedTargets.includes(target))
+}
+
+export function importedTikzStyleReferenceMatchesPresetKind(
+  reference: ImportedTikzStyleReference,
+  kind: StylePresetKind,
+): boolean {
+  return importedTikzStyleTargetsMatchPresetKind(reference.targets, kind)
+}
+
+export function updateImportedTikzStyleReferenceTargets(
+  diagram: Diagram,
+  referenceId: string,
+  targets: readonly TikzStyleTarget[],
+): Diagram {
+  const currentReferences = diagram.importedTikzStyleReferences ?? []
+  const nextTargets = uniqueTikzStyleTargets(targets)
+
+  if (
+    nextTargets.length === 0 ||
+    !currentReferences.some((reference) => reference.id === referenceId)
+  ) {
+    return diagram
+  }
+
+  return {
+    ...diagram,
+    importedTikzStyleReferences: currentReferences.map((reference) =>
+      reference.id === referenceId
+        ? { ...reference, targets: nextTargets }
+        : reference,
+    ),
+  }
+}
+
 export function normalizeExternalTikzStyleSourceName(name: string): string {
   return normalizeSingleLineCommentText(name, defaultExternalStyleSourceName)
 }

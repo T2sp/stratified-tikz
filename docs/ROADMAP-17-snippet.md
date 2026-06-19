@@ -65,3 +65,5 @@ Recommended `phaseSlugs` entries:
 - Add error/status messages.
 - Add combined workflow tests.
 - Document import/export limitations.
+- Keep imported preset lists scrollable/filterable, show imported source/load
+  hints, allow target tag edits, and warn that SVG preview is approximate.

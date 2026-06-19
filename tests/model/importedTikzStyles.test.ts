@@ -9,7 +9,16 @@ import {
   parseTikzsetStyles,
 } from '../../src/model/importedTikzStyles.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import { applyUserStylePresetToStratum } from '../../src/model/stylePresets.ts'
+import {
+  applyUserStylePresetToStratum,
+  createUserStylePresetFromStyle,
+  deleteUserStylePreset,
+} from '../../src/model/stylePresets.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
+import { curveStylePresets } from '../../src/model/styles.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import type { CurveStyle, Diagram } from '../../src/model/types.ts'
 
@@ -438,6 +447,124 @@ test('duplicate imported keys are handled deterministically', () => {
       options: 'draw=blue',
     },
   ])
+})
+
+test('combined imported and user preset workflow preserves export and persistence rules', () => {
+  const importResult = importTikzStyleFile(
+    createDiagramWithCurve(),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/1strata/color/x/.style={draw=blue,opacity=.4,dashed}}`,
+  )
+  const reference = importResult.references[0]
+  const importedCurvePreset = importResult.diagram.userStylePresets?.find(
+    (preset) =>
+      preset.kind === 'curve' &&
+      preset.importedTikzStyleReferenceId === reference?.id,
+  )
+
+  if (reference === undefined || importedCurvePreset === undefined) {
+    throw new Error('Expected imported style reference and curve preset.')
+  }
+
+  assert.equal(reference.key, '3cat/phys/1strata/color/x')
+  assert.ok(reference.targets.includes('curve'))
+  assert.equal(importedCurvePreset.style.strokeColor, '#0000FF')
+
+  const withImportedPreset = applyUserStylePresetToStratum(
+    importResult.diagram,
+    'wire',
+    importedCurvePreset.id,
+  )
+  const importedTikz = generateTikz(withImportedPreset)
+
+  assert.match(importedTikz, /% External TikZ styles referenced below\./)
+  assert.match(importedTikz, /% {3}\\input\{3cat\.sty\}/)
+  assert.doesNotMatch(importedTikz, /\\tikzset\{/)
+  assert.match(
+    importedTikz,
+    /\\draw\[[\s\S]*3cat\/phys\/1strata\/color\/x[\s\S]*\]/,
+  )
+
+  const localPresetStyle = curveStyle({
+    strokeColor: '#006633',
+    strokeOpacity: 0.85,
+    lineWidth: 1.6,
+    lineStyle: 'dotted',
+  })
+  const createdUserPreset = createUserStylePresetFromStyle(
+    withImportedPreset,
+    'curve',
+    'Local curve',
+    localPresetStyle,
+  )
+
+  if (createdUserPreset === null) {
+    throw new Error('Expected local user preset creation to succeed.')
+  }
+
+  const withUserPreset = applyUserStylePresetToStratum(
+    createdUserPreset.diagram,
+    'wire',
+    createdUserPreset.preset.id,
+  )
+  const userPresetTikz = generateTikz(withUserPreset)
+  const localStyleDefinition = `${createdUserPreset.preset.tikzStyleName}/.style=`
+
+  assert.ok(
+    userPresetTikz.indexOf(localStyleDefinition) >
+      userPresetTikz.indexOf('\\begin{tikzpicture}['),
+  )
+  assert.ok(
+    userPresetTikz.indexOf(localStyleDefinition) <
+      userPresetTikz.indexOf('% Coordinates'),
+  )
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(withUserPreset))
+
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+
+  assert.ok(
+    loaded.diagram.userStylePresets?.some(
+      (preset) => preset.id === createdUserPreset.preset.id,
+    ),
+  )
+  assert.ok(
+    loaded.diagram.userStylePresets?.some(
+      (preset) => preset.importedTikzStyleReferenceId === reference.id,
+    ),
+  )
+  assert.deepEqual(
+    loaded.diagram.importedTikzStyleReferences,
+    withUserPreset.importedTikzStyleReferences,
+  )
+  assert.deepEqual(
+    loaded.diagram.externalTikzStyleSources,
+    withUserPreset.externalTikzStyleSources,
+  )
+
+  const deleted = deleteUserStylePreset(
+    loaded.diagram,
+    createdUserPreset.preset.id,
+  )
+
+  assert.equal(
+    deleted.userStylePresets?.some(
+      (preset) => preset.id === createdUserPreset.preset.id,
+    ),
+    false,
+  )
+  assert.ok(
+    deleted.userStylePresets?.some(
+      (preset) => preset.importedTikzStyleReferenceId === reference.id,
+    ),
+  )
+  assert.deepEqual(
+    curveStylePresets.map((preset) => preset.id),
+    ['blackSolidCurve', 'blackDenselyDottedCurve'],
+  )
 })
 
 function createDiagramWithCurve(): Diagram {

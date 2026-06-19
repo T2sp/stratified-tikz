@@ -708,6 +708,13 @@ structured style values, and sanitized `tikzStyleName` values. Applying a user
 preset copies explicit style values and records `stylePresetId` on the selected
 compatible element. Manual style edits clear that reference.
 
+The Inspector should group presets by origin: built-in, user, and imported.
+Built-in presets are shown as read-only shortcut controls. User presets expose
+clear apply, rename, delete, and style-edit controls. Imported presets expose the
+imported key, source name, load hint, parsed preview options when available, and
+editable target tags. Long imported preset lists must remain scrollable and
+filterable so a large `.sty` file does not overflow the Inspector.
+
 The actual element style object remains the model source of truth. Generated
 TikZ may reference a local user preset style only when the element style still
 matches that preset; otherwise it should emit inline structured style options.
@@ -717,11 +724,15 @@ Phase 17A user preset definitions are emitted as local options of
 Imported TikZ styles are external references. Diagram data may store
 `externalTikzStyleSources`, `importedTikzStyleReferences`, and optional
 `importedTikzStyleReferenceId` values on elements or user presets. Imported keys
-are emitted as TikZ option keys after StratifiedTikZ's structured/local-preset
-options. The generator must not inline full external `\tikzset{...}` definitions
-and must not emit an active `\input{...}` by default; it only emits comments that
-list the external style files/load hints the user should include in the LaTeX
-preamble or before the picture.
+are emitted as TikZ option keys in deterministic command option order: a
+matching local user preset style name comes first when one is used, then the
+applicable imported external style key, then structured inline fallback options
+when no local preset is used. Thus imported keys follow matching local preset
+style names but precede structured fallback options. The generator must not
+inline full external `\tikzset{...}` definitions and must not emit an active
+`\input{...}` by default; it only emits comments that list the external style
+files/load hints the user should include in the LaTeX preamble or before the
+picture.
 
 Imported `.sty` / `.tex` files are parsed with a limited `\tikzset` extractor,
 not a full TeX parser. The supported subset is multiple braced `\tikzset{...}`
@@ -743,6 +754,13 @@ opacity, dashed/dotted/densely dotted, `thick`, `thin`, and simple
 `line width=<...>` values. Unsupported options are ignored for preview, but the
 imported key and source metadata remain saved so TikZ export can use the
 external definition.
+
+Import/status messages should be concise and explicit for failed import,
+unsupported TikZ syntax skipped, duplicate imported keys, invalid preset names,
+incompatible imported preset targets, and missing external sources. Imported
+style UI must warn that the SVG preview is approximate and that external style
+files must be loaded by the user; generated TikZ comments load instructions but
+does not inline external `\tikzset`.
 
 ## Free text labels
 
