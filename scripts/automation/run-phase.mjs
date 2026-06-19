@@ -85,6 +85,12 @@ const phaseSlugs = {
   "16D": "layer-translation",
   "16E": "layer-visibility-locking",
   "16F": "layer-manager-polish",
+  "17A": "user-editable-style-presets",
+  "17B": "external-tikz-style-references",
+  "17C": "tikzset-style-import-parser",
+  "17D": "imported-style-autodetect-preview",
+  "17E": "custom-tikz-style-export",
+  "17F": "style-manager-polish",
 };
 
 function makePhaseSpec(phase) {
