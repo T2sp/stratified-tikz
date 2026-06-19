@@ -723,6 +723,16 @@ and must not emit an active `\input{...}` by default; it only emits comments tha
 list the external style files/load hints the user should include in the LaTeX
 preamble or before the picture.
 
+Imported `.sty` / `.tex` files are parsed with a limited `\tikzset` extractor,
+not a full TeX parser. The supported subset is multiple braced `\tikzset{...}`
+blocks, `.cd` prefixes, top-level comma-separated entries, and
+`key/.style={...}` entries with simple nested braces in the option body.
+Unsupported entries are skipped with warnings. The importer does not expand
+macros, resolve `\input`, evaluate TeX conditionals, or execute TeX. Parsed
+option bodies may be saved as metadata on imported style references, but export
+continues to use external-load comments rather than inlining the original
+`\tikzset`.
+
 ## Free text labels
 
 The user must be able to place arbitrary text or mathematical labels at arbitrary positions.

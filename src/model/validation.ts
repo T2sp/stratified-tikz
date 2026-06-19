@@ -309,6 +309,13 @@ function validateImportedTikzStyleReferences(
       pushError(errors, `${referencePath}.displayName`, 'Imported style display name must be non-empty.')
     }
 
+    if (
+      reference.options !== undefined &&
+      typeof reference.options !== 'string'
+    ) {
+      pushError(errors, `${referencePath}.options`, 'Imported style options must be a string when present.')
+    }
+
     validateTikzStyleTargets(reference.targets, `${referencePath}.targets`, errors)
   })
 }

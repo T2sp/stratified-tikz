@@ -18,6 +18,7 @@ import {
   normalizeExternalTikzStyleSourceName,
   normalizeImportedTikzStyleDisplayName,
   normalizeImportedTikzStyleKey,
+  normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
 import type {
   AmbientDimension,
@@ -548,6 +549,11 @@ function normalizeLoadedImportedTikzStyleReferences(
           `Saved imported style reference ${index + 1} display name was normalized.`,
         )
       }
+      const options = loadedImportedTikzStyleOptions(
+        savedReference.options,
+        index,
+        warnings,
+      )
 
       return [
         {
@@ -556,6 +562,7 @@ function normalizeLoadedImportedTikzStyleReferences(
           sourceId: savedReference.sourceId,
           displayName,
           targets,
+          ...(options === undefined ? {} : { options }),
         },
       ]
     },
@@ -597,6 +604,25 @@ function loadedTikzStyleTargets(
   })
 
   return targets
+}
+
+function loadedImportedTikzStyleOptions(
+  savedOptions: unknown,
+  index: number,
+  warnings: string[],
+): string | undefined {
+  if (savedOptions === undefined) {
+    return undefined
+  }
+
+  if (typeof savedOptions !== 'string') {
+    warnings.push(
+      `Saved imported style reference ${index + 1} options were ignored.`,
+    )
+    return undefined
+  }
+
+  return normalizeImportedTikzStyleOptions(savedOptions)
 }
 
 function normalizeLoadedUserStylePresets(

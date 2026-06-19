@@ -84,6 +84,15 @@ external TikZ style can override or refine generated options when LaTeX resolves
 the option list. If several elements use references from the same external
 source, the load comment lists that source once.
 
+The `.sty` / `.tex` importer uses a limited `\tikzset` parser. It supports
+multiple braced `\tikzset{...}` blocks, `.cd` path prefixes, and keys of the
+form `name/.style={...}` with simple nested braces in the option body. It strips
+ordinary TeX comments where practical and skips unsupported entries with
+warnings. It does not expand macros, resolve `\input`, evaluate conditionals, or
+execute TeX. Parsed option bodies are saved as reference metadata for inspection,
+but generated TikZ still emits only the external-load comments and imported
+option keys; it never inlines the parsed `\tikzset` definitions.
+
 ## Mathematical convention
 
 The word **n-stratum** means **codimension n**.

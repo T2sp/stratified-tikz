@@ -23,6 +23,7 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from './model/serialization.ts'
+import { importTikzStyleFile } from './model/importedTikzStyles.ts'
 import {
   elementsOnLayer,
   isLayerLocked,
@@ -202,6 +203,7 @@ type ExampleId =
   | 'evenOddBoundary'
 type CopyStatus = 'idle' | 'copied' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
+type StyleImportStatus = 'idle' | 'imported' | 'failed'
 type CreationTool = WorkPlanePreviewTool
 type DirectCreationTool =
   | 'createPoint'
@@ -238,6 +240,15 @@ type PolylineDraft = {
 type CubicBezierDraft = {
   points: Vec3[]
 } | null
+type StyleImportReport = {
+  status: StyleImportStatus
+  sourceName: string
+  importedCount: number
+  skippedCount: number
+  keys: string[]
+  warnings: string[]
+  message: string
+}
 
 type EditableEditorState = {
   editableDiagram: Diagram
@@ -367,6 +378,15 @@ const cameraNumericFields: Array<{ field: CameraControlField; label: string }> =
   { field: 'panX', label: 'pan x' },
   { field: 'panY', label: 'pan y' },
 ]
+const emptyStyleImportReport: StyleImportReport = {
+  status: 'idle',
+  sourceName: '',
+  importedCount: 0,
+  skippedCount: 0,
+  keys: [],
+  warnings: [],
+  message: '',
+}
 
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
@@ -482,12 +502,16 @@ function App() {
   const [directSourceKey, setDirectSourceKey] = useState<string>('')
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
+  const [styleImportReport, setStyleImportReport] = useState<StyleImportReport>(
+    emptyStyleImportReport,
+  )
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
     defaultJsonDownloadFilename,
   )
   const [includeCoordinateAxesInTikz, setIncludeCoordinateAxesInTikz] =
     useState<boolean>(false)
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
+  const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
@@ -821,6 +845,7 @@ function App() {
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
+    setStyleImportReport(emptyStyleImportReport)
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -980,6 +1005,7 @@ function App() {
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
+    setStyleImportReport(emptyStyleImportReport)
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -1005,6 +1031,7 @@ function App() {
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
+    setStyleImportReport(emptyStyleImportReport)
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -1048,6 +1075,67 @@ function App() {
 
   function openLoadJsonPicker(): void {
     loadFileInputRef.current?.click()
+  }
+
+  function openStyleImportPicker(): void {
+    styleImportFileInputRef.current?.click()
+  }
+
+  async function importTikzStyleFileFromPicker(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+
+    if (file === undefined) {
+      return
+    }
+
+    if (!/\.(sty|tex)$/i.test(file.name)) {
+      setStyleImportReport({
+        ...emptyStyleImportReport,
+        status: 'failed',
+        sourceName: file.name,
+        message: 'Choose a .sty or .tex file.',
+      })
+      return
+    }
+
+    let text: string
+
+    try {
+      text = await file.text()
+    } catch {
+      setStyleImportReport({
+        ...emptyStyleImportReport,
+        status: 'failed',
+        sourceName: file.name,
+        message: 'Could not read TikZ style file.',
+      })
+      return
+    }
+
+    const result = importTikzStyleFile(editableDiagram, file.name, text)
+    const importedCount = result.references.length
+    const skippedCount = result.parseResult.skipped
+    const warnings = result.parseResult.warnings.map((warning) => warning.message)
+
+    if (importedCount > 0) {
+      updateEditableDiagram(result.diagram)
+    }
+
+    setStyleImportReport({
+      status: importedCount > 0 ? 'imported' : 'failed',
+      sourceName: file.name,
+      importedCount,
+      skippedCount,
+      keys: result.references.map((reference) => reference.key),
+      warnings,
+      message:
+        importedCount > 0
+          ? `Imported ${importedCount} style${importedCount === 1 ? '' : 's'}.`
+          : 'No supported TikZ styles found.',
+    })
   }
 
   async function loadJsonFile(event: ChangeEvent<HTMLInputElement>): Promise<void> {
@@ -1097,6 +1185,7 @@ function App() {
     setSheetStatus('')
     setDirectCreationStatus('')
     setLayerOperationStatus('')
+    setStyleImportReport(emptyStyleImportReport)
     setFillBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
@@ -4526,6 +4615,53 @@ function App() {
               accept="application/json,.json"
               onChange={loadJsonFile}
             />
+          </div>
+          <div className="tikz-style-import">
+            <span className="control-label">Import TikZ style file</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={openStyleImportPicker}
+            >
+              Choose .sty/.tex
+            </button>
+            <input
+              ref={styleImportFileInputRef}
+              className="file-input"
+              type="file"
+              accept=".sty,.tex,text/x-tex,text/plain"
+              onChange={importTikzStyleFileFromPicker}
+            />
+            {styleImportReport.status !== 'idle' && (
+              <div
+                className={`tikz-style-import-report tikz-style-import-report-${styleImportReport.status}`}
+                role="status"
+              >
+                <span>{styleImportReport.message}</span>
+                <span>Source: {styleImportReport.sourceName}</span>
+                <span>
+                  {styleImportReport.importedCount} imported;{' '}
+                  {styleImportReport.skippedCount} skipped.
+                </span>
+                {styleImportReport.keys.length > 0 && (
+                  <ul className="tikz-style-import-keys">
+                    {styleImportReport.keys.map((key) => (
+                      <li key={key}>{key}</li>
+                    ))}
+                  </ul>
+                )}
+                {styleImportReport.warnings.length > 0 && (
+                  <details className="tikz-style-import-warnings">
+                    <summary>{styleImportReport.warnings.length} warning(s)</summary>
+                    <ul>
+                      {styleImportReport.warnings.map((warning, index) => (
+                        <li key={`${warning}-${index}`}>{warning}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
           </div>
           <span
             className={`toolbar-status file-status file-status-${saveLoadStatus}`}

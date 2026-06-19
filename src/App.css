@@ -1183,6 +1183,42 @@
   flex: 1 1 440px;
 }
 
+.tikz-style-import {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.tikz-style-import-report {
+  display: grid;
+  flex: 1 1 280px;
+  gap: 4px;
+  min-width: min(280px, 100%);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.tikz-style-import-report-failed {
+  color: #a13d2d;
+}
+
+.tikz-style-import-keys,
+.tikz-style-import-warnings ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+}
+
+.tikz-style-import-warnings summary {
+  cursor: pointer;
+}
+
 .layer-filter-control {
   flex: 0 1 190px;
 }

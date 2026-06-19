@@ -106,14 +106,18 @@ type ImportedTikzStyleReference = {
   sourceId: string;
   displayName: string;
   targets: TikzStyleTarget[];
+  options?: string;
 };
 ```
 
 Elements and user presets may store `importedTikzStyleReferenceId`. The
 referenced `key` is emitted as a raw TikZ option in generated commands; it is not
 parsed as geometry and its external `\tikzset{...}` definition is not saved or
-inlined by StratifiedTikZ. The SVG preview continues to use the structured
-`style` object.
+inlined by StratifiedTikZ. Imported `.sty` / `.tex` files may populate
+`options` with the extracted `/.style={...}` body for metadata and review. The
+import parser is deliberately limited: no TeX macro expansion, no `\input`
+resolution, no conditionals, and no TeX execution. The SVG preview continues to
+use the structured `style` object.
 
 ## Layer metadata
 
