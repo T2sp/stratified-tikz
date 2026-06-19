@@ -27,6 +27,7 @@ import {
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
 import {
+  applyUserStylePresetToLabel,
   applyUserStylePresetToStratum,
   createUserStylePresetFromStyle,
 } from '../../src/model/stylePresets.ts'
@@ -296,7 +297,7 @@ test('3D output has codim 1 sheets, codim 2 curves, and codim 3 points', () => {
   assert.match(tikz, /% Codimension 1 strata: sheets/)
   assert.match(tikz, /% Codimension 2 strata: curves/)
   assert.match(tikz, /% Codimension 3 strata: points/)
-  assert.match(tikz, /\\path\[/)
+  assert.match(tikz, /\\filldraw\[/)
   assert.match(tikz, /\\draw\[/)
   assert.match(tikz, /\\node\[/)
 })
@@ -402,6 +403,107 @@ test('commands reference the local user preset style when style still matches', 
   assert.match(tikz, /\\draw\[\n\s+stratifiedStyleReferencedCurve\n\s+\]/)
 })
 
+test('filldraw commands reference the local user preset style when style still matches', () => {
+  const diagram = createFilledRegionDiagram()
+  const region = diagram.strata[0]
+
+  if (region.geometricKind !== 'region') {
+    throw new Error('Expected region.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'region',
+    'Referenced region',
+    region.style,
+  )
+
+  if (created === null) {
+    throw new Error('Expected region preset creation to succeed.')
+  }
+
+  const withPreset = applyUserStylePresetToStratum(
+    created.diagram,
+    region.id,
+    created.preset.id,
+  )
+  const tikz = generateTikz(withPreset)
+
+  assert.match(
+    tikz,
+    /stratifiedStyleReferencedRegion\/\.style=\{fill=stzStyleuserregionreferencedregionFill, fill opacity=0\.35, draw=stzStyleuserregionreferencedregionStroke, draw opacity=1\}/,
+  )
+  assert.match(tikz, /\\filldraw\[\n\s+stratifiedStyleReferencedRegion\n\s+\]/)
+})
+
+test('point node commands reference the local user preset style when style still matches', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const point = diagram.strata[1]
+
+  if (point.geometricKind !== 'point') {
+    throw new Error('Expected point.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'point',
+    'Referenced point',
+    point.style,
+  )
+
+  if (created === null) {
+    throw new Error('Expected point preset creation to succeed.')
+  }
+
+  const withPreset = applyUserStylePresetToStratum(
+    created.diagram,
+    point.id,
+    created.preset.id,
+  )
+  const tikz = generateTikz(withPreset)
+
+  assert.match(
+    tikz,
+    /stratifiedStyleReferencedPoint\/\.style=\{circle, fill=stzStyleuserpointreferencedpoint, draw=stzStyleuserpointreferencedpoint, opacity=1, inner sep=1\.5pt\}/,
+  )
+  assert.match(
+    tikz,
+    /\\node\[\n\s+stratifiedStyleReferencedPoint\n\s+\] at \(pointVertex0p0\) \{\};/,
+  )
+})
+
+test('label node commands reference the local user preset style when style still matches', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const label = diagram.labels[0]
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'label',
+    'Referenced label',
+    label.style,
+  )
+
+  if (created === null) {
+    throw new Error('Expected label preset creation to succeed.')
+  }
+
+  const withPreset = applyUserStylePresetToLabel(
+    created.diagram,
+    label.id,
+    created.preset.id,
+  )
+  const tikz = generateTikz(withPreset)
+
+  assert.match(
+    tikz,
+    /stratifiedStyleReferencedLabel\/\.style=\{text=stzStyleuserlabelreferencedlabel, opacity=1, font=\\fontsize\{10pt\}\{12pt\}\\selectfont, anchor=center\}/,
+  )
+  assert.match(
+    tikz,
+    /\\node\[\n\s+stratifiedStyleReferencedLabel\n\s+\] at \(2,3\) \{\$F\^\{\(1\)\}L\$\};/,
+  )
+})
+
 test('stale user preset references fall back to inline structured style', () => {
   const diagram = createTwoDimensionalDiagram()
   const curve = diagram.strata[0]
@@ -439,7 +541,7 @@ test('stale user preset references fall back to inline structured style', () => 
   assert.match(tikz, /dashed/)
 })
 
-test('element imported draw style exports the raw key after structured draw options', () => {
+test('element imported draw style exports the raw key before structured draw fallback options', () => {
   const diagram = withImportedTikzStyleReference(
     createTwoDimensionalDiagram(),
     'external-draw',
@@ -458,8 +560,12 @@ test('element imported draw style exports the raw key after structured draw opti
   assert.match(layerBlock, /\\draw\[/)
   assert.match(layerBlock, /draw=stzCurvewireStroke/)
   assert.ok(
-    layerBlock.indexOf('line width=1.2pt') <
-      layerBlock.indexOf('3cat/phys/1strata/color/x'),
+    layerBlock.indexOf('3cat/phys/1strata/color/x') <
+      layerBlock.indexOf('draw=stzCurvewireStroke'),
+  )
+  assert.ok(
+    layerBlock.indexOf('3cat/phys/1strata/color/x') <
+      layerBlock.indexOf('line width=1.2pt'),
   )
   assert.match(layerBlock, /3cat\/phys\/1strata\/color\/x/)
 })
@@ -478,11 +584,14 @@ test('element imported filldraw style exports the raw key in filldraw options', 
   )
 
   const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
 
-  assert.match(
-    tikz,
-    /\\filldraw\[[\s\S]*fill=stzRegionfilledregionFill,[\s\S]*3cat\/phys\/2strata\/fill\/y[\s\S]*\]/,
+  assert.match(layerBlock, /\\filldraw\[/)
+  assert.ok(
+    layerBlock.indexOf('3cat/phys/2strata/fill/y') <
+      layerBlock.indexOf('fill=stzRegionfilledregionFill'),
   )
+  assert.match(layerBlock, /3cat\/phys\/2strata\/fill\/y/)
 })
 
 test('element imported node style exports the raw key in node options', () => {
@@ -499,11 +608,58 @@ test('element imported node style exports the raw key in node options', () => {
   )
 
   const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\node\[/)
+  assert.ok(
+    layerBlock.indexOf('3cat/phys/3strata/shape/L') <
+      layerBlock.indexOf('fill=stzPointvertex'),
+  )
+  assert.match(
+    layerBlock,
+    /3cat\/phys\/3strata\/shape\/L[\s\S]*\] at \(pointVertex0p0\) \{\};/,
+  )
+})
+
+test('element imported label style exports the raw key in node options', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-label-node',
+    '3cat/phys/label/style/T',
+    ['node', 'label'],
+  )
+  diagram.labels = diagram.labels.map((label) =>
+    label.id === 'formula'
+      ? { ...label, importedTikzStyleReferenceId: 'external-label-node' }
+      : label,
+  )
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
 
   assert.match(
-    tikz,
-    /\\node\[[\s\S]*fill=stzPointvertex,[\s\S]*3cat\/phys\/3strata\/shape\/L[\s\S]*\] at \(pointVertex0p0\) \{\};/,
+    layerBlock,
+    /\\node\[\n\s+3cat\/phys\/label\/style\/T\n\s+\] at \(2,3\) \{\$F\^\{\(1\)\}L\$\};/,
   )
+})
+
+test('incompatible imported style targets are not emitted', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-node-only',
+    '3cat/phys/3strata/shape/L',
+    ['node', 'point'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'wire'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-node-only' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.doesNotMatch(tikz, /3cat\/phys\/3strata\/shape\/L/)
+  assert.doesNotMatch(tikz, /External TikZ styles referenced below/)
 })
 
 test('imported styles emit external load comments without tikzset or active input', () => {
@@ -1396,7 +1552,7 @@ test('existing 3D vertex sheet export remains a single closed path', () => {
   const tikz = generateTikz(createThreeDimensionalDiagram())
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
 
-  assert.match(layerBlock, /\\path\[/)
+  assert.match(layerBlock, /\\filldraw\[/)
   assert.match(
     layerBlock,
     /\(sheetQuadPage0p0\) -- \(sheetQuadPage0p1\) -- \(sheetQuadPage0p2\) -- \(sheetQuadPage0p3\) -- cycle;/,

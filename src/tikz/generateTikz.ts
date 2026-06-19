@@ -24,6 +24,7 @@ import type {
   PathSegment,
   PathTemplate,
   StylePresetKind,
+  TikzStyleTarget,
   UserStylePreset,
   Vec3,
   WorkPlaneFrameSnapshot,
@@ -651,7 +652,7 @@ function emitSheet(
 
   return [
     `% Filled sheet "${sheet.name}" [${sheet.id}] from stored ${sheet.kind === 'quadSheet' ? 'quad' : 'polygon'} vertices.`,
-    `\\path[`,
+    `\\filldraw[`,
     ...formatTikzOptions(options),
     `]`,
     `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
@@ -1338,15 +1339,16 @@ function labelStyleOptions(
   label: TextLabel,
   context: GenerateContext,
 ): string[] {
-  const presetStyleOption = userStylePresetTikzOption(
+  const importedOptions = importedStyleOptionsForElement(
     'label',
+    'node',
+    label.importedTikzStyleReferenceId,
     label.stylePresetId,
     label.style,
     context,
   )
-  const importedOptions = importedStyleOptionsForElement(
+  const presetStyleOption = userStylePresetTikzOption(
     'label',
-    label.importedTikzStyleReferenceId,
     label.stylePresetId,
     label.style,
     context,
@@ -1361,8 +1363,8 @@ function labelStyleOptions(
   }
 
   return [
-    ...labelStyleTikzOptions(label.style, `Label${label.id}`, context),
     ...importedOptions,
+    ...labelStyleTikzOptions(label.style, `Label${label.id}`, context),
   ]
 }
 
@@ -1418,22 +1420,23 @@ function curveStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
+  const importedOptions = importedStyleOptionsForElement(
+    'curve',
+    'draw',
+    importedTikzStyleReferenceId,
+    stylePresetId,
+    style,
+    context,
+  )
   const presetStyleOption = userStylePresetTikzOption(
     'curve',
     stylePresetId,
     style,
     context,
   )
-  const importedOptions = importedStyleOptionsForElement(
-    'curve',
-    importedTikzStyleReferenceId,
-    stylePresetId,
-    style,
-    context,
-  )
 
   return presetStyleOption === null
-    ? [...curveStyleTikzOptions(style, colorBaseName, context), ...importedOptions]
+    ? [...importedOptions, ...curveStyleTikzOptions(style, colorBaseName, context)]
     : [presetStyleOption, ...importedOptions]
 }
 
@@ -1464,15 +1467,16 @@ function filledSurfaceStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
-  const presetStyleOption = userStylePresetTikzOption(
+  const importedOptions = importedStyleOptionsForElement(
     kind,
+    'filldraw',
+    importedTikzStyleReferenceId,
     stylePresetId,
     style,
     context,
   )
-  const importedOptions = importedStyleOptionsForElement(
+  const presetStyleOption = userStylePresetTikzOption(
     kind,
-    importedTikzStyleReferenceId,
     stylePresetId,
     style,
     context,
@@ -1480,8 +1484,8 @@ function filledSurfaceStyleOptionsForElement(
 
   return presetStyleOption === null
     ? [
-        ...filledSurfaceStyleTikzOptions(style, colorBaseName, context),
         ...importedOptions,
+        ...filledSurfaceStyleTikzOptions(style, colorBaseName, context),
       ]
     : [presetStyleOption, ...importedOptions]
 }
@@ -1509,22 +1513,23 @@ function pointStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
+  const importedOptions = importedStyleOptionsForElement(
+    'point',
+    'node',
+    importedTikzStyleReferenceId,
+    stylePresetId,
+    style,
+    context,
+  )
   const presetStyleOption = userStylePresetTikzOption(
     'point',
     stylePresetId,
     style,
     context,
   )
-  const importedOptions = importedStyleOptionsForElement(
-    'point',
-    importedTikzStyleReferenceId,
-    stylePresetId,
-    style,
-    context,
-  )
 
   return presetStyleOption === null
-    ? [...pointStyleTikzOptions(style, colorBaseName, context), ...importedOptions]
+    ? [...importedOptions, ...pointStyleTikzOptions(style, colorBaseName, context)]
     : [presetStyleOption, ...importedOptions]
 }
 
@@ -1547,6 +1552,7 @@ function userStylePresetTikzOption(
 
 function importedStyleOptionsForElement(
   kind: StylePresetKind,
+  commandTarget: TikzStyleTarget,
   importedTikzStyleReferenceId: string | undefined,
   stylePresetId: string | undefined,
   style: UserStylePreset['style'],
@@ -1567,6 +1573,10 @@ function importedStyleOptionsForElement(
     return []
   }
 
+  if (!styleReferenceAppliesToElement(reference, kind, commandTarget)) {
+    return []
+  }
+
   const source = context.externalTikzStyleSources.get(reference.sourceId)
 
   if (source !== undefined) {
@@ -1574,6 +1584,17 @@ function importedStyleOptionsForElement(
   }
 
   return [reference.key]
+}
+
+function styleReferenceAppliesToElement(
+  reference: ImportedTikzStyleReference,
+  kind: StylePresetKind,
+  commandTarget: TikzStyleTarget,
+): boolean {
+  return (
+    reference.targets.includes(kind) ||
+    reference.targets.includes(commandTarget)
+  )
 }
 
 function matchingUserStylePreset(
