@@ -1123,6 +1123,22 @@
   min-width: 180px;
 }
 
+.tikz-export-mode-control {
+  display: inline-grid;
+  grid-template-columns: auto minmax(150px, 1fr);
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.tikz-export-mode-control .toolbar-select {
+  width: 100%;
+  max-width: none;
+  min-height: 32px;
+}
+
 .tikz-export-checkbox {
   display: inline-flex;
   align-items: center;

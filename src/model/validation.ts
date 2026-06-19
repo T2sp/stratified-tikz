@@ -30,6 +30,7 @@ import {
   isTikzStyleTarget,
 } from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
+import { tikzExportModes } from './types.ts'
 import {
   arcSegmentExpectedEnd,
   arcSegmentExpectedStart,
@@ -70,6 +71,7 @@ import type {
   SheetStyle,
   Stratum,
   TextLabel,
+  TikzExportMode,
   TikzStyleTarget,
   UserStylePreset,
   Vec2,
@@ -458,6 +460,17 @@ function validateDiagramView(
       errors,
       `${path}.showCoordinateAxesInTikz`,
       'Coordinate axes TikZ export option must be a boolean.',
+    )
+  }
+
+  if (
+    view.exportMode !== undefined &&
+    !tikzExportModes.includes(view.exportMode as TikzExportMode)
+  ) {
+    pushError(
+      errors,
+      `${path}.exportMode`,
+      'TikZ export mode must be standalone or inlineMath.',
     )
   }
 

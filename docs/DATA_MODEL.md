@@ -230,6 +230,10 @@ initial/default camera. Invalid saved camera metadata is ignored and replaced
 with the initial/default camera; load UI may report this as a warning while
 still accepting valid geometry.
 
+TikZ export mode is an export preference rather than geometry. The editor may
+persist it under `diagram.view.exportMode` when downloading JSON. Saved files
+that omit export mode load with the standalone default.
+
 For the user-facing layer operation semantics, see
 [Layer Manager](./LAYER_MANAGER.md).
 
@@ -273,9 +277,12 @@ export type PerspectiveCamera3D = {
 
 export type Camera3D = OrthographicCamera3D | PerspectiveCamera3D;
 
+export type TikzExportMode = "standalone" | "inlineMath";
+
 export type DiagramViewOptions = {
   camera3d?: Camera3D;
   showCoordinateAxesInTikz?: boolean;
+  exportMode?: TikzExportMode;
 };
 ```
 

@@ -20,6 +20,7 @@ import {
   normalizeImportedTikzStyleKey,
   normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
+import { tikzExportModes } from './types.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -38,6 +39,7 @@ import type {
   CurveStyle,
   PointStyle,
   LabelStyle,
+  TikzExportMode,
   UserStylePreset,
   Stratum,
   TextLabel,
@@ -71,6 +73,7 @@ export type SavedDiagramFile = {
 export type SerializeDiagramOptions = {
   camera3d?: Camera3D
   showCoordinateAxesInTikz?: boolean
+  exportMode?: TikzExportMode
 }
 
 export type ParseSavedDiagramResult =
@@ -265,6 +268,12 @@ function normalizePersistentView(
 
   if (showCoordinateAxesInTikz !== undefined) {
     view.showCoordinateAxesInTikz = showCoordinateAxesInTikz
+  }
+
+  const exportMode = options.exportMode ?? diagram.view?.exportMode
+
+  if (exportMode !== undefined) {
+    view.exportMode = exportMode
   }
 
   return Object.keys(view).length === 0 ? undefined : view
@@ -1005,7 +1014,22 @@ function normalizeLoadedView(
     }
   }
 
+  if (isRecord(savedView) && 'exportMode' in savedView) {
+    if (
+      typeof savedView.exportMode === 'string' &&
+      isTikzExportMode(savedView.exportMode)
+    ) {
+      view.exportMode = savedView.exportMode
+    } else {
+      warnings.push('Saved TikZ export mode is invalid; using standalone.')
+    }
+  }
+
   return Object.keys(view).length === 0 ? undefined : view
+}
+
+function isTikzExportMode(value: string): value is TikzExportMode {
+  return tikzExportModes.includes(value as TikzExportMode)
 }
 
 function camera2DFromPersistent(value: unknown): Camera2D | null {

@@ -40,6 +40,24 @@ test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   assert.doesNotMatch(tikz, /\(0,0,0\)/)
 })
 
+test('default TikZ export mode is standalone', () => {
+  const diagram = createTwoDimensionalDiagram()
+
+  assert.equal(
+    generateTikz(diagram),
+    generateTikz(diagram, { exportMode: 'standalone' }),
+  )
+  assert.doesNotMatch(generateTikz(diagram), /TikZ export mode: inline math/)
+})
+
+test('inline math export mode reaches the generator', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /TikZ export mode: inline math/)
+})
+
 test('3D TikZ output uses tikz-3dplot camera setup and 3D coordinates', () => {
   const camera = {
     ...createInitialCamera3D(),

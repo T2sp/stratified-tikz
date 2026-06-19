@@ -46,13 +46,13 @@ import type {
   LineStyle,
   OrthographicCamera3D,
   Stratum,
+  TikzExportMode,
   Vec2,
   Vec3,
   WorkPlane,
 } from './model/types'
 import { lineStyles } from './model/types'
 import { SvgDiagram, svgPointToModelOnWorkPlane } from './rendering'
-import { generateTikz } from './tikz'
 import {
   addConcatenatedPathStratumWithResult,
   addArcPathFromDirectInput,
@@ -99,6 +99,7 @@ import {
   createCameraPresetCamera,
   createInitialCameraControlState,
   createExistingCoordinateSourceOptions,
+  createSerializeDiagramOptionsForUi,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
@@ -112,6 +113,7 @@ import {
   defaultCustomOriginNormalWorkPlaneInput,
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
+  defaultTikzExportMode,
   deriveAvailableLayers,
   EditableInspector,
   existingCoordinateSourceKey,
@@ -158,11 +160,14 @@ import {
   startWorkPlanePointPicking,
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
+  tikzExportModeFromSelectValue,
+  tikzExportModeOptions,
   validateWorkPlanePointPickingState,
   workPlanePointPickingStatus,
   workPlaneDisplayName,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
+  generateTikzForUi,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectConcatenatedPathManualSegmentInput,
@@ -510,6 +515,8 @@ function App() {
   )
   const [includeCoordinateAxesInTikz, setIncludeCoordinateAxesInTikz] =
     useState<boolean>(false)
+  const [tikzExportMode, setTikzExportMode] =
+    useState<TikzExportMode>(defaultTikzExportMode)
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
@@ -590,12 +597,18 @@ function App() {
     exampleOptions[0]
   const tikzSource = useMemo(
     () =>
-      generateTikz(editableDiagram, {
-        includeCoordinateAxes: includeCoordinateAxesInTikz,
+      generateTikzForUi(editableDiagram, {
+        exportMode: tikzExportMode,
+        includeCoordinateAxesInTikz,
         camera3d:
           editableDiagram.ambientDimension === 3 ? cameraControl : undefined,
       }),
-    [cameraControl, editableDiagram, includeCoordinateAxesInTikz],
+    [
+      cameraControl,
+      editableDiagram,
+      includeCoordinateAxesInTikz,
+      tikzExportMode,
+    ],
   )
   const availableLayers = useMemo(
     () => deriveAvailableLayers(editableDiagram),
@@ -757,6 +770,11 @@ function App() {
 
   function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
     setIncludeCoordinateAxesInTikz(includeAxes)
+    setCopyStatus('idle')
+  }
+
+  function updateTikzExportMode(mode: TikzExportMode): void {
+    setTikzExportMode(mode)
     setCopyStatus('idle')
   }
 
@@ -1045,13 +1063,14 @@ function App() {
 
   function downloadJson(): void {
     try {
-      const serialized = serializeDiagram(editableDiagram, {
-        camera3d: showCameraControls ? cameraControl : undefined,
-        showCoordinateAxesInTikz:
-          editableDiagram.ambientDimension === 3
-            ? includeCoordinateAxesInTikz
-            : undefined,
-      })
+      const serialized = serializeDiagram(
+        editableDiagram,
+        createSerializeDiagramOptionsForUi(editableDiagram, {
+          exportMode: tikzExportMode,
+          includeCoordinateAxesInTikz,
+          camera3d: showCameraControls ? cameraControl : undefined,
+        }),
+      )
       const blob = new Blob([serialized], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -1218,6 +1237,7 @@ function App() {
         ? result.diagram.view?.showCoordinateAxesInTikz ?? false
         : false,
     )
+    setTikzExportMode(result.diagram.view?.exportMode ?? defaultTikzExportMode)
     setSaveLoadStatus('loaded')
     setSaveLoadMessage(
       result.warnings.length === 0
@@ -5138,6 +5158,24 @@ function App() {
               <span>read-only source</span>
             </div>
             <div className="copy-controls">
+              <label className="tikz-export-mode-control">
+                <span>TikZ export mode</span>
+                <select
+                  className="toolbar-select"
+                  value={tikzExportMode}
+                  onChange={(event) =>
+                    updateTikzExportMode(
+                      tikzExportModeFromSelectValue(event.currentTarget.value),
+                    )
+                  }
+                >
+                  {tikzExportModeOptions.map((option) => (
+                    <option key={option.mode} value={option.mode}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="tikz-export-checkbox">
                 <input
                   type="checkbox"
