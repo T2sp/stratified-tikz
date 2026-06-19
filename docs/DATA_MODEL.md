@@ -53,6 +53,8 @@ export type Diagram = {
   view?: DiagramViewOptions;
   layers?: DiagramLayer[];
   userStylePresets?: UserStylePreset[];
+  externalTikzStyleSources?: ExternalTikzStyleSource[];
+  importedTikzStyleReferences?: ImportedTikzStyleReference[];
   strata: Stratum[];
   labels: Label[];
 };
@@ -87,6 +89,31 @@ Elements may store `stylePresetId` when a user preset is applied. The explicit
 structured `style` object remains the model source of truth. Direct Inspector
 style edits clear `stylePresetId`; deleting a user preset also clears matching
 references while keeping the element's materialized style.
+
+Imported TikZ styles are saved as external references, not as expanded
+definitions:
+
+```ts
+type ExternalTikzStyleSource = {
+  id: string;
+  name: string;
+  loadHint: string;
+};
+
+type ImportedTikzStyleReference = {
+  id: string;
+  key: string;
+  sourceId: string;
+  displayName: string;
+  targets: TikzStyleTarget[];
+};
+```
+
+Elements and user presets may store `importedTikzStyleReferenceId`. The
+referenced `key` is emitted as a raw TikZ option in generated commands; it is not
+parsed as geometry and its external `\tikzset{...}` definition is not saved or
+inlined by StratifiedTikZ. The SVG preview continues to use the structured
+`style` object.
 
 ## Layer metadata
 

@@ -375,6 +375,44 @@ test('SVG style attributes update when a user curve preset is applied', () => {
   })
 })
 
+test('SVG preview style conversion ignores unknown imported TikZ style keys', () => {
+  const style: CurveStyle = {
+    kind: 'curveStyle',
+    strokeColor: '#123456',
+    strokeOpacity: 0.4,
+    lineWidth: 1.6,
+    lineStyle: 'dotted',
+  }
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'imported-style-preview',
+    name: 'Imported style preview',
+    importedTikzStyleReferenceId: 'unknown-external-style',
+    style,
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  assert.deepEqual(curveStyleToSvgStrokeAttributes(curve.style), {
+    stroke: '#123456',
+    strokeOpacity: 0.4,
+    strokeWidth: 1.6,
+    strokeDasharray: '1 5',
+  })
+})
+
 test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('solid'), undefined)
   assert.equal(lineStyleToStrokeDasharray('dashed'), '8 5')

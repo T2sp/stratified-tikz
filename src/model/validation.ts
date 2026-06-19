@@ -25,6 +25,10 @@ import {
   isStylePresetKind,
   sanitizeTikzStyleName,
 } from './stylePresets.ts'
+import {
+  hasTikzOptionLineBreak,
+  isTikzStyleTarget,
+} from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
 import {
   arcSegmentExpectedEnd,
@@ -51,7 +55,9 @@ import type {
   DiagramLayer,
   DiagramValidationIssue,
   DiagramValidationResult,
+  ExternalTikzStyleSource,
   FilledRegion2DStratum,
+  ImportedTikzStyleReference,
   LabelStyle,
   PartialCurveStyle,
   PathSegment,
@@ -64,6 +70,7 @@ import type {
   SheetStyle,
   Stratum,
   TextLabel,
+  TikzStyleTarget,
   UserStylePreset,
   Vec2,
   Vec3,
@@ -96,6 +103,17 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     'userStylePresets',
     errors,
   )
+  validateExternalTikzStyleSources(
+    diagram.externalTikzStyleSources,
+    'externalTikzStyleSources',
+    errors,
+  )
+  validateImportedTikzStyleReferences(
+    diagram.importedTikzStyleReferences,
+    diagram.externalTikzStyleSources,
+    'importedTikzStyleReferences',
+    errors,
+  )
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -117,6 +135,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   })
 
   validateUserStylePresetReferences(diagram, errors)
+  validateImportedTikzStyleReferenceUsages(diagram, errors)
 
   return {
     valid: errors.length === 0,
@@ -198,6 +217,136 @@ function validateUserStylePresetStyle(
       validateLabelStyle(preset.style, path, errors)
       return
   }
+}
+
+function validateExternalTikzStyleSources(
+  sources: ExternalTikzStyleSource[] | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (sources === undefined) {
+    return
+  }
+
+  if (!Array.isArray(sources)) {
+    pushError(errors, path, 'External TikZ style sources must be an array.')
+    return
+  }
+
+  const seenIds = new Map<string, string>()
+
+  sources.forEach((source, index) => {
+    const sourcePath = `${path}[${index}]`
+
+    if (typeof source !== 'object' || source === null || Array.isArray(source)) {
+      pushError(errors, sourcePath, 'External TikZ style source must be an object.')
+      return
+    }
+
+    validateId(source.id, `${sourcePath}.id`, errors)
+    addUniqueId(source.id, `${sourcePath}.id`, seenIds, errors)
+
+    if (typeof source.name !== 'string' || source.name.trim().length === 0) {
+      pushError(errors, `${sourcePath}.name`, 'External style source name must be non-empty.')
+    }
+
+    if (
+      typeof source.loadHint !== 'string' ||
+      source.loadHint.trim().length === 0
+    ) {
+      pushError(errors, `${sourcePath}.loadHint`, 'External style source load hint must be non-empty.')
+    }
+  })
+}
+
+function validateImportedTikzStyleReferences(
+  references: ImportedTikzStyleReference[] | undefined,
+  sources: ExternalTikzStyleSource[] | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (references === undefined) {
+    return
+  }
+
+  if (!Array.isArray(references)) {
+    pushError(errors, path, 'Imported TikZ style references must be an array.')
+    return
+  }
+
+  const seenIds = new Map<string, string>()
+  const sourceIds = new Set((sources ?? []).map((source) => source.id))
+
+  references.forEach((reference, index) => {
+    const referencePath = `${path}[${index}]`
+
+    if (
+      typeof reference !== 'object' ||
+      reference === null ||
+      Array.isArray(reference)
+    ) {
+      pushError(errors, referencePath, 'Imported TikZ style reference must be an object.')
+      return
+    }
+
+    validateId(reference.id, `${referencePath}.id`, errors)
+    addUniqueId(reference.id, `${referencePath}.id`, seenIds, errors)
+    validateImportedTikzStyleKey(reference.key, `${referencePath}.key`, errors)
+
+    if (
+      typeof reference.sourceId !== 'string' ||
+      reference.sourceId.trim().length === 0
+    ) {
+      pushError(errors, `${referencePath}.sourceId`, 'Imported style source reference must be non-empty.')
+    } else if (!sourceIds.has(reference.sourceId)) {
+      pushError(errors, `${referencePath}.sourceId`, 'Imported style source reference does not exist.')
+    }
+
+    if (
+      typeof reference.displayName !== 'string' ||
+      reference.displayName.trim().length === 0
+    ) {
+      pushError(errors, `${referencePath}.displayName`, 'Imported style display name must be non-empty.')
+    }
+
+    validateTikzStyleTargets(reference.targets, `${referencePath}.targets`, errors)
+  })
+}
+
+function validateImportedTikzStyleKey(
+  key: string,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (typeof key !== 'string' || key.trim().length === 0) {
+    pushError(errors, path, 'Imported TikZ style key must be non-empty.')
+    return
+  }
+
+  if (hasTikzOptionLineBreak(key)) {
+    pushError(errors, path, 'Imported TikZ style key must stay on one line.')
+  }
+}
+
+function validateTikzStyleTargets(
+  targets: TikzStyleTarget[],
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Array.isArray(targets)) {
+    pushError(errors, path, 'Imported style targets must be an array.')
+    return
+  }
+
+  if (targets.length === 0) {
+    pushError(errors, path, 'Imported style targets must not be empty.')
+  }
+
+  targets.forEach((target, index) => {
+    if (typeof target !== 'string' || !isTikzStyleTarget(target)) {
+      pushError(errors, `${path}[${index}]`, 'Imported style target is not supported.')
+    }
+  })
 }
 
 function validateTikzStyleName(
@@ -1755,6 +1904,110 @@ function validateUserStylePresetReferences(
       errors,
     )
   })
+}
+
+function validateImportedTikzStyleReferenceUsages(
+  diagram: Diagram,
+  errors: DiagramValidationIssue[],
+): void {
+  const referencesById = new Map(
+    (diagram.importedTikzStyleReferences ?? []).map((reference) => [
+      reference.id,
+      reference,
+    ]),
+  )
+
+  diagram.userStylePresets?.forEach((preset, index) => {
+    validateImportedTikzStyleReferenceUsage(
+      preset.importedTikzStyleReferenceId,
+      stylePresetKindTargets(preset.kind),
+      `userStylePresets[${index}].importedTikzStyleReferenceId`,
+      referencesById,
+      errors,
+    )
+  })
+
+  diagram.strata.forEach((stratum, index) => {
+    validateImportedTikzStyleReferenceUsage(
+      stratum.importedTikzStyleReferenceId,
+      stratumTargets(stratum),
+      `strata[${index}].importedTikzStyleReferenceId`,
+      referencesById,
+      errors,
+    )
+  })
+
+  diagram.labels.forEach((label, index) => {
+    validateImportedTikzStyleReferenceUsage(
+      label.importedTikzStyleReferenceId,
+      ['label', 'node'],
+      `labels[${index}].importedTikzStyleReferenceId`,
+      referencesById,
+      errors,
+    )
+  })
+}
+
+function validateImportedTikzStyleReferenceUsage(
+  referenceId: string | undefined,
+  expectedTargets: readonly TikzStyleTarget[],
+  path: string,
+  referencesById: Map<string, ImportedTikzStyleReference>,
+  errors: DiagramValidationIssue[],
+): void {
+  if (referenceId === undefined) {
+    return
+  }
+
+  if (typeof referenceId !== 'string' || referenceId.trim().length === 0) {
+    pushError(errors, path, 'Imported TikZ style reference must be non-empty.')
+    return
+  }
+
+  const reference = referencesById.get(referenceId)
+
+  if (reference === undefined) {
+    pushError(errors, path, 'Imported TikZ style reference does not exist.')
+    return
+  }
+
+  if (!reference.targets.some((target) => expectedTargets.includes(target))) {
+    pushError(
+      errors,
+      path,
+      `Imported TikZ style reference must target ${expectedTargets.join(' or ')}.`,
+    )
+  }
+}
+
+function stratumTargets(stratum: Stratum): readonly TikzStyleTarget[] {
+  switch (stratum.geometricKind) {
+    case 'region':
+      return ['region', 'filldraw']
+    case 'sheet':
+      return ['sheet', 'filldraw']
+    case 'curve':
+      return ['curve', 'draw']
+    case 'point':
+      return ['point', 'node']
+  }
+}
+
+function stylePresetKindTargets(
+  kind: UserStylePreset['kind'],
+): readonly TikzStyleTarget[] {
+  switch (kind) {
+    case 'region':
+      return ['region', 'filldraw']
+    case 'sheet':
+      return ['sheet', 'filldraw']
+    case 'curve':
+      return ['curve', 'draw']
+    case 'point':
+      return ['point', 'node']
+    case 'label':
+      return ['label', 'node']
+  }
 }
 
 function validateUserStylePresetReference(

@@ -81,6 +81,7 @@ export type CreateRegionStratumInput = {
   label?: string
   visible?: boolean
   style?: RegionStyle
+  importedTikzStyleReferenceId?: string
   layer?: number
 }
 
@@ -90,6 +91,7 @@ export type CreateFilledRegion2DStratumInput = {
   label?: string
   visible?: boolean
   style?: RegionStyle
+  importedTikzStyleReferenceId?: string
   boundaries: ClosedPathBoundary[]
   fillRule?: FillRule
   layer?: number
@@ -101,6 +103,7 @@ export type CreateSheetStratumInput = {
   name?: string
   label?: string
   style?: SheetStyle
+  importedTikzStyleReferenceId?: string
   corners: [Vec3, Vec3, Vec3, Vec3]
   layer?: number
 }
@@ -110,6 +113,7 @@ export type CreateWorkPlaneFilledSheet3DStratumInput = {
   name?: string
   label?: string
   style?: SheetStyle
+  importedTikzStyleReferenceId?: string
   planeFrame: WorkPlaneFrameSnapshot
   boundaries: ClosedPathBoundary[]
   fillRule?: FillRule
@@ -121,6 +125,7 @@ export type CreateCurvedSheetStratumInput = {
   name?: string
   label?: string
   style?: SheetStyle
+  importedTikzStyleReferenceId?: string
   primitive: CurvedSheetPrimitive
   layer?: number
 }
@@ -133,6 +138,7 @@ export type CreateCurveStratumInput = {
   label?: string
   pathLabel?: string
   style?: CurveStyle
+  importedTikzStyleReferenceId?: string
   points: Vec3[]
   bezierControls?: CubicBezierControlMode
   styleSegments?: CurveStyleSegment[]
@@ -146,6 +152,7 @@ export type CreateConcatenatedPathStratumInput = {
   label?: string
   pathLabel?: string
   style?: CurveStyle
+  importedTikzStyleReferenceId?: string
   segments: PathSegment[]
   styleSegments?: CurveStyleSegment[]
   layer?: number
@@ -158,6 +165,7 @@ export type CreateTemplatePathStratumInput = {
   label?: string
   pathLabel?: string
   style?: CurveStyle
+  importedTikzStyleReferenceId?: string
   template: PathTemplate
   styleSegments?: CurveStyleSegment[]
   layer?: number
@@ -169,6 +177,7 @@ export type CreatePointStratumInput = {
   name?: string
   label?: string
   style?: PointStyle
+  importedTikzStyleReferenceId?: string
   position: Vec3
   layer?: number
 }
@@ -180,6 +189,7 @@ export type CreateTextLabelInput = {
   text: string
   position: Vec3
   style?: LabelStyle
+  importedTikzStyleReferenceId?: string
   layer?: number
 }
 
@@ -246,6 +256,7 @@ export function createRegionStratum({
   label,
   visible = true,
   style = defaultRegionStyle,
+  importedTikzStyleReferenceId,
   layer = 0,
 }: CreateRegionStratumInput): RegionStratum {
   return withOptionalLabel(
@@ -256,6 +267,9 @@ export function createRegionStratum({
       name,
       visible,
       style: cloneRegionStyle(style),
+      ...(importedTikzStyleReferenceId === undefined
+        ? {}
+        : { importedTikzStyleReferenceId }),
       layer,
     },
     label,
@@ -268,6 +282,7 @@ export function createFilledRegion2DStratum({
   label,
   visible = true,
   style = defaultRegionStyle,
+  importedTikzStyleReferenceId,
   boundaries,
   fillRule = 'nonzero',
   layer = 0,
@@ -281,6 +296,9 @@ export function createFilledRegion2DStratum({
       name,
       visible,
       style: cloneRegionStyle(style),
+      ...(importedTikzStyleReferenceId === undefined
+        ? {}
+        : { importedTikzStyleReferenceId }),
       boundaries: normalizeClosedPathBoundariesForAmbientDimension(boundaries, 2),
       fillRule,
       layer,
@@ -294,6 +312,7 @@ export function createSheetStratum({
   name = 'Sheet',
   label,
   style = defaultSheetStyle,
+  importedTikzStyleReferenceId,
   corners,
   layer = 0,
 }: CreateSheetStratumInput): SheetStratum {
@@ -304,6 +323,9 @@ export function createSheetStratum({
     kind: 'quadSheet',
     name,
     style: cloneSheetStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     corners: corners.map(cloneVec3) as [Vec3, Vec3, Vec3, Vec3],
     layer,
   }
@@ -316,6 +338,7 @@ export function createWorkPlaneFilledSheet3DStratum({
   name = 'Filled sheet',
   label,
   style = defaultSheetStyle,
+  importedTikzStyleReferenceId,
   planeFrame,
   boundaries,
   fillRule = 'nonzero',
@@ -328,6 +351,9 @@ export function createWorkPlaneFilledSheet3DStratum({
     kind: 'workPlaneFilledSheet',
     name,
     style: cloneSheetStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     planeFrame: cloneWorkPlaneFrameSnapshot(planeFrame),
     boundaries: normalizeClosedPathBoundariesForAmbientDimension(boundaries, 3),
     fillRule,
@@ -342,6 +368,7 @@ export function createCurvedSheetStratum({
   name = 'Curved sheet',
   label,
   style = defaultSheetStyle,
+  importedTikzStyleReferenceId,
   primitive,
   layer = 0,
 }: CreateCurvedSheetStratumInput): CurvedSheetStratum {
@@ -352,6 +379,9 @@ export function createCurvedSheetStratum({
     kind: 'curvedSheet',
     name,
     style: cloneSheetStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     primitive: cloneCurvedSheetPrimitive(primitive),
     layer,
   }
@@ -367,6 +397,7 @@ export function createCurveStratum({
   label,
   pathLabel,
   style = defaultCurveStyle,
+  importedTikzStyleReferenceId,
   points,
   bezierControls,
   styleSegments = [],
@@ -380,6 +411,9 @@ export function createCurveStratum({
       kind,
       name,
       style: cloneCurveStyle(style),
+      ...(importedTikzStyleReferenceId === undefined
+        ? {}
+        : { importedTikzStyleReferenceId }),
       points: points.map((point) =>
         normalizePointForAmbientDimension(ambientDimension, point),
       ),
@@ -405,6 +439,9 @@ export function createCurveStratum({
     kind,
     name,
     style: cloneCurveStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     points: points.map((point) =>
       normalizePointForAmbientDimension(ambientDimension, point),
     ),
@@ -426,6 +463,7 @@ export function createConcatenatedPathStratum({
   label,
   pathLabel,
   style = defaultCurveStyle,
+  importedTikzStyleReferenceId,
   segments,
   styleSegments = [],
   layer = 0,
@@ -437,6 +475,9 @@ export function createConcatenatedPathStratum({
     kind: 'concatenatedPath',
     name,
     style: cloneCurveStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     segments: normalizePathSegmentsForAmbientDimension(
       segments,
       ambientDimension,
@@ -459,6 +500,7 @@ export function createTemplatePathStratum({
   label,
   pathLabel,
   style = defaultCurveStyle,
+  importedTikzStyleReferenceId,
   template,
   styleSegments = [],
   layer = 0,
@@ -470,6 +512,9 @@ export function createTemplatePathStratum({
     kind: 'templatePath',
     name,
     style: cloneCurveStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     template: normalizeTemplatePathForAmbientDimension(
       template,
       ambientDimension,
@@ -491,6 +536,7 @@ export function createPointStratum({
   name = 'Point',
   label,
   style = defaultPointStyle,
+  importedTikzStyleReferenceId,
   position,
   layer = 0,
 }: CreatePointStratumInput): PointStratum {
@@ -501,6 +547,9 @@ export function createPointStratum({
       geometricKind: 'point',
       name,
       style: clonePointStyle(style),
+      ...(importedTikzStyleReferenceId === undefined
+        ? {}
+        : { importedTikzStyleReferenceId }),
       position: normalizePointForAmbientDimension(ambientDimension, position),
       layer,
     },
@@ -515,6 +564,7 @@ export function createTextLabel({
   text,
   position,
   style = defaultLabelStyle,
+  importedTikzStyleReferenceId,
   layer = 0,
 }: CreateTextLabelInput): TextLabel {
   return {
@@ -523,6 +573,9 @@ export function createTextLabel({
     name,
     text,
     position: normalizePointForAmbientDimension(ambientDimension, position),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
     style: cloneLabelStyle(style),
     layer,
   }

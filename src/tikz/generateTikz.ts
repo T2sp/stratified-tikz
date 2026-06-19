@@ -7,8 +7,10 @@ import type {
   CurveStyle,
   CurveStratum,
   Diagram,
+  ExternalTikzStyleSource,
   FilledRegion2DStratum,
   HexColor,
+  ImportedTikzStyleReference,
   LabelStyle,
   LineStyle,
   PointShape,
@@ -42,6 +44,7 @@ import {
   isOrthographicCamera3D,
 } from '../model/camera.ts'
 import { stylePresetStylesEqual } from '../model/stylePresets.ts'
+import { normalizeSingleLineCommentText } from '../model/importedTikzStyles.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   isFiniteVec3,
@@ -126,6 +129,9 @@ type GenerateContext = {
   coordinates: CoordinateRegistry
   userStylePresets: Map<string, UserStylePreset>
   localStyles: LocalStyleRegistry
+  externalTikzStyleSources: Map<string, ExternalTikzStyleSource>
+  importedTikzStyleReferences: Map<string, ImportedTikzStyleReference>
+  externalTikzStyleUsage: ExternalTikzStyleUsageRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
   includeCoordinateAxes: boolean
@@ -150,7 +156,13 @@ export function generateTikz2D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
-  const context = createContext('2d', options, diagram.userStylePresets)
+  const context = createContext(
+    '2d',
+    options,
+    diagram.userStylePresets,
+    diagram.externalTikzStyleSources,
+    diagram.importedTikzStyleReferences,
+  )
   const regionSectionTitle = 'Codimension 0 strata: regions'
   const curveSectionTitle = 'Codimension 1 strata: curves'
   const pointSectionTitle = 'Codimension 2 strata: points'
@@ -216,6 +228,8 @@ export function generateTikz3D(
     '3d',
     options,
     diagram.userStylePresets,
+    diagram.externalTikzStyleSources,
+    diagram.importedTikzStyleReferences,
     resolveTikzCamera3D(diagram, options),
   )
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
@@ -316,6 +330,8 @@ function createContext(
   mode: TikzMode,
   options: GenerateTikzOptions,
   userStylePresets: readonly UserStylePreset[] | undefined,
+  externalTikzStyleSources: readonly ExternalTikzStyleSource[] | undefined,
+  importedTikzStyleReferences: readonly ImportedTikzStyleReference[] | undefined,
   camera3d?: OrthographicCamera3D,
 ): GenerateContext {
   return {
@@ -327,6 +343,16 @@ function createContext(
       (userStylePresets ?? []).map((preset) => [preset.id, preset]),
     ),
     localStyles: new LocalStyleRegistry(),
+    externalTikzStyleSources: new Map(
+      (externalTikzStyleSources ?? []).map((source) => [source.id, source]),
+    ),
+    importedTikzStyleReferences: new Map(
+      (importedTikzStyleReferences ?? []).map((reference) => [
+        reference.id,
+        reference,
+      ]),
+    ),
+    externalTikzStyleUsage: new ExternalTikzStyleUsageRegistry(),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
     includeCoordinateAxes:
@@ -375,6 +401,7 @@ function assembleTikz({
   const lines = [
     ...section('Styles and colors', [
       ...emitRequiredLibraryComment(context),
+      ...emitExternalTikzStyleLoadComment(context),
       ...context.colors.emitDefinitions(),
       ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
       ...emitTikzCameraSetup(context),
@@ -442,6 +469,27 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
   }
 
   return lines
+}
+
+function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
+  const sources = context.externalTikzStyleUsage.usedSources()
+
+  if (sources.length === 0) {
+    return []
+  }
+
+  return [
+    '% External TikZ styles referenced below.',
+    '% Load these files in your LaTeX preamble or before the picture:',
+    ...sources.map((source) => `% - ${commentLineText(source.name)}`),
+    '% Suggested:',
+    ...sources.map((source) => `%   ${commentLineText(source.loadHint)}`),
+    '',
+  ]
+}
+
+function commentLineText(value: string): string {
+  return normalizeSingleLineCommentText(value, 'external TikZ style source')
 }
 
 function emitTikzLayerDeclarations(
@@ -590,6 +638,7 @@ function emitSheet(
     ...filledSurfaceStyleOptionsForElement(
       'sheet',
       sheet.stylePresetId,
+      sheet.importedTikzStyleReferenceId,
       sheet.style,
       `Sheet${sheet.id}`,
       context,
@@ -649,6 +698,7 @@ function emitCurvedSheet(
   const options = filledSurfaceStyleOptionsForElement(
     'sheet',
     sheet.stylePresetId,
+    sheet.importedTikzStyleReferenceId,
     sheet.style,
     `Sheet${sheet.id}`,
     context,
@@ -692,6 +742,7 @@ function emitFilledRegion(
     ...filledSurfaceStyleOptionsForElement(
       'region',
       region.stylePresetId,
+      region.importedTikzStyleReferenceId,
       region.style,
       `Region${region.id}`,
       context,
@@ -722,6 +773,7 @@ function emitWorkPlaneFilledSheet(
     ...filledSurfaceStyleOptionsForElement(
       'sheet',
       sheet.stylePresetId,
+      sheet.importedTikzStyleReferenceId,
       sheet.style,
       `Sheet${sheet.id}`,
       context,
@@ -831,6 +883,7 @@ function emitCurve(
     const continuousOptions = [
       ...curveStyleOptionsForElement(
         curve.stylePresetId,
+        curve.importedTikzStyleReferenceId,
         continuousStyle,
         `Curve${curve.id}`,
         context,
@@ -850,6 +903,7 @@ function emitCurve(
   const options = [
     ...curveStyleOptionsForElement(
       curve.stylePresetId,
+      curve.importedTikzStyleReferenceId,
       curve.style,
       `Curve${curve.id}`,
       context,
@@ -903,6 +957,7 @@ function emitTemplatePath(
   const options = [
     ...curveStyleOptionsForElement(
       curve.stylePresetId,
+      curve.importedTikzStyleReferenceId,
       curve.style,
       `Curve${curve.id}`,
       context,
@@ -1073,6 +1128,7 @@ function emitConcatenatedPathStyleRun(
   )
   const options = curveStyleOptionsForElement(
     curve.stylePresetId,
+    curve.importedTikzStyleReferenceId,
     run.style,
     `Curve${curve.id}Segment${run.startIndex + 1}`,
     context,
@@ -1169,6 +1225,7 @@ function emitPoint(
   )
   const options = pointStyleOptionsForElement(
     point.stylePresetId,
+    point.importedTikzStyleReferenceId,
     point.style,
     `Point${point.id}`,
     context,
@@ -1287,16 +1344,26 @@ function labelStyleOptions(
     label.style,
     context,
   )
+  const importedOptions = importedStyleOptionsForElement(
+    'label',
+    label.importedTikzStyleReferenceId,
+    label.stylePresetId,
+    label.style,
+    context,
+  )
 
   if (presetStyleOption !== null) {
-    return [presetStyleOption]
+    return [presetStyleOption, ...importedOptions]
   }
 
   if (isDefaultLabelStyle(label.style)) {
-    return []
+    return importedOptions
   }
 
-  return labelStyleTikzOptions(label.style, `Label${label.id}`, context)
+  return [
+    ...labelStyleTikzOptions(label.style, `Label${label.id}`, context),
+    ...importedOptions,
+  ]
 }
 
 function labelStyleTikzOptions(
@@ -1346,6 +1413,7 @@ function curveStyleTikzOptions(
 
 function curveStyleOptionsForElement(
   stylePresetId: string | undefined,
+  importedTikzStyleReferenceId: string | undefined,
   style: CurveStyle,
   colorBaseName: string,
   context: GenerateContext,
@@ -1356,10 +1424,17 @@ function curveStyleOptionsForElement(
     style,
     context,
   )
+  const importedOptions = importedStyleOptionsForElement(
+    'curve',
+    importedTikzStyleReferenceId,
+    stylePresetId,
+    style,
+    context,
+  )
 
   return presetStyleOption === null
-    ? curveStyleTikzOptions(style, colorBaseName, context)
-    : [presetStyleOption]
+    ? [...curveStyleTikzOptions(style, colorBaseName, context), ...importedOptions]
+    : [presetStyleOption, ...importedOptions]
 }
 
 function filledSurfaceStyleTikzOptions(
@@ -1384,6 +1459,7 @@ function filledSurfaceStyleTikzOptions(
 function filledSurfaceStyleOptionsForElement(
   kind: 'region' | 'sheet',
   stylePresetId: string | undefined,
+  importedTikzStyleReferenceId: string | undefined,
   style: RegionStyle | SheetStyle,
   colorBaseName: string,
   context: GenerateContext,
@@ -1394,10 +1470,20 @@ function filledSurfaceStyleOptionsForElement(
     style,
     context,
   )
+  const importedOptions = importedStyleOptionsForElement(
+    kind,
+    importedTikzStyleReferenceId,
+    stylePresetId,
+    style,
+    context,
+  )
 
   return presetStyleOption === null
-    ? filledSurfaceStyleTikzOptions(style, colorBaseName, context)
-    : [presetStyleOption]
+    ? [
+        ...filledSurfaceStyleTikzOptions(style, colorBaseName, context),
+        ...importedOptions,
+      ]
+    : [presetStyleOption, ...importedOptions]
 }
 
 function pointStyleTikzOptions(
@@ -1418,6 +1504,7 @@ function pointStyleTikzOptions(
 
 function pointStyleOptionsForElement(
   stylePresetId: string | undefined,
+  importedTikzStyleReferenceId: string | undefined,
   style: PointStyle,
   colorBaseName: string,
   context: GenerateContext,
@@ -1428,10 +1515,17 @@ function pointStyleOptionsForElement(
     style,
     context,
   )
+  const importedOptions = importedStyleOptionsForElement(
+    'point',
+    importedTikzStyleReferenceId,
+    stylePresetId,
+    style,
+    context,
+  )
 
   return presetStyleOption === null
-    ? pointStyleTikzOptions(style, colorBaseName, context)
-    : [presetStyleOption]
+    ? [...pointStyleTikzOptions(style, colorBaseName, context), ...importedOptions]
+    : [presetStyleOption, ...importedOptions]
 }
 
 function userStylePresetTikzOption(
@@ -1440,6 +1534,54 @@ function userStylePresetTikzOption(
   style: UserStylePreset['style'],
   context: GenerateContext,
 ): string | null {
+  const preset = matchingUserStylePreset(kind, stylePresetId, style, context)
+
+  if (preset === undefined) {
+    return null
+  }
+
+  return context.localStyles.define(preset, () =>
+    styleOptionsForUserPreset(preset, context),
+  )
+}
+
+function importedStyleOptionsForElement(
+  kind: StylePresetKind,
+  importedTikzStyleReferenceId: string | undefined,
+  stylePresetId: string | undefined,
+  style: UserStylePreset['style'],
+  context: GenerateContext,
+): string[] {
+  const referenceId =
+    importedTikzStyleReferenceId ??
+    matchingUserStylePreset(kind, stylePresetId, style, context)
+      ?.importedTikzStyleReferenceId
+
+  if (referenceId === undefined) {
+    return []
+  }
+
+  const reference = context.importedTikzStyleReferences.get(referenceId)
+
+  if (reference === undefined) {
+    return []
+  }
+
+  const source = context.externalTikzStyleSources.get(reference.sourceId)
+
+  if (source !== undefined) {
+    context.externalTikzStyleUsage.use(source)
+  }
+
+  return [reference.key]
+}
+
+function matchingUserStylePreset(
+  kind: StylePresetKind,
+  stylePresetId: string | undefined,
+  style: UserStylePreset['style'],
+  context: GenerateContext,
+): UserStylePreset | undefined {
   const preset =
     stylePresetId === undefined
       ? undefined
@@ -1450,12 +1592,10 @@ function userStylePresetTikzOption(
     preset.kind !== kind ||
     !stylePresetStylesEqual(style, preset.style)
   ) {
-    return null
+    return undefined
   }
 
-  return context.localStyles.define(preset, () =>
-    styleOptionsForUserPreset(preset, context),
-  )
+  return preset
 }
 
 function styleOptionsForUserPreset(
@@ -2333,6 +2473,24 @@ class LocalStyleRegistry {
     const name = `${safeName}${suffix}`
     this.usedNames.add(name)
     return name
+  }
+}
+
+class ExternalTikzStyleUsageRegistry {
+  private readonly sources: ExternalTikzStyleSource[] = []
+  private readonly usedSourceIds = new Set<string>()
+
+  use(source: ExternalTikzStyleSource): void {
+    if (this.usedSourceIds.has(source.id)) {
+      return
+    }
+
+    this.usedSourceIds.add(source.id)
+    this.sources.push(source)
+  }
+
+  usedSources(): ExternalTikzStyleSource[] {
+    return [...this.sources]
   }
 }
 
