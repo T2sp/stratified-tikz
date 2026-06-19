@@ -91,6 +91,10 @@ const phaseSlugs = {
   "17D": "imported-style-autodetect-preview",
   "17E": "custom-tikz-style-export",
   "17F": "style-manager-polish",
+  "18A": "tikz-export-mode-model-ui",
+  "18B": "inline-math-setup-baseline",
+  "18C": "inline-math-no-blank-lines",
+  "18D": "export-mode-polish-docs",
 };
 
 function makePhaseSpec(phase) {
