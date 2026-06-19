@@ -435,7 +435,49 @@ Important export policy:
 - Add combined workflow tests.
 - Document import/export limitations.
 
-## Phase 18: Multi-selection and batch editing
+## Phase 18: TikZ export modes for standalone and inline math
+
+Phase 18 separates traditional standalone TikZ export from inline math export intended for environments such as `align`.
+
+Recommended `phaseSlugs` entries:
+
+```js
+"18A": "tikz-export-mode-model-ui",
+"18B": "inline-math-setup-baseline",
+"18C": "inline-math-no-blank-lines",
+"18D": "export-mode-polish-docs",
+```
+
+### Phase 18A: TikZ export mode model and UI
+
+- Add export mode:
+  - standalone;
+  - inline math.
+- Add UI selector.
+- Pass mode through TikZ generator.
+- Standalone remains default.
+
+### Phase 18B: Inline math setup placement and baseline option
+
+- In inline math mode, all setup and drawing commands are inside each `tikzpicture`.
+- Always include:
+  - `baseline={([yshift=-.5ex]current bounding box.center)}`.
+- Emit `\definecolor`, local `\tikzset`, layer setup, and camera setup inside the picture.
+- Imported external style files are still comments only.
+
+### Phase 18C: Blank-line-free inline formatter with comment separators
+
+- Inline math output contains no blank lines.
+- Use comment separator lines for readability.
+- Safe for `align` and similar math environments.
+
+### Phase 18D: Export mode polish, documentation, and regression coverage
+
+- Add docs and examples.
+- Ensure copy/download uses selected mode.
+- Add representative regression tests.
+
+## Phase 19: Multi-selection and batch editing
 
 Multi-selection is postponed until after layer manager.
 
