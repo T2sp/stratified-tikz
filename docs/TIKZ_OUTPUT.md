@@ -12,25 +12,62 @@ The output should look like code a human might have written.
 
 StratifiedTikZ has two TikZ export modes:
 
-- `standalone`: the default, traditional output intended for ordinary
-  `tikzpicture` snippets. Existing standalone output remains the compatibility
-  baseline.
-- `inlineMath`: intended for use inside math environments such as `align`, where
-  each diagram is still exported as an independent `tikzpicture`.
+- `standalone`
+- `inlineMath`
 
-In `standalone` mode, setup commands may appear before `\begin{tikzpicture}` as
-they did before Phase 18. In `inlineMath` mode, each exported snippet starts
-with a `tikzpicture` whose options include
-`baseline={([yshift=-.5ex]current bounding box.center)}`. Diagram-local setup is
-then emitted inside that picture: external-style load comments, local
-`\definecolor` commands, local user styles, layer declarations, camera setup, and
-then the diagram content.
+### Standalone mode
 
-Inline math output is formatted without blank physical lines, including leading
-or trailing blank lines. This makes the snippet safe to paste into `align` and
-similar math environments without creating paragraph breaks. Readability is
-preserved with comment separators such as `%----------------------------------------`
-and section comments instead of empty lines.
+`standalone` is the default, traditional output intended for ordinary document
+snippets and standalone figures. Existing standalone output remains the
+compatibility baseline.
+
+Setup commands may appear before `\begin{tikzpicture}` as they did before Phase
+18. For example, package requirement comments, external-style load comments,
+local color definitions, layer declarations, and 3D camera setup may be emitted
+before the picture. The `tikzpicture` itself keeps the normal drawing options,
+including `tdplot_main_coords` for 3D output.
+
+Standalone mode may use blank lines for readability.
+
+### Inline math mode
+
+`inlineMath` is intended for `align`, `aligned`, `equation`, and similar
+math-environment workflows. Each exported diagram is still its own independent
+`tikzpicture`; StratifiedTikZ does not combine multiple pictures into one export.
+
+Every inline math snippet starts with a `tikzpicture` whose options include:
+
+```tex
+baseline={([yshift=-.5ex]current bounding box.center)}
+```
+
+All diagram-local setup is emitted inside that picture: external-style load
+comments, local `\definecolor` commands, local user styles, layer declarations,
+camera setup, and then the diagram content. Inline math output has no blank
+physical lines, including leading or trailing blank lines, because blank lines
+can create paragraph breaks and errors in `align` and related environments.
+Readability is preserved with comment separators such as
+`%----------------------------------------` and section comments instead of empty
+lines.
+
+External imported TikZ style files are not inlined. The generated inline snippet
+includes comment-only load instructions, but no active external `\input`. Load
+those external files in the parent document preamble or before the math
+environment that contains the exported picture.
+
+Example `align` use:
+
+```tex
+\begin{align}
+  \begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
+    % ...
+  \end{tikzpicture}
+  &=
+  \begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
+    % ...
+  \end{tikzpicture}
+\end{align}
+```
 
 The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.

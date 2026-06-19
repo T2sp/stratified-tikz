@@ -352,6 +352,113 @@ test('inline math output normalizes embedded label newlines', () => {
   }
 })
 
+test('standalone mode remains the default for representative export features', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const twoDimensionalDiagram = createTwoDimensionalExportModeRegressionDiagram()
+  const threeDimensionalDiagram =
+    createThreeDimensionalExportModeRegressionDiagram()
+
+  assert.equal(
+    generateTikz(twoDimensionalDiagram),
+    generateTikz(twoDimensionalDiagram, { exportMode: 'standalone' }),
+  )
+  assert.equal(
+    generateTikz(threeDimensionalDiagram, {
+      camera3d: camera,
+      includeCoordinateAxes: true,
+    }),
+    generateTikz(threeDimensionalDiagram, {
+      camera3d: camera,
+      exportMode: 'standalone',
+      includeCoordinateAxes: true,
+    }),
+  )
+})
+
+test('representative inline 2D export keeps setup local and align-safe', () => {
+  const tikz = generateTikz(createTwoDimensionalExportModeRegressionDiagram(), {
+    exportMode: 'inlineMath',
+  })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const colorIndex = tikz.indexOf(
+    '\\definecolor{stzStyleuserregioninlineregionFill}{HTML}{112233}',
+  )
+  const tikzsetBlock = extractTikzsetBlock(tikz)
+  const externalCommentIndex = tikz.indexOf(
+    '% External TikZ styles referenced below.',
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayerMinus1')
+
+  assert.equal(tikz.slice(0, beginIndex).trim(), '')
+  assert.match(
+    tikz,
+    /\\begin\{tikzpicture\}\[baseline=\{\(\[yshift=-\.5ex\]current bounding box\.center\)\}/,
+  )
+  assert.ok(beginIndex < externalCommentIndex)
+  assert.ok(beginIndex < colorIndex)
+  assert.ok(colorIndex < tikz.indexOf('\\tikzset{'))
+  assert.match(
+    tikzsetBlock,
+    /stratifiedStyleInlineRegion\/\.style=\{fill=stzStyleuserregioninlineregionFill, fill opacity=0\.42, draw=stzStyleuserregioninlineregionStroke, draw opacity=0\.73\}/,
+  )
+  assert.doesNotMatch(tikzsetBlock, /3cat\/phys\/1strata\/color\/x/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayerMinus1,stratifiedLayer2,main\}/)
+  assert.match(layerBlock, /\\filldraw\[/)
+  assert.match(layerBlock, /stratifiedStyleInlineRegion/)
+  assert.match(layerBlock, /even odd rule/)
+  assert.match(tikz, /3cat\/phys\/1strata\/color\/x/)
+  assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
+  assert.doesNotMatch(
+    tikz,
+    /3cat\/phys\/1strata\/color\/x\/\.style=/,
+  )
+  expectNoBlankLines(tikz)
+})
+
+test('representative inline 3D export keeps camera and layer setup local', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const tikz = generateTikz(createThreeDimensionalExportModeRegressionDiagram(), {
+    camera3d: camera,
+    exportMode: 'inlineMath',
+    includeCoordinateAxes: true,
+  })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const cameraIndex = tikz.indexOf('\\tdplotsetmaincoords{70}{110}')
+  const tdplotScopeIndex = tikz.indexOf('\\begin{scope}[tdplot_main_coords]')
+  const libraryIndex = tikz.indexOf('\\usetikzlibrary{3d}')
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer3')
+
+  assert.equal(tikz.slice(0, beginIndex).trim(), '')
+  assert.match(
+    tikz,
+    /\\begin\{tikzpicture\}\[baseline=\{\(\[yshift=-\.5ex\]current bounding box\.center\)\}/,
+  )
+  assert.ok(beginIndex < libraryIndex)
+  assert.ok(beginIndex < cameraIndex)
+  assert.ok(cameraIndex < tdplotScopeIndex)
+  assert.match(
+    tikz,
+    /\\pgfsetlayers\{stratifiedGuideLayer,stratifiedLayer1,stratifiedLayer3,stratifiedLayer4,main\}/,
+  )
+  assert.match(tikz, /% Requires \\usepackage\{tikz-3dplot\}/)
+  assert.match(tikz, /% \\usetikzlibrary\{shapes\.geometric,shapes\.symbols\}/)
+  assert.match(tikz, /\\definecolor\{stzSheetfilledsheetFill\}\{HTML\}\{ABCDEF\}/)
+  assert.match(layerBlock, /canvas is plane/)
+  assert.match(layerBlock, /fill opacity=0\.28/)
+  assert.match(layerBlock, /draw opacity=0\.66/)
+  assert.match(tikz, /\\coordinate \(curvePolyCameraLine0p0\) at \(0,0,0\);/)
+  assert.match(tikz, /regular polygon sides=3/)
+  expectNoBlankLines(tikz)
+})
+
 test('standalone output keeps blank-line section spacing', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram(), {
     exportMode: 'standalone',
@@ -2553,6 +2660,14 @@ function extractLayerBlock(tikz: string, layerName: string): string {
   return match[1]
 }
 
+function extractTikzsetBlock(tikz: string): string {
+  const match = tikz.match(/\\tikzset\{[\s\S]*?\n\}/)
+
+  assert.notEqual(match, null)
+
+  return match[0]
+}
+
 function normalizeGeneratedCoordinateNames(tikz: string): string {
   const coordinateNames = extractCoordinateNames(tikz)
   let normalized = tikz
@@ -2602,6 +2717,134 @@ function withImportedTikzStyleReferences(
       targets: reference.targets,
     })),
   }
+}
+
+function createTwoDimensionalExportModeRegressionDiagram(): Diagram {
+  let diagram = createFilledRegionDiagram({
+    boundaries: [
+      squareBoundary2D('outer', 0, 0, 4),
+      squareBoundary2D('inner', 1, 1, 1),
+    ],
+    fillRule: 'evenOdd',
+    layer: -1,
+    style: regionStyle({
+      fillColor: '#112233',
+      fillOpacity: 0.42,
+      strokeColor: '#445566',
+      strokeOpacity: 0.73,
+    }),
+  })
+  const region = diagram.strata[0]
+
+  if (region.geometricKind !== 'region') {
+    throw new Error('Expected a filled region.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'region',
+    'Inline region',
+    region.style,
+  )
+
+  if (created === null) {
+    throw new Error('Expected region preset creation to succeed.')
+  }
+
+  diagram = applyUserStylePresetToStratum(
+    created.diagram,
+    region.id,
+    created.preset.id,
+  )
+  diagram = withImportedTikzStyleReference(
+    diagram,
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'external-wire',
+    name: 'External wire',
+    importedTikzStyleReferenceId: 'external-draw',
+    style: curveStyle({
+      strokeColor: '#778899',
+      strokeOpacity: 0.8,
+      lineStyle: 'denselyDotted',
+    }),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 4, y: 4, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 2,
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'align-label',
+    name: 'Align label',
+    text: '$A$',
+    position: { x: 4.4, y: 4.2, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 2,
+  })
+
+  return diagram
+}
+
+function createThreeDimensionalExportModeRegressionDiagram(): Diagram {
+  const diagram = createWorkPlaneFilledSheetDiagram({
+    layer: 3,
+    style: sheetStyle({
+      fillColor: '#ABCDEF',
+      fillOpacity: 0.28,
+      strokeColor: '#123ABC',
+      strokeOpacity: 0.66,
+    }),
+  })
+
+  diagram.strata.push(
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'camera-line',
+      name: 'Camera line',
+      style: curveStyle({
+        strokeColor: '#CC0033',
+        lineWidth: 1.8,
+      }),
+      points: [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 1, z: 2 },
+      ],
+      styleSegments: [],
+      layer: 1,
+    },
+    {
+      codim: 3,
+      geometricKind: 'point',
+      id: 'triangle-junction',
+      name: 'Triangle junction',
+      style: pointStyle({
+        color: '#00AA33',
+        shape: 'triangle',
+        size: 4,
+      }),
+      position: { x: 1, y: 1, z: 2 },
+      layer: 4,
+    },
+  )
+
+  return diagram
 }
 
 function createLayeredTwoDimensionalDiagram(): Diagram {
