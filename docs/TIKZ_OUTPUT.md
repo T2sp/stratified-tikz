@@ -18,11 +18,13 @@ StratifiedTikZ has two TikZ export modes:
 - `inlineMath`: intended for use inside math environments such as `align`, where
   each diagram is still exported as an independent `tikzpicture`.
 
-Phase 18A adds the model, UI selector, persistence, and generator option
-plumbing for these modes. Inline math output currently includes a temporary
-comment marker so the selected mode is visible in generated source. Later Phase
-18 subphases will move setup commands inside each picture, add the inline
-baseline option, and remove blank lines from inline snippets.
+In `standalone` mode, setup commands may appear before `\begin{tikzpicture}` as
+they did before Phase 18. In `inlineMath` mode, each exported snippet starts
+with a `tikzpicture` whose options include
+`baseline={([yshift=-.5ex]current bounding box.center)}`. Diagram-local setup is
+then emitted inside that picture: external-style load comments, local
+`\definecolor` commands, local user styles, layer declarations, camera setup, and
+then the diagram content.
 
 The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.
@@ -87,7 +89,8 @@ If an imported reference is missing its external source or its target tags are
 incompatible with the selected preset kind, the Inspector reports that status
 instead of silently treating the imported key as reliable.
 
-Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
+In standalone output, Phase 17A user presets are emitted as local options of
+`\begin{tikzpicture}`:
 
 ```tex
 \begin{tikzpicture}[
@@ -97,16 +100,31 @@ Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
 ]
 ```
 
-The generator does not emit a pre-picture `\tikzset{...}` block for these user
-presets.
+The generator does not emit a pre-picture `\tikzset{...}` block for standalone
+user presets. In inline math output, user preset definitions are emitted inside
+the picture after local color definitions so color-dependent styles can resolve
+locally:
+
+```tex
+\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}, line cap=round, line join=round]
+% Local colors
+\definecolor{stzStyleusercurveblackcurveStroke}{HTML}{000000}
+% Local styles
+\tikzset{
+  stratifiedStyleBlackCurve/.style={draw=stzStyleusercurveblackcurveStroke, draw opacity=1, line width=1.2pt}
+}
+...
+\end{tikzpicture}
+```
 
 Imported TikZ style references are external. StratifiedTikZ saves the source
 metadata and imported option key, but generated TikZ does not inline the
 external `\tikzset{...}` definition and does not emit an active `\input{...}` by
 default. Imported references are emitted only when their saved targets match the
 element kind or the TikZ command target (`draw`, `filldraw`, or `node`). When an
-emitted command uses an imported key, the top style section
-contains comment-only load instructions:
+emitted command uses an imported key, the top style section contains
+comment-only load instructions. In inline math mode these comments are inside
+the `tikzpicture`; in standalone mode they remain before the picture as before:
 
 ```tex
 % External TikZ styles referenced below.
@@ -478,6 +496,12 @@ The `theta` and `phi` values come from the current 3D camera's `thetaDeg` and
 side; the generator does not pre-project model geometry into 2D coordinates.
 Coordinate axes guide export, when enabled, uses the same outer
 `tdplot_main_coords` picture and therefore the same camera view.
+
+In inline math output, `tdplot_main_coords` is not placed on the
+`\begin{tikzpicture}` options because `\tdplotsetmaincoords{theta}{phi}` is local
+setup inside the picture. Instead, the camera command appears near the top of the
+picture body and model-coordinate content is emitted in a
+`\begin{scope}[tdplot_main_coords]` scope.
 
 This camera export is a `tikz-3dplot`-compatible orthographic orientation, not
 perspective projection. Future perspective export may require different PGF/TikZ

@@ -145,6 +145,8 @@ const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
 const coordinateAxesGuideColor: HexColor = '#64748B'
 const coordinateAxesGuideLength = 2.5
 const coordinateAxesGuideLabelOffset = 0.25
+const inlineMathBaselineTikzOption =
+  'baseline={([yshift=-.5ex]current bounding box.center)}'
 export const maxCurvedSheetTikzFaces = 256
 
 export function generateTikz(
@@ -215,10 +217,15 @@ export function generateTikz2D(
     context,
     layers,
     bodySections: [
-      section('Coordinates', emitCoordinateDefinitions(context)),
+      section(
+        'Coordinates',
+        emitCoordinateDefinitions(context),
+        context.exportMode,
+      ),
       section(
         'Layered drawing commands',
         emitLayeredCommands(drawingCommands, sectionTitles),
+        context.exportMode,
       ),
     ],
   })
@@ -282,13 +289,24 @@ export function generateTikz3D(
     context,
     layers,
     bodySections: [
-      section('Coordinates', emitCoordinateDefinitions(context)),
+      section(
+        'Coordinates',
+        emitCoordinateDefinitions(context),
+        context.exportMode,
+      ),
       ...(coordinateAxesGuide.length === 0
         ? []
-        : [section('Coordinate axes guide', coordinateAxesGuide)]),
+        : [
+            section(
+              'Coordinate axes guide',
+              coordinateAxesGuide,
+              context.exportMode,
+            ),
+          ]),
       section(
         'Layered drawing commands',
         emitLayeredCommands(drawingCommands, sectionTitles),
+        context.exportMode,
       ),
     ],
   })
@@ -403,12 +421,28 @@ function assembleTikz({
   layers: number[]
   bodySections: string[][]
 }): string {
+  if (context.exportMode === 'inlineMath') {
+    return assembleInlineMathTikz({ context, layers, bodySections })
+  }
+
+  return assembleStandaloneTikz({ context, layers, bodySections })
+}
+
+function assembleStandaloneTikz({
+  context,
+  layers,
+  bodySections,
+}: {
+  context: GenerateContext
+  layers: number[]
+  bodySections: string[][]
+}): string {
   const lines = [
     ...section('Styles and colors', [
       ...emitExportModeComment(context),
       ...emitRequiredLibraryComment(context),
       ...emitExternalTikzStyleLoadComment(context),
-      ...context.colors.emitDefinitions(),
+      ...emitColorDefinitions(context, false),
       ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
       ...emitTikzCameraSetup(context),
       ...emitTikzPictureStart(context),
@@ -417,7 +451,38 @@ function assembleTikz({
     '\\end{tikzpicture}',
   ]
 
-  return `${lines.join('\n')}\n`
+  return joinStandaloneTikzLines(lines)
+}
+
+function assembleInlineMathTikz({
+  context,
+  layers,
+  bodySections,
+}: {
+  context: GenerateContext
+  layers: number[]
+  bodySections: string[][]
+}): string {
+  const lines = [
+    ...emitTikzPictureStart(context),
+    ...section(
+      'Styles and colors',
+      [
+        ...emitExportModeComment(context),
+        ...emitRequiredLibraryComment(context),
+        ...emitExternalTikzStyleLoadComment(context),
+        ...emitColorDefinitions(context, true),
+        ...emitLocalStyleTikzset(context),
+        ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
+        ...emitTikzCameraSetup(context),
+      ],
+      context.exportMode,
+    ),
+    ...emitBodySections(context, bodySections),
+    '\\end{tikzpicture}',
+  ]
+
+  return joinInlineMathTikzLines(lines)
 }
 
 function emitExportModeComment(context: GenerateContext): string[] {
@@ -425,12 +490,20 @@ function emitExportModeComment(context: GenerateContext): string[] {
     return []
   }
 
-  return [
-    '% TikZ export mode: inline math. Phase 18B/18C will move setup and remove blank lines.',
-  ]
+  return ['% TikZ export mode: inline math. Setup is local to this tikzpicture.']
 }
 
 function emitTikzPictureStart(context: GenerateContext): string[] {
+  if (context.exportMode === 'inlineMath') {
+    return [
+      `\\begin{tikzpicture}[${[
+        inlineMathBaselineTikzOption,
+        'line cap=round',
+        'line join=round',
+      ].join(', ')}]`,
+    ]
+  }
+
   const baseOptions =
     context.mode === '2d'
       ? ['line cap=round', 'line join=round']
@@ -442,6 +515,52 @@ function emitTikzPictureStart(context: GenerateContext): string[] {
   }
 
   return ['\\begin{tikzpicture}[', ...formatTikzOptions(options), ']']
+}
+
+function emitColorDefinitions(
+  context: GenerateContext,
+  includeInlineHeading: boolean,
+): string[] {
+  const definitions = context.colors.emitDefinitions()
+
+  if (definitions.length === 0) {
+    return []
+  }
+
+  return includeInlineHeading
+    ? ['% Local colors', ...definitions, '']
+    : definitions
+}
+
+function emitLocalStyleTikzset(context: GenerateContext): string[] {
+  const definitions = context.localStyles.emitDefinitions()
+
+  if (definitions.length === 0) {
+    return []
+  }
+
+  return ['% Local styles', '\\tikzset{', ...formatTikzOptions(definitions), '}', '']
+}
+
+function emitBodySections(
+  context: GenerateContext,
+  bodySections: string[][],
+): string[] {
+  const lines = bodySections.flat()
+
+  if (
+    context.exportMode === 'inlineMath' &&
+    context.mode === '3d' &&
+    context.camera3d !== undefined
+  ) {
+    return [
+      '\\begin{scope}[tdplot_main_coords]',
+      ...indentLines(lines),
+      '\\end{scope}',
+    ]
+  }
+
+  return lines
 }
 
 function emitTikzCameraSetup(context: GenerateContext): string[] {
@@ -1272,17 +1391,34 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
 
   const options = labelStyleOptions(label, context)
   const coordinate = formatCoordinate(label.position, context.mode)
+  const labelText = formatLabelTextForTikz(label.text, context.exportMode)
 
   if (options.length === 0) {
-    return [`\\node at ${coordinate} {${label.text}};`, '']
+    return [`\\node at ${coordinate} {${labelText}};`, '']
   }
 
   return [
     '\\node[',
     ...formatTikzOptions(options),
-    `] at ${coordinate} {${label.text}};`,
+    `] at ${coordinate} {${labelText}};`,
     '',
   ]
+}
+
+function formatLabelTextForTikz(
+  labelText: string,
+  exportMode: TikzExportMode,
+): string {
+  if (exportMode !== 'inlineMath') {
+    return labelText
+  }
+
+  // Inline math export is commonly pasted into align-like environments, where
+  // physical blank lines are invalid. Normalize raw label line breaks only in
+  // emitted TikZ; the stored label text remains unchanged.
+  return labelText
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]*\n+[^\S\n]*/g, ' ')
 }
 
 function emitLayeredItems<T extends { layer: number }>(
@@ -2334,7 +2470,38 @@ function formatTikzOptions(options: string[]): string[] {
   )
 }
 
-function section(title: string, lines: string[]): string[] {
+function joinStandaloneTikzLines(lines: string[]): string {
+  return `${lines.join('\n')}\n`
+}
+
+function joinInlineMathTikzLines(lines: string[]): string {
+  return removeBlankLinesForInlineMath(lines).join('\n')
+}
+
+function removeBlankLinesForInlineMath(lines: string[]): string[] {
+  return lines.filter(isNonBlankLine)
+}
+
+function isNonBlankLine(line: string): boolean {
+  return !/^\s*$/.test(line)
+}
+
+function section(
+  title: string,
+  lines: string[],
+  exportMode: TikzExportMode = 'standalone',
+): string[] {
+  if (exportMode === 'inlineMath') {
+    const separator = '%----------------------------------------'
+
+    return [
+      separator,
+      `% ${title}`,
+      separator,
+      ...lines.filter(isNonBlankLine),
+    ]
+  }
+
   return [
     '% ----------------------------------------------------------------------------',
     `% ${title}`,
