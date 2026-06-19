@@ -53,7 +53,11 @@ export type Camera = Camera2D | Camera3D
 export type DiagramViewOptions = {
   camera3d?: Camera3D
   showCoordinateAxesInTikz?: boolean
+  exportMode?: TikzExportMode
 }
+
+export const tikzExportModes = ['standalone', 'inlineMath'] as const
+export type TikzExportMode = (typeof tikzExportModes)[number]
 
 export type CoordinateInputMode = 'direct' | 'cursor'
 

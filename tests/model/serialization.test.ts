@@ -75,6 +75,34 @@ test('serializeDiagram writes 3D camera as view metadata', () => {
   assert.equal(parsed.diagram.view?.showCoordinateAxesInTikz, true)
 })
 
+test('serializeDiagram can persist TikZ export mode as view metadata', () => {
+  const serialized = serializeDiagram(twoDimensionalExample, {
+    exportMode: 'inlineMath',
+  })
+  const parsed = JSON.parse(serialized) as {
+    diagram: {
+      view?: {
+        exportMode?: unknown
+      }
+    }
+  }
+
+  assert.equal(parsed.diagram.view?.exportMode, 'inlineMath')
+})
+
+test('parseSavedDiagramJson loads saved TikZ export mode metadata', () => {
+  const result = parseSavedDiagramJson(
+    serializeDiagram(twoDimensionalExample, { exportMode: 'inlineMath' }),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.view?.exportMode, 'inlineMath')
+})
+
 test('serializeDiagram omits deprecated 3D projectionBasis metadata', () => {
   const camera: Camera3D = {
     mode: '3d',
@@ -271,6 +299,31 @@ test('old diagrams without user style presets still load', () => {
   assert.equal(result.diagram.userStylePresets, undefined)
   assert.equal(result.diagram.externalTikzStyleSources, undefined)
   assert.equal(result.diagram.importedTikzStyleReferences, undefined)
+})
+
+test('old saved diagrams without TikZ export mode still load as standalone', () => {
+  const saved = JSON.parse(
+    serializeDiagram(twoDimensionalExample, { exportMode: 'inlineMath' }),
+  ) as {
+    diagram: {
+      view?: {
+        exportMode?: unknown
+      }
+    }
+  }
+
+  if (saved.diagram.view !== undefined) {
+    delete saved.diagram.view.exportMode
+  }
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.view?.exportMode ?? 'standalone', 'standalone')
 })
 
 test('parseSavedDiagramJson rejects duplicate user style preset ids', () => {

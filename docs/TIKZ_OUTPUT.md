@@ -8,6 +8,31 @@ Do not emit one huge unreadable path.
 
 The output should look like code a human might have written.
 
+## Export Modes
+
+StratifiedTikZ has two TikZ export modes:
+
+- `standalone`: the default, traditional output intended for ordinary
+  `tikzpicture` snippets. Existing standalone output remains the compatibility
+  baseline.
+- `inlineMath`: intended for use inside math environments such as `align`, where
+  each diagram is still exported as an independent `tikzpicture`.
+
+Phase 18A adds the model, UI selector, persistence, and generator option
+plumbing for these modes. Inline math output currently includes a temporary
+comment marker so the selected mode is visible in generated source. Later Phase
+18 subphases will move setup commands inside each picture, add the inline
+baseline option, and remove blank lines from inline snippets.
+
+The selected mode affects only TikZ output. It does not affect SVG preview,
+diagram geometry, layer membership, camera controls, or undo/redo history.
+Standalone is used when no saved export mode is present.
+
+The editor treats the selected export mode as export UI state. When JSON is
+downloaded from the UI, the preference is persisted as `diagram.view.exportMode`
+alongside other view/export preferences. Old saved diagrams without that field
+load using `standalone`.
+
 ## Reference examples and presets
 
 The app ships editable reference examples for common export patterns:

@@ -24,6 +24,7 @@ import type {
   PathSegment,
   PathTemplate,
   StylePresetKind,
+  TikzExportMode,
   TikzStyleTarget,
   UserStylePreset,
   Vec3,
@@ -121,6 +122,7 @@ type PathSegmentCoordinateNames =
 export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
   camera3d?: Camera3D
+  exportMode?: TikzExportMode
 }
 
 type GenerateContext = {
@@ -136,6 +138,7 @@ type GenerateContext = {
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
   includeCoordinateAxes: boolean
+  exportMode: TikzExportMode
 }
 
 const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
@@ -358,6 +361,7 @@ function createContext(
     requiresTikz3dLibrary: false,
     includeCoordinateAxes:
       mode === '3d' && options.includeCoordinateAxes === true,
+    exportMode: options.exportMode ?? 'standalone',
   }
 }
 
@@ -401,6 +405,7 @@ function assembleTikz({
 }): string {
   const lines = [
     ...section('Styles and colors', [
+      ...emitExportModeComment(context),
       ...emitRequiredLibraryComment(context),
       ...emitExternalTikzStyleLoadComment(context),
       ...context.colors.emitDefinitions(),
@@ -413,6 +418,16 @@ function assembleTikz({
   ]
 
   return `${lines.join('\n')}\n`
+}
+
+function emitExportModeComment(context: GenerateContext): string[] {
+  if (context.exportMode !== 'inlineMath') {
+    return []
+  }
+
+  return [
+    '% TikZ export mode: inline math. Phase 18B/18C will move setup and remove blank lines.',
+  ]
 }
 
 function emitTikzPictureStart(context: GenerateContext): string[] {
