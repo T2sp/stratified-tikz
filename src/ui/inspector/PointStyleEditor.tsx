@@ -1,5 +1,6 @@
 import { pointFills, pointShapes } from '../../model/types.ts'
 import type {
+  Diagram,
   HexColor,
   PointFill,
   PointShape,
@@ -16,14 +17,17 @@ import {
   EditablePositiveNumberField,
   EditableSelectField,
 } from './InspectorField.tsx'
+import { UserStylePresetControls } from './UserStylePresetControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type PointStyleEditorProps = {
+  diagram: Diagram
   point: PointStratum
   onDiagramChange: DiagramChangeHandler
 }
 
 export function PointStyleEditor({
+  diagram,
   point,
   onDiagramChange,
 }: PointStyleEditorProps) {
@@ -54,6 +58,13 @@ export function PointStyleEditor({
             ))}
           </div>
         </div>
+        <UserStylePresetControls
+          diagram={diagram}
+          kind="point"
+          currentStyle={point.style}
+          target={{ kind: 'stratum', id: point.id }}
+          onDiagramChange={onDiagramChange}
+        />
         <EditableColorField
           label="Color"
           value={point.style.color}

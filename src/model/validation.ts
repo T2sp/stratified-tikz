@@ -21,6 +21,10 @@ import {
   isPointShape,
   isPositiveFiniteNumber,
 } from './styles.ts'
+import {
+  isStylePresetKind,
+  sanitizeTikzStyleName,
+} from './stylePresets.ts'
 import { sheetVertices } from './sheets.ts'
 import {
   arcSegmentExpectedEnd,
@@ -60,6 +64,7 @@ import type {
   SheetStyle,
   Stratum,
   TextLabel,
+  UserStylePreset,
   Vec2,
   Vec3,
   WorkPlaneFrameSnapshot,
@@ -86,6 +91,11 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   validateCamera(diagram.camera, diagram.ambientDimension, 'camera', errors)
   validateDiagramView(diagram.view, diagram.ambientDimension, 'view', errors)
   validateDiagramLayers(diagram.layers, 'layers', errors)
+  validateUserStylePresets(
+    diagram.userStylePresets,
+    'userStylePresets',
+    errors,
+  )
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -106,9 +116,105 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     )
   })
 
+  validateUserStylePresetReferences(diagram, errors)
+
   return {
     valid: errors.length === 0,
     errors,
+  }
+}
+
+function validateUserStylePresets(
+  presets: UserStylePreset[] | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (presets === undefined) {
+    return
+  }
+
+  if (!Array.isArray(presets)) {
+    pushError(errors, path, 'User style presets must be an array.')
+    return
+  }
+
+  const seenIds = new Map<string, string>()
+  const seenTikzNames = new Map<string, string>()
+
+  presets.forEach((preset, index) => {
+    const presetPath = `${path}[${index}]`
+
+    if (typeof preset !== 'object' || preset === null || Array.isArray(preset)) {
+      pushError(errors, presetPath, 'User style preset must be an object.')
+      return
+    }
+
+    validateId(preset.id, `${presetPath}.id`, errors)
+    addUniqueId(preset.id, `${presetPath}.id`, seenIds, errors)
+
+    if (typeof preset.name !== 'string' || preset.name.trim().length === 0) {
+      pushError(errors, `${presetPath}.name`, 'Preset name must be non-empty.')
+    }
+
+    if (!isStylePresetKind(preset.kind)) {
+      pushError(errors, `${presetPath}.kind`, 'Preset kind is not supported.')
+      return
+    }
+
+    validateTikzStyleName(
+      preset.tikzStyleName,
+      `${presetPath}.tikzStyleName`,
+      errors,
+    )
+    addUniqueId(
+      preset.tikzStyleName,
+      `${presetPath}.tikzStyleName`,
+      seenTikzNames,
+      errors,
+    )
+    validateUserStylePresetStyle(preset, `${presetPath}.style`, errors)
+  })
+}
+
+function validateUserStylePresetStyle(
+  preset: UserStylePreset,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  switch (preset.kind) {
+    case 'region':
+      validateRegionStyle(preset.style, path, errors)
+      return
+    case 'sheet':
+      validateSheetStyle(preset.style, path, errors)
+      return
+    case 'curve':
+      validateCurveStyle(preset.style, path, errors)
+      return
+    case 'point':
+      validatePointStyle(preset.style, path, errors)
+      return
+    case 'label':
+      validateLabelStyle(preset.style, path, errors)
+      return
+  }
+}
+
+function validateTikzStyleName(
+  tikzStyleName: string,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (
+    typeof tikzStyleName !== 'string' ||
+    tikzStyleName.trim().length === 0
+  ) {
+    pushError(errors, path, 'TikZ style name must be non-empty.')
+    return
+  }
+
+  if (sanitizeTikzStyleName(tikzStyleName, 'stratifiedStylePreset') !== tikzStyleName) {
+    pushError(errors, path, 'TikZ style name must be sanitized.')
   }
 }
 
@@ -1620,6 +1726,80 @@ function validateUniqueIds(
   diagram.labels.forEach((label, index) => {
     addUniqueId(label.id, `labels[${index}].id`, seenIds, errors)
   })
+}
+
+function validateUserStylePresetReferences(
+  diagram: Diagram,
+  errors: DiagramValidationIssue[],
+): void {
+  const presetsById = new Map(
+    (diagram.userStylePresets ?? []).map((preset) => [preset.id, preset]),
+  )
+
+  diagram.strata.forEach((stratum, index) => {
+    validateUserStylePresetReference(
+      stratum.stylePresetId,
+      stylePresetKindForStratum(stratum),
+      `strata[${index}].stylePresetId`,
+      presetsById,
+      errors,
+    )
+  })
+
+  diagram.labels.forEach((label, index) => {
+    validateUserStylePresetReference(
+      label.stylePresetId,
+      'label',
+      `labels[${index}].stylePresetId`,
+      presetsById,
+      errors,
+    )
+  })
+}
+
+function validateUserStylePresetReference(
+  presetId: string | undefined,
+  expectedKind: UserStylePreset['kind'],
+  path: string,
+  presetsById: Map<string, UserStylePreset>,
+  errors: DiagramValidationIssue[],
+): void {
+  if (presetId === undefined) {
+    return
+  }
+
+  if (typeof presetId !== 'string' || presetId.trim().length === 0) {
+    pushError(errors, path, 'Style preset reference must be non-empty.')
+    return
+  }
+
+  const preset = presetsById.get(presetId)
+
+  if (preset === undefined) {
+    pushError(errors, path, 'Style preset reference does not exist.')
+    return
+  }
+
+  if (preset.kind !== expectedKind) {
+    pushError(
+      errors,
+      path,
+      `Style preset reference must point to a ${expectedKind} preset.`,
+    )
+  }
+}
+
+function stylePresetKindForStratum(stratum: Stratum): UserStylePreset['kind'] {
+  switch (stratum.geometricKind) {
+    case 'region':
+      return 'region'
+    case 'sheet':
+      return 'sheet'
+    case 'curve':
+      return 'curve'
+    case 'point':
+      return 'point'
+  }
 }
 
 function addUniqueId(

@@ -1,5 +1,10 @@
 import { lineStyles } from '../../model/types.ts'
-import type { CurveStratum, HexColor, LineStyle } from '../../model/types.ts'
+import type {
+  CurveStratum,
+  Diagram,
+  HexColor,
+  LineStyle,
+} from '../../model/types.ts'
 import {
   cloneStylePreset,
   curveStylePresets,
@@ -11,14 +16,17 @@ import {
   EditablePositiveNumberField,
   EditableSelectField,
 } from './InspectorField.tsx'
+import { UserStylePresetControls } from './UserStylePresetControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type CurveStyleEditorProps = {
+  diagram: Diagram
   curve: CurveStratum
   onDiagramChange: DiagramChangeHandler
 }
 
 export function CurveStyleEditor({
+  diagram,
   curve,
   onDiagramChange,
 }: CurveStyleEditorProps) {
@@ -49,6 +57,13 @@ export function CurveStyleEditor({
             ))}
           </div>
         </div>
+        <UserStylePresetControls
+          diagram={diagram}
+          kind="curve"
+          currentStyle={curve.style}
+          target={{ kind: 'stratum', id: curve.id }}
+          onDiagramChange={onDiagramChange}
+        />
         <EditableColorField
           label="Stroke color"
           value={curve.style.strokeColor}

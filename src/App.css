@@ -1385,6 +1385,16 @@
   min-width: 0;
 }
 
+.style-preset-manager {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.style-preset-select {
+  min-height: 31px;
+}
+
 .style-preset-button {
   min-width: 0;
   padding: 5px 8px;

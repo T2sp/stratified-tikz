@@ -5,6 +5,13 @@ import {
   isOrthographicCamera3D,
 } from './camera.ts'
 import { createDefaultCamera2D } from './constructors.ts'
+import {
+  isStylePresetKind,
+  normalizeStylePresetName,
+  sanitizeTikzStyleName,
+  tikzStyleNameFromPresetName,
+  uniqueTikzStyleName,
+} from './stylePresets.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -14,7 +21,14 @@ import type {
   DiagramLayer,
   DiagramValidationResult,
   DiagramViewOptions,
+  StylePresetKind,
   OrthographicCamera3D,
+  RegionStyle,
+  SheetStyle,
+  CurveStyle,
+  PointStyle,
+  LabelStyle,
+  UserStylePreset,
   Stratum,
   TextLabel,
 } from './types.ts'
@@ -30,6 +44,7 @@ export type PersistentDiagram = {
   camera?: Camera
   view?: DiagramViewOptions
   layers?: DiagramLayer[]
+  userStylePresets?: UserStylePreset[]
   strata: Stratum[]
   labels: TextLabel[]
 }
@@ -62,6 +77,7 @@ type SavedDiagramInput = {
   camera?: unknown
   view?: unknown
   layers?: unknown
+  userStylePresets?: unknown
   strata: unknown[]
   labels: unknown[]
 }
@@ -170,12 +186,17 @@ function toPersistentDiagram(
 ): PersistentDiagram {
   const view = normalizePersistentView(diagram, options)
   const layers = normalizePersistentLayers(diagram)
+  const userStylePresets =
+    diagram.userStylePresets === undefined || diagram.userStylePresets.length === 0
+      ? undefined
+      : diagram.userStylePresets
 
   return {
     version: diagram.version,
     ambientDimension: diagram.ambientDimension,
     ...(view === undefined ? {} : { view }),
     ...(layers === undefined ? {} : { layers }),
+    ...(userStylePresets === undefined ? {} : { userStylePresets }),
     strata: diagram.strata,
     labels: diagram.labels,
   }
@@ -238,11 +259,34 @@ function normalizeLoadedDiagram(
   const warnings: string[] = []
   const camera = normalizeLoadedCamera(savedDiagram, warnings)
   const view = normalizeLoadedView(savedDiagram, camera, warnings)
+  const presetNormalization = normalizeLoadedUserStylePresets(
+    savedDiagram.userStylePresets,
+  )
+  warnings.push(...presetNormalization.warnings)
+
+  if (presetNormalization.errors.length > 0) {
+    return {
+      diagram: {
+        version: savedDiagram.version,
+        ambientDimension: savedDiagram.ambientDimension,
+        camera,
+        ...(view === undefined ? {} : { view }),
+        strata: savedDiagram.strata as Stratum[],
+        labels: savedDiagram.labels as TextLabel[],
+      },
+      warnings,
+      errors: presetNormalization.errors,
+    }
+  }
+
   const diagramWithoutLayers: Diagram = {
     version: savedDiagram.version,
     ambientDimension: savedDiagram.ambientDimension,
     camera,
     ...(view === undefined ? {} : { view }),
+    ...(presetNormalization.userStylePresets === undefined
+      ? {}
+      : { userStylePresets: presetNormalization.userStylePresets }),
     strata: savedDiagram.strata as Stratum[],
     labels: savedDiagram.labels as TextLabel[],
   }
@@ -263,6 +307,157 @@ function normalizeLoadedDiagram(
     diagram,
     warnings,
     errors: layerNormalization.errors,
+  }
+}
+
+function normalizeLoadedUserStylePresets(
+  savedPresets: unknown,
+): {
+  userStylePresets?: UserStylePreset[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedPresets === undefined) {
+    return {
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedPresets)) {
+    return {
+      warnings: [],
+      errors: ['userStylePresets must be an array when present.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const seenIds = new Set<string>()
+  const usedTikzNames: string[] = []
+  const userStylePresets = savedPresets.flatMap(
+    (savedPreset, index): UserStylePreset[] => {
+      const presetPath = `userStylePresets[${index}]`
+
+      if (!isRecord(savedPreset)) {
+        errors.push(`${presetPath} must be a style preset object.`)
+        return []
+      }
+
+      if (typeof savedPreset.id !== 'string' || savedPreset.id.trim().length === 0) {
+        errors.push(`${presetPath}.id must be non-empty.`)
+        return []
+      }
+
+      if (seenIds.has(savedPreset.id)) {
+        errors.push(`${presetPath}.id duplicates an earlier preset id.`)
+        return []
+      }
+      seenIds.add(savedPreset.id)
+
+      if (
+        typeof savedPreset.kind !== 'string' ||
+        !isStylePresetKind(savedPreset.kind)
+      ) {
+        errors.push(`${presetPath}.kind is not supported.`)
+        return []
+      }
+
+      const kind = savedPreset.kind
+      const name = loadedStylePresetName(savedPreset.name, kind, index, warnings)
+      const tikzStyleName = loadedTikzStyleName(
+        savedPreset.tikzStyleName,
+        name,
+        kind,
+        index,
+        usedTikzNames,
+        warnings,
+      )
+      usedTikzNames.push(tikzStyleName)
+
+      if (!isRecord(savedPreset.style)) {
+        errors.push(`${presetPath}.style must be a style object.`)
+        return []
+      }
+
+      return [
+        loadedUserStylePreset(
+          savedPreset.id,
+          name,
+          kind,
+          savedPreset.style,
+          tikzStyleName,
+        ),
+      ]
+    },
+  )
+
+  return {
+    ...(userStylePresets.length === 0 ? {} : { userStylePresets }),
+    warnings,
+    errors,
+  }
+}
+
+function loadedStylePresetName(
+  savedName: unknown,
+  kind: StylePresetKind,
+  index: number,
+  warnings: string[],
+): string {
+  if (typeof savedName === 'string' && savedName.trim().length > 0) {
+    return normalizeStylePresetName(savedName, kind)
+  }
+
+  warnings.push(
+    `Saved style preset ${index + 1} has a blank name; using a default name.`,
+  )
+  return normalizeStylePresetName('', kind)
+}
+
+function loadedTikzStyleName(
+  savedTikzStyleName: unknown,
+  name: string,
+  kind: StylePresetKind,
+  index: number,
+  usedTikzNames: readonly string[],
+  warnings: string[],
+): string {
+  const fallback = tikzStyleNameFromPresetName(name, kind)
+  const rawName =
+    typeof savedTikzStyleName === 'string' && savedTikzStyleName.trim().length > 0
+      ? savedTikzStyleName
+      : fallback
+  const sanitized = sanitizeTikzStyleName(rawName, fallback)
+  const unique = uniqueTikzStyleName(sanitized, usedTikzNames)
+
+  if (rawName !== unique) {
+    warnings.push(
+      `Saved style preset ${index + 1} TikZ style name was normalized to ${unique}.`,
+    )
+  }
+
+  return unique
+}
+
+function loadedUserStylePreset(
+  id: string,
+  name: string,
+  kind: StylePresetKind,
+  style: Record<string, unknown>,
+  tikzStyleName: string,
+): UserStylePreset {
+  switch (kind) {
+    case 'region':
+      return { id, name, kind, style: style as RegionStyle, tikzStyleName }
+    case 'sheet':
+      return { id, name, kind, style: style as SheetStyle, tikzStyleName }
+    case 'curve':
+      return { id, name, kind, style: style as CurveStyle, tikzStyleName }
+    case 'point':
+      return { id, name, kind, style: style as PointStyle, tikzStyleName }
+    case 'label':
+      return { id, name, kind, style: style as LabelStyle, tikzStyleName }
   }
 }
 

@@ -25,6 +25,10 @@ import {
   createInitialCamera3D,
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
+import {
+  applyUserStylePresetToStratum,
+  createUserStylePresetFromStyle,
+} from '../../src/model/stylePresets.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -313,6 +317,125 @@ test('custom colors are emitted as definecolor commands', () => {
   assert.match(tikz, /\\definecolor\{stzSheetpageFill\}\{HTML\}\{4D9DE0\}/)
   assert.match(tikz, /\\definecolor\{stzCurvelineStroke\}\{HTML\}\{FF00AA\}/)
   assert.match(tikz, /\\definecolor\{stzPointjunction\}\{HTML\}\{00AA33\}/)
+})
+
+test('user curve presets are emitted as tikzpicture local style options', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Black curve',
+    {
+      ...curve.style,
+      strokeColor: '#000000',
+      lineWidth: 0.8,
+    },
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const tikz = generateTikz(withPreset)
+  const styleDefinition = 'stratifiedStyleBlackCurve/.style='
+
+  assert.ok(tikz.indexOf(styleDefinition) > tikz.indexOf('\\begin{tikzpicture}['))
+  assert.ok(tikz.indexOf(styleDefinition) < tikz.indexOf('% Coordinates'))
+  assert.match(
+    tikz,
+    /stratifiedStyleBlackCurve\/\.style=\{draw=stzStyleusercurveblackcurveStroke, draw opacity=1, line width=0\.8pt\}/,
+  )
+})
+
+test('user preset export does not emit a pre-picture tikzset block', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'No tikzset curve',
+    curve.style,
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const tikz = generateTikz(withPreset)
+
+  assert.doesNotMatch(tikz, /\\tikzset\{/)
+})
+
+test('commands reference the local user preset style when style still matches', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Referenced curve',
+    curve.style,
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const tikz = generateTikz(withPreset)
+
+  assert.match(tikz, /\\draw\[\n\s+stratifiedStyleReferencedCurve\n\s+\]/)
+})
+
+test('stale user preset references fall back to inline structured style', () => {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Stale curve',
+    curve.style,
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const staleDiagram: Diagram = {
+    ...withPreset,
+    strata: withPreset.strata.map((stratum) =>
+      stratum.id === curve.id && stratum.geometricKind === 'curve'
+        ? {
+            ...stratum,
+            style: { ...stratum.style, lineStyle: 'dashed' },
+          }
+        : stratum,
+    ),
+  }
+  const tikz = generateTikz(staleDiagram)
+
+  assert.doesNotMatch(tikz, /stratifiedStyleStaleCurve\/\.style=/)
+  assert.match(tikz, /draw=stzCurvewireStroke/)
+  assert.match(tikz, /dashed/)
 })
 
 test('TikZ layer names are deterministic and TikZ-safe', () => {

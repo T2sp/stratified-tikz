@@ -5,6 +5,10 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import { setLayerLock } from '../../src/model/layers.ts'
+import {
+  applyUserStylePresetToStratum,
+  createUserStylePresetFromStyle,
+} from '../../src/model/stylePresets.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import {
   createInspectorCompactSummary,
@@ -1474,6 +1478,36 @@ test('updateStratumStyleById updates curve style immutably', () => {
     updated.strata.find((stratum) => stratum.id === 'hiddenWire'),
     twoDimensionalExample.strata.find((stratum) => stratum.id === 'hiddenWire'),
   )
+})
+
+test('manual stratum style edits clear applied user preset references', () => {
+  const visibleWire = twoDimensionalExample.strata.find(
+    (stratum) => stratum.id === 'visibleWire',
+  )
+
+  if (visibleWire?.geometricKind !== 'curve') {
+    throw new Error('Expected visibleWire to be a curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    twoDimensionalExample,
+    'curve',
+    'Editable wire',
+    visibleWire.style,
+  )
+  const applied = applyUserStylePresetToStratum(
+    created?.diagram ?? twoDimensionalExample,
+    'visibleWire',
+    created?.preset.id ?? '',
+  )
+  const edited = updateStratumStyleById(applied, 'visibleWire', (style) =>
+    style.kind === 'curveStyle' ? { ...style, lineWidth: 2 } : style,
+  )
+  const editedWire = edited.strata.find(
+    (stratum) => stratum.id === 'visibleWire',
+  )
+
+  assert.equal(editedWire?.stylePresetId, undefined)
 })
 
 test('updateStratumStyleById updates point shape and fill immutably', () => {

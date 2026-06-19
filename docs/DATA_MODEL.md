@@ -52,6 +52,7 @@ export type Diagram = {
   camera: Camera;
   view?: DiagramViewOptions;
   layers?: DiagramLayer[];
+  userStylePresets?: UserStylePreset[];
   strata: Stratum[];
   labels: Label[];
 };
@@ -60,6 +61,32 @@ export type Diagram = {
 An empty canvas is represented by the same `Diagram` shape with `strata: []`
 and `labels: []`. Empty 2D and empty 3D diagrams are valid ordinary diagrams,
 not a separate null or draft state.
+
+`userStylePresets` is optional for backward compatibility. It stores
+user-created structured style presets that affect export. Built-in presets are
+not stored in the diagram.
+
+```ts
+type StylePresetKind =
+  | "region"
+  | "sheet"
+  | "curve"
+  | "point"
+  | "label";
+
+type UserStylePreset = {
+  id: string;
+  name: string;
+  kind: StylePresetKind;
+  style: RegionStyle | SheetStyle | CurveStyle | PointStyle | LabelStyle;
+  tikzStyleName: string;
+};
+```
+
+Elements may store `stylePresetId` when a user preset is applied. The explicit
+structured `style` object remains the model source of truth. Direct Inspector
+style edits clear `stylePresetId`; deleting a user preset also clears matching
+references while keeping the element's materialized style.
 
 ## Layer metadata
 

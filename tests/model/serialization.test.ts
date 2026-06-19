@@ -7,11 +7,16 @@ import {
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
+  createEmptyDiagram,
+} from '../../src/model/constructors.ts'
+import {
+  applyUserStylePresetToStratum,
+  createUserStylePresetFromStyle,
   parseSavedDiagramJson,
   savedDiagramFormat,
   savedDiagramVersion,
   serializeDiagram,
-} from '../../src/model/serialization.ts'
+} from '../../src/model/index.ts'
 import type {
   Camera3D,
   Diagram,
@@ -114,6 +119,101 @@ test('parseSavedDiagramJson returns a valid saved diagram', () => {
   }
 
   assert.deepEqual(result.diagram, ensureLayerMetadata(threeDimensionalExample))
+})
+
+test('user style presets save and load with element references', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'wire',
+    name: 'Wire',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#CC0033',
+      strokeOpacity: 0.75,
+      lineWidth: 1.8,
+      lineStyle: 'dashed',
+    },
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Reusable wire',
+    diagram.strata[0].style,
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    'wire',
+    created?.preset.id ?? '',
+  )
+  const result = parseSavedDiagramJson(serializeDiagram(withPreset))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.userStylePresets, withPreset.userStylePresets)
+  assert.equal(result.diagram.strata[0]?.stylePresetId, created?.preset.id)
+})
+
+test('old diagrams without user style presets still load', () => {
+  const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
+    diagram: {
+      userStylePresets?: unknown
+    }
+  }
+  delete saved.diagram.userStylePresets
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.userStylePresets, undefined)
+})
+
+test('parseSavedDiagramJson rejects duplicate user style preset ids', () => {
+  const created = createUserStylePresetFromStyle(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    'curve',
+    'Duplicate',
+    {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+  )
+  const saved = JSON.parse(
+    serializeDiagram(created?.diagram ?? createEmptyDiagram({ ambientDimension: 2 })),
+  ) as {
+    diagram: {
+      userStylePresets: unknown[]
+    }
+  }
+
+  saved.diagram.userStylePresets.push(saved.diagram.userStylePresets[0])
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected duplicate preset ids to be rejected.')
+  }
+  assert.match(result.error, /duplicates an earlier preset id/)
 })
 
 test('parseSavedDiagramJson migrates legacy 3D projected-basis cameras', () => {

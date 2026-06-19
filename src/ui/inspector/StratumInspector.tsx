@@ -76,7 +76,11 @@ export function StratumInspector({
         onDiagramChange={onDiagramChange}
       />
 
-      <StyleEditor stratum={stratum} onDiagramChange={onDiagramChange} />
+      <StyleEditor
+        diagram={diagram}
+        stratum={stratum}
+        onDiagramChange={onDiagramChange}
+      />
     </div>
   )
 }

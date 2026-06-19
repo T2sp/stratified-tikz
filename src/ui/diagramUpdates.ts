@@ -212,19 +212,27 @@ export function updateStratumStyleById(
     switch (stratum.geometricKind) {
       case 'region': {
         const style = updater(stratum.style)
-        return style.kind === 'regionStyle' ? { ...stratum, style } : stratum
+        return style.kind === 'regionStyle'
+          ? clearStylePresetReference({ ...stratum, style })
+          : stratum
       }
       case 'sheet': {
         const style = updater(stratum.style)
-        return style.kind === 'sheetStyle' ? { ...stratum, style } : stratum
+        return style.kind === 'sheetStyle'
+          ? clearStylePresetReference({ ...stratum, style })
+          : stratum
       }
       case 'curve': {
         const style = updater(stratum.style)
-        return style.kind === 'curveStyle' ? { ...stratum, style } : stratum
+        return style.kind === 'curveStyle'
+          ? clearStylePresetReference({ ...stratum, style })
+          : stratum
       }
       case 'point': {
         const style = updater(stratum.style)
-        return style.kind === 'pointStyle' ? { ...stratum, style } : stratum
+        return style.kind === 'pointStyle'
+          ? clearStylePresetReference({ ...stratum, style })
+          : stratum
       }
     }
   })
@@ -236,9 +244,19 @@ export function updateLabelStyleById(
   updater: (style: LabelStyle) => LabelStyle,
 ): Diagram {
   return updateLabelById(diagram, id, (label) => ({
-    ...label,
+    ...clearStylePresetReference(label),
     style: updater(label.style),
   }))
+}
+
+function clearStylePresetReference<T extends { stylePresetId?: string }>(
+  value: T,
+): T {
+  const nextValue = { ...value }
+
+  delete nextValue.stylePresetId
+
+  return nextValue
 }
 
 export type AddPointStratumOptions = {
