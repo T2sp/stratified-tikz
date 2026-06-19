@@ -148,6 +148,7 @@ const coordinateAxesGuideLabelOffset = 0.25
 const inlineMathBaselineTikzOption =
   'baseline={([yshift=-.5ex]current bounding box.center)}'
 const inlineMathCommentSeparatorLine = '%----------------------------------------'
+const TIKZ_INDENT = '    '
 export const maxCurvedSheetTikzFaces = 256
 
 export function generateTikz(
@@ -452,7 +453,7 @@ function assembleStandaloneTikz({
       ...emitTikzCameraSetup(context),
       ...emitTikzPictureStart(context),
     ]),
-    ...bodySections.flat(),
+    ...indentLines(bodySections.flat()),
     '\\end{tikzpicture}',
   ]
 
@@ -470,24 +471,28 @@ function assembleInlineMathTikz({
 }): string {
   const lines = [
     ...emitTikzPictureStart(context),
-    ...section(
-      'Styles and colors',
+    ...indentLines(
       [
-        ...emitExportModeComment(context),
-        ...emitRequiredLibraryComment(context),
-        ...emitExternalTikzStyleLoadComment(context),
-        ...emitColorDefinitions(context, true),
-        ...emitLocalStyleTikzset(context),
-        ...emitTikzLayerDeclarations(
-          layers,
-          context.includeCoordinateAxes,
+        ...section(
+          'Styles and colors',
+          [
+            ...emitExportModeComment(context),
+            ...emitRequiredLibraryComment(context),
+            ...emitExternalTikzStyleLoadComment(context),
+            ...emitColorDefinitions(context, true),
+            ...emitLocalStyleTikzset(context),
+            ...emitTikzLayerDeclarations(
+              layers,
+              context.includeCoordinateAxes,
+              context.exportMode,
+            ),
+            ...emitTikzCameraSetup(context),
+          ],
           context.exportMode,
         ),
-        ...emitTikzCameraSetup(context),
+        ...emitBodySections(context, bodySections),
       ],
-      context.exportMode,
     ),
-    ...emitBodySections(context, bodySections),
     '\\end{tikzpicture}',
   ]
 
@@ -756,10 +761,12 @@ function emitCoordinateAxisGuide(
       '->',
     ]),
     ']',
-    `  ${formatCoordinate({ x: 0, y: 0, z: 0 }, '3d')} -- ${formatCoordinate(
-      end,
-      '3d',
-    )};`,
+    indentLine(
+      `${formatCoordinate({ x: 0, y: 0, z: 0 }, '3d')} -- ${formatCoordinate(
+        end,
+        '3d',
+      )};`,
+    ),
     '\\node[',
     ...formatTikzOptions([
       `text=${axisColor}`,
@@ -818,7 +825,9 @@ function emitSheet(
     `\\filldraw[`,
     ...formatTikzOptions(options),
     `]`,
-    `  ${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
+    indentLine(
+      `${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
+    ),
     '',
   ]
 }
@@ -867,9 +876,10 @@ function emitCurvedSheet(
     `Sheet${sheet.id}`,
     context,
   )
-  const faceLines = mesh.faces.map(
-    (face) =>
-      `  \\filldraw ${face.map((vertexIndex) => `(${coordinates[vertexIndex]})`).join(' -- ')} -- cycle;`,
+  const faceLines = mesh.faces.map((face) =>
+    indentLine(
+      `\\filldraw ${face.map((vertexIndex) => `(${coordinates[vertexIndex]})`).join(' -- ')} -- cycle;`,
+    ),
   )
 
   return [
@@ -953,21 +963,27 @@ function emitWorkPlaneFilledSheet(
       `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] from ${sheet.boundaries.length} closed boundary path${sheet.boundaries.length === 1 ? '' : 's'}.`,
       `% Fill rule: ${sheet.fillRule}; exported in a local TikZ 3d plane scope.`,
       '\\begin{scope}[',
-      `  plane origin={${formatCoordinate(sheet.planeFrame.origin, '3d')}},`,
-      `  plane x={${formatCoordinate(
-        addVec3(sheet.planeFrame.origin, sheet.planeFrame.u),
-        '3d',
-      )}},`,
-      `  plane y={${formatCoordinate(
-        addVec3(sheet.planeFrame.origin, sheet.planeFrame.v),
-        '3d',
-      )}},`,
-      '  canvas is plane',
+      indentLine(
+        `plane origin={${formatCoordinate(sheet.planeFrame.origin, '3d')}},`,
+      ),
+      indentLine(
+        `plane x={${formatCoordinate(
+          addVec3(sheet.planeFrame.origin, sheet.planeFrame.u),
+          '3d',
+        )}},`,
+      ),
+      indentLine(
+        `plane y={${formatCoordinate(
+          addVec3(sheet.planeFrame.origin, sheet.planeFrame.v),
+          '3d',
+        )}},`,
+      ),
+      indentLine('canvas is plane'),
       ']',
-      '  \\filldraw[',
-      ...formatTikzOptions(options).map((line) => `  ${line}`),
-      '  ]',
-      ...formatClosedBoundaryPathLines(scopedPath).map((line) => `  ${line}`),
+      indentLine('\\filldraw['),
+      ...indentLines(formatTikzOptions(options)),
+      indentLine(']'),
+      ...indentLines(formatClosedBoundaryPathLines(scopedPath)),
       '\\end{scope}',
       '',
     ]
@@ -1059,7 +1075,7 @@ function emitCurve(
       '\\draw[',
       ...formatTikzOptions(continuousOptions),
       ']',
-      `  ${formatConcatenatedPath(coordinates)};`,
+      indentLine(`${formatConcatenatedPath(coordinates)};`),
       '',
     ]
   }
@@ -1090,7 +1106,7 @@ function emitCurve(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    `  ${formatCurvePath(curve, coordinates, context.mode)};`,
+    indentLine(`${formatCurvePath(curve, coordinates, context.mode)};`),
     '',
   ]
 }
@@ -1161,7 +1177,7 @@ function emitTemplatePath(
       '\\draw[',
       ...formatTikzOptions(options),
       ']',
-      `  ${drawCommand};`,
+      indentLine(`${drawCommand};`),
       '\\end{scope}',
       '',
     ]
@@ -1171,7 +1187,7 @@ function emitTemplatePath(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    `  ${drawCommand};`,
+    indentLine(`${drawCommand};`),
     '',
   ]
 }
@@ -1208,29 +1224,35 @@ function emitTemplatePath3D(
     curve.template.kind === 'ellipseTemplate' &&
     (curve.template.rotationDeg ?? 0) !== 0
       ? [
-          `  \\begin{scope}[rotate around={${formatNumber(
-            curve.template.rotationDeg ?? 0,
-          )}:(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})}]`,
-          '    \\draw[',
-          ...formatTikzOptions(options).map((line) => `    ${line}`),
-          '    ]',
-          `      ${drawCommand};`,
-          '  \\end{scope}',
+          indentLine(
+            `\\begin{scope}[rotate around={${formatNumber(
+              curve.template.rotationDeg ?? 0,
+            )}:(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})}]`,
+          ),
+          indentLine('\\draw[', 2),
+          ...indentLines(formatTikzOptions(options), 2),
+          indentLine(']', 2),
+          indentLine(`${drawCommand};`, 3),
+          indentLine('\\end{scope}'),
         ]
       : [
-          '  \\draw[',
-          ...formatTikzOptions(options).map((line) => `  ${line}`),
-          '  ]',
-          `    ${drawCommand};`,
+          indentLine('\\draw['),
+          ...indentLines(formatTikzOptions(options)),
+          indentLine(']'),
+          indentLine(`${drawCommand};`, 2),
         ]
 
   return [
     `% Template path "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope.`,
     '\\begin{scope}[',
-    `  plane origin={${formatCoordinate(frame.origin, '3d')}},`,
-    `  plane x={${formatCoordinate(addVec3(frame.origin, frame.u), '3d')}},`,
-    `  plane y={${formatCoordinate(addVec3(frame.origin, frame.v), '3d')}},`,
-    '  canvas is plane',
+    indentLine(`plane origin={${formatCoordinate(frame.origin, '3d')}},`),
+    indentLine(
+      `plane x={${formatCoordinate(addVec3(frame.origin, frame.u), '3d')}},`,
+    ),
+    indentLine(
+      `plane y={${formatCoordinate(addVec3(frame.origin, frame.v), '3d')}},`,
+    ),
+    indentLine('canvas is plane'),
     ']',
     ...drawLines,
     '\\end{scope}',
@@ -1275,7 +1297,7 @@ function emitSavedConcatenatedPath(
     '\\path[',
     ...formatTikzOptions(options),
     ']',
-    `  ${formatConcatenatedPath(coordinates)};`,
+    indentLine(`${formatConcatenatedPath(coordinates)};`),
     '',
   ]
 }
@@ -1305,7 +1327,7 @@ function emitConcatenatedPathStyleRun(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    `  ${formatConcatenatedPath(runCoordinates)};`,
+    indentLine(`${formatConcatenatedPath(runCoordinates)};`),
     '',
   ]
 }
@@ -1332,21 +1354,27 @@ function emitScopedWorkPlaneRelativeBezierCurve(
 
   return [
     '\\begin{scope}[',
-    `  plane origin={${formatCoordinate(scopedPath.frame.origin, '3d')}},`,
-    `  plane x={${formatCoordinate(
-      addVec3(scopedPath.frame.origin, scopedPath.frame.u),
-      '3d',
-    )}},`,
-    `  plane y={${formatCoordinate(
-      addVec3(scopedPath.frame.origin, scopedPath.frame.v),
-      '3d',
-    )}},`,
-    '  canvas is plane',
+    indentLine(
+      `plane origin={${formatCoordinate(scopedPath.frame.origin, '3d')}},`,
+    ),
+    indentLine(
+      `plane x={${formatCoordinate(
+        addVec3(scopedPath.frame.origin, scopedPath.frame.u),
+        '3d',
+      )}},`,
+    ),
+    indentLine(
+      `plane y={${formatCoordinate(
+        addVec3(scopedPath.frame.origin, scopedPath.frame.v),
+        '3d',
+      )}},`,
+    ),
+    indentLine('canvas is plane'),
     ']',
-    '  \\draw[',
-    ...formatTikzOptions(options).map((line) => `  ${line}`),
-    '  ]',
-    `    ${scopedPath.path};`,
+    indentLine('\\draw['),
+    ...indentLines(formatTikzOptions(options)),
+    indentLine(']'),
+    indentLine(`${scopedPath.path};`, 2),
     '\\end{scope}',
     '',
   ]
@@ -1505,12 +1533,18 @@ function emitLayeredCommands(
   return [...layeredLines, ...emptySectionLines]
 }
 
-function indentLines(lines: string[]): string[] {
-  return lines.map((line) => (line.length === 0 ? line : `  ${line}`))
+function indentLine(line: string, level = 1): string {
+  return `${TIKZ_INDENT.repeat(level)}${line}`
+}
+
+function indentLines(lines: string[], level = 1): string[] {
+  return lines.map((line) =>
+    line.length === 0 ? line : indentLine(line, level),
+  )
 }
 
 function layerSectionComment(sectionTitle: string): string[] {
-  return commentSeparatorLines(sectionTitle, '  ')
+  return commentSeparatorLines(sectionTitle, TIKZ_INDENT)
 }
 
 function labelStyleOptions(
@@ -2168,7 +2202,7 @@ function emitFillDrawClosedBoundaries(
 
 function formatClosedBoundaryPathLines(paths: readonly string[]): string[] {
   return paths.map((path, index) =>
-    index === paths.length - 1 ? `  ${path};` : `  ${path}`,
+    indentLine(index === paths.length - 1 ? `${path};` : path),
   )
 }
 
@@ -2493,7 +2527,7 @@ function spathSaveOptions(
 
 function formatTikzOptions(options: string[]): string[] {
   return options.map((option, index) =>
-    index === options.length - 1 ? `  ${option}` : `  ${option},`,
+    indentLine(index === options.length - 1 ? option : `${option},`),
   )
 }
 

@@ -315,22 +315,115 @@ test('inline math output uses comment separators for readability', () => {
 
   assert.match(
     tikz,
-    /%----------------------------------------\n% Styles and colors\n%----------------------------------------/,
+    /    %----------------------------------------\n    % Styles and colors\n    %----------------------------------------/,
   )
   assert.match(
     tikz,
-    /%----------------------------------------\n% Local colors\n%----------------------------------------/,
+    /    %----------------------------------------\n    % Local colors\n    %----------------------------------------/,
   )
   assert.match(
     tikz,
-    /%----------------------------------------\n% TikZ layers\n%----------------------------------------/,
+    /    %----------------------------------------\n    % TikZ layers\n    %----------------------------------------/,
   )
   assert.match(
     tikz,
-    /\s*%----------------------------------------\n\s*% Layered drawing commands\n\s*%----------------------------------------/,
+    /        %----------------------------------------\n        % Layered drawing commands\n        %----------------------------------------/,
   )
-  assert.ok(countMatches(tikz, /^%----------------------------------------$/gm) >= 8)
+  assert.ok(
+    countMatches(tikz, /^\s*%----------------------------------------$/gm) >= 8,
+  )
   expectNoBlankLines(tikz)
+})
+
+test('standalone output uses four-space indentation inside tikzpicture', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram(), {
+    exportMode: 'standalone',
+  })
+
+  assert.match(tikz, /\n    \\coordinate \(curvePolyWire0p0\) at \(0,0\);/)
+  assert.match(tikz, /\n    \\begin\{pgfonlayer\}\{stratifiedLayer0\}/)
+  expectNoTwoSpaceCommandIndent(tikz)
+})
+
+test('inline output uses four-space indentation inside tikzpicture', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /\n    \\coordinate \(curvePolyWire0p0\) at \(0,0\);/)
+  assert.match(tikz, /\n    \\begin\{pgfonlayer\}\{stratifiedLayer0\}/)
+  expectNoTwoSpaceCommandIndent(tikz)
+  expectNoBlankLines(tikz)
+})
+
+test('pgfonlayer bodies are indented one level deeper than layer blocks', () => {
+  const tikz = generateTikz(createLayeredTwoDimensionalDiagram())
+  const lines = tikz.split('\n')
+  const layerName = 'stratifiedLayer0'
+  const beginIndex = lines.findIndex(
+    (line) => line === `    \\begin{pgfonlayer}{${layerName}}`,
+  )
+  const endIndex = lines.findIndex(
+    (line, index) =>
+      index > beginIndex && line === '    \\end{pgfonlayer}',
+  )
+  const bodyLines = lines.slice(beginIndex + 1, endIndex)
+
+  assert.notEqual(beginIndex, -1)
+  assert.notEqual(endIndex, -1)
+  assert.ok(bodyLines.some((line) => line.startsWith('        \\draw[')))
+  assert.doesNotMatch(bodyLines.join('\n'), /^  \\(?:draw|coordinate|node)/m)
+})
+
+test('inline 3D scope and nested pgfonlayer indentation use four-space levels', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+  const lines = tikz.split('\n')
+  const scopeBeginIndex = lines.findIndex(
+    (line) => line === '    \\begin{scope}[tdplot_main_coords]',
+  )
+  const scopeEndIndex = lines.findIndex(
+    (line, index) => index > scopeBeginIndex && line === '    \\end{scope}',
+  )
+  const layerBeginIndex = lines.findIndex(
+    (line, index) =>
+      index > scopeBeginIndex &&
+      index < scopeEndIndex &&
+      line === '        \\begin{pgfonlayer}{stratifiedLayer0}',
+  )
+  const layerEndIndex = lines.findIndex(
+    (line, index) =>
+      index > layerBeginIndex &&
+      index < scopeEndIndex &&
+      line === '        \\end{pgfonlayer}',
+  )
+  const layerBodyLines = lines.slice(layerBeginIndex + 1, layerEndIndex)
+
+  assert.notEqual(scopeBeginIndex, -1)
+  assert.notEqual(scopeEndIndex, -1)
+  assert.notEqual(layerBeginIndex, -1)
+  assert.notEqual(layerEndIndex, -1)
+  assert.ok(
+    layerBodyLines.some((line) => line.startsWith('            \\filldraw[')),
+  )
+  expectNoTwoSpaceCommandIndent(tikz)
+  expectNoBlankLines(tikz)
+})
+
+test('inline indentation keeps no blank lines across regression cases', () => {
+  const layered = createLayeredTwoDimensionalDiagram()
+  const multilineLabel = createTextLabelDiagram('A\n\nB')
+  const outputs = [
+    generateTikz(createTwoDimensionalDiagram(), { exportMode: 'inlineMath' }),
+    generateTikz(createThreeDimensionalDiagram(), { exportMode: 'inlineMath' }),
+    generateTikz(layered, { exportMode: 'inlineMath' }),
+    generateTikz(multilineLabel, { exportMode: 'inlineMath' }),
+  ]
+
+  for (const output of outputs) {
+    expectNoBlankLines(output)
+  }
 })
 
 test('inline math output normalizes embedded label newlines', () => {
@@ -2623,6 +2716,16 @@ function expectNoBlankLines(output: string, message?: string): void {
   assert.deepEqual(blankLines, [], message)
 }
 
+function expectNoTwoSpaceCommandIndent(output: string): void {
+  const twoSpaceCommandIndent =
+    /\n  \\(?:begin\{pgfonlayer\}|end\{pgfonlayer\}|begin\{scope\}|end\{scope\}|coordinate|definecolor|draw|filldraw|node|path|pgfdeclarelayer|pgfsetlayers|tdplotsetmaincoords|tikzset)/
+
+  assert.doesNotMatch(
+    output,
+    twoSpaceCommandIndent,
+  )
+}
+
 function expectNoLeadingOrTrailingBlankLine(output: string): void {
   const lines = output.split('\n')
 
@@ -2661,7 +2764,7 @@ function extractLayerBlock(tikz: string, layerName: string): string {
 }
 
 function extractTikzsetBlock(tikz: string): string {
-  const match = tikz.match(/\\tikzset\{[\s\S]*?\n\}/)
+  const match = tikz.match(/\\tikzset\{[\s\S]*?\n\s*\}/)
 
   assert.notEqual(match, null)
 
