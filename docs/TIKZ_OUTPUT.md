@@ -65,7 +65,9 @@ presets.
 Imported TikZ style references are external. StratifiedTikZ saves the source
 metadata and imported option key, but generated TikZ does not inline the
 external `\tikzset{...}` definition and does not emit an active `\input{...}` by
-default. When an emitted command uses an imported key, the top style section
+default. Imported references are emitted only when their saved targets match the
+element kind or the TikZ command target (`draw`, `filldraw`, or `node`). When an
+emitted command uses an imported key, the top style section
 contains comment-only load instructions:
 
 ```tex
@@ -79,19 +81,27 @@ contains comment-only load instructions:
   line join=round
 ]
   \draw[
+    3cat/phys/1strata/color/x,
     draw=stzCurvewireStroke,
     draw opacity=1,
-    line width=1.2pt,
-    3cat/phys/1strata/color/x
+    line width=1.2pt
   ]
     (curvePolyWire0p0) -- (curvePolyWire0p1);
 \end{tikzpicture}
 ```
 
-Imported keys are emitted after structured or local-preset options so the
-external TikZ style can override or refine generated options when LaTeX resolves
-the option list. If several elements use references from the same external
-source, the load comment lists that source once.
+Command option ordering is deterministic:
+
+1. matching local user preset style name;
+2. imported external style key;
+3. structured inline fallback options when no local preset is used;
+4. non-style command options such as `spath/save` or `even odd rule`.
+
+User preset definitions themselves are emitted once as local
+`\begin{tikzpicture}` options and contain only structured StratifiedTikZ style
+options. Imported keys are never inlined into those local definitions. If
+several elements use references from the same external source, the load comment
+lists that source once.
 
 The `.sty` / `.tex` importer uses a limited `\tikzset` parser. It supports
 multiple braced `\tikzset{...}` blocks, `.cd` path prefixes, and keys of the
@@ -680,7 +690,7 @@ A sheet style should include:
 Example:
 
 ```tex
-\path[
+\filldraw[
   fill=stzSheetFillA,
   fill opacity=.35,
   draw=stzSheetStrokeA,

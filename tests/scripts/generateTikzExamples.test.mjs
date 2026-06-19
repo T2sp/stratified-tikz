@@ -44,7 +44,7 @@ test('generateTikzExamples writes representative TikZ files', async () => {
     assert.match(threeDimensionalSource, /% Requires \\usepackage\{tikz-3dplot\}/)
     assert.match(threeDimensionalSource, /\\tdplotsetmaincoords\{13\}\{-23\}/)
     assert.match(threeDimensionalSource, /tdplot_main_coords/)
-    assert.match(threeDimensionalSource, /\\path\[/)
+    assert.match(threeDimensionalSource, /\\filldraw\[/)
     assert.match(threeDimensionalSource, /star points=5/)
     assert.match(referenceFillsSource, /Blue translucent region/)
     assert.match(referenceFillsSource, /densely dotted/)
