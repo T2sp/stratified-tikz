@@ -496,11 +496,18 @@ function resolveTikzKeyPath(currentDirectory: string, rawPath: string): string {
 }
 
 function normalizeTikzPath(path: string): string {
-  return path
+  const trimmedPath = path.trim()
+  const isAbsolute = trimmedPath.startsWith('/')
+  const normalizedPath = trimmedPath
     .split('/')
     .map((part) => part.trim())
     .filter((part) => part.length > 0)
     .join('/')
+
+  // Absolute TikZ key paths are semantically different from relative ones:
+  // `/tikz/wire` is usable as an explicit option key, while `tikz/wire` is a
+  // relative path under the current TikZ key directory.
+  return isAbsolute ? `/${normalizedPath}` : normalizedPath
 }
 
 function normalizeOptionList(options: string): string {

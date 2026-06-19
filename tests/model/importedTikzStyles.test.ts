@@ -38,6 +38,42 @@ test('parser applies .cd prefix to relative style keys', () => {
   ])
 })
 
+test('parser preserves absolute /tikz .cd style keys', () => {
+  const result = parseTikzsetStyles(
+    String.raw`\tikzset{/tikz/.cd, wire/.style={draw=red}}`,
+  )
+  const style = result.styles[0]
+
+  assert.equal(result.skipped, 0)
+  assert.equal(style?.key, '/tikz/wire')
+  assert.notEqual(style?.key, 'tikz/wire')
+  assert.equal(style?.options, 'draw=red')
+})
+
+test('parser preserves absolute /tikz style keys', () => {
+  const result = parseTikzsetStyles(
+    String.raw`\tikzset{/tikz/wire/.style={draw=red}}`,
+  )
+  const style = result.styles[0]
+
+  assert.equal(result.skipped, 0)
+  assert.equal(style?.key, '/tikz/wire')
+  assert.notEqual(style?.key, 'tikz/wire')
+  assert.equal(style?.options, 'draw=red')
+})
+
+test('parser preserves non-/tikz absolute .cd style keys', () => {
+  const result = parseTikzsetStyles(
+    String.raw`\tikzset{/3cat/.cd, phys/1strata/color/x/.style={red!60}}`,
+  )
+  const style = result.styles[0]
+
+  assert.equal(result.skipped, 0)
+  assert.equal(style?.key, '/3cat/phys/1strata/color/x')
+  assert.notEqual(style?.key, '3cat/phys/1strata/color/x')
+  assert.equal(style?.options, 'red!60')
+})
+
 test('parser extracts styles from multiple tikzset blocks', () => {
   const result = parseTikzsetStyles(String.raw`
     \tikzset{first/.style={draw=black}}
@@ -160,6 +196,28 @@ test('generated TikZ from imported parser output does not inline tikzset', () =>
   assert.match(tikz, /wireStyle/)
 })
 
+test('generated TikZ uses absolute key imported from /tikz .cd', () => {
+  const { tikz, referenceKey } = generatedTikzForImportedCurveStyle(
+    String.raw`\tikzset{/tikz/.cd, wire/.style={draw=red}}`,
+  )
+
+  assert.equal(referenceKey, '/tikz/wire')
+  assert.match(tikz, /\/tikz\/wire/)
+  assertNoRelativeTikzWireOption(tikz)
+  assertIncludesOnlyExternalLoadComments(tikz)
+})
+
+test('generated TikZ uses absolute key imported from /tikz/name .style', () => {
+  const { tikz, referenceKey } = generatedTikzForImportedCurveStyle(
+    String.raw`\tikzset{/tikz/wire/.style={draw=red}}`,
+  )
+
+  assert.equal(referenceKey, '/tikz/wire')
+  assert.match(tikz, /\/tikz\/wire/)
+  assertNoRelativeTikzWireOption(tikz)
+  assertIncludesOnlyExternalLoadComments(tikz)
+})
+
 test('generated TikZ from imported parser output includes only load comments', () => {
   const importResult = importTikzStyleFile(
     createDiagramWithCurve(),
@@ -228,6 +286,48 @@ function createDiagramWithCurve(): Diagram {
   })
 
   return diagram
+}
+
+function generatedTikzForImportedCurveStyle(styleText: string): {
+  tikz: string
+  referenceKey: string
+} {
+  const importResult = importTikzStyleFile(
+    createDiagramWithCurve(),
+    'mygeometry.sty',
+    styleText,
+  )
+  const reference = importResult.references[0]
+
+  if (reference === undefined) {
+    throw new Error('Expected imported style reference.')
+  }
+
+  const diagram: Diagram = {
+    ...importResult.diagram,
+    strata: importResult.diagram.strata.map((stratum) =>
+      stratum.id === 'wire'
+        ? { ...stratum, importedTikzStyleReferenceId: reference.id }
+        : stratum,
+    ),
+  }
+
+  return {
+    tikz: generateTikz(diagram),
+    referenceKey: reference.key,
+  }
+}
+
+function assertNoRelativeTikzWireOption(tikz: string): void {
+  assert.doesNotMatch(tikz, /(?:\[|,)\s*tikz\/wire\s*(?=,|\])/)
+}
+
+function assertIncludesOnlyExternalLoadComments(tikz: string): void {
+  assert.match(tikz, /% External TikZ styles referenced below\./)
+  assert.match(tikz, /% - mygeometry\.sty/)
+  assert.match(tikz, /%   \\input\{mygeometry\.sty\}/)
+  assert.doesNotMatch(tikz, /\\tikzset\{/)
+  assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
 }
 
 function curveStyle(overrides: Partial<CurveStyle> = {}): CurveStyle {
