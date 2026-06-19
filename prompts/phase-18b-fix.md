@@ -1,4 +1,4 @@
-# Phase 18B Fix Prompt: Remove all blank lines from inline math TikZ output
+# Phase 18B Fix Prompt: Sanitize embedded label newlines in inline math TikZ output
 
 ## Environment
 
@@ -29,64 +29,68 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 18B implemented inline math TikZ export.
+Phase 18B implemented inline math TikZ output.
 
-Review result:
+A previous fix removed blank lines introduced by generator section helpers and line arrays.
+
+Review result after that fix:
 
 - Tests pass.
 - Build passes.
 - No Critical issues.
 - One Medium issue remains.
-- One Low-priority test coverage issue remains.
 
 ## Medium issue
 
-Inline math output still contains blank lines.
+Inline math output can still contain blank lines when raw label text contains embedded blank lines.
 
-Review notes:
+Current behavior:
 
-- `src/tikz/generateTikz.ts` routes inline output through `section(...)`.
-- `section(...)` inserts empty lines.
-- Additional inline helpers append empty string lines, for example:
-  - local colors/styles;
-  - camera/library comments;
-  - other section helpers.
-- A targeted check found:
-  - 28 blank lines in representative 2D inline output;
-  - 32 blank lines in representative 3D inline output.
+- `emitLabel` interpolates `label.text` directly into a single TikZ string.
+- `joinInlineMathTikzLines` only filters blank entries in the generated line array.
+- If `label.text` itself contains embedded newlines, those newlines become actual lines in the final output.
+- A label such as:
 
-This violates the align-safe requirement.
+```text
+A
 
-Inline math output is intended for use inside math environments such as:
-
-```tex
-\begin{align}
-  \begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
-    ...
-  \end{tikzpicture}
-  &=
-  \begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
-    ...
-  \end{tikzpicture}
-\end{align}
+B
 ```
 
-Blank lines inside such snippets can create paragraph breaks and errors in math environments.
+or the string:
 
-## Low-priority issue
+```ts
+"A\n\nB"
+```
 
-The current tests do not assert the no-blank-lines invariant for inline math output.
+can produce an actual blank line inside:
 
-This allowed the issue to pass.
+```tex
+\node ... {A
+
+B};
+```
+
+This violates the inline math no-blank-lines requirement and can break use inside `align`.
+
+The UI permits such label text through the label textarea, and validation does not currently constrain label text. The fix should handle this at TikZ export time.
 
 ## Goal
 
-Fix inline math TikZ generation so that:
+Fix inline math blank-line handling for embedded newlines in raw label text.
 
-- `exportMode: "inlineMath"` emits no blank lines anywhere;
-- standalone output formatting remains unchanged;
-- readability in inline mode is preserved with comment separator lines instead of empty lines;
-- tests assert the no-blank-lines invariant for representative 2D and 3D outputs.
+Inline math export must not contain any blank line, including blank lines that originate inside label text.
+
+Requirements:
+
+- `exportMode: "inlineMath"` emits no blank lines anywhere.
+- Label text is preserved as much as practical.
+- Standalone output behavior should remain unchanged unless there is an existing bug.
+- Add a regression test with a free text label containing:
+
+```ts
+"A\n\nB"
+```
 
 ## Scope
 
@@ -94,330 +98,266 @@ This is a targeted Phase 18B fix.
 
 Implement:
 
-- blank-line-free inline formatter;
-- inline-mode-safe section/comment helpers;
-- removal/filtering of empty string lines from inline output;
-- tests asserting no blank lines for representative inline outputs.
+- inline-safe label text formatting/sanitization for TikZ export;
+- tests for label text with embedded blank lines;
+- final no-blank-lines regression coverage if needed.
 
 Do not implement:
 
-- new export modes;
-- new geometry;
-- new style features;
-- new UI features;
+- new label editor UI;
+- new validation constraints on label text;
+- full LaTeX text parser;
 - broad TikZ generator rewrite;
-- LaTeX compilation;
+- new export modes;
 - new dependencies.
 
 Do not change:
 
-- standalone output formatting, unless absolutely necessary;
-- standalone setup placement;
-- inline baseline behavior;
-- inline setup placement;
-- layer-aware TikZ semantics;
-- camera export semantics;
-- imported external style comment policy;
-- local user style behavior;
-- SVG preview;
-- save/load;
-- undo/redo.
+- diagram data model;
+- saved label text;
+- standalone output semantics unless explicitly justified;
+- SVG preview behavior;
+- label editing UI behavior;
+- style/layer/camera/work-plane behavior.
 
-## Required inline formatting invariant
-
-For inline math output, no line may match:
-
-```text
-^\s*$
-```
-
-In other words:
-
-- no empty lines;
-- no whitespace-only lines;
-- no leading blank line;
-- no trailing blank line;
-- no blank line between sections.
-
-This should be true for all inline exports:
-
-- 2D;
-- 3D;
-- with colors;
-- with local user presets;
-- with imported style comments;
-- with layers;
-- with camera setup;
-- with filled regions/sheets;
-- with paths/surfaces.
-
-## Preserve readable section separation with comments
-
-Do not make inline output an unreadable wall of commands.
-
-Use comment separators instead of blank lines.
-
-Preferred style:
-
-```tex
-\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
-  %----------------------------------------
-  % Local colors
-  %----------------------------------------
-  \definecolor{...}{HTML}{...}
-  %----------------------------------------
-  % Local styles
-  %----------------------------------------
-  \tikzset{...}
-  %----------------------------------------
-  % Layers
-  %----------------------------------------
-  \pgfdeclarelayer{...}
-  \pgfsetlayers{...}
-  %----------------------------------------
-  % Drawing commands
-  %----------------------------------------
-  ...
-\end{tikzpicture}
-```
-
-Comment lines are allowed.
-
-Blank lines are not.
-
-## 1. Inspect current TikZ generator section helpers
+## 1. Inspect label export
 
 Inspect:
 
 - `src/tikz/generateTikz.ts`;
-- `section(...)`;
-- helpers that return arrays of lines;
-- helpers that append `""`;
-- local colors/styles emitters;
-- camera/library comment emitters;
-- layer emitters;
-- imported style comment emitters;
-- final output join logic.
+- `emitLabel`;
+- any helper that formats raw label text;
+- `joinInlineMathTikzLines`;
+- tests for label export;
+- tests for inline math output no-blank-lines.
 
-Find all paths used by `exportMode: "inlineMath"` that can introduce empty lines.
+Find where `label.text` is interpolated into TikZ output.
 
-The review specifically mentions:
-
-- `section(...)` around line 452;
-- `section(...)` inserting empty lines around line 2436;
-- inline helpers appending `""`.
-
-## 2. Add an inline-safe line joining / filtering strategy
-
-Add a clear formatting strategy.
-
-Acceptable approaches:
-
-### Option A: Mode-aware section helper
-
-Make `section(...)` mode-aware.
-
-For standalone mode:
-
-- keep existing behavior with blank lines if desired.
-
-For inline math mode:
-
-- do not insert empty lines;
-- use comment separator lines instead.
-
-Example:
+Current problematic pattern is conceptually:
 
 ```ts
-section(title, lines, { exportMode }) {
-  if (exportMode === "inlineMath") {
-    return [
-      "%----------------------------------------",
-      `% ${title}`,
-      "%----------------------------------------",
-      ...lines.filter(isNonBlankLine),
-    ];
-  }
-
-  return [
-    "",
-    `% ${title}`,
-    "",
-    ...lines,
-    "",
-  ];
-}
+`\\node[...] at (...) {${label.text}};`
 ```
 
-Exact formatting can differ.
+If `label.text` contains `\n\n`, the final output contains a blank line even if the line array has no blank entries.
 
-### Option B: Final inline sanitizer
+## 2. Add inline-safe label text formatting
 
-After building inline output, run a final helper:
+Add a helper such as:
 
 ```ts
-removeBlankLinesForInlineMath(output)
+formatLabelTextForTikz(labelText: string, options: { exportMode: TikzExportMode }): string
 ```
 
-or build with:
+or:
 
 ```ts
-joinTikzLines(lines, { allowBlankLines: false })
+formatInlineMathLabelText(labelText: string): string
 ```
 
-This is acceptable only if it does not remove meaningful content.
+Exact name can differ.
+
+For `exportMode: "inlineMath"`, the helper must ensure the returned string does not contain a blank line.
+
+Acceptable behavior:
+
+### Preferred
+
+Replace line breaks in label text with a LaTeX-safe inline separator that preserves visual intent reasonably.
+
+For example:
+
+```text
+A\nB     -> A\\ B
+A\n\nB   -> A\\ B
+```
+
+or:
+
+```text
+A\nB     -> A \\\\ B
+A\n\nB   -> A \\\\ B
+```
+
+Choose the safest convention for TikZ node text in this project.
+
+### Also acceptable
+
+Collapse all whitespace/newline runs to a single space in inline math mode:
+
+```text
+A\n\nB -> A B
+```
+
+This is less faithful but align-safe and simple.
+
+### Not acceptable
+
+Leaving actual newline characters in inline label text when they can create blank lines.
+
+If preserving line breaks with `\\` is implemented, ensure the produced TikZ remains valid inside node text.
+
+## 3. Preserve standalone behavior
+
+Standalone output may continue to preserve raw label newlines if that was the previous behavior.
 
 Preferred:
 
-- combine mode-aware section helpers with a final guard/sanitizer.
+- Only sanitize embedded newlines for `inlineMath`.
+- Leave standalone label text unchanged.
 
-### Option C: Dedicated inline builder
+If a shared helper is introduced, make mode-specific behavior explicit.
 
-Route inline output through a dedicated builder that never appends blank lines.
+## 4. Preserve diagram data and SVG preview
 
-This is acceptable if not too broad.
+Do not modify stored `label.text`.
 
-## 3. Remove or guard empty string lines from inline helpers
+The export formatter should be output-only.
 
-Any helper used by inline output should avoid appending `""`.
+Requirements:
 
-Examples to inspect:
+- user-entered label text remains unchanged in diagram data;
+- save/load preserves label text;
+- SVG preview remains unchanged unless it already normalizes display;
+- inspector textarea behavior remains unchanged.
 
-- local colors/styles helpers;
-- imported external style comment helpers;
-- camera setup helpers;
-- library comments;
-- layer setup helpers;
-- coordinate sections;
-- draw sections.
+## 5. Final inline no-blank-lines guard
 
-Required:
+The earlier inline formatter removes blank entries from generated line arrays, but this issue proves blank lines can appear inside a single generated string.
 
-- helpers may return empty arrays when nothing is needed;
-- helpers should not return arrays containing `""` in inline mode;
-- final inline output should have no blank lines even if some helper accidentally returns `""`.
+Add or update a final inline output assertion/sanitizer if appropriate.
 
-## 4. Preserve standalone formatting unchanged
+Options:
 
-Standalone mode should remain the traditional readable output.
+### Option A: Ensure all emitters produce inline-safe strings
 
-Required:
+- Sanitize label text.
+- Keep final joiner as-is.
 
-- standalone output may keep blank lines;
-- standalone tests should not be rewritten to match inline formatting;
-- avoid changing standalone output unless there is a bug.
+### Option B: Add final check in tests only
 
-Add or keep a regression test that standalone output remains unchanged or semantically equivalent.
+- Tests assert no blank lines in final output.
+- Production generator does not silently rewrite arbitrary content except known label text.
 
-## 5. Preserve Phase 18B inline setup behavior
+### Option C: Add final production sanitizer
 
-Do not regress what Phase 18B got right.
+- Replace blank lines in final inline output.
+- Be careful not to corrupt TikZ commands.
 
-Inline output should still:
+Preferred:
 
-- start directly with `\begin{tikzpicture}`;
-- include:
+- sanitize known free-text fields such as labels;
+- keep final no-blank-lines test coverage.
 
-```tex
-baseline={([yshift=-.5ex]current bounding box.center)}
-```
+Do not use a blind final regex that might corrupt meaningful TikZ content unless carefully justified.
 
-- emit no active setup before `\begin{tikzpicture}`;
-- place `\definecolor` inside the picture;
-- place local user preset `\tikzset` inside the picture;
-- place layer declarations inside the picture;
-- place 3D camera setup inside the picture;
-- keep imported external TikZ styles comment-only;
-- emit no active `\input`;
-- not inline imported external `\tikzset`;
-- preserve standalone behavior.
+## 6. Consider other free-text fields
 
-## 6. Tests
+Review whether other user-entered raw text fields can contain embedded blank lines and appear inside generated TikZ.
+
+Potential examples:
+
+- free text labels;
+- comments;
+- raw TikZ snippets if any;
+- imported style comments if user-controlled;
+- path labels if they are emitted as raw text.
+
+This fix must handle free text labels at minimum.
+
+If other fields can create blank lines in inline output, either:
+
+- sanitize them too; or
+- add a TODO/report limitation.
+
+Do not let this become a broad raw-TikZ parser task.
+
+## 7. Tests
 
 Add focused tests.
 
-Create a reusable assertion helper, for example:
-
-```ts
-function expectNoBlankLines(output: string): void {
-  const blankLines = output
-    .split("\n")
-    .map((line, index) => ({ line, index }))
-    .filter(({ line }) => /^\s*$/.test(line));
-
-  expect(blankLines).toEqual([]);
-}
-```
-
-or equivalent.
-
 Required tests:
 
-1. Representative 2D inline export has no blank lines.
+1. Inline export with free text label `"A\n\nB"` contains no blank lines.
 
-Use a diagram with at least:
-
-- a point or curve;
-- layer output if feasible;
-- local style/color if feasible.
-
-2. Representative 3D inline export has no blank lines.
-
-Use a diagram with at least:
-
-- 3D camera setup;
-- layer output;
-- one rendered object.
-
-3. Inline output with local user style presets has no blank lines.
-
-This should cover:
-
-- `\definecolor`;
-- local `\tikzset`.
-
-4. Inline output with imported external style comments has no blank lines.
-
-This should cover comment-only imported style instructions.
-
-5. Inline output with layers has no blank lines.
-
-This should cover:
-
-- `\pgfdeclarelayer`;
-- `\pgfsetlayers`;
-- `pgfonlayer` blocks.
-
-6. Inline output with camera setup has no blank lines.
-
-This should cover:
-
-- `\tdplotsetmaincoords`;
-- `tdplot_main_coords` scope if used.
-
-7. Inline output has no leading or trailing blank line.
-
-8. Inline output still includes the baseline option.
-
-9. Inline output still has setup inside `tikzpicture`, not before it.
-
-10. Standalone output remains unchanged or at least is not forced into no-blank-line formatting.
-
-If snapshot tests are brittle, assert structural invariants rather than exact full output.
-
-## 7. Optional debug assertion
-
-Consider adding an internal development/test helper:
+Use assertion:
 
 ```ts
-assertNoBlankLinesForInlineMath(output)
+expect(output.split("\n").some((line) => /^\s*$/.test(line))).toBe(false);
 ```
 
-This can be used in tests only.
+2. Inline export with label `"A\n\nB"` still contains both `A` and `B`.
 
-Do not throw in production unless that is consistent with existing generator validation.
+3. Inline export with label `"A\nB"` contains no blank lines.
 
-## 8. Manual verification checklist
+4. Inline export with label containing leading/trailing blank lines, for example:
+
+```ts
+"\nA\n\nB\n"
+```
+
+contains no blank lines and remains valid.
+
+5. Standalone output behavior for multiline labels is preserved or intentionally updated and documented.
+
+6. Existing inline no-blank-lines tests for representative 2D/3D output still pass.
+
+7. Save/load or model data tests confirm label text is not mutated by export, if such tests are easy.
+
+## 8. TikZ validity expectations
+
+If the helper converts newlines to `\\` or `\\ `, add a test that generated node command remains syntactically plausible.
+
+For example, output should look like one line:
+
+```tex
+\node[...] at (...) {A\\ B};
+```
+
+or:
+
+```tex
+\node[...] at (...) {A B};
+```
+
+depending on chosen policy.
+
+It should not emit:
+
+```tex
+\node[...] at (...) {A
+
+B};
+```
+
+## 9. Documentation/comments
+
+Add a short comment near the label text formatting helper:
+
+- inline math export cannot contain blank lines;
+- raw label newlines are normalized only for export;
+- stored label text is unchanged.
+
+Update user docs only if necessary.
+
+## 10. Preserve existing behavior
+
+Do not regress:
+
+- inline baseline option;
+- inline setup placement;
+- inline no-blank-lines behavior from section helpers;
+- imported style comments;
+- local user styles;
+- layer-aware output;
+- camera output;
+- standalone output;
+- SVG preview;
+- label editing;
+- save/load;
+- all geometry export.
+
+## 11. Manual verification checklist
 
 After implementation, run:
 
@@ -427,38 +367,29 @@ PATH=/opt/homebrew/bin:$PATH npm run dev
 
 Then:
 
-1. Select TikZ export mode: Inline math.
-2. Generate/copy a simple 2D diagram.
-3. Confirm the output contains no blank lines.
-4. Confirm it starts with `\begin{tikzpicture}[baseline=...]`.
-5. Confirm setup is inside the picture.
-6. Generate/copy a 3D diagram.
-7. Confirm no blank lines.
-8. Confirm camera setup is inside the picture.
-9. Generate/copy a diagram with imported style comments.
-10. Confirm comments are present but no blank lines.
-11. Paste output inside a simple `align` environment if practical.
-12. Confirm there are no blank-line paragraph breaks.
-13. Switch to Standalone mode.
-14. Confirm standalone formatting remains readable and unchanged.
+1. Create or select a free text label.
+2. Set label text to:
 
-## 9. Preserve existing behavior
+```text
+A
 
-Do not regress:
+B
+```
 
-- inline baseline option;
-- inline setup placement;
-- imported style comment-only policy;
-- local user style output;
-- layer-aware output;
-- camera output;
-- standalone output;
-- SVG preview;
-- save/load;
-- copy/download;
-- all geometry export.
+3. Switch TikZ export mode to Inline math.
+4. Confirm generated TikZ contains no blank lines.
+5. Confirm both `A` and `B` are still present in the node text.
+6. Confirm the output still starts with:
 
-## 10. Verification
+```tex
+\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}]
+```
+
+7. Switch to Standalone mode.
+8. Confirm standalone output remains acceptable.
+9. Copy the inline output and paste into an `align` environment if practical.
+
+## 12. Verification
 
 Run:
 
@@ -468,16 +399,15 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 11. Report after implementation
+## 13. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of blank lines in inline output;
-- formatter/helper changes;
-- whether `section(...)` is now mode-aware;
-- whether final inline sanitizer was added;
-- how standalone formatting was preserved;
+- root cause of embedded label blank lines;
+- chosen newline-normalization policy;
+- whether standalone label output changed;
+- how stored label text remains unchanged;
 - tests added/updated;
 - test results;
 - build results;

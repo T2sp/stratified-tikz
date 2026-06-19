@@ -56,6 +56,7 @@ test('inline math export mode reaches the generator', () => {
   })
 
   assert.match(tikz, /TikZ export mode: inline math/)
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output starts with the baseline tikzpicture option', () => {
@@ -74,6 +75,7 @@ test('inline math output starts with the baseline tikzpicture option', () => {
   for (const tikz of outputs) {
     assert.ok(tikz.startsWith(`\\begin{tikzpicture}[${baseline}`))
     assert.equal(countMatches(tikz, new RegExp(escapeRegExp(baseline), 'g')), 1)
+    expectNoBlankLines(tikz)
   }
 })
 
@@ -85,6 +87,7 @@ test('inline math output emits no active setup before tikzpicture begin', () => 
   const beforeBegin = tikz.slice(0, tikz.indexOf('\\begin{tikzpicture}'))
 
   assert.equal(beforeBegin.trim(), '')
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output places color definitions inside the tikzpicture', () => {
@@ -97,6 +100,7 @@ test('inline math output places color definitions inside the tikzpicture', () =>
 
   assert.ok(beginIndex < colorIndex)
   assert.ok(colorIndex < endIndex)
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output emits user presets with local tikzset inside the picture', () => {
@@ -133,6 +137,7 @@ test('inline math output emits user presets with local tikzset inside the pictur
   assert.doesNotMatch(beginLine, /stratifiedStyleInlineCurve\/\.style=/)
   assert.ok(tikz.indexOf(styleDefinition) > tikz.indexOf('\\begin{tikzpicture}'))
   assert.ok(tikz.indexOf(styleDefinition) < tikz.indexOf('% Coordinates'))
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output places layer setup inside the picture before scopes', () => {
@@ -149,6 +154,7 @@ test('inline math output places layer setup inside the picture before scopes', (
   assert.ok(declareIndex < setLayersIndex)
   assert.ok(setLayersIndex < tdplotScopeIndex)
   assert.ok(tdplotScopeIndex < endIndex)
+  expectNoBlankLines(tikz)
 })
 
 test('inline 3D output keeps camera setup inside the picture and scopes content', () => {
@@ -173,6 +179,7 @@ test('inline 3D output keeps camera setup inside the picture and scopes content'
   assert.ok(cameraIndex < scopeIndex)
   assert.ok(scopeIndex < coordinateIndex)
   assert.ok(coordinateIndex < scopeEndIndex)
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output keeps imported style comments inside without inlining imports', () => {
@@ -197,6 +204,29 @@ test('inline math output keeps imported style comments inside without inlining i
   assert.ok(commentIndex < keyIndex)
   assert.doesNotMatch(tikz, /\\tikzset\{/)
   assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
+  expectNoBlankLines(tikz)
+})
+
+test('inline math output has no blank lines for representative 2D and 3D exports', () => {
+  expectNoBlankLines(
+    generateTikz(createLayeredTwoDimensionalDiagram(), {
+      exportMode: 'inlineMath',
+    }),
+  )
+  expectNoBlankLines(
+    generateTikz(createThreeDimensionalDiagram(), {
+      exportMode: 'inlineMath',
+      includeCoordinateAxes: true,
+    }),
+  )
+})
+
+test('standalone output keeps blank-line section spacing', () => {
+  const tikz = generateTikz(createTwoDimensionalDiagram(), {
+    exportMode: 'standalone',
+  })
+
+  assert.match(tikz, /\n\s*\n/)
 })
 
 test('3D TikZ output uses tikz-3dplot camera setup and 3D coordinates', () => {
@@ -2336,6 +2366,15 @@ test('changing a stratum name changes only generated coordinate names', () => {
 
 function assertIncludesSection(tikz: string, title: string): void {
   assert.match(tikz, new RegExp(`% ${escapeRegExp(title)}`))
+}
+
+function expectNoBlankLines(output: string): void {
+  const blankLines = output
+    .split('\n')
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => /^\s*$/.test(line))
+
+  assert.deepEqual(blankLines, [])
 }
 
 function escapeRegExp(value: string): string {

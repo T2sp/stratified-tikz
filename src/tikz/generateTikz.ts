@@ -217,10 +217,15 @@ export function generateTikz2D(
     context,
     layers,
     bodySections: [
-      section('Coordinates', emitCoordinateDefinitions(context)),
+      section(
+        'Coordinates',
+        emitCoordinateDefinitions(context),
+        context.exportMode,
+      ),
       section(
         'Layered drawing commands',
         emitLayeredCommands(drawingCommands, sectionTitles),
+        context.exportMode,
       ),
     ],
   })
@@ -284,13 +289,24 @@ export function generateTikz3D(
     context,
     layers,
     bodySections: [
-      section('Coordinates', emitCoordinateDefinitions(context)),
+      section(
+        'Coordinates',
+        emitCoordinateDefinitions(context),
+        context.exportMode,
+      ),
       ...(coordinateAxesGuide.length === 0
         ? []
-        : [section('Coordinate axes guide', coordinateAxesGuide)]),
+        : [
+            section(
+              'Coordinate axes guide',
+              coordinateAxesGuide,
+              context.exportMode,
+            ),
+          ]),
       section(
         'Layered drawing commands',
         emitLayeredCommands(drawingCommands, sectionTitles),
+        context.exportMode,
       ),
     ],
   })
@@ -435,7 +451,7 @@ function assembleStandaloneTikz({
     '\\end{tikzpicture}',
   ]
 
-  return `${lines.join('\n')}\n`
+  return joinStandaloneTikzLines(lines)
 }
 
 function assembleInlineMathTikz({
@@ -449,20 +465,24 @@ function assembleInlineMathTikz({
 }): string {
   const lines = [
     ...emitTikzPictureStart(context),
-    ...section('Styles and colors', [
-      ...emitExportModeComment(context),
-      ...emitRequiredLibraryComment(context),
-      ...emitExternalTikzStyleLoadComment(context),
-      ...emitColorDefinitions(context, true),
-      ...emitLocalStyleTikzset(context),
-      ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
-      ...emitTikzCameraSetup(context),
-    ]),
+    ...section(
+      'Styles and colors',
+      [
+        ...emitExportModeComment(context),
+        ...emitRequiredLibraryComment(context),
+        ...emitExternalTikzStyleLoadComment(context),
+        ...emitColorDefinitions(context, true),
+        ...emitLocalStyleTikzset(context),
+        ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
+        ...emitTikzCameraSetup(context),
+      ],
+      context.exportMode,
+    ),
     ...emitBodySections(context, bodySections),
     '\\end{tikzpicture}',
   ]
 
-  return `${lines.join('\n')}\n`
+  return joinInlineMathTikzLines(lines)
 }
 
 function emitExportModeComment(context: GenerateContext): string[] {
@@ -2433,7 +2453,38 @@ function formatTikzOptions(options: string[]): string[] {
   )
 }
 
-function section(title: string, lines: string[]): string[] {
+function joinStandaloneTikzLines(lines: string[]): string {
+  return `${lines.join('\n')}\n`
+}
+
+function joinInlineMathTikzLines(lines: string[]): string {
+  return removeBlankLinesForInlineMath(lines).join('\n')
+}
+
+function removeBlankLinesForInlineMath(lines: string[]): string[] {
+  return lines.filter(isNonBlankLine)
+}
+
+function isNonBlankLine(line: string): boolean {
+  return !/^\s*$/.test(line)
+}
+
+function section(
+  title: string,
+  lines: string[],
+  exportMode: TikzExportMode = 'standalone',
+): string[] {
+  if (exportMode === 'inlineMath') {
+    const separator = '%----------------------------------------'
+
+    return [
+      separator,
+      `% ${title}`,
+      separator,
+      ...lines.filter(isNonBlankLine),
+    ]
+  }
+
   return [
     '% ----------------------------------------------------------------------------',
     `% ${title}`,
