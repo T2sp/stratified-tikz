@@ -166,13 +166,100 @@ test('user style presets save and load with element references', () => {
   assert.equal(result.diagram.strata[0]?.stylePresetId, created?.preset.id)
 })
 
+test('external TikZ style source metadata save and load round-trips', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.externalTikzStyleSources = [
+    {
+      id: 'source-mygeometry',
+      name: 'mygeometry.sty',
+      loadHint: '\\input{mygeometry.sty}',
+    },
+  ]
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(
+    result.diagram.externalTikzStyleSources,
+    diagram.externalTikzStyleSources,
+  )
+})
+
+test('imported TikZ style key save and load round-trips', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.externalTikzStyleSources = [
+    {
+      id: 'source-mygeometry',
+      name: 'mygeometry.sty',
+      loadHint: '\\input{mygeometry.sty}',
+    },
+  ]
+  diagram.importedTikzStyleReferences = [
+    {
+      id: 'external-draw',
+      key: '3cat/phys/1strata/color/x',
+      sourceId: 'source-mygeometry',
+      displayName: 'Wire x',
+      targets: ['draw', 'curve'],
+    },
+  ]
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(
+    result.diagram.importedTikzStyleReferences,
+    diagram.importedTikzStyleReferences,
+  )
+})
+
+test('parseSavedDiagramJson rejects a blank imported TikZ style key', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.externalTikzStyleSources = [
+    {
+      id: 'source-mygeometry',
+      name: 'mygeometry.sty',
+      loadHint: '\\input{mygeometry.sty}',
+    },
+  ]
+  diagram.importedTikzStyleReferences = [
+    {
+      id: 'blank-key',
+      key: '   ',
+      sourceId: 'source-mygeometry',
+      displayName: 'Blank',
+      targets: ['draw'],
+    },
+  ]
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected blank imported style key to be rejected.')
+  }
+  assert.match(result.error, /importedTikzStyleReferences\[0\]\.key must be non-empty/)
+})
+
 test('old diagrams without user style presets still load', () => {
   const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
     diagram: {
       userStylePresets?: unknown
+      externalTikzStyleSources?: unknown
+      importedTikzStyleReferences?: unknown
     }
   }
   delete saved.diagram.userStylePresets
+  delete saved.diagram.externalTikzStyleSources
+  delete saved.diagram.importedTikzStyleReferences
 
   const result = parseSavedDiagramJson(JSON.stringify(saved))
 
@@ -182,6 +269,8 @@ test('old diagrams without user style presets still load', () => {
   }
 
   assert.equal(result.diagram.userStylePresets, undefined)
+  assert.equal(result.diagram.externalTikzStyleSources, undefined)
+  assert.equal(result.diagram.importedTikzStyleReferences, undefined)
 })
 
 test('parseSavedDiagramJson rejects duplicate user style preset ids', () => {

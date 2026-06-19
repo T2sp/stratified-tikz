@@ -1,6 +1,7 @@
 export * from './camera.ts'
 export * from './constructors.ts'
 export * from './filledBoundaries.ts'
+export * from './importedTikzStyles.ts'
 export * from './layers.ts'
 export * from './paths.ts'
 export * from './serialization.ts'

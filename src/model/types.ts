@@ -279,12 +279,39 @@ export type StylePresetKind =
   | 'point'
   | 'label'
 
+export const tikzStyleTargets = [
+  'draw',
+  'filldraw',
+  'node',
+  'curve',
+  'sheet',
+  'point',
+  'label',
+  'region',
+] as const
+export type TikzStyleTarget = (typeof tikzStyleTargets)[number]
+
+export type ExternalTikzStyleSource = {
+  id: string
+  name: string
+  loadHint: string
+}
+
+export type ImportedTikzStyleReference = {
+  id: string
+  key: string
+  sourceId: string
+  displayName: string
+  targets: TikzStyleTarget[]
+}
+
 export type UserRegionStylePreset = {
   id: string
   name: string
   kind: 'region'
   style: RegionStyle
   tikzStyleName: string
+  importedTikzStyleReferenceId?: string
 }
 
 export type UserSheetStylePreset = {
@@ -293,6 +320,7 @@ export type UserSheetStylePreset = {
   kind: 'sheet'
   style: SheetStyle
   tikzStyleName: string
+  importedTikzStyleReferenceId?: string
 }
 
 export type UserCurveStylePreset = {
@@ -301,6 +329,7 @@ export type UserCurveStylePreset = {
   kind: 'curve'
   style: CurveStyle
   tikzStyleName: string
+  importedTikzStyleReferenceId?: string
 }
 
 export type UserPointStylePreset = {
@@ -309,6 +338,7 @@ export type UserPointStylePreset = {
   kind: 'point'
   style: PointStyle
   tikzStyleName: string
+  importedTikzStyleReferenceId?: string
 }
 
 export type UserLabelStylePreset = {
@@ -317,6 +347,7 @@ export type UserLabelStylePreset = {
   kind: 'label'
   style: LabelStyle
   tikzStyleName: string
+  importedTikzStyleReferenceId?: string
 }
 
 export type UserStylePreset =
@@ -333,6 +364,7 @@ type RegionStratumBase = {
   name: string
   label?: string
   stylePresetId?: string
+  importedTikzStyleReferenceId?: string
   visible: boolean
   style: RegionStyle
   layer: number
@@ -357,6 +389,7 @@ type SheetStratumBase = {
   name: string
   label?: string
   stylePresetId?: string
+  importedTikzStyleReferenceId?: string
   style: SheetStyle
   layer: number
 }
@@ -445,6 +478,7 @@ type CurveStratumBase = {
   label?: string
   pathLabel?: string
   stylePresetId?: string
+  importedTikzStyleReferenceId?: string
   style: CurveStyle
   styleSegments: CurveStyleSegment[]
   layer: number
@@ -502,6 +536,7 @@ export type PointStratum = {
   name: string
   label?: string
   stylePresetId?: string
+  importedTikzStyleReferenceId?: string
   style: PointStyle
   position: Vec3
   layer: number
@@ -520,6 +555,7 @@ export type TextLabel = {
   text: string
   position: Vec3
   stylePresetId?: string
+  importedTikzStyleReferenceId?: string
   style: LabelStyle
   layer: number
 }
@@ -538,6 +574,8 @@ export type Diagram = {
   view?: DiagramViewOptions
   layers?: DiagramLayer[]
   userStylePresets?: UserStylePreset[]
+  externalTikzStyleSources?: ExternalTikzStyleSource[]
+  importedTikzStyleReferences?: ImportedTikzStyleReference[]
   strata: Stratum[]
   labels: TextLabel[]
 }

@@ -714,6 +714,15 @@ matches that preset; otherwise it should emit inline structured style options.
 Phase 17A user preset definitions are emitted as local options of
 `\begin{tikzpicture}[...]`, not as a pre-picture `\tikzset{...}` block.
 
+Imported TikZ styles are external references. Diagram data may store
+`externalTikzStyleSources`, `importedTikzStyleReferences`, and optional
+`importedTikzStyleReferenceId` values on elements or user presets. Imported keys
+are emitted as TikZ option keys after StratifiedTikZ's structured/local-preset
+options. The generator must not inline full external `\tikzset{...}` definitions
+and must not emit an active `\input{...}` by default; it only emits comments that
+list the external style files/load hints the user should include in the LaTeX
+preamble or before the picture.
+
 ## Free text labels
 
 The user must be able to place arbitrary text or mathematical labels at arbitrary positions.

@@ -53,6 +53,37 @@ Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
 The generator does not emit a pre-picture `\tikzset{...}` block for these user
 presets.
 
+Imported TikZ style references are external. StratifiedTikZ saves the source
+metadata and imported option key, but generated TikZ does not inline the
+external `\tikzset{...}` definition and does not emit an active `\input{...}` by
+default. When an emitted command uses an imported key, the top style section
+contains comment-only load instructions:
+
+```tex
+% External TikZ styles referenced below.
+% Load these files in your LaTeX preamble or before the picture:
+% - mygeometry.sty
+% Suggested:
+%   \input{mygeometry.sty}
+\begin{tikzpicture}[
+  line cap=round,
+  line join=round
+]
+  \draw[
+    draw=stzCurvewireStroke,
+    draw opacity=1,
+    line width=1.2pt,
+    3cat/phys/1strata/color/x
+  ]
+    (curvePolyWire0p0) -- (curvePolyWire0p1);
+\end{tikzpicture}
+```
+
+Imported keys are emitted after structured or local-preset options so the
+external TikZ style can override or refine generated options when LaTeX resolves
+the option list. If several elements use references from the same external
+source, the load comment lists that source once.
+
 ## Mathematical convention
 
 The word **n-stratum** means **codimension n**.

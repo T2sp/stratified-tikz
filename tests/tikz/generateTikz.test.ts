@@ -17,6 +17,7 @@ import type {
   PointStyle,
   RegionStyle,
   SheetStyle,
+  TikzStyleTarget,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlane,
@@ -436,6 +437,171 @@ test('stale user preset references fall back to inline structured style', () => 
   assert.doesNotMatch(tikz, /stratifiedStyleStaleCurve\/\.style=/)
   assert.match(tikz, /draw=stzCurvewireStroke/)
   assert.match(tikz, /dashed/)
+})
+
+test('element imported draw style exports the raw key after structured draw options', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'wire'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-draw' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\draw\[/)
+  assert.match(layerBlock, /draw=stzCurvewireStroke/)
+  assert.ok(
+    layerBlock.indexOf('line width=1.2pt') <
+      layerBlock.indexOf('3cat/phys/1strata/color/x'),
+  )
+  assert.match(layerBlock, /3cat\/phys\/1strata\/color\/x/)
+})
+
+test('element imported filldraw style exports the raw key in filldraw options', () => {
+  const diagram = withImportedTikzStyleReference(
+    createFilledRegionDiagram(),
+    'external-filldraw',
+    '3cat/phys/2strata/fill/y',
+    ['filldraw', 'region'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'filled-region'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-filldraw' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\filldraw\[[\s\S]*fill=stzRegionfilledregionFill,[\s\S]*3cat\/phys\/2strata\/fill\/y[\s\S]*\]/,
+  )
+})
+
+test('element imported node style exports the raw key in node options', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-node',
+    '3cat/phys/3strata/shape/L',
+    ['node', 'point'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'vertex'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-node' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\node\[[\s\S]*fill=stzPointvertex,[\s\S]*3cat\/phys\/3strata\/shape\/L[\s\S]*\] at \(pointVertex0p0\) \{\};/,
+  )
+})
+
+test('imported styles emit external load comments without tikzset or active input', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === 'wire'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-draw' }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /% External TikZ styles referenced below\./)
+  assert.match(tikz, /% - mygeometry\.sty/)
+  assert.match(tikz, /%   \\input\{mygeometry\.sty\}/)
+  assert.ok(
+    tikz.indexOf('% External TikZ styles referenced below.') <
+      tikz.indexOf('\\begin{tikzpicture}['),
+  )
+  assert.doesNotMatch(tikz, /\\tikzset\{/)
+  assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
+})
+
+test('duplicate external source comments are de-duplicated', () => {
+  const diagram = withImportedTikzStyleReferences(
+    createTwoDimensionalDiagram(),
+    [
+      {
+        id: 'external-draw',
+        key: '3cat/phys/1strata/color/x',
+        targets: ['draw', 'curve'],
+      },
+      {
+        id: 'external-node',
+        key: '3cat/phys/3strata/shape/L',
+        targets: ['node', 'point'],
+      },
+    ],
+  )
+  diagram.strata = diagram.strata.map((stratum) => {
+    if (stratum.id === 'wire') {
+      return { ...stratum, importedTikzStyleReferenceId: 'external-draw' }
+    }
+
+    if (stratum.id === 'vertex') {
+      return { ...stratum, importedTikzStyleReferenceId: 'external-node' }
+    }
+
+    return stratum
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.equal(countMatches(tikz, /% - mygeometry\.sty/g), 1)
+  assert.equal(countMatches(tikz, /%   \\input\{mygeometry\.sty\}/g), 1)
+})
+
+test('imported style reference from a matching user preset exports after the local preset option', () => {
+  const diagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Imported preset curve',
+    curve.style,
+    'external-draw',
+  )
+  const withPreset = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    curve.id,
+    created?.preset.id ?? '',
+  )
+  const tikz = generateTikz(withPreset)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(
+    tikz,
+    /stratifiedStyleImportedPresetCurve\/\.style=\{draw=stzStyleusercurveimportedpresetcurveStroke, draw opacity=1, line width=1\.2pt\}/,
+  )
+  assert.ok(
+    layerBlock.indexOf('stratifiedStyleImportedPresetCurve') <
+      layerBlock.indexOf('3cat/phys/1strata/color/x'),
+  )
 })
 
 test('TikZ layer names are deterministic and TikZ-safe', () => {
@@ -1895,6 +2061,46 @@ function normalizeGeneratedCoordinateNames(tikz: string): string {
   })
 
   return normalized
+}
+
+function countMatches(value: string, pattern: RegExp): number {
+  return [...value.matchAll(pattern)].length
+}
+
+function withImportedTikzStyleReference(
+  diagram: Diagram,
+  id: string,
+  key: string,
+  targets: TikzStyleTarget[],
+): Diagram {
+  return withImportedTikzStyleReferences(diagram, [{ id, key, targets }])
+}
+
+function withImportedTikzStyleReferences(
+  diagram: Diagram,
+  references: Array<{
+    id: string
+    key: string
+    targets: TikzStyleTarget[]
+  }>,
+): Diagram {
+  return {
+    ...diagram,
+    externalTikzStyleSources: [
+      {
+        id: 'external-source-mygeometry',
+        name: 'mygeometry.sty',
+        loadHint: '\\input{mygeometry.sty}',
+      },
+    ],
+    importedTikzStyleReferences: references.map((reference) => ({
+      id: reference.id,
+      key: reference.key,
+      sourceId: 'external-source-mygeometry',
+      displayName: reference.key,
+      targets: reference.targets,
+    })),
+  }
 }
 
 function createLayeredTwoDimensionalDiagram(): Diagram {

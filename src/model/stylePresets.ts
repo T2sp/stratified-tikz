@@ -42,6 +42,7 @@ export function createUserStylePresetFromStyle(
   kind: StylePresetKind,
   rawName: string,
   style: StylePresetStyle,
+  importedTikzStyleReferenceId?: string,
 ): CreateUserStylePresetResult | null {
   if (!isStyleCompatibleWithPresetKind(kind, style)) {
     return null
@@ -54,7 +55,14 @@ export function createUserStylePresetFromStyle(
     tikzStyleNameFromPresetName(name, kind),
     currentPresets.map((preset) => preset.tikzStyleName),
   )
-  const preset = createUserStylePreset(id, name, kind, style, tikzStyleName)
+  const preset = createUserStylePreset(
+    id,
+    name,
+    kind,
+    style,
+    tikzStyleName,
+    importedTikzStyleReferenceId,
+  )
   const userStylePresets = [...currentPresets, preset]
 
   return {
@@ -109,6 +117,7 @@ export function updateUserStylePresetStyle(
     preset.kind,
     style,
     preset.tikzStyleName,
+    preset.importedTikzStyleReferenceId,
   )
   const userStylePresets = currentPresets.map((current) =>
     current.id === presetId ? updatedPreset : current,
@@ -189,11 +198,11 @@ export function applyUserStylePresetToLabel(
     }
 
     changed = true
-    return {
+    return withImportedTikzStyleReferenceId({
       ...label,
       style: cloneLabelStyle(preset.style),
       stylePresetId: preset.id,
-    }
+    }, preset.importedTikzStyleReferenceId)
   })
 
   return changed ? { ...diagram, labels } : diagram
@@ -392,7 +401,13 @@ function createUserStylePreset(
   kind: StylePresetKind,
   style: StylePresetStyle,
   tikzStyleName: string,
+  importedTikzStyleReferenceId?: string,
 ): UserStylePreset {
+  const importedStyleReference =
+    importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }
+
   switch (kind) {
     case 'region':
       if (style.kind !== 'regionStyle') {
@@ -405,6 +420,7 @@ function createUserStylePreset(
         kind,
         style: cloneRegionStyle(style),
         tikzStyleName,
+        ...importedStyleReference,
       }
     case 'sheet':
       if (style.kind !== 'sheetStyle') {
@@ -417,6 +433,7 @@ function createUserStylePreset(
         kind,
         style: cloneSheetStyle(style),
         tikzStyleName,
+        ...importedStyleReference,
       }
     case 'curve':
       if (style.kind !== 'curveStyle') {
@@ -429,6 +446,7 @@ function createUserStylePreset(
         kind,
         style: cloneCurveStyle(style),
         tikzStyleName,
+        ...importedStyleReference,
       }
     case 'point':
       if (style.kind !== 'pointStyle') {
@@ -441,6 +459,7 @@ function createUserStylePreset(
         kind,
         style: clonePointStyle(style),
         tikzStyleName,
+        ...importedStyleReference,
       }
     case 'label':
       if (style.kind !== 'labelStyle') {
@@ -453,6 +472,7 @@ function createUserStylePreset(
         kind,
         style: cloneLabelStyle(style),
         tikzStyleName,
+        ...importedStyleReference,
       }
   }
 }
@@ -470,7 +490,10 @@ function syncUserStylePresetUsage(
     ),
     labels: diagram.labels.map((label) =>
       label.stylePresetId === preset.id && preset.kind === 'label'
-        ? { ...label, style: cloneLabelStyle(preset.style) }
+        ? withImportedTikzStyleReferenceId(
+            { ...label, style: cloneLabelStyle(preset.style) },
+            preset.importedTikzStyleReferenceId,
+          )
         : label,
     ),
   }
@@ -500,37 +523,51 @@ function applyPresetToStratum(
   switch (stratum.geometricKind) {
     case 'region':
       return preset.kind === 'region'
-        ? {
+        ? withImportedTikzStyleReferenceId({
             ...stratum,
             style: cloneRegionStyle(preset.style),
             stylePresetId: preset.id,
-          }
+          }, preset.importedTikzStyleReferenceId)
         : stratum
     case 'sheet':
       return preset.kind === 'sheet'
-        ? {
+        ? withImportedTikzStyleReferenceId({
             ...stratum,
             style: cloneSheetStyle(preset.style),
             stylePresetId: preset.id,
-          }
+          }, preset.importedTikzStyleReferenceId)
         : stratum
     case 'curve':
       return preset.kind === 'curve'
-        ? {
+        ? withImportedTikzStyleReferenceId({
             ...stratum,
             style: cloneCurveStyle(preset.style),
             stylePresetId: preset.id,
-          }
+          }, preset.importedTikzStyleReferenceId)
         : stratum
     case 'point':
       return preset.kind === 'point'
-        ? {
+        ? withImportedTikzStyleReferenceId({
             ...stratum,
             style: clonePointStyle(preset.style),
             stylePresetId: preset.id,
-          }
+          }, preset.importedTikzStyleReferenceId)
         : stratum
   }
+}
+
+function withImportedTikzStyleReferenceId<
+  T extends { importedTikzStyleReferenceId?: string },
+>(value: T, importedTikzStyleReferenceId: string | undefined): T {
+  const nextValue = { ...value }
+
+  if (importedTikzStyleReferenceId === undefined) {
+    delete nextValue.importedTikzStyleReferenceId
+    return nextValue
+  }
+
+  nextValue.importedTikzStyleReferenceId = importedTikzStyleReferenceId
+  return nextValue
 }
 
 function clearStylePresetId<T extends { stylePresetId?: string }>(value: T): T {

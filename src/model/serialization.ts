@@ -12,6 +12,13 @@ import {
   tikzStyleNameFromPresetName,
   uniqueTikzStyleName,
 } from './stylePresets.ts'
+import {
+  isTikzStyleTarget,
+  normalizeExternalTikzStyleLoadHint,
+  normalizeExternalTikzStyleSourceName,
+  normalizeImportedTikzStyleDisplayName,
+  normalizeImportedTikzStyleKey,
+} from './importedTikzStyles.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -21,6 +28,8 @@ import type {
   DiagramLayer,
   DiagramValidationResult,
   DiagramViewOptions,
+  ExternalTikzStyleSource,
+  ImportedTikzStyleReference,
   StylePresetKind,
   OrthographicCamera3D,
   RegionStyle,
@@ -31,6 +40,7 @@ import type {
   UserStylePreset,
   Stratum,
   TextLabel,
+  TikzStyleTarget,
 } from './types.ts'
 import { getLayerMetadata, normalizeLayerMetadataForDiagram } from './layers.ts'
 import { validateDiagram } from './validation.ts'
@@ -45,6 +55,8 @@ export type PersistentDiagram = {
   view?: DiagramViewOptions
   layers?: DiagramLayer[]
   userStylePresets?: UserStylePreset[]
+  externalTikzStyleSources?: ExternalTikzStyleSource[]
+  importedTikzStyleReferences?: ImportedTikzStyleReference[]
   strata: Stratum[]
   labels: TextLabel[]
 }
@@ -78,6 +90,8 @@ type SavedDiagramInput = {
   view?: unknown
   layers?: unknown
   userStylePresets?: unknown
+  externalTikzStyleSources?: unknown
+  importedTikzStyleReferences?: unknown
   strata: unknown[]
   labels: unknown[]
 }
@@ -190,6 +204,16 @@ function toPersistentDiagram(
     diagram.userStylePresets === undefined || diagram.userStylePresets.length === 0
       ? undefined
       : diagram.userStylePresets
+  const externalTikzStyleSources =
+    diagram.externalTikzStyleSources === undefined ||
+    diagram.externalTikzStyleSources.length === 0
+      ? undefined
+      : diagram.externalTikzStyleSources
+  const importedTikzStyleReferences =
+    diagram.importedTikzStyleReferences === undefined ||
+    diagram.importedTikzStyleReferences.length === 0
+      ? undefined
+      : diagram.importedTikzStyleReferences
 
   return {
     version: diagram.version,
@@ -197,6 +221,12 @@ function toPersistentDiagram(
     ...(view === undefined ? {} : { view }),
     ...(layers === undefined ? {} : { layers }),
     ...(userStylePresets === undefined ? {} : { userStylePresets }),
+    ...(externalTikzStyleSources === undefined
+      ? {}
+      : { externalTikzStyleSources }),
+    ...(importedTikzStyleReferences === undefined
+      ? {}
+      : { importedTikzStyleReferences }),
     strata: diagram.strata,
     labels: diagram.labels,
   }
@@ -259,23 +289,50 @@ function normalizeLoadedDiagram(
   const warnings: string[] = []
   const camera = normalizeLoadedCamera(savedDiagram, warnings)
   const view = normalizeLoadedView(savedDiagram, camera, warnings)
+  const sourceNormalization = normalizeLoadedExternalTikzStyleSources(
+    savedDiagram.externalTikzStyleSources,
+  )
+  warnings.push(...sourceNormalization.warnings)
+  const referenceNormalization = normalizeLoadedImportedTikzStyleReferences(
+    savedDiagram.importedTikzStyleReferences,
+    sourceNormalization.externalTikzStyleSources,
+  )
+  warnings.push(...referenceNormalization.warnings)
   const presetNormalization = normalizeLoadedUserStylePresets(
     savedDiagram.userStylePresets,
   )
   warnings.push(...presetNormalization.warnings)
 
-  if (presetNormalization.errors.length > 0) {
+  const styleMetadataErrors = [
+    ...sourceNormalization.errors,
+    ...referenceNormalization.errors,
+    ...presetNormalization.errors,
+  ]
+
+  if (styleMetadataErrors.length > 0) {
     return {
       diagram: {
         version: savedDiagram.version,
         ambientDimension: savedDiagram.ambientDimension,
         camera,
         ...(view === undefined ? {} : { view }),
+        ...(sourceNormalization.externalTikzStyleSources === undefined
+          ? {}
+          : {
+              externalTikzStyleSources:
+                sourceNormalization.externalTikzStyleSources,
+            }),
+        ...(referenceNormalization.importedTikzStyleReferences === undefined
+          ? {}
+          : {
+              importedTikzStyleReferences:
+                referenceNormalization.importedTikzStyleReferences,
+            }),
         strata: savedDiagram.strata as Stratum[],
         labels: savedDiagram.labels as TextLabel[],
       },
       warnings,
-      errors: presetNormalization.errors,
+      errors: styleMetadataErrors,
     }
   }
 
@@ -284,6 +341,18 @@ function normalizeLoadedDiagram(
     ambientDimension: savedDiagram.ambientDimension,
     camera,
     ...(view === undefined ? {} : { view }),
+    ...(sourceNormalization.externalTikzStyleSources === undefined
+      ? {}
+      : {
+          externalTikzStyleSources:
+            sourceNormalization.externalTikzStyleSources,
+        }),
+    ...(referenceNormalization.importedTikzStyleReferences === undefined
+      ? {}
+      : {
+          importedTikzStyleReferences:
+            referenceNormalization.importedTikzStyleReferences,
+        }),
     ...(presetNormalization.userStylePresets === undefined
       ? {}
       : { userStylePresets: presetNormalization.userStylePresets }),
@@ -308,6 +377,226 @@ function normalizeLoadedDiagram(
     warnings,
     errors: layerNormalization.errors,
   }
+}
+
+function normalizeLoadedExternalTikzStyleSources(
+  savedSources: unknown,
+): {
+  externalTikzStyleSources?: ExternalTikzStyleSource[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedSources === undefined) {
+    return {
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedSources)) {
+    return {
+      warnings: [],
+      errors: ['externalTikzStyleSources must be an array when present.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const seenIds = new Set<string>()
+  const externalTikzStyleSources = savedSources.flatMap(
+    (savedSource, index): ExternalTikzStyleSource[] => {
+      const sourcePath = `externalTikzStyleSources[${index}]`
+
+      if (!isRecord(savedSource)) {
+        errors.push(`${sourcePath} must be an external TikZ style source object.`)
+        return []
+      }
+
+      if (typeof savedSource.id !== 'string' || savedSource.id.trim().length === 0) {
+        errors.push(`${sourcePath}.id must be non-empty.`)
+        return []
+      }
+
+      if (seenIds.has(savedSource.id)) {
+        errors.push(`${sourcePath}.id duplicates an earlier external style source id.`)
+        return []
+      }
+      seenIds.add(savedSource.id)
+
+      const rawName =
+        typeof savedSource.name === 'string' ? savedSource.name : ''
+      const name = normalizeExternalTikzStyleSourceName(rawName)
+      if (rawName !== name) {
+        warnings.push(
+          `Saved external style source ${index + 1} name was normalized.`,
+        )
+      }
+
+      const rawLoadHint =
+        typeof savedSource.loadHint === 'string' ? savedSource.loadHint : ''
+      const loadHint = normalizeExternalTikzStyleLoadHint(rawLoadHint, name)
+      if (rawLoadHint !== loadHint) {
+        warnings.push(
+          `Saved external style source ${index + 1} load hint was normalized.`,
+        )
+      }
+
+      return [{ id: savedSource.id, name, loadHint }]
+    },
+  )
+
+  return {
+    ...(externalTikzStyleSources.length === 0
+      ? {}
+      : { externalTikzStyleSources }),
+    warnings,
+    errors,
+  }
+}
+
+function normalizeLoadedImportedTikzStyleReferences(
+  savedReferences: unknown,
+  sources: readonly ExternalTikzStyleSource[] | undefined,
+): {
+  importedTikzStyleReferences?: ImportedTikzStyleReference[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedReferences === undefined) {
+    return {
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedReferences)) {
+    return {
+      warnings: [],
+      errors: ['importedTikzStyleReferences must be an array when present.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const seenIds = new Set<string>()
+  const sourceIds = new Set((sources ?? []).map((source) => source.id))
+  const importedTikzStyleReferences = savedReferences.flatMap(
+    (savedReference, index): ImportedTikzStyleReference[] => {
+      const referencePath = `importedTikzStyleReferences[${index}]`
+
+      if (!isRecord(savedReference)) {
+        errors.push(`${referencePath} must be an imported TikZ style reference object.`)
+        return []
+      }
+
+      if (
+        typeof savedReference.id !== 'string' ||
+        savedReference.id.trim().length === 0
+      ) {
+        errors.push(`${referencePath}.id must be non-empty.`)
+        return []
+      }
+
+      if (seenIds.has(savedReference.id)) {
+        errors.push(`${referencePath}.id duplicates an earlier imported style reference id.`)
+        return []
+      }
+      seenIds.add(savedReference.id)
+
+      if (
+        typeof savedReference.key !== 'string' ||
+        normalizeImportedTikzStyleKey(savedReference.key).length === 0
+      ) {
+        errors.push(`${referencePath}.key must be non-empty.`)
+        return []
+      }
+      const key = normalizeImportedTikzStyleKey(savedReference.key)
+
+      if (
+        typeof savedReference.sourceId !== 'string' ||
+        savedReference.sourceId.trim().length === 0
+      ) {
+        errors.push(`${referencePath}.sourceId must be non-empty.`)
+        return []
+      }
+
+      if (!sourceIds.has(savedReference.sourceId)) {
+        errors.push(`${referencePath}.sourceId does not match an external style source.`)
+        return []
+      }
+
+      const targets = loadedTikzStyleTargets(
+        savedReference.targets,
+        referencePath,
+        errors,
+      )
+
+      if (targets.length === 0) {
+        return []
+      }
+
+      const rawDisplayName =
+        typeof savedReference.displayName === 'string'
+          ? savedReference.displayName
+          : ''
+      const displayName = normalizeImportedTikzStyleDisplayName(
+        rawDisplayName,
+        key,
+      )
+      if (rawDisplayName !== displayName) {
+        warnings.push(
+          `Saved imported style reference ${index + 1} display name was normalized.`,
+        )
+      }
+
+      return [
+        {
+          id: savedReference.id,
+          key,
+          sourceId: savedReference.sourceId,
+          displayName,
+          targets,
+        },
+      ]
+    },
+  )
+
+  return {
+    ...(importedTikzStyleReferences.length === 0
+      ? {}
+      : { importedTikzStyleReferences }),
+    warnings,
+    errors,
+  }
+}
+
+function loadedTikzStyleTargets(
+  savedTargets: unknown,
+  referencePath: string,
+  errors: string[],
+): TikzStyleTarget[] {
+  if (!Array.isArray(savedTargets)) {
+    errors.push(`${referencePath}.targets must be an array.`)
+    return []
+  }
+
+  if (savedTargets.length === 0) {
+    errors.push(`${referencePath}.targets must not be empty.`)
+    return []
+  }
+
+  const targets: TikzStyleTarget[] = []
+
+  savedTargets.forEach((savedTarget, targetIndex) => {
+    if (typeof savedTarget !== 'string' || !isTikzStyleTarget(savedTarget)) {
+      errors.push(`${referencePath}.targets[${targetIndex}] is not supported.`)
+      return
+    }
+
+    targets.push(savedTarget)
+  })
+
+  return targets
 }
 
 function normalizeLoadedUserStylePresets(
@@ -380,6 +669,13 @@ function normalizeLoadedUserStylePresets(
         return []
       }
 
+      const importedTikzStyleReferenceId =
+        loadedOptionalImportedTikzStyleReferenceId(
+          savedPreset.importedTikzStyleReferenceId,
+          `${presetPath}.importedTikzStyleReferenceId`,
+          errors,
+        )
+
       return [
         loadedUserStylePreset(
           savedPreset.id,
@@ -387,6 +683,7 @@ function normalizeLoadedUserStylePresets(
           kind,
           savedPreset.style,
           tikzStyleName,
+          importedTikzStyleReferenceId,
         ),
       ]
     },
@@ -446,19 +743,77 @@ function loadedUserStylePreset(
   kind: StylePresetKind,
   style: Record<string, unknown>,
   tikzStyleName: string,
+  importedTikzStyleReferenceId: string | undefined,
 ): UserStylePreset {
+  const importedStyleReference =
+    importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }
+
   switch (kind) {
     case 'region':
-      return { id, name, kind, style: style as RegionStyle, tikzStyleName }
+      return {
+        id,
+        name,
+        kind,
+        style: style as RegionStyle,
+        tikzStyleName,
+        ...importedStyleReference,
+      }
     case 'sheet':
-      return { id, name, kind, style: style as SheetStyle, tikzStyleName }
+      return {
+        id,
+        name,
+        kind,
+        style: style as SheetStyle,
+        tikzStyleName,
+        ...importedStyleReference,
+      }
     case 'curve':
-      return { id, name, kind, style: style as CurveStyle, tikzStyleName }
+      return {
+        id,
+        name,
+        kind,
+        style: style as CurveStyle,
+        tikzStyleName,
+        ...importedStyleReference,
+      }
     case 'point':
-      return { id, name, kind, style: style as PointStyle, tikzStyleName }
+      return {
+        id,
+        name,
+        kind,
+        style: style as PointStyle,
+        tikzStyleName,
+        ...importedStyleReference,
+      }
     case 'label':
-      return { id, name, kind, style: style as LabelStyle, tikzStyleName }
+      return {
+        id,
+        name,
+        kind,
+        style: style as LabelStyle,
+        tikzStyleName,
+        ...importedStyleReference,
+      }
   }
+}
+
+function loadedOptionalImportedTikzStyleReferenceId(
+  value: unknown,
+  path: string,
+  errors: string[],
+): string | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    errors.push(`${path} must be non-empty when present.`)
+    return undefined
+  }
+
+  return value
 }
 
 function normalizeLoadedLayers(
