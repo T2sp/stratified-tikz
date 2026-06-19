@@ -1391,17 +1391,34 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
 
   const options = labelStyleOptions(label, context)
   const coordinate = formatCoordinate(label.position, context.mode)
+  const labelText = formatLabelTextForTikz(label.text, context.exportMode)
 
   if (options.length === 0) {
-    return [`\\node at ${coordinate} {${label.text}};`, '']
+    return [`\\node at ${coordinate} {${labelText}};`, '']
   }
 
   return [
     '\\node[',
     ...formatTikzOptions(options),
-    `] at ${coordinate} {${label.text}};`,
+    `] at ${coordinate} {${labelText}};`,
     '',
   ]
+}
+
+function formatLabelTextForTikz(
+  labelText: string,
+  exportMode: TikzExportMode,
+): string {
+  if (exportMode !== 'inlineMath') {
+    return labelText
+  }
+
+  // Inline math export is commonly pasted into align-like environments, where
+  // physical blank lines are invalid. Normalize raw label line breaks only in
+  // emitted TikZ; the stored label text remains unchanged.
+  return labelText
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]*\n+[^\S\n]*/g, ' ')
 }
 
 function emitLayeredItems<T extends { layer: number }>(

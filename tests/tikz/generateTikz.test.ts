@@ -221,12 +221,39 @@ test('inline math output has no blank lines for representative 2D and 3D exports
   )
 })
 
+test('inline math output normalizes embedded label newlines', () => {
+  const labelTexts = [
+    { text: 'A\n\nB', nodePattern: /\\node at \(0,0\) \{A B\};/ },
+    { text: 'A\nB', nodePattern: /\\node at \(0,0\) \{A B\};/ },
+    { text: '\nA\n\nB\n', nodePattern: /\\node at \(0,0\) \{\s*A B\s*\};/ },
+  ] as const
+
+  for (const { text, nodePattern } of labelTexts) {
+    const diagram = createTextLabelDiagram(text)
+    const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+    expectNoBlankLines(tikz)
+    assert.match(tikz, nodePattern)
+    assert.match(tikz, /A/)
+    assert.match(tikz, /B/)
+    assert.equal(diagram.labels[0].text, text)
+  }
+})
+
 test('standalone output keeps blank-line section spacing', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram(), {
     exportMode: 'standalone',
   })
 
   assert.match(tikz, /\n\s*\n/)
+})
+
+test('standalone output preserves multiline label text', () => {
+  const diagram = createTextLabelDiagram('A\n\nB')
+  const tikz = generateTikz(diagram, { exportMode: 'standalone' })
+
+  assert.ok(tikz.includes('\\node at (0,0) {A\n\nB};'))
+  assert.equal(diagram.labels[0].text, 'A\n\nB')
 })
 
 test('3D TikZ output uses tikz-3dplot camera setup and 3D coordinates', () => {
@@ -2635,6 +2662,28 @@ function createTwoDimensionalDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createTextLabelDiagram(text: string): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'text-label',
+    name: 'Text label',
+    text,
+    position: { x: 0, y: 0, z: 0 },
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 0,
+  })
 
   return diagram
 }
