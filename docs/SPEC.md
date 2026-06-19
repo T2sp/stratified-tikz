@@ -733,6 +733,17 @@ option bodies may be saved as metadata on imported style references, but export
 continues to use external-load comments rather than inlining the original
 `\tikzset`.
 
+The importer heuristically detects useful preset candidates from style keys and
+option bodies. Keys containing `/color/` or simple color/opacity options produce
+editable color presets for curves, sheets, regions, labels, and points. Keys
+containing `/shape/` or simple node-shape options produce editable point/label
+presets. The SVG preview approximation intentionally handles only common
+options such as named colors, `red!60`-style xcolor mixes, opacity, fill/draw
+opacity, dashed/dotted/densely dotted, `thick`, `thin`, and simple
+`line width=<...>` values. Unsupported options are ignored for preview, but the
+imported key and source metadata remain saved so TikZ export can use the
+external definition.
+
 ## Free text labels
 
 The user must be able to place arbitrary text or mathematical labels at arbitrary positions.

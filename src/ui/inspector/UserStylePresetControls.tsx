@@ -144,7 +144,7 @@ export function UserStylePresetControls({
   return (
     <>
       <div className="inspector-field">
-        <span className="inspector-field-label">User presets</span>
+        <span className="inspector-field-label">Saved presets</span>
         <div className="style-preset-manager">
           <button
             type="button"
