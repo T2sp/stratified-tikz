@@ -7,6 +7,8 @@ import {
   createTikzGenerateOptionsForUi,
   defaultTikzExportMode,
   generateTikzForUi,
+  inlineMathTikzExportHelp,
+  tikzDownloadFilenameForMode,
   tikzExportModeFromSelectValue,
   tikzExportModeLabel,
 } from '../../src/ui/tikzExportMode.ts'
@@ -14,12 +16,27 @@ import {
 test('TikZ export UI state defaults to standalone mode', () => {
   assert.equal(defaultTikzExportMode, 'standalone')
   assert.equal(tikzExportModeFromSelectValue('unknown'), 'standalone')
-  assert.equal(tikzExportModeLabel('standalone'), 'Standalone TikZ')
+  assert.equal(tikzExportModeLabel('standalone'), 'Standalone')
 })
 
 test('TikZ export UI state can switch to inline math mode', () => {
   assert.equal(tikzExportModeFromSelectValue('inlineMath'), 'inlineMath')
-  assert.equal(tikzExportModeLabel('inlineMath'), 'Inline math TikZ')
+  assert.equal(tikzExportModeLabel('inlineMath'), 'Inline math')
+})
+
+test('TikZ export UI documents inline math behavior', () => {
+  assert.equal(
+    inlineMathTikzExportHelp,
+    'Inline math puts setup inside tikzpicture, adds baseline centering, and removes blank lines for align.',
+  )
+})
+
+test('TikZ download filenames include the selected export mode', () => {
+  assert.equal(tikzDownloadFilenameForMode('standalone'), 'diagram-standalone.tex')
+  assert.equal(
+    tikzDownloadFilenameForMode('inlineMath'),
+    'diagram-inline-math.tex',
+  )
 })
 
 test('selected TikZ export mode is passed to generator options', () => {

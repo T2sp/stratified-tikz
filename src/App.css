@@ -1139,6 +1139,15 @@
   min-height: 32px;
 }
 
+.tikz-export-help {
+  max-width: 300px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+}
+
 .tikz-export-checkbox {
   display: inline-flex;
   align-items: center;
@@ -1160,6 +1169,13 @@
 
 .tikz-export-checkbox:has(input:disabled) {
   opacity: 0.58;
+}
+
+.tikz-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .copy-button {

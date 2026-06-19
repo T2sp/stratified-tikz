@@ -160,6 +160,8 @@ import {
   startWorkPlanePointPicking,
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
+  inlineMathTikzExportHelp,
+  tikzDownloadFilenameForMode,
   tikzExportModeFromSelectValue,
   tikzExportModeOptions,
   validateWorkPlanePointPickingState,
@@ -206,7 +208,7 @@ type ExampleId =
   | 'hemispherePatch'
   | 'saddlePatch'
   | 'evenOddBoundary'
-type CopyStatus = 'idle' | 'copied' | 'failed'
+type CopyStatus = 'idle' | 'copied' | 'downloaded' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type StyleImportStatus = 'idle' | 'imported' | 'failed'
 type CreationTool = WorkPlanePreviewTool
@@ -763,6 +765,24 @@ function App() {
 
       await navigator.clipboard.writeText(tikzSource)
       setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+  }
+
+  function downloadTikz(): void {
+    try {
+      const blob = new Blob([tikzSource], { type: 'text/x-tex;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = tikzDownloadFilenameForMode(tikzExportMode)
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setCopyStatus('downloaded')
     } catch {
       setCopyStatus('failed')
     }
@@ -5159,10 +5179,11 @@ function App() {
             </div>
             <div className="copy-controls">
               <label className="tikz-export-mode-control">
-                <span>TikZ export mode</span>
+                <span>TikZ export mode:</span>
                 <select
                   className="toolbar-select"
                   value={tikzExportMode}
+                  aria-describedby="tikz-export-mode-help"
                   onChange={(event) =>
                     updateTikzExportMode(
                       tikzExportModeFromSelectValue(event.currentTarget.value),
@@ -5176,6 +5197,9 @@ function App() {
                   ))}
                 </select>
               </label>
+              <p id="tikz-export-mode-help" className="tikz-export-help">
+                {inlineMathTikzExportHelp}
+              </p>
               <label className="tikz-export-checkbox">
                 <input
                   type="checkbox"
@@ -5190,12 +5214,23 @@ function App() {
                 />
                 <span>Show xyz axes in TikZ output</span>
               </label>
-              <button type="button" className="copy-button" onClick={copyTikz}>
-                Copy TikZ
-              </button>
+              <div className="tikz-export-actions">
+                <button type="button" className="copy-button" onClick={copyTikz}>
+                  Copy TikZ
+                </button>
+                <button
+                  type="button"
+                  className="copy-button"
+                  onClick={downloadTikz}
+                  title={`Download ${tikzDownloadFilenameForMode(tikzExportMode)}`}
+                >
+                  Download TikZ
+                </button>
+              </div>
               <span className="copy-status" role="status">
                 {copyStatus === 'copied' && 'Copied'}
-                {copyStatus === 'failed' && 'Copy failed'}
+                {copyStatus === 'downloaded' && 'Downloaded'}
+                {copyStatus === 'failed' && 'Copy/download failed'}
               </span>
             </div>
           </div>

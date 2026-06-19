@@ -14,9 +14,12 @@ export const tikzExportModeOptions: Array<{
   mode: TikzExportMode
   label: string
 }> = [
-  { mode: 'standalone', label: 'Standalone TikZ' },
-  { mode: 'inlineMath', label: 'Inline math TikZ' },
+  { mode: 'standalone', label: 'Standalone' },
+  { mode: 'inlineMath', label: 'Inline math' },
 ]
+
+export const inlineMathTikzExportHelp =
+  'Inline math puts setup inside tikzpicture, adds baseline centering, and removes blank lines for align.'
 
 export type TikzExportUiOptions = {
   exportMode: TikzExportMode
@@ -33,6 +36,12 @@ export function tikzExportModeLabel(mode: TikzExportMode): string {
     tikzExportModeOptions.find((option) => option.mode === mode)?.label ??
     tikzExportModeOptions[0].label
   )
+}
+
+export function tikzDownloadFilenameForMode(mode: TikzExportMode): string {
+  return mode === 'inlineMath'
+    ? 'diagram-inline-math.tex'
+    : 'diagram-standalone.tex'
 }
 
 export function createTikzGenerateOptionsForUi(
