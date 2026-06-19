@@ -207,18 +207,130 @@ test('inline math output keeps imported style comments inside without inlining i
   expectNoBlankLines(tikz)
 })
 
-test('inline math output has no blank lines for representative 2D and 3D exports', () => {
-  expectNoBlankLines(
-    generateTikz(createLayeredTwoDimensionalDiagram(), {
+test('inline math output has no blank lines for Phase 18C regression cases', () => {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const externalStyleDiagram = withImportedTikzStyleReference(
+    createTwoDimensionalDiagram(),
+    'external-draw',
+    '3cat/phys/1strata/color/x',
+    ['draw', 'curve'],
+  )
+  externalStyleDiagram.strata = externalStyleDiagram.strata.map((stratum) =>
+    stratum.id === 'wire'
+      ? { ...stratum, importedTikzStyleReferenceId: 'external-draw' }
+      : stratum,
+  )
+  const cases = [
+    {
+      name: '2D output',
+      output: generateTikz(createTwoDimensionalDiagram(), {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\coordinate \(curvePolyWire0p0\) at \(0,0\);/,
+    },
+    {
+      name: '3D output',
+      output: generateTikz(createThreeDimensionalDiagram(), {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\coordinate \(curvePolyLine0p0\) at \(0,0,1\);/,
+    },
+    {
+      name: 'custom colors',
+      output: generateTikz(createThreeDimensionalDiagram(), {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\definecolor\{stzSheetpageFill\}\{HTML\}\{4D9DE0\}/,
+    },
+    {
+      name: 'layers',
+      output: generateTikz(createLayeredTwoDimensionalDiagram(), {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\pgfdeclarelayer\{stratifiedLayerMinus1\}/,
+    },
+    {
+      name: 'camera',
+      output: generateTikz(createThreeDimensionalDiagram(), {
+        camera3d: camera,
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\tdplotsetmaincoords\{70\}\{110\}/,
+    },
+    {
+      name: 'external style comments',
+      output: generateTikz(externalStyleDiagram, {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /% External TikZ styles referenced below\./,
+    },
+    {
+      name: 'user presets',
+      output: generateTikz(createTwoDimensionalDiagramWithCurvePreset(), {
+        exportMode: 'inlineMath',
+      }),
+      expectedPattern: /\\tikzset\{/,
+    },
+  ] satisfies Array<{
+    name: string
+    output: string
+    expectedPattern: RegExp
+  }>
+
+  for (const { name, output, expectedPattern } of cases) {
+    assert.match(output, expectedPattern, name)
+    assert.doesNotMatch(output, /\n\s*\n/, name)
+    expectNoBlankLines(output, name)
+  }
+})
+
+test('inline math output has no leading or trailing blank line', () => {
+  const outputs = [
+    generateTikz(createTwoDimensionalDiagram(), {
       exportMode: 'inlineMath',
     }),
-  )
-  expectNoBlankLines(
     generateTikz(createThreeDimensionalDiagram(), {
       exportMode: 'inlineMath',
       includeCoordinateAxes: true,
     }),
+    generateTikz(createEmptyDiagram({ ambientDimension: 2 }), {
+      exportMode: 'inlineMath',
+    }),
+  ]
+
+  for (const output of outputs) {
+    expectNoLeadingOrTrailingBlankLine(output)
+    expectNoBlankLines(output)
+  }
+})
+
+test('inline math output uses comment separators for readability', () => {
+  const tikz = generateTikz(createThreeDimensionalDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(
+    tikz,
+    /%----------------------------------------\n% Styles and colors\n%----------------------------------------/,
   )
+  assert.match(
+    tikz,
+    /%----------------------------------------\n% Local colors\n%----------------------------------------/,
+  )
+  assert.match(
+    tikz,
+    /%----------------------------------------\n% TikZ layers\n%----------------------------------------/,
+  )
+  assert.match(
+    tikz,
+    /\s*%----------------------------------------\n\s*% Layered drawing commands\n\s*%----------------------------------------/,
+  )
+  assert.ok(countMatches(tikz, /^%----------------------------------------$/gm) >= 8)
+  expectNoBlankLines(tikz)
 })
 
 test('inline math output normalizes embedded label newlines', () => {
@@ -2395,13 +2507,21 @@ function assertIncludesSection(tikz: string, title: string): void {
   assert.match(tikz, new RegExp(`% ${escapeRegExp(title)}`))
 }
 
-function expectNoBlankLines(output: string): void {
+function expectNoBlankLines(output: string, message?: string): void {
   const blankLines = output
     .split('\n')
     .map((line, index) => ({ line, index }))
     .filter(({ line }) => /^\s*$/.test(line))
 
-  assert.deepEqual(blankLines, [])
+  assert.deepEqual(blankLines, [], message)
+}
+
+function expectNoLeadingOrTrailingBlankLine(output: string): void {
+  const lines = output.split('\n')
+
+  assert.notEqual(lines.length, 0)
+  assert.doesNotMatch(lines[0] ?? '', /^\s*$/)
+  assert.doesNotMatch(lines[lines.length - 1] ?? '', /^\s*$/)
 }
 
 function escapeRegExp(value: string): string {
@@ -2686,6 +2806,36 @@ function createTextLabelDiagram(text: string): Diagram {
   })
 
   return diagram
+}
+
+function createTwoDimensionalDiagramWithCurvePreset(): Diagram {
+  const diagram = createTwoDimensionalDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Inline curve',
+    {
+      ...curve.style,
+      strokeColor: '#000000',
+      lineWidth: 0.8,
+    },
+  )
+
+  if (created === null) {
+    throw new Error('Expected curve preset creation to succeed.')
+  }
+
+  return applyUserStylePresetToStratum(
+    created.diagram,
+    curve.id,
+    created.preset.id,
+  )
 }
 
 function createThreeDimensionalDiagram(): Diagram {
