@@ -26,6 +26,12 @@ then emitted inside that picture: external-style load comments, local
 `\definecolor` commands, local user styles, layer declarations, camera setup, and
 then the diagram content.
 
+Inline math output is formatted without blank physical lines, including leading
+or trailing blank lines. This makes the snippet safe to paste into `align` and
+similar math environments without creating paragraph breaks. Readability is
+preserved with comment separators such as `%----------------------------------------`
+and section comments instead of empty lines.
+
 The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.
 Standalone is used when no saved export mode is present.
@@ -107,9 +113,13 @@ locally:
 
 ```tex
 \begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}, line cap=round, line join=round]
+%----------------------------------------
 % Local colors
+%----------------------------------------
 \definecolor{stzStyleusercurveblackcurveStroke}{HTML}{000000}
+%----------------------------------------
 % Local styles
+%----------------------------------------
 \tikzset{
   stratifiedStyleBlackCurve/.style={draw=stzStyleusercurveblackcurveStroke, draw opacity=1, line width=1.2pt}
 }

@@ -147,6 +147,7 @@ const coordinateAxesGuideLength = 2.5
 const coordinateAxesGuideLabelOffset = 0.25
 const inlineMathBaselineTikzOption =
   'baseline={([yshift=-.5ex]current bounding box.center)}'
+const inlineMathCommentSeparatorLine = '%----------------------------------------'
 export const maxCurvedSheetTikzFaces = 256
 
 export function generateTikz(
@@ -443,7 +444,11 @@ function assembleStandaloneTikz({
       ...emitRequiredLibraryComment(context),
       ...emitExternalTikzStyleLoadComment(context),
       ...emitColorDefinitions(context, false),
-      ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
+      ...emitTikzLayerDeclarations(
+        layers,
+        context.includeCoordinateAxes,
+        context.exportMode,
+      ),
       ...emitTikzCameraSetup(context),
       ...emitTikzPictureStart(context),
     ]),
@@ -473,7 +478,11 @@ function assembleInlineMathTikz({
         ...emitExternalTikzStyleLoadComment(context),
         ...emitColorDefinitions(context, true),
         ...emitLocalStyleTikzset(context),
-        ...emitTikzLayerDeclarations(layers, context.includeCoordinateAxes),
+        ...emitTikzLayerDeclarations(
+          layers,
+          context.includeCoordinateAxes,
+          context.exportMode,
+        ),
         ...emitTikzCameraSetup(context),
       ],
       context.exportMode,
@@ -528,7 +537,7 @@ function emitColorDefinitions(
   }
 
   return includeInlineHeading
-    ? ['% Local colors', ...definitions, '']
+    ? inlineMathCommentSection('Local colors', definitions)
     : definitions
 }
 
@@ -539,7 +548,11 @@ function emitLocalStyleTikzset(context: GenerateContext): string[] {
     return []
   }
 
-  return ['% Local styles', '\\tikzset{', ...formatTikzOptions(definitions), '}', '']
+  return inlineMathCommentSection('Local styles', [
+    '\\tikzset{',
+    ...formatTikzOptions(definitions),
+    '}',
+  ])
 }
 
 function emitBodySections(
@@ -568,12 +581,15 @@ function emitTikzCameraSetup(context: GenerateContext): string[] {
     return []
   }
 
-  return [
+  const setupLines = [
     `\\tdplotsetmaincoords{${formatNumber(
       context.camera3d.thetaDeg,
     )}}{${formatNumber(context.camera3d.phiDeg)}}`,
-    '',
   ]
+
+  return context.exportMode === 'inlineMath'
+    ? inlineMathCommentSection('Camera setup', setupLines)
+    : [...setupLines, '']
 }
 
 function emitRequiredLibraryComment(context: GenerateContext): string[] {
@@ -603,7 +619,9 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
     lines.push('\\usetikzlibrary{3d}', '')
   }
 
-  return lines
+  return context.exportMode === 'inlineMath' && lines.length > 0
+    ? inlineMathCommentSection('Package requirements', lines)
+    : lines
 }
 
 function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
@@ -613,14 +631,17 @@ function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
     return []
   }
 
-  return [
+  const lines = [
     '% External TikZ styles referenced below.',
     '% Load these files in your LaTeX preamble or before the picture:',
     ...sources.map((source) => `% - ${commentLineText(source.name)}`),
     '% Suggested:',
     ...sources.map((source) => `%   ${commentLineText(source.loadHint)}`),
-    '',
   ]
+
+  return context.exportMode === 'inlineMath'
+    ? inlineMathCommentSection('External TikZ styles', lines)
+    : [...lines, '']
 }
 
 function commentLineText(value: string): string {
@@ -630,6 +651,7 @@ function commentLineText(value: string): string {
 function emitTikzLayerDeclarations(
   layers: number[],
   includeCoordinateAxesGuideLayer: boolean,
+  exportMode: TikzExportMode = 'standalone',
 ): string[] {
   if (layers.length === 0 && !includeCoordinateAxesGuideLayer) {
     return []
@@ -639,10 +661,17 @@ function emitTikzLayerDeclarations(
     ...(includeCoordinateAxesGuideLayer ? [coordinateAxesGuideLayerName] : []),
     ...layers.map(layerToTikzLayerName),
   ]
-
-  return [
+  const declarations = [
     ...layerNames.map((layerName) => `\\pgfdeclarelayer{${layerName}}`),
     `\\pgfsetlayers{${[...layerNames, 'main'].join(',')}}`,
+  ]
+
+  if (exportMode === 'inlineMath') {
+    return inlineMathCommentSection('TikZ layers', declarations)
+  }
+
+  return [
+    ...declarations,
     '',
   ]
 }
@@ -1481,9 +1510,7 @@ function indentLines(lines: string[]): string[] {
 }
 
 function layerSectionComment(sectionTitle: string): string[] {
-  const separator = '  %----------------------------------------'
-
-  return [separator, `  % ${sectionTitle}`, separator]
+  return commentSeparatorLines(sectionTitle, '  ')
 }
 
 function labelStyleOptions(
@@ -2475,15 +2502,28 @@ function joinStandaloneTikzLines(lines: string[]): string {
 }
 
 function joinInlineMathTikzLines(lines: string[]): string {
-  return removeBlankLinesForInlineMath(lines).join('\n')
+  return joinTikzLinesNoBlankLines(lines)
 }
 
-function removeBlankLinesForInlineMath(lines: string[]): string[] {
-  return lines.filter(isNonBlankLine)
+function joinTikzLinesNoBlankLines(lines: string[]): string {
+  return lines
+    .flatMap((line) => line.replace(/\r\n?/g, '\n').split('\n'))
+    .filter(isNonBlankLine)
+    .join('\n')
 }
 
 function isNonBlankLine(line: string): boolean {
   return !/^\s*$/.test(line)
+}
+
+function inlineMathCommentSection(title: string, lines: string[]): string[] {
+  return [...commentSeparatorLines(title), ...lines.filter(isNonBlankLine)]
+}
+
+function commentSeparatorLines(title: string, indent = ''): string[] {
+  const separator = `${indent}${inlineMathCommentSeparatorLine}`
+
+  return [separator, `${indent}% ${title}`, separator]
 }
 
 function section(
@@ -2492,14 +2532,7 @@ function section(
   exportMode: TikzExportMode = 'standalone',
 ): string[] {
   if (exportMode === 'inlineMath') {
-    const separator = '%----------------------------------------'
-
-    return [
-      separator,
-      `% ${title}`,
-      separator,
-      ...lines.filter(isNonBlankLine),
-    ]
+    return inlineMathCommentSection(title, lines)
   }
 
   return [
