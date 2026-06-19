@@ -303,6 +303,7 @@ export type ImportedTikzStyleReference = {
   sourceId: string
   displayName: string
   targets: TikzStyleTarget[]
+  options?: string
 }
 
 export type UserRegionStylePreset = {
