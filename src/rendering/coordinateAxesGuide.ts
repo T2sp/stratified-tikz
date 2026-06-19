@@ -24,15 +24,13 @@ export function createCoordinateAxesGuide(
   ambientDimension: AmbientDimension,
   length = defaultCoordinateAxesGuideLength,
 ): CoordinateAxesGuide | null {
-  if (ambientDimension !== 3) {
-    return null
-  }
-
   const origin = createVec3(0, 0, 0)
   const axes: CoordinateAxisGuide[] = [
     createAxisGuide('x', origin, createVec3(length, 0, 0), labelOffset),
     createAxisGuide('y', origin, createVec3(0, length, 0), labelOffset),
-    createAxisGuide('z', origin, createVec3(0, 0, length), labelOffset),
+    ...(ambientDimension === 3
+      ? [createAxisGuide('z', origin, createVec3(0, 0, length), labelOffset)]
+      : []),
   ]
 
   return {

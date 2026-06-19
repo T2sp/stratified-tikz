@@ -614,8 +614,22 @@ test('3D coordinate axes guide data is available for preview rendering', () => {
   assert.equal(guide.fitPoints.length, 9)
 })
 
-test('2D diagrams do not create a 3D coordinate axes guide', () => {
-  assert.equal(createCoordinateAxesGuide(2), null)
+test('2D coordinate axes guide data is available for preview rendering', () => {
+  const guide = createCoordinateAxesGuide(2)
+
+  assert.notEqual(guide, null)
+  if (guide === null) {
+    throw new Error('Expected a 2D coordinate axes guide.')
+  }
+
+  assert.deepEqual(
+    guide.axes.map((axis) => axis.axis),
+    ['x', 'y'],
+  )
+  assert.deepEqual(guide.axes[0].from, { x: 0, y: 0, z: 0 })
+  assert.deepEqual(guide.axes[0].to, { x: 2.5, y: 0, z: 0 })
+  assert.deepEqual(guide.axes[1].to, { x: 0, y: 2.5, z: 0 })
+  assert.equal(guide.fitPoints.length, 6)
 })
 
 test('coordinate axes guide is preview-only and not selectable', () => {
@@ -652,6 +666,46 @@ test('empty 3D coordinate axes guide projects with the SVG camera', () => {
   )
 
   assert.equal(camera.mode, '3d')
+  assert.ok(
+    projectedPoints.every(
+      (point) =>
+        Number.isFinite(point.x) &&
+        Number.isFinite(point.y) &&
+        point.x >= 0 &&
+        point.x <= 200 &&
+        point.y >= 0 &&
+        point.y <= 120,
+    ),
+  )
+})
+
+test('empty 2D coordinate axes guide projects with the SVG camera', () => {
+  const guide = createCoordinateAxesGuide(2)
+
+  assert.notEqual(guide, null)
+  if (guide === null) {
+    throw new Error('Expected a 2D coordinate axes guide.')
+  }
+
+  const camera = resolveSvgCamera(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    200,
+    120,
+    {
+      fitToView: true,
+      extraPointsForFit: guide.fitPoints,
+    },
+  )
+  const projectedOrigin = projectToSvgPoint(camera, { x: 0, y: 0, z: 0 }, 120)
+  const projectedX = projectToSvgPoint(camera, { x: 2.5, y: 0, z: 0 }, 120)
+  const projectedY = projectToSvgPoint(camera, { x: 0, y: 2.5, z: 0 }, 120)
+  const projectedPoints = guide.fitPoints.map((point) =>
+    projectToSvgPoint(camera, point, 120),
+  )
+
+  assert.equal(camera.mode, '2d')
+  assert.ok(projectedX.x > projectedOrigin.x)
+  assert.ok(projectedY.y < projectedOrigin.y)
   assert.ok(
     projectedPoints.every(
       (point) =>
