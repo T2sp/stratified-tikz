@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  importedStylePresetKindsForReference,
+  importedStylePresetStyle,
+  inferImportedTikzStyleTargets,
   importTikzStyleFile,
+  parseTikzStylePreviewOptions,
   parseTikzsetStyles,
 } from '../../src/model/importedTikzStyles.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import { applyUserStylePresetToStratum } from '../../src/model/stylePresets.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import type { CurveStyle, Diagram } from '../../src/model/types.ts'
 
@@ -170,6 +175,174 @@ test('import creates imported style references with extracted options', () => {
   assert.deepEqual(result.diagram.importedTikzStyleReferences, result.references)
 })
 
+test('/color/ imported key is auto-detected as a color preset target', () => {
+  const targets = inferImportedTikzStyleTargets(
+    '3cat/phys/1strata/color/x',
+    '',
+  )
+
+  assert.ok(targets.includes('curve'))
+  assert.ok(targets.includes('sheet'))
+  assert.ok(targets.includes('region'))
+  assert.ok(targets.includes('label'))
+  assert.ok(targets.includes('point'))
+})
+
+test('/shape/ imported key is auto-detected as a point and label preset target', () => {
+  const reference = importTikzStyleFile(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/3strata/shape/L/.style={circle,inner sep=1.5pt}}`,
+  ).references[0]
+
+  if (reference === undefined) {
+    throw new Error('Expected imported style reference.')
+  }
+
+  assert.ok(reference.targets.includes('node'))
+  assert.ok(reference.targets.includes('point'))
+  assert.ok(reference.targets.includes('label'))
+  assert.deepEqual(importedStylePresetKindsForReference(reference), [
+    'point',
+    'label',
+  ])
+})
+
+test('preview parser reads opacity shorthand', () => {
+  assert.deepEqual(parseTikzStylePreviewOptions('opacity=.4'), {
+    opacity: 0.4,
+  })
+})
+
+test('preview parser reads fill and draw opacity', () => {
+  assert.deepEqual(
+    parseTikzStylePreviewOptions('fill opacity=.25,draw opacity=.8'),
+    {
+      fillOpacity: 0.25,
+      drawOpacity: 0.8,
+    },
+  )
+})
+
+test('preview parser approximates xcolor mixes against white', () => {
+  assert.deepEqual(parseTikzStylePreviewOptions('red!60'), {
+    color: '#FF6666',
+  })
+})
+
+test('preview parser reads common line styles', () => {
+  assert.equal(parseTikzStylePreviewOptions('dashed').lineStyle, 'dashed')
+  assert.equal(parseTikzStylePreviewOptions('dotted').lineStyle, 'dotted')
+  assert.equal(
+    parseTikzStylePreviewOptions('densely dotted').lineStyle,
+    'denselyDotted',
+  )
+})
+
+test('preview parser approximates thick line width', () => {
+  assert.equal(parseTikzStylePreviewOptions('thick').lineWidth, 2)
+})
+
+test('imported color styles create editable presets in the preset list', () => {
+  const result = importTikzStyleFile(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/1strata/color/x/.style={red!60,opacity=.4,dashed}}`,
+  )
+  const presets = result.diagram.userStylePresets ?? []
+
+  assert.equal(result.references[0]?.displayName, '3cat: phys/1strata/color/x')
+  assert.deepEqual(
+    presets.map((preset) => preset.kind),
+    ['curve', 'sheet', 'region', 'label', 'point'],
+  )
+  assert.ok(
+    presets.every(
+      (preset) =>
+        preset.importedTikzStyleReferenceId === result.references[0]?.id,
+    ),
+  )
+})
+
+test('imported preview style ignores unsupported options but keeps parsed values', () => {
+  const style = importedStylePresetStyle(
+    'curve',
+    'red!60,decorate,decoration={snake},dashed',
+  )
+
+  assert.deepEqual(style, {
+    kind: 'curveStyle',
+    strokeColor: '#FF6666',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'dashed',
+  })
+})
+
+test('applying an imported preset stores the imported style key reference', () => {
+  const importResult = importTikzStyleFile(
+    createDiagramWithCurve(),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/1strata/color/x/.style={blue!40,opacity=.4,dotted}}`,
+  )
+  const curvePreset = importResult.diagram.userStylePresets?.find(
+    (preset) => preset.kind === 'curve',
+  )
+
+  if (curvePreset === undefined) {
+    throw new Error('Expected imported curve preset.')
+  }
+
+  const applied = applyUserStylePresetToStratum(
+    importResult.diagram,
+    'wire',
+    curvePreset.id,
+  )
+  const curve = applied.strata[0]
+
+  assert.equal(curve.stylePresetId, curvePreset.id)
+  assert.equal(
+    curve.importedTikzStyleReferenceId,
+    curvePreset.importedTikzStyleReferenceId,
+  )
+  assert.deepEqual(curve.style, curvePreset.style)
+})
+
+test('TikZ output for an auto-detected imported preset uses the imported key and load comment only', () => {
+  const importResult = importTikzStyleFile(
+    createDiagramWithCurve(),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/1strata/color/x/.style={red!60,decorate,decoration={snake}}}`,
+  )
+  const reference = importResult.references[0]
+  const curvePreset = importResult.diagram.userStylePresets?.find(
+    (preset) => preset.kind === 'curve',
+  )
+
+  if (reference === undefined || curvePreset === undefined) {
+    throw new Error('Expected imported reference and curve preset.')
+  }
+
+  const applied = applyUserStylePresetToStratum(
+    importResult.diagram,
+    'wire',
+    curvePreset.id,
+  )
+  const tikz = generateTikz(applied)
+
+  assert.equal(
+    reference.options,
+    'red!60,decorate,decoration={snake}',
+  )
+  assert.match(tikz, /3cat\/phys\/1strata\/color\/x/)
+  assert.match(tikz, /% External TikZ styles referenced below\./)
+  assert.match(tikz, /% - 3cat\.sty/)
+  assert.match(tikz, /% {3}\\input\{3cat\.sty\}/)
+  assert.doesNotMatch(tikz, /\\tikzset\{/)
+  assert.doesNotMatch(tikz, /^\\input\{3cat\.sty\}/m)
+  assert.doesNotMatch(tikz, /decorate/)
+})
+
 test('generated TikZ from imported parser output does not inline tikzset', () => {
   const importResult = importTikzStyleFile(
     createDiagramWithCurve(),
@@ -242,7 +415,7 @@ test('generated TikZ from imported parser output includes only load comments', (
 
   assert.match(tikz, /% External TikZ styles referenced below\./)
   assert.match(tikz, /% - mygeometry\.sty/)
-  assert.match(tikz, /%   \\input\{mygeometry\.sty\}/)
+  assert.match(tikz, /% {3}\\input\{mygeometry\.sty\}/)
   assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
   assert.ok(
     tikz.indexOf('% External TikZ styles referenced below.') <
@@ -325,7 +498,7 @@ function assertNoRelativeTikzWireOption(tikz: string): void {
 function assertIncludesOnlyExternalLoadComments(tikz: string): void {
   assert.match(tikz, /% External TikZ styles referenced below\./)
   assert.match(tikz, /% - mygeometry\.sty/)
-  assert.match(tikz, /%   \\input\{mygeometry\.sty\}/)
+  assert.match(tikz, /% {3}\\input\{mygeometry\.sty\}/)
   assert.doesNotMatch(tikz, /\\tikzset\{/)
   assert.doesNotMatch(tikz, /^\\input\{mygeometry\.sty\}/m)
 }

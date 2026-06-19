@@ -40,6 +40,15 @@ Direct manual edits clear `stylePresetId`. If a loaded diagram ever has a stale
 generator falls back to inline structured options so the exported source matches
 the model style.
 
+Imported `.sty` / `.tex` styles that look like color or node-shape styles also
+appear in the same saved preset chooser. This detection is heuristic: `/color/`
+keys and simple color/opacity options become presets for curves, sheets,
+regions, labels, and points; `/shape/` keys and simple node-shape options become
+presets for points and labels. The Inspector preview uses an approximate subset
+of TikZ options, including named colors, simple `red!60` xcolor mixes, opacity,
+fill/draw opacity, dashed/dotted/densely dotted, `thick`, `thin`, and simple
+`line width=<...>` values. Unsupported options are ignored for preview.
+
 Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
 
 ```tex
@@ -91,7 +100,9 @@ ordinary TeX comments where practical and skips unsupported entries with
 warnings. It does not expand macros, resolve `\input`, evaluate conditionals, or
 execute TeX. Parsed option bodies are saved as reference metadata for inspection,
 but generated TikZ still emits only the external-load comments and imported
-option keys; it never inlines the parsed `\tikzset` definitions.
+option keys; it never inlines the parsed `\tikzset` definitions. Unsupported
+preview options are therefore preserved for export by the external style key,
+not by copying the option body into generated TikZ.
 
 ## Mathematical convention
 

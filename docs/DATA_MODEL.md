@@ -119,6 +119,12 @@ import parser is deliberately limited: no TeX macro expansion, no `\input`
 resolution, no conditionals, and no TeX execution. The SVG preview continues to
 use the structured `style` object.
 
+When imported options look like common color or node-shape styles, the importer
+may create editable `userStylePresets` that store approximate structured style
+values and an `importedTikzStyleReferenceId`. That approximation is only for the
+Inspector and SVG preview. Export still preserves the imported key and external
+source comments instead of inlining the original `\tikzset` body.
+
 ## Layer metadata
 
 Element membership in a layer is still stored on each rendered element:
