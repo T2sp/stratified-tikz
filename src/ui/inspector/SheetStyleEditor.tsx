@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { HexColor, SheetStratum } from '../../model/types.ts'
+import type { Diagram, HexColor, SheetStratum } from '../../model/types.ts'
 import {
   cloneStylePreset,
   sheetStylePresets,
@@ -13,14 +13,17 @@ import {
   EditableColorField,
   EditableOpacityField,
 } from './InspectorField.tsx'
+import { UserStylePresetControls } from './UserStylePresetControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type SheetStyleEditorProps = {
+  diagram: Diagram
   sheet: SheetStratum
   onDiagramChange: DiagramChangeHandler
 }
 
 export function SheetStyleEditor({
+  diagram,
   sheet,
   onDiagramChange,
 }: SheetStyleEditorProps) {
@@ -57,6 +60,13 @@ export function SheetStyleEditor({
             ))}
           </div>
         </div>
+        <UserStylePresetControls
+          diagram={diagram}
+          kind="sheet"
+          currentStyle={sheet.style}
+          target={{ kind: 'stratum', id: sheet.id }}
+          onDiagramChange={onDiagramChange}
+        />
         <label className="inspector-field inspector-checkbox-field">
           <span className="inspector-field-label">Color link</span>
           <span className="inspector-checkbox-control">

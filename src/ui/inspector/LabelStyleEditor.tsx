@@ -1,5 +1,10 @@
 import { labelAnchors } from '../../model/types.ts'
-import type { HexColor, LabelAnchor, TextLabel } from '../../model/types.ts'
+import type {
+  Diagram,
+  HexColor,
+  LabelAnchor,
+  TextLabel,
+} from '../../model/types.ts'
 import { updateLabelStyleById } from '../diagramUpdates.ts'
 import {
   EditableColorField,
@@ -7,14 +12,17 @@ import {
   EditablePositiveNumberField,
   EditableSelectField,
 } from './InspectorField.tsx'
+import { UserStylePresetControls } from './UserStylePresetControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type LabelStyleEditorProps = {
+  diagram: Diagram
   label: TextLabel
   onDiagramChange: DiagramChangeHandler
 }
 
 export function LabelStyleEditor({
+  diagram,
   label,
   onDiagramChange,
 }: LabelStyleEditorProps) {
@@ -22,6 +30,13 @@ export function LabelStyleEditor({
     <section className="inspector-section">
       <h3>Style</h3>
       <div className="inspector-form">
+        <UserStylePresetControls
+          diagram={diagram}
+          kind="label"
+          currentStyle={label.style}
+          target={{ kind: 'label', id: label.id }}
+          onDiagramChange={onDiagramChange}
+        />
         <EditableColorField
           label="Text color"
           value={label.style.color}

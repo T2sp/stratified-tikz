@@ -696,11 +696,23 @@ See [Layer Manager](./LAYER_MANAGER.md) for the user-facing operation summary.
 
 ## Style presets
 
-The app may provide style presets for convenience, but the user must not be restricted to presets.
+The app may provide style presets for convenience, but the user must not be
+restricted to presets.
 
-Presets are only shortcuts.
+Built-in presets are read-only shortcuts. Applying a built-in preset copies
+explicit structured style values into the selected element.
 
-The actual diagram model should store explicit style values so that TikZ output is stable and independent of the current preset list.
+User presets are editable diagram-level data stored in `diagram.userStylePresets`.
+They have stable ids, user-visible names, compatible style kinds, explicit
+structured style values, and sanitized `tikzStyleName` values. Applying a user
+preset copies explicit style values and records `stylePresetId` on the selected
+compatible element. Manual style edits clear that reference.
+
+The actual element style object remains the model source of truth. Generated
+TikZ may reference a local user preset style only when the element style still
+matches that preset; otherwise it should emit inline structured style options.
+Phase 17A user preset definitions are emitted as local options of
+`\begin{tikzpicture}[...]`, not as a pre-picture `\tikzset{...}` block.
 
 ## Free text labels
 

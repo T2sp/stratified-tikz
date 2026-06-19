@@ -24,12 +24,34 @@ The `generate:tikz-examples` script writes these references alongside the base
 npm run generate:tikz-examples
 ```
 
-The style inspectors expose lightweight presets for blue/red translucent filled
-regions or sheets, black solid curves, black densely dotted curves, and common
-black point markers. Presets are convenience controls only. Applying a preset
-copies explicit style values into the selected stratum; diagrams do not store a
-`styleId`, so saved JSON and exported TikZ remain stable if preset definitions
-change later.
+The style inspectors expose read-only built-in presets for blue/red translucent
+filled regions or sheets, black solid curves, black densely dotted curves, and
+common black point markers. The Inspector also supports user-created structured
+presets for regions, sheets, curves, points, and free text labels. User presets
+can be created from the selected element style, renamed, edited, deleted, and
+applied to compatible elements.
+
+Built-in presets remain convenience controls: applying one copies explicit style
+values into the selected element. User presets are saved in
+`diagram.userStylePresets`; applying one copies explicit style values and records
+`stylePresetId` on the element so TikZ can reference the local preset style.
+Direct manual edits clear `stylePresetId`. If a loaded diagram ever has a stale
+`stylePresetId` whose structured style no longer matches the preset, the TikZ
+generator falls back to inline structured options so the exported source matches
+the model style.
+
+Phase 17A user presets are emitted as local options of `\begin{tikzpicture}`:
+
+```tex
+\begin{tikzpicture}[
+  line cap=round,
+  line join=round,
+  stratifiedStyleBlackCurve/.style={draw=stzStyleusercurveblackcurveStroke, draw opacity=1, line width=1.2pt}
+]
+```
+
+The generator does not emit a pre-picture `\tikzset{...}` block for these user
+presets.
 
 ## Mathematical convention
 

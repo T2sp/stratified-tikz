@@ -13,6 +13,7 @@ import type {
   LineStyle,
   PointShape,
   PointStratum,
+  PointStyle,
   RegionStyle,
   SheetStyle,
   SheetStratum,
@@ -20,6 +21,8 @@ import type {
   OrthographicCamera3D,
   PathSegment,
   PathTemplate,
+  StylePresetKind,
+  UserStylePreset,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
@@ -38,6 +41,7 @@ import {
   createInitialCamera3D,
   isOrthographicCamera3D,
 } from '../model/camera.ts'
+import { stylePresetStylesEqual } from '../model/stylePresets.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   isFiniteVec3,
@@ -120,6 +124,8 @@ type GenerateContext = {
   camera3d?: OrthographicCamera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
+  userStylePresets: Map<string, UserStylePreset>
+  localStyles: LocalStyleRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
   includeCoordinateAxes: boolean
@@ -144,7 +150,7 @@ export function generateTikz2D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
-  const context = createContext('2d', options)
+  const context = createContext('2d', options, diagram.userStylePresets)
   const regionSectionTitle = 'Codimension 0 strata: regions'
   const curveSectionTitle = 'Codimension 1 strata: curves'
   const pointSectionTitle = 'Codimension 2 strata: points'
@@ -206,7 +212,12 @@ export function generateTikz3D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
-  const context = createContext('3d', options, resolveTikzCamera3D(diagram, options))
+  const context = createContext(
+    '3d',
+    options,
+    diagram.userStylePresets,
+    resolveTikzCamera3D(diagram, options),
+  )
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
   const curveSectionTitle = 'Codimension 2 strata: curves'
   const pointSectionTitle = 'Codimension 3 strata: points'
@@ -304,6 +315,7 @@ export function layerToTikzLayerName(layer: number): string {
 function createContext(
   mode: TikzMode,
   options: GenerateTikzOptions,
+  userStylePresets: readonly UserStylePreset[] | undefined,
   camera3d?: OrthographicCamera3D,
 ): GenerateContext {
   return {
@@ -311,6 +323,10 @@ function createContext(
     ...(mode === '3d' && camera3d !== undefined ? { camera3d } : {}),
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
+    userStylePresets: new Map(
+      (userStylePresets ?? []).map((preset) => [preset.id, preset]),
+    ),
+    localStyles: new LocalStyleRegistry(),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
     includeCoordinateAxes:
@@ -372,17 +388,17 @@ function assembleTikz({
 }
 
 function emitTikzPictureStart(context: GenerateContext): string[] {
+  const baseOptions =
+    context.mode === '2d'
+      ? ['line cap=round', 'line join=round']
+      : ['tdplot_main_coords', 'line cap=round', 'line join=round']
+  const options = [...baseOptions, ...context.localStyles.emitDefinitions()]
+
   if (context.mode === '2d') {
-    return ['\\begin{tikzpicture}[', '  line cap=round,', '  line join=round', ']']
+    return ['\\begin{tikzpicture}[', ...formatTikzOptions(options), ']']
   }
 
-  return [
-    '\\begin{tikzpicture}[',
-    '  tdplot_main_coords,',
-    '  line cap=round,',
-    '  line join=round',
-    ']',
-  ]
+  return ['\\begin{tikzpicture}[', ...formatTikzOptions(options), ']']
 }
 
 function emitTikzCameraSetup(context: GenerateContext): string[] {
@@ -563,14 +579,6 @@ function emitSheet(
     ]
   }
 
-  const fillColor = context.colors.define(
-    `Sheet${sheet.id}Fill`,
-    sheet.style.fillColor,
-  )
-  const strokeColor = context.colors.define(
-    `Sheet${sheet.id}Stroke`,
-    sheet.style.strokeColor,
-  )
   const coordinates = sheetVertices(sheet).map((vertex, index) =>
     context.coordinates.define(
       sheetCoordinateBaseName(sheet, elementIndex),
@@ -579,10 +587,13 @@ function emitSheet(
     ),
   )
   const options = [
-    `fill=${fillColor}`,
-    `fill opacity=${formatNumber(sheet.style.fillOpacity)}`,
-    `draw=${strokeColor}`,
-    `draw opacity=${formatNumber(sheet.style.strokeOpacity)}`,
+    ...filledSurfaceStyleOptionsForElement(
+      'sheet',
+      sheet.stylePresetId,
+      sheet.style,
+      `Sheet${sheet.id}`,
+      context,
+    ),
     ...spathSaveOptions(
       sheet.kind === 'polygonSheet' ? sheet.pathLabel : undefined,
       context,
@@ -635,7 +646,9 @@ function emitCurvedSheet(
   const coordinates = mesh.vertices.map((vertex, index) =>
     context.coordinates.define(coordinateBaseName, index, vertex),
   )
-  const options = filledSurfaceStyleTikzOptions(
+  const options = filledSurfaceStyleOptionsForElement(
+    'sheet',
+    sheet.stylePresetId,
     sheet.style,
     `Sheet${sheet.id}`,
     context,
@@ -676,7 +689,13 @@ function emitFilledRegion(
     context,
   )
   const options = [
-    ...filledSurfaceStyleTikzOptions(region.style, `Region${region.id}`, context),
+    ...filledSurfaceStyleOptionsForElement(
+      'region',
+      region.stylePresetId,
+      region.style,
+      `Region${region.id}`,
+      context,
+    ),
     ...fillRuleTikzOptions(region.fillRule),
   ]
 
@@ -700,7 +719,13 @@ function emitWorkPlaneFilledSheet(
   }
 
   const options = [
-    ...filledSurfaceStyleTikzOptions(sheet.style, `Sheet${sheet.id}`, context),
+    ...filledSurfaceStyleOptionsForElement(
+      'sheet',
+      sheet.stylePresetId,
+      sheet.style,
+      `Sheet${sheet.id}`,
+      context,
+    ),
     ...fillRuleTikzOptions(sheet.fillRule),
   ]
   const scopedPath = formatWorkPlaneFilledSheetLocalPath(sheet)
@@ -804,7 +829,12 @@ function emitCurve(
     }
     const continuousStyle = styleRuns[0]?.style ?? curve.style
     const continuousOptions = [
-      ...curveStyleTikzOptions(continuousStyle, `Curve${curve.id}`, context),
+      ...curveStyleOptionsForElement(
+        curve.stylePresetId,
+        continuousStyle,
+        `Curve${curve.id}`,
+        context,
+      ),
       ...spathSaveOptions(curve.pathLabel, context),
     ]
 
@@ -818,7 +848,12 @@ function emitCurve(
   }
 
   const options = [
-    ...curveStyleTikzOptions(curve.style, `Curve${curve.id}`, context),
+    ...curveStyleOptionsForElement(
+      curve.stylePresetId,
+      curve.style,
+      `Curve${curve.id}`,
+      context,
+    ),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
   const scopedCurve = emitScopedWorkPlaneRelativeBezierCurve(
@@ -866,7 +901,12 @@ function emitTemplatePath(
   context: GenerateContext,
 ): string[] {
   const options = [
-    ...curveStyleTikzOptions(curve.style, `Curve${curve.id}`, context),
+    ...curveStyleOptionsForElement(
+      curve.stylePresetId,
+      curve.style,
+      `Curve${curve.id}`,
+      context,
+    ),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
 
@@ -1031,7 +1071,8 @@ function emitConcatenatedPathStyleRun(
     run.startIndex,
     run.startIndex + run.segments.length,
   )
-  const options = curveStyleTikzOptions(
+  const options = curveStyleOptionsForElement(
+    curve.stylePresetId,
     run.style,
     `Curve${curve.id}Segment${run.startIndex + 1}`,
     context,
@@ -1121,19 +1162,17 @@ function emitPoint(
     ]
   }
 
-  const pointColor = context.colors.define(`Point${point.id}`, point.style.color)
   const coordinate = context.coordinates.define(
     pointCoordinateBaseName(point, elementIndex),
     0,
     point.position,
   )
-  const options = [
-    ...pointShapeOptions(point.style.shape, context),
-    `fill=${point.style.fill === 'filled' ? pointColor : 'white'}`,
-    `draw=${pointColor}`,
-    `opacity=${formatNumber(point.style.opacity)}`,
-    `inner sep=${formatNumber(point.style.size / 2)}pt`,
-  ]
+  const options = pointStyleOptionsForElement(
+    point.stylePresetId,
+    point.style,
+    `Point${point.id}`,
+    context,
+  )
 
   return [
     '\\node[',
@@ -1242,19 +1281,38 @@ function labelStyleOptions(
   label: TextLabel,
   context: GenerateContext,
 ): string[] {
+  const presetStyleOption = userStylePresetTikzOption(
+    'label',
+    label.stylePresetId,
+    label.style,
+    context,
+  )
+
+  if (presetStyleOption !== null) {
+    return [presetStyleOption]
+  }
+
   if (isDefaultLabelStyle(label.style)) {
     return []
   }
 
-  const labelColor = context.colors.define(`Label${label.id}`, label.style.color)
+  return labelStyleTikzOptions(label.style, `Label${label.id}`, context)
+}
+
+function labelStyleTikzOptions(
+  style: LabelStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const labelColor = context.colors.define(colorBaseName, style.color)
 
   return [
     `text=${labelColor}`,
-    `opacity=${formatNumber(label.style.opacity)}`,
-    `font=\\fontsize{${formatNumber(label.style.fontSize)}pt}{${formatNumber(
-      label.style.fontSize * 1.2,
+    `opacity=${formatNumber(style.opacity)}`,
+    `font=\\fontsize{${formatNumber(style.fontSize)}pt}{${formatNumber(
+      style.fontSize * 1.2,
     )}pt}\\selectfont`,
-    `anchor=${label.style.anchor}`,
+    `anchor=${style.anchor}`,
   ]
 }
 
@@ -1286,6 +1344,24 @@ function curveStyleTikzOptions(
   ]
 }
 
+function curveStyleOptionsForElement(
+  stylePresetId: string | undefined,
+  style: CurveStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const presetStyleOption = userStylePresetTikzOption(
+    'curve',
+    stylePresetId,
+    style,
+    context,
+  )
+
+  return presetStyleOption === null
+    ? curveStyleTikzOptions(style, colorBaseName, context)
+    : [presetStyleOption]
+}
+
 function filledSurfaceStyleTikzOptions(
   style: RegionStyle | SheetStyle,
   colorBaseName: string,
@@ -1303,6 +1379,106 @@ function filledSurfaceStyleTikzOptions(
     `draw=${strokeColor}`,
     `draw opacity=${formatNumber(style.strokeOpacity)}`,
   ]
+}
+
+function filledSurfaceStyleOptionsForElement(
+  kind: 'region' | 'sheet',
+  stylePresetId: string | undefined,
+  style: RegionStyle | SheetStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const presetStyleOption = userStylePresetTikzOption(
+    kind,
+    stylePresetId,
+    style,
+    context,
+  )
+
+  return presetStyleOption === null
+    ? filledSurfaceStyleTikzOptions(style, colorBaseName, context)
+    : [presetStyleOption]
+}
+
+function pointStyleTikzOptions(
+  style: PointStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const pointColor = context.colors.define(colorBaseName, style.color)
+
+  return [
+    ...pointShapeOptions(style.shape, context),
+    `fill=${style.fill === 'filled' ? pointColor : 'white'}`,
+    `draw=${pointColor}`,
+    `opacity=${formatNumber(style.opacity)}`,
+    `inner sep=${formatNumber(style.size / 2)}pt`,
+  ]
+}
+
+function pointStyleOptionsForElement(
+  stylePresetId: string | undefined,
+  style: PointStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const presetStyleOption = userStylePresetTikzOption(
+    'point',
+    stylePresetId,
+    style,
+    context,
+  )
+
+  return presetStyleOption === null
+    ? pointStyleTikzOptions(style, colorBaseName, context)
+    : [presetStyleOption]
+}
+
+function userStylePresetTikzOption(
+  kind: StylePresetKind,
+  stylePresetId: string | undefined,
+  style: UserStylePreset['style'],
+  context: GenerateContext,
+): string | null {
+  const preset =
+    stylePresetId === undefined
+      ? undefined
+      : context.userStylePresets.get(stylePresetId)
+
+  if (
+    preset === undefined ||
+    preset.kind !== kind ||
+    !stylePresetStylesEqual(style, preset.style)
+  ) {
+    return null
+  }
+
+  return context.localStyles.define(preset, () =>
+    styleOptionsForUserPreset(preset, context),
+  )
+}
+
+function styleOptionsForUserPreset(
+  preset: UserStylePreset,
+  context: GenerateContext,
+): string[] {
+  const colorBaseName = `Style${preset.id}`
+
+  switch (preset.kind) {
+    case 'region':
+    case 'sheet':
+      return filledSurfaceStyleTikzOptions(
+        preset.style,
+        colorBaseName,
+        context,
+      )
+    case 'curve':
+      return curveStyleTikzOptions(preset.style, colorBaseName, context)
+    case 'point':
+      return pointStyleTikzOptions(preset.style, colorBaseName, context)
+    case 'label':
+      return labelStyleTikzOptions(preset.style, colorBaseName, context)
+  }
 }
 
 function fillRuleTikzOptions(fillRule: 'nonzero' | 'evenOdd'): string[] {
@@ -2104,6 +2280,57 @@ class ColorRegistry {
     }
 
     const name = `${baseName}${suffix}`
+    this.usedNames.add(name)
+    return name
+  }
+}
+
+class LocalStyleRegistry {
+  private readonly definitions: Array<{ name: string; options: string[] }> = []
+  private readonly namesByPresetId = new Map<string, string>()
+  private readonly usedNames = new Set<string>()
+
+  define(preset: UserStylePreset, createOptions: () => string[]): string {
+    const existingName = this.namesByPresetId.get(preset.id)
+
+    if (existingName !== undefined) {
+      return existingName
+    }
+
+    const name = this.uniqueName(preset.tikzStyleName)
+
+    this.namesByPresetId.set(preset.id, name)
+    this.definitions.push({ name, options: createOptions() })
+
+    return name
+  }
+
+  emitDefinitions(): string[] {
+    return this.definitions.map(
+      (definition) =>
+        `${definition.name}/.style={${definition.options.join(', ')}}`,
+    )
+  }
+
+  private uniqueName(preferredName: string): string {
+    const identifier = /^[a-zA-Z][a-zA-Z0-9]*$/.test(preferredName)
+      ? preferredName
+      : toIdentifierPart(preferredName, 'stratifiedStylePreset')
+    const safeName = /^[a-zA-Z]/.test(identifier)
+      ? identifier
+      : `stratifiedStylePreset${identifier}`
+
+    if (!this.usedNames.has(safeName)) {
+      this.usedNames.add(safeName)
+      return safeName
+    }
+
+    let suffix = 2
+    while (this.usedNames.has(`${safeName}${suffix}`)) {
+      suffix += 1
+    }
+
+    const name = `${safeName}${suffix}`
     this.usedNames.add(name)
     return name
   }

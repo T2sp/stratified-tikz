@@ -89,7 +89,11 @@ export function TextLabelInspector({
         </div>
       </section>
 
-      <LabelStyleEditor label={label} onDiagramChange={onDiagramChange} />
+      <LabelStyleEditor
+        diagram={diagram}
+        label={label}
+        onDiagramChange={onDiagramChange}
+      />
     </div>
   )
 }

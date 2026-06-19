@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { HexColor, RegionStratum } from '../../model/types.ts'
+import type { Diagram, HexColor, RegionStratum } from '../../model/types.ts'
 import {
   cloneStylePreset,
   regionStylePresets,
@@ -9,14 +9,17 @@ import {
   EditableColorField,
   EditableOpacityField,
 } from './InspectorField.tsx'
+import { UserStylePresetControls } from './UserStylePresetControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type RegionStyleEditorProps = {
+  diagram: Diagram
   region: RegionStratum
   onDiagramChange: DiagramChangeHandler
 }
 
 export function RegionStyleEditor({
+  diagram,
   region,
   onDiagramChange,
 }: RegionStyleEditorProps) {
@@ -53,6 +56,13 @@ export function RegionStyleEditor({
             ))}
           </div>
         </div>
+        <UserStylePresetControls
+          diagram={diagram}
+          kind="region"
+          currentStyle={region.style}
+          target={{ kind: 'stratum', id: region.id }}
+          onDiagramChange={onDiagramChange}
+        />
         <label className="inspector-field inspector-checkbox-field">
           <span className="inspector-field-label">Color link</span>
           <span className="inspector-checkbox-control">

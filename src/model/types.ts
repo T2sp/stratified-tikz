@@ -272,12 +272,67 @@ export type StratumStyle =
   | CurveStyle
   | PointStyle
 
+export type StylePresetKind =
+  | 'region'
+  | 'sheet'
+  | 'curve'
+  | 'point'
+  | 'label'
+
+export type UserRegionStylePreset = {
+  id: string
+  name: string
+  kind: 'region'
+  style: RegionStyle
+  tikzStyleName: string
+}
+
+export type UserSheetStylePreset = {
+  id: string
+  name: string
+  kind: 'sheet'
+  style: SheetStyle
+  tikzStyleName: string
+}
+
+export type UserCurveStylePreset = {
+  id: string
+  name: string
+  kind: 'curve'
+  style: CurveStyle
+  tikzStyleName: string
+}
+
+export type UserPointStylePreset = {
+  id: string
+  name: string
+  kind: 'point'
+  style: PointStyle
+  tikzStyleName: string
+}
+
+export type UserLabelStylePreset = {
+  id: string
+  name: string
+  kind: 'label'
+  style: LabelStyle
+  tikzStyleName: string
+}
+
+export type UserStylePreset =
+  | UserRegionStylePreset
+  | UserSheetStylePreset
+  | UserCurveStylePreset
+  | UserPointStylePreset
+  | UserLabelStylePreset
+
 type RegionStratumBase = {
   id: string
   codim: 0
   geometricKind: 'region'
   name: string
   label?: string
+  stylePresetId?: string
   visible: boolean
   style: RegionStyle
   layer: number
@@ -301,6 +356,7 @@ type SheetStratumBase = {
   geometricKind: 'sheet'
   name: string
   label?: string
+  stylePresetId?: string
   style: SheetStyle
   layer: number
 }
@@ -388,6 +444,7 @@ type CurveStratumBase = {
   name: string
   label?: string
   pathLabel?: string
+  stylePresetId?: string
   style: CurveStyle
   styleSegments: CurveStyleSegment[]
   layer: number
@@ -444,6 +501,7 @@ export type PointStratum = {
   geometricKind: 'point'
   name: string
   label?: string
+  stylePresetId?: string
   style: PointStyle
   position: Vec3
   layer: number
@@ -461,6 +519,7 @@ export type TextLabel = {
   name: string
   text: string
   position: Vec3
+  stylePresetId?: string
   style: LabelStyle
   layer: number
 }
@@ -478,6 +537,7 @@ export type Diagram = {
   camera: Camera
   view?: DiagramViewOptions
   layers?: DiagramLayer[]
+  userStylePresets?: UserStylePreset[]
   strata: Stratum[]
   labels: TextLabel[]
 }

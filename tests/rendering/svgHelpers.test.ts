@@ -19,6 +19,10 @@ import {
   createPointStratum,
   createTextLabel,
 } from '../../src/model/constructors.ts'
+import {
+  applyUserStylePresetToStratum,
+  createUserStylePresetFromStyle,
+} from '../../src/model/stylePresets.ts'
 import { setLayerVisibility } from '../../src/model/layers.ts'
 import {
   pathSegmentStyleRuns,
@@ -315,6 +319,59 @@ test('filled surface SVG attributes preserve fill and stroke style values', () =
     stroke: '#DDEEFF',
     strokeOpacity: 0.9,
     strokeWidth: 2,
+  })
+})
+
+test('SVG style attributes update when a user curve preset is applied', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'preview-curve',
+    name: 'Preview curve',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Preview preset',
+    {
+      kind: 'curveStyle',
+      strokeColor: '#CC0033',
+      strokeOpacity: 0.5,
+      lineWidth: 2,
+      lineStyle: 'dashed',
+    },
+  )
+  const applied = applyUserStylePresetToStratum(
+    created?.diagram ?? diagram,
+    'preview-curve',
+    created?.preset.id ?? '',
+  )
+  const curve = applied.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  assert.deepEqual(curveStyleToSvgStrokeAttributes(curve.style), {
+    stroke: '#CC0033',
+    strokeOpacity: 0.5,
+    strokeWidth: 2,
+    strokeDasharray: '8 5',
   })
 })
 
