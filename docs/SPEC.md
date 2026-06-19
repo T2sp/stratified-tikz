@@ -724,12 +724,14 @@ Phase 17A user preset definitions are emitted as local options of
 Imported TikZ styles are external references. Diagram data may store
 `externalTikzStyleSources`, `importedTikzStyleReferences`, and optional
 `importedTikzStyleReferenceId` values on elements or user presets. Imported keys
-are emitted as TikZ option keys in deterministic command option order: a
-matching local user preset style name comes first when one is used, then the
-applicable imported external style key, then structured inline fallback options
-when no local preset is used. Thus imported keys follow matching local preset
-style names but precede structured fallback options. The generator must not
-inline full external `\tikzset{...}` definitions and must not emit an active
+are emitted as TikZ option keys in deterministic command option order. When a
+matching local user preset style name is used, it comes first and the applicable
+imported external style key follows it; structured inline fallback options are
+not emitted for that element style. When no matching local preset is used, the
+applicable imported external style key is emitted before any structured inline
+fallback options. Thus imported keys follow matching local preset style names
+but precede structured fallback options in fallback commands. The generator must
+not inline full external `\tikzset{...}` definitions and must not emit an active
 `\input{...}` by default; it only emits comments that list the external style
 files/load hints the user should include in the LaTeX preamble or before the
 picture.
