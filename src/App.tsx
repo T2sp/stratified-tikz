@@ -1096,7 +1096,7 @@ function App() {
         ...emptyStyleImportReport,
         status: 'failed',
         sourceName: file.name,
-        message: 'Choose a .sty or .tex file.',
+        message: 'Style import failed: choose a .sty or .tex file.',
       })
       return
     }
@@ -1110,7 +1110,7 @@ function App() {
         ...emptyStyleImportReport,
         status: 'failed',
         sourceName: file.name,
-        message: 'Could not read TikZ style file.',
+        message: 'Style import failed: could not read the file.',
       })
       return
     }
@@ -1118,7 +1118,15 @@ function App() {
     const result = importTikzStyleFile(editableDiagram, file.name, text)
     const importedCount = result.references.length
     const skippedCount = result.parseResult.skipped
-    const warnings = result.parseResult.warnings.map((warning) => warning.message)
+    const warnings = [
+      ...result.parseResult.warnings.map((warning) => warning.message),
+      ...(importedCount > 0
+        ? [
+            'External style files are not embedded; load them in LaTeX before compiling.',
+            'SVG preview is approximate for imported TikZ styles.',
+          ]
+        : []),
+    ]
 
     if (importedCount > 0) {
       updateEditableDiagram(result.diagram)
@@ -1134,7 +1142,7 @@ function App() {
       message:
         importedCount > 0
           ? `Imported ${importedCount} style${importedCount === 1 ? '' : 's'}.`
-          : 'No supported TikZ styles found.',
+          : 'Style import failed: no supported \\tikzset style entries found.',
     })
   }
 

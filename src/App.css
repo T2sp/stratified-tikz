@@ -1427,6 +1427,137 @@
   min-width: 0;
 }
 
+.style-preset-toolbar {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.style-preset-filter {
+  min-width: 0;
+}
+
+.style-preset-group-list {
+  display: grid;
+  gap: 8px;
+  max-height: 230px;
+  min-width: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.style-preset-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.style-preset-group-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.style-preset-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.style-preset-list-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-h);
+  background: #ffffff;
+  text-align: left;
+}
+
+.style-preset-list-item:hover {
+  background: var(--button-hover);
+}
+
+.style-preset-list-item-selected {
+  border-color: #4d9de0;
+  background: #eef7ff;
+}
+
+.style-preset-list-item-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.style-preset-list-item-meta,
+.style-preset-empty,
+.style-preset-status,
+.style-preset-details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.style-preset-list-item-meta,
+.style-preset-empty {
+  color: var(--muted);
+}
+
+.style-preset-status {
+  color: var(--text-h);
+}
+
+.style-preset-details {
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fbfcff;
+  color: var(--text-h);
+}
+
+.style-preset-options {
+  font-family: var(--mono);
+}
+
+.style-preset-warning {
+  color: #8a5a00;
+}
+
+.style-preset-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.style-preset-target-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--text-h);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .style-preset-select {
   min-height: 31px;
 }
@@ -1445,6 +1576,17 @@
 
 .style-preset-button:hover {
   background: var(--button-hover);
+}
+
+.style-preset-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: #f7f8fa;
+}
+
+.style-preset-delete-button {
+  border-color: #d0a4a4;
+  color: #8f2d2d;
 }
 
 .readonly-value {

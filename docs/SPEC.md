@@ -708,6 +708,13 @@ structured style values, and sanitized `tikzStyleName` values. Applying a user
 preset copies explicit style values and records `stylePresetId` on the selected
 compatible element. Manual style edits clear that reference.
 
+The Inspector should group presets by origin: built-in, user, and imported.
+Built-in presets are shown as read-only shortcut controls. User presets expose
+clear apply, rename, delete, and style-edit controls. Imported presets expose the
+imported key, source name, load hint, parsed preview options when available, and
+editable target tags. Long imported preset lists must remain scrollable and
+filterable so a large `.sty` file does not overflow the Inspector.
+
 The actual element style object remains the model source of truth. Generated
 TikZ may reference a local user preset style only when the element style still
 matches that preset; otherwise it should emit inline structured style options.
@@ -743,6 +750,13 @@ opacity, dashed/dotted/densely dotted, `thick`, `thin`, and simple
 `line width=<...>` values. Unsupported options are ignored for preview, but the
 imported key and source metadata remain saved so TikZ export can use the
 external definition.
+
+Import/status messages should be concise and explicit for failed import,
+unsupported TikZ syntax skipped, duplicate imported keys, invalid preset names,
+incompatible imported preset targets, and missing external sources. Imported
+style UI must warn that the SVG preview is approximate and that external style
+files must be loaded by the user; generated TikZ comments load instructions but
+does not inline external `\tikzset`.
 
 ## Free text labels
 

@@ -35,7 +35,7 @@ export function CurveStyleEditor({
       <h3>Style</h3>
       <div className="inspector-form">
         <div className="inspector-field">
-          <span className="inspector-field-label">Preset</span>
+          <span className="inspector-field-label">Built-in presets</span>
           <div className="style-preset-buttons">
             {curveStylePresets.map((preset) => (
               <button
