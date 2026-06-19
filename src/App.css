@@ -1215,6 +1215,12 @@
   font-family: var(--mono);
 }
 
+.tikz-style-import-keys {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .tikz-style-import-warnings summary {
   cursor: pointer;
 }

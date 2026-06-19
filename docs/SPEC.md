@@ -724,11 +724,15 @@ Phase 17A user preset definitions are emitted as local options of
 Imported TikZ styles are external references. Diagram data may store
 `externalTikzStyleSources`, `importedTikzStyleReferences`, and optional
 `importedTikzStyleReferenceId` values on elements or user presets. Imported keys
-are emitted as TikZ option keys after StratifiedTikZ's structured/local-preset
-options. The generator must not inline full external `\tikzset{...}` definitions
-and must not emit an active `\input{...}` by default; it only emits comments that
-list the external style files/load hints the user should include in the LaTeX
-preamble or before the picture.
+are emitted as TikZ option keys in deterministic command option order: a
+matching local user preset style name comes first when one is used, then the
+applicable imported external style key, then structured inline fallback options
+when no local preset is used. Thus imported keys follow matching local preset
+style names but precede structured fallback options. The generator must not
+inline full external `\tikzset{...}` definitions and must not emit an active
+`\input{...}` by default; it only emits comments that list the external style
+files/load hints the user should include in the LaTeX preamble or before the
+picture.
 
 Imported `.sty` / `.tex` files are parsed with a limited `\tikzset` extractor,
 not a full TeX parser. The supported subset is multiple braced `\tikzset{...}`
