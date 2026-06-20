@@ -1,5 +1,6 @@
 import {
   MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS,
+  isBoundaryPathClosed,
   validateBoundaryPathSnapshot,
   validateCurvedSheetPrimitive,
 } from '../geometry/curvedSheets.ts'
@@ -107,6 +108,37 @@ export type CreateCoonsPatchFromBoundaryPathsResult =
       error: CreateCoonsPatchFromBoundaryPathsError
       sourcePathId?: string
       role?: CoonsPatchBoundaryRole
+    }
+
+export type BoundarySurfaceBoundaryPathSourceError =
+  | 'missingSourcePath'
+  | 'sourceNotBoundaryPath'
+  | 'sourceWrongCodimension'
+  | 'sourceNonFinite'
+  | 'invalidBoundary'
+
+export type CoonsPatchBoundaryPathSourceError =
+  | BoundarySurfaceBoundaryPathSourceError
+  | 'sourceClosedPath'
+
+export type BoundarySurfaceBoundaryPathSourceValidationResult =
+  | {
+      ok: true
+      boundary: BoundaryPathSnapshot
+    }
+  | {
+      ok: false
+      error: BoundarySurfaceBoundaryPathSourceError
+    }
+
+export type CoonsPatchBoundaryPathSourceValidationResult =
+  | {
+      ok: true
+      boundary: BoundaryPathSnapshot
+    }
+  | {
+      ok: false
+      error: CoonsPatchBoundaryPathSourceError
     }
 
 export function createRuledSurfaceFromBoundaryPaths(
@@ -346,6 +378,33 @@ export function isRuledSurfaceBoundaryPathStratum(
   return isBoundarySurfaceBoundaryPathStratum(stratum, ambientDimension)
 }
 
+export function validateRuledSurfaceBoundaryPathSource(
+  diagram: Diagram,
+  sourcePathId: string,
+): BoundarySurfaceBoundaryPathSourceValidationResult {
+  return loadBoundaryPathSnapshot(diagram, sourcePathId)
+}
+
+export function validateCoonsPatchBoundaryPathSource(
+  diagram: Diagram,
+  sourcePathId: string,
+): CoonsPatchBoundaryPathSourceValidationResult {
+  const result = loadBoundaryPathSnapshot(diagram, sourcePathId)
+
+  if (!result.ok) {
+    return result
+  }
+
+  if (isBoundaryPathClosed(result.boundary)) {
+    return {
+      ok: false,
+      error: 'sourceClosedPath',
+    }
+  }
+
+  return result
+}
+
 export function boundaryPathSnapshotFromCurveStratum(
   curve: CurveStratum,
   ambientDimension: AmbientDimension,
@@ -417,12 +476,32 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
   }
 }
 
-type BoundaryPathLoadError =
-  | 'missingSourcePath'
-  | 'sourceNotBoundaryPath'
-  | 'sourceWrongCodimension'
-  | 'sourceNonFinite'
-  | 'invalidBoundary'
+export function boundarySurfaceBoundaryPathSourceErrorMessage(
+  error: BoundarySurfaceBoundaryPathSourceError,
+): string {
+  switch (error) {
+    case 'missingSourcePath':
+      return 'Picked boundary path is no longer available.'
+    case 'sourceNotBoundaryPath':
+      return 'Click a path, polyline, cubic Bezier, or path template.'
+    case 'sourceWrongCodimension':
+      return 'Boundary paths must be codimension 2 in a 3D diagram.'
+    case 'sourceNonFinite':
+      return 'Boundary paths must have finite coordinates.'
+    case 'invalidBoundary':
+      return 'Boundary paths must be valid composable paths.'
+  }
+}
+
+export function coonsPatchBoundaryPathSourceErrorMessage(
+  error: CoonsPatchBoundaryPathSourceError,
+): string {
+  if (error === 'sourceClosedPath') {
+    return 'Coons patch boundaries must be open paths.'
+  }
+
+  return boundarySurfaceBoundaryPathSourceErrorMessage(error)
+}
 
 type BoundaryPathLoadResult =
   | {
@@ -431,7 +510,7 @@ type BoundaryPathLoadResult =
     }
   | {
       ok: false
-      error: BoundaryPathLoadError
+      error: BoundarySurfaceBoundaryPathSourceError
     }
 
 function loadBoundaryPathSnapshot(
