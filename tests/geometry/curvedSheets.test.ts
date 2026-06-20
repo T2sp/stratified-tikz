@@ -24,6 +24,7 @@ import {
   parseSavedDiagramJson,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
+import { refreshDiagramSymbolicCoordinatePreviews } from '../../src/model/symbolicCoordinates.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
@@ -31,6 +32,7 @@ import type {
   CoonsPatchPrimitive,
   Diagram,
   HemisphereCurvedSheetPrimitive,
+  PathSegment,
   RuledSurfacePrimitive,
   SaddleCurvedSheetPrimitive,
   SurfaceFrame,
@@ -343,6 +345,255 @@ test('boundary surface stratum rejects invalid saved boundary data', () => {
   assert.match(result.error, /at least one segment/i)
 })
 
+test('parseSavedDiagramJson rejects ruled surface boundary line missing start without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('missing-start', [
+        malformedPathSegment({
+          kind: 'line',
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /boundary0\.segments\[0\]\.start.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects ruled surface boundary line missing end without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('missing-end', [
+        malformedPathSegment({
+          kind: 'line',
+          start: { x: 0, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /boundary0\.segments\[0\]\.end.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects ruled surface boundary cubic missing control1 without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('missing-control1', [
+        malformedPathSegment({
+          kind: 'cubicBezier',
+          start: { x: 0, y: 0, z: 0 },
+          control2: { x: 1.5, y: 0.25, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /boundary0\.segments\[0\]\.control1.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects ruled surface boundary cubic missing start without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('missing-cubic-start', [
+        malformedPathSegment({
+          kind: 'cubicBezier',
+          control1: { x: 0.5, y: 0.25, z: 0 },
+          control2: { x: 1.5, y: 0.25, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /boundary0\.segments\[0\]\.start.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects ruled surface boundary unknown segment kind without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('unknown-kind', [
+        malformedPathSegment({
+          kind: 'quadraticBezier',
+          start: { x: 0, y: 0, z: 0 },
+          control: { x: 1, y: 0.5, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /boundary0\.segments\[0\]\.kind.*line, cubicBezier, or arc/,
+  )
+})
+
+test('parseSavedDiagramJson rejects ruled surface boundary whose segments are not an array without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validRuledSurface(),
+      boundary0: boundaryWithSegments('non-array-segments', 'not-segments'),
+    },
+    /boundary0\.segments.*array/,
+  )
+})
+
+test('parseSavedDiagramJson rejects Coons patch boundary line missing start without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      bottom: boundaryWithSegments('coons-missing-start', [
+        malformedPathSegment({
+          kind: 'line',
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /bottom\.segments\[0\]\.start.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects Coons patch boundary cubic missing control2 without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      bottom: boundaryWithSegments('coons-missing-control2', [
+        malformedPathSegment({
+          kind: 'cubicBezier',
+          start: { x: 0, y: 0, z: 0 },
+          control1: { x: 0.5, y: 0.25, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /bottom\.segments\[0\]\.control2.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects Coons patch malformed arc boundary without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      bottom: boundaryWithSegments('coons-malformed-arc', [
+        malformedPathSegment({
+          kind: 'arc',
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+          radius: 1,
+          startAngleDeg: 180,
+          endAngleDeg: 0,
+          direction: 'clockwise',
+          frame: xyFrame(),
+        }),
+      ]),
+    },
+    /bottom\.segments\[0\]\.center.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects Coons patch unknown boundary segment kind without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      bottom: boundaryWithSegments('coons-unknown-kind', [
+        malformedPathSegment({
+          kind: 'quadraticBezier',
+          start: { x: 0, y: 0, z: 0 },
+          control: { x: 1, y: 0.5, z: 0 },
+          end: { x: 2, y: 0, z: 0 },
+        }),
+      ]),
+    },
+    /bottom\.segments\[0\]\.kind.*line, cubicBezier, or arc/,
+  )
+})
+
+test('parseSavedDiagramJson rejects a Coons patch with one malformed boundary without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      right: boundaryWithSegments('coons-one-bad-boundary', [
+        malformedPathSegment({
+          kind: 'line',
+          end: { x: 2, y: 1, z: 0 },
+        }),
+      ]),
+    },
+    /right\.segments\[0\]\.start.*Coordinate must be an object/,
+  )
+})
+
+test('valid ruled surface saved diagram still loads', () => {
+  const result = parseBoundarySurfacePrimitiveNoThrow(validRuledSurface())
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+})
+
+test('valid Coons patch saved diagram still loads', () => {
+  const result = parseBoundarySurfacePrimitiveNoThrow(validCoonsPatch())
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+})
+
+test('symbolic coordinates in valid boundary snapshots still refresh', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const sheet = createCurvedSheetStratum({
+    id: 'symbolic-boundary-refresh',
+    primitive: validRuledSurface(),
+  })
+  const symbolicStart: Vec3 = {
+    x: -10,
+    y: 0,
+    z: 0,
+    symbolic: {
+      x: { kind: 'symbolic', expression: 'R', previewValue: -10 },
+      y: { kind: 'numeric', value: 0 },
+      z: { kind: 'numeric', value: 0 },
+    },
+  }
+
+  diagram.strata.push({
+    ...sheet,
+    primitive: {
+      ...validRuledSurface(),
+      boundary0: lineBoundary(
+        'symbolic-ruled-boundary',
+        symbolicStart,
+        { x: 2, y: 0, z: 0 },
+      ),
+    },
+  })
+
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(diagram, {
+    variableNames: ['R'],
+    previewValues: new Map([['R', 0.75]]),
+  })
+
+  assert.equal(refreshed.ok, true)
+  if (!refreshed.ok) {
+    throw new Error(joinMessages(refreshed.errors))
+  }
+
+  const refreshedSheet = refreshed.diagram.strata[0]
+  if (
+    refreshedSheet === undefined ||
+    refreshedSheet.kind !== 'curvedSheet' ||
+    refreshedSheet.primitive.kind !== 'ruledSurface'
+  ) {
+    throw new Error('Expected refreshed ruled surface stratum.')
+  }
+
+  const refreshedStart = refreshedSheet.primitive.boundary0.segments[0].start
+
+  assert.equal(refreshedStart.x, 0.75)
+  assert.equal(refreshedStart.symbolic?.x.kind, 'symbolic')
+  assert.equal(refreshedStart.symbolic?.x.previewValue, 0.75)
+})
+
 test('existing curved sheets, filled boundaries, and paths still validate', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.strata.push(
@@ -373,6 +624,59 @@ test('existing curved sheets, filled boundaries, and paths still validate', () =
   assert.equal(validateCurvedSheetPrimitive(validSaddle()).valid, true)
   assertValid(diagram)
 })
+
+function assertBoundarySurfaceParseError(
+  primitive: RuledSurfacePrimitive | CoonsPatchPrimitive,
+  expectedMessage: RegExp,
+): void {
+  const result = parseBoundarySurfacePrimitiveNoThrow(primitive)
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected malformed boundary surface to fail.')
+  }
+  assert.match(result.error, expectedMessage)
+}
+
+function parseBoundarySurfacePrimitiveNoThrow(
+  primitive: RuledSurfacePrimitive | CoonsPatchPrimitive,
+): ReturnType<typeof parseSavedDiagramJson> {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const sheet = createCurvedSheetStratum({
+    id: 'parse-boundary-surface',
+    primitive: validRuledSurface(),
+  })
+  diagram.strata.push({
+    ...sheet,
+    primitive,
+  })
+  const json = serializeDiagram(diagram)
+  let result: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+  assert.doesNotThrow(() => {
+    result = parseSavedDiagramJson(json)
+  })
+
+  if (result === undefined) {
+    throw new Error('Expected parseSavedDiagramJson to return a result.')
+  }
+
+  return result
+}
+
+function boundaryWithSegments(
+  id: string,
+  segments: unknown,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    segments,
+  } as unknown as BoundaryPathSnapshot
+}
+
+function malformedPathSegment(segment: Record<string, unknown>): PathSegment {
+  return segment as unknown as PathSegment
+}
 
 function validHemisphere(): HemisphereCurvedSheetPrimitive {
   return {

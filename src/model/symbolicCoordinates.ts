@@ -1026,6 +1026,158 @@ function refreshClosedPathBoundaries(
   }))
 }
 
+function validatePathSegmentForSymbolicPreviewRefresh(
+  segment: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): segment is PathSegment {
+  if (!isRecord(segment)) {
+    pushError(errors, path, 'Path segment must be an object.')
+    return false
+  }
+
+  switch (segment.kind) {
+    case 'line': {
+      const startIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.start,
+        `${path}.start`,
+        errors,
+      )
+      const endIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.end,
+        `${path}.end`,
+        errors,
+      )
+
+      return startIsValid && endIsValid
+    }
+    case 'cubicBezier': {
+      const startIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.start,
+        `${path}.start`,
+        errors,
+      )
+      const control1IsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.control1,
+        `${path}.control1`,
+        errors,
+      )
+      const control2IsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.control2,
+        `${path}.control2`,
+        errors,
+      )
+      const endIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.end,
+        `${path}.end`,
+        errors,
+      )
+      const controlModeIsValid =
+        validateCubicBezierControlModeForSymbolicPreviewRefresh(
+          segment.controlMode,
+          `${path}.controlMode`,
+          errors,
+        )
+
+      return (
+        startIsValid &&
+        control1IsValid &&
+        control2IsValid &&
+        endIsValid &&
+        controlModeIsValid
+      )
+    }
+    case 'arc': {
+      const startIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.start,
+        `${path}.start`,
+        errors,
+      )
+      const endIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.end,
+        `${path}.end`,
+        errors,
+      )
+      const centerIsValid = validateVec3ForSymbolicPreviewRefresh(
+        segment.center,
+        `${path}.center`,
+        errors,
+      )
+      const radiusIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+        segment.radius,
+        `${path}.radius`,
+        'Arc radius',
+        errors,
+      )
+      const startAngleIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+        segment.startAngleDeg,
+        `${path}.startAngleDeg`,
+        'Arc start angle',
+        errors,
+      )
+      const endAngleIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+        segment.endAngleDeg,
+        `${path}.endAngleDeg`,
+        'Arc end angle',
+        errors,
+      )
+      const directionIsValid =
+        segment.direction === 'counterclockwise' ||
+        segment.direction === 'clockwise'
+
+      if (!directionIsValid) {
+        pushError(
+          errors,
+          `${path}.direction`,
+          'Arc direction must be counterclockwise or clockwise.',
+        )
+      }
+
+      if (
+        typeof segment.radius === 'number' &&
+        Number.isFinite(segment.radius) &&
+        segment.radius <= 0
+      ) {
+        pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
+      }
+
+      let frameIsValid = true
+
+      if (segment.frame === undefined) {
+        if (ambientDimension === 3) {
+          pushError(errors, `${path}.frame`, '3D arc segments must store a work-plane frame.')
+          frameIsValid = false
+        }
+      } else {
+        frameIsValid = validateWorkPlaneFrameForSymbolicPreviewRefresh(
+          segment.frame,
+          `${path}.frame`,
+          errors,
+        )
+      }
+
+      return (
+        startIsValid &&
+        endIsValid &&
+        centerIsValid &&
+        radiusIsValid &&
+        startAngleIsValid &&
+        endAngleIsValid &&
+        directionIsValid &&
+        frameIsValid
+      )
+    }
+    default:
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Path segment kind must be line, cubicBezier, or arc.',
+      )
+      return false
+  }
+}
+
 function refreshPathSegments(
   segments: readonly PathSegment[],
   ambientDimension: AmbientDimension,
@@ -1033,6 +1185,11 @@ function refreshPathSegments(
   path: string,
   errors: DiagramValidationIssue[],
 ): PathSegment[] {
+  if (!Array.isArray(segments)) {
+    pushError(errors, path, 'Path segments must be an array.')
+    return segments as unknown as PathSegment[]
+  }
+
   return segments.map((segment, index) =>
     refreshPathSegment(
       segment,
@@ -1051,6 +1208,17 @@ function refreshPathSegment(
   path: string,
   errors: DiagramValidationIssue[],
 ): PathSegment {
+  if (
+    !validatePathSegmentForSymbolicPreviewRefresh(
+      segment,
+      ambientDimension,
+      path,
+      errors,
+    )
+  ) {
+    return segment
+  }
+
   switch (segment.kind) {
     case 'line':
       return {
@@ -1157,8 +1325,23 @@ function refreshPathTemplate(
   path: string,
   errors: DiagramValidationIssue[],
 ): PathTemplate {
+  if (!isRecord(template)) {
+    pushError(errors, path, 'Path template must be an object.')
+    return template
+  }
+
   switch (template.kind) {
     case 'circleTemplate':
+      if (
+        !validateVec3ForSymbolicPreviewRefresh(
+          template.center,
+          `${path}.center`,
+          errors,
+        )
+      ) {
+        return template
+      }
+
       return {
         ...template,
         center: refreshVec3SymbolicPreview(
@@ -1180,6 +1363,16 @@ function refreshPathTemplate(
             }),
       }
     case 'ellipseTemplate':
+      if (
+        !validateVec3ForSymbolicPreviewRefresh(
+          template.center,
+          `${path}.center`,
+          errors,
+        )
+      ) {
+        return template
+      }
+
       return {
         ...template,
         center: refreshVec3SymbolicPreview(
@@ -1203,12 +1396,58 @@ function refreshPathTemplate(
   }
 }
 
+function validateCubicBezierControlModeForSymbolicPreviewRefresh(
+  controlMode: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): controlMode is CubicBezierControlMode | undefined {
+  if (controlMode === undefined) {
+    return true
+  }
+
+  if (!isRecord(controlMode)) {
+    pushError(errors, path, 'Cubic Bezier control mode must be an object.')
+    return false
+  }
+
+  switch (controlMode.kind) {
+    case 'absolute':
+    case 'relativeCartesian':
+    case 'relativePolar':
+      return true
+    case 'workPlaneRelativeCartesian':
+    case 'workPlaneRelativePolar':
+      return validateWorkPlaneFrameForSymbolicPreviewRefresh(
+        controlMode.frame,
+        `${path}.frame`,
+        errors,
+      )
+    default:
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Cubic Bezier control mode kind is not supported.',
+      )
+      return false
+  }
+}
+
 function refreshCubicBezierControlModeSymbolicPreviews(
   controlMode: CubicBezierControlMode,
   context: CoordinateExpressionContext,
   path: string,
   errors: DiagramValidationIssue[],
 ): CubicBezierControlMode {
+  if (
+    !validateCubicBezierControlModeForSymbolicPreviewRefresh(
+      controlMode,
+      path,
+      errors,
+    )
+  ) {
+    return controlMode
+  }
+
   switch (controlMode.kind) {
     case 'absolute':
     case 'relativeCartesian':
@@ -1315,7 +1554,13 @@ function refreshBoundaryPathSnapshotSymbolicPreviews(
   path: string,
   errors: DiagramValidationIssue[],
 ): BoundaryPathSnapshot {
-  if (!isRecord(snapshot) || !Array.isArray(snapshot.segments)) {
+  if (!isRecord(snapshot)) {
+    pushError(errors, path, 'Boundary path snapshot must be an object.')
+    return snapshot
+  }
+
+  if (!Array.isArray(snapshot.segments)) {
+    pushError(errors, `${path}.segments`, 'Boundary path segments must be an array.')
     return snapshot
   }
 
@@ -1331,12 +1576,50 @@ function refreshBoundaryPathSnapshotSymbolicPreviews(
   }
 }
 
+function validateWorkPlaneFrameForSymbolicPreviewRefresh(
+  frame: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): frame is WorkPlaneFrameSnapshot {
+  if (!isRecord(frame)) {
+    pushError(errors, path, 'Work-plane frame must be an object.')
+    return false
+  }
+
+  const originIsValid = validateVec3ForSymbolicPreviewRefresh(
+    frame.origin,
+    `${path}.origin`,
+    errors,
+  )
+  const uIsValid = validateVec3ForSymbolicPreviewRefresh(
+    frame.u,
+    `${path}.u`,
+    errors,
+  )
+  const vIsValid = validateVec3ForSymbolicPreviewRefresh(
+    frame.v,
+    `${path}.v`,
+    errors,
+  )
+  const normalIsValid = validateVec3ForSymbolicPreviewRefresh(
+    frame.normal,
+    `${path}.normal`,
+    errors,
+  )
+
+  return originIsValid && uIsValid && vIsValid && normalIsValid
+}
+
 function refreshWorkPlaneFrameSnapshotSymbolicPreviews(
   frame: WorkPlaneFrameSnapshot,
   context: CoordinateExpressionContext,
   path: string,
   errors: DiagramValidationIssue[],
 ): WorkPlaneFrameSnapshot {
+  if (!validateWorkPlaneFrameForSymbolicPreviewRefresh(frame, path, errors)) {
+    return frame
+  }
+
   return {
     origin: refreshVec3SymbolicPreview(
       frame.origin,
@@ -1369,6 +1652,52 @@ function refreshWorkPlaneFrameSnapshotSymbolicPreviews(
   }
 }
 
+function validateVec3ForSymbolicPreviewRefresh(
+  point: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): point is Vec3 {
+  if (!isRecord(point)) {
+    pushError(errors, path, 'Coordinate must be an object.')
+    return false
+  }
+
+  const xIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+    point.x,
+    `${path}.x`,
+    'Coordinate x value',
+    errors,
+  )
+  const yIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+    point.y,
+    `${path}.y`,
+    'Coordinate y value',
+    errors,
+  )
+  const zIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
+    point.z,
+    `${path}.z`,
+    'Coordinate z value',
+    errors,
+  )
+
+  return xIsValid && yIsValid && zIsValid
+}
+
+function validateFiniteNumberForSymbolicPreviewRefresh(
+  value: unknown,
+  path: string,
+  label: string,
+  errors: DiagramValidationIssue[],
+): value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    pushError(errors, path, `${label} must be a finite number.`)
+    return false
+  }
+
+  return true
+}
+
 function refreshVec3SymbolicPreview(
   point: Vec3,
   ambientDimension: AmbientDimension,
@@ -1376,6 +1705,10 @@ function refreshVec3SymbolicPreview(
   path: string,
   errors: DiagramValidationIssue[],
 ): Vec3 {
+  if (!validateVec3ForSymbolicPreviewRefresh(point, path, errors)) {
+    return point
+  }
+
   if (point.symbolic === undefined) {
     return normalizePreviewPoint(point, ambientDimension)
   }
