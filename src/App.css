@@ -704,6 +704,52 @@
   font-size: 12px;
 }
 
+.coons-corner-equation-list {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.coons-corner-equation-title {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.coons-corner-equation-row {
+  display: grid;
+  grid-template-columns: 32px minmax(170px, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.coons-corner-equation-row.matches .coons-corner-equation-mark {
+  color: #0f7b4f;
+}
+
+.coons-corner-equation-row.mismatch .coons-corner-equation-mark {
+  color: #b3261e;
+}
+
+.coons-corner-equation-mark {
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.coons-corner-equation-label {
+  color: var(--text);
+}
+
+.coons-corner-equation-values {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+}
+
 .direct-coordinate-mode-field {
   grid-template-columns: auto minmax(180px, 260px);
 }

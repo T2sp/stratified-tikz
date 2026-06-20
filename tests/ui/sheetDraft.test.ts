@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { emptyThreeDimensionalDiagram } from '../../src/examples/emptyDiagrams.ts'
 import { defaultCurveStyle } from '../../src/model/styles.ts'
-import type { ConcatenatedPathStratum } from '../../src/model/types.ts'
+import type { ConcatenatedPathStratum, Diagram, Vec3 } from '../../src/model/types.ts'
 import {
   areFinitePoints,
   arePointsOnWorkPlane,
@@ -11,10 +11,12 @@ import {
   coonsPatchBoundaryDraftPickedBoundaryForRole,
   coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryDraftStatusMessage,
+  coonsPatchBoundaryDraftPickedSourceIds,
   createCoonsPatchBoundaryDraft,
   createRuledSurfaceBoundaryDraft,
   createSheetPolygonDraft,
   isPointOnWorkPlane,
+  pickCoonsPatchBoundaryDraftPoint,
   pickCoonsPatchBoundaryDraftPath,
   pickRuledSurfaceBoundaryDraftPath,
   resetCoonsPatchBoundaryDraft,
@@ -25,7 +27,10 @@ import {
   toggleCoonsPatchBoundaryDraftReverse,
 } from '../../src/ui/sheetDraft.ts'
 import {
+  coonsPatchCornerEquationStatuses,
+  coonsPatchRequiredCornerEquations,
   validateCoonsPatchBoundaryPathSource,
+  validateCoonsPatchBoundaryPointSource,
   validateRuledSurfaceBoundaryPathSource,
 } from '../../src/ui/ruledSurface.ts'
 import type { PointStratum, WorkPlane } from '../../src/model/types.ts'
@@ -120,7 +125,10 @@ test('Coons patch boundary draft picks bottom, right, top, then left', () => {
   let draft = createCoonsPatchBoundaryDraft()
 
   assert.equal(draft.nextRole, 'bottom')
-  assert.equal(coonsPatchBoundaryDraftStatusMessage(draft), 'Pick bottom boundary path.')
+  assert.equal(
+    coonsPatchBoundaryDraftStatusMessage(draft),
+    'Pick bottom boundary path or point.',
+  )
 
   const bottom = pickCoonsPatchBoundaryDraftPath(draft, 'bottom-path')
 
@@ -265,6 +273,104 @@ test('Coons patch boundary draft toggles one role direction without clearing pic
     toggleCoonsPatchBoundaryDraftReverse(createCoonsPatchBoundaryDraft(), 'left'),
     createCoonsPatchBoundaryDraft(),
   )
+})
+
+test('Coons patch boundary draft stores point inputs and mixed selections', () => {
+  const bottom = pickCoonsPatchBoundaryDraftPoint(
+    createCoonsPatchBoundaryDraft(),
+    'bottom-point',
+  )
+
+  assert.equal(bottom.ok, true)
+  if (!bottom.ok) {
+    throw new Error('Expected bottom point pick to succeed.')
+  }
+  assert.deepEqual(bottom.draft.bottom, {
+    kind: 'point',
+    sourcePointId: 'bottom-point',
+  })
+  assert.deepEqual(coonsPatchBoundaryDraftPickedSourceIds(bottom.draft), [
+    'bottom-point',
+  ])
+
+  const right = pickCoonsPatchBoundaryDraftPath(bottom.draft, 'right-path')
+  assert.equal(right.ok, true)
+  if (!right.ok) {
+    throw new Error('Expected right path pick to succeed.')
+  }
+
+  assert.deepEqual(coonsPatchBoundarySelectionsFromDraft(right.draft), {
+    bottom: { kind: 'point', sourcePointId: 'bottom-point' },
+    right: { sourcePathId: 'right-path', reversed: false },
+  })
+  assert.deepEqual(
+    toggleCoonsPatchBoundaryDraftReverse(right.draft, 'bottom'),
+    right.draft,
+  )
+})
+
+test('Coons patch corner equation helper returns required equations and status updates', () => {
+  const selections = {
+    bottom: 'coons-bottom',
+    right: 'coons-right',
+    top: 'coons-top',
+    left: 'coons-left',
+  }
+  const validStatuses = coonsPatchCornerEquationStatuses(
+    coonsStatusDiagram(),
+    selections,
+  )
+  const reversedRightStatuses = coonsPatchCornerEquationStatuses(
+    coonsStatusDiagram(),
+    {
+      ...selections,
+      right: { sourcePathId: 'coons-right', reversed: true },
+    },
+  )
+
+  assert.deepEqual(
+    coonsPatchRequiredCornerEquations.map((equation) => equation.label),
+    [
+      'bottom start = left start',
+      'bottom end = right start',
+      'top start = left end',
+      'top end = right end',
+    ],
+  )
+  assert.deepEqual(
+    validStatuses.map((status) => status.matches),
+    [true, true, true, true],
+  )
+  assert.deepEqual(
+    reversedRightStatuses
+      .filter((status) => status.matches === false)
+      .map((status) => status.label),
+    ['bottom end = right start', 'top end = right end'],
+  )
+})
+
+test('Coons patch corner equation status supports constant point boundaries', () => {
+  const statuses = coonsPatchCornerEquationStatuses(coonsPointStatusDiagram(), {
+    bottom: { kind: 'point', sourcePointId: 'coons-bottom-point' },
+    right: 'coons-point-right',
+    top: 'coons-point-top',
+    left: 'coons-point-left',
+  })
+  const pointValidation = validateCoonsPatchBoundaryPointSource(
+    coonsPointStatusDiagram(),
+    'coons-bottom-point',
+  )
+
+  assert.deepEqual(
+    statuses.map((status) => status.matches),
+    [true, true, true, true],
+  )
+  assert.equal(pointValidation.ok, true)
+  if (!pointValidation.ok) {
+    throw new Error('Expected point source validation to succeed.')
+  }
+  assert.equal(pointValidation.boundary.kind, 'constantPoint')
+  assert.deepEqual(pointValidation.boundary.point, { x: 0, y: 0, z: 0 })
 })
 
 test('ruled surface boundary draft picks first then second boundary', () => {
@@ -466,7 +572,51 @@ test('Coons patch pick-time validation rejects closed boundary paths', () => {
   assert.equal(result.error, 'sourceClosedPath')
 })
 
+function coonsStatusDiagram(): Diagram {
+  return {
+    ...emptyThreeDimensionalDiagram,
+    strata: [
+      boundaryPath('coons-bottom', { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }),
+      boundaryPath('coons-right', { x: 1, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }),
+      boundaryPath('coons-top', { x: 0, y: 1, z: 0 }, { x: 1, y: 1, z: 0 }),
+      boundaryPath('coons-left', { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }),
+    ],
+  }
+}
+
+function coonsPointStatusDiagram(): Diagram {
+  return {
+    ...emptyThreeDimensionalDiagram,
+    strata: [
+      pointStratum('coons-bottom-point'),
+      boundaryPath(
+        'coons-point-right',
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ),
+      boundaryPath(
+        'coons-point-top',
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 1, z: 0 },
+      ),
+      boundaryPath(
+        'coons-point-left',
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ),
+    ],
+  }
+}
+
 function openBoundaryPath(id: string): ConcatenatedPathStratum {
+  return boundaryPath(id, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 })
+}
+
+function boundaryPath(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): ConcatenatedPathStratum {
   return {
     id,
     codim: 2,
@@ -479,8 +629,8 @@ function openBoundaryPath(id: string): ConcatenatedPathStratum {
     segments: [
       {
         kind: 'line',
-        start: { x: 0, y: 0, z: 0 },
-        end: { x: 1, y: 0, z: 0 },
+        start,
+        end,
       },
     ],
   }

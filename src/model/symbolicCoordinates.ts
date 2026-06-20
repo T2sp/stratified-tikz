@@ -8,6 +8,8 @@ import type {
   AmbientDimension,
   BoundaryPathSnapshot,
   ClosedPathBoundary,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CoordinateComponent,
   CubicBezierControlMode,
   CurvedSheetPrimitive,
@@ -674,22 +676,22 @@ function validateCurvedSheetPrimitiveSymbolicMetadata(
   }
 
   if (primitive.kind === 'coonsPatch') {
-    validateBoundaryPathSnapshotSymbolicMetadata(
+    validateCoonsBoundarySnapshotSymbolicMetadata(
       primitive.bottom,
       `${path}.bottom`,
       errors,
     )
-    validateBoundaryPathSnapshotSymbolicMetadata(
+    validateCoonsBoundarySnapshotSymbolicMetadata(
       primitive.right,
       `${path}.right`,
       errors,
     )
-    validateBoundaryPathSnapshotSymbolicMetadata(
+    validateCoonsBoundarySnapshotSymbolicMetadata(
       primitive.top,
       `${path}.top`,
       errors,
     )
-    validateBoundaryPathSnapshotSymbolicMetadata(
+    validateCoonsBoundarySnapshotSymbolicMetadata(
       primitive.left,
       `${path}.left`,
       errors,
@@ -712,6 +714,19 @@ function validateBoundaryPathSnapshotSymbolicMetadata(
     `${path}.segments`,
     errors,
   )
+}
+
+function validateCoonsBoundarySnapshotSymbolicMetadata(
+  snapshot: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (isConstantCoonsBoundarySnapshotLike(snapshot)) {
+    validateSymbolicVec3Metadata(snapshot.point, 3, `${path}.point`, errors)
+    return
+  }
+
+  validateBoundaryPathSnapshotSymbolicMetadata(snapshot, path, errors)
 }
 
 function validateWorkPlaneFrameSnapshotSymbolicMetadata(
@@ -1520,25 +1535,25 @@ function refreshCurvedSheetPrimitiveSymbolicPreviews(
     case 'coonsPatch':
       return {
         ...primitive,
-        bottom: refreshBoundaryPathSnapshotSymbolicPreviews(
+        bottom: refreshCoonsBoundarySnapshotSymbolicPreviews(
           primitive.bottom,
           context,
           `${path}.bottom`,
           errors,
         ),
-        right: refreshBoundaryPathSnapshotSymbolicPreviews(
+        right: refreshCoonsBoundarySnapshotSymbolicPreviews(
           primitive.right,
           context,
           `${path}.right`,
           errors,
         ),
-        top: refreshBoundaryPathSnapshotSymbolicPreviews(
+        top: refreshCoonsBoundarySnapshotSymbolicPreviews(
           primitive.top,
           context,
           `${path}.top`,
           errors,
         ),
-        left: refreshBoundaryPathSnapshotSymbolicPreviews(
+        left: refreshCoonsBoundarySnapshotSymbolicPreviews(
           primitive.left,
           context,
           `${path}.left`,
@@ -1574,6 +1589,52 @@ function refreshBoundaryPathSnapshotSymbolicPreviews(
       errors,
     ),
   }
+}
+
+function refreshCoonsBoundarySnapshotSymbolicPreviews(
+  snapshot: CoonsBoundarySnapshot,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): CoonsBoundarySnapshot {
+  if (isConstantCoonsBoundarySnapshot(snapshot)) {
+    return {
+      ...snapshot,
+      point: refreshVec3SymbolicPreview(
+        snapshot.point,
+        3,
+        context,
+        `${path}.point`,
+        errors,
+      ),
+    }
+  }
+
+  return refreshBoundaryPathSnapshotSymbolicPreviews(
+    snapshot,
+    context,
+    path,
+    errors,
+  )
+}
+
+function isConstantCoonsBoundarySnapshot(
+  snapshot: CoonsBoundarySnapshot,
+): snapshot is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in snapshot && snapshot.kind === 'constantPoint'
+}
+
+function isConstantCoonsBoundarySnapshotLike(
+  snapshot: unknown,
+): snapshot is { point: unknown } {
+  return (
+    typeof snapshot === 'object' &&
+    snapshot !== null &&
+    !Array.isArray(snapshot) &&
+    'kind' in snapshot &&
+    snapshot.kind === 'constantPoint' &&
+    'point' in snapshot
+  )
 }
 
 function validateWorkPlaneFrameForSymbolicPreviewRefresh(

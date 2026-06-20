@@ -1,7 +1,10 @@
 import {
+  boundaryEnd,
+  boundaryStart,
   MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS,
   isBoundaryPathClosed,
   isBoundaryPathOpen,
+  validateCoonsBoundarySnapshot,
   validateBoundaryPathSnapshot,
   validateCurvedSheetPrimitive,
 } from '../geometry/curvedSheets.ts'
@@ -10,6 +13,7 @@ import { createCurvedSheetStratum } from '../model/constructors.ts'
 import {
   cloneBoundaryPathSnapshot,
   normalizePathSegmentsForAmbientDimension,
+  pathEndpointEpsilon,
   pathCoordinates,
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
@@ -20,14 +24,18 @@ import { defaultSheetStyle } from '../model/styles.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CoonsPatchPrimitive,
   CurveStratum,
   Diagram,
   PathSegment,
+  PointStratum,
   RuledSurfacePrimitive,
   SheetStyle,
   SurfaceSampling,
   Stratum,
+  Vec3,
 } from '../model/types.ts'
 import { makeUniqueId } from './diagramUpdates.ts'
 
@@ -42,22 +50,68 @@ export const coonsPatchBoundaryRoles = [
   'top',
   'left',
 ] as const
+export const coonsPatchRequiredCornerEquations = [
+  {
+    id: 'bottomStartEqualsLeftStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'start',
+    label: 'bottom start = left start',
+  },
+  {
+    id: 'bottomEndEqualsRightStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'start',
+    label: 'bottom end = right start',
+  },
+  {
+    id: 'topStartEqualsLeftEnd',
+    leftRole: 'top',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'end',
+    label: 'top start = left end',
+  },
+  {
+    id: 'topEndEqualsRightEnd',
+    leftRole: 'top',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'end',
+    label: 'top end = right end',
+  },
+] as const satisfies readonly CoonsPatchCornerEquation[]
 
 export type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
 export type CoonsPatchBoundaryPathIds = Partial<
   Record<CoonsPatchBoundaryRole, string>
 >
-export type PickedCoonsBoundary = {
+export type PickedCoonsPathBoundary = {
+  kind?: 'path'
   sourcePathId: string
   reversed: boolean
 }
-export type CoonsPatchBoundaryPathSelection = string | PickedCoonsBoundary
+export type PickedCoonsPointBoundary = {
+  kind: 'point'
+  sourcePointId: string
+}
+export type PickedCoonsBoundary =
+  | PickedCoonsPathBoundary
+  | PickedCoonsPointBoundary
+export type CoonsPatchBoundaryPathSelection = string | PickedCoonsPathBoundary
+export type CoonsPatchBoundaryPointSelection = PickedCoonsPointBoundary
+export type CoonsPatchBoundarySelection =
+  | CoonsPatchBoundaryPathSelection
+  | CoonsPatchBoundaryPointSelection
 export type CoonsPatchBoundaryPathSelections = Partial<
-  Record<CoonsPatchBoundaryRole, CoonsPatchBoundaryPathSelection>
+  Record<CoonsPatchBoundaryRole, CoonsPatchBoundarySelection>
 >
 export type CoonsPatchBoundarySnapshots = Record<
   CoonsPatchBoundaryRole,
-  BoundaryPathSnapshot
+  CoonsBoundarySnapshot
 >
 
 export type CreateRuledSurfaceFromBoundaryPathsError =
@@ -98,6 +152,8 @@ export type CreateCoonsPatchFromBoundaryPathsError =
   | 'duplicateSourcePath'
   | 'missingSourcePath'
   | 'sourceNotBoundaryPath'
+  | 'missingSourcePoint'
+  | 'sourceNotBoundaryPoint'
   | 'sourceWrongCodimension'
   | 'sourceNonFinite'
   | 'sourceClosedPath'
@@ -160,6 +216,12 @@ export type CoonsPatchBoundaryPathSourceError =
   | BoundarySurfaceBoundaryPathSourceError
   | 'sourceClosedPath'
 
+export type CoonsPatchBoundaryPointSourceError =
+  | 'missingSourcePoint'
+  | 'sourceNotBoundaryPoint'
+  | 'sourceWrongCodimension'
+  | 'sourceNonFinite'
+
 export type BoundarySurfaceBoundaryPathSourceValidationResult =
   | {
       ok: true
@@ -179,6 +241,36 @@ export type CoonsPatchBoundaryPathSourceValidationResult =
       ok: false
       error: CoonsPatchBoundaryPathSourceError
     }
+
+export type CoonsPatchBoundaryPointSourceValidationResult =
+  | {
+      ok: true
+      boundary: CoonsConstantPointBoundarySnapshot
+    }
+  | {
+      ok: false
+      error: CoonsPatchBoundaryPointSourceError
+    }
+
+export type CoonsPatchCornerEndpoint = 'start' | 'end'
+export type CoonsPatchCornerEquationId =
+  | 'bottomStartEqualsLeftStart'
+  | 'bottomEndEqualsRightStart'
+  | 'topStartEqualsLeftEnd'
+  | 'topEndEqualsRightEnd'
+export type CoonsPatchCornerEquation = {
+  id: CoonsPatchCornerEquationId
+  leftRole: CoonsPatchBoundaryRole
+  leftEndpoint: CoonsPatchCornerEndpoint
+  rightRole: CoonsPatchBoundaryRole
+  rightEndpoint: CoonsPatchCornerEndpoint
+  label: string
+}
+export type CoonsPatchCornerEquationStatus = CoonsPatchCornerEquation & {
+  matches: boolean | null
+  leftPoint?: Vec3
+  rightPoint?: Vec3
+}
 
 export function createRuledSurfaceFromBoundaryPaths(
   diagram: Diagram,
@@ -346,9 +438,13 @@ export function createCoonsPatchFromBoundaryPaths(
 }
 
 export function orientedCoonsBoundarySnapshot(
-  sourceSnapshot: BoundaryPathSnapshot,
+  sourceSnapshot: CoonsBoundarySnapshot,
   reversed: boolean,
-): BoundaryPathSnapshot {
+): CoonsBoundarySnapshot {
+  if (isCoonsConstantPointBoundary(sourceSnapshot)) {
+    return cloneCoonsConstantPointBoundarySnapshot(sourceSnapshot)
+  }
+
   return reversed
     ? reverseBoundaryPathSnapshot(sourceSnapshot)
     : cloneBoundaryPathSnapshot(sourceSnapshot)
@@ -382,8 +478,10 @@ export function resolveCoonsPatchBoundarySnapshots(
     }
   }
 
-  const sourcePathIdsByRole = roleSelections.map(({ selection }) =>
-    selection === null ? '' : selection.sourcePathId,
+  const sourcePathIdsByRole = roleSelections.flatMap(({ selection }) =>
+    selection !== null && selection.kind === 'path'
+      ? [selection.sourcePathId]
+      : [],
   )
 
   if (new Set(sourcePathIdsByRole).size !== sourcePathIdsByRole.length) {
@@ -404,33 +502,21 @@ export function resolveCoonsPatchBoundarySnapshots(
       }
     }
 
-    const boundaryResult = loadBoundaryPathSnapshot(
+    const boundaryResult = resolveNormalizedCoonsPatchBoundarySnapshot(
       diagram,
-      selection.sourcePathId,
+      selection,
     )
 
     if (!boundaryResult.ok) {
       return {
         ok: false,
         error: boundaryResult.error,
-        sourcePathId: selection.sourcePathId,
+        sourcePathId: boundaryResult.sourceId,
         role,
       }
     }
 
-    if (!isBoundaryPathOpen(boundaryResult.boundary)) {
-      return {
-        ok: false,
-        error: 'sourceClosedPath',
-        sourcePathId: selection.sourcePathId,
-        role,
-      }
-    }
-
-    boundaries[role] = orientedCoonsBoundarySnapshot(
-      boundaryResult.boundary,
-      selection.reversed,
-    )
+    boundaries[role] = boundaryResult.boundary
   }
 
   if (
@@ -480,6 +566,58 @@ export function validateCoonsPatchBoundarySelections(
     : { ok: false, error: 'invalidBoundary' }
 }
 
+export function coonsPatchCornerEquationStatuses(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): CoonsPatchCornerEquationStatus[] {
+  const boundaries = coonsPatchBoundarySnapshotsForStatus(diagram, sourcePathIds)
+
+  return coonsPatchRequiredCornerEquations.map((equation) => {
+    const leftPoint = coonsBoundaryEndpointForStatus(
+      boundaries[equation.leftRole],
+      equation.leftEndpoint,
+    )
+    const rightPoint = coonsBoundaryEndpointForStatus(
+      boundaries[equation.rightRole],
+      equation.rightEndpoint,
+    )
+
+    return {
+      ...equation,
+      matches:
+        leftPoint === undefined || rightPoint === undefined
+          ? null
+          : vec3ApproximatelyEqual(leftPoint, rightPoint, pathEndpointEpsilon),
+      ...(leftPoint === undefined ? {} : { leftPoint }),
+      ...(rightPoint === undefined ? {} : { rightPoint }),
+    }
+  })
+}
+
+export function coonsPatchFailedCornerEquationLabels(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): string[] {
+  return coonsPatchCornerEquationStatuses(diagram, sourcePathIds)
+    .filter((status) => status.matches === false)
+    .map((status) => status.label)
+}
+
+export function coonsPatchCornerMismatchMessage(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): string | null {
+  const failed = coonsPatchFailedCornerEquationLabels(diagram, sourcePathIds)
+
+  if (failed.length === 0) {
+    return null
+  }
+
+  return `Coons corners do not match with current boundary directions. Failed: ${failed.join(
+    '; ',
+  )}. Use Reverse controls or choose a point/path with matching endpoint.`
+}
+
 export function isBoundarySurfaceBoundaryPathStratum(
   stratum: Stratum,
   ambientDimension: AmbientDimension,
@@ -523,6 +661,13 @@ export function validateCoonsPatchBoundaryPathSource(
   }
 
   return result
+}
+
+export function validateCoonsPatchBoundaryPointSource(
+  diagram: Diagram,
+  sourcePointId: string,
+): CoonsPatchBoundaryPointSourceValidationResult {
+  return loadCoonsConstantPointBoundarySnapshot(diagram, sourcePointId)
 }
 
 export function boundaryPathSnapshotFromCurveStratum(
@@ -579,17 +724,21 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
     case 'unsupportedAmbientDimension':
       return 'Coons patches are available only in 3D diagrams.'
     case 'wrongBoundaryCount':
-      return 'Pick bottom, right, top, and left boundary paths.'
+      return 'Pick bottom, right, top, and left boundary paths or points.'
     case 'duplicateSourcePath':
       return 'Use four different boundary paths for the Coons patch.'
     case 'missingSourcePath':
       return 'A picked Coons patch boundary path is no longer available.'
     case 'sourceNotBoundaryPath':
       return 'Picked sources must be paths, polylines, cubic Beziers, or path templates.'
+    case 'missingSourcePoint':
+      return 'A picked Coons patch boundary point is no longer available.'
+    case 'sourceNotBoundaryPoint':
+      return 'Picked constant Coons boundaries must be point strata.'
     case 'sourceWrongCodimension':
-      return 'Picked boundary paths must be codimension 2 in a 3D diagram.'
+      return 'Picked boundary paths must be codimension 2 and picked boundary points must be codimension 3 in a 3D diagram.'
     case 'sourceNonFinite':
-      return 'Picked boundary paths must have finite coordinates.'
+      return 'Picked boundary paths and points must have finite coordinates.'
     case 'sourceClosedPath':
       return role === undefined
         ? 'Coons patch boundaries must be open paths.'
@@ -597,7 +746,7 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
     case 'invalidSampling':
       return `Coons patch u and v sampling must be positive integers at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
     case 'invalidBoundary':
-      return 'Coons corners do not match with the current boundary directions. Use Reverse controls to adjust boundary directions.'
+      return 'Coons corners do not match with the current boundary directions. Check the failed corner equation, then use Reverse controls or choose a point/path with matching endpoints.'
   }
 }
 
@@ -628,6 +777,21 @@ export function coonsPatchBoundaryPathSourceErrorMessage(
   return boundarySurfaceBoundaryPathSourceErrorMessage(error)
 }
 
+export function coonsPatchBoundaryPointSourceErrorMessage(
+  error: CoonsPatchBoundaryPointSourceError,
+): string {
+  switch (error) {
+    case 'missingSourcePoint':
+      return 'Picked Coons boundary point is no longer available.'
+    case 'sourceNotBoundaryPoint':
+      return 'Click a point for a constant Coons boundary.'
+    case 'sourceWrongCodimension':
+      return 'Coons boundary points must be codimension 3 in a 3D diagram.'
+    case 'sourceNonFinite':
+      return 'Coons boundary points must have finite coordinates.'
+  }
+}
+
 type BoundaryPathLoadResult =
   | {
       ok: true
@@ -636,6 +800,27 @@ type BoundaryPathLoadResult =
   | {
       ok: false
       error: BoundarySurfaceBoundaryPathSourceError
+    }
+
+type ConstantPointBoundaryLoadResult =
+  | {
+      ok: true
+      boundary: CoonsConstantPointBoundarySnapshot
+    }
+  | {
+      ok: false
+      error: CoonsPatchBoundaryPointSourceError
+    }
+
+type CoonsBoundaryResolveResult =
+  | {
+      ok: true
+      boundary: CoonsBoundarySnapshot
+    }
+  | {
+      ok: false
+      error: CreateCoonsPatchFromBoundaryPathsError
+      sourceId: string
     }
 
 function loadBoundaryPathSnapshot(
@@ -704,6 +889,154 @@ function loadBoundaryPathSnapshot(
   }
 }
 
+function loadCoonsConstantPointBoundarySnapshot(
+  diagram: Diagram,
+  sourcePointId: string,
+): ConstantPointBoundaryLoadResult {
+  const source = diagram.strata.find((stratum) => stratum.id === sourcePointId)
+
+  if (source === undefined) {
+    return {
+      ok: false,
+      error: 'missingSourcePoint',
+    }
+  }
+
+  if (source.geometricKind !== 'point') {
+    return {
+      ok: false,
+      error: 'sourceNotBoundaryPoint',
+    }
+  }
+
+  if (source.codim !== expectedBoundaryPointCodim(diagram.ambientDimension)) {
+    return {
+      ok: false,
+      error: 'sourceWrongCodimension',
+    }
+  }
+
+  if (!isCoonsBoundaryPointStratum(source, diagram.ambientDimension)) {
+    return {
+      ok: false,
+      error: 'sourceNotBoundaryPoint',
+    }
+  }
+
+  if (!isFiniteVec3(source.position)) {
+    return {
+      ok: false,
+      error: 'sourceNonFinite',
+    }
+  }
+
+  const boundary: CoonsConstantPointBoundarySnapshot = {
+    kind: 'constantPoint',
+    sourceId: source.id,
+    ...(source.name.trim().length === 0 ? {} : { name: source.name }),
+    point: cloneVec3(source.position),
+  }
+
+  if (!validateCoonsBoundarySnapshot(boundary).valid) {
+    return {
+      ok: false,
+      error: 'sourceNonFinite',
+    }
+  }
+
+  return {
+    ok: true,
+    boundary,
+  }
+}
+
+function resolveNormalizedCoonsPatchBoundarySnapshot(
+  diagram: Diagram,
+  selection: NormalizedCoonsPatchBoundarySelection,
+): CoonsBoundaryResolveResult {
+  if (selection.kind === 'point') {
+    const pointResult = loadCoonsConstantPointBoundarySnapshot(
+      diagram,
+      selection.sourcePointId,
+    )
+
+    return pointResult.ok
+      ? { ok: true, boundary: pointResult.boundary }
+      : {
+          ok: false,
+          error: pointResult.error,
+          sourceId: selection.sourcePointId,
+        }
+  }
+
+  const pathResult = loadBoundaryPathSnapshot(diagram, selection.sourcePathId)
+
+  if (!pathResult.ok) {
+    return {
+      ok: false,
+      error: pathResult.error,
+      sourceId: selection.sourcePathId,
+    }
+  }
+
+  if (!isBoundaryPathOpen(pathResult.boundary)) {
+    return {
+      ok: false,
+      error: 'sourceClosedPath',
+      sourceId: selection.sourcePathId,
+    }
+  }
+
+  return {
+    ok: true,
+    boundary: orientedCoonsBoundarySnapshot(
+      pathResult.boundary,
+      selection.reversed,
+    ),
+  }
+}
+
+function coonsPatchBoundarySnapshotsForStatus(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): Partial<CoonsPatchBoundarySnapshots> {
+  const boundaries: Partial<CoonsPatchBoundarySnapshots> = {}
+
+  coonsPatchBoundaryRoles.forEach((role) => {
+    const selection = normalizeCoonsPatchBoundarySelection(sourcePathIds[role])
+
+    if (selection === null) {
+      return
+    }
+
+    const boundaryResult = resolveNormalizedCoonsPatchBoundarySnapshot(
+      diagram,
+      selection,
+    )
+
+    if (boundaryResult.ok) {
+      boundaries[role] = boundaryResult.boundary
+    }
+  })
+
+  return boundaries
+}
+
+function coonsBoundaryEndpointForStatus(
+  boundary: CoonsBoundarySnapshot | undefined,
+  endpoint: CoonsPatchCornerEndpoint,
+): Vec3 | undefined {
+  if (boundary === undefined) {
+    return undefined
+  }
+
+  try {
+    return endpoint === 'start' ? boundaryStart(boundary) : boundaryEnd(boundary)
+  } catch {
+    return undefined
+  }
+}
+
 function boundaryPathSegmentsFromCurve(
   curve: CurveStratum,
   ambientDimension: AmbientDimension,
@@ -748,13 +1081,33 @@ function expectedBoundaryPathCodim(ambientDimension: AmbientDimension): 1 | 2 {
   return ambientDimension === 2 ? 1 : 2
 }
 
-type NormalizedCoonsPatchBoundarySelection = {
-  sourcePathId: string
-  reversed: boolean
+function expectedBoundaryPointCodim(ambientDimension: AmbientDimension): 2 | 3 {
+  return ambientDimension === 2 ? 2 : 3
 }
 
+function isCoonsBoundaryPointStratum(
+  stratum: Stratum,
+  ambientDimension: AmbientDimension,
+): stratum is PointStratum {
+  return (
+    stratum.geometricKind === 'point' &&
+    stratum.codim === expectedBoundaryPointCodim(ambientDimension)
+  )
+}
+
+type NormalizedCoonsPatchBoundarySelection =
+  | {
+      kind: 'path'
+      sourcePathId: string
+      reversed: boolean
+    }
+  | {
+      kind: 'point'
+      sourcePointId: string
+    }
+
 function normalizeCoonsPatchBoundarySelection(
-  selection: CoonsPatchBoundaryPathSelection | undefined,
+  selection: CoonsPatchBoundarySelection | undefined,
 ): NormalizedCoonsPatchBoundarySelection | null {
   if (selection === undefined) {
     return null
@@ -765,14 +1118,68 @@ function normalizeCoonsPatchBoundarySelection(
 
     return sourcePathId.length === 0
       ? null
-      : { sourcePathId, reversed: false }
+      : { kind: 'path', sourcePathId, reversed: false }
+  }
+
+  if (selection.kind === 'point') {
+    const sourcePointId = selection.sourcePointId.trim()
+
+    return sourcePointId.length === 0
+      ? null
+      : { kind: 'point', sourcePointId }
   }
 
   const sourcePathId = selection.sourcePathId.trim()
 
   return sourcePathId.length === 0
     ? null
-    : { sourcePathId, reversed: selection.reversed }
+    : { kind: 'path', sourcePathId, reversed: selection.reversed }
+}
+
+function isCoonsConstantPointBoundary(
+  boundary: CoonsBoundarySnapshot,
+): boundary is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in boundary && boundary.kind === 'constantPoint'
+}
+
+function cloneCoonsConstantPointBoundarySnapshot(
+  boundary: CoonsConstantPointBoundarySnapshot,
+): CoonsConstantPointBoundarySnapshot {
+  return {
+    kind: 'constantPoint',
+    ...(boundary.sourceId === undefined ? {} : { sourceId: boundary.sourceId }),
+    ...(boundary.name === undefined ? {} : { name: boundary.name }),
+    point: cloneVec3(boundary.point),
+  }
+}
+
+function cloneVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+    ...(point.symbolic === undefined
+      ? {}
+      : {
+          symbolic: {
+            x: { ...point.symbolic.x },
+            y: { ...point.symbolic.y },
+            z: { ...point.symbolic.z },
+          },
+        }),
+  }
+}
+
+function vec3ApproximatelyEqual(
+  first: Vec3,
+  second: Vec3,
+  epsilon: number,
+): boolean {
+  return (
+    Math.abs(first.x - second.x) <= epsilon &&
+    Math.abs(first.y - second.y) <= epsilon &&
+    Math.abs(first.z - second.z) <= epsilon
+  )
 }
 
 function safeBoundarySurfaceId(

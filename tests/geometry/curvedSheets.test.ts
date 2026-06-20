@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   MAX_CURVED_SHEET_SAMPLING_SEGMENTS,
+  boundaryEnd,
+  boundaryStart,
+  evaluateBoundary,
+  reverseBoundary,
+  sampleBoundary,
   sampleBoundaryPath,
   sampleCoonsPatch,
   sampleCurvedSheetPrimitive,
@@ -9,6 +14,7 @@ import {
   sampleRuledSurface,
   sampleSaddle,
   surfaceBoundaryPolylines,
+  validateCoonsBoundarySnapshot,
   validateCurvedSheetPrimitive,
   validateSurfaceFrame,
   validateSurfaceSampling,
@@ -29,6 +35,7 @@ import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
   CoonsPatchPrimitive,
   Diagram,
   HemisphereCurvedSheetPrimitive,
@@ -270,6 +277,163 @@ test('valid Coons patch primitive validates', () => {
   assert.equal(validation.valid, true, joinMessages(validation.errors))
 })
 
+test('constant Coons boundary helpers use the same point for every endpoint and sample', () => {
+  const point = { x: 1, y: 2, z: 3 }
+  const boundary = constantBoundary('constant-helper', point)
+  const samples = sampleBoundary(boundary, 4)
+  const reversed = reverseBoundary(boundary)
+
+  assert.deepEqual(boundaryStart(boundary), point)
+  assert.deepEqual(boundaryEnd(boundary), point)
+  assert.deepEqual(evaluateBoundary(boundary, 0), point)
+  assert.deepEqual(evaluateBoundary(boundary, 0.5), point)
+  assert.deepEqual(evaluateBoundary(boundary, 1), point)
+  assert.equal(samples.length, 5)
+  assert.equal(samples.every((sample) => isFiniteVec3(sample)), true)
+  assert.deepEqual(samples, [point, point, point, point, point])
+  assert.deepEqual(reversed, boundary)
+})
+
+test('constant Coons boundary validation rejects non-finite points', () => {
+  const validation = validateCoonsBoundarySnapshot({
+    kind: 'constantPoint',
+    sourceId: 'bad-point',
+    point: { x: 0, y: Number.POSITIVE_INFINITY, z: 0 },
+  })
+
+  assert.equal(validation.valid, false)
+  assert.match(joinMessages(validation.errors), /point\.y/i)
+})
+
+test('Coons patch validates with a bottom constant point when adjacent starts match it', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validCoonsPatch(),
+    bottom: constantBoundary('coons-bottom-point', { x: 0, y: 0, z: 0 }),
+    right: lineBoundary(
+      'coons-right-from-bottom-point',
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+    top: lineBoundary(
+      'coons-top-for-bottom-point',
+      { x: 0, y: 1, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+  })
+
+  assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+test('Coons patch validates with a top constant point when adjacent ends match it', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validCoonsPatch(),
+    top: constantBoundary('coons-top-point', { x: 0, y: 1, z: 0 }),
+    bottom: lineBoundary(
+      'coons-bottom-for-top-point',
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+    ),
+    right: lineBoundary(
+      'coons-right-to-top-point',
+      { x: 2, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 },
+    ),
+  })
+
+  assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+test('Coons patch validates with a left constant point when left corners collapse', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validCoonsPatch(),
+    left: constantBoundary('coons-left-point', { x: 0, y: 0, z: 0 }),
+    top: lineBoundary(
+      'coons-top-from-left-point',
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+    right: lineBoundary(
+      'coons-right-for-left-point',
+      { x: 2, y: 0, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+  })
+
+  assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+test('Coons patch validates with a right constant point when right corners collapse', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validCoonsPatch(),
+    right: constantBoundary('coons-right-point', { x: 2, y: 0, z: 0 }),
+    top: lineBoundary(
+      'coons-top-to-right-point',
+      { x: 0, y: 1, z: 0.5 },
+      { x: 2, y: 0, z: 0 },
+    ),
+    left: lineBoundary(
+      'coons-left-for-right-point',
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0.5 },
+    ),
+  })
+
+  assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+test('Coons patch rejects mismatched adjacent endpoints for a constant boundary', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validCoonsPatch(),
+    bottom: constantBoundary('coons-bottom-mismatch-point', {
+      x: 0,
+      y: 0,
+      z: 0,
+    }),
+  })
+
+  assert.equal(validation.valid, false)
+  assert.match(joinMessages(validation.errors), /corner must match/i)
+})
+
+test('Coons patch with constant boundaries samples finite meshes', () => {
+  const oneConstant = {
+    ...validCoonsPatch(),
+    bottom: constantBoundary('coons-bottom-point-sampled', {
+      x: 0,
+      y: 0,
+      z: 0,
+    }),
+    right: lineBoundary(
+      'coons-right-point-sampled',
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+    top: lineBoundary(
+      'coons-top-point-sampled',
+      { x: 0, y: 1, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+  } satisfies CoonsPatchPrimitive
+  const twoConstants = {
+    ...oneConstant,
+    left: constantBoundary('coons-left-point-sampled', { x: 0, y: 0, z: 0 }),
+    top: lineBoundary(
+      'coons-top-two-points-sampled',
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 1, z: 1 },
+    ),
+  } satisfies CoonsPatchPrimitive
+
+  for (const primitive of [oneConstant, twoConstants]) {
+    const validation = validateCurvedSheetPrimitive(primitive)
+    const mesh = sampleCoonsPatch(primitive)
+
+    assert.equal(validation.valid, true, joinMessages(validation.errors))
+    assert.equal(mesh.vertices.every(isFiniteVec3), true)
+    assert.equal(mesh.faces.length, primitive.sampling.uSegments * primitive.sampling.vSegments)
+  }
+})
+
 for (const role of coonsPatchBoundaryRoles) {
   test(`Coons patch primitive rejects closed ${role} boundary`, () => {
     const validation = validateCurvedSheetPrimitive({
@@ -498,6 +662,20 @@ test('parseSavedDiagramJson rejects Coons patch boundary line missing start with
       ]),
     },
     /bottom\.segments\[0\]\.start.*Coordinate must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects Coons patch malformed constant boundary without throwing', () => {
+  assertBoundarySurfaceParseError(
+    {
+      ...validCoonsPatch(),
+      bottom: {
+        kind: 'constantPoint',
+        sourceId: 'malformed-constant',
+        point: { x: 0, y: Number.NaN, z: 0 },
+      },
+    },
+    /bottom\.point\.y.*finite/,
   )
 })
 
@@ -832,6 +1010,15 @@ function lineBoundary(
   return {
     id,
     segments: [lineSegment(start, end)],
+  }
+}
+
+function constantBoundary(id: string, point: Vec3): CoonsBoundarySnapshot {
+  return {
+    kind: 'constantPoint',
+    sourceId: id,
+    name: id,
+    point,
   }
 }
 

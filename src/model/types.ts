@@ -232,6 +232,17 @@ export type BoundaryPathSnapshot = {
   segments: PathSegment[]
 }
 
+export type CoonsConstantPointBoundarySnapshot = {
+  kind: 'constantPoint'
+  sourceId?: string
+  name?: string
+  point: Vec3
+}
+
+export type CoonsBoundarySnapshot =
+  | BoundaryPathSnapshot
+  | CoonsConstantPointBoundarySnapshot
+
 export type RuledSurfacePrimitive = {
   kind: 'ruledSurface'
   boundary0: BoundaryPathSnapshot
@@ -241,10 +252,10 @@ export type RuledSurfacePrimitive = {
 
 export type CoonsPatchPrimitive = {
   kind: 'coonsPatch'
-  bottom: BoundaryPathSnapshot
-  right: BoundaryPathSnapshot
-  top: BoundaryPathSnapshot
-  left: BoundaryPathSnapshot
+  bottom: CoonsBoundarySnapshot
+  right: CoonsBoundarySnapshot
+  top: CoonsBoundarySnapshot
+  left: CoonsBoundarySnapshot
   sampling: SurfaceSampling
 }
 

@@ -1,6 +1,8 @@
 import type {
   BoundaryPathSnapshot,
   ClosedPathBoundary,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CurveStyleSegment,
   CurveStratum,
   CubicBezierControlMode,
@@ -986,22 +988,22 @@ function translateCurvedSheetPrimitive(
     case 'coonsPatch':
       return {
         ...primitive,
-        bottom: translateBoundaryPathSnapshot(
+        bottom: translateCoonsBoundarySnapshot(
           primitive.bottom,
           translation,
           diagram,
         ),
-        right: translateBoundaryPathSnapshot(
+        right: translateCoonsBoundarySnapshot(
           primitive.right,
           translation,
           diagram,
         ),
-        top: translateBoundaryPathSnapshot(
+        top: translateCoonsBoundarySnapshot(
           primitive.top,
           translation,
           diagram,
         ),
-        left: translateBoundaryPathSnapshot(
+        left: translateCoonsBoundarySnapshot(
           primitive.left,
           translation,
           diagram,
@@ -1021,6 +1023,27 @@ function translateBoundaryPathSnapshot(
       translatePathSegment(segment, translation, diagram),
     ),
   }
+}
+
+function translateCoonsBoundarySnapshot(
+  snapshot: CoonsBoundarySnapshot,
+  translation: LayerTranslationVector,
+  diagram: Diagram,
+): CoonsBoundarySnapshot {
+  if (snapshotIsCoonsConstantPointBoundary(snapshot)) {
+    return {
+      ...snapshot,
+      point: translateVec3(snapshot.point, translation, diagram),
+    }
+  }
+
+  return translateBoundaryPathSnapshot(snapshot, translation, diagram)
+}
+
+function snapshotIsCoonsConstantPointBoundary(
+  snapshot: CoonsBoundarySnapshot,
+): snapshot is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in snapshot && snapshot.kind === 'constantPoint'
 }
 
 function translateFrameOrigin(

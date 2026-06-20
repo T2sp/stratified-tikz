@@ -43,7 +43,9 @@ import type {
   AmbientDimension,
   ArcDirection,
   AxisAlignedWorkPlaneName,
+  BoundaryPathSnapshot,
   Camera,
+  CoonsConstantPointBoundarySnapshot,
   CoordinateInputMode,
   CurveStyle,
   Diagram,
@@ -117,11 +119,14 @@ import {
   boundarySurfacePathClickWorkflow,
   coonsPatchBoundaryDraftCanCreate,
   coonsPatchBoundaryDraftPickedBoundaryForRole,
-  coonsPatchBoundaryDraftPickedPathIds,
+  coonsPatchBoundaryDraftPickedSourceIds,
   coonsPatchBoundaryRoles,
   coonsPatchBoundaryDraftStatusMessage,
   coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryPathSourceErrorMessage,
+  coonsPatchBoundaryPointSourceErrorMessage,
+  coonsPatchCornerEquationStatuses,
+  coonsPatchCornerMismatchMessage,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
@@ -164,6 +169,7 @@ import {
   parsePositiveFiniteNumber,
   orientedCoonsBoundarySnapshot,
   pickCoonsPatchBoundaryDraftPath,
+  pickCoonsPatchBoundaryDraftPoint,
   pickRuledSurfaceBoundaryDraftPath,
   parseDirectLayerInput,
   redoLastDiagramChange,
@@ -210,6 +216,7 @@ import {
   validateWorkPlanePointPickingState,
   undoRuledSurfaceBoundaryDraftPick,
   validateCoonsPatchBoundaryPathSource,
+  validateCoonsPatchBoundaryPointSource,
   validateRuledSurfaceBoundaryPathSource,
   workPlanePointPickingStatus,
   workPlaneDisplayName,
@@ -235,6 +242,7 @@ import {
   type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
   type CoonsPatchBoundaryDraft,
+  type CoonsPatchCornerEquationStatus,
   type CoonsPatchBoundaryRole,
   type CoordinateSourceHighlight,
   type CurvedSheetCreationKind,
@@ -1690,11 +1698,40 @@ function App() {
     )
   }
 
+  function pickCoonsPatchBoundaryPoint(pointId: string): void {
+    const draftResult = pickCoonsPatchBoundaryDraftPoint(
+      coonsPatchBoundaryDraft,
+      pointId,
+    )
+
+    if (!draftResult.ok) {
+      setSheetStatus(boundarySurfaceDraftPickErrorMessage(draftResult.error))
+      return
+    }
+
+    const sourceResult = validateCoonsPatchBoundaryPointSource(
+      editableDiagram,
+      pointId,
+    )
+
+    if (!sourceResult.ok) {
+      setSheetStatus(coonsPatchBoundaryPointSourceErrorMessage(sourceResult.error))
+      return
+    }
+
+    setCoonsPatchBoundaryDraft(draftResult.draft)
+    setSheetStatus(
+      coonsPatchBoundaryDraftStatusForUi(editableDiagram, draftResult.draft),
+    )
+  }
+
   function resetCoonsPatchBoundaryPicking(): void {
     const draft = resetCoonsPatchBoundaryDraft()
 
     setCoonsPatchBoundaryDraft(draft)
-    setSheetStatus('Coons patch boundary picks reset. Pick bottom boundary path.')
+    setSheetStatus(
+      'Coons patch boundary picks reset. Pick bottom boundary path or point.',
+    )
   }
 
   function undoCoonsPatchBoundaryPicking(): void {
@@ -1726,6 +1763,15 @@ function App() {
     if (boundaryPathClickWorkflow === 'coonsPatch') {
       pickCoonsPatchBoundaryPath(pathId)
     }
+  }
+
+  function handleCoonsPatchBoundaryPointClick(pointId: string): boolean {
+    if (boundaryPathClickWorkflow !== 'coonsPatch') {
+      return false
+    }
+
+    pickCoonsPatchBoundaryPoint(pointId)
+    return true
   }
 
   function createCoonsPatchFromPickedPaths(
@@ -1762,8 +1808,17 @@ function App() {
     )
 
     if (!result.ok) {
+      const mismatchMessage =
+        result.error === 'invalidBoundary'
+          ? coonsPatchCornerMismatchMessage(
+              editableDiagram,
+              coonsPatchBoundarySelectionsFromDraft(coonsPatchBoundaryDraft),
+            )
+          : null
+
       setStatus(
-        createCoonsPatchFromBoundaryPathsErrorMessage(result.error, result.role),
+        mismatchMessage ??
+          createCoonsPatchFromBoundaryPathsErrorMessage(result.error, result.role),
       )
       return false
     }
@@ -2093,6 +2148,10 @@ function App() {
     }
 
     if (creationTool === 'select') {
+      return
+    }
+
+    if (handleCoonsPatchBoundaryPointClick(pointId)) {
       return
     }
 
@@ -5008,7 +5067,7 @@ function App() {
                   type="button"
                   className="toolbar-button"
                   disabled={
-                    coonsPatchBoundaryDraftPickedPathIds(
+                    coonsPatchBoundaryDraftPickedSourceIds(
                       coonsPatchBoundaryDraft,
                     ).length === 0
                   }
@@ -5020,7 +5079,7 @@ function App() {
                   type="button"
                   className="toolbar-button"
                   disabled={
-                    coonsPatchBoundaryDraftPickedPathIds(
+                    coonsPatchBoundaryDraftPickedSourceIds(
                       coonsPatchBoundaryDraft,
                     ).length === 0
                   }
@@ -5075,8 +5134,12 @@ function App() {
                         <button
                           type="button"
                           className="toolbar-button coons-boundary-reverse-button"
-                          disabled={picked === null}
-                          aria-pressed={picked?.reversed ?? false}
+                          disabled={picked === null || picked.kind === 'point'}
+                          aria-pressed={
+                            picked !== null && picked.kind !== 'point'
+                              ? picked.reversed
+                              : false
+                          }
                           aria-label={`Reverse ${coonsPatchBoundaryRoleLabel(
                             role,
                           )} boundary direction`}
@@ -5087,6 +5150,37 @@ function App() {
                       </div>
                     )
                   })}
+                </div>
+                <div
+                  className="coons-corner-equation-list"
+                  aria-label="Required Coons corners"
+                >
+                  <div className="coons-corner-equation-title">
+                    Required Coons corners
+                  </div>
+                  {coonsPatchCornerEquationStatuses(
+                    editableDiagram,
+                    coonsPatchBoundarySelectionsFromDraft(
+                      coonsPatchBoundaryDraft,
+                    ),
+                  ).map((status) => (
+                    <div
+                      key={status.id}
+                      className={`coons-corner-equation-row ${coonsPatchCornerEquationClassName(
+                        status.matches,
+                      )}`}
+                    >
+                      <span className="coons-corner-equation-mark">
+                        {coonsPatchCornerEquationMark(status.matches)}
+                      </span>
+                      <span className="coons-corner-equation-label">
+                        {status.label}
+                      </span>
+                      <span className="coons-corner-equation-values">
+                        {formatCoonsPatchCornerEquationStatus(status)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 <span className="toolbar-status">
                   {coonsPatchBoundaryDraftStatusForUi(
@@ -6479,14 +6573,16 @@ function createBoundaryPathHighlightsForSheetDraft(
         role,
       )
 
-      return picked === null
-        ? []
-        : [
-            {
-              id: picked.sourcePathId,
-              label: coonsPatchBoundaryRoleLabel(role),
-            },
-          ]
+      if (picked === null || picked.kind === 'point') {
+        return []
+      }
+
+      return [
+        {
+          id: picked.sourcePathId,
+          label: coonsPatchBoundaryRoleLabel(role),
+        },
+      ]
     })
   }
 
@@ -6555,12 +6651,22 @@ function coonsPatchBoundaryDraftStatusForUi(
     coonsPatchBoundarySelectionsFromDraft(draft),
   )
 
-  return validation.ok
-    ? 'Coons patch: picked 4/4. Boundary directions match. Create is enabled.'
-    : createCoonsPatchFromBoundaryPathsErrorMessage(
-        validation.error,
-        validation.role,
-      )
+  if (validation.ok) {
+    return 'Coons patch: picked 4/4. Boundary directions match. Create is enabled.'
+  }
+
+  return (
+    (validation.error === 'invalidBoundary'
+      ? coonsPatchCornerMismatchMessage(
+          diagram,
+          coonsPatchBoundarySelectionsFromDraft(draft),
+        )
+      : null) ??
+    createCoonsPatchFromBoundaryPathsErrorMessage(
+      validation.error,
+      validation.role,
+    )
+  )
 }
 
 function formatCoonsPatchBoundaryDirectionSummary(
@@ -6575,12 +6681,34 @@ function formatCoonsPatchBoundaryDirectionSummary(
   }
 
   const source = diagram.strata.find(
-    (stratum) => stratum.id === picked.sourcePathId,
+    (stratum) =>
+      stratum.id ===
+      (picked.kind === 'point' ? picked.sourcePointId : picked.sourcePathId),
   )
   const sourceLabel =
     source?.name !== undefined && source.name.trim().length > 0
       ? source.name
-      : picked.sourcePathId
+      : picked.kind === 'point'
+        ? picked.sourcePointId
+        : picked.sourcePathId
+
+  if (picked.kind === 'point') {
+    const sourceResult = validateCoonsPatchBoundaryPointSource(
+      diagram,
+      picked.sourcePointId,
+    )
+
+    if (!sourceResult.ok) {
+      return `${sourceLabel} (constant; ${coonsPatchBoundaryPointSourceErrorMessage(
+        sourceResult.error,
+      )})`
+    }
+
+    return `${sourceLabel} (constant) ${formatCompactVec3(
+      sourceResult.boundary.point,
+    )} -> ${formatCompactVec3(sourceResult.boundary.point)}`
+  }
+
   const sourceResult = validateCoonsPatchBoundaryPathSource(
     diagram,
     picked.sourcePathId,
@@ -6594,7 +6722,7 @@ function formatCoonsPatchBoundaryDirectionSummary(
   }
 
   const endpoints = pathEndpoints(
-    orientedCoonsBoundarySnapshot(
+    orientedPathCoonsBoundarySnapshot(
       sourceResult.boundary,
       picked.reversed,
     ).segments,
@@ -6605,6 +6733,55 @@ function formatCoonsPatchBoundaryDirectionSummary(
     : `${sourceLabel} (${direction}) ${formatCompactVec3(
         endpoints.start,
       )} -> ${formatCompactVec3(endpoints.end)}`
+}
+
+function orientedPathCoonsBoundarySnapshot(
+  boundary: Parameters<typeof orientedCoonsBoundarySnapshot>[0],
+  reversed: boolean,
+): BoundaryPathSnapshot {
+  const oriented = orientedCoonsBoundarySnapshot(boundary, reversed)
+
+  if (isConstantCoonsBoundarySnapshot(oriented)) {
+    throw new Error('Expected a path Coons boundary.')
+  }
+
+  return oriented
+}
+
+function isConstantCoonsBoundarySnapshot(
+  boundary: Parameters<typeof orientedCoonsBoundarySnapshot>[0],
+): boundary is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in boundary && boundary.kind === 'constantPoint'
+}
+
+function coonsPatchCornerEquationClassName(matches: boolean | null): string {
+  if (matches === null) {
+    return 'pending'
+  }
+
+  return matches ? 'matches' : 'mismatch'
+}
+
+function coonsPatchCornerEquationMark(matches: boolean | null): string {
+  if (matches === null) {
+    return '...'
+  }
+
+  return matches ? 'OK' : 'X'
+}
+
+function formatCoonsPatchCornerEquationStatus(
+  status: CoonsPatchCornerEquationStatus,
+): string {
+  if (status.leftPoint === undefined || status.rightPoint === undefined) {
+    return 'waiting for both endpoints'
+  }
+
+  const comparator = status.matches === false ? ' != ' : ' = '
+
+  return `${formatCompactVec3(status.leftPoint)}${comparator}${formatCompactVec3(
+    status.rightPoint,
+  )}`
 }
 
 function formatCompactVec3(point: Vec3): string {

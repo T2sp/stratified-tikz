@@ -858,25 +858,25 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
       )
       return
     case 'coonsPatch':
-      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+      validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.bottom,
         `${path}.bottom`,
         errors,
         coordinateExpressionContext,
       )
-      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+      validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.right,
         `${path}.right`,
         errors,
         coordinateExpressionContext,
       )
-      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+      validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.top,
         `${path}.top`,
         errors,
         coordinateExpressionContext,
       )
-      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+      validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.left,
         `${path}.left`,
         errors,
@@ -940,6 +940,50 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
       )
     }
   })
+}
+
+function validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
+  snapshot: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  if (isConstantCoonsBoundarySnapshotLike(snapshot)) {
+    if (isObjectRecord(snapshot.point)) {
+      validateSymbolicVec3(
+        snapshot.point as Vec3,
+        3,
+        `${path}.point`,
+        coordinateExpressionContext,
+        errors,
+      )
+    }
+    return
+  }
+
+  validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+    snapshot,
+    path,
+    errors,
+    coordinateExpressionContext,
+  )
+}
+
+function isConstantCoonsBoundarySnapshotLike(
+  snapshot: unknown,
+): snapshot is { point: unknown } {
+  return (
+    typeof snapshot === 'object' &&
+    snapshot !== null &&
+    !Array.isArray(snapshot) &&
+    'kind' in snapshot &&
+    snapshot.kind === 'constantPoint' &&
+    'point' in snapshot
+  )
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function boundaryPathSegmentCoordinatesForPolicy(segment: unknown): Vec3[] {
