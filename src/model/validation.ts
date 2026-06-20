@@ -54,6 +54,7 @@ import type {
   ArcPathSegment,
   Camera,
   ClosedPathBoundary,
+  CurvedSheetPrimitive,
   CurvedSheetStratum,
   CubicBezierCurveStratum,
   DiagramViewOptions,
@@ -740,7 +741,13 @@ function validateSheetStratum(
   }
 
   if (stratum.kind === 'curvedSheet') {
-    validateCurvedSheetStratum(stratum, ambientDimension, path, errors)
+    validateCurvedSheetStratum(
+      stratum,
+      ambientDimension,
+      path,
+      errors,
+      coordinateExpressionContext,
+    )
     return
   }
 
@@ -760,6 +767,7 @@ function validateCurvedSheetStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (ambientDimension !== 3) {
     pushError(errors, path, 'Curved sheet strata are valid only in 3D diagrams.')
@@ -774,6 +782,54 @@ function validateCurvedSheetStratum(
       pushError(errors, issue.path, issue.message)
     },
   )
+  validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
+    stratum.primitive,
+    `${path}.primitive`,
+    errors,
+    coordinateExpressionContext,
+  )
+}
+
+function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
+  primitive: CurvedSheetPrimitive,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  switch (primitive.kind) {
+    case 'hemisphere':
+      validateSymbolicVec3(
+        primitive.center,
+        3,
+        `${path}.center`,
+        coordinateExpressionContext,
+        errors,
+      )
+      if (hasSymbolicVec3Coordinates(primitive.center)) {
+        pushError(
+          errors,
+          `${path}.center`,
+          'Curved sheet centers must be numeric because mesh export derives sampled coordinates.',
+        )
+      }
+      validateWorkPlaneFrameSnapshot(
+        primitive.frame,
+        `${path}.frame`,
+        errors,
+        coordinateExpressionContext,
+        'numericOnly',
+      )
+      return
+    case 'saddle':
+      validateWorkPlaneFrameSnapshot(
+        primitive.frame,
+        `${path}.frame`,
+        errors,
+        coordinateExpressionContext,
+        'numericOnly',
+      )
+      return
+  }
 }
 
 function validateWorkPlaneFilledSheet3DStratum(
@@ -803,6 +859,8 @@ function validateWorkPlaneFilledSheet3DStratum(
     stratum.planeFrame,
     `${path}.planeFrame`,
     errors,
+    coordinateExpressionContext,
+    'planeScope',
   )
   validateFillRule(stratum.fillRule, `${path}.fillRule`, errors)
   validateClosedPathBoundaries(
@@ -955,6 +1013,8 @@ function validateCubicBezierCurve(
     ambientDimension,
     `${path}.bezierControls`,
     errors,
+    coordinateExpressionContext,
+    'planeScope',
   )
 }
 
@@ -1226,6 +1286,8 @@ function validatePathSegment(
         ambientDimension,
         `${path}.controlMode`,
         errors,
+        coordinateExpressionContext,
+        'numericOnly',
       )
       return
     case 'arc':
@@ -1297,13 +1359,25 @@ function validateArcPathSegment(
     if (segment.frame === undefined) {
       pushError(errors, `${path}.frame`, '3D arc segments must store a work-plane frame.')
     } else {
-      validateWorkPlaneFrameSnapshot(segment.frame, `${path}.frame`, errors)
+      validateWorkPlaneFrameSnapshot(
+        segment.frame,
+        `${path}.frame`,
+        errors,
+        coordinateExpressionContext,
+        'numericOnly',
+      )
       validatePointOnFrame(segment.center, segment.frame, `${path}.center`, errors)
       validatePointOnFrame(segment.start, segment.frame, `${path}.start`, errors)
       validatePointOnFrame(segment.end, segment.frame, `${path}.end`, errors)
     }
   } else if (segment.frame !== undefined) {
-    validateWorkPlaneFrameSnapshot(segment.frame, `${path}.frame`, errors)
+    validateWorkPlaneFrameSnapshot(
+      segment.frame,
+      `${path}.frame`,
+      errors,
+      coordinateExpressionContext,
+      'numericOnly',
+    )
   }
 
   if (
@@ -1370,7 +1444,13 @@ function validatePathTemplate(
         pushError(errors, `${path}.radius`, 'Circle radius must be positive.')
       }
 
-      validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateFrame(
+        template,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     case 'ellipseTemplate':
@@ -1396,7 +1476,13 @@ function validatePathTemplate(
         validateFinite(template.rotationDeg, `${path}.rotationDeg`, errors)
       }
 
-      validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateFrame(
+        template,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     default:
@@ -1430,6 +1516,7 @@ function validateTemplateFrame(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (ambientDimension === 3 && template.frame === undefined) {
     pushError(
@@ -1444,7 +1531,13 @@ function validateTemplateFrame(
     return
   }
 
-  validateWorkPlaneFrameSnapshot(template.frame, `${path}.frame`, errors)
+  validateWorkPlaneFrameSnapshot(
+    template.frame,
+    `${path}.frame`,
+    errors,
+    coordinateExpressionContext,
+    ambientDimension === 3 ? 'planeScope' : 'numericOnly',
+  )
   templatePathCoordinates(template).forEach((point, index) => {
     validatePointOnFrame(point, templatePathFrame(template), `${path}.points[${index}]`, errors)
   })
@@ -1510,6 +1603,8 @@ function validateCubicBezierControlMode(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+  workPlaneFrameSymbolicPolicy: WorkPlaneFrameSymbolicPolicy,
 ): void {
   if (controlMode === undefined) {
     return
@@ -1544,6 +1639,8 @@ function validateCubicBezierControlMode(
         ambientDimension,
         path,
         errors,
+        coordinateExpressionContext,
+        workPlaneFrameSymbolicPolicy,
       )
       validateWorkPlaneRelativeControlModeMatchesEndpoints(
         points,
@@ -1567,6 +1664,8 @@ function validateCubicBezierControlMode(
         ambientDimension,
         path,
         errors,
+        coordinateExpressionContext,
+        workPlaneFrameSymbolicPolicy,
       )
       validateWorkPlaneRelativeControlModeMatchesEndpoints(
         points,
@@ -1651,6 +1750,8 @@ function validateWorkPlaneRelativeCartesianControlMode(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+  workPlaneFrameSymbolicPolicy: WorkPlaneFrameSymbolicPolicy,
 ): void {
   if (ambientDimension !== 3) {
     pushError(
@@ -1660,7 +1761,13 @@ function validateWorkPlaneRelativeCartesianControlMode(
     )
   }
 
-  validateWorkPlaneFrameSnapshot(controlMode.frame, `${path}.frame`, errors)
+  validateWorkPlaneFrameSnapshot(
+    controlMode.frame,
+    `${path}.frame`,
+    errors,
+    coordinateExpressionContext,
+    workPlaneFrameSymbolicPolicy,
+  )
   validateWorkPlaneLocalCoordinate(
     controlMode.localStart,
     `${path}.localStart`,
@@ -1696,6 +1803,8 @@ function validateWorkPlaneRelativePolarControlMode(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+  workPlaneFrameSymbolicPolicy: WorkPlaneFrameSymbolicPolicy,
 ): void {
   if (ambientDimension !== 3) {
     pushError(
@@ -1705,7 +1814,13 @@ function validateWorkPlaneRelativePolarControlMode(
     )
   }
 
-  validateWorkPlaneFrameSnapshot(controlMode.frame, `${path}.frame`, errors)
+  validateWorkPlaneFrameSnapshot(
+    controlMode.frame,
+    `${path}.frame`,
+    errors,
+    coordinateExpressionContext,
+    workPlaneFrameSymbolicPolicy,
+  )
   validateWorkPlaneLocalCoordinate(
     controlMode.localStart,
     `${path}.localStart`,
@@ -1728,15 +1843,44 @@ function validateWorkPlaneRelativePolarControlMode(
   }
 }
 
+type WorkPlaneFrameSymbolicPolicy = 'planeScope' | 'numericOnly'
+
 function validateWorkPlaneFrameSnapshot(
   frame: WorkPlaneFrameSnapshot,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+  symbolicPolicy: WorkPlaneFrameSymbolicPolicy,
 ): void {
-  validateVec3ForAmbient(frame.origin, 3, `${path}.origin`, errors)
-  validateVec3ForAmbient(frame.u, 3, `${path}.u`, errors)
-  validateVec3ForAmbient(frame.v, 3, `${path}.v`, errors)
-  validateVec3ForAmbient(frame.normal, 3, `${path}.normal`, errors)
+  validateVec3ForAmbient(
+    frame.origin,
+    3,
+    `${path}.origin`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateVec3ForAmbient(
+    frame.u,
+    3,
+    `${path}.u`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateVec3ForAmbient(
+    frame.v,
+    3,
+    `${path}.v`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateVec3ForAmbient(
+    frame.normal,
+    3,
+    `${path}.normal`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateWorkPlaneFrameSymbolicPolicy(frame, path, errors, symbolicPolicy)
 
   if (
     isFiniteVec3(frame.origin) &&
@@ -1749,6 +1893,36 @@ function validateWorkPlaneFrameSnapshot(
       errors,
       path,
       'Work-plane-local Bezier frame must be an orthonormal right-handed frame.',
+    )
+  }
+}
+
+function validateWorkPlaneFrameSymbolicPolicy(
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+  symbolicPolicy: WorkPlaneFrameSymbolicPolicy,
+): void {
+  if (symbolicPolicy === 'numericOnly') {
+    const frameFields = ['origin', 'u', 'v', 'normal'] as const
+
+    frameFields.forEach((field) => {
+      if (hasSymbolicVec3Coordinates(frame[field])) {
+        pushError(
+          errors,
+          `${path}.${field}`,
+          'Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.',
+        )
+      }
+    })
+    return
+  }
+
+  if (hasSymbolicVec3Coordinates(frame.normal)) {
+    pushError(
+      errors,
+      `${path}.normal`,
+      'Work-plane frame normal must be numeric because TikZ plane scopes export origin, u, and v only.',
     )
   }
 }

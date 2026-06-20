@@ -1088,6 +1088,129 @@ test('symbolic work-plane-filled sheet boundaries use absolute coordinates to pr
   assert.doesNotMatch(tikz, /canvas is plane/)
 })
 
+test('symbolic work-plane-filled sheet frame origin exports in local plane options', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  diagram.variables = symbolicFrameVariables()
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+  sheet.planeFrame = {
+    ...sheet.planeFrame,
+    origin: symbolicVec3(symbolicComponent('R', 2), 0, 2),
+  }
+
+  const tikz = generateTikz(diagram)
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const originIndex = tikz.indexOf('plane origin={({\\R},0,2)}')
+
+  assert.notEqual(variableIndex, -1)
+  assert.notEqual(originIndex, -1)
+  assert.ok(variableIndex < originIndex)
+  assert.match(tikz, /plane x=\{\(\{\\R \+ 1\},0,2\)\}/)
+  assert.match(tikz, /plane y=\{\(\{\\R\},1,2\)\}/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,2\)\}/)
+})
+
+test('symbolic work-plane-filled sheet frame basis exports in local plane options', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  diagram.variables = symbolicUnitFrameVariables()
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+  sheet.planeFrame = {
+    ...sheet.planeFrame,
+    u: symbolicVec3(symbolicComponent('U', 1), 0, 0),
+    v: symbolicVec3(0, symbolicComponent('V', 1), 0),
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /plane x=\{\(\{\\U\},0,2\)\}/)
+  assert.match(tikz, /plane y=\{\(0,\{\\V\},2\)\}/)
+  assert.doesNotMatch(tikz, /plane x=\{\(1,0,2\)\}/)
+  assert.doesNotMatch(tikz, /plane y=\{\(0,1,2\)\}/)
+})
+
+test('invalid symbolic work-plane-filled sheet frame export omits instead of using previews', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+  sheet.planeFrame = {
+    ...sheet.planeFrame,
+    origin: symbolicVec3(symbolicComponent('Missing', 2), 0, 2),
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /omitted because its local plane frame cannot be exported safely/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,2\)\}/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
+})
+
+test('inline symbolic work-plane frame output keeps variables before use and no blanks', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram()
+  const sheet = diagram.strata[0]
+
+  diagram.variables = symbolicFrameVariables()
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+  sheet.planeFrame = {
+    ...sheet.planeFrame,
+    origin: symbolicVec3(symbolicComponent('R', 2), 0, 2),
+  }
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const originIndex = tikz.indexOf('plane origin={({\\R},0,2)}')
+
+  assert.notEqual(variableIndex, -1)
+  assert.notEqual(originIndex, -1)
+  assert.ok(variableIndex < originIndex)
+  expectNoBlankLines(tikz)
+})
+
+test('symbolic 3D template frame exports in local plane options', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = symbolicUnitFrameVariables()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'symbolic-template-frame',
+    name: 'Symbolic Template Frame',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    template: {
+      kind: 'circleTemplate',
+      center: { x: 2, y: 0, z: 2 },
+      radius: 1,
+      frame: {
+        origin: symbolicVec3(symbolicComponent('R', 2), 0, 2),
+        u: symbolicVec3(symbolicComponent('U', 1), 0, 0),
+        v: symbolicVec3(0, symbolicComponent('V', 1), 0),
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /plane origin=\{\(\{\\R\},0,2\)\}/)
+  assert.match(tikz, /plane x=\{\(\{\\R \+ \\U\},0,2\)\}/)
+  assert.match(tikz, /plane y=\{\(\{\\R\},\{\\V\},2\)\}/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,2\)\}/)
+})
+
 test('symbolic sheet vertices export through named sheet coordinates', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.variables = symbolicExportVariables()
@@ -2896,6 +3019,59 @@ test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scop
   )
 })
 
+test('symbolic work-plane-local relative Bezier frame exports in local plane options', () => {
+  const diagram = createWorkPlaneRelativePolarBezierDiagram()
+  const curve = diagram.strata[0]
+
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '10',
+      previewValue: 10,
+    },
+    {
+      id: 'var-U',
+      name: 'U',
+      macroName: 'U',
+      expression: '1',
+      previewValue: 1,
+    },
+    {
+      id: 'var-V',
+      name: 'V',
+      macroName: 'V',
+      expression: '1',
+      previewValue: 1,
+    },
+  ]
+  if (
+    curve.geometricKind !== 'curve' ||
+    curve.kind !== 'cubicBezier' ||
+    curve.bezierControls?.kind !== 'workPlaneRelativePolar'
+  ) {
+    throw new Error('Expected a work-plane-relative polar Bezier curve.')
+  }
+  curve.bezierControls = {
+    ...curve.bezierControls,
+    frame: {
+      ...curve.bezierControls.frame,
+      origin: symbolicVec3(symbolicComponent('R', 10), 20, 30),
+      u: symbolicVec3(symbolicComponent('U', 1), 0, 0),
+      v: symbolicVec3(0, 0, symbolicComponent('V', 1)),
+    },
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /plane origin=\{\(\{\\R\},20,30\)\}/)
+  assert.match(tikz, /plane x=\{\(\{\\R \+ \\U\},20,30\)\}/)
+  assert.match(tikz, /plane y=\{\(\{\\R\},20,\{30 \+ \\V\}\)\}/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(10,20,30\)\}/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierLocalRelativePolar0p1\)/)
+})
+
 test('work-plane-local relative Cartesian 3D Bezier uses local relative controls', () => {
   const tikz = generateTikz(createWorkPlaneRelativeCartesianBezierDiagram())
 
@@ -3627,6 +3803,38 @@ function symbolicExportVariables(): SymbolicVariable[] {
       macroName: 'S',
       expression: '5',
       previewValue: 5,
+    },
+  ]
+}
+
+function symbolicFrameVariables(): SymbolicVariable[] {
+  return [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+}
+
+function symbolicUnitFrameVariables(): SymbolicVariable[] {
+  return [
+    ...symbolicFrameVariables(),
+    {
+      id: 'var-U',
+      name: 'U',
+      macroName: 'U',
+      expression: '1',
+      previewValue: 1,
+    },
+    {
+      id: 'var-V',
+      name: 'V',
+      macroName: 'V',
+      expression: '1',
+      previewValue: 1,
     },
   ]
 }
