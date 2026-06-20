@@ -2211,6 +2211,42 @@ test('2D grid exports a rectangular clip', () => {
   assert.match(tikz, /\\clip \(0,0\) rectangle \(5,5\);/)
 })
 
+test('2D triangular lattice exports compact foreach loops and clip', () => {
+  const tikz = generateTikz(
+    createTwoDimensionalGridDiagram({
+      latticePattern: 'triangular',
+      uRange: numericGridRange(0, 3, 1),
+      vRange: numericGridRange(0, 3, 1),
+      clip: numericGridClip(0, 3, 0, 3),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\clip \(0,0\) rectangle \(3,3\);/)
+  assert.equal(countMatches(layerBlock, /\\foreach/g), 3)
+  assert.match(layerBlock, /\\foreach \\stzGridW/)
+  assert.match(layerBlock, /1\.732051/)
+  assert.doesNotMatch(layerBlock, /NaN|Infinity/)
+})
+
+test('2D honeycomb lattice exports compact foreach loops and clip', () => {
+  const tikz = generateTikz(
+    createTwoDimensionalGridDiagram({
+      latticePattern: 'honeycomb',
+      uRange: numericGridRange(0, 3, 1),
+      vRange: numericGridRange(0, 3, 1),
+      clip: numericGridClip(0, 3, 0, 3),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\clip \(0,0\) rectangle \(3,3\);/)
+  assert.match(layerBlock, /\\foreach \\stzGridI/)
+  assert.match(layerBlock, /\\foreach \\stzGridJ/)
+  assert.match(layerBlock, /-- cycle;/)
+  assert.doesNotMatch(layerBlock, /NaN|Infinity/)
+})
+
 test('2D grid foreach export does not expand every line', () => {
   const tikz = generateTikz(
     createTwoDimensionalGridDiagram({
@@ -2252,6 +2288,30 @@ test('3D work-plane grid uses local coordinates inside the scope', () => {
   assert.doesNotMatch(layerBlock, /\(0,1,-1\) -- \(0,1,1\);/)
 })
 
+test('3D triangular lattice exports a canvas-is-plane foreach scope', () => {
+  const tikz = generateTikz(
+    createThreeDimensionalGridDiagram({ latticePattern: 'triangular' }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(layerBlock, /canvas is plane/)
+  assert.match(layerBlock, /\\foreach \\stzGridW/)
+  assert.match(layerBlock, /\\clip \(-1,-1\) rectangle \(1,1\);/)
+})
+
+test('3D honeycomb lattice exports a canvas-is-plane foreach scope', () => {
+  const tikz = generateTikz(
+    createThreeDimensionalGridDiagram({ latticePattern: 'honeycomb' }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(layerBlock, /canvas is plane/)
+  assert.match(layerBlock, /\\foreach \\stzGridI/)
+  assert.match(layerBlock, /\\clip \(-1,-1\) rectangle \(1,1\);/)
+})
+
 test('grid TikZ export preserves style and layer', () => {
   const tikz = generateTikz(
     createTwoDimensionalGridDiagram({
@@ -2276,6 +2336,31 @@ test('grid TikZ export preserves style and layer', () => {
   assert.match(layerBlock, /\\foreach/)
 })
 
+test('triangular lattice TikZ export preserves style and layer', () => {
+  const tikz = generateTikz(
+    createTwoDimensionalGridDiagram({
+      latticePattern: 'triangular',
+      id: 'styled-triangle-grid',
+      name: 'Styled triangular grid',
+      layer: 7,
+      style: curveStyle({
+        strokeColor: '#4D9DE0',
+        strokeOpacity: 0.4,
+        lineWidth: 0.8,
+        lineStyle: 'dashed',
+      }),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer7')
+
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer7,main\}/)
+  assert.match(tikz, /\{HTML\}\{4D9DE0\}/)
+  assert.match(layerBlock, /draw opacity=0\.4/)
+  assert.match(layerBlock, /line width=0\.8pt/)
+  assert.match(layerBlock, /dashed/)
+  assert.match(layerBlock, /\\foreach \\stzGridW/)
+})
+
 test('invalid grid ranges are rejected before export', () => {
   const diagram = createTwoDimensionalGridDiagram({
     uRange: numericGridRange(2, -2, 1),
@@ -2296,6 +2381,25 @@ test('inline grid output has no blank lines', () => {
 
   assert.match(tikz, /\\foreach \\stzGridU/)
   expectNoBlankLines(tikz)
+})
+
+test('inline triangular and honeycomb lattice output has no blank lines', () => {
+  const outputs = [
+    generateTikz(
+      createTwoDimensionalGridDiagram({ latticePattern: 'triangular' }),
+      { exportMode: 'inlineMath' },
+    ),
+    generateTikz(
+      createTwoDimensionalGridDiagram({ latticePattern: 'honeycomb' }),
+      { exportMode: 'inlineMath' },
+    ),
+  ]
+
+  for (const tikz of outputs) {
+    assert.match(tikz, /\\foreach/)
+    assert.doesNotMatch(tikz, /NaN|Infinity/)
+    expectNoBlankLines(tikz)
+  }
 })
 
 test('grid foreach indentation uses four-space levels', () => {

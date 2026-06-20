@@ -79,6 +79,7 @@ import type {
   GridStratum,
   HemisphereSide,
   LabelStyle,
+  LatticePattern,
   PathTemplate,
   PathSegment,
   PointStratum,
@@ -339,6 +340,7 @@ export type AddCurvedSheetStratumOptions = {
 export type AddGridStratumOptions = {
   id?: string
   name?: string
+  latticePattern?: LatticePattern
   layer?: number
   style?: CurveStyle
 }
@@ -2402,6 +2404,7 @@ function createGridForDiagram(
     ambientDimension: diagram.ambientDimension,
     id: safeOptionalId(diagram, options.id, 'grid'),
     name: safeOptionalName(options.name, 'Grid'),
+    latticePattern: options.latticePattern,
     style: options.style ?? defaultCurveStyle,
     frame,
     uRange,

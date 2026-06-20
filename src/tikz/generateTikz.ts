@@ -15,6 +15,7 @@ import type {
   HexColor,
   ImportedTikzStyleReference,
   LabelStyle,
+  LatticePattern,
   LineStyle,
   PointShape,
   PointStratum,
@@ -36,6 +37,7 @@ import type {
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
 } from '../model/types'
+import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
   arcSegmentToCubicBezierSegments,
@@ -146,6 +148,11 @@ type GridRangeValues = {
   step: number
 }
 
+type GridRangeBounds = {
+  min: number
+  max: number
+}
+
 type GridClipValues = {
   uMin: FormattedGridScalar
   uMax: FormattedGridScalar
@@ -168,12 +175,25 @@ type GridForeachSequence = {
 type GridLoopVariables = {
   u: string
   v: string
+  w: string
+  i: string
+  j: string
 }
 
 type GridRangeReadResult =
   | {
       ok: true
       range: GridRangeValues
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type GridRangeBoundsReadResult =
+  | {
+      ok: true
+      bounds: GridRangeBounds
     }
   | {
       ok: false
@@ -1314,41 +1334,10 @@ function emitGrid(
   grid: Extract<CurveStratum, { kind: 'grid' }>,
   context: GenerateContext,
 ): string[] {
-  const uRange = readGridNumericRange(grid.uRange, 'uRange')
-  const vRange = readGridNumericRange(grid.vRange, 'vRange')
-  const clip = formatGridClip(grid.clip, context)
+  const pattern = readGridExportPattern(grid)
 
-  if (!uRange.ok) {
-    return emitGridOmitted(grid, uRange.error)
-  }
-
-  if (!vRange.ok) {
-    return emitGridOmitted(grid, vRange.error)
-  }
-
-  if (!clip.ok) {
-    return emitGridOmitted(grid, clip.error)
-  }
-
-  const uSequence = gridForeachSequence(
-    uRange.range,
-    clip.clip.uMin.value,
-    clip.clip.uMax.value,
-    'uRange',
-  )
-  const vSequence = gridForeachSequence(
-    vRange.range,
-    clip.clip.vMin.value,
-    clip.clip.vMax.value,
-    'vRange',
-  )
-
-  if (!uSequence.ok) {
-    return emitGridOmitted(grid, uSequence.error)
-  }
-
-  if (!vSequence.ok) {
-    return emitGridOmitted(grid, vSequence.error)
+  if (!pattern.ok) {
+    return emitGridOmitted(grid, pattern.error)
   }
 
   const options = curveStyleOptionsForElement(
@@ -1359,13 +1348,17 @@ function emitGrid(
     context,
   )
   const loopVariables = gridLoopVariables(context)
-  const scopeBody = emitGridScopeBody(
-    clip.clip,
-    uSequence.sequence,
-    vSequence.sequence,
+  const scopeBody = emitGridPatternScopeBody(
+    grid,
+    pattern.pattern,
+    context,
     loopVariables,
     options,
   )
+
+  if (!scopeBody.ok) {
+    return emitGridOmitted(grid, scopeBody.error)
+  }
 
   if (context.mode === '2d') {
     if (grid.frame.kind !== 'xy' || !isCanonicalGridXyFrame(grid.frame.frame)) {
@@ -1378,7 +1371,7 @@ function emitGrid(
     return [
       `% Grid "${grid.name}" [${grid.id}] exported with TikZ foreach loops and rectangular clip.`,
       '\\begin{scope}',
-      ...scopeBody,
+      ...scopeBody.lines,
       '\\end{scope}',
       '',
     ]
@@ -1411,10 +1404,778 @@ function emitGrid(
     '\\begin{scope}[',
     ...frameOptions.options.map((option) => indentLine(option)),
     ']',
-    ...scopeBody,
+    ...scopeBody.lines,
     '\\end{scope}',
     '',
   ]
+}
+
+function readGridExportPattern(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+):
+  | {
+      ok: true
+      pattern: LatticePattern
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const rawPattern = (grid as { latticePattern?: unknown }).latticePattern
+
+  if (rawPattern !== undefined && !isLatticePattern(rawPattern)) {
+    return {
+      ok: false,
+      error: 'grid lattice pattern must be rectangular, triangular, or honeycomb.',
+    }
+  }
+
+  return {
+    ok: true,
+    pattern: gridLatticePattern(grid),
+  }
+}
+
+function emitGridPatternScopeBody(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  pattern: LatticePattern,
+  context: GenerateContext,
+  loopVariables: GridLoopVariables,
+  options: string[],
+):
+  | {
+      ok: true
+      lines: string[]
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  switch (pattern) {
+    case 'rectangular':
+      return emitRectangularGridScopeBody(
+        grid,
+        context,
+        loopVariables,
+        options,
+      )
+    case 'triangular':
+      return emitTriangularGridScopeBody(grid, loopVariables, options)
+    case 'honeycomb':
+      return emitHoneycombGridScopeBody(grid, loopVariables, options)
+  }
+}
+
+function emitRectangularGridScopeBody(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  context: GenerateContext,
+  loopVariables: GridLoopVariables,
+  options: string[],
+):
+  | {
+      ok: true
+      lines: string[]
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const uRange = readGridNumericRange(grid.uRange, 'uRange')
+  const vRange = readGridNumericRange(grid.vRange, 'vRange')
+  const clip = formatGridClip(grid.clip, context)
+
+  if (!uRange.ok) {
+    return uRange
+  }
+
+  if (!vRange.ok) {
+    return vRange
+  }
+
+  if (!clip.ok) {
+    return clip
+  }
+
+  const uSequence = gridForeachSequence(
+    uRange.range,
+    clip.clip.uMin.value,
+    clip.clip.uMax.value,
+    'uRange',
+  )
+  const vSequence = gridForeachSequence(
+    vRange.range,
+    clip.clip.vMin.value,
+    clip.clip.vMax.value,
+    'vRange',
+  )
+
+  if (!uSequence.ok) {
+    return uSequence
+  }
+
+  if (!vSequence.ok) {
+    return vSequence
+  }
+
+  return {
+    ok: true,
+    lines: emitGridScopeBody(
+      clip.clip,
+      uSequence.sequence,
+      vSequence.sequence,
+      loopVariables,
+      options,
+    ),
+  }
+}
+
+function emitTriangularGridScopeBody(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  loopVariables: GridLoopVariables,
+  options: string[],
+):
+  | {
+      ok: true
+      lines: string[]
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const values = readNonRectangularGridValues(grid, 'triangular lattice')
+
+  if (!values.ok) {
+    return values
+  }
+
+  const domain = gridDomainFromBoundsAndClip(
+    values.uBounds,
+    values.vBounds,
+    values.clip,
+  )
+
+  if (domain === null) {
+    return {
+      ok: true,
+      lines: [emitGridClipLine(values.clip)],
+    }
+  }
+
+  const spacing = values.spacing
+  const verticalSpacing = (Math.sqrt(3) / 2) * spacing
+  const horizontalSequence = gridForeachSequenceFromBounds(
+    values.vBounds.min,
+    verticalSpacing,
+    domain.vMin.value,
+    domain.vMax.value,
+    'triangular horizontal family',
+  )
+  const positiveDiagonalSequence = gridForeachSequenceFromBounds(
+    values.uBounds.min,
+    spacing,
+    minGridDomainCornerValue(
+      domain,
+      (corner) => corner.u - corner.v / Math.sqrt(3),
+    ),
+    maxGridDomainCornerValue(
+      domain,
+      (corner) => corner.u - corner.v / Math.sqrt(3),
+    ),
+    'triangular +60 family',
+  )
+  const negativeDiagonalSequence = gridForeachSequenceFromBounds(
+    values.uBounds.min,
+    spacing,
+    minGridDomainCornerValue(
+      domain,
+      (corner) => corner.u + corner.v / Math.sqrt(3),
+    ),
+    maxGridDomainCornerValue(
+      domain,
+      (corner) => corner.u + corner.v / Math.sqrt(3),
+    ),
+    'triangular -60 family',
+  )
+
+  if (!horizontalSequence.ok) {
+    return horizontalSequence
+  }
+
+  if (!positiveDiagonalSequence.ok) {
+    return positiveDiagonalSequence
+  }
+
+  if (!negativeDiagonalSequence.ok) {
+    return negativeDiagonalSequence
+  }
+
+  const padding = diagonalGridLinePadding(domain, spacing)
+  const paddedUMin = normalizeGridTikzNumber(domain.uMin.value - padding)
+  const paddedUMax = normalizeGridTikzNumber(domain.uMax.value + padding)
+  const slope = Math.sqrt(3)
+
+  return {
+    ok: true,
+    lines: [
+      emitGridClipLine(domain),
+      ...emitGridForeachLoop(
+        loopVariables.v,
+        horizontalSequence.sequence,
+        options,
+        formatGridLocalCoordinate(domain.uMin.tikz, loopVariables.v),
+        formatGridLocalCoordinate(domain.uMax.tikz, loopVariables.v),
+      ),
+      ...emitGridForeachLoop(
+        loopVariables.u,
+        positiveDiagonalSequence.sequence,
+        options,
+        formatGridLocalCoordinate(
+          formatNumber(paddedUMin),
+          gridMathExpression(
+            `${formatNumber(slope)} * (${formatNumber(paddedUMin)} - ${loopVariables.u})`,
+          ),
+        ),
+        formatGridLocalCoordinate(
+          formatNumber(paddedUMax),
+          gridMathExpression(
+            `${formatNumber(slope)} * (${formatNumber(paddedUMax)} - ${loopVariables.u})`,
+          ),
+        ),
+      ),
+      ...emitGridForeachLoop(
+        loopVariables.w,
+        negativeDiagonalSequence.sequence,
+        options,
+        formatGridLocalCoordinate(
+          formatNumber(paddedUMin),
+          gridMathExpression(
+            `-${formatNumber(slope)} * (${formatNumber(paddedUMin)} - ${loopVariables.w})`,
+          ),
+        ),
+        formatGridLocalCoordinate(
+          formatNumber(paddedUMax),
+          gridMathExpression(
+            `-${formatNumber(slope)} * (${formatNumber(paddedUMax)} - ${loopVariables.w})`,
+          ),
+        ),
+      ),
+    ],
+  }
+}
+
+function emitHoneycombGridScopeBody(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  loopVariables: GridLoopVariables,
+  options: string[],
+):
+  | {
+      ok: true
+      lines: string[]
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const values = readNonRectangularGridValues(grid, 'honeycomb lattice')
+
+  if (!values.ok) {
+    return values
+  }
+
+  const domain = gridDomainFromBoundsAndClip(
+    values.uBounds,
+    values.vBounds,
+    values.clip,
+  )
+
+  if (domain === null) {
+    return {
+      ok: true,
+      lines: [emitGridClipLine(values.clip)],
+    }
+  }
+
+  const edgeLength = values.spacing
+  const columnStep = 1.5 * edgeLength
+  const rowStep = Math.sqrt(3) * edgeLength
+  const iFirst = Math.floor((domain.uMin.value - edgeLength - values.uBounds.min) / columnStep)
+  const iLast = Math.ceil((domain.uMax.value + edgeLength - values.uBounds.min) / columnStep)
+  const jFirst = Math.floor(
+    (domain.vMin.value - rowStep - values.vBounds.min - rowStep / 2) / rowStep,
+  )
+  const jLast = Math.ceil(
+    (domain.vMax.value + rowStep - values.vBounds.min) / rowStep,
+  )
+  const evenColumns = integerGridForeachSequence(
+    firstIntegerWithParity(iFirst, 0),
+    iLast,
+    2,
+  )
+  const oddColumns = integerGridForeachSequence(
+    firstIntegerWithParity(iFirst, 1),
+    iLast,
+    2,
+  )
+  const rows = integerGridForeachSequence(jFirst, jLast, 1)
+
+  return {
+    ok: true,
+    lines: [
+      emitGridClipLine(domain),
+      ...emitHoneycombColumnLoops(
+        evenColumns,
+        rows,
+        0,
+        values.uBounds.min,
+        values.vBounds.min,
+        columnStep,
+        rowStep,
+        edgeLength,
+        loopVariables,
+        options,
+      ),
+      ...emitHoneycombColumnLoops(
+        oddColumns,
+        rows,
+        rowStep / 2,
+        values.uBounds.min,
+        values.vBounds.min,
+        columnStep,
+        rowStep,
+        edgeLength,
+        loopVariables,
+        options,
+      ),
+    ],
+  }
+}
+
+function emitHoneycombColumnLoops(
+  columnSequence: GridForeachSequence,
+  rowSequence: GridForeachSequence,
+  rowOffset: number,
+  baseU: number,
+  baseV: number,
+  columnStep: number,
+  rowStep: number,
+  edgeLength: number,
+  loopVariables: GridLoopVariables,
+  options: string[],
+): string[] {
+  if (columnSequence.count === 0 || rowSequence.count === 0) {
+    return []
+  }
+
+  return [
+    indentLine(
+      `\\foreach ${loopVariables.i} in ${formatGridForeachRange(columnSequence)} {`,
+    ),
+    indentLine(
+      `\\foreach ${loopVariables.j} in ${formatGridForeachRange(rowSequence)} {`,
+      2,
+    ),
+    indentLine('\\draw[', 3),
+    ...indentLines(formatTikzOptions(options), 3),
+    indentLine(']', 3),
+    indentLine(
+      `${formatHoneycombHexagonPath(
+        baseU,
+        baseV,
+        columnStep,
+        rowStep,
+        rowOffset,
+        edgeLength,
+        loopVariables,
+      )};`,
+      4,
+    ),
+    indentLine('}', 2),
+    indentLine('}'),
+  ]
+}
+
+function formatHoneycombHexagonPath(
+  baseU: number,
+  baseV: number,
+  columnStep: number,
+  rowStep: number,
+  rowOffset: number,
+  edgeLength: number,
+  loopVariables: GridLoopVariables,
+): string {
+  const halfHeight = (Math.sqrt(3) / 2) * edgeLength
+  const offsets = [
+    { u: edgeLength, v: 0 },
+    { u: edgeLength / 2, v: halfHeight },
+    { u: -edgeLength / 2, v: halfHeight },
+    { u: -edgeLength, v: 0 },
+    { u: -edgeLength / 2, v: -halfHeight },
+    { u: edgeLength / 2, v: -halfHeight },
+  ]
+
+  return `${offsets
+    .map((offset) =>
+      formatGridLocalCoordinate(
+        gridMathExpression(
+          gridMathSum([
+            formatNumber(baseU),
+            `${formatNumber(columnStep)} * ${loopVariables.i}`,
+            formatNumber(offset.u),
+          ]),
+        ),
+        gridMathExpression(
+          gridMathSum([
+            formatNumber(baseV),
+            `${formatNumber(rowStep)} * ${loopVariables.j}`,
+            formatNumber(rowOffset),
+            formatNumber(offset.v),
+          ]),
+        ),
+      ),
+    )
+    .join(' -- ')} -- cycle`
+}
+
+type NonRectangularGridValues = {
+  uBounds: GridRangeBounds
+  vBounds: GridRangeBounds
+  clip: GridClipValues
+  spacing: number
+}
+
+function readNonRectangularGridValues(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  latticeName: 'triangular lattice' | 'honeycomb lattice',
+):
+  | {
+      ok: true
+    } & NonRectangularGridValues
+  | {
+      ok: false
+      error: string
+    } {
+  const uBounds = readGridNumericRangeBounds(grid.uRange, 'uRange')
+  const vBounds = readGridNumericRangeBounds(grid.vRange, 'vRange')
+  const clip = readGridNumericClip(grid.clip)
+  const spacing = readGridNumericRangeScalar(
+    grid.uRange.step,
+    `${latticeName} spacing`,
+  )
+
+  if (!uBounds.ok) {
+    return uBounds
+  }
+
+  if (!vBounds.ok) {
+    return vBounds
+  }
+
+  if (!clip.ok) {
+    return clip
+  }
+
+  if (!spacing.ok) {
+    return spacing
+  }
+
+  if (spacing.value <= 0) {
+    return {
+      ok: false,
+      error: `${latticeName} spacing must be positive for grid foreach export.`,
+    }
+  }
+
+  return {
+    ok: true,
+    uBounds: uBounds.bounds,
+    vBounds: vBounds.bounds,
+    clip: clip.clip,
+    spacing: spacing.value,
+  }
+}
+
+function readGridNumericRangeBounds(
+  range: GridParameterRange,
+  fieldName: 'uRange' | 'vRange',
+): GridRangeBoundsReadResult {
+  const min = readGridNumericRangeScalar(range.min, `${fieldName}.min`)
+  const max = readGridNumericRangeScalar(range.max, `${fieldName}.max`)
+
+  if (!min.ok) {
+    return min
+  }
+
+  if (!max.ok) {
+    return max
+  }
+
+  if (max.value < min.value) {
+    return {
+      ok: false,
+      error: `${fieldName}.max must be greater than or equal to ${fieldName}.min for grid foreach export.`,
+    }
+  }
+
+  return {
+    ok: true,
+    bounds: {
+      min: min.value,
+      max: max.value,
+    },
+  }
+}
+
+function readGridNumericClip(clip: GridRectangleClip): GridClipFormatResult {
+  if (clip.kind !== 'rectangle') {
+    return {
+      ok: false,
+      error: 'grid clip must be a rectangle for foreach export.',
+    }
+  }
+
+  const uMin = readGridNumericRangeScalar(clip.uMin, 'clip.uMin')
+  const uMax = readGridNumericRangeScalar(clip.uMax, 'clip.uMax')
+  const vMin = readGridNumericRangeScalar(clip.vMin, 'clip.vMin')
+  const vMax = readGridNumericRangeScalar(clip.vMax, 'clip.vMax')
+
+  if (!uMin.ok) {
+    return uMin
+  }
+
+  if (!uMax.ok) {
+    return uMax
+  }
+
+  if (!vMin.ok) {
+    return vMin
+  }
+
+  if (!vMax.ok) {
+    return vMax
+  }
+
+  if (uMax.value < uMin.value) {
+    return {
+      ok: false,
+      error: 'clip.uMax must be greater than or equal to clip.uMin for grid foreach export.',
+    }
+  }
+
+  if (vMax.value < vMin.value) {
+    return {
+      ok: false,
+      error: 'clip.vMax must be greater than or equal to clip.vMin for grid foreach export.',
+    }
+  }
+
+  return {
+    ok: true,
+    clip: {
+      uMin: formattedNumericGridScalar(uMin.value),
+      uMax: formattedNumericGridScalar(uMax.value),
+      vMin: formattedNumericGridScalar(vMin.value),
+      vMax: formattedNumericGridScalar(vMax.value),
+    },
+  }
+}
+
+function formattedNumericGridScalar(value: number): FormattedGridScalar {
+  return {
+    value,
+    tikz: formatNumber(value),
+  }
+}
+
+function gridDomainFromBoundsAndClip(
+  uBounds: GridRangeBounds,
+  vBounds: GridRangeBounds,
+  clip: GridClipValues,
+): GridClipValues | null {
+  const uMin = Math.max(uBounds.min, clip.uMin.value)
+  const uMax = Math.min(uBounds.max, clip.uMax.value)
+  const vMin = Math.max(vBounds.min, clip.vMin.value)
+  const vMax = Math.min(vBounds.max, clip.vMax.value)
+
+  if (uMax < uMin - gridTikzEpsilon || vMax < vMin - gridTikzEpsilon) {
+    return null
+  }
+
+  return {
+    uMin: formattedNumericGridScalar(normalizeGridTikzNumber(uMin)),
+    uMax: formattedNumericGridScalar(normalizeGridTikzNumber(uMax)),
+    vMin: formattedNumericGridScalar(normalizeGridTikzNumber(vMin)),
+    vMax: formattedNumericGridScalar(normalizeGridTikzNumber(vMax)),
+  }
+}
+
+function emitGridClipLine(clip: GridClipValues): string {
+  return indentLine(
+    `\\clip ${formatGridLocalCoordinate(
+      clip.uMin.tikz,
+      clip.vMin.tikz,
+    )} rectangle ${formatGridLocalCoordinate(clip.uMax.tikz, clip.vMax.tikz)};`,
+  )
+}
+
+function minGridDomainCornerValue(
+  domain: GridClipValues,
+  value: (corner: { u: number; v: number }) => number,
+): number {
+  return Math.min(...gridDomainCorners(domain).map(value))
+}
+
+function maxGridDomainCornerValue(
+  domain: GridClipValues,
+  value: (corner: { u: number; v: number }) => number,
+): number {
+  return Math.max(...gridDomainCorners(domain).map(value))
+}
+
+function gridDomainCorners(domain: GridClipValues): Array<{
+  u: number
+  v: number
+}> {
+  return [
+    { u: domain.uMin.value, v: domain.vMin.value },
+    { u: domain.uMin.value, v: domain.vMax.value },
+    { u: domain.uMax.value, v: domain.vMin.value },
+    { u: domain.uMax.value, v: domain.vMax.value },
+  ]
+}
+
+function diagonalGridLinePadding(
+  domain: GridClipValues,
+  spacing: number,
+): number {
+  return Math.max(
+    spacing,
+    domain.uMax.value - domain.uMin.value,
+    domain.vMax.value - domain.vMin.value,
+  )
+}
+
+function gridMathExpression(expression: string): string {
+  return `{${expression}}`
+}
+
+function gridMathSum(terms: string[]): string {
+  return terms
+    .filter((term) => term !== '0')
+    .join(' + ')
+    .replaceAll('+ -', '- ')
+    .replaceAll('* -', '* -')
+}
+
+function gridForeachSequenceFromBounds(
+  base: number,
+  step: number,
+  lower: number,
+  upper: number,
+  fieldName: string,
+): GridForeachSequenceResult {
+  if (!Number.isFinite(step) || step <= 0) {
+    return {
+      ok: false,
+      error: `${fieldName} step must be positive for grid foreach export.`,
+    }
+  }
+
+  if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+    return {
+      ok: false,
+      error: `${fieldName} bounds must be finite for grid foreach export.`,
+    }
+  }
+
+  if (upper < lower - gridTikzEpsilon) {
+    return {
+      ok: true,
+      sequence: {
+        count: 0,
+        first: 0,
+        last: 0,
+      },
+    }
+  }
+
+  const firstIndex = Math.ceil((lower - base) / step - gridTikzEpsilon)
+  const lastIndex = Math.floor((upper - base) / step + gridTikzEpsilon)
+
+  if (lastIndex < firstIndex) {
+    return {
+      ok: true,
+      sequence: {
+        count: 0,
+        first: 0,
+        last: 0,
+      },
+    }
+  }
+
+  const count = lastIndex - firstIndex + 1
+
+  if (!Number.isSafeInteger(count)) {
+    return {
+      ok: false,
+      error: `${fieldName} line count must be a finite safe integer for grid foreach export.`,
+    }
+  }
+
+  const first = normalizeGridTikzNumber(base + firstIndex * step)
+  const last = normalizeGridTikzNumber(base + lastIndex * step)
+  const next =
+    count > 1 ? normalizeGridTikzNumber(base + (firstIndex + 1) * step) : undefined
+
+  if (
+    !Number.isFinite(first) ||
+    !Number.isFinite(last) ||
+    (next !== undefined && !Number.isFinite(next))
+  ) {
+    return {
+      ok: false,
+      error: `${fieldName} produced a non-finite foreach range value.`,
+    }
+  }
+
+  return {
+    ok: true,
+    sequence: {
+      count,
+      first,
+      last,
+      ...(next === undefined ? {} : { next }),
+    },
+  }
+}
+
+function integerGridForeachSequence(
+  first: number,
+  upperBound: number,
+  step: number,
+): GridForeachSequence {
+  if (first > upperBound || step <= 0) {
+    return {
+      count: 0,
+      first: 0,
+      last: 0,
+    }
+  }
+
+  const count = Math.floor((upperBound - first) / step) + 1
+  const last = first + (count - 1) * step
+
+  return {
+    count,
+    first,
+    last,
+    ...(count > 1 ? { next: first + step } : {}),
+  }
+}
+
+function firstIntegerWithParity(first: number, parity: 0 | 1): number {
+  const normalizedParity = ((first % 2) + 2) % 2
+
+  return normalizedParity === parity ? first : first + 1
 }
 
 function emitGridScopeBody(
@@ -1425,12 +2186,7 @@ function emitGridScopeBody(
   options: string[],
 ): string[] {
   return [
-    indentLine(
-      `\\clip ${formatGridLocalCoordinate(
-        clip.uMin.tikz,
-        clip.vMin.tikz,
-      )} rectangle ${formatGridLocalCoordinate(clip.uMax.tikz, clip.vMax.tikz)};`,
-    ),
+    emitGridClipLine(clip),
     ...emitGridForeachLoop(
       loopVariables.u,
       uSequence,
@@ -1776,10 +2532,22 @@ function gridLoopVariables(context: GenerateContext): GridLoopVariables {
   const u = uniqueGridLoopVariable('\\stzGridU', usedMacros)
 
   usedMacros.add(u)
+  const v = uniqueGridLoopVariable('\\stzGridV', usedMacros)
+
+  usedMacros.add(v)
+  const w = uniqueGridLoopVariable('\\stzGridW', usedMacros)
+
+  usedMacros.add(w)
+  const i = uniqueGridLoopVariable('\\stzGridI', usedMacros)
+
+  usedMacros.add(i)
 
   return {
     u,
-    v: uniqueGridLoopVariable('\\stzGridV', usedMacros),
+    v,
+    w,
+    i,
+    j: uniqueGridLoopVariable('\\stzGridJ', usedMacros),
   }
 }
 

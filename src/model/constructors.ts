@@ -47,6 +47,7 @@ import type {
   GridRectangleClip,
   GridStratum,
   LabelStyle,
+  LatticePattern,
   PointStratum,
   PointStyle,
   PointCurveKind,
@@ -186,6 +187,7 @@ export type CreateGridStratumInput = {
   name?: string
   label?: string
   pathLabel?: string
+  latticePattern?: LatticePattern
   style?: CurveStyle
   importedTikzStyleReferenceId?: string
   frame: GridFrame
@@ -561,6 +563,7 @@ export function createGridStratum({
   name = 'Grid',
   label,
   pathLabel,
+  latticePattern = 'rectangular',
   style = defaultCurveStyle,
   importedTikzStyleReferenceId,
   frame,
@@ -575,6 +578,7 @@ export function createGridStratum({
     codim: ambientDimension === 2 ? 1 : 2,
     geometricKind: 'curve',
     kind: 'grid',
+    latticePattern,
     name,
     style: cloneCurveStyle(style),
     ...(importedTikzStyleReferenceId === undefined
