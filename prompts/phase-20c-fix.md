@@ -1,4 +1,4 @@
-# Phase 20C Fix Prompt: Coons patch boundary direction display and per-boundary reverse controls
+# Phase 20C Fix Prompt: Allow point inputs as constant Coons boundaries and show target corner equations
 
 ## Environment
 
@@ -31,56 +31,52 @@ You are working on the StratifiedTikZ project.
 
 Phase 20C implemented Coons patch creation from four boundary paths.
 
-Recent fixes attempted to infer/reinterpret boundary orientation automatically. However, the actual desired behavior is different:
+Recent fixes added or attempted to add boundary-direction handling. The desired behavior now needs two additional changes:
 
-- During **Coons patch path selection only**, the UI should show the direction of each selected boundary path.
-- The user should be able to manually reverse the direction of each selected boundary path inside the Coons patch creation draft.
-- This reversal should affect only the copied boundary snapshot used for creating the Coons patch.
-- The original source path must not be mutated.
-- The user should not need to leave Add sheet > Coons mode to fix path directions.
+1. **Allow point inputs for Coons patch boundaries.**
 
-Current user-facing problem:
+   In Add sheet > Coons patch mode, users should be able to select an existing point as one of the four Coons inputs:
 
-- Four paths can form a geometrically closed boundary.
-- But if one or more paths are oriented opposite to the canonical Coons convention, creation fails with an error like:
+   ```text
+   bottom
+   right
+   top
+   left
+   ```
 
-```text
-Coons patch corners must match: bottom start = left start, bottom end = right start, top start = left end, and top end = right end.
-```
+   A selected point should be treated as a constant path:
 
-Desired fix:
+   ```text
+   C(t) = P
+   ```
 
-- In Add sheet > Coons mode, after selecting boundary paths, show each path's current effective direction.
-- Provide a Reverse button/toggle per boundary role:
-  - bottom;
-  - right;
-  - top;
-  - left.
-- The user can flip any role's effective direction and immediately revalidate the Coons corner conditions.
+   so its start and end are both the selected point.
+
+2. **Show the correct Coons corner-matching conditions during direction adjustment.**
+
+   While selecting paths/points and adjusting boundary directions, the UI should explicitly display the target equations:
+
+   ```text
+   bottom start = left start
+   bottom end   = right start
+   top start    = left end
+   top end      = right end
+   ```
+
+   The display should update as the user reverses paths or selects point inputs.
 
 ## Goal
 
-Implement user-controlled boundary direction reversal for Coons patch creation.
+Fix Coons patch creation so that:
 
-Specifically:
-
-1. Coons boundary picking still uses the explicit role order:
-
-```text
-bottom -> right -> top -> left
-```
-
-2. Each picked boundary stores an orientation override in the Coons creation draft.
-
-3. The UI displays the effective direction of each picked path.
-
-4. The UI provides a per-boundary reverse control.
-
-5. Coons patch creation uses the effective oriented snapshots.
-
-6. Source paths remain unchanged.
-
-7. This direction UI is only for Coons patch boundary picking. Do not add broad direction controls for all path selection modes.
+- each Coons boundary role can be either:
+  - an existing path boundary; or
+  - an existing point interpreted as a constant path;
+- explicit point inputs are accepted even though their start and end coincide;
+- ordinary closed path inputs remain rejected if that is the current Coons policy;
+- source paths and source points are never mutated;
+- the Coons direction UI shows the desired corner equations and current match/mismatch status;
+- Coons patch creation uses the effective oriented/copied boundaries.
 
 ## Scope
 
@@ -88,390 +84,443 @@ This is a targeted Phase 20C fix.
 
 Implement:
 
-- Coons boundary draft orientation flags;
-- per-role reverse controls in Add sheet > Coons mode;
-- effective boundary snapshot generation based on orientation flag;
-- direction/status display for picked boundaries;
-- optional SVG direction indicators while picking Coons boundaries;
-- validation using oriented snapshots;
-- tests.
+- point-as-constant-boundary support for Coons patch inputs;
+- Coons boundary input model that can distinguish path boundaries from explicit point boundaries;
+- effective constant-path boundary snapshots;
+- validation updates allowing explicit point constant boundaries;
+- UI display of target Coons corner equations;
+- tests for point boundary inputs and direction-equation display helpers.
 
 Do not implement:
 
-- general path direction editing UI;
-- broad multi-selection;
-- new surface types;
-- snapping;
-- live linked boundaries;
-- automatic role inference from unordered paths;
-- mutating source path direction;
+- point inputs for all surface types unless trivial and explicitly safe;
+- general live linked boundaries;
+- automatic role inference from unordered paths/points;
+- automatic snapping/endpoint repair;
+- new surface formulas;
+- new geometry object kinds beyond what is needed for constant boundary snapshots;
+- broad multi-selection redesign;
 - new dependencies.
 
 Do not change:
 
-- Coons patch formula;
-- Coons boundary role order;
 - source path geometry;
-- saved source paths;
+- source point geometry;
 - copy-on-create policy;
-- SVG/TikZ export semantics for already-created valid Coons patches;
-- ruled surface behavior unless a shared pure helper is safely reused;
-- save/load format for completed Coons patches unless absolutely necessary.
+- Coons patch formula;
+- SVG/TikZ export semantics for valid Coons patches;
+- save/load format unless needed to persist explicit constant boundaries in completed Coons patches;
+- ruled surface behavior unless explicitly reusing safe helpers.
 
-## 1. Add Coons boundary orientation state to the creation draft
+## 1. Extend Coons boundary input model
 
-Extend the Coons creation draft state.
+Currently Coons boundaries are likely represented as path snapshots.
 
-Suggested shape:
+Extend the creation/input model to support explicit point boundaries.
+
+Suggested draft state:
 
 ```ts
 type CoonsBoundaryRole = "bottom" | "right" | "top" | "left";
 
-type PickedCoonsBoundary = {
-  sourcePathId: string;
-  reversed: boolean;
-};
-
-type CoonsPatchBoundaryDraft = {
-  kind: "coonsPatch";
-  bottom?: PickedCoonsBoundary;
-  right?: PickedCoonsBoundary;
-  top?: PickedCoonsBoundary;
-  left?: PickedCoonsBoundary;
-  nextRole: CoonsBoundaryRole;
-  status?: string;
-};
+type PickedCoonsBoundary =
+  | {
+      kind: "path";
+      sourcePathId: string;
+      reversed: boolean;
+    }
+  | {
+      kind: "point";
+      sourcePointId: string;
+    };
 ```
 
 Exact shape can differ.
 
 Requirements:
 
-- `reversed` defaults to `false` when a path is picked.
-- Toggling reverse flips only the draft's `reversed` value.
-- Source path data is not modified.
-- Draft state is UI/editor state only.
-- Draft state is not saved in `Diagram`.
-- Draft state is cleared on Finish/Create, Cancel, Reset, or intentional tool switch according to existing creation-draft policy.
+- path inputs keep the existing `reversed` behavior;
+- point inputs do not need `reversed`, because a constant path has no direction;
+- point input is explicit and must be distinguishable from a closed path;
+- point input draft state is UI/editor state until creation;
+- completed Coons patch stores copied boundary geometry / primitive data, not live references.
 
-## 2. Add pure boundary reversal helper if not already robust
+## 2. Constant path representation
 
-Add or reuse:
+Add a representation for a constant Coons boundary.
 
-```ts
-reverseBoundaryPathSnapshot(boundary: BoundaryPathSnapshot): BoundaryPathSnapshot
-```
-
-Requirements:
-
-- does not mutate input;
-- reverses segment order;
-- reverses each segment;
-- line segment:
-  - start/end swapped;
-- cubic Bézier segment:
-  - start = old end;
-  - control1 = old control2;
-  - control2 = old control1;
-  - end = old start;
-- arc segment, if supported:
-  - start/end swapped;
-  - direction flipped;
-  - start/end angles swapped or adjusted consistently;
-  - center/radius/frame preserved;
-- preserves symbolic coordinate metadata;
-- preserves any boundary metadata that should survive copying.
-
-If this helper already exists, add tests if missing and use it consistently.
-
-## 3. Effective boundary snapshots
-
-Add a helper to resolve Coons draft boundaries into effective oriented snapshots.
-
-Suggested:
+Recommended persistent representation:
 
 ```ts
-resolveCoonsDraftBoundarySnapshot(
-  diagram: Diagram,
-  picked: PickedCoonsBoundary
-): Result<BoundaryPathSnapshot, ValidationError>
+type CoonsBoundarySnapshot =
+  | {
+      kind: "path";
+      segments: PathSegment[];
+      name?: string;
+      sourceId?: string;
+    }
+  | {
+      kind: "constantPoint";
+      point: Vec3;
+      name?: string;
+      sourceId?: string;
+    };
 ```
 
-or:
+or equivalent.
 
-```ts
-orientedCoonsBoundarySnapshot(sourceSnapshot, reversed): BoundaryPathSnapshot
-```
+Alternative:
 
-Behavior:
-
-- copy source path boundary snapshot;
-- if `reversed === true`, reverse the copy;
-- return oriented copy;
-- never mutate source path.
-
-Add helper:
-
-```ts
-resolveCoonsDraftBoundaries(draft, diagram): Result<{
-  bottom: BoundaryPathSnapshot;
-  right: BoundaryPathSnapshot;
-  top: BoundaryPathSnapshot;
-  left: BoundaryPathSnapshot;
-}, ValidationError>
-```
-
-Requirements:
-
-- fails if any role is missing;
-- fails if source path no longer exists;
-- fails if source path is unsupported;
-- returns effective oriented boundaries for validation/creation.
-
-## 4. Coons UI: show direction and reverse controls
-
-In Add sheet > Coons mode, show the selected boundary roles and their direction.
-
-Suggested UI:
-
-```text
-Coons patch boundaries
-  Bottom: pathName [start -> end] [Reverse]
-  Right:  pathName [start -> end] [Reverse]
-  Top:    pathName [start -> end] [Reverse]
-  Left:   pathName [start -> end] [Reverse]
-
-Next: top
-[Reset] [Create]
-```
-
-The exact layout can differ.
-
-Direction display should be understandable.
-
-Acceptable direction display options:
-
-### Option A: Endpoint coordinates
-
-```text
-Bottom: boundaryA  (0,0,0) -> (1,0,0)
-```
-
-### Option B: Endpoint labels/names if available
-
-```text
-Bottom: boundaryA  start -> end
-```
-
-### Option C: Direction arrow in SVG plus textual reversed state
-
-```text
-Bottom: boundaryA  normal direction
-Bottom: boundaryA  reversed
-```
-
-Preferred:
-
-- show path name/id;
-- show whether effective direction is normal or reversed;
-- show start/end coordinates if compact.
-
-Requirements:
-
-- Reverse button/toggle exists for each picked role;
-- Reverse is disabled/hidden for roles not picked yet;
-- clicking Reverse updates status/validation immediately;
-- Create button becomes enabled when oriented boundaries satisfy Coons validation;
-- Create button remains disabled when they do not;
-- validation error should update after reversal.
-
-## 5. Optional SVG direction indicators while picking Coons paths
-
-If feasible, add preview-only direction indicators for picked Coons boundaries.
-
-Examples:
-
-- small arrow marker along each selected boundary;
-- label with role name;
-- different highlight for reversed boundaries.
-
-Requirements:
-
-- only active during Add sheet > Coons mode;
-- preview-only;
-- not stored in `Diagram`;
-- not exported to TikZ;
-- does not intercept pointer events.
-
-MVP without SVG arrows is acceptable if textual direction/reverse UI is clear.
-
-Report limitation if SVG direction display is deferred.
-
-## 6. Validation and Create behavior
-
-When Create is clicked:
-
-1. Resolve effective oriented boundary snapshots from draft.
-2. Validate all four roles are present.
-3. Validate boundary paths are open if that is current Coons policy.
-4. Validate canonical Coons corner equations:
-
-```text
-bottom.start == left.start
-bottom.end   == right.start
-top.start    == left.end
-top.end      == right.end
-```
-
-5. If valid:
-   - create Coons patch from oriented copied snapshots;
-   - select created surface;
-   - clear draft;
-   - push one undo history entry if undo/redo exists.
-6. If invalid:
-   - do not create anything;
-   - keep draft boundaries and orientation flags;
-   - show concise error.
+- represent constant point as a special boundary snapshot that evaluates to `point` for every parameter `t`;
+- avoid encoding it as a normal closed path with zero-length segment unless the validation clearly distinguishes explicit constant boundaries from rejected closed paths.
 
 Important:
 
-- Do not auto-reverse behind the user's back in this fix.
-- The user chooses reversal via UI.
-- If an existing auto-orientation helper remains, either disable it for the Coons UI path or make sure the user's explicit reverse settings are respected.
-- Avoid confusing behavior where the UI says one orientation but creation uses another.
+- Do not simply accept all closed paths as Coons boundaries.
+- Explicit point-as-constant-boundary is allowed.
+- Ordinary closed path boundaries are still rejected for Coons unless there is a separate intentional feature.
 
-## 7. Error messages
+## 3. Evaluation and endpoints for constant boundaries
 
-The current corner mismatch error is too opaque.
+Update boundary helper functions to support constant point boundaries.
 
-Keep the canonical requirement if needed, but add role/direction guidance.
+Required helper behavior:
+
+```text
+boundaryStart(constantPoint(P)) = P
+boundaryEnd(constantPoint(P)) = P
+evaluateBoundary(constantPoint(P), t) = P for all t
+sampleBoundary(constantPoint(P), n) = [P, P, ..., P]
+reverseBoundary(constantPoint(P)) = constantPoint(P)
+```
+
+Requirements:
+
+- finite point required;
+- symbolic preview coordinates supported if the project supports symbolic points;
+- no NaN/Infinity;
+- constant boundary samples must have the same number of points as other sampled boundaries when used in Coons patch sampling.
+
+## 4. Coons validation with constant boundaries
+
+Canonical Coons corner equations remain:
+
+```text
+bottom start = left start
+bottom end   = right start
+top start    = left end
+top end      = right end
+```
+
+Point boundaries should satisfy these equations with start=end.
 
 Examples:
 
-```text
-Coons corners do not match with the current boundary directions. Try reversing top or left.
-```
+### Bottom is a point
+
+If:
 
 ```text
-Bottom end does not match right start. Reverse bottom or right, or choose a different path.
+bottom = P
 ```
 
-If detailed suggestions are hard, at least say:
+then:
 
 ```text
-Coons corners do not match with the current boundary directions. Use Reverse controls to adjust boundary directions.
+bottom start = P
+bottom end   = P
 ```
 
-## 8. Interaction with sequential picking
+So validation requires:
 
-Preserve sequential picking behavior:
+```text
+left start  = P
+right start = P
+```
+
+This represents a bottom edge collapsed to a point.
+
+### Top is a point
+
+If:
+
+```text
+top = P
+```
+
+then validation requires:
+
+```text
+left end  = P
+right end = P
+```
+
+### Left is a point
+
+If:
+
+```text
+left = P
+```
+
+then validation requires:
+
+```text
+bottom start = P
+top start    = P
+```
+
+### Right is a point
+
+If:
+
+```text
+right = P
+```
+
+then validation requires:
+
+```text
+bottom end = P
+top end    = P
+```
+
+Reject if equations fail.
+
+## 5. Coons sampling with constant boundaries
+
+Update Coons patch sampling to support constant boundaries.
+
+The standard Coons interpolation still works if boundary evaluators return constant values.
+
+Requirements:
+
+- sampling returns finite mesh;
+- constant boundaries do not crash;
+- degenerate but valid patches are allowed when corner equations are satisfied;
+- surface may degenerate to triangular-like or cone-like patch near the collapsed boundary;
+- no division by zero or non-finite values.
+
+## 6. Add point picking in Add sheet > Coons mode
+
+Update click handling in Add sheet > Coons mode.
+
+Current Coons workflow picks paths sequentially.
+
+New behavior:
+
+- clicking an eligible path assigns a path boundary to the next role;
+- clicking an eligible point assigns a constant point boundary to the next role;
+- no need to switch to Select mode;
+- selected role order remains:
 
 ```text
 bottom -> right -> top -> left
 ```
 
-When a path is picked:
+Requirements:
 
-- store it in the next role;
-- set `reversed = false`;
-- advance to next role;
-- keep previous roles and reversal flags.
+- point input is accepted only in Coons patch mode unless intentionally supported elsewhere;
+- path and point clicks should not mutate selection as their primary action in Add sheet > Coons mode;
+- invalid clicked objects are rejected without clearing draft;
+- previous picks are preserved;
+- Reset clears all picks;
+- Create disabled until all four roles are filled and validation passes.
 
-When the user toggles a previously picked role:
+## 7. Direction / reverse controls with point inputs
 
-- do not change `nextRole`;
-- do not clear other picks.
+For path boundary inputs:
 
-Reset:
+- show current direction;
+- show Reverse button/toggle;
+- reversal affects the copied boundary only.
 
-- clears all picks and reversal flags.
+For point boundary inputs:
 
-Cancel/tool switch:
+- show it as constant:
 
-- follows existing draft clearing policy.
+```text
+Bottom: Point P (constant)
+```
 
-## 9. Do not mutate source paths
+or:
 
-This is critical.
+```text
+Bottom: P -> P
+```
 
-Tests should confirm:
+- no Reverse button is needed, or it should be disabled.
 
-- source path segment order remains unchanged;
-- source path start/end remain unchanged;
-- only the copied boundary snapshot in the Coons patch is oriented/reversed.
+If a point is shown with endpoints:
 
-The created Coons patch may store a reversed copy.
+```text
+start = end = (x,y,z)
+```
 
-## 10. Tests
+## 8. Show target Coons corner equations
+
+Add UI display in Add sheet > Coons mode showing the canonical target conditions.
+
+Required display:
+
+```text
+Required Coons corners:
+  bottom start = left start
+  bottom end   = right start
+  top start    = left end
+  top end      = right end
+```
+
+The display should update with current status if enough roles are picked.
+
+Preferred UI:
+
+```text
+Required Coons corners
+  ✓ bottom start = left start
+      (0,0,0) = (0,0,0)
+  ✗ bottom end = right start
+      (1,0,0) ≠ (0,1,0)
+  ✓ top start = left end
+  ✓ top end = right end
+```
+
+Acceptable MVP:
+
+- always show the required equations as text;
+- show a concise validation status below them;
+- when a mismatch occurs, mention which equation failed.
+
+Better behavior:
+
+- display checkmarks/crosses for each equation;
+- include endpoint coordinates or point/path names where compact.
+
+Requirements:
+
+- equations visible only for Coons mode;
+- updates when boundary directions are reversed;
+- updates when a point constant boundary is selected;
+- helps the user know which path to reverse.
+
+## 9. Error messages
+
+Improve the current generic error.
+
+Instead of only:
+
+```text
+Coons patch corners must match...
+```
+
+show something actionable:
+
+```text
+Coons corners do not match with current boundary directions.
+Failed: bottom end = right start.
+Use Reverse controls or choose a point/path with matching endpoint.
+```
+
+If multiple conditions fail, list them concisely.
+
+If point constant boundary is involved, make message clear:
+
+```text
+Bottom is a constant point, so left start and right start must both equal that point.
+```
+
+## 10. Save/load behavior
+
+If completed Coons patches can persist constant point boundaries, update save/load validation.
+
+Requirements:
+
+- valid Coons patch with constant point boundary saves/loads;
+- invalid constant boundary point rejected if non-finite/malformed;
+- malformed saved constant boundary rejected cleanly;
+- old diagrams without constant boundaries still load.
+
+If you choose to convert constant point boundary into a degenerate path representation for persistence, tests must prove the validator still distinguishes explicit constant boundaries from ordinary closed paths.
+
+Preferred:
+
+- use explicit `kind: "constantPoint"` or equivalent.
+
+## 11. TikZ/SVG export behavior
+
+Created Coons patches with constant point boundaries should render/export like other Coons patches.
+
+Requirements:
+
+- SVG preview finite;
+- TikZ sampled mesh finite;
+- style/layer preserved;
+- inline math output no blank lines;
+- 4-space indentation preserved.
+
+No special TikZ syntax is required for constant boundaries. Existing sampled mesh output is fine.
+
+## 12. Tests
 
 Add focused tests.
 
-### Draft state tests
+### Constant boundary helper tests
 
-1. Picking bottom stores `reversed: false`.
-2. Picking right/top/left stores `reversed: false`.
-3. Toggling bottom reverse flips only bottom.
-4. Toggling top reverse does not clear bottom/right/left.
-5. Reset clears all picked boundaries and reversal flags.
-6. Missing role prevents Create.
+1. `boundaryStart(constantPoint(P)) = P`.
+2. `boundaryEnd(constantPoint(P)) = P`.
+3. `evaluateBoundary(constantPoint(P), t) = P`.
+4. Reversing constant point boundary is a no-op.
+5. Sampling constant boundary returns finite repeated points.
+6. Non-finite constant point rejected.
 
-### Boundary reversal tests
+### Coons validation tests
 
-7. Reversing a line boundary swaps endpoints.
-8. Reversing a cubic boundary swaps endpoints and control points.
-9. Reversing a multi-segment boundary reverses segment order.
-10. Reversal preserves symbolic coordinate metadata.
-11. Reversal does not mutate source snapshot.
+7. Coons patch with bottom constant point validates when left.start and right.start match it.
+8. Coons patch with top constant point validates when left.end and right.end match it.
+9. Coons patch with left constant point validates when bottom.start and top.start match it.
+10. Coons patch with right constant point validates when bottom.end and top.end match it.
+11. Constant boundary with mismatched adjacent endpoints rejected.
+12. Ordinary closed path boundary is still rejected.
+13. Valid open-boundary Coons patch still validates.
 
-### Coons creation tests with explicit reversal
+### Coons sampling tests
 
-12. Cyclic boundary case:
+14. Coons patch with one constant boundary samples finite mesh.
+15. Coons patch with two compatible constant boundaries samples finite mesh if geometrically valid.
+16. Degenerate invalid cases rejected or sampled safely according to policy.
 
-```text
-bottom: A -> B
-right:  B -> C
-top:    C -> D
-left:   D -> A
-```
+### UI/draft tests
 
-With `top.reversed = true` and `left.reversed = true`, creation succeeds.
+17. Coons draft can store a point input for bottom.
+18. Coons draft can store mixed path/point inputs.
+19. Reverse control is disabled/hidden for point inputs.
+20. Direction/equation status updates when a path is reversed.
+21. Required equations display helper returns all four equations.
+22. Mismatch status identifies failing equation.
 
-13. Same cyclic case without reversing top/left fails with a direction/corner message.
+### Creation tests
 
-14. Canonical boundary case succeeds without reversals:
+23. Add sheet > Coons mode can create a patch with one point input and three paths.
+24. Source point is not mutated.
+25. Source paths are not mutated.
+26. Created patch stores copied constant boundary.
+27. Created patch selected.
 
-```text
-bottom: A -> B
-right:  B -> C
-top:    D -> C
-left:   A -> D
-```
+### Save/load/export tests
 
-15. Reversing the wrong boundary still fails.
-
-16. Created Coons patch stores oriented boundary snapshots.
-
-17. Source paths are unchanged after creation.
-
-### UI/helper tests
-
-18. Reverse control is available for picked roles.
-19. Reverse control is unavailable for unpicked roles.
-20. Create button becomes enabled only when effective oriented boundaries validate, if UI state is testable.
-21. Error message mentions using Reverse controls when directions mismatch.
+28. Coons patch with constant boundary save/load round-trip.
+29. Malformed constant boundary in saved JSON returns `ok: false`.
+30. SVG/TikZ export works.
+31. Inline TikZ output has no blank lines.
 
 ### Regression tests
 
-22. Sequential Coons picking still works.
-23. Closed Coons boundary rejection still works.
-24. Ruled surface creation still works.
-25. SVG preview/TikZ export for created Coons patch still works.
-26. Save/load of valid Coons patch still works.
-27. Inline/standalone TikZ formatting unchanged.
+32. Coons patch with four open paths still works.
+33. Coons path direction controls still work.
+34. Closed path rejection still works.
+35. Ruled surface behavior unchanged unless intentionally extended.
 
-If full UI tests are difficult, extract pure draft reducers and orientation helpers and test those. Still wire the actual UI to those helpers.
-
-## 11. Manual verification checklist
+## 13. Manual verification checklist
 
 After implementation, run:
 
@@ -481,71 +530,45 @@ PATH=/opt/homebrew/bin:$PATH npm run dev
 
 Manual test:
 
-1. Create four open paths forming a closed loop:
-   - bottom: A -> B;
-   - right: B -> C;
-   - top: C -> D;
-   - left: D -> A.
-2. Enter Add sheet > Coons mode.
-3. Pick paths in order:
-   - bottom;
-   - right;
-   - top;
-   - left.
-4. Confirm the UI shows all four picked paths.
-5. Confirm the UI shows direction or normal/reversed state.
-6. Confirm Create is disabled or shows corner mismatch.
-7. Reverse top.
-8. Reverse left.
-9. Confirm validation updates.
-10. Confirm Create becomes enabled.
+1. Create a point `P`.
+2. Create three open paths that meet at `P` as required for a Coons patch with one collapsed boundary.
+3. Enter Add sheet > Coons mode.
+4. Pick `P` as one role, e.g. bottom.
+5. Pick paths for right/top/left.
+6. Confirm UI shows bottom as constant.
+7. Confirm required corner equations are visible.
+8. Confirm matching equations show success/failure.
+9. Reverse relevant path directions if needed.
+10. Confirm status updates.
 11. Create Coons patch.
-12. Confirm surface appears and is selected.
-13. Confirm source paths remain unchanged.
-14. Undo/redo.
+12. Confirm SVG preview shows a finite surface.
+13. Confirm TikZ output is generated.
+14. Save/load and confirm the patch persists.
 
-Failure test:
+Regression:
 
-15. Reverse the wrong boundary.
-16. Confirm creation remains blocked with useful error.
+15. Create Coons patch with four paths as before.
+16. Confirm direction controls still work.
+17. Confirm ordinary closed path boundaries are still rejected.
 
-Canonical test:
-
-17. Create four paths already in canonical orientation.
-18. Pick them.
-19. Confirm no reversal is needed.
-
-## 12. Documentation / UI help
-
-Update UI help or docs:
-
-- Coons boundaries are picked by role:
-  - bottom;
-  - right;
-  - top;
-  - left.
-- The direction of each picked path matters.
-- Use Reverse to flip a boundary direction for the Coons patch.
-- Source paths are not modified.
-- Reversal only affects the copied boundary used by the new Coons patch.
-
-## 13. Preserve existing behavior
+## 14. Preserve existing behavior
 
 Do not regress:
 
 - Coons sequential boundary picking;
-- Coons closed-boundary rejection;
-- Coons corner validation;
-- Coons SVG preview;
-- Coons TikZ export;
+- Coons path direction reverse controls;
+- ordinary open-boundary Coons patches;
+- closed path rejection;
 - ruled surface creation;
-- source path copy-on-create;
+- source path/point copy-on-create;
+- SVG preview;
+- TikZ export;
 - save/load;
 - undo/redo;
 - layer/style/camera/work-plane behavior;
 - inline/standalone TikZ formatting.
 
-## 14. Verification
+## 15. Verification
 
 Run:
 
@@ -555,17 +578,17 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 15. Report after implementation
+## 16. Report after implementation
 
 Please report:
 
 - files modified;
-- Coons draft orientation state shape;
-- UI direction display;
-- Reverse control behavior;
-- effective boundary snapshot resolution;
-- how source paths remain unchanged;
-- validation behavior before/after reversal;
+- constant boundary representation;
+- point picking behavior in Coons mode;
+- validation rules for constant boundaries;
+- sampling behavior;
+- direction/equation UI behavior;
+- save/load behavior;
 - tests added/updated;
 - test results;
 - build results;
