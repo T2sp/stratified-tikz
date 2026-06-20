@@ -17,6 +17,7 @@ import {
   parseFiniteNumber,
   type CoordinateAxis,
 } from '../diagramUpdates.ts'
+import { formatSymbolicInputError } from '../symbolicInputMessages.ts'
 import { formatNumberInput } from './InspectorField.tsx'
 
 export type CoordinateEditorProps = {
@@ -60,6 +61,16 @@ export function CoordinateEditor({
   )
 }
 
+type CoordinateDraftParseResult =
+  | {
+      ok: true
+      component: CoordinateComponent
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 function CoordinateAxisInput({
   axis,
   point,
@@ -77,11 +88,11 @@ function CoordinateAxisInput({
   const symbolicComponent =
     point.symbolic?.[axis].kind === 'symbolic' ? point.symbolic[axis] : null
   const [draft, setDraft] = useState(committedValue)
-  const [invalid, setInvalid] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     setDraft(committedValue)
-    setInvalid(false)
+    setError('')
   }, [committedValue])
 
   return (
@@ -93,7 +104,7 @@ function CoordinateAxisInput({
         inputMode="decimal"
         spellCheck={false}
         value={draft}
-        aria-invalid={invalid}
+        aria-invalid={error !== ''}
         onChange={(event) => {
           const nextDraft = event.currentTarget.value
           const parsed = parseCoordinateDraft(
@@ -103,16 +114,21 @@ function CoordinateAxisInput({
           )
 
           setDraft(nextDraft)
-          setInvalid(parsed === null)
+          setError(parsed.ok ? '' : parsed.error)
 
-          if (parsed !== null) {
-            onCoordinateChange(axis, parsed)
+          if (parsed.ok) {
+            onCoordinateChange(axis, parsed.component)
           }
         }}
       />
       {symbolicComponent !== null && (
         <span className="coordinate-preview">
           preview: {formatNumberInput(symbolicComponent.previewValue)}
+        </span>
+      )}
+      {error !== '' && (
+        <span className="coordinate-input-error" role="status">
+          {error}
         </span>
       )}
     </label>
@@ -123,16 +139,32 @@ function parseCoordinateDraft(
   rawValue: string,
   allowSymbolic: boolean,
   expressionContext: CoordinateExpressionContext,
-): CoordinateComponent | null {
+): CoordinateDraftParseResult {
   if (!allowSymbolic) {
     const parsedValue = parseFiniteNumber(rawValue)
 
-    return parsedValue === null ? null : numericCoordinateComponent(parsedValue)
+    return parsedValue === null
+      ? {
+          ok: false,
+          error: 'Invalid expression: coordinate must be a finite number.',
+        }
+      : {
+          ok: true,
+          component: numericCoordinateComponent(parsedValue),
+        }
   }
 
   const parsed = createCoordinateComponentFromInput(rawValue, expressionContext)
 
-  return parsed.ok ? parsed.component : null
+  return parsed.ok
+    ? {
+        ok: true,
+        component: parsed.component,
+      }
+    : {
+        ok: false,
+        error: formatSymbolicInputError(parsed.error),
+      }
 }
 
 function coordinateInputValue(point: Vec3, axis: CoordinateAxis): string {

@@ -6,6 +6,7 @@ import {
   createPointStratum,
   createTextLabel,
 } from '../model/constructors.ts'
+import { symbolicGridExampleDiagrams } from './symbolicGridExamples.ts'
 import {
   cloneStylePreset,
   curveStylePresets,
@@ -53,6 +54,7 @@ export const referenceExampleDiagrams = [
   hemispherePatchExample,
   saddlePatchExample,
   evenOddFilledBoundaryExample,
+  ...symbolicGridExampleDiagrams,
 ] as const satisfies readonly Diagram[]
 
 function createTranslucentFilledStrataExample(): Diagram {

@@ -100,6 +100,10 @@ import {
   resolveExistingCoordinateForDirectCreation,
   type ExistingCoordinateSource,
 } from './coordinateSources.ts'
+import {
+  formatGridIssue,
+  formatSymbolicInputError,
+} from './symbolicInputMessages.ts'
 
 export type CoordinateAxis = 'x' | 'y' | 'z'
 
@@ -403,6 +407,7 @@ export type AddCurvedSheetStratumResult = {
 export type AddGridStratumResult = {
   diagram: Diagram
   id: string | null
+  message?: string
 }
 
 export type DirectCoordinateInput = {
@@ -485,6 +490,36 @@ export type DirectGridInput = {
   }
 }
 
+type ParsedDirectGridRangeInput =
+  | {
+      ok: true
+      range: GridParameterRange
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type ParsedDirectGridClipInput =
+  | {
+      ok: true
+      clip: GridRectangleClip
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type ParsedDirectGridScalarInput =
+  | {
+      ok: true
+      scalar: ScalarInputValue
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type DirectPointCreationResult =
   | {
       ok: true
@@ -543,6 +578,7 @@ export type DirectGridCreationResult =
       ok: false
       diagram: Diagram
       error: DirectGridCreationError
+      message: string
     }
 
 export type DirectCreationLayerOptions = {
@@ -865,11 +901,30 @@ export function addGridStratumFromDirectInput(
   const vRange = parseDirectGridRangeInput(input.vRange, context)
   const clip = parseDirectGridClipInput(input.clip, context)
 
-  if (uRange === null || vRange === null || clip === null) {
+  if (!uRange.ok) {
     return {
       ok: false,
       diagram,
       error: 'invalidScalar',
+      message: uRange.error,
+    }
+  }
+
+  if (!vRange.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidScalar',
+      message: vRange.error,
+    }
+  }
+
+  if (!clip.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidScalar',
+      message: clip.error,
     }
   }
 
@@ -880,15 +935,16 @@ export function addGridStratumFromDirectInput(
       ok: false,
       diagram,
       error: 'invalidWorkPlane',
+      message: 'The active work plane must be valid before creating a 3D grid.',
     }
   }
 
   const result = addGridStratumWithResult(
     diagram,
     frame,
-    uRange,
-    vRange,
-    clip,
+    uRange.range,
+    vRange.range,
+    clip.clip,
     options,
   )
 
@@ -897,6 +953,7 @@ export function addGridStratumFromDirectInput(
       ok: false,
       diagram,
       error: 'invalidGrid',
+      message: result.message ?? 'Grid ranges, clipping bounds, and line count must be valid.',
     }
   }
 
@@ -929,6 +986,7 @@ export function addGridStratumWithResult(
     return {
       diagram,
       id: null,
+      message: formatGridIssue(preview.errors[0]),
     }
   }
 
@@ -2390,46 +2448,85 @@ function isValidTemplatePathForDiagram(
 function parseDirectGridRangeInput(
   input: DirectGridRangeInput,
   context: CoordinateExpressionContext,
-): GridParameterRange | null {
-  const min = parseDirectGridScalarInput(input.min, context)
-  const max = parseDirectGridScalarInput(input.max, context)
-  const step = parseDirectGridScalarInput(input.step, context)
+): ParsedDirectGridRangeInput {
+  const min = parseDirectGridScalarInput(input.min, context, 'grid range min')
+  const max = parseDirectGridScalarInput(input.max, context, 'grid range max')
+  const step = parseDirectGridScalarInput(input.step, context, 'grid range step')
 
-  return min === null || max === null || step === null
-    ? null
-    : { min, max, step }
+  if (!min.ok) {
+    return min
+  }
+
+  if (!max.ok) {
+    return max
+  }
+
+  if (!step.ok) {
+    return step
+  }
+
+  return {
+    ok: true,
+    range: { min: min.scalar, max: max.scalar, step: step.scalar },
+  }
 }
 
 function parseDirectGridClipInput(
   input: DirectGridInput['clip'],
   context: CoordinateExpressionContext,
-): GridRectangleClip | null {
-  const uMin = parseDirectGridScalarInput(input.uMin, context)
-  const uMax = parseDirectGridScalarInput(input.uMax, context)
-  const vMin = parseDirectGridScalarInput(input.vMin, context)
-  const vMax = parseDirectGridScalarInput(input.vMax, context)
+): ParsedDirectGridClipInput {
+  const uMin = parseDirectGridScalarInput(input.uMin, context, 'clip u min')
+  const uMax = parseDirectGridScalarInput(input.uMax, context, 'clip u max')
+  const vMin = parseDirectGridScalarInput(input.vMin, context, 'clip v min')
+  const vMax = parseDirectGridScalarInput(input.vMax, context, 'clip v max')
 
-  return uMin === null || uMax === null || vMin === null || vMax === null
-    ? null
-    : {
-        kind: 'rectangle',
-        uMin,
-        uMax,
-        vMin,
-        vMax,
-      }
+  if (!uMin.ok) {
+    return uMin
+  }
+
+  if (!uMax.ok) {
+    return uMax
+  }
+
+  if (!vMin.ok) {
+    return vMin
+  }
+
+  if (!vMax.ok) {
+    return vMax
+  }
+
+  return {
+    ok: true,
+    clip: {
+      kind: 'rectangle',
+      uMin: uMin.scalar,
+      uMax: uMax.scalar,
+      vMin: vMin.scalar,
+      vMax: vMax.scalar,
+    },
+  }
 }
 
 function parseDirectGridScalarInput(
   source: string,
   context: CoordinateExpressionContext,
-): ScalarInputValue | null {
+  label: string,
+): ParsedDirectGridScalarInput {
   const parsed = createScalarInputValue(source, {
     variables: context.variableNames,
     previewValues: context.previewValues,
   })
 
-  return parsed.ok ? parsed.scalar : null
+  return parsed.ok
+    ? {
+        ok: true,
+        scalar: parsed.scalar,
+      }
+    : {
+        ok: false,
+        error: `${label}: ${formatSymbolicInputError(parsed.error)}`,
+      }
 }
 
 function gridFrameForDiagram(

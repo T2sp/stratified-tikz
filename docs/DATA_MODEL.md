@@ -176,9 +176,14 @@ u interval. The preview rejects non-finite values, `step <= 0`, `max < min`,
 invalid frames, non-finite generated points, and grids that would exceed the
 500-line preview cap.
 
-TikZ `\foreach` export and symbolic foreach range formatting are intentionally
-left to Phase 19F. Until then, grid strata are persisted, validated, shown in
-SVG, and represented by an explicit omitted-grid comment in TikZ output.
+TikZ export emits valid grids compactly with `\foreach` loops and a rectangular
+`\clip` rather than expanding each grid line into a persisted or exported
+polyline. The `uRange` and `vRange` triplets must be numeric for the MVP so the
+exporter can form safe `{first,next,...,last}` loops. Symbolic range triplets
+are kept valid for preview when their preview values are finite, but TikZ
+export omits the grid with a clear unsupported-symbolic-range comment.
+Rectangular clip endpoints may be symbolic and export through the same PGFMath
+formatter used for symbolic coordinates.
 
 ## Symbolic variables
 

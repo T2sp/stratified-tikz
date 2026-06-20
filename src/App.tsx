@@ -14,8 +14,12 @@ import {
   evenOddFilledBoundaryExample,
   hemispherePatchExample,
   saddlePatchExample,
+  symbolicCirclePointExample,
+  symbolicPathExample,
   threeDimensionalExample,
+  threeDimensionalWorkPlaneGridExample,
   translucentFilledStrataExample,
+  twoDimensionalGridExample,
   twoDimensionalExample,
 } from './examples'
 import { normalizePointForAmbientDimension } from './geometry'
@@ -213,6 +217,10 @@ type ExampleId =
   | 'hemispherePatch'
   | 'saddlePatch'
   | 'evenOddBoundary'
+  | 'symbolicCirclePoint'
+  | 'symbolicPath'
+  | 'grid2d'
+  | 'workPlaneGrid3d'
 type CopyStatus = 'idle' | 'copied' | 'downloaded' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type StyleImportStatus = 'idle' | 'imported' | 'failed'
@@ -329,6 +337,30 @@ const exampleOptions: ExampleOption[] = [
     name: 'Even-odd boundary',
     summary: 'compound filled boundary using the even-odd rule',
     diagram: evenOddFilledBoundaryExample,
+  },
+  {
+    id: 'symbolicCirclePoint',
+    name: 'Symbolic point',
+    summary: 'point at R*cos(q), R*sin(q)',
+    diagram: symbolicCirclePointExample,
+  },
+  {
+    id: 'symbolicPath',
+    name: 'Symbolic path',
+    summary: 'path vertices driven by variables',
+    diagram: symbolicPathExample,
+  },
+  {
+    id: 'grid2d',
+    name: '2D grid',
+    summary: 'foreach grid with rectangular clip',
+    diagram: twoDimensionalGridExample,
+  },
+  {
+    id: 'workPlaneGrid3d',
+    name: '3D work-plane grid',
+    summary: 'foreach grid in a local work-plane frame',
+    diagram: threeDimensionalWorkPlaneGridExample,
   },
   {
     id: 'empty2d',
@@ -2799,7 +2831,9 @@ function App() {
     )
 
     if (!result.ok) {
-      setDirectCreationStatus(directGridCreationErrorMessage(result.error))
+      setDirectCreationStatus(
+        directGridCreationErrorMessage(result.error, result.message),
+      )
       return
     }
 
@@ -3147,20 +3181,29 @@ function App() {
             </select>
           </label>
         </div>
-        <div className="direct-grid-range-grid" role="group" aria-label="Grid ranges">
-          {directGridFields().map((field) => (
-            <label key={field.id} className="direct-create-field">
-              <span>{field.label}</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                spellCheck={false}
-                value={field.value}
-                onChange={(event) =>
-                  updateDirectGridField(field.id, event.currentTarget.value)
-                }
-              />
-            </label>
+        <div className="direct-grid-range-grid">
+          {directGridFieldGroups().map((group) => (
+            <fieldset
+              key={group.legend}
+              className="direct-grid-field-group"
+              aria-label={group.legend}
+            >
+              <legend>{group.legend}</legend>
+              {group.fields.map((field) => (
+                <label key={field.id} className="direct-create-field">
+                  <span>{field.label}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    spellCheck={false}
+                    value={field.value}
+                    onChange={(event) =>
+                      updateDirectGridField(field.id, event.currentTarget.value)
+                    }
+                  />
+                </label>
+              ))}
+            </fieldset>
           ))}
         </div>
         <span className="direct-source-summary">
@@ -3172,22 +3215,40 @@ function App() {
     )
   }
 
-  function directGridFields(): Array<{
-    id: DirectGridField
-    label: string
-    value: string
+  function directGridFieldGroups(): Array<{
+    legend: string
+    fields: Array<{
+      id: DirectGridField
+      label: string
+      value: string
+    }>
   }> {
     return [
-      { id: 'uMin', label: 'u min', value: directGridInput.uRange.min },
-      { id: 'uMax', label: 'u max', value: directGridInput.uRange.max },
-      { id: 'uStep', label: 'u step', value: directGridInput.uRange.step },
-      { id: 'vMin', label: 'v min', value: directGridInput.vRange.min },
-      { id: 'vMax', label: 'v max', value: directGridInput.vRange.max },
-      { id: 'vStep', label: 'v step', value: directGridInput.vRange.step },
-      { id: 'clipUMin', label: 'clip u min', value: directGridInput.clip.uMin },
-      { id: 'clipUMax', label: 'clip u max', value: directGridInput.clip.uMax },
-      { id: 'clipVMin', label: 'clip v min', value: directGridInput.clip.vMin },
-      { id: 'clipVMax', label: 'clip v max', value: directGridInput.clip.vMax },
+      {
+        legend: 'u lines',
+        fields: [
+          { id: 'uMin', label: 'min', value: directGridInput.uRange.min },
+          { id: 'uMax', label: 'max', value: directGridInput.uRange.max },
+          { id: 'uStep', label: 'step', value: directGridInput.uRange.step },
+        ],
+      },
+      {
+        legend: 'v lines',
+        fields: [
+          { id: 'vMin', label: 'min', value: directGridInput.vRange.min },
+          { id: 'vMax', label: 'max', value: directGridInput.vRange.max },
+          { id: 'vStep', label: 'step', value: directGridInput.vRange.step },
+        ],
+      },
+      {
+        legend: 'clip',
+        fields: [
+          { id: 'clipUMin', label: 'u min', value: directGridInput.clip.uMin },
+          { id: 'clipUMax', label: 'u max', value: directGridInput.clip.uMax },
+          { id: 'clipVMin', label: 'v min', value: directGridInput.clip.vMin },
+          { id: 'clipVMax', label: 'v max', value: directGridInput.clip.vMax },
+        ],
+      },
     ]
   }
 
@@ -5679,7 +5740,12 @@ function directCreationErrorMessage(
 
 function directGridCreationErrorMessage(
   error: DirectGridCreationError,
+  detail?: string,
 ): string {
+  if (detail !== undefined && detail.trim().length > 0) {
+    return detail
+  }
+
   switch (error) {
     case 'invalidScalar':
       return 'Grid range and clip values must be valid finite scalar expressions.'

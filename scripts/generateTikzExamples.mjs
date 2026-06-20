@@ -5,8 +5,12 @@ import {
   evenOddFilledBoundaryExample,
   hemispherePatchExample,
   saddlePatchExample,
+  symbolicCirclePointExample,
+  symbolicPathExample,
   threeDimensionalExample,
+  threeDimensionalWorkPlaneGridExample,
   translucentFilledStrataExample,
+  twoDimensionalGridExample,
   twoDimensionalExample,
 } from '../src/examples/index.ts'
 import { generateTikz } from '../src/tikz/index.ts'
@@ -42,6 +46,22 @@ export async function generateTikzExamples({
     {
       fileName: 'even-odd-boundary.tex',
       source: generateTikz(evenOddFilledBoundaryExample),
+    },
+    {
+      fileName: 'symbolic-circle-point.tex',
+      source: generateTikz(symbolicCirclePointExample),
+    },
+    {
+      fileName: 'symbolic-path.tex',
+      source: generateTikz(symbolicPathExample),
+    },
+    {
+      fileName: 'grid-2d.tex',
+      source: generateTikz(twoDimensionalGridExample),
+    },
+    {
+      fileName: 'work-plane-grid-3d.tex',
+      source: generateTikz(threeDimensionalWorkPlaneGridExample),
     },
   ]
 

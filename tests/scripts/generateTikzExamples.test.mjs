@@ -11,7 +11,7 @@ test('generateTikzExamples writes representative TikZ files', async () => {
   try {
     const files = await generateTikzExamples({ outputDir })
 
-    assert.equal(files.length, 6)
+    assert.equal(files.length, 10)
 
     const twoDimensionalSource = await readFile(
       join(outputDir, 'diagram-2d.tex'),
@@ -37,6 +37,19 @@ test('generateTikzExamples writes representative TikZ files', async () => {
       join(outputDir, 'even-odd-boundary.tex'),
       'utf8',
     )
+    const symbolicPointSource = await readFile(
+      join(outputDir, 'symbolic-circle-point.tex'),
+      'utf8',
+    )
+    const symbolicPathSource = await readFile(
+      join(outputDir, 'symbolic-path.tex'),
+      'utf8',
+    )
+    const grid2dSource = await readFile(join(outputDir, 'grid-2d.tex'), 'utf8')
+    const grid3dSource = await readFile(
+      join(outputDir, 'work-plane-grid-3d.tex'),
+      'utf8',
+    )
 
     assert.match(twoDimensionalSource, /\\begin\{tikzpicture\}/)
     assert.match(twoDimensionalSource, /\$F\^\{\(1\)\}L\$/)
@@ -53,6 +66,11 @@ test('generateTikzExamples writes representative TikZ files', async () => {
     assert.match(saddleSource, /Primitive: saddle/)
     assert.match(saddleSource, /faces=30/)
     assert.match(evenOddSource, /even odd rule/)
+    assert.match(symbolicPointSource, /\\pgfmathsetmacro\{\\R\}\{2\}/)
+    assert.match(symbolicPointSource, /\{\\R \* cos\(\\q\)\}/)
+    assert.match(symbolicPathSource, /curvePathSymbolicRadiusPath0p1/)
+    assert.match(grid2dSource, /\\foreach \\stzGridU/)
+    assert.match(grid3dSource, /canvas is plane/)
     assert.doesNotMatch(
       [
         twoDimensionalSource,
@@ -61,6 +79,10 @@ test('generateTikzExamples writes representative TikZ files', async () => {
         hemisphereSource,
         saddleSource,
         evenOddSource,
+        symbolicPointSource,
+        symbolicPathSource,
+        grid2dSource,
+        grid3dSource,
       ].join('\n'),
       /NaN|Infinity/,
     )
