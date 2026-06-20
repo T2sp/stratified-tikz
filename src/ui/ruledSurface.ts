@@ -1,6 +1,7 @@
 import {
   MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS,
   isBoundaryPathClosed,
+  isBoundaryPathOpen,
   validateBoundaryPathSnapshot,
   validateCurvedSheetPrimitive,
 } from '../geometry/curvedSheets.ts'
@@ -85,6 +86,7 @@ export type CreateCoonsPatchFromBoundaryPathsError =
   | 'sourceNotBoundaryPath'
   | 'sourceWrongCodimension'
   | 'sourceNonFinite'
+  | 'sourceClosedPath'
   | 'invalidSampling'
   | 'invalidBoundary'
 
@@ -303,6 +305,16 @@ export function createCoonsPatchFromBoundaryPaths(
       }
     }
 
+    if (!isBoundaryPathOpen(boundaryResult.boundary)) {
+      return {
+        ok: false,
+        diagram,
+        error: 'sourceClosedPath',
+        sourcePathId,
+        role,
+      }
+    }
+
     boundaries[role] = boundaryResult.boundary
   }
 
@@ -453,6 +465,7 @@ export function createRuledSurfaceFromBoundaryPathsErrorMessage(
 
 export function createCoonsPatchFromBoundaryPathsErrorMessage(
   error: CreateCoonsPatchFromBoundaryPathsError,
+  role?: CoonsPatchBoundaryRole,
 ): string {
   switch (error) {
     case 'unsupportedAmbientDimension':
@@ -469,6 +482,10 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
       return 'Picked boundary paths must be codimension 2 in a 3D diagram.'
     case 'sourceNonFinite':
       return 'Picked boundary paths must have finite coordinates.'
+    case 'sourceClosedPath':
+      return role === undefined
+        ? 'Coons patch boundaries must be open paths.'
+        : `Coons patch ${role} boundary must be an open path.`
     case 'invalidSampling':
       return `Coons patch u and v sampling must be positive integers at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
     case 'invalidBoundary':

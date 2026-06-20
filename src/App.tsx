@@ -1742,7 +1742,9 @@ function App() {
     )
 
     if (!result.ok) {
-      setStatus(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+      setStatus(
+        createCoonsPatchFromBoundaryPathsErrorMessage(result.error, result.role),
+      )
       return false
     }
 
