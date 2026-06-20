@@ -1,0 +1,577 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  emptyThreeDimensionalDiagram,
+  emptyTwoDimensionalDiagram,
+} from '../../src/examples/index.ts'
+import {
+  addSymbolicVariableToDiagram,
+  updateSymbolicVariableInDiagram,
+} from '../../src/model/variables.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
+import type {
+  CoordinateComponent,
+  CurveStyle,
+  Diagram,
+  PointStratum,
+  SymbolicVariable,
+  Vec3,
+} from '../../src/model/types.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
+import {
+  addConcatenatedPathFromDirectInput,
+  addPointStratumFromDirectInput,
+} from '../../src/ui/diagramUpdates.ts'
+
+test('direct symbolic point input stores expressions and preview values', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: 'R',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id)
+
+  assertClose(point.position.x, Math.sqrt(3))
+  assertClose(point.position.y, 1)
+  assert.equal(point.position.z, 0)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.x.expression, 'R*cos(q)')
+  assertClose(point.position.symbolic?.x.previewValue ?? Number.NaN, Math.sqrt(3))
+  assert.equal(point.position.symbolic?.y.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.y.expression, 'R*sin(q)')
+  assertClose(point.position.symbolic?.y.previewValue ?? Number.NaN, 1)
+  assert.equal(point.position.symbolic?.z.kind, 'numeric')
+  assert.equal(point.position.symbolic?.z.value, 0)
+})
+
+test('symbolic point coordinates export as TikZ macro expressions', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: '0',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram)
+
+  assert.match(tikz, /\\pgfmathsetmacro\{\\R\}\{2\}/)
+  assert.match(tikz, /\\pgfmathsetmacro\{\\q\}\{30\}/)
+  assert.match(tikz, /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
+})
+
+test('mixed numeric and symbolic coordinates export component-wise', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R',
+    y: '0',
+    z: '0',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected mixed point creation to succeed.')
+  }
+
+  assert.match(generateTikz(result.diagram), /\(\{\\R\},0\)/)
+})
+
+test('variable updates recompute symbolic coordinate preview values', () => {
+  const initial = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: '0',
+  })
+
+  assert.equal(initial.ok, true)
+  if (!initial.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(initial.diagram, 'var-R', {
+      expression: '4',
+    }),
+  )
+  const point = findPoint(updated, initial.id)
+
+  assertClose(point.position.x, 2 * Math.sqrt(3))
+  assertClose(point.position.y, 2)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.x.expression, 'R*cos(q)')
+  assertClose(
+    point.position.symbolic?.x.previewValue ?? Number.NaN,
+    2 * Math.sqrt(3),
+  )
+})
+
+test('unknown variables and invalid coordinate expressions are rejected', () => {
+  const unknownVariable = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'S',
+    y: '0',
+    z: '0',
+  })
+  const invalidExpression = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*',
+    y: '0',
+    z: '0',
+  })
+
+  assert.equal(unknownVariable.ok, false)
+  assert.equal(invalidExpression.ok, false)
+})
+
+test('non-finite symbolic coordinate previews are rejected', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'sqrt(-1)',
+    y: '0',
+    z: '0',
+  })
+
+  assert.equal(result.ok, false)
+})
+
+test('direct symbolic path creation stores symbolic vertices and exports them', () => {
+  const result = addConcatenatedPathFromDirectInput(symbolicDiagram(), {
+    start: { x: 'R', y: '0', z: '0' },
+    segments: [
+      {
+        kind: 'line',
+        end: { x: 'R*cos(q)', y: 'R*sin(q)', z: '0' },
+      },
+    ],
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const path = result.diagram.strata.find(
+    (stratum) => stratum.id === result.id,
+  )
+
+  assert.equal(path?.geometricKind, 'curve')
+  assert.equal(path?.kind, 'concatenatedPath')
+  if (path?.geometricKind !== 'curve' || path.kind !== 'concatenatedPath') {
+    throw new Error('Expected a concatenated path.')
+  }
+
+  assert.equal(path.segments[0].start.symbolic?.x.kind, 'symbolic')
+  assert.equal(path.segments[0].end.symbolic?.y.kind, 'symbolic')
+  assert.match(generateTikz(result.diagram), /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
+})
+
+test('symbolic coordinate save and load round-trip preserves expressions', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: '0',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const point = findPoint(parsed.diagram, result.id)
+
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.x.expression, 'R*cos(q)')
+  assert.equal(point.position.symbolic?.y.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.y.expression, 'R*sin(q)')
+})
+
+test('parseSavedDiagramJson rejects symbolic Vec3 metadata with missing component fields cleanly', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+
+  if (point.position.symbolic === undefined) {
+    throw new Error('Expected saved point to have symbolic metadata.')
+  }
+
+  delete (point.position.symbolic as unknown as Record<string, unknown>).y
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved.file)),
+    /strata\[0\]\.position\.symbolic\.y Coordinate component must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects malformed symbolic component shape cleanly', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+
+  if (point.position.symbolic === undefined) {
+    throw new Error('Expected saved point to have symbolic metadata.')
+  }
+
+  const symbolicRecord = point.position.symbolic as unknown as Record<
+    string,
+    unknown
+  >
+  symbolicRecord.x = 'bad'
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved.file)),
+    /strata\[0\]\.position\.symbolic\.x Coordinate component must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects invalid saved symbolic expressions cleanly', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+  const x = symbolicX(point)
+
+  x.expression = 'R*'
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved.file)),
+    /strata\[0\]\.position\.symbolic\.x\.expression Expression ended unexpectedly/,
+  )
+})
+
+test('parseSavedDiagramJson rejects non-finite saved symbolic preview values cleanly', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+  const x = symbolicX(point)
+
+  x.previewValue = 12345
+
+  assertParseError(
+    parseSavedDiagramJson(
+      JSON.stringify(saved.file).replace(
+        '"previewValue":12345',
+        '"previewValue":1e309',
+      ),
+    ),
+    /strata\[0\]\.position\.symbolic\.x\.previewValue Symbolic coordinate preview value must be finite/,
+  )
+})
+
+test('parseSavedDiagramJson rejects non-finite saved symbolic evaluation cleanly', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+  const x = symbolicX(point)
+
+  point.position.x = 0
+  x.expression = 'sqrt(-1)'
+  x.previewValue = 0
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved.file)),
+    /strata\[0\]\.position\.symbolic\.x\.expression Expression evaluated to a non-finite number/,
+  )
+})
+
+test('parseSavedDiagramJson refreshes valid stale symbolic Vec3 previews', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+  const x = symbolicX(point)
+
+  point.position.x = -10
+  x.previewValue = -10
+
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved.file))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  assert.deepEqual(parsed.warnings, [
+    'Saved symbolic coordinate preview values were recalculated.',
+  ])
+  assertClose(findPoint(parsed.diagram, saved.pointId).position.x, Math.sqrt(3))
+})
+
+test('parseSavedDiagramJson loads old Vec3 coordinates without symbolic metadata', () => {
+  const saved = savedSymbolicPointFile()
+  const point = findPoint(saved.diagram, saved.pointId)
+
+  delete point.position.symbolic
+
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved.file))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  assert.equal(findPoint(parsed.diagram, saved.pointId).position.symbolic, undefined)
+})
+
+test('parseSavedDiagramJson rejects saved symbolic arc coordinates because arc export is numeric-derived', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'symbolic-arc',
+    name: 'Symbolic Arc',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: symbolicPoint(3, 0, 0, 'R + 1'),
+        end: { x: 2, y: 1, z: 0 },
+        center: symbolicPoint(2, 0, 0, 'R'),
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /Arc segment coordinates must be numeric/,
+  )
+})
+
+test('parseSavedDiagramJson rejects saved symbolic 3D template centers because export is local numeric', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'symbolic-template-3d',
+    name: 'Symbolic Template 3D',
+    style: curveStyle(),
+    template: {
+      kind: 'circleTemplate',
+      center: symbolicPoint(2, 0, 0, 'R'),
+      radius: 1,
+      frame: {
+        origin: { x: 2, y: 0, z: 0 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /3D template path centers must be numeric/,
+  )
+})
+
+test('existing numeric coordinate input remains numeric-only in the model', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: '1.5',
+    y: '-2',
+    z: 'R',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected numeric point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id)
+
+  assert.deepEqual(point.position, { x: 1.5, y: -2, z: 0 })
+})
+
+test('inline math output with symbolic coordinates has no blank lines', () => {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: '0',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+
+  assert.doesNotMatch(tikz, /\n\s*\n/)
+  assert.match(tikz, /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
+})
+
+function symbolicDiagram(): Diagram {
+  const withR = expectVariableDiagramOk(
+    addSymbolicVariableToDiagram(emptyTwoDimensionalDiagram, variable('var-R', 'R', '2')),
+  )
+
+  return expectVariableDiagramOk(
+    addSymbolicVariableToDiagram(withR, variable('var-q', 'q', '30')),
+  )
+}
+
+function symbolicThreeDimensionalDiagram(): Diagram {
+  return expectVariableDiagramOk(
+    addSymbolicVariableToDiagram(
+      emptyThreeDimensionalDiagram,
+      variable('var-R', 'R', '2'),
+    ),
+  )
+}
+
+type MutableSavedDiagramFile = {
+  diagram: Diagram
+  [key: string]: unknown
+}
+
+function savedSymbolicPointFile(): {
+  file: MutableSavedDiagramFile
+  diagram: Diagram
+  pointId: string
+} {
+  const result = addPointStratumFromDirectInput(symbolicDiagram(), {
+    x: 'R*cos(q)',
+    y: 'R*sin(q)',
+    z: '0',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic point creation to succeed.')
+  }
+
+  const file = JSON.parse(serializeDiagram(result.diagram)) as MutableSavedDiagramFile
+
+  return {
+    file,
+    diagram: file.diagram,
+    pointId: result.id,
+  }
+}
+
+function symbolicX(
+  point: PointStratum,
+): Extract<CoordinateComponent, { kind: 'symbolic' }> {
+  const component = point.position.symbolic?.x
+
+  assert.equal(component?.kind, 'symbolic')
+  if (component?.kind !== 'symbolic') {
+    throw new Error('Expected symbolic x component.')
+  }
+
+  return component
+}
+
+function symbolicPoint(
+  x: number,
+  y: number,
+  z: number,
+  xExpression: string,
+): Vec3 {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x: {
+        kind: 'symbolic',
+        expression: xExpression,
+        previewValue: x,
+      },
+      y: {
+        kind: 'numeric',
+        value: y,
+      },
+      z: {
+        kind: 'numeric',
+        value: z,
+      },
+    },
+  }
+}
+
+function variable(
+  id: string,
+  name: string,
+  expression: string,
+): Omit<SymbolicVariable, 'previewValue'> {
+  return {
+    id,
+    name,
+    macroName: name,
+    expression,
+  }
+}
+
+function expectVariableDiagramOk(
+  result: ReturnType<
+    typeof addSymbolicVariableToDiagram | typeof updateSymbolicVariableInDiagram
+  >,
+): Diagram {
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  return result.diagram
+}
+
+function findPoint(diagram: Diagram, id: string): PointStratum {
+  const point = diagram.strata.find(
+    (stratum): stratum is PointStratum =>
+      stratum.id === id && stratum.geometricKind === 'point',
+  )
+
+  if (point === undefined) {
+    throw new Error(`Point ${id} not found.`)
+  }
+
+  return point
+}
+
+function curveStyle(): CurveStyle {
+  return {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+  }
+}
+
+function assertParseError(
+  result: ReturnType<typeof parseSavedDiagramJson>,
+  pattern: RegExp,
+): void {
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected saved diagram parsing to fail.')
+  }
+  assert.match(result.error, pattern)
+}
+
+function assertClose(actual: number, expected: number): void {
+  assert.ok(
+    Math.abs(actual - expected) < 1e-9,
+    `Expected ${actual} to be close to ${expected}.`,
+  )
+}

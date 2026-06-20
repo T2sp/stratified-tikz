@@ -5,10 +5,28 @@ export type Vec2 = {
   y: number
 }
 
+export type CoordinateComponent =
+  | {
+      kind: 'numeric'
+      value: number
+    }
+  | {
+      kind: 'symbolic'
+      expression: string
+      previewValue: number
+    }
+
+export type SymbolicVec3 = {
+  x: CoordinateComponent
+  y: CoordinateComponent
+  z: CoordinateComponent
+}
+
 export type Vec3 = {
   x: number
   y: number
   z: number
+  symbolic?: SymbolicVec3
 }
 
 export type Camera2D = {

@@ -27,6 +27,8 @@ export function PointGeometryEditor({
           label="Position"
           point={point.position}
           ambientDimension={diagram.ambientDimension}
+          variables={diagram.variables}
+          allowSymbolic
           onCoordinateChange={(axis, value) =>
             onDiagramChange((currentDiagram) =>
               updateStratumById(currentDiagram, point.id, (current) => {

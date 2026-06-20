@@ -30,6 +30,8 @@ export function SheetGeometryEditor({
             label={`${sheet.kind === 'quadSheet' ? 'Corner' : 'Vertex'} ${vertexIndex + 1}`}
             point={vertex}
             ambientDimension={diagram.ambientDimension}
+            variables={diagram.variables}
+            allowSymbolic
             onCoordinateChange={(axis, value) =>
               onDiagramChange((currentDiagram) =>
                 updateStratumById(currentDiagram, sheet.id, (current) => {

@@ -33,6 +33,7 @@ import {
   setLayerVisibility,
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
+import { hasSymbolicVec3Coordinates } from './model/symbolicCoordinates.ts'
 import type {
   AmbientDimension,
   ArcDirection,
@@ -2484,7 +2485,7 @@ function App() {
       )
 
       if (!result.ok) {
-        setDirectCreationStatus('Coordinates must be finite numbers.')
+        setDirectCreationStatus('Coordinates must be valid finite expressions.')
         return
       }
 
@@ -2507,7 +2508,7 @@ function App() {
       )
 
       if (!result.ok) {
-        setDirectCreationStatus('Coordinates must be finite numbers.')
+        setDirectCreationStatus('Coordinates must be valid finite expressions.')
         return
       }
 
@@ -2543,7 +2544,7 @@ function App() {
     )
 
     if (coordinateRows === null) {
-      setDirectCreationStatus('Coordinates must be finite rows.')
+      setDirectCreationStatus('Coordinates must be valid coordinate rows.')
       return
     }
 
@@ -2706,7 +2707,14 @@ function App() {
       const parameters = parseCurvedSheetCreationParameters(setDirectCreationStatus)
 
       if (anchorPoint === null) {
-        setDirectCreationStatus('Coordinates must be finite numbers.')
+        setDirectCreationStatus('Coordinates must be valid finite expressions.')
+        return
+      }
+
+      if (hasSymbolicVec3Coordinates(anchorPoint)) {
+        setDirectCreationStatus(
+          'Curved sheet anchor coordinates must be numeric in this phase.',
+        )
         return
       }
 
@@ -2749,7 +2757,7 @@ function App() {
     )
 
     if (coordinateRows === null) {
-      setDirectCreationStatus('Coordinates must be finite rows.')
+      setDirectCreationStatus('Coordinates must be valid coordinate rows.')
       return
     }
 
@@ -3405,8 +3413,9 @@ function App() {
               )}
             </span>
             <input
-              type="number"
-              step="any"
+              type="text"
+              inputMode="decimal"
+              spellCheck={false}
               value={coordinates[axis]}
               onChange={(event) =>
                 onCoordinateChange(axis, event.currentTarget.value)
@@ -4408,8 +4417,9 @@ function App() {
                         `(${curvedSheetAnchorLabel(sheetCreationKind)})`}
                     </span>
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
+                      spellCheck={false}
                       value={directCoordinates[axis]}
                       onChange={(event) =>
                         updateDirectCoordinate(axis, event.currentTarget.value)
@@ -5378,7 +5388,7 @@ function directCreationErrorMessage(
 ): string {
   switch (error) {
     case 'invalidCoordinates':
-      return 'Coordinates must be finite numbers.'
+      return 'Coordinates must be valid finite expressions.'
     case 'invalidRadius':
       return 'Radii must be positive finite numbers.'
     case 'invalidAngle':

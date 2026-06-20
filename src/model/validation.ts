@@ -31,7 +31,15 @@ import {
 } from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
 import { tikzExportModes } from './types.ts'
-import { validateSymbolicVariables } from './variables.ts'
+import {
+  resolveSymbolicVariables,
+  validateSymbolicVariables,
+} from './variables.ts'
+import {
+  hasSymbolicVec3Coordinates,
+  validateSymbolicVec3,
+  type CoordinateExpressionContext,
+} from './symbolicCoordinates.ts'
 import {
   arcSegmentExpectedEnd,
   arcSegmentExpectedStart,
@@ -118,6 +126,8 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     errors,
   )
   errors.push(...validateSymbolicVariables(diagram.variables, 'variables'))
+  const coordinateExpressionContext =
+    symbolicCoordinateExpressionContextForDiagram(diagram)
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -126,6 +136,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
       diagram.ambientDimension,
       `strata[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 
@@ -135,6 +146,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
       diagram.ambientDimension,
       `labels[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 
@@ -144,6 +156,21 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   return {
     valid: errors.length === 0,
     errors,
+  }
+}
+
+function symbolicCoordinateExpressionContextForDiagram(
+  diagram: Diagram,
+): CoordinateExpressionContext | undefined {
+  const resolved = resolveSymbolicVariables(diagram.variables ?? [])
+
+  if (!resolved.ok) {
+    return undefined
+  }
+
+  return {
+    variableNames: resolved.variables.map((variable) => variable.name),
+    previewValues: resolved.values,
   }
 }
 
@@ -535,6 +562,7 @@ function validateStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   validateId(stratum.id, `${path}.id`, errors)
   validateName(stratum.name, `${path}.name`, errors)
@@ -550,16 +578,40 @@ function validateStratum(
 
   switch (stratum.geometricKind) {
     case 'region':
-      validateRegionStratum(stratum, ambientDimension, path, errors)
+      validateRegionStratum(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       break
     case 'sheet':
-      validateSheetStratum(stratum, ambientDimension, path, errors)
+      validateSheetStratum(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       break
     case 'curve':
-      validateCurveStratum(stratum, ambientDimension, path, errors)
+      validateCurveStratum(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       break
     case 'point':
-      validatePointStratum(stratum, ambientDimension, path, errors)
+      validatePointStratum(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       break
   }
 }
@@ -569,6 +621,7 @@ function validateRegionStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (stratum.codim !== 0) {
     pushError(errors, `${path}.codim`, 'Regions must have codimension 0.')
@@ -591,7 +644,13 @@ function validateRegionStratum(
     return
   }
 
-  validateFilledRegion2DStratum(stratum, ambientDimension, path, errors)
+  validateFilledRegion2DStratum(
+    stratum,
+    ambientDimension,
+    path,
+    errors,
+    coordinateExpressionContext,
+  )
 }
 
 function validateFilledRegion2DStratum(
@@ -599,6 +658,7 @@ function validateFilledRegion2DStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (ambientDimension !== 2) {
     pushError(errors, path, 'Filled region strata are valid only in 2D diagrams.')
@@ -618,6 +678,7 @@ function validateFilledRegion2DStratum(
     ambientDimension,
     `${path}.boundaries`,
     errors,
+    coordinateExpressionContext,
   )
 }
 
@@ -626,6 +687,7 @@ function validateSheetStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (ambientDimension !== 3) {
     pushError(errors, path, 'Sheet strata are valid only in 3D diagrams.')
@@ -667,7 +729,13 @@ function validateSheetStratum(
   validateSheetStyle(stratum.style, `${path}.style`, errors)
 
   if (stratum.kind === 'workPlaneFilledSheet') {
-    validateWorkPlaneFilledSheet3DStratum(stratum, ambientDimension, path, errors)
+    validateWorkPlaneFilledSheet3DStratum(
+      stratum,
+      ambientDimension,
+      path,
+      errors,
+      coordinateExpressionContext,
+    )
     return
   }
 
@@ -682,6 +750,7 @@ function validateSheetStratum(
       ambientDimension,
       `${path}.${stratum.kind === 'quadSheet' ? 'corners' : 'vertices'}[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 }
@@ -712,6 +781,7 @@ function validateWorkPlaneFilledSheet3DStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (ambientDimension !== 3) {
     pushError(
@@ -740,6 +810,7 @@ function validateWorkPlaneFilledSheet3DStratum(
     ambientDimension,
     `${path}.boundaries`,
     errors,
+    coordinateExpressionContext,
   )
   validateClosedPathBoundariesOnPlane(
     stratum.boundaries,
@@ -754,6 +825,7 @@ function validateCurveStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   const expectedCodim = ambientDimension === 2 ? 1 : 2
 
@@ -784,16 +856,40 @@ function validateCurveStratum(
 
   switch (stratum.kind) {
     case 'polyline':
-      validatePolylineCurve(stratum, ambientDimension, path, errors)
+      validatePolylineCurve(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       return
     case 'cubicBezier':
-      validateCubicBezierCurve(stratum, ambientDimension, path, errors)
+      validateCubicBezierCurve(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       return
     case 'concatenatedPath':
-      validateConcatenatedPathCurve(stratum, ambientDimension, path, errors)
+      validateConcatenatedPathCurve(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       return
     case 'templatePath':
-      validateTemplatePathCurve(stratum, ambientDimension, path, errors)
+      validateTemplatePathCurve(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       return
   }
 }
@@ -803,6 +899,7 @@ function validatePolylineCurve(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (stratum.kind !== 'polyline') {
     return
@@ -822,6 +919,7 @@ function validatePolylineCurve(
       ambientDimension,
       `${path}.points[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 }
@@ -831,6 +929,7 @@ function validateCubicBezierCurve(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (stratum.points.length !== 4) {
     pushError(
@@ -846,6 +945,7 @@ function validateCubicBezierCurve(
       ambientDimension,
       `${path}.points[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 
@@ -863,6 +963,7 @@ function validateConcatenatedPathCurve(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (stratum.kind !== 'concatenatedPath') {
     return
@@ -882,6 +983,7 @@ function validateConcatenatedPathCurve(
       ambientDimension,
       `${path}.segments[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 
@@ -893,12 +995,19 @@ function validateTemplatePathCurve(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (stratum.kind !== 'templatePath') {
     return
   }
 
-  validatePathTemplate(stratum.template, ambientDimension, `${path}.template`, errors)
+  validatePathTemplate(
+    stratum.template,
+    ambientDimension,
+    `${path}.template`,
+    errors,
+    coordinateExpressionContext,
+  )
 }
 
 function validateClosedPathBoundaries(
@@ -906,6 +1015,7 @@ function validateClosedPathBoundaries(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   if (!Array.isArray(boundaries)) {
     pushError(errors, path, 'Closed path boundaries must be an array.')
@@ -922,6 +1032,7 @@ function validateClosedPathBoundaries(
       ambientDimension,
       `${path}[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 }
@@ -931,6 +1042,7 @@ function validateClosedPathBoundary(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   validateId(boundary.id, `${path}.id`, errors)
   validateOptionalName(boundary.name, `${path}.name`, errors)
@@ -955,6 +1067,7 @@ function validateClosedPathBoundary(
       ambientDimension,
       `${path}.segments[${index}]`,
       errors,
+      coordinateExpressionContext,
     )
   })
 
@@ -1053,6 +1166,7 @@ function validatePathSegment(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   validatePathSegmentStyleOverride(
     segment.styleOverride,
@@ -1062,24 +1176,50 @@ function validatePathSegment(
 
   switch (segment.kind) {
     case 'line':
-      validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
-      validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
+      validateVec3ForAmbient(
+        segment.start,
+        ambientDimension,
+        `${path}.start`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateVec3ForAmbient(
+        segment.end,
+        ambientDimension,
+        `${path}.end`,
+        errors,
+        coordinateExpressionContext,
+      )
       return
     case 'cubicBezier':
-      validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
+      validateVec3ForAmbient(
+        segment.start,
+        ambientDimension,
+        `${path}.start`,
+        errors,
+        coordinateExpressionContext,
+      )
       validateVec3ForAmbient(
         segment.control1,
         ambientDimension,
         `${path}.control1`,
         errors,
+        coordinateExpressionContext,
       )
       validateVec3ForAmbient(
         segment.control2,
         ambientDimension,
         `${path}.control2`,
         errors,
+        coordinateExpressionContext,
       )
-      validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
+      validateVec3ForAmbient(
+        segment.end,
+        ambientDimension,
+        `${path}.end`,
+        errors,
+        coordinateExpressionContext,
+      )
       validateCubicBezierControlMode(
         [segment.start, segment.control1, segment.control2, segment.end],
         segment.controlMode,
@@ -1089,7 +1229,13 @@ function validatePathSegment(
       )
       return
     case 'arc':
-      validateArcPathSegment(segment, ambientDimension, path, errors)
+      validateArcPathSegment(
+        segment,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
       return
     default:
       pushError(
@@ -1105,10 +1251,29 @@ function validateArcPathSegment(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
-  validateVec3ForAmbient(segment.start, ambientDimension, `${path}.start`, errors)
-  validateVec3ForAmbient(segment.end, ambientDimension, `${path}.end`, errors)
-  validateVec3ForAmbient(segment.center, ambientDimension, `${path}.center`, errors)
+  validateVec3ForAmbient(
+    segment.start,
+    ambientDimension,
+    `${path}.start`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateVec3ForAmbient(
+    segment.end,
+    ambientDimension,
+    `${path}.end`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateVec3ForAmbient(
+    segment.center,
+    ambientDimension,
+    `${path}.center`,
+    errors,
+    coordinateExpressionContext,
+  )
   validateFinite(segment.radius, `${path}.radius`, errors)
   validateFinite(segment.startAngleDeg, `${path}.startAngleDeg`, errors)
   validateFinite(segment.endAngleDeg, `${path}.endAngleDeg`, errors)
@@ -1139,6 +1304,18 @@ function validateArcPathSegment(
     }
   } else if (segment.frame !== undefined) {
     validateWorkPlaneFrameSnapshot(segment.frame, `${path}.frame`, errors)
+  }
+
+  if (
+    hasSymbolicVec3Coordinates(segment.start) ||
+    hasSymbolicVec3Coordinates(segment.end) ||
+    hasSymbolicVec3Coordinates(segment.center)
+  ) {
+    pushError(
+      errors,
+      path,
+      'Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.',
+    )
   }
 
   if (
@@ -1176,6 +1353,7 @@ function validatePathTemplate(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   switch (template.kind) {
     case 'circleTemplate':
@@ -1184,6 +1362,7 @@ function validatePathTemplate(
         ambientDimension,
         `${path}.center`,
         errors,
+        coordinateExpressionContext,
       )
       validateFinite(template.radius, `${path}.radius`, errors)
 
@@ -1192,6 +1371,7 @@ function validatePathTemplate(
       }
 
       validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     case 'ellipseTemplate':
       validateVec3ForAmbient(
@@ -1199,6 +1379,7 @@ function validatePathTemplate(
         ambientDimension,
         `${path}.center`,
         errors,
+        coordinateExpressionContext,
       )
       validateFinite(template.radiusX, `${path}.radiusX`, errors)
       validateFinite(template.radiusY, `${path}.radiusY`, errors)
@@ -1216,6 +1397,7 @@ function validatePathTemplate(
       }
 
       validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     default:
       pushError(
@@ -1224,6 +1406,23 @@ function validatePathTemplate(
         'Template path kind must be circleTemplate or ellipseTemplate.',
       )
   }
+}
+
+function validateTemplateSymbolicCoordinatePolicy(
+  template: PathTemplate,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3 || !hasSymbolicVec3Coordinates(template.center)) {
+    return
+  }
+
+  pushError(
+    errors,
+    `${path}.center`,
+    '3D template path centers must be numeric because template export derives local plane coordinates.',
+  )
 }
 
 function validateTemplateFrame(
@@ -1675,6 +1874,7 @@ function validatePointStratum(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   const expectedCodim = ambientDimension === 2 ? 2 : 3
 
@@ -1692,6 +1892,7 @@ function validatePointStratum(
     ambientDimension,
     `${path}.position`,
     errors,
+    coordinateExpressionContext,
   )
 }
 
@@ -1700,11 +1901,18 @@ function validateTextLabel(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
 ): void {
   validateId(label.id, `${path}.id`, errors)
   validateName(label.name, `${path}.name`, errors)
   validateLayer(label.layer, `${path}.layer`, errors)
-  validateVec3ForAmbient(label.position, ambientDimension, `${path}.position`, errors)
+  validateVec3ForAmbient(
+    label.position,
+    ambientDimension,
+    `${path}.position`,
+    errors,
+    coordinateExpressionContext,
+  )
   validateLabelStyle(label.style, `${path}.style`, errors)
 }
 
@@ -2122,10 +2330,18 @@ function validateVec3ForAmbient(
   ambientDimension: 2 | 3,
   path: string,
   errors: DiagramValidationIssue[],
+  coordinateExpressionContext?: CoordinateExpressionContext,
 ): void {
   validateFinite(point.x, `${path}.x`, errors)
   validateFinite(point.y, `${path}.y`, errors)
   validateFinite(point.z, `${path}.z`, errors)
+  validateSymbolicVec3(
+    point,
+    ambientDimension,
+    path,
+    coordinateExpressionContext,
+    errors,
+  )
 
   if (ambientDimension === 2 && point.z !== 0) {
     pushError(errors, `${path}.z`, '2D diagram coordinates must have z = 0.')

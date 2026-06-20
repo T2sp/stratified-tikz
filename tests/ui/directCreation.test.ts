@@ -101,6 +101,49 @@ test('direct point creation commits to editable diagram state', () => {
   assert.match(generateTikz(committed.editableDiagram), /\(10,11\)/)
 })
 
+test('global direct point coordinates accept scientific notation', () => {
+  const cases = [
+    ['1e-3', 0.001],
+    ['1E-3', 0.001],
+    ['2e+4', 20000],
+    ['-3.5e2', -350],
+    ['+4.2E-1', 0.42],
+    ['.5e2', 50],
+    ['5.', 5],
+  ] as const
+
+  cases.forEach(([x, expectedX], index) => {
+    const result = addPointStratumFromDirectInput(
+      emptyThreeDimensionalDiagram,
+      { x, y: '0', z: '0' },
+      { id: `scientific-point-${index}` },
+    )
+
+    assert.equal(result.ok, true)
+    if (!result.ok) {
+      throw new Error(`Expected ${x} to be accepted.`)
+    }
+
+    assertVec3ApproximatelyEqual(
+      findPoint(result.diagram, result.id).position,
+      { x: expectedX, y: 0, z: 0 },
+    )
+  })
+})
+
+test('global direct point coordinates reject non-finite numeric inputs', () => {
+  const invalidInputs = ['Infinity', '-Infinity', 'NaN', '1e309', '1/0']
+
+  invalidInputs.forEach((x) => {
+    const result = addPointStratumFromDirectInput(
+      emptyThreeDimensionalDiagram,
+      { x, y: '0', z: '0' },
+    )
+
+    assert.equal(result.ok, false)
+  })
+})
+
 test('direct label creation commits to editable diagram state', () => {
   const initialState = createTestEditorState(twoDimensionalExample)
   const result = addTextLabelFromDirectInput(
@@ -557,6 +600,26 @@ test('3D direct circle template lies in the active work plane', () => {
   assert.match(tikz, /circle\[radius=1\]/)
 })
 
+test('3D direct template centers reject symbolic input because export uses local numeric coordinates', () => {
+  const result = addCirclePathFromDirectInput(
+    createSymbolicThreeDimensionalDiagram(),
+    {
+      center: { x: 'R', y: '20', z: '30' },
+      radius: '1',
+    },
+    {
+      coordinateMode: 'global',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected symbolic 3D template center to be rejected.')
+  }
+  assert.equal(result.error, 'invalidCoordinates')
+})
+
 test('direct ellipse template creates a persistent rotated ellipse template path', () => {
   const result = addEllipsePathFromDirectInput(emptyTwoDimensionalDiagram, {
     center: { x: '0', y: '0', z: '9' },
@@ -661,6 +724,21 @@ test('direct arc template creates an open first-class arc segment', () => {
   assertVec3ApproximatelyEqual(path.segments[0].end, { x: 0, y: -1, z: 0 })
   assert.notDeepEqual(path.segments[0].start, path.segments[0].end)
   assert.match(generateTikz(result.diagram), /arc\[start angle=0, end angle=270, radius=1\]/)
+})
+
+test('direct arc template rejects symbolic center input because arc export derives numeric endpoints', () => {
+  const result = addArcPathFromDirectInput(createSymbolicTwoDimensionalDiagram(), {
+    center: { x: 'R', y: '0', z: '0' },
+    radius: '1',
+    startAngleDeg: '0',
+    endAngleDeg: '90',
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected symbolic arc center to be rejected.')
+  }
+  assert.equal(result.error, 'invalidCoordinates')
 })
 
 test('direct arc template rejects invalid radius and equal angles', () => {
@@ -2220,6 +2298,36 @@ function createPlaneLocalPoint(
   }
 
   return findPoint(result.diagram, result.id).position
+}
+
+function createSymbolicTwoDimensionalDiagram(): Diagram {
+  return {
+    ...emptyTwoDimensionalDiagram,
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '2',
+        previewValue: 2,
+      },
+    ],
+  }
+}
+
+function createSymbolicThreeDimensionalDiagram(): Diagram {
+  return {
+    ...emptyThreeDimensionalDiagram,
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '10',
+        previewValue: 10,
+      },
+    ],
+  }
 }
 
 function sourceInput(source: ExistingCoordinateSource): {
