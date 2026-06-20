@@ -21,8 +21,11 @@ import {
   ruledSurfaceBoundaryDraftStatusMessage,
   sheetDraftBlocksWorkPlaneChange,
 } from '../../src/ui/sheetDraft.ts'
-import { validateCoonsPatchBoundaryPathSource } from '../../src/ui/ruledSurface.ts'
-import type { WorkPlane } from '../../src/model/types.ts'
+import {
+  validateCoonsPatchBoundaryPathSource,
+  validateRuledSurfaceBoundaryPathSource,
+} from '../../src/ui/ruledSurface.ts'
+import type { PointStratum, WorkPlane } from '../../src/model/types.ts'
 
 test('sheet polygon draft captures the initial work plane', () => {
   const workPlane: WorkPlane = { kind: 'xy', z: 2 }
@@ -279,6 +282,64 @@ test('boundary path click workflow preserves select mode and routes Add sheet bo
     }),
     null,
   )
+  assert.equal(
+    boundarySurfacePathClickWorkflow({
+      tool: 'createSheet',
+      sheetCreationKind: 'other',
+      workPlanePointPickingActive: false,
+    }),
+    null,
+  )
+})
+
+test('invalid boundary source validation rejects without clearing previous draft picks', () => {
+  const first = pickRuledSurfaceBoundaryDraftPath(
+    createRuledSurfaceBoundaryDraft(),
+    'first-boundary',
+  )
+
+  assert.equal(first.ok, true)
+  if (!first.ok) {
+    throw new Error('Expected first ruled boundary pick to succeed.')
+  }
+
+  const invalidClickedObject = pointStratum('not-a-path')
+  const sourceValidation = validateRuledSurfaceBoundaryPathSource(
+    {
+      ...emptyThreeDimensionalDiagram,
+      strata: [openBoundaryPath('first-boundary'), invalidClickedObject],
+    },
+    invalidClickedObject.id,
+  )
+
+  const sourceValidationFailed = !sourceValidation.ok
+
+  assert.equal(sourceValidationFailed, true)
+  if (sourceValidation.ok) {
+    throw new Error('Expected point source validation to fail.')
+  }
+  assert.equal(sourceValidation.error, 'sourceNotBoundaryPath')
+
+  const uncommittedPick = pickRuledSurfaceBoundaryDraftPath(
+    first.draft,
+    invalidClickedObject.id,
+  )
+
+  assert.equal(uncommittedPick.ok, true)
+  if (!uncommittedPick.ok) {
+    throw new Error('Expected raw draft pick to accept a non-empty id.')
+  }
+  assert.notDeepEqual(uncommittedPick.draft, first.draft)
+
+  const committedDraft = sourceValidationFailed
+    ? first.draft
+    : uncommittedPick.draft
+
+  assert.deepEqual(committedDraft, {
+    kind: 'ruledSurface',
+    boundary0Id: 'first-boundary',
+    nextRole: 'boundary1',
+  })
 })
 
 test('Coons patch pick-time validation rejects closed boundary paths', () => {
@@ -328,3 +389,43 @@ test('Coons patch pick-time validation rejects closed boundary paths', () => {
   }
   assert.equal(result.error, 'sourceClosedPath')
 })
+
+function openBoundaryPath(id: string): ConcatenatedPathStratum {
+  return {
+    id,
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    name: 'Open boundary',
+    style: defaultCurveStyle,
+    styleSegments: [],
+    layer: 0,
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+    ],
+  }
+}
+
+function pointStratum(id: string): PointStratum {
+  return {
+    id,
+    codim: 3,
+    geometricKind: 'point',
+    kind: 'point',
+    name: 'Point source',
+    position: { x: 0, y: 0, z: 0 },
+    style: {
+      kind: 'pointStyle',
+      color: '#000000',
+      opacity: 1,
+      shape: 'circle',
+      fill: 'filled',
+      size: 3,
+    },
+    layer: 0,
+  }
+}

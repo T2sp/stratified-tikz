@@ -28,8 +28,9 @@ In a 3D diagram:
    concatenated paths, and path templates can be used. Grids cannot be used as
    boundary paths.
 2. Choose `Add sheet`, then `Ruled`.
-3. Select a boundary path and click `Pick boundary path`; repeat for the second
-   boundary.
+3. Click the first boundary path in the SVG preview, then click the second
+   boundary path. The picked paths remain in the current Add sheet draft, so
+   there is no need to switch back to Select mode between picks.
 4. Set `Segments`.
 5. Click `Create`.
 
@@ -45,8 +46,9 @@ In a 3D diagram:
    concatenated paths, and path templates can be used. Grids cannot be used as
    boundary paths.
 2. Choose `Add sheet`, then `Coons`.
-3. Select each source path and assign it with the matching role button:
-   `Pick bottom`, `Pick right`, `Pick top`, and `Pick left`.
+3. Click the boundary paths directly in this order: `bottom`, `right`, `top`,
+   then `left`. The picked paths remain in the current Add sheet draft, so
+   there is no need to switch back to Select mode between picks.
 4. Set `U segments` and `V segments`.
 5. Click `Create`.
 
