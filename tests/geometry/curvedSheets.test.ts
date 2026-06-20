@@ -39,6 +39,9 @@ import type {
   Vec3,
 } from '../../src/model/types.ts'
 
+const coonsPatchBoundaryRoles = ['bottom', 'right', 'top', 'left'] as const
+type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
+
 test('valid hemisphere primitive validates', () => {
   const validation = validateCurvedSheetPrimitive(validHemisphere())
 
@@ -243,10 +246,57 @@ test('ruled surface boundary closure mismatch is rejected', () => {
   assert.match(joinMessages(validation.errors), /same closure status/i)
 })
 
+test('ruled surface still accepts two closed boundaries with matching closure status', () => {
+  const validation = validateCurvedSheetPrimitive({
+    ...validRuledSurface(),
+    boundary0: closedBoundary('closed-ruled-boundary-0', {
+      x: 0,
+      y: 0,
+      z: 0,
+    }),
+    boundary1: closedBoundary('closed-ruled-boundary-1', {
+      x: 0,
+      y: 1,
+      z: 1,
+    }),
+  })
+
+  assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
 test('valid Coons patch primitive validates', () => {
   const validation = validateCurvedSheetPrimitive(validCoonsPatch())
 
   assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+for (const role of coonsPatchBoundaryRoles) {
+  test(`Coons patch primitive rejects closed ${role} boundary`, () => {
+    const validation = validateCurvedSheetPrimitive({
+      ...validCoonsPatch(),
+      [role]: closedBoundary(
+        `closed-coons-${role}`,
+        coonsPatchBoundaryStart(role),
+      ),
+    })
+
+    assert.equal(validation.valid, false)
+    assert.match(
+      joinMessages(validation.errors),
+      new RegExp(`Coons patch ${role} boundary must be an open path`, 'i'),
+    )
+  })
+}
+
+test('Coons patch primitive rejects a closed boundary even if corners match', () => {
+  const validation = validateCurvedSheetPrimitive(
+    coonsPatchWithClosedBottomAndMatchingCorners(),
+  )
+  const messages = joinMessages(validation.errors)
+
+  assert.equal(validation.valid, false)
+  assert.match(messages, /Coons patch bottom boundary must be an open path/i)
+  assert.doesNotMatch(messages, /corner must match/i)
 })
 
 test('Coons patch rejects inconsistent corners', () => {
@@ -521,6 +571,21 @@ test('parseSavedDiagramJson rejects a Coons patch with one malformed boundary wi
   )
 })
 
+for (const role of coonsPatchBoundaryRoles) {
+  test(`parseSavedDiagramJson rejects Coons patch with closed ${role} boundary without throwing`, () => {
+    assertBoundarySurfaceParseError(
+      {
+        ...validCoonsPatch(),
+        [role]: closedBoundary(
+          `saved-closed-coons-${role}`,
+          coonsPatchBoundaryStart(role),
+        ),
+      },
+      new RegExp(`Coons patch ${role} boundary must be an open path`, 'i'),
+    )
+  })
+}
+
 test('valid ruled surface saved diagram still loads', () => {
   const result = parseBoundarySurfacePrimitiveNoThrow(validRuledSurface())
 
@@ -744,6 +809,21 @@ function validCoonsPatch(): CoonsPatchPrimitive {
   }
 }
 
+function coonsPatchWithClosedBottomAndMatchingCorners(): CoonsPatchPrimitive {
+  const sharedBottomCorner = { x: 0, y: 0, z: 0 }
+  const topLeft = { x: 0, y: 1, z: 0 }
+  const topRight = { x: 1, y: 1, z: 0 }
+
+  return {
+    kind: 'coonsPatch',
+    bottom: closedBoundary('coons-closed-bottom-matching', sharedBottomCorner),
+    right: lineBoundary('coons-right-matching', sharedBottomCorner, topRight),
+    top: lineBoundary('coons-top-matching', topLeft, topRight),
+    left: lineBoundary('coons-left-matching', sharedBottomCorner, topLeft),
+    sampling: { uSegments: 4, vSegments: 3 },
+  }
+}
+
 function lineBoundary(
   id: string,
   start: Vec3,
@@ -752,6 +832,31 @@ function lineBoundary(
   return {
     id,
     segments: [lineSegment(start, end)],
+  }
+}
+
+function closedBoundary(id: string, start: Vec3): BoundaryPathSnapshot {
+  const middle = {
+    x: start.x + 0.5,
+    y: start.y + 0.25,
+    z: start.z,
+  }
+
+  return {
+    id,
+    segments: [lineSegment(start, middle), lineSegment(middle, start)],
+  }
+}
+
+function coonsPatchBoundaryStart(role: CoonsPatchBoundaryRole): Vec3 {
+  switch (role) {
+    case 'bottom':
+    case 'left':
+      return { x: 0, y: 0, z: 0 }
+    case 'right':
+      return { x: 2, y: 0, z: 0 }
+    case 'top':
+      return { x: 0, y: 1, z: 0 }
   }
 }
 

@@ -177,14 +177,25 @@ export function validateBoundaryPathSnapshot(
 }
 
 export function isBoundaryPathClosed(
-  snapshot: BoundaryPathSnapshot,
+  snapshot: unknown,
   epsilon = pathEndpointEpsilon,
 ): boolean {
-  const endpoints = pathEndpoints(snapshot.segments)
+  const endpoints = boundaryPathSnapshotEndpoints(snapshot)
 
   return endpoints === null
     ? false
     : vec3ApproximatelyEqual(endpoints.start, endpoints.end, epsilon)
+}
+
+export function isBoundaryPathOpen(
+  snapshot: unknown,
+  epsilon = pathEndpointEpsilon,
+): boolean {
+  const endpoints = boundaryPathSnapshotEndpoints(snapshot)
+
+  return endpoints === null
+    ? false
+    : !vec3ApproximatelyEqual(endpoints.start, endpoints.end, epsilon)
 }
 
 export function evaluateBoundaryPathAt(
@@ -571,14 +582,26 @@ function validateCoonsPatchPrimitive(
     isBoundaryPathSnapshot(primitive.top) &&
     isBoundaryPathSnapshot(primitive.left)
   ) {
-    validateCoonsPatchCorners(
-      primitive.bottom,
-      primitive.right,
-      primitive.top,
-      primitive.left,
-      path,
-      errors,
+    const boundaries = [
+      { role: 'bottom', boundary: primitive.bottom },
+      { role: 'right', boundary: primitive.right },
+      { role: 'top', boundary: primitive.top },
+      { role: 'left', boundary: primitive.left },
+    ] as const
+    const allBoundariesOpen = boundaries.every(({ role, boundary }) =>
+      validateCoonsPatchOpenBoundary(boundary, role, `${path}.${role}`, errors),
     )
+
+    if (allBoundariesOpen) {
+      validateCoonsPatchCorners(
+        primitive.bottom,
+        primitive.right,
+        primitive.top,
+        primitive.left,
+        path,
+        errors,
+      )
+    }
   }
 }
 
@@ -648,6 +671,20 @@ function validateCoonsPatchCorners(
     `${path}.right`,
     errors,
   )
+}
+
+function validateCoonsPatchOpenBoundary(
+  boundary: BoundaryPathSnapshot,
+  role: 'bottom' | 'right' | 'top' | 'left',
+  path: string,
+  errors: SurfaceValidationIssue[],
+): boolean {
+  if (isBoundaryPathOpen(boundary)) {
+    return true
+  }
+
+  pushError(errors, path, `Coons patch ${role} boundary must be an open path.`)
+  return false
 }
 
 function validateCornerMatch(
@@ -927,6 +964,16 @@ function isBoundaryPathSnapshot(value: unknown): value is BoundaryPathSnapshot {
     value.segments.length > 0 &&
     value.segments.every(isBoundaryPathSegment)
   )
+}
+
+function boundaryPathSnapshotEndpoints(
+  snapshot: unknown,
+): ReturnType<typeof pathEndpoints> {
+  if (!isBoundaryPathSnapshot(snapshot)) {
+    return null
+  }
+
+  return pathEndpoints(snapshot.segments)
 }
 
 function isBoundaryPathSegment(value: unknown): value is PathSegment {

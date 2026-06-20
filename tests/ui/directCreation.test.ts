@@ -65,10 +65,12 @@ import {
   type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
 import {
+  coonsPatchBoundaryRoles,
   createCoonsPatchFromBoundaryPaths,
   createCoonsPatchFromBoundaryPathsErrorMessage,
   createRuledSurfaceFromBoundaryPaths,
   createRuledSurfaceFromBoundaryPathsErrorMessage,
+  type CoonsPatchBoundaryRole,
 } from '../../src/ui/ruledSurface.ts'
 import {
   commitDiagramChange,
@@ -1720,6 +1722,31 @@ test('Coons patch creation rejects invalid boundary selections safely', () => {
   )
 })
 
+test('Coons patch creation rejects closed boundary sources without mutating diagram', () => {
+  for (const role of coonsPatchBoundaryRoles) {
+    const diagram = createCoonsPatchSourceDiagramWithClosedBoundary(role)
+    const beforeJson = serializeDiagram(diagram)
+    const result = createCoonsPatchFromBoundaryPaths(
+      diagram,
+      coonsPatchSourcePathIds,
+    )
+
+    assert.equal(result.ok, false)
+    if (result.ok) {
+      throw new Error(`Expected closed ${role} Coons boundary to fail.`)
+    }
+    assert.equal(result.error, 'sourceClosedPath')
+    assert.equal(result.role, role)
+    assert.equal(result.sourcePathId, coonsPatchSourcePathIds[role])
+    assert.match(
+      createCoonsPatchFromBoundaryPathsErrorMessage(result.error, result.role),
+      new RegExp(`Coons patch ${role} boundary must be an open path`, 'i'),
+    )
+    assert.equal(serializeDiagram(diagram), beforeJson)
+    assert.equal(serializeDiagram(result.diagram), beforeJson)
+  }
+})
+
 test('Coons patch sampling edits update SVG mesh and TikZ export', () => {
   const result = createCoonsPatchFromBoundaryPaths(
     createCoonsPatchSourceDiagram(),
@@ -2751,6 +2778,13 @@ const expectedFrameSnapshot = {
   normal: { x: 0, y: -1, z: 0 },
 }
 
+const coonsPatchSourcePathIds: Record<CoonsPatchBoundaryRole, string> = {
+  bottom: 'coons-bottom',
+  right: 'coons-right',
+  top: 'coons-top',
+  left: 'coons-left',
+}
+
 function createRuledSurfaceSourceDiagram(): Diagram {
   const firstPath = addConcatenatedPathFromDirectInput(
     emptyThreeDimensionalDiagram,
@@ -2849,6 +2883,24 @@ function createCoonsPatchSourceDiagramWithPoint(): Diagram {
   ).diagram
 }
 
+function createCoonsPatchSourceDiagramWithClosedBoundary(
+  role: CoonsPatchBoundaryRole,
+): Diagram {
+  const sourcePathId = coonsPatchSourcePathIds[role]
+
+  return updateStratumById(
+    createCoonsPatchSourceDiagram(),
+    sourcePathId,
+    (stratum) =>
+      stratum.geometricKind === 'curve' && stratum.kind === 'concatenatedPath'
+        ? {
+            ...stratum,
+            segments: closedCoonsBoundarySegments(coonsPatchBoundaryStart(role)),
+          }
+        : stratum,
+  )
+}
+
 function addCoonsBoundaryPath(
   diagram: Diagram,
   id: string,
@@ -2880,6 +2932,41 @@ function addCoonsBoundaryPath(
   }
 
   return result.diagram
+}
+
+function closedCoonsBoundarySegments(
+  start: Vec3,
+): ConcatenatedPathStratum['segments'] {
+  const middle = {
+    x: start.x + 0.5,
+    y: start.y + 0.25,
+    z: start.z,
+  }
+
+  return [
+    {
+      kind: 'line',
+      start,
+      end: middle,
+    },
+    {
+      kind: 'line',
+      start: middle,
+      end: start,
+    },
+  ]
+}
+
+function coonsPatchBoundaryStart(role: CoonsPatchBoundaryRole): Vec3 {
+  switch (role) {
+    case 'bottom':
+    case 'left':
+      return { x: 0, y: 0, z: 0 }
+    case 'right':
+      return { x: 2, y: 0, z: 0 }
+    case 'top':
+      return { x: 0, y: 1, z: 0.5 }
+  }
 }
 
 function directVec3(point: Vec3): DirectCoordinateInput {
