@@ -63,12 +63,31 @@ import {
   layerFilterIncludesLayer,
   type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
+import {
+  createRuledSurfaceFromBoundaryPaths,
+  createRuledSurfaceFromBoundaryPathsErrorMessage,
+} from '../../src/ui/ruledSurface.ts'
+import {
+  commitDiagramChange,
+  createDiagramHistory,
+  redoLastDiagramChange,
+  undoLastDiagramChange,
+  type DiagramHistory,
+} from '../../src/ui/undo.ts'
 
 type TestEditorState = {
   editableDiagram: Diagram
   selectedElement: SelectedElement
   layerFilter: LayerFilter
   draftMarker: string
+}
+
+type UndoTestEditorState = TestEditorState & {
+  polylineDraft: null
+  cubicBezierDraft: null
+  pathDraft: null
+  sheetPolygonDraft: null
+  history: DiagramHistory
 }
 
 test('direct point creation commits to editable diagram state', () => {
@@ -1296,6 +1315,218 @@ test('curved sheet creation rejects unsupported ambient dimension and invalid pr
   assert.equal(invalidSampling.id, null)
 })
 
+test('ruled surface creation copies two valid boundary paths and leaves sources unchanged', () => {
+  const diagram = createRuledSurfaceSourceDiagram()
+  const source0Before = findConcatenatedPath(diagram, 'ruled-boundary-0')
+  const source1Before = findConcatenatedPath(diagram, 'ruled-boundary-1')
+  const style = sheetStyle({
+    fillColor: '#AA8844',
+    fillOpacity: 0.37,
+    strokeColor: '#2255AA',
+    strokeOpacity: 0.68,
+  })
+  const result = createRuledSurfaceFromBoundaryPaths(
+    diagram,
+    ['ruled-boundary-0', 'ruled-boundary-1'],
+    {
+      id: 'ui-ruled-surface',
+      name: 'UI Ruled Surface',
+      layer: 6,
+      style,
+      samplingSegments: 5,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createRuledSurfaceFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'ruled-boundary-0'), source0Before)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'ruled-boundary-1'), source1Before)
+
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(sheet.codim, 1)
+  assert.equal(sheet.layer, 6)
+  assert.deepEqual(sheet.style, style)
+  assert.equal(sheet.primitive.kind, 'ruledSurface')
+  assert.deepEqual(sheet.primitive.sampling, { segments: 5 })
+  assert.notEqual(sheet.primitive.boundary0.segments, source0Before.segments)
+  assert.notEqual(sheet.primitive.boundary1.segments, source1Before.segments)
+  assert.deepEqual(sheet.primitive.boundary0.segments, source0Before.segments)
+  assert.deepEqual(sheet.primitive.boundary1.segments, source1Before.segments)
+
+  const editedSources = updateStratumById(result.diagram, 'ruled-boundary-0', (stratum) =>
+    stratum.geometricKind === 'curve' && stratum.kind === 'concatenatedPath'
+      ? {
+          ...stratum,
+          segments: [
+            {
+              kind: 'line',
+              start: { x: 10, y: 0, z: 0 },
+              end: { x: 12, y: 0, z: 0 },
+            },
+          ],
+        }
+      : stratum,
+  )
+
+  assert.deepEqual(
+    findCurvedSheet(editedSources, result.id).primitive,
+    sheet.primitive,
+  )
+
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.primitiveKind, 'ruledSurface')
+  assert.equal(mesh.uSegments, 5)
+  assert.equal(mesh.vSegments, 1)
+  assert.equal(mesh.faces.length, 5)
+  assert.equal(mesh.boundaryPathData.length, 1)
+  assert.doesNotMatch(
+    [...mesh.faces.map((face) => face.points), ...mesh.boundaryPathData].join('\n'),
+    /NaN|Infinity/,
+  )
+
+  const tikz = generateTikz(result.diagram)
+
+  assert.match(tikz, /Ruled surface generated from two boundary paths/)
+  assert.match(tikz, /Primitive: ruledSurface; sampling: u=5, v=1; faces=5/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer0,stratifiedLayer6,main\}/)
+  assert.match(tikz, /\{HTML\}\{AA8844\}/)
+  assert.match(tikz, /\{HTML\}\{2255AA\}/)
+  assert.match(tikz, /fill opacity=0\.37/)
+  assert.match(tikz, /draw opacity=0\.68/)
+  assert.equal((tikz.match(/\\filldraw/g) ?? []).length, 5)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
+})
+
+test('ruled surface creation rejects invalid boundary selections safely', () => {
+  const diagram = createRuledSurfaceSourceDiagram()
+
+  assertRuledSurfaceCreationError(
+    createRuledSurfaceFromBoundaryPaths(diagram, ['ruled-boundary-0']),
+    'wrongBoundaryCount',
+  )
+  assertRuledSurfaceCreationError(
+    createRuledSurfaceFromBoundaryPaths(
+      diagram,
+      ['ruled-boundary-0', 'ruled-boundary-0'],
+    ),
+    'duplicateSourcePath',
+  )
+  assertRuledSurfaceCreationError(
+    createRuledSurfaceFromBoundaryPaths(
+      diagram,
+      ['ruled-boundary-0', 'missing-path'],
+    ),
+    'missingSourcePath',
+  )
+  assertRuledSurfaceCreationError(
+    createRuledSurfaceFromBoundaryPaths(
+      createRuledSurfaceSourceDiagramWithPoint(),
+      ['ruled-boundary-0', 'not-a-boundary'],
+    ),
+    'sourceNotBoundaryPath',
+  )
+  assertRuledSurfaceCreationError(
+    createRuledSurfaceFromBoundaryPaths(
+      diagram,
+      ['ruled-boundary-0', 'ruled-boundary-1'],
+      { samplingSegments: 0 },
+    ),
+    'invalidSampling',
+  )
+})
+
+test('ruled surface sampling edits update SVG mesh and TikZ export', () => {
+  const result = createRuledSurfaceFromBoundaryPaths(
+    createRuledSurfaceSourceDiagram(),
+    ['ruled-boundary-0', 'ruled-boundary-1'],
+    { id: 'editable-ruled-surface', samplingSegments: 3 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected ruled surface creation to succeed.')
+  }
+
+  const edited = updateCurvedSheetPrimitiveById(
+    result.diagram,
+    result.id,
+    (primitive) =>
+      primitive.kind === 'ruledSurface'
+        ? { ...primitive, sampling: { segments: 7 } }
+        : primitive,
+  )
+  const sheet = findCurvedSheet(edited, result.id)
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.faces.length, 7)
+  assert.match(
+    generateTikz(edited),
+    /Primitive: ruledSurface; sampling: u=7, v=1; faces=7/,
+  )
+})
+
+test('ruled surface creation is undoable and redoable through diagram history', () => {
+  const initial = createUndoTestEditorState(createRuledSurfaceSourceDiagram())
+  const result = createRuledSurfaceFromBoundaryPaths(
+    initial.editableDiagram,
+    ['ruled-boundary-0', 'ruled-boundary-1'],
+    { id: 'undoable-ruled-surface', layer: 4 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected ruled surface creation to succeed.')
+  }
+
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'stratum', id: result.id },
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(
+    undone.editableDiagram.strata.some((stratum) => stratum.id === result.id),
+    false,
+  )
+  assert.equal(
+    redone.editableDiagram.strata.some((stratum) => stratum.id === result.id),
+    true,
+  )
+})
+
+test('ruled surface inline TikZ output has no blank lines', () => {
+  const result = createRuledSurfaceFromBoundaryPaths(
+    createRuledSurfaceSourceDiagram(),
+    ['ruled-boundary-0', 'ruled-boundary-1'],
+    { id: 'inline-ruled-surface', samplingSegments: 4 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected ruled surface creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+
+  assert.match(tikz, /Ruled surface generated from two boundary paths/)
+  assertNoBlankLines(tikz)
+})
+
 test('direct creation layer helpers reject invalid layer input and keep TikZ UI-state independent', () => {
   assert.equal(parseDirectLayerInput(''), null)
   assert.equal(parseDirectLayerInput('Infinity'), null)
@@ -2231,6 +2462,98 @@ const expectedFrameSnapshot = {
   u: { x: 1, y: 0, z: 0 },
   v: { x: 0, y: 0, z: 1 },
   normal: { x: 0, y: -1, z: 0 },
+}
+
+function createRuledSurfaceSourceDiagram(): Diagram {
+  const firstPath = addConcatenatedPathFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      start: { x: '0', y: '0', z: '0' },
+      segments: [
+        {
+          kind: 'line',
+          end: { x: '2', y: '0', z: '0' },
+        },
+      ],
+    },
+    {
+      id: 'ruled-boundary-0',
+      name: 'Ruled boundary 0',
+      layer: 0,
+    },
+  )
+
+  assert.equal(firstPath.ok, true)
+  if (!firstPath.ok) {
+    throw new Error('Expected first ruled source path to be created.')
+  }
+
+  const secondPath = addConcatenatedPathFromDirectInput(
+    firstPath.diagram,
+    {
+      start: { x: '0', y: '1', z: '1' },
+      segments: [
+        {
+          kind: 'line',
+          end: { x: '2', y: '1', z: '1' },
+        },
+      ],
+    },
+    {
+      id: 'ruled-boundary-1',
+      name: 'Ruled boundary 1',
+      layer: 0,
+    },
+  )
+
+  assert.equal(secondPath.ok, true)
+  if (!secondPath.ok) {
+    throw new Error('Expected second ruled source path to be created.')
+  }
+
+  return secondPath.diagram
+}
+
+function createRuledSurfaceSourceDiagramWithPoint(): Diagram {
+  return addPointStratumWithResult(
+    createRuledSurfaceSourceDiagram(),
+    { x: 0, y: 0, z: 0 },
+    { id: 'not-a-boundary' },
+  ).diagram
+}
+
+function createUndoTestEditorState(diagram: Diagram): UndoTestEditorState {
+  return {
+    ...createTestEditorState(diagram),
+    polylineDraft: null,
+    cubicBezierDraft: null,
+    pathDraft: null,
+    sheetPolygonDraft: null,
+    history: createDiagramHistory(diagram),
+  }
+}
+
+function assertRuledSurfaceCreationError(
+  result: ReturnType<typeof createRuledSurfaceFromBoundaryPaths>,
+  expectedError: Parameters<
+    typeof createRuledSurfaceFromBoundaryPathsErrorMessage
+  >[0],
+): void {
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected ruled surface creation to fail.')
+  }
+
+  assert.equal(result.error, expectedError)
+}
+
+function assertNoBlankLines(tikz: string): void {
+  assert.deepEqual(
+    tikz
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length === 0),
+    [],
+  )
 }
 
 function findCurve(diagram: Diagram, id: string): CurveStratum {

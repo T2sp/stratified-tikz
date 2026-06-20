@@ -28,5 +28,6 @@ git diff --check
 - [Specification](docs/SPEC.md)
 - [Data model](docs/DATA_MODEL.md)
 - [TikZ output](docs/TIKZ_OUTPUT.md)
+- [Ruled surfaces](docs/RULED_SURFACES.md)
 - [Symbolic input and grids](docs/SYMBOLIC_INPUT_AND_GRIDS.md)
 - [Layer manager](docs/LAYER_MANAGER.md)

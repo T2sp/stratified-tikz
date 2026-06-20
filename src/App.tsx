@@ -110,12 +110,15 @@ import {
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
+  createRuledSurfaceFromBoundaryPaths,
+  createRuledSurfaceFromBoundaryPathsErrorMessage,
   createWorkPlanePointPickingHighlights,
   createCustomWorkPlanePreview,
   createConcatenatedPathDraft,
   createDiagramHistory,
   createSheetPolygonDraft,
   defaultHemisphereCreationParameters,
+  defaultRuledSurfaceSamplingSegments,
   defaultSaddleCreationParameters,
   defaultCustomOriginNormalWorkPlaneInput,
   defaultCustomThreePointWorkPlaneInput,
@@ -169,6 +172,7 @@ import {
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
   inlineMathTikzExportHelp,
+  isRuledSurfaceBoundaryPathStratum,
   tikzDownloadFilenameForMode,
   tikzExportModeFromSelectValue,
   tikzExportModeOptions,
@@ -235,7 +239,7 @@ type DirectCreationTool =
   | 'createSheet'
   | 'createGrid'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
-type SheetCreationKind = 'polygon' | CurvedSheetCreationKind
+type SheetCreationKind = 'polygon' | CurvedSheetCreationKind | 'ruledSurface'
 type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
 type DirectPathManualCoordinateRole = 'center' | 'control1' | 'control2' | 'end'
 type DirectPathManualSegmentDraft = {
@@ -416,6 +420,7 @@ const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
   { id: 'polygon', label: 'Polygon' },
   { id: 'hemisphere', label: 'Hemisphere' },
   { id: 'saddle', label: 'Saddle' },
+  { id: 'ruledSurface', label: 'Ruled' },
 ]
 const concatenatedPathSegmentKinds: Array<{
   id: ConcatenatedPathSegmentKind
@@ -504,6 +509,10 @@ function App() {
   const [saddleVSegmentsInput, setSaddleVSegmentsInput] = useState<string>(
     String(defaultSaddleCreationParameters.sampling.vSegments),
   )
+  const [ruledSurfaceSegmentsInput, setRuledSurfaceSegmentsInput] =
+    useState<string>(String(defaultRuledSurfaceSamplingSegments))
+  const [ruledSurfaceBoundaryPathIds, setRuledSurfaceBoundaryPathIds] =
+    useState<string[]>([])
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
@@ -977,6 +986,7 @@ function App() {
     setDirectCreationStatus('')
     setLayerOperationStatus('')
     setFillBoundaryPathIds([])
+    setRuledSurfaceBoundaryPathIds([])
     setFillRule('nonzero')
     setFillStatus('')
     setDirectLayerInput('0')
@@ -1485,6 +1495,89 @@ function App() {
     setCopyStatus('idle')
   }
 
+  function pickSelectedRuledSurfaceBoundaryPath(): void {
+    const selected = findSelectedElement(editableDiagram, selectedElement)
+
+    if (
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      !isRuledSurfaceBoundaryPathStratum(
+        selected.element,
+        editableDiagram.ambientDimension,
+      )
+    ) {
+      setSheetStatus('Select a path, polyline, cubic Bezier, or path template first.')
+      return
+    }
+
+    const pathId = selected.element.id
+
+    if (ruledSurfaceBoundaryPathIds.includes(pathId)) {
+      setSheetStatus('Boundary path already picked.')
+      return
+    }
+
+    if (ruledSurfaceBoundaryPathIds.length >= 2) {
+      setSheetStatus('Reset picked boundaries before choosing another path.')
+      return
+    }
+
+    setRuledSurfaceBoundaryPathIds((current) => [...current, pathId])
+    setSheetStatus(
+      `Picked boundary ${ruledSurfaceBoundaryPathIds.length + 1}: ${selected.element.name}.`,
+    )
+  }
+
+  function resetRuledSurfaceBoundaryPicking(): void {
+    setRuledSurfaceBoundaryPathIds([])
+    setSheetStatus('Ruled surface boundary picks reset.')
+  }
+
+  function createRuledSurfaceFromPickedPaths(
+    creationLayer: number,
+    setStatus: (message: string) => void,
+  ): boolean {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setStatus('Finish or cancel point picking first.')
+      return false
+    }
+
+    const samplingSegments = parseSamplingInput(
+      ruledSurfaceSegmentsInput,
+      'Ruled surface sampling segments',
+      setStatus,
+    )
+
+    if (samplingSegments === null) {
+      return false
+    }
+
+    const result = createRuledSurfaceFromBoundaryPaths(
+      editableDiagram,
+      ruledSurfaceBoundaryPathIds,
+      {
+        layer: creationLayer,
+        samplingSegments,
+      },
+    )
+
+    if (!result.ok) {
+      setStatus(createRuledSurfaceFromBoundaryPathsErrorMessage(result.error))
+      return false
+    }
+
+    commitCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      creationLayer,
+    )
+    setRuledSurfaceBoundaryPathIds([])
+    setSheetStatus('Ruled surface created.')
+    setDirectCreationStatus('Ruled surface created.')
+    setCopyStatus('idle')
+    return true
+  }
+
   useEffect(() => {
     setInspectorDisclosure((current) =>
       nextInspectorDisclosureStateForSelection(current, selectedElement),
@@ -1659,6 +1752,7 @@ function App() {
       setCubicBezierStatus('')
       setPathStatus('')
       setSheetStatus('')
+      setRuledSurfaceBoundaryPathIds([])
       return
     }
 
@@ -1694,6 +1788,9 @@ function App() {
   function updateSheetCreationKind(kind: SheetCreationKind): void {
     setSheetCreationKind(kind)
     setDirectCreationStatus('')
+    if (kind !== 'ruledSurface') {
+      setRuledSurfaceBoundaryPathIds([])
+    }
     if (kind !== 'polygon') {
       setDirectSheetSources([])
       setDirectSourceTargetRow('1')
@@ -1727,6 +1824,11 @@ function App() {
       coordinateInputMode === 'direct' &&
       (creationTool === 'createPoint' || creationTool === 'createLabel')
     ) {
+      return
+    }
+
+    if (creationTool === 'createSheet' && sheetCreationKind === 'ruledSurface') {
+      setSheetStatus('Pick two selected boundary paths, then create the ruled surface.')
       return
     }
 
@@ -1771,6 +1873,11 @@ function App() {
       coordinateInputMode === 'direct' &&
       (creationTool === 'createPoint' || creationTool === 'createLabel')
     ) {
+      return
+    }
+
+    if (creationTool === 'createSheet' && sheetCreationKind === 'ruledSurface') {
+      setSheetStatus('Pick two selected boundary paths, then create the ruled surface.')
       return
     }
 
@@ -1823,7 +1930,8 @@ function App() {
       creationTool === 'createPoint' ||
       creationTool === 'createLabel' ||
       (creationTool === 'createCubicBezier' && nextCubicBezierPointCount >= 4) ||
-      (creationTool === 'createSheet' && sheetCreationKind !== 'polygon')
+      (creationTool === 'createSheet' &&
+        isAnchorCurvedSheetCreationKind(sheetCreationKind))
     const cursorCreationLayer = shouldCommitOnClick
       ? parseNewElementLayer(
           creationTool === 'createCubicBezier'
@@ -1839,13 +1947,14 @@ function App() {
     }
 
     const curvedSheetParameters =
-      creationTool === 'createSheet' && sheetCreationKind !== 'polygon'
+      creationTool === 'createSheet' &&
+      isAnchorCurvedSheetCreationKind(sheetCreationKind)
         ? parseCurvedSheetCreationParameters(setSheetStatus)
         : null
 
     if (
       creationTool === 'createSheet' &&
-      sheetCreationKind !== 'polygon' &&
+      isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
       curvedSheetParameters === null
     ) {
       return
@@ -1964,6 +2073,10 @@ function App() {
 
       if (creationTool === 'createSheet') {
         if (current.editableDiagram.ambientDimension !== 3) {
+          return current
+        }
+
+        if (sheetCreationKind === 'ruledSurface') {
           return current
         }
 
@@ -2520,7 +2633,7 @@ function App() {
   function parseCurvedSheetCreationParameters(
     setStatus: (message: string) => void,
   ): CurvedSheetCreationParameters | null {
-    if (sheetCreationKind === 'polygon') {
+    if (!isAnchorCurvedSheetCreationKind(sheetCreationKind)) {
       return null
     }
 
@@ -2887,7 +3000,12 @@ function App() {
   }
 
   function createDirectSheet(directLayer: number): void {
-    if (sheetCreationKind !== 'polygon') {
+    if (sheetCreationKind === 'ruledSurface') {
+      createRuledSurfaceFromPickedPaths(directLayer, setDirectCreationStatus)
+      return
+    }
+
+    if (isAnchorCurvedSheetCreationKind(sheetCreationKind)) {
       const anchorPoint = parseDirectCoordinateInput(
         directCoordinates,
         editableDiagram.ambientDimension,
@@ -4547,6 +4665,60 @@ function App() {
                   Cancel sheet
                 </button>
               </>
+            ) : sheetCreationKind === 'ruledSurface' ? (
+              <div className="curved-sheet-parameter-grid">
+                <label className="direct-create-field">
+                  <span>Segments</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxCurvedSheetSamplingSegments}
+                    step="1"
+                    value={ruledSurfaceSegmentsInput}
+                    onChange={(event) => {
+                      setRuledSurfaceSegmentsInput(event.currentTarget.value)
+                      setSheetStatus('')
+                      setDirectCreationStatus('')
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={pickSelectedRuledSurfaceBoundaryPath}
+                >
+                  Pick boundary path
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={resetRuledSurfaceBoundaryPicking}
+                >
+                  Reset boundaries
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => {
+                    const creationLayer = parseNewElementLayer(setSheetStatus)
+
+                    if (creationLayer !== null) {
+                      createRuledSurfaceFromPickedPaths(
+                        creationLayer,
+                        setSheetStatus,
+                      )
+                    }
+                  }}
+                >
+                  Create
+                </button>
+                <span className="toolbar-status">
+                  {formatRuledSurfaceBoundaryPickSummary(
+                    editableDiagram,
+                    ruledSurfaceBoundaryPathIds,
+                  )}
+                </span>
+              </div>
             ) : (
               <div className="curved-sheet-parameter-grid">
                 {sheetCreationKind === 'hemisphere' ? (
@@ -4769,7 +4941,9 @@ function App() {
             >
               <span className="control-label">{directCreationTitle(creationTool)}</span>
               {editableDiagram.ambientDimension === 3 &&
-                creationTool !== 'createGrid' && (
+                creationTool !== 'createGrid' &&
+                (creationTool !== 'createSheet' ||
+                  sheetCreationKind !== 'ruledSurface') && (
                 <label className="direct-create-field direct-coordinate-mode-field">
                   <span>Coordinate mode</span>
                   <select
@@ -4805,7 +4979,7 @@ function App() {
               {(creationTool === 'createPoint' ||
                 creationTool === 'createLabel' ||
                 (creationTool === 'createSheet' &&
-                  sheetCreationKind !== 'polygon')) &&
+                  isAnchorCurvedSheetCreationKind(sheetCreationKind))) &&
                 directCoordinateAxes(
                   editableDiagram.ambientDimension,
                   effectiveDirectCoordinateMode(
@@ -4821,7 +4995,7 @@ function App() {
                         directCoordinateMode,
                       )}{' '}
                       {creationTool === 'createSheet' &&
-                        sheetCreationKind !== 'polygon' &&
+                        isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
                         axis === 'x' &&
                         `(${curvedSheetAnchorLabel(sheetCreationKind)})`}
                     </span>
@@ -5849,6 +6023,8 @@ function sheetCreationStatusPrompt(kind: SheetCreationKind): string {
       return 'Click the preview to place the hemisphere center.'
     case 'saddle':
       return 'Click the preview to place the saddle origin.'
+    case 'ruledSurface':
+      return 'Pick two boundary paths to create a ruled surface.'
   }
 }
 
@@ -5860,16 +6036,42 @@ function sheetCreationKindLabel(kind: SheetCreationKind): string {
       return 'Hemisphere'
     case 'saddle':
       return 'Saddle'
+    case 'ruledSurface':
+      return 'Ruled surface'
   }
 }
 
-function curvedSheetAnchorLabel(kind: Exclude<SheetCreationKind, 'polygon'>): string {
+function curvedSheetAnchorLabel(kind: CurvedSheetCreationKind): string {
   switch (kind) {
     case 'hemisphere':
       return 'center'
     case 'saddle':
       return 'origin'
   }
+}
+
+function isAnchorCurvedSheetCreationKind(
+  kind: SheetCreationKind,
+): kind is CurvedSheetCreationKind {
+  return kind === 'hemisphere' || kind === 'saddle'
+}
+
+function formatRuledSurfaceBoundaryPickSummary(
+  diagram: Diagram,
+  sourcePathIds: readonly string[],
+): string {
+  if (sourcePathIds.length === 0) {
+    return 'No boundary paths picked.'
+  }
+
+  return sourcePathIds
+    .map((sourcePathId, index) => {
+      const source = diagram.strata.find((stratum) => stratum.id === sourcePathId)
+      const label = source?.name ?? sourcePathId
+
+      return `Boundary ${index + 1}: ${label}`
+    })
+    .join('; ')
 }
 
 function parseFiniteInput(

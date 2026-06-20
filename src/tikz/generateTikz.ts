@@ -1093,6 +1093,9 @@ function emitCurvedSheet(
 
   return [
     `% Curved sheet "${sheet.name}" [${sheet.id}] sampled mesh export.`,
+    ...(sheet.primitive.kind === 'ruledSurface'
+      ? ['% Ruled surface generated from two boundary paths.']
+      : []),
     `% Primitive: ${sheet.primitive.kind}; sampling: u=${mesh.uSegments}, v=${mesh.vSegments}; faces=${mesh.faces.length}.`,
     '% Each sampled face is emitted as one filled polygon; hidden-surface sorting is not applied.',
     '\\begin{scope}[',
