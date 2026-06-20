@@ -49,8 +49,12 @@ In a 3D diagram:
 3. Click the boundary paths directly in this order: `bottom`, `right`, `top`,
    then `left`. The picked paths remain in the current Add sheet draft, so
    there is no need to switch back to Select mode between picks.
-4. Set `U segments` and `V segments`.
-5. Click `Create`.
+4. Check the displayed direction for each picked boundary. Use the per-role
+   `Reverse` control to flip a boundary direction for this Coons patch draft.
+   Reversal affects only the copied boundary snapshot used by the new Coons
+   patch; it does not modify the source path.
+5. Set `U segments` and `V segments`.
+6. Click `Create`.
 
 Boundary role order is part of the geometry:
 
@@ -66,8 +70,10 @@ The required corner matches are:
 - top start = left end
 - top end = right end
 
-Inconsistent corners are rejected with a status message. The source paths are
-not modified. The created Coons patch stores copied boundary geometry, not live
+Inconsistent corners are rejected with a status message. If the four paths form
+a geometric loop but the corners do not match in the current directions, reverse
+the affected roles in the Coons draft and revalidate. The source paths are not
+modified. The created Coons patch stores copied boundary geometry, not live
 references, so later source-path edits do not move the patch.
 
 ## Preview And Export

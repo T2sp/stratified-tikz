@@ -13,6 +13,7 @@ import {
   pathSegmentStyleRuns,
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
+  reverseBoundaryPathSnapshot,
   resolvePathSegmentStyle,
 } from '../../src/model/paths.ts'
 import {
@@ -22,6 +23,7 @@ import {
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
+  BoundaryPathSnapshot,
   CurveStratum,
   Diagram,
   PathSegment,
@@ -371,6 +373,167 @@ test('cubic Bezier conversion preserves start, control, and end order', () => {
       end: points[3],
     },
   ])
+})
+
+test('boundary snapshot reversal swaps line endpoints without mutating source', () => {
+  const boundary: BoundaryPathSnapshot = {
+    id: 'line-boundary',
+    name: 'Line boundary',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+    ],
+  }
+  const before = structuredClone(boundary)
+
+  const reversed = reverseBoundaryPathSnapshot(boundary)
+
+  assert.deepEqual(reversed, {
+    id: 'line-boundary',
+    name: 'Line boundary',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 0, z: 0 },
+      },
+    ],
+  })
+  assert.deepEqual(boundary, before)
+  assert.notEqual(reversed.segments, boundary.segments)
+  assert.notEqual(reversed.segments[0].start, boundary.segments[0].end)
+})
+
+test('boundary snapshot reversal swaps cubic endpoints and control points', () => {
+  const boundary: BoundaryPathSnapshot = {
+    segments: [
+      {
+        kind: 'cubicBezier',
+        start: { x: 0, y: 0, z: 0 },
+        control1: { x: 1, y: 2, z: 0 },
+        control2: { x: 3, y: 2, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+      },
+    ],
+  }
+
+  assert.deepEqual(reverseBoundaryPathSnapshot(boundary).segments[0], {
+    kind: 'cubicBezier',
+    start: { x: 4, y: 0, z: 0 },
+    control1: { x: 3, y: 2, z: 0 },
+    control2: { x: 1, y: 2, z: 0 },
+    end: { x: 0, y: 0, z: 0 },
+  })
+})
+
+test('boundary snapshot reversal reverses multi-segment order', () => {
+  const boundary: BoundaryPathSnapshot = {
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: { x: 1, y: 1, z: 0 },
+        control2: { x: 2, y: 1, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 2, y: 0, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+      },
+    ],
+  }
+
+  const reversed = reverseBoundaryPathSnapshot(boundary)
+
+  assert.deepEqual(
+    reversed.segments.map((segment) => segment.kind),
+    ['line', 'cubicBezier', 'line'],
+  )
+  assert.deepEqual(pathEndpoints(reversed.segments), {
+    start: { x: 3, y: 0, z: 0 },
+    end: { x: 0, y: 0, z: 0 },
+  })
+  assert.equal(areSegmentsComposable(reversed.segments), true)
+})
+
+test('boundary snapshot reversal preserves symbolic coordinate metadata', () => {
+  const symbolicEnd = {
+    x: 1,
+    y: 2,
+    z: 0,
+    symbolic: {
+      x: { kind: 'symbolic' as const, expression: 'a', previewValue: 1 },
+      y: { kind: 'numeric' as const, value: 2 },
+      z: { kind: 'numeric' as const, value: 0 },
+    },
+  }
+  const boundary: BoundaryPathSnapshot = {
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: symbolicEnd,
+      },
+    ],
+  }
+
+  const reversed = reverseBoundaryPathSnapshot(boundary)
+
+  assert.deepEqual(reversed.segments[0].start, symbolicEnd)
+  assert.notEqual(reversed.segments[0].start, symbolicEnd)
+  assert.notEqual(reversed.segments[0].start.symbolic, symbolicEnd.symbolic)
+})
+
+test('boundary snapshot reversal swaps arc endpoints, angles, and direction', () => {
+  const boundary: BoundaryPathSnapshot = {
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+        frame: {
+          origin: { x: 0, y: 0, z: 0 },
+          u: { x: 1, y: 0, z: 0 },
+          v: { x: 0, y: 1, z: 0 },
+          normal: { x: 0, y: 0, z: 1 },
+        },
+      },
+    ],
+  }
+
+  const reversed = reverseBoundaryPathSnapshot(boundary)
+
+  assert.deepEqual(reversed.segments[0], {
+    kind: 'arc',
+    start: { x: 0, y: 1, z: 0 },
+    end: { x: 1, y: 0, z: 0 },
+    center: { x: 0, y: 0, z: 0 },
+    radius: 1,
+    startAngleDeg: 90,
+    endAngleDeg: 0,
+    direction: 'clockwise',
+    frame: {
+      origin: { x: 0, y: 0, z: 0 },
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    },
+  })
+  assert.notEqual(reversed.segments[0], boundary.segments[0])
 })
 
 test('concatenated paths normalize for ambient dimension without mutating input', () => {

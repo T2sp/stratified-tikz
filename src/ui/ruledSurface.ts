@@ -8,10 +8,12 @@ import {
 import { isFiniteVec3 } from '../geometry/workPlane.ts'
 import { createCurvedSheetStratum } from '../model/constructors.ts'
 import {
+  cloneBoundaryPathSnapshot,
   normalizePathSegmentsForAmbientDimension,
   pathCoordinates,
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
+  reverseBoundaryPathSnapshot,
   sampleTemplatePathPoints,
 } from '../model/paths.ts'
 import { defaultSheetStyle } from '../model/styles.ts'
@@ -44,6 +46,18 @@ export const coonsPatchBoundaryRoles = [
 export type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
 export type CoonsPatchBoundaryPathIds = Partial<
   Record<CoonsPatchBoundaryRole, string>
+>
+export type PickedCoonsBoundary = {
+  sourcePathId: string
+  reversed: boolean
+}
+export type CoonsPatchBoundaryPathSelection = string | PickedCoonsBoundary
+export type CoonsPatchBoundaryPathSelections = Partial<
+  Record<CoonsPatchBoundaryRole, CoonsPatchBoundaryPathSelection>
+>
+export type CoonsPatchBoundarySnapshots = Record<
+  CoonsPatchBoundaryRole,
+  BoundaryPathSnapshot
 >
 
 export type CreateRuledSurfaceFromBoundaryPathsError =
@@ -107,6 +121,29 @@ export type CreateCoonsPatchFromBoundaryPathsResult =
   | {
       ok: false
       diagram: Diagram
+      error: CreateCoonsPatchFromBoundaryPathsError
+      sourcePathId?: string
+      role?: CoonsPatchBoundaryRole
+    }
+
+export type ResolveCoonsPatchBoundarySnapshotsResult =
+  | {
+      ok: true
+      boundaries: CoonsPatchBoundarySnapshots
+    }
+  | {
+      ok: false
+      error: CreateCoonsPatchFromBoundaryPathsError
+      sourcePathId?: string
+      role?: CoonsPatchBoundaryRole
+    }
+
+export type ValidateCoonsPatchBoundarySelectionsResult =
+  | {
+      ok: true
+    }
+  | {
+      ok: false
       error: CreateCoonsPatchFromBoundaryPathsError
       sourcePathId?: string
       role?: CoonsPatchBoundaryRole
@@ -236,7 +273,7 @@ export function createRuledSurfaceFromBoundaryPaths(
 
 export function createCoonsPatchFromBoundaryPaths(
   diagram: Diagram,
-  sourcePathIds: CoonsPatchBoundaryPathIds,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
   options: CreateCoonsPatchFromBoundaryPathsOptions = {},
 ): CreateCoonsPatchFromBoundaryPathsResult {
   if (diagram.ambientDimension !== 3) {
@@ -244,35 +281,6 @@ export function createCoonsPatchFromBoundaryPaths(
       ok: false,
       diagram,
       error: 'unsupportedAmbientDimension',
-    }
-  }
-
-  const rolePathIds = coonsPatchBoundaryRoles.map((role) => ({
-    role,
-    sourcePathId: sourcePathIds[role]?.trim() ?? '',
-  }))
-
-  const missingRole = rolePathIds.find(
-    ({ sourcePathId }) => sourcePathId.length === 0,
-  )
-
-  if (missingRole !== undefined) {
-    return {
-      ok: false,
-      diagram,
-      error: 'wrongBoundaryCount',
-      role: missingRole.role,
-    }
-  }
-
-  if (
-    new Set(rolePathIds.map(({ sourcePathId }) => sourcePathId)).size !==
-    rolePathIds.length
-  ) {
-    return {
-      ok: false,
-      diagram,
-      error: 'duplicateSourcePath',
     }
   }
 
@@ -289,59 +297,24 @@ export function createCoonsPatchFromBoundaryPaths(
     }
   }
 
-  const boundaries: Partial<Record<CoonsPatchBoundaryRole, BoundaryPathSnapshot>> =
-    {}
+  const boundaryResult = resolveCoonsPatchBoundarySnapshots(diagram, sourcePathIds)
 
-  for (const { role, sourcePathId } of rolePathIds) {
-    const boundaryResult = loadBoundaryPathSnapshot(diagram, sourcePathId)
-
-    if (!boundaryResult.ok) {
-      return {
-        ok: false,
-        diagram,
-        error: boundaryResult.error,
-        sourcePathId,
-        role,
-      }
-    }
-
-    if (!isBoundaryPathOpen(boundaryResult.boundary)) {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceClosedPath',
-        sourcePathId,
-        role,
-      }
-    }
-
-    boundaries[role] = boundaryResult.boundary
-  }
-
-  const bottom = boundaries.bottom
-  const right = boundaries.right
-  const top = boundaries.top
-  const left = boundaries.left
-
-  if (
-    bottom === undefined ||
-    right === undefined ||
-    top === undefined ||
-    left === undefined
-  ) {
+  if (!boundaryResult.ok) {
     return {
       ok: false,
       diagram,
-      error: 'wrongBoundaryCount',
+      error: boundaryResult.error,
+      sourcePathId: boundaryResult.sourcePathId,
+      role: boundaryResult.role,
     }
   }
 
   const primitive: CoonsPatchPrimitive = {
     kind: 'coonsPatch',
-    bottom,
-    right,
-    top,
-    left,
+    bottom: boundaryResult.boundaries.bottom,
+    right: boundaryResult.boundaries.right,
+    top: boundaryResult.boundaries.top,
+    left: boundaryResult.boundaries.left,
     sampling: { ...sampling },
   }
 
@@ -370,6 +343,141 @@ export function createCoonsPatchFromBoundaryPaths(
     },
     id: sheet.id,
   }
+}
+
+export function orientedCoonsBoundarySnapshot(
+  sourceSnapshot: BoundaryPathSnapshot,
+  reversed: boolean,
+): BoundaryPathSnapshot {
+  return reversed
+    ? reverseBoundaryPathSnapshot(sourceSnapshot)
+    : cloneBoundaryPathSnapshot(sourceSnapshot)
+}
+
+export function resolveCoonsPatchBoundarySnapshots(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): ResolveCoonsPatchBoundarySnapshotsResult {
+  if (diagram.ambientDimension !== 3) {
+    return {
+      ok: false,
+      error: 'unsupportedAmbientDimension',
+    }
+  }
+
+  const roleSelections = coonsPatchBoundaryRoles.map((role) => ({
+    role,
+    selection: normalizeCoonsPatchBoundarySelection(sourcePathIds[role]),
+  }))
+
+  const missingRole = roleSelections.find(
+    ({ selection }) => selection === null,
+  )
+
+  if (missingRole !== undefined) {
+    return {
+      ok: false,
+      error: 'wrongBoundaryCount',
+      role: missingRole.role,
+    }
+  }
+
+  const sourcePathIdsByRole = roleSelections.map(({ selection }) =>
+    selection === null ? '' : selection.sourcePathId,
+  )
+
+  if (new Set(sourcePathIdsByRole).size !== sourcePathIdsByRole.length) {
+    return {
+      ok: false,
+      error: 'duplicateSourcePath',
+    }
+  }
+
+  const boundaries: Partial<CoonsPatchBoundarySnapshots> = {}
+
+  for (const { role, selection } of roleSelections) {
+    if (selection === null) {
+      return {
+        ok: false,
+        error: 'wrongBoundaryCount',
+        role,
+      }
+    }
+
+    const boundaryResult = loadBoundaryPathSnapshot(
+      diagram,
+      selection.sourcePathId,
+    )
+
+    if (!boundaryResult.ok) {
+      return {
+        ok: false,
+        error: boundaryResult.error,
+        sourcePathId: selection.sourcePathId,
+        role,
+      }
+    }
+
+    if (!isBoundaryPathOpen(boundaryResult.boundary)) {
+      return {
+        ok: false,
+        error: 'sourceClosedPath',
+        sourcePathId: selection.sourcePathId,
+        role,
+      }
+    }
+
+    boundaries[role] = orientedCoonsBoundarySnapshot(
+      boundaryResult.boundary,
+      selection.reversed,
+    )
+  }
+
+  if (
+    boundaries.bottom === undefined ||
+    boundaries.right === undefined ||
+    boundaries.top === undefined ||
+    boundaries.left === undefined
+  ) {
+    return {
+      ok: false,
+      error: 'wrongBoundaryCount',
+    }
+  }
+
+  return {
+    ok: true,
+    boundaries: {
+      bottom: boundaries.bottom,
+      right: boundaries.right,
+      top: boundaries.top,
+      left: boundaries.left,
+    },
+  }
+}
+
+export function validateCoonsPatchBoundarySelections(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathSelections,
+): ValidateCoonsPatchBoundarySelectionsResult {
+  const boundaryResult = resolveCoonsPatchBoundarySnapshots(diagram, sourcePathIds)
+
+  if (!boundaryResult.ok) {
+    return boundaryResult
+  }
+
+  const primitive: CoonsPatchPrimitive = {
+    kind: 'coonsPatch',
+    bottom: boundaryResult.boundaries.bottom,
+    right: boundaryResult.boundaries.right,
+    top: boundaryResult.boundaries.top,
+    left: boundaryResult.boundaries.left,
+    sampling: { ...defaultCoonsPatchSampling },
+  }
+
+  return validateCurvedSheetPrimitive(primitive).valid
+    ? { ok: true }
+    : { ok: false, error: 'invalidBoundary' }
 }
 
 export function isBoundarySurfaceBoundaryPathStratum(
@@ -489,7 +597,7 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
     case 'invalidSampling':
       return `Coons patch u and v sampling must be positive integers at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
     case 'invalidBoundary':
-      return 'Coons patch corners must match: bottom start = left start, bottom end = right start, top start = left end, and top end = right end.'
+      return 'Coons corners do not match with the current boundary directions. Use Reverse controls to adjust boundary directions.'
   }
 }
 
@@ -638,6 +746,33 @@ function isValidBoundarySurfaceSamplingSegmentCount(value: number): boolean {
 
 function expectedBoundaryPathCodim(ambientDimension: AmbientDimension): 1 | 2 {
   return ambientDimension === 2 ? 1 : 2
+}
+
+type NormalizedCoonsPatchBoundarySelection = {
+  sourcePathId: string
+  reversed: boolean
+}
+
+function normalizeCoonsPatchBoundarySelection(
+  selection: CoonsPatchBoundaryPathSelection | undefined,
+): NormalizedCoonsPatchBoundarySelection | null {
+  if (selection === undefined) {
+    return null
+  }
+
+  if (typeof selection === 'string') {
+    const sourcePathId = selection.trim()
+
+    return sourcePathId.length === 0
+      ? null
+      : { sourcePathId, reversed: false }
+  }
+
+  const sourcePathId = selection.sourcePathId.trim()
+
+  return sourcePathId.length === 0
+    ? null
+    : { sourcePathId, reversed: selection.reversed }
 }
 
 function safeBoundarySurfaceId(

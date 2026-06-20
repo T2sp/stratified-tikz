@@ -378,14 +378,16 @@ S(u, v)
 ```
 
 The validator requires bottom start = left start, bottom end = right start, top
-start = left end, and top end = right end. Inconsistent corners are rejected
-until a future repair workflow exists. The sampler returns the existing finite
+start = left end, and top end = right end. During creation, each picked Coons
+boundary can be reversed in the Add sheet draft before validation; this changes
+only the copied boundary snapshot, not the source path. The sampler returns the existing finite
 quad mesh representation used by curved sheets: a deterministic flat vertex
 array plus quad index faces and boundary polylines for later rendering,
 depth-sorting, and TikZ export work. User-facing creation supports ruled
 surfaces from two boundary paths and Coons patches from explicit bottom, right,
-top, and left boundary roles. Both workflows store copied boundary geometry,
-not live references.
+top, and left boundary roles. The workflow does not infer unordered roles
+automatically. Both workflows store copied boundary geometry, not live
+references.
 
 ### Concatenated path editing
 

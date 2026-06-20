@@ -8,6 +8,8 @@ import {
   arePointsOnWorkPlane,
   boundarySurfacePathClickWorkflow,
   coonsPatchBoundaryDraftCanCreate,
+  coonsPatchBoundaryDraftPickedBoundaryForRole,
+  coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryDraftStatusMessage,
   createCoonsPatchBoundaryDraft,
   createRuledSurfaceBoundaryDraft,
@@ -20,6 +22,7 @@ import {
   ruledSurfaceBoundaryDraftCanCreate,
   ruledSurfaceBoundaryDraftStatusMessage,
   sheetDraftBlocksWorkPlaneChange,
+  toggleCoonsPatchBoundaryDraftReverse,
 } from '../../src/ui/sheetDraft.ts'
 import {
   validateCoonsPatchBoundaryPathSource,
@@ -126,7 +129,14 @@ test('Coons patch boundary draft picks bottom, right, top, then left', () => {
     throw new Error('Expected bottom pick to succeed.')
   }
   draft = bottom.draft
-  assert.equal(draft.bottomId, 'bottom-path')
+  assert.deepEqual(draft.bottom, {
+    sourcePathId: 'bottom-path',
+    reversed: false,
+  })
+  assert.deepEqual(coonsPatchBoundaryDraftPickedBoundaryForRole(draft, 'bottom'), {
+    sourcePathId: 'bottom-path',
+    reversed: false,
+  })
   assert.equal(draft.nextRole, 'right')
   assert.equal(coonsPatchBoundaryDraftCanCreate(draft), false)
 
@@ -137,7 +147,10 @@ test('Coons patch boundary draft picks bottom, right, top, then left', () => {
     throw new Error('Expected right pick to succeed.')
   }
   draft = right.draft
-  assert.equal(draft.rightId, 'right-path')
+  assert.deepEqual(draft.right, {
+    sourcePathId: 'right-path',
+    reversed: false,
+  })
   assert.equal(draft.nextRole, 'top')
 
   const top = pickCoonsPatchBoundaryDraftPath(draft, 'top-path')
@@ -147,7 +160,10 @@ test('Coons patch boundary draft picks bottom, right, top, then left', () => {
     throw new Error('Expected top pick to succeed.')
   }
   draft = top.draft
-  assert.equal(draft.topId, 'top-path')
+  assert.deepEqual(draft.top, {
+    sourcePathId: 'top-path',
+    reversed: false,
+  })
   assert.equal(draft.nextRole, 'left')
   assert.equal(
     coonsPatchBoundaryDraftStatusMessage(draft),
@@ -161,9 +177,18 @@ test('Coons patch boundary draft picks bottom, right, top, then left', () => {
     throw new Error('Expected left pick to succeed.')
   }
   draft = left.draft
-  assert.equal(draft.leftId, 'left-path')
+  assert.deepEqual(draft.left, {
+    sourcePathId: 'left-path',
+    reversed: false,
+  })
   assert.equal(draft.nextRole, 'left')
   assert.equal(coonsPatchBoundaryDraftCanCreate(draft), true)
+  assert.deepEqual(coonsPatchBoundarySelectionsFromDraft(draft), {
+    bottom: { sourcePathId: 'bottom-path', reversed: false },
+    right: { sourcePathId: 'right-path', reversed: false },
+    top: { sourcePathId: 'top-path', reversed: false },
+    left: { sourcePathId: 'left-path', reversed: false },
+  })
 })
 
 test('Coons patch boundary draft reset clears picks and duplicate does not clear previous picks', () => {
@@ -189,6 +214,57 @@ test('Coons patch boundary draft reset clears picks and duplicate does not clear
   const reset = resetCoonsPatchBoundaryDraft()
 
   assert.deepEqual(reset, createCoonsPatchBoundaryDraft())
+})
+
+test('Coons patch boundary draft toggles one role direction without clearing picks', () => {
+  const bottom = pickCoonsPatchBoundaryDraftPath(
+    createCoonsPatchBoundaryDraft(),
+    'bottom-path',
+  )
+  assert.equal(bottom.ok, true)
+  if (!bottom.ok) {
+    throw new Error('Expected bottom pick to succeed.')
+  }
+
+  const right = pickCoonsPatchBoundaryDraftPath(bottom.draft, 'right-path')
+  assert.equal(right.ok, true)
+  if (!right.ok) {
+    throw new Error('Expected right pick to succeed.')
+  }
+
+  const top = pickCoonsPatchBoundaryDraftPath(right.draft, 'top-path')
+  assert.equal(top.ok, true)
+  if (!top.ok) {
+    throw new Error('Expected top pick to succeed.')
+  }
+
+  const left = pickCoonsPatchBoundaryDraftPath(top.draft, 'left-path')
+  assert.equal(left.ok, true)
+  if (!left.ok) {
+    throw new Error('Expected left pick to succeed.')
+  }
+
+  const reversedTop = toggleCoonsPatchBoundaryDraftReverse(left.draft, 'top')
+
+  assert.deepEqual(reversedTop.bottom, left.draft.bottom)
+  assert.deepEqual(reversedTop.right, left.draft.right)
+  assert.deepEqual(reversedTop.left, left.draft.left)
+  assert.deepEqual(reversedTop.top, {
+    sourcePathId: 'top-path',
+    reversed: true,
+  })
+  assert.equal(reversedTop.nextRole, 'left')
+
+  const restoredTop = toggleCoonsPatchBoundaryDraftReverse(reversedTop, 'top')
+
+  assert.deepEqual(restoredTop.top, {
+    sourcePathId: 'top-path',
+    reversed: false,
+  })
+  assert.deepEqual(
+    toggleCoonsPatchBoundaryDraftReverse(createCoonsPatchBoundaryDraft(), 'left'),
+    createCoonsPatchBoundaryDraft(),
+  )
 })
 
 test('ruled surface boundary draft picks first then second boundary', () => {

@@ -70,6 +70,7 @@ import {
   createCoonsPatchFromBoundaryPathsErrorMessage,
   createRuledSurfaceFromBoundaryPaths,
   createRuledSurfaceFromBoundaryPathsErrorMessage,
+  validateCoonsPatchBoundarySelections,
   type CoonsPatchBoundaryRole,
 } from '../../src/ui/ruledSurface.ts'
 import {
@@ -1645,6 +1646,98 @@ test('Coons patch creation copies four compatible boundary paths and preserves s
   assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
 })
 
+test('Coons patch creation succeeds with explicit reversed cyclic boundaries', () => {
+  const diagram = createCyclicCoonsPatchSourceDiagram()
+  const sourcesBefore = {
+    bottom: findConcatenatedPath(diagram, 'cyclic-bottom'),
+    right: findConcatenatedPath(diagram, 'cyclic-right'),
+    top: findConcatenatedPath(diagram, 'cyclic-top'),
+    left: findConcatenatedPath(diagram, 'cyclic-left'),
+  }
+
+  const result = createCoonsPatchFromBoundaryPaths(
+    diagram,
+    {
+      bottom: { sourcePathId: 'cyclic-bottom', reversed: false },
+      right: { sourcePathId: 'cyclic-right', reversed: false },
+      top: { sourcePathId: 'cyclic-top', reversed: true },
+      left: { sourcePathId: 'cyclic-left', reversed: true },
+    },
+    { id: 'explicit-reversed-coons-patch' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'cyclic-bottom'), sourcesBefore.bottom)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'cyclic-right'), sourcesBefore.right)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'cyclic-top'), sourcesBefore.top)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'cyclic-left'), sourcesBefore.left)
+
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(sheet.primitive.kind, 'coonsPatch')
+  assert.deepEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
+  assert.deepEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
+  assert.deepEqual(sheet.primitive.top.segments, [
+    {
+      kind: 'line',
+      start: { x: 0, y: 1, z: 0.5 },
+      end: { x: 2, y: 1, z: 1 },
+    },
+  ])
+  assert.deepEqual(sheet.primitive.left.segments, [
+    {
+      kind: 'line',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 0, y: 1, z: 0.5 },
+    },
+  ])
+  assert.notEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
+  assert.notEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
+})
+
+test('Coons patch creation rejects cyclic boundaries until user reverses top and left', () => {
+  const diagram = createCyclicCoonsPatchSourceDiagram()
+  const cyclicSelections = {
+    bottom: 'cyclic-bottom',
+    right: 'cyclic-right',
+    top: 'cyclic-top',
+    left: 'cyclic-left',
+  }
+
+  const validation = validateCoonsPatchBoundarySelections(
+    diagram,
+    cyclicSelections,
+  )
+
+  assert.equal(validation.ok, false)
+  if (validation.ok) {
+    throw new Error('Expected cyclic Coons boundary validation to fail.')
+  }
+  assert.equal(validation.error, 'invalidBoundary')
+  assert.match(
+    createCoonsPatchFromBoundaryPathsErrorMessage(validation.error),
+    /Reverse controls/,
+  )
+
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(diagram, cyclicSelections),
+    'invalidBoundary',
+  )
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(diagram, {
+      bottom: { sourcePathId: 'cyclic-bottom', reversed: false },
+      right: { sourcePathId: 'cyclic-right', reversed: false },
+      top: { sourcePathId: 'cyclic-top', reversed: true },
+      left: { sourcePathId: 'cyclic-left', reversed: false },
+    }),
+    'invalidBoundary',
+  )
+})
+
 test('Coons patch creation rejects inconsistent corners safely', () => {
   const diagram = updateStratumById(
     createCoonsPatchSourceDiagram(),
@@ -2872,6 +2965,38 @@ function createCoonsPatchSourceDiagram(): Diagram {
     'Coons left',
     { x: 0, y: 0, z: 0 },
     { x: 0, y: 1, z: 0.5 },
+  )
+}
+
+function createCyclicCoonsPatchSourceDiagram(): Diagram {
+  let diagram = addCoonsBoundaryPath(
+    emptyThreeDimensionalDiagram,
+    'cyclic-bottom',
+    'Cyclic bottom',
+    { x: 0, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+  )
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'cyclic-right',
+    'Cyclic right',
+    { x: 2, y: 0, z: 0 },
+    { x: 2, y: 1, z: 1 },
+  )
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'cyclic-top',
+    'Cyclic top',
+    { x: 2, y: 1, z: 1 },
+    { x: 0, y: 1, z: 0.5 },
+  )
+
+  return addCoonsBoundaryPath(
+    diagram,
+    'cyclic-left',
+    'Cyclic left',
+    { x: 0, y: 1, z: 0.5 },
+    { x: 0, y: 0, z: 0 },
   )
 }
 
