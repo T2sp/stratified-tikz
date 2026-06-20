@@ -95,6 +95,13 @@ const phaseSlugs = {
   "18B": "inline-math-setup-baseline",
   "18C": "inline-math-no-blank-lines",
   "18D": "export-mode-polish-docs",
+  "19A": "symbolic-expression-model",
+  "19B": "variable-manager-pgfmathsetmacro",
+  "19C": "symbolic-coordinate-input",
+  "19D": "symbolic-tikz-export-integration",
+  "19E": "grid-generation-model-preview",
+  "19F": "grid-foreach-clip-export",
+  "19G": "symbolic-grid-polish",
 };
 
 function makePhaseSpec(phase) {
