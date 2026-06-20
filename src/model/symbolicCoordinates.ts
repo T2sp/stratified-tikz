@@ -7,6 +7,8 @@ import type {
   AmbientDimension,
   ClosedPathBoundary,
   CoordinateComponent,
+  CubicBezierControlMode,
+  CurvedSheetPrimitive,
   Diagram,
   DiagramValidationIssue,
   PathSegment,
@@ -14,6 +16,7 @@ import type {
   Stratum,
   SymbolicVec3,
   Vec3,
+  WorkPlaneFrameSnapshot,
 } from './types.ts'
 
 export type CoordinateAxis = 'x' | 'y' | 'z'
@@ -372,10 +375,24 @@ function validateStratumSymbolicCoordinateMetadata(
       }
 
       if (stratum.kind === 'workPlaneFilledSheet') {
+        validateWorkPlaneFrameSnapshotSymbolicMetadata(
+          stratum.planeFrame,
+          `${path}.planeFrame`,
+          errors,
+        )
         validateClosedPathBoundariesSymbolicMetadata(
           stratum.boundaries,
           ambientDimension,
           `${path}.boundaries`,
+          errors,
+        )
+        return
+      }
+
+      if (stratum.kind === 'curvedSheet') {
+        validateCurvedSheetPrimitiveSymbolicMetadata(
+          stratum.primitive,
+          `${path}.primitive`,
           errors,
         )
       }
@@ -393,6 +410,13 @@ function validateStratumSymbolicCoordinateMetadata(
             errors,
           ),
         )
+        if (stratum.kind === 'cubicBezier') {
+          validateCubicBezierControlModeSymbolicMetadata(
+            stratum.bezierControls,
+            `${path}.bezierControls`,
+            errors,
+          )
+        }
         return
       }
 
@@ -411,6 +435,11 @@ function validateStratumSymbolicCoordinateMetadata(
           stratum.template.center,
           ambientDimension,
           `${path}.template.center`,
+          errors,
+        )
+        validatePathTemplateFrameSymbolicMetadata(
+          stratum.template,
+          `${path}.template`,
           errors,
         )
       }
@@ -522,6 +551,11 @@ function validatePathSegmentSymbolicMetadata(
         `${path}.end`,
         errors,
       )
+      validateCubicBezierControlModeSymbolicMetadata(
+        segment.controlMode,
+        `${path}.controlMode`,
+        errors,
+      )
       return
     case 'arc':
       validateSymbolicVec3Metadata(
@@ -542,10 +576,100 @@ function validatePathSegmentSymbolicMetadata(
         `${path}.center`,
         errors,
       )
+      validateWorkPlaneFrameSnapshotSymbolicMetadata(
+        segment.frame,
+        `${path}.frame`,
+        errors,
+      )
       return
     default:
       return
   }
+}
+
+function validateCubicBezierControlModeSymbolicMetadata(
+  controlMode: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(controlMode)) {
+    return
+  }
+
+  if (
+    controlMode.kind === 'workPlaneRelativeCartesian' ||
+    controlMode.kind === 'workPlaneRelativePolar'
+  ) {
+    validateWorkPlaneFrameSnapshotSymbolicMetadata(
+      controlMode.frame,
+      `${path}.frame`,
+      errors,
+    )
+  }
+}
+
+function validatePathTemplateFrameSymbolicMetadata(
+  template: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(template) || template.frame === undefined) {
+    return
+  }
+
+  validateWorkPlaneFrameSnapshotSymbolicMetadata(
+    template.frame,
+    `${path}.frame`,
+    errors,
+  )
+}
+
+function validateCurvedSheetPrimitiveSymbolicMetadata(
+  primitive: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(primitive)) {
+    return
+  }
+
+  if (primitive.kind === 'hemisphere') {
+    validateSymbolicVec3Metadata(
+      primitive.center,
+      3,
+      `${path}.center`,
+      errors,
+    )
+    validateWorkPlaneFrameSnapshotSymbolicMetadata(
+      primitive.frame,
+      `${path}.frame`,
+      errors,
+    )
+    return
+  }
+
+  if (primitive.kind === 'saddle') {
+    validateWorkPlaneFrameSnapshotSymbolicMetadata(
+      primitive.frame,
+      `${path}.frame`,
+      errors,
+    )
+  }
+}
+
+function validateWorkPlaneFrameSnapshotSymbolicMetadata(
+  frame: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(frame)) {
+    return
+  }
+
+  validateSymbolicVec3Metadata(frame.origin, 3, `${path}.origin`, errors)
+  validateSymbolicVec3Metadata(frame.u, 3, `${path}.u`, errors)
+  validateSymbolicVec3Metadata(frame.v, 3, `${path}.v`, errors)
+  validateSymbolicVec3Metadata(frame.normal, 3, `${path}.normal`, errors)
 }
 
 function validateSymbolicVec3Metadata(
@@ -651,6 +775,12 @@ function refreshStratumSymbolicCoordinatePreviews(
         case 'workPlaneFilledSheet':
           return {
             ...stratum,
+            planeFrame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+              stratum.planeFrame,
+              context,
+              `${path}.planeFrame`,
+              errors,
+            ),
             boundaries: refreshClosedPathBoundaries(
               stratum.boundaries,
               ambientDimension,
@@ -660,13 +790,33 @@ function refreshStratumSymbolicCoordinatePreviews(
             ),
           }
         case 'curvedSheet':
-          return stratum
+          return {
+            ...stratum,
+            primitive: refreshCurvedSheetPrimitiveSymbolicPreviews(
+              stratum.primitive,
+              context,
+              `${path}.primitive`,
+              errors,
+            ),
+          }
         default:
           return stratum
       }
     case 'curve':
       switch (stratum.kind) {
         case 'polyline':
+          return {
+            ...stratum,
+            points: stratum.points.map((point, index) =>
+              refreshVec3SymbolicPreview(
+                point,
+                ambientDimension,
+                context,
+                `${path}.points[${index}]`,
+                errors,
+              ),
+            ),
+          }
         case 'cubicBezier':
           return {
             ...stratum,
@@ -679,6 +829,16 @@ function refreshStratumSymbolicCoordinatePreviews(
                 errors,
               ),
             ),
+            ...(stratum.bezierControls === undefined
+              ? {}
+              : {
+                  bezierControls: refreshCubicBezierControlModeSymbolicPreviews(
+                    stratum.bezierControls,
+                    context,
+                    `${path}.bezierControls`,
+                    errors,
+                  ),
+                }),
           }
         case 'concatenatedPath':
           return {
@@ -813,6 +973,16 @@ function refreshPathSegment(
           `${path}.end`,
           errors,
         ),
+        ...(segment.controlMode === undefined
+          ? {}
+          : {
+              controlMode: refreshCubicBezierControlModeSymbolicPreviews(
+                segment.controlMode,
+                context,
+                `${path}.controlMode`,
+                errors,
+              ),
+            }),
       }
     case 'arc':
       return {
@@ -838,6 +1008,16 @@ function refreshPathSegment(
           `${path}.center`,
           errors,
         ),
+        ...(segment.frame === undefined
+          ? {}
+          : {
+              frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+                segment.frame,
+                context,
+                `${path}.frame`,
+                errors,
+              ),
+            }),
       }
   }
 }
@@ -860,6 +1040,16 @@ function refreshPathTemplate(
           `${path}.center`,
           errors,
         ),
+        ...(template.frame === undefined
+          ? {}
+          : {
+              frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+                template.frame,
+                context,
+                `${path}.frame`,
+                errors,
+              ),
+            }),
       }
     case 'ellipseTemplate':
       return {
@@ -871,7 +1061,117 @@ function refreshPathTemplate(
           `${path}.center`,
           errors,
         ),
+        ...(template.frame === undefined
+          ? {}
+          : {
+              frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+                template.frame,
+                context,
+                `${path}.frame`,
+                errors,
+              ),
+            }),
       }
+  }
+}
+
+function refreshCubicBezierControlModeSymbolicPreviews(
+  controlMode: CubicBezierControlMode,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): CubicBezierControlMode {
+  switch (controlMode.kind) {
+    case 'absolute':
+    case 'relativeCartesian':
+    case 'relativePolar':
+      return controlMode
+    case 'workPlaneRelativeCartesian':
+    case 'workPlaneRelativePolar':
+      return {
+        ...controlMode,
+        frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+          controlMode.frame,
+          context,
+          `${path}.frame`,
+          errors,
+        ),
+      }
+  }
+}
+
+function refreshCurvedSheetPrimitiveSymbolicPreviews(
+  primitive: CurvedSheetPrimitive,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): CurvedSheetPrimitive {
+  switch (primitive.kind) {
+    case 'hemisphere':
+      return {
+        ...primitive,
+        center: refreshVec3SymbolicPreview(
+          primitive.center,
+          3,
+          context,
+          `${path}.center`,
+          errors,
+        ),
+        frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+          primitive.frame,
+          context,
+          `${path}.frame`,
+          errors,
+        ),
+      }
+    case 'saddle':
+      return {
+        ...primitive,
+        frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+          primitive.frame,
+          context,
+          `${path}.frame`,
+          errors,
+        ),
+      }
+  }
+}
+
+function refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+  frame: WorkPlaneFrameSnapshot,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): WorkPlaneFrameSnapshot {
+  return {
+    origin: refreshVec3SymbolicPreview(
+      frame.origin,
+      3,
+      context,
+      `${path}.origin`,
+      errors,
+    ),
+    u: refreshVec3SymbolicPreview(
+      frame.u,
+      3,
+      context,
+      `${path}.u`,
+      errors,
+    ),
+    v: refreshVec3SymbolicPreview(
+      frame.v,
+      3,
+      context,
+      `${path}.v`,
+      errors,
+    ),
+    normal: refreshVec3SymbolicPreview(
+      frame.normal,
+      3,
+      context,
+      `${path}.normal`,
+      errors,
+    ),
   }
 }
 

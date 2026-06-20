@@ -94,6 +94,13 @@ This keeps generated TeX control sequences simple and means names such as `R1`
 are rejected until a broader macro policy is introduced. Variable expressions
 use StratifiedTikZ's scalar-expression parser, not raw TeX.
 
+Export policy: every valid diagram variable is emitted, including variables not
+currently referenced by exported geometry. This keeps output deterministic and
+keeps dependent variable definitions readable without a separate use-analysis
+pass. Variables are emitted in dependency order; independent variables keep the
+user's saved order. Invalid or duplicate variables do not produce duplicate
+`\pgfmathsetmacro` definitions.
+
 In standalone mode, variable definitions are emitted in the setup area before
 `\begin{tikzpicture}`. In inline math mode, they are emitted near the top of the
 picture after local setup and before coordinates/drawing commands:
@@ -108,6 +115,33 @@ picture after local setup and before coordinates/drawing commands:
 ```
 
 Inline math output still contains no blank physical lines.
+
+## Symbolic coordinates
+
+Coordinate components that store expressions are exported as braced PGF math
+expressions. For example, with variables `R` and `q`, a point whose model
+coordinate is `(R*cos(q), R*sin(q), 0)` exports as:
+
+```tex
+\pgfmathsetmacro{\R}{2}
+\pgfmathsetmacro{\q}{30}
+\coordinate (pointOrbit0p0) at ({\R * cos(\q)},{\R * sin(\q)});
+```
+
+The same coordinate formatting is used for point coordinates, label positions,
+ordinary curve vertices, absolute cubic controls, filled-region boundaries, and
+sheet vertices. In 3D mode the third component is emitted in the same way.
+
+For 3D work-plane-filled sheets, symbolic boundary coordinates are exported as
+absolute 3D coordinates instead of the compact local `canvas is plane` form, so
+the saved symbolic expressions are preserved. Numeric work-plane-filled sheets
+continue to use the local plane scope when possible.
+
+Arc segment coordinates and 3D template centers are currently numeric-derived
+exports and are rejected by validation when symbolic coordinate metadata is
+present. In 2D template paths, symbolic centers export through the named center
+coordinate, but template radii and rotation fields are still numeric in the MVP
+data model.
 
 The editor treats the selected export mode as export UI state. When JSON is
 downloaded from the UI, the preference is persisted as `diagram.view.exportMode`

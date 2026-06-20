@@ -13,10 +13,12 @@ import {
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import type {
+  ClosedPathBoundary,
   CoordinateComponent,
   CurveStyle,
   Diagram,
   PointStratum,
+  SheetStyle,
   SymbolicVariable,
   Vec3,
 } from '../../src/model/types.ts'
@@ -384,6 +386,159 @@ test('parseSavedDiagramJson rejects saved symbolic 3D template centers because e
   )
 })
 
+test('parseSavedDiagramJson rejects malformed symbolic work-plane frame metadata cleanly', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'workPlaneFilledSheet',
+    id: 'symbolic-frame-sheet',
+    name: 'Symbolic Frame Sheet',
+    style: sheetStyle(),
+    planeFrame: {
+      origin: symbolicPoint(2, 0, 2, 'R'),
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    boundaries: [squareBoundary3D('frame-boundary', 2)],
+    fillRule: 'nonzero',
+    layer: 0,
+  })
+  const sheet = saved.diagram.strata[saved.diagram.strata.length - 1]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+  if (sheet.planeFrame.origin.symbolic === undefined) {
+    throw new Error('Expected symbolic frame origin metadata.')
+  }
+  delete (sheet.planeFrame.origin.symbolic as unknown as Record<string, unknown>).y
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /strata\[\d+\]\.planeFrame\.origin\.symbolic\.y Coordinate component must be an object/,
+  )
+})
+
+test('parseSavedDiagramJson rejects symbolic arc frames because arc export derives numeric coordinates', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'symbolic-arc-frame',
+    name: 'Symbolic Arc Frame',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 3, y: 0, z: 0 },
+        end: { x: 2, y: 1, z: 0 },
+        center: { x: 2, y: 0, z: 0 },
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+        frame: {
+          origin: symbolicPoint(2, 0, 0, 'R'),
+          u: { x: 1, y: 0, z: 0 },
+          v: { x: 0, y: 1, z: 0 },
+          normal: { x: 0, y: 0, z: 1 },
+        },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /Work-plane frame coordinates must be numeric/,
+  )
+})
+
+test('parseSavedDiagramJson rejects symbolic concatenated Bezier control-mode frames', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'symbolic-segment-frame',
+    name: 'Symbolic Segment Frame',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'cubicBezier',
+        start: { x: 3, y: 0, z: 0 },
+        control1: { x: 3.5, y: 0, z: 0 },
+        control2: { x: 3.5, y: 0, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+        controlMode: {
+          kind: 'workPlaneRelativeCartesian',
+          frame: {
+            origin: symbolicPoint(2, 0, 0, 'R'),
+            u: { x: 1, y: 0, z: 0 },
+            v: { x: 0, y: 1, z: 0 },
+            normal: { x: 0, y: 0, z: 1 },
+          },
+          localStart: { a: 1, b: 0 },
+          localEnd: { a: 2, b: 0 },
+          firstControlOffset: { dx: 0.5, dy: 0 },
+          secondControlOffset: { dx: -0.5, dy: 0 },
+          secondOffsetReference: 'end',
+        },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /Work-plane frame coordinates must be numeric/,
+  )
+})
+
+test('parseSavedDiagramJson rejects symbolic curved sheet frames because mesh export samples previews', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    id: 'symbolic-curved-frame',
+    name: 'Symbolic Curved Frame',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'saddle',
+      frame: {
+        origin: symbolicPoint(2, 0, 0, 'R'),
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+      width: 2,
+      depth: 2,
+      height: 1,
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /Work-plane frame coordinates must be numeric/,
+  )
+})
+
 test('existing numeric coordinate input remains numeric-only in the model', () => {
   const result = addPointStratumFromDirectInput(symbolicDiagram(), {
     x: '1.5',
@@ -555,6 +710,35 @@ function curveStyle(): CurveStyle {
     strokeOpacity: 1,
     lineWidth: 1.2,
     lineStyle: 'solid',
+  }
+}
+
+function sheetStyle(): SheetStyle {
+  return {
+    kind: 'sheetStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#4D9DE0',
+    strokeOpacity: 1,
+  }
+}
+
+function squareBoundary3D(id: string, z: number): ClosedPathBoundary {
+  const points: [Vec3, Vec3, Vec3, Vec3] = [
+    { x: 0, y: 0, z },
+    { x: 2, y: 0, z },
+    { x: 2, y: 2, z },
+    { x: 0, y: 2, z },
+  ]
+
+  return {
+    id,
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
   }
 }
 

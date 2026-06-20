@@ -1,6 +1,7 @@
 import type {
   ClosedPathBoundary,
   ConcatenatedPathStratum,
+  CoordinateComponent,
   CubicBezierCurveStratum,
   CubicBezierControlMode,
   Camera3D,
@@ -56,6 +57,7 @@ import {
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
 import { parseScalarExpression } from '../model/scalarExpressions.ts'
+import { hasSymbolicVec3Coordinates } from '../model/symbolicCoordinates.ts'
 import {
   isSymbolicVariableMacroName,
   resolveSymbolicVariables,
@@ -1074,31 +1076,35 @@ function emitWorkPlaneFilledSheet(
     ),
     ...fillRuleTikzOptions(sheet.fillRule),
   ]
-  const scopedPath = formatWorkPlaneFilledSheetLocalPath(sheet)
+  const hasSymbolicBoundaryCoordinates = closedBoundariesHaveSymbolicCoordinates(
+    sheet.boundaries,
+  )
+  const scopedPath = hasSymbolicBoundaryCoordinates
+    ? null
+    : formatWorkPlaneFilledSheetLocalPath(sheet)
 
   if (scopedPath !== null) {
+    const frameOptions = formatTikzPlaneScopeOptions(
+      sheet.planeFrame,
+      context,
+      `work-plane filled sheet "${sheet.name}" [${sheet.id}] frame`,
+    )
+
+    if (!frameOptions.ok) {
+      return [
+        `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] omitted because its local plane frame cannot be exported safely.`,
+        `% ${frameOptions.error}`,
+        '',
+      ]
+    }
+
     context.requiresTikz3dLibrary = true
 
     return [
       `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] from ${sheet.boundaries.length} closed boundary path${sheet.boundaries.length === 1 ? '' : 's'}.`,
       `% Fill rule: ${sheet.fillRule}; exported in a local TikZ 3d plane scope.`,
       '\\begin{scope}[',
-      indentLine(
-        `plane origin={${formatCoordinate(sheet.planeFrame.origin, '3d')}},`,
-      ),
-      indentLine(
-        `plane x={${formatCoordinate(
-          addVec3(sheet.planeFrame.origin, sheet.planeFrame.u),
-          '3d',
-        )}},`,
-      ),
-      indentLine(
-        `plane y={${formatCoordinate(
-          addVec3(sheet.planeFrame.origin, sheet.planeFrame.v),
-          '3d',
-        )}},`,
-      ),
-      indentLine('canvas is plane'),
+      ...frameOptions.options.map((option) => indentLine(option)),
       ']',
       indentLine('\\filldraw['),
       ...indentLines(formatTikzOptions(options)),
@@ -1116,7 +1122,9 @@ function emitWorkPlaneFilledSheet(
   )
 
   return [
-    `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
+    hasSymbolicBoundaryCoordinates
+      ? `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates to preserve symbolic boundary expressions.`
+      : `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
     `% Fill rule: ${sheet.fillRule}.`,
     ...emitFillDrawClosedBoundaries(coordinates, options),
   ]
@@ -1317,6 +1325,13 @@ function emitTemplatePath3D(
   options: string[],
   context: GenerateContext,
 ): string[] {
+  if (hasSymbolicVec3Coordinates(curve.template.center)) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because 3D template centers use local numeric plane coordinates and cannot preserve symbolic center expressions yet.`,
+      '',
+    ]
+  }
+
   if (curve.template.frame === undefined) {
     return [
       `% Template path "${curve.name}" [${curve.id}] omitted because 3D templates require a stored frame.`,
@@ -1339,6 +1354,19 @@ function emitTemplatePath3D(
   }
 
   context.requiresTikz3dLibrary = true
+  const frameOptions = formatTikzPlaneScopeOptions(
+    frame,
+    context,
+    `template path "${curve.name}" [${curve.id}] frame`,
+  )
+
+  if (!frameOptions.ok) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because its local plane frame cannot be exported safely.`,
+      `% ${frameOptions.error}`,
+      '',
+    ]
+  }
 
   const drawLines =
     curve.template.kind === 'ellipseTemplate' &&
@@ -1365,14 +1393,7 @@ function emitTemplatePath3D(
   return [
     `% Template path "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope.`,
     '\\begin{scope}[',
-    indentLine(`plane origin={${formatCoordinate(frame.origin, '3d')}},`),
-    indentLine(
-      `plane x={${formatCoordinate(addVec3(frame.origin, frame.u), '3d')}},`,
-    ),
-    indentLine(
-      `plane y={${formatCoordinate(addVec3(frame.origin, frame.v), '3d')}},`,
-    ),
-    indentLine('canvas is plane'),
+    ...frameOptions.options.map((option) => indentLine(option)),
     ']',
     ...drawLines,
     '\\end{scope}',
@@ -1464,32 +1485,47 @@ function emitScopedWorkPlaneRelativeBezierCurve(
   options: string[],
   context: GenerateContext,
 ): string[] | null {
+  const workPlaneFrame = workPlaneRelativeBezierControlFrame(curve)
+
+  if (curveHasSymbolicCoordinates(curve)) {
+    return workPlaneFrame !== null && workPlaneFrameHasSymbolicMetadata(workPlaneFrame)
+      ? [
+          `% Curve "${curve.name}" [${curve.id}] omitted because symbolic work-plane-local frame coordinates cannot be preserved when symbolic absolute curve points require fallback export.`,
+          '',
+        ]
+      : null
+  }
+
   const scopedPath = formatScopedWorkPlaneRelativeBezierPath(curve, context.mode)
 
   if (scopedPath === null) {
-    return null
+    return workPlaneFrame !== null && workPlaneFrameHasSymbolicMetadata(workPlaneFrame)
+      ? [
+          `% Curve "${curve.name}" [${curve.id}] omitted because its symbolic work-plane-local frame cannot be exported safely without a valid local plane scope.`,
+          '',
+        ]
+      : null
+  }
+
+  const frameOptions = formatTikzPlaneScopeOptions(
+    scopedPath.frame,
+    context,
+    `curve "${curve.name}" [${curve.id}] work-plane-local frame`,
+  )
+
+  if (!frameOptions.ok) {
+    return [
+      `% Curve "${curve.name}" [${curve.id}] omitted because its work-plane-local frame cannot be exported safely.`,
+      `% ${frameOptions.error}`,
+      '',
+    ]
   }
 
   context.requiresTikz3dLibrary = true
 
   return [
     '\\begin{scope}[',
-    indentLine(
-      `plane origin={${formatCoordinate(scopedPath.frame.origin, '3d')}},`,
-    ),
-    indentLine(
-      `plane x={${formatCoordinate(
-        addVec3(scopedPath.frame.origin, scopedPath.frame.u),
-        '3d',
-      )}},`,
-    ),
-    indentLine(
-      `plane y={${formatCoordinate(
-        addVec3(scopedPath.frame.origin, scopedPath.frame.v),
-        '3d',
-      )}},`,
-    ),
-    indentLine('canvas is plane'),
+    ...frameOptions.options.map((option) => indentLine(option)),
     ']',
     indentLine('\\draw['),
     ...indentLines(formatTikzOptions(options)),
@@ -1498,6 +1534,272 @@ function emitScopedWorkPlaneRelativeBezierCurve(
     '\\end{scope}',
     '',
   ]
+}
+
+function workPlaneRelativeBezierControlFrame(
+  curve: CurveStratum,
+): WorkPlaneFrameSnapshot | null {
+  if (curve.kind !== 'cubicBezier') {
+    return null
+  }
+
+  const controlMode = curve.bezierControls
+
+  return controlMode?.kind === 'workPlaneRelativeCartesian' ||
+    controlMode?.kind === 'workPlaneRelativePolar'
+    ? controlMode.frame
+    : null
+}
+
+function workPlaneFrameHasSymbolicMetadata(
+  frame: WorkPlaneFrameSnapshot,
+): boolean {
+  return (
+    frame.origin.symbolic !== undefined ||
+    frame.u.symbolic !== undefined ||
+    frame.v.symbolic !== undefined ||
+    frame.normal.symbolic !== undefined
+  )
+}
+
+type FormatTikzPlaneScopeOptionsResult =
+  | {
+      ok: true
+      options: string[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+function formatTikzPlaneScopeOptions(
+  frame: WorkPlaneFrameSnapshot,
+  context: GenerateContext,
+  frameDescription: string,
+): FormatTikzPlaneScopeOptionsResult {
+  const origin = formatFrameCoordinate(
+    frame.origin,
+    context,
+    `${frameDescription}.origin`,
+  )
+  const u = formatFrameCoordinate(
+    frame.u,
+    context,
+    `${frameDescription}.u`,
+  )
+  const v = formatFrameCoordinate(
+    frame.v,
+    context,
+    `${frameDescription}.v`,
+  )
+  const normal = validateNumericFrameCoordinate(
+    frame.normal,
+    context,
+    `${frameDescription}.normal`,
+  )
+  const planeX = formatFrameCoordinate(
+    addVec3PreservingSymbolicCoordinates(frame.origin, frame.u),
+    context,
+    `${frameDescription}.u`,
+  )
+  const planeY = formatFrameCoordinate(
+    addVec3PreservingSymbolicCoordinates(frame.origin, frame.v),
+    context,
+    `${frameDescription}.v`,
+  )
+
+  if (!origin.ok) {
+    return origin
+  }
+
+  if (!u.ok) {
+    return u
+  }
+
+  if (!v.ok) {
+    return v
+  }
+
+  if (!normal.ok) {
+    return normal
+  }
+
+  if (!planeX.ok) {
+    return planeX
+  }
+
+  if (!planeY.ok) {
+    return planeY
+  }
+
+  return {
+    ok: true,
+    options: [
+      `plane origin={${origin.coordinate}},`,
+      `plane x={${planeX.coordinate}},`,
+      `plane y={${planeY.coordinate}},`,
+      'canvas is plane',
+    ],
+  }
+}
+
+function validateNumericFrameCoordinate(
+  point: Vec3,
+  context: GenerateContext,
+  path: string,
+): FormatFrameCoordinateResult {
+  if (hasSymbolicVec3Coordinates(point)) {
+    return {
+      ok: false,
+      error: `${path} is symbolic, but this frame component is not emitted by TikZ plane scope options.`,
+    }
+  }
+
+  const formatted = formatFrameCoordinate(point, context, path)
+
+  return formatted.ok
+    ? {
+        ok: true,
+        coordinate: formatted.coordinate,
+      }
+    : formatted
+}
+
+type FormatFrameCoordinateResult =
+  | {
+      ok: true
+      coordinate: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+function formatFrameCoordinate(
+  point: Vec3,
+  context: GenerateContext,
+  path: string,
+): FormatFrameCoordinateResult {
+  const components = [
+    formatFrameCoordinateComponent(point, 'x', context, `${path}.x`),
+    formatFrameCoordinateComponent(point, 'y', context, `${path}.y`),
+    formatFrameCoordinateComponent(point, 'z', context, `${path}.z`),
+  ] as const
+  const values: string[] = []
+
+  for (const component of components) {
+    if (!component.ok) {
+      return component
+    }
+    values.push(component.value)
+  }
+
+  return {
+    ok: true,
+    coordinate: `(${values.join(',')})`,
+  }
+}
+
+type FormatFrameCoordinateComponentResult =
+  | {
+      ok: true
+      value: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+function formatFrameCoordinateComponent(
+  point: Vec3,
+  axis: 'x' | 'y' | 'z',
+  context: GenerateContext,
+  path: string,
+): FormatFrameCoordinateComponentResult {
+  if (!Number.isFinite(point[axis])) {
+    return {
+      ok: false,
+      error: `${path} is not finite.`,
+    }
+  }
+
+  if (point.symbolic === undefined) {
+    return {
+      ok: true,
+      value: formatNumber(point[axis]),
+    }
+  }
+
+  const symbolic = point.symbolic as Partial<Record<'x' | 'y' | 'z', unknown>>
+  const rawComponent = symbolic[axis]
+
+  if (!isCoordinateComponent(rawComponent)) {
+    return {
+      ok: false,
+      error: `${path} symbolic metadata is malformed.`,
+    }
+  }
+
+  const component = rawComponent
+
+  if (component.kind === 'numeric') {
+    if (
+      !Number.isFinite(component.value) ||
+      !numbersApproximatelyEqual(component.value, point[axis])
+    ) {
+      return {
+        ok: false,
+        error: `${path} numeric symbolic metadata does not match the coordinate preview value.`,
+      }
+    }
+
+    return {
+      ok: true,
+      value: formatNumber(point[axis]),
+    }
+  }
+
+  if (!Number.isFinite(component.previewValue)) {
+    return {
+      ok: false,
+      error: `${path} symbolic preview value is not finite.`,
+    }
+  }
+
+  if (!numbersApproximatelyEqual(component.previewValue, point[axis])) {
+    return {
+      ok: false,
+      error: `${path} symbolic preview value does not match the coordinate preview value.`,
+    }
+  }
+
+  const parsed = parseScalarExpression(component.expression, {
+    variables: context.variables.variableNames,
+  })
+
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: `${path} ${parsed.error}`,
+    }
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    context.variables.variableMacros,
+  )
+
+  if (!formatted.ok) {
+    return {
+      ok: false,
+      error: `${path} ${formatted.error}`,
+    }
+  }
+
+  return {
+    ok: true,
+    value: `{${formatted.expression}}`,
+  }
 }
 
 function curveCoordinateBaseName(
@@ -2206,6 +2508,14 @@ function closedBoundariesHaveFiniteCoordinates(
   )
 }
 
+function closedBoundariesHaveSymbolicCoordinates(
+  boundaries: readonly ClosedPathBoundary[],
+): boolean {
+  return boundaries.some((boundary) =>
+    boundary.segments.some(pathSegmentHasSymbolicCoordinates),
+  )
+}
+
 function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
   switch (segment.kind) {
     case 'line':
@@ -2229,6 +2539,29 @@ function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
   }
 }
 
+function pathSegmentHasSymbolicCoordinates(segment: PathSegment): boolean {
+  switch (segment.kind) {
+    case 'line':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.end)
+      )
+    case 'cubicBezier':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.control1) ||
+        hasSymbolicVec3Coordinates(segment.control2) ||
+        hasSymbolicVec3Coordinates(segment.end)
+      )
+    case 'arc':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.end) ||
+        hasSymbolicVec3Coordinates(segment.center)
+      )
+  }
+}
+
 function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
   switch (curve.kind) {
     case 'polyline':
@@ -2240,6 +2573,20 @@ function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
       return (
         templatePathCoordinates(curve.template).every(isFiniteVec3) &&
         templatePathHasFiniteParameters(curve.template)
+      )
+  }
+}
+
+function curveHasSymbolicCoordinates(curve: CurveStratum): boolean {
+  switch (curve.kind) {
+    case 'polyline':
+    case 'cubicBezier':
+      return curve.points.some(hasSymbolicVec3Coordinates)
+    case 'concatenatedPath':
+      return curve.segments.some(pathSegmentHasSymbolicCoordinates)
+    case 'templatePath':
+      return templatePathCoordinates(curve.template).some(
+        hasSymbolicVec3Coordinates,
       )
   }
 }
@@ -2751,12 +3098,124 @@ function formatWorkPlaneLocalOffset(offset: WorkPlaneLocalOffset): string {
   return `(${formatNumber(offset.dx)},${formatNumber(offset.dy)})`
 }
 
-function addVec3(first: Vec3, second: Vec3): Vec3 {
-  return {
-    x: first.x + second.x,
-    y: first.y + second.y,
-    z: first.z + second.z,
+function addVec3PreservingSymbolicCoordinates(first: Vec3, second: Vec3): Vec3 {
+  const x = addCoordinateComponents(
+    coordinateComponentForPoint(first, 'x'),
+    coordinateComponentForPoint(second, 'x'),
+  )
+  const y = addCoordinateComponents(
+    coordinateComponentForPoint(first, 'y'),
+    coordinateComponentForPoint(second, 'y'),
+  )
+  const z = addCoordinateComponents(
+    coordinateComponentForPoint(first, 'z'),
+    coordinateComponentForPoint(second, 'z'),
+  )
+  const point = {
+    x: coordinateComponentPreviewValue(x),
+    y: coordinateComponentPreviewValue(y),
+    z: coordinateComponentPreviewValue(z),
   }
+
+  return x.kind === 'symbolic' || y.kind === 'symbolic' || z.kind === 'symbolic'
+    ? {
+        ...point,
+        symbolic: { x, y, z },
+      }
+    : point
+}
+
+function coordinateComponentForPoint(
+  point: Vec3,
+  axis: 'x' | 'y' | 'z',
+): CoordinateComponent {
+  const rawComponent = point.symbolic?.[axis]
+
+  return rawComponent?.kind === 'symbolic'
+    ? {
+        kind: 'symbolic',
+        expression: rawComponent.expression,
+        previewValue: rawComponent.previewValue,
+      }
+    : {
+        kind: 'numeric',
+        value: point[axis],
+      }
+}
+
+function addCoordinateComponents(
+  first: CoordinateComponent,
+  second: CoordinateComponent,
+): CoordinateComponent {
+  if (first.kind === 'numeric' && second.kind === 'numeric') {
+    return {
+      kind: 'numeric',
+      value: first.value + second.value,
+    }
+  }
+
+  const firstPreview = coordinateComponentPreviewValue(first)
+  const secondPreview = coordinateComponentPreviewValue(second)
+
+  if (first.kind === 'numeric' && numbersApproximatelyEqual(first.value, 0)) {
+    return {
+      kind: 'symbolic',
+      expression: coordinateComponentExpression(second),
+      previewValue: firstPreview + secondPreview,
+    }
+  }
+
+  if (second.kind === 'numeric' && numbersApproximatelyEqual(second.value, 0)) {
+    return {
+      kind: 'symbolic',
+      expression: coordinateComponentExpression(first),
+      previewValue: firstPreview + secondPreview,
+    }
+  }
+
+  return {
+    kind: 'symbolic',
+    expression: `(${coordinateComponentExpression(
+      first,
+    )}) + (${coordinateComponentExpression(second)})`,
+    previewValue: firstPreview + secondPreview,
+  }
+}
+
+function coordinateComponentExpression(component: CoordinateComponent): string {
+  return component.kind === 'symbolic'
+    ? component.expression
+    : formatNumber(component.value)
+}
+
+function coordinateComponentPreviewValue(component: CoordinateComponent): number {
+  return component.kind === 'symbolic' ? component.previewValue : component.value
+}
+
+function isCoordinateComponent(component: unknown): component is CoordinateComponent {
+  if (typeof component !== 'object' || component === null || Array.isArray(component)) {
+    return false
+  }
+
+  const candidate = component as Partial<CoordinateComponent>
+
+  if (candidate.kind === 'numeric') {
+    return (
+      typeof candidate.value === 'number' &&
+      Number.isFinite(candidate.value)
+    )
+  }
+
+  return (
+    candidate.kind === 'symbolic' &&
+    typeof candidate.expression === 'string' &&
+    typeof candidate.previewValue === 'number' &&
+    Number.isFinite(candidate.previewValue)
+  )
+}
+
+function numbersApproximatelyEqual(first: number, second: number): boolean {
+  return Math.abs(first - second) <= 1e-9
 }
 
 function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
