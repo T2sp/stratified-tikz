@@ -773,6 +773,45 @@ test('empty 3D TikZ output includes only axes when the option is enabled', () =>
   assert.match(tikz, /% Labels/)
 })
 
+test('standalone output emits pgfmathsetmacro variables before tikzpicture', () => {
+  const tikz = generateTikz(createVariableDiagram())
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+
+  assert.notEqual(variableIndex, -1)
+  assert.notEqual(beginIndex, -1)
+  assert.ok(variableIndex < beginIndex)
+  assert.match(tikz, /\\pgfmathsetmacro\{\\q\}\{30\}/)
+})
+
+test('dependent variables export in dependency order', () => {
+  const tikz = generateTikz(createDependentVariableDiagram())
+  const rIndex = tikz.indexOf('\\pgfmathsetmacro{\\r}{\\R / 2}')
+  const rDependencyIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+
+  assert.notEqual(rIndex, -1)
+  assert.notEqual(rDependencyIndex, -1)
+  assert.ok(rDependencyIndex < rIndex)
+})
+
+test('inline output emits variables inside tikzpicture with no blank lines', () => {
+  const tikz = generateTikz(createVariableDiagram(), { exportMode: 'inlineMath' })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const variableSectionIndex = tikz.indexOf('% Variables')
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const coordinateIndex = tikz.indexOf('% Coordinates')
+  const endIndex = tikz.indexOf('\\end{tikzpicture}')
+
+  assert.notEqual(beginIndex, -1)
+  assert.notEqual(variableSectionIndex, -1)
+  assert.notEqual(variableIndex, -1)
+  assert.ok(beginIndex < variableSectionIndex)
+  assert.ok(variableSectionIndex < variableIndex)
+  assert.ok(variableIndex < coordinateIndex)
+  assert.ok(coordinateIndex < endIndex)
+  expectNoBlankLines(tikz)
+})
+
 test('TikZ 3d library is not emitted when no scoped 3D export is used', () => {
   const tikz = generateTikz(createThreeDimensionalDiagram())
 
@@ -3082,6 +3121,50 @@ function createCurveNamingDiagram(): Diagram {
   )
 
   return diagram
+}
+
+function createVariableDiagram(): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '2',
+        previewValue: 2,
+      },
+      {
+        id: 'var-q',
+        name: 'q',
+        macroName: 'q',
+        expression: '30',
+        previewValue: 30,
+      },
+    ],
+  }
+}
+
+function createDependentVariableDiagram(): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-r',
+        name: 'r',
+        macroName: 'r',
+        expression: 'R/2',
+        previewValue: 1,
+      },
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '2',
+        previewValue: 2,
+      },
+    ],
+  }
 }
 
 function createTwoDimensionalDiagram(): Diagram {

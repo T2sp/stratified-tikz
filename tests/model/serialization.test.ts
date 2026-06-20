@@ -11,6 +11,7 @@ import {
 } from '../../src/model/constructors.ts'
 import {
   applyUserStylePresetToStratum,
+  addSymbolicVariableToDiagram,
   createUserStylePresetFromStyle,
   parseSavedDiagramJson,
   savedDiagramFormat,
@@ -101,6 +102,60 @@ test('parseSavedDiagramJson loads saved TikZ export mode metadata', () => {
   }
 
   assert.equal(result.diagram.view?.exportMode, 'inlineMath')
+})
+
+test('variables save and load round-trip', () => {
+  const withR = addSymbolicVariableToDiagram(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    {
+      id: 'var-R',
+      name: 'R',
+      expression: '2',
+    },
+  )
+
+  assert.equal(withR.ok, true)
+  if (!withR.ok) {
+    throw new Error(withR.error)
+  }
+
+  const withSmallR = addSymbolicVariableToDiagram(withR.diagram, {
+    id: 'var-r',
+    name: 'r',
+    expression: 'R/2',
+  })
+
+  assert.equal(withSmallR.ok, true)
+  if (!withSmallR.ok) {
+    throw new Error(withSmallR.error)
+  }
+
+  const result = parseSavedDiagramJson(serializeDiagram(withSmallR.diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.variables, withSmallR.diagram.variables)
+})
+
+test('old diagrams without variables still load', () => {
+  const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
+    diagram: {
+      variables?: unknown
+    }
+  }
+  delete saved.diagram.variables
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.variables, undefined)
 })
 
 test('serializeDiagram omits deprecated 3D projectionBasis metadata', () => {

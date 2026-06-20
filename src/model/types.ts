@@ -572,6 +572,14 @@ export type DiagramLayer = {
   locked?: boolean
 }
 
+export type SymbolicVariable = {
+  id: string
+  name: string
+  macroName: string
+  expression: string
+  previewValue: number
+}
+
 export type Diagram = {
   version: 1
   ambientDimension: AmbientDimension
@@ -581,6 +589,7 @@ export type Diagram = {
   userStylePresets?: UserStylePreset[]
   externalTikzStyleSources?: ExternalTikzStyleSource[]
   importedTikzStyleReferences?: ImportedTikzStyleReference[]
+  variables?: SymbolicVariable[]
   strata: Stratum[]
   labels: TextLabel[]
 }

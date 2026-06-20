@@ -103,6 +103,48 @@ symbolic coordinate components at the coordinate-generator boundary, for
 example `({\R * cos(\q)}, {\R * sin(\q)})`, rather than storing braces inside
 the expression model.
 
+## Symbolic variables
+
+Phase 19B adds diagram-level symbolic variables. Variables are export-affecting
+diagram data, not toolbar-only UI state:
+
+```ts
+type SymbolicVariable = {
+  id: string;
+  name: string;
+  macroName: string;
+  expression: string;
+  previewValue: number;
+};
+```
+
+`diagram.variables` is optional for backward compatibility. Old diagrams
+without the field load as before. Saved variables are normalized on load by
+re-evaluating `previewValue` from `expression`.
+
+The MVP uses a conservative TeX macro policy: variable names and macro names
+must contain letters only, matching `[A-Za-z]+`. Names such as `R` and `q`
+export as `\R` and `\q`. Names with digits or underscores, such as `R1`, are
+not allowed yet because TeX control sequence names with those characters need a
+more explicit policy. Variable and macro names also cannot be scalar function
+names, constants, dangerous TeX command names, or raw control sequences with a
+leading backslash.
+
+Variable expressions use the scalar-expression grammar above and may depend on
+other variables:
+
+```text
+R = 2
+q = 30
+r = R/2
+```
+
+The model validator rejects duplicate variable names, duplicate macro names,
+unknown dependencies, dependency cycles, invalid expressions, non-finite
+preview values, and stale preview values that no longer match evaluation.
+Dependency evaluation is a DAG; variables are exported in dependency order even
+if the saved array order differs.
+
 ## Top-level diagram
 
 ```ts
@@ -117,6 +159,7 @@ export type Diagram = {
   userStylePresets?: UserStylePreset[];
   externalTikzStyleSources?: ExternalTikzStyleSource[];
   importedTikzStyleReferences?: ImportedTikzStyleReference[];
+  variables?: SymbolicVariable[];
   strata: Stratum[];
   labels: Label[];
 };

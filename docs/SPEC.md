@@ -11,6 +11,11 @@ The app supports two ambient modes:
 
 The app should allow users to create diagrams consisting of strata, preview them in a canvas, edit their coordinates either numerically or graphically, and export readable TikZ code.
 
+The toolbar also supports diagram-level symbolic variables. In the Phase 19B
+MVP, variable names are letter-only TeX macro names such as `R` and `q`; their
+expressions are validated scalar expressions, evaluated for SVG preview values,
+and exported as `\pgfmathsetmacro`.
+
 ## Core mathematical convention
 
 The term **n-stratum** means **codimension n**, not geometric dimension n.

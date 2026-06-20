@@ -142,6 +142,7 @@ import {
   shouldShowWorkPlaneControls,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
+  VariableManager,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
   applyPickedPointWorkPlane,
@@ -4315,6 +4316,11 @@ function App() {
             Redo
           </button>
         </div>
+
+        <VariableManager
+          diagram={editableDiagram}
+          onDiagramChange={updateEditableDiagram}
+        />
 
         <div className="control-group new-element-layer-control">
           <label className="direct-create-field new-element-layer-field">

@@ -13,6 +13,10 @@ import {
   uniqueTikzStyleName,
 } from './stylePresets.ts'
 import {
+  macroNameFromSymbolicVariableName,
+  resolveSymbolicVariables,
+} from './variables.ts'
+import {
   isTikzStyleTarget,
   normalizeExternalTikzStyleLoadHint,
   normalizeExternalTikzStyleSourceName,
@@ -42,6 +46,7 @@ import type {
   TikzExportMode,
   UserStylePreset,
   Stratum,
+  SymbolicVariable,
   TextLabel,
   TikzStyleTarget,
 } from './types.ts'
@@ -60,6 +65,7 @@ export type PersistentDiagram = {
   userStylePresets?: UserStylePreset[]
   externalTikzStyleSources?: ExternalTikzStyleSource[]
   importedTikzStyleReferences?: ImportedTikzStyleReference[]
+  variables?: SymbolicVariable[]
   strata: Stratum[]
   labels: TextLabel[]
 }
@@ -96,6 +102,7 @@ type SavedDiagramInput = {
   userStylePresets?: unknown
   externalTikzStyleSources?: unknown
   importedTikzStyleReferences?: unknown
+  variables?: unknown
   strata: unknown[]
   labels: unknown[]
 }
@@ -218,6 +225,10 @@ function toPersistentDiagram(
     diagram.importedTikzStyleReferences.length === 0
       ? undefined
       : diagram.importedTikzStyleReferences
+  const variables =
+    diagram.variables === undefined || diagram.variables.length === 0
+      ? undefined
+      : diagram.variables
 
   return {
     version: diagram.version,
@@ -231,6 +242,7 @@ function toPersistentDiagram(
     ...(importedTikzStyleReferences === undefined
       ? {}
       : { importedTikzStyleReferences }),
+    ...(variables === undefined ? {} : { variables }),
     strata: diagram.strata,
     labels: diagram.labels,
   }
@@ -312,11 +324,14 @@ function normalizeLoadedDiagram(
     savedDiagram.userStylePresets,
   )
   warnings.push(...presetNormalization.warnings)
+  const variableNormalization = normalizeLoadedVariables(savedDiagram.variables)
+  warnings.push(...variableNormalization.warnings)
 
   const styleMetadataErrors = [
     ...sourceNormalization.errors,
     ...referenceNormalization.errors,
     ...presetNormalization.errors,
+    ...variableNormalization.errors,
   ]
 
   if (styleMetadataErrors.length > 0) {
@@ -338,6 +353,9 @@ function normalizeLoadedDiagram(
               importedTikzStyleReferences:
                 referenceNormalization.importedTikzStyleReferences,
             }),
+        ...(variableNormalization.variables === undefined
+          ? {}
+          : { variables: variableNormalization.variables }),
         strata: savedDiagram.strata as Stratum[],
         labels: savedDiagram.labels as TextLabel[],
       },
@@ -366,6 +384,9 @@ function normalizeLoadedDiagram(
     ...(presetNormalization.userStylePresets === undefined
       ? {}
       : { userStylePresets: presetNormalization.userStylePresets }),
+    ...(variableNormalization.variables === undefined
+      ? {}
+      : { variables: variableNormalization.variables }),
     strata: savedDiagram.strata as Stratum[],
     labels: savedDiagram.labels as TextLabel[],
   }
@@ -726,6 +747,120 @@ function normalizeLoadedUserStylePresets(
 
   return {
     ...(userStylePresets.length === 0 ? {} : { userStylePresets }),
+    warnings,
+    errors,
+  }
+}
+
+function normalizeLoadedVariables(savedVariables: unknown): {
+  variables?: SymbolicVariable[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedVariables === undefined) {
+    return {
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedVariables)) {
+    return {
+      warnings: [],
+      errors: ['variables must be an array when present.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const previewRecalculatedIndexes = new Set<number>()
+  const variables = savedVariables.flatMap(
+    (savedVariable, index): SymbolicVariable[] => {
+      const variablePath = `variables[${index}]`
+
+      if (!isRecord(savedVariable)) {
+        errors.push(`${variablePath} must be a variable object.`)
+        return []
+      }
+
+      if (
+        typeof savedVariable.id !== 'string' ||
+        savedVariable.id.trim().length === 0
+      ) {
+        errors.push(`${variablePath}.id must be non-empty.`)
+        return []
+      }
+
+      if (typeof savedVariable.name !== 'string') {
+        errors.push(`${variablePath}.name must be a string.`)
+        return []
+      }
+
+      if (typeof savedVariable.expression !== 'string') {
+        errors.push(`${variablePath}.expression must be a string.`)
+        return []
+      }
+
+      const macroName =
+        typeof savedVariable.macroName === 'string'
+          ? savedVariable.macroName
+          : macroNameFromSymbolicVariableName(savedVariable.name)
+      if (typeof savedVariable.macroName !== 'string') {
+        warnings.push(
+          `Saved variable ${index + 1} macro name was regenerated from its name.`,
+        )
+      }
+
+      if (
+        typeof savedVariable.previewValue !== 'number' ||
+        !Number.isFinite(savedVariable.previewValue)
+      ) {
+        previewRecalculatedIndexes.add(index)
+        warnings.push(
+          `Saved variable ${index + 1} preview value was recalculated.`,
+        )
+      }
+
+      return [
+        {
+          id: savedVariable.id.trim(),
+          name: savedVariable.name.trim(),
+          macroName: macroName.trim(),
+          expression: savedVariable.expression.trim(),
+          previewValue:
+            typeof savedVariable.previewValue === 'number' &&
+            Number.isFinite(savedVariable.previewValue)
+              ? savedVariable.previewValue
+              : 0,
+        },
+      ]
+    },
+  )
+  const resolved = resolveSymbolicVariables(variables)
+
+  if (!resolved.ok) {
+    return {
+      warnings,
+      errors: resolved.errors.map((issue) => `${issue.path} ${issue.message}`),
+    }
+  }
+
+  resolved.variables.forEach((variable, index) => {
+    const savedVariable = variables[index]
+
+    if (
+      savedVariable !== undefined &&
+      !previewRecalculatedIndexes.has(index) &&
+      !previewValuesEqual(savedVariable.previewValue, variable.previewValue)
+    ) {
+      warnings.push(
+        `Saved variable ${index + 1} preview value was recalculated.`,
+      )
+    }
+  })
+
+  return {
+    ...(resolved.variables.length === 0 ? {} : { variables: resolved.variables }),
     warnings,
     errors,
   }
@@ -1161,6 +1296,10 @@ function isFiniteVec2Record(value: unknown): value is { x: number; y: number } {
     Number.isFinite(value.x) &&
     Number.isFinite(value.y)
   )
+}
+
+function previewValuesEqual(first: number, second: number): boolean {
+  return Math.abs(first - second) <= 1e-9
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
