@@ -12,6 +12,9 @@ import type {
   CoordinateComponent,
   CurveStyle,
   Diagram,
+  GridParameterRange,
+  GridRectangleClip,
+  GridStratum,
   PerspectiveCamera3D,
   PointShape,
   PointStratum,
@@ -33,6 +36,7 @@ import {
   applyUserStylePresetToStratum,
   createUserStylePresetFromStyle,
 } from '../../src/model/stylePresets.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -2194,6 +2198,185 @@ test('3D template paths export in a TikZ canvas-is-plane scope', () => {
   assert.match(tikz, /\(0,0\) circle\[radius=2\]/)
 })
 
+test('2D grid exports foreach loops', () => {
+  const tikz = generateTikz(createTwoDimensionalGridDiagram())
+
+  assert.match(tikz, /\\foreach \\stzGridU in \{0,1,\.\.\.,5\} \{/)
+  assert.match(tikz, /\\foreach \\stzGridV in \{0,1,\.\.\.,5\} \{/)
+})
+
+test('2D grid exports a rectangular clip', () => {
+  const tikz = generateTikz(createTwoDimensionalGridDiagram())
+
+  assert.match(tikz, /\\clip \(0,0\) rectangle \(5,5\);/)
+})
+
+test('2D grid foreach export does not expand every line', () => {
+  const tikz = generateTikz(
+    createTwoDimensionalGridDiagram({
+      uRange: numericGridRange(0, 5, 1),
+      vRange: numericGridRange(0, 5, 1),
+      clip: numericGridClip(0, 5, 0, 5),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.equal(countMatches(layerBlock, /\\foreach/g), 2)
+  assert.equal(countMatches(layerBlock, /\\draw\[/g), 2)
+})
+
+test('3D work-plane grid exports a canvas-is-plane scope', () => {
+  const tikz = generateTikz(createThreeDimensionalGridDiagram())
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(layerBlock, /plane origin=\{\(0,1,0\)\}/)
+  assert.match(layerBlock, /plane x=\{\(1,1,0\)\}/)
+  assert.match(layerBlock, /plane y=\{\(0,1,1\)\}/)
+  assert.match(layerBlock, /canvas is plane/)
+})
+
+test('3D work-plane grid uses local coordinates inside the scope', () => {
+  const tikz = generateTikz(createThreeDimensionalGridDiagram())
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(layerBlock, /\\clip \(-1,-1\) rectangle \(1,1\);/)
+  assert.match(
+    layerBlock,
+    /\(\\stzGridU,-1\) -- \(\\stzGridU,1\);/,
+  )
+  assert.match(
+    layerBlock,
+    /\(-1,\\stzGridV\) -- \(1,\\stzGridV\);/,
+  )
+  assert.doesNotMatch(layerBlock, /\(0,1,-1\) -- \(0,1,1\);/)
+})
+
+test('grid TikZ export preserves style and layer', () => {
+  const tikz = generateTikz(
+    createTwoDimensionalGridDiagram({
+      id: 'styled-grid',
+      name: 'Styled grid',
+      layer: 7,
+      style: curveStyle({
+        strokeColor: '#4D9DE0',
+        strokeOpacity: 0.4,
+        lineWidth: 0.8,
+        lineStyle: 'dashed',
+      }),
+    }),
+  )
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer7')
+
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer7,main\}/)
+  assert.match(tikz, /\{HTML\}\{4D9DE0\}/)
+  assert.match(layerBlock, /draw opacity=0\.4/)
+  assert.match(layerBlock, /line width=0\.8pt/)
+  assert.match(layerBlock, /dashed/)
+  assert.match(layerBlock, /\\foreach/)
+})
+
+test('invalid grid ranges are rejected before export', () => {
+  const diagram = createTwoDimensionalGridDiagram({
+    uRange: numericGridRange(2, -2, 1),
+  })
+  const validation = validateDiagram(diagram)
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(validation.errors.map(formatValidationIssue).join('\n'), /max must be greater/)
+  assert.match(tikz, /Grid "Grid" \[grid\] omitted: uRange\.max/)
+  assert.doesNotMatch(tikz, /\\foreach/)
+})
+
+test('inline grid output has no blank lines', () => {
+  const tikz = generateTikz(createTwoDimensionalGridDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /\\foreach \\stzGridU/)
+  expectNoBlankLines(tikz)
+})
+
+test('grid foreach indentation uses four-space levels', () => {
+  const tikz = generateTikz(createTwoDimensionalGridDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /\n {12}\\foreach \\stzGridU/)
+  assert.match(tikz, /\n {16}\\draw\[/)
+  assert.match(tikz, /\n {20}draw=/)
+  expectNoTwoSpaceCommandIndent(tikz)
+})
+
+test('grid numeric TikZ output is finite', () => {
+  const tikz = generateTikz(createThreeDimensionalGridDiagram())
+
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('symbolic grid clip endpoints export when foreach ranges are numeric', () => {
+  const diagram = createTwoDimensionalGridDiagram({
+    clip: {
+      kind: 'rectangle',
+      uMin: numericGridScalar(0),
+      uMax: symbolicGridScalar('R', 5),
+      vMin: numericGridScalar(0),
+      vMax: symbolicGridScalar('S', 5),
+    },
+  })
+
+  diagram.variables = [
+    {
+      id: 'grid-var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '5',
+      previewValue: 5,
+    },
+    {
+      id: 'grid-var-S',
+      name: 'S',
+      macroName: 'S',
+      expression: '5',
+      previewValue: 5,
+    },
+  ]
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\pgfmathsetmacro\{\\R\}\{5\}/)
+  assert.match(tikz, /\\clip \(0,0\) rectangle \(\{\\R\},\{\\S\}\);/)
+  assert.match(tikz, /\\foreach \\stzGridU in \{0,1,\.\.\.,5\}/)
+})
+
+test('symbolic grid foreach ranges are omitted with a clear limitation', () => {
+  const diagram = createTwoDimensionalGridDiagram({
+    uRange: {
+      min: symbolicGridScalar('R', 0),
+      max: numericGridScalar(5),
+      step: numericGridScalar(1),
+    },
+  })
+
+  diagram.variables = [
+    {
+      id: 'grid-var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '0',
+      previewValue: 0,
+    },
+  ]
+
+  const validation = validateDiagram(diagram)
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validation.valid, true)
+  assert.match(tikz, /uRange\.min is symbolic/)
+  assert.doesNotMatch(tikz, /\\foreach/)
+})
+
 test('2D arc path segment exports using readable TikZ arc syntax', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.strata.push({
@@ -3430,6 +3613,120 @@ function normalizeGeneratedCoordinateNames(tikz: string): string {
 
 function countMatches(value: string, pattern: RegExp): number {
   return [...value.matchAll(pattern)].length
+}
+
+function formatValidationIssue(issue: { path: string; message: string }): string {
+  return `${issue.path} ${issue.message}`
+}
+
+function createTwoDimensionalGridDiagram(
+  overrides: Partial<GridStratum> = {},
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const grid: GridStratum = {
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'grid',
+    id: 'grid',
+    name: 'Grid',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    frame: {
+      kind: 'xy',
+      frame: xyPlaneFrameAtZ(0),
+    },
+    uRange: numericGridRange(0, 5, 1),
+    vRange: numericGridRange(0, 5, 1),
+    clip: numericGridClip(0, 5, 0, 5),
+    ...overrides,
+  }
+
+  diagram.strata.push(grid)
+
+  return diagram
+}
+
+function createThreeDimensionalGridDiagram(
+  overrides: Partial<GridStratum> = {},
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const grid: GridStratum = {
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'grid',
+    id: 'grid-3d',
+    name: '3D Grid',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    frame: {
+      kind: 'workPlane',
+      frame: xzPlaneFrameAtY(1),
+    },
+    uRange: numericGridRange(-1, 1, 1),
+    vRange: numericGridRange(-1, 1, 1),
+    clip: numericGridClip(-1, 1, -1, 1),
+    ...overrides,
+  }
+
+  diagram.strata.push(grid)
+
+  return diagram
+}
+
+function numericGridRange(
+  min: number,
+  max: number,
+  step: number,
+): GridParameterRange {
+  return {
+    min: numericGridScalar(min),
+    max: numericGridScalar(max),
+    step: numericGridScalar(step),
+  }
+}
+
+function numericGridClip(
+  uMin: number,
+  uMax: number,
+  vMin: number,
+  vMax: number,
+): GridRectangleClip {
+  return {
+    kind: 'rectangle',
+    uMin: numericGridScalar(uMin),
+    uMax: numericGridScalar(uMax),
+    vMin: numericGridScalar(vMin),
+    vMax: numericGridScalar(vMax),
+  }
+}
+
+function numericGridScalar(value: number): GridParameterRange['min'] {
+  return {
+    kind: 'numeric',
+    value,
+  }
+}
+
+function symbolicGridScalar(
+  expression: string,
+  previewValue: number,
+): GridParameterRange['min'] {
+  return {
+    kind: 'symbolic',
+    expression,
+    previewValue,
+  }
+}
+
+function xzPlaneFrameAtY(y: number): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 0, y, z: 0 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 0, z: 1 },
+    normal: { x: 0, y: -1, z: 0 },
+  }
 }
 
 function withImportedTikzStyleReference(

@@ -143,6 +143,80 @@ present. In 2D template paths, symbolic centers export through the named center
 coordinate, but template radii and rotation fields are still numeric in the MVP
 data model.
 
+## Grid export
+
+Grid strata export compactly with TikZ `\foreach` loops rather than one emitted
+`\draw` command per grid line. In 2D, a grid uses the canonical xy frame and
+exports as a local scope with a rectangular clip followed by vertical and
+horizontal foreach loops:
+
+```tex
+\begin{scope}
+    \clip (0,0) rectangle (5,5);
+    \foreach \stzGridU in {0,0.5,...,5} {
+        \draw[
+            draw=stzCurveGridStroke,
+            draw opacity=1,
+            line width=1.2pt
+        ]
+            (\stzGridU,0) -- (\stzGridU,5);
+    }
+    \foreach \stzGridV in {0,0.5,...,5} {
+        \draw[
+            draw=stzCurveGridStroke,
+            draw opacity=1,
+            line width=1.2pt
+        ]
+            (0,\stzGridV) -- (5,\stzGridV);
+    }
+\end{scope}
+```
+
+The rectangular clip is always emitted before the loops. It is the saved grid
+clip in local grid coordinates, so it affects both loop directions and keeps the
+visible grid boundary concise. Grid style options use the same curve-style
+export path as other geometric 1-dimensional strata, including named colors,
+opacity, line width, line style, local user presets, and compatible imported
+TikZ style references. Layer placement is unchanged: the whole grid scope is
+emitted inside the grid stratum's `pgfonlayer` block.
+
+In 3D, a grid stores the work-plane frame snapshot from creation/edit time. The
+generator does not consult transient active work-plane UI state. When the saved
+frame can be emitted safely, the grid uses the TikZ `3d` library plane scope:
+
+```tex
+\begin{scope}[
+    plane origin={(0,1,0)},
+    plane x={(1,1,0)},
+    plane y={(0,1,1)},
+    canvas is plane
+]
+    \clip (-1,-1) rectangle (1,1);
+    \foreach \stzGridU in {-1,0,...,1} {
+        \draw[...] (\stzGridU,-1) -- (\stzGridU,1);
+    }
+\end{scope}
+```
+
+Inside that scope, grid paths are local 2D `(u,v)` coordinates. The plane scope
+is the only place the 3D frame is described. `\usetikzlibrary{3d}` is emitted
+when at least one work-plane-local grid, work-plane-filled sheet, 3D template
+path, or work-plane-local relative Bézier curve needs this scope form.
+
+MVP symbolic policy: the `\foreach` range triplets (`min`, `max`, and `step`)
+must be numeric so the generator can produce safe `{first,next,...,last}`
+syntax and avoid broken or ambiguous PGF loops. Symbolic range triplets are
+omitted with a clear comment rather than expanded line by line. Rectangular
+clip endpoints may be symbolic when they pass the same scalar-expression parser
+and TikZ formatter used for symbolic coordinates; those endpoints are emitted as
+braced PGF math expressions such as `({\R},0)`.
+
+Invalid grid ranges, non-positive steps, reversed clips, non-finite preview
+values, and unsafe symbolic expressions are rejected by model validation before
+normal export. The generator also guards against these cases and omits an
+invalid grid with a readable comment instead of writing `NaN`, `Infinity`, or a
+malformed `\foreach`.
+
 The editor treats the selected export mode as export UI state. When JSON is
 downloaded from the UI, the preference is persisted as `diagram.view.exportMode`
 alongside other view/export preferences. Old saved diagrams without that field
