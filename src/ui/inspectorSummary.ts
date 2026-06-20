@@ -225,7 +225,7 @@ function createSheetGeometrySection(
         { label: 'Primitive', value: sheet.primitive.kind },
         {
           label: 'Sampling',
-          value: `${sheet.primitive.sampling.uSegments} x ${sheet.primitive.sampling.vSegments}`,
+          value: curvedSheetSamplingSummary(sheet.primitive),
         },
       ],
     }
@@ -238,6 +238,16 @@ function createSheetGeometrySection(
       value: formatVec3(vertex, ambientDimension),
     })),
   }
+}
+
+function curvedSheetSamplingSummary(
+  primitive: Extract<SheetStratum, { kind: 'curvedSheet' }>['primitive'],
+): string {
+  if (primitive.kind === 'ruledSurface') {
+    return String(primitive.sampling.segments)
+  }
+
+  return `${primitive.sampling.uSegments} x ${primitive.sampling.vSegments}`
 }
 
 export function createFilledBoundaryGeometryFields(

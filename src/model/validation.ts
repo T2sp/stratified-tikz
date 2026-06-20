@@ -56,11 +56,13 @@ import {
   pathSegmentStart,
   pathEndpointEpsilon,
   pathEndpoints,
+  pathSegmentCoordinates,
   templatePathCoordinates,
   templatePathFrame,
 } from './paths.ts'
 import type {
   ArcPathSegment,
+  BoundaryPathSnapshot,
   Camera,
   ClosedPathBoundary,
   CurvedSheetPrimitive,
@@ -841,7 +843,121 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
         'numericOnly',
       )
       return
+    case 'ruledSurface':
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.boundary0,
+        `${path}.boundary0`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.boundary1,
+        `${path}.boundary1`,
+        errors,
+        coordinateExpressionContext,
+      )
+      return
+    case 'coonsPatch':
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.bottom,
+        `${path}.bottom`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.right,
+        `${path}.right`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.top,
+        `${path}.top`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+        primitive.left,
+        `${path}.left`,
+        errors,
+        coordinateExpressionContext,
+      )
+      return
   }
+}
+
+function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
+  snapshot: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  if (
+    typeof snapshot !== 'object' ||
+    snapshot === null ||
+    Array.isArray(snapshot)
+  ) {
+    return
+  }
+
+  const snapshotRecord = snapshot as BoundaryPathSnapshot
+
+  if (!Array.isArray(snapshotRecord.segments)) {
+    return
+  }
+
+  snapshotRecord.segments.forEach((segment, segmentIndex) => {
+    boundaryPathSegmentCoordinatesForPolicy(segment).forEach((point, pointIndex) => {
+      const pointPath = `${path}.segments[${segmentIndex}].points[${pointIndex}]`
+      validateSymbolicVec3(point, 3, pointPath, coordinateExpressionContext, errors)
+
+      if (hasSymbolicVec3Coordinates(point)) {
+        pushError(
+          errors,
+          pointPath,
+          'Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.',
+        )
+      }
+    })
+
+    if (
+      typeof segment === 'object' &&
+      segment !== null &&
+      !Array.isArray(segment)
+    ) {
+      const segmentRecord = segment as Record<string, unknown>
+
+      if (segmentRecord.kind !== 'arc' || segmentRecord.frame === undefined) {
+        return
+      }
+
+      validateWorkPlaneFrameSnapshot(
+        segmentRecord.frame as WorkPlaneFrameSnapshot,
+        `${path}.segments[${segmentIndex}].frame`,
+        errors,
+        coordinateExpressionContext,
+        'numericOnly',
+      )
+    }
+  })
+}
+
+function boundaryPathSegmentCoordinatesForPolicy(segment: unknown): Vec3[] {
+  if (typeof segment !== 'object' || segment === null || Array.isArray(segment)) {
+    return []
+  }
+
+  const candidate = segment as PathSegment
+
+  if (
+    candidate.kind !== 'line' &&
+    candidate.kind !== 'cubicBezier' &&
+    candidate.kind !== 'arc'
+  ) {
+    return []
+  }
+
+  return pathSegmentCoordinates(candidate)
 }
 
 function validateWorkPlaneFilledSheet3DStratum(

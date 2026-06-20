@@ -345,8 +345,6 @@ export type AddGridStratumOptions = {
   style?: CurveStyle
 }
 
-export type CurvedSheetCreationKind = CurvedSheetPrimitive['kind']
-
 export type HemisphereCreationParameters = {
   kind: 'hemisphere'
   radius: number
@@ -365,6 +363,8 @@ export type SaddleCreationParameters = {
 export type CurvedSheetCreationParameters =
   | HemisphereCreationParameters
   | SaddleCreationParameters
+
+export type CurvedSheetCreationKind = CurvedSheetCreationParameters['kind']
 
 export type AddPointStratumResult = {
   diagram: Diagram
@@ -2581,12 +2581,16 @@ function createCurvedSheetForDiagram(
   }
 }
 
-function curvedSheetDefaultName(kind: CurvedSheetCreationKind): string {
+function curvedSheetDefaultName(kind: CurvedSheetPrimitive['kind']): string {
   switch (kind) {
     case 'hemisphere':
       return 'Hemisphere'
     case 'saddle':
       return 'Saddle'
+    case 'ruledSurface':
+      return 'Ruled surface'
+    case 'coonsPatch':
+      return 'Coons patch'
   }
 }
 

@@ -178,8 +178,9 @@ Expressions reject unknown variables, raw TeX/backslashes, braces, semicolons,
 newlines, unsupported functions, invalid syntax, division by zero, and
 non-finite preview values. In 2D diagrams z remains numeric 0. In the Phase 19C
 MVP, symbolic input is supported for global coordinate fields; active
-work-plane-local direct input, 3D template centers, and curved sheet anchors
-remain numeric-only and reject symbolic values.
+work-plane-local direct input, 3D template centers, curved sheet anchors, and
+sampled boundary-surface path snapshots remain numeric-only and reject symbolic
+values.
 
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
@@ -339,6 +340,51 @@ later source-path edits do not change the fill. In 2D this creates a codim 0
 `workPlaneFilledSheet` only when all picked boundaries lie on one reliable
 plane, preferring the active work plane when applicable and otherwise deriving a
 plane from non-collinear boundary points. Non-coplanar 3D picks are rejected.
+
+### Boundary surface sheets
+
+The model supports two additional 3D codim 1 sheet primitives for Phase 20A:
+ruled surfaces and Coons patches. These are saved as `curvedSheet` primitives
+with copied boundary path snapshots, not live references to source curve
+strata. Editing, moving, or deleting an original source path after surface
+creation must not mutate the surface.
+
+Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
+The Phase 20A evaluator supports line, cubic Bezier, and 3D arc segments.
+Circle and ellipse templates are not accepted as boundary snapshots until they
+are expanded into ordinary path segments. Boundaries must be non-empty,
+composable, finite, and sample to finite points. Boundary-surface coordinates
+are numeric-only for now because preview and export derive sampled mesh
+coordinates.
+
+A ruled surface from boundaries `C0` and `C1` uses:
+
+```text
+S(u, v) = (1 - v) C0(u) + v C1(u)
+```
+
+Both boundaries are sampled at the same deterministic `u` values. The saved
+resolution is a positive integer `{ segments }`, capped by the shared curved
+sheet sampling cap. Both boundaries must have the same closure status; a
+closed/open mismatch is rejected.
+
+A Coons patch uses four oriented boundaries: bottom and top run left to right,
+while left and right run bottom to top. The sampler uses:
+
+```text
+S(u, v)
+= (1 - v) bottom(u) + v top(u)
++ (1 - u) left(v) + u right(v)
+- bilinearCornerBlend(u, v)
+```
+
+The validator requires bottom start = left start, bottom end = right start, top
+start = left end, and top end = right end. Inconsistent corners are rejected
+until a future repair workflow exists. The sampler returns the existing finite
+quad mesh representation used by curved sheets: a deterministic flat vertex
+array plus quad index faces and boundary polylines for later rendering,
+depth-sorting, and TikZ export work. User-facing ruled/Coons creation workflows
+are intentionally deferred.
 
 ### Concatenated path editing
 

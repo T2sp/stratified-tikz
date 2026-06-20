@@ -132,8 +132,9 @@ The Phase 19C MVP supports symbolic global coordinates for point positions,
 free-label positions, polyline and cubic/path vertices, filled-boundary path
 coordinates, 2D template centers, and polygon/quad sheet vertices. Active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
-remain numeric-only for now; symbolic plane-local input is rejected instead of
-being converted through a symbolic frame algebra.
+and boundary-surface path snapshots remain numeric-only for now; symbolic
+plane-local input is rejected instead of being converted through a symbolic
+frame or sampled-surface algebra.
 
 ## Grid strata
 
@@ -386,10 +387,11 @@ free text labels on the selected numeric layer: point and label positions,
 polyline and cubic Bezier points, concatenated path segment coordinates,
 arc/template centers, polygon and quad sheet vertices, filled-boundary
 segments, work-plane-filled sheet boundary points and plane-frame origins, and
-curved sheet primitive centers/origins. Stored work-plane frame basis vectors
-and local/relative coordinates are not rotated, scaled, or otherwise changed;
-only frame origins are translated. In 2D, only `dx` and `dy` are accepted and
-all translated coordinates remain on `z = 0`.
+curved sheet primitive centers/origins and copied boundary-surface path
+snapshots. Stored work-plane frame basis vectors and local/relative coordinates
+are not rotated, scaled, or otherwise changed; only frame origins and copied
+absolute path coordinates are translated. In 2D, only `dx` and `dy` are
+accepted and all translated coordinates remain on `z = 0`.
 
 ## Saved diagram file
 
@@ -822,6 +824,12 @@ export type SurfaceSampling = {
   vSegments: number;
 };
 
+export type BoundaryPathSnapshot = {
+  id?: string;
+  name?: string;
+  segments: PathSegment[];
+};
+
 export type CurvedSheetPrimitive =
   | {
       kind: "hemisphere";
@@ -837,6 +845,20 @@ export type CurvedSheetPrimitive =
       width: number;
       depth: number;
       height: number;
+      sampling: SurfaceSampling;
+    }
+  | {
+      kind: "ruledSurface";
+      boundary0: BoundaryPathSnapshot;
+      boundary1: BoundaryPathSnapshot;
+      sampling: { segments: number };
+    }
+  | {
+      kind: "coonsPatch";
+      bottom: BoundaryPathSnapshot;
+      right: BoundaryPathSnapshot;
+      top: BoundaryPathSnapshot;
+      left: BoundaryPathSnapshot;
       sampling: SurfaceSampling;
     };
 
@@ -869,19 +891,64 @@ scope using the stored frame and local `(a,b)` coordinates, with absolute 3D
 coordinate output reserved as a fallback for unusable existing frame data.
 
 `curvedSheet` is the committed model for specialized non-planar 3D codim 1
-sheet primitives. A `SurfaceFrame` is the local orientation frame for a
-primitive and must be finite, orthonormal, and right-handed. A hemisphere uses
-angular parameters: `u` runs around the equator from `0` to `2*pi`, and `v`
-runs from the pole to the equator from `0` to `pi/2`. `hemisphereSide` chooses
-whether the pole is in the positive or negative `normal` direction. A saddle
-uses rectangular local frame coordinates with `u` in `[-width/2, width/2]` and
-`v` in `[-depth/2, depth/2]`; its current sampler uses the hyperbolic patch
-`normalOffset = height * normalizedU * normalizedV`.
+sheet primitives. A `SurfaceFrame` is the local orientation frame for frame
+based primitives and must be finite, orthonormal, and right-handed. A
+hemisphere uses angular parameters: `u` runs around the equator from `0` to
+`2*pi`, and `v` runs from the pole to the equator from `0` to `pi/2`.
+`hemisphereSide` chooses whether the pole is in the positive or negative
+`normal` direction. A saddle uses rectangular local frame coordinates with `u`
+in `[-width/2, width/2]` and `v` in `[-depth/2, depth/2]`; its current sampler
+uses the hyperbolic patch `normalOffset = height * normalizedU * normalizedV`.
+
+Boundary-surface primitives store copied boundary path geometry. A
+`BoundaryPathSnapshot` is not a live reference to a curve stratum: later edits
+to the source curve do not mutate the surface. The Phase 20A boundary evaluator
+supports copied concatenated `PathSegment[]` geometry made from line, cubic
+Bezier, and 3D arc segments. Template paths are not accepted as boundary
+snapshots yet unless they have first been expanded into ordinary path
+segments. Boundary snapshots must be non-empty, composable, finite, and must
+sample to finite points. Boundary coordinates are numeric-only for this MVP
+because mesh generation derives sampled coordinates.
+
+A ruled surface stores two boundary snapshots with a shared deterministic
+piecewise-uniform boundary parameter `u`. Its sampler uses:
+
+```text
+S(u, v) = (1 - v) C0(u) + v C1(u)
+```
+
+The saved resolution is `{ segments }`, capped by
+`MAX_CURVED_SHEET_SAMPLING_SEGMENTS`; the current mesh has `segments` strips in
+`u` and one strip in `v`. Both ruled boundaries must have the same closure
+status. A closed/open mismatch is rejected rather than repaired.
+
+A Coons patch stores four boundary snapshots with this orientation:
+
+- bottom: left to right
+- right: bottom to top
+- top: left to right
+- left: bottom to top
+
+Its sampler uses:
+
+```text
+S(u, v)
+= (1 - v) bottom(u) + v top(u)
++ (1 - u) left(v) + u right(v)
+- bilinearCornerBlend(u, v)
+```
+
+The validator requires corner consistency: bottom start equals left start,
+bottom end equals right start, top start equals left end, and top end equals
+right end. Inconsistent corners are rejected until a future repair workflow is
+implemented.
 
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry
-helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. The sampler returns a
-finite quad mesh and boundary polylines, but it is an approximation only:
+helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. Ruled surfaces use the
+same cap for their single `segments` field. The sampler returns a finite flat
+vertex array with deterministic quad index faces and boundary polylines, but it
+is an approximation only:
 adaptive tessellation, hidden-surface sorting, boolean operations, advanced
 surface editing, and true smooth vector surface export are deferred.
 
@@ -902,9 +969,10 @@ Editor workflow:
   and leave the saved `Diagram` unchanged.
 
 Current limitations: inspector editing does not yet rotate or replace the saved
-surface frame; create a new primitive on the desired work plane when a different
-orientation is needed. The saved model also does not support arbitrary symbolic
-parametric surfaces, boolean operations, or mesh sculpting.
+surface frame, and there is no user-facing creation workflow for ruled surfaces
+or Coons patches yet. The saved model also does not support symbolic sampled
+surface boundaries, arbitrary symbolic parametric surfaces, boolean operations,
+or mesh sculpting.
 
 ## Closed path boundaries
 
@@ -1718,13 +1786,22 @@ polygonal region as cyclically ordered `vertices` and requires at least three
 vertices. `workPlaneFilledSheet` stores one or more copied closed path
 boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
 stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
-local `(a,b)` coordinates. `curvedSheet` stores a hemisphere or saddle
-primitive, including an explicit finite orthonormal surface frame and capped
-positive-integer sampling counts. SVG preview and TikZ export currently use the
-sampled finite quad mesh approximation: each sampled face is rendered/exported
-as a flat polygon with the sheet style. This is a display/export approximation,
-not a new saved mesh representation. Advanced frame editing, hidden-surface
-sorting, boolean operations, and true smooth vector surface export are deferred.
+local `(a,b)` coordinates. `curvedSheet` stores a hemisphere, saddle, ruled
+surface, or Coons patch primitive. Hemisphere and saddle primitives store an
+explicit finite orthonormal surface frame. Ruled surfaces and Coons patches
+store copied line/cubic/arc boundary path snapshots, not live references to
+source path strata. Ruled surfaces require two boundaries with matching closure
+status and use `S(u,v) = (1-v) C0(u) + v C1(u)`. Coons patches require
+consistent bottom/right/top/left corners and use the standard Coons formula
+with the bilinear corner blend subtracted. All surface sampling counts are
+positive integers capped by `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`.
+
+SVG preview and TikZ export currently use the sampled finite quad mesh
+approximation: each sampled face is rendered/exported as a flat polygon with
+the sheet style. This is a display/export approximation, not a new saved mesh
+representation. Advanced frame editing, boundary repair workflows,
+hidden-surface sorting, boolean operations, and true smooth vector surface
+export are deferred.
 
 ### Curve stratum
 

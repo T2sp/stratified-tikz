@@ -226,9 +226,37 @@ export type SaddleCurvedSheetPrimitive = {
   sampling: SurfaceSampling
 }
 
+export type BoundaryPathSnapshot = {
+  id?: string
+  name?: string
+  segments: PathSegment[]
+}
+
+export type RuledSurfacePrimitive = {
+  kind: 'ruledSurface'
+  boundary0: BoundaryPathSnapshot
+  boundary1: BoundaryPathSnapshot
+  sampling: { segments: number }
+}
+
+export type CoonsPatchPrimitive = {
+  kind: 'coonsPatch'
+  bottom: BoundaryPathSnapshot
+  right: BoundaryPathSnapshot
+  top: BoundaryPathSnapshot
+  left: BoundaryPathSnapshot
+  sampling: SurfaceSampling
+}
+
+export type BoundarySurfacePrimitive =
+  | RuledSurfacePrimitive
+  | CoonsPatchPrimitive
+
 export type CurvedSheetPrimitive =
   | HemisphereCurvedSheetPrimitive
   | SaddleCurvedSheetPrimitive
+  | RuledSurfacePrimitive
+  | CoonsPatchPrimitive
 
 export type WorkPlaneLocalCoordinate = {
   a: number

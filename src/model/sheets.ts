@@ -1,5 +1,7 @@
 import type {
+  BoundaryPathSnapshot,
   CurvedSheetPrimitive,
+  PathSegment,
   PolygonSheetStratum,
   QuadSheetStratum,
   SurfaceFrame,
@@ -75,6 +77,22 @@ export function cloneCurvedSheetPrimitive(
         height: primitive.height,
         sampling: cloneSurfaceSampling(primitive.sampling),
       }
+    case 'ruledSurface':
+      return {
+        kind: 'ruledSurface',
+        boundary0: cloneBoundaryPathSnapshot(primitive.boundary0),
+        boundary1: cloneBoundaryPathSnapshot(primitive.boundary1),
+        sampling: { ...primitive.sampling },
+      }
+    case 'coonsPatch':
+      return {
+        kind: 'coonsPatch',
+        bottom: cloneBoundaryPathSnapshot(primitive.bottom),
+        right: cloneBoundaryPathSnapshot(primitive.right),
+        top: cloneBoundaryPathSnapshot(primitive.top),
+        left: cloneBoundaryPathSnapshot(primitive.left),
+        sampling: cloneSurfaceSampling(primitive.sampling),
+      }
   }
 }
 
@@ -89,6 +107,61 @@ export function cloneSurfaceFrame(frame: SurfaceFrame): SurfaceFrame {
 
 function cloneSurfaceSampling(sampling: SurfaceSampling): SurfaceSampling {
   return { ...sampling }
+}
+
+function cloneBoundaryPathSnapshot(
+  snapshot: BoundaryPathSnapshot,
+): BoundaryPathSnapshot {
+  return {
+    ...(snapshot.id === undefined ? {} : { id: snapshot.id }),
+    ...(snapshot.name === undefined ? {} : { name: snapshot.name }),
+    segments: snapshot.segments.map(clonePathSegment),
+  }
+}
+
+function clonePathSegment(segment: PathSegment): PathSegment {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: cloneVec3(segment.start),
+        end: cloneVec3(segment.end),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: { ...segment.styleOverride } }),
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: cloneVec3(segment.start),
+        control1: cloneVec3(segment.control1),
+        control2: cloneVec3(segment.control2),
+        end: cloneVec3(segment.end),
+        ...(segment.controlMode === undefined
+          ? {}
+          : { controlMode: structuredClone(segment.controlMode) }),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: { ...segment.styleOverride } }),
+      }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: cloneVec3(segment.start),
+        end: cloneVec3(segment.end),
+        center: cloneVec3(segment.center),
+        radius: segment.radius,
+        startAngleDeg: segment.startAngleDeg,
+        endAngleDeg: segment.endAngleDeg,
+        direction: segment.direction,
+        ...(segment.frame === undefined
+          ? {}
+          : { frame: cloneSurfaceFrame(segment.frame) }),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: { ...segment.styleOverride } }),
+      }
+  }
 }
 
 function cloneVec3(point: Vec3): Vec3 {

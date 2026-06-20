@@ -6,6 +6,7 @@ import {
 import type { ScalarInputValue } from './scalarExpressions.ts'
 import type {
   AmbientDimension,
+  BoundaryPathSnapshot,
   ClosedPathBoundary,
   CoordinateComponent,
   CubicBezierControlMode,
@@ -655,7 +656,62 @@ function validateCurvedSheetPrimitiveSymbolicMetadata(
       `${path}.frame`,
       errors,
     )
+    return
   }
+
+  if (primitive.kind === 'ruledSurface') {
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.boundary0,
+      `${path}.boundary0`,
+      errors,
+    )
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.boundary1,
+      `${path}.boundary1`,
+      errors,
+    )
+    return
+  }
+
+  if (primitive.kind === 'coonsPatch') {
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.bottom,
+      `${path}.bottom`,
+      errors,
+    )
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.right,
+      `${path}.right`,
+      errors,
+    )
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.top,
+      `${path}.top`,
+      errors,
+    )
+    validateBoundaryPathSnapshotSymbolicMetadata(
+      primitive.left,
+      `${path}.left`,
+      errors,
+    )
+  }
+}
+
+function validateBoundaryPathSnapshotSymbolicMetadata(
+  snapshot: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(snapshot)) {
+    return
+  }
+
+  validatePathSegmentsSymbolicMetadata(
+    snapshot.segments,
+    3,
+    `${path}.segments`,
+    errors,
+  )
 }
 
 function validateWorkPlaneFrameSnapshotSymbolicMetadata(
@@ -1206,6 +1262,72 @@ function refreshCurvedSheetPrimitiveSymbolicPreviews(
           errors,
         ),
       }
+    case 'ruledSurface':
+      return {
+        ...primitive,
+        boundary0: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.boundary0,
+          context,
+          `${path}.boundary0`,
+          errors,
+        ),
+        boundary1: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.boundary1,
+          context,
+          `${path}.boundary1`,
+          errors,
+        ),
+      }
+    case 'coonsPatch':
+      return {
+        ...primitive,
+        bottom: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.bottom,
+          context,
+          `${path}.bottom`,
+          errors,
+        ),
+        right: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.right,
+          context,
+          `${path}.right`,
+          errors,
+        ),
+        top: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.top,
+          context,
+          `${path}.top`,
+          errors,
+        ),
+        left: refreshBoundaryPathSnapshotSymbolicPreviews(
+          primitive.left,
+          context,
+          `${path}.left`,
+          errors,
+        ),
+      }
+  }
+}
+
+function refreshBoundaryPathSnapshotSymbolicPreviews(
+  snapshot: BoundaryPathSnapshot,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): BoundaryPathSnapshot {
+  if (!isRecord(snapshot) || !Array.isArray(snapshot.segments)) {
+    return snapshot
+  }
+
+  return {
+    ...snapshot,
+    segments: refreshPathSegments(
+      snapshot.segments,
+      3,
+      context,
+      `${path}.segments`,
+      errors,
+    ),
   }
 }
 
