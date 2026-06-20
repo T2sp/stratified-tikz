@@ -1,4 +1,4 @@
-# Phase 20C Fix Prompt: Auto-orient boundary paths for Ruled surfaces and Coons patches
+# Phase 20C Fix Prompt: Infer Coons corners from endpoint connectivity, not only pre-oriented paths
 
 ## Environment
 
@@ -29,130 +29,66 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 20B/20C implemented ruled surfaces and Coons patches.
-
-Current issue:
-
-- Boundary paths must currently have exactly the expected orientation.
-- Even when the endpoints match geometrically, creation can fail if one or more selected paths are reversed.
-- This is especially painful for Coons patches, where users pick four existing paths as:
+Phase 20B/20C implemented ruled surfaces and Coons patches. A previous fix attempted to auto-orient boundary paths, but manual testing still shows this error:
 
 ```text
-bottom -> right -> top -> left
+Coons patch corners must match: bottom start = left start, bottom end = right start, top start = left end, and top end = right end.
 ```
 
-- If those paths connect at the correct endpoints as geometric sets, but some of them are oriented oppositely, the app should automatically reinterpret/reverse copied boundary snapshots instead of rejecting the input.
-- Ruled surfaces have a similar issue: the two boundary curves should be automatically aligned when one is picked in the opposite direction.
+Observed problem:
 
-Desired behavior:
+- The selected paths' endpoints match geometrically.
+- The four paths form a closed boundary cycle.
+- However, Coons creation still fails unless path orientations already match the implementation's exact canonical orientation.
+- This means the current validation/orientation logic is still too oriented-path-specific.
 
-- Source paths remain unchanged.
-- Boundary snapshots copied into the new surface may be reversed/canonicalized.
-- If a valid orientation exists, creation should succeed.
-- If no orientation assignment makes the boundaries compatible, creation should still reject clearly.
+User expectation:
+
+- If the four selected boundary paths form a closed loop as endpoint sets, Coons patch creation should succeed.
+- The implementation should reinterpret/reverse copied boundary snapshots into the canonical Coons orientation automatically.
+- Source paths must not be mutated.
+
+This fix should make Coons patch boundary handling based on endpoint connectivity first, and orientation second.
 
 ## Goal
 
-Implement automatic boundary path orientation for:
+Fix Coons patch boundary validation/orientation so that it accepts geometrically connected boundary paths even when their individual directions follow a closed loop orientation or are otherwise reversed.
 
-1. Ruled surfaces from two boundary paths.
-2. Coons patches from four boundary paths.
-
-The user should be able to select geometrically compatible paths without manually editing their directions.
+Also make sure ruled surface boundary orientation remains robust.
 
 ## Scope
 
-This is a targeted Phase 20B/20C fix.
+This is a targeted Phase 20C fix.
 
 Implement:
 
-- path boundary reversal helper;
-- ruled surface boundary auto-orientation;
-- Coons patch boundary auto-orientation;
-- validation updates;
-- tests.
+- endpoint-set / corner-inference based Coons boundary orientation;
+- robust reversal of copied boundary snapshots;
+- tests for closed-loop boundary orientation cases;
+- ruled surface orientation regression tests.
 
 Do not implement:
 
-- new surface types;
-- new creation UI beyond status text if helpful;
+- new surface primitives;
+- automatic role inference from unordered four paths;
 - live linked boundaries;
 - path direction editing UI;
 - snapping;
-- broad multi-selection changes;
-- auto-repair of nonmatching endpoints;
-- boolean operations;
+- approximate endpoint repair;
 - new dependencies.
 
 Do not change:
 
-- Coons patch formula;
-- ruled surface formula;
+- Coons patch mathematical formula;
 - source path geometry;
 - copy-on-create policy;
-- SVG/TikZ export semantics except created surfaces now succeed in more cases;
-- save/load format unless absolutely necessary.
+- ruled/Coons data model unless absolutely necessary;
+- SVG/TikZ export semantics;
+- save/load format.
 
-## 1. Add path boundary reversal helpers
+## Key design change
 
-Add pure helpers for reversing boundary snapshots and path segments.
-
-Suggested helpers:
-
-```ts
-reverseBoundaryPathSnapshot(boundary: BoundaryPathSnapshot): BoundaryPathSnapshot
-reversePathSegments(segments: PathSegment[]): PathSegment[]
-reversePathSegment(segment: PathSegment): PathSegment
-```
-
-Requirements:
-
-- do not mutate input;
-- preserve symbolic coordinate metadata;
-- preserve style/metadata if present;
-- reverse segment order;
-- swap start/end for line segments;
-- swap start/end and control points for cubic Bézier segments:
-  - reversed cubic start = original end;
-  - reversed control1 = original control2;
-  - reversed control2 = original control1;
-  - reversed end = original start;
-- reverse arc segment orientation correctly if arcs are supported:
-  - swap start/end;
-  - swap start/end angles or otherwise preserve the same geometric arc traversed in reverse;
-  - flip direction clockwise/counterclockwise;
-  - preserve center/radius/frame;
-- handle circle/ellipse/path-template boundaries only if they are supported as boundary snapshots;
-  - if not supported, reject them cleanly.
-
-## 2. Endpoint helper utilities
-
-Add or reuse helpers:
-
-```ts
-boundaryStart(boundary): Vec3
-boundaryEnd(boundary): Vec3
-pointsApproximatelyEqual(a, b, epsilon): boolean
-endpointDistance(a, b): number
-```
-
-Requirements:
-
-- finite checks;
-- symbolic preview coordinates used for comparison;
-- respect existing tolerance;
-- no thrown TypeError for malformed input;
-- invalid/malformed boundaries rejected cleanly.
-
-## 3. Coons patch auto-orientation
-
-Coons role order remains:
-
-```text
-bottom -> right -> top -> left
-```
-
-Canonical Coons orientation should satisfy:
+Current or previous logic appears to require the four paths to already satisfy the canonical oriented equations:
 
 ```text
 bottom.start == left.start
@@ -161,34 +97,120 @@ top.start    == left.end
 top.end      == right.end
 ```
 
-Current behavior appears to require picked paths already satisfy this orientation.
+This is too strict as an initial check.
 
-New behavior:
+Instead, for picked roles:
 
-- Given the four picked boundary paths, try orientation flips for each path.
-- There are only `2^4 = 16` possible orientation assignments.
-- Find assignments that satisfy the corner compatibility equations within tolerance.
-- If at least one valid assignment exists:
-  - choose the assignment with the fewest reversals;
-  - if tied, use deterministic tie-break order;
-  - store copied boundary snapshots in canonical orientation;
-  - create the Coons patch.
-- If no assignment exists:
-  - reject with a clear validation message;
-  - keep draft picks so user can reset/fix;
-  - do not create invalid diagram data.
+```text
+bottom, right, top, left
+```
+
+first check endpoint connectivity as unordered endpoints:
+
+```text
+bottom and left share bottom-left corner
+bottom and right share bottom-right corner
+top and left share top-left corner
+top and right share top-right corner
+```
+
+Then orient the copied boundaries into canonical Coons orientation:
+
+```text
+bottom: bottom-left -> bottom-right
+right:  bottom-right -> top-right
+top:    top-left -> top-right
+left:   bottom-left -> top-left
+```
+
+After orientation, the existing canonical Coons equations should hold.
 
 Important:
 
-- Do not reorder roles. Only reverse individual paths.
-- If the user picked a path as `bottom`, it remains `bottom`.
-- The source path object is not mutated.
-- Only the copied boundary snapshot is reversed if needed.
+- The roles `bottom`, `right`, `top`, `left` are not reordered.
+- Only individual boundary direction may be reversed.
+- The source paths are not mutated.
+- The created Coons patch stores oriented copied boundary snapshots.
 
-Suggested helper:
+## Example that must succeed
+
+Suppose four paths form a closed loop in cyclic direction:
+
+```text
+bottom: A -> B
+right:  B -> C
+top:    C -> D
+left:   D -> A
+```
+
+This is a perfectly valid closed boundary cycle.
+
+Canonical Coons orientation wants:
+
+```text
+bottom: A -> B
+right:  B -> C
+top:    D -> C
+left:   A -> D
+```
+
+So the implementation should automatically reverse `top` and `left` in the copied boundary snapshots and create the patch.
+
+This case must not fail with the current corner error.
+
+## 1. Add endpoint connectivity helpers
+
+Add or reuse pure helpers:
 
 ```ts
-orientCoonsBoundaries({
+getBoundaryStart(boundary): Vec3
+getBoundaryEnd(boundary): Vec3
+areEndpointsEqual(a, b, epsilon): boolean
+findSharedEndpoint(boundaryA, boundaryB, epsilon): SharedEndpointResult
+```
+
+A boundary has two endpoint candidates:
+
+```text
+start
+end
+```
+
+`findSharedEndpoint` should determine whether the endpoint sets share exactly one geometric endpoint within tolerance.
+
+Return enough information to know which endpoint was shared:
+
+```ts
+type BoundaryEndpointRole = "start" | "end";
+
+type SharedEndpointResult =
+  | {
+      ok: true;
+      point: Vec3;
+      aEndpoint: BoundaryEndpointRole;
+      bEndpoint: BoundaryEndpointRole;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+```
+
+or equivalent.
+
+Validation:
+
+- missing endpoints rejected cleanly;
+- non-finite endpoints rejected;
+- if no endpoint matches, return failure;
+- if both endpoints match due to degeneracy/closed path ambiguity, return failure unless there is a clear existing policy.
+
+## 2. Infer Coons corners from endpoint connectivity
+
+Implement helper:
+
+```ts
+orientCoonsBoundariesByConnectivity({
   bottom,
   right,
   top,
@@ -205,210 +227,278 @@ orientCoonsBoundaries({
     top: boolean;
     left: boolean;
   };
+  corners: {
+    bottomLeft: Vec3;
+    bottomRight: Vec3;
+    topRight: Vec3;
+    topLeft: Vec3;
+  };
 }, ValidationError>
 ```
 
-## 4. Ruled surface auto-orientation
+or update the existing orientation helper to follow this behavior.
 
-For ruled surfaces, the two boundary paths should have compatible parameter direction.
+The helper should:
 
-Preferred behavior:
+1. Find shared endpoint between `bottom` and `left`.
+   - This is `bottomLeft`.
 
-- Keep `boundary0` orientation as picked.
-- Compare `boundary1` in original and reversed orientation.
-- Choose the orientation whose endpoints best align with `boundary0`.
+2. Find shared endpoint between `bottom` and `right`.
+   - This is `bottomRight`.
 
-For open boundaries:
+3. Find shared endpoint between `right` and `top`.
+   - This is `topRight`.
+
+4. Find shared endpoint between `top` and `left`.
+   - This is `topLeft`.
+
+5. Verify the four corner points are well-defined and non-degenerate.
+   - At least reject obvious degeneracy where adjacent required corners collapse unexpectedly.
+
+6. Orient each copied boundary to canonical direction:
+   - `bottom`: `bottomLeft -> bottomRight`;
+   - `right`: `bottomRight -> topRight`;
+   - `top`: `topLeft -> topRight`;
+   - `left`: `bottomLeft -> topLeft`.
+
+7. Validate that the oriented boundaries now satisfy:
 
 ```text
-same direction score =
-  distance(boundary0.start, boundary1.start)
-  + distance(boundary0.end, boundary1.end)
-
-reversed direction score =
-  distance(boundary0.start, boundary1.end)
-  + distance(boundary0.end, boundary1.start)
+bottom.start == left.start
+bottom.end   == right.start
+top.start    == left.end
+top.end      == right.end
 ```
 
-If reversed score is clearly smaller, reverse `boundary1`.
+8. Return the oriented copies and reversal flags.
 
-If endpoints are expected to match exactly according to current ruled-surface validation, require the chosen orientation to pass that validation.
+If any shared endpoint is missing, return a clean validation failure.
 
-If the current ruled surface model only needs same closure status and parameter sampling, use the distance heuristic and document it.
+## 3. Add helper to orient a boundary to requested endpoints
 
-Requirements:
-
-- source paths unchanged;
-- copied boundary1 may be reversed;
-- finite endpoint checks;
-- deterministic behavior;
-- clear status/report if boundary1 was auto-reversed.
-
-Suggested helper:
+Add pure helper:
 
 ```ts
-orientRuledSurfaceBoundaries(
-  boundary0,
-  boundary1,
-  epsilon
-): Result<{
-  boundary0: BoundaryPathSnapshot;
-  boundary1: BoundaryPathSnapshot;
-  reversedBoundary1: boolean;
-}, ValidationError>
+orientBoundaryToEndpoints(
+  boundary: BoundaryPathSnapshot,
+  desiredStart: Vec3,
+  desiredEnd: Vec3,
+  epsilon: number
+): Result<{ boundary: BoundaryPathSnapshot; reversed: boolean }, ValidationError>
 ```
 
-Optional:
+Behavior:
 
-- allow reversing both boundaries only if the current model has a canonical direction requirement.
-- MVP should keep boundary0 as picked and only reverse boundary1 if needed.
+- if `boundary.start ~= desiredStart` and `boundary.end ~= desiredEnd`, return original copy;
+- if `boundary.start ~= desiredEnd` and `boundary.end ~= desiredStart`, return reversed copy;
+- otherwise return failure.
 
-## 5. Integrate with creation workflows
+Do not mutate input.
 
-Update creation helpers used by:
+Use existing or new `reverseBoundaryPathSnapshot`.
 
-- Add sheet > Ruled surface;
-- Add sheet > Coons patch;
-- sequential boundary picking workflow;
-- creation from selected paths if still supported.
+## 4. Ensure reversal handles all supported segment kinds
 
-Integration point should be before final surface validation and before copying into the created surface.
+Verify `reverseBoundaryPathSnapshot` works for every path segment that can be used in Coons/Ruled boundaries.
+
+Required:
+
+### Line
+
+```text
+start/end swapped
+```
+
+### Cubic Bézier
+
+```text
+start = old end
+control1 = old control2
+control2 = old control1
+end = old start
+```
+
+### Arc, if supported
+
+Reverse geometric traversal:
+
+- start/end swapped;
+- direction flipped;
+- start/end angles swapped or otherwise adjusted consistently;
+- center/radius/frame preserved.
+
+### Concatenated multi-segment path
+
+- segment order reversed;
+- each segment reversed.
+
+The reversed boundary's start and end must be correct.
+
+## 5. Integrate with Coons creation
+
+Update every Coons creation path:
+
+- sequential Add sheet > Coons picking;
+- creation from selected paths if still supported;
+- pure helper tests;
+- any direct helper.
 
 Expected flow:
 
 ```text
 picked source paths
 -> copy boundary snapshots
--> auto-orient copied snapshots
--> validate oriented surface
--> create surface
+-> orientCoonsBoundariesByConnectivity(...)
+-> validate oriented Coons patch
+-> create Coons patch
 ```
 
-Do not mutate source paths.
+Do not use the old canonical orientation check before attempting connectivity-based orientation.
 
-## 6. Status messages
+If final validation fails after orientation, report a meaningful error.
 
-If a boundary was auto-reversed, it is helpful to show a concise status message.
+## 6. Improve error messages
 
-Examples:
+Current error says only:
 
 ```text
-Coons patch created. Auto-reversed top boundary.
+Coons patch corners must match...
+```
+
+That is still useful after orientation fails, but the UI should clarify whether:
+
+- endpoints do not form a closed boundary cycle;
+- a specific adjacent pair does not share an endpoint;
+- orientation succeeded but corner consistency still failed.
+
+Example messages:
+
+```text
+Coons patch boundaries do not form a connected cycle: bottom and right do not share an endpoint.
 ```
 
 ```text
-Coons patch created. Auto-reversed right and left boundaries.
+Coons patch boundaries form a cycle, but canonical orientation failed.
 ```
 
 ```text
-Ruled surface created. Auto-reversed second boundary.
+Coons patch created. Auto-reversed top and left boundaries.
 ```
 
-If status messages are not easy to implement, at least include reversal information in helper return values and tests.
+Keep messages concise.
 
-## 7. Validation behavior
+## 7. Ruled surface orientation refinement
 
-Cases that should now succeed:
+For ruled surfaces, ensure the previous auto-orientation fix is robust.
 
-### Coons
+Behavior:
 
-- endpoints match geometrically but one or more paths are reversed;
-- all four roles are correct, but directions differ.
+- keep `boundary0` orientation as picked;
+- compare `boundary1` original vs reversed using endpoint-distance score;
+- choose the orientation with smaller score;
+- if existing validation requires endpoint compatibility, validate after orientation;
+- source paths unchanged.
 
-Cases that should still fail:
+Add tests for the common case:
 
-- endpoints do not match any orientation assignment;
-- wrong roles picked, e.g. top path picked as right path;
-- missing boundary;
-- malformed boundary;
-- non-finite endpoint;
-- unsupported boundary type.
+```text
+boundary0: A -> B
+boundary1: D -> C
+```
 
-### Ruled
+where the intended aligned orientation is:
 
-- second boundary is picked in the opposite direction and can be reversed;
-- source paths remain unchanged.
+```text
+boundary1: C -> D
+```
 
-Cases that should still fail:
-
-- incompatible closure status if current validation requires matching closure status;
-- malformed boundary;
-- non-finite endpoint;
-- unsupported boundary type.
+or equivalent depending on the chosen endpoint matching convention.
 
 ## 8. Tests
 
 Add focused tests.
 
-### Boundary reversal helper tests
+### Coons connectivity/orientation tests
 
-1. Reversing a line segment swaps start/end.
-2. Reversing a cubic segment swaps start/end and control1/control2 correctly.
-3. Reversing a multi-segment boundary reverses segment order and endpoints.
-4. Reversal preserves symbolic coordinate metadata.
-5. Reversing an arc segment preserves geometric arc in reverse direction if arcs are supported.
-6. Unsupported boundary segment is rejected cleanly.
-
-### Coons orientation tests
-
-7. Coons boundaries already oriented correctly remain unchanged.
-8. Coons patch with reversed bottom boundary succeeds and stores bottom reversed.
-9. Coons patch with reversed right boundary succeeds and stores right reversed.
-10. Coons patch with reversed top boundary succeeds and stores top reversed.
-11. Coons patch with reversed left boundary succeeds and stores left reversed.
-12. Coons patch with multiple reversed boundaries succeeds.
-13. Coons orientation chooses the fewest reversals.
-14. Coons with no valid orientation assignment fails cleanly.
-15. Coons source paths are not mutated.
-
-Use simple paths with endpoints:
+1. Closed-loop cyclic orientation succeeds:
 
 ```text
 bottom: A -> B
-right: B -> C
-top: D -> C or C -> D depending on canonical convention
-left: A -> D
+right:  B -> C
+top:    C -> D
+left:   D -> A
 ```
 
-Match the canonical equations in the implementation.
+Expected:
 
-### Ruled orientation tests
+- creation/orientation succeeds;
+- copied `top` reversed to `D -> C`;
+- copied `left` reversed to `A -> D`.
 
-16. Ruled boundaries with same direction remain unchanged.
-17. Ruled second boundary reversed is auto-reversed.
-18. Ruled source paths are not mutated.
-19. Ruled incompatible boundaries still fail if validation requires compatibility.
+2. All canonical orientation succeeds unchanged:
 
-### Creation workflow tests
+```text
+bottom: A -> B
+right:  B -> C
+top:    D -> C
+left:   A -> D
+```
 
-20. Sequential Coons picking with reversed path directions can create a patch.
-21. Sequential ruled picking with reversed second boundary can create a surface.
-22. Draft is preserved on failed final orientation.
-23. Created surface uses oriented copied boundary snapshots.
-24. SVG/TikZ export still works for created surfaces.
+3. Reversed bottom only succeeds if endpoints form the same cycle.
+
+4. Reversed right only succeeds.
+
+5. Reversed top only succeeds.
+
+6. Reversed left only succeeds.
+
+7. Multiple reversed paths succeed.
+
+8. Source boundary snapshots are not mutated.
+
+9. Returned reversal flags are correct.
+
+10. Oriented result satisfies canonical equations.
+
+### Coons failure tests
+
+11. `bottom` and `right` do not share an endpoint -> clean failure.
+
+12. `right` and `top` do not share an endpoint -> clean failure.
+
+13. Degenerate/ambiguous endpoint sharing is rejected or handled according to documented policy.
+
+14. Wrong role assignment still fails.
+
+### Coons creation workflow tests
+
+15. Sequential Add sheet > Coons picking can create patch with cyclically oriented boundaries.
+
+16. Draft is preserved if final orientation fails.
+
+17. Error message is clear.
+
+### Ruled tests
+
+18. Ruled surface auto-reverses second boundary when needed.
+
+19. Ruled source paths not mutated.
+
+20. Ruled incompatible boundaries still fail if required by validation.
 
 ### Regression tests
 
-25. Existing Coons patch creation with already oriented paths still works.
-26. Existing ruled surface creation still works.
-27. Save/load valid ruled/Coons surfaces still works.
-28. Malformed boundary save/load rejection from earlier fix still works.
+21. Existing Coons patch creation with already oriented paths still works.
 
-## 9. Documentation
+22. Existing ruled surface creation still works.
 
-Update docs or creation help text:
+23. SVG/TikZ export still works for created surfaces.
 
-- Boundary paths may be picked in either direction.
-- Coons patch roles still matter:
-  - bottom;
-  - right;
-  - top;
-  - left.
-- The editor may auto-reverse copied boundary snapshots to satisfy endpoint compatibility.
-- Source paths are not modified.
-- If no orientation assignment matches, creation is rejected.
+24. Save/load valid Coons and ruled surfaces still works.
 
-## 10. Manual verification checklist
+25. Malformed boundary load rejection still works.
+
+## 9. Manual verification checklist
 
 After implementation, run:
 
@@ -416,44 +506,49 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Coons manual test:
+Manual Coons test:
 
-1. Create four boundary paths whose endpoints form a quadrilateral.
-2. Reverse one of the paths by creating it in the opposite direction.
-3. Enter Add sheet > Coons mode.
-4. Pick paths in role order:
+1. Create four paths that form a closed loop:
+   - bottom left-to-right;
+   - right bottom-to-top;
+   - top right-to-left;
+   - left top-to-bottom.
+2. Enter Add sheet > Coons mode.
+3. Pick in role order:
    - bottom;
    - right;
    - top;
    - left.
-5. Confirm creation succeeds.
-6. Confirm surface appears.
-7. Confirm source paths remain unchanged.
-8. Repeat with multiple reversed boundaries.
+4. Confirm Coons patch is created.
+5. Confirm no corner mismatch error.
+6. Confirm source paths remain unchanged.
 
-Ruled manual test:
+Then test:
 
-9. Create two open boundary paths with opposite directions.
-10. Enter Add sheet > Ruled surface mode.
-11. Pick first boundary.
-12. Pick second reversed boundary.
-13. Confirm creation succeeds.
-14. Confirm source paths remain unchanged.
+7. Reverse one or more source path directions.
+8. Pick the same roles.
+9. Confirm Coons patch still creates.
 
 Failure test:
 
-15. Pick paths whose endpoints cannot form a valid Coons patch under any reversal.
-16. Confirm creation fails cleanly and draft is preserved.
+10. Pick four paths that do not form a closed endpoint cycle.
+11. Confirm creation fails cleanly and indicates which adjacency is bad.
 
-## 11. Preserve existing behavior
+Manual ruled test:
+
+12. Create two ruled boundaries with opposite directions.
+13. Pick them in ruled mode.
+14. Confirm ruled surface is created.
+
+## 10. Preserve existing behavior
 
 Do not regress:
 
-- sequential boundary picking workflow;
-- source path copy-on-create;
-- ruled surface sampling;
-- Coons patch sampling;
-- Coons corner validation;
+- sequential boundary picking;
+- Coons formula;
+- ruled formula;
+- copy-on-create;
+- source path geometry;
 - SVG preview;
 - TikZ export;
 - save/load;
@@ -461,7 +556,7 @@ Do not regress:
 - layer/style/camera/work-plane behavior;
 - inline/standalone TikZ formatting.
 
-## 12. Verification
+## 11. Verification
 
 Run:
 
@@ -471,18 +566,18 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 13. Report after implementation
+## 12. Report after implementation
 
 Please report:
 
 - files modified;
-- boundary reversal helper implementation;
-- Coons auto-orientation algorithm;
-- Ruled surface auto-orientation algorithm;
-- tie-break policy;
-- validation behavior;
+- root cause of remaining corner mismatch error;
+- endpoint connectivity algorithm;
+- canonical orientation policy;
+- boundary reversal helper behavior;
+- Coons success/failure cases tested;
+- ruled orientation updates;
 - source mutation avoidance;
-- status message behavior;
 - tests added/updated;
 - test results;
 - build results;
