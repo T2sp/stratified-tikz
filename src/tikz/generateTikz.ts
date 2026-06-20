@@ -10,6 +10,8 @@ import type {
   Diagram,
   ExternalTikzStyleSource,
   FilledRegion2DStratum,
+  GridParameterRange,
+  GridRectangleClip,
   HexColor,
   ImportedTikzStyleReference,
   LabelStyle,
@@ -56,7 +58,10 @@ import {
   pointFromWorkPlaneLocalCoordinate,
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
-import { parseScalarExpression } from '../model/scalarExpressions.ts'
+import {
+  type ScalarInputValue,
+  parseScalarExpression,
+} from '../model/scalarExpressions.ts'
 import { hasSymbolicVec3Coordinates } from '../model/symbolicCoordinates.ts'
 import {
   isSymbolicVariableMacroName,
@@ -135,6 +140,66 @@ type PathSegmentCoordinateNames =
       }>
     }
 
+type GridRangeValues = {
+  min: number
+  max: number
+  step: number
+}
+
+type GridClipValues = {
+  uMin: FormattedGridScalar
+  uMax: FormattedGridScalar
+  vMin: FormattedGridScalar
+  vMax: FormattedGridScalar
+}
+
+type FormattedGridScalar = {
+  value: number
+  tikz: string
+}
+
+type GridForeachSequence = {
+  count: number
+  first: number
+  last: number
+  next?: number
+}
+
+type GridLoopVariables = {
+  u: string
+  v: string
+}
+
+type GridRangeReadResult =
+  | {
+      ok: true
+      range: GridRangeValues
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type GridClipFormatResult =
+  | {
+      ok: true
+      clip: GridClipValues
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type GridForeachSequenceResult =
+  | {
+      ok: true
+      sequence: GridForeachSequence
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
   camera3d?: Camera3D
@@ -167,6 +232,7 @@ const inlineMathBaselineTikzOption =
 const inlineMathCommentSeparatorLine = '%----------------------------------------'
 const TIKZ_INDENT = '    '
 export const maxCurvedSheetTikzFaces = 256
+const gridTikzEpsilon = 1e-9
 
 export function generateTikz(
   diagram: Diagram,
@@ -1173,7 +1239,7 @@ function emitCurve(
   }
 
   if (curve.kind === 'grid') {
-    return emitGridPlaceholder(curve)
+    return emitGrid(curve, context)
   }
 
   if (curve.kind === 'concatenatedPath') {
@@ -1244,9 +1310,516 @@ function emitCurve(
   ]
 }
 
-function emitGridPlaceholder(curve: Extract<CurveStratum, { kind: 'grid' }>): string[] {
+function emitGrid(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  context: GenerateContext,
+): string[] {
+  const uRange = readGridNumericRange(grid.uRange, 'uRange')
+  const vRange = readGridNumericRange(grid.vRange, 'vRange')
+  const clip = formatGridClip(grid.clip, context)
+
+  if (!uRange.ok) {
+    return emitGridOmitted(grid, uRange.error)
+  }
+
+  if (!vRange.ok) {
+    return emitGridOmitted(grid, vRange.error)
+  }
+
+  if (!clip.ok) {
+    return emitGridOmitted(grid, clip.error)
+  }
+
+  const uSequence = gridForeachSequence(
+    uRange.range,
+    clip.clip.uMin.value,
+    clip.clip.uMax.value,
+    'uRange',
+  )
+  const vSequence = gridForeachSequence(
+    vRange.range,
+    clip.clip.vMin.value,
+    clip.clip.vMax.value,
+    'vRange',
+  )
+
+  if (!uSequence.ok) {
+    return emitGridOmitted(grid, uSequence.error)
+  }
+
+  if (!vSequence.ok) {
+    return emitGridOmitted(grid, vSequence.error)
+  }
+
+  const options = curveStyleOptionsForElement(
+    grid.stylePresetId,
+    grid.importedTikzStyleReferenceId,
+    grid.style,
+    `Curve${grid.id}`,
+    context,
+  )
+  const loopVariables = gridLoopVariables(context)
+  const scopeBody = emitGridScopeBody(
+    clip.clip,
+    uSequence.sequence,
+    vSequence.sequence,
+    loopVariables,
+    options,
+  )
+
+  if (context.mode === '2d') {
+    if (grid.frame.kind !== 'xy' || !isCanonicalGridXyFrame(grid.frame.frame)) {
+      return emitGridOmitted(
+        grid,
+        '2D grid foreach export requires the canonical xy frame at z = 0.',
+      )
+    }
+
+    return [
+      `% Grid "${grid.name}" [${grid.id}] exported with TikZ foreach loops and rectangular clip.`,
+      '\\begin{scope}',
+      ...scopeBody,
+      '\\end{scope}',
+      '',
+    ]
+  }
+
+  if (grid.frame.kind !== 'workPlane') {
+    return emitGridOmitted(
+      grid,
+      '3D grid foreach export requires a stored work-plane frame snapshot.',
+    )
+  }
+
+  const frameOptions = formatTikzPlaneScopeOptions(
+    grid.frame.frame,
+    context,
+    `grid "${grid.name}" [${grid.id}] frame`,
+  )
+
+  if (!frameOptions.ok) {
+    return emitGridOmitted(
+      grid,
+      `its local plane frame cannot be exported safely. ${frameOptions.error}`,
+    )
+  }
+
+  context.requiresTikz3dLibrary = true
+
   return [
-    `% Grid "${curve.name}" [${curve.id}] omitted: grid TikZ foreach export is implemented in Phase 19F.`,
+    `% Grid "${grid.name}" [${grid.id}] exported in a local TikZ 3d plane scope with foreach loops and rectangular clip.`,
+    '\\begin{scope}[',
+    ...frameOptions.options.map((option) => indentLine(option)),
+    ']',
+    ...scopeBody,
+    '\\end{scope}',
+    '',
+  ]
+}
+
+function emitGridScopeBody(
+  clip: GridClipValues,
+  uSequence: GridForeachSequence,
+  vSequence: GridForeachSequence,
+  loopVariables: GridLoopVariables,
+  options: string[],
+): string[] {
+  return [
+    indentLine(
+      `\\clip ${formatGridLocalCoordinate(
+        clip.uMin.tikz,
+        clip.vMin.tikz,
+      )} rectangle ${formatGridLocalCoordinate(clip.uMax.tikz, clip.vMax.tikz)};`,
+    ),
+    ...emitGridForeachLoop(
+      loopVariables.u,
+      uSequence,
+      options,
+      formatGridLocalCoordinate(loopVariables.u, clip.vMin.tikz),
+      formatGridLocalCoordinate(loopVariables.u, clip.vMax.tikz),
+    ),
+    ...emitGridForeachLoop(
+      loopVariables.v,
+      vSequence,
+      options,
+      formatGridLocalCoordinate(clip.uMin.tikz, loopVariables.v),
+      formatGridLocalCoordinate(clip.uMax.tikz, loopVariables.v),
+    ),
+  ]
+}
+
+function emitGridForeachLoop(
+  loopVariable: string,
+  sequence: GridForeachSequence,
+  options: string[],
+  start: string,
+  end: string,
+): string[] {
+  if (sequence.count === 0) {
+    return []
+  }
+
+  return [
+    indentLine(
+      `\\foreach ${loopVariable} in ${formatGridForeachRange(sequence)} {`,
+    ),
+    indentLine('\\draw[', 2),
+    ...indentLines(formatTikzOptions(options), 2),
+    indentLine(']', 2),
+    indentLine(`${start} -- ${end};`, 3),
+    indentLine('}'),
+  ]
+}
+
+function readGridNumericRange(
+  range: GridParameterRange,
+  fieldName: 'uRange' | 'vRange',
+): GridRangeReadResult {
+  const min = readGridNumericRangeScalar(range.min, `${fieldName}.min`)
+  const max = readGridNumericRangeScalar(range.max, `${fieldName}.max`)
+  const step = readGridNumericRangeScalar(range.step, `${fieldName}.step`)
+
+  if (!min.ok) {
+    return min
+  }
+
+  if (!max.ok) {
+    return max
+  }
+
+  if (!step.ok) {
+    return step
+  }
+
+  if (step.value <= 0) {
+    return {
+      ok: false,
+      error: `${fieldName}.step must be positive for grid foreach export.`,
+    }
+  }
+
+  if (max.value < min.value) {
+    return {
+      ok: false,
+      error: `${fieldName}.max must be greater than or equal to ${fieldName}.min for grid foreach export.`,
+    }
+  }
+
+  return {
+    ok: true,
+    range: {
+      min: min.value,
+      max: max.value,
+      step: step.value,
+    },
+  }
+}
+
+function readGridNumericRangeScalar(
+  value: ScalarInputValue,
+  path: string,
+):
+  | {
+      ok: true
+      value: number
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  if (value.kind !== 'numeric') {
+    return {
+      ok: false,
+      error: `${path} is symbolic; grid foreach ranges currently require numeric min, max, and step values.`,
+    }
+  }
+
+  if (!Number.isFinite(value.value)) {
+    return {
+      ok: false,
+      error: `${path} must be finite for grid foreach export.`,
+    }
+  }
+
+  return {
+    ok: true,
+    value: value.value,
+  }
+}
+
+function formatGridClip(
+  clip: GridRectangleClip,
+  context: GenerateContext,
+): GridClipFormatResult {
+  if (clip.kind !== 'rectangle') {
+    return {
+      ok: false,
+      error: 'grid clip must be a rectangle for foreach export.',
+    }
+  }
+
+  const uMin = formatGridScalar(clip.uMin, context, 'clip.uMin')
+  const uMax = formatGridScalar(clip.uMax, context, 'clip.uMax')
+  const vMin = formatGridScalar(clip.vMin, context, 'clip.vMin')
+  const vMax = formatGridScalar(clip.vMax, context, 'clip.vMax')
+
+  if (!uMin.ok) {
+    return uMin
+  }
+
+  if (!uMax.ok) {
+    return uMax
+  }
+
+  if (!vMin.ok) {
+    return vMin
+  }
+
+  if (!vMax.ok) {
+    return vMax
+  }
+
+  if (uMax.scalar.value < uMin.scalar.value) {
+    return {
+      ok: false,
+      error: 'clip.uMax must be greater than or equal to clip.uMin for grid foreach export.',
+    }
+  }
+
+  if (vMax.scalar.value < vMin.scalar.value) {
+    return {
+      ok: false,
+      error: 'clip.vMax must be greater than or equal to clip.vMin for grid foreach export.',
+    }
+  }
+
+  return {
+    ok: true,
+    clip: {
+      uMin: uMin.scalar,
+      uMax: uMax.scalar,
+      vMin: vMin.scalar,
+      vMax: vMax.scalar,
+    },
+  }
+}
+
+function formatGridScalar(
+  value: ScalarInputValue,
+  context: GenerateContext,
+  path: string,
+):
+  | {
+      ok: true
+      scalar: FormattedGridScalar
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  if (value.kind === 'numeric') {
+    if (!Number.isFinite(value.value)) {
+      return {
+        ok: false,
+        error: `${path} must be finite for grid foreach export.`,
+      }
+    }
+
+    return {
+      ok: true,
+      scalar: {
+        value: value.value,
+        tikz: formatNumber(value.value),
+      },
+    }
+  }
+
+  if (!Number.isFinite(value.previewValue)) {
+    return {
+      ok: false,
+      error: `${path} symbolic preview value must be finite for grid foreach export.`,
+    }
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: context.variables.variableNames,
+  })
+
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: `${path} ${parsed.error}`,
+    }
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    context.variables.variableMacros,
+  )
+
+  if (!formatted.ok) {
+    return {
+      ok: false,
+      error: `${path} ${formatted.error}`,
+    }
+  }
+
+  return {
+    ok: true,
+    scalar: {
+      value: value.previewValue,
+      tikz: `{${formatted.expression}}`,
+    },
+  }
+}
+
+function gridForeachSequence(
+  range: GridRangeValues,
+  clipMin: number,
+  clipMax: number,
+  fieldName: 'uRange' | 'vRange',
+): GridForeachSequenceResult {
+  const lower = Math.max(range.min, clipMin)
+  const upper = Math.min(range.max, clipMax)
+
+  if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+    return {
+      ok: false,
+      error: `${fieldName} clipped bounds must be finite for grid foreach export.`,
+    }
+  }
+
+  if (upper < lower - gridTikzEpsilon) {
+    return {
+      ok: true,
+      sequence: {
+        count: 0,
+        first: 0,
+        last: 0,
+      },
+    }
+  }
+
+  const firstIndex = Math.max(
+    0,
+    Math.ceil((lower - range.min) / range.step - gridTikzEpsilon),
+  )
+  const lastIndex = Math.floor(
+    (upper - range.min) / range.step + gridTikzEpsilon,
+  )
+
+  if (lastIndex < firstIndex) {
+    return {
+      ok: true,
+      sequence: {
+        count: 0,
+        first: 0,
+        last: 0,
+      },
+    }
+  }
+
+  const count = lastIndex - firstIndex + 1
+
+  if (!Number.isSafeInteger(count)) {
+    return {
+      ok: false,
+      error: `${fieldName} line count must be a finite safe integer for grid foreach export.`,
+    }
+  }
+
+  const first = normalizeGridTikzNumber(range.min + firstIndex * range.step)
+  const last = normalizeGridTikzNumber(range.min + lastIndex * range.step)
+  const next =
+    count > 1
+      ? normalizeGridTikzNumber(range.min + (firstIndex + 1) * range.step)
+      : undefined
+
+  if (
+    !Number.isFinite(first) ||
+    !Number.isFinite(last) ||
+    (next !== undefined && !Number.isFinite(next))
+  ) {
+    return {
+      ok: false,
+      error: `${fieldName} produced a non-finite foreach range value.`,
+    }
+  }
+
+  return {
+    ok: true,
+    sequence: {
+      count,
+      first,
+      last,
+      ...(next === undefined ? {} : { next }),
+    },
+  }
+}
+
+function formatGridForeachRange(sequence: GridForeachSequence): string {
+  if (sequence.count <= 1 || sequence.next === undefined) {
+    return `{${formatNumber(sequence.first)}}`
+  }
+
+  return `{${formatNumber(sequence.first)},${formatNumber(
+    sequence.next,
+  )},...,${formatNumber(sequence.last)}}`
+}
+
+function formatGridLocalCoordinate(x: string, y: string): string {
+  return `(${x},${y})`
+}
+
+function gridLoopVariables(context: GenerateContext): GridLoopVariables {
+  const usedMacros = new Set(context.variables.variableMacros.values())
+  const u = uniqueGridLoopVariable('\\stzGridU', usedMacros)
+
+  usedMacros.add(u)
+
+  return {
+    u,
+    v: uniqueGridLoopVariable('\\stzGridV', usedMacros),
+  }
+}
+
+function uniqueGridLoopVariable(
+  preferred: string,
+  usedMacros: ReadonlySet<string>,
+): string {
+  let suffix = ''
+
+  while (true) {
+    const candidate = `${preferred}${suffix}`
+
+    if (!usedMacros.has(candidate)) {
+      return candidate
+    }
+
+    suffix = `${suffix}A`
+  }
+}
+
+function isCanonicalGridXyFrame(frame: WorkPlaneFrameSnapshot): boolean {
+  return (
+    isValidWorkPlaneFrameSnapshot(frame) &&
+    vec3ApproximatelyEqual(frame.origin, { x: 0, y: 0, z: 0 }) &&
+    vec3ApproximatelyEqual(frame.u, { x: 1, y: 0, z: 0 }) &&
+    vec3ApproximatelyEqual(frame.v, { x: 0, y: 1, z: 0 }) &&
+    vec3ApproximatelyEqual(frame.normal, { x: 0, y: 0, z: 1 })
+  )
+}
+
+function normalizeGridTikzNumber(value: number): number {
+  return Math.abs(value) <= gridTikzEpsilon ? 0 : value
+}
+
+function emitGridOmitted(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  reason: string,
+): string[] {
+  return [
+    `% Grid "${grid.name}" [${grid.id}] omitted: ${commentLineText(reason)}`,
     '',
   ]
 }
