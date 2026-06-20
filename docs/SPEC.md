@@ -350,12 +350,11 @@ strata. Editing, moving, or deleting an original source path after surface
 creation must not mutate the surface.
 
 Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
-The Phase 20A evaluator supports line, cubic Bezier, and 3D arc segments.
-Circle and ellipse templates are not accepted as boundary snapshots until they
-are expanded into ordinary path segments. Boundaries must be non-empty,
-composable, finite, and sample to finite points. Boundary-surface coordinates
-are numeric-only for now because preview and export derive sampled mesh
-coordinates.
+The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
+template geometry. Circle and ellipse templates are copied into ordinary path
+segments at creation time. Boundaries must be non-empty, composable, finite, and
+sample to finite points. Boundary-surface coordinates are numeric-only for now
+because preview and export derive sampled mesh coordinates.
 
 A ruled surface from boundaries `C0` and `C1` uses:
 

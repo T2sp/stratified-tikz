@@ -902,13 +902,13 @@ uses the hyperbolic patch `normalOffset = height * normalizedU * normalizedV`.
 
 Boundary-surface primitives store copied boundary path geometry. A
 `BoundaryPathSnapshot` is not a live reference to a curve stratum: later edits
-to the source curve do not mutate the surface. The Phase 20A boundary evaluator
-supports copied concatenated `PathSegment[]` geometry made from line, cubic
-Bezier, and 3D arc segments. Template paths are not accepted as boundary
-snapshots yet unless they have first been expanded into ordinary path
-segments. Boundary snapshots must be non-empty, composable, finite, and must
-sample to finite points. Boundary coordinates are numeric-only for this MVP
-because mesh generation derives sampled coordinates.
+to the source curve do not mutate the surface. The boundary evaluator supports
+copied concatenated `PathSegment[]` geometry made from line, cubic Bezier, 3D
+arc, and sampled path template segments. Circle and ellipse template paths are
+copied into ordinary path segments at creation time. Boundary snapshots must be
+non-empty, composable, finite, and must sample to finite points. Boundary
+coordinates are numeric-only for this MVP because mesh generation derives
+sampled coordinates.
 
 A ruled surface stores two boundary snapshots with a shared deterministic
 piecewise-uniform boundary parameter `u`. Its sampler uses:
