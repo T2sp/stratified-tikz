@@ -36,6 +36,7 @@ import {
   validateSymbolicVariables,
 } from './variables.ts'
 import {
+  hasSymbolicVec3Coordinates,
   validateSymbolicVec3,
   type CoordinateExpressionContext,
 } from './symbolicCoordinates.ts'
@@ -1306,6 +1307,18 @@ function validateArcPathSegment(
   }
 
   if (
+    hasSymbolicVec3Coordinates(segment.start) ||
+    hasSymbolicVec3Coordinates(segment.end) ||
+    hasSymbolicVec3Coordinates(segment.center)
+  ) {
+    pushError(
+      errors,
+      path,
+      'Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.',
+    )
+  }
+
+  if (
     isFiniteVec3(segment.start) &&
     isFiniteVec3(segment.end) &&
     isFiniteVec3(segment.center) &&
@@ -1358,6 +1371,7 @@ function validatePathTemplate(
       }
 
       validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     case 'ellipseTemplate':
       validateVec3ForAmbient(
@@ -1383,6 +1397,7 @@ function validatePathTemplate(
       }
 
       validateTemplateFrame(template, ambientDimension, path, errors)
+      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     default:
       pushError(
@@ -1391,6 +1406,23 @@ function validatePathTemplate(
         'Template path kind must be circleTemplate or ellipseTemplate.',
       )
   }
+}
+
+function validateTemplateSymbolicCoordinatePolicy(
+  template: PathTemplate,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (ambientDimension !== 3 || !hasSymbolicVec3Coordinates(template.center)) {
+    return
+  }
+
+  pushError(
+    errors,
+    `${path}.center`,
+    '3D template path centers must be numeric because template export derives local plane coordinates.',
+  )
 }
 
 function validateTemplateFrame(

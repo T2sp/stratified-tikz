@@ -179,7 +179,16 @@ export function coordinateComponentPreviewValue(
 }
 
 export function hasSymbolicVec3Coordinates(point: Vec3): boolean {
-  return point.symbolic !== undefined && symbolicVec3HasSymbolic(point.symbolic)
+  const symbolic = point.symbolic
+
+  return (
+    isRecord(symbolic) &&
+    coordinateAxes.some((axis) => {
+      const component = symbolic[axis]
+
+      return isRecord(component) && component.kind === 'symbolic'
+    })
+  )
 }
 
 export function refreshDiagramSymbolicCoordinatePreviews(
@@ -282,6 +291,312 @@ export function validateSymbolicVec3(
   })
 }
 
+export function validateDiagramSymbolicCoordinateMetadata(
+  diagram: Diagram,
+): DiagramValidationIssue[] {
+  const errors: DiagramValidationIssue[] = []
+
+  if (Array.isArray(diagram.strata)) {
+    diagram.strata.forEach((stratum, index) => {
+      validateStratumSymbolicCoordinateMetadata(
+        stratum,
+        diagram.ambientDimension,
+        `strata[${index}]`,
+        errors,
+      )
+    })
+  }
+
+  if (Array.isArray(diagram.labels)) {
+    diagram.labels.forEach((label, index) => {
+      if (!isRecord(label)) {
+        return
+      }
+
+      validateSymbolicVec3Metadata(
+        label.position,
+        diagram.ambientDimension,
+        `labels[${index}].position`,
+        errors,
+      )
+    })
+  }
+
+  return errors
+}
+
+function validateStratumSymbolicCoordinateMetadata(
+  stratum: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(stratum)) {
+    return
+  }
+
+  switch (stratum.geometricKind) {
+    case 'region':
+      if (stratum.kind === 'filledRegion') {
+        validateClosedPathBoundariesSymbolicMetadata(
+          stratum.boundaries,
+          ambientDimension,
+          `${path}.boundaries`,
+          errors,
+        )
+      }
+      return
+    case 'sheet':
+      if (stratum.kind === 'quadSheet' && Array.isArray(stratum.corners)) {
+        stratum.corners.forEach((corner, index) =>
+          validateSymbolicVec3Metadata(
+            corner,
+            ambientDimension,
+            `${path}.corners[${index}]`,
+            errors,
+          ),
+        )
+        return
+      }
+
+      if (stratum.kind === 'polygonSheet' && Array.isArray(stratum.vertices)) {
+        stratum.vertices.forEach((vertex, index) =>
+          validateSymbolicVec3Metadata(
+            vertex,
+            ambientDimension,
+            `${path}.vertices[${index}]`,
+            errors,
+          ),
+        )
+        return
+      }
+
+      if (stratum.kind === 'workPlaneFilledSheet') {
+        validateClosedPathBoundariesSymbolicMetadata(
+          stratum.boundaries,
+          ambientDimension,
+          `${path}.boundaries`,
+          errors,
+        )
+      }
+      return
+    case 'curve':
+      if (
+        (stratum.kind === 'polyline' || stratum.kind === 'cubicBezier') &&
+        Array.isArray(stratum.points)
+      ) {
+        stratum.points.forEach((point, index) =>
+          validateSymbolicVec3Metadata(
+            point,
+            ambientDimension,
+            `${path}.points[${index}]`,
+            errors,
+          ),
+        )
+        return
+      }
+
+      if (stratum.kind === 'concatenatedPath') {
+        validatePathSegmentsSymbolicMetadata(
+          stratum.segments,
+          ambientDimension,
+          `${path}.segments`,
+          errors,
+        )
+        return
+      }
+
+      if (stratum.kind === 'templatePath' && isRecord(stratum.template)) {
+        validateSymbolicVec3Metadata(
+          stratum.template.center,
+          ambientDimension,
+          `${path}.template.center`,
+          errors,
+        )
+      }
+      return
+    case 'point':
+      validateSymbolicVec3Metadata(
+        stratum.position,
+        ambientDimension,
+        `${path}.position`,
+        errors,
+      )
+      return
+    default:
+      return
+  }
+}
+
+function validateClosedPathBoundariesSymbolicMetadata(
+  boundaries: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Array.isArray(boundaries)) {
+    return
+  }
+
+  boundaries.forEach((boundary, index) => {
+    if (!isRecord(boundary)) {
+      return
+    }
+
+    validatePathSegmentsSymbolicMetadata(
+      boundary.segments,
+      ambientDimension,
+      `${path}[${index}].segments`,
+      errors,
+    )
+  })
+}
+
+function validatePathSegmentsSymbolicMetadata(
+  segments: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Array.isArray(segments)) {
+    return
+  }
+
+  segments.forEach((segment, index) =>
+    validatePathSegmentSymbolicMetadata(
+      segment,
+      ambientDimension,
+      `${path}[${index}]`,
+      errors,
+    ),
+  )
+}
+
+function validatePathSegmentSymbolicMetadata(
+  segment: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(segment)) {
+    return
+  }
+
+  switch (segment.kind) {
+    case 'line':
+      validateSymbolicVec3Metadata(
+        segment.start,
+        ambientDimension,
+        `${path}.start`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.end,
+        ambientDimension,
+        `${path}.end`,
+        errors,
+      )
+      return
+    case 'cubicBezier':
+      validateSymbolicVec3Metadata(
+        segment.start,
+        ambientDimension,
+        `${path}.start`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.control1,
+        ambientDimension,
+        `${path}.control1`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.control2,
+        ambientDimension,
+        `${path}.control2`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.end,
+        ambientDimension,
+        `${path}.end`,
+        errors,
+      )
+      return
+    case 'arc':
+      validateSymbolicVec3Metadata(
+        segment.start,
+        ambientDimension,
+        `${path}.start`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.end,
+        ambientDimension,
+        `${path}.end`,
+        errors,
+      )
+      validateSymbolicVec3Metadata(
+        segment.center,
+        ambientDimension,
+        `${path}.center`,
+        errors,
+      )
+      return
+    default:
+      return
+  }
+}
+
+function validateSymbolicVec3Metadata(
+  point: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(point)) {
+    return
+  }
+
+  const symbolic = point.symbolic
+
+  if (symbolic === undefined) {
+    return
+  }
+
+  if (!isRecord(symbolic)) {
+    pushError(errors, `${path}.symbolic`, 'Symbolic coordinate metadata must be an object.')
+    return
+  }
+
+  coordinateAxes.forEach((axis) => {
+    const component = readCoordinateComponent(
+      symbolic[axis],
+      `${path}.symbolic.${axis}`,
+      undefined,
+      errors,
+    )
+
+    if (component === null) {
+      return
+    }
+
+    const previewValue = coordinateComponentPreviewValue(component)
+
+    if (
+      ambientDimension === 2 &&
+      axis === 'z' &&
+      (component.kind === 'symbolic' || !numbersApproximatelyEqual(previewValue, 0))
+    ) {
+      pushError(
+        errors,
+        `${path}.symbolic.z`,
+        '2D symbolic coordinates must keep z numeric and equal to 0.',
+      )
+    }
+  })
+}
+
 function refreshStratumSymbolicCoordinatePreviews(
   stratum: Stratum,
   ambientDimension: AmbientDimension,
@@ -346,6 +661,8 @@ function refreshStratumSymbolicCoordinatePreviews(
           }
         case 'curvedSheet':
           return stratum
+        default:
+          return stratum
       }
     case 'curve':
       switch (stratum.kind) {
@@ -385,6 +702,8 @@ function refreshStratumSymbolicCoordinatePreviews(
               errors,
             ),
           }
+        default:
+          return stratum
       }
     case 'point':
       return {
@@ -677,21 +996,55 @@ function normalizeSymbolicVec3ForAmbientDimension(
 
 function symbolicVec3ComponentsFromPoint(point: Vec3): SymbolicVec3 {
   const symbolic = point.symbolic
+  const symbolicX = coordinateComponentFromUnknown(symbolic?.x)
+  const symbolicY = coordinateComponentFromUnknown(symbolic?.y)
+  const symbolicZ = coordinateComponentFromUnknown(symbolic?.z)
 
   return {
     x:
-      symbolic?.x.kind === 'symbolic'
-        ? cloneCoordinateComponent(symbolic.x)
+      symbolicX?.kind === 'symbolic'
+        ? cloneCoordinateComponent(symbolicX)
         : numericCoordinateComponent(point.x),
     y:
-      symbolic?.y.kind === 'symbolic'
-        ? cloneCoordinateComponent(symbolic.y)
+      symbolicY?.kind === 'symbolic'
+        ? cloneCoordinateComponent(symbolicY)
         : numericCoordinateComponent(point.y),
     z:
-      symbolic?.z.kind === 'symbolic'
-        ? cloneCoordinateComponent(symbolic.z)
+      symbolicZ?.kind === 'symbolic'
+        ? cloneCoordinateComponent(symbolicZ)
         : numericCoordinateComponent(point.z),
   }
+}
+
+function coordinateComponentFromUnknown(
+  component: unknown,
+): CoordinateComponent | null {
+  if (!isRecord(component)) {
+    return null
+  }
+
+  if (component.kind === 'numeric') {
+    return typeof component.value === 'number' && Number.isFinite(component.value)
+      ? {
+          kind: 'numeric',
+          value: component.value,
+        }
+      : null
+  }
+
+  if (component.kind !== 'symbolic') {
+    return null
+  }
+
+  return typeof component.expression === 'string' &&
+    typeof component.previewValue === 'number' &&
+    Number.isFinite(component.previewValue)
+    ? {
+        kind: 'symbolic',
+        expression: component.expression,
+        previewValue: component.previewValue,
+      }
+    : null
 }
 
 function symbolicVec3HasSymbolic(symbolic: SymbolicVec3): boolean {

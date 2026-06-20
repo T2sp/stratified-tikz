@@ -1137,6 +1137,14 @@ export function addArcPathFromDirectInput(
     }
   }
 
+  if (hasSymbolicVec3Coordinates(centerResult.center)) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidCoordinates',
+    }
+  }
+
   const radius = parsePositiveFiniteNumber(input.radius)
   const startAngleDeg = parseFiniteNumber(input.startAngleDeg)
   const endAngleDeg = parseFiniteNumber(input.endAngleDeg)

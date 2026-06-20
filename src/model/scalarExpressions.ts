@@ -527,6 +527,27 @@ function readNumberToken(source: string, start: number): number {
     }
   }
 
+  if (source[index] === 'e' || source[index] === 'E') {
+    const exponentStart = index
+    let exponentIndex = index + 1
+
+    if (source[exponentIndex] === '+' || source[exponentIndex] === '-') {
+      exponentIndex += 1
+    }
+
+    if (isDigit(source[exponentIndex])) {
+      exponentIndex += 1
+
+      while (isDigit(source[exponentIndex])) {
+        exponentIndex += 1
+      }
+
+      return exponentIndex
+    }
+
+    return exponentStart
+  }
+
   return index
 }
 

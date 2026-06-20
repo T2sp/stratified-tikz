@@ -325,7 +325,7 @@ function TemplatePathGeometryEditor({
         point={template.center}
         ambientDimension={diagram.ambientDimension}
         variables={diagram.variables}
-        allowSymbolic
+        allowSymbolic={diagram.ambientDimension === 2}
         onCoordinateChange={(axis, value) =>
           updateTemplatePathInDiagram(path.id, onDiagramChange, (current) => {
             const center = updateVec3Coordinate(

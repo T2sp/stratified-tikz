@@ -71,6 +71,16 @@ test('numeric literal parses and evaluates', () => {
   assert.equal(evaluated.value, -3.5)
 })
 
+test('scientific numeric literals parse and evaluate', () => {
+  assert.equal(evaluateOk('1e-3'), 0.001)
+  assert.equal(evaluateOk('1E-3'), 0.001)
+  assert.equal(evaluateOk('2e+4'), 20000)
+  assert.equal(evaluateOk('-3.5e2'), -350)
+  assert.equal(evaluateOk('+4.2E-1'), 0.42)
+  assert.equal(evaluateOk('.5e2'), 50)
+  assert.equal(evaluateOk('5.'), 5)
+})
+
 test('createScalarInputValue classifies numeric and symbolic scalar values', () => {
   const numeric = createScalarInputValue('-2.25')
   const symbolic = createScalarInputValue('R + 1', {

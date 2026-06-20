@@ -16,7 +16,10 @@ import {
   macroNameFromSymbolicVariableName,
   resolveSymbolicVariables,
 } from './variables.ts'
-import { refreshDiagramSymbolicCoordinatePreviews } from './symbolicCoordinates.ts'
+import {
+  refreshDiagramSymbolicCoordinatePreviews,
+  validateDiagramSymbolicCoordinateMetadata,
+} from './symbolicCoordinates.ts'
 import {
   isTikzStyleTarget,
   normalizeExternalTikzStyleLoadHint,
@@ -403,6 +406,21 @@ function normalizeLoadedDiagram(
       ? {}
       : { layers: layerNormalization.layers }),
   }
+  const symbolicMetadataErrors = validateDiagramSymbolicCoordinateMetadata(diagram)
+
+  if (symbolicMetadataErrors.length > 0) {
+    return {
+      diagram,
+      warnings,
+      errors: [
+        ...layerNormalization.errors,
+        ...symbolicMetadataErrors.map(
+          (issue) => `${issue.path} ${issue.message}`,
+        ),
+      ],
+    }
+  }
+
   const coordinateRefresh = refreshLoadedSymbolicCoordinatePreviews(diagram)
   warnings.push(...coordinateRefresh.warnings)
 
