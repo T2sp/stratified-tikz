@@ -56,6 +56,7 @@ import {
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
 import { parseScalarExpression } from '../model/scalarExpressions.ts'
+import { hasSymbolicVec3Coordinates } from '../model/symbolicCoordinates.ts'
 import {
   isSymbolicVariableMacroName,
   resolveSymbolicVariables,
@@ -1074,7 +1075,12 @@ function emitWorkPlaneFilledSheet(
     ),
     ...fillRuleTikzOptions(sheet.fillRule),
   ]
-  const scopedPath = formatWorkPlaneFilledSheetLocalPath(sheet)
+  const hasSymbolicBoundaryCoordinates = closedBoundariesHaveSymbolicCoordinates(
+    sheet.boundaries,
+  )
+  const scopedPath = hasSymbolicBoundaryCoordinates
+    ? null
+    : formatWorkPlaneFilledSheetLocalPath(sheet)
 
   if (scopedPath !== null) {
     context.requiresTikz3dLibrary = true
@@ -1116,7 +1122,9 @@ function emitWorkPlaneFilledSheet(
   )
 
   return [
-    `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
+    hasSymbolicBoundaryCoordinates
+      ? `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates to preserve symbolic boundary expressions.`
+      : `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
     `% Fill rule: ${sheet.fillRule}.`,
     ...emitFillDrawClosedBoundaries(coordinates, options),
   ]
@@ -1317,6 +1325,13 @@ function emitTemplatePath3D(
   options: string[],
   context: GenerateContext,
 ): string[] {
+  if (hasSymbolicVec3Coordinates(curve.template.center)) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because 3D template centers use local numeric plane coordinates and cannot preserve symbolic center expressions yet.`,
+      '',
+    ]
+  }
+
   if (curve.template.frame === undefined) {
     return [
       `% Template path "${curve.name}" [${curve.id}] omitted because 3D templates require a stored frame.`,
@@ -1464,6 +1479,10 @@ function emitScopedWorkPlaneRelativeBezierCurve(
   options: string[],
   context: GenerateContext,
 ): string[] | null {
+  if (curveHasSymbolicCoordinates(curve)) {
+    return null
+  }
+
   const scopedPath = formatScopedWorkPlaneRelativeBezierPath(curve, context.mode)
 
   if (scopedPath === null) {
@@ -2206,6 +2225,14 @@ function closedBoundariesHaveFiniteCoordinates(
   )
 }
 
+function closedBoundariesHaveSymbolicCoordinates(
+  boundaries: readonly ClosedPathBoundary[],
+): boolean {
+  return boundaries.some((boundary) =>
+    boundary.segments.some(pathSegmentHasSymbolicCoordinates),
+  )
+}
+
 function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
   switch (segment.kind) {
     case 'line':
@@ -2229,6 +2256,29 @@ function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
   }
 }
 
+function pathSegmentHasSymbolicCoordinates(segment: PathSegment): boolean {
+  switch (segment.kind) {
+    case 'line':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.end)
+      )
+    case 'cubicBezier':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.control1) ||
+        hasSymbolicVec3Coordinates(segment.control2) ||
+        hasSymbolicVec3Coordinates(segment.end)
+      )
+    case 'arc':
+      return (
+        hasSymbolicVec3Coordinates(segment.start) ||
+        hasSymbolicVec3Coordinates(segment.end) ||
+        hasSymbolicVec3Coordinates(segment.center)
+      )
+  }
+}
+
 function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
   switch (curve.kind) {
     case 'polyline':
@@ -2240,6 +2290,20 @@ function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
       return (
         templatePathCoordinates(curve.template).every(isFiniteVec3) &&
         templatePathHasFiniteParameters(curve.template)
+      )
+  }
+}
+
+function curveHasSymbolicCoordinates(curve: CurveStratum): boolean {
+  switch (curve.kind) {
+    case 'polyline':
+    case 'cubicBezier':
+      return curve.points.some(hasSymbolicVec3Coordinates)
+    case 'concatenatedPath':
+      return curve.segments.some(pathSegmentHasSymbolicCoordinates)
+    case 'templatePath':
+      return templatePathCoordinates(curve.template).some(
+        hasSymbolicVec3Coordinates,
       )
   }
 }

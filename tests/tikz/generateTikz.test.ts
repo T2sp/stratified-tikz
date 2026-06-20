@@ -9,6 +9,7 @@ import {
 } from '../../src/tikz/index.ts'
 import type {
   ClosedPathBoundary,
+  CoordinateComponent,
   CurveStyle,
   Diagram,
   PerspectiveCamera3D,
@@ -17,6 +18,7 @@ import type {
   PointStyle,
   RegionStyle,
   SheetStyle,
+  SymbolicVariable,
   TikzStyleTarget,
   Vec3,
   WorkPlaneFrameSnapshot,
@@ -867,6 +869,378 @@ test('inline output emits variables inside tikzpicture with no blank lines', () 
   assert.ok(variableIndex < coordinateIndex)
   assert.ok(coordinateIndex < endIndex)
   expectNoBlankLines(tikz)
+})
+
+test('standalone symbolic export emits variables before symbolic coordinates', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'orbit-point',
+    name: 'Orbit point',
+    style: pointStyle(),
+    position: symbolicVec3(
+      symbolicComponent('R*cos(q)', Math.sqrt(3)),
+      symbolicComponent('R*sin(q)', 1),
+      0,
+    ),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const coordinateIndex = tikz.indexOf(
+    '\\coordinate (pointOrbitPoint0p0) at ({\\R * cos(\\q)},{\\R * sin(\\q)});',
+  )
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+
+  assert.notEqual(variableIndex, -1)
+  assert.notEqual(coordinateIndex, -1)
+  assert.ok(variableIndex < beginIndex)
+  assert.ok(variableIndex < coordinateIndex)
+})
+
+test('inline symbolic export emits variables before coordinates with no blank lines', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'inline-symbolic-point',
+    name: 'Inline symbolic point',
+    style: pointStyle(),
+    position: symbolicVec3(symbolicComponent('R', 2), 0, 0),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const beginIndex = tikz.indexOf('\\begin{tikzpicture}')
+  const variableIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const coordinateIndex = tikz.indexOf(
+    '\\coordinate (pointInlineSymbolicPoint0p0) at ({\\R},0);',
+  )
+  const endIndex = tikz.indexOf('\\end{tikzpicture}')
+
+  assert.equal(tikz.slice(0, beginIndex).trim(), '')
+  assert.notEqual(variableIndex, -1)
+  assert.notEqual(coordinateIndex, -1)
+  assert.ok(beginIndex < variableIndex)
+  assert.ok(variableIndex < coordinateIndex)
+  assert.ok(coordinateIndex < endIndex)
+  expectNoBlankLines(tikz)
+})
+
+test('symbolic point coordinates export as braced TikZ expressions', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'symbolic-point',
+    name: 'Symbolic point',
+    style: pointStyle(),
+    position: symbolicVec3(symbolicComponent('R + 1', 3), 0, 0),
+    layer: 0,
+  })
+
+  assert.match(
+    generateTikz(diagram),
+    /\\coordinate \(pointSymbolicPoint0p0\) at \(\{\\R \+ 1\},0\);/,
+  )
+})
+
+test('symbolic label positions export directly in node coordinates', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'symbolic-label',
+    name: 'Symbolic label',
+    text: '$P$',
+    position: symbolicVec3(
+      symbolicComponent('R*cos(q)', Math.sqrt(3)),
+      symbolicComponent('R*sin(q)', 1),
+      0,
+    ),
+    style: {
+      kind: 'labelStyle',
+      color: '#000000',
+      opacity: 1,
+      fontSize: 10,
+      anchor: 'center',
+    },
+    layer: 0,
+  })
+
+  assert.match(
+    generateTikz(diagram),
+    /\\node at \(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\) \{\$P\$\};/,
+  )
+})
+
+test('symbolic path vertices export through named coordinates', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'symbolic-path',
+    name: 'Symbolic Path',
+    style: curveStyle(),
+    points: [
+      symbolicVec3(symbolicComponent('R', 2), 0, 0),
+      symbolicVec3(
+        symbolicComponent('R*cos(q)', Math.sqrt(3)),
+        symbolicComponent('R*sin(q)', 1),
+        0,
+      ),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolySymbolicPath0p0\) at \(\{\\R\},0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolySymbolicPath0p1\) at \(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\);/,
+  )
+})
+
+test('symbolic cubic control coordinates export when absolute controls are used', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'symbolic-cubic',
+    name: 'Symbolic Cubic',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      symbolicVec3(symbolicComponent('R', 2), 1, 0),
+      symbolicVec3(3, symbolicComponent('R*sin(q)', 1), 0),
+      { x: 4, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierSymbolicCubic0p1\) at \(\{\\R\},1\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierSymbolicCubic0p2\) at \(3,\{\\R \* sin\(\\q\)\}\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierSymbolicCubic0p0\) \.\. controls \(curveBezierSymbolicCubic0p1\) and \(curveBezierSymbolicCubic0p2\) \.\. \(curveBezierSymbolicCubic0p3\);/,
+  )
+})
+
+test('symbolic filled-region boundary coordinates export in boundary coordinate definitions', () => {
+  const diagram = createFilledRegionDiagram({
+    boundaries: [
+      squareBoundaryFromPoints('symbolic-region', [
+        symbolicVec3(symbolicComponent('R', 2), 0, 0),
+        { x: 4, y: 0, z: 0 },
+        { x: 4, y: 2, z: 0 },
+        { x: 0, y: 2, z: 0 },
+      ]),
+    ],
+  })
+  diagram.variables = symbolicExportVariables()
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(regionFilledFilledRegion0b0p0\) at \(\{\\R\},0\);/,
+  )
+  assert.match(tikz, /\\pgfmathsetmacro\{\\R\}\{2\}/)
+})
+
+test('symbolic work-plane-filled sheet boundaries use absolute coordinates to preserve expressions', () => {
+  const diagram = createWorkPlaneFilledSheetDiagram({
+    boundaries: [
+      squareBoundaryFromPoints('symbolic-sheet', [
+        symbolicVec3(symbolicComponent('R', 2), 0, 2),
+        { x: 4, y: 0, z: 2 },
+        { x: 4, y: 2, z: 2 },
+        { x: 0, y: 2, z: 2 },
+      ]),
+    ],
+  })
+  diagram.variables = symbolicExportVariables()
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /preserve symbolic boundary expressions/)
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetFilledFilledSheet0b0p0\) at \(\{\\R\},0,2\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+})
+
+test('symbolic sheet vertices export through named sheet coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.variables = symbolicExportVariables()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: 'symbolic-sheet-vertices',
+    name: 'Symbolic Sheet',
+    style: sheetStyle(),
+    vertices: [
+      symbolicVec3(symbolicComponent('R', 2), 0, 0),
+      { x: 3, y: 0, z: 0 },
+      { x: 3, y: 1, z: 0 },
+    ],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetPolySymbolicSheet0p0\) at \(\{\\R\},0,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(sheetPolySymbolicSheet0p0\) -- \(sheetPolySymbolicSheet0p1\) -- \(sheetPolySymbolicSheet0p2\) -- cycle;/,
+  )
+})
+
+test('2D template path symbolic centers export through the center coordinate', () => {
+  const diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'symbolic-circle',
+    name: 'Symbolic Circle',
+    style: curveStyle(),
+    styleSegments: [],
+    layer: 0,
+    template: {
+      kind: 'circleTemplate',
+      center: symbolicVec3(symbolicComponent('R', 2), 0, 0),
+      radius: 1.5,
+    },
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\\coordinate \(curveTemplateSymbolicCircle0p0\) at \(\{\\R\},0\);/,
+  )
+  assert.match(tikz, /\(curveTemplateSymbolicCircle0p0\) circle\[radius=1\.5\]/)
+})
+
+test('unused variables are emitted in deterministic user order', () => {
+  const tikz = generateTikz(createSymbolicExportDiagram())
+  const radiusIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const angleIndex = tikz.indexOf('\\pgfmathsetmacro{\\q}{30}')
+  const unusedIndex = tikz.indexOf('\\pgfmathsetmacro{\\S}{5}')
+
+  assert.notEqual(radiusIndex, -1)
+  assert.notEqual(angleIndex, -1)
+  assert.notEqual(unusedIndex, -1)
+  assert.ok(radiusIndex < angleIndex)
+  assert.ok(angleIndex < unusedIndex)
+})
+
+test('duplicate variables are reported without duplicate macro definitions', () => {
+  const tikz = generateTikz({
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'first-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '2',
+        previewValue: 2,
+      },
+      {
+        id: 'second-R',
+        name: 'R',
+        macroName: 'Rdup',
+        expression: '3',
+        previewValue: 3,
+      },
+    ],
+  })
+
+  assert.equal(countMatches(tikz, /\\pgfmathsetmacro\{\\R\}/g), 0)
+  assert.match(tikz, /Variable omitted/)
+})
+
+test('local user styles and external imported styles still apply to symbolic coordinates', () => {
+  let diagram = createSymbolicExportDiagram()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'styled-symbolic',
+    name: 'Styled Symbolic',
+    style: curveStyle({ strokeColor: '#224466' }),
+    points: [
+      symbolicVec3(symbolicComponent('R', 2), 0, 0),
+      { x: 3, y: 1, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const curve = diagram.strata[0]
+
+  if (curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  const created = createUserStylePresetFromStyle(
+    diagram,
+    'curve',
+    'Symbolic preset',
+    curve.style,
+  )
+
+  if (created === null) {
+    throw new Error('Expected curve preset creation to succeed.')
+  }
+
+  diagram = withImportedTikzStyleReference(
+    applyUserStylePresetToStratum(created.diagram, curve.id, created.preset.id),
+    'external-symbolic-draw',
+    '3cat/phys/1strata/symbolic/x',
+    ['draw', 'curve'],
+  )
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === curve.id
+      ? {
+          ...stratum,
+          importedTikzStyleReferenceId: 'external-symbolic-draw',
+        }
+      : stratum,
+  )
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyStyledSymbolic0p0\) at \(\{\\R\},0\);/,
+  )
+  assert.match(tikz, /stratifiedStyleSymbolicPreset/)
+  assert.match(layerBlock, /3cat\/phys\/1strata\/symbolic\/x/)
 })
 
 test('TikZ 3d library is not emitted when no scoped 3D export is used', () => {
@@ -3221,6 +3595,86 @@ function createDependentVariableDiagram(): Diagram {
         previewValue: 2,
       },
     ],
+  }
+}
+
+function createSymbolicExportDiagram(): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: symbolicExportVariables(),
+  }
+}
+
+function symbolicExportVariables(): SymbolicVariable[] {
+  return [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+    {
+      id: 'var-q',
+      name: 'q',
+      macroName: 'q',
+      expression: '30',
+      previewValue: 30,
+    },
+    {
+      id: 'var-S',
+      name: 'S',
+      macroName: 'S',
+      expression: '5',
+      previewValue: 5,
+    },
+  ]
+}
+
+function symbolicComponent(
+  expression: string,
+  previewValue: number,
+): CoordinateComponent {
+  return {
+    kind: 'symbolic',
+    expression,
+    previewValue,
+  }
+}
+
+function coordinateComponent(value: CoordinateComponent | number): CoordinateComponent {
+  return typeof value === 'number'
+    ? {
+        kind: 'numeric',
+        value,
+      }
+    : value
+}
+
+function coordinateComponentPreviewValue(
+  component: CoordinateComponent,
+): number {
+  return component.kind === 'numeric' ? component.value : component.previewValue
+}
+
+function symbolicVec3(
+  x: CoordinateComponent | number,
+  y: CoordinateComponent | number,
+  z: CoordinateComponent | number,
+): Vec3 {
+  const xComponent = coordinateComponent(x)
+  const yComponent = coordinateComponent(y)
+  const zComponent = coordinateComponent(z)
+
+  return {
+    x: coordinateComponentPreviewValue(xComponent),
+    y: coordinateComponentPreviewValue(yComponent),
+    z: coordinateComponentPreviewValue(zComponent),
+    symbolic: {
+      x: xComponent,
+      y: yComponent,
+      z: zComponent,
+    },
   }
 }
 
