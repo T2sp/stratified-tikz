@@ -698,7 +698,8 @@
   grid-template-columns: auto minmax(220px, 320px);
 }
 
-.direct-path-form {
+.direct-path-form,
+.direct-grid-form {
   display: flex;
   flex: 1 1 640px;
   flex-wrap: wrap;
@@ -720,7 +721,8 @@
   min-width: min(360px, 100%);
 }
 
-.direct-path-style-grid {
+.direct-path-style-grid,
+.direct-grid-range-grid {
   display: flex;
   flex: 1 1 520px;
   flex-wrap: wrap;

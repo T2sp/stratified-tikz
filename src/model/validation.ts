@@ -26,6 +26,15 @@ import {
   sanitizeTikzStyleName,
 } from './stylePresets.ts'
 import {
+  scalarInputPreviewValue,
+  validateGridPreview,
+} from './grids.ts'
+import {
+  evaluateScalarExpression,
+  parseScalarExpression,
+} from './scalarExpressions.ts'
+import type { ScalarInputValue } from './scalarExpressions.ts'
+import {
   hasTikzOptionLineBreak,
   isTikzStyleTarget,
 } from './importedTikzStyles.ts'
@@ -68,6 +77,9 @@ import type {
   DiagramValidationResult,
   ExternalTikzStyleSource,
   FilledRegion2DStratum,
+  GridParameterRange,
+  GridRectangleClip,
+  GridStratum,
   ImportedTikzStyleReference,
   LabelStyle,
   PartialCurveStyle,
@@ -899,12 +911,13 @@ function validateCurveStratum(
     stratum.kind !== 'polyline' &&
     stratum.kind !== 'cubicBezier' &&
     stratum.kind !== 'concatenatedPath' &&
-    stratum.kind !== 'templatePath'
+    stratum.kind !== 'templatePath' &&
+    stratum.kind !== 'grid'
   ) {
     pushError(
       errors,
       `${path}.kind`,
-      'Curve kind must be polyline, cubicBezier, concatenatedPath, or templatePath.',
+      'Curve kind must be polyline, cubicBezier, concatenatedPath, templatePath, or grid.',
     )
   }
 
@@ -942,6 +955,15 @@ function validateCurveStratum(
       return
     case 'templatePath':
       validateTemplatePathCurve(
+        stratum,
+        ambientDimension,
+        path,
+        errors,
+        coordinateExpressionContext,
+      )
+      return
+    case 'grid':
+      validateGridStratum(
         stratum,
         ambientDimension,
         path,
@@ -1068,6 +1090,170 @@ function validateTemplatePathCurve(
     errors,
     coordinateExpressionContext,
   )
+}
+
+function validateGridStratum(
+  stratum: GridStratum,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  const scalarFieldsValid =
+    validateGridParameterRange(
+      stratum.uRange,
+      `${path}.uRange`,
+      errors,
+      coordinateExpressionContext,
+    ) &&
+    validateGridParameterRange(
+      stratum.vRange,
+      `${path}.vRange`,
+      errors,
+      coordinateExpressionContext,
+    ) &&
+    validateGridRectangleClip(
+      stratum.clip,
+      `${path}.clip`,
+      errors,
+      coordinateExpressionContext,
+    )
+
+  if (!scalarFieldsValid) {
+    return
+  }
+
+  validateGridPreview(stratum, ambientDimension, path).forEach((issue) =>
+    pushError(errors, issue.path, issue.message),
+  )
+}
+
+function validateGridParameterRange(
+  range: GridParameterRange,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): boolean {
+  const before = errors.length
+
+  validateScalarInputValue(
+    range.min,
+    `${path}.min`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateScalarInputValue(
+    range.max,
+    `${path}.max`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateScalarInputValue(
+    range.step,
+    `${path}.step`,
+    errors,
+    coordinateExpressionContext,
+  )
+
+  return errors.length === before
+}
+
+function validateGridRectangleClip(
+  clip: GridRectangleClip,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): boolean {
+  const before = errors.length
+
+  if (clip.kind !== 'rectangle') {
+    pushError(errors, `${path}.kind`, 'Grid clip kind must be rectangle.')
+  }
+
+  validateScalarInputValue(
+    clip.uMin,
+    `${path}.uMin`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateScalarInputValue(
+    clip.uMax,
+    `${path}.uMax`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateScalarInputValue(
+    clip.vMin,
+    `${path}.vMin`,
+    errors,
+    coordinateExpressionContext,
+  )
+  validateScalarInputValue(
+    clip.vMax,
+    `${path}.vMax`,
+    errors,
+    coordinateExpressionContext,
+  )
+
+  return errors.length === before
+}
+
+function validateScalarInputValue(
+  value: ScalarInputValue,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  if (value.kind === 'numeric') {
+    validateFinite(value.value, `${path}.value`, errors)
+    return
+  }
+
+  if (value.kind !== 'symbolic') {
+    pushError(errors, `${path}.kind`, 'Grid scalar kind must be numeric or symbolic.')
+    return
+  }
+
+  if (typeof value.expression !== 'string') {
+    pushError(errors, `${path}.expression`, 'Grid scalar expression must be a string.')
+    return
+  }
+
+  validateFinite(value.previewValue, `${path}.previewValue`, errors)
+
+  if (
+    !Number.isFinite(scalarInputPreviewValue(value)) ||
+    coordinateExpressionContext === undefined
+  ) {
+    return
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: coordinateExpressionContext.variableNames,
+  })
+
+  if (!parsed.ok) {
+    pushError(errors, `${path}.expression`, parsed.error)
+    return
+  }
+
+  const evaluated = evaluateScalarExpression(
+    parsed.expression,
+    coordinateExpressionContext.previewValues,
+  )
+
+  if (!evaluated.ok) {
+    pushError(errors, `${path}.expression`, evaluated.error)
+    return
+  }
+
+  if (!numbersApproximatelyEqual(value.previewValue, evaluated.value)) {
+    pushError(
+      errors,
+      `${path}.previewValue`,
+      'Grid scalar preview value must match the evaluated expression.',
+    )
+  }
 }
 
 function validateClosedPathBoundaries(
@@ -2622,6 +2808,14 @@ function pointsApproximatelyEqual(
     Math.abs(first.y - second.y) <= epsilon &&
     Math.abs(first.z - second.z) <= epsilon
   )
+}
+
+function numbersApproximatelyEqual(
+  first: number,
+  second: number,
+  epsilon = 1e-9,
+): boolean {
+  return Math.abs(first - second) <= epsilon
 }
 
 function pushError(

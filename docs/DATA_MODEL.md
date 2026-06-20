@@ -135,6 +135,51 @@ work-plane-local direct input, 3D template centers, and curved sheet anchors
 remain numeric-only for now; symbolic plane-local input is rejected instead of
 being converted through a symbolic frame algebra.
 
+## Grid strata
+
+Phase 19E adds grid strata as generated curve strata. A grid is stored as one
+compact diagram object rather than as many persisted polyline curves:
+
+```ts
+type GridStratum = {
+  id: string;
+  name: string;
+  geometricKind: "curve";
+  codim: 1 | 2;
+  kind: "grid";
+  frame: GridFrame;
+  uRange: { min: ScalarInputValue; max: ScalarInputValue; step: ScalarInputValue };
+  vRange: { min: ScalarInputValue; max: ScalarInputValue; step: ScalarInputValue };
+  clip: {
+    kind: "rectangle";
+    uMin: ScalarInputValue;
+    uMax: ScalarInputValue;
+    vMin: ScalarInputValue;
+    vMax: ScalarInputValue;
+  };
+  style: CurveStyle;
+  styleSegments: CurveStyleSegment[];
+  layer: number;
+};
+```
+
+In 2D diagrams, grid strata have `codim: 1` and use an xy frame with `z = 0`.
+In 3D diagrams, grid strata have `codim: 2` and store a snapshot of the active
+work-plane frame at creation time. Later work-plane changes do not mutate
+existing grids.
+
+The SVG preview evaluates range and clip scalar fields through their finite
+preview values. A constant-u line is generated for each u value in `uRange`
+that lies inside the rectangular clip's u interval, spanning from `clip.vMin`
+to `clip.vMax`. A constant-v line is generated analogously, spanning the clip's
+u interval. The preview rejects non-finite values, `step <= 0`, `max < min`,
+invalid frames, non-finite generated points, and grids that would exceed the
+500-line preview cap.
+
+TikZ `\foreach` export and symbolic foreach range formatting are intentionally
+left to Phase 19F. Until then, grid strata are persisted, validated, shown in
+SVG, and represented by an explicit omitted-grid comment in TikZ output.
+
 ## Symbolic variables
 
 Phase 19B adds diagram-level symbolic variables. Variables are export-affecting

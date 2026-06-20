@@ -18,6 +18,11 @@ import {
   normalizeTemplatePathForAmbientDimension,
 } from './paths.ts'
 import { cloneCurvedSheetPrimitive } from './sheets.ts'
+import {
+  cloneGridFrame,
+  cloneGridParameterRange,
+  cloneGridRectangleClip,
+} from './grids.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -37,6 +42,10 @@ import type {
   EditorState,
   FilledRegion2DStratum,
   FillRule,
+  GridFrame,
+  GridParameterRange,
+  GridRectangleClip,
+  GridStratum,
   LabelStyle,
   PointStratum,
   PointStyle,
@@ -167,6 +176,22 @@ export type CreateTemplatePathStratumInput = {
   style?: CurveStyle
   importedTikzStyleReferenceId?: string
   template: PathTemplate
+  styleSegments?: CurveStyleSegment[]
+  layer?: number
+}
+
+export type CreateGridStratumInput = {
+  ambientDimension: AmbientDimension
+  id: string
+  name?: string
+  label?: string
+  pathLabel?: string
+  style?: CurveStyle
+  importedTikzStyleReferenceId?: string
+  frame: GridFrame
+  uRange: GridParameterRange
+  vRange: GridParameterRange
+  clip: GridRectangleClip
   styleSegments?: CurveStyleSegment[]
   layer?: number
 }
@@ -528,6 +553,46 @@ export function createTemplatePathStratum({
   }
 
   return withOptionalLabel(path, label)
+}
+
+export function createGridStratum({
+  ambientDimension,
+  id,
+  name = 'Grid',
+  label,
+  pathLabel,
+  style = defaultCurveStyle,
+  importedTikzStyleReferenceId,
+  frame,
+  uRange,
+  vRange,
+  clip,
+  styleSegments = [],
+  layer = 0,
+}: CreateGridStratumInput): GridStratum {
+  const grid: Omit<GridStratum, 'label'> = {
+    id,
+    codim: ambientDimension === 2 ? 1 : 2,
+    geometricKind: 'curve',
+    kind: 'grid',
+    name,
+    style: cloneCurveStyle(style),
+    ...(importedTikzStyleReferenceId === undefined
+      ? {}
+      : { importedTikzStyleReferenceId }),
+    frame: cloneGridFrame(frame),
+    uRange: cloneGridParameterRange(uRange),
+    vRange: cloneGridParameterRange(vRange),
+    clip: cloneGridRectangleClip(clip),
+    styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    layer,
+  }
+
+  if (pathLabel !== undefined) {
+    grid.pathLabel = pathLabel
+  }
+
+  return withOptionalLabel(grid, label)
 }
 
 export function createPointStratum({

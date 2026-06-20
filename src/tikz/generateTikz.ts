@@ -98,7 +98,8 @@ type LayeredTikzCommand = {
 
 type PointCurveStratum = Exclude<
   CurveStratum,
-  ConcatenatedPathStratum | Extract<CurveStratum, { kind: 'templatePath' }>
+  | ConcatenatedPathStratum
+  | Extract<CurveStratum, { kind: 'templatePath' | 'grid' }>
 >
 
 type PathSegmentCoordinateNames =
@@ -1171,6 +1172,10 @@ function emitCurve(
     return emitTemplatePath(curve, elementIndex, context)
   }
 
+  if (curve.kind === 'grid') {
+    return emitGridPlaceholder(curve)
+  }
+
   if (curve.kind === 'concatenatedPath') {
     const coordinates = defineConcatenatedPathCoordinates(
       curve,
@@ -1235,6 +1240,13 @@ function emitCurve(
     ...formatTikzOptions(options),
     ']',
     indentLine(`${formatCurvePath(curve, coordinates, context.mode)};`),
+    '',
+  ]
+}
+
+function emitGridPlaceholder(curve: Extract<CurveStratum, { kind: 'grid' }>): string[] {
+  return [
+    `% Grid "${curve.name}" [${curve.id}] omitted: grid TikZ foreach export is implemented in Phase 19F.`,
     '',
   ]
 }
@@ -1815,6 +1827,8 @@ function curveCoordinateBaseName(
       return `curvePath${stem}${elementIndex}`
     case 'templatePath':
       return `curveTemplate${stem}${elementIndex}`
+    case 'grid':
+      return `curveGrid${stem}${elementIndex}`
     case 'polyline':
       return `curvePoly${stem}${elementIndex}`
   }
@@ -2574,6 +2588,8 @@ function curveHasFiniteCoordinates(curve: CurveStratum): boolean {
         templatePathCoordinates(curve.template).every(isFiniteVec3) &&
         templatePathHasFiniteParameters(curve.template)
       )
+    case 'grid':
+      return true
   }
 }
 
@@ -2588,6 +2604,8 @@ function curveHasSymbolicCoordinates(curve: CurveStratum): boolean {
       return templatePathCoordinates(curve.template).some(
         hasSymbolicVec3Coordinates,
       )
+    case 'grid':
+      return false
   }
 }
 

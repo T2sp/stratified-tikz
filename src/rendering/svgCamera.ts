@@ -1,6 +1,7 @@
 import { projectVec3 } from '../geometry/projection.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { closedPathBoundaryCoordinates } from '../model/filledBoundaries.ts'
+import { gridPreviewSegments } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import { pathCoordinates, sampleTemplatePathPoints } from '../model/paths.ts'
 import type { Camera, Diagram, Vec2, Vec3 } from '../model/types'
@@ -154,6 +155,14 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
 
         return [...sheetVertices(stratum)]
       case 'curve':
+        if (stratum.kind === 'grid') {
+          const preview = gridPreviewSegments(stratum, diagram.ambientDimension)
+
+          return preview.ok
+            ? preview.segments.flatMap((segment) => [segment.start, segment.end])
+            : []
+        }
+
         if (stratum.kind === 'concatenatedPath') {
           return pathCoordinates(stratum.segments)
         }

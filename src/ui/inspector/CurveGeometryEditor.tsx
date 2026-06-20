@@ -15,9 +15,15 @@ import type {
   HexColor,
   LineStyle,
   PathSegment,
+  GridParameterRange,
+  GridRectangleClip,
   Vec3,
 } from '../../model/types.ts'
 import { hasCurveStyleOverride, resolveCurveStyle } from '../../model/styles.ts'
+import { gridPreviewSegments } from '../../model/grids.ts'
+import { createScalarInputValue } from '../../model/scalarExpressions.ts'
+import type { ScalarInputValue } from '../../model/scalarExpressions.ts'
+import { resolveSymbolicVariables } from '../../model/variables.ts'
 import { lineStyles } from '../../model/types.ts'
 import {
   type CoordinateAxis,
@@ -32,6 +38,7 @@ import {
   EditableOpacityField,
   EditablePositiveNumberField,
   EditableSelectField,
+  EditableTextField,
   ReadOnlyField,
 } from './InspectorField.tsx'
 import { formatSelectedGeometry } from './geometryPreview.ts'
@@ -58,6 +65,18 @@ type InspectorBezierControlMode =
   | 'absolute'
   | 'relativeCartesian'
   | 'relativePolar'
+
+type GridScalarField =
+  | 'uMin'
+  | 'uMax'
+  | 'uStep'
+  | 'vMin'
+  | 'vMax'
+  | 'vStep'
+  | 'clipUMin'
+  | 'clipUMax'
+  | 'clipVMin'
+  | 'clipVMax'
 
 export type CurveGeometryEditorProps = {
   diagram: Diagram
@@ -135,6 +154,16 @@ function renderCurveCoordinateEditors(
       <TemplatePathGeometryEditor
         diagram={diagram}
         path={curve}
+        onDiagramChange={onDiagramChange}
+      />
+    )
+  }
+
+  if (curve.kind === 'grid') {
+    return (
+      <GridGeometryEditor
+        diagram={diagram}
+        grid={curve}
         onDiagramChange={onDiagramChange}
       />
     )
@@ -305,6 +334,161 @@ function renderCurveCoordinateEditors(
       onDiagramChange={onDiagramChange}
     />
   ))
+}
+
+function GridGeometryEditor({
+  diagram,
+  grid,
+  onDiagramChange,
+}: {
+  diagram: Diagram
+  grid: Extract<CurveStratum, { kind: 'grid' }>
+  onDiagramChange: DiagramChangeHandler
+}) {
+  const preview = gridPreviewSegments(grid, diagram.ambientDimension)
+
+  return (
+    <>
+      <ReadOnlyField label="Frame" value={grid.frame.kind} />
+      {gridScalarFields(grid).map((field) => (
+        <EditableTextField
+          key={field.id}
+          label={field.label}
+          value={formatGridScalarInput(field.value)}
+          onChange={(value) =>
+            updateGridScalarField(diagram, grid, field.id, value, onDiagramChange)
+          }
+        />
+      ))}
+      <ReadOnlyField
+        label="Preview lines"
+        value={preview.ok ? String(preview.lineCount) : 'invalid'}
+      />
+    </>
+  )
+}
+
+function gridScalarFields(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+): Array<{
+  id: GridScalarField
+  label: string
+  value: ScalarInputValue
+}> {
+  return [
+    { id: 'uMin', label: 'u min', value: grid.uRange.min },
+    { id: 'uMax', label: 'u max', value: grid.uRange.max },
+    { id: 'uStep', label: 'u step', value: grid.uRange.step },
+    { id: 'vMin', label: 'v min', value: grid.vRange.min },
+    { id: 'vMax', label: 'v max', value: grid.vRange.max },
+    { id: 'vStep', label: 'v step', value: grid.vRange.step },
+    { id: 'clipUMin', label: 'clip u min', value: grid.clip.uMin },
+    { id: 'clipUMax', label: 'clip u max', value: grid.clip.uMax },
+    { id: 'clipVMin', label: 'clip v min', value: grid.clip.vMin },
+    { id: 'clipVMax', label: 'clip v max', value: grid.clip.vMax },
+  ]
+}
+
+function updateGridScalarField(
+  diagram: Diagram,
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  field: GridScalarField,
+  source: string,
+  onDiagramChange: DiagramChangeHandler,
+): void {
+  const scalar = createGridScalarInput(source, diagram)
+
+  if (scalar === null) {
+    return
+  }
+
+  onDiagramChange((currentDiagram) =>
+    updateStratumById(currentDiagram, grid.id, (current) => {
+      if (current.geometricKind !== 'curve' || current.kind !== 'grid') {
+        return current
+      }
+
+      const nextGrid = gridWithScalarField(current, field, scalar)
+
+      return gridPreviewSegments(nextGrid, currentDiagram.ambientDimension).ok
+        ? nextGrid
+        : current
+    }),
+  )
+}
+
+function createGridScalarInput(
+  source: string,
+  diagram: Diagram,
+): ScalarInputValue | null {
+  const resolved = resolveSymbolicVariables(diagram.variables ?? [])
+  const parsed = createScalarInputValue(source, {
+    variables: resolved.ok
+      ? resolved.variables.map((variable) => variable.name)
+      : [],
+    previewValues: resolved.ok ? resolved.values : new Map(),
+  })
+
+  return parsed.ok ? parsed.scalar : null
+}
+
+function gridWithScalarField(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  field: GridScalarField,
+  scalar: ScalarInputValue,
+): Extract<CurveStratum, { kind: 'grid' }> {
+  switch (field) {
+    case 'uMin':
+      return { ...grid, uRange: updateGridRange(grid.uRange, 'min', scalar) }
+    case 'uMax':
+      return { ...grid, uRange: updateGridRange(grid.uRange, 'max', scalar) }
+    case 'uStep':
+      return { ...grid, uRange: updateGridRange(grid.uRange, 'step', scalar) }
+    case 'vMin':
+      return { ...grid, vRange: updateGridRange(grid.vRange, 'min', scalar) }
+    case 'vMax':
+      return { ...grid, vRange: updateGridRange(grid.vRange, 'max', scalar) }
+    case 'vStep':
+      return { ...grid, vRange: updateGridRange(grid.vRange, 'step', scalar) }
+    case 'clipUMin':
+      return { ...grid, clip: updateGridClip(grid.clip, 'uMin', scalar) }
+    case 'clipUMax':
+      return { ...grid, clip: updateGridClip(grid.clip, 'uMax', scalar) }
+    case 'clipVMin':
+      return { ...grid, clip: updateGridClip(grid.clip, 'vMin', scalar) }
+    case 'clipVMax':
+      return { ...grid, clip: updateGridClip(grid.clip, 'vMax', scalar) }
+  }
+}
+
+function updateGridRange(
+  range: GridParameterRange,
+  field: keyof GridParameterRange,
+  scalar: ScalarInputValue,
+): GridParameterRange {
+  return {
+    ...range,
+    [field]: scalar,
+  }
+}
+
+function updateGridClip(
+  clip: GridRectangleClip,
+  field: Exclude<keyof GridRectangleClip, 'kind'>,
+  scalar: ScalarInputValue,
+): GridRectangleClip {
+  return {
+    ...clip,
+    [field]: scalar,
+  }
+}
+
+function formatGridScalarInput(value: ScalarInputValue): string {
+  return value.kind === 'symbolic' ? value.expression : formatCompactNumber(value.value)
+}
+
+function formatCompactNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)))
 }
 
 function TemplatePathGeometryEditor({
@@ -940,7 +1124,8 @@ function AbsoluteCurvePointEditor({
             if (
               current.geometricKind !== 'curve' ||
               current.kind === 'concatenatedPath' ||
-              current.kind === 'templatePath'
+              current.kind === 'templatePath' ||
+              current.kind === 'grid'
             ) {
               return current
             }

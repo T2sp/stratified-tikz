@@ -10,6 +10,7 @@ import {
   validateCurvedSheetPrimitive,
 } from '../geometry/curvedSheets.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
+import { createGridStratum } from '../model/constructors.ts'
 import {
   isFiniteVec3,
   projectPointToWorkPlaneCoordinates,
@@ -25,6 +26,15 @@ import {
   pathCoordinates,
   pathEndpointEpsilon,
 } from '../model/paths.ts'
+import {
+  createScalarInputValue,
+  type ScalarInputValue,
+} from '../model/scalarExpressions.ts'
+import {
+  gridPreviewSegments,
+  workPlaneGridFrame,
+  xyGridFrame,
+} from '../model/grids.ts'
 import {
   coordinateComponentPreviewValue,
   createVec3FromCoordinateInputs,
@@ -63,6 +73,10 @@ import type {
   CurvedSheetPrimitive,
   CurvedSheetStratum,
   Diagram,
+  GridFrame,
+  GridParameterRange,
+  GridRectangleClip,
+  GridStratum,
   HemisphereSide,
   LabelStyle,
   PathTemplate,
@@ -318,6 +332,13 @@ export type AddCurvedSheetStratumOptions = {
   style?: SheetStyle
 }
 
+export type AddGridStratumOptions = {
+  id?: string
+  name?: string
+  layer?: number
+  style?: CurveStyle
+}
+
 export type CurvedSheetCreationKind = CurvedSheetPrimitive['kind']
 
 export type HemisphereCreationParameters = {
@@ -375,6 +396,11 @@ export type AddPolygonSheetStratumResult = {
 }
 
 export type AddCurvedSheetStratumResult = {
+  diagram: Diagram
+  id: string | null
+}
+
+export type AddGridStratumResult = {
   diagram: Diagram
   id: string | null
 }
@@ -442,6 +468,23 @@ export type DirectArcPathInput = {
   endAngleDeg: string
 }
 
+export type DirectGridRangeInput = {
+  min: string
+  max: string
+  step: string
+}
+
+export type DirectGridInput = {
+  uRange: DirectGridRangeInput
+  vRange: DirectGridRangeInput
+  clip: {
+    uMin: string
+    uMax: string
+    vMin: string
+    vMax: string
+  }
+}
+
 export type DirectPointCreationResult =
   | {
       ok: true
@@ -473,6 +516,11 @@ export type DirectPathCreationError =
   | 'wrongPointCount'
   | 'unsupportedAmbientDimension'
 
+export type DirectGridCreationError =
+  | 'invalidScalar'
+  | 'invalidWorkPlane'
+  | 'invalidGrid'
+
 export type DirectPathCreationResult =
   | {
       ok: true
@@ -483,6 +531,18 @@ export type DirectPathCreationResult =
       ok: false
       diagram: Diagram
       error: DirectPathCreationError
+    }
+
+export type DirectGridCreationResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: DirectGridCreationError
     }
 
 export type DirectCreationLayerOptions = {
@@ -789,6 +849,95 @@ export function addCurvedSheetStratumWithResult(
       strata: [...diagram.strata, sheet],
     },
     id: sheet.id,
+  }
+}
+
+export function addGridStratumFromDirectInput(
+  diagram: Diagram,
+  input: DirectGridInput,
+  workPlane: WorkPlane,
+  options: AddGridStratumOptions & DirectCoordinateParseOptions = {},
+): DirectGridCreationResult {
+  const context = coordinateExpressionContextForOptions(
+    directCoordinateParseOptionsForDiagram(diagram, options),
+  )
+  const uRange = parseDirectGridRangeInput(input.uRange, context)
+  const vRange = parseDirectGridRangeInput(input.vRange, context)
+  const clip = parseDirectGridClipInput(input.clip, context)
+
+  if (uRange === null || vRange === null || clip === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidScalar',
+    }
+  }
+
+  const frame = gridFrameForDiagram(diagram, workPlane)
+
+  if (frame === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidWorkPlane',
+    }
+  }
+
+  const result = addGridStratumWithResult(
+    diagram,
+    frame,
+    uRange,
+    vRange,
+    clip,
+    options,
+  )
+
+  if (result.id === null) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidGrid',
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addGridStratumWithResult(
+  diagram: Diagram,
+  frame: GridFrame,
+  uRange: GridParameterRange,
+  vRange: GridParameterRange,
+  clip: GridRectangleClip,
+  options: AddGridStratumOptions = {},
+): AddGridStratumResult {
+  const grid = createGridForDiagram(
+    diagram,
+    frame,
+    uRange,
+    vRange,
+    clip,
+    options,
+  )
+  const preview = gridPreviewSegments(grid, diagram.ambientDimension)
+
+  if (!preview.ok) {
+    return {
+      diagram,
+      id: null,
+    }
+  }
+
+  return {
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, grid],
+    },
+    id: grid.id,
   }
 }
 
@@ -2183,6 +2332,27 @@ function createTemplatePathForDiagram(
   return path
 }
 
+function createGridForDiagram(
+  diagram: Diagram,
+  frame: GridFrame,
+  uRange: GridParameterRange,
+  vRange: GridParameterRange,
+  clip: GridRectangleClip,
+  options: AddGridStratumOptions,
+): GridStratum {
+  return createGridStratum({
+    ambientDimension: diagram.ambientDimension,
+    id: safeOptionalId(diagram, options.id, 'grid'),
+    name: safeOptionalName(options.name, 'Grid'),
+    style: options.style ?? defaultCurveStyle,
+    frame,
+    uRange,
+    vRange,
+    clip,
+    layer: options.layer ?? nextLayer(diagram),
+  })
+}
+
 function isValidTemplatePathForDiagram(
   diagram: Diagram,
   template: PathTemplate,
@@ -2215,6 +2385,64 @@ function isValidTemplatePathForDiagram(
         (template.rotationDeg === undefined || Number.isFinite(template.rotationDeg))
       )
   }
+}
+
+function parseDirectGridRangeInput(
+  input: DirectGridRangeInput,
+  context: CoordinateExpressionContext,
+): GridParameterRange | null {
+  const min = parseDirectGridScalarInput(input.min, context)
+  const max = parseDirectGridScalarInput(input.max, context)
+  const step = parseDirectGridScalarInput(input.step, context)
+
+  return min === null || max === null || step === null
+    ? null
+    : { min, max, step }
+}
+
+function parseDirectGridClipInput(
+  input: DirectGridInput['clip'],
+  context: CoordinateExpressionContext,
+): GridRectangleClip | null {
+  const uMin = parseDirectGridScalarInput(input.uMin, context)
+  const uMax = parseDirectGridScalarInput(input.uMax, context)
+  const vMin = parseDirectGridScalarInput(input.vMin, context)
+  const vMax = parseDirectGridScalarInput(input.vMax, context)
+
+  return uMin === null || uMax === null || vMin === null || vMax === null
+    ? null
+    : {
+        kind: 'rectangle',
+        uMin,
+        uMax,
+        vMin,
+        vMax,
+      }
+}
+
+function parseDirectGridScalarInput(
+  source: string,
+  context: CoordinateExpressionContext,
+): ScalarInputValue | null {
+  const parsed = createScalarInputValue(source, {
+    variables: context.variableNames,
+    previewValues: context.previewValues,
+  })
+
+  return parsed.ok ? parsed.scalar : null
+}
+
+function gridFrameForDiagram(
+  diagram: Diagram,
+  workPlane: WorkPlane,
+): GridFrame | null {
+  if (diagram.ambientDimension === 2) {
+    return xyGridFrame()
+  }
+
+  const frame = workPlaneFrameSnapshotFromWorkPlane(workPlane)
+
+  return frame === null ? null : workPlaneGridFrame(frame)
 }
 
 function createPolygonSheetForDiagram(

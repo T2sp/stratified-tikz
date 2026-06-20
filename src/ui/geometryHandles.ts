@@ -197,6 +197,7 @@ function updateCurvePoint(
       stratum.geometricKind !== 'curve' ||
       stratum.kind === 'concatenatedPath' ||
       stratum.kind === 'templatePath' ||
+      stratum.kind === 'grid' ||
       pointIndex >= stratum.points.length ||
       (stratum.kind === 'cubicBezier' && stratum.points.length !== 4)
     ) {

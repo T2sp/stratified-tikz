@@ -3,6 +3,7 @@ import {
   parseScalarExpression,
   scalarExpressionVariables,
 } from './scalarExpressions.ts'
+import type { ScalarInputValue } from './scalarExpressions.ts'
 import type {
   AmbientDimension,
   ClosedPathBoundary,
@@ -862,6 +863,77 @@ function refreshStratumSymbolicCoordinatePreviews(
               errors,
             ),
           }
+        case 'grid':
+          return {
+            ...stratum,
+            uRange: {
+              min: refreshScalarInputValuePreview(
+                stratum.uRange.min,
+                context,
+                `${path}.uRange.min`,
+                errors,
+              ),
+              max: refreshScalarInputValuePreview(
+                stratum.uRange.max,
+                context,
+                `${path}.uRange.max`,
+                errors,
+              ),
+              step: refreshScalarInputValuePreview(
+                stratum.uRange.step,
+                context,
+                `${path}.uRange.step`,
+                errors,
+              ),
+            },
+            vRange: {
+              min: refreshScalarInputValuePreview(
+                stratum.vRange.min,
+                context,
+                `${path}.vRange.min`,
+                errors,
+              ),
+              max: refreshScalarInputValuePreview(
+                stratum.vRange.max,
+                context,
+                `${path}.vRange.max`,
+                errors,
+              ),
+              step: refreshScalarInputValuePreview(
+                stratum.vRange.step,
+                context,
+                `${path}.vRange.step`,
+                errors,
+              ),
+            },
+            clip: {
+              kind: 'rectangle',
+              uMin: refreshScalarInputValuePreview(
+                stratum.clip.uMin,
+                context,
+                `${path}.clip.uMin`,
+                errors,
+              ),
+              uMax: refreshScalarInputValuePreview(
+                stratum.clip.uMax,
+                context,
+                `${path}.clip.uMax`,
+                errors,
+              ),
+              vMin: refreshScalarInputValuePreview(
+                stratum.clip.vMin,
+                context,
+                `${path}.clip.vMin`,
+                errors,
+              ),
+              vMax: refreshScalarInputValuePreview(
+                stratum.clip.vMax,
+                context,
+                `${path}.clip.vMax`,
+                errors,
+              ),
+            },
+          }
         default:
           return stratum
       }
@@ -1219,6 +1291,41 @@ function refreshVec3SymbolicPreview(
   }
 
   return vec3FromCoordinateComponents(components, ambientDimension)
+}
+
+function refreshScalarInputValuePreview(
+  value: ScalarInputValue,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): ScalarInputValue {
+  if (value.kind === 'numeric') {
+    return value
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: context.variableNames,
+  })
+
+  if (!parsed.ok) {
+    pushError(errors, `${path}.expression`, parsed.error)
+    return value
+  }
+
+  const evaluated = evaluateScalarExpression(
+    parsed.expression,
+    context.previewValues,
+  )
+
+  if (!evaluated.ok) {
+    pushError(errors, `${path}.expression`, evaluated.error)
+    return value
+  }
+
+  return {
+    ...value,
+    previewValue: evaluated.value,
+  }
 }
 
 function refreshSymbolicCoordinateComponent(
