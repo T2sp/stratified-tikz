@@ -102,6 +102,15 @@ const phaseSlugs = {
   "19E": "grid-generation-model-preview",
   "19F": "grid-foreach-clip-export",
   "19G": "symbolic-grid-polish",
+  "19H": "triangular-honeycomb",
+  "20A": "ruled-coons-model-sampling",
+  "20B": "ruled-surface-create-render-export",
+  "20C": "coons-patch-create-render-export",
+  "20D": "projected-render-depth-model",
+  "20E": "surface-depth-sorting",
+  "20F": "curve-occlusion-hidden-style",
+  "20G": "point-label-visibility-ui",
+  "20H": "auto-visibility-export-hardening",
 };
 
 function makePhaseSpec(phase) {
