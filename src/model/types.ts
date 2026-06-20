@@ -557,6 +557,13 @@ export type GridFrame = {
   frame: WorkPlaneFrameSnapshot
 }
 
+export const latticePatterns = [
+  'rectangular',
+  'triangular',
+  'honeycomb',
+] as const
+export type LatticePattern = (typeof latticePatterns)[number]
+
 export type GridParameterRange = {
   min: ScalarInputValue
   max: ScalarInputValue
@@ -573,6 +580,7 @@ export type GridRectangleClip = {
 
 export type GridStratum = CurveStratumBase & {
   kind: 'grid'
+  latticePattern?: LatticePattern
   frame: GridFrame
   uRange: GridParameterRange
   vRange: GridParameterRange

@@ -146,9 +146,11 @@ data model.
 ## Grid export
 
 Grid strata export compactly with TikZ `\foreach` loops rather than one emitted
-`\draw` command per grid line. In 2D, a grid uses the canonical xy frame and
-exports as a local scope with a rectangular clip followed by vertical and
-horizontal foreach loops:
+`\draw` command per grid line. The saved `latticePattern` selects rectangular,
+triangular, or honeycomb output; missing values default to rectangular for old
+diagrams. In 2D, a rectangular grid uses the canonical xy frame and exports as
+a local scope with a rectangular clip followed by vertical and horizontal
+foreach loops:
 
 ```tex
 \begin{scope}
@@ -180,6 +182,14 @@ opacity, line width, line style, local user presets, and compatible imported
 TikZ style references. Layer placement is unchanged: the whole grid scope is
 emitted inside the grid stratum's `pgfonlayer` block.
 
+Triangular lattices use `uRange.step` as the local spacing. The exporter clips
+to the numeric intersection of the saved range rectangle and rectangular clip,
+then emits three line-family loops: local u-direction lines, +60 degree lines,
+and -60 degree lines. Honeycomb lattices use `uRange.step` as the flat-top
+hexagon edge length. Their SVG preview de-duplicates shared edges; compact TikZ
+export uses nested `\foreach` loops over hexagon centers and draws a clipped
+hexagon path for each cell, so shared edges can be overdrawn in the MVP.
+
 In 3D, a grid stores the work-plane frame snapshot from creation/edit time. The
 generator does not consult transient active work-plane UI state. When the saved
 frame can be emitted safely, the grid uses the TikZ `3d` library plane scope:
@@ -203,13 +213,15 @@ is the only place the 3D frame is described. `\usetikzlibrary{3d}` is emitted
 when at least one work-plane-local grid, work-plane-filled sheet, 3D template
 path, or work-plane-local relative Bézier curve needs this scope form.
 
-MVP symbolic policy: the `\foreach` range triplets (`min`, `max`, and `step`)
-must be numeric so the generator can produce safe `{first,next,...,last}`
-syntax and avoid broken or ambiguous PGF loops. Symbolic range triplets are
-omitted with a clear comment rather than expanded line by line. Rectangular
-clip endpoints may be symbolic when they pass the same scalar-expression parser
-and TikZ formatter used for symbolic coordinates; those endpoints are emitted as
-braced PGF math expressions such as `({\R},0)`.
+MVP symbolic policy: rectangular `\foreach` range triplets (`min`, `max`, and
+`step`) must be numeric so the generator can produce safe
+`{first,next,...,last}` syntax and avoid broken or ambiguous PGF loops.
+Symbolic range triplets are omitted with a clear comment rather than expanded
+line by line. Rectangular clip endpoints may be symbolic when they pass the same
+scalar-expression parser and TikZ formatter used for symbolic coordinates;
+those endpoints are emitted as braced PGF math expressions such as `({\R},0)`.
+Triangular and honeycomb compact exports currently require numeric ranges,
+spacing/edge length, and clip bounds.
 
 Invalid grid ranges, non-positive steps, reversed clips, non-finite preview
 values, and unsafe symbolic expressions are rejected by model validation before

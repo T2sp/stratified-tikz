@@ -147,6 +147,7 @@ type GridStratum = {
   geometricKind: "curve";
   codim: 1 | 2;
   kind: "grid";
+  latticePattern?: "rectangular" | "triangular" | "honeycomb";
   frame: GridFrame;
   uRange: { min: ScalarInputValue; max: ScalarInputValue; step: ScalarInputValue };
   vRange: { min: ScalarInputValue; max: ScalarInputValue; step: ScalarInputValue };
@@ -166,15 +167,18 @@ type GridStratum = {
 In 2D diagrams, grid strata have `codim: 1` and use an xy frame with `z = 0`.
 In 3D diagrams, grid strata have `codim: 2` and store a snapshot of the active
 work-plane frame at creation time. Later work-plane changes do not mutate
-existing grids.
+existing grids. Missing `latticePattern` means `"rectangular"` for compatibility
+with older saved diagrams.
 
 The SVG preview evaluates range and clip scalar fields through their finite
-preview values. A constant-u line is generated for each u value in `uRange`
-that lies inside the rectangular clip's u interval, spanning from `clip.vMin`
-to `clip.vMax`. A constant-v line is generated analogously, spanning the clip's
-u interval. The preview rejects non-finite values, `step <= 0`, `max < min`,
-invalid frames, non-finite generated points, and grids that would exceed the
-500-line preview cap.
+preview values. Rectangular grids generate constant-u and constant-v line
+families. Triangular grids use `uRange.step` as the spacing and generate three
+families in local coordinates: horizontal, +60 degrees, and -60 degrees.
+Honeycomb grids use `uRange.step` as the hexagon edge length and generate a
+flat-top hexagonal edge graph with de-duplicated preview edges. All patterns
+are generated in local `(u,v)` coordinates and embedded by `frame`. The preview
+rejects non-finite values, `step <= 0`, `max < min`, invalid frames, non-finite
+generated points, and grids that would exceed the 500-line/edge preview cap.
 
 TikZ export emits valid grids compactly with `\foreach` loops and a rectangular
 `\clip` rather than expanding each grid line into a persisted or exported
@@ -183,7 +187,8 @@ exporter can form safe `{first,next,...,last}` loops. Symbolic range triplets
 are kept valid for preview when their preview values are finite, but TikZ
 export omits the grid with a clear unsupported-symbolic-range comment.
 Rectangular clip endpoints may be symbolic and export through the same PGFMath
-formatter used for symbolic coordinates.
+formatter used for symbolic coordinates. Triangular and honeycomb compact loop
+export requires numeric ranges, spacing/edge length, and clip bounds.
 
 ## Symbolic variables
 

@@ -100,15 +100,18 @@ into many persisted polyline strata.
 A grid stores:
 
 - a frame;
+- a lattice pattern: rectangular, triangular, or honeycomb;
 - `uRange = min, max, step`;
 - `vRange = min, max, step`;
 - a rectangular clip `uMin, uMax, vMin, vMax`;
 - curve style and layer metadata.
 
 2D grids use the canonical xy frame at `z = 0`. 3D grids store a snapshot of
-the active work-plane frame at creation time.
+the active work-plane frame at creation time. Triangular and honeycomb grids are
+still local 2D lattices; in 3D they are embedded by the saved work-plane frame,
+not by the transient active work plane at export time.
 
-TikZ export uses `\foreach` and `\clip`:
+Rectangular TikZ export uses two `\foreach` loops and `\clip`:
 
 ```tex
 \begin{scope}
@@ -121,6 +124,13 @@ TikZ export uses `\foreach` and `\clip`:
     }
 \end{scope}
 ```
+
+Triangular lattices use `uRange.step` as spacing and export as three looped line
+families: horizontal, +60 degrees, and -60 degrees. Honeycomb lattices use
+`uRange.step` as the hexagon edge length and export as nested loops over
+flat-top hexagon centers inside the rectangular clip. SVG preview de-duplicates
+honeycomb shared edges; the compact TikZ MVP draws clipped hexagon paths per
+cell, so shared edges may be overdrawn.
 
 For 3D work-plane grids, the loops run in a TikZ `3d` library plane scope:
 
@@ -138,11 +148,13 @@ For 3D work-plane grids, the loops run in a TikZ `3d` library plane scope:
 \end{scope}
 ```
 
-The `\foreach` range triplets must be numeric in the MVP. Symbolic range
-triplets are reported as unsupported symbolic grid ranges and are omitted from
-TikZ with a comment rather than expanded line by line. Rectangular clip
+The rectangular `\foreach` range triplets must be numeric in the MVP. Symbolic
+range triplets are reported as unsupported symbolic grid ranges and are omitted
+from TikZ with a comment rather than expanded line by line. Rectangular clip
 endpoints may be symbolic when they parse and evaluate safely; for example,
-`clip u max = R` exports as `({\R},...)`.
+`clip u max = R` exports as `({\R},...)`. Triangular and honeycomb compact loop
+export currently requires numeric ranges, numeric spacing/edge length, and
+numeric clip bounds.
 
 ## Error Categories
 
@@ -164,4 +176,4 @@ diagram or generate malformed TikZ.
 StratifiedTikZ does not implement a full TeX parser, arbitrary raw TikZ
 snippets, or symbolic geometry theorem proving. Symbolic grid generation is
 limited to rectangular clip/range grids, and symbolic `\foreach` range triplets
-are intentionally deferred.
+for all lattice patterns are intentionally deferred.

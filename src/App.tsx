@@ -48,6 +48,7 @@ import type {
   Diagram,
   FillRule,
   HexColor,
+  LatticePattern,
   LineStyle,
   OrthographicCamera3D,
   Stratum,
@@ -56,7 +57,7 @@ import type {
   Vec3,
   WorkPlane,
 } from './model/types'
-import { lineStyles } from './model/types'
+import { latticePatterns, lineStyles } from './model/types'
 import { SvgDiagram, svgPointToModelOnWorkPlane } from './rendering'
 import {
   addConcatenatedPathStratumWithResult,
@@ -539,6 +540,8 @@ function App() {
     defaultCurveStyle.lineStyle,
   )
   const [directGridName, setDirectGridName] = useState<string>('Grid')
+  const [directGridPattern, setDirectGridPattern] =
+    useState<LatticePattern>('rectangular')
   const [directGridInput, setDirectGridInput] =
     useState<DirectGridInput>(defaultDirectGridInput)
   const [directGridStrokeColor, setDirectGridStrokeColor] = useState<string>(
@@ -2379,7 +2382,14 @@ function App() {
         case 'uMax':
           return { ...current, uRange: { ...current.uRange, max: value } }
         case 'uStep':
-          return { ...current, uRange: { ...current.uRange, step: value } }
+          return {
+            ...current,
+            uRange: { ...current.uRange, step: value },
+            vRange:
+              directGridPattern === 'rectangular'
+                ? current.vRange
+                : { ...current.vRange, step: value },
+          }
         case 'vMin':
           return { ...current, vRange: { ...current.vRange, min: value } }
         case 'vMax':
@@ -2826,6 +2836,7 @@ function App() {
         diagram: editableDiagram,
         layer: directLayer,
         name: directGridName,
+        latticePattern: directGridPattern,
         style,
       },
     )
@@ -3121,6 +3132,33 @@ function App() {
             }}
           />
         </label>
+        <label className="direct-create-field">
+          <span>Grid pattern</span>
+          <select
+            value={directGridPattern}
+            onChange={(event) => {
+              const nextPattern = event.currentTarget.value as LatticePattern
+
+              setDirectGridPattern(nextPattern)
+              if (nextPattern !== 'rectangular') {
+                setDirectGridInput((current) => ({
+                  ...current,
+                  vRange: {
+                    ...current.vRange,
+                    step: current.uRange.step,
+                  },
+                }))
+              }
+              setDirectCreationStatus('')
+            }}
+          >
+            {latticePatterns.map((pattern) => (
+              <option key={pattern} value={pattern}>
+                {latticePatternLabel(pattern)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div
           className="direct-path-style-grid"
           role="group"
@@ -3223,6 +3261,42 @@ function App() {
       value: string
     }>
   }> {
+    if (directGridPattern !== 'rectangular') {
+      return [
+        {
+          legend: directGridPattern === 'triangular' ? 'spacing' : 'cell',
+          fields: [
+            {
+              id: 'uStep',
+              label:
+                directGridPattern === 'triangular'
+                  ? 'spacing'
+                  : 'edge length',
+              value: directGridInput.uRange.step,
+            },
+          ],
+        },
+        {
+          legend: 'range',
+          fields: [
+            { id: 'uMin', label: 'u min', value: directGridInput.uRange.min },
+            { id: 'uMax', label: 'u max', value: directGridInput.uRange.max },
+            { id: 'vMin', label: 'v min', value: directGridInput.vRange.min },
+            { id: 'vMax', label: 'v max', value: directGridInput.vRange.max },
+          ],
+        },
+        {
+          legend: 'clip',
+          fields: [
+            { id: 'clipUMin', label: 'u min', value: directGridInput.clip.uMin },
+            { id: 'clipUMax', label: 'u max', value: directGridInput.clip.uMax },
+            { id: 'clipVMin', label: 'v min', value: directGridInput.clip.vMin },
+            { id: 'clipVMax', label: 'v max', value: directGridInput.clip.vMax },
+          ],
+        },
+      ]
+    }
+
     return [
       {
         legend: 'u lines',
@@ -3250,6 +3324,17 @@ function App() {
         ],
       },
     ]
+  }
+
+  function latticePatternLabel(pattern: LatticePattern): string {
+    switch (pattern) {
+      case 'rectangular':
+        return 'Rectangular'
+      case 'triangular':
+        return 'Triangular'
+      case 'honeycomb':
+        return 'Honeycomb'
+    }
   }
 
   function renderDirectPathControls() {

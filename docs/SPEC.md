@@ -181,14 +181,17 @@ MVP, symbolic input is supported for global coordinate fields; active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
 remain numeric-only and reject symbolic values.
 
-Direct input also supports generated grid strata. A grid stores numeric or
-symbolic scalar fields for `uRange`, `vRange`, and a rectangular clip. SVG
-preview uses finite preview values and rejects invalid steps, reversed ranges,
-non-finite values, and grids above the line-count cap. TikZ export uses compact
-`\foreach` loops with `\clip`; in 3D, the grid is emitted in the saved
-work-plane-local frame with `canvas is plane`. MVP `\foreach` range triplets
-must be numeric, while symbolic clip endpoints are allowed when they parse and
-evaluate safely.
+Direct input also supports generated grid strata. A grid stores a lattice
+pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
+rectangular clip. Supported patterns are rectangular, triangular, and
+honeycomb. SVG preview uses finite preview values and rejects invalid steps,
+reversed ranges, non-finite values, and grids above the line/edge-count cap.
+TikZ export uses compact `\foreach` loops with `\clip`; in 3D, the grid is
+emitted in the saved work-plane-local frame with `canvas is plane`. MVP
+rectangular `\foreach` range triplets must be numeric, while rectangular
+symbolic clip endpoints are allowed when they parse and evaluate safely.
+Triangular spacing and honeycomb edge length use `uRange.step`; their compact
+TikZ loops currently require numeric ranges and clip bounds.
 
 ### Cursor input mode
 

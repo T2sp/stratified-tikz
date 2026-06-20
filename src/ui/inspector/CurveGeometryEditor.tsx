@@ -18,14 +18,18 @@ import type {
   PathSegment,
   GridParameterRange,
   GridRectangleClip,
+  LatticePattern,
   Vec3,
 } from '../../model/types.ts'
 import { hasCurveStyleOverride, resolveCurveStyle } from '../../model/styles.ts'
-import { gridPreviewSegments } from '../../model/grids.ts'
+import {
+  gridLatticePattern,
+  gridPreviewSegments,
+} from '../../model/grids.ts'
 import { createScalarInputValue } from '../../model/scalarExpressions.ts'
 import type { ScalarInputValue } from '../../model/scalarExpressions.ts'
 import { resolveSymbolicVariables } from '../../model/variables.ts'
-import { lineStyles } from '../../model/types.ts'
+import { latticePatterns, lineStyles } from '../../model/types.ts'
 import {
   formatGridIssue,
   formatSymbolicInputError,
@@ -350,11 +354,20 @@ function GridGeometryEditor({
   onDiagramChange: DiagramChangeHandler
 }) {
   const preview = gridPreviewSegments(grid, diagram.ambientDimension)
+  const latticePattern = gridLatticePattern(grid)
 
   return (
     <>
       <ReadOnlyField label="Frame" value={grid.frame.kind} />
-      {gridScalarFields(grid).map((field) => (
+      <EditableSelectField
+        label="Lattice pattern"
+        value={latticePattern}
+        options={latticePatterns}
+        onChange={(value) =>
+          updateGridLatticePattern(grid, value, onDiagramChange)
+        }
+      />
+      {gridScalarFields(grid, latticePattern).map((field) => (
         <GridScalarEditor
           key={field.id}
           diagram={diagram}
@@ -366,18 +379,45 @@ function GridGeometryEditor({
         />
       ))}
       <ReadOnlyField
-        label="Preview lines"
+        label={latticePattern === 'honeycomb' ? 'Preview edges' : 'Preview lines'}
         value={preview.ok ? String(preview.lineCount) : formatGridIssue(preview.errors[0])}
       />
       <ReadOnlyField
         label="TikZ range"
         value={
-          gridHasSymbolicForeachRange(grid)
+          gridHasSymbolicForeachRange(grid, latticePattern)
             ? 'unsupported symbolic grid range'
             : 'foreach range'
         }
       />
     </>
+  )
+}
+
+function updateGridLatticePattern(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  latticePattern: LatticePattern,
+  onDiagramChange: DiagramChangeHandler,
+): void {
+  onDiagramChange((currentDiagram) =>
+    updateStratumById(currentDiagram, grid.id, (current) => {
+      if (current.geometricKind !== 'curve' || current.kind !== 'grid') {
+        return current
+      }
+
+      const nextGrid = {
+        ...current,
+        latticePattern,
+        vRange:
+          latticePattern === 'rectangular'
+            ? current.vRange
+            : { ...current.vRange, step: current.uRange.step },
+      }
+
+      return gridPreviewSegments(nextGrid, currentDiagram.ambientDimension).ok
+        ? nextGrid
+        : current
+    }),
   )
 }
 
@@ -459,11 +499,30 @@ function GridScalarEditor({
 
 function gridScalarFields(
   grid: Extract<CurveStratum, { kind: 'grid' }>,
+  latticePattern: LatticePattern,
 ): Array<{
   id: GridScalarField
   label: string
   value: ScalarInputValue
 }> {
+  if (latticePattern !== 'rectangular') {
+    return [
+      {
+        id: 'uStep',
+        label: latticePattern === 'triangular' ? 'spacing' : 'edge length',
+        value: grid.uRange.step,
+      },
+      { id: 'uMin', label: 'u min', value: grid.uRange.min },
+      { id: 'uMax', label: 'u max', value: grid.uRange.max },
+      { id: 'vMin', label: 'v min', value: grid.vRange.min },
+      { id: 'vMax', label: 'v max', value: grid.vRange.max },
+      { id: 'clipUMin', label: 'clip u min', value: grid.clip.uMin },
+      { id: 'clipUMax', label: 'clip u max', value: grid.clip.uMax },
+      { id: 'clipVMin', label: 'clip v min', value: grid.clip.vMin },
+      { id: 'clipVMax', label: 'clip v max', value: grid.clip.vMax },
+    ]
+  }
+
   return [
     { id: 'uMin', label: 'u min', value: grid.uRange.min },
     { id: 'uMax', label: 'u max', value: grid.uRange.max },
@@ -541,7 +600,14 @@ function gridWithScalarField(
     case 'uMax':
       return { ...grid, uRange: updateGridRange(grid.uRange, 'max', scalar) }
     case 'uStep':
-      return { ...grid, uRange: updateGridRange(grid.uRange, 'step', scalar) }
+      return {
+        ...grid,
+        uRange: updateGridRange(grid.uRange, 'step', scalar),
+        vRange:
+          gridLatticePattern(grid) === 'rectangular'
+            ? grid.vRange
+            : updateGridRange(grid.vRange, 'step', scalar),
+      }
     case 'vMin':
       return { ...grid, vRange: updateGridRange(grid.vRange, 'min', scalar) }
     case 'vMax':
@@ -587,14 +653,29 @@ function formatGridScalarInput(value: ScalarInputValue): string {
 
 function gridHasSymbolicForeachRange(
   grid: Extract<CurveStratum, { kind: 'grid' }>,
+  latticePattern: LatticePattern,
 ): boolean {
-  return [...gridRangeScalars(grid.uRange), ...gridRangeScalars(grid.vRange)].some(
-    (value) => value.kind === 'symbolic',
-  )
+  const scalars =
+    latticePattern === 'rectangular'
+      ? [...gridRangeScalars(grid.uRange), ...gridRangeScalars(grid.vRange)]
+      : [
+          grid.uRange.min,
+          grid.uRange.max,
+          grid.uRange.step,
+          grid.vRange.min,
+          grid.vRange.max,
+          ...gridClipScalars(grid.clip),
+        ]
+
+  return scalars.some((value) => value.kind === 'symbolic')
 }
 
 function gridRangeScalars(range: GridParameterRange): ScalarInputValue[] {
   return [range.min, range.max, range.step]
+}
+
+function gridClipScalars(clip: GridRectangleClip): ScalarInputValue[] {
+  return [clip.uMin, clip.uMax, clip.vMin, clip.vMax]
 }
 
 function formatCompactNumber(value: number): string {

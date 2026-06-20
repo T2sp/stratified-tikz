@@ -15,7 +15,11 @@ import type {
 } from '../model/types'
 import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
 import { isClosedPathBoundary } from '../model/filledBoundaries.ts'
-import { gridPreviewSegments, scalarInputPreviewValue } from '../model/grids.ts'
+import {
+  gridLatticePattern,
+  gridPreviewSegments,
+  scalarInputPreviewValue,
+} from '../model/grids.ts'
 import { pathCoordinates, pathEndpoints } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { FilledBoundaryStratum } from './filledStratumEditing.ts'
@@ -355,6 +359,7 @@ function gridSummaryFields(
 
   return [
     { label: 'Frame', value: grid.frame.kind },
+    { label: 'Pattern', value: gridLatticePattern(grid) },
     {
       label: 'U range',
       value: formatGridRange(grid.uRange),

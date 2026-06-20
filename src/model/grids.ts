@@ -3,12 +3,14 @@ import {
   pointFromWorkPlaneLocalCoordinate,
 } from '../geometry/bezierControls.ts'
 import type { ScalarInputValue } from './scalarExpressions.ts'
+import { latticePatterns } from './types.ts'
 import type {
   AmbientDimension,
   GridFrame,
   GridParameterRange,
   GridRectangleClip,
   GridStratum,
+  LatticePattern,
   Vec3,
   WorkPlaneFrameSnapshot,
 } from './types.ts'
@@ -47,14 +49,26 @@ type ClipValues = {
   vMax: number
 }
 
+type LocalPoint = {
+  u: number
+  v: number
+}
+
+type LocalSegment = {
+  start: LocalPoint
+  end: LocalPoint
+}
+
 type ParameterSequence = {
   firstIndex: number
   count: number
 }
 
 export const maxGridPreviewLines = 500
+export const defaultLatticePattern: LatticePattern = 'rectangular'
 
 const gridEpsilon = 1e-9
+const sqrtThree = Math.sqrt(3)
 
 export function createNumericScalarInputValue(value: number): ScalarInputValue {
   return {
@@ -74,6 +88,21 @@ export function cloneScalarInputValue(value: ScalarInputValue): ScalarInputValue
         expression: value.expression,
         previewValue: value.previewValue,
       }
+}
+
+export function isLatticePattern(value: unknown): value is LatticePattern {
+  return (
+    typeof value === 'string' &&
+    latticePatterns.some((pattern) => pattern === value)
+  )
+}
+
+export function gridLatticePattern(
+  grid: Pick<GridStratum, 'latticePattern'>,
+): LatticePattern {
+  return isLatticePattern(grid.latticePattern)
+    ? grid.latticePattern
+    : defaultLatticePattern
 }
 
 export function cloneGridFrame(frame: GridFrame): GridFrame {
@@ -155,37 +184,32 @@ export function validateGridPreview(
   const errors: GridValidationIssue[] = []
 
   validateGridFrame(grid.frame, ambientDimension, `${path}.frame`, errors)
+  const pattern = readGridLatticePattern(grid, path, errors)
 
   const uRange = readRangeValues(grid.uRange, `${path}.uRange`, errors)
   const vRange = readRangeValues(grid.vRange, `${path}.vRange`, errors)
   const clip = readClipValues(grid.clip, `${path}.clip`, errors)
 
-  if (uRange === null || vRange === null || clip === null) {
+  if (
+    pattern === null ||
+    uRange === null ||
+    vRange === null ||
+    clip === null
+  ) {
     return errors
   }
 
-  const uSequence = parameterSequenceForRange(
+  const lineCount = gridPreviewLineCountForPattern(
+    pattern,
     uRange,
-    clip.uMin,
-    clip.uMax,
-    `${path}.uRange`,
-    errors,
-  )
-  const vSequence = parameterSequenceForRange(
     vRange,
-    clip.vMin,
-    clip.vMax,
-    `${path}.vRange`,
+    clip,
+    path,
     errors,
+    maxLineCount,
   )
 
-  if (uSequence === null || vSequence === null) {
-    return errors
-  }
-
-  const lineCount = uSequence.count + vSequence.count
-
-  if (lineCount > maxLineCount) {
+  if (lineCount !== null && lineCount > maxLineCount) {
     errors.push({
       path,
       message: `Grid preview would create ${lineCount} lines, exceeding the ${maxLineCount} line cap.`,
@@ -217,38 +241,15 @@ export function gridPreviewSegments(
   const uRange = scalarRangeValues(grid.uRange)
   const vRange = scalarRangeValues(grid.vRange)
   const clip = clipValues(grid.clip)
-  const uSequence = parameterSequenceForRangeUnchecked(
+  const localSegments = localGridSegmentsForPattern(
+    gridLatticePattern(grid),
     uRange,
-    clip.uMin,
-    clip.uMax,
-  )
-  const vSequence = parameterSequenceForRangeUnchecked(
     vRange,
-    clip.vMin,
-    clip.vMax,
+    clip,
   )
-  const segments = [
-    ...parameterValues(uRange, uSequence).map((u) => ({
-      start: pointFromWorkPlaneLocalCoordinate(grid.frame.frame, {
-        a: u,
-        b: clip.vMin,
-      }),
-      end: pointFromWorkPlaneLocalCoordinate(grid.frame.frame, {
-        a: u,
-        b: clip.vMax,
-      }),
-    })),
-    ...parameterValues(vRange, vSequence).map((v) => ({
-      start: pointFromWorkPlaneLocalCoordinate(grid.frame.frame, {
-        a: clip.uMin,
-        b: v,
-      }),
-      end: pointFromWorkPlaneLocalCoordinate(grid.frame.frame, {
-        a: clip.uMax,
-        b: v,
-      }),
-    })),
-  ]
+  const segments = localSegments.map((segment) =>
+    workPlaneSegmentFromLocalSegment(grid.frame.frame, segment),
+  )
   const nonFiniteSegmentIndex = segments.findIndex(
     (segment) => !isFiniteVec3(segment.start) || !isFiniteVec3(segment.end),
   )
@@ -270,6 +271,28 @@ export function gridPreviewSegments(
     segments,
     lineCount: segments.length,
   }
+}
+
+function readGridLatticePattern(
+  grid: GridStratum,
+  path: string,
+  errors: GridValidationIssue[],
+): LatticePattern | null {
+  const latticePattern = (grid as { latticePattern?: unknown }).latticePattern
+
+  if (latticePattern === undefined) {
+    return defaultLatticePattern
+  }
+
+  if (!isLatticePattern(latticePattern)) {
+    errors.push({
+      path: `${path}.latticePattern`,
+      message: 'Grid lattice pattern must be rectangular, triangular, or honeycomb.',
+    })
+    return null
+  }
+
+  return latticePattern
 }
 
 function validateGridFrame(
@@ -481,6 +504,477 @@ function isFiniteVec3(point: Vec3): boolean {
     Number.isFinite(point.y) &&
     Number.isFinite(point.z)
   )
+}
+
+function gridPreviewLineCountForPattern(
+  pattern: LatticePattern,
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+  path: string,
+  errors: GridValidationIssue[],
+  maxLineCount: number,
+): number | null {
+  switch (pattern) {
+    case 'rectangular':
+      return rectangularGridPreviewLineCount(uRange, vRange, clip, path, errors)
+    case 'triangular':
+      return triangularGridPreviewLineCount(uRange, vRange, clip)
+    case 'honeycomb': {
+      const result = honeycombLocalSegments(
+        uRange,
+        vRange,
+        clip,
+        maxLineCount + 1,
+      )
+
+      return result.truncated ? maxLineCount + 1 : result.segments.length
+    }
+  }
+}
+
+function rectangularGridPreviewLineCount(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+  path: string,
+  errors: GridValidationIssue[],
+): number | null {
+  const uSequence = parameterSequenceForRange(
+    uRange,
+    clip.uMin,
+    clip.uMax,
+    `${path}.uRange`,
+    errors,
+  )
+  const vSequence = parameterSequenceForRange(
+    vRange,
+    clip.vMin,
+    clip.vMax,
+    `${path}.vRange`,
+    errors,
+  )
+
+  return uSequence === null || vSequence === null
+    ? null
+    : uSequence.count + vSequence.count
+}
+
+function triangularGridPreviewLineCount(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+): number {
+  const domain = clippedRangeDomain(uRange, vRange, clip)
+
+  if (domain === null) {
+    return 0
+  }
+
+  const spacing = uRange.step
+  const verticalSpacing = (sqrtThree / 2) * spacing
+  const horizontalCount = parameterCountFromBounds(
+    vRange.min,
+    verticalSpacing,
+    domain.vMin,
+    domain.vMax,
+  )
+  const positiveDiagonalCount = parameterCountFromBounds(
+    uRange.min,
+    spacing,
+    minCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+    maxCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+  )
+  const negativeDiagonalCount = parameterCountFromBounds(
+    uRange.min,
+    spacing,
+    minCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+    maxCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+  )
+
+  return horizontalCount + positiveDiagonalCount + negativeDiagonalCount
+}
+
+function localGridSegmentsForPattern(
+  pattern: LatticePattern,
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+): LocalSegment[] {
+  switch (pattern) {
+    case 'rectangular':
+      return rectangularLocalSegments(uRange, vRange, clip)
+    case 'triangular':
+      return triangularLocalSegments(uRange, vRange, clip)
+    case 'honeycomb':
+      return honeycombLocalSegments(uRange, vRange, clip).segments
+  }
+}
+
+function rectangularLocalSegments(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+): LocalSegment[] {
+  const uSequence = parameterSequenceForRangeUnchecked(
+    uRange,
+    clip.uMin,
+    clip.uMax,
+  )
+  const vSequence = parameterSequenceForRangeUnchecked(
+    vRange,
+    clip.vMin,
+    clip.vMax,
+  )
+
+  return [
+    ...parameterValues(uRange, uSequence).map((u) => ({
+      start: { u, v: clip.vMin },
+      end: { u, v: clip.vMax },
+    })),
+    ...parameterValues(vRange, vSequence).map((v) => ({
+      start: { u: clip.uMin, v },
+      end: { u: clip.uMax, v },
+    })),
+  ]
+}
+
+function triangularLocalSegments(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+): LocalSegment[] {
+  const domain = clippedRangeDomain(uRange, vRange, clip)
+
+  if (domain === null) {
+    return []
+  }
+
+  const spacing = uRange.step
+  const verticalSpacing = (sqrtThree / 2) * spacing
+  const paddedUMin = domain.uMin - diagonalLinePadding(domain, spacing)
+  const paddedUMax = domain.uMax + diagonalLinePadding(domain, spacing)
+  const segments: LocalSegment[] = []
+
+  parameterValuesFromBounds(vRange.min, verticalSpacing, domain.vMin, domain.vMax)
+    .map((v) => ({
+      start: { u: domain.uMin, v },
+      end: { u: domain.uMax, v },
+    }))
+    .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
+
+  parameterValuesFromBounds(
+    uRange.min,
+    spacing,
+    minCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+    maxCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+  )
+    .map((intercept) => ({
+      start: {
+        u: paddedUMin,
+        v: sqrtThree * (paddedUMin - intercept),
+      },
+      end: {
+        u: paddedUMax,
+        v: sqrtThree * (paddedUMax - intercept),
+      },
+    }))
+    .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
+
+  parameterValuesFromBounds(
+    uRange.min,
+    spacing,
+    minCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+    maxCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+  )
+    .map((intercept) => ({
+      start: {
+        u: paddedUMin,
+        v: -sqrtThree * (paddedUMin - intercept),
+      },
+      end: {
+        u: paddedUMax,
+        v: -sqrtThree * (paddedUMax - intercept),
+      },
+    }))
+    .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
+
+  return segments
+}
+
+function honeycombLocalSegments(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+  maxSegmentCount = Number.POSITIVE_INFINITY,
+): { segments: LocalSegment[]; truncated: boolean } {
+  const domain = clippedRangeDomain(uRange, vRange, clip)
+
+  if (domain === null) {
+    return { segments: [], truncated: false }
+  }
+
+  const edgeLength = uRange.step
+  const centerColumnStep = 1.5 * edgeLength
+  const centerRowStep = sqrtThree * edgeLength
+  const iFirst = Math.floor((domain.uMin - edgeLength - uRange.min) / centerColumnStep)
+  const iLast = Math.ceil((domain.uMax + edgeLength - uRange.min) / centerColumnStep)
+  const columnCount = iLast - iFirst + 1
+  const roughRowCount = Math.ceil(
+    (domain.vMax - domain.vMin + 2 * centerRowStep) / centerRowStep,
+  )
+
+  if (
+    columnCount > 0 &&
+    roughRowCount > 0 &&
+    columnCount * roughRowCount * 3 > maxSegmentCount
+  ) {
+    return { segments: [], truncated: true }
+  }
+
+  const edges = new Map<string, LocalSegment>()
+
+  for (let i = iFirst; i <= iLast; i += 1) {
+    const centerU = uRange.min + i * centerColumnStep
+    const rowOffset = isOddInteger(i) ? centerRowStep / 2 : 0
+    const jFirst = Math.floor(
+      (domain.vMin - centerRowStep - vRange.min - rowOffset) / centerRowStep,
+    )
+    const jLast = Math.ceil(
+      (domain.vMax + centerRowStep - vRange.min - rowOffset) / centerRowStep,
+    )
+
+    for (let j = jFirst; j <= jLast; j += 1) {
+      const centerV = vRange.min + rowOffset + j * centerRowStep
+      const vertices = honeycombHexagonVertices(centerU, centerV, edgeLength)
+
+      for (let vertexIndex = 0; vertexIndex < vertices.length; vertexIndex += 1) {
+        const edge = {
+          start: vertices[vertexIndex],
+          end: vertices[(vertexIndex + 1) % vertices.length],
+        }
+        const key = localSegmentKey(edge)
+
+        if (!edges.has(key)) {
+          edges.set(key, edge)
+        }
+      }
+    }
+  }
+
+  const segments: LocalSegment[] = []
+
+  for (const edge of edges.values()) {
+    pushClippedLocalSegment(segments, edge, domain)
+
+    if (segments.length > maxSegmentCount) {
+      return { segments: [], truncated: true }
+    }
+  }
+
+  return { segments, truncated: false }
+}
+
+function clippedRangeDomain(
+  uRange: ScalarRangeValues,
+  vRange: ScalarRangeValues,
+  clip: ClipValues,
+): ClipValues | null {
+  const domain = {
+    uMin: Math.max(uRange.min, clip.uMin),
+    uMax: Math.min(uRange.max, clip.uMax),
+    vMin: Math.max(vRange.min, clip.vMin),
+    vMax: Math.min(vRange.max, clip.vMax),
+  }
+
+  return domain.uMax < domain.uMin - gridEpsilon ||
+    domain.vMax < domain.vMin - gridEpsilon
+    ? null
+    : domain
+}
+
+function diagonalLinePadding(domain: ClipValues, spacing: number): number {
+  return Math.max(
+    spacing,
+    domain.uMax - domain.uMin,
+    domain.vMax - domain.vMin,
+  )
+}
+
+function parameterValuesFromBounds(
+  base: number,
+  step: number,
+  lower: number,
+  upper: number,
+): number[] {
+  const count = parameterCountFromBounds(base, step, lower, upper)
+
+  if (count <= 0 || !Number.isSafeInteger(count)) {
+    return []
+  }
+
+  const firstIndex = Math.ceil((lower - base) / step - gridEpsilon)
+
+  return Array.from({ length: count }, (_, offset) =>
+    normalizeNearZero(base + (firstIndex + offset) * step),
+  )
+}
+
+function parameterCountFromBounds(
+  base: number,
+  step: number,
+  lower: number,
+  upper: number,
+): number {
+  if (upper < lower - gridEpsilon) {
+    return 0
+  }
+
+  const firstIndex = Math.ceil((lower - base) / step - gridEpsilon)
+  const lastIndex = Math.floor((upper - base) / step + gridEpsilon)
+
+  if (lastIndex < firstIndex) {
+    return 0
+  }
+
+  return lastIndex - firstIndex + 1
+}
+
+function pushClippedLocalSegment(
+  segments: LocalSegment[],
+  segment: LocalSegment,
+  domain: ClipValues,
+): void {
+  const clipped = clipLocalSegmentToRectangle(segment, domain)
+
+  if (clipped !== null) {
+    segments.push(clipped)
+  }
+}
+
+function clipLocalSegmentToRectangle(
+  segment: LocalSegment,
+  domain: ClipValues,
+): LocalSegment | null {
+  const dx = segment.end.u - segment.start.u
+  const dy = segment.end.v - segment.start.v
+  let t0 = 0
+  let t1 = 1
+
+  const checks = [
+    { p: -dx, q: segment.start.u - domain.uMin },
+    { p: dx, q: domain.uMax - segment.start.u },
+    { p: -dy, q: segment.start.v - domain.vMin },
+    { p: dy, q: domain.vMax - segment.start.v },
+  ]
+
+  for (const { p, q } of checks) {
+    if (Math.abs(p) <= gridEpsilon) {
+      if (q < -gridEpsilon) {
+        return null
+      }
+      continue
+    }
+
+    const r = q / p
+
+    if (p < 0) {
+      t0 = Math.max(t0, r)
+    } else {
+      t1 = Math.min(t1, r)
+    }
+
+    if (t0 > t1 + gridEpsilon) {
+      return null
+    }
+  }
+
+  const start = {
+    u: normalizeNearZero(segment.start.u + t0 * dx),
+    v: normalizeNearZero(segment.start.v + t0 * dy),
+  }
+  const end = {
+    u: normalizeNearZero(segment.start.u + t1 * dx),
+    v: normalizeNearZero(segment.start.v + t1 * dy),
+  }
+
+  return Math.abs(start.u - end.u) <= gridEpsilon &&
+    Math.abs(start.v - end.v) <= gridEpsilon
+    ? null
+    : { start, end }
+}
+
+function honeycombHexagonVertices(
+  centerU: number,
+  centerV: number,
+  edgeLength: number,
+): LocalPoint[] {
+  const halfHeight = (sqrtThree / 2) * edgeLength
+
+  return [
+    { u: centerU + edgeLength, v: centerV },
+    { u: centerU + edgeLength / 2, v: centerV + halfHeight },
+    { u: centerU - edgeLength / 2, v: centerV + halfHeight },
+    { u: centerU - edgeLength, v: centerV },
+    { u: centerU - edgeLength / 2, v: centerV - halfHeight },
+    { u: centerU + edgeLength / 2, v: centerV - halfHeight },
+  ]
+}
+
+function minCornerValue(
+  domain: ClipValues,
+  value: (corner: LocalPoint) => number,
+): number {
+  return Math.min(...rectangleCorners(domain).map(value))
+}
+
+function maxCornerValue(
+  domain: ClipValues,
+  value: (corner: LocalPoint) => number,
+): number {
+  return Math.max(...rectangleCorners(domain).map(value))
+}
+
+function rectangleCorners(domain: ClipValues): LocalPoint[] {
+  return [
+    { u: domain.uMin, v: domain.vMin },
+    { u: domain.uMin, v: domain.vMax },
+    { u: domain.uMax, v: domain.vMin },
+    { u: domain.uMax, v: domain.vMax },
+  ]
+}
+
+function localSegmentKey(segment: LocalSegment): string {
+  const start = localPointKey(segment.start)
+  const end = localPointKey(segment.end)
+
+  return start < end ? `${start}|${end}` : `${end}|${start}`
+}
+
+function localPointKey(point: LocalPoint): string {
+  const scale = 1 / gridEpsilon
+
+  return `${Math.round(point.u * scale)},${Math.round(point.v * scale)}`
+}
+
+function isOddInteger(value: number): boolean {
+  return Math.abs(value % 2) === 1
+}
+
+function workPlaneSegmentFromLocalSegment(
+  frame: WorkPlaneFrameSnapshot,
+  segment: LocalSegment,
+): GridPreviewSegment {
+  return {
+    start: pointFromWorkPlaneLocalCoordinate(frame, {
+      a: segment.start.u,
+      b: segment.start.v,
+    }),
+    end: pointFromWorkPlaneLocalCoordinate(frame, {
+      a: segment.end.u,
+      b: segment.end.v,
+    }),
+  }
 }
 
 function isCanonicalXyFrame(frame: WorkPlaneFrameSnapshot): boolean {
