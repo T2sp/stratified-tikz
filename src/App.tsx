@@ -107,9 +107,12 @@ import {
   createInitialCameraControlState,
   createExistingCoordinateSourceOptions,
   createSerializeDiagramOptionsForUi,
+  coonsPatchBoundaryRoles,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
+  createCoonsPatchFromBoundaryPaths,
+  createCoonsPatchFromBoundaryPathsErrorMessage,
   createRuledSurfaceFromBoundaryPaths,
   createRuledSurfaceFromBoundaryPathsErrorMessage,
   createWorkPlanePointPickingHighlights,
@@ -117,6 +120,7 @@ import {
   createConcatenatedPathDraft,
   createDiagramHistory,
   createSheetPolygonDraft,
+  defaultCoonsPatchSampling,
   defaultHemisphereCreationParameters,
   defaultRuledSurfaceSamplingSegments,
   defaultSaddleCreationParameters,
@@ -172,6 +176,7 @@ import {
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
   inlineMathTikzExportHelp,
+  isBoundarySurfaceBoundaryPathStratum,
   isRuledSurfaceBoundaryPathStratum,
   tikzDownloadFilenameForMode,
   tikzExportModeFromSelectValue,
@@ -200,6 +205,8 @@ import {
   type ConcatenatedPathDraft,
   type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
+  type CoonsPatchBoundaryPathIds,
+  type CoonsPatchBoundaryRole,
   type CoordinateSourceHighlight,
   type CurvedSheetCreationKind,
   type CurvedSheetCreationParameters,
@@ -239,7 +246,11 @@ type DirectCreationTool =
   | 'createSheet'
   | 'createGrid'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
-type SheetCreationKind = 'polygon' | CurvedSheetCreationKind | 'ruledSurface'
+type SheetCreationKind =
+  | 'polygon'
+  | CurvedSheetCreationKind
+  | 'ruledSurface'
+  | 'coonsPatch'
 type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
 type DirectPathManualCoordinateRole = 'center' | 'control1' | 'control2' | 'end'
 type DirectPathManualSegmentDraft = {
@@ -406,6 +417,14 @@ const defaultDirectGridInput: DirectGridInput = {
     vMax: '2',
   },
 }
+function emptyCoonsPatchBoundaryPathIds(): Record<CoonsPatchBoundaryRole, string> {
+  return {
+    bottom: '',
+    right: '',
+    top: '',
+    left: '',
+  }
+}
 const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'select', label: 'Select' },
   { id: 'createPoint', label: 'Add point' },
@@ -421,6 +440,7 @@ const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
   { id: 'hemisphere', label: 'Hemisphere' },
   { id: 'saddle', label: 'Saddle' },
   { id: 'ruledSurface', label: 'Ruled' },
+  { id: 'coonsPatch', label: 'Coons' },
 ]
 const concatenatedPathSegmentKinds: Array<{
   id: ConcatenatedPathSegmentKind
@@ -513,6 +533,14 @@ function App() {
     useState<string>(String(defaultRuledSurfaceSamplingSegments))
   const [ruledSurfaceBoundaryPathIds, setRuledSurfaceBoundaryPathIds] =
     useState<string[]>([])
+  const [coonsPatchUSegmentsInput, setCoonsPatchUSegmentsInput] =
+    useState<string>(String(defaultCoonsPatchSampling.uSegments))
+  const [coonsPatchVSegmentsInput, setCoonsPatchVSegmentsInput] =
+    useState<string>(String(defaultCoonsPatchSampling.vSegments))
+  const [coonsPatchBoundaryPathIds, setCoonsPatchBoundaryPathIds] =
+    useState<Record<CoonsPatchBoundaryRole, string>>(
+      emptyCoonsPatchBoundaryPathIds,
+    )
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
@@ -987,6 +1015,7 @@ function App() {
     setLayerOperationStatus('')
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryPathIds([])
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
     setFillRule('nonzero')
     setFillStatus('')
     setDirectLayerInput('0')
@@ -1117,6 +1146,8 @@ function App() {
     setSheetStatus('')
     setDirectCreationStatus('')
     setFillBoundaryPathIds([])
+    setRuledSurfaceBoundaryPathIds([])
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
     setFillStatus('')
     resetDirectPathInput()
     resetDirectCoordinateSources()
@@ -1147,6 +1178,8 @@ function App() {
     setDirectCreationStatus('')
     setLayerOperationStatus('')
     setFillBoundaryPathIds([])
+    setRuledSurfaceBoundaryPathIds([])
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canUndo, history.past])
@@ -1173,6 +1206,8 @@ function App() {
     setDirectCreationStatus('')
     setLayerOperationStatus('')
     setFillBoundaryPathIds([])
+    setRuledSurfaceBoundaryPathIds([])
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canRedo, history.future])
@@ -1330,6 +1365,8 @@ function App() {
     setLayerOperationStatus('')
     setStyleImportReport(emptyStyleImportReport)
     setFillBoundaryPathIds([])
+    setRuledSurfaceBoundaryPathIds([])
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
     setFillRule('nonzero')
     setFillStatus('')
     setDirectLayerInput('0')
@@ -1578,6 +1615,102 @@ function App() {
     return true
   }
 
+  function pickSelectedCoonsPatchBoundaryPath(
+    role: CoonsPatchBoundaryRole,
+  ): void {
+    const selected = findSelectedElement(editableDiagram, selectedElement)
+
+    if (
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      !isBoundarySurfaceBoundaryPathStratum(
+        selected.element,
+        editableDiagram.ambientDimension,
+      )
+    ) {
+      setSheetStatus('Select a path, polyline, cubic Bezier, or path template first.')
+      return
+    }
+
+    const pathId = selected.element.id
+    const assignedRole = coonsPatchAssignedRoleForPath(
+      coonsPatchBoundaryPathIds,
+      pathId,
+    )
+
+    if (assignedRole !== null && assignedRole !== role) {
+      setSheetStatus(
+        `Boundary path already assigned to ${coonsPatchBoundaryRoleLabel(
+          assignedRole,
+        )}.`,
+      )
+      return
+    }
+
+    setCoonsPatchBoundaryPathIds((current) => ({
+      ...current,
+      [role]: pathId,
+    }))
+    setSheetStatus(
+      `Picked ${coonsPatchBoundaryRoleLabel(role)}: ${selected.element.name}.`,
+    )
+  }
+
+  function resetCoonsPatchBoundaryPicking(): void {
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
+    setSheetStatus('Coons patch boundary picks reset.')
+  }
+
+  function createCoonsPatchFromPickedPaths(
+    creationLayer: number,
+    setStatus: (message: string) => void,
+  ): boolean {
+    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+      setStatus('Finish or cancel point picking first.')
+      return false
+    }
+
+    const uSegments = parseSamplingInput(
+      coonsPatchUSegmentsInput,
+      'Coons patch u segments',
+      setStatus,
+    )
+    const vSegments = parseSamplingInput(
+      coonsPatchVSegmentsInput,
+      'Coons patch v segments',
+      setStatus,
+    )
+
+    if (uSegments === null || vSegments === null) {
+      return false
+    }
+
+    const result = createCoonsPatchFromBoundaryPaths(
+      editableDiagram,
+      coonsPatchBoundaryPathIds,
+      {
+        layer: creationLayer,
+        sampling: { uSegments, vSegments },
+      },
+    )
+
+    if (!result.ok) {
+      setStatus(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+      return false
+    }
+
+    commitCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      creationLayer,
+    )
+    setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
+    setSheetStatus('Coons patch created.')
+    setDirectCreationStatus('Coons patch created.')
+    setCopyStatus('idle')
+    return true
+  }
+
   useEffect(() => {
     setInspectorDisclosure((current) =>
       nextInspectorDisclosureStateForSelection(current, selectedElement),
@@ -1753,6 +1886,7 @@ function App() {
       setPathStatus('')
       setSheetStatus('')
       setRuledSurfaceBoundaryPathIds([])
+      setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
       return
     }
 
@@ -1791,6 +1925,9 @@ function App() {
     if (kind !== 'ruledSurface') {
       setRuledSurfaceBoundaryPathIds([])
     }
+    if (kind !== 'coonsPatch') {
+      setCoonsPatchBoundaryPathIds(emptyCoonsPatchBoundaryPathIds())
+    }
     if (kind !== 'polygon') {
       setDirectSheetSources([])
       setDirectSourceTargetRow('1')
@@ -1827,8 +1964,11 @@ function App() {
       return
     }
 
-    if (creationTool === 'createSheet' && sheetCreationKind === 'ruledSurface') {
-      setSheetStatus('Pick two selected boundary paths, then create the ruled surface.')
+    if (
+      creationTool === 'createSheet' &&
+      isBoundarySurfaceSheetCreationKind(sheetCreationKind)
+    ) {
+      setSheetStatus(sheetCreationStatusPrompt(sheetCreationKind))
       return
     }
 
@@ -1876,8 +2016,11 @@ function App() {
       return
     }
 
-    if (creationTool === 'createSheet' && sheetCreationKind === 'ruledSurface') {
-      setSheetStatus('Pick two selected boundary paths, then create the ruled surface.')
+    if (
+      creationTool === 'createSheet' &&
+      isBoundarySurfaceSheetCreationKind(sheetCreationKind)
+    ) {
+      setSheetStatus(sheetCreationStatusPrompt(sheetCreationKind))
       return
     }
 
@@ -2076,7 +2219,7 @@ function App() {
           return current
         }
 
-        if (sheetCreationKind === 'ruledSurface') {
+        if (isBoundarySurfaceSheetCreationKind(sheetCreationKind)) {
           return current
         }
 
@@ -3002,6 +3145,11 @@ function App() {
   function createDirectSheet(directLayer: number): void {
     if (sheetCreationKind === 'ruledSurface') {
       createRuledSurfaceFromPickedPaths(directLayer, setDirectCreationStatus)
+      return
+    }
+
+    if (sheetCreationKind === 'coonsPatch') {
+      createCoonsPatchFromPickedPaths(directLayer, setDirectCreationStatus)
       return
     }
 
@@ -4719,6 +4867,78 @@ function App() {
                   )}
                 </span>
               </div>
+            ) : sheetCreationKind === 'coonsPatch' ? (
+              <div className="curved-sheet-parameter-grid">
+                <label className="direct-create-field">
+                  <span>U segments</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxCurvedSheetSamplingSegments}
+                    step="1"
+                    value={coonsPatchUSegmentsInput}
+                    onChange={(event) => {
+                      setCoonsPatchUSegmentsInput(event.currentTarget.value)
+                      setSheetStatus('')
+                      setDirectCreationStatus('')
+                    }}
+                  />
+                </label>
+                <label className="direct-create-field">
+                  <span>V segments</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxCurvedSheetSamplingSegments}
+                    step="1"
+                    value={coonsPatchVSegmentsInput}
+                    onChange={(event) => {
+                      setCoonsPatchVSegmentsInput(event.currentTarget.value)
+                      setSheetStatus('')
+                      setDirectCreationStatus('')
+                    }}
+                  />
+                </label>
+                {coonsPatchBoundaryRoles.map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    className="toolbar-button"
+                    onClick={() => pickSelectedCoonsPatchBoundaryPath(role)}
+                  >
+                    Pick {coonsPatchBoundaryRoleLabel(role)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={resetCoonsPatchBoundaryPicking}
+                >
+                  Reset boundaries
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => {
+                    const creationLayer = parseNewElementLayer(setSheetStatus)
+
+                    if (creationLayer !== null) {
+                      createCoonsPatchFromPickedPaths(
+                        creationLayer,
+                        setSheetStatus,
+                      )
+                    }
+                  }}
+                >
+                  Create
+                </button>
+                <span className="toolbar-status">
+                  {formatCoonsPatchBoundaryPickSummary(
+                    editableDiagram,
+                    coonsPatchBoundaryPathIds,
+                  )}
+                </span>
+              </div>
             ) : (
               <div className="curved-sheet-parameter-grid">
                 {sheetCreationKind === 'hemisphere' ? (
@@ -4943,7 +5163,7 @@ function App() {
               {editableDiagram.ambientDimension === 3 &&
                 creationTool !== 'createGrid' &&
                 (creationTool !== 'createSheet' ||
-                  sheetCreationKind !== 'ruledSurface') && (
+                  !isBoundarySurfaceSheetCreationKind(sheetCreationKind)) && (
                 <label className="direct-create-field direct-coordinate-mode-field">
                   <span>Coordinate mode</span>
                   <select
@@ -6025,6 +6245,8 @@ function sheetCreationStatusPrompt(kind: SheetCreationKind): string {
       return 'Click the preview to place the saddle origin.'
     case 'ruledSurface':
       return 'Pick two boundary paths to create a ruled surface.'
+    case 'coonsPatch':
+      return 'Pick bottom, right, top, and left boundary paths to create a Coons patch.'
   }
 }
 
@@ -6038,6 +6260,8 @@ function sheetCreationKindLabel(kind: SheetCreationKind): string {
       return 'Saddle'
     case 'ruledSurface':
       return 'Ruled surface'
+    case 'coonsPatch':
+      return 'Coons patch'
   }
 }
 
@@ -6056,6 +6280,12 @@ function isAnchorCurvedSheetCreationKind(
   return kind === 'hemisphere' || kind === 'saddle'
 }
 
+function isBoundarySurfaceSheetCreationKind(
+  kind: SheetCreationKind,
+): kind is 'ruledSurface' | 'coonsPatch' {
+  return kind === 'ruledSurface' || kind === 'coonsPatch'
+}
+
 function formatRuledSurfaceBoundaryPickSummary(
   diagram: Diagram,
   sourcePathIds: readonly string[],
@@ -6070,6 +6300,50 @@ function formatRuledSurfaceBoundaryPickSummary(
       const label = source?.name ?? sourcePathId
 
       return `Boundary ${index + 1}: ${label}`
+    })
+    .join('; ')
+}
+
+function coonsPatchBoundaryRoleLabel(role: CoonsPatchBoundaryRole): string {
+  switch (role) {
+    case 'bottom':
+      return 'bottom'
+    case 'right':
+      return 'right'
+    case 'top':
+      return 'top'
+    case 'left':
+      return 'left'
+  }
+}
+
+function coonsPatchAssignedRoleForPath(
+  sourcePathIds: CoonsPatchBoundaryPathIds,
+  sourcePathId: string,
+): CoonsPatchBoundaryRole | null {
+  return (
+    coonsPatchBoundaryRoles.find(
+      (role) => sourcePathIds[role] === sourcePathId,
+    ) ?? null
+  )
+}
+
+function formatCoonsPatchBoundaryPickSummary(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathIds,
+): string {
+  return coonsPatchBoundaryRoles
+    .map((role) => {
+      const sourcePathId = sourcePathIds[role]
+      const source =
+        sourcePathId === undefined || sourcePathId.trim().length === 0
+          ? undefined
+          : diagram.strata.find((stratum) => stratum.id === sourcePathId)
+      const label = source?.name ?? sourcePathId
+
+      return `${coonsPatchBoundaryRoleLabel(role)}: ${
+        label === undefined || label.trim().length === 0 ? 'not picked' : label
+      }`
     })
     .join('; ')
 }

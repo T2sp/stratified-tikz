@@ -16,16 +16,33 @@ import { defaultSheetStyle } from '../model/styles.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
+  CoonsPatchPrimitive,
   CurveStratum,
   Diagram,
   PathSegment,
   RuledSurfacePrimitive,
   SheetStyle,
+  SurfaceSampling,
   Stratum,
 } from '../model/types.ts'
 import { makeUniqueId } from './diagramUpdates.ts'
 
 export const defaultRuledSurfaceSamplingSegments = 8
+export const defaultCoonsPatchSampling: SurfaceSampling = {
+  uSegments: 8,
+  vSegments: 8,
+}
+export const coonsPatchBoundaryRoles = [
+  'bottom',
+  'right',
+  'top',
+  'left',
+] as const
+
+export type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
+export type CoonsPatchBoundaryPathIds = Partial<
+  Record<CoonsPatchBoundaryRole, string>
+>
 
 export type CreateRuledSurfaceFromBoundaryPathsError =
   | 'unsupportedAmbientDimension'
@@ -57,6 +74,39 @@ export type CreateRuledSurfaceFromBoundaryPathsResult =
       diagram: Diagram
       error: CreateRuledSurfaceFromBoundaryPathsError
       sourcePathId?: string
+    }
+
+export type CreateCoonsPatchFromBoundaryPathsError =
+  | 'unsupportedAmbientDimension'
+  | 'wrongBoundaryCount'
+  | 'duplicateSourcePath'
+  | 'missingSourcePath'
+  | 'sourceNotBoundaryPath'
+  | 'sourceWrongCodimension'
+  | 'sourceNonFinite'
+  | 'invalidSampling'
+  | 'invalidBoundary'
+
+export type CreateCoonsPatchFromBoundaryPathsOptions = {
+  id?: string
+  name?: string
+  layer?: number
+  style?: SheetStyle
+  sampling?: SurfaceSampling
+}
+
+export type CreateCoonsPatchFromBoundaryPathsResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: CreateCoonsPatchFromBoundaryPathsError
+      sourcePathId?: string
+      role?: CoonsPatchBoundaryRole
     }
 
 export function createRuledSurfaceFromBoundaryPaths(
@@ -102,77 +152,18 @@ export function createRuledSurfaceFromBoundaryPaths(
   const boundaries: BoundaryPathSnapshot[] = []
 
   for (const sourcePathId of sourcePathIds) {
-    const source = diagram.strata.find((stratum) => stratum.id === sourcePathId)
+    const boundaryResult = loadBoundaryPathSnapshot(diagram, sourcePathId)
 
-    if (source === undefined) {
+    if (!boundaryResult.ok) {
       return {
         ok: false,
         diagram,
-        error: 'missingSourcePath',
+        error: boundaryResult.error,
         sourcePathId,
       }
     }
 
-    if (source.geometricKind !== 'curve') {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNotBoundaryPath',
-        sourcePathId,
-      }
-    }
-
-    if (source.codim !== expectedBoundaryPathCodim(diagram.ambientDimension)) {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceWrongCodimension',
-        sourcePathId,
-      }
-    }
-
-    if (!isRuledSurfaceBoundaryPathStratum(source, diagram.ambientDimension)) {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNotBoundaryPath',
-        sourcePathId,
-      }
-    }
-
-    const boundary = boundaryPathSnapshotFromCurveStratum(
-      source,
-      diagram.ambientDimension,
-    )
-
-    if (boundary === null) {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNotBoundaryPath',
-        sourcePathId,
-      }
-    }
-
-    if (!pathCoordinates(boundary.segments).every(isFiniteVec3)) {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNonFinite',
-        sourcePathId,
-      }
-    }
-
-    if (!validateBoundaryPathSnapshot(boundary).valid) {
-      return {
-        ok: false,
-        diagram,
-        error: 'invalidBoundary',
-        sourcePathId,
-      }
-    }
-
-    boundaries.push(boundary)
+    boundaries.push(boundaryResult.boundary)
   }
 
   const primitive: RuledSurfacePrimitive = {
@@ -192,7 +183,7 @@ export function createRuledSurfaceFromBoundaryPaths(
 
   const layer = options.layer ?? nextLayer(diagram)
   const sheet = createCurvedSheetStratum({
-    id: safeRuledSurfaceId(diagram, options.id),
+    id: safeBoundarySurfaceId(diagram, options.id),
     name: options.name ?? 'Ruled surface',
     style: options.style ?? defaultSheetStyle,
     primitive,
@@ -209,7 +200,135 @@ export function createRuledSurfaceFromBoundaryPaths(
   }
 }
 
-export function isRuledSurfaceBoundaryPathStratum(
+export function createCoonsPatchFromBoundaryPaths(
+  diagram: Diagram,
+  sourcePathIds: CoonsPatchBoundaryPathIds,
+  options: CreateCoonsPatchFromBoundaryPathsOptions = {},
+): CreateCoonsPatchFromBoundaryPathsResult {
+  if (diagram.ambientDimension !== 3) {
+    return {
+      ok: false,
+      diagram,
+      error: 'unsupportedAmbientDimension',
+    }
+  }
+
+  const rolePathIds = coonsPatchBoundaryRoles.map((role) => ({
+    role,
+    sourcePathId: sourcePathIds[role]?.trim() ?? '',
+  }))
+
+  const missingRole = rolePathIds.find(
+    ({ sourcePathId }) => sourcePathId.length === 0,
+  )
+
+  if (missingRole !== undefined) {
+    return {
+      ok: false,
+      diagram,
+      error: 'wrongBoundaryCount',
+      role: missingRole.role,
+    }
+  }
+
+  if (
+    new Set(rolePathIds.map(({ sourcePathId }) => sourcePathId)).size !==
+    rolePathIds.length
+  ) {
+    return {
+      ok: false,
+      diagram,
+      error: 'duplicateSourcePath',
+    }
+  }
+
+  const sampling = options.sampling ?? defaultCoonsPatchSampling
+
+  if (
+    !isValidBoundarySurfaceSamplingSegmentCount(sampling.uSegments) ||
+    !isValidBoundarySurfaceSamplingSegmentCount(sampling.vSegments)
+  ) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidSampling',
+    }
+  }
+
+  const boundaries: Partial<Record<CoonsPatchBoundaryRole, BoundaryPathSnapshot>> =
+    {}
+
+  for (const { role, sourcePathId } of rolePathIds) {
+    const boundaryResult = loadBoundaryPathSnapshot(diagram, sourcePathId)
+
+    if (!boundaryResult.ok) {
+      return {
+        ok: false,
+        diagram,
+        error: boundaryResult.error,
+        sourcePathId,
+        role,
+      }
+    }
+
+    boundaries[role] = boundaryResult.boundary
+  }
+
+  const bottom = boundaries.bottom
+  const right = boundaries.right
+  const top = boundaries.top
+  const left = boundaries.left
+
+  if (
+    bottom === undefined ||
+    right === undefined ||
+    top === undefined ||
+    left === undefined
+  ) {
+    return {
+      ok: false,
+      diagram,
+      error: 'wrongBoundaryCount',
+    }
+  }
+
+  const primitive: CoonsPatchPrimitive = {
+    kind: 'coonsPatch',
+    bottom,
+    right,
+    top,
+    left,
+    sampling: { ...sampling },
+  }
+
+  if (!validateCurvedSheetPrimitive(primitive).valid) {
+    return {
+      ok: false,
+      diagram,
+      error: 'invalidBoundary',
+    }
+  }
+
+  const layer = options.layer ?? nextLayer(diagram)
+  const sheet = createCurvedSheetStratum({
+    id: safeBoundarySurfaceId(diagram, options.id),
+    name: options.name ?? 'Coons patch',
+    style: options.style ?? defaultSheetStyle,
+    primitive,
+    layer,
+  })
+
+  return {
+    ok: true,
+    diagram: {
+      ...diagram,
+      strata: [...diagram.strata, sheet],
+    },
+    id: sheet.id,
+  }
+}
+
+export function isBoundarySurfaceBoundaryPathStratum(
   stratum: Stratum,
   ambientDimension: AmbientDimension,
 ): stratum is CurveStratum {
@@ -218,6 +337,13 @@ export function isRuledSurfaceBoundaryPathStratum(
     stratum.codim === expectedBoundaryPathCodim(ambientDimension) &&
     boundaryPathSnapshotFromCurveStratum(stratum, ambientDimension) !== null
   )
+}
+
+export function isRuledSurfaceBoundaryPathStratum(
+  stratum: Stratum,
+  ambientDimension: AmbientDimension,
+): stratum is CurveStratum {
+  return isBoundarySurfaceBoundaryPathStratum(stratum, ambientDimension)
 }
 
 export function boundaryPathSnapshotFromCurveStratum(
@@ -266,6 +392,114 @@ export function createRuledSurfaceFromBoundaryPathsErrorMessage(
   }
 }
 
+export function createCoonsPatchFromBoundaryPathsErrorMessage(
+  error: CreateCoonsPatchFromBoundaryPathsError,
+): string {
+  switch (error) {
+    case 'unsupportedAmbientDimension':
+      return 'Coons patches are available only in 3D diagrams.'
+    case 'wrongBoundaryCount':
+      return 'Pick bottom, right, top, and left boundary paths.'
+    case 'duplicateSourcePath':
+      return 'Use four different boundary paths for the Coons patch.'
+    case 'missingSourcePath':
+      return 'A picked Coons patch boundary path is no longer available.'
+    case 'sourceNotBoundaryPath':
+      return 'Picked sources must be paths, polylines, cubic Beziers, or path templates.'
+    case 'sourceWrongCodimension':
+      return 'Picked boundary paths must be codimension 2 in a 3D diagram.'
+    case 'sourceNonFinite':
+      return 'Picked boundary paths must have finite coordinates.'
+    case 'invalidSampling':
+      return `Coons patch u and v sampling must be positive integers at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
+    case 'invalidBoundary':
+      return 'Coons patch corners must match: bottom start = left start, bottom end = right start, top start = left end, and top end = right end.'
+  }
+}
+
+type BoundaryPathLoadError =
+  | 'missingSourcePath'
+  | 'sourceNotBoundaryPath'
+  | 'sourceWrongCodimension'
+  | 'sourceNonFinite'
+  | 'invalidBoundary'
+
+type BoundaryPathLoadResult =
+  | {
+      ok: true
+      boundary: BoundaryPathSnapshot
+    }
+  | {
+      ok: false
+      error: BoundaryPathLoadError
+    }
+
+function loadBoundaryPathSnapshot(
+  diagram: Diagram,
+  sourcePathId: string,
+): BoundaryPathLoadResult {
+  const source = diagram.strata.find((stratum) => stratum.id === sourcePathId)
+
+  if (source === undefined) {
+    return {
+      ok: false,
+      error: 'missingSourcePath',
+    }
+  }
+
+  if (source.geometricKind !== 'curve') {
+    return {
+      ok: false,
+      error: 'sourceNotBoundaryPath',
+    }
+  }
+
+  if (source.codim !== expectedBoundaryPathCodim(diagram.ambientDimension)) {
+    return {
+      ok: false,
+      error: 'sourceWrongCodimension',
+    }
+  }
+
+  if (!isBoundarySurfaceBoundaryPathStratum(source, diagram.ambientDimension)) {
+    return {
+      ok: false,
+      error: 'sourceNotBoundaryPath',
+    }
+  }
+
+  const boundary = boundaryPathSnapshotFromCurveStratum(
+    source,
+    diagram.ambientDimension,
+  )
+
+  if (boundary === null) {
+    return {
+      ok: false,
+      error: 'sourceNotBoundaryPath',
+    }
+  }
+
+  if (!pathCoordinates(boundary.segments).every(isFiniteVec3)) {
+    return {
+      ok: false,
+      error: 'sourceNonFinite',
+    }
+  }
+
+  if (!validateBoundaryPathSnapshot(boundary).valid) {
+    return {
+      ok: false,
+      error: 'invalidBoundary',
+    }
+  }
+
+  return {
+    ok: true,
+    boundary,
+  }
+}
+
 function boundaryPathSegmentsFromCurve(
   curve: CurveStratum,
   ambientDimension: AmbientDimension,
@@ -310,7 +544,7 @@ function expectedBoundaryPathCodim(ambientDimension: AmbientDimension): 1 | 2 {
   return ambientDimension === 2 ? 1 : 2
 }
 
-function safeRuledSurfaceId(
+function safeBoundarySurfaceId(
   diagram: Diagram,
   id: string | undefined,
 ): string {

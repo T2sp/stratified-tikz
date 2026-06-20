@@ -969,10 +969,11 @@ Editor workflow:
   and leave the saved `Diagram` unchanged.
 
 Current limitations: inspector editing does not yet rotate or replace the saved
-surface frame, and there is no user-facing creation workflow for ruled surfaces
-or Coons patches yet. The saved model also does not support symbolic sampled
-surface boundaries, arbitrary symbolic parametric surfaces, boolean operations,
-or mesh sculpting.
+surface frame. Boundary-surface creation for ruled surfaces and Coons patches
+stores copied boundary geometry only; it does not create live links back to
+source paths or repair inconsistent Coons corners. The saved model also does
+not support symbolic sampled surface boundaries, arbitrary symbolic parametric
+surfaces, boolean operations, or mesh sculpting.
 
 ## Closed path boundaries
 

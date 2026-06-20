@@ -50,6 +50,7 @@ import {
   updateCurvedSheetPrimitiveById,
   updateStratumById,
   updateStratumStyleById,
+  type DirectCoordinateInput,
 } from '../../src/ui/diagramUpdates.ts'
 import { gridPreviewSegments } from '../../src/model/grids.ts'
 import {
@@ -64,6 +65,8 @@ import {
   type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
 import {
+  createCoonsPatchFromBoundaryPaths,
+  createCoonsPatchFromBoundaryPathsErrorMessage,
   createRuledSurfaceFromBoundaryPaths,
   createRuledSurfaceFromBoundaryPathsErrorMessage,
 } from '../../src/ui/ruledSurface.ts'
@@ -1527,6 +1530,290 @@ test('ruled surface inline TikZ output has no blank lines', () => {
   assertNoBlankLines(tikz)
 })
 
+test('Coons patch creation copies four compatible boundary paths and preserves style and layer', () => {
+  const diagram = createCoonsPatchSourceDiagram()
+  const sourcesBefore = {
+    bottom: findConcatenatedPath(diagram, 'coons-bottom'),
+    right: findConcatenatedPath(diagram, 'coons-right'),
+    top: findConcatenatedPath(diagram, 'coons-top'),
+    left: findConcatenatedPath(diagram, 'coons-left'),
+  }
+  const style = sheetStyle({
+    fillColor: '#CC8844',
+    fillOpacity: 0.42,
+    strokeColor: '#3366AA',
+    strokeOpacity: 0.72,
+  })
+  const result = createCoonsPatchFromBoundaryPaths(
+    diagram,
+    {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-left',
+    },
+    {
+      id: 'ui-coons-patch',
+      name: 'UI Coons Patch',
+      layer: 7,
+      style,
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'coons-bottom'), sourcesBefore.bottom)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'coons-right'), sourcesBefore.right)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'coons-top'), sourcesBefore.top)
+  assert.deepEqual(findConcatenatedPath(result.diagram, 'coons-left'), sourcesBefore.left)
+
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(sheet.codim, 1)
+  assert.equal(sheet.layer, 7)
+  assert.deepEqual(sheet.style, style)
+  assert.equal(sheet.primitive.kind, 'coonsPatch')
+  assert.deepEqual(sheet.primitive.sampling, { uSegments: 4, vSegments: 3 })
+  assert.notEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
+  assert.notEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
+  assert.notEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
+  assert.notEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
+  assert.deepEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
+  assert.deepEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
+  assert.deepEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
+  assert.deepEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
+
+  const editedSources = updateStratumById(result.diagram, 'coons-bottom', (stratum) =>
+    stratum.geometricKind === 'curve' && stratum.kind === 'concatenatedPath'
+      ? {
+          ...stratum,
+          segments: [
+            {
+              kind: 'line',
+              start: { x: 10, y: 0, z: 0 },
+              end: { x: 12, y: 0, z: 0 },
+            },
+          ],
+        }
+      : stratum,
+  )
+
+  assert.deepEqual(
+    findCurvedSheet(editedSources, result.id).primitive,
+    sheet.primitive,
+  )
+
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.primitiveKind, 'coonsPatch')
+  assert.equal(mesh.uSegments, 4)
+  assert.equal(mesh.vSegments, 3)
+  assert.equal(mesh.faces.length, 12)
+  assert.equal(mesh.boundaryPathData.length, 1)
+  assert.doesNotMatch(
+    [...mesh.faces.map((face) => face.points), ...mesh.boundaryPathData].join('\n'),
+    /NaN|Infinity/,
+  )
+
+  const tikz = generateTikz(result.diagram)
+
+  assert.match(
+    tikz,
+    /Coons patch generated from copied bottom, right, top, and left boundary paths/,
+  )
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=4, v=3; faces=12/)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer0,stratifiedLayer7,main\}/)
+  assert.match(tikz, /\{HTML\}\{CC8844\}/)
+  assert.match(tikz, /\{HTML\}\{3366AA\}/)
+  assert.match(tikz, /fill opacity=0\.42/)
+  assert.match(tikz, /draw opacity=0\.72/)
+  assert.equal((tikz.match(/\\filldraw/g) ?? []).length, 12)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
+})
+
+test('Coons patch creation rejects inconsistent corners safely', () => {
+  const diagram = updateStratumById(
+    createCoonsPatchSourceDiagram(),
+    'coons-top',
+    (stratum) =>
+      stratum.geometricKind === 'curve' && stratum.kind === 'concatenatedPath'
+        ? {
+            ...stratum,
+            segments: [
+              {
+                kind: 'line',
+                start: { x: 0, y: 2, z: 0 },
+                end: { x: 2, y: 1, z: 1 },
+              },
+            ],
+          }
+        : stratum,
+  )
+
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(diagram, {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-left',
+    }),
+    'invalidBoundary',
+  )
+})
+
+test('Coons patch creation rejects invalid boundary selections safely', () => {
+  const diagram = createCoonsPatchSourceDiagram()
+
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(diagram, {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+    }),
+    'wrongBoundaryCount',
+  )
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(diagram, {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-bottom',
+    }),
+    'duplicateSourcePath',
+  )
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(
+      createCoonsPatchSourceDiagramWithPoint(),
+      {
+        bottom: 'coons-bottom',
+        right: 'coons-right',
+        top: 'coons-top',
+        left: 'not-a-coons-boundary',
+      },
+    ),
+    'sourceNotBoundaryPath',
+  )
+  assertCoonsPatchCreationError(
+    createCoonsPatchFromBoundaryPaths(
+      diagram,
+      {
+        bottom: 'coons-bottom',
+        right: 'coons-right',
+        top: 'coons-top',
+        left: 'coons-left',
+      },
+      { sampling: { uSegments: 0, vSegments: 3 } },
+    ),
+    'invalidSampling',
+  )
+})
+
+test('Coons patch sampling edits update SVG mesh and TikZ export', () => {
+  const result = createCoonsPatchFromBoundaryPaths(
+    createCoonsPatchSourceDiagram(),
+    {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-left',
+    },
+    { id: 'editable-coons-patch', sampling: { uSegments: 3, vSegments: 2 } },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected Coons patch creation to succeed.')
+  }
+
+  const edited = updateCurvedSheetPrimitiveById(
+    result.diagram,
+    result.id,
+    (primitive) =>
+      primitive.kind === 'coonsPatch'
+        ? { ...primitive, sampling: { uSegments: 5, vSegments: 4 } }
+        : primitive,
+  )
+  const sheet = findCurvedSheet(edited, result.id)
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+
+  assert.equal(mesh.faces.length, 20)
+  assert.match(
+    generateTikz(edited),
+    /Primitive: coonsPatch; sampling: u=5, v=4; faces=20/,
+  )
+})
+
+test('Coons patch creation is undoable and redoable through diagram history', () => {
+  const initial = createUndoTestEditorState(createCoonsPatchSourceDiagram())
+  const result = createCoonsPatchFromBoundaryPaths(
+    initial.editableDiagram,
+    {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-left',
+    },
+    { id: 'undoable-coons-patch', layer: 4 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected Coons patch creation to succeed.')
+  }
+
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'stratum', id: result.id },
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(
+    undone.editableDiagram.strata.some((stratum) => stratum.id === result.id),
+    false,
+  )
+  assert.equal(
+    redone.editableDiagram.strata.some((stratum) => stratum.id === result.id),
+    true,
+  )
+})
+
+test('Coons patch inline TikZ output has no blank lines', () => {
+  const result = createCoonsPatchFromBoundaryPaths(
+    createCoonsPatchSourceDiagram(),
+    {
+      bottom: 'coons-bottom',
+      right: 'coons-right',
+      top: 'coons-top',
+      left: 'coons-left',
+    },
+    { id: 'inline-coons-patch', sampling: { uSegments: 3, vSegments: 2 } },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected Coons patch creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+
+  assert.match(tikz, /Coons patch generated from copied bottom/)
+  assertNoBlankLines(tikz)
+})
+
 test('direct creation layer helpers reject invalid layer input and keep TikZ UI-state independent', () => {
   assert.equal(parseDirectLayerInput(''), null)
   assert.equal(parseDirectLayerInput('Infinity'), null)
@@ -2522,6 +2809,87 @@ function createRuledSurfaceSourceDiagramWithPoint(): Diagram {
   ).diagram
 }
 
+function createCoonsPatchSourceDiagram(): Diagram {
+  let diagram = addCoonsBoundaryPath(
+    emptyThreeDimensionalDiagram,
+    'coons-bottom',
+    'Coons bottom',
+    { x: 0, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+  )
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'coons-right',
+    'Coons right',
+    { x: 2, y: 0, z: 0 },
+    { x: 2, y: 1, z: 1 },
+  )
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'coons-top',
+    'Coons top',
+    { x: 0, y: 1, z: 0.5 },
+    { x: 2, y: 1, z: 1 },
+  )
+
+  return addCoonsBoundaryPath(
+    diagram,
+    'coons-left',
+    'Coons left',
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0.5 },
+  )
+}
+
+function createCoonsPatchSourceDiagramWithPoint(): Diagram {
+  return addPointStratumWithResult(
+    createCoonsPatchSourceDiagram(),
+    { x: 0, y: 0, z: 0 },
+    { id: 'not-a-coons-boundary' },
+  ).diagram
+}
+
+function addCoonsBoundaryPath(
+  diagram: Diagram,
+  id: string,
+  name: string,
+  start: Vec3,
+  end: Vec3,
+): Diagram {
+  const result = addConcatenatedPathFromDirectInput(
+    diagram,
+    {
+      start: directVec3(start),
+      segments: [
+        {
+          kind: 'line',
+          end: directVec3(end),
+        },
+      ],
+    },
+    {
+      id,
+      name,
+      layer: 0,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(`Expected ${name} source path to be created.`)
+  }
+
+  return result.diagram
+}
+
+function directVec3(point: Vec3): DirectCoordinateInput {
+  return {
+    x: String(point.x),
+    y: String(point.y),
+    z: String(point.z),
+  }
+}
+
 function createUndoTestEditorState(diagram: Diagram): UndoTestEditorState {
   return {
     ...createTestEditorState(diagram),
@@ -2542,6 +2910,20 @@ function assertRuledSurfaceCreationError(
   assert.equal(result.ok, false)
   if (result.ok) {
     throw new Error('Expected ruled surface creation to fail.')
+  }
+
+  assert.equal(result.error, expectedError)
+}
+
+function assertCoonsPatchCreationError(
+  result: ReturnType<typeof createCoonsPatchFromBoundaryPaths>,
+  expectedError: Parameters<
+    typeof createCoonsPatchFromBoundaryPathsErrorMessage
+  >[0],
+): void {
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected Coons patch creation to fail.')
   }
 
   assert.equal(result.error, expectedError)
