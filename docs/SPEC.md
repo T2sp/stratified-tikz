@@ -383,8 +383,10 @@ start = left end, and top end = right end. Inconsistent corners are rejected
 until a future repair workflow exists. The sampler returns the existing finite
 quad mesh representation used by curved sheets: a deterministic flat vertex
 array plus quad index faces and boundary polylines for later rendering,
-depth-sorting, and TikZ export work. User-facing ruled/Coons creation workflows
-are intentionally deferred.
+depth-sorting, and TikZ export work. User-facing creation supports ruled
+surfaces from two boundary paths and Coons patches from explicit bottom, right,
+top, and left boundary roles. Both workflows store copied boundary geometry,
+not live references.
 
 ### Concatenated path editing
 
