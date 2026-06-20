@@ -12,10 +12,13 @@ import {
   pathEndpointEpsilon,
   pathEndpoints,
   pathPointAt,
+  reverseBoundaryPathSnapshot,
 } from '../model/paths.ts'
 import type {
   ArcPathSegment,
   BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CoonsPatchPrimitive,
   CurvedSheetPrimitive,
   HemisphereCurvedSheetPrimitive,
@@ -176,6 +179,17 @@ export function validateBoundaryPathSnapshot(
   return validationResult(errors)
 }
 
+export function validateCoonsBoundarySnapshot(
+  snapshot: unknown,
+  path = 'boundary',
+): SurfaceValidationResult {
+  if (isCoonsConstantPointBoundaryRecord(snapshot)) {
+    return validateCoonsConstantPointBoundarySnapshot(snapshot, path)
+  }
+
+  return validateBoundaryPathSnapshot(snapshot, path)
+}
+
 export function isBoundaryPathClosed(
   snapshot: unknown,
   epsilon = pathEndpointEpsilon,
@@ -220,6 +234,48 @@ export function sampleBoundaryPath(
   return Array.from({ length: segments + 1 }, (_, index) =>
     evaluateBoundaryPathAt(snapshot, index / segments),
   )
+}
+
+export function boundaryStart(boundary: CoonsBoundarySnapshot): Vec3 {
+  return boundaryEndpoint(boundary, 'start')
+}
+
+export function boundaryEnd(boundary: CoonsBoundarySnapshot): Vec3 {
+  return boundaryEndpoint(boundary, 'end')
+}
+
+export function evaluateBoundary(
+  boundary: CoonsBoundarySnapshot,
+  parameter: number,
+): Vec3 {
+  if (isCoonsConstantPointBoundarySnapshot(boundary)) {
+    return cloneVec3(boundary.point)
+  }
+
+  return evaluateBoundaryPathAt(boundary, parameter)
+}
+
+export function sampleBoundary(
+  boundary: CoonsBoundarySnapshot,
+  segments: number,
+): Vec3[] {
+  assertValidSegmentCount(segments, 'segments')
+
+  if (isCoonsConstantPointBoundarySnapshot(boundary)) {
+    return Array.from({ length: segments + 1 }, () => cloneVec3(boundary.point))
+  }
+
+  return sampleBoundaryPath(boundary, segments)
+}
+
+export function reverseBoundary(
+  boundary: CoonsBoundarySnapshot,
+): CoonsBoundarySnapshot {
+  if (isCoonsConstantPointBoundarySnapshot(boundary)) {
+    return cloneCoonsConstantPointBoundarySnapshot(boundary)
+  }
+
+  return reverseBoundaryPathSnapshot(boundary)
 }
 
 export function validateCurvedSheetPrimitive(
@@ -412,10 +468,10 @@ export function sampleCoonsPatch(
   primitive: CoonsPatchPrimitive,
 ): SurfaceSampleMesh {
   assertValidPrimitive(primitive)
-  const bottom = sampleBoundaryPath(primitive.bottom, primitive.sampling.uSegments)
-  const top = sampleBoundaryPath(primitive.top, primitive.sampling.uSegments)
-  const left = sampleBoundaryPath(primitive.left, primitive.sampling.vSegments)
-  const right = sampleBoundaryPath(primitive.right, primitive.sampling.vSegments)
+  const bottom = sampleBoundary(primitive.bottom, primitive.sampling.uSegments)
+  const top = sampleBoundary(primitive.top, primitive.sampling.uSegments)
+  const left = sampleBoundary(primitive.left, primitive.sampling.vSegments)
+  const right = sampleBoundary(primitive.right, primitive.sampling.vSegments)
   const bottomLeft = bottom[0]
   const bottomRight = bottom[bottom.length - 1]
   const topLeft = top[0]
@@ -557,19 +613,19 @@ function validateCoonsPatchPrimitive(
 ): void {
   appendIssues(
     errors,
-    validateBoundaryPathSnapshot(primitive.bottom, `${path}.bottom`),
+    validateCoonsBoundarySnapshot(primitive.bottom, `${path}.bottom`),
   )
   appendIssues(
     errors,
-    validateBoundaryPathSnapshot(primitive.right, `${path}.right`),
+    validateCoonsBoundarySnapshot(primitive.right, `${path}.right`),
   )
   appendIssues(
     errors,
-    validateBoundaryPathSnapshot(primitive.top, `${path}.top`),
+    validateCoonsBoundarySnapshot(primitive.top, `${path}.top`),
   )
   appendIssues(
     errors,
-    validateBoundaryPathSnapshot(primitive.left, `${path}.left`),
+    validateCoonsBoundarySnapshot(primitive.left, `${path}.left`),
   )
   appendIssues(
     errors,
@@ -577,10 +633,10 @@ function validateCoonsPatchPrimitive(
   )
 
   if (
-    isBoundaryPathSnapshot(primitive.bottom) &&
-    isBoundaryPathSnapshot(primitive.right) &&
-    isBoundaryPathSnapshot(primitive.top) &&
-    isBoundaryPathSnapshot(primitive.left)
+    isCoonsBoundarySnapshot(primitive.bottom) &&
+    isCoonsBoundarySnapshot(primitive.right) &&
+    isCoonsBoundarySnapshot(primitive.top) &&
+    isCoonsBoundarySnapshot(primitive.left)
   ) {
     const boundaries = [
       { role: 'bottom', boundary: primitive.bottom },
@@ -622,51 +678,37 @@ function validateRuledSurfaceSampling(
 }
 
 function validateCoonsPatchCorners(
-  bottom: BoundaryPathSnapshot,
-  right: BoundaryPathSnapshot,
-  top: BoundaryPathSnapshot,
-  left: BoundaryPathSnapshot,
+  bottom: CoonsBoundarySnapshot,
+  right: CoonsBoundarySnapshot,
+  top: CoonsBoundarySnapshot,
+  left: CoonsBoundarySnapshot,
   path: string,
   errors: SurfaceValidationIssue[],
 ): void {
-  const bottomEndpoints = pathEndpoints(bottom.segments)
-  const rightEndpoints = pathEndpoints(right.segments)
-  const topEndpoints = pathEndpoints(top.segments)
-  const leftEndpoints = pathEndpoints(left.segments)
-
-  if (
-    bottomEndpoints === null ||
-    rightEndpoints === null ||
-    topEndpoints === null ||
-    leftEndpoints === null
-  ) {
-    return
-  }
-
   validateCornerMatch(
-    bottomEndpoints.start,
-    leftEndpoints.start,
+    boundaryStart(bottom),
+    boundaryStart(left),
     `${path}.bottom`,
     `${path}.left`,
     errors,
   )
   validateCornerMatch(
-    bottomEndpoints.end,
-    rightEndpoints.start,
+    boundaryEnd(bottom),
+    boundaryStart(right),
     `${path}.bottom`,
     `${path}.right`,
     errors,
   )
   validateCornerMatch(
-    topEndpoints.start,
-    leftEndpoints.end,
+    boundaryStart(top),
+    boundaryEnd(left),
     `${path}.top`,
     `${path}.left`,
     errors,
   )
   validateCornerMatch(
-    topEndpoints.end,
-    rightEndpoints.end,
+    boundaryEnd(top),
+    boundaryEnd(right),
     `${path}.top`,
     `${path}.right`,
     errors,
@@ -674,11 +716,15 @@ function validateCoonsPatchCorners(
 }
 
 function validateCoonsPatchOpenBoundary(
-  boundary: BoundaryPathSnapshot,
+  boundary: CoonsBoundarySnapshot,
   role: 'bottom' | 'right' | 'top' | 'left',
   path: string,
   errors: SurfaceValidationIssue[],
 ): boolean {
+  if (isCoonsConstantPointBoundarySnapshot(boundary)) {
+    return true
+  }
+
   if (isBoundaryPathOpen(boundary)) {
     return true
   }
@@ -871,6 +917,39 @@ function validateVec3(
   return xIsFinite && yIsFinite && zIsFinite
 }
 
+function validateCoonsConstantPointBoundarySnapshot(
+  snapshot: Record<string, unknown>,
+  path: string,
+): SurfaceValidationResult {
+  const errors: SurfaceValidationIssue[] = []
+
+  if (
+    snapshot.sourceId !== undefined &&
+    (typeof snapshot.sourceId !== 'string' || snapshot.sourceId.trim().length === 0)
+  ) {
+    pushError(
+      errors,
+      `${path}.sourceId`,
+      'Constant Coons boundary source id must be non-empty.',
+    )
+  }
+
+  if (
+    snapshot.name !== undefined &&
+    (typeof snapshot.name !== 'string' || snapshot.name.trim().length === 0)
+  ) {
+    pushError(
+      errors,
+      `${path}.name`,
+      'Constant Coons boundary name must be non-empty.',
+    )
+  }
+
+  validateVec3(snapshot.point, `${path}.point`, errors)
+
+  return validationResult(errors)
+}
+
 function validateBoundaryPathSegment(
   segment: unknown,
   path: string,
@@ -966,6 +1045,28 @@ function isBoundaryPathSnapshot(value: unknown): value is BoundaryPathSnapshot {
   )
 }
 
+function isCoonsBoundarySnapshot(value: unknown): value is CoonsBoundarySnapshot {
+  return (
+    isBoundaryPathSnapshot(value) || isCoonsConstantPointBoundarySnapshot(value)
+  )
+}
+
+function isCoonsConstantPointBoundarySnapshot(
+  value: unknown,
+): value is CoonsConstantPointBoundarySnapshot {
+  return (
+    isRecord(value) &&
+    value.kind === 'constantPoint' &&
+    isFiniteBoundaryVec3(value.point)
+  )
+}
+
+function isCoonsConstantPointBoundaryRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return isRecord(value) && value.kind === 'constantPoint'
+}
+
 function boundaryPathSnapshotEndpoints(
   snapshot: unknown,
 ): ReturnType<typeof pathEndpoints> {
@@ -1048,6 +1149,51 @@ function assertValidSegmentCount(value: number, path: string): void {
     throw new Error(
       errors.map((issue) => `${issue.path} ${issue.message}`).join('; '),
     )
+  }
+}
+
+function boundaryEndpoint(
+  boundary: CoonsBoundarySnapshot,
+  endpoint: 'start' | 'end',
+): Vec3 {
+  if (isCoonsConstantPointBoundarySnapshot(boundary)) {
+    return cloneVec3(boundary.point)
+  }
+
+  const endpoints = pathEndpoints(boundary.segments)
+
+  if (endpoints === null) {
+    throw new Error('Boundary path endpoint lookup failed.')
+  }
+
+  return cloneVec3(endpoints[endpoint])
+}
+
+function cloneCoonsConstantPointBoundarySnapshot(
+  boundary: CoonsConstantPointBoundarySnapshot,
+): CoonsConstantPointBoundarySnapshot {
+  return {
+    kind: 'constantPoint',
+    ...(boundary.sourceId === undefined ? {} : { sourceId: boundary.sourceId }),
+    ...(boundary.name === undefined ? {} : { name: boundary.name }),
+    point: cloneVec3(boundary.point),
+  }
+}
+
+function cloneVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+    ...(point.symbolic === undefined
+      ? {}
+      : {
+          symbolic: {
+            x: { ...point.symbolic.x },
+            y: { ...point.symbolic.y },
+            z: { ...point.symbolic.z },
+          },
+        }),
   }
 }
 

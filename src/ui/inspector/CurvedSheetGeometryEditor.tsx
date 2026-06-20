@@ -1,5 +1,6 @@
 import type {
-  BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CurvedSheetPrimitive,
   CurvedSheetStratum,
   Diagram,
@@ -323,7 +324,18 @@ function updateSurfaceSamplingPrimitive(
   }
 }
 
-function formatBoundarySummary(boundary: BoundaryPathSnapshot): string {
+function formatBoundarySummary(boundary: CoonsBoundarySnapshot): string {
+  if (isConstantPointBoundary(boundary)) {
+    const prefix =
+      boundary.name !== undefined
+        ? boundary.name
+        : boundary.sourceId !== undefined
+          ? boundary.sourceId
+          : 'copied point'
+
+    return `${prefix}, constant point`
+  }
+
   const prefix =
     boundary.name !== undefined
       ? boundary.name
@@ -332,6 +344,12 @@ function formatBoundarySummary(boundary: BoundaryPathSnapshot): string {
         : 'copied path'
 
   return `${prefix}, ${boundary.segments.length} segment${boundary.segments.length === 1 ? '' : 's'}`
+}
+
+function isConstantPointBoundary(
+  boundary: CoonsBoundarySnapshot,
+): boundary is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in boundary && boundary.kind === 'constantPoint'
 }
 
 function SamplingField({

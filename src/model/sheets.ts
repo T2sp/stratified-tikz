@@ -1,5 +1,7 @@
 import type {
   BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
+  CoonsConstantPointBoundarySnapshot,
   CurvedSheetPrimitive,
   PathSegment,
   PolygonSheetStratum,
@@ -87,10 +89,10 @@ export function cloneCurvedSheetPrimitive(
     case 'coonsPatch':
       return {
         kind: 'coonsPatch',
-        bottom: cloneBoundaryPathSnapshot(primitive.bottom),
-        right: cloneBoundaryPathSnapshot(primitive.right),
-        top: cloneBoundaryPathSnapshot(primitive.top),
-        left: cloneBoundaryPathSnapshot(primitive.left),
+        bottom: cloneCoonsBoundarySnapshot(primitive.bottom),
+        right: cloneCoonsBoundarySnapshot(primitive.right),
+        top: cloneCoonsBoundarySnapshot(primitive.top),
+        left: cloneCoonsBoundarySnapshot(primitive.left),
         sampling: cloneSurfaceSampling(primitive.sampling),
       }
   }
@@ -117,6 +119,27 @@ function cloneBoundaryPathSnapshot(
     ...(snapshot.name === undefined ? {} : { name: snapshot.name }),
     segments: snapshot.segments.map(clonePathSegment),
   }
+}
+
+function cloneCoonsBoundarySnapshot(
+  snapshot: CoonsBoundarySnapshot,
+): CoonsBoundarySnapshot {
+  if (snapshotIsCoonsConstantPointBoundary(snapshot)) {
+    return {
+      kind: 'constantPoint',
+      ...(snapshot.sourceId === undefined ? {} : { sourceId: snapshot.sourceId }),
+      ...(snapshot.name === undefined ? {} : { name: snapshot.name }),
+      point: cloneVec3(snapshot.point),
+    }
+  }
+
+  return cloneBoundaryPathSnapshot(snapshot)
+}
+
+function snapshotIsCoonsConstantPointBoundary(
+  snapshot: CoonsBoundarySnapshot,
+): snapshot is CoonsConstantPointBoundarySnapshot {
+  return 'kind' in snapshot && snapshot.kind === 'constantPoint'
 }
 
 function clonePathSegment(segment: PathSegment): PathSegment {

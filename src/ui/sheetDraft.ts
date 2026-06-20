@@ -40,6 +40,7 @@ export type CoonsPatchBoundaryDraft = {
 
 export type BoundarySurfaceDraftPickError =
   | 'emptyPathId'
+  | 'emptyPointId'
   | 'duplicatePath'
   | 'completeDraft'
 
@@ -163,7 +164,23 @@ export function coonsPatchBoundaryDraftPickedPathIds(
   return coonsPatchBoundaryRoles.flatMap((role) => {
     const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
 
-    return picked === null ? [] : [picked.sourcePathId]
+    return picked === null || picked.kind === 'point' ? [] : [picked.sourcePathId]
+  })
+}
+
+export function coonsPatchBoundaryDraftPickedSourceIds(
+  draft: CoonsPatchBoundaryDraft,
+): string[] {
+  return coonsPatchBoundaryRoles.flatMap((role) => {
+    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
+
+    if (picked === null) {
+      return []
+    }
+
+    return picked.kind === 'point'
+      ? [picked.sourcePointId]
+      : [picked.sourcePathId]
   })
 }
 
@@ -182,7 +199,9 @@ export function coonsPatchBoundaryPathIdsFromDraft(
     const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
 
     if (picked !== null) {
-      sourcePathIds[role] = picked.sourcePathId
+      if (picked.kind !== 'point') {
+        sourcePathIds[role] = picked.sourcePathId
+      }
     }
   })
 
@@ -303,6 +322,43 @@ export function pickCoonsPatchBoundaryDraftPath(
   }
 }
 
+export function pickCoonsPatchBoundaryDraftPoint(
+  draft: CoonsPatchBoundaryDraft,
+  sourcePointId: string,
+): CoonsPatchBoundaryDraftPickResult {
+  const pointId = normalizePickedPathId(sourcePointId)
+
+  if (pointId === null) {
+    return {
+      ok: false,
+      draft,
+      error: 'emptyPointId',
+    }
+  }
+
+  if (coonsPatchBoundaryDraftCanCreate(draft)) {
+    return {
+      ok: false,
+      draft,
+      error: 'completeDraft',
+    }
+  }
+
+  const role = draft.nextRole
+
+  return {
+    ok: true,
+    role,
+    draft: {
+      ...setCoonsPatchBoundaryDraftPickedBoundary(draft, role, {
+        kind: 'point',
+        sourcePointId: pointId,
+      }),
+      nextRole: nextCoonsPatchBoundaryRole(role),
+    },
+  }
+}
+
 export function undoRuledSurfaceBoundaryDraftPick(
   draft: RuledSurfaceBoundaryDraft,
 ): RuledSurfaceBoundaryDraft {
@@ -354,6 +410,10 @@ export function toggleCoonsPatchBoundaryDraftReverse(
     return draft
   }
 
+  if (picked.kind === 'point') {
+    return draft
+  }
+
   return setCoonsPatchBoundaryDraftPickedBoundary(draft, role, {
     sourcePathId: picked.sourcePathId,
     reversed: !picked.reversed,
@@ -381,10 +441,10 @@ export function ruledSurfaceBoundaryDraftStatusMessage(
 export function coonsPatchBoundaryDraftStatusMessage(
   draft: CoonsPatchBoundaryDraft,
 ): string {
-  const pickedCount = coonsPatchBoundaryDraftPickedPathIds(draft).length
+  const pickedCount = coonsPatchBoundaryDraftPickedSourceIds(draft).length
 
   if (pickedCount === 0) {
-    return 'Pick bottom boundary path.'
+    return 'Pick bottom boundary path or point.'
   }
 
   if (coonsPatchBoundaryDraftCanCreate(draft)) {
@@ -400,10 +460,12 @@ export function boundarySurfaceDraftPickErrorMessage(
   switch (error) {
     case 'emptyPathId':
       return 'Clicked path is unavailable.'
+    case 'emptyPointId':
+      return 'Clicked point is unavailable.'
     case 'duplicatePath':
       return 'Boundary path already picked.'
     case 'completeDraft':
-      return 'All boundary paths are already picked. Create or reset before choosing another path.'
+      return 'All Coons boundaries are already picked. Create or reset before choosing another boundary.'
   }
 }
 
@@ -577,11 +639,23 @@ function clearCoonsPatchBoundaryDraftPickedBoundary(
 function normalizePickedCoonsBoundary(
   picked: PickedCoonsBoundary | undefined,
 ): PickedCoonsBoundary | null {
-  const sourcePathId = normalizePickedPathId(picked?.sourcePathId)
+  if (picked === undefined) {
+    return null
+  }
+
+  if (picked.kind === 'point') {
+    const sourcePointId = normalizePickedPathId(picked.sourcePointId)
+
+    return sourcePointId === null
+      ? null
+      : { kind: 'point', sourcePointId }
+  }
+
+  const sourcePathId = normalizePickedPathId(picked.sourcePathId)
 
   return sourcePathId === null
     ? null
-    : { sourcePathId, reversed: picked?.reversed ?? false }
+    : { sourcePathId, reversed: picked.reversed ?? false }
 }
 
 function nextCoonsPatchBoundaryRole(

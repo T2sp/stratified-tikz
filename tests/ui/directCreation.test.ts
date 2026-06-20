@@ -7,6 +7,8 @@ import {
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import type {
+  BoundaryPathSnapshot,
+  CoonsBoundarySnapshot,
   ConcatenatedPathStratum,
   CurvedSheetStratum,
   CurveStratum,
@@ -1581,14 +1583,38 @@ test('Coons patch creation copies four compatible boundary paths and preserves s
   assert.deepEqual(sheet.style, style)
   assert.equal(sheet.primitive.kind, 'coonsPatch')
   assert.deepEqual(sheet.primitive.sampling, { uSegments: 4, vSegments: 3 })
-  assert.notEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
-  assert.notEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
-  assert.notEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
-  assert.notEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
-  assert.deepEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
-  assert.deepEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
-  assert.deepEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
-  assert.deepEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.bottom).segments,
+    sourcesBefore.bottom.segments,
+  )
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.right).segments,
+    sourcesBefore.right.segments,
+  )
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.top).segments,
+    sourcesBefore.top.segments,
+  )
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.left).segments,
+    sourcesBefore.left.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.bottom).segments,
+    sourcesBefore.bottom.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.right).segments,
+    sourcesBefore.right.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.top).segments,
+    sourcesBefore.top.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.left).segments,
+    sourcesBefore.left.segments,
+  )
 
   const editedSources = updateStratumById(result.diagram, 'coons-bottom', (stratum) =>
     stratum.geometricKind === 'curve' && stratum.kind === 'concatenatedPath'
@@ -1679,24 +1705,123 @@ test('Coons patch creation succeeds with explicit reversed cyclic boundaries', (
   const sheet = findCurvedSheet(result.diagram, result.id)
 
   assert.equal(sheet.primitive.kind, 'coonsPatch')
-  assert.deepEqual(sheet.primitive.bottom.segments, sourcesBefore.bottom.segments)
-  assert.deepEqual(sheet.primitive.right.segments, sourcesBefore.right.segments)
-  assert.deepEqual(sheet.primitive.top.segments, [
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.bottom).segments,
+    sourcesBefore.bottom.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.right).segments,
+    sourcesBefore.right.segments,
+  )
+  assert.deepEqual(coonsPathBoundary(sheet.primitive.top).segments, [
     {
       kind: 'line',
       start: { x: 0, y: 1, z: 0.5 },
       end: { x: 2, y: 1, z: 1 },
     },
   ])
-  assert.deepEqual(sheet.primitive.left.segments, [
+  assert.deepEqual(coonsPathBoundary(sheet.primitive.left).segments, [
     {
       kind: 'line',
       start: { x: 0, y: 0, z: 0 },
       end: { x: 0, y: 1, z: 0.5 },
     },
   ])
-  assert.notEqual(sheet.primitive.top.segments, sourcesBefore.top.segments)
-  assert.notEqual(sheet.primitive.left.segments, sourcesBefore.left.segments)
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.top).segments,
+    sourcesBefore.top.segments,
+  )
+  assert.notEqual(
+    coonsPathBoundary(sheet.primitive.left).segments,
+    sourcesBefore.left.segments,
+  )
+})
+
+test('Coons patch creation accepts a point as a constant bottom boundary', () => {
+  const diagram = createCoonsPatchSourceDiagramWithBottomPointBoundary()
+  const pointBefore = findPoint(diagram, 'coons-bottom-point')
+  const sourcesBefore = {
+    right: findConcatenatedPath(diagram, 'coons-point-right'),
+    top: findConcatenatedPath(diagram, 'coons-point-top'),
+    left: findConcatenatedPath(diagram, 'coons-point-left'),
+  }
+
+  const result = createCoonsPatchFromBoundaryPaths(
+    diagram,
+    {
+      bottom: { kind: 'point', sourcePointId: 'coons-bottom-point' },
+      right: 'coons-point-right',
+      top: 'coons-point-top',
+      left: 'coons-point-left',
+    },
+    { id: 'coons-with-bottom-point', sampling: { uSegments: 4, vSegments: 3 } },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  assert.deepEqual(findPoint(result.diagram, 'coons-bottom-point'), pointBefore)
+  assert.deepEqual(
+    findConcatenatedPath(result.diagram, 'coons-point-right'),
+    sourcesBefore.right,
+  )
+  assert.deepEqual(
+    findConcatenatedPath(result.diagram, 'coons-point-top'),
+    sourcesBefore.top,
+  )
+  assert.deepEqual(
+    findConcatenatedPath(result.diagram, 'coons-point-left'),
+    sourcesBefore.left,
+  )
+
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(sheet.primitive.kind, 'coonsPatch')
+  assert.equal(
+    'kind' in sheet.primitive.bottom &&
+      sheet.primitive.bottom.kind === 'constantPoint',
+    true,
+  )
+  if (
+    !('kind' in sheet.primitive.bottom) ||
+    sheet.primitive.bottom.kind !== 'constantPoint'
+  ) {
+    throw new Error('Expected bottom boundary to be a constant point.')
+  }
+  assert.equal(sheet.primitive.bottom.sourceId, 'coons-bottom-point')
+  assert.deepEqual(sheet.primitive.bottom.point, pointBefore.position)
+  assert.notEqual(sheet.primitive.bottom.point, pointBefore.position)
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.right).segments,
+    sourcesBefore.right.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.top).segments,
+    sourcesBefore.top.segments,
+  )
+  assert.deepEqual(
+    coonsPathBoundary(sheet.primitive.left).segments,
+    sourcesBefore.left.segments,
+  )
+
+  const mesh = curvedSheetToSvgMesh(sheet, createInitialCamera3D(), 240)
+  const tikz = generateTikz(result.diagram)
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(mesh.faces.length, 12)
+  assert.doesNotMatch(
+    [...mesh.faces.map((face) => face.points), ...mesh.boundaryPathData].join('\n'),
+    /NaN|Infinity/,
+  )
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=4, v=3; faces=12/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
 })
 
 test('Coons patch creation rejects cyclic boundaries until user reverses top and left', () => {
@@ -3008,6 +3133,35 @@ function createCoonsPatchSourceDiagramWithPoint(): Diagram {
   ).diagram
 }
 
+function createCoonsPatchSourceDiagramWithBottomPointBoundary(): Diagram {
+  let diagram = addPointStratumWithResult(
+    emptyThreeDimensionalDiagram,
+    { x: 0, y: 0, z: 0 },
+    { id: 'coons-bottom-point', name: 'Coons bottom point' },
+  ).diagram
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'coons-point-right',
+    'Coons point right',
+    { x: 0, y: 0, z: 0 },
+    { x: 2, y: 1, z: 1 },
+  )
+  diagram = addCoonsBoundaryPath(
+    diagram,
+    'coons-point-top',
+    'Coons point top',
+    { x: 0, y: 1, z: 0 },
+    { x: 2, y: 1, z: 1 },
+  )
+  return addCoonsBoundaryPath(
+    diagram,
+    'coons-point-left',
+    'Coons point left',
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  )
+}
+
 function createCoonsPatchSourceDiagramWithClosedBoundary(
   role: CoonsPatchBoundaryRole,
 ): Diagram {
@@ -3207,6 +3361,16 @@ function findCurvedSheet(diagram: Diagram, id: string): CurvedSheetStratum {
   }
 
   return stratum
+}
+
+function coonsPathBoundary(
+  boundary: CoonsBoundarySnapshot,
+): BoundaryPathSnapshot {
+  if ('kind' in boundary && boundary.kind === 'constantPoint') {
+    throw new Error('Expected a Coons path boundary.')
+  }
+
+  return boundary
 }
 
 function findPoint(diagram: Diagram, id: string): PointStratum {
