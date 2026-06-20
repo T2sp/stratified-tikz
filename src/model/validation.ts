@@ -31,6 +31,7 @@ import {
 } from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
 import { tikzExportModes } from './types.ts'
+import { validateSymbolicVariables } from './variables.ts'
 import {
   arcSegmentExpectedEnd,
   arcSegmentExpectedStart,
@@ -116,6 +117,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     'importedTikzStyleReferences',
     errors,
   )
+  errors.push(...validateSymbolicVariables(diagram.variables, 'variables'))
   validateUniqueIds(diagram, errors)
 
   diagram.strata.forEach((stratum, index) => {
@@ -1894,6 +1896,10 @@ function validateUniqueIds(
 
   diagram.labels.forEach((label, index) => {
     addUniqueId(label.id, `labels[${index}].id`, seenIds, errors)
+  })
+
+  diagram.variables?.forEach((variable, index) => {
+    addUniqueId(variable.id, `variables[${index}].id`, seenIds, errors)
   })
 }
 

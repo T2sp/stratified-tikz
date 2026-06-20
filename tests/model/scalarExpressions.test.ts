@@ -21,10 +21,33 @@ const reviewRequiredDangerousTexNames = [
   'shipout',
   'special',
   'immediate',
+  'input',
   'openin',
   'closein',
+  'openout',
   'closeout',
+  'write',
   'write18',
+  'read',
+  'catcode',
+] as const
+
+const reviewRequiredTikzReservedNames = [
+  'draw',
+  'fill',
+  'filldraw',
+  'node',
+  'coordinate',
+  'path',
+  'clip',
+  'foreach',
+  'begin',
+  'end',
+  'pgfmathsetmacro',
+  'pgfmathparse',
+  'pgfmathresult',
+  'tikzset',
+  'tikzpicture',
 ] as const
 
 const safeScalarVariableNames = [
@@ -121,8 +144,14 @@ test('unknown function is rejected', () => {
 })
 
 test('dangerous TeX command names are rejected even without a backslash', () => {
-  for (const name of ['input', ...reviewRequiredDangerousTexNames]) {
+  for (const name of reviewRequiredDangerousTexNames) {
     expectParseError(`${name}(1)`, /dangerous TeX command/)
+  }
+})
+
+test('TikZ and PGF command names are rejected even without a backslash', () => {
+  for (const name of reviewRequiredTikzReservedNames) {
+    expectParseError(`${name}(1)`, /TeX\/TikZ\/PGF command/)
   }
 })
 
@@ -152,7 +181,7 @@ test('non-finite evaluation is rejected', () => {
   ]))
 })
 
-test('variable names reject reserved functions, constants, and dangerous commands', () => {
+test('variable names reject reserved functions, constants, and TeX command names', () => {
   for (const name of safeScalarVariableNames) {
     assert.equal(isScalarExpressionVariableName(name), true)
     parseOk(name, [name])
@@ -163,6 +192,10 @@ test('variable names reject reserved functions, constants, and dangerous command
   assert.equal(isScalarExpressionVariableName('input'), false)
 
   for (const name of reviewRequiredDangerousTexNames) {
+    assert.equal(isScalarExpressionVariableName(name), false)
+  }
+
+  for (const name of reviewRequiredTikzReservedNames) {
     assert.equal(isScalarExpressionVariableName(name), false)
   }
 

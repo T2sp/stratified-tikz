@@ -73,6 +73,42 @@ The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.
 Standalone is used when no saved export mode is present.
 
+## Variables
+
+Diagram variables export as `\pgfmathsetmacro` definitions. For example:
+
+```tex
+\pgfmathsetmacro{\R}{2}
+\pgfmathsetmacro{\q}{30}
+```
+
+For dependent variables, expressions are formatted with the explicit macro map:
+
+```tex
+\pgfmathsetmacro{\R}{2}
+\pgfmathsetmacro{\r}{\R / 2}
+```
+
+The MVP accepts variable and macro names made only of letters (`[A-Za-z]+`).
+This keeps generated TeX control sequences simple and means names such as `R1`
+are rejected until a broader macro policy is introduced. Variable expressions
+use StratifiedTikZ's scalar-expression parser, not raw TeX.
+
+In standalone mode, variable definitions are emitted in the setup area before
+`\begin{tikzpicture}`. In inline math mode, they are emitted near the top of the
+picture after local setup and before coordinates/drawing commands:
+
+```tex
+\begin{tikzpicture}[baseline={([yshift=-.5ex]current bounding box.center)}, line cap=round, line join=round]
+    %----------------------------------------
+    % Variables
+    %----------------------------------------
+    \pgfmathsetmacro{\R}{2}
+\end{tikzpicture}
+```
+
+Inline math output still contains no blank physical lines.
+
 The editor treats the selected export mode as export UI state. When JSON is
 downloaded from the UI, the preference is persisted as `diagram.view.exportMode`
 alongside other view/export preferences. Old saved diagrams without that field

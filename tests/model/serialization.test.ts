@@ -11,6 +11,7 @@ import {
 } from '../../src/model/constructors.ts'
 import {
   applyUserStylePresetToStratum,
+  addSymbolicVariableToDiagram,
   createUserStylePresetFromStyle,
   parseSavedDiagramJson,
   savedDiagramFormat,
@@ -101,6 +102,99 @@ test('parseSavedDiagramJson loads saved TikZ export mode metadata', () => {
   }
 
   assert.equal(result.diagram.view?.exportMode, 'inlineMath')
+})
+
+test('variables save and load round-trip', () => {
+  const withR = addSymbolicVariableToDiagram(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    {
+      id: 'var-R',
+      name: 'R',
+      expression: '2',
+    },
+  )
+
+  assert.equal(withR.ok, true)
+  if (!withR.ok) {
+    throw new Error(withR.error)
+  }
+
+  const withSmallR = addSymbolicVariableToDiagram(withR.diagram, {
+    id: 'var-r',
+    name: 'r',
+    expression: 'R/2',
+  })
+
+  assert.equal(withSmallR.ok, true)
+  if (!withSmallR.ok) {
+    throw new Error(withSmallR.error)
+  }
+
+  const result = parseSavedDiagramJson(serializeDiagram(withSmallR.diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.variables, withSmallR.diagram.variables)
+})
+
+test('old diagrams without variables still load', () => {
+  const saved = JSON.parse(serializeDiagram(twoDimensionalExample)) as {
+    diagram: {
+      variables?: unknown
+    }
+  }
+  delete saved.diagram.variables
+
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.variables, undefined)
+})
+
+test('parseSavedDiagramJson rejects a saved variable with reserved implicit macro name', () => {
+  const result = parseSavedDiagramJson(
+    savedDiagramTextWithVariables([
+      {
+        id: 'var-draw',
+        name: 'draw',
+        expression: '2',
+        previewValue: 2,
+      },
+    ]),
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected reserved implicit variable macro name to fail.')
+  }
+  assert.match(result.error, /variables\[0\]\.name .*reserved/)
+})
+
+test('parseSavedDiagramJson rejects a saved variable with reserved explicit macro name', () => {
+  const result = parseSavedDiagramJson(
+    savedDiagramTextWithVariables([
+      {
+        id: 'var-radius',
+        name: 'radius',
+        macroName: 'draw',
+        expression: '2',
+        previewValue: 2,
+      },
+    ]),
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected reserved explicit variable macro name to fail.')
+  }
+  assert.match(result.error, /variables\[0\]\.macroName .*reserved/)
 })
 
 test('serializeDiagram omits deprecated 3D projectionBasis metadata', () => {
@@ -516,6 +610,19 @@ test('parseSavedDiagramJson rejects unsupported perspective camera metadata', ()
   assert.deepEqual(result.diagram.view?.camera3d, createInitialCamera3D())
   assert.match(result.warnings.join(' '), /perspective 3D camera metadata is unsupported/)
 })
+
+function savedDiagramTextWithVariables(variables: unknown[]): string {
+  const saved = JSON.parse(
+    serializeDiagram(createEmptyDiagram({ ambientDimension: 2 })),
+  ) as {
+    diagram: {
+      variables?: unknown[]
+    }
+  }
+  saved.diagram.variables = variables
+
+  return JSON.stringify(saved)
+}
 
 test('parseSavedDiagramJson rejects malformed JSON', () => {
   const result = parseSavedDiagramJson('{not json')

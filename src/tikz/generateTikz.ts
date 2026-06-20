@@ -24,6 +24,7 @@ import type {
   PathSegment,
   PathTemplate,
   StylePresetKind,
+  SymbolicVariable,
   TikzExportMode,
   TikzStyleTarget,
   UserStylePreset,
@@ -54,6 +55,12 @@ import {
   pointFromWorkPlaneLocalCoordinate,
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
+import { parseScalarExpression } from '../model/scalarExpressions.ts'
+import {
+  isSymbolicVariableMacroName,
+  resolveSymbolicVariables,
+} from '../model/variables.ts'
+import { formatScalarExpressionForTikz } from './expressionFormatter.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
   kind: 'labelStyle',
@@ -73,6 +80,10 @@ type ColorDefinition = {
 type CoordinateDefinition = {
   name: string
   position: Vec3
+}
+
+type VariableExportContext = {
+  definitions: string[]
 }
 
 type LayeredTikzCommand = {
@@ -130,6 +141,7 @@ type GenerateContext = {
   camera3d?: OrthographicCamera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
+  variables: VariableExportContext
   userStylePresets: Map<string, UserStylePreset>
   localStyles: LocalStyleRegistry
   externalTikzStyleSources: Map<string, ExternalTikzStyleSource>
@@ -167,6 +179,7 @@ export function generateTikz2D(
   const context = createContext(
     '2d',
     options,
+    diagram.variables,
     diagram.userStylePresets,
     diagram.externalTikzStyleSources,
     diagram.importedTikzStyleReferences,
@@ -240,6 +253,7 @@ export function generateTikz3D(
   const context = createContext(
     '3d',
     options,
+    diagram.variables,
     diagram.userStylePresets,
     diagram.externalTikzStyleSources,
     diagram.importedTikzStyleReferences,
@@ -353,6 +367,7 @@ export function layerToTikzLayerName(layer: number): string {
 function createContext(
   mode: TikzMode,
   options: GenerateTikzOptions,
+  variables: readonly SymbolicVariable[] | undefined,
   userStylePresets: readonly UserStylePreset[] | undefined,
   externalTikzStyleSources: readonly ExternalTikzStyleSource[] | undefined,
   importedTikzStyleReferences: readonly ImportedTikzStyleReference[] | undefined,
@@ -363,6 +378,7 @@ function createContext(
     ...(mode === '3d' && camera3d !== undefined ? { camera3d } : {}),
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
+    variables: createVariableExportContext(variables),
     userStylePresets: new Map(
       (userStylePresets ?? []).map((preset) => [preset.id, preset]),
     ),
@@ -445,6 +461,7 @@ function assembleStandaloneTikz({
       ...emitRequiredLibraryComment(context),
       ...emitExternalTikzStyleLoadComment(context),
       ...emitColorDefinitions(context, false),
+      ...emitStandaloneVariableDefinitions(context),
       ...emitTikzLayerDeclarations(
         layers,
         context.includeCoordinateAxes,
@@ -490,6 +507,7 @@ function assembleInlineMathTikz({
           ],
           context.exportMode,
         ),
+        ...emitInlineVariableSection(context),
         ...emitBodySections(context, bodySections),
       ],
     ),
@@ -558,6 +576,30 @@ function emitLocalStyleTikzset(context: GenerateContext): string[] {
     ...formatTikzOptions(definitions),
     '}',
   ])
+}
+
+function emitStandaloneVariableDefinitions(context: GenerateContext): string[] {
+  if (context.variables.definitions.length === 0) {
+    return []
+  }
+
+  return [
+    '% Variables',
+    ...context.variables.definitions,
+    '',
+  ]
+}
+
+function emitInlineVariableSection(context: GenerateContext): string[] {
+  if (context.variables.definitions.length === 0) {
+    return []
+  }
+
+  return section(
+    'Variables',
+    context.variables.definitions,
+    context.exportMode,
+  )
 }
 
 function emitBodySections(
@@ -651,6 +693,75 @@ function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
 
 function commentLineText(value: string): string {
   return normalizeSingleLineCommentText(value, 'external TikZ style source')
+}
+
+function createVariableExportContext(
+  variables: readonly SymbolicVariable[] | undefined,
+): VariableExportContext {
+  const resolved = resolveSymbolicVariables(variables ?? [])
+
+  if (!resolved.ok) {
+    return {
+      definitions: resolved.errors.map(
+        (issue) =>
+          `% Variable omitted: ${commentLineText(`${issue.path} ${issue.message}`)}`,
+      ),
+    }
+  }
+
+  if (resolved.orderedVariables.length === 0) {
+    return {
+      definitions: [],
+    }
+  }
+
+  const variableNames = resolved.variables.map((variable) => variable.name)
+  const variableMacros = new Map(
+    resolved.variables.map((variable) => [
+      variable.name,
+      `\\${variable.macroName}`,
+    ]),
+  )
+  const definitions = resolved.orderedVariables.map((variable) =>
+    emitVariableDefinition(variable, variableNames, variableMacros),
+  )
+
+  return {
+    definitions,
+  }
+}
+
+function emitVariableDefinition(
+  variable: SymbolicVariable,
+  variableNames: readonly string[],
+  variableMacros: ReadonlyMap<string, string>,
+): string {
+  if (!isSymbolicVariableMacroName(variable.macroName)) {
+    const error = commentLineText(
+      'Variable macro name is not safe for TikZ export.',
+    )
+
+    return `% Variable "${commentLineText(variable.name)}" omitted: ${error}`
+  }
+
+  const parsed = parseScalarExpression(variable.expression, {
+    variables: variableNames,
+  })
+
+  if (!parsed.ok) {
+    return `% Variable "${commentLineText(variable.name)}" omitted: ${commentLineText(parsed.error)}`
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    variableMacros,
+  )
+
+  if (!formatted.ok) {
+    return `% Variable "${commentLineText(variable.name)}" omitted: ${commentLineText(formatted.error)}`
+  }
+
+  return `\\pgfmathsetmacro{\\${variable.macroName}}{${formatted.expression}}`
 }
 
 function emitTikzLayerDeclarations(

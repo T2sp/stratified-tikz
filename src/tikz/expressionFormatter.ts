@@ -4,8 +4,8 @@ import type {
   ScalarExpressionBinaryOperator,
 } from '../model/scalarExpressions.ts'
 import {
-  isDangerousTexControlSequenceName,
   isScalarExpressionVariableName,
+  isSafeTexMacroName,
 } from '../model/scalarExpressions.ts'
 
 export type TikzExpressionFormatResult =
@@ -245,15 +245,7 @@ function binaryOperatorPrecedence(
 }
 
 export function isSafeTikzMacroName(macro: string): boolean {
-  if (isDangerousTexControlSequenceName(macro)) {
-    return false
-  }
-
-  if (!/^\\?[A-Za-z]+$/.test(macro)) {
-    return false
-  }
-
-  return true
+  return isSafeTexMacroName(macro)
 }
 
 function isSafeTikzMacroMapping(macro: string): boolean {
