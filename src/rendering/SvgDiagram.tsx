@@ -83,6 +83,11 @@ import {
   shouldRenderTextLabelInSvgPreview,
 } from './svgPreviewPolicy.ts'
 
+export type BoundaryPathHighlight = {
+  id: string
+  label: string
+}
+
 export type SvgDiagramProps = {
   diagram: Diagram
   width?: number
@@ -97,9 +102,11 @@ export type SvgDiagramProps = {
   sheetDraft?: Vec3[]
   workPlanePreview?: WorkPlanePreview
   coordinateSourceHighlights?: CoordinateSourceHighlight[]
+  boundaryPathHighlights?: BoundaryPathHighlight[]
   layerFilter?: LayerFilter
   showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
+  onCurveStratumClick?: (curveId: string) => void
   onPointStratumClick?: (pointId: string) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -166,9 +173,11 @@ export function SvgDiagram({
   sheetDraft,
   workPlanePreview,
   coordinateSourceHighlights,
+  boundaryPathHighlights,
   layerFilter = allLayersFilter,
   showGeometryHandles = false,
   onSelectionChange,
+  onCurveStratumClick,
   onPointStratumClick,
   onCanvasClick,
   onGeometryHandleDrag,
@@ -206,7 +215,9 @@ export function SvgDiagram({
           height,
           selectedElement,
           layerFilter,
+          boundaryPathHighlights,
           onSelectionChange,
+          onCurveStratumClick,
           onPointStratumClick,
         ),
       ),
@@ -571,7 +582,9 @@ function renderStratum(
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
 ): RenderItem {
   switch (stratum.geometricKind) {
@@ -603,7 +616,9 @@ function renderStratum(
         viewportHeight,
         selectedElement,
         layerFilter,
+        boundaryPathHighlights,
         onSelectionChange,
+        onCurveStratumClick,
       )
     case 'point':
       return renderPoint(
@@ -930,7 +945,9 @@ function renderCurve(
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
 ): RenderItem {
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
   const pathRuns = curveToSvgPathRuns(curve, camera, viewportHeight)
@@ -941,6 +958,9 @@ function renderCurve(
     curve.layer,
   )
   const isSelected = isSelectable && isSelectedStratum(selectedElement, curve.id)
+  const boundaryHighlight = boundaryPathHighlights?.find(
+    (highlight) => highlight.id === curve.id,
+  )
 
   return {
     id: curve.id,
@@ -952,9 +972,28 @@ function renderCurve(
         opacity={previewElementOpacity(isIncludedByFilter)}
         pointerEvents={isSelectable ? undefined : 'none'}
         onClick={(event) =>
-          selectElement(event, { kind: 'stratum', id: curve.id }, onSelectionChange)
+          selectCurveElement(
+            event,
+            curve.id,
+            onSelectionChange,
+            onCurveStratumClick,
+          )
         }
       >
+        {boundaryHighlight !== undefined && (
+          <path
+            d={pathData}
+            fill="none"
+            stroke="#0F766E"
+            strokeOpacity={0.8}
+            strokeWidth={curve.style.lineWidth + 7}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            data-boundary-highlight-label={boundaryHighlight.label}
+          />
+        )}
         {isSelected && (
           <path
             d={pathData}
@@ -2088,6 +2127,21 @@ function selectElement(
 
   event.stopPropagation()
   onSelectionChange(selection)
+}
+
+function selectCurveElement(
+  event: MouseEvent<SVGGElement>,
+  curveId: string,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
+): void {
+  if (onCurveStratumClick !== undefined) {
+    event.stopPropagation()
+    onCurveStratumClick(curveId)
+    return
+  }
+
+  selectElement(event, { kind: 'stratum', id: curveId }, onSelectionChange)
 }
 
 function selectPointElement(
