@@ -11,6 +11,59 @@ import {
 } from '../../src/model/index.ts'
 import type { Diagram, SymbolicVariable } from '../../src/model/types.ts'
 
+const reviewRequiredReservedVariableMacroNames = [
+  'draw',
+  'fill',
+  'filldraw',
+  'node',
+  'coordinate',
+  'path',
+  'clip',
+  'foreach',
+  'pgfmathsetmacro',
+  'pgfmathparse',
+  'pgfmathresult',
+  'tikzset',
+  'tikzpicture',
+  'begin',
+  'end',
+] as const
+
+const reviewRequiredDangerousTexNames = [
+  'def',
+  'let',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+  'include',
+  'includeonly',
+  'input',
+  'usepackage',
+  'shipout',
+  'special',
+  'immediate',
+  'openin',
+  'closein',
+  'openout',
+  'closeout',
+  'write',
+  'write18',
+  'read',
+  'catcode',
+] as const
+
+const reviewRequiredValidVariableNames = [
+  'r',
+  'theta',
+  'scale',
+  'height',
+  'radius',
+  'alpha',
+  'beta',
+  'myVar',
+  'xOne',
+] as const
+
 test('variables can be added to a diagram with evaluated preview values', () => {
   const withR = expectVariableDiagramOk(
     addSymbolicVariableToDiagram(createEmptyDiagram({ ambientDimension: 2 }), {
@@ -79,6 +132,64 @@ test('invalid variable names are rejected', () => {
     throw new Error('Expected invalid name to fail.')
   }
   assert.match(result.error, /letters only/)
+})
+
+test('reserved TikZ and PGF command names are rejected as implicit macros', () => {
+  for (const name of reviewRequiredReservedVariableMacroNames) {
+    const result = setVariables([variable(`var-${name}`, name, '2')])
+
+    assert.equal(result.ok, false, name)
+    if (result.ok) {
+      throw new Error(`Expected reserved variable name ${name} to fail.`)
+    }
+    assert.match(result.error, /reserved/, name)
+  }
+})
+
+test('dangerous TeX command names remain rejected as implicit macros', () => {
+  for (const name of reviewRequiredDangerousTexNames) {
+    const result = setVariables([variable(`var-${name}`, name, '2')])
+
+    assert.equal(result.ok, false, name)
+    if (result.ok) {
+      throw new Error(`Expected dangerous variable name ${name} to fail.`)
+    }
+    assert.match(result.error, /reserved/, name)
+  }
+})
+
+test('reserved TikZ macro names are rejected when explicit', () => {
+  for (const macroName of ['draw', 'node', 'pgfmathsetmacro'] as const) {
+    const result = setVariables([
+      {
+        ...variable(`var-radius-${macroName}`, `radius${macroName}`, '2'),
+        macroName,
+      },
+    ])
+
+    assert.equal(result.ok, false, macroName)
+    if (result.ok) {
+      throw new Error(`Expected reserved macro name ${macroName} to fail.`)
+    }
+    assert.match(result.error, /Variable macro names.*reserved/, macroName)
+  }
+})
+
+test('ordinary variable names remain valid', () => {
+  const result = setVariables(
+    reviewRequiredValidVariableNames.map((name) =>
+      variable(`var-${name}`, name, '2'),
+    ),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(
+    result.variables.map((item) => item.name),
+    [...reviewRequiredValidVariableNames],
+  )
 })
 
 test('invalid variable expressions are rejected', () => {

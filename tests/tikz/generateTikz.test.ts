@@ -784,6 +784,63 @@ test('standalone output emits pgfmathsetmacro variables before tikzpicture', () 
   assert.match(tikz, /\\pgfmathsetmacro\{\\q\}\{30\}/)
 })
 
+test('valid variable names still export as pgfmathsetmacro definitions', () => {
+  const tikz = generateTikz({
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-radius',
+        name: 'radius',
+        macroName: 'radius',
+        expression: '2',
+        previewValue: 2,
+      },
+    ],
+  })
+
+  assert.match(tikz, /\\pgfmathsetmacro\{\\radius\}\{2\}/)
+})
+
+test('TikZ export does not emit reserved variable macro names', () => {
+  const unsafeImplicit = generateTikz({
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-draw',
+        name: 'draw',
+        macroName: 'draw',
+        expression: '2',
+        previewValue: 2,
+      },
+      {
+        id: 'var-node',
+        name: 'node',
+        macroName: 'node',
+        expression: '3',
+        previewValue: 3,
+      },
+    ],
+  })
+  const unsafeExplicit = generateTikz({
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-radius',
+        name: 'radius',
+        macroName: 'draw',
+        expression: '2',
+        previewValue: 2,
+      },
+    ],
+  })
+
+  assert.doesNotMatch(unsafeImplicit, /\\pgfmathsetmacro\{\\draw\}/)
+  assert.doesNotMatch(unsafeImplicit, /\\pgfmathsetmacro\{\\node\}/)
+  assert.doesNotMatch(unsafeExplicit, /\\pgfmathsetmacro\{\\draw\}/)
+  assert.match(unsafeImplicit, /Variable omitted/)
+  assert.match(unsafeExplicit, /Variable omitted/)
+})
+
 test('dependent variables export in dependency order', () => {
   const tikz = generateTikz(createDependentVariableDiagram())
   const rIndex = tikz.indexOf('\\pgfmathsetmacro{\\r}{\\R / 2}')

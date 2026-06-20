@@ -18,14 +18,37 @@ const reviewRequiredDangerousTexNames = [
   'providecommand',
   'include',
   'includeonly',
+  'input',
   'usepackage',
   'shipout',
   'special',
   'immediate',
   'openin',
   'closein',
+  'openout',
   'closeout',
+  'write',
   'write18',
+  'read',
+  'catcode',
+] as const
+
+const reviewRequiredTikzReservedMacroNames = [
+  'draw',
+  'fill',
+  'filldraw',
+  'node',
+  'coordinate',
+  'path',
+  'clip',
+  'foreach',
+  'begin',
+  'end',
+  'pgfmathsetmacro',
+  'pgfmathparse',
+  'pgfmathresult',
+  'tikzset',
+  'tikzpicture',
 ] as const
 
 const safeTikzMacroNames = [
@@ -113,6 +136,13 @@ test('TikZ macro validator rejects dangerous control sequence names', () => {
 
   assert.equal(isSafeTikzMacroName('\\input'), false)
   assert.equal(isSafeTikzMacroName('\\RequirePackage'), false)
+})
+
+test('TikZ macro validator rejects TikZ and PGF command names', () => {
+  for (const name of reviewRequiredTikzReservedMacroNames) {
+    assert.equal(isSafeTikzMacroName(name), false)
+    assert.equal(isSafeTikzMacroName(`\\${name}`), false)
+  }
 })
 
 test('TikZ macro validator keeps safe control sequence names valid', () => {

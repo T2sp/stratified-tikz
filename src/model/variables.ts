@@ -1,6 +1,7 @@
 import {
   evaluateScalarExpression,
   isScalarExpressionVariableName,
+  isSafeTexMacroName,
   parseScalarExpression,
   scalarExpressionVariables,
   type ParsedScalarExpression,
@@ -89,7 +90,8 @@ export function isSymbolicVariableMacroName(macroName: string): boolean {
   return (
     !macroName.startsWith('\\') &&
     variableNamePattern.test(macroName) &&
-    isScalarExpressionVariableName(macroName)
+    isScalarExpressionVariableName(macroName) &&
+    isSafeTexMacroName(macroName)
   )
 }
 
@@ -418,7 +420,7 @@ function readVariableCandidate(
     pushError(
       errors,
       `${path}.macroName`,
-      'Variable macro names must contain letters only, without a leading backslash.',
+      'Variable macro names must contain letters only, without a leading backslash, and must not be reserved.',
     )
   }
 

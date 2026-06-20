@@ -56,7 +56,10 @@ import {
   workPlaneLocalCoordinateFromPoint,
 } from '../geometry/bezierControls.ts'
 import { parseScalarExpression } from '../model/scalarExpressions.ts'
-import { resolveSymbolicVariables } from '../model/variables.ts'
+import {
+  isSymbolicVariableMacroName,
+  resolveSymbolicVariables,
+} from '../model/variables.ts'
 import { formatScalarExpressionForTikz } from './expressionFormatter.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
@@ -733,6 +736,14 @@ function emitVariableDefinition(
   variableNames: readonly string[],
   variableMacros: ReadonlyMap<string, string>,
 ): string {
+  if (!isSymbolicVariableMacroName(variable.macroName)) {
+    const error = commentLineText(
+      'Variable macro name is not safe for TikZ export.',
+    )
+
+    return `% Variable "${commentLineText(variable.name)}" omitted: ${error}`
+  }
+
   const parsed = parseScalarExpression(variable.expression, {
     variables: variableNames,
   })

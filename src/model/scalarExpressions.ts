@@ -166,8 +166,40 @@ export const DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES = [
   'pdfimageresolution',
 ] as const
 
+export const TIKZ_PGF_LATEX_RESERVED_CONTROL_SEQUENCE_NAMES = [
+  'draw',
+  'fill',
+  'filldraw',
+  'node',
+  'coordinate',
+  'path',
+  'clip',
+  'foreach',
+  'begin',
+  'end',
+  'pgfmathsetmacro',
+  'pgfmathparse',
+  'pgfmathresult',
+  'tikzset',
+  'tikzpicture',
+  'definecolor',
+  'pgfdeclarelayer',
+  'pgfsetlayers',
+  'pgfonlayer',
+  'scope',
+  'tdplotsetmaincoords',
+] as const
+
+export const RESERVED_TEX_CONTROL_SEQUENCE_NAMES = [
+  ...DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES,
+  ...TIKZ_PGF_LATEX_RESERVED_CONTROL_SEQUENCE_NAMES,
+] as const
+
 const dangerousTexControlSequenceNameSet: ReadonlySet<string> = new Set(
   DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES,
+)
+const reservedTexControlSequenceNameSet: ReadonlySet<string> = new Set(
+  RESERVED_TEX_CONTROL_SEQUENCE_NAMES,
 )
 
 type ScalarExpressionToken =
@@ -210,6 +242,16 @@ export function isDangerousTexControlSequenceName(name: string): boolean {
   )
 }
 
+export function isReservedTexControlSequenceName(name: string): boolean {
+  return reservedTexControlSequenceNameSet.has(
+    normalizeTexControlSequenceName(name),
+  )
+}
+
+export function isSafeTexMacroName(macro: string): boolean {
+  return /^\\?[A-Za-z]+$/.test(macro) && !isReservedTexControlSequenceName(macro)
+}
+
 function normalizeTexControlSequenceName(name: string): string {
   const trimmed = name.trim()
   const withoutLeadingBackslash = trimmed.startsWith('\\')
@@ -224,7 +266,7 @@ export function isSafeScalarExpressionVariableName(name: string): boolean {
     identifierPattern.test(name) &&
     !isScalarExpressionFunctionName(name) &&
     !isScalarExpressionConstantName(name) &&
-    !isDangerousTexControlSequenceName(name)
+    !isReservedTexControlSequenceName(name)
   )
 }
 
@@ -647,10 +689,9 @@ class ScalarExpressionParser {
       )
     }
 
-    if (isDangerousTexControlSequenceName(token.text)) {
-      throw new Error(
-        `Identifier "${token.text}" is reserved because it matches a dangerous TeX command name.`,
-      )
+    const reservedNameError = reservedTexControlSequenceNameError(token.text)
+    if (reservedNameError !== undefined) {
+      throw new Error(reservedNameError)
     }
 
     if (!this.declaredVariables.has(token.text)) {
@@ -671,10 +712,9 @@ class ScalarExpressionParser {
         throw new Error(`Constant "${token.text}" cannot be called as a function.`)
       }
 
-      if (isDangerousTexControlSequenceName(token.text)) {
-        throw new Error(
-          `Identifier "${token.text}" is reserved because it matches a dangerous TeX command name.`,
-        )
+      const reservedNameError = reservedTexControlSequenceNameError(token.text)
+      if (reservedNameError !== undefined) {
+        throw new Error(reservedNameError)
       }
 
       throw new Error(`Unknown function "${token.text}".`)
@@ -785,6 +825,18 @@ class ScalarExpressionParser {
 
     return token
   }
+}
+
+function reservedTexControlSequenceNameError(name: string): string | undefined {
+  if (isDangerousTexControlSequenceName(name)) {
+    return `Identifier "${name}" is reserved because it matches a dangerous TeX command name.`
+  }
+
+  if (isReservedTexControlSequenceName(name)) {
+    return `Identifier "${name}" is reserved because it matches a TeX/TikZ/PGF command name.`
+  }
+
+  return undefined
 }
 
 function evaluateAst(
