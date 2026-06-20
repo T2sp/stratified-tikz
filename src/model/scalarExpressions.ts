@@ -114,14 +114,61 @@ export type CreateScalarInputValueResult =
     }
 
 const identifierPattern = /^[A-Za-z][A-Za-z0-9_]*$/
-const dangerousTexCommandNames = [
+export const DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES = [
+  'def',
+  'let',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+  'include',
+  'includeonly',
+  'usepackage',
+  'shipout',
+  'special',
+  'immediate',
   'input',
-  'write',
   'read',
+  'write',
+  'write18',
+  'openin',
+  'closein',
   'openout',
+  'closeout',
   'catcode',
   'csname',
+  'endcsname',
+  'expandafter',
+  'noexpand',
+  'futurelet',
+  'afterassignment',
+  'everyjob',
+  'errmessage',
+  'errorstopmode',
+  'scrollmode',
+  'batchmode',
+  'nonstopmode',
+  'global',
+  'long',
+  'outer',
+  'protected',
+  'par',
+  'documentclass',
+  'requirepackage',
+  'providespackage',
+  'passoptionstopackage',
+  'directlua',
+  'luaescapestring',
+  'pdfobj',
+  'pdfcatalog',
+  'pdfinfo',
+  'pdfliteral',
+  'pdfcompresslevel',
+  'pdfimageresolution',
 ] as const
+
+const dangerousTexControlSequenceNameSet: ReadonlySet<string> = new Set(
+  DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES,
+)
 
 type ScalarExpressionToken =
   | {
@@ -156,6 +203,30 @@ type ScalarExpressionToken =
       kind: 'eof'
       start: number
     }
+
+export function isDangerousTexControlSequenceName(name: string): boolean {
+  return dangerousTexControlSequenceNameSet.has(
+    normalizeTexControlSequenceName(name),
+  )
+}
+
+function normalizeTexControlSequenceName(name: string): string {
+  const trimmed = name.trim()
+  const withoutLeadingBackslash = trimmed.startsWith('\\')
+    ? trimmed.slice(1)
+    : trimmed
+
+  return withoutLeadingBackslash.toLowerCase()
+}
+
+export function isSafeScalarExpressionVariableName(name: string): boolean {
+  return (
+    identifierPattern.test(name) &&
+    !isScalarExpressionFunctionName(name) &&
+    !isScalarExpressionConstantName(name) &&
+    !isDangerousTexControlSequenceName(name)
+  )
+}
 
 export function parseScalarExpression(
   source: string,
@@ -256,12 +327,7 @@ export function scalarExpressionVariables(
 }
 
 export function isScalarExpressionVariableName(name: string): boolean {
-  return (
-    identifierPattern.test(name) &&
-    !isScalarExpressionFunctionName(name) &&
-    !isScalarExpressionConstantName(name) &&
-    !isDangerousTexCommandName(name)
-  )
+  return isSafeScalarExpressionVariableName(name)
 }
 
 export function isScalarExpressionFunctionName(
@@ -581,7 +647,7 @@ class ScalarExpressionParser {
       )
     }
 
-    if (isDangerousTexCommandName(token.text)) {
+    if (isDangerousTexControlSequenceName(token.text)) {
       throw new Error(
         `Identifier "${token.text}" is reserved because it matches a dangerous TeX command name.`,
       )
@@ -605,7 +671,7 @@ class ScalarExpressionParser {
         throw new Error(`Constant "${token.text}" cannot be called as a function.`)
       }
 
-      if (isDangerousTexCommandName(token.text)) {
+      if (isDangerousTexControlSequenceName(token.text)) {
         throw new Error(
           `Identifier "${token.text}" is reserved because it matches a dangerous TeX command name.`,
         )
@@ -913,10 +979,4 @@ function isIdentifierStart(char: string | undefined): boolean {
 
 function isIdentifierPart(char: string | undefined): boolean {
   return char !== undefined && (isIdentifierStart(char) || isDigit(char) || char === '_')
-}
-
-function isDangerousTexCommandName(name: string): boolean {
-  return dangerousTexCommandNames.includes(
-    name as (typeof dangerousTexCommandNames)[number],
-  )
 }

@@ -5,7 +5,38 @@ import type {
   ParsedScalarExpression,
   ScalarExpressionAst,
 } from '../../src/model/scalarExpressions.ts'
-import { formatScalarExpressionForTikz } from '../../src/tikz/expressionFormatter.ts'
+import {
+  formatScalarExpressionForTikz,
+  isSafeTikzMacroName,
+} from '../../src/tikz/expressionFormatter.ts'
+
+const reviewRequiredDangerousTexNames = [
+  'def',
+  'let',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+  'include',
+  'includeonly',
+  'usepackage',
+  'shipout',
+  'special',
+  'immediate',
+  'openin',
+  'closein',
+  'closeout',
+  'write18',
+] as const
+
+const safeTikzMacroNames = [
+  'x',
+  'y',
+  'z',
+  'theta',
+  'radius',
+  'height',
+  'alphaBeta',
+] as const
 
 test('TikZ formatter maps variables to macro names', () => {
   const formatted = formatOk('R*cos(q)', ['R', 'q'], new Map([
@@ -65,6 +96,54 @@ test('TikZ formatter rejects unsafe macro names', () => {
   const formatted = formatScalarExpressionForTikz(
     parsed,
     new Map([['R', '\\input']]),
+  )
+
+  assert.equal(formatted.ok, false)
+  if (formatted.ok) {
+    throw new Error('Expected formatting to fail.')
+  }
+  assert.match(formatted.error, /not safe/)
+})
+
+test('TikZ macro validator rejects dangerous control sequence names', () => {
+  for (const name of reviewRequiredDangerousTexNames) {
+    assert.equal(isSafeTikzMacroName(name), false)
+    assert.equal(isSafeTikzMacroName(`\\${name}`), false)
+  }
+
+  assert.equal(isSafeTikzMacroName('\\input'), false)
+  assert.equal(isSafeTikzMacroName('\\RequirePackage'), false)
+})
+
+test('TikZ macro validator keeps safe control sequence names valid', () => {
+  for (const name of safeTikzMacroNames) {
+    assert.equal(isSafeTikzMacroName(name), true)
+    assert.equal(isSafeTikzMacroName(`\\${name}`), true)
+  }
+})
+
+test('TikZ formatter rejects dangerous variable macro mappings', () => {
+  const parsed = parseOk('x', ['x'])
+
+  for (const macro of ['\\def', 'def']) {
+    const formatted = formatScalarExpressionForTikz(
+      parsed,
+      new Map([['x', macro]]),
+    )
+
+    assert.equal(formatted.ok, false)
+    if (formatted.ok) {
+      throw new Error('Expected formatting to fail.')
+    }
+    assert.match(formatted.error, /not safe/)
+  }
+})
+
+test('TikZ formatter rejects unsafe AST variable names', () => {
+  const ast: ScalarExpressionAst = { kind: 'variable', name: 'def' }
+  const formatted = formatScalarExpressionForTikz(
+    ast,
+    new Map([['def', '\\x']]),
   )
 
   assert.equal(formatted.ok, false)

@@ -9,6 +9,34 @@ import {
 } from '../../src/model/scalarExpressions.ts'
 import type { ParsedScalarExpression } from '../../src/model/scalarExpressions.ts'
 
+const reviewRequiredDangerousTexNames = [
+  'def',
+  'let',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+  'include',
+  'includeonly',
+  'usepackage',
+  'shipout',
+  'special',
+  'immediate',
+  'openin',
+  'closein',
+  'closeout',
+  'write18',
+] as const
+
+const safeScalarVariableNames = [
+  'x',
+  'y',
+  'z',
+  'theta',
+  'radius',
+  'height_1',
+  'alphaBeta',
+] as const
+
 test('numeric literal parses and evaluates', () => {
   const parsed = parseOk('-3.5')
   const evaluated = evaluateScalarExpression(parsed)
@@ -93,7 +121,9 @@ test('unknown function is rejected', () => {
 })
 
 test('dangerous TeX command names are rejected even without a backslash', () => {
-  expectParseError('input(1)', /dangerous TeX command/)
+  for (const name of ['input', ...reviewRequiredDangerousTexNames]) {
+    expectParseError(`${name}(1)`, /dangerous TeX command/)
+  }
 })
 
 test('backslash is rejected', () => {
@@ -123,10 +153,20 @@ test('non-finite evaluation is rejected', () => {
 })
 
 test('variable names reject reserved functions, constants, and dangerous commands', () => {
-  assert.equal(isScalarExpressionVariableName('theta'), true)
+  for (const name of safeScalarVariableNames) {
+    assert.equal(isScalarExpressionVariableName(name), true)
+    parseOk(name, [name])
+  }
+
   assert.equal(isScalarExpressionVariableName('sin'), false)
   assert.equal(isScalarExpressionVariableName('pi'), false)
   assert.equal(isScalarExpressionVariableName('input'), false)
+
+  for (const name of reviewRequiredDangerousTexNames) {
+    assert.equal(isScalarExpressionVariableName(name), false)
+  }
+
+  assert.equal(isScalarExpressionVariableName('RequirePackage'), false)
 })
 
 function parseOk(

@@ -3,6 +3,10 @@ import type {
   ScalarExpressionAst,
   ScalarExpressionBinaryOperator,
 } from '../model/scalarExpressions.ts'
+import {
+  isDangerousTexControlSequenceName,
+  isScalarExpressionVariableName,
+} from '../model/scalarExpressions.ts'
 
 export type TikzExpressionFormatResult =
   | {
@@ -13,15 +17,6 @@ export type TikzExpressionFormatResult =
       ok: false
       error: string
     }
-
-const dangerousTikzMacroNames = new Set([
-  'input',
-  'write',
-  'read',
-  'openout',
-  'catcode',
-  'csname',
-])
 
 export function formatScalarExpressionForTikz(
   expression: ParsedScalarExpression | ScalarExpressionAst,
@@ -77,6 +72,13 @@ function formatVariable(
   name: string,
   variableMacros: ReadonlyMap<string, string>,
 ): TikzExpressionFormatResult {
+  if (!isScalarExpressionVariableName(name)) {
+    return {
+      ok: false,
+      error: `Variable "${name}" is not safe for TikZ expression formatting.`,
+    }
+  }
+
   const macro = variableMacros.get(name)
 
   if (macro === undefined) {
@@ -86,7 +88,7 @@ function formatVariable(
     }
   }
 
-  if (!isSafeTikzMacroName(macro)) {
+  if (!isSafeTikzMacroMapping(macro)) {
     return {
       ok: false,
       error: `TikZ macro mapping for variable "${name}" is not safe.`,
@@ -242,12 +244,20 @@ function binaryOperatorPrecedence(
   }
 }
 
-function isSafeTikzMacroName(macro: string): boolean {
-  if (!/^\\[A-Za-z]+$/.test(macro)) {
+export function isSafeTikzMacroName(macro: string): boolean {
+  if (isDangerousTexControlSequenceName(macro)) {
     return false
   }
 
-  return !dangerousTikzMacroNames.has(macro.slice(1))
+  if (!/^\\?[A-Za-z]+$/.test(macro)) {
+    return false
+  }
+
+  return true
+}
+
+function isSafeTikzMacroMapping(macro: string): boolean {
+  return /^\\[A-Za-z]+$/.test(macro) && isSafeTikzMacroName(macro)
 }
 
 function formatExpressionNumber(value: number): string {
