@@ -26,6 +26,15 @@ import {
   pathEndpointEpsilon,
 } from '../model/paths.ts'
 import {
+  coordinateComponentPreviewValue,
+  createVec3FromCoordinateInputs,
+  emptyCoordinateExpressionContext,
+  hasSymbolicVec3Coordinates,
+  numericCoordinateComponent,
+  updateVec3CoordinateComponent,
+  type CoordinateExpressionContext,
+} from '../model/symbolicCoordinates.ts'
+import {
   isSelectionCompatibleWithLayerFilter,
   layerFilterIncludesLayer,
   normalizeLayerFilterForDiagram,
@@ -41,9 +50,11 @@ import {
   defaultPointStyle,
   defaultSheetStyle,
 } from '../model/styles.ts'
+import { resolveSymbolicVariables } from '../model/variables.ts'
 import type {
   AmbientDimension,
   ArcDirection,
+  CoordinateComponent,
   CubicBezierPolarControl,
   CubicBezierControlMode,
   CubicBezierPathSegment,
@@ -1224,6 +1235,8 @@ export function manualDirectPathInputToSegments(
 
       if (
         center === null ||
+        hasSymbolicVec3Coordinates(anchor) ||
+        hasSymbolicVec3Coordinates(center) ||
         radius === null ||
         endAngleDeg === null ||
         frame === null
@@ -1581,6 +1594,13 @@ function parseDirectTemplateCenter(
       ok: true,
       center,
       frame: xyTemplateFrame(center),
+    }
+  }
+
+  if (hasSymbolicVec3Coordinates(center)) {
+    return {
+      ok: false,
+      error: 'invalidCoordinates',
     }
   }
 
@@ -2326,13 +2346,22 @@ export function coordinateAxesForAmbientDimension(
 export function updateVec3Coordinate(
   point: Vec3,
   axis: CoordinateAxis,
-  value: number,
+  value: number | CoordinateComponent,
   ambientDimension: AmbientDimension,
 ): Vec3 {
-  return normalizePointForAmbientDimension(ambientDimension, {
-    ...point,
-    [axis]: value,
-  })
+  const component =
+    typeof value === 'number' ? numericCoordinateComponent(value) : value
+
+  if (!Number.isFinite(coordinateComponentPreviewValue(component))) {
+    return point
+  }
+
+  return updateVec3CoordinateComponent(
+    point,
+    axis,
+    component,
+    ambientDimension,
+  )
 }
 
 export function parseDirectCoordinateInput(
@@ -2363,15 +2392,17 @@ export function parseDirectCoordinateInput(
     return parseWorkPlaneLocalCoordinateInput(coordinates, options.workPlane)
   }
 
-  const x = parseFiniteNumber(coordinates.x)
-  const y = parseFiniteNumber(coordinates.y)
-  const z = ambientDimension === 2 ? 0 : parseFiniteNumber(coordinates.z)
+  const parsed = createVec3FromCoordinateInputs(
+    coordinates,
+    ambientDimension,
+    coordinateExpressionContextForOptions(options),
+  )
 
-  if (x === null || y === null || z === null) {
+  if (!parsed.ok) {
     return null
   }
 
-  return normalizePointForAmbientDimension(ambientDimension, { x, y, z })
+  return parsed.point
 }
 
 export function parseDirectCoordinateInputs(
@@ -2410,9 +2441,11 @@ export function parseDirectCoordinateRows(
       continue
     }
 
-    const parts = trimmedRow.split(/[\s,]+/u)
+    const parts = trimmedRow.includes(',')
+      ? trimmedRow.split(',').map((part) => part.trim())
+      : trimmedRow.split(/\s+/u)
 
-    if (parts.length !== axisCount) {
+    if (parts.length !== axisCount || parts.some((part) => part.length === 0)) {
       return null
     }
 
@@ -2435,7 +2468,22 @@ function parseNumericDirectCoordinateInput(
     return null
   }
 
-  return parseDirectCoordinateInput(coordinates, ambientDimension, options)
+  if (
+    ambientDimension === 3 &&
+    options.coordinateMode === 'workPlaneLocal'
+  ) {
+    return parseWorkPlaneLocalCoordinateInput(coordinates, options.workPlane)
+  }
+
+  const x = parseFiniteNumber(coordinates.x)
+  const y = parseFiniteNumber(coordinates.y)
+  const z = ambientDimension === 2 ? 0 : parseFiniteNumber(coordinates.z)
+
+  if (x === null || y === null || z === null) {
+    return null
+  }
+
+  return normalizePointForAmbientDimension(ambientDimension, { x, y, z })
 }
 
 function parseWorkPlaneLocalCoordinateInput(
@@ -2576,6 +2624,25 @@ export function localDirectCoordinateInputFromExistingSource(
     }
   } catch {
     return null
+  }
+}
+
+function coordinateExpressionContextForOptions(
+  options: DirectCoordinateParseOptions,
+): CoordinateExpressionContext {
+  if (options.diagram === undefined) {
+    return emptyCoordinateExpressionContext
+  }
+
+  const resolved = resolveSymbolicVariables(options.diagram.variables ?? [])
+
+  if (!resolved.ok) {
+    return emptyCoordinateExpressionContext
+  }
+
+  return {
+    variableNames: resolved.variables.map((variable) => variable.name),
+    previewValues: resolved.values,
   }
 }
 

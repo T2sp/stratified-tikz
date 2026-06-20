@@ -22,6 +22,7 @@ import type {
   PathSegment,
   PathSegmentStyleOverride,
   Vec3,
+  CoordinateComponent,
 } from '../model/types.ts'
 import { updateVec3Coordinate, type CoordinateAxis } from './diagramUpdates.ts'
 
@@ -94,9 +95,9 @@ export function updateConcatenatedPathCoordinate(
   ambientDimension: AmbientDimension,
   target: ConcatenatedPathPointTarget,
   axis: CoordinateAxis,
-  value: number,
+  value: number | CoordinateComponent,
 ): ConcatenatedPathStratum {
-  if (!Number.isFinite(value)) {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
     return path
   }
 
@@ -188,9 +189,9 @@ export function updateConcatenatedPathRelativeCartesianOffset(
   segmentIndex: number,
   offsetKey: 'firstControlOffset' | 'secondControlOffset',
   axis: CoordinateAxis,
-  value: number,
+  value: number | CoordinateComponent,
 ): ConcatenatedPathStratum {
-  if (!Number.isFinite(value)) {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
     return path
   }
 

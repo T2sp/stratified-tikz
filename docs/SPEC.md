@@ -158,6 +158,29 @@ also stores curve-level work-plane frame metadata for later local TikZ export.
 
 Direct input is the canonical precise input method.
 
+Coordinate text fields may also contain validated scalar expressions using
+diagram variables and elementary functions:
+
+```text
+R = 2
+q = 30
+x = R*cos(q)
+y = R*sin(q)
+```
+
+The editor evaluates expressions with current variable preview values for SVG
+preview, but TikZ export preserves symbolic components as PGFMath expressions,
+for example `({\R * cos(\q)}, {\R * sin(\q)})`. Trigonometric functions use
+degrees, matching PGFMath/TikZ. Label text is not automatically wrapped in math
+mode; users type `$...$` themselves when desired.
+
+Expressions reject unknown variables, raw TeX/backslashes, braces, semicolons,
+newlines, unsupported functions, invalid syntax, division by zero, and
+non-finite preview values. In 2D diagrams z remains numeric 0. In the Phase 19C
+MVP, symbolic input is supported for global coordinate fields; active
+work-plane-local direct input, 3D template centers, and curved sheet anchors
+remain numeric-only and reject symbolic values.
+
 ### Cursor input mode
 
 In cursor input mode, the user places or moves points using the mouse or trackpad.

@@ -7,6 +7,7 @@ import {
 import type {
   AmbientDimension,
   ConcatenatedPathStratum,
+  CoordinateComponent,
   CubicBezierCurveStratum,
   CubicBezierControlMode,
   CurveStratum,
@@ -323,6 +324,8 @@ function TemplatePathGeometryEditor({
         label="Center"
         point={template.center}
         ambientDimension={diagram.ambientDimension}
+        variables={diagram.variables}
+        allowSymbolic
         onCoordinateChange={(axis, value) =>
           updateTemplatePathInDiagram(path.id, onDiagramChange, (current) => {
             const center = updateVec3Coordinate(
@@ -873,6 +876,8 @@ function renderPathPointCoordinateEditor(
       label={`Segment ${segmentNumber} ${point.label}`}
       point={point.point}
       ambientDimension={diagram.ambientDimension}
+      variables={diagram.variables}
+      allowSymbolic
       onCoordinateChange={(axis, value) =>
         updateConcatenatedPathInDiagram(path.id, onDiagramChange, (current) =>
           updateConcatenatedPathCoordinate(
@@ -927,6 +932,8 @@ function AbsoluteCurvePointEditor({
       label={label}
       point={point}
       ambientDimension={diagram.ambientDimension}
+      variables={diagram.variables}
+      allowSymbolic
       onCoordinateChange={(axis, value) =>
         onDiagramChange((currentDiagram) =>
           updateStratumById(currentDiagram, curve.id, (current) => {
@@ -978,6 +985,8 @@ function RelativeEndpointEditor({
       label={label}
       point={curve.points[pointIndex]}
       ambientDimension={diagram.ambientDimension}
+      variables={diagram.variables}
+      allowSymbolic
       onCoordinateChange={(axis, value) =>
         onDiagramChange((currentDiagram) =>
           updateStratumById(currentDiagram, curve.id, (current) => {
@@ -1024,7 +1033,7 @@ function updateRelativeCubicBezierEndpoint(
   ambientDimension: AmbientDimension,
   pointIndex: 0 | 3,
   axis: CoordinateAxis,
-  value: number,
+  value: CoordinateComponent,
 ): CubicBezierCurveStratum {
   const bezierControls = curve.bezierControls
 
@@ -1055,7 +1064,7 @@ function updateRelativeCartesianOffset(
   curve: CurveStratum,
   offsetKey: 'firstControlOffset' | 'secondControlOffset',
   axis: CoordinateAxis,
-  value: number,
+  value: CoordinateComponent,
   onDiagramChange: DiagramChangeHandler,
 ): void {
   onDiagramChange((currentDiagram) =>

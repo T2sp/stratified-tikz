@@ -68,6 +68,8 @@ export function TextLabelInspector({
             label="Position"
             point={label.position}
             ambientDimension={diagram.ambientDimension}
+            variables={diagram.variables}
+            allowSymbolic
             onCoordinateChange={(axis, value) =>
               onDiagramChange((currentDiagram) =>
                 updateLabelById(currentDiagram, label.id, (current) => ({

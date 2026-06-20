@@ -16,6 +16,7 @@ import {
   macroNameFromSymbolicVariableName,
   resolveSymbolicVariables,
 } from './variables.ts'
+import { refreshDiagramSymbolicCoordinatePreviews } from './symbolicCoordinates.ts'
 import {
   isTikzStyleTarget,
   normalizeExternalTikzStyleLoadHint,
@@ -402,11 +403,54 @@ function normalizeLoadedDiagram(
       ? {}
       : { layers: layerNormalization.layers }),
   }
+  const coordinateRefresh = refreshLoadedSymbolicCoordinatePreviews(diagram)
+  warnings.push(...coordinateRefresh.warnings)
 
   return {
-    diagram,
+    diagram: coordinateRefresh.diagram,
     warnings,
-    errors: layerNormalization.errors,
+    errors: [...layerNormalization.errors, ...coordinateRefresh.errors],
+  }
+}
+
+function refreshLoadedSymbolicCoordinatePreviews(diagram: Diagram): {
+  diagram: Diagram
+  warnings: string[]
+  errors: string[]
+} {
+  const resolved = resolveSymbolicVariables(diagram.variables ?? [])
+
+  if (!resolved.ok) {
+    return {
+      diagram,
+      warnings: [],
+      errors: resolved.errors.map((issue) => `${issue.path} ${issue.message}`),
+    }
+  }
+
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(diagram, {
+    variableNames: resolved.variables.map((variable) => variable.name),
+    previewValues: resolved.values,
+  })
+
+  if (!refreshed.ok) {
+    return {
+      diagram,
+      warnings: [],
+      errors: refreshed.errors.map((issue) => `${issue.path} ${issue.message}`),
+    }
+  }
+
+  const changed =
+    JSON.stringify(diagram.strata) !== JSON.stringify(refreshed.diagram.strata) ||
+    JSON.stringify(diagram.labels) !== JSON.stringify(refreshed.diagram.labels)
+
+  return {
+    diagram: refreshed.diagram,
+    warnings: changed
+      ? ['Saved symbolic coordinate preview values were recalculated.']
+      : [],
+    errors: [],
   }
 }
 

@@ -84,6 +84,8 @@ type CoordinateDefinition = {
 
 type VariableExportContext = {
   definitions: string[]
+  variableNames: string[]
+  variableMacros: ReadonlyMap<string, string>
 }
 
 type LayeredTikzCommand = {
@@ -706,12 +708,16 @@ function createVariableExportContext(
         (issue) =>
           `% Variable omitted: ${commentLineText(`${issue.path} ${issue.message}`)}`,
       ),
+      variableNames: [],
+      variableMacros: new Map(),
     }
   }
 
   if (resolved.orderedVariables.length === 0) {
     return {
       definitions: [],
+      variableNames: [],
+      variableMacros: new Map(),
     }
   }
 
@@ -728,6 +734,8 @@ function createVariableExportContext(
 
   return {
     definitions,
+    variableNames,
+    variableMacros,
   }
 }
 
@@ -798,6 +806,7 @@ function emitCoordinateDefinitions(context: GenerateContext): string[] {
       `\\coordinate (${definition.name}) at ${formatCoordinate(
         definition.position,
         context.mode,
+        context,
       )};`,
   )
 }
@@ -1558,7 +1567,7 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
   }
 
   const options = labelStyleOptions(label, context)
-  const coordinate = formatCoordinate(label.position, context.mode)
+  const coordinate = formatCoordinate(label.position, context.mode, context)
   const labelText = formatLabelTextForTikz(label.text, context.exportMode)
 
   if (options.length === 0) {
@@ -2690,14 +2699,46 @@ function section(
   ]
 }
 
-function formatCoordinate(point: Vec3, mode: TikzMode): string {
+function formatCoordinate(
+  point: Vec3,
+  mode: TikzMode,
+  context?: GenerateContext,
+): string {
+  const x = formatCoordinateComponent(point, 'x', context)
+  const y = formatCoordinateComponent(point, 'y', context)
+
   if (mode === '2d') {
-    return `(${formatNumber(point.x)},${formatNumber(point.y)})`
+    return `(${x},${y})`
   }
 
-  return `(${formatNumber(point.x)},${formatNumber(point.y)},${formatNumber(
-    point.z,
-  )})`
+  return `(${x},${y},${formatCoordinateComponent(point, 'z', context)})`
+}
+
+function formatCoordinateComponent(
+  point: Vec3,
+  axis: 'x' | 'y' | 'z',
+  context: GenerateContext | undefined,
+): string {
+  const component = point.symbolic?.[axis]
+
+  if (component?.kind !== 'symbolic' || context === undefined) {
+    return formatNumber(point[axis])
+  }
+
+  const parsed = parseScalarExpression(component.expression, {
+    variables: context.variables.variableNames,
+  })
+
+  if (!parsed.ok) {
+    return formatNumber(point[axis])
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    context.variables.variableMacros,
+  )
+
+  return formatted.ok ? `{${formatted.expression}}` : formatNumber(point[axis])
 }
 
 function formatWorkPlaneLocalCoordinate(

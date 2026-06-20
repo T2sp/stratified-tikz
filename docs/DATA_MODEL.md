@@ -25,6 +25,7 @@ export type Vec3 = {
   x: number;
   y: number;
   z: number;
+  symbolic?: SymbolicVec3;
 };
 ```
 
@@ -43,9 +44,10 @@ export type Vec2 = {
 
 ## Symbolic scalar expressions
 
-Phase 19A adds a reusable scalar-expression layer for later symbolic variables
-and symbolic coordinate fields. Existing committed geometry still uses numeric
-`Vec3` values until the symbolic coordinate integration phase.
+Phase 19A adds a reusable scalar-expression layer for symbolic variables and
+symbolic coordinate fields. Committed geometry still keeps finite numeric `Vec3`
+values as the SVG preview source of truth. When a coordinate component is
+symbolic, the `Vec3` also carries optional explicit component metadata:
 
 ```ts
 type NumericScalar = {
@@ -60,7 +62,18 @@ type SymbolicScalar = {
 };
 
 type ScalarInputValue = NumericScalar | SymbolicScalar;
+
+type SymbolicVec3 = {
+  x: ScalarInputValue;
+  y: ScalarInputValue;
+  z: ScalarInputValue;
+};
 ```
+
+Numeric-only coordinates omit `symbolic` so old diagrams and numeric editing
+remain unchanged. Mixed coordinates are allowed; for example a point may store a
+symbolic x component and numeric y/z components. In 2D, z is always normalized
+to numeric 0, and saved symbolic z expressions are invalid.
 
 The parser accepts a limited PGFMath-like scalar grammar:
 
@@ -102,6 +115,25 @@ expression and an explicit variable-to-macro map such as `R -> \R`; for example,
 symbolic coordinate components at the coordinate-generator boundary, for
 example `({\R * cos(\q)}, {\R * sin(\q)})`, rather than storing braces inside
 the expression model.
+
+Coordinate inputs accept either numeric expressions or symbolic expressions
+using declared diagram variables and the supported elementary functions. Numeric
+expressions with no variables are stored as numeric preview values. Symbolic
+expressions store the source expression plus the evaluated preview value.
+Trigonometric evaluation follows PGFMath degree semantics, matching TikZ export.
+
+Changing a diagram variable is an export-affecting diagram edit. After a
+successful variable update, all symbolic coordinate preview values are
+recomputed from the unchanged stored expressions. Deleting or renaming a
+variable used by a coordinate is rejected because it would make the coordinate
+expression unknown.
+
+The Phase 19C MVP supports symbolic global coordinates for point positions,
+free-label positions, polyline and cubic/path vertices, filled-boundary path
+coordinates, 2D template centers, and polygon/quad sheet vertices. Active
+work-plane-local direct input, 3D template centers, and curved sheet anchors
+remain numeric-only for now; symbolic plane-local input is rejected instead of
+being converted through a symbolic frame algebra.
 
 ## Symbolic variables
 

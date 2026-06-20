@@ -6,6 +6,7 @@ import {
   scalarExpressionVariables,
   type ParsedScalarExpression,
 } from './scalarExpressions.ts'
+import { refreshDiagramSymbolicCoordinatePreviews } from './symbolicCoordinates.ts'
 import type {
   Diagram,
   DiagramValidationIssue,
@@ -237,9 +238,18 @@ export function setDiagramSymbolicVariables(
     delete nextDiagram.variables
   }
 
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(nextDiagram, {
+    variableNames: resolved.variables.map((variable) => variable.name),
+    previewValues: resolved.values,
+  })
+
+  if (!refreshed.ok) {
+    return variableDiagramError(refreshed.errors)
+  }
+
   return {
     ok: true,
-    diagram: nextDiagram,
+    diagram: refreshed.diagram,
     variables: resolved.variables,
   }
 }
