@@ -1,4 +1,5 @@
 import type {
+  BoundaryPathSnapshot,
   ClosedPathBoundary,
   CurveStyleSegment,
   CurveStratum,
@@ -968,6 +969,57 @@ function translateCurvedSheetPrimitive(
         ...primitive,
         frame: translateFrameOrigin(primitive.frame, translation, diagram),
       }
+    case 'ruledSurface':
+      return {
+        ...primitive,
+        boundary0: translateBoundaryPathSnapshot(
+          primitive.boundary0,
+          translation,
+          diagram,
+        ),
+        boundary1: translateBoundaryPathSnapshot(
+          primitive.boundary1,
+          translation,
+          diagram,
+        ),
+      }
+    case 'coonsPatch':
+      return {
+        ...primitive,
+        bottom: translateBoundaryPathSnapshot(
+          primitive.bottom,
+          translation,
+          diagram,
+        ),
+        right: translateBoundaryPathSnapshot(
+          primitive.right,
+          translation,
+          diagram,
+        ),
+        top: translateBoundaryPathSnapshot(
+          primitive.top,
+          translation,
+          diagram,
+        ),
+        left: translateBoundaryPathSnapshot(
+          primitive.left,
+          translation,
+          diagram,
+        ),
+      }
+  }
+}
+
+function translateBoundaryPathSnapshot(
+  snapshot: BoundaryPathSnapshot,
+  translation: LayerTranslationVector,
+  diagram: Diagram,
+): BoundaryPathSnapshot {
+  return {
+    ...snapshot,
+    segments: snapshot.segments.map((segment) =>
+      translatePathSegment(segment, translation, diagram),
+    ),
   }
 }
 

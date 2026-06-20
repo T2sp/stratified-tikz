@@ -130,6 +130,74 @@ export function pathSegmentEnd(segment: PathSegment): Vec3 {
   return segment.end
 }
 
+export function pathSegmentPointAt(
+  segment: PathSegment,
+  parameter: number,
+  ambientDimension: AmbientDimension,
+): Vec3 | null {
+  const t = normalizedUnitParameter(parameter)
+
+  if (t === null) {
+    return null
+  }
+
+  let point: Vec3 | null
+
+  switch (segment.kind) {
+    case 'line':
+      point = lerpVec3(segment.start, segment.end, t)
+      break
+    case 'cubicBezier':
+      point = cubicBezierPointAt(segment, t)
+      break
+    case 'arc': {
+      const sweepDegrees = arcSweepDegrees(segment)
+
+      point =
+        sweepDegrees === null
+          ? null
+          : arcPointAtAngle(
+              segment,
+              segment.startAngleDeg + sweepDegrees * t,
+              ambientDimension,
+            )
+      break
+    }
+  }
+
+  return point !== null && isFiniteVec3(point) ? point : null
+}
+
+export function pathPointAt(
+  segments: readonly PathSegment[],
+  parameter: number,
+  ambientDimension: AmbientDimension,
+): Vec3 | null {
+  const t = normalizedUnitParameter(parameter)
+
+  if (t === null || segments.length === 0) {
+    return null
+  }
+
+  if (t === 1) {
+    return pathSegmentPointAt(
+      segments[segments.length - 1],
+      1,
+      ambientDimension,
+    )
+  }
+
+  const scaledParameter = t * segments.length
+  const segmentIndex = Math.floor(scaledParameter)
+  const localParameter = scaledParameter - segmentIndex
+
+  return pathSegmentPointAt(
+    segments[segmentIndex],
+    localParameter,
+    ambientDimension,
+  )
+}
+
 export function pathSegmentCoordinates(segment: PathSegment): Vec3[] {
   switch (segment.kind) {
     case 'line':
@@ -578,6 +646,56 @@ function arcPointAtAngle(
     segment.frame ?? xyTemplateFrame(segment.center),
     ambientDimension,
   )
+}
+
+function cubicBezierPointAt(
+  segment: CubicBezierPathSegment,
+  parameter: number,
+): Vec3 {
+  const inverse = 1 - parameter
+  const startScale = inverse * inverse * inverse
+  const control1Scale = 3 * inverse * inverse * parameter
+  const control2Scale = 3 * inverse * parameter * parameter
+  const endScale = parameter * parameter * parameter
+
+  return {
+    x:
+      segment.start.x * startScale +
+      segment.control1.x * control1Scale +
+      segment.control2.x * control2Scale +
+      segment.end.x * endScale,
+    y:
+      segment.start.y * startScale +
+      segment.control1.y * control1Scale +
+      segment.control2.y * control2Scale +
+      segment.end.y * endScale,
+    z:
+      segment.start.z * startScale +
+      segment.control1.z * control1Scale +
+      segment.control2.z * control2Scale +
+      segment.end.z * endScale,
+  }
+}
+
+function lerpVec3(start: Vec3, end: Vec3, parameter: number): Vec3 {
+  return {
+    x: start.x + (end.x - start.x) * parameter,
+    y: start.y + (end.y - start.y) * parameter,
+    z: start.z + (end.z - start.z) * parameter,
+  }
+}
+
+function normalizedUnitParameter(parameter: number): number | null {
+  if (
+    typeof parameter !== 'number' ||
+    !Number.isFinite(parameter) ||
+    parameter < 0 ||
+    parameter > 1
+  ) {
+    return null
+  }
+
+  return Object.is(parameter, -0) ? 0 : parameter
 }
 
 function circularArcCubicSegment(

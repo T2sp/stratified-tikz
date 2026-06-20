@@ -15,7 +15,12 @@ export function formatSelectedGeometry(
   switch (stratum.geometricKind) {
     case 'sheet':
       if (stratum.kind === 'curvedSheet') {
-        return `${stratum.primitive.kind}; sampling ${stratum.primitive.sampling.uSegments} x ${stratum.primitive.sampling.vSegments}`
+        const sampling =
+          stratum.primitive.kind === 'ruledSurface'
+            ? String(stratum.primitive.sampling.segments)
+            : `${stratum.primitive.sampling.uSegments} x ${stratum.primitive.sampling.vSegments}`
+
+        return `${stratum.primitive.kind}; sampling ${sampling}`
       }
 
       return sheetVertices(stratum)

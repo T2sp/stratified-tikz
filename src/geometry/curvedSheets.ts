@@ -2,11 +2,25 @@ import {
   addVec3,
   isFiniteVec3,
   scaleVec3,
+  subtractVec3,
 } from './workPlane.ts'
 import { isValidWorkPlaneFrameSnapshot } from './bezierControls.ts'
+import {
+  arcSegmentExpectedEnd,
+  arcSegmentExpectedStart,
+  areSegmentsComposable,
+  pathEndpointEpsilon,
+  pathEndpoints,
+  pathPointAt,
+} from '../model/paths.ts'
 import type {
+  ArcPathSegment,
+  BoundaryPathSnapshot,
+  CoonsPatchPrimitive,
   CurvedSheetPrimitive,
   HemisphereCurvedSheetPrimitive,
+  PathSegment,
+  RuledSurfacePrimitive,
   SaddleCurvedSheetPrimitive,
   SurfaceFrame,
   SurfaceSampling,
@@ -14,6 +28,8 @@ import type {
 } from '../model/types.ts'
 
 export const MAX_CURVED_SHEET_SAMPLING_SEGMENTS = 64
+export const MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS =
+  MAX_CURVED_SHEET_SAMPLING_SEGMENTS
 
 export type SurfaceParameterInterval = {
   min: number
@@ -99,6 +115,102 @@ export function validateSurfaceSampling(
   return validationResult(errors)
 }
 
+export function validateBoundaryPathSnapshot(
+  snapshot: unknown,
+  path = 'boundary',
+): SurfaceValidationResult {
+  const errors: SurfaceValidationIssue[] = []
+
+  if (!isRecord(snapshot)) {
+    pushError(errors, path, 'Boundary path snapshot must be an object.')
+    return validationResult(errors)
+  }
+
+  if (
+    snapshot.id !== undefined &&
+    (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0)
+  ) {
+    pushError(errors, `${path}.id`, 'Boundary path snapshot id must be non-empty.')
+  }
+
+  if (
+    snapshot.name !== undefined &&
+    (typeof snapshot.name !== 'string' || snapshot.name.trim().length === 0)
+  ) {
+    pushError(
+      errors,
+      `${path}.name`,
+      'Boundary path snapshot name must be non-empty.',
+    )
+  }
+
+  if (!Array.isArray(snapshot.segments)) {
+    pushError(errors, `${path}.segments`, 'Boundary path segments must be an array.')
+    return validationResult(errors)
+  }
+
+  if (snapshot.segments.length === 0) {
+    pushError(
+      errors,
+      `${path}.segments`,
+      'Boundary path snapshots must have at least one segment.',
+    )
+    return validationResult(errors)
+  }
+
+  snapshot.segments.forEach((segment, index) => {
+    validateBoundaryPathSegment(segment, `${path}.segments[${index}]`, errors)
+  })
+
+  if (
+    snapshot.segments.every(isBoundaryPathSegment) &&
+    !areSegmentsComposable(snapshot.segments, pathEndpointEpsilon)
+  ) {
+    pushError(
+      errors,
+      `${path}.segments`,
+      'Boundary path segment endpoints must match consecutively.',
+    )
+  }
+
+  return validationResult(errors)
+}
+
+export function isBoundaryPathClosed(
+  snapshot: BoundaryPathSnapshot,
+  epsilon = pathEndpointEpsilon,
+): boolean {
+  const endpoints = pathEndpoints(snapshot.segments)
+
+  return endpoints === null
+    ? false
+    : vec3ApproximatelyEqual(endpoints.start, endpoints.end, epsilon)
+}
+
+export function evaluateBoundaryPathAt(
+  snapshot: BoundaryPathSnapshot,
+  parameter: number,
+): Vec3 {
+  const point = pathPointAt(snapshot.segments, parameter, 3)
+
+  if (point === null || !isFiniteVec3(point)) {
+    throw new Error('Boundary path evaluation produced a non-finite point.')
+  }
+
+  return point
+}
+
+export function sampleBoundaryPath(
+  snapshot: BoundaryPathSnapshot,
+  segments: number,
+): Vec3[] {
+  assertValidSegmentCount(segments, 'segments')
+
+  return Array.from({ length: segments + 1 }, (_, index) =>
+    evaluateBoundaryPathAt(snapshot, index / segments),
+  )
+}
+
 export function validateCurvedSheetPrimitive(
   primitive: unknown,
   path = 'primitive',
@@ -117,11 +229,17 @@ export function validateCurvedSheetPrimitive(
     case 'saddle':
       validateSaddlePrimitive(primitive, path, errors)
       break
+    case 'ruledSurface':
+      validateRuledSurfacePrimitive(primitive, path, errors)
+      break
+    case 'coonsPatch':
+      validateCoonsPatchPrimitive(primitive, path, errors)
+      break
     default:
       pushError(
         errors,
         `${path}.kind`,
-        'Curved sheet primitive kind must be hemisphere or saddle.',
+        'Curved sheet primitive kind must be hemisphere, saddle, ruledSurface, or coonsPatch.',
       )
       break
   }
@@ -170,6 +288,22 @@ export function surfaceParameterDomain(
           max: primitive.depth / 2,
           closed: false,
         },
+      }
+    case 'ruledSurface':
+      return {
+        u: {
+          min: 0,
+          max: 1,
+          closed:
+            isBoundaryPathClosed(primitive.boundary0) &&
+            isBoundaryPathClosed(primitive.boundary1),
+        },
+        v: { min: 0, max: 1, closed: false },
+      }
+    case 'coonsPatch':
+      return {
+        u: { min: 0, max: 1, closed: false },
+        v: { min: 0, max: 1, closed: false },
       }
   }
 }
@@ -232,6 +366,71 @@ export function sampleSaddle(
   return mesh
 }
 
+export function sampleRuledSurface(
+  primitive: RuledSurfacePrimitive,
+): SurfaceSampleMesh {
+  assertValidPrimitive(primitive)
+  const boundary0 = sampleBoundaryPath(
+    primitive.boundary0,
+    primitive.sampling.segments,
+  )
+  const boundary1 = sampleBoundaryPath(
+    primitive.boundary1,
+    primitive.sampling.segments,
+  )
+  const mesh = sampleMesh(
+    {
+      uSegments: primitive.sampling.segments,
+      vSegments: 1,
+    },
+    (uIndex, vIndex) => {
+      const v = vIndex
+
+      return addVec3(
+        scaleVec3(boundary0[uIndex], 1 - v),
+        scaleVec3(boundary1[uIndex], v),
+      )
+    },
+  )
+
+  assertFiniteMesh(mesh)
+  return mesh
+}
+
+export function sampleCoonsPatch(
+  primitive: CoonsPatchPrimitive,
+): SurfaceSampleMesh {
+  assertValidPrimitive(primitive)
+  const bottom = sampleBoundaryPath(primitive.bottom, primitive.sampling.uSegments)
+  const top = sampleBoundaryPath(primitive.top, primitive.sampling.uSegments)
+  const left = sampleBoundaryPath(primitive.left, primitive.sampling.vSegments)
+  const right = sampleBoundaryPath(primitive.right, primitive.sampling.vSegments)
+  const bottomLeft = bottom[0]
+  const bottomRight = bottom[bottom.length - 1]
+  const topLeft = top[0]
+  const topRight = top[top.length - 1]
+  const mesh = sampleMesh(primitive.sampling, (uIndex, vIndex) => {
+    const u = uIndex / primitive.sampling.uSegments
+    const v = vIndex / primitive.sampling.vSegments
+    const boundaryBlend = addVec3(
+      addVec3(scaleVec3(bottom[uIndex], 1 - v), scaleVec3(top[uIndex], v)),
+      addVec3(scaleVec3(left[vIndex], 1 - u), scaleVec3(right[vIndex], u)),
+    )
+    const bilinearCornerBlend = addVec3(
+      addVec3(
+        scaleVec3(bottomLeft, (1 - u) * (1 - v)),
+        scaleVec3(bottomRight, u * (1 - v)),
+      ),
+      addVec3(scaleVec3(topLeft, (1 - u) * v), scaleVec3(topRight, u * v)),
+    )
+
+    return subtractVec3(boundaryBlend, bilinearCornerBlend)
+  })
+
+  assertFiniteMesh(mesh)
+  return mesh
+}
+
 export function sampleCurvedSheetPrimitive(
   primitive: CurvedSheetPrimitive,
 ): SurfaceSampleMesh {
@@ -240,6 +439,10 @@ export function sampleCurvedSheetPrimitive(
       return sampleHemisphere(primitive)
     case 'saddle':
       return sampleSaddle(primitive)
+    case 'ruledSurface':
+      return sampleRuledSurface(primitive)
+    case 'coonsPatch':
+      return sampleCoonsPatch(primitive)
   }
 }
 
@@ -252,6 +455,10 @@ export function surfaceBoundaryPolylines(
     case 'hemisphere':
       return [meshRow(mesh, mesh.vSegments)]
     case 'saddle':
+      return [meshPerimeter(mesh)]
+    case 'ruledSurface':
+      return [meshPerimeter(mesh)]
+    case 'coonsPatch':
       return [meshPerimeter(mesh)]
   }
 }
@@ -295,6 +502,168 @@ function validateSaddlePrimitive(
     errors,
     validateSurfaceSampling(primitive.sampling, `${path}.sampling`),
   )
+}
+
+function validateRuledSurfacePrimitive(
+  primitive: Record<string, unknown>,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.boundary0, `${path}.boundary0`),
+  )
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.boundary1, `${path}.boundary1`),
+  )
+  appendIssues(
+    errors,
+    validateRuledSurfaceSampling(primitive.sampling, `${path}.sampling`),
+  )
+
+  if (
+    isBoundaryPathSnapshot(primitive.boundary0) &&
+    isBoundaryPathSnapshot(primitive.boundary1)
+  ) {
+    const boundary0Closed = isBoundaryPathClosed(primitive.boundary0)
+    const boundary1Closed = isBoundaryPathClosed(primitive.boundary1)
+
+    if (boundary0Closed !== boundary1Closed) {
+      pushError(
+        errors,
+        path,
+        'Ruled surface boundaries must have the same closure status.',
+      )
+    }
+  }
+}
+
+function validateCoonsPatchPrimitive(
+  primitive: Record<string, unknown>,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.bottom, `${path}.bottom`),
+  )
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.right, `${path}.right`),
+  )
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.top, `${path}.top`),
+  )
+  appendIssues(
+    errors,
+    validateBoundaryPathSnapshot(primitive.left, `${path}.left`),
+  )
+  appendIssues(
+    errors,
+    validateSurfaceSampling(primitive.sampling, `${path}.sampling`),
+  )
+
+  if (
+    isBoundaryPathSnapshot(primitive.bottom) &&
+    isBoundaryPathSnapshot(primitive.right) &&
+    isBoundaryPathSnapshot(primitive.top) &&
+    isBoundaryPathSnapshot(primitive.left)
+  ) {
+    validateCoonsPatchCorners(
+      primitive.bottom,
+      primitive.right,
+      primitive.top,
+      primitive.left,
+      path,
+      errors,
+    )
+  }
+}
+
+function validateRuledSurfaceSampling(
+  sampling: unknown,
+  path: string,
+): SurfaceValidationResult {
+  const errors: SurfaceValidationIssue[] = []
+
+  if (!isRecord(sampling)) {
+    pushError(errors, path, 'Ruled surface sampling must be an object.')
+    return validationResult(errors)
+  }
+
+  validateSegmentCount(sampling.segments, `${path}.segments`, errors)
+
+  return validationResult(errors)
+}
+
+function validateCoonsPatchCorners(
+  bottom: BoundaryPathSnapshot,
+  right: BoundaryPathSnapshot,
+  top: BoundaryPathSnapshot,
+  left: BoundaryPathSnapshot,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  const bottomEndpoints = pathEndpoints(bottom.segments)
+  const rightEndpoints = pathEndpoints(right.segments)
+  const topEndpoints = pathEndpoints(top.segments)
+  const leftEndpoints = pathEndpoints(left.segments)
+
+  if (
+    bottomEndpoints === null ||
+    rightEndpoints === null ||
+    topEndpoints === null ||
+    leftEndpoints === null
+  ) {
+    return
+  }
+
+  validateCornerMatch(
+    bottomEndpoints.start,
+    leftEndpoints.start,
+    `${path}.bottom`,
+    `${path}.left`,
+    errors,
+  )
+  validateCornerMatch(
+    bottomEndpoints.end,
+    rightEndpoints.start,
+    `${path}.bottom`,
+    `${path}.right`,
+    errors,
+  )
+  validateCornerMatch(
+    topEndpoints.start,
+    leftEndpoints.end,
+    `${path}.top`,
+    `${path}.left`,
+    errors,
+  )
+  validateCornerMatch(
+    topEndpoints.end,
+    rightEndpoints.end,
+    `${path}.top`,
+    `${path}.right`,
+    errors,
+  )
+}
+
+function validateCornerMatch(
+  first: Vec3,
+  second: Vec3,
+  firstPath: string,
+  secondPath: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  if (!vec3ApproximatelyEqual(first, second, pathEndpointEpsilon)) {
+    pushError(
+      errors,
+      firstPath,
+      `Coons patch corner must match ${secondPath}.`,
+    )
+  }
 }
 
 function sampleMesh(
@@ -378,6 +747,12 @@ function validateCurvedSheetPrimitiveStructure(
     case 'saddle':
       validateSaddlePrimitive(primitive, 'primitive', errors)
       break
+    case 'ruledSurface':
+      validateRuledSurfacePrimitive(primitive, 'primitive', errors)
+      break
+    case 'coonsPatch':
+      validateCoonsPatchPrimitive(primitive, 'primitive', errors)
+      break
   }
 
   return validationResult(errors)
@@ -457,6 +832,188 @@ function validateVec3(
   const zIsFinite = validateFinite(value.z, `${path}.z`, 'Vector z coordinate', errors)
 
   return xIsFinite && yIsFinite && zIsFinite
+}
+
+function validateBoundaryPathSegment(
+  segment: unknown,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  if (!isRecord(segment)) {
+    pushError(errors, path, 'Boundary path segment must be an object.')
+    return
+  }
+
+  switch (segment.kind) {
+    case 'line':
+      validateVec3(segment.start, `${path}.start`, errors)
+      validateVec3(segment.end, `${path}.end`, errors)
+      return
+    case 'cubicBezier':
+      validateVec3(segment.start, `${path}.start`, errors)
+      validateVec3(segment.control1, `${path}.control1`, errors)
+      validateVec3(segment.control2, `${path}.control2`, errors)
+      validateVec3(segment.end, `${path}.end`, errors)
+      return
+    case 'arc':
+      validateBoundaryArcSegment(segment, path, errors)
+      return
+    default:
+      pushError(
+        errors,
+        `${path}.kind`,
+        'Boundary path segment kind must be line, cubicBezier, or arc.',
+      )
+  }
+}
+
+function validateBoundaryArcSegment(
+  segment: Record<string, unknown>,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  validateVec3(segment.start, `${path}.start`, errors)
+  validateVec3(segment.end, `${path}.end`, errors)
+  validateVec3(segment.center, `${path}.center`, errors)
+  validatePositiveFinite(segment.radius, `${path}.radius`, 'Arc radius', errors)
+  validateFinite(segment.startAngleDeg, `${path}.startAngleDeg`, 'Arc start angle', errors)
+  validateFinite(segment.endAngleDeg, `${path}.endAngleDeg`, 'Arc end angle', errors)
+
+  if (
+    segment.direction !== 'counterclockwise' &&
+    segment.direction !== 'clockwise'
+  ) {
+    pushError(
+      errors,
+      `${path}.direction`,
+      'Arc direction must be counterclockwise or clockwise.',
+    )
+  }
+
+  if (segment.frame === undefined) {
+    pushError(errors, `${path}.frame`, '3D boundary arc segments must store a frame.')
+  } else {
+    appendIssues(errors, validateSurfaceFrame(segment.frame, `${path}.frame`))
+  }
+
+  if (!isBoundaryArcSegment(segment)) {
+    return
+  }
+
+  const expectedStart = arcSegmentExpectedStart(segment, 3)
+  const expectedEnd = arcSegmentExpectedEnd(segment, 3)
+
+  if (!vec3ApproximatelyEqual(segment.start, expectedStart, pathEndpointEpsilon)) {
+    pushError(
+      errors,
+      `${path}.start`,
+      'Arc start must match center, radius, and start angle.',
+    )
+  }
+
+  if (!vec3ApproximatelyEqual(segment.end, expectedEnd, pathEndpointEpsilon)) {
+    pushError(
+      errors,
+      `${path}.end`,
+      'Arc end must match center, radius, and end angle.',
+    )
+  }
+}
+
+function isBoundaryPathSnapshot(value: unknown): value is BoundaryPathSnapshot {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.segments) &&
+    value.segments.length > 0 &&
+    value.segments.every(isBoundaryPathSegment)
+  )
+}
+
+function isBoundaryPathSegment(value: unknown): value is PathSegment {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  switch (value.kind) {
+    case 'line':
+      return isFiniteBoundaryVec3(value.start) && isFiniteBoundaryVec3(value.end)
+    case 'cubicBezier':
+      return (
+        isFiniteBoundaryVec3(value.start) &&
+        isFiniteBoundaryVec3(value.control1) &&
+        isFiniteBoundaryVec3(value.control2) &&
+        isFiniteBoundaryVec3(value.end)
+      )
+    case 'arc':
+      return isBoundaryArcSegment(value)
+    default:
+      return false
+  }
+}
+
+function isBoundaryArcSegment(value: Record<string, unknown>): value is ArcPathSegment {
+  return (
+    value.kind === 'arc' &&
+    isFiniteBoundaryVec3(value.start) &&
+    isFiniteBoundaryVec3(value.end) &&
+    isFiniteBoundaryVec3(value.center) &&
+    typeof value.radius === 'number' &&
+    Number.isFinite(value.radius) &&
+    value.radius > 0 &&
+    typeof value.startAngleDeg === 'number' &&
+    Number.isFinite(value.startAngleDeg) &&
+    typeof value.endAngleDeg === 'number' &&
+    Number.isFinite(value.endAngleDeg) &&
+    (value.direction === 'counterclockwise' || value.direction === 'clockwise') &&
+    value.frame !== undefined &&
+    isBoundarySurfaceFrame(value.frame)
+  )
+}
+
+function isFiniteBoundaryVec3(value: unknown): value is Vec3 {
+  return (
+    isRecord(value) &&
+    typeof value.x === 'number' &&
+    Number.isFinite(value.x) &&
+    typeof value.y === 'number' &&
+    Number.isFinite(value.y) &&
+    typeof value.z === 'number' &&
+    Number.isFinite(value.z)
+  )
+}
+
+function isBoundarySurfaceFrame(value: unknown): value is SurfaceFrame {
+  return (
+    isRecord(value) &&
+    isFiniteBoundaryVec3(value.origin) &&
+    isFiniteBoundaryVec3(value.u) &&
+    isFiniteBoundaryVec3(value.v) &&
+    isFiniteBoundaryVec3(value.normal) &&
+    isValidWorkPlaneFrameSnapshot(value as SurfaceFrame)
+  )
+}
+
+function assertValidSegmentCount(value: number, path: string): void {
+  const errors: SurfaceValidationIssue[] = []
+  validateSegmentCount(value, path, errors)
+
+  if (errors.length > 0) {
+    throw new Error(
+      errors.map((issue) => `${issue.path} ${issue.message}`).join('; '),
+    )
+  }
+}
+
+function vec3ApproximatelyEqual(
+  first: Vec3,
+  second: Vec3,
+  epsilon: number,
+): boolean {
+  return (
+    Math.abs(first.x - second.x) <= epsilon &&
+    Math.abs(first.y - second.y) <= epsilon &&
+    Math.abs(first.z - second.z) <= epsilon
+  )
 }
 
 function appendIssues(
