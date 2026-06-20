@@ -1,4 +1,4 @@
-# Phase 20C Fix Prompt: Sequential boundary-path picking for Ruled surfaces and Coons patches
+# Phase 20C Fix Prompt: Reject closed Coons boundary paths in helper and saved-data validation
 
 ## Environment
 
@@ -29,451 +29,275 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 20B/20C added ruled surfaces and Coons patches.
+Phase 20C implemented Coons patch creation, preview, and TikZ export.
 
-Manual UI check found a serious workflow issue:
+Review result:
 
-- In Add sheet mode, Coons patch creation can only use the one path that is already selected when entering the mode.
-- For each of `bottom`, `right`, `top`, `left`, the user currently needs to leave Add sheet mode, go back to Select mode, select another path, and then return.
-- Returning to Select mode clears the previously picked boundary information, so it is not possible to pick all four Coons boundaries in one workflow.
-- Ruled surface creation has the same problem for its two boundary paths.
+- Tests pass.
+- Build passes.
+- No Critical issues.
+- One Medium issue remains.
 
-Desired behavior:
+## Medium issue
 
-- In Add sheet > Coons mode, users should be able to click existing paths directly and pick them sequentially without leaving Add sheet mode.
-- Coons picking order should be:
+Closed Coons boundary paths are rejected only in the UI click/pick workflow, but not in lower-level creation helpers or saved primitive validation.
 
-```text
-bottom -> right -> top -> left
-```
+Current behavior:
 
-- In Add sheet > Ruled surface mode, users should be able to click two existing paths sequentially without leaving Add sheet mode.
-- Previously picked paths should remain stored in the current creation draft until the user finishes, cancels, resets, or changes tool intentionally.
+- `src/ui/ruledSurface.ts` rejects closed paths during clicking.
+- But `createCoonsPatchFromBoundaryPaths(...)` can load/copy snapshots directly.
+- `validateCoonsPatchPrimitive(...)` only validates corner equality.
+- A persisted `coonsPatch` with a closed bottom boundary and matching degenerate corners can validate as `true`.
+- This leaves an ambiguous boundary-order path into creation/save-load outside the click workflow.
+
+Review's targeted requirement:
+
+> Fix Phase 20C Coons patch validation so all four Coons boundary snapshots must be open paths in `validateCoonsPatchPrimitive` and `createCoonsPatchFromBoundaryPaths`, add tests for direct creation and save/load rejection of closed Coons boundaries, and keep existing pick-time behavior unchanged.
 
 ## Goal
 
-Fix the Add sheet ruled/Coons creation workflow so boundary paths can be selected continuously inside Add sheet mode.
+Make Coons patch closed-boundary rejection robust at all entry points.
 
-The user should not need to switch to Select mode between boundary picks.
+A Coons patch requires four open boundary paths:
+
+```text
+bottom
+right
+top
+left
+```
+
+All four boundary snapshots must be open paths.
+
+Closed paths must be rejected:
+
+- during UI picking, as already implemented;
+- during helper-level creation;
+- during primitive validation;
+- during saved JSON load/validation.
 
 ## Scope
 
-This is a targeted Phase 20B/20C UI/workflow fix.
+This is a targeted Phase 20C fix.
 
 Implement:
 
-- sequential boundary picking while Add sheet mode is active;
-- Coons boundary draft state for `bottom`, `right`, `top`, `left`;
-- ruled surface boundary draft state for `boundary0`, `boundary1`;
-- path click handling in Add sheet mode;
-- visible status/progress text;
-- highlight of already picked boundary paths if infrastructure exists;
-- tests for the draft state and click handling where practical.
+- open-boundary validation for all four Coons boundary snapshots;
+- rejection in `createCoonsPatchFromBoundaryPaths(...)`;
+- rejection in `validateCoonsPatchPrimitive(...)`;
+- save/load rejection tests;
+- direct helper creation rejection tests.
 
 Do not implement:
 
-- new surface primitives;
+- new surface types;
+- automatic role inference from closed paths;
+- accepting closed paths as Coons boundaries;
+- Coons boundary splitting;
+- new UI workflows;
 - new geometry formulas;
-- auto-visibility/depth sorting;
-- broad multi-selection;
-- general selection redesign;
-- live linked boundaries;
-- snapping;
+- visibility/depth sorting;
 - new dependencies.
 
 Do not change:
 
-- ruled surface data model except if needed for picking state;
-- Coons patch data model except if needed for picking state;
-- copy-on-create boundary policy;
-- Coons corner validation;
-- SVG/TikZ export semantics;
-- save/load format;
-- normal Select mode behavior.
+- valid open-boundary Coons creation;
+- Coons patch formula;
+- Coons corner compatibility rules;
+- source path copy-on-create semantics;
+- ruled surface behavior unless shared helpers require safe refactoring;
+- SVG/TikZ export semantics for valid Coons patches;
+- save/load format for valid diagrams.
 
-## 1. Add explicit boundary-picking draft state
+## 1. Define and centralize "open boundary" check
 
-Do not rely on global `selectedElement` as the only source for boundary paths.
+Add or reuse a helper to determine whether a boundary path snapshot is closed.
 
-Add or refine Add sheet draft state so it stores picked boundary path IDs/roles.
-
-Suggested state shape:
+Suggested helpers:
 
 ```ts
-type RuledSurfaceBoundaryDraft = {
-  kind: "ruledSurface";
-  boundary0Id?: string;
-  boundary1Id?: string;
-  nextRole: "boundary0" | "boundary1";
-  status?: string;
-};
-
-type CoonsPatchBoundaryDraft = {
-  kind: "coonsPatch";
-  bottomId?: string;
-  rightId?: string;
-  topId?: string;
-  leftId?: string;
-  nextRole: "bottom" | "right" | "top" | "left";
-  status?: string;
-};
+isBoundaryPathClosed(boundary: BoundaryPathSnapshot, epsilon: number): boolean
+isBoundaryPathOpen(boundary: BoundaryPathSnapshot, epsilon: number): boolean
 ```
 
-Exact shape can differ.
+or equivalent.
+
+Definition:
+
+- boundary is closed if its start endpoint and end endpoint are approximately equal within the existing geometric tolerance.
+- boundary is open if start and end are both finite and not approximately equal.
 
 Requirements:
 
-- draft state is UI/editor state only;
-- draft state is not stored in `Diagram`;
-- draft survives path clicks while staying in Add sheet mode;
-- draft is cleared on Cancel/Reset/Finish;
-- draft is cleared or validated when changing tool/mode if existing creation drafts behave that way;
-- draft is not exported to TikZ.
+- handles malformed boundaries safely;
+- does not throw raw `TypeError`;
+- works with symbolic preview coordinates;
+- uses existing endpoint helpers if available;
+- respects existing tolerance conventions.
 
-## 2. Coons patch sequential picking workflow
+If malformed endpoint data is encountered, return validation failure rather than treating it as open.
 
-In Add sheet > Coons mode:
+## 2. Enforce open boundaries in `validateCoonsPatchPrimitive`
 
-1. Initially prompt:
+Update `validateCoonsPatchPrimitive(...)` or equivalent validation logic.
 
-```text
-Pick bottom boundary path
-```
-
-2. User clicks an existing path.
-3. Store it as `bottom`.
-4. Prompt:
+Before or during corner validation, require:
 
 ```text
-Pick right boundary path
+bottom is open
+right is open
+top is open
+left is open
 ```
 
-5. User clicks another existing path.
-6. Store it as `right`.
-7. Prompt:
+If any boundary is closed, validation must fail.
+
+Error should identify the offending role when possible:
 
 ```text
-Pick top boundary path
+Coons patch bottom boundary must be an open path.
 ```
 
-8. Store clicked path as `top`.
-9. Prompt:
+or:
 
 ```text
-Pick left boundary path
+Coons patch boundaries must be open paths; closed boundary found at bottom.
 ```
 
-10. Store clicked path as `left`.
-11. Once all four are present, enable Create/Finish.
+Requirements:
 
-Required:
+- do not rely solely on UI pick-time guard;
+- saved primitive validation catches closed boundaries;
+- closed paths with degenerate/matching corners are still rejected;
+- valid open-boundary Coons patches still validate.
 
-- boundary role order is exactly `bottom -> right -> top -> left`;
-- user does not leave Add sheet mode;
-- previously picked boundary IDs are not lost;
-- repeated clicks on the same path are rejected unless explicitly allowed;
-- invalid clicked objects are rejected without clearing previous picks;
-- status message indicates progress, e.g.:
+## 3. Enforce open boundaries in `createCoonsPatchFromBoundaryPaths`
 
-```text
-Coons patch: picked 2/4. Next: top.
-```
+Update `createCoonsPatchFromBoundaryPaths(...)` or equivalent helper.
 
-- optional Back/Undo-pick button may remove the last picked boundary;
-- Reset clears all picked boundaries;
-- Cancel exits/clears draft according to existing Add sheet behavior.
+Requirements:
 
-## 3. Ruled surface sequential picking workflow
-
-In Add sheet > Ruled surface mode:
-
-1. Prompt:
-
-```text
-Pick first boundary path
-```
-
-2. User clicks an existing path.
-3. Store as `boundary0`.
-4. Prompt:
-
-```text
-Pick second boundary path
-```
-
-5. User clicks another existing path.
-6. Store as `boundary1`.
-7. Enable Create/Finish.
-
-Required:
-
-- user does not leave Add sheet mode;
-- previously picked boundary is not lost;
-- duplicate path rejected unless explicitly allowed;
-- invalid clicked objects rejected without clearing previous pick;
-- status message indicates progress.
-
-## 4. Click handling in Add sheet mode
-
-Inspect:
-
-- `App.tsx` Add sheet creation handlers;
-- `SvgDiagram.tsx` click handlers;
-- selection click handlers for curves/paths;
-- surface creation UI.
-
-Currently, existing path clicks likely route to normal selection only in Select mode.
-
-Modify click handling so that:
-
-### In Select mode
-
-- clicking a path selects it as before.
-
-### In Add sheet > Coons mode
-
-- clicking an eligible path uses it as the next Coons boundary role;
-- it should not replace global selection as the primary workflow;
-- it should not clear previously picked roles;
-- it should not accidentally create a different sheet vertex.
-
-### In Add sheet > Ruled mode
-
-- clicking an eligible path uses it as the next ruled boundary;
-- same constraints as above.
-
-### In other Add sheet modes
-
-- existing behavior remains unchanged.
-
-Avoid breaking:
-
-- ordinary path selection;
-- cursor creation of polygon sheets;
-- point picking for work planes;
-- coordinate source picking;
-- camera dragging;
-- handle dragging.
-
-## 5. Eligible boundary paths
-
-Define which existing objects can be boundary paths.
-
-Preferred eligible objects:
-
-- concatenated paths;
-- path templates if boundary extraction supports them:
-  - circle;
-  - ellipse;
-  - arc-containing path if closed/open rules match;
-- other curve strata only if existing boundary evaluation supports them.
-
-For ruled surfaces:
-
-- open paths allowed if both boundaries have compatible closure status;
-- closed paths allowed if both are closed;
-- mismatch rejected according to existing Phase 20A/20B policy.
-
-For Coons patches:
-
-- each boundary should be an open path with endpoints matching the adjacent boundaries;
-- if closed paths are not meaningful for a Coons boundary, reject them with a clear message.
-- corner compatibility is checked after four picks.
-
-Do not silently accept unsupported curve kinds.
-
-## 6. Validation timing
-
-Validation should happen in two stages.
-
-### On each pick
-
-Validate:
-
-- clicked object is an eligible path;
-- path has finite/evaluable geometry;
-- path can be used as boundary snapshot;
-- duplicate path not already picked for this draft unless allowed.
-
-If invalid:
-
-- show status message;
-- keep existing picked boundaries unchanged.
-
-### On Finish/Create
-
-Validate full surface:
-
-Ruled:
-
-- two boundaries present;
-- ruled surface validation passes.
-
-Coons:
-
-- all four boundaries present;
-- corner compatibility passes:
-  - bottom start = left start;
-  - bottom end = right start;
-  - top start = left end;
-  - top end = right end;
-- Coons sampling validation passes.
-
-If final validation fails:
-
-- keep draft data so user can reset/back/fix;
-- do not create invalid diagram data.
-
-## 7. Boundary highlighting / preview
-
-If the project already has coordinate-source or picked-source highlighting, reuse it.
-
-Preferred:
-
-- picked boundary paths are highlighted in SVG preview;
-- different roles are labeled or indicated:
+- reject closed boundaries before creating diagram data;
+- reject all roles:
   - bottom;
   - right;
   - top;
   - left;
-- next expected role is shown in UI status.
+- do not create a Coons patch when any boundary is closed;
+- return a clean failure/result/status rather than throwing;
+- preserve existing UI pick-time behavior;
+- preserve existing corner compatibility behavior for open paths.
 
-MVP acceptable:
+If this helper first auto-orients/reverses boundary snapshots, the open-boundary check can happen before or after orientation, but it must occur before final creation. Since reversing a closed path is still closed, either is fine.
 
-- text status only, no highlight;
-- but report highlight limitation.
-
-Do not store highlights in `Diagram`.
-
-Do not export highlights to TikZ.
-
-## 8. Create/Finish behavior
-
-When the user clicks Create/Finish:
-
-Ruled surface:
-
-- copy boundary path snapshots from the two picked paths;
-- create one ruled surface stratum;
-- select created surface;
-- clear draft;
-- push one undo history entry if undo/redo exists.
-
-Coons patch:
-
-- copy four boundary path snapshots;
-- create one Coons patch stratum;
-- select created surface;
-- clear draft;
-- push one undo history entry if undo/redo exists.
-
-Source paths remain unchanged.
-
-No live linking.
-
-## 9. UI controls
-
-Add or adjust controls in Add sheet mode.
-
-Suggested UI:
+Preferred flow:
 
 ```text
-Sheet type:
-  Polygon
-  Ruled surface
-  Coons patch
-
-Ruled surface:
-  Picked:
-    Boundary 1: <name or none>
-    Boundary 2: <name or none>
-  Next: Boundary 2
-  [Back] [Reset] [Create]
-
-Coons patch:
-  Picked:
-    Bottom: <name or none>
-    Right: <name or none>
-    Top: <name or none>
-    Left: <name or none>
-  Next: Top
-  [Back] [Reset] [Create]
+copy boundary snapshots
+-> validate each boundary is open
+-> auto-orient by connectivity
+-> validate corners
+-> create Coons patch
 ```
 
-Requirements:
+## 4. Save/load behavior
 
-- Create disabled until required boundaries are picked;
-- Reset visible;
-- Cancel/back behavior clear;
-- UI remains compact and does not overflow badly;
-- switching between Ruled and Coons should reset or convert draft in a predictable way.
+Malformed or invalid saved diagrams containing Coons patches with closed boundaries must be rejected.
 
-## 10. Tests
+For `parseSavedDiagramJson(...)` or equivalent:
+
+- a saved `coonsPatch` with a closed bottom boundary returns `ok: false`;
+- same for right/top/left;
+- no raw exception is thrown;
+- error message should mention closed Coons boundary or open-boundary requirement.
+
+Do not silently normalize closed boundaries into open ones.
+
+Do not accept closed boundaries just because corner equations are degenerate and pass.
+
+## 5. Keep pick-time behavior unchanged
+
+Existing click/pick UI already rejects closed paths.
+
+Preserve that behavior.
+
+This fix adds lower-level defense, not a replacement.
+
+The UI should still reject closed paths immediately when picking Coons boundaries if it currently does.
+
+## 6. Ruled surface behavior
+
+This fix is primarily about Coons patches.
+
+Do not add a closed-boundary restriction to ruled surfaces unless the existing ruled-surface design already requires it.
+
+Ruled surfaces may validly connect two closed boundary curves, for example between two loops, depending on current semantics.
+
+Therefore:
+
+- Coons: all four boundaries must be open.
+- Ruled: keep existing policy.
+
+Add tests to ensure ruled surface behavior is not accidentally changed, if practical.
+
+## 7. Tests
 
 Add focused tests.
 
-### Draft-state tests
+### Primitive validation tests
 
-1. Coons draft starts with next role `bottom`.
-2. Picking first path stores `bottom` and advances to `right`.
-3. Picking second path stores `right` and advances to `top`.
-4. Picking third path stores `top` and advances to `left`.
-5. Picking fourth path stores `left` and enables create.
-6. Reset clears all Coons picks.
-7. Duplicate path pick rejected without clearing previous picks.
+1. `validateCoonsPatchPrimitive` rejects closed bottom boundary.
+2. `validateCoonsPatchPrimitive` rejects closed right boundary.
+3. `validateCoonsPatchPrimitive` rejects closed top boundary.
+4. `validateCoonsPatchPrimitive` rejects closed left boundary.
+5. `validateCoonsPatchPrimitive` rejects a closed boundary even if corner equality would otherwise pass.
+6. `validateCoonsPatchPrimitive` accepts a valid open-boundary Coons patch.
 
-8. Ruled draft starts with `boundary0`.
-9. Picking first path stores `boundary0` and advances to `boundary1`.
-10. Picking second path stores `boundary1` and enables create.
-11. Reset clears ruled picks.
+### Helper creation tests
 
-### Click-handling tests
+7. `createCoonsPatchFromBoundaryPaths(...)` rejects closed bottom boundary.
+8. `createCoonsPatchFromBoundaryPaths(...)` rejects closed right boundary.
+9. `createCoonsPatchFromBoundaryPaths(...)` rejects closed top boundary.
+10. `createCoonsPatchFromBoundaryPaths(...)` rejects closed left boundary.
+11. Helper returns a clean failure/status and does not replace/mutate the diagram.
+12. Helper still creates a Coons patch from valid open boundaries.
 
-12. In Select mode, clicking a path selects it normally.
-13. In Add sheet > Coons mode, clicking a path adds it as next boundary instead of requiring Select mode.
-14. In Add sheet > Ruled mode, clicking a path adds it as next boundary.
-15. Invalid clicked object does not clear draft.
-16. Switching away from Add sheet clears or validates draft according to policy.
+### Save/load tests
 
-### Creation tests
-
-17. Coons surface can be created after four sequential path clicks.
-18. Ruled surface can be created after two sequential path clicks.
-19. Created surface uses copied boundary snapshots.
-20. Source paths unchanged.
-21. Created surface selected.
-22. Undo/redo creation if testable.
-
-### Validation tests
-
-23. Coons corner mismatch after four picks prevents creation but keeps draft.
-24. Ruled incompatible boundaries rejected at finish.
-25. Unsupported curve kind rejected.
+13. `parseSavedDiagramJson(...)` returns `ok: false` for saved Coons patch with closed bottom boundary.
+14. Same for right boundary.
+15. Same for top boundary.
+16. Same for left boundary.
+17. Saved valid open-boundary Coons patch still loads.
+18. No raw exception is thrown for invalid closed-boundary Coons patch.
 
 ### Regression tests
 
-26. Polygon sheet creation still works.
-27. Existing path selection still works.
-28. Point picking for work plane still works.
-29. Coordinate source picking still works.
-30. SVG/TikZ export for existing ruled/Coons surfaces unchanged.
+19. UI pick-time closed-path rejection still works if testable.
+20. Ruled surface behavior for closed boundaries remains unchanged according to existing policy.
+21. Existing Coons auto-orientation tests still pass.
+22. Existing Coons SVG/TikZ export tests still pass.
+23. Existing malformed boundary load rejection tests still pass.
 
-If full UI pointer tests are difficult, extract pure draft reducer/helper functions and test them. Still wire the actual App/SvgDiagram click path to those helpers.
+## 8. Error messages
 
-## 11. Documentation
+Add or update error text to be clear.
 
-Update docs or inline UI help:
+Good examples:
 
-- Coons patch boundaries are picked in order:
-  - bottom;
-  - right;
-  - top;
-  - left.
-- Ruled surface boundaries are picked sequentially.
-- Boundary picks are copy-on-create.
-- No need to switch to Select mode.
+```text
+Coons patch bottom boundary must be an open path.
+```
 
-## 12. Manual verification checklist
+```text
+Coons patch boundaries must be open paths; closed boundary found at top.
+```
+
+Avoid generic corner-only errors when the real problem is a closed boundary.
+
+This matters because a closed path may produce confusing degenerate corner matches.
+
+## 9. Manual verification checklist
 
 After implementation, run:
 
@@ -481,58 +305,47 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Verify Coons:
+Manual tests:
 
-1. Create four compatible boundary paths.
-2. Enter Add sheet mode.
-3. Select Coons patch mode.
-4. Click bottom path.
-5. Confirm UI says next is right.
-6. Click right path.
-7. Confirm UI says next is top.
-8. Click top path.
-9. Confirm UI says next is left.
-10. Click left path.
-11. Confirm Create is enabled.
-12. Create Coons patch.
-13. Confirm surface appears and is selected.
-14. Confirm source paths remain.
-15. Undo/redo.
+1. Create a closed path.
+2. Enter Add sheet > Coons mode.
+3. Try to pick it as bottom boundary.
+4. Confirm UI rejects it immediately, as before.
 
-Verify Ruled:
+Then test helper/save-load behavior if practical:
 
-16. Enter Add sheet mode.
-17. Select Ruled surface mode.
-18. Click first boundary path.
-19. Click second boundary path.
-20. Create ruled surface.
-21. Confirm it appears and is selected.
+5. Load or construct a diagram JSON with a Coons patch whose bottom boundary is closed.
+6. Confirm load is rejected gracefully.
+7. Confirm app does not crash.
+8. Confirm error/status mentions open-boundary requirement.
+9. Load a valid open-boundary Coons patch.
+10. Confirm it loads/renders/exports.
 
 Regression:
 
-22. Switch to Select mode.
-23. Click a path.
-24. Confirm it selects normally.
-25. Create polygon sheet as before.
-26. Confirm no regression.
+11. Create a Coons patch from four valid open paths.
+12. Confirm creation succeeds.
+13. Create a ruled surface with closed-loop boundaries if currently allowed.
+14. Confirm ruled policy is unchanged.
 
-## 13. Preserve existing behavior
+## 10. Preserve existing behavior
 
 Do not regress:
 
-- existing ruled surface data/sampling;
-- existing Coons patch data/sampling;
-- polygon sheet creation;
-- path selection in Select mode;
+- valid open-boundary Coons creation;
+- Coons path auto-orientation;
+- Coons corner compatibility for open boundaries;
+- sequential boundary picking;
 - source path copy-on-create;
+- ruled surface creation/validation;
 - SVG preview;
 - TikZ export;
-- save/load;
+- save/load of valid diagrams;
 - undo/redo;
 - layer/style/camera/work-plane behavior;
-- inline/standalone export formatting.
+- inline/standalone TikZ formatting.
 
-## 14. Verification
+## 11. Verification
 
 Run:
 
@@ -542,17 +355,17 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 15. Report after implementation
+## 12. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of the one-path-only workflow;
-- new ruled surface boundary draft behavior;
-- new Coons patch boundary draft behavior;
-- click-handling changes in Add sheet mode;
-- validation behavior;
-- highlight/status behavior;
+- where open-boundary validation was added;
+- how `validateCoonsPatchPrimitive` rejects closed boundaries;
+- how `createCoonsPatchFromBoundaryPaths` rejects closed boundaries;
+- save/load rejection behavior;
+- error messages added/updated;
+- ruled surface behavior preserved;
 - tests added/updated;
 - test results;
 - build results;
