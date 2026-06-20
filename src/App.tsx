@@ -38,6 +38,7 @@ import {
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import { hasSymbolicVec3Coordinates } from './model/symbolicCoordinates.ts'
+import { pathEndpoints } from './model/paths.ts'
 import type {
   AmbientDimension,
   ArcDirection,
@@ -115,10 +116,11 @@ import {
   boundarySurfaceDraftPickErrorMessage,
   boundarySurfacePathClickWorkflow,
   coonsPatchBoundaryDraftCanCreate,
+  coonsPatchBoundaryDraftPickedBoundaryForRole,
   coonsPatchBoundaryDraftPickedPathIds,
   coonsPatchBoundaryRoles,
   coonsPatchBoundaryDraftStatusMessage,
-  coonsPatchBoundaryPathIdsFromDraft,
+  coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryPathSourceErrorMessage,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
@@ -160,6 +162,7 @@ import {
   parseFiniteNumber,
   parseOpacity,
   parsePositiveFiniteNumber,
+  orientedCoonsBoundarySnapshot,
   pickCoonsPatchBoundaryDraftPath,
   pickRuledSurfaceBoundaryDraftPath,
   parseDirectLayerInput,
@@ -167,6 +170,8 @@ import {
   removeSelectedElementWithLayerFilter,
   resetCameraControlState,
   resetCoonsPatchBoundaryDraft,
+  toggleCoonsPatchBoundaryDraftReverse,
+  validateCoonsPatchBoundarySelections,
   setConcatenatedPathDraftSegmentKind,
   resetRuledSurfaceBoundaryDraft,
   ruledSurfaceBoundaryDraftCanCreate,
@@ -1680,7 +1685,9 @@ function App() {
     }
 
     setCoonsPatchBoundaryDraft(draftResult.draft)
-    setSheetStatus(coonsPatchBoundaryDraftStatusMessage(draftResult.draft))
+    setSheetStatus(
+      coonsPatchBoundaryDraftStatusForUi(editableDiagram, draftResult.draft),
+    )
   }
 
   function resetCoonsPatchBoundaryPicking(): void {
@@ -1694,7 +1701,20 @@ function App() {
     const draft = undoCoonsPatchBoundaryDraftPick(coonsPatchBoundaryDraft)
 
     setCoonsPatchBoundaryDraft(draft)
-    setSheetStatus(coonsPatchBoundaryDraftStatusMessage(draft))
+    setSheetStatus(coonsPatchBoundaryDraftStatusForUi(editableDiagram, draft))
+  }
+
+  function toggleCoonsPatchBoundaryDirection(
+    role: CoonsPatchBoundaryRole,
+  ): void {
+    const draft = toggleCoonsPatchBoundaryDraftReverse(
+      coonsPatchBoundaryDraft,
+      role,
+    )
+
+    setCoonsPatchBoundaryDraft(draft)
+    setSheetStatus(coonsPatchBoundaryDraftStatusForUi(editableDiagram, draft))
+    setDirectCreationStatus('')
   }
 
   function handleBoundarySurfaceCurveClick(pathId: string): void {
@@ -1734,7 +1754,7 @@ function App() {
 
     const result = createCoonsPatchFromBoundaryPaths(
       editableDiagram,
-      coonsPatchBoundaryPathIdsFromDraft(coonsPatchBoundaryDraft),
+      coonsPatchBoundarySelectionsFromDraft(coonsPatchBoundaryDraft),
       {
         layer: creationLayer,
         sampling: { uSegments, vSegments },
@@ -5011,7 +5031,12 @@ function App() {
                 <button
                   type="button"
                   className="toolbar-button"
-                  disabled={!coonsPatchBoundaryDraftCanCreate(coonsPatchBoundaryDraft)}
+                  disabled={
+                    !coonsPatchBoundaryDraftCanCreateWithCurrentDirections(
+                      editableDiagram,
+                      coonsPatchBoundaryDraft,
+                    )
+                  }
                   onClick={() => {
                     const creationLayer = parseNewElementLayer(setSheetStatus)
 
@@ -5025,9 +5050,46 @@ function App() {
                 >
                   Create
                 </button>
+                <div
+                  className="coons-boundary-direction-list"
+                  aria-label="Coons patch boundaries"
+                >
+                  {coonsPatchBoundaryRoles.map((role) => {
+                    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(
+                      coonsPatchBoundaryDraft,
+                      role,
+                    )
+
+                    return (
+                      <div key={role} className="coons-boundary-direction-row">
+                        <span className="coons-boundary-direction-label">
+                          {coonsPatchBoundaryRoleLabel(role)}:
+                        </span>
+                        <span className="coons-boundary-direction-text">
+                          {formatCoonsPatchBoundaryDirectionSummary(
+                            editableDiagram,
+                            coonsPatchBoundaryDraft,
+                            role,
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="toolbar-button coons-boundary-reverse-button"
+                          disabled={picked === null}
+                          aria-pressed={picked?.reversed ?? false}
+                          aria-label={`Reverse ${coonsPatchBoundaryRoleLabel(
+                            role,
+                          )} boundary direction`}
+                          onClick={() => toggleCoonsPatchBoundaryDirection(role)}
+                        >
+                          Reverse
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
                 <span className="toolbar-status">
-                  {coonsPatchBoundaryDraftStatusMessage(coonsPatchBoundaryDraft)}{' '}
-                  {formatCoonsPatchBoundaryPickSummary(
+                  {coonsPatchBoundaryDraftStatusForUi(
                     editableDiagram,
                     coonsPatchBoundaryDraft,
                   )}
@@ -6412,13 +6474,16 @@ function createBoundaryPathHighlightsForSheetDraft(
 
   if (sheetCreationKind === 'coonsPatch') {
     return coonsPatchBoundaryRoles.flatMap((role) => {
-      const pathId = coonsPatchDraftSourcePathId(coonsPatchDraft, role)
+      const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(
+        coonsPatchDraft,
+        role,
+      )
 
-      return pathId === undefined || pathId.trim().length === 0
+      return picked === null
         ? []
         : [
             {
-              id: pathId,
+              id: picked.sourcePathId,
               label: coonsPatchBoundaryRoleLabel(role),
             },
           ]
@@ -6464,40 +6529,98 @@ function coonsPatchBoundaryRoleLabel(role: CoonsPatchBoundaryRole): string {
   }
 }
 
-function formatCoonsPatchBoundaryPickSummary(
+function coonsPatchBoundaryDraftCanCreateWithCurrentDirections(
+  diagram: Diagram,
+  draft: CoonsPatchBoundaryDraft,
+): boolean {
+  return (
+    coonsPatchBoundaryDraftCanCreate(draft) &&
+    validateCoonsPatchBoundarySelections(
+      diagram,
+      coonsPatchBoundarySelectionsFromDraft(draft),
+    ).ok
+  )
+}
+
+function coonsPatchBoundaryDraftStatusForUi(
   diagram: Diagram,
   draft: CoonsPatchBoundaryDraft,
 ): string {
-  return coonsPatchBoundaryRoles
-    .map((role) => {
-      const sourcePathId = coonsPatchDraftSourcePathId(draft, role)
-      const source =
-        sourcePathId === undefined || sourcePathId.trim().length === 0
-          ? undefined
-          : diagram.strata.find((stratum) => stratum.id === sourcePathId)
-      const label = source?.name ?? sourcePathId
+  if (!coonsPatchBoundaryDraftCanCreate(draft)) {
+    return coonsPatchBoundaryDraftStatusMessage(draft)
+  }
 
-      return `${coonsPatchBoundaryRoleLabel(role)}: ${
-        label === undefined || label.trim().length === 0 ? 'not picked' : label
-      }`
-    })
-    .join('; ')
+  const validation = validateCoonsPatchBoundarySelections(
+    diagram,
+    coonsPatchBoundarySelectionsFromDraft(draft),
+  )
+
+  return validation.ok
+    ? 'Coons patch: picked 4/4. Boundary directions match. Create is enabled.'
+    : createCoonsPatchFromBoundaryPathsErrorMessage(
+        validation.error,
+        validation.role,
+      )
 }
 
-function coonsPatchDraftSourcePathId(
+function formatCoonsPatchBoundaryDirectionSummary(
+  diagram: Diagram,
   draft: CoonsPatchBoundaryDraft,
   role: CoonsPatchBoundaryRole,
-): string | undefined {
-  switch (role) {
-    case 'bottom':
-      return draft.bottomId
-    case 'right':
-      return draft.rightId
-    case 'top':
-      return draft.topId
-    case 'left':
-      return draft.leftId
+): string {
+  const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
+
+  if (picked === null) {
+    return 'not picked'
   }
+
+  const source = diagram.strata.find(
+    (stratum) => stratum.id === picked.sourcePathId,
+  )
+  const sourceLabel =
+    source?.name !== undefined && source.name.trim().length > 0
+      ? source.name
+      : picked.sourcePathId
+  const sourceResult = validateCoonsPatchBoundaryPathSource(
+    diagram,
+    picked.sourcePathId,
+  )
+  const direction = picked.reversed ? 'reversed' : 'normal'
+
+  if (!sourceResult.ok) {
+    return `${sourceLabel} (${direction}; ${coonsPatchBoundaryPathSourceErrorMessage(
+      sourceResult.error,
+    )})`
+  }
+
+  const endpoints = pathEndpoints(
+    orientedCoonsBoundarySnapshot(
+      sourceResult.boundary,
+      picked.reversed,
+    ).segments,
+  )
+
+  return endpoints === null
+    ? `${sourceLabel} (${direction})`
+    : `${sourceLabel} (${direction}) ${formatCompactVec3(
+        endpoints.start,
+      )} -> ${formatCompactVec3(endpoints.end)}`
+}
+
+function formatCompactVec3(point: Vec3): string {
+  return `(${formatCompactNumber(point.x)}, ${formatCompactNumber(
+    point.y,
+  )}, ${formatCompactNumber(point.z)})`
+}
+
+function formatCompactNumber(value: number): string {
+  const normalized = Math.abs(value) < 1e-9 ? 0 : value
+
+  if (Number.isInteger(normalized)) {
+    return String(normalized)
+  }
+
+  return normalized.toFixed(3).replace(/\.?0+$/, '')
 }
 
 function parseFiniteInput(

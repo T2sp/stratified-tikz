@@ -940,8 +940,9 @@ S(u, v)
 
 The validator requires corner consistency: bottom start equals left start,
 bottom end equals right start, top start equals left end, and top end equals
-right end. Inconsistent corners are rejected until a future repair workflow is
-implemented.
+right end. During Coons patch creation, the Add sheet draft can reverse the
+effective direction of each picked boundary before the copied snapshots are
+validated and saved. This draft reversal does not mutate the source paths.
 
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry
@@ -971,9 +972,9 @@ Editor workflow:
 Current limitations: inspector editing does not yet rotate or replace the saved
 surface frame. Boundary-surface creation for ruled surfaces and Coons patches
 stores copied boundary geometry only; it does not create live links back to
-source paths or repair inconsistent Coons corners. The saved model also does
-not support symbolic sampled surface boundaries, arbitrary symbolic parametric
-surfaces, boolean operations, or mesh sculpting.
+source paths or infer unordered Coons roles automatically. The saved model also
+does not support symbolic sampled surface boundaries, arbitrary symbolic
+parametric surfaces, boolean operations, or mesh sculpting.
 
 ## Closed path boundaries
 

@@ -4,6 +4,7 @@ import type {
   AmbientDimension,
   ArcDirection,
   ArcPathSegment,
+  BoundaryPathSnapshot,
   CircleTemplatePath,
   ConcatenatedPathStratum,
   CurveStyle,
@@ -67,6 +68,113 @@ export function pathSegmentsFromCubicBezier(
         : { controlMode: cloneCubicBezierControlMode(controlMode) }),
     },
   ]
+}
+
+export function cloneBoundaryPathSnapshot(
+  snapshot: BoundaryPathSnapshot,
+): BoundaryPathSnapshot {
+  return {
+    ...(snapshot.id === undefined ? {} : { id: snapshot.id }),
+    ...(snapshot.name === undefined ? {} : { name: snapshot.name }),
+    segments: snapshot.segments.map(clonePathSegment),
+  }
+}
+
+export function reverseBoundaryPathSnapshot(
+  boundary: BoundaryPathSnapshot,
+): BoundaryPathSnapshot {
+  return {
+    ...(boundary.id === undefined ? {} : { id: boundary.id }),
+    ...(boundary.name === undefined ? {} : { name: boundary.name }),
+    segments: [...boundary.segments].reverse().map(reversePathSegment),
+  }
+}
+
+export function clonePathSegment(segment: PathSegment): PathSegment {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: cloneVec3(segment.start),
+        end: cloneVec3(segment.end),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: cloneVec3(segment.start),
+        control1: cloneVec3(segment.control1),
+        control2: cloneVec3(segment.control2),
+        end: cloneVec3(segment.end),
+        ...(segment.controlMode === undefined
+          ? {}
+          : { controlMode: cloneCubicBezierControlMode(segment.controlMode) }),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: cloneVec3(segment.start),
+        end: cloneVec3(segment.end),
+        center: cloneVec3(segment.center),
+        radius: segment.radius,
+        startAngleDeg: segment.startAngleDeg,
+        endAngleDeg: segment.endAngleDeg,
+        direction: segment.direction,
+        ...(segment.frame === undefined
+          ? {}
+          : { frame: cloneWorkPlaneFrameSnapshot(segment.frame) }),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+  }
+}
+
+export function reversePathSegment(segment: PathSegment): PathSegment {
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: cloneVec3(segment.end),
+        end: cloneVec3(segment.start),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: cloneVec3(segment.end),
+        control1: cloneVec3(segment.control2),
+        control2: cloneVec3(segment.control1),
+        end: cloneVec3(segment.start),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: cloneVec3(segment.end),
+        end: cloneVec3(segment.start),
+        center: cloneVec3(segment.center),
+        radius: segment.radius,
+        startAngleDeg: segment.endAngleDeg,
+        endAngleDeg: segment.startAngleDeg,
+        direction: reverseArcDirection(segment.direction),
+        ...(segment.frame === undefined
+          ? {}
+          : { frame: cloneWorkPlaneFrameSnapshot(segment.frame) }),
+        ...(segment.styleOverride === undefined
+          ? {}
+          : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
+      }
+  }
 }
 
 export function pathEndpoints(
@@ -573,8 +681,10 @@ function normalizePathSegment(
   }
 }
 
-function cloneVec3(point: Vec3): Vec3 {
-  return { ...point }
+export function cloneVec3(point: Vec3): Vec3 {
+  return point.symbolic === undefined
+    ? { ...point }
+    : { ...point, symbolic: structuredClone(point.symbolic) }
 }
 
 function cloneWorkPlaneFrameSnapshot(
@@ -851,6 +961,10 @@ function clonePathSegmentStyleOverride(
   styleOverride: PathSegmentStyleOverride | undefined,
 ): PathSegmentStyleOverride | undefined {
   return styleOverride === undefined ? undefined : { ...styleOverride }
+}
+
+function reverseArcDirection(direction: ArcDirection): ArcDirection {
+  return direction === 'counterclockwise' ? 'clockwise' : 'counterclockwise'
 }
 
 function cloneCubicBezierControlMode(

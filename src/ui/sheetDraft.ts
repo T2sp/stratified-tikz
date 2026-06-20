@@ -2,7 +2,9 @@ import type { Vec3, WorkPlane } from '../model/types.ts'
 import {
   coonsPatchBoundaryRoles,
   type CoonsPatchBoundaryPathIds,
+  type CoonsPatchBoundaryPathSelections,
   type CoonsPatchBoundaryRole,
+  type PickedCoonsBoundary,
 } from './ruledSurface.ts'
 import {
   dot,
@@ -29,10 +31,10 @@ export type RuledSurfaceBoundaryDraft = {
 
 export type CoonsPatchBoundaryDraft = {
   kind: 'coonsPatch'
-  bottomId?: string
-  rightId?: string
-  topId?: string
-  leftId?: string
+  bottom?: PickedCoonsBoundary
+  right?: PickedCoonsBoundary
+  top?: PickedCoonsBoundary
+  left?: PickedCoonsBoundary
   nextRole: CoonsPatchBoundaryRole
 }
 
@@ -139,7 +141,7 @@ export function coonsPatchBoundaryDraftCanCreate(
   draft: CoonsPatchBoundaryDraft,
 ): boolean {
   return coonsPatchBoundaryRoles.every(
-    (role) => coonsPatchBoundaryDraftPathIdForRole(draft, role) !== null,
+    (role) => coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role) !== null,
   )
 }
 
@@ -159,9 +161,9 @@ export function coonsPatchBoundaryDraftPickedPathIds(
   draft: CoonsPatchBoundaryDraft,
 ): string[] {
   return coonsPatchBoundaryRoles.flatMap((role) => {
-    const pathId = coonsPatchBoundaryDraftPathIdForRole(draft, role)
+    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
 
-    return pathId === null ? [] : [pathId]
+    return picked === null ? [] : [picked.sourcePathId]
   })
 }
 
@@ -177,10 +179,26 @@ export function coonsPatchBoundaryPathIdsFromDraft(
   const sourcePathIds: CoonsPatchBoundaryPathIds = {}
 
   coonsPatchBoundaryRoles.forEach((role) => {
-    const pathId = coonsPatchBoundaryDraftPathIdForRole(draft, role)
+    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
 
-    if (pathId !== null) {
-      sourcePathIds[role] = pathId
+    if (picked !== null) {
+      sourcePathIds[role] = picked.sourcePathId
+    }
+  })
+
+  return sourcePathIds
+}
+
+export function coonsPatchBoundarySelectionsFromDraft(
+  draft: CoonsPatchBoundaryDraft,
+): CoonsPatchBoundaryPathSelections {
+  const sourcePathIds: CoonsPatchBoundaryPathSelections = {}
+
+  coonsPatchBoundaryRoles.forEach((role) => {
+    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
+
+    if (picked !== null) {
+      sourcePathIds[role] = picked
     }
   })
 
@@ -276,7 +294,10 @@ export function pickCoonsPatchBoundaryDraftPath(
     ok: true,
     role,
     draft: {
-      ...setCoonsPatchBoundaryDraftPathId(draft, role, pathId),
+      ...setCoonsPatchBoundaryDraftPickedBoundary(draft, role, {
+        sourcePathId: pathId,
+        reversed: false,
+      }),
       nextRole: nextCoonsPatchBoundaryRole(role),
     },
   }
@@ -309,16 +330,34 @@ export function undoCoonsPatchBoundaryDraftPick(
 ): CoonsPatchBoundaryDraft {
   const lastPickedRole = [...coonsPatchBoundaryRoles]
     .reverse()
-    .find((role) => coonsPatchBoundaryDraftPathIdForRole(draft, role) !== null)
+    .find(
+      (role) => coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role) !== null,
+    )
 
   if (lastPickedRole === undefined) {
     return draft
   }
 
   return {
-    ...clearCoonsPatchBoundaryDraftPathId(draft, lastPickedRole),
+    ...clearCoonsPatchBoundaryDraftPickedBoundary(draft, lastPickedRole),
     nextRole: lastPickedRole,
   }
+}
+
+export function toggleCoonsPatchBoundaryDraftReverse(
+  draft: CoonsPatchBoundaryDraft,
+  role: CoonsPatchBoundaryRole,
+): CoonsPatchBoundaryDraft {
+  const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(draft, role)
+
+  if (picked === null) {
+    return draft
+  }
+
+  return setCoonsPatchBoundaryDraftPickedBoundary(draft, role, {
+    sourcePathId: picked.sourcePathId,
+    reversed: !picked.reversed,
+  })
 }
 
 export function ruledSurfaceBoundaryDraftStatusMessage(
@@ -486,53 +525,63 @@ function ruledSurfaceBoundaryRoleLabel(role: RuledSurfaceBoundaryRole): string {
   }
 }
 
-function coonsPatchBoundaryDraftPathIdForRole(
+export function coonsPatchBoundaryDraftPickedBoundaryForRole(
   draft: CoonsPatchBoundaryDraft,
   role: CoonsPatchBoundaryRole,
-): string | null {
+): PickedCoonsBoundary | null {
   switch (role) {
     case 'bottom':
-      return normalizePickedPathId(draft.bottomId)
+      return normalizePickedCoonsBoundary(draft.bottom)
     case 'right':
-      return normalizePickedPathId(draft.rightId)
+      return normalizePickedCoonsBoundary(draft.right)
     case 'top':
-      return normalizePickedPathId(draft.topId)
+      return normalizePickedCoonsBoundary(draft.top)
     case 'left':
-      return normalizePickedPathId(draft.leftId)
+      return normalizePickedCoonsBoundary(draft.left)
   }
 }
 
-function setCoonsPatchBoundaryDraftPathId(
+function setCoonsPatchBoundaryDraftPickedBoundary(
   draft: CoonsPatchBoundaryDraft,
   role: CoonsPatchBoundaryRole,
-  pathId: string,
+  picked: PickedCoonsBoundary,
 ): CoonsPatchBoundaryDraft {
   switch (role) {
     case 'bottom':
-      return { ...draft, bottomId: pathId }
+      return { ...draft, bottom: picked }
     case 'right':
-      return { ...draft, rightId: pathId }
+      return { ...draft, right: picked }
     case 'top':
-      return { ...draft, topId: pathId }
+      return { ...draft, top: picked }
     case 'left':
-      return { ...draft, leftId: pathId }
+      return { ...draft, left: picked }
   }
 }
 
-function clearCoonsPatchBoundaryDraftPathId(
+function clearCoonsPatchBoundaryDraftPickedBoundary(
   draft: CoonsPatchBoundaryDraft,
   role: CoonsPatchBoundaryRole,
 ): CoonsPatchBoundaryDraft {
   switch (role) {
     case 'bottom':
-      return { ...draft, bottomId: undefined }
+      return { ...draft, bottom: undefined }
     case 'right':
-      return { ...draft, rightId: undefined }
+      return { ...draft, right: undefined }
     case 'top':
-      return { ...draft, topId: undefined }
+      return { ...draft, top: undefined }
     case 'left':
-      return { ...draft, leftId: undefined }
+      return { ...draft, left: undefined }
   }
+}
+
+function normalizePickedCoonsBoundary(
+  picked: PickedCoonsBoundary | undefined,
+): PickedCoonsBoundary | null {
+  const sourcePathId = normalizePickedPathId(picked?.sourcePathId)
+
+  return sourcePathId === null
+    ? null
+    : { sourcePathId, reversed: picked?.reversed ?? false }
 }
 
 function nextCoonsPatchBoundaryRole(
