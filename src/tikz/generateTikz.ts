@@ -36,6 +36,7 @@ import type {
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
+  VisibilityOptions,
 } from '../model/types'
 import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
@@ -69,6 +70,18 @@ import {
   isSymbolicVariableMacroName,
   resolveSymbolicVariables,
 } from '../model/variables.ts'
+import {
+  defaultVisibilityOptions,
+  resolveVisibilityOptions,
+  surfaceDepthSortEnabled,
+} from '../model/visibility.ts'
+import {
+  compareProjectedSurfaceFaces,
+} from '../rendering/surfaceDepthSort.ts'
+import {
+  extractProjectedRenderPrimitives,
+  type ProjectedSurfaceFace,
+} from '../rendering/projectedPrimitives.ts'
 import { formatScalarExpressionForTikz } from './expressionFormatter.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
@@ -224,6 +237,7 @@ export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
   camera3d?: Camera3D
   exportMode?: TikzExportMode
+  visibility?: VisibilityOptions
 }
 
 type GenerateContext = {
@@ -241,6 +255,7 @@ type GenerateContext = {
   requiresTikz3dLibrary: boolean
   includeCoordinateAxes: boolean
   exportMode: TikzExportMode
+  visibility: VisibilityOptions
 }
 
 const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
@@ -274,6 +289,8 @@ export function generateTikz2D(
     diagram.userStylePresets,
     diagram.externalTikzStyleSources,
     diagram.importedTikzStyleReferences,
+    undefined,
+    resolveVisibilityOptions(diagram, options.visibility),
   )
   const regionSectionTitle = 'Codimension 0 strata: regions'
   const curveSectionTitle = 'Codimension 1 strata: curves'
@@ -349,6 +366,7 @@ export function generateTikz3D(
     diagram.externalTikzStyleSources,
     diagram.importedTikzStyleReferences,
     resolveTikzCamera3D(diagram, options),
+    resolveVisibilityOptions(diagram, options.visibility),
   )
   const sheetSectionTitle = 'Codimension 1 strata: sheets'
   const curveSectionTitle = 'Codimension 2 strata: curves'
@@ -360,15 +378,18 @@ export function generateTikz3D(
     pointSectionTitle,
     labelSectionTitle,
   ]
+  const sheetCommands = surfaceDepthSortEnabled(context.visibility)
+    ? emitDepthSortedSurfaceFaces(diagram, sheetSectionTitle, context)
+    : emitLayeredItems(
+        sheetSectionTitle,
+        diagram.strata.filter(
+          (stratum): stratum is SheetStratum =>
+            stratum.geometricKind === 'sheet' && stratum.codim === 1,
+        ),
+        (sheet, index) => emitSheet(sheet, index, context),
+      )
   const drawingCommands = [
-    ...emitLayeredItems(
-      sheetSectionTitle,
-      diagram.strata.filter(
-        (stratum): stratum is SheetStratum =>
-          stratum.geometricKind === 'sheet' && stratum.codim === 1,
-      ),
-      (sheet, index) => emitSheet(sheet, index, context),
-    ),
+    ...sheetCommands,
     ...emitLayeredItems(
       curveSectionTitle,
       diagram.strata.filter(
@@ -463,6 +484,7 @@ function createContext(
   externalTikzStyleSources: readonly ExternalTikzStyleSource[] | undefined,
   importedTikzStyleReferences: readonly ImportedTikzStyleReference[] | undefined,
   camera3d?: OrthographicCamera3D,
+  visibility: VisibilityOptions = defaultVisibilityOptions,
 ): GenerateContext {
   return {
     mode,
@@ -489,6 +511,7 @@ function createContext(
     includeCoordinateAxes:
       mode === '3d' && options.includeCoordinateAxes === true,
     exportMode: options.exportMode ?? 'standalone',
+    visibility,
   }
 }
 
@@ -1034,6 +1057,183 @@ function emitSheet(
     `\\filldraw[`,
     ...formatTikzOptions(options),
     `]`,
+    indentLine(
+      `${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
+    ),
+    '',
+  ]
+}
+
+function emitDepthSortedSurfaceFaces(
+  diagram: Diagram,
+  sectionTitle: string,
+  context: GenerateContext,
+): LayeredTikzCommand[] {
+  if (context.camera3d === undefined) {
+    return emitLayeredItems(
+      sectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is SheetStratum =>
+          stratum.geometricKind === 'sheet' && stratum.codim === 1,
+      ),
+      (sheet, index) => emitSheet(sheet, index, context),
+    )
+  }
+
+  const sheets = sortByLayer(
+    diagram.strata.filter(
+      (stratum): stratum is SheetStratum =>
+        stratum.geometricKind === 'sheet' && stratum.codim === 1,
+    ),
+  )
+  const sheetSources = new Map(
+    sheets.map(({ item }, index) => [
+      item.id,
+      {
+        sheet: item,
+        elementIndex: index,
+      },
+    ]),
+  )
+  let faces: ProjectedSurfaceFace[]
+
+  try {
+    faces = extractProjectedRenderPrimitives(diagram, {
+      camera: context.camera3d,
+    }).filter(
+      (primitive): primitive is ProjectedSurfaceFace =>
+        primitive.kind === 'surfaceFace' && sheetSources.has(primitive.sourceId),
+    )
+  } catch {
+    return emitLayeredItems(
+      sectionTitle,
+      sheets.map(({ item }) => item),
+      (sheet, index) => emitSheet(sheet, index, context),
+    )
+  }
+
+  const oversizedSheetIds = sheetIdsWithTooManySortedFaces(faces)
+  const oversizedSheetCommands = [...oversizedSheetIds].flatMap(
+    (sheetId): LayeredTikzCommand[] => {
+      const source = sheetSources.get(sheetId)
+
+      return source === undefined
+        ? []
+        : [
+            {
+              layer: normalizeLayer(source.sheet.layer),
+              sectionTitle,
+              lines: [
+                `% Sheet "${source.sheet.name}" [${source.sheet.id}] omitted because surface depth sorting would emit more than ${maxCurvedSheetTikzFaces} faces.`,
+                `% Reduce sampling or disable surface depth sorting for readable TikZ export.`,
+                '',
+              ],
+            },
+          ]
+    },
+  )
+  const sortedFaces = faces
+    .filter((face) => !oversizedSheetIds.has(face.sourceId))
+    .sort((left, right) =>
+      compareProjectedSurfaceFaces(left, right, context.visibility),
+    )
+  const optionsBySheetId = new Map<string, string[]>()
+
+  return [
+    ...oversizedSheetCommands,
+    ...sortedFaces.flatMap((face): LayeredTikzCommand[] => {
+      const source = sheetSources.get(face.sourceId)
+
+      return source === undefined
+        ? []
+        : [
+            {
+              layer: normalizeLayer(face.layer),
+              sectionTitle,
+              lines: emitDepthSortedSurfaceFace(
+                source.sheet,
+                source.elementIndex,
+                depthSortedSurfaceStyleOptions(
+                  source.sheet,
+                  optionsBySheetId,
+                  context,
+                ),
+                face,
+                context,
+              ),
+            },
+          ]
+    }),
+  ]
+}
+
+function depthSortedSurfaceStyleOptions(
+  sheet: SheetStratum,
+  optionsBySheetId: Map<string, string[]>,
+  context: GenerateContext,
+): string[] {
+  const cachedOptions = optionsBySheetId.get(sheet.id)
+
+  if (cachedOptions !== undefined) {
+    return cachedOptions
+  }
+
+  const options = filledSurfaceStyleOptionsForElement(
+    'sheet',
+    sheet.stylePresetId,
+    sheet.importedTikzStyleReferenceId,
+    sheet.style,
+    `Sheet${sheet.id}`,
+    context,
+  )
+
+  optionsBySheetId.set(sheet.id, options)
+  return options
+}
+
+function sheetIdsWithTooManySortedFaces(
+  faces: readonly ProjectedSurfaceFace[],
+): Set<string> {
+  const faceCounts = new Map<string, number>()
+
+  for (const face of faces) {
+    faceCounts.set(face.sourceId, (faceCounts.get(face.sourceId) ?? 0) + 1)
+  }
+
+  return new Set(
+    [...faceCounts]
+      .filter(([, count]) => count > maxCurvedSheetTikzFaces)
+      .map(([sheetId]) => sheetId),
+  )
+}
+
+function emitDepthSortedSurfaceFace(
+  sheet: SheetStratum,
+  elementIndex: number,
+  options: string[],
+  face: ProjectedSurfaceFace,
+  context: GenerateContext,
+): string[] {
+  if (face.vertices3D.length < 3 || !face.vertices3D.every(isFiniteVec3)) {
+    return [
+      `% Sheet "${sheet.name}" [${sheet.id}] face ${face.faceIndex} omitted because its vertices contain non-finite coordinates.`,
+      '',
+    ]
+  }
+
+  const coordinateBaseName = `${sheetCoordinateBaseName(
+    sheet,
+    elementIndex,
+  )}Face${face.faceIndex}`
+  const coordinates = face.vertices3D.map((vertex, index) =>
+    context.coordinates.define(coordinateBaseName, index, vertex),
+  )
+
+  return [
+    `% Auto surface face depth sort: sheet "${sheet.name}" [${sheet.id}], face ${face.faceIndex}, avg depth ${formatNumber(face.depth.avg)}.`,
+    '\\filldraw[',
+    ...formatTikzOptions(options),
+    ']',
     indentLine(
       `${coordinates.map((name) => `(${name})`).join(' -- ')} -- cycle;`,
     ),

@@ -29,6 +29,12 @@ import {
   normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
 import { tikzExportModes } from './types.ts'
+import {
+  cloneVisibilityOptions,
+  defaultVisibilityOptions,
+  isVisibilitySortMode,
+  visibilityOptionsEqual,
+} from './visibility.ts'
 import type {
   AmbientDimension,
   Camera,
@@ -53,6 +59,7 @@ import type {
   SymbolicVariable,
   TextLabel,
   TikzStyleTarget,
+  VisibilityOptions,
 } from './types.ts'
 import { getLayerMetadata, normalizeLayerMetadataForDiagram } from './layers.ts'
 import { validateDiagram } from './validation.ts'
@@ -84,6 +91,7 @@ export type SerializeDiagramOptions = {
   camera3d?: Camera3D
   showCoordinateAxesInTikz?: boolean
   exportMode?: TikzExportMode
+  visibility?: VisibilityOptions
 }
 
 export type ParseSavedDiagramResult =
@@ -290,6 +298,15 @@ function normalizePersistentView(
 
   if (exportMode !== undefined) {
     view.exportMode = exportMode
+  }
+
+  const visibility = options.visibility ?? diagram.view?.visibility
+
+  if (
+    visibility !== undefined &&
+    !visibilityOptionsEqual(visibility, defaultVisibilityOptions)
+  ) {
+    view.visibility = cloneVisibilityOptions(visibility)
   }
 
   return Object.keys(view).length === 0 ? undefined : view
@@ -1222,11 +1239,45 @@ function normalizeLoadedView(
     }
   }
 
+  if (isRecord(savedView) && 'visibility' in savedView) {
+    const visibility = visibilityOptionsFromPersistent(savedView.visibility)
+
+    if (visibility === null) {
+      warnings.push('Saved visibility options are invalid; using defaults.')
+    } else {
+      view.visibility = visibility
+    }
+  }
+
   return Object.keys(view).length === 0 ? undefined : view
 }
 
 function isTikzExportMode(value: string): value is TikzExportMode {
   return tikzExportModes.includes(value as TikzExportMode)
+}
+
+function visibilityOptionsFromPersistent(
+  value: unknown,
+): VisibilityOptions | null {
+  if (
+    !isRecord(value) ||
+    typeof value.enabled !== 'boolean' ||
+    typeof value.surfaceDepthSort !== 'boolean' ||
+    typeof value.sortMode !== 'string' ||
+    !isVisibilitySortMode(value.sortMode) ||
+    typeof value.depthEpsilon !== 'number' ||
+    !Number.isFinite(value.depthEpsilon) ||
+    value.depthEpsilon < 0
+  ) {
+    return null
+  }
+
+  return {
+    enabled: value.enabled,
+    surfaceDepthSort: value.surfaceDepthSort,
+    sortMode: value.sortMode,
+    depthEpsilon: value.depthEpsilon,
+  }
 }
 
 function camera2DFromPersistent(value: unknown): Camera2D | null {

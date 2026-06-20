@@ -5,8 +5,13 @@ import type {
   Camera3D,
   Diagram,
   TikzExportMode,
+  VisibilityOptions,
 } from '../model/types.ts'
 import { tikzExportModes } from '../model/types.ts'
+import {
+  defaultVisibilityOptions,
+  cloneVisibilityOptions,
+} from '../model/visibility.ts'
 
 export const defaultTikzExportMode: TikzExportMode = 'standalone'
 
@@ -25,6 +30,7 @@ export type TikzExportUiOptions = {
   exportMode: TikzExportMode
   includeCoordinateAxesInTikz: boolean
   camera3d?: Camera3D
+  visibility?: VisibilityOptions
 }
 
 export function tikzExportModeFromSelectValue(value: string): TikzExportMode {
@@ -55,6 +61,8 @@ export function createTikzGenerateOptionsForUi(
         ? options.includeCoordinateAxesInTikz
         : undefined,
     camera3d: diagram.ambientDimension === 3 ? options.camera3d : undefined,
+    visibility:
+      options.visibility ?? diagram.view?.visibility ?? defaultVisibilityOptions,
   }
 }
 
@@ -76,6 +84,10 @@ export function createSerializeDiagramOptionsForUi(
       diagram.ambientDimension === 3
         ? options.includeCoordinateAxesInTikz
         : undefined,
+    visibility:
+      options.visibility === undefined
+        ? undefined
+        : cloneVisibilityOptions(options.visibility),
   }
 }
 

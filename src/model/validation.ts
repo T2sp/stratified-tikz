@@ -39,7 +39,7 @@ import {
   isTikzStyleTarget,
 } from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
-import { tikzExportModes } from './types.ts'
+import { tikzExportModes, visibilitySortModes } from './types.ts'
 import {
   resolveSymbolicVariables,
   validateSymbolicVariables,
@@ -518,6 +518,10 @@ function validateDiagramView(
     )
   }
 
+  if (view.visibility !== undefined) {
+    validateVisibilityOptions(view.visibility, `${path}.visibility`, errors)
+  }
+
   if (view.camera3d === undefined) {
     return
   }
@@ -540,6 +544,53 @@ function validateDiagramView(
       issue.message,
     )
   })
+}
+
+function validateVisibilityOptions(
+  visibility: DiagramViewOptions['visibility'],
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (visibility === undefined) {
+    return
+  }
+
+  if (typeof visibility !== 'object' || visibility === null) {
+    pushError(errors, path, 'Visibility options must be an object.')
+    return
+  }
+
+  if (typeof visibility.enabled !== 'boolean') {
+    pushError(errors, `${path}.enabled`, 'Visibility enabled must be a boolean.')
+  }
+
+  if (typeof visibility.surfaceDepthSort !== 'boolean') {
+    pushError(
+      errors,
+      `${path}.surfaceDepthSort`,
+      'Surface depth sort must be a boolean.',
+    )
+  }
+
+  if (!visibilitySortModes.includes(visibility.sortMode)) {
+    pushError(
+      errors,
+      `${path}.sortMode`,
+      'Visibility sort mode must be layerThenDepth or depthThenLayer.',
+    )
+  }
+
+  if (
+    typeof visibility.depthEpsilon !== 'number' ||
+    !Number.isFinite(visibility.depthEpsilon) ||
+    visibility.depthEpsilon < 0
+  ) {
+    pushError(
+      errors,
+      `${path}.depthEpsilon`,
+      'Visibility depth epsilon must be a finite non-negative number.',
+    )
+  }
 }
 
 function validateCamera(

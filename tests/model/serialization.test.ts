@@ -104,6 +104,52 @@ test('parseSavedDiagramJson loads saved TikZ export mode metadata', () => {
   assert.equal(result.diagram.view?.exportMode, 'inlineMath')
 })
 
+test('visibility options save and load round-trip as view metadata', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.view = {
+    ...diagram.view,
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      sortMode: 'layerThenDepth',
+      depthEpsilon: 0.000001,
+    },
+  }
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.view?.visibility, diagram.view.visibility)
+})
+
+test('invalid saved visibility options are ignored with a warning', () => {
+  const saved = JSON.parse(serializeDiagram(threeDimensionalExample)) as {
+    diagram: {
+      view: {
+        visibility?: unknown
+      }
+    }
+  }
+  saved.diagram.view.visibility = {
+    enabled: true,
+    surfaceDepthSort: true,
+    sortMode: 'unknown',
+    depthEpsilon: 0.001,
+  }
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.view?.visibility, undefined)
+  assert.match(result.warnings.join(' '), /visibility options are invalid/)
+})
+
 test('variables save and load round-trip', () => {
   const withR = addSymbolicVariableToDiagram(
     createEmptyDiagram({ ambientDimension: 2 }),

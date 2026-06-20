@@ -38,6 +38,8 @@ import {
   type ProjectedRenderPrimitive,
   type ProjectedSurfaceFace,
 } from '../../src/rendering/projectedPrimitives.ts'
+import { sortProjectedSurfaceFaces } from '../../src/rendering/surfaceDepthSort.ts'
+import { sortedSvgSurfaceFaces } from '../../src/rendering/svgSurfaceDepthSort.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 
 const testCamera: Camera3D = {
@@ -208,6 +210,94 @@ test('projected primitive extraction does not mutate diagram or existing SVG/Tik
   )
 })
 
+test('surface faces sort by depth inside the same layer', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near', 0, 1, 0),
+      projectedTestFace('far', 0, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far', 'near'],
+  )
+})
+
+test('layerThenDepth keeps layer order before depth order', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near-upper-layer', 2, 1, 0),
+      projectedTestFace('far-lower-layer', 1, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far-lower-layer', 'near-upper-layer'],
+  )
+})
+
+test('depthThenLayer sorts by depth before layer order', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near-lower-layer', 1, 1, 0),
+      projectedTestFace('far-upper-layer', 2, 3, 1),
+    ],
+    enabledVisibilityOptions('depthThenLayer'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far-upper-layer', 'near-lower-layer'],
+  )
+})
+
+test('surface face sorting uses original index as stable depth tie breaker', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('second', 0, 2, 8),
+      projectedTestFace('first', 0, 2, 3),
+    ],
+    {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      depthEpsilon: 1,
+    },
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['first', 'second'],
+  )
+})
+
+test('SVG surface render order changes only when surface depth sort is enabled', () => {
+  const diagram = twoSurfaceSortDiagram()
+  const disabledFaces = sortedSvgSurfaceFaces(
+    diagram,
+    testCamera,
+    180,
+    {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      enabled: false,
+    },
+  )
+  const enabledFaces = sortedSvgSurfaceFaces(
+    diagram,
+    testCamera,
+    180,
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.equal(disabledFaces, null)
+  assert.deepEqual(
+    enabledFaces?.map((face) => face.sheet.id),
+    ['z-far', 'a-near'],
+  )
+})
+
 function primitiveCoverageDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
 
@@ -361,6 +451,50 @@ function primitiveCoverageDiagram(): Diagram {
   return diagram
 }
 
+function twoSurfaceSortDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    testCamera.thetaDeg,
+    testCamera.phiDeg,
+  ).forward
+
+  diagram.camera = testCamera
+  diagram.view = { camera3d: testCamera }
+  diagram.strata = [
+    surfaceSortSheet('a-near', 'Near sheet', '#AA0000', viewDirection, -0.6),
+    surfaceSortSheet('z-far', 'Far sheet', '#00AA00', viewDirection, 0.6),
+  ]
+
+  return diagram
+}
+
+function surfaceSortSheet(
+  id: string,
+  name: string,
+  fillColor: '#AA0000' | '#00AA00',
+  viewDirection: Vec3,
+  depthOffset: number,
+): PolygonSheetStratum {
+  return {
+    id,
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    name,
+    style: {
+      ...defaultSheetStyle,
+      fillColor,
+      strokeColor: fillColor,
+      fillOpacity: 0.5,
+      strokeOpacity: 1,
+    },
+    vertices: squarePoints(-0.5, -0.5, 1, 0).map((point) =>
+      addVec3(point, scaleVec3(viewDirection, depthOffset)),
+    ),
+    layer: 0,
+  }
+}
+
 function polygonSheet(): PolygonSheetStratum {
   return {
     id: 'polygon-sheet',
@@ -420,6 +554,45 @@ function numericRange(min: number, max: number, step: number) {
     max: createNumericScalarInputValue(max),
     step: createNumericScalarInputValue(step),
   }
+}
+
+function projectedTestFace(
+  sourceId: string,
+  layer: number,
+  depth: number,
+  originalIndex: number,
+): ProjectedSurfaceFace {
+  return {
+    kind: 'surfaceFace',
+    sourceId,
+    layer,
+    projectedPolygon: [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ],
+    vertices3D: [
+      { x: 0, y: 0, z: depth },
+      { x: 1, y: 0, z: depth },
+      { x: 1, y: 1, z: depth },
+    ],
+    depth: {
+      min: depth,
+      max: depth,
+      avg: depth,
+    },
+    faceIndex: originalIndex,
+    originalIndex,
+  }
+}
+
+function enabledVisibilityOptions(sortMode: 'layerThenDepth' | 'depthThenLayer') {
+  return {
+    enabled: true,
+    surfaceDepthSort: true,
+    sortMode,
+    depthEpsilon: 1e-9,
+  } as const
 }
 
 function isSurfaceFace(
@@ -483,6 +656,14 @@ function findCurvedSheet(diagram: Diagram, id: string): CurvedSheetStratum {
   assert.notEqual(sheet, undefined)
 
   return sheet
+}
+
+function addVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
 }
 
 function scaleVec3(point: Vec3, scalar: number): Vec3 {
