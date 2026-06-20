@@ -524,6 +524,15 @@ Phase 19 adds PGFMath-style symbolic variables, symbolic coordinate expressions,
 
 - Add docs, examples, error messages, and combined regression tests.
 
+## Phase 19H: Triangular and honeycomb lattice grid patterns
+
+- Extend grid generation beyond the existing rectangular/cubic lattice.
+- Add triangular lattice pattern.
+- Add honeycomb lattice pattern.
+- Support 2D and 3D work-plane-local grids.
+- Preserve compact TikZ export using `\foreach` and `\clip` where practical.
+- Preserve inline math no-blank-lines and 4-space indentation.
+- Keep existing rectangular/cubic grid behavior unchanged.
 
 ## Phase 20: Multi-selection and batch editing
 

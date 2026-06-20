@@ -181,6 +181,15 @@ MVP, symbolic input is supported for global coordinate fields; active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
 remain numeric-only and reject symbolic values.
 
+Direct input also supports generated grid strata. A grid stores numeric or
+symbolic scalar fields for `uRange`, `vRange`, and a rectangular clip. SVG
+preview uses finite preview values and rejects invalid steps, reversed ranges,
+non-finite values, and grids above the line-count cap. TikZ export uses compact
+`\foreach` loops with `\clip`; in 3D, the grid is emitted in the saved
+work-plane-local frame with `canvas is plane`. MVP `\foreach` range triplets
+must be numeric, while symbolic clip endpoints are allowed when they parse and
+evaluate safely.
+
 ### Cursor input mode
 
 In cursor input mode, the user places or moves points using the mouse or trackpad.

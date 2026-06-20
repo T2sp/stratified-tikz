@@ -7,6 +7,10 @@ import {
   updateSymbolicVariableInDiagram,
 } from '../model/variables.ts'
 import type { Diagram, SymbolicVariable } from '../model/types.ts'
+import {
+  formatDiagramValidationIssue,
+  formatSymbolicInputError,
+} from './symbolicInputMessages.ts'
 
 export type VariableManagerProps = {
   diagram: Diagram
@@ -45,7 +49,7 @@ export function VariableManager({
     })
 
     if (!result.ok) {
-      setStatus(result.error)
+      setStatus(formatVariableUpdateError(result))
       return
     }
 
@@ -80,12 +84,14 @@ export function VariableManager({
     })
 
     if (!result.ok) {
+      const message = formatVariableUpdateError(result)
+
       setDrafts((current) =>
         current.map((candidate) =>
-          candidate.id === id ? { ...candidate, error: result.error } : candidate,
+          candidate.id === id ? { ...candidate, error: message } : candidate,
         ),
       )
-      setStatus(result.error)
+      setStatus(message)
       return
     }
 
@@ -98,12 +104,14 @@ export function VariableManager({
     const result = deleteSymbolicVariableFromDiagram(diagram, id)
 
     if (!result.ok) {
+      const message = formatVariableUpdateError(result)
+
       setDrafts((current) =>
         current.map((candidate) =>
-          candidate.id === id ? { ...candidate, error: result.error } : candidate,
+          candidate.id === id ? { ...candidate, error: message } : candidate,
         ),
       )
-      setStatus(result.error)
+      setStatus(message)
       return
     }
 
@@ -214,26 +222,28 @@ function VariableRow({
         />
       </label>
       <span className="variable-macro" title="TikZ macro">
-        \{macroName}
+        macro \{macroName}
       </span>
       <span className="variable-preview" title="Preview value">
-        {formatPreviewValue(variable.previewValue)}
+        preview {formatPreviewValue(variable.previewValue)}
       </span>
-      <button
-        type="button"
-        className="toolbar-button"
-        disabled={!changed}
-        onClick={() => onApply(variable.id)}
-      >
-        Apply
-      </button>
-      <button
-        type="button"
-        className="toolbar-button"
-        onClick={() => onDelete(variable.id)}
-      >
-        Delete
-      </button>
+      <span className="variable-row-actions">
+        <button
+          type="button"
+          className="toolbar-button"
+          disabled={!changed}
+          onClick={() => onApply(variable.id)}
+        >
+          Apply
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => onDelete(variable.id)}
+        >
+          Delete
+        </button>
+      </span>
       {draft.error !== '' && (
         <span className="variable-row-error" role="status">
           {draft.error}
@@ -284,7 +294,7 @@ function variableSummary(variables: readonly SymbolicVariable[]): string {
     .join(', ')
   const suffix = variables.length > 3 ? `, +${variables.length - 3}` : ''
 
-  return `${variables.length} ${variables.length === 1 ? 'variable' : 'variables'}: ${listedVariables}${suffix}`
+  return `${variables.length}: ${listedVariables}${suffix}`
 }
 
 function formatPreviewValue(value: number): string {
@@ -301,4 +311,21 @@ function formatPreviewValue(value: number): string {
   }
 
   return String(Number(value.toFixed(6)))
+}
+
+function formatVariableUpdateError(
+  result: Extract<
+    ReturnType<typeof updateSymbolicVariableInDiagram>,
+    { ok: false }
+  >,
+): string {
+  const firstError = result.errors[0]
+
+  if (firstError === undefined) {
+    return result.error
+  }
+
+  return firstError.path.endsWith('.expression')
+    ? formatSymbolicInputError(firstError.message)
+    : formatDiagramValidationIssue(firstError)
 }

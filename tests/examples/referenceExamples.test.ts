@@ -5,8 +5,12 @@ import {
   hemispherePatchExample,
   referenceExampleDiagrams,
   saddlePatchExample,
+  symbolicCirclePointExample,
+  symbolicPathExample,
   threeDimensionalExample,
+  threeDimensionalWorkPlaneGridExample,
   translucentFilledStrataExample,
+  twoDimensionalGridExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
@@ -27,6 +31,10 @@ const exampleCases = [
   { name: 'hemisphere patch', diagram: hemispherePatchExample },
   { name: 'saddle patch', diagram: saddlePatchExample },
   { name: 'even-odd boundary', diagram: evenOddFilledBoundaryExample },
+  { name: 'symbolic circle point', diagram: symbolicCirclePointExample },
+  { name: 'symbolic path', diagram: symbolicPathExample },
+  { name: '2D grid', diagram: twoDimensionalGridExample },
+  { name: '3D work-plane grid', diagram: threeDimensionalWorkPlaneGridExample },
 ] as const
 
 test('existing and reference examples validate', () => {
@@ -88,6 +96,22 @@ test('even-odd boundary example exports compound fill rule', () => {
   assert.match(tikz, /Fill rule: evenOdd/)
   assert.match(tikz, /even odd rule/)
   assert.equal((tikz.match(/-- cycle/g) ?? []).length, 2)
+})
+
+test('symbolic and grid examples export macros and foreach grids', () => {
+  const pointTikz = generateTikz(symbolicCirclePointExample)
+  const pathTikz = generateTikz(symbolicPathExample)
+  const grid2dTikz = generateTikz(twoDimensionalGridExample)
+  const grid3dTikz = generateTikz(threeDimensionalWorkPlaneGridExample)
+
+  assert.match(pointTikz, /\\pgfmathsetmacro\{\\R\}\{2\}/)
+  assert.match(pointTikz, /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
+  assert.match(pathTikz, /curvePathSymbolicRadiusPath0p1/)
+  assert.match(pathTikz, /\{\\R \* cos\(\\q\)\}/)
+  assert.match(grid2dTikz, /\\foreach \\stzGridU/)
+  assert.match(grid2dTikz, /\\clip \(-2,-2\) rectangle \(2,2\);/)
+  assert.match(grid3dTikz, /canvas is plane/)
+  assert.match(grid3dTikz, /\\foreach \\stzGridV/)
 })
 
 test('reference examples produce finite SVG helper geometry', () => {

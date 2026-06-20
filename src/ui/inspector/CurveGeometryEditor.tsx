@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   absoluteCubicBezierPointsFromControlMode,
   cubicBezierControlModeLabel,
@@ -26,6 +27,10 @@ import type { ScalarInputValue } from '../../model/scalarExpressions.ts'
 import { resolveSymbolicVariables } from '../../model/variables.ts'
 import { lineStyles } from '../../model/types.ts'
 import {
+  formatGridIssue,
+  formatSymbolicInputError,
+} from '../symbolicInputMessages.ts'
+import {
   type CoordinateAxis,
   updateStratumById,
   updateVec3Coordinate,
@@ -38,7 +43,6 @@ import {
   EditableOpacityField,
   EditablePositiveNumberField,
   EditableSelectField,
-  EditableTextField,
   ReadOnlyField,
 } from './InspectorField.tsx'
 import { formatSelectedGeometry } from './geometryPreview.ts'
@@ -351,20 +355,105 @@ function GridGeometryEditor({
     <>
       <ReadOnlyField label="Frame" value={grid.frame.kind} />
       {gridScalarFields(grid).map((field) => (
-        <EditableTextField
+        <GridScalarEditor
           key={field.id}
+          diagram={diagram}
+          grid={grid}
+          field={field.id}
           label={field.label}
-          value={formatGridScalarInput(field.value)}
-          onChange={(value) =>
-            updateGridScalarField(diagram, grid, field.id, value, onDiagramChange)
-          }
+          value={field.value}
+          onDiagramChange={onDiagramChange}
         />
       ))}
       <ReadOnlyField
         label="Preview lines"
-        value={preview.ok ? String(preview.lineCount) : 'invalid'}
+        value={preview.ok ? String(preview.lineCount) : formatGridIssue(preview.errors[0])}
+      />
+      <ReadOnlyField
+        label="TikZ range"
+        value={
+          gridHasSymbolicForeachRange(grid)
+            ? 'unsupported symbolic grid range'
+            : 'foreach range'
+        }
       />
     </>
+  )
+}
+
+function GridScalarEditor({
+  diagram,
+  grid,
+  field,
+  label,
+  value,
+  onDiagramChange,
+}: {
+  diagram: Diagram
+  grid: Extract<CurveStratum, { kind: 'grid' }>
+  field: GridScalarField
+  label: string
+  value: ScalarInputValue
+  onDiagramChange: DiagramChangeHandler
+}) {
+  const committedValue = formatGridScalarInput(value)
+  const [draft, setDraft] = useState(committedValue)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDraft(committedValue)
+    setError('')
+  }, [committedValue])
+
+  return (
+    <label className="inspector-field inspector-field-with-note">
+      <span className="inspector-field-label">{label}</span>
+      <input
+        className="inspector-input"
+        type="text"
+        inputMode="decimal"
+        spellCheck={false}
+        value={draft}
+        aria-invalid={error !== ''}
+        onChange={(event) => {
+          const source = event.currentTarget.value
+          const scalar = createGridScalarInput(source, diagram)
+
+          setDraft(source)
+
+          if (!scalar.ok) {
+            setError(scalar.error)
+            return
+          }
+
+          const nextGrid = gridWithScalarField(grid, field, scalar.scalar)
+          const preview = gridPreviewSegments(nextGrid, diagram.ambientDimension)
+
+          if (!preview.ok) {
+            setError(formatGridIssue(preview.errors[0]))
+            return
+          }
+
+          setError('')
+          updateGridScalarField(
+            grid,
+            field,
+            scalar.scalar,
+            onDiagramChange,
+          )
+        }}
+      />
+      {value.kind === 'symbolic' && (
+        <span className="inspector-field-note">
+          preview {formatCompactNumber(value.previewValue)}
+        </span>
+      )}
+      {error !== '' && (
+        <span className="inspector-field-error" role="status">
+          {error}
+        </span>
+      )}
+    </label>
   )
 }
 
@@ -390,18 +479,11 @@ function gridScalarFields(
 }
 
 function updateGridScalarField(
-  diagram: Diagram,
   grid: Extract<CurveStratum, { kind: 'grid' }>,
   field: GridScalarField,
-  source: string,
+  scalar: ScalarInputValue,
   onDiagramChange: DiagramChangeHandler,
 ): void {
-  const scalar = createGridScalarInput(source, diagram)
-
-  if (scalar === null) {
-    return
-  }
-
   onDiagramChange((currentDiagram) =>
     updateStratumById(currentDiagram, grid.id, (current) => {
       if (current.geometricKind !== 'curve' || current.kind !== 'grid') {
@@ -420,7 +502,15 @@ function updateGridScalarField(
 function createGridScalarInput(
   source: string,
   diagram: Diagram,
-): ScalarInputValue | null {
+):
+  | {
+      ok: true
+      scalar: ScalarInputValue
+    }
+  | {
+      ok: false
+      error: string
+    } {
   const resolved = resolveSymbolicVariables(diagram.variables ?? [])
   const parsed = createScalarInputValue(source, {
     variables: resolved.ok
@@ -429,7 +519,15 @@ function createGridScalarInput(
     previewValues: resolved.ok ? resolved.values : new Map(),
   })
 
-  return parsed.ok ? parsed.scalar : null
+  return parsed.ok
+    ? {
+        ok: true,
+        scalar: parsed.scalar,
+      }
+    : {
+        ok: false,
+        error: formatSymbolicInputError(parsed.error),
+      }
 }
 
 function gridWithScalarField(
@@ -485,6 +583,18 @@ function updateGridClip(
 
 function formatGridScalarInput(value: ScalarInputValue): string {
   return value.kind === 'symbolic' ? value.expression : formatCompactNumber(value.value)
+}
+
+function gridHasSymbolicForeachRange(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+): boolean {
+  return [...gridRangeScalars(grid.uRange), ...gridRangeScalars(grid.vRange)].some(
+    (value) => value.kind === 'symbolic',
+  )
+}
+
+function gridRangeScalars(range: GridParameterRange): ScalarInputValue[] {
+  return [range.min, range.max, range.step]
 }
 
 function formatCompactNumber(value: number): string {
