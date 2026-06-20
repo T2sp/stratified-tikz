@@ -41,6 +41,68 @@ export type Vec2 = {
 };
 ```
 
+## Symbolic scalar expressions
+
+Phase 19A adds a reusable scalar-expression layer for later symbolic variables
+and symbolic coordinate fields. Existing committed geometry still uses numeric
+`Vec3` values until the symbolic coordinate integration phase.
+
+```ts
+type NumericScalar = {
+  kind: "numeric";
+  value: number;
+};
+
+type SymbolicScalar = {
+  kind: "symbolic";
+  expression: string;
+  previewValue: number;
+};
+
+type ScalarInputValue = NumericScalar | SymbolicScalar;
+```
+
+The parser accepts a limited PGFMath-like scalar grammar:
+
+```text
+expression  := additive
+additive    := multiplicative (("+" | "-") multiplicative)*
+multiplicative := unary (("*" | "/") unary)*
+unary       := ("+" | "-") unary | power
+power       := primary ("^" unary)?
+primary     := number | variable | constant | functionCall | "(" expression ")"
+functionCall := functionName "(" expression ("," expression)* ")"
+```
+
+Supported constants are `pi` and `e`. Supported functions are `sin`, `cos`,
+`tan`, `asin`, `acos`, `atan`, `sqrt`, `abs`, `exp`, `ln`, `log`, `min`, and
+`max`. The `min` and `max` functions require at least two arguments; the other
+functions require exactly one argument. Decimal and integer literals are
+supported, with unary `+` and `-` handled by the parser. Scientific notation is
+not part of the Phase 19A grammar.
+
+Trigonometric preview evaluation follows PGFMath/TikZ conventions: `sin`,
+`cos`, and `tan` interpret their inputs as degrees, and inverse trig functions
+return degrees. `ln` is the natural logarithm, while `log` is base 10.
+
+Variables must be declared before parsing an expression. Unknown identifiers
+are rejected instead of being treated as zero. Function names, constants, and
+dangerous TeX command names such as `input`, `write`, `read`, `openout`,
+`catcode`, and `csname` are reserved and cannot be variable names.
+
+Expression input is data, not TeX source. The validator rejects backslashes,
+braces, semicolons, newlines, unmatched parentheses, unknown functions, invalid
+tokens, division by zero during preview evaluation, missing or non-finite
+variable preview values, and any non-finite final result. The evaluator does
+not execute TeX and does not use JavaScript `eval`.
+
+TikZ expression formatting is separate from the model parser. It takes a parsed
+expression and an explicit variable-to-macro map such as `R -> \R`; for example,
+`R*cos(q)` formats as `\R * cos(\q)`. Coordinate export phases should wrap
+symbolic coordinate components at the coordinate-generator boundary, for
+example `({\R * cos(\q)}, {\R * sin(\q)})`, rather than storing braces inside
+the expression model.
+
 ## Top-level diagram
 
 ```ts
