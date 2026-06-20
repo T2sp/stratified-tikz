@@ -21,6 +21,7 @@ import {
   sampleTemplatePathPoints,
 } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
+import { gridPreviewSegments } from '../model/grids.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import type { SelectedElement } from '../ui/selection'
 import type {
@@ -991,6 +992,21 @@ function curveToSvgPathData(
   camera: Diagram['camera'],
   viewportHeight: number,
 ): string {
+  if (curve.kind === 'grid') {
+    const preview = gridPreviewSegments(curve, curve.codim === 1 ? 2 : 3)
+
+    return preview.ok
+      ? preview.segments
+          .map((segment) =>
+            polylineToSvgPath([
+              projectToSvgPoint(camera, segment.start, viewportHeight),
+              projectToSvgPoint(camera, segment.end, viewportHeight),
+            ]),
+          )
+          .join(' ')
+      : ''
+  }
+
   if (curve.kind === 'concatenatedPath') {
     return pathSegmentsToSvgPath(
       curve.segments.flatMap((segment) =>
@@ -1027,6 +1043,20 @@ function curveToSvgPathRuns(
   camera: Diagram['camera'],
   viewportHeight: number,
 ): SvgCurvePathRun[] {
+  if (curve.kind === 'grid') {
+    const pathData = curveToSvgPathData(curve, camera, viewportHeight)
+
+    return pathData === ''
+      ? []
+      : [
+          {
+            key: `${curve.id}-grid`,
+            pathData,
+            ...curveStyleToSvgStrokeAttributes(curve.style),
+          },
+        ]
+  }
+
   if (curve.kind !== 'concatenatedPath') {
     return [
       {
@@ -1898,6 +1928,10 @@ function renderSelectedGeometryHandles(
             )}
           </g>
         )
+      }
+
+      if (stratum.kind === 'grid') {
+        return null
       }
 
       return (

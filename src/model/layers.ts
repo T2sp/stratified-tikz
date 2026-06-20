@@ -819,6 +819,14 @@ function translateCurveStratum(
         ...stratum,
         template: translatePathTemplate(stratum.template, translation, diagram),
       }
+    case 'grid':
+      return {
+        ...stratum,
+        frame: {
+          ...stratum.frame,
+          frame: translateFrameOrigin(stratum.frame.frame, translation, diagram),
+        },
+      }
   }
 }
 
@@ -1331,7 +1339,8 @@ function isSupportedStratumForLayerDuplicate(stratum: Stratum): boolean {
         candidate.kind === 'polyline' ||
         candidate.kind === 'cubicBezier' ||
         candidate.kind === 'concatenatedPath' ||
-        candidate.kind === 'templatePath'
+        candidate.kind === 'templatePath' ||
+        candidate.kind === 'grid'
       )
     case 'point':
       return true

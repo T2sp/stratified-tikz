@@ -5,6 +5,7 @@ import type {
   SheetStratum,
 } from '../../model/types.ts'
 import { sheetVertices } from '../../model/sheets.ts'
+import { gridPreviewSegments } from '../../model/grids.ts'
 import { describeCurvePoints, formatVec3 } from '../inspectorSummary.ts'
 
 export function formatSelectedGeometry(
@@ -24,6 +25,12 @@ export function formatSelectedGeometry(
         )
         .join('; ')
     case 'curve':
+      if (stratum.kind === 'grid') {
+        const preview = gridPreviewSegments(stratum, ambientDimension)
+
+        return preview.ok ? `${preview.lineCount} preview lines` : 'invalid grid'
+      }
+
       return describeCurvePoints(stratum)
         .map(
           (description) =>

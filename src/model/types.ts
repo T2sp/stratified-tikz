@@ -1,3 +1,5 @@
+import type { ScalarInputValue } from './scalarExpressions.ts'
+
 export type AmbientDimension = 2 | 3
 
 export type Vec2 = {
@@ -491,7 +493,11 @@ export type ClosedPathBoundary = {
 }
 
 export type PointCurveKind = 'polyline' | 'cubicBezier'
-export type CurveKind = PointCurveKind | 'concatenatedPath' | 'templatePath'
+export type CurveKind =
+  | PointCurveKind
+  | 'concatenatedPath'
+  | 'templatePath'
+  | 'grid'
 
 type CurveStratumBase = {
   id: string
@@ -546,11 +552,39 @@ export type TemplatePathStratum = CurveStratumBase & {
   template: PathTemplate
 }
 
+export type GridFrame = {
+  kind: 'xy' | 'workPlane'
+  frame: WorkPlaneFrameSnapshot
+}
+
+export type GridParameterRange = {
+  min: ScalarInputValue
+  max: ScalarInputValue
+  step: ScalarInputValue
+}
+
+export type GridRectangleClip = {
+  kind: 'rectangle'
+  uMin: ScalarInputValue
+  uMax: ScalarInputValue
+  vMin: ScalarInputValue
+  vMax: ScalarInputValue
+}
+
+export type GridStratum = CurveStratumBase & {
+  kind: 'grid'
+  frame: GridFrame
+  uRange: GridParameterRange
+  vRange: GridParameterRange
+  clip: GridRectangleClip
+}
+
 export type CurveStratum =
   | PolylineCurveStratum
   | CubicBezierCurveStratum
   | ConcatenatedPathStratum
   | TemplatePathStratum
+  | GridStratum
 
 export type PointStratum = {
   id: string

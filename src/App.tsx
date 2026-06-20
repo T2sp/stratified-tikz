@@ -63,6 +63,7 @@ import {
   addCubicBezierCurveStratumWithResult,
   addEllipsePathFromDirectInput,
   addCurvedSheetStratumWithResult,
+  addGridStratumFromDirectInput,
   addPolygonSheetFromDirectInput,
   addPolygonSheetStratumWithResult,
   addPolylineCurveFromDirectInput,
@@ -178,6 +179,8 @@ import {
   type DirectCoordinateInput,
   type DirectCoordinateMode,
   type DirectCubicBezierControlMode,
+  type DirectGridCreationError,
+  type DirectGridInput,
   type DirectPathCreationError,
   type DiagramHistory,
   type ExistingCoordinateSource,
@@ -221,6 +224,7 @@ type DirectCreationTool =
   | 'createCubicBezier'
   | 'createPath'
   | 'createSheet'
+  | 'createGrid'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type SheetCreationKind = 'polygon' | CurvedSheetCreationKind
 type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
@@ -243,6 +247,17 @@ type DirectPathCoordinateSourceTarget =
       role: DirectPathManualCoordinateRole
     }
   | { kind: 'templateCenter' }
+type DirectGridField =
+  | 'uMin'
+  | 'uMax'
+  | 'uStep'
+  | 'vMin'
+  | 'vMax'
+  | 'vStep'
+  | 'clipUMin'
+  | 'clipUMax'
+  | 'clipVMin'
+  | 'clipVMax'
 type PolylineDraft = {
   points: Vec3[]
 } | null
@@ -336,6 +351,24 @@ const defaultDirectCoordinates: DirectCoordinateInput = {
   y: '0',
   z: '0',
 }
+const defaultDirectGridInput: DirectGridInput = {
+  uRange: {
+    min: '-2',
+    max: '2',
+    step: '1',
+  },
+  vRange: {
+    min: '-2',
+    max: '2',
+    step: '1',
+  },
+  clip: {
+    uMin: '-2',
+    uMax: '2',
+    vMin: '-2',
+    vMax: '2',
+  },
+}
 const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'select', label: 'Select' },
   { id: 'createPoint', label: 'Add point' },
@@ -344,6 +377,7 @@ const creationTools: Array<{ id: CreationTool; label: string }> = [
   { id: 'createCubicBezier', label: 'Add cubic Bezier' },
   { id: 'createPath', label: 'Add path' },
   { id: 'createSheet', label: 'Add sheet' },
+  { id: 'createGrid', label: 'Add grid' },
 ]
 const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
   { id: 'polygon', label: 'Polygon' },
@@ -470,6 +504,21 @@ function App() {
     String(defaultCurveStyle.lineWidth),
   )
   const [directPathLineStyle, setDirectPathLineStyle] = useState<LineStyle>(
+    defaultCurveStyle.lineStyle,
+  )
+  const [directGridName, setDirectGridName] = useState<string>('Grid')
+  const [directGridInput, setDirectGridInput] =
+    useState<DirectGridInput>(defaultDirectGridInput)
+  const [directGridStrokeColor, setDirectGridStrokeColor] = useState<string>(
+    defaultCurveStyle.strokeColor,
+  )
+  const [directGridStrokeOpacity, setDirectGridStrokeOpacity] = useState<string>(
+    String(defaultCurveStyle.strokeOpacity),
+  )
+  const [directGridLineWidth, setDirectGridLineWidth] = useState<string>(
+    String(defaultCurveStyle.lineWidth),
+  )
+  const [directGridLineStyle, setDirectGridLineStyle] = useState<LineStyle>(
     defaultCurveStyle.lineStyle,
   )
   const [directPathStart, setDirectPathStart] = useState<DirectCoordinateInput>(
@@ -2290,6 +2339,34 @@ function App() {
     setDirectPathSourceTargetKey('manual-start')
   }
 
+  function updateDirectGridField(field: DirectGridField, value: string): void {
+    setDirectGridInput((current) => {
+      switch (field) {
+        case 'uMin':
+          return { ...current, uRange: { ...current.uRange, min: value } }
+        case 'uMax':
+          return { ...current, uRange: { ...current.uRange, max: value } }
+        case 'uStep':
+          return { ...current, uRange: { ...current.uRange, step: value } }
+        case 'vMin':
+          return { ...current, vRange: { ...current.vRange, min: value } }
+        case 'vMax':
+          return { ...current, vRange: { ...current.vRange, max: value } }
+        case 'vStep':
+          return { ...current, vRange: { ...current.vRange, step: value } }
+        case 'clipUMin':
+          return { ...current, clip: { ...current.clip, uMin: value } }
+        case 'clipUMax':
+          return { ...current, clip: { ...current.clip, uMax: value } }
+        case 'clipVMin':
+          return { ...current, clip: { ...current.clip, vMin: value } }
+        case 'clipVMax':
+          return { ...current, clip: { ...current.clip, vMax: value } }
+      }
+    })
+    setDirectCreationStatus('')
+  }
+
   function updateDirectRowsForCreationTool(
     tool: 'createPolyline' | 'createCubicBezier' | 'createSheet',
     value: string,
@@ -2532,6 +2609,11 @@ function App() {
       return
     }
 
+    if (creationTool === 'createGrid') {
+      createDirectGrid(directLayer)
+      return
+    }
+
     const coordinateRows = parseDirectCoordinateRows(
       directRowsForCreationTool(creationTool),
       editableDiagram.ambientDimension,
@@ -2694,6 +2776,68 @@ function App() {
       strokeOpacity,
       lineWidth,
       lineStyle: directPathLineStyle,
+    }
+  }
+
+  function createDirectGrid(directLayer: number): void {
+    const style = parseDirectGridStyle()
+
+    if (style === null) {
+      return
+    }
+
+    const result = addGridStratumFromDirectInput(
+      editableDiagram,
+      directGridInput,
+      activeWorkPlane,
+      {
+        diagram: editableDiagram,
+        layer: directLayer,
+        name: directGridName,
+        style,
+      },
+    )
+
+    if (!result.ok) {
+      setDirectCreationStatus(directGridCreationErrorMessage(result.error))
+      return
+    }
+
+    commitCreatedElement(
+      result.diagram,
+      { kind: 'stratum', id: result.id },
+      directLayer,
+    )
+    setDirectCreationStatus('Grid created.')
+    setCopyStatus('idle')
+  }
+
+  function parseDirectGridStyle(): CurveStyle | null {
+    if (!isHexColor(directGridStrokeColor)) {
+      setDirectCreationStatus('Grid stroke color must be a #RRGGBB hex color.')
+      return null
+    }
+
+    const strokeOpacity = parseOpacity(directGridStrokeOpacity)
+
+    if (strokeOpacity === null) {
+      setDirectCreationStatus('Grid stroke opacity must be between 0 and 1.')
+      return null
+    }
+
+    const lineWidth = parsePositiveFiniteNumber(directGridLineWidth)
+
+    if (lineWidth === null) {
+      setDirectCreationStatus('Grid line width must be positive.')
+      return null
+    }
+
+    return {
+      kind: 'curveStyle',
+      strokeColor: directGridStrokeColor as HexColor,
+      strokeOpacity,
+      lineWidth,
+      lineStyle: directGridLineStyle,
     }
   }
 
@@ -2927,6 +3071,124 @@ function App() {
       case 'createSheet':
         return directSheetSources
     }
+  }
+
+  function renderDirectGridControls() {
+    return (
+      <div className="direct-grid-form">
+        <label className="direct-create-field direct-path-name-field">
+          <span>Grid name</span>
+          <input
+            type="text"
+            value={directGridName}
+            onChange={(event) => {
+              setDirectGridName(event.currentTarget.value)
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <div
+          className="direct-path-style-grid"
+          role="group"
+          aria-label="Grid style"
+        >
+          <label className="direct-create-field">
+            <span>Stroke</span>
+            <input
+              type="text"
+              value={directGridStrokeColor}
+              onChange={(event) => {
+                setDirectGridStrokeColor(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Opacity</span>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              max="1"
+              value={directGridStrokeOpacity}
+              onChange={(event) => {
+                setDirectGridStrokeOpacity(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Width</span>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={directGridLineWidth}
+              onChange={(event) => {
+                setDirectGridLineWidth(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>Line style</span>
+            <select
+              value={directGridLineStyle}
+              onChange={(event) => {
+                setDirectGridLineStyle(event.currentTarget.value as LineStyle)
+                setDirectCreationStatus('')
+              }}
+            >
+              {lineStyles.map((lineStyle) => (
+                <option key={lineStyle} value={lineStyle}>
+                  {lineStyle}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="direct-grid-range-grid" role="group" aria-label="Grid ranges">
+          {directGridFields().map((field) => (
+            <label key={field.id} className="direct-create-field">
+              <span>{field.label}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                spellCheck={false}
+                value={field.value}
+                onChange={(event) =>
+                  updateDirectGridField(field.id, event.currentTarget.value)
+                }
+              />
+            </label>
+          ))}
+        </div>
+        <span className="direct-source-summary">
+          {editableDiagram.ambientDimension === 2
+            ? 'Frame: xy plane at z = 0'
+            : `Frame: active work plane (${workPlaneDisplayName(activeWorkPlane)})`}
+        </span>
+      </div>
+    )
+  }
+
+  function directGridFields(): Array<{
+    id: DirectGridField
+    label: string
+    value: string
+  }> {
+    return [
+      { id: 'uMin', label: 'u min', value: directGridInput.uRange.min },
+      { id: 'uMax', label: 'u max', value: directGridInput.uRange.max },
+      { id: 'uStep', label: 'u step', value: directGridInput.uRange.step },
+      { id: 'vMin', label: 'v min', value: directGridInput.vRange.min },
+      { id: 'vMax', label: 'v max', value: directGridInput.vRange.max },
+      { id: 'vStep', label: 'v step', value: directGridInput.vRange.step },
+      { id: 'clipUMin', label: 'clip u min', value: directGridInput.clip.uMin },
+      { id: 'clipUMax', label: 'clip u max', value: directGridInput.clip.uMax },
+      { id: 'clipVMin', label: 'clip v min', value: directGridInput.clip.vMin },
+      { id: 'clipVMax', label: 'clip v max', value: directGridInput.clip.vMax },
+    ]
   }
 
   function renderDirectPathControls() {
@@ -4360,7 +4622,8 @@ function App() {
               }}
             >
               <span className="control-label">{directCreationTitle(creationTool)}</span>
-              {editableDiagram.ambientDimension === 3 && (
+              {editableDiagram.ambientDimension === 3 &&
+                creationTool !== 'createGrid' && (
                 <label className="direct-create-field direct-coordinate-mode-field">
                   <span>Coordinate mode</span>
                   <select
@@ -4428,6 +4691,7 @@ function App() {
                   </label>
                 ))}
               {creationTool === 'createPath' && renderDirectPathControls()}
+              {creationTool === 'createGrid' && renderDirectGridControls()}
               {isDirectPathCreationTool(creationTool) &&
                 (creationTool !== 'createSheet' ||
                   sheetCreationKind === 'polygon') && (
@@ -5341,7 +5605,8 @@ function isDirectCreationTool(tool: CreationTool): tool is DirectCreationTool {
     tool === 'createPolyline' ||
     tool === 'createCubicBezier' ||
     tool === 'createPath' ||
-    tool === 'createSheet'
+    tool === 'createSheet' ||
+    tool === 'createGrid'
   )
 }
 
@@ -5379,6 +5644,8 @@ function directCreationTitle(tool: DirectCreationTool): string {
       return 'Path'
     case 'createSheet':
       return 'Sheet'
+    case 'createGrid':
+      return 'Grid'
   }
 }
 
@@ -5407,6 +5674,19 @@ function directCreationErrorMessage(
       return kind === 'sheet'
         ? 'Sheets are available only in 3D.'
         : 'This cubic Bezier control mode requires 2D coordinates or 3D active work-plane local coordinates.'
+  }
+}
+
+function directGridCreationErrorMessage(
+  error: DirectGridCreationError,
+): string {
+  switch (error) {
+    case 'invalidScalar':
+      return 'Grid range and clip values must be valid finite scalar expressions.'
+    case 'invalidWorkPlane':
+      return 'The active work plane must be valid before creating a 3D grid.'
+    case 'invalidGrid':
+      return 'Grid ranges, clipping bounds, and line count must be valid.'
   }
 }
 

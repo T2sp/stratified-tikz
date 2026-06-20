@@ -15,6 +15,7 @@ import type {
 } from '../model/types'
 import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
 import { isClosedPathBoundary } from '../model/filledBoundaries.ts'
+import { gridPreviewSegments, scalarInputPreviewValue } from '../model/grids.ts'
 import { pathCoordinates, pathEndpoints } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { FilledBoundaryStratum } from './filledStratumEditing.ts'
@@ -100,6 +101,10 @@ export function formatVec3(
 }
 
 export function describeCurvePoints(curve: CurveStratum): CurvePointDescription[] {
+  if (curve.kind === 'grid') {
+    return []
+  }
+
   if (curve.kind === 'cubicBezier') {
     const bezierLabels = ['Start', 'Control point 1', 'Control point 2', 'End']
 
@@ -322,6 +327,9 @@ function createCurveGeometrySection(
       ...(curve.kind === 'templatePath'
         ? templatePathSummaryFields(curve.template)
         : []),
+      ...(curve.kind === 'grid'
+        ? gridSummaryFields(curve, ambientDimension)
+        : []),
       ...(curve.kind === 'cubicBezier'
         ? [
             {
@@ -337,6 +345,47 @@ function createCurveGeometrySection(
       })),
     ],
   }
+}
+
+function gridSummaryFields(
+  grid: Extract<CurveStratum, { kind: 'grid' }>,
+  ambientDimension: AmbientDimension,
+): InspectorField[] {
+  const preview = gridPreviewSegments(grid, ambientDimension)
+
+  return [
+    { label: 'Frame', value: grid.frame.kind },
+    {
+      label: 'U range',
+      value: formatGridRange(grid.uRange),
+    },
+    {
+      label: 'V range',
+      value: formatGridRange(grid.vRange),
+    },
+    {
+      label: 'Clip',
+      value: `u ${formatScalar(grid.clip.uMin)} to ${formatScalar(grid.clip.uMax)}, v ${formatScalar(grid.clip.vMin)} to ${formatScalar(grid.clip.vMax)}`,
+    },
+    {
+      label: 'Preview lines',
+      value: preview.ok ? String(preview.lineCount) : 'invalid',
+    },
+  ]
+}
+
+function formatGridRange(
+  range: Extract<CurveStratum, { kind: 'grid' }>['uRange'],
+): string {
+  return `${formatScalar(range.min)} to ${formatScalar(range.max)} step ${formatScalar(range.step)}`
+}
+
+function formatScalar(
+  value: Extract<CurveStratum, { kind: 'grid' }>['uRange']['min'],
+): string {
+  return value.kind === 'symbolic'
+    ? `${value.expression} (${formatNumber(scalarInputPreviewValue(value))})`
+    : formatNumber(value.value)
 }
 
 function templatePathSummaryFields(template: PathTemplate): InspectorField[] {

@@ -34,6 +34,7 @@ import {
   addCubicBezierCurveFromDirectInput,
   addCubicBezierCurveStratumWithResult,
   addEllipsePathFromDirectInput,
+  addGridStratumFromDirectInput,
   addPointStratumFromDirectInput,
   addPointStratumWithResult,
   addPolygonSheetFromDirectInput,
@@ -50,6 +51,7 @@ import {
   updateStratumById,
   updateStratumStyleById,
 } from '../../src/ui/diagramUpdates.ts'
+import { gridPreviewSegments } from '../../src/model/grids.ts'
 import {
   createExistingCoordinateSourceOptions,
   formatExistingCoordinateSourceLabel,
@@ -214,6 +216,54 @@ test('direct polyline creation assigns 2D codim, layer, selection, and z normali
   })
   assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 7 })
   assert.equal(layerFilterIncludesLayer(committed.layerFilter, curve.layer), true)
+})
+
+test('direct grid creation snapshots active work plane and preserves style and layer', () => {
+  const style = {
+    kind: 'curveStyle' as const,
+    strokeColor: '#4D9DE0' as const,
+    strokeOpacity: 0.5,
+    lineWidth: 0.75,
+    lineStyle: 'dashed' as const,
+  }
+  const result = addGridStratumFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    {
+      uRange: { min: '-1', max: '1', step: '1' },
+      vRange: { min: '-1', max: '1', step: '1' },
+      clip: { uMin: '-1', uMax: '1', vMin: '-1', vMax: '1' },
+    },
+    { kind: 'xz', y: 2 },
+    {
+      name: 'XZ grid',
+      layer: 4,
+      style,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const grid = findCurve(result.diagram, result.id)
+
+  assert.equal(grid.kind, 'grid')
+  if (grid.kind !== 'grid') {
+    throw new Error('Expected a grid stratum.')
+  }
+  assert.equal(grid.codim, 2)
+  assert.equal(grid.layer, 4)
+  assert.deepEqual(grid.style, style)
+  assert.equal(grid.frame.kind, 'workPlane')
+  assert.deepEqual(grid.frame.frame.origin, { x: 0, y: 2, z: 0 })
+
+  const preview = gridPreviewSegments(grid, 3)
+  assert.equal(preview.ok, true)
+  if (!preview.ok) {
+    throw new Error(preview.errors[0]?.message ?? 'Invalid grid preview.')
+  }
+  assert.equal(preview.lineCount, 6)
 })
 
 test('direct polyline creation commits to editable diagram state', () => {

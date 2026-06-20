@@ -10,6 +10,7 @@ export type WorkPlanePreviewTool =
   | 'createCubicBezier'
   | 'createPath'
   | 'createSheet'
+  | 'createGrid'
 
 export type WorkPlaneDirectionIndicator = {
   from: Vec3
@@ -47,6 +48,7 @@ export function shouldShowWorkPlanePreview(
     case 'createCubicBezier':
     case 'createPath':
     case 'createSheet':
+    case 'createGrid':
       return ambientDimension === 3
   }
 }
