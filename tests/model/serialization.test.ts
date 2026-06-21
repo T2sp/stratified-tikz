@@ -7,6 +7,7 @@ import {
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
+  createCurvedSheetStratum,
   createEmptyDiagram,
 } from '../../src/model/constructors.ts'
 import {
@@ -20,8 +21,10 @@ import {
 } from '../../src/model/index.ts'
 import type {
   Camera3D,
+  BoundaryPathSnapshot,
   Diagram,
   PerspectiveCamera3D,
+  Vec3,
   WorkPlane,
 } from '../../src/model/types.ts'
 
@@ -116,6 +119,8 @@ test('visibility options save and load round-trip as view metadata', () => {
       labelVisibility: 'autoDim',
       sortMode: 'layerThenDepth',
       depthEpsilon: 0.000001,
+      maxSurfaceFacesForSorting: 96,
+      maxCurveSamples: 128,
       hiddenCurveStyle: {
         lineStyle: 'dashed',
         opacity: 0.35,
@@ -166,6 +171,11 @@ test('visibility options without hidden curve style load with defaults', () => {
     lineStyle: 'denselyDotted',
     opacity: 0.45,
   })
+  assert.equal(
+    result.diagram.view?.visibility?.maxSurfaceFacesForSorting,
+    256,
+  )
+  assert.equal(result.diagram.view?.visibility?.maxCurveSamples, 512)
 })
 
 test('old visibility options without point and label policies load with defaults', () => {
@@ -212,6 +222,168 @@ test('old visibility options without point and label policies load with defaults
     result.diagram.view?.visibility?.labelVisibility,
     'alwaysForeground',
   )
+  assert.equal(
+    result.diagram.view?.visibility?.maxSurfaceFacesForSorting,
+    256,
+  )
+  assert.equal(result.diagram.view?.visibility?.maxCurveSamples, 512)
+})
+
+test('old visibility options without performance caps load with defaults', () => {
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'dimHidden',
+      labelVisibility: 'alwaysForeground',
+      sortMode: 'layerThenDepth',
+      depthEpsilon: 0.000001,
+      hiddenCurveStyle: {
+        lineStyle: 'dashed',
+        opacity: 0.35,
+      },
+    },
+  })
+  const saved = JSON.parse(serialized) as {
+    diagram: {
+      view?: {
+        visibility?: {
+          maxSurfaceFacesForSorting?: unknown
+          maxCurveSamples?: unknown
+        }
+      }
+    }
+  }
+
+  delete saved.diagram.view?.visibility?.maxSurfaceFacesForSorting
+  delete saved.diagram.view?.visibility?.maxCurveSamples
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(
+    result.diagram.view?.visibility?.maxSurfaceFacesForSorting,
+    256,
+  )
+  assert.equal(result.diagram.view?.visibility?.maxCurveSamples, 512)
+})
+
+test('oversized saved visibility caps are clamped on load', () => {
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'dimHidden',
+      labelVisibility: 'alwaysForeground',
+      sortMode: 'layerThenDepth',
+      depthEpsilon: 0.000001,
+      maxSurfaceFacesForSorting: 99999,
+      maxCurveSamples: 99999,
+      hiddenCurveStyle: {
+        lineStyle: 'dashed',
+        opacity: 0.35,
+      },
+    },
+  })
+  const result = parseSavedDiagramJson(serialized)
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(
+    result.diagram.view?.visibility?.maxSurfaceFacesForSorting,
+    2048,
+  )
+  assert.equal(result.diagram.view?.visibility?.maxCurveSamples, 2048)
+})
+
+test('boundary surfaces and visibility options save and load round-trip', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.view = {
+    ...diagram.view,
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'dimHidden',
+      labelVisibility: 'autoDim',
+      sortMode: 'depthThenLayer',
+      depthEpsilon: 0.00001,
+      maxSurfaceFacesForSorting: 64,
+      maxCurveSamples: 96,
+      hiddenCurveStyle: {
+        lineStyle: 'dotted',
+        opacity: 0.5,
+      },
+    },
+  }
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'saved-ruled-surface',
+      name: 'Saved ruled surface',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: lineBoundarySnapshot(
+          'saved-ruled-bottom',
+          { x: -1, y: 0, z: -1 },
+          { x: 1, y: 0, z: -1 },
+        ),
+        boundary1: lineBoundarySnapshot(
+          'saved-ruled-top',
+          { x: -1, y: 0, z: 1 },
+          { x: 1, y: 0, z: 1 },
+        ),
+        sampling: { segments: 4 },
+      },
+      layer: 0,
+    }),
+    createCurvedSheetStratum({
+      id: 'saved-coons-patch',
+      name: 'Saved Coons patch',
+      primitive: {
+        kind: 'coonsPatch',
+        bottom: lineBoundarySnapshot(
+          'saved-coons-bottom',
+          { x: -1, y: -1, z: 0 },
+          { x: 1, y: -1, z: 0.2 },
+        ),
+        right: lineBoundarySnapshot(
+          'saved-coons-right',
+          { x: 1, y: -1, z: 0.2 },
+          { x: 1, y: 1, z: -0.2 },
+        ),
+        top: lineBoundarySnapshot(
+          'saved-coons-top',
+          { x: -1, y: 1, z: 0.35 },
+          { x: 1, y: 1, z: -0.2 },
+        ),
+        left: lineBoundarySnapshot(
+          'saved-coons-left',
+          { x: -1, y: -1, z: 0 },
+          { x: -1, y: 1, z: 0.35 },
+        ),
+        sampling: { uSegments: 4, vSegments: 3 },
+      },
+      layer: 1,
+    }),
+  )
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.view?.visibility, diagram.view.visibility)
+  assert.deepEqual(result.diagram.strata, diagram.strata)
 })
 
 test('invalid saved visibility options are ignored with a warning', () => {
@@ -1218,6 +1390,23 @@ test('serializeDiagram excludes active custom work-plane UI state', () => {
   assert.equal(serialized.includes('camera-leak-p0'), false)
   assert.equal(serialized.includes('existingPointStrata'), false)
 })
+
+function lineBoundarySnapshot(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+      },
+    ],
+  }
+}
 
 const localBezierFrame = {
   origin: { x: 10, y: 20, z: 30 },

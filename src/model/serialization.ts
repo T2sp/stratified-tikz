@@ -38,6 +38,8 @@ import {
   cloneVisibilityOptions,
   defaultVisibilityOptions,
   isVisibilitySortMode,
+  normalizeVisibilityMaxCurveSamples,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
   visibilityOptionsEqual,
 } from './visibility.ts'
 import type {
@@ -1314,6 +1316,30 @@ function visibilityOptionsFromPersistent(
     return null
   }
 
+  const maxSurfaceFacesForSorting =
+    'maxSurfaceFacesForSorting' in value
+      ? visibilityLimitFromPersistent(
+          value.maxSurfaceFacesForSorting,
+          normalizeVisibilityMaxSurfaceFacesForSorting,
+        )
+      : defaultVisibilityOptions.maxSurfaceFacesForSorting
+
+  if (maxSurfaceFacesForSorting === null) {
+    return null
+  }
+
+  const maxCurveSamples =
+    'maxCurveSamples' in value
+      ? visibilityLimitFromPersistent(
+          value.maxCurveSamples,
+          normalizeVisibilityMaxCurveSamples,
+        )
+      : defaultVisibilityOptions.maxCurveSamples
+
+  if (maxCurveSamples === null) {
+    return null
+  }
+
   return {
     enabled: value.enabled,
     surfaceDepthSort: value.surfaceDepthSort,
@@ -1322,6 +1348,8 @@ function visibilityOptionsFromPersistent(
     labelVisibility,
     sortMode: value.sortMode,
     depthEpsilon: value.depthEpsilon,
+    maxSurfaceFacesForSorting,
+    maxCurveSamples,
     hiddenCurveStyle,
   }
 }
@@ -1346,6 +1374,22 @@ function labelVisibilityFromPersistent(
     labelVisibilityPolicies.includes(value as VisibilityOptions['labelVisibility'])
     ? (value as VisibilityOptions['labelVisibility'])
     : null
+}
+
+function visibilityLimitFromPersistent(
+  value: unknown,
+  normalize: (value: number | undefined) => number,
+): number | null {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 1
+  ) {
+    return null
+  }
+
+  return normalize(value)
 }
 
 function hiddenCurveStyleFromPersistent(

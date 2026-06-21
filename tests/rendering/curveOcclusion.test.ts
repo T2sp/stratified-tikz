@@ -454,6 +454,43 @@ test('curve occlusion respects layerThenDepth and depthThenLayer options', () =>
   assert.equal(depthThenLayer[0]?.segments[0]?.visibility, 'hidden')
 })
 
+test('curve occlusion surface face cap falls back before sorting projected faces', () => {
+  const curve = polylineCurve('over-face-cap-curve', [
+    { x: -0.5, y: -1, z: 0 },
+    { x: 0.5, y: -1, z: 0 },
+  ])
+  const diagram = occlusionDiagramWithTwoSheets(curve)
+  const originalSort = Array.prototype.sort
+  let sortCalled = false
+
+  Array.prototype.sort = function sortSpy<T>(
+    this: T[],
+    compareFn?: (left: T, right: T) => number,
+  ): T[] {
+    sortCalled = true
+    return originalSort.call(this, compareFn)
+  }
+
+  try {
+    const [result] = classifyCurveOcclusion(diagram, {
+      camera: occlusionCamera,
+      visibility: {
+        ...enabledVisibility(),
+        maxSurfaceFacesForSorting: 1,
+      },
+      curveSegmentSamples: 4,
+    })
+
+    assert.equal(result?.capped, true)
+    assert.equal(result?.fallbackReason, 'surfaceFaceCapExceeded')
+    assert.equal(result?.sampledSegmentCount, 0)
+    assert.deepEqual(result?.segments, [])
+    assert.equal(sortCalled, false)
+  } finally {
+    Array.prototype.sort = originalSort
+  }
+})
+
 test('curve occlusion sampling cap falls back instead of exposing a prefix', () => {
   const points = longPolylinePoints(30, 1)
   const curve = polylineCurve('long-curve', points)
@@ -707,6 +744,30 @@ function occlusionDiagram(curve: CurveStratum): Diagram {
     }),
     curve,
   ]
+
+  return diagram
+}
+
+function occlusionDiagramWithTwoSheets(curve: CurveStratum): Diagram {
+  const diagram = occlusionDiagram(curve)
+
+  diagram.strata.splice(
+    1,
+    0,
+    createSheetStratum({
+      ambientDimension: 3,
+      id: 'second-occluding-sheet',
+      name: 'Second occluding sheet',
+      style: defaultSheetStyle,
+      corners: [
+        { x: -1, y: 0, z: -1 },
+        { x: 1, y: 0, z: -1 },
+        { x: 1, y: 0, z: 1 },
+        { x: -1, y: 0, z: 1 },
+      ],
+      layer: 0,
+    }),
+  )
 
   return diagram
 }

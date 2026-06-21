@@ -10,6 +10,8 @@ import { sheetVertices } from '../model/sheets.ts'
 import { curveStylesEqual } from '../model/styles.ts'
 import {
   curveOcclusionEnabled,
+  normalizeVisibilityMaxCurveSamples,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
   resolveVisibilityOptions,
 } from '../model/visibility.ts'
 import type {
@@ -37,7 +39,9 @@ import {
 } from './projectedPrimitives.ts'
 
 export type CurveVisibility = 'visible' | 'hidden'
-export type CurveOcclusionFallbackReason = 'sampleCapExceeded'
+export type CurveOcclusionFallbackReason =
+  | 'sampleCapExceeded'
+  | 'surfaceFaceCapExceeded'
 
 export type CurveOcclusionSegment = {
   curveId: string
@@ -77,6 +81,11 @@ export type CurveOcclusionOptions = {
 type SurfaceFaceSample = {
   vertices3D: Vec3[]
   faceIndex: number
+}
+
+type ProjectedSurfaceFaceCollection = {
+  faces: ProjectedSurfaceFace[]
+  capExceeded: boolean
 }
 
 type StyledCurveSegmentSample = {
@@ -128,21 +137,53 @@ export function classifyCurveOcclusion(
     defaultTemplatePathSamples,
     maxCurveOcclusionTemplatePathSamples,
   )
-  const maxCurveSegmentsPerCurve = normalizedMaxSegments(
-    options.maxCurveSegmentsPerCurve,
+  const maxCurveSegmentsPerCurve = normalizeVisibilityMaxCurveSamples(
+    options.maxCurveSegmentsPerCurve ?? visibility.maxCurveSamples,
   )
-  const faces = projectedSurfaceFacesForDiagram(
+  const maxSurfaceFacesForSorting =
+    normalizeVisibilityMaxSurfaceFacesForSorting(
+      visibility.maxSurfaceFacesForSorting,
+    )
+  const collectedFaces = projectedSurfaceFacesForDiagram(
     diagram,
     camera,
     curveSegmentSamples,
     options.occludingSurfaceIds,
-  ).sort((left, right) =>
-    compareProjectedSurfaceFaces(left, right, visibility),
+    maxSurfaceFacesForSorting,
   )
+
+  if (collectedFaces.capExceeded) {
+    return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
+      if (
+        stratum.geometricKind !== 'curve' ||
+        stratum.codim !== 2 ||
+        (options.curveIds !== undefined && !options.curveIds.has(stratum.id))
+      ) {
+        return []
+      }
+
+      return [
+        {
+          curveId: stratum.id,
+          curve: stratum,
+          segments: [],
+          sampledSegmentCount: 0,
+          capped: true,
+          fallbackReason: 'surfaceFaceCapExceeded',
+        },
+      ]
+    })
+  }
+
+  const faces = collectedFaces.faces
 
   if (faces.length === 0) {
     return []
   }
+
+  faces.sort((left, right) =>
+    compareProjectedSurfaceFaces(left, right, visibility),
+  )
 
   return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
     if (
@@ -290,7 +331,8 @@ function projectedSurfaceFacesForDiagram(
   camera: Camera3D,
   curveSegmentSamples: number,
   occludingSurfaceIds: ReadonlySet<string> | undefined,
-): ProjectedSurfaceFace[] {
+  maxSurfaceFacesForSorting: number,
+): ProjectedSurfaceFaceCollection {
   const faces: ProjectedSurfaceFace[] = []
   let nextOriginalIndex = 0
 
@@ -318,45 +360,78 @@ function projectedSurfaceFacesForDiagram(
       if (projected !== null) {
         faces.push(projected)
         nextOriginalIndex += 1
+
+        // The surface-face cap must be enforced before sorting. Otherwise large
+        // diagrams still pay the expensive projected-face sort before falling
+        // back.
+        if (faces.length > maxSurfaceFacesForSorting) {
+          return {
+            faces,
+            capExceeded: true,
+          }
+        }
       }
     }
   }
 
-  return faces
+  return {
+    faces,
+    capExceeded: false,
+  }
 }
 
-function surfaceFacesForSheet(
+function* surfaceFacesForSheet(
   sheet: SheetStratum,
   ambientDimension: AmbientDimension,
   curveSegmentSamples: number,
-): SurfaceFaceSample[] {
+): Generator<SurfaceFaceSample> {
   switch (sheet.kind) {
     case 'quadSheet':
     case 'polygonSheet':
-      return [
-        {
-          vertices3D: sheetVertices(sheet).map(cloneVec3),
-          faceIndex: 0,
-        },
-      ]
+      yield {
+        vertices3D: sheetVertices(sheet).map(cloneVec3),
+        faceIndex: 0,
+      }
+      return
     case 'workPlaneFilledSheet':
-      return sheet.boundaries
-        .map((boundary, index) => ({
-          vertices3D: closedBoundaryPolygon(
-            boundary,
-            ambientDimension,
-            curveSegmentSamples,
-          ),
-          faceIndex: index,
-        }))
-        .filter((face) => face.vertices3D.length >= 3)
+      for (let index = 0; index < sheet.boundaries.length; index += 1) {
+        const boundary = sheet.boundaries[index]
+
+        if (boundary === undefined) {
+          continue
+        }
+
+        const vertices3D = closedBoundaryPolygon(
+          boundary,
+          ambientDimension,
+          curveSegmentSamples,
+        )
+
+        if (vertices3D.length >= 3) {
+          yield {
+            vertices3D,
+            faceIndex: index,
+          }
+        }
+      }
+      return
     case 'curvedSheet': {
       const mesh = sampleCurvedSheetPrimitive(sheet.primitive)
 
-      return mesh.faces.map((face, index) => ({
-        vertices3D: face.map((vertexIndex) => cloneVec3(mesh.vertices[vertexIndex])),
-        faceIndex: index,
-      }))
+      for (let index = 0; index < mesh.faces.length; index += 1) {
+        const face = mesh.faces[index]
+
+        if (face === undefined) {
+          continue
+        }
+
+        yield {
+          vertices3D: face.map((vertexIndex) =>
+            cloneVec3(mesh.vertices[vertexIndex]),
+          ),
+          faceIndex: index,
+        }
+      }
     }
   }
 }
@@ -1027,14 +1102,6 @@ function normalizedSampleCount(
   }
 
   return Math.min(maximum, Math.max(1, Math.floor(value)))
-}
-
-function normalizedMaxSegments(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) {
-    return defaultMaxCurveOcclusionSegmentsPerCurve
-  }
-
-  return Math.max(1, Math.floor(value))
 }
 
 function midpointVec3(start: Vec3, end: Vec3): Vec3 {

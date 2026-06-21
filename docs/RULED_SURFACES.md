@@ -85,11 +85,16 @@ sheets.
 
 TikZ export emits one readable `\filldraw` polygon per sampled face. The output
 is layer-aware, uses the sheet style, and includes comments identifying the
-surface primitive and sampling counts. Export does not depend on `tikz-3dtools`.
+surface primitive and sampling counts. When automatic visibility is enabled,
+the sampled mesh faces can participate in the same approximate painter-style
+depth sorting as other sheet faces, and curves can be sampled into visible and
+hidden runs behind the sheet. Export does not depend on `tikz-3dtools`.
 
 ## Limitations
 
-The Phase 20C MVP stores copied boundary paths only. It does not support live
-linked boundaries, automatic visibility/depth sorting, advanced corner repair,
-boolean operations, or advanced surface editing. Template path boundaries are
-copied as sampled polylines.
+The Phase 20 MVP stores copied boundary paths only. It does not support live
+linked boundaries, exact hidden-surface removal, advanced corner repair,
+boolean operations, or advanced surface editing. Automatic visibility is an
+approximate painter's algorithm with sampled midpoint curve occlusion, so
+intersecting surfaces, cyclic overlaps, and coarse meshes may still need manual
+layer adjustment. Template path boundaries are copied as sampled polylines.

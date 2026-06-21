@@ -80,6 +80,8 @@ type VisibilityOptions = {
   labelVisibility: "alwaysForeground" | "autoDim" | "autoHide";
   sortMode: "layerThenDepth" | "depthThenLayer";
   depthEpsilon: number;
+  maxSurfaceFacesForSorting?: number;
+  maxCurveSamples?: number;
   hiddenCurveStyle?: {
     lineStyle: "dotted" | "denselyDotted" | "dashed";
     opacity: number;
@@ -98,6 +100,8 @@ The default is conservative:
   labelVisibility: "alwaysForeground",
   sortMode: "layerThenDepth",
   depthEpsilon: 1e-9,
+  maxSurfaceFacesForSorting: 256,
+  maxCurveSamples: 512,
   hiddenCurveStyle: {
     lineStyle: "denselyDotted",
     opacity: 0.45
@@ -121,6 +125,11 @@ in their precomputed face order, and curves, points, labels, and other
 non-surface items keep their existing id ordering above those faces. Sorted
 TikZ export emits one `\filldraw` command per sorted face with comments
 recording the source sheet, face index, and average depth.
+
+Surface sorting has a performance cap. If the exported surface-face count
+exceeds `maxSurfaceFacesForSorting`, preview falls back to the ordinary
+layer-aware sheet rendering and TikZ export emits a warning comment before the
+ordinary sheet export. Saved values above the hard cap are clamped on load.
 
 ## Curve Occlusion
 
@@ -151,6 +160,12 @@ export considers exported sheets and emits sampled visible/hidden `\draw`
 commands when visibility is enabled; when visibility is disabled, exact curve
 export, saved paths, local plane scopes, symbolic-friendly commands, and grid
 foreach output are unchanged.
+
+Curve occlusion has a per-curve sample cap. If a curve would require more than
+`maxCurveSamples` sampled segments, or if the surface-face cap is exceeded, SVG
+preview keeps the original curve rendering and TikZ export emits a warning
+comment followed by the ordinary curve command. This avoids freezing the editor
+or producing partial sampled paths.
 
 ## Point And Label Visibility
 
@@ -187,6 +202,8 @@ projected coordinates and finite depth metadata that can support:
 - Surface sorting is a painter's algorithm, not exact hidden-surface removal.
 - Intersecting surfaces or cyclic overlaps may still sort incorrectly.
 - Large faces may need finer sampling before depth sorting looks right.
+- Very large diagrams may exceed the configured face/sample caps and fall back
+  to ordinary layer-aware output with comments in TikZ export.
 - Curve occlusion is midpoint sampled; it does not compute exact
   curve/surface intersections or clipped split points.
 - Point and label visibility tests only the anchor point, not the visual extent
@@ -198,3 +215,7 @@ projected coordinates and finite depth metadata that can support:
   face primitives rather than triangulated polygons with holes.
 - Automatic visibility is disabled by default for old and new diagrams unless
   the user enables it in the 3D Visibility controls.
+- The MVP does not depend on `tikz-3dtools` or LuaLaTeX. A future optional
+  LuaLaTeX/lua-tikz3dtools export mode could provide enhanced TeX-side 3D
+  tooling, but the current preview and TikZ export compute visibility in
+  TypeScript.

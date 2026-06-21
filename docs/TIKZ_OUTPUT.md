@@ -92,8 +92,21 @@ blocks, so declared layer order remains important for the final drawing.
 
 This is a painter's algorithm approximation. Intersecting surfaces, cyclic
 overlaps, and large coarse faces can still render incorrectly. Increase surface
-sampling or use the layer manager when exact visibility matters. Curve, point,
-and label occlusion are not part of this phase.
+sampling or use the layer manager when exact visibility matters. The MVP does
+not depend on `tikz-3dtools` or LuaLaTeX-side visibility packages; SVG preview
+and TikZ export use the TypeScript visibility approximation so they stay
+aligned. A future optional LuaLaTeX/lua-tikz3dtools export mode could be added
+separately.
+
+Automatic visibility also supports sampled curve hidden segments and optional
+point/label visibility policies. Hidden curve runs are exported as separate
+`\draw` commands using the configured hidden line style and opacity multiplier;
+visible runs use the original curve style. Point and label visibility either
+dims or omits anchors according to the saved policy. If the face or curve sample
+caps are exceeded, TikZ export emits a warning comment and falls back to the
+ordinary layer-aware command for that sheet or curve instead of writing partial
+or unbounded sampled output. Inline math export still removes blank lines from
+these comments and generated commands.
 
 ## Variables
 
@@ -878,12 +891,15 @@ TikZ source remains readable. If sampling fails or would produce non-finite
 coordinates, the generator omits that curved sheet and emits a readable comment
 rather than writing `NaN` or `Infinity`.
 
-TikZ export also caps curved-sheet mesh output at 256 sampled faces. A curved
-sheet above that cap is omitted with a comment asking the user to reduce
-sampling. This keeps generated source readable and prevents accidentally large
-manual edits from producing thousands of `\filldraw` commands. SVG preview and
-model validation still use the model's explicit capped sampling values; the
-256-face limit is an export-readability guard, not a new surface model.
+TikZ export also caps ordinary curved-sheet mesh output at 256 sampled faces. A
+curved sheet above that cap is omitted with a comment asking the user to reduce
+sampling. Automatic surface sorting has its own configurable
+`maxSurfaceFacesForSorting` cap; when that cap is exceeded, sorting is skipped
+with a warning and ordinary layer-aware sheet export follows. This keeps
+generated source readable and prevents accidentally large manual edits from
+producing thousands of `\filldraw` commands. SVG preview and model validation
+still use the model's explicit capped sampling values; the export caps are
+readability/performance guards, not new surface models.
 
 ## Output sections in 2D mode
 

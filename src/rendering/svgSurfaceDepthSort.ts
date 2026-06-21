@@ -4,7 +4,10 @@ import type {
   SheetStratum,
   VisibilityOptions,
 } from '../model/types.ts'
-import { surfaceDepthSortEnabled } from '../model/visibility.ts'
+import {
+  normalizeVisibilityMaxSurfaceFacesForSorting,
+  surfaceDepthSortEnabled,
+} from '../model/visibility.ts'
 import { shouldRenderStratumInSvgPreview } from './svgPreviewPolicy.ts'
 import { projectToSvgPoint } from './svgProjection.ts'
 import { svgPointList } from './svgPath.ts'
@@ -46,11 +49,22 @@ export function sortedSvgSurfaceFaces(
   )
 
   try {
-    return extractProjectedRenderPrimitives(diagram, { camera })
+    const faces = extractProjectedRenderPrimitives(diagram, { camera })
       .filter(
         (primitive): primitive is ProjectedSurfaceFace =>
           primitive.kind === 'surfaceFace' && sheetById.has(primitive.sourceId),
       )
+
+    if (
+      faces.length >
+      normalizeVisibilityMaxSurfaceFacesForSorting(
+        visibilityOptions.maxSurfaceFacesForSorting,
+      )
+    ) {
+      return null
+    }
+
+    return faces
       .sort((left, right) =>
         compareProjectedSurfaceFaces(left, right, visibilityOptions),
       )

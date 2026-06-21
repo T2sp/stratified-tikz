@@ -109,6 +109,8 @@ export type VisibilityOptions = {
   labelVisibility: LabelVisibilityPolicy
   sortMode: VisibilitySortMode
   depthEpsilon: number
+  maxSurfaceFacesForSorting?: number
+  maxCurveSamples?: number
   hiddenCurveStyle?: HiddenCurveStyle
 }
 

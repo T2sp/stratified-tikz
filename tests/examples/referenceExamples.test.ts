@@ -2,13 +2,16 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   evenOddFilledBoundaryExample,
+  coonsPatchExample,
   hemispherePatchExample,
   referenceExampleDiagrams,
+  ruledSurfaceOcclusionExample,
   saddlePatchExample,
   symbolicCirclePointExample,
   symbolicPathExample,
   threeDimensionalExample,
   threeDimensionalWorkPlaneGridExample,
+  translucentSortedSheetsExample,
   translucentFilledStrataExample,
   twoDimensionalGridExample,
   twoDimensionalExample,
@@ -31,6 +34,9 @@ const exampleCases = [
   { name: 'hemisphere patch', diagram: hemispherePatchExample },
   { name: 'saddle patch', diagram: saddlePatchExample },
   { name: 'even-odd boundary', diagram: evenOddFilledBoundaryExample },
+  { name: 'ruled surface occlusion', diagram: ruledSurfaceOcclusionExample },
+  { name: 'Coons patch', diagram: coonsPatchExample },
+  { name: 'sorted translucent sheets', diagram: translucentSortedSheetsExample },
   { name: 'symbolic circle point', diagram: symbolicCirclePointExample },
   { name: 'symbolic path', diagram: symbolicPathExample },
   { name: '2D grid', diagram: twoDimensionalGridExample },
@@ -87,6 +93,23 @@ test('hemisphere and saddle examples export sampled curved sheets', () => {
   assert.match(saddleTikz, /Each sampled face is emitted/)
   assert.match(hemisphereTikz, /\\node at \(0\.35,0,1\.62\) \{\$\\gamma\$\};/)
   assert.match(saddleTikz, /\\node at \(0\.2,0\.15,0\.35\) \{\$p\$\};/)
+})
+
+test('boundary surface and visibility examples export auto-visibility TikZ', () => {
+  const ruledTikz = generateTikz(ruledSurfaceOcclusionExample)
+  const coonsTikz = generateTikz(coonsPatchExample)
+  const sortedTikz = generateTikz(translucentSortedSheetsExample)
+
+  assert.match(ruledTikz, /Auto surface face depth sort/)
+  assert.match(ruledTikz, /Auto curve occlusion/)
+  assert.match(ruledTikz, /Hidden sampled segment/)
+  assert.match(coonsTikz, /Coons patch generated/)
+  assert.match(coonsTikz, /Primitive: coonsPatch/)
+  assert.match(sortedTikz, /Auto surface face depth sort/)
+  assert.doesNotMatch(
+    [ruledTikz, coonsTikz, sortedTikz].join('\n'),
+    /NaN|Infinity/,
+  )
 })
 
 test('even-odd boundary example exports compound fill rule', () => {
