@@ -12,8 +12,6 @@ import {
   emptyThreeDimensionalDiagram,
   emptyTwoDimensionalDiagram,
   evenOddFilledBoundaryExample,
-  hemispherePatchExample,
-  saddlePatchExample,
   symbolicCirclePointExample,
   symbolicPathExample,
   threeDimensionalExample,
@@ -290,8 +288,6 @@ type ExampleId =
   | '2d'
   | '3d'
   | 'referenceFilled'
-  | 'hemispherePatch'
-  | 'saddlePatch'
   | 'evenOddBoundary'
   | 'symbolicCirclePoint'
   | 'symbolicPath'
@@ -403,18 +399,6 @@ const exampleOptions: ExampleOption[] = [
     name: 'Reference fills',
     summary: 'translucent filled regions with solid and dotted curves',
     diagram: translucentFilledStrataExample,
-  },
-  {
-    id: 'hemispherePatch',
-    name: 'Hemisphere patch',
-    summary: 'sampled sheet with paths, points, and labels',
-    diagram: hemispherePatchExample,
-  },
-  {
-    id: 'saddlePatch',
-    name: 'Saddle patch',
-    summary: 'sampled saddle with crossing paths and labels',
-    diagram: saddlePatchExample,
   },
   {
     id: 'evenOddBoundary',

@@ -73,9 +73,100 @@ import {
   type LayerFilter,
 } from '../../src/ui/layerFilter.ts'
 
+const threeDimensionalSelectionExample: Diagram = {
+  version: 1,
+  ambientDimension: 3,
+  camera: threeDimensionalExample.camera,
+  view: threeDimensionalExample.view,
+  strata: [
+    {
+      id: 'blueSheet',
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'quadSheet',
+      name: 'Blue sheet',
+      style: {
+        kind: 'sheetStyle',
+        fillColor: '#4D9DE0',
+        fillOpacity: 0.35,
+        strokeColor: '#1D6FA5',
+        strokeOpacity: 0.9,
+      },
+      corners: [
+        { x: -1, y: -1, z: 0 },
+        { x: 2, y: -1, z: 0 },
+        { x: 2, y: 1.25, z: 0 },
+        { x: -1, y: 1.25, z: 0 },
+      ],
+      layer: 0,
+    },
+    {
+      id: 'roseSheet',
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'quadSheet',
+      name: 'Rose sheet',
+      style: {
+        kind: 'sheetStyle',
+        fillColor: '#E76F51',
+        fillOpacity: 0.22,
+        strokeColor: '#9D3D2F',
+        strokeOpacity: 0.8,
+      },
+      corners: [
+        { x: -0.5, y: 0.2, z: -0.5 },
+        { x: 1.5, y: 0.2, z: -0.5 },
+        { x: 1.5, y: 0.2, z: 1.7 },
+        { x: -0.5, y: 0.2, z: 1.7 },
+      ],
+      layer: 1,
+    },
+    {
+      id: 'solidLine',
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      name: 'Solid line defect',
+      style: {
+        kind: 'curveStyle',
+        strokeColor: '#111111',
+        strokeOpacity: 1,
+        lineWidth: 1.2,
+        lineStyle: 'solid',
+      },
+      points: [
+        { x: -0.75, y: -0.75, z: 0.15 },
+        { x: 0.25, y: -0.1, z: 0.65 },
+        { x: 1.5, y: 0.85, z: 1.1 },
+      ],
+      styleSegments: [],
+      layer: 2,
+    },
+  ],
+  labels: [
+    {
+      id: 'lineLabel',
+      geometricKind: 'label',
+      name: 'Line label',
+      text: '$F^{(1)}L$',
+      position: { x: 0.8, y: 0.15, z: 1.45 },
+      style: {
+        kind: 'labelStyle',
+        color: '#C44536',
+        opacity: 1,
+        fontSize: 10,
+        anchor: 'north',
+      },
+      layer: 3,
+    },
+  ],
+}
+
 function createEmptyDiagramForTest(ambientDimension: AmbientDimension): Diagram {
   const example =
-    ambientDimension === 2 ? twoDimensionalExample : threeDimensionalExample
+    ambientDimension === 2
+      ? twoDimensionalExample
+      : threeDimensionalSelectionExample
 
   return {
     ...example,
@@ -108,8 +199,14 @@ test('clearSelectionIfMissing clears selection when switching diagrams', () => {
   const selection: SelectedElement = { kind: 'stratum', id: 'visibleWire' }
 
   assert.equal(selectionExistsInDiagram(twoDimensionalExample, selection), true)
-  assert.equal(selectionExistsInDiagram(threeDimensionalExample, selection), false)
-  assert.equal(clearSelectionIfMissing(threeDimensionalExample, selection), null)
+  assert.equal(
+    selectionExistsInDiagram(threeDimensionalSelectionExample, selection),
+    false,
+  )
+  assert.equal(
+    clearSelectionIfMissing(threeDimensionalSelectionExample, selection),
+    null,
+  )
 })
 
 test('formatVec3 formats 2D coordinates without z', () => {
@@ -160,7 +257,7 @@ test('describeCurvePoints labels cubic Bezier points semantically', () => {
 })
 
 test('describeCurvePoints labels polyline points as vertices', () => {
-  const curve = threeDimensionalExample.strata.find(
+  const curve = threeDimensionalSelectionExample.strata.find(
     (stratum) => stratum.id === 'solidLine',
   )
 
@@ -230,7 +327,7 @@ test('2D point position coordinates omit z', () => {
 })
 
 test('3D polyline vertex coordinates include z', () => {
-  const sections = createInspectorSections(threeDimensionalExample, {
+  const sections = createInspectorSections(threeDimensionalSelectionExample, {
     kind: 'stratum',
     id: 'solidLine',
   })
@@ -247,7 +344,7 @@ test('3D polyline vertex coordinates include z', () => {
 })
 
 test('3D sheet corner coordinates include z', () => {
-  const sections = createInspectorSections(threeDimensionalExample, {
+  const sections = createInspectorSections(threeDimensionalSelectionExample, {
     kind: 'stratum',
     id: 'roseSheet',
   })
@@ -268,7 +365,7 @@ test('label positions follow ambient dimension coordinate display', () => {
     kind: 'label',
     id: 'mathMorphismLabel',
   })
-  const threeDSections = createInspectorSections(threeDimensionalExample, {
+  const threeDSections = createInspectorSections(threeDimensionalSelectionExample, {
     kind: 'label',
     id: 'lineLabel',
   })
@@ -739,7 +836,7 @@ test('addPointStratumWithResult returns the updated diagram and created id atomi
 
 test('addPointStratum returns a new 3D diagram with codim 3', () => {
   const updated = addPointStratum(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     { x: 3, y: 4, z: 5 },
     { id: 'point-1' },
   )
@@ -856,16 +953,18 @@ test('addPolygonSheetStratum returns a new 3D diagram with codim 1', () => {
     { x: 1, y: 1, z: 1 },
   ]
   const updated = addPolygonSheetStratum(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     vertices,
     { id: 'sheet-1' },
   )
   const sheet = updated.strata.find((stratum) => stratum.id === 'sheet-1')
 
-  assert.notEqual(updated, threeDimensionalExample)
-  assert.equal(updated.labels, threeDimensionalExample.labels)
+  assert.notEqual(updated, threeDimensionalSelectionExample)
+  assert.equal(updated.labels, threeDimensionalSelectionExample.labels)
   assert.equal(
-    threeDimensionalExample.strata.some((stratum) => stratum.id === 'sheet-1'),
+    threeDimensionalSelectionExample.strata.some(
+      (stratum) => stratum.id === 'sheet-1',
+    ),
     false,
   )
   assert.equal(sheet?.geometricKind, 'sheet')
@@ -887,11 +986,11 @@ test('addPolygonSheetStratum returns a new 3D diagram with codim 1', () => {
 
 test('addPolygonSheetStratumWithResult returns the updated diagram and created id atomically', () => {
   const diagram = {
-    ...threeDimensionalExample,
+    ...threeDimensionalSelectionExample,
     strata: [
-      ...threeDimensionalExample.strata,
+      ...threeDimensionalSelectionExample.strata,
       {
-        ...threeDimensionalExample.strata[0],
+        ...threeDimensionalSelectionExample.strata[0],
         id: 'sheet-1',
       },
     ],
@@ -910,17 +1009,20 @@ test('addPolygonSheetStratumWithResult returns the updated diagram and created i
 })
 
 test('addPolygonSheetStratumWithResult safely rejects invalid sheet creation', () => {
-  const twoPointResult = addPolygonSheetStratumWithResult(threeDimensionalExample, [
-    { x: 0, y: 0, z: 0 },
-    { x: 1, y: 0, z: 0 },
-  ])
+  const twoPointResult = addPolygonSheetStratumWithResult(
+    threeDimensionalSelectionExample,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+  )
   const twoDimensionalResult = addPolygonSheetStratumWithResult(twoDimensionalExample, [
     { x: 0, y: 0, z: 0 },
     { x: 1, y: 0, z: 0 },
     { x: 0, y: 1, z: 0 },
   ])
 
-  assert.equal(twoPointResult.diagram, threeDimensionalExample)
+  assert.equal(twoPointResult.diagram, threeDimensionalSelectionExample)
   assert.equal(twoPointResult.id, null)
   assert.equal(twoDimensionalResult.diagram, twoDimensionalExample)
   assert.equal(twoDimensionalResult.id, null)
@@ -934,13 +1036,16 @@ test('addPolygonSheetStratumWithResult rejects non-finite vertices', () => {
   ]
 
   for (const invalidValue of invalidValues) {
-    const result = addPolygonSheetStratumWithResult(threeDimensionalExample, [
-      { x: 0, y: 0, z: 0 },
-      { x: 1, y: invalidValue, z: 0 },
-      { x: 0, y: 1, z: 0 },
-    ])
+    const result = addPolygonSheetStratumWithResult(
+      threeDimensionalSelectionExample,
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: invalidValue, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ],
+    )
 
-    assert.equal(result.diagram, threeDimensionalExample)
+    assert.equal(result.diagram, threeDimensionalSelectionExample)
     assert.equal(result.id, null)
     assert.equal(
       result.diagram.strata.some((stratum) => stratum.id === 'sheet-1'),
@@ -985,7 +1090,7 @@ test('addPolylineCurveStratum returns a new 2D diagram with codim 1 and z normal
 
 test('addPolylineCurveStratum returns a new 3D diagram with codim 2', () => {
   const updated = addPolylineCurveStratum(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     [
       { x: 1, y: 2, z: 3 },
       { x: 4, y: 5, z: 6 },
@@ -1153,7 +1258,7 @@ test('addCubicBezierCurveStratum returns a new 3D diagram with codim 2', () => {
     { x: 4, y: 0, z: 5 },
   ]
   const updated = addCubicBezierCurveStratum(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     points,
     { id: 'curve-1' },
   )
@@ -1426,7 +1531,7 @@ test('generated TikZ includes newly added cubic Bezier curve', () => {
 
 test('generated TikZ includes newly added polygon sheet as a closed polygon', () => {
   const updated = addPolygonSheetStratum(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     [
       { x: 0, y: 0, z: 2 },
       { x: 1, y: 0, z: 2 },
@@ -1538,7 +1643,7 @@ test('updateStratumStyleById updates point shape and fill immutably', () => {
 
 test('updateStratumStyleById updates sheet style immutably', () => {
   const updated = updateStratumStyleById(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     'roseSheet',
     (style) =>
       style.kind === 'sheetStyle'
@@ -1555,7 +1660,7 @@ test('updateStratumStyleById updates sheet style immutably', () => {
 
   assert.equal(sheet.style.fillOpacity, 0.6)
   assert.equal(sheet.style.strokeColor, '#654321')
-  assert.equal(updated.labels, threeDimensionalExample.labels)
+  assert.equal(updated.labels, threeDimensionalSelectionExample.labels)
 })
 
 test('updateLabelStyleById updates label anchor immutably', () => {
@@ -1699,7 +1804,7 @@ test('style edits are reflected in generated TikZ', () => {
 
 test('sheet style edits through update helpers are reflected in generated TikZ', () => {
   const updated = updateStratumStyleById(
-    threeDimensionalExample,
+    threeDimensionalSelectionExample,
     'roseSheet',
     (style) =>
       style.kind === 'sheetStyle'

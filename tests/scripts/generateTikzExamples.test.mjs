@@ -55,10 +55,14 @@ test('generateTikzExamples writes representative TikZ files', async () => {
     assert.match(twoDimensionalSource, /\$F\^\{\(1\)\}L\$/)
     assert.match(twoDimensionalSource, /densely dotted/)
     assert.match(threeDimensionalSource, /% Requires \\usepackage\{tikz-3dplot\}/)
-    assert.match(threeDimensionalSource, /\\tdplotsetmaincoords\{13\}\{-23\}/)
+    assert.match(
+      threeDimensionalSource,
+      /\\tdplotsetmaincoords\{70\.728711\}\{20\.933203\}/,
+    )
     assert.match(threeDimensionalSource, /tdplot_main_coords/)
-    assert.match(threeDimensionalSource, /\\filldraw\[/)
-    assert.match(threeDimensionalSource, /star points=5/)
+    assert.match(threeDimensionalSource, /\\pgfmathsetmacro\{\\Len\}\{4\}/)
+    assert.match(threeDimensionalSource, /Primitive: coonsPatch/)
+    assert.match(threeDimensionalSource, /\\filldraw \(/)
     assert.match(referenceFillsSource, /Blue translucent region/)
     assert.match(referenceFillsSource, /densely dotted/)
     assert.match(hemisphereSource, /Primitive: hemisphere/)
