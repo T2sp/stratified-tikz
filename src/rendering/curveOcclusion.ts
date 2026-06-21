@@ -83,6 +83,11 @@ type SurfaceFaceSample = {
   faceIndex: number
 }
 
+type ProjectedSurfaceFaceCollection = {
+  faces: ProjectedSurfaceFace[]
+  capExceeded: boolean
+}
+
 type StyledCurveSegmentSample = {
   start: Vec3
   end: Vec3
@@ -135,25 +140,19 @@ export function classifyCurveOcclusion(
   const maxCurveSegmentsPerCurve = normalizeVisibilityMaxCurveSamples(
     options.maxCurveSegmentsPerCurve ?? visibility.maxCurveSamples,
   )
-  const faces = projectedSurfaceFacesForDiagram(
-    diagram,
-    camera,
-    curveSegmentSamples,
-    options.occludingSurfaceIds,
-  ).sort((left, right) =>
-    compareProjectedSurfaceFaces(left, right, visibility),
-  )
-
-  if (faces.length === 0) {
-    return []
-  }
-
   const maxSurfaceFacesForSorting =
     normalizeVisibilityMaxSurfaceFacesForSorting(
       visibility.maxSurfaceFacesForSorting,
     )
+  const collectedFaces = projectedSurfaceFacesForDiagram(
+    diagram,
+    camera,
+    curveSegmentSamples,
+    options.occludingSurfaceIds,
+    maxSurfaceFacesForSorting,
+  )
 
-  if (faces.length > maxSurfaceFacesForSorting) {
+  if (collectedFaces.capExceeded) {
     return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
       if (
         stratum.geometricKind !== 'curve' ||
@@ -175,6 +174,16 @@ export function classifyCurveOcclusion(
       ]
     })
   }
+
+  const faces = collectedFaces.faces
+
+  if (faces.length === 0) {
+    return []
+  }
+
+  faces.sort((left, right) =>
+    compareProjectedSurfaceFaces(left, right, visibility),
+  )
 
   return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
     if (
@@ -322,7 +331,8 @@ function projectedSurfaceFacesForDiagram(
   camera: Camera3D,
   curveSegmentSamples: number,
   occludingSurfaceIds: ReadonlySet<string> | undefined,
-): ProjectedSurfaceFace[] {
+  maxSurfaceFacesForSorting: number,
+): ProjectedSurfaceFaceCollection {
   const faces: ProjectedSurfaceFace[] = []
   let nextOriginalIndex = 0
 
@@ -350,45 +360,78 @@ function projectedSurfaceFacesForDiagram(
       if (projected !== null) {
         faces.push(projected)
         nextOriginalIndex += 1
+
+        // The surface-face cap must be enforced before sorting. Otherwise large
+        // diagrams still pay the expensive projected-face sort before falling
+        // back.
+        if (faces.length > maxSurfaceFacesForSorting) {
+          return {
+            faces,
+            capExceeded: true,
+          }
+        }
       }
     }
   }
 
-  return faces
+  return {
+    faces,
+    capExceeded: false,
+  }
 }
 
-function surfaceFacesForSheet(
+function* surfaceFacesForSheet(
   sheet: SheetStratum,
   ambientDimension: AmbientDimension,
   curveSegmentSamples: number,
-): SurfaceFaceSample[] {
+): Generator<SurfaceFaceSample> {
   switch (sheet.kind) {
     case 'quadSheet':
     case 'polygonSheet':
-      return [
-        {
-          vertices3D: sheetVertices(sheet).map(cloneVec3),
-          faceIndex: 0,
-        },
-      ]
+      yield {
+        vertices3D: sheetVertices(sheet).map(cloneVec3),
+        faceIndex: 0,
+      }
+      return
     case 'workPlaneFilledSheet':
-      return sheet.boundaries
-        .map((boundary, index) => ({
-          vertices3D: closedBoundaryPolygon(
-            boundary,
-            ambientDimension,
-            curveSegmentSamples,
-          ),
-          faceIndex: index,
-        }))
-        .filter((face) => face.vertices3D.length >= 3)
+      for (let index = 0; index < sheet.boundaries.length; index += 1) {
+        const boundary = sheet.boundaries[index]
+
+        if (boundary === undefined) {
+          continue
+        }
+
+        const vertices3D = closedBoundaryPolygon(
+          boundary,
+          ambientDimension,
+          curveSegmentSamples,
+        )
+
+        if (vertices3D.length >= 3) {
+          yield {
+            vertices3D,
+            faceIndex: index,
+          }
+        }
+      }
+      return
     case 'curvedSheet': {
       const mesh = sampleCurvedSheetPrimitive(sheet.primitive)
 
-      return mesh.faces.map((face, index) => ({
-        vertices3D: face.map((vertexIndex) => cloneVec3(mesh.vertices[vertexIndex])),
-        faceIndex: index,
-      }))
+      for (let index = 0; index < mesh.faces.length; index += 1) {
+        const face = mesh.faces[index]
+
+        if (face === undefined) {
+          continue
+        }
+
+        yield {
+          vertices3D: face.map((vertexIndex) =>
+            cloneVec3(mesh.vertices[vertexIndex]),
+          ),
+          faceIndex: index,
+        }
+      }
     }
   }
 }

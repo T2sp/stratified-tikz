@@ -786,6 +786,48 @@ test('curve sample cap falls back with a TikZ warning comment', () => {
   assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 
+test('curve occlusion surface face cap TikZ fallback emits original curve only', () => {
+  const tikz = generateTikz(createSurfaceFaceCapCurveOcclusionDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      maxSurfaceFacesForSorting: 1,
+    },
+  })
+
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.match(
+    tikz,
+    /surface face count exceeds the maxSurfaceFacesForSorting cap of 1/,
+  )
+  assert.doesNotMatch(tikz, /Hidden sampled segment/)
+  assert.doesNotMatch(tikz, /Visible sampled segment/)
+  assert.doesNotMatch(tikz, /densely dotted/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyPartlyHiddenCurve0p3\) at \(2,-1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curvePolyPartlyHiddenCurve0p2\) -- \(curvePolyPartlyHiddenCurve0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('inline curve occlusion surface face cap fallback has no blank lines', () => {
+  const tikz = generateTikz(createSurfaceFaceCapCurveOcclusionDiagram(), {
+    exportMode: 'inlineMath',
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      maxSurfaceFacesForSorting: 1,
+    },
+  })
+
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.doesNotMatch(tikz, /Hidden sampled segment/)
+  expectNoBlankLines(tikz)
+  expectNoTwoSpaceCommandIndent(tikz)
+})
+
 test('straight polyline curve occlusion TikZ output splits visible hidden visible runs', () => {
   const tikz = generateTikz(createStraightCurveOcclusionDiagram('polyline'), {
     visibility: enabledVisibilityOptions('layerThenDepth'),
@@ -4874,6 +4916,23 @@ function createCurveOcclusionDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createSurfaceFaceCapCurveOcclusionDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet === undefined || sheet.geometricKind !== 'sheet') {
+    throw new Error('Expected occluding sheet.')
+  }
+
+  diagram.strata.splice(1, 0, {
+    ...sheet,
+    id: 'second-occluding-sheet',
+    name: 'Second Occluding Sheet',
+  })
 
   return diagram
 }
