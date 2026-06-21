@@ -86,6 +86,16 @@ export type VisibilitySortMode = (typeof visibilitySortModes)[number]
 export const hiddenCurveLineStyles = ['dotted', 'denselyDotted', 'dashed'] as const
 export type HiddenCurveLineStyle = (typeof hiddenCurveLineStyles)[number]
 
+export const pointVisibilityPolicies = ['dimHidden', 'hideHidden'] as const
+export type PointVisibilityPolicy = (typeof pointVisibilityPolicies)[number]
+
+export const labelVisibilityPolicies = [
+  'alwaysForeground',
+  'autoDim',
+  'autoHide',
+] as const
+export type LabelVisibilityPolicy = (typeof labelVisibilityPolicies)[number]
+
 export type HiddenCurveStyle = {
   lineStyle: HiddenCurveLineStyle
   opacity: Opacity
@@ -94,6 +104,9 @@ export type HiddenCurveStyle = {
 export type VisibilityOptions = {
   enabled: boolean
   surfaceDepthSort: boolean
+  curveOcclusion: boolean
+  pointVisibility: PointVisibilityPolicy
+  labelVisibility: LabelVisibilityPolicy
   sortMode: VisibilitySortMode
   depthEpsilon: number
   hiddenCurveStyle?: HiddenCurveStyle

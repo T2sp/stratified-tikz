@@ -788,6 +788,9 @@ function enabledVisibilityOptions(sortMode: 'layerThenDepth' | 'depthThenLayer')
   return {
     enabled: true,
     surfaceDepthSort: true,
+    curveOcclusion: true,
+    pointVisibility: 'dimHidden',
+    labelVisibility: 'alwaysForeground',
     sortMode,
     depthEpsilon: 1e-9,
   } as const

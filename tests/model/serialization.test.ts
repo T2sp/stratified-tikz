@@ -111,6 +111,9 @@ test('visibility options save and load round-trip as view metadata', () => {
     visibility: {
       enabled: true,
       surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'hideHidden',
+      labelVisibility: 'autoDim',
       sortMode: 'layerThenDepth',
       depthEpsilon: 0.000001,
       hiddenCurveStyle: {
@@ -134,6 +137,9 @@ test('visibility options without hidden curve style load with defaults', () => {
     visibility: {
       enabled: true,
       surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'dimHidden',
+      labelVisibility: 'alwaysForeground',
       sortMode: 'layerThenDepth',
       depthEpsilon: 0.000001,
     },
@@ -160,6 +166,52 @@ test('visibility options without hidden curve style load with defaults', () => {
     lineStyle: 'denselyDotted',
     opacity: 0.45,
   })
+})
+
+test('old visibility options without point and label policies load with defaults', () => {
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: true,
+      pointVisibility: 'hideHidden',
+      labelVisibility: 'autoHide',
+      sortMode: 'layerThenDepth',
+      depthEpsilon: 0.000001,
+      hiddenCurveStyle: {
+        lineStyle: 'dashed',
+        opacity: 0.35,
+      },
+    },
+  })
+  const saved = JSON.parse(serialized) as {
+    diagram: {
+      view?: {
+        visibility?: {
+          curveOcclusion?: unknown
+          pointVisibility?: unknown
+          labelVisibility?: unknown
+        }
+      }
+    }
+  }
+
+  delete saved.diagram.view?.visibility?.curveOcclusion
+  delete saved.diagram.view?.visibility?.pointVisibility
+  delete saved.diagram.view?.visibility?.labelVisibility
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.diagram.view?.visibility?.curveOcclusion, true)
+  assert.equal(result.diagram.view?.visibility?.pointVisibility, 'dimHidden')
+  assert.equal(
+    result.diagram.view?.visibility?.labelVisibility,
+    'alwaysForeground',
+  )
 })
 
 test('invalid saved visibility options are ignored with a warning', () => {

@@ -1399,6 +1399,14 @@
   text-align: right;
 }
 
+.tikz-export-control-heading {
+  color: var(--text-h);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: right;
+}
+
 .tikz-export-checkbox {
   display: inline-flex;
   align-items: center;

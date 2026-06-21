@@ -9,8 +9,8 @@ import {
 import { sheetVertices } from '../model/sheets.ts'
 import { curveStylesEqual } from '../model/styles.ts'
 import {
+  curveOcclusionEnabled,
   resolveVisibilityOptions,
-  surfaceDepthSortEnabled,
 } from '../model/visibility.ts'
 import type {
   AmbientDimension,
@@ -113,7 +113,7 @@ export function classifyCurveOcclusion(
   if (
     diagram.ambientDimension !== 3 ||
     camera.mode !== '3d' ||
-    !surfaceDepthSortEnabled(visibility)
+    !curveOcclusionEnabled(visibility)
   ) {
     return []
   }
@@ -854,7 +854,7 @@ function faceOccludesCurveSegmentMidpoint(
   visibility: VisibilityOptions,
 ): boolean {
   if (
-    !surfaceLayerCanOccludeCurve(
+    !surfaceLayerCanOccludeTarget(
       face.layer,
       curveLayer,
       visibility.sortMode,
@@ -873,16 +873,16 @@ function faceOccludesCurveSegmentMidpoint(
   return curveDepth - faceDepth > visibility.depthEpsilon
 }
 
-function surfaceLayerCanOccludeCurve(
+export function surfaceLayerCanOccludeTarget(
   surfaceLayer: number,
-  curveLayer: number,
+  targetLayer: number,
   sortMode: VisibilitySortMode,
 ): boolean {
   if (sortMode === 'depthThenLayer') {
     return true
   }
 
-  return normalizeLayer(surfaceLayer) >= normalizeLayer(curveLayer)
+  return normalizeLayer(surfaceLayer) >= normalizeLayer(targetLayer)
 }
 
 function closedBoundaryPolygon(

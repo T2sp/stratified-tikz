@@ -41,6 +41,8 @@ import {
 import { sheetVertices } from './sheets.ts'
 import {
   hiddenCurveLineStyles,
+  labelVisibilityPolicies,
+  pointVisibilityPolicies,
   tikzExportModes,
   visibilitySortModes,
 } from './types.ts'
@@ -574,6 +576,30 @@ function validateVisibilityOptions(
       errors,
       `${path}.surfaceDepthSort`,
       'Surface depth sort must be a boolean.',
+    )
+  }
+
+  if (typeof visibility.curveOcclusion !== 'boolean') {
+    pushError(
+      errors,
+      `${path}.curveOcclusion`,
+      'Curve occlusion must be a boolean.',
+    )
+  }
+
+  if (!pointVisibilityPolicies.includes(visibility.pointVisibility)) {
+    pushError(
+      errors,
+      `${path}.pointVisibility`,
+      'Point visibility policy must be dimHidden or hideHidden.',
+    )
+  }
+
+  if (!labelVisibilityPolicies.includes(visibility.labelVisibility)) {
+    pushError(
+      errors,
+      `${path}.labelVisibility`,
+      'Label visibility policy must be alwaysForeground, autoDim, or autoHide.',
     )
   }
 

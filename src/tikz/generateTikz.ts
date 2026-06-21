@@ -71,9 +71,14 @@ import {
   resolveSymbolicVariables,
 } from '../model/variables.ts'
 import {
+  curveOcclusionEnabled,
   defaultHiddenCurveStyle,
   defaultVisibilityOptions,
+  hiddenLabelStyleFromBase,
   hiddenCurveStyleFromBase,
+  hiddenPointStyleFromBase,
+  labelAutoVisibilityEnabled,
+  pointAutoVisibilityEnabled,
   resolveVisibilityOptions,
   surfaceDepthSortEnabled,
 } from '../model/visibility.ts'
@@ -89,6 +94,10 @@ import {
   type CurveOcclusionResult,
   type CurveOcclusionSegment,
 } from '../rendering/curveOcclusion.ts'
+import {
+  classifyAnchorOcclusion,
+  type AnchorOcclusionResult,
+} from '../rendering/pointOcclusion.ts'
 import { formatScalarExpressionForTikz } from './expressionFormatter.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
@@ -122,6 +131,8 @@ type LayeredTikzCommand = {
   sectionTitle: string
   lines: string[]
 }
+
+type AnchorOcclusionById = ReadonlyMap<string, AnchorOcclusionResult>
 
 type PointCurveStratum = Exclude<
   CurveStratum,
@@ -395,7 +406,7 @@ export function generateTikz3D(
         ),
         (sheet, index) => emitSheet(sheet, index, context),
       )
-  const curveCommands = surfaceDepthSortEnabled(context.visibility)
+  const curveCommands = curveOcclusionEnabled(context.visibility)
     ? emitOcclusionSegmentedCurves(diagram, curveSectionTitle, context)
     : emitLayeredItems(
         curveSectionTitle,
@@ -405,6 +416,8 @@ export function generateTikz3D(
         ),
         (curve, index) => emitCurve(curve, index, context),
       )
+  const pointOcclusionById = createTikzPointOcclusionMap(diagram, context)
+  const labelOcclusionById = createTikzLabelOcclusionMap(diagram, context)
   const drawingCommands = [
     ...sheetCommands,
     ...curveCommands,
@@ -414,10 +427,11 @@ export function generateTikz3D(
         (stratum): stratum is PointStratum =>
           stratum.geometricKind === 'point' && stratum.codim === 3,
       ),
-      (point, index) => emitPoint(point, index, context),
+      (point, index) =>
+        emitPoint(point, index, context, pointOcclusionById.get(point.id)),
     ),
     ...emitLayeredItems(labelSectionTitle, diagram.labels, (label) =>
-      emitLabel(label, context),
+      emitLabel(label, context, labelOcclusionById.get(label.id)),
     ),
   ]
   const coordinateAxesGuide = emitCoordinateAxesGuide(context)
@@ -1605,6 +1619,72 @@ function emitOcclusionSegmentedCurves(
           : emitOcclusionSegmentedCurve(item, index, occlusion, context),
     }
   })
+}
+
+function createTikzPointOcclusionMap(
+  diagram: Diagram,
+  context: GenerateContext,
+): AnchorOcclusionById {
+  if (
+    context.camera3d === undefined ||
+    !pointAutoVisibilityEnabled(context.visibility)
+  ) {
+    return new Map()
+  }
+
+  const targets = diagram.strata.flatMap((stratum) =>
+    stratum.geometricKind === 'point' && stratum.codim === 3
+      ? [
+          {
+            id: stratum.id,
+            layer: stratum.layer,
+            position: stratum.position,
+          },
+        ]
+      : [],
+  )
+
+  try {
+    return new Map(
+      classifyAnchorOcclusion(diagram, targets, {
+        camera: context.camera3d,
+        visibility: context.visibility,
+        kind: 'point',
+      }).map((result) => [result.id, result]),
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+function createTikzLabelOcclusionMap(
+  diagram: Diagram,
+  context: GenerateContext,
+): AnchorOcclusionById {
+  if (
+    context.camera3d === undefined ||
+    !labelAutoVisibilityEnabled(context.visibility)
+  ) {
+    return new Map()
+  }
+
+  const targets = diagram.labels.map((label) => ({
+    id: label.id,
+    layer: label.layer,
+    position: label.position,
+  }))
+
+  try {
+    return new Map(
+      classifyAnchorOcclusion(diagram, targets, {
+        camera: context.camera3d,
+        visibility: context.visibility,
+        kind: 'label',
+      }).map((result) => [result.id, result]),
+    )
+  } catch {
+    return new Map()
+  }
 }
 
 function emitOcclusionSegmentedCurve(
@@ -3550,6 +3630,7 @@ function emitPoint(
   point: PointStratum,
   elementIndex: number,
   context: GenerateContext,
+  occlusion?: AnchorOcclusionResult,
 ): string[] {
   if (!isFiniteVec3(point.position)) {
     return [
@@ -3558,6 +3639,21 @@ function emitPoint(
     ]
   }
 
+  const isHiddenBySurface = occlusion?.visibility === 'hidden'
+
+  if (
+    isHiddenBySurface &&
+    context.visibility.pointVisibility === 'hideHidden'
+  ) {
+    return [
+      `% Auto point visibility: point "${point.name}" [${point.id}] hidden behind ${occludingFaceComment(occlusion)} and omitted.`,
+      '',
+    ]
+  }
+
+  const style = isHiddenBySurface
+    ? hiddenPointStyleFromBase(point.style)
+    : point.style
   const coordinate = context.coordinates.define(
     pointCoordinateBaseName(point, elementIndex),
     0,
@@ -3566,12 +3662,17 @@ function emitPoint(
   const options = pointStyleOptionsForElement(
     point.stylePresetId,
     point.importedTikzStyleReferenceId,
-    point.style,
+    style,
     `Point${point.id}`,
     context,
   )
 
   return [
+    ...(isHiddenBySurface
+      ? [
+          `% Auto point visibility: point "${point.name}" [${point.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`,
+        ]
+      : []),
     '\\node[',
     ...formatTikzOptions(options),
     `] at (${coordinate}) {};`,
@@ -3586,7 +3687,11 @@ function pointCoordinateBaseName(
   return `point${sanitizeTikzNameStem(point.name, 'point')}${elementIndex}`
 }
 
-function emitLabel(label: TextLabel, context: GenerateContext): string[] {
+function emitLabel(
+  label: TextLabel,
+  context: GenerateContext,
+  occlusion?: AnchorOcclusionResult,
+): string[] {
   if (!isFiniteVec3(label.position)) {
     return [
       `% Label "${label.name}" [${label.id}] omitted because its position contains non-finite coordinates.`,
@@ -3594,20 +3699,56 @@ function emitLabel(label: TextLabel, context: GenerateContext): string[] {
     ]
   }
 
-  const options = labelStyleOptions(label, context)
+  const isHiddenBySurface = occlusion?.visibility === 'hidden'
+
+  if (
+    isHiddenBySurface &&
+    context.visibility.labelVisibility === 'autoHide'
+  ) {
+    return [
+      `% Auto label visibility: label "${label.name}" [${label.id}] hidden behind ${occludingFaceComment(occlusion)} and omitted.`,
+      '',
+    ]
+  }
+
+  const effectiveLabel =
+    isHiddenBySurface && context.visibility.labelVisibility === 'autoDim'
+      ? {
+          ...label,
+          style: hiddenLabelStyleFromBase(label.style),
+        }
+      : label
+  const options = labelStyleOptions(effectiveLabel, context)
   const coordinate = formatCoordinate(label.position, context.mode, context)
   const labelText = formatLabelTextForTikz(label.text, context.exportMode)
+  const visibilityComment =
+    isHiddenBySurface && context.visibility.labelVisibility === 'autoDim'
+      ? [
+          `% Auto label visibility: label "${label.name}" [${label.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`,
+        ]
+      : []
 
   if (options.length === 0) {
-    return [`\\node at ${coordinate} {${labelText}};`, '']
+    return [
+      ...visibilityComment,
+      `\\node at ${coordinate} {${labelText}};`,
+      '',
+    ]
   }
 
   return [
+    ...visibilityComment,
     '\\node[',
     ...formatTikzOptions(options),
     `] at ${coordinate} {${labelText}};`,
     '',
   ]
+}
+
+function occludingFaceComment(occlusion: AnchorOcclusionResult): string {
+  return occlusion.occludingFace === undefined
+    ? 'a surface face'
+    : `sheet [${occlusion.occludingFace.sourceId}] face ${occlusion.occludingFace.faceIndex}`
 }
 
 function formatLabelTextForTikz(

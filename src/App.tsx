@@ -52,9 +52,11 @@ import type {
   FillRule,
   HexColor,
   HiddenCurveLineStyle,
+  LabelVisibilityPolicy,
   LatticePattern,
   LineStyle,
   OrthographicCamera3D,
+  PointVisibilityPolicy,
   Stratum,
   TikzExportMode,
   Vec2,
@@ -63,7 +65,13 @@ import type {
   VisibilitySortMode,
   WorkPlane,
 } from './model/types'
-import { hiddenCurveLineStyles, latticePatterns, lineStyles } from './model/types'
+import {
+  hiddenCurveLineStyles,
+  labelVisibilityPolicies,
+  latticePatterns,
+  lineStyles,
+  pointVisibilityPolicies,
+} from './model/types'
 import {
   cloneVisibilityOptions,
   defaultHiddenCurveStyle,
@@ -532,6 +540,21 @@ const hiddenCurveLineStyleOptions: Array<{
   { style: 'dotted', label: 'Dotted' },
   { style: 'dashed', label: 'Dashed' },
 ]
+const pointVisibilityPolicyOptions: Array<{
+  policy: PointVisibilityPolicy
+  label: string
+}> = [
+  { policy: 'dimHidden', label: 'Dim hidden' },
+  { policy: 'hideHidden', label: 'Hide hidden' },
+]
+const labelVisibilityPolicyOptions: Array<{
+  policy: LabelVisibilityPolicy
+  label: string
+}> = [
+  { policy: 'alwaysForeground', label: 'Always foreground' },
+  { policy: 'autoDim', label: 'Auto dim' },
+  { policy: 'autoHide', label: 'Auto hide' },
+]
 const emptyStyleImportReport: StyleImportReport = {
   status: 'idle',
   sourceName: '',
@@ -548,6 +571,22 @@ function hiddenCurveLineStyleFromSelectValue(
   return hiddenCurveLineStyles.includes(value as HiddenCurveLineStyle)
     ? (value as HiddenCurveLineStyle)
     : defaultHiddenCurveStyle.lineStyle
+}
+
+function pointVisibilityPolicyFromSelectValue(
+  value: string,
+): PointVisibilityPolicy {
+  return pointVisibilityPolicies.includes(value as PointVisibilityPolicy)
+    ? (value as PointVisibilityPolicy)
+    : defaultVisibilityOptions.pointVisibility
+}
+
+function labelVisibilityPolicyFromSelectValue(
+  value: string,
+): LabelVisibilityPolicy {
+  return labelVisibilityPolicies.includes(value as LabelVisibilityPolicy)
+    ? (value as LabelVisibilityPolicy)
+    : defaultVisibilityOptions.labelVisibility
 }
 
 function App() {
@@ -1011,11 +1050,42 @@ function App() {
     setCopyStatus('idle')
   }
 
-  function updateSurfaceDepthSort(enabled: boolean): void {
+  function updateAutoVisibility(enabled: boolean): void {
     setVisibilityOptions((current) => ({
       ...current,
       enabled,
-      surfaceDepthSort: enabled,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateSurfaceDepthSort(surfaceDepthSort: boolean): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      surfaceDepthSort,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateCurveOcclusion(curveOcclusion: boolean): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      curveOcclusion,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updatePointVisibility(pointVisibility: PointVisibilityPolicy): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      pointVisibility,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateLabelVisibility(labelVisibility: LabelVisibilityPolicy): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      labelVisibility,
     }))
     setCopyStatus('idle')
   }
@@ -6387,30 +6457,63 @@ function App() {
                 />
                 <span>Show xyz axes in TikZ output</span>
               </label>
+              <div className="tikz-export-control-heading">3D Visibility</div>
               <label className="tikz-export-checkbox">
                 <input
                   type="checkbox"
                   checked={
                     editableDiagram.ambientDimension === 3 &&
-                    visibilityOptions.enabled &&
-                    visibilityOptions.surfaceDepthSort
+                    visibilityOptions.enabled
                   }
                   disabled={editableDiagram.ambientDimension !== 3}
+                  onChange={(event) =>
+                    updateAutoVisibility(event.currentTarget.checked)
+                  }
+                />
+                <span>Enable approximate 3D visibility</span>
+              </label>
+              <label className="tikz-export-checkbox">
+                <input
+                  type="checkbox"
+                  checked={
+                    editableDiagram.ambientDimension === 3 &&
+                    visibilityOptions.surfaceDepthSort
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled
+                  }
                   onChange={(event) =>
                     updateSurfaceDepthSort(event.currentTarget.checked)
                   }
                 />
-                <span>Sort surface faces</span>
+                <span>Auto depth-sort surfaces</span>
+              </label>
+              <label className="tikz-export-checkbox">
+                <input
+                  type="checkbox"
+                  checked={
+                    editableDiagram.ambientDimension === 3 &&
+                    visibilityOptions.curveOcclusion
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled
+                  }
+                  onChange={(event) =>
+                    updateCurveOcclusion(event.currentTarget.checked)
+                  }
+                />
+                <span>Auto hide/dot curves behind sheets</span>
               </label>
               <label className="tikz-export-mode-control">
-                <span>Surface order:</span>
+                <span>Sort mode:</span>
                 <select
                   className="toolbar-select"
                   value={visibilityOptions.sortMode}
                   disabled={
                     editableDiagram.ambientDimension !== 3 ||
-                    !visibilityOptions.enabled ||
-                    !visibilityOptions.surfaceDepthSort
+                    !visibilityOptions.enabled
                   }
                   onChange={(event) =>
                     updateVisibilitySortMode(
@@ -6436,7 +6539,7 @@ function App() {
                   disabled={
                     editableDiagram.ambientDimension !== 3 ||
                     !visibilityOptions.enabled ||
-                    !visibilityOptions.surfaceDepthSort
+                    !visibilityOptions.curveOcclusion
                   }
                   onChange={(event) =>
                     updateHiddenCurveLineStyle(
@@ -6468,12 +6571,60 @@ function App() {
                   disabled={
                     editableDiagram.ambientDimension !== 3 ||
                     !visibilityOptions.enabled ||
-                    !visibilityOptions.surfaceDepthSort
+                    !visibilityOptions.curveOcclusion
                   }
                   onChange={(event) =>
                     updateHiddenCurveOpacity(event.currentTarget.value)
                   }
                 />
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Hidden points:</span>
+                <select
+                  className="toolbar-select"
+                  value={visibilityOptions.pointVisibility}
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled
+                  }
+                  onChange={(event) =>
+                    updatePointVisibility(
+                      pointVisibilityPolicyFromSelectValue(
+                        event.currentTarget.value,
+                      ),
+                    )
+                  }
+                >
+                  {pointVisibilityPolicyOptions.map((option) => (
+                    <option key={option.policy} value={option.policy}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Label visibility:</span>
+                <select
+                  className="toolbar-select"
+                  value={visibilityOptions.labelVisibility}
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled
+                  }
+                  onChange={(event) =>
+                    updateLabelVisibility(
+                      labelVisibilityPolicyFromSelectValue(
+                        event.currentTarget.value,
+                      ),
+                    )
+                  }
+                >
+                  {labelVisibilityPolicyOptions.map((option) => (
+                    <option key={option.policy} value={option.policy}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="tikz-export-actions">
                 <button type="button" className="copy-button" onClick={copyTikz}>

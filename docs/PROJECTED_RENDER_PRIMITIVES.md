@@ -75,6 +75,9 @@ The visibility option shape is:
 type VisibilityOptions = {
   enabled: boolean;
   surfaceDepthSort: boolean;
+  curveOcclusion: boolean;
+  pointVisibility: "dimHidden" | "hideHidden";
+  labelVisibility: "alwaysForeground" | "autoDim" | "autoHide";
   sortMode: "layerThenDepth" | "depthThenLayer";
   depthEpsilon: number;
   hiddenCurveStyle?: {
@@ -90,6 +93,9 @@ The default is conservative:
 {
   enabled: false,
   surfaceDepthSort: true,
+  curveOcclusion: true,
+  pointVisibility: "dimHidden",
+  labelVisibility: "alwaysForeground",
   sortMode: "layerThenDepth",
   depthEpsilon: 1e-9,
   hiddenCurveStyle: {
@@ -112,8 +118,7 @@ layer order remains the final layer-aware drawing structure.
 Sorted SVG preview renders sheet faces individually, then applies one total
 layer-first render key. Within each layer, sorted surface faces are drawn first
 in their precomputed face order, and curves, points, labels, and other
-non-surface items keep their existing id ordering above those faces. Curve,
-point, and label depth occlusion are intentionally left to later phases. Sorted
+non-surface items keep their existing id ordering above those faces. Sorted
 TikZ export emits one `\filldraw` command per sorted face with comments
 recording the source sheet, face index, and average depth.
 
@@ -121,7 +126,8 @@ recording the source sheet, face index, and average depth.
 
 Phase 20F adds optional sampled curve occlusion behind projected surface faces.
 The implementation lives in `src/rendering/curveOcclusion.ts` and is shared by
-SVG preview and TikZ export.
+SVG preview and TikZ export. Phase 20G separates this from surface sorting with
+the `curveOcclusion` switch.
 
 For each sampled curve segment, StratifiedTikZ:
 
@@ -146,6 +152,26 @@ commands when visibility is enabled; when visibility is disabled, exact curve
 export, saved paths, local plane scopes, symbolic-friendly commands, and grid
 foreach output are unchanged.
 
+## Point And Label Visibility
+
+Point and label visibility use the same projected surface-face test as curve
+midpoints, but the anchor position is the point position or free label position.
+The implementation lives in `src/rendering/pointOcclusion.ts`.
+
+When automatic visibility is enabled:
+
+- `pointVisibility: "dimHidden"` multiplies the point opacity by the hidden
+  point opacity factor;
+- `pointVisibility: "hideHidden"` omits hidden point nodes;
+- `labelVisibility: "alwaysForeground"` keeps free text labels in front and is
+  the default;
+- `labelVisibility: "autoDim"` dims labels whose anchor is behind a sheet;
+- `labelVisibility: "autoHide"` omits labels whose anchor is behind a sheet.
+
+SVG preview ignores hidden-layer sheets as point/label occluders. TikZ export
+uses the exported sheet set and writes comments when a point or label is dimmed
+or omitted by automatic visibility.
+
 ## Approximation Goal
 
 This model is a foundation for automatic visibility. It provides finite
@@ -163,9 +189,12 @@ projected coordinates and finite depth metadata that can support:
 - Large faces may need finer sampling before depth sorting looks right.
 - Curve occlusion is midpoint sampled; it does not compute exact
   curve/surface intersections or clipped split points.
+- Point and label visibility tests only the anchor point, not the visual extent
+  of the point marker or rendered text.
 - Sampled curve occlusion export is numeric and approximate. Disable
   visibility when exact symbolic paths, saved paths, or grid foreach output are
   more important than preview-matched hidden segments.
 - Work-plane filled sheets with holes are represented as separate boundary-loop
   face primitives rather than triangulated polygons with holes.
-- Labels are not emitted as primitives yet.
+- Automatic visibility is disabled by default for old and new diagrams unless
+  the user enables it in the 3D Visibility controls.
