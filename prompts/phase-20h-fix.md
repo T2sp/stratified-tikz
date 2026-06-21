@@ -1,4 +1,4 @@
-# Phase 20H Additional Fix Prompt: Enforce curve-occlusion surface-face cap before projection/sorting
+# Phase 20H / Phase 19C Fix Prompt: Load symbolic boundary-surface JSON by resolving variables before rendering
 
 ## Environment
 
@@ -29,331 +29,447 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 20H implemented auto-visibility export hardening. A previous fix may have attempted to address curve-occlusion cap behavior, but review still reports the same Medium issue.
+Phase 19G and Phase 20H are complete.
 
-Current review result:
+Manual JSON load check found a practical problem:
 
-- Tests pass.
-- Build passes.
-- No Critical issues.
-- One Medium issue remains.
+- A saved diagram contains Coons patch / boundary-surface paths whose coordinates are symbolic.
+- The saved file defines variables such as `Len` and `R`, and boundary paths contain expressions such as:
+  - `Len`;
+  - `R`;
+  - `.5*Len`;
+  - `-.5*Len`;
+  - `0.6*Len`;
+- Loading the JSON currently fails with an error similar to:
 
-## Medium issue
+```text
+Saved diagram is invalid: strata[3].primitive.bottom.segments[0].points[1] Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
+```
 
-`classifyCurveOcclusion` still collects and sorts all projected surface faces before checking `maxSurfaceFacesForSorting`.
+This is too strict.
 
-Review details:
-
-- In `src/rendering/curveOcclusion.ts`, `classifyCurveOcclusion` collects projected surface faces.
-- It then sorts all projected faces.
-- The cap check for `maxSurfaceFacesForSorting` happens only after this expensive work.
-- TikZ export reaches this through `src/tikz/generateTikz.ts`.
-- Therefore, large diagrams with curve occlusion enabled can still pay the expensive surface-face projection/sort cost before falling back.
-
-This defeats the purpose of the cap.
+In practice, boundary paths for ruled surfaces / Coons patches are often naturally specified symbolically. The editor should support loading these diagrams by asking the user for variable values, evaluating finite preview coordinates, and then rendering.
 
 ## Goal
 
-Fix Phase 20H curve-occlusion cap enforcement for real.
+Change JSON load behavior and boundary-surface validation so that symbolic boundary coordinates are allowed when they can be resolved to finite numeric preview values.
 
-In `classifyCurveOcclusion`:
+When a loaded JSON contains symbolic variables / symbolic coordinates:
 
-1. Enforce `maxSurfaceFacesForSorting` before sorting projected faces.
-2. Preferably stop face collection/projection once `cap + 1` relevant faces are reached.
-3. When the cap is exceeded:
-   - do not sort;
-   - do not classify hidden segments;
-   - fall back to original curve rendering/export;
-   - emit the surface-face-cap fallback warning/comment in TikZ;
-   - emit no hidden sampled curve segments.
+1. detect the variables used by the diagram;
+2. show a variable-resolution dialog before final rendering;
+3. prefill values from saved variable definitions when available;
+4. allow the user to confirm or edit variable values;
+5. validate/evaluate variables using the existing Phase 19 expression evaluator;
+6. refresh all symbolic preview values, including boundary path snapshots in ruled surfaces and Coons patches;
+7. then run full diagram validation and render.
+
+Do not reject boundary surface paths merely because their coordinates are symbolic.
+
+Reject only if symbolic coordinates cannot be resolved to finite numeric preview coordinates.
 
 ## Scope
 
-This is a targeted Phase 20H additional fix.
-
 Implement:
 
-- pre-sort cap enforcement in `classifyCurveOcclusion`;
-- ideally pre-projection or early projection short-circuit at `cap + 1`;
-- fallback behavior when cap is exceeded;
-- regression tests proving the cap path avoids hidden segment output.
+- load-time symbolic variable detection;
+- pending import / variable resolution flow;
+- finite-preview validation for symbolic boundary-surface coordinates;
+- symbolic preview refresh for ruled/Coons boundary snapshots before mesh validation;
+- tests for loading saved diagrams with symbolic Coons/ruled boundaries.
 
 Do not implement:
 
-- new visibility algorithms;
-- exact occlusion;
-- BSP splitting;
-- new UI options;
-- new geometry features;
-- broad SVG/TikZ export refactors;
+- full TeX parser;
+- arbitrary raw TikZ evaluation;
+- server-side LaTeX evaluation;
+- symbolic surface sampling in TikZ itself;
+- new surface geometry;
+- new variable syntax beyond Phase 19;
 - new dependencies.
 
 Do not change:
 
-- normal curve occlusion behavior under the cap;
-- hidden style semantics;
-- disabled visibility behavior;
-- surface sorting behavior under the cap;
-- layer/depth mode semantics;
-- original curve geometry;
-- save/load format;
-- inline/standalone export formatting;
-- 4-space indentation;
-- inline no-blank-lines invariant.
+- symbolic expression grammar except if needed for bug fixes;
+- TikZ export syntax for valid symbolic coordinates;
+- SVG rendering semantics except allowing finite preview values;
+- source geometry semantics;
+- save/load format except optional import-state helpers;
+- existing numeric-only diagram loading;
+- inline/standalone TikZ export formatting.
 
-## 1. First add a failing regression test
+## 1. Replace “numeric-only” boundary validation with “finite preview required”
 
-Before modifying implementation, add a test that currently fails under the review issue.
-
-Test setup should create or call a helper with:
-
-- curve occlusion enabled;
-- `maxSurfaceFacesForSorting` set very low, e.g. `1`;
-- more than `1` relevant surface face;
-- one curve that would otherwise be classified.
-
-Expected behavior after the fix:
-
-- classification returns a cap-exceeded fallback result; or
-- TikZ export emits the cap fallback comment and no hidden sampled segments.
-
-This test should fail before the implementation change if the cap is still checked after sorting.
-
-## 2. Inspect and refactor `classifyCurveOcclusion`
-
-Inspect:
-
-- `src/rendering/curveOcclusion.ts`;
-- `classifyCurveOcclusion`;
-- projected surface face collection;
-- surface face projection;
-- sorting;
-- `maxSurfaceFacesForSorting`;
-- fallback result types;
-- SVG consumer in `src/rendering/SvgDiagram.tsx`;
-- TikZ consumer in `src/tikz/generateTikz.ts`.
-
-Find the exact sequence:
+Find the validation that emits:
 
 ```text
-collect faces
-project faces
-sort faces
-check cap
-classify curve
+Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
 ```
 
-Refactor it to:
+This validation is too strict.
+
+Update the policy:
+
+### Old policy
 
 ```text
-collect/project only up to cap + 1
-if cap exceeded:
-    return fallback
-else:
-    sort faces
-    classify curve
+Boundary surface path coordinates must be numeric.
 ```
 
-or, even better if possible:
+### New policy
 
 ```text
-count candidate faces before projection
-if count exceeds cap:
-    return fallback
-else:
-    project faces
-    sort faces
-    classify curve
+Boundary surface path coordinates must have finite numeric preview values.
 ```
 
-Choose the safest strategy that preserves correctness.
+Allowed:
 
-## 3. Enforce cap before sorting
+- numeric coordinate component;
+- symbolic coordinate component with a finite `previewValue`;
+- symbolic coordinate component whose preview can be refreshed from resolved variables.
 
-Required implementation rule:
+Rejected:
 
-No code path may call the projected-face sorting step before the cap check has proven the number of faces is within `maxSurfaceFacesForSorting`.
+- unknown variable;
+- invalid expression;
+- missing preview after refresh;
+- non-finite preview;
+- malformed symbolic coordinate object;
+- raw unsafe TeX.
 
-Acceptable implementation:
+Mesh sampling/rendering should use numeric preview values.
 
-```ts
-const projectedFaces: ProjectedSurfaceFace[] = [];
+TikZ export should preserve symbolic expressions where possible.
 
-for (const face of candidateFaces) {
-  const projected = projectFace(face);
+## 2. Refresh symbolic previews for boundary snapshots before validation
 
-  if (projected) {
-    projectedFaces.push(projected);
-  }
+Ensure symbolic preview refresh covers all geometry paths, including:
 
-  if (projectedFaces.length > maxSurfaceFacesForSorting) {
-    return {
-      kind: "fallbackOriginal",
-      reason: "surfaceFaceCapExceeded",
-      faceCount: projectedFaces.length,
-      cap: maxSurfaceFacesForSorting,
-    };
-  }
-}
+- ordinary strata positions;
+- labels;
+- path segments;
+- filled region boundaries;
+- work-plane-filled sheet boundaries;
+- ruled surface boundary snapshots;
+- Coons patch boundary snapshots;
+- constant point boundaries if supported;
+- curved surface parameters if symbolic fields exist;
+- grids if symbolic ranges exist.
 
-projectedFaces.sort(compareProjectedSurfaceFaces);
+The immediate bug concerns:
+
+```text
+strata[n].primitive.bottom/right/top/left.segments[*].points[*]
 ```
 
-Do not continue collecting/projecting after cap overflow unless there is a documented reason.
-
-Do not sort after cap overflow.
-
-## 4. Avoid expensive work after cap overflow
-
-When cap is exceeded:
-
-- do not sort faces;
-- do not classify sampled curve segments;
-- do not create hidden runs;
-- do not emit hidden sampled segments;
-- do not truncate the curve;
-- render/export the original curve normally.
-
-This behavior should match the cap fallback policy from Phase 20F/20H.
-
-## 5. Fallback result behavior
-
-If the project has a result type for curve occlusion, use or extend it clearly.
-
-Suggested shape:
-
-```ts
-type CurveOcclusionResult =
-  | {
-      kind: "segmented";
-      runs: OccludedCurveRun[];
-    }
-  | {
-      kind: "fallbackOriginal";
-      reason:
-        | "surfaceFaceCapExceeded"
-        | "curveSampleCapExceeded";
-      cap: number;
-      observedCount?: number;
-    };
-```
-
-Exact shape can differ.
+or equivalent path segment coordinate fields inside Coons patches.
 
 Requirements:
 
-- SVG caller renders the original curve for fallback;
-- TikZ caller exports the original curve for fallback;
-- TikZ caller emits a comment/warning for `surfaceFaceCapExceeded`;
-- no hidden sampled segment output is emitted in fallback path.
+- all symbolic coordinates inside `BoundaryPathSnapshot` are refreshed using current/resolved variables;
+- no raw `TypeError` if a coordinate is malformed;
+- malformed coordinates return a load/validation error;
+- valid symbolic boundary coordinates produce finite preview values.
 
-## 6. TikZ fallback comment
+## 3. Add pending import flow for variable resolution
 
-Generated TikZ should contain a concise comment when the surface-face cap is exceeded.
+When loading JSON, do not immediately fail if symbolic coordinates require variables.
+
+Instead:
+
+1. parse JSON structurally;
+2. detect symbolic variables and symbolic coordinate references;
+3. collect required variable names;
+4. collect saved variable definitions if present;
+5. show a modal/panel asking the user to confirm or enter values;
+6. only after user confirmation, evaluate variables and complete diagram load.
+
+Suggested UI:
+
+```text
+Resolve symbolic variables
+
+This diagram uses symbolic variables.
+Enter numeric preview values or expressions.
+
+Len = [ 4 ]
+R   = [ 1 ]
+
+[Cancel] [Load diagram]
+```
+
+Requirements:
+
+- values are prefilled from saved variable definitions when available;
+- if a variable is referenced but not defined, show it with an empty input;
+- user cannot complete load until all required variables have valid finite preview values;
+- cancel leaves the current diagram unchanged;
+- successful confirmation replaces/loads the diagram;
+- status/error messages are clear.
+
+If the project already has a Variable Manager, reuse its validation/evaluation logic.
+
+## 4. Should the dialog always appear?
+
+Preferred behavior:
+
+- If a loaded diagram contains any symbolic variables or symbolic coordinates, show the variable-resolution dialog.
+- Prefill saved values and allow the user to simply click “Load diagram”.
+- This gives users a chance to change variable values on import.
+
+Alternative acceptable behavior:
+
+- If all variables have valid saved values, load immediately and optionally show a non-blocking notice.
+- If any variable value is missing/invalid, show the dialog.
+
+The user explicitly wants values requested on load when variables are detected, so the preferred behavior is the blocking dialog with prefilled values.
+
+## 5. Variable detection
+
+Detect variables from:
+
+- `diagram.variables`, if present;
+- symbolic coordinate expressions;
+- symbolic grid ranges;
+- symbolic surface/path parameters;
+- any Phase 19 symbolic scalar fields.
 
 Example:
 
-```tex
-% Curve occlusion skipped for <curve name or id>: surface face count exceeds maxSurfaceFacesForSorting.
+```text
+R*cos(q)
 ```
+
+requires:
+
+```text
+R
+q
+```
+
+Do not confuse function names with variables:
+
+- `sin`;
+- `cos`;
+- `sqrt`;
+- `abs`;
+- etc.
+
+Use the Phase 19 parser/AST rather than regex if possible.
+
+Unknown identifiers that are not variables/functions should appear as required variables or be rejected according to existing expression policy.
+
+## 6. Variable evaluation
+
+Use existing Phase 19 variable logic.
 
 Requirements:
 
-- comment is emitted only when fallback occurs;
-- comment does not introduce blank lines in inline math mode;
-- 4-space indentation preserved;
-- no active TikZ commands are introduced by the warning.
+- validate variable names/macros;
+- validate expressions;
+- support dependencies if already supported;
+- reject cycles;
+- reject unknown variables after resolution;
+- reject non-finite preview values;
+- reject unsafe tokens;
+- do not use JavaScript `eval`;
+- do not execute TeX.
 
-## 7. Tests
-
-Add or update tests.
-
-### Classification tests
-
-1. Under-cap case:
-   - `classifyCurveOcclusion` returns normal segmented result.
-   - projected faces are sorted/classified as before.
-
-2. Over-cap case:
-   - with `maxSurfaceFacesForSorting = 1` and at least 2 projected faces;
-   - `classifyCurveOcclusion` returns fallback, not segmented hidden runs.
-
-3. If possible, assert sorting is not called when over cap.
-   - If direct spying is hard, factor sorting into a helper and test the call path indirectly.
-   - Or assert via a deliberately throwing comparator/sort helper in a unit test if architecture allows.
-   - Do not add new dependencies just for this.
-
-4. If possible, assert face collection/projection stops at `cap + 1`.
-
-### TikZ export tests
-
-5. With curve occlusion enabled and surface face count exceeding cap:
-   - generated TikZ emits the surface-face-cap fallback warning/comment.
-
-6. In the same output:
-   - no hidden sampled curve segments are emitted;
-   - hidden style marker is absent for that curve if testable.
-
-7. Original curve output is still complete.
-   - It must reach the original endpoint.
-   - It must not be truncated.
-   - It must not disappear.
-
-8. Inline math output with the fallback comment has no blank lines.
-
-9. 4-space indentation is preserved.
-
-### Regression tests
-
-10. Normal under-cap hidden/visible curve output still works.
-
-11. Disabled visibility mode remains unchanged.
-
-12. Sorted surface export tests still pass.
-
-13. Existing curve sample cap fallback tests still pass.
-
-14. Ruled/Coons surface examples/tests still pass.
-
-## 8. Avoid false confidence from tests
-
-The previous test suite passed despite the review issue.
-
-Make sure the new test specifically checks the surface-face cap path before sorting.
-
-A test that only verifies the fallback comment appears after sorting is not enough.
-
-Try to make the test fail if the implementation still sorts all faces before checking the cap.
-
-Possible strategies:
-
-- expose a helper that collects projected faces with cap and returns `{ faces, capExceeded }`;
-- test that helper directly;
-- mock or wrap the sorting helper in a way that would throw if called in the cap-exceeded case;
-- count how many projection calls happen if the projection helper can be injected.
-
-Keep the change small and idiomatic.
-
-## 9. Preserve behavior under cap
-
-For diagrams below the cap:
-
-- do not change sorting order;
-- do not change hidden/visible classification;
-- do not change SVG/TikZ output except for incidental internal refactor with identical semantics;
-- all existing tests should pass.
-
-## 10. Documentation/comments
-
-Add a code comment near the cap check:
+Example:
 
 ```text
-The surface-face cap must be enforced before sorting. Otherwise large diagrams still pay the expensive projected-face sort before falling back.
+Len = 4
+R = 1
 ```
 
-Update user docs only if needed.
+Then:
 
-## 11. Manual verification checklist
+```text
+.5*Len -> 2
+-.5*Len -> -2
+R -> 1
+```
+
+## 7. Load transaction safety
+
+Do not partially mutate the current editor state while variable resolution is pending.
+
+Required:
+
+- parse/pending import state is UI state;
+- current diagram remains unchanged until user confirms;
+- cancel restores/leaves the previous diagram;
+- failed validation after variable input leaves previous diagram unchanged;
+- successful confirmation commits one load operation according to existing load behavior.
+
+If existing load behavior resets undo/redo, preserve that policy.
+
+## 8. Boundary surface mesh sampling
+
+For ruled and Coons surfaces with symbolic boundary coordinates:
+
+- use refreshed numeric preview coordinates for mesh sampling;
+- sampled mesh must be finite;
+- preview renders correctly;
+- TikZ export should keep symbolic coordinate expressions where applicable only if the existing export path supports it;
+- if mesh export currently outputs sampled numeric mesh coordinates, it may use preview values, but this should be documented.
+
+Important distinction:
+
+- SVG preview and mesh sampling need numeric preview values.
+- The saved symbolic expressions should not be discarded.
+- Future TikZ export should preserve symbolic intent where practical.
+
+If current mesh TikZ export cannot preserve symbolic sampling formulas, it may export numeric preview mesh coordinates for boundary surfaces, but it must not reject the loaded diagram solely because input boundary coordinates are symbolic.
+
+## 9. Error handling
+
+Replace the current error with more helpful messages.
+
+Examples:
+
+```text
+This diagram uses symbolic boundary coordinates. Please assign values to: Len, R.
+```
+
+```text
+Could not load diagram: variable Len has invalid expression.
+```
+
+```text
+Could not load diagram: Coons boundary coordinate R*cos(q) could not be evaluated with the provided variables.
+```
+
+```text
+Boundary surface path coordinates must have finite preview values after variable resolution.
+```
+
+Avoid:
+
+```text
+Boundary surface path coordinates must be numeric
+```
+
+for valid symbolic input.
+
+## 10. Tests
+
+Add focused tests.
+
+### Load detection tests
+
+1. Saved diagram with symbolic Coons boundary and variables is detected as needing variable resolution.
+
+2. Saved diagram with symbolic Coons boundary but missing variable definition asks for the missing variable.
+
+3. Function names such as `sin` and `cos` are not treated as required variables.
+
+4. Saved numeric-only diagram loads normally.
+
+### Resolution tests
+
+5. Given variables:
+
+```text
+Len = 4
+R = 1
+```
+
+a saved Coons boundary coordinate containing `.5*Len`, `-.5*Len`, and `R` refreshes to finite previews.
+
+6. Changing import value `Len = 6` updates preview values before rendering.
+
+7. Invalid variable expression prevents load and leaves current diagram unchanged.
+
+8. Cyclic variables prevent load if dependencies are supported.
+
+9. Non-finite variable value prevents load.
+
+### Boundary validation tests
+
+10. `validateCoonsPatchPrimitive` accepts symbolic boundary coordinates when finite previews exist.
+
+11. `validateRuledSurfacePrimitive` accepts symbolic boundary coordinates when finite previews exist.
+
+12. Boundary surface validation rejects symbolic boundary coordinates with missing preview/unresolved variable.
+
+13. Malformed boundary objects are still rejected cleanly.
+
+### Mesh sampling tests
+
+14. Coons patch with symbolic boundary previews samples finite mesh after resolution.
+
+15. Ruled surface with symbolic boundary previews samples finite mesh after resolution.
+
+16. No NaN/Infinity in sampled mesh.
+
+### UI/transaction tests
+
+17. Pending import cancel leaves current diagram unchanged.
+
+18. Confirming variable dialog loads the resolved diagram.
+
+19. Saved values prefill the variable dialog if testable.
+
+### Export/save tests
+
+20. Save/load round-trip preserves symbolic expressions.
+
+21. TikZ export after load works.
+
+22. Inline math output after load has no blank lines.
+
+23. Existing numeric boundary surface diagrams still load.
+
+## 11. Use the attached JSON as a regression fixture if practical
+
+The uploaded example contains symbolic variables such as:
+
+```text
+Len
+R
+```
+
+and Coons/ruled boundary paths with symbolic coordinates.
+
+If appropriate, create a minimized fixture based on that file rather than using the full large file.
+
+Do not add huge fixtures if they make tests slow.
+
+Prefer a small hand-authored fixture containing:
+
+- variables `Len = 4`, `R = 1`;
+- one Coons patch boundary with symbolic coordinates;
+- enough geometry to reproduce the old rejection.
+
+## 12. Documentation
+
+Update docs:
+
+- JSON load with symbolic variables triggers variable resolution;
+- saved values are prefilled;
+- mesh preview/export uses numeric preview values;
+- symbolic expressions remain part of saved diagram where supported;
+- boundary surfaces allow symbolic coordinates if finite previews are available.
+
+## 13. Preserve existing behavior
+
+Do not regress:
+
+- numeric JSON loading;
+- variable manager;
+- symbolic coordinate editing;
+- ruled/Coons surface creation;
+- boundary malformed-data rejection;
+- SVG preview;
+- TikZ export;
+- inline no-blank-lines;
+- 4-space indentation;
+- save/load old diagrams;
+- undo/redo;
+- layer/style/camera/work-plane behavior.
+
+## 14. Manual verification checklist
 
 After implementation, run:
 
@@ -361,35 +477,31 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-If the UI exposes the cap:
+Manual test using uploaded JSON:
 
-1. Open a diagram with many surface faces.
-2. Enable curve occlusion.
-3. Set `maxSurfaceFacesForSorting` low.
-4. Generate TikZ.
-5. Confirm output remains responsive.
-6. Confirm fallback warning/comment appears.
-7. Confirm no hidden sampled curve segments are emitted.
-8. Confirm the original curve still appears fully.
+1. Click Load JSON.
+2. Select the uploaded diagram with symbolic Coons boundary coordinates.
+3. Confirm a variable-resolution dialog appears.
+4. Confirm variables such as `Len` and `R` are listed.
+5. Confirm saved values are prefilled if present.
+6. Click Load/Confirm.
+7. Confirm the diagram loads and renders.
+8. Confirm no error says “Boundary surface path coordinates must be numeric”.
+9. Change `Len` or `R` during import.
+10. Confirm preview changes accordingly.
+11. Generate TikZ.
+12. Confirm export succeeds.
+13. Save the loaded diagram and reload it.
+14. Confirm symbolic data persists.
 
-If the UI does not expose the cap, rely on tests.
+Failure test:
 
-## 12. Preserve existing behavior
+15. Load a file with missing variable value.
+16. Confirm load is blocked until a valid value is entered.
+17. Enter invalid expression.
+18. Confirm useful validation error.
 
-Do not regress:
-
-- sorted surface export determinism;
-- hidden/visible curve TikZ output under cap;
-- disabled visibility mode;
-- inline no-blank-line behavior;
-- 4-space indentation;
-- visibility docs/examples;
-- save/load visibility caps;
-- ruled/Coons surfaces;
-- layer/style/camera/work-plane behavior;
-- symbolic/grid export.
-
-## 13. Verification
+## 15. Verification
 
 Run:
 
@@ -399,17 +511,16 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 14. Report after implementation
+## 16. Report after implementation
 
 Please report:
 
 - files modified;
-- why the previous implementation still checked cap too late;
-- exact new cap-check location;
-- whether collection/projection stops at `cap + 1`;
-- whether sorting is skipped on cap overflow;
-- fallback result behavior;
-- TikZ fallback warning/comment behavior;
+- root cause of the numeric-only boundary rejection;
+- new import variable-resolution flow;
+- whether variable dialog always appears or only when values are missing/invalid;
+- how boundary snapshots refresh symbolic previews;
+- how mesh validation now checks finite previews;
 - tests added/updated;
 - test results;
 - build results;
