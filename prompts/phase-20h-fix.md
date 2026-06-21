@@ -1,4 +1,4 @@
-# Phase 20H / Phase 19C Fix Prompt: Load symbolic boundary-surface JSON by resolving variables before rendering
+# Phase 20H Fix Prompt: Allow symbolic work-plane frame coordinates after variable resolution
 
 ## Environment
 
@@ -31,432 +31,404 @@ You are working on the StratifiedTikZ project.
 
 Phase 19G and Phase 20H are complete.
 
-Manual JSON load check found a practical problem:
+A previous fix changed JSON loading so symbolic boundary path coordinates can be resolved by asking the user for variable values before rendering.
 
-- A saved diagram contains Coons patch / boundary-surface paths whose coordinates are symbolic.
-- The saved file defines variables such as `Len` and `R`, and boundary paths contain expressions such as:
-  - `Len`;
-  - `R`;
-  - `.5*Len`;
-  - `-.5*Len`;
-  - `0.6*Len`;
-- Loading the JSON currently fails with an error similar to:
+However, loading the attached JSON still fails with:
 
 ```text
-Saved diagram is invalid: strata[3].primitive.bottom.segments[0].points[1] Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
+Could not load diagram: strata[3].primitive.bottom.segments[0].frame.origin Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
 ```
+
+This means the loader now handles symbolic boundary point coordinates better, but still rejects symbolic coordinates inside work-plane frame snapshots.
+
+The uploaded diagram uses symbolic variables such as `Len` and `R`, and at least one Coons/ruled boundary segment carries a work-plane frame whose `origin` or other frame coordinates are symbolic.
 
 This is too strict.
 
-In practice, boundary paths for ruled surfaces / Coons patches are often naturally specified symbolically. The editor should support loading these diagrams by asking the user for variable values, evaluating finite preview coordinates, and then rendering.
+In practice, boundary paths and their associated work-plane frames are often naturally defined symbolically. Loading should succeed after variable values are provided and all symbolic frame coordinates evaluate to finite numeric preview values.
 
 ## Goal
 
-Change JSON load behavior and boundary-surface validation so that symbolic boundary coordinates are allowed when they can be resolved to finite numeric preview values.
+Update load/validation/rendering so symbolic coordinates in work-plane frame snapshots are allowed when they can be resolved to finite preview values.
 
-When a loaded JSON contains symbolic variables / symbolic coordinates:
+The error:
 
-1. detect the variables used by the diagram;
-2. show a variable-resolution dialog before final rendering;
-3. prefill values from saved variable definitions when available;
-4. allow the user to confirm or edit variable values;
-5. validate/evaluate variables using the existing Phase 19 expression evaluator;
-6. refresh all symbolic preview values, including boundary path snapshots in ruled surfaces and Coons patches;
-7. then run full diagram validation and render.
+```text
+Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
+```
 
-Do not reject boundary surface paths merely because their coordinates are symbolic.
+should be replaced by a finite-preview requirement.
 
-Reject only if symbolic coordinates cannot be resolved to finite numeric preview coordinates.
+New policy:
+
+```text
+Work-plane frame coordinates may be numeric or symbolic.
+They are valid if, after variable resolution and preview refresh, all frame coordinates have finite numeric preview values and the frame is geometrically valid.
+```
 
 ## Scope
 
+This is a targeted Phase 20H / symbolic-load fix.
+
 Implement:
 
-- load-time symbolic variable detection;
-- pending import / variable resolution flow;
-- finite-preview validation for symbolic boundary-surface coordinates;
-- symbolic preview refresh for ruled/Coons boundary snapshots before mesh validation;
-- tests for loading saved diagrams with symbolic Coons/ruled boundaries.
+- symbolic preview refresh for work-plane frame snapshots;
+- finite-preview validation for frame `origin`, `u`, `v`, and `normal`;
+- load-time variable resolution covering frame coordinates;
+- tests using symbolic frame coordinates in Coons/ruled boundary snapshots;
+- improved error messages.
 
 Do not implement:
 
-- full TeX parser;
-- arbitrary raw TikZ evaluation;
-- server-side LaTeX evaluation;
-- symbolic surface sampling in TikZ itself;
-- new surface geometry;
-- new variable syntax beyond Phase 19;
+- full TeX evaluation;
+- raw TikZ evaluation;
+- symbolic surface mesh export formulas;
+- new surface primitives;
+- new expression syntax;
 - new dependencies.
 
 Do not change:
 
-- symbolic expression grammar except if needed for bug fixes;
-- TikZ export syntax for valid symbolic coordinates;
-- SVG rendering semantics except allowing finite preview values;
-- source geometry semantics;
-- save/load format except optional import-state helpers;
-- existing numeric-only diagram loading;
-- inline/standalone TikZ export formatting.
+- valid numeric work-plane frame behavior;
+- variable manager semantics;
+- existing symbolic boundary coordinate support;
+- Coons/ruled surface formulas;
+- source path copy-on-create policy;
+- TikZ export mode behavior;
+- inline no-blank-lines;
+- 4-space indentation.
 
-## 1. Replace “numeric-only” boundary validation with “finite preview required”
+## 1. Replace numeric-only frame validation with finite-preview validation
 
 Find the validation that emits:
 
 ```text
-Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
+Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
 ```
 
 This validation is too strict.
 
-Update the policy:
+Update it to require finite numeric preview values instead.
 
 ### Old policy
 
 ```text
-Boundary surface path coordinates must be numeric.
+Work-plane frame coordinates must be numeric.
 ```
 
 ### New policy
 
 ```text
-Boundary surface path coordinates must have finite numeric preview values.
+Work-plane frame coordinates must have finite preview coordinates after symbolic variable resolution.
 ```
 
 Allowed:
 
-- numeric coordinate component;
-- symbolic coordinate component with a finite `previewValue`;
-- symbolic coordinate component whose preview can be refreshed from resolved variables.
+- numeric frame coordinates;
+- symbolic frame coordinates with finite refreshed preview values.
 
 Rejected:
 
-- unknown variable;
+- unresolved variable;
 - invalid expression;
-- missing preview after refresh;
-- non-finite preview;
+- missing preview value;
+- non-finite preview value;
 - malformed symbolic coordinate object;
-- raw unsafe TeX.
+- unsafe raw TeX expression;
+- geometrically invalid frame after preview evaluation.
 
-Mesh sampling/rendering should use numeric preview values.
+## 2. Refresh symbolic previews for frame snapshots
 
-TikZ export should preserve symbolic expressions where possible.
+Add or extend helpers so every work-plane frame snapshot can be refreshed using resolved variables.
 
-## 2. Refresh symbolic previews for boundary snapshots before validation
+Frame-like objects may include:
 
-Ensure symbolic preview refresh covers all geometry paths, including:
-
-- ordinary strata positions;
-- labels;
-- path segments;
-- filled region boundaries;
-- work-plane-filled sheet boundaries;
-- ruled surface boundary snapshots;
-- Coons patch boundary snapshots;
-- constant point boundaries if supported;
-- curved surface parameters if symbolic fields exist;
-- grids if symbolic ranges exist.
-
-The immediate bug concerns:
-
-```text
-strata[n].primitive.bottom/right/top/left.segments[*].points[*]
+```ts
+type WorkPlaneFrameSnapshot = {
+  origin: Vec3 | SymbolicVec3;
+  u: Vec3 | SymbolicVec3;
+  v: Vec3 | SymbolicVec3;
+  normal: Vec3 | SymbolicVec3;
+};
 ```
 
-or equivalent path segment coordinate fields inside Coons patches.
+Exact types may differ.
 
-Requirements:
+Required refresh behavior:
 
-- all symbolic coordinates inside `BoundaryPathSnapshot` are refreshed using current/resolved variables;
-- no raw `TypeError` if a coordinate is malformed;
-- malformed coordinates return a load/validation error;
-- valid symbolic boundary coordinates produce finite preview values.
+- refresh `origin`;
+- refresh `u`;
+- refresh `v`;
+- refresh `normal`;
+- return finite preview vectors;
+- do not mutate malformed input into accepted data;
+- return validation failure instead of throwing.
 
-## 3. Add pending import flow for variable resolution
+Suggested helper names:
 
-When loading JSON, do not immediately fail if symbolic coordinates require variables.
-
-Instead:
-
-1. parse JSON structurally;
-2. detect symbolic variables and symbolic coordinate references;
-3. collect required variable names;
-4. collect saved variable definitions if present;
-5. show a modal/panel asking the user to confirm or enter values;
-6. only after user confirmation, evaluate variables and complete diagram load.
-
-Suggested UI:
-
-```text
-Resolve symbolic variables
-
-This diagram uses symbolic variables.
-Enter numeric preview values or expressions.
-
-Len = [ 4 ]
-R   = [ 1 ]
-
-[Cancel] [Load diagram]
+```ts
+refreshWorkPlaneFrameSymbolicPreview(...)
+refreshSurfaceFrameSymbolicPreview(...)
+refreshBoundarySegmentFrameSymbolicPreview(...)
 ```
 
-Requirements:
+or equivalent.
 
-- values are prefilled from saved variable definitions when available;
-- if a variable is referenced but not defined, show it with an empty input;
-- user cannot complete load until all required variables have valid finite preview values;
-- cancel leaves the current diagram unchanged;
-- successful confirmation replaces/loads the diagram;
-- status/error messages are clear.
+Important paths to inspect:
 
-If the project already has a Variable Manager, reuse its validation/evaluation logic.
+- `src/model/symbolicCoordinates.ts`;
+- Coons/ruled boundary snapshot refresh code;
+- path segment refresh code;
+- arc/circle/ellipse/template path segment refresh code if they contain `frame`;
+- curved sheet primitive refresh code;
+- grid/work-plane frame refresh code if shared.
 
-## 4. Should the dialog always appear?
+## 3. Refresh frames inside boundary path snapshots
 
-Preferred behavior:
-
-- If a loaded diagram contains any symbolic variables or symbolic coordinates, show the variable-resolution dialog.
-- Prefill saved values and allow the user to simply click “Load diagram”.
-- This gives users a chance to change variable values on import.
-
-Alternative acceptable behavior:
-
-- If all variables have valid saved values, load immediately and optionally show a non-blocking notice.
-- If any variable value is missing/invalid, show the dialog.
-
-The user explicitly wants values requested on load when variables are detected, so the preferred behavior is the blocking dialog with prefilled values.
-
-## 5. Variable detection
-
-Detect variables from:
-
-- `diagram.variables`, if present;
-- symbolic coordinate expressions;
-- symbolic grid ranges;
-- symbolic surface/path parameters;
-- any Phase 19 symbolic scalar fields.
-
-Example:
+The failing path is:
 
 ```text
-R*cos(q)
+strata[3].primitive.bottom.segments[0].frame.origin
 ```
 
-requires:
+So at minimum, symbolic refresh must cover frames nested inside:
 
-```text
-R
-q
-```
+- `BoundaryPathSnapshot.segments[*].frame`;
+- Coons patch boundaries:
+  - bottom;
+  - right;
+  - top;
+  - left;
+- ruled surface boundaries:
+  - boundary0;
+  - boundary1;
+- any arc/path-template segments that store a frame.
 
-Do not confuse function names with variables:
+Before validation and mesh sampling, all these nested frames should have finite preview values.
 
-- `sin`;
-- `cos`;
-- `sqrt`;
-- `abs`;
-- etc.
+## 4. Frame geometric validation after preview refresh
 
-Use the Phase 19 parser/AST rather than regex if possible.
-
-Unknown identifiers that are not variables/functions should appear as required variables or be rejected according to existing expression policy.
-
-## 6. Variable evaluation
-
-Use existing Phase 19 variable logic.
-
-Requirements:
-
-- validate variable names/macros;
-- validate expressions;
-- support dependencies if already supported;
-- reject cycles;
-- reject unknown variables after resolution;
-- reject non-finite preview values;
-- reject unsafe tokens;
-- do not use JavaScript `eval`;
-- do not execute TeX.
-
-Example:
-
-```text
-Len = 4
-R = 1
-```
-
-Then:
-
-```text
-.5*Len -> 2
--.5*Len -> -2
-R -> 1
-```
-
-## 7. Load transaction safety
-
-Do not partially mutate the current editor state while variable resolution is pending.
+Once frame coordinates are refreshed, validate the numeric preview frame.
 
 Required:
 
-- parse/pending import state is UI state;
-- current diagram remains unchanged until user confirms;
-- cancel restores/leaves the previous diagram;
-- failed validation after variable input leaves previous diagram unchanged;
-- successful confirmation commits one load operation according to existing load behavior.
+- all preview components finite;
+- `u`, `v`, and `normal` nonzero;
+- `u` and `v` approximately orthogonal;
+- `normal` approximately equals or is consistent with `cross(u, v)`;
+- frame handedness policy preserved;
+- normalization policy preserved.
 
-If existing load behavior resets undo/redo, preserve that policy.
+If the frame is allowed to store non-normalized symbolic vectors, either:
 
-## 8. Boundary surface mesh sampling
+- normalize preview values during validation/usage; or
+- reject non-normalized frames consistently with existing work-plane validation.
 
-For ruled and Coons surfaces with symbolic boundary coordinates:
+Do not accept a frame just because symbolic expressions parse; numeric preview geometry must be valid.
 
-- use refreshed numeric preview coordinates for mesh sampling;
-- sampled mesh must be finite;
-- preview renders correctly;
-- TikZ export should keep symbolic coordinate expressions where applicable only if the existing export path supports it;
-- if mesh export currently outputs sampled numeric mesh coordinates, it may use preview values, but this should be documented.
+## 5. Load-time variable resolution must include frame expressions
 
-Important distinction:
+When loading JSON with symbolic variables, variable detection must include expressions inside frame coordinates.
 
-- SVG preview and mesh sampling need numeric preview values.
-- The saved symbolic expressions should not be discarded.
-- Future TikZ export should preserve symbolic intent where practical.
+Detect variables from:
 
-If current mesh TikZ export cannot preserve symbolic sampling formulas, it may export numeric preview mesh coordinates for boundary surfaces, but it must not reject the loaded diagram solely because input boundary coordinates are symbolic.
+- frame origin coordinates;
+- frame `u`;
+- frame `v`;
+- frame `normal`;
+- boundary path coordinates;
+- other symbolic geometry fields;
+- diagram variables.
 
-## 9. Error handling
+If a frame coordinate references `Len`, `R`, `q`, etc., those variables must appear in the import resolution dialog.
 
-Replace the current error with more helpful messages.
+If saved variable definitions exist, prefill them.
 
-Examples:
-
-```text
-This diagram uses symbolic boundary coordinates. Please assign values to: Len, R.
-```
+Example:
 
 ```text
-Could not load diagram: variable Len has invalid expression.
+frame.origin.x = -.5*Len
 ```
+
+must cause `Len` to be required and evaluated.
+
+## 6. Pending import flow behavior
+
+The existing variable-resolution dialog should handle this case.
+
+Required behavior:
+
+1. User selects JSON.
+2. Loader detects symbolic variables in boundary coordinates and frame coordinates.
+3. Variable-resolution dialog appears.
+4. Variables are prefilled from saved definitions if available.
+5. User confirms values.
+6. Symbolic previews are refreshed for:
+   - boundary points;
+   - boundary segment frames;
+   - surface frames;
+   - all other symbolic fields.
+7. Full validation runs.
+8. Diagram renders.
+
+Cancel must leave the current diagram unchanged.
+
+If frame variables are missing/invalid, load must fail gracefully with an informative error.
+
+## 7. Mesh sampling/export behavior
+
+Coons/ruled mesh sampling needs numeric coordinates.
+
+Use refreshed preview values for frame-derived numeric computations.
+
+Requirements:
+
+- mesh sampling finite;
+- no NaN/Infinity;
+- symbolic source expressions remain stored where supported;
+- source symbolic expressions are not discarded just because preview values are computed;
+- TikZ export should continue to work.
+
+If mesh TikZ export currently outputs numeric sampled faces, it may use preview values. That is acceptable for now.
+
+The important fix is:
+
+- do not reject symbolic frame coordinates before preview resolution.
+
+## 8. Error messages
+
+Replace the current error with a clearer finite-preview message.
+
+Bad:
 
 ```text
-Could not load diagram: Coons boundary coordinate R*cos(q) could not be evaluated with the provided variables.
+Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
 ```
+
+Good:
 
 ```text
-Boundary surface path coordinates must have finite preview values after variable resolution.
+Work-plane frame coordinates must have finite preview values after variable resolution.
 ```
 
-Avoid:
+Better with path context:
 
 ```text
-Boundary surface path coordinates must be numeric
+Could not evaluate strata[3].primitive.bottom.segments[0].frame.origin.x. Variable Len is missing or invalid.
 ```
 
-for valid symbolic input.
+or:
 
-## 10. Tests
+```text
+Work-plane frame at strata[3].primitive.bottom.segments[0].frame is invalid after evaluating symbolic variables.
+```
+
+Avoid raw TypeError or numeric-only messages for valid symbolic input.
+
+## 9. Tests
 
 Add focused tests.
 
-### Load detection tests
+### Frame refresh tests
 
-1. Saved diagram with symbolic Coons boundary and variables is detected as needing variable resolution.
+1. Work-plane frame with numeric coordinates refreshes unchanged.
 
-2. Saved diagram with symbolic Coons boundary but missing variable definition asks for the missing variable.
+2. Work-plane frame with symbolic `origin.x = -.5*Len` refreshes to finite preview when `Len = 4`.
 
-3. Function names such as `sin` and `cos` are not treated as required variables.
+3. Work-plane frame with symbolic `u`, `v`, or `normal` refreshes to finite preview when expressions are valid.
 
-4. Saved numeric-only diagram loads normally.
+4. Frame with unknown variable fails cleanly.
 
-### Resolution tests
+5. Frame with non-finite evaluated value fails cleanly.
 
-5. Given variables:
+6. Frame with malformed symbolic coordinate fails cleanly.
+
+### Boundary snapshot tests
+
+7. Coons boundary segment frame with symbolic origin refreshes successfully after variable resolution.
+
+8. Ruled boundary segment frame with symbolic origin refreshes successfully after variable resolution.
+
+9. Symbolic frame inside an arc/circle/ellipse segment refreshes successfully if such segments are supported.
+
+10. Malformed frame inside boundary snapshot returns validation failure, not thrown exception.
+
+### Load tests
+
+11. `parseSavedDiagramJson` or import flow detects variables used in `frame.origin`.
+
+12. JSON with symbolic Coons boundary frame loads after providing variable values.
+
+13. JSON with symbolic ruled boundary frame loads after providing variable values.
+
+14. JSON with missing frame variable prompts/requires the missing variable.
+
+15. JSON with invalid frame variable value fails without mutating current diagram.
+
+16. Numeric-only saved diagrams still load.
+
+### Validation/sampling tests
+
+17. `validateCoonsPatchPrimitive` accepts symbolic boundary frame coordinates after finite previews exist.
+
+18. `validateRuledSurfacePrimitive` accepts symbolic boundary frame coordinates after finite previews exist.
+
+19. Coons patch with symbolic boundary frame samples finite mesh.
+
+20. Ruled surface with symbolic boundary frame samples finite mesh.
+
+21. Invalid frame geometry after evaluation is rejected.
+
+### Export tests
+
+22. TikZ export after loading symbolic frame Coons patch succeeds.
+
+23. Inline math output after loading symbolic frame diagram has no blank lines.
+
+24. No NaN/Infinity in SVG/TikZ output.
+
+### Regression tests
+
+25. Previous symbolic boundary coordinate import tests still pass.
+
+26. Malformed boundary segment load rejection still passes.
+
+27. Existing work-plane validation tests still pass.
+
+## 10. Use uploaded JSON as a regression source if practical
+
+The uploaded file `counit (3).json` triggers:
 
 ```text
-Len = 4
-R = 1
+strata[3].primitive.bottom.segments[0].frame.origin
 ```
 
-a saved Coons boundary coordinate containing `.5*Len`, `-.5*Len`, and `R` refreshes to finite previews.
+If possible, create a minimized fixture from it containing:
 
-6. Changing import value `Len = 6` updates preview values before rendering.
+- variables such as `Len` and `R`;
+- one Coons patch boundary segment with symbolic `frame.origin`;
+- enough geometry to reproduce the old error.
 
-7. Invalid variable expression prevents load and leaves current diagram unchanged.
+Do not add a huge fixture if it slows tests.
 
-8. Cyclic variables prevent load if dependencies are supported.
+A small hand-written fixture is preferred.
 
-9. Non-finite variable value prevents load.
-
-### Boundary validation tests
-
-10. `validateCoonsPatchPrimitive` accepts symbolic boundary coordinates when finite previews exist.
-
-11. `validateRuledSurfacePrimitive` accepts symbolic boundary coordinates when finite previews exist.
-
-12. Boundary surface validation rejects symbolic boundary coordinates with missing preview/unresolved variable.
-
-13. Malformed boundary objects are still rejected cleanly.
-
-### Mesh sampling tests
-
-14. Coons patch with symbolic boundary previews samples finite mesh after resolution.
-
-15. Ruled surface with symbolic boundary previews samples finite mesh after resolution.
-
-16. No NaN/Infinity in sampled mesh.
-
-### UI/transaction tests
-
-17. Pending import cancel leaves current diagram unchanged.
-
-18. Confirming variable dialog loads the resolved diagram.
-
-19. Saved values prefill the variable dialog if testable.
-
-### Export/save tests
-
-20. Save/load round-trip preserves symbolic expressions.
-
-21. TikZ export after load works.
-
-22. Inline math output after load has no blank lines.
-
-23. Existing numeric boundary surface diagrams still load.
-
-## 11. Use the attached JSON as a regression fixture if practical
-
-The uploaded example contains symbolic variables such as:
-
-```text
-Len
-R
-```
-
-and Coons/ruled boundary paths with symbolic coordinates.
-
-If appropriate, create a minimized fixture based on that file rather than using the full large file.
-
-Do not add huge fixtures if they make tests slow.
-
-Prefer a small hand-authored fixture containing:
-
-- variables `Len = 4`, `R = 1`;
-- one Coons patch boundary with symbolic coordinates;
-- enough geometry to reproduce the old rejection.
-
-## 12. Documentation
+## 11. Documentation
 
 Update docs:
 
-- JSON load with symbolic variables triggers variable resolution;
-- saved values are prefilled;
-- mesh preview/export uses numeric preview values;
-- symbolic expressions remain part of saved diagram where supported;
-- boundary surfaces allow symbolic coordinates if finite previews are available.
+- symbolic coordinates are allowed in work-plane/surface frame snapshots if finite preview values can be resolved;
+- load-time variable resolution applies to frame coordinates as well as point coordinates;
+- mesh sampling uses preview values;
+- symbolic expressions are preserved where supported.
 
-## 13. Preserve existing behavior
+## 12. Preserve existing behavior
 
 Do not regress:
 
 - numeric JSON loading;
+- symbolic boundary coordinate loading;
+- variable-resolution dialog;
 - variable manager;
 - symbolic coordinate editing;
 - ruled/Coons surface creation;
@@ -469,7 +441,7 @@ Do not regress:
 - undo/redo;
 - layer/style/camera/work-plane behavior.
 
-## 14. Manual verification checklist
+## 13. Manual verification checklist
 
 After implementation, run:
 
@@ -477,31 +449,30 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Manual test using uploaded JSON:
+Manual test with uploaded JSON:
 
 1. Click Load JSON.
-2. Select the uploaded diagram with symbolic Coons boundary coordinates.
-3. Confirm a variable-resolution dialog appears.
-4. Confirm variables such as `Len` and `R` are listed.
-5. Confirm saved values are prefilled if present.
-6. Click Load/Confirm.
-7. Confirm the diagram loads and renders.
-8. Confirm no error says “Boundary surface path coordinates must be numeric”.
-9. Change `Len` or `R` during import.
-10. Confirm preview changes accordingly.
-11. Generate TikZ.
-12. Confirm export succeeds.
-13. Save the loaded diagram and reload it.
-14. Confirm symbolic data persists.
+2. Select the uploaded diagram.
+3. Confirm variable-resolution dialog appears.
+4. Confirm variables such as `Len` and `R` are listed and prefilled if saved.
+5. Confirm values.
+6. Confirm the diagram loads and renders.
+7. Confirm no error says:
+   - `Boundary surface path coordinates must be numeric`
+   - `Work-plane frame coordinates must be numeric`
+8. Generate TikZ.
+9. Confirm export succeeds.
+10. Switch inline mode if applicable.
+11. Confirm inline output has no blank lines.
 
 Failure test:
 
-15. Load a file with missing variable value.
-16. Confirm load is blocked until a valid value is entered.
-17. Enter invalid expression.
-18. Confirm useful validation error.
+12. Load a version with missing `Len`.
+13. Confirm dialog asks for `Len`.
+14. Enter invalid value.
+15. Confirm useful validation error and current diagram unchanged.
 
-## 15. Verification
+## 14. Verification
 
 Run:
 
@@ -511,16 +482,16 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 16. Report after implementation
+## 15. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of the numeric-only boundary rejection;
-- new import variable-resolution flow;
-- whether variable dialog always appears or only when values are missing/invalid;
-- how boundary snapshots refresh symbolic previews;
-- how mesh validation now checks finite previews;
+- root cause of the frame numeric-only rejection;
+- frame symbolic refresh helper behavior;
+- variable detection for frame expressions;
+- load-time variable resolution behavior;
+- finite-preview frame validation behavior;
 - tests added/updated;
 - test results;
 - build results;
