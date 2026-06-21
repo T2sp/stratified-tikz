@@ -823,6 +823,75 @@ test('disabled straight line path occlusion preserves normal TikZ output', () =>
   )
 })
 
+test('hidden point visibility dims hidden points by default', () => {
+  const tikz = generateTikz(createPointAndLabelVisibilityDiagram(), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto point visibility/)
+  assert.match(tikz, /hidden behind sheet \[occluding-sheet\] face 0 and dimmed/)
+  assert.match(tikz, /opacity=0\.28/)
+  assert.match(tikz, /\\node\[/)
+  assert.match(tikz, /pointHiddenPoint0p0/)
+})
+
+test('hidden point visibility can omit hidden points', () => {
+  const tikz = generateTikz(createPointAndLabelVisibilityDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      pointVisibility: 'hideHidden',
+    },
+  })
+
+  assert.match(tikz, /Auto point visibility/)
+  assert.match(tikz, /hidden behind sheet \[occluding-sheet\] face 0 and omitted/)
+  assert.doesNotMatch(tikz, /pointHiddenPoint0p0/)
+})
+
+test('labels remain foreground by default when visibility is enabled', () => {
+  const tikz = generateTikz(createPointAndLabelVisibilityDiagram(), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.doesNotMatch(tikz, /Auto label visibility/)
+  assert.match(tikz, /\\node at \(0,-1,0\) \{\$L\$\};/)
+})
+
+test('label auto visibility can dim or hide hidden labels', () => {
+  const dimmed = generateTikz(createPointAndLabelVisibilityDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      labelVisibility: 'autoDim',
+    },
+  })
+  const hidden = generateTikz(createPointAndLabelVisibilityDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      labelVisibility: 'autoHide',
+    },
+  })
+
+  assert.match(dimmed, /Auto label visibility/)
+  assert.match(dimmed, /opacity=0\.35/)
+  assert.match(dimmed, /\{\$L\$\};/)
+  assert.match(hidden, /Auto label visibility/)
+  assert.match(hidden, /hidden behind sheet \[occluding-sheet\] face 0 and omitted/)
+  assert.doesNotMatch(hidden, /\{\$L\$\};/)
+})
+
+test('disabling curve occlusion keeps surface sorting enabled independently', () => {
+  const tikz = generateTikz(createCurveOcclusionDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      curveOcclusion: false,
+    },
+  })
+
+  assert.match(tikz, /Auto surface face depth sort/)
+  assert.doesNotMatch(tikz, /Auto curve occlusion/)
+  assert.match(tikz, /\\draw\[/)
+})
+
 test('current camera option overrides saved diagram camera metadata', () => {
   const savedCamera = {
     ...createInitialCamera3D(),
@@ -4713,6 +4782,47 @@ function createCurveOcclusionDiagram(): Diagram {
   return diagram
 }
 
+function createPointAndLabelVisibilityDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet === undefined) {
+    throw new Error('Expected occluding sheet.')
+  }
+
+  diagram.strata = [
+    sheet,
+    {
+      codim: 3,
+      geometricKind: 'point',
+      id: 'hidden-point',
+      name: 'Hidden Point',
+      style: pointStyle(),
+      position: { x: 0, y: -1, z: 0 },
+      layer: 0,
+    },
+  ]
+  diagram.labels = [
+    {
+      geometricKind: 'label',
+      id: 'hidden-label',
+      name: 'Hidden Label',
+      text: '$L$',
+      position: { x: 0, y: -1, z: 0 },
+      style: {
+        kind: 'labelStyle',
+        color: '#000000',
+        opacity: 1,
+        fontSize: 10,
+        anchor: 'center',
+      },
+      layer: 0,
+    },
+  ]
+
+  return diagram
+}
+
 function createStraightCurveOcclusionDiagram(
   curveKind: 'polyline' | 'linePath',
   styleOverride?: Partial<CurveStyle>,
@@ -5239,6 +5349,9 @@ function enabledVisibilityOptions(sortMode: 'layerThenDepth' | 'depthThenLayer')
   return {
     enabled: true,
     surfaceDepthSort: true,
+    curveOcclusion: true,
+    pointVisibility: 'dimHidden',
+    labelVisibility: 'alwaysForeground',
     sortMode,
     depthEpsilon: 1e-9,
   } as const

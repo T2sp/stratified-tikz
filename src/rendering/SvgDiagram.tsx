@@ -15,9 +15,13 @@ import type {
   VisibilityOptions,
 } from '../model/types'
 import {
+  curveOcclusionEnabled,
   defaultHiddenCurveStyle,
+  hiddenLabelStyleFromBase,
+  hiddenPointStyleFromBase,
+  labelAutoVisibilityEnabled,
+  pointAutoVisibilityEnabled,
   resolveVisibilityOptions,
-  surfaceDepthSortEnabled,
 } from '../model/visibility.ts'
 import {
   arcSegmentToCubicBezierSegments,
@@ -99,6 +103,10 @@ import {
   classifyCurveOcclusion,
   type CurveOcclusionResult,
 } from './curveOcclusion.ts'
+import {
+  classifyAnchorOcclusion,
+  type AnchorOcclusionResult,
+} from './pointOcclusion.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -174,6 +182,7 @@ type SvgCurvePathRun = {
 }
 
 type CurveOcclusionById = ReadonlyMap<string, CurveOcclusionResult>
+type AnchorOcclusionById = ReadonlyMap<string, AnchorOcclusionResult>
 
 type ActiveCameraDrag = {
   mode: CameraDragMode
@@ -244,6 +253,16 @@ export function SvgDiagram({
     camera,
     visibilityOptions,
   )
+  const pointOcclusionById = createSvgPointOcclusionMap(
+    diagram,
+    camera,
+    visibilityOptions,
+  )
+  const labelOcclusionById = createSvgLabelOcclusionMap(
+    diagram,
+    camera,
+    visibilityOptions,
+  )
   const sortedSurfaceItems = renderSortedSurfaceFaces(
     diagram,
     camera,
@@ -277,6 +296,7 @@ export function SvgDiagram({
             layerFilter,
             boundaryPathHighlights,
             curveOcclusionById,
+            pointOcclusionById,
             visibilityOptions,
             onSelectionChange,
             onCurveStratumClick,
@@ -296,6 +316,8 @@ export function SvgDiagram({
             height,
             selectedElement,
             layerFilter,
+            labelOcclusionById,
+            visibilityOptions,
             onSelectionChange,
           ),
           'label',
@@ -526,7 +548,7 @@ function createSvgCurveOcclusionMap(
   if (
     diagram.ambientDimension !== 3 ||
     camera.mode !== '3d' ||
-    !surfaceDepthSortEnabled(visibilityOptions)
+    !curveOcclusionEnabled(visibilityOptions)
   ) {
     return new Map()
   }
@@ -553,6 +575,97 @@ function createSvgCurveOcclusionMap(
   } catch {
     return new Map()
   }
+}
+
+function createSvgPointOcclusionMap(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  visibilityOptions: VisibilityOptions,
+): AnchorOcclusionById {
+  if (
+    diagram.ambientDimension !== 3 ||
+    camera.mode !== '3d' ||
+    !pointAutoVisibilityEnabled(visibilityOptions)
+  ) {
+    return new Map()
+  }
+
+  const visibleSheetIds = visibleSvgSheetIds(diagram)
+  const targets = diagram.strata.flatMap((stratum) =>
+    stratum.geometricKind === 'point' &&
+    stratum.codim === 3 &&
+    shouldRenderStratumInSvgPreview(diagram, stratum)
+      ? [
+          {
+            id: stratum.id,
+            layer: stratum.layer,
+            position: stratum.position,
+          },
+        ]
+      : [],
+  )
+
+  try {
+    return new Map(
+      classifyAnchorOcclusion(diagram, targets, {
+        camera,
+        visibility: visibilityOptions,
+        occludingSurfaceIds: visibleSheetIds,
+        kind: 'point',
+      }).map((result) => [result.id, result]),
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+function createSvgLabelOcclusionMap(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  visibilityOptions: VisibilityOptions,
+): AnchorOcclusionById {
+  if (
+    diagram.ambientDimension !== 3 ||
+    camera.mode !== '3d' ||
+    !labelAutoVisibilityEnabled(visibilityOptions)
+  ) {
+    return new Map()
+  }
+
+  const visibleSheetIds = visibleSvgSheetIds(diagram)
+  const targets = diagram.labels
+    .filter((label) => shouldRenderTextLabelInSvgPreview(diagram, label))
+    .map((label) => ({
+      id: label.id,
+      layer: label.layer,
+      position: label.position,
+    }))
+
+  try {
+    return new Map(
+      classifyAnchorOcclusion(diagram, targets, {
+        camera,
+        visibility: visibilityOptions,
+        occludingSurfaceIds: visibleSheetIds,
+        kind: 'label',
+      }).map((result) => [result.id, result]),
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+function visibleSvgSheetIds(diagram: Diagram): ReadonlySet<string> {
+  return new Set(
+    diagram.strata
+      .filter(
+        (stratum): stratum is SheetStratum =>
+          stratum.geometricKind === 'sheet' &&
+          stratum.codim === 1 &&
+          shouldRenderStratumInSvgPreview(diagram, stratum),
+      )
+      .map((sheet) => sheet.id),
+  )
 }
 
 function renderSortedSurfaceFace(
@@ -806,6 +919,7 @@ function renderStratum(
   layerFilter: LayerFilter,
   boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
   curveOcclusionById: CurveOcclusionById,
+  pointOcclusionById: AnchorOcclusionById,
   visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
@@ -854,6 +968,8 @@ function renderStratum(
         viewportHeight,
         selectedElement,
         layerFilter,
+        pointOcclusionById,
+        visibilityOptions,
         onSelectionChange,
         onPointStratumClick,
       )
@@ -1391,12 +1507,37 @@ function renderPoint(
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  pointOcclusionById: AnchorOcclusionById,
+  visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
 ): RenderItemElement {
+  const occlusion = pointOcclusionById.get(point.id)
+  const isHiddenBySurface = occlusion?.visibility === 'hidden'
+
+  if (
+    isHiddenBySurface &&
+    visibilityOptions.pointVisibility === 'hideHidden'
+  ) {
+    return {
+      id: point.id,
+      layer: point.layer,
+      element: (
+        <g
+          key={point.id}
+          data-point-visibility="hidden"
+          data-occluding-surface-id={occlusion.occludingFace?.sourceId}
+        />
+      ),
+    }
+  }
+
+  const style = isHiddenBySurface
+    ? hiddenPointStyleFromBase(point.style)
+    : point.style
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
-  const radius = Math.max(point.style.size * pointRadiusScale, 1)
-  const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
+  const radius = Math.max(style.size * pointRadiusScale, 1)
+  const fill = style.fill === 'hollow' ? '#ffffff' : style.color
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, point.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -1411,13 +1552,17 @@ function renderPoint(
   } as const
   const commonProps = {
     fill,
-    stroke: point.style.color,
+    stroke: style.color,
     strokeWidth: 1.4,
-    opacity: point.style.opacity,
+    opacity: style.opacity,
     vectorEffect: 'non-scaling-stroke',
   }
+  const visibilityDataProps = {
+    'data-point-visibility': isHiddenBySurface ? 'dimmed' : 'visible',
+    'data-occluding-surface-id': occlusion?.occludingFace?.sourceId,
+  }
 
-  switch (point.style.shape) {
+  switch (style.shape) {
     case 'circle':
       return {
         id: point.id,
@@ -1426,6 +1571,7 @@ function renderPoint(
           <g
             key={point.id}
             {...groupProps}
+            {...visibilityDataProps}
             onClick={(event) =>
               selectPointElement(
                 event,
@@ -1448,6 +1594,7 @@ function renderPoint(
           <g
             key={point.id}
             {...groupProps}
+            {...visibilityDataProps}
             onClick={(event) =>
               selectPointElement(
                 event,
@@ -1475,6 +1622,7 @@ function renderPoint(
           <g
             key={point.id}
             {...groupProps}
+            {...visibilityDataProps}
             onClick={(event) =>
               selectPointElement(
                 event,
@@ -1502,6 +1650,7 @@ function renderPoint(
           <g
             key={point.id}
             {...groupProps}
+            {...visibilityDataProps}
             onClick={(event) =>
               selectPointElement(
                 event,
@@ -1529,8 +1678,34 @@ function renderLabel(
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  labelOcclusionById: AnchorOcclusionById,
+  visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItemElement {
+  const occlusion = labelOcclusionById.get(label.id)
+  const isHiddenBySurface = occlusion?.visibility === 'hidden'
+
+  if (
+    isHiddenBySurface &&
+    visibilityOptions.labelVisibility === 'autoHide'
+  ) {
+    return {
+      id: label.id,
+      layer: label.layer,
+      element: (
+        <g
+          key={label.id}
+          data-label-visibility="hidden"
+          data-occluding-surface-id={occlusion.occludingFace?.sourceId}
+        />
+      ),
+    }
+  }
+
+  const style =
+    isHiddenBySurface && visibilityOptions.labelVisibility === 'autoDim'
+      ? hiddenLabelStyleFromBase(label.style)
+      : label.style
   const position = projectToSvgPoint(camera, label.position, viewportHeight)
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, label.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
@@ -1542,8 +1717,8 @@ function renderLabel(
     isSelectable &&
     selectedElement?.kind === 'label' &&
     selectedElement.id === label.id
-  const fontSize = label.style.fontSize * 1.35
-  const anchorPlacement = svgLabelAnchorPlacement(label.style.anchor, fontSize)
+  const fontSize = style.fontSize * 1.35
+  const anchorPlacement = svgLabelAnchorPlacement(style.anchor, fontSize)
 
   return {
     id: label.id,
@@ -1554,6 +1729,8 @@ function renderLabel(
         className={svgPreviewElementClassName(isIncludedByFilter, isSelectable)}
         opacity={previewElementOpacity(isIncludedByFilter)}
         pointerEvents={isSelectable ? undefined : 'none'}
+        data-label-visibility={isHiddenBySurface ? 'dimmed' : 'visible'}
+        data-occluding-surface-id={occlusion?.occludingFace?.sourceId}
         onClick={(event) =>
           selectElement(event, { kind: 'label', id: label.id }, onSelectionChange)
         }
@@ -1574,8 +1751,8 @@ function renderLabel(
         <text
           x={position.x}
           y={position.y + anchorPlacement.dy}
-          fill={label.style.color}
-          opacity={label.style.opacity}
+          fill={style.color}
+          opacity={style.opacity}
           fontSize={fontSize}
           textAnchor={anchorPlacement.textAnchor}
           dominantBaseline={anchorPlacement.dominantBaseline}

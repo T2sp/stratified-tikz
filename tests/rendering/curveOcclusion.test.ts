@@ -12,6 +12,8 @@ import {
 } from '../../src/model/styles.ts'
 import {
   defaultVisibilityOptions,
+  hiddenLabelStyleFromBase,
+  hiddenPointStyleFromBase,
 } from '../../src/model/visibility.ts'
 import type {
   Camera3D,
@@ -26,6 +28,9 @@ import {
   classifyCurveOcclusion,
   type CurveOcclusionResult,
 } from '../../src/rendering/curveOcclusion.ts'
+import {
+  classifyAnchorOcclusion,
+} from '../../src/rendering/pointOcclusion.ts'
 import {
   curveStyleToSvgStrokeAttributes,
   hiddenCurveStyleToSvgStrokeAttributes,
@@ -492,6 +497,193 @@ test('curve occlusion does not mutate original curve geometry', () => {
   })
 
   assert.deepEqual(diagram, before)
+})
+
+test('default visibility options keep automatic anchor visibility disabled', () => {
+  const results = classifyAnchorOcclusion(
+    occlusionDiagram(polylineCurve('unused-curve', [
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ])),
+    [
+      {
+        id: 'hidden-point',
+        layer: 0,
+        position: { x: 0, y: -1, z: 0 },
+      },
+    ],
+    {
+      camera: occlusionCamera,
+      visibility: defaultVisibilityOptions,
+      kind: 'point',
+    },
+  )
+
+  assert.equal(defaultVisibilityOptions.enabled, false)
+  assert.equal(defaultVisibilityOptions.pointVisibility, 'dimHidden')
+  assert.equal(defaultVisibilityOptions.labelVisibility, 'alwaysForeground')
+  assert.deepEqual(results, [])
+})
+
+test('point anchor behind surface is classified hidden', () => {
+  const [result] = classifyAnchorOcclusion(
+    occlusionDiagram(polylineCurve('unused-curve', [
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ])),
+    [
+      {
+        id: 'behind-point',
+        layer: 0,
+        position: { x: 0, y: -1, z: 0 },
+      },
+    ],
+    {
+      camera: occlusionCamera,
+      visibility: enabledVisibility(),
+      kind: 'point',
+    },
+  )
+
+  assert.equal(result?.visibility, 'hidden')
+  assert.equal(result?.occludingFace?.sourceId, 'occluding-sheet')
+})
+
+test('label anchor auto mode classifies hidden labels', () => {
+  const [result] = classifyAnchorOcclusion(
+    occlusionDiagram(polylineCurve('unused-curve', [
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ])),
+    [
+      {
+        id: 'behind-label',
+        layer: 0,
+        position: { x: 0, y: -1, z: 0 },
+      },
+    ],
+    {
+      camera: occlusionCamera,
+      visibility: {
+        ...enabledVisibility(),
+        labelVisibility: 'autoDim',
+      },
+      kind: 'label',
+    },
+  )
+
+  assert.equal(result?.visibility, 'hidden')
+})
+
+test('always foreground label policy skips label anchor classification', () => {
+  const results = classifyAnchorOcclusion(
+    occlusionDiagram(polylineCurve('unused-curve', [
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ])),
+    [
+      {
+        id: 'behind-label',
+        layer: 0,
+        position: { x: 0, y: -1, z: 0 },
+      },
+    ],
+    {
+      camera: occlusionCamera,
+      visibility: enabledVisibility(),
+      kind: 'label',
+    },
+  )
+
+  assert.deepEqual(results, [])
+})
+
+test('anchor occlusion respects layerThenDepth and depthThenLayer options', () => {
+  const diagram = occlusionDiagram(polylineCurve('unused-curve', [
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+  ]))
+  const targets = [
+    {
+      id: 'upper-layer-point',
+      layer: 1,
+      position: { x: 0, y: -1, z: 0 },
+    },
+  ]
+  const layerThenDepth = classifyAnchorOcclusion(diagram, targets, {
+    camera: occlusionCamera,
+    visibility: enabledVisibility('layerThenDepth'),
+    kind: 'point',
+  })
+  const depthThenLayer = classifyAnchorOcclusion(diagram, targets, {
+    camera: occlusionCamera,
+    visibility: enabledVisibility('depthThenLayer'),
+    kind: 'point',
+  })
+
+  assert.equal(layerThenDepth[0]?.visibility, 'visible')
+  assert.equal(depthThenLayer[0]?.visibility, 'hidden')
+})
+
+test('anchor occlusion respects explicit occluding surface ids', () => {
+  const results = classifyAnchorOcclusion(
+    occlusionDiagram(polylineCurve('unused-curve', [
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ])),
+    [
+      {
+        id: 'behind-point',
+        layer: 0,
+        position: { x: 0, y: -1, z: 0 },
+      },
+    ],
+    {
+      camera: occlusionCamera,
+      visibility: enabledVisibility(),
+      occludingSurfaceIds: new Set(['not-the-sheet']),
+      kind: 'point',
+    },
+  )
+
+  assert.deepEqual(results, [])
+})
+
+test('hidden point and label styles only reduce opacity', () => {
+  assert.deepEqual(
+    hiddenPointStyleFromBase({
+      kind: 'pointStyle',
+      color: '#123456',
+      opacity: 0.5,
+      shape: 'square',
+      fill: 'hollow',
+      size: 4,
+    }),
+    {
+      kind: 'pointStyle',
+      color: '#123456',
+      opacity: 0.14,
+      shape: 'square',
+      fill: 'hollow',
+      size: 4,
+    },
+  )
+  assert.deepEqual(
+    hiddenLabelStyleFromBase({
+      kind: 'labelStyle',
+      color: '#654321',
+      opacity: 0.8,
+      fontSize: 12,
+      anchor: 'north east',
+    }),
+    {
+      kind: 'labelStyle',
+      color: '#654321',
+      opacity: 0.27999999999999997,
+      fontSize: 12,
+      anchor: 'north east',
+    },
+  )
 })
 
 function occlusionDiagram(curve: CurveStratum): Diagram {

@@ -28,7 +28,12 @@ import {
   normalizeImportedTikzStyleKey,
   normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
-import { hiddenCurveLineStyles, tikzExportModes } from './types.ts'
+import {
+  hiddenCurveLineStyles,
+  labelVisibilityPolicies,
+  pointVisibilityPolicies,
+  tikzExportModes,
+} from './types.ts'
 import {
   cloneVisibilityOptions,
   defaultVisibilityOptions,
@@ -1282,13 +1287,65 @@ function visibilityOptionsFromPersistent(
     return null
   }
 
+  const curveOcclusion =
+    'curveOcclusion' in value
+      ? booleanVisibilityFieldFromPersistent(value.curveOcclusion)
+      : defaultVisibilityOptions.curveOcclusion
+
+  if (curveOcclusion === null) {
+    return null
+  }
+
+  const pointVisibility =
+    'pointVisibility' in value
+      ? pointVisibilityFromPersistent(value.pointVisibility)
+      : defaultVisibilityOptions.pointVisibility
+
+  if (pointVisibility === null) {
+    return null
+  }
+
+  const labelVisibility =
+    'labelVisibility' in value
+      ? labelVisibilityFromPersistent(value.labelVisibility)
+      : defaultVisibilityOptions.labelVisibility
+
+  if (labelVisibility === null) {
+    return null
+  }
+
   return {
     enabled: value.enabled,
     surfaceDepthSort: value.surfaceDepthSort,
+    curveOcclusion,
+    pointVisibility,
+    labelVisibility,
     sortMode: value.sortMode,
     depthEpsilon: value.depthEpsilon,
     hiddenCurveStyle,
   }
+}
+
+function booleanVisibilityFieldFromPersistent(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null
+}
+
+function pointVisibilityFromPersistent(
+  value: unknown,
+): VisibilityOptions['pointVisibility'] | null {
+  return typeof value === 'string' &&
+    pointVisibilityPolicies.includes(value as VisibilityOptions['pointVisibility'])
+    ? (value as VisibilityOptions['pointVisibility'])
+    : null
+}
+
+function labelVisibilityFromPersistent(
+  value: unknown,
+): VisibilityOptions['labelVisibility'] | null {
+  return typeof value === 'string' &&
+    labelVisibilityPolicies.includes(value as VisibilityOptions['labelVisibility'])
+    ? (value as VisibilityOptions['labelVisibility'])
+    : null
 }
 
 function hiddenCurveStyleFromPersistent(
