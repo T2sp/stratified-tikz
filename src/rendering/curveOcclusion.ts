@@ -7,6 +7,7 @@ import {
   sampleTemplatePathPoints,
 } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
+import { curveStylesEqual } from '../model/styles.ts'
 import {
   resolveVisibilityOptions,
   surfaceDepthSortEnabled,
@@ -80,6 +81,11 @@ type StyledCurveSegmentSample = {
   start: Vec3
   end: Vec3
   style: CurveStyle
+  mergeKey?: string
+}
+
+type MergeableCurveOcclusionSegment = CurveOcclusionSegment & {
+  mergeKey?: string
 }
 
 type StyledCurveSegmentAccumulator = {
@@ -152,8 +158,8 @@ export function classifyCurveOcclusion(
       templatePathSamples,
       maxCurveSegmentsPerCurve,
     )
-    const segments = sampled.segments.flatMap(
-      (segment, segmentIndex): CurveOcclusionSegment[] => {
+    const classifiedSegments = sampled.segments.flatMap(
+      (segment, segmentIndex): MergeableCurveOcclusionSegment[] => {
         const classified = classifyCurveSegment(
           stratum,
           segment,
@@ -165,6 +171,10 @@ export function classifyCurveOcclusion(
 
         return classified === null ? [] : [classified]
       },
+    )
+    const segments = mergeClassifiedCurveSegments(
+      classifiedSegments,
+      camera,
     )
 
     return [
@@ -380,7 +390,13 @@ function styledCurveSegmentsForStratum(
 
   switch (curve.kind) {
     case 'polyline':
-      appendPointPairSamples(accumulator, curve.points, curve.style)
+      appendSubdividedPointPairSamples(
+        accumulator,
+        curve.points,
+        curve.style,
+        curveSegmentSamples,
+        'polyline',
+      )
       break
     case 'cubicBezier':
       if (curve.points.length !== 4) {
@@ -402,15 +418,16 @@ function styledCurveSegmentsForStratum(
       )
       break
     case 'concatenatedPath':
-      for (const segment of curve.segments) {
+      curve.segments.forEach((segment, index) => {
         appendPathSegmentSamples(
           accumulator,
           segment,
           resolvePathSegmentStyle(curve.style, segment),
           ambientDimension,
           curveSegmentSamples,
+          `path:${index}`,
         )
-      }
+      })
       break
     case 'templatePath':
       appendPointPairSamples(
@@ -452,7 +469,20 @@ function appendPathSegmentSamples(
   style: CurveStyle,
   ambientDimension: AmbientDimension,
   sampleCount: number,
+  mergeKey?: string,
 ): void {
+  if (segment.kind === 'line') {
+    appendSubdividedLineSamples(
+      accumulator,
+      segment.start,
+      segment.end,
+      style,
+      sampleCount,
+      mergeKey,
+    )
+    return
+  }
+
   appendPointPairSamples(
     accumulator,
     pathSegmentPolyline(segment, ambientDimension, sampleCount),
@@ -488,6 +518,66 @@ function pathSegmentPolyline(
   return points
 }
 
+function appendSubdividedPointPairSamples(
+  accumulator: StyledCurveSegmentAccumulator,
+  points: readonly Vec3[],
+  style: CurveStyle,
+  sampleCount: number,
+  mergeKeyPrefix: string,
+): void {
+  for (let index = 0; index < points.length - 1; index += 1) {
+    appendSubdividedLineSamples(
+      accumulator,
+      points[index],
+      points[index + 1],
+      style,
+      sampleCount,
+      `${mergeKeyPrefix}:${index}`,
+    )
+  }
+}
+
+function appendSubdividedLineSamples(
+  accumulator: StyledCurveSegmentAccumulator,
+  start: Vec3,
+  end: Vec3,
+  style: CurveStyle,
+  sampleCount: number,
+  mergeKey: string | undefined,
+): void {
+  if (!isFiniteVec3(start) || !isFiniteVec3(end)) {
+    return
+  }
+
+  if (vec3ApproximatelyEqual(start, end)) {
+    return
+  }
+
+  let previous = cloneVec3(start)
+
+  // Straight segments must be subdivided for midpoint occlusion to detect
+  // partial hiding. Sampling is bounded by curveSegmentSamples and the
+  // accumulator max segment cap; this is approximate, not analytic clipping.
+  for (let index = 1; index <= sampleCount; index += 1) {
+    const next =
+      index === sampleCount
+        ? cloneVec3(end)
+        : interpolateVec3(start, end, index / sampleCount)
+
+    appendStyledSegment(accumulator, previous, next, style, mergeKey)
+
+    if (
+      accumulator.segments.length >= accumulator.maxSegments &&
+      index < sampleCount
+    ) {
+      accumulator.capped = true
+      return
+    }
+
+    previous = next
+  }
+}
+
 function appendPointPairSamples(
   accumulator: StyledCurveSegmentAccumulator,
   points: readonly Vec3[],
@@ -503,6 +593,7 @@ function appendStyledSegment(
   start: Vec3,
   end: Vec3,
   style: CurveStyle,
+  mergeKey?: string,
 ): void {
   if (accumulator.segments.length >= accumulator.maxSegments) {
     accumulator.capped = true
@@ -517,6 +608,7 @@ function appendStyledSegment(
     start: cloneVec3(start),
     end: cloneVec3(end),
     style: cloneCurveStyle(style),
+    ...(mergeKey === undefined ? {} : { mergeKey }),
   })
 }
 
@@ -527,7 +619,7 @@ function classifyCurveSegment(
   faces: readonly ProjectedSurfaceFace[],
   camera: Camera3D,
   visibility: VisibilityOptions,
-): CurveOcclusionSegment | null {
+): MergeableCurveOcclusionSegment | null {
   const midpoint = midpointVec3(segment.start, segment.end)
   const projectedStart = projectVec3(camera, segment.start)
   const projectedEnd = projectVec3(camera, segment.end)
@@ -566,7 +658,91 @@ function classifyCurveSegment(
     projectedMidpoint: cloneVec2(projectedMidpoint),
     curveDepth,
     style: cloneCurveStyle(segment.style),
+    ...(segment.mergeKey === undefined ? {} : { mergeKey: segment.mergeKey }),
     ...(occludingFace === undefined ? {} : { occludingFace }),
+  }
+}
+
+function mergeClassifiedCurveSegments(
+  segments: MergeableCurveOcclusionSegment[],
+  camera: Camera3D,
+): CurveOcclusionSegment[] {
+  const mergedSegments: MergeableCurveOcclusionSegment[] = []
+
+  for (const segment of segments) {
+    const previous = mergedSegments[mergedSegments.length - 1]
+
+    if (
+      previous !== undefined &&
+      canMergeClassifiedCurveSegments(previous, segment)
+    ) {
+      mergedSegments[mergedSegments.length - 1] = mergedCurveOcclusionSegment(
+        previous,
+        segment,
+        camera,
+      )
+      continue
+    }
+
+    mergedSegments.push(segment)
+  }
+
+  return mergedSegments.map(stripMergeKey)
+}
+
+function canMergeClassifiedCurveSegments(
+  first: MergeableCurveOcclusionSegment,
+  second: MergeableCurveOcclusionSegment,
+): boolean {
+  return (
+    first.mergeKey !== undefined &&
+    second.mergeKey !== undefined &&
+    (first.mergeKey === second.mergeKey ||
+      collinearVec3(first.start, first.end, second.end)) &&
+    first.visibility === second.visibility &&
+    vec3ApproximatelyEqual(first.end, second.start) &&
+    curveStylesEqual(first.style, second.style)
+  )
+}
+
+function mergedCurveOcclusionSegment(
+  first: MergeableCurveOcclusionSegment,
+  second: MergeableCurveOcclusionSegment,
+  camera: Camera3D,
+): MergeableCurveOcclusionSegment {
+  const midpoint = midpointVec3(first.start, second.end)
+  const projectedMidpoint = projectVec3(camera, midpoint)
+
+  return {
+    ...first,
+    end: cloneVec3(second.end),
+    projectedEnd: cloneVec2(second.projectedEnd),
+    midpoint,
+    projectedMidpoint: cloneVec2(projectedMidpoint),
+    curveDepth: projectedDepth(camera, midpoint),
+    ...(first.occludingFace === undefined
+      ? {}
+      : { occludingFace: first.occludingFace }),
+  }
+}
+
+function stripMergeKey(segment: MergeableCurveOcclusionSegment): CurveOcclusionSegment {
+  return {
+    curveId: segment.curveId,
+    layer: segment.layer,
+    segmentIndex: segment.segmentIndex,
+    visibility: segment.visibility,
+    start: cloneVec3(segment.start),
+    end: cloneVec3(segment.end),
+    projectedStart: cloneVec2(segment.projectedStart),
+    projectedEnd: cloneVec2(segment.projectedEnd),
+    midpoint: cloneVec3(segment.midpoint),
+    projectedMidpoint: cloneVec2(segment.projectedMidpoint),
+    curveDepth: segment.curveDepth,
+    style: cloneCurveStyle(segment.style),
+    ...(segment.occludingFace === undefined
+      ? {}
+      : { occludingFace: segment.occludingFace }),
   }
 }
 
@@ -770,6 +946,14 @@ function midpointVec3(start: Vec3, end: Vec3): Vec3 {
   }
 }
 
+function interpolateVec3(start: Vec3, end: Vec3, parameter: number): Vec3 {
+  return {
+    x: start.x + (end.x - start.x) * parameter,
+    y: start.y + (end.y - start.y) * parameter,
+    z: start.z + (end.z - start.z) * parameter,
+  }
+}
+
 function normalizeLayer(layer: number): number {
   if (!Number.isFinite(layer)) {
     return 0
@@ -783,6 +967,28 @@ function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
     Math.abs(first.x - second.x) <= pointComparisonEpsilon &&
     Math.abs(first.y - second.y) <= pointComparisonEpsilon &&
     Math.abs(first.z - second.z) <= pointComparisonEpsilon
+  )
+}
+
+function collinearVec3(first: Vec3, second: Vec3, third: Vec3): boolean {
+  const ab = {
+    x: second.x - first.x,
+    y: second.y - first.y,
+    z: second.z - first.z,
+  }
+  const ac = {
+    x: third.x - first.x,
+    y: third.y - first.y,
+    z: third.z - first.z,
+  }
+  const cross = {
+    x: ab.y * ac.z - ab.z * ac.y,
+    y: ab.z * ac.x - ab.x * ac.z,
+    z: ab.x * ac.y - ab.y * ac.x,
+  }
+
+  return (
+    Math.hypot(cross.x, cross.y, cross.z) <= pointComparisonEpsilon
   )
 }
 

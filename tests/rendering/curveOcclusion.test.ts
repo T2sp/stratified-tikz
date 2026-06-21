@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createConcatenatedPathStratum,
   createCurveStratum,
   createEmptyDiagram,
   createSheetStratum,
@@ -16,13 +17,19 @@ import type {
   Camera3D,
   CurveStratum,
   Diagram,
+  PathSegmentStyleOverride,
   Vec3,
   VisibilityOptions,
   VisibilitySortMode,
 } from '../../src/model/types.ts'
 import {
   classifyCurveOcclusion,
+  type CurveOcclusionResult,
 } from '../../src/rendering/curveOcclusion.ts'
+import {
+  curveStyleToSvgStrokeAttributes,
+  hiddenCurveStyleToSvgStrokeAttributes,
+} from '../../src/rendering/svgStyle.ts'
 
 const occlusionCamera: Camera3D = {
   mode: '3d',
@@ -84,6 +91,217 @@ test('curve partly behind surface produces visible and hidden segments', () => {
   )
 })
 
+test('straight polyline edge subdivision samples one edge more than once', () => {
+  const curve = polylineCurve('subdivided-polyline', [
+    { x: -0.5, y: -1, z: 0 },
+    { x: 0.5, y: -1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(result?.segments[0]?.start, { x: -0.5, y: -1, z: 0 })
+  assert.deepEqual(result?.segments[0]?.end, { x: 0.5, y: -1, z: 0 })
+})
+
+test('line path segment subdivision samples one line more than once', () => {
+  const curve = linePathCurve(
+    'subdivided-line-path',
+    { x: -0.5, y: -1, z: 0 },
+    { x: 0.5, y: -1, z: 0 },
+  )
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(result?.segments[0]?.start, { x: -0.5, y: -1, z: 0 })
+  assert.deepEqual(result?.segments[0]?.end, { x: 0.5, y: -1, z: 0 })
+})
+
+test('straight subdivision keeps finite sampled run coordinates', () => {
+  const curve = polylineCurve('finite-subdivision', [
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 8,
+  })
+
+  assert.equal(result?.segments.every(segmentHasFiniteCoordinates), true)
+})
+
+test('zero-length straight line subdivision is skipped safely', () => {
+  const curve = linePathCurve(
+    'zero-length-line-path',
+    { x: 0, y: -1, z: 0 },
+    { x: 0, y: -1, z: 0 },
+  )
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 0)
+  assert.equal(result?.segments.length, 0)
+})
+
+test('single straight polyline crossing behind a surface splits visible hidden visible', () => {
+  const curve = polylineCurve('single-segment-crossing-polyline', [
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(visibilityRuns(result), ['visible', 'hidden', 'visible'])
+  assert.deepEqual(result?.segments[0]?.start, { x: -2, y: -1, z: 0 })
+  assert.deepEqual(result?.segments.at(-1)?.end, { x: 2, y: -1, z: 0 })
+})
+
+test('single straight line path crossing behind a surface splits visible hidden visible', () => {
+  const curve = linePathCurve(
+    'single-segment-crossing-path',
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+  )
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(visibilityRuns(result), ['visible', 'hidden', 'visible'])
+})
+
+test('disabled curve visibility does not classify straight occlusion runs', () => {
+  const curve = polylineCurve('disabled-crossing-polyline', [
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+  ])
+  const results = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: {
+      ...enabledVisibility(),
+      enabled: false,
+    },
+    curveSegmentSamples: 4,
+  })
+
+  assert.deepEqual(results, [])
+})
+
+test('fully visible straight segment remains one visible run', () => {
+  const curve = polylineCurve('fully-visible-line', [
+    { x: -0.5, y: 1, z: 0 },
+    { x: 0.5, y: 1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(visibilityRuns(result), ['visible'])
+})
+
+test('fully hidden straight segment remains one hidden run', () => {
+  const curve = polylineCurve('fully-hidden-line', [
+    { x: -0.5, y: -1, z: 0 },
+    { x: 0.5, y: -1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 4)
+  assert.deepEqual(visibilityRuns(result), ['hidden'])
+})
+
+test('line path style override is preserved after subdivision', () => {
+  const curve = linePathCurve(
+    'styled-line-path',
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+    {
+      strokeColor: '#AA0033',
+      strokeOpacity: 0.8,
+      lineWidth: 2.4,
+      lineStyle: 'dotted',
+    },
+  )
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+
+  assert.equal(result?.segments.every((segment) => (
+    segment.style.strokeColor === '#AA0033' &&
+    segment.style.strokeOpacity === 0.8 &&
+    segment.style.lineWidth === 2.4 &&
+    segment.style.lineStyle === 'dotted'
+  )), true)
+})
+
+test('SVG hidden and visible styles use subdivided line segment styles', () => {
+  const curve = linePathCurve(
+    'svg-styled-line-path',
+    { x: -2, y: -1, z: 0 },
+    { x: 2, y: -1, z: 0 },
+    {
+      strokeColor: '#AA0033',
+      strokeOpacity: 0.8,
+      lineWidth: 2.4,
+      lineStyle: 'dotted',
+    },
+  )
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 4,
+  })
+  const hiddenRun = result?.segments.find((segment) => segment.visibility === 'hidden')
+  const visibleRun = result?.segments.find((segment) => segment.visibility === 'visible')
+
+  assert.ok(hiddenRun)
+  assert.ok(visibleRun)
+  assert.deepEqual(curveStyleToSvgStrokeAttributes(visibleRun.style), {
+    stroke: '#AA0033',
+    strokeOpacity: 0.8,
+    strokeWidth: 2.4,
+    strokeDasharray: '1 5',
+  })
+  assert.deepEqual(
+    hiddenCurveStyleToSvgStrokeAttributes(hiddenRun.style, {
+      lineStyle: 'denselyDotted',
+      opacity: 0.5,
+    }),
+    {
+      stroke: '#AA0033',
+      strokeOpacity: 0.4,
+      strokeWidth: 2.4,
+      strokeDasharray: '1 2',
+    },
+  )
+})
+
 test('curve occlusion respects layerThenDepth and depthThenLayer options', () => {
   const curve = polylineCurve(
     'upper-layer-curve',
@@ -121,7 +339,7 @@ test('curve occlusion sampling cap prevents excessive sampled segments', () => {
   })
 
   assert.equal(result?.sampledSegmentCount, 5)
-  assert.equal(result?.segments.length, 5)
+  assert.ok((result?.segments.length ?? 0) <= 5)
   assert.equal(result?.capped, true)
 })
 
@@ -180,6 +398,54 @@ function polylineCurve(
     points,
     layer,
   })
+}
+
+function linePathCurve(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+  styleOverride?: PathSegmentStyleOverride,
+): CurveStratum {
+  return createConcatenatedPathStratum({
+    ambientDimension: 3,
+    id,
+    name: id,
+    style: defaultCurveStyle,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+        ...(styleOverride === undefined ? {} : { styleOverride }),
+      },
+    ],
+  })
+}
+
+function visibilityRuns(
+  result: CurveOcclusionResult | undefined,
+): string[] {
+  return result?.segments.map((segment) => segment.visibility) ?? []
+}
+
+function segmentHasFiniteCoordinates(segment: {
+  start: Vec3
+  end: Vec3
+  midpoint: Vec3
+}): boolean {
+  return (
+    isFiniteVec3(segment.start) &&
+    isFiniteVec3(segment.end) &&
+    isFiniteVec3(segment.midpoint)
+  )
+}
+
+function isFiniteVec3(point: Vec3): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    Number.isFinite(point.z)
+  )
 }
 
 function enabledVisibility(

@@ -692,6 +692,74 @@ test('inline curve occlusion TikZ output has no blank lines', () => {
   expectNoBlankLines(tikz)
 })
 
+test('straight polyline curve occlusion TikZ output splits visible hidden visible runs', () => {
+  const tikz = generateTikz(createStraightCurveOcclusionDiagram('polyline'), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /Visible sampled segment/g), 2)
+  assert.equal(countMatches(tikz, /Hidden sampled segment/g), 1)
+  assert.match(tikz, /densely dotted/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('straight line path occlusion TikZ output preserves style overrides', () => {
+  const tikz = generateTikz(
+    createStraightCurveOcclusionDiagram('linePath', {
+      strokeColor: '#AA0033',
+      strokeOpacity: 0.8,
+      lineWidth: 2.4,
+      lineStyle: 'dotted',
+    }),
+    {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        hiddenCurveStyle: {
+          lineStyle: 'dashed',
+          opacity: 0.5,
+        },
+      },
+    },
+  )
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /Visible sampled segment/g), 2)
+  assert.equal(countMatches(tikz, /Hidden sampled segment/g), 1)
+  assert.match(tikz, /\{HTML\}\{AA0033\}/)
+  assert.match(tikz, /line width=2\.4pt/)
+  assert.match(tikz, /dotted/)
+  assert.match(tikz, /dashed/)
+  assert.match(tikz, /draw opacity=0\.4/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('inline straight line path occlusion TikZ output has no blank lines', () => {
+  const tikz = generateTikz(createStraightCurveOcclusionDiagram('linePath'), {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /Hidden sampled segment/g), 1)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  expectNoBlankLines(tikz)
+})
+
+test('disabled straight line path occlusion preserves normal TikZ output', () => {
+  const diagram = createStraightCurveOcclusionDiagram('linePath')
+
+  assert.equal(
+    generateTikz(diagram, {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        enabled: false,
+      },
+    }),
+    generateTikz(diagram),
+  )
+})
+
 test('current camera option overrides saved diagram camera metadata', () => {
   const savedCamera = {
     ...createInitialCamera3D(),
@@ -4578,6 +4646,56 @@ function createCurveOcclusionDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createStraightCurveOcclusionDiagram(
+  curveKind: 'polyline' | 'linePath',
+  styleOverride?: Partial<CurveStyle>,
+): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const sheet = diagram.strata[0]
+  const start = { x: -2, y: -1, z: 0 }
+  const end = { x: 2, y: -1, z: 0 }
+
+  if (sheet === undefined) {
+    throw new Error('Expected occluding sheet.')
+  }
+
+  diagram.strata = [
+    sheet,
+    curveKind === 'polyline'
+      ? {
+          codim: 2,
+          geometricKind: 'curve',
+          kind: 'polyline',
+          id: 'straight-occlusion-polyline',
+          name: 'Straight Occlusion Polyline',
+          style: curveStyle(),
+          points: [start, end],
+          styleSegments: [],
+          layer: 0,
+        }
+      : {
+          codim: 2,
+          geometricKind: 'curve',
+          kind: 'concatenatedPath',
+          id: 'straight-occlusion-path',
+          name: 'Straight Occlusion Path',
+          style: curveStyle(),
+          segments: [
+            {
+              kind: 'line',
+              start,
+              end,
+              ...(styleOverride === undefined ? {} : { styleOverride }),
+            },
+          ],
+          styleSegments: [],
+          layer: 0,
+        },
+  ]
 
   return diagram
 }
