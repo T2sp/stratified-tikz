@@ -173,10 +173,12 @@ the saved symbolic expressions are preserved. Numeric work-plane-filled sheets
 continue to use the local plane scope when possible.
 
 Ruled surfaces and Coons patches may load copied boundary snapshots with
-symbolic coordinates when those expressions resolve to finite preview values.
-Their current TikZ surface output is a sampled mesh, so each emitted face uses
-the resolved numeric preview mesh coordinates. The saved diagram still keeps the
-symbolic boundary coordinate expressions for later editing and round-tripping.
+symbolic coordinates, including symbolic work-plane frame snapshot components
+on 3D arc boundary segments, when those expressions resolve to finite preview
+values and the evaluated frame is geometrically valid. Their current TikZ
+surface output is a sampled mesh, so each emitted face uses the resolved numeric
+preview mesh coordinates. The saved diagram still keeps the symbolic boundary
+coordinate and frame expressions for later editing and round-tripping.
 
 Standalone arc segment coordinates and 3D template centers are currently
 numeric-derived exports and are rejected by validation when symbolic coordinate

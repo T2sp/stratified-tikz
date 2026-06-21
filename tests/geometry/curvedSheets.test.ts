@@ -43,6 +43,7 @@ import type {
   RuledSurfacePrimitive,
   SaddleCurvedSheetPrimitive,
   SurfaceFrame,
+  SymbolicVariable,
   Vec3,
 } from '../../src/model/types.ts'
 
@@ -908,6 +909,116 @@ test('symbolic coordinates in valid boundary snapshots still refresh', () => {
   assert.equal(refreshedStart.symbolic?.x.previewValue, 0.75)
 })
 
+test('symbolic Coons boundary frame previews validate and sample after refresh', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.variables = [symbolicLenVariable()]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-coons-frame-refresh',
+      primitive: {
+        kind: 'coonsPatch',
+        bottom: arcBoundary(
+          'symbolic-coons-frame-bottom',
+          symbolicBoundaryFrame(),
+        ),
+        right: lineBoundary(
+          'symbolic-coons-frame-right',
+          { x: 2, y: 0, z: 0 },
+          { x: 2, y: 1, z: 0 },
+        ),
+        top: lineBoundary(
+          'symbolic-coons-frame-top',
+          { x: -2, y: 1, z: 0 },
+          { x: 2, y: 1, z: 0 },
+        ),
+        left: lineBoundary(
+          'symbolic-coons-frame-left',
+          { x: -2, y: 0, z: 0 },
+          { x: -2, y: 1, z: 0 },
+        ),
+        sampling: { uSegments: 4, vSegments: 3 },
+      },
+    }),
+  )
+
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(diagram, {
+    variableNames: ['Len'],
+    previewValues: new Map([['Len', 4]]),
+  })
+
+  assert.equal(refreshed.ok, true)
+  if (!refreshed.ok) {
+    throw new Error(joinMessages(refreshed.errors))
+  }
+  assertValid(refreshed.diagram)
+
+  const sheet = refreshed.diagram.strata[0]
+
+  if (
+    sheet === undefined ||
+    sheet.kind !== 'curvedSheet' ||
+    sheet.primitive.kind !== 'coonsPatch'
+  ) {
+    throw new Error('Expected refreshed Coons patch stratum.')
+  }
+
+  const frame = sheet.primitive.bottom.segments[0].frame
+
+  assert.equal(frame?.origin.x, -2)
+  assert.equal(frame?.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(sampleCoonsPatch(sheet.primitive).vertices.every(isFiniteVec3), true)
+})
+
+test('symbolic ruled boundary frame previews validate and sample after refresh', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.variables = [symbolicLenVariable()]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-ruled-frame-refresh',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: arcBoundary(
+          'symbolic-ruled-frame-bottom',
+          symbolicBoundaryFrame(),
+        ),
+        boundary1: lineBoundary(
+          'symbolic-ruled-frame-top',
+          { x: -2, y: 1, z: 1 },
+          { x: 2, y: 1, z: 1 },
+        ),
+        sampling: { segments: 4 },
+      },
+    }),
+  )
+
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(diagram, {
+    variableNames: ['Len'],
+    previewValues: new Map([['Len', 4]]),
+  })
+
+  assert.equal(refreshed.ok, true)
+  if (!refreshed.ok) {
+    throw new Error(joinMessages(refreshed.errors))
+  }
+  assertValid(refreshed.diagram)
+
+  const sheet = refreshed.diagram.strata[0]
+
+  if (
+    sheet === undefined ||
+    sheet.kind !== 'curvedSheet' ||
+    sheet.primitive.kind !== 'ruledSurface'
+  ) {
+    throw new Error('Expected refreshed ruled surface stratum.')
+  }
+
+  const frame = sheet.primitive.boundary0.segments[0].frame
+
+  assert.equal(frame?.origin.x, -2)
+  assert.equal(frame?.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(sampleRuledSurface(sheet.primitive).vertices.every(isFiniteVec3), true)
+})
+
 test('existing curved sheets, filled boundaries, and paths still validate', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.strata.push(
@@ -1125,6 +1236,47 @@ function lineBoundary(
   return {
     id,
     segments: [lineSegment(start, end)],
+  }
+}
+
+function arcBoundary(
+  id: string,
+  frame: SurfaceFrame,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: -2, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: 2,
+        startAngleDeg: 180,
+        endAngleDeg: 0,
+        direction: 'clockwise',
+        frame,
+      },
+    ],
+  }
+}
+
+function symbolicBoundaryFrame(): SurfaceFrame {
+  return {
+    origin: symbolicVec3(-99, 0, 0, { x: '-.5*Len' }),
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function symbolicLenVariable(): SymbolicVariable {
+  return {
+    id: 'var-len',
+    name: 'Len',
+    macroName: 'Len',
+    expression: '4',
+    previewValue: 4,
   }
 }
 

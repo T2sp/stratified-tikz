@@ -353,11 +353,12 @@ Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
 The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
 template geometry. Circle and ellipse templates are copied into ordinary path
 segments at creation time. Boundaries must be non-empty, composable, finite, and
-sample to finite points. Boundary-surface coordinates may be symbolic when
-loading saved JSON, but they must resolve to finite numeric preview values
-before the diagram is committed. Preview and sampled-mesh TikZ output use those
-preview coordinates while the saved model preserves symbolic expressions where
-supported.
+sample to finite points. Boundary-surface coordinates and nested work-plane
+frame snapshot components may be symbolic when loading saved JSON, but they must
+resolve to finite numeric preview values before the diagram is committed. Frame
+previews must also pass geometric frame validation. Preview and sampled-mesh
+TikZ output use those preview coordinates while the saved model preserves
+symbolic expressions where supported.
 
 A ruled surface from boundaries `C0` and `C1` uses:
 
