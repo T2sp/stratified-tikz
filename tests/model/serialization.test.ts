@@ -15,13 +15,18 @@ import {
   addSymbolicVariableToDiagram,
   createUserStylePresetFromStyle,
   parseSavedDiagramJson,
+  parseSavedDiagramJsonForImport,
+  resolvePendingSymbolicDiagramImport,
   savedDiagramFormat,
   savedDiagramVersion,
   serializeDiagram,
+  type PendingSymbolicDiagramImport,
 } from '../../src/model/index.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import type {
   Camera3D,
   BoundaryPathSnapshot,
+  CoonsPatchPrimitive,
   Diagram,
   PerspectiveCamera3D,
   Vec3,
@@ -1349,6 +1354,232 @@ test('parseSavedDiagramJson rejects non-string path labels', () => {
   assert.match(result.error, /Path label must be a string/)
 })
 
+test('parseSavedDiagramJsonForImport detects symbolic Coons boundaries with saved variables', () => {
+  const result = parseSavedDiagramJsonForImport(
+    serializeDiagram(symbolicCoonsDiagram()),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic Coons import to need variable resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [
+      { name: 'Len', expression: '4', defined: true },
+      { name: 'R', expression: '1', defined: true },
+    ],
+  )
+})
+
+test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variables', () => {
+  const diagram = symbolicCoonsDiagram()
+  delete diagram.variables
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected missing variable import to need resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [
+      { name: 'Len', expression: '', defined: false },
+      { name: 'R', expression: '', defined: false },
+    ],
+  )
+})
+
+test('parseSavedDiagramJsonForImport does not treat function names as variables', () => {
+  const diagram = symbolicCoonsDiagram()
+  diagram.variables = [
+    ...(diagram.variables ?? []),
+    {
+      id: 'var-q',
+      name: 'q',
+      macroName: 'q',
+      expression: '0',
+      previewValue: 0,
+    },
+  ]
+  const sheet = diagram.strata[0]
+  if (sheet?.kind !== 'curvedSheet' || sheet.primitive.kind !== 'coonsPatch') {
+    throw new Error('Expected symbolic Coons fixture.')
+  }
+  const bottom = coonsPathBoundary(sheet.primitive.bottom)
+  bottom.segments[0].end = symbolicPoint(
+    1,
+    0,
+    0,
+    { x: 'R*cos(q)' },
+  )
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic import to need resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => variable.name),
+    ['Len', 'R', 'q'],
+  )
+})
+
+test('parseSavedDiagramJsonForImport loads numeric-only diagrams immediately', () => {
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(twoDimensionalExample))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'ready') {
+    throw new Error('Expected numeric diagram to be ready.')
+  }
+
+  assert.deepEqual(result.diagram, ensureLayerMetadata(twoDimensionalExample))
+})
+
+test('resolvePendingSymbolicDiagramImport refreshes symbolic Coons previews', () => {
+  const pending = pendingImportForDiagram(symbolicCoonsDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+    { name: 'R', expression: '1' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedCoonsPrimitive(resolved.diagram)
+  assert.equal(coonsPathBoundary(primitive.bottom).segments[0].start.x, -2)
+  assert.equal(coonsPathBoundary(primitive.bottom).segments[0].end.x, 2)
+  assert.equal(coonsPathBoundary(primitive.right).segments[0].end.y, 1)
+  assert.equal(
+    coonsPathBoundary(primitive.bottom).segments[0].end.symbolic?.x.previewValue,
+    2,
+  )
+})
+
+test('resolvePendingSymbolicDiagramImport uses edited import values before validation', () => {
+  const pending = pendingImportForDiagram(symbolicCoonsDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '6' },
+    { name: 'R', expression: '1' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedCoonsPrimitive(resolved.diagram)
+  assert.equal(coonsPathBoundary(primitive.bottom).segments[0].start.x, -3)
+  assert.equal(coonsPathBoundary(primitive.bottom).segments[0].end.x, 3)
+})
+
+test('resolvePendingSymbolicDiagramImport rejects invalid values without mutating pending diagram', () => {
+  const pending = pendingImportForDiagram(symbolicCoonsDiagram())
+  const before = serializeDiagram(pending.diagram)
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+    { name: 'R', expression: '1/' },
+  ])
+
+  assert.equal(resolved.ok, false)
+  if (resolved.ok) {
+    throw new Error('Expected invalid import value to fail.')
+  }
+  assert.match(resolved.error, /Could not load diagram/)
+  assert.equal(serializeDiagram(pending.diagram), before)
+})
+
+test('parseSavedDiagramJsonForImport lets invalid saved variable expressions be corrected', () => {
+  const diagram = symbolicCoonsDiagram()
+  const variable = diagram.variables?.find((candidate) => candidate.name === 'R')
+
+  if (variable === undefined) {
+    throw new Error('Expected R variable.')
+  }
+  variable.expression = '1/'
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected invalid saved variable to open resolver.')
+  }
+
+  const failed = resolvePendingSymbolicDiagramImport(result.pendingImport, [
+    { name: 'Len', expression: '4' },
+    { name: 'R', expression: '1/' },
+  ])
+  const corrected = resolvePendingSymbolicDiagramImport(result.pendingImport, [
+    { name: 'Len', expression: '4' },
+    { name: 'R', expression: '1' },
+  ])
+
+  assert.equal(failed.ok, false)
+  assert.equal(corrected.ok, true)
+})
+
+test('resolvePendingSymbolicDiagramImport rejects cyclic and non-finite variables', () => {
+  const cycle = resolvePendingSymbolicDiagramImport(
+    pendingImportForDiagram(symbolicCoonsDiagram()),
+    [
+      { name: 'Len', expression: 'R' },
+      { name: 'R', expression: 'Len' },
+    ],
+  )
+  const nonFinite = resolvePendingSymbolicDiagramImport(
+    pendingImportForDiagram(symbolicCoonsDiagram()),
+    [
+      { name: 'Len', expression: '1/0' },
+      { name: 'R', expression: '1' },
+    ],
+  )
+
+  assert.equal(cycle.ok, false)
+  assert.equal(nonFinite.ok, false)
+  if (cycle.ok || nonFinite.ok) {
+    throw new Error('Expected invalid symbolic imports to fail.')
+  }
+  assert.match(cycle.error, /cycle/i)
+  assert.match(nonFinite.error, /Division by zero|non-finite/)
+})
+
+test('symbolic Coons import preserves expressions and exports TikZ', () => {
+  const pending = pendingImportForDiagram(symbolicCoonsDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+    { name: 'R', expression: '1' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const serialized = serializeDiagram(resolved.diagram)
+  assert.equal(serialized.includes('"expression": "-.5*Len"'), true)
+  assert.equal(serialized.includes('"expression": "R"'), true)
+
+  const tikz = generateTikz(resolved.diagram, { exportMode: 'inlineMath' })
+
+  assert.equal(tikz.includes('\n\n'), false)
+  assert.match(tikz, /\\pgfmathsetmacro/)
+})
+
 test('serializeDiagram does not include editor-only state', () => {
   const serialized = serializeDiagram(twoDimensionalExample)
 
@@ -1390,6 +1621,116 @@ test('serializeDiagram excludes active custom work-plane UI state', () => {
   assert.equal(serialized.includes('camera-leak-p0'), false)
   assert.equal(serialized.includes('existingPointStrata'), false)
 })
+
+function symbolicCoonsDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+    {
+      id: 'var-r',
+      name: 'R',
+      macroName: 'R',
+      expression: '1',
+      previewValue: 1,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-coons',
+      primitive: {
+        kind: 'coonsPatch',
+        bottom: lineBoundarySnapshot(
+          'coons-bottom',
+          symbolicPoint(-2, 0, 0, { x: '-.5*Len' }),
+          symbolicPoint(2, 0, 0, { x: '.5*Len' }),
+        ),
+        right: lineBoundarySnapshot(
+          'coons-right',
+          symbolicPoint(2, 0, 0, { x: '.5*Len' }),
+          symbolicPoint(2, 1, 0, { x: '.5*Len', y: 'R' }),
+        ),
+        top: lineBoundarySnapshot(
+          'coons-top',
+          symbolicPoint(-2, 1, 0, { x: '-.5*Len', y: 'R' }),
+          symbolicPoint(2, 1, 0, { x: '.5*Len', y: 'R' }),
+        ),
+        left: lineBoundarySnapshot(
+          'coons-left',
+          symbolicPoint(-2, 0, 0, { x: '-.5*Len' }),
+          symbolicPoint(-2, 1, 0, { x: '-.5*Len', y: 'R' }),
+        ),
+        sampling: { uSegments: 2, vSegments: 2 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function pendingImportForDiagram(diagram: Diagram): PendingSymbolicDiagramImport {
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending symbolic import.')
+  }
+
+  return result.pendingImport
+}
+
+function resolvedCoonsPrimitive(diagram: Diagram): CoonsPatchPrimitive {
+  const sheet = diagram.strata[0]
+
+  if (sheet?.kind !== 'curvedSheet' || sheet.primitive.kind !== 'coonsPatch') {
+    throw new Error('Expected a Coons patch.')
+  }
+
+  return sheet.primitive
+}
+
+function coonsPathBoundary(
+  boundary: CoonsPatchPrimitive['bottom'],
+): BoundaryPathSnapshot {
+  if ('segments' in boundary) {
+    return boundary
+  }
+
+  throw new Error('Expected a Coons path boundary.')
+}
+
+function symbolicPoint(
+  x: number,
+  y: number,
+  z: number,
+  expressions: Partial<Record<'x' | 'y' | 'z', string>>,
+): Vec3 {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x:
+        expressions.x === undefined
+          ? { kind: 'numeric', value: x }
+          : { kind: 'symbolic', expression: expressions.x, previewValue: x },
+      y:
+        expressions.y === undefined
+          ? { kind: 'numeric', value: y }
+          : { kind: 'symbolic', expression: expressions.y, previewValue: y },
+      z:
+        expressions.z === undefined
+          ? { kind: 'numeric', value: z }
+          : { kind: 'symbolic', expression: expressions.z, previewValue: z },
+    },
+  }
+}
 
 function lineBoundarySnapshot(
   id: string,

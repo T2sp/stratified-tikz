@@ -172,11 +172,18 @@ absolute 3D coordinates instead of the compact local `canvas is plane` form, so
 the saved symbolic expressions are preserved. Numeric work-plane-filled sheets
 continue to use the local plane scope when possible.
 
-Arc segment coordinates and 3D template centers are currently numeric-derived
-exports and are rejected by validation when symbolic coordinate metadata is
-present. In 2D template paths, symbolic centers export through the named center
-coordinate, but template radii and rotation fields are still numeric in the MVP
-data model.
+Ruled surfaces and Coons patches may load copied boundary snapshots with
+symbolic coordinates when those expressions resolve to finite preview values.
+Their current TikZ surface output is a sampled mesh, so each emitted face uses
+the resolved numeric preview mesh coordinates. The saved diagram still keeps the
+symbolic boundary coordinate expressions for later editing and round-tripping.
+
+Standalone arc segment coordinates and 3D template centers are currently
+numeric-derived exports and are rejected by validation when symbolic coordinate
+metadata is present. Copied boundary snapshots for boundary-surface meshes use
+finite preview values for sampling. In 2D template paths, symbolic centers
+export through the named center coordinate, but template radii and rotation
+fields are still numeric in the MVP data model.
 
 ## Grid export
 

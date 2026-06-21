@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createScalarInputValue,
+  detectScalarExpressionVariables,
   evaluateScalarExpression,
   isScalarExpressionVariableName,
   parseScalarExpression,
@@ -143,6 +144,17 @@ test('scalarExpressionVariables returns declared variable names used by the AST'
   const parsed = parseOk('R*cos(q) + R', ['R', 'q'])
 
   assert.deepEqual(scalarExpressionVariables(parsed), ['R', 'q'])
+})
+
+test('detectScalarExpressionVariables excludes function and constant names', () => {
+  const detected = detectScalarExpressionVariables('R*cos(q) + sin(theta) + pi')
+
+  assert.equal(detected.ok, true)
+  if (!detected.ok) {
+    throw new Error(detected.error)
+  }
+
+  assert.deepEqual(detected.variables, ['R', 'q', 'theta'])
 })
 
 test('unknown variable is rejected', () => {

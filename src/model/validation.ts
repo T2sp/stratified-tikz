@@ -987,13 +987,6 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
         coordinateExpressionContext,
         errors,
       )
-      if (hasSymbolicVec3Coordinates(primitive.center)) {
-        pushError(
-          errors,
-          `${path}.center`,
-          'Curved sheet centers must be numeric because mesh export derives sampled coordinates.',
-        )
-      }
       validateWorkPlaneFrameSnapshot(
         primitive.frame,
         `${path}.frame`,
@@ -1078,14 +1071,6 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
     boundaryPathSegmentCoordinatesForPolicy(segment).forEach((point, pointIndex) => {
       const pointPath = `${path}.segments[${segmentIndex}].points[${pointIndex}]`
       validateSymbolicVec3(point, 3, pointPath, coordinateExpressionContext, errors)
-
-      if (hasSymbolicVec3Coordinates(point)) {
-        pushError(
-          errors,
-          pointPath,
-          'Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.',
-        )
-      }
     })
 
     if (

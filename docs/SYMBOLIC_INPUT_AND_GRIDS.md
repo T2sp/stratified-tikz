@@ -88,9 +88,24 @@ value. In 2D diagrams, `z` remains hidden or locked to numeric `0`.
 
 Symbolic global coordinates are supported for point positions, free-label
 positions, ordinary curve vertices, absolute cubic controls, filled-boundary
-path coordinates, 2D template centers, and sheet vertices. Active work-plane
-local symbolic input, 3D template centers, and curved sheet anchors remain
-numeric-only in the MVP.
+path coordinates, 2D template centers, sheet vertices, and copied boundary
+snapshots used by ruled surfaces and Coons patches. Active work-plane local
+symbolic input and 3D template centers remain numeric-only in the MVP.
+
+## JSON Import With Symbolic Variables
+
+When a saved JSON diagram contains symbolic variables or symbolic coordinate
+expressions, loading pauses at a variable-resolution dialog. Saved variable
+definitions are prefilled, and referenced variables that are missing from the
+file are shown with empty inputs. Confirming the dialog validates the variable
+expressions with the same scalar-expression evaluator, rejects cycles,
+unknown variables, unsafe tokens, and non-finite preview values, then refreshes
+all symbolic preview coordinates before the diagram is committed.
+
+Canceling the dialog leaves the current editor diagram unchanged. Boundary
+surface snapshots are included in this refresh, so symbolic Coons or ruled
+boundary coordinates such as `.5*Len`, `-.5*Len`, and `R` can load as long as
+the confirmed variables produce finite numeric preview values.
 
 ## Grid Generation
 

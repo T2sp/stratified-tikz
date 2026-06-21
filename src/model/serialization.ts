@@ -13,6 +13,11 @@ import {
   uniqueTikzStyleName,
 } from './stylePresets.ts'
 import {
+  detectScalarExpressionVariables,
+} from './scalarExpressions.ts'
+import {
+  isSymbolicVariableMacroName,
+  isSymbolicVariableName,
   macroNameFromSymbolicVariableName,
   resolveSymbolicVariables,
 } from './variables.ts'
@@ -113,6 +118,51 @@ export type ParseSavedDiagramResult =
       error: string
     }
 
+export type SymbolicImportVariableDraft = {
+  name: string
+  expression: string
+  defined: boolean
+}
+
+export type PendingSymbolicDiagramImport = {
+  diagram: Diagram
+  warnings: string[]
+  variables: SymbolicImportVariableDraft[]
+}
+
+export type ParseSavedDiagramForImportResult =
+  | {
+      ok: true
+      kind: 'ready'
+      diagram: Diagram
+      warnings: string[]
+    }
+  | {
+      ok: true
+      kind: 'needsVariableResolution'
+      pendingImport: PendingSymbolicDiagramImport
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+export type ResolveSymbolicImportVariableInput = {
+  name: string
+  expression: string
+}
+
+export type ResolvePendingSymbolicDiagramImportResult =
+  | {
+      ok: true
+      diagram: Diagram
+      warnings: string[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 type SavedDiagramInput = {
   version: 1
   ambientDimension: AmbientDimension
@@ -133,6 +183,16 @@ type LoadedDiagramNormalization = {
   errors: string[]
 }
 
+type LoadedDiagramNormalizationOptions = {
+  variables?: 'resolve' | 'structural'
+  refreshSymbolicPreviews?: boolean
+}
+
+type SymbolicExpressionSource = {
+  path: string
+  expression: string
+}
+
 export function serializeDiagram(
   diagram: Diagram,
   options: SerializeDiagramOptions = {},
@@ -147,6 +207,191 @@ export function serializeDiagram(
 }
 
 export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
+  const parsed = parseSavedDiagramFile(text)
+
+  if (!parsed.ok) {
+    return parsed
+  }
+
+  const normalization = normalizeLoadedDiagram(parsed.diagram)
+  if (normalization.errors.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${normalization.errors[0]}`,
+    }
+  }
+
+  const diagram = normalization.diagram
+  let validation: DiagramValidationResult
+
+  try {
+    validation = validateDiagram(diagram)
+  } catch {
+    return {
+      ok: false,
+      error: 'Saved diagram is malformed.',
+    }
+  }
+
+  if (!validation.valid) {
+    const firstIssue = validation.errors[0]
+
+    return {
+      ok: false,
+      error:
+        firstIssue === undefined
+          ? 'Saved diagram is invalid.'
+          : `Saved diagram is invalid: ${firstIssue.path} ${firstIssue.message}`,
+    }
+  }
+
+  return {
+    ok: true,
+    diagram,
+    warnings: normalization.warnings,
+  }
+}
+
+export function parseSavedDiagramJsonForImport(
+  text: string,
+): ParseSavedDiagramForImportResult {
+  const parsed = parseSavedDiagramFile(text)
+
+  if (!parsed.ok) {
+    return parsed
+  }
+
+  const normalization = normalizeLoadedDiagram(parsed.diagram, {
+    variables: 'structural',
+    refreshSymbolicPreviews: false,
+  })
+
+  if (normalization.errors.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${normalization.errors[0]}`,
+    }
+  }
+
+  const pendingImport = createPendingSymbolicDiagramImport(
+    normalization.diagram,
+    normalization.warnings,
+  )
+
+  if (!pendingImport.ok) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${pendingImport.error}`,
+    }
+  }
+
+  if (pendingImport.pendingImport === null) {
+    const ready = parseSavedDiagramJson(text)
+
+    if (!ready.ok) {
+      return ready
+    }
+
+    return {
+      ok: true,
+      kind: 'ready',
+      diagram: ready.diagram,
+      warnings: ready.warnings,
+    }
+  }
+
+  return {
+    ok: true,
+    kind: 'needsVariableResolution',
+    pendingImport: pendingImport.pendingImport,
+  }
+}
+
+export function resolvePendingSymbolicDiagramImport(
+  pendingImport: PendingSymbolicDiagramImport,
+  variableInputs: readonly ResolveSymbolicImportVariableInput[],
+): ResolvePendingSymbolicDiagramImportResult {
+  const inputByName = new Map(
+    variableInputs.map((input) => [input.name, input.expression]),
+  )
+  const variables: SymbolicVariable[] = []
+  const usedIds = importVariableReservedIds(pendingImport.diagram)
+
+  for (const [index, variable] of pendingImport.variables.entries()) {
+    const expression = inputByName.get(variable.name)?.trim() ?? ''
+
+    if (expression.length === 0) {
+      return {
+        ok: false,
+        error: `Could not load diagram: variable ${variable.name} needs a value.`,
+      }
+    }
+
+    const savedVariable = pendingImport.diagram.variables?.find(
+      (candidate) => candidate.name === variable.name,
+    )
+    const id =
+      savedVariable?.id ??
+      nextImportVariableId(variable.name, index, usedIds)
+
+    usedIds.add(id)
+    variables.push({
+      id,
+      name: variable.name,
+      macroName:
+        savedVariable?.macroName ?? macroNameFromSymbolicVariableName(variable.name),
+      expression,
+      previewValue: savedVariable?.previewValue ?? 0,
+    })
+  }
+
+  const resolved = resolveSymbolicVariables(variables)
+
+  if (!resolved.ok) {
+    return symbolicImportError(resolved.errors)
+  }
+
+  const diagramWithVariables: Diagram = {
+    ...pendingImport.diagram,
+    variables:
+      resolved.variables.length === 0 ? undefined : resolved.variables,
+  }
+  const refreshed = refreshDiagramSymbolicCoordinatePreviews(
+    diagramWithVariables,
+    {
+      variableNames: resolved.variables.map((variable) => variable.name),
+      previewValues: resolved.values,
+    },
+  )
+
+  if (!refreshed.ok) {
+    return symbolicImportError(refreshed.errors)
+  }
+
+  const validation = validateDiagram(refreshed.diagram)
+
+  if (!validation.valid) {
+    return symbolicImportError(validation.errors)
+  }
+
+  return {
+    ok: true,
+    diagram: refreshed.diagram,
+    warnings: pendingImport.warnings,
+  }
+}
+
+function parseSavedDiagramFile(
+  text: string,
+):
+  | {
+      ok: true
+      diagram: SavedDiagramInput
+    }
+  | {
+      ok: false
+      error: string
+    } {
   let parsed: unknown
 
   try {
@@ -186,42 +431,174 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  const normalization = normalizeLoadedDiagram(parsed.diagram)
-  if (normalization.errors.length > 0) {
+  return {
+    ok: true,
+    diagram: parsed.diagram,
+  }
+}
+
+function createPendingSymbolicDiagramImport(
+  diagram: Diagram,
+  warnings: readonly string[],
+):
+  | {
+      ok: true
+      pendingImport: PendingSymbolicDiagramImport | null
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const symbolicExpressions = collectDiagramSymbolicExpressionSources(diagram)
+  const hasSymbolicInput =
+    (diagram.variables ?? []).length > 0 || symbolicExpressions.length > 0
+
+  if (!hasSymbolicInput) {
     return {
-      ok: false,
-      error: `Saved diagram is invalid: ${normalization.errors[0]}`,
+      ok: true,
+      pendingImport: null,
     }
   }
 
-  const diagram = normalization.diagram
-  let validation: DiagramValidationResult
+  const requiredNames = new Set<string>()
 
-  try {
-    validation = validateDiagram(diagram)
-  } catch {
-    return {
-      ok: false,
-      error: 'Saved diagram is malformed.',
-    }
+  for (const variable of diagram.variables ?? []) {
+    requiredNames.add(variable.name)
   }
 
-  if (!validation.valid) {
-    const firstIssue = validation.errors[0]
+  for (const variable of diagram.variables ?? []) {
+    const detected = detectScalarExpressionVariables(variable.expression)
+
+    if (!detected.ok) {
+      continue
+    }
+
+    detected.variables.forEach((name) => requiredNames.add(name))
+  }
+
+  for (const source of symbolicExpressions) {
+    const detected = detectScalarExpressionVariables(source.expression)
+
+    if (!detected.ok) {
+      return {
+        ok: false,
+        error: `${source.path}.expression ${detected.error}`,
+      }
+    }
+
+    detected.variables.forEach((name) => requiredNames.add(name))
+  }
+
+  const savedVariables = new Map(
+    (diagram.variables ?? []).map((variable) => [variable.name, variable]),
+  )
+  const variables = [...requiredNames].map((name): SymbolicImportVariableDraft => {
+    const savedVariable = savedVariables.get(name)
 
     return {
-      ok: false,
-      error:
-        firstIssue === undefined
-          ? 'Saved diagram is invalid.'
-          : `Saved diagram is invalid: ${firstIssue.path} ${firstIssue.message}`,
+      name,
+      expression: savedVariable?.expression ?? '',
+      defined: savedVariable !== undefined,
     }
-  }
+  })
 
   return {
     ok: true,
-    diagram,
-    warnings: normalization.warnings,
+    pendingImport: {
+      diagram,
+      warnings: [...warnings],
+      variables,
+    },
+  }
+}
+
+function collectDiagramSymbolicExpressionSources(
+  diagram: Diagram,
+): SymbolicExpressionSource[] {
+  const sources: SymbolicExpressionSource[] = []
+  const seen = new WeakSet<object>()
+
+  collectSymbolicExpressionSources(diagram.strata, 'strata', sources, seen)
+  collectSymbolicExpressionSources(diagram.labels, 'labels', sources, seen)
+
+  return sources
+}
+
+function collectSymbolicExpressionSources(
+  value: unknown,
+  path: string,
+  sources: SymbolicExpressionSource[],
+  seen: WeakSet<object>,
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectSymbolicExpressionSources(
+        item,
+        `${path}[${index}]`,
+        sources,
+        seen,
+      ),
+    )
+    return
+  }
+
+  if (!isRecord(value)) {
+    return
+  }
+
+  if (seen.has(value)) {
+    return
+  }
+  seen.add(value)
+
+  if (value.kind === 'symbolic' && typeof value.expression === 'string') {
+    sources.push({
+      path,
+      expression: value.expression,
+    })
+  }
+
+  Object.entries(value).forEach(([key, child]) => {
+    collectSymbolicExpressionSources(child, `${path}.${key}`, sources, seen)
+  })
+}
+
+function importVariableReservedIds(diagram: Diagram): Set<string> {
+  return new Set([
+    ...(diagram.variables ?? []).map((variable) => variable.id),
+    ...diagram.strata.map((stratum) => stratum.id),
+    ...diagram.labels.map((label) => label.id),
+  ])
+}
+
+function nextImportVariableId(
+  name: string,
+  index: number,
+  usedIds: ReadonlySet<string>,
+): string {
+  const base = `import-variable-${name.toLowerCase()}`
+  let candidate = `${base}-${index + 1}`
+  let suffix = 2
+
+  while (usedIds.has(candidate)) {
+    candidate = `${base}-${index + 1}-${suffix}`
+    suffix += 1
+  }
+
+  return candidate
+}
+
+function symbolicImportError(
+  errors: readonly { path: string; message: string }[],
+): ResolvePendingSymbolicDiagramImportResult {
+  const firstError = errors[0]
+
+  return {
+    ok: false,
+    error:
+      firstError === undefined
+        ? 'Could not load diagram.'
+        : `Could not load diagram: ${firstError.path} ${firstError.message}`,
   }
 }
 
@@ -336,8 +713,11 @@ function normalizeCamera3DForPersistence(
 
 function normalizeLoadedDiagram(
   savedDiagram: SavedDiagramInput,
+  options: LoadedDiagramNormalizationOptions = {},
 ): LoadedDiagramNormalization {
   const warnings: string[] = []
+  const shouldRefreshSymbolicPreviews =
+    options.refreshSymbolicPreviews !== false
   const camera = normalizeLoadedCamera(savedDiagram, warnings)
   const view = normalizeLoadedView(savedDiagram, camera, warnings)
   const sourceNormalization = normalizeLoadedExternalTikzStyleSources(
@@ -353,7 +733,10 @@ function normalizeLoadedDiagram(
     savedDiagram.userStylePresets,
   )
   warnings.push(...presetNormalization.warnings)
-  const variableNormalization = normalizeLoadedVariables(savedDiagram.variables)
+  const variableNormalization =
+    options.variables === 'structural'
+      ? normalizeLoadedVariablesStructurally(savedDiagram.variables)
+      : normalizeLoadedVariables(savedDiagram.variables)
   warnings.push(...variableNormalization.warnings)
 
   const styleMetadataErrors = [
@@ -443,6 +826,14 @@ function normalizeLoadedDiagram(
           (issue) => `${issue.path} ${issue.message}`,
         ),
       ],
+    }
+  }
+
+  if (!shouldRefreshSymbolicPreviews) {
+    return {
+      diagram,
+      warnings,
+      errors: layerNormalization.errors,
     }
   }
 
@@ -951,6 +1342,156 @@ function normalizeLoadedVariables(savedVariables: unknown): {
     warnings,
     errors,
   }
+}
+
+function normalizeLoadedVariablesStructurally(savedVariables: unknown): {
+  variables?: SymbolicVariable[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedVariables === undefined) {
+    return {
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedVariables)) {
+    return {
+      warnings: [],
+      errors: ['variables must be an array when present.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const seenIds = new Map<string, string>()
+  const seenNames = new Map<string, string>()
+  const seenMacroNames = new Map<string, string>()
+  const variables = savedVariables.flatMap(
+    (savedVariable, index): SymbolicVariable[] => {
+      const variablePath = `variables[${index}]`
+
+      if (!isRecord(savedVariable)) {
+        errors.push(`${variablePath} must be a variable object.`)
+        return []
+      }
+
+      if (
+        typeof savedVariable.id !== 'string' ||
+        savedVariable.id.trim().length === 0
+      ) {
+        errors.push(`${variablePath}.id must be non-empty.`)
+        return []
+      }
+
+      if (typeof savedVariable.name !== 'string') {
+        errors.push(`${variablePath}.name must be a string.`)
+        return []
+      }
+
+      const name = savedVariable.name.trim()
+      if (!isSymbolicVariableName(name)) {
+        errors.push(
+          `${variablePath}.name Variable names must contain letters only and must not be reserved.`,
+        )
+        return []
+      }
+
+      if (typeof savedVariable.expression !== 'string') {
+        errors.push(`${variablePath}.expression must be a string.`)
+        return []
+      }
+
+      const expression = savedVariable.expression.trim()
+      const rawMacroName =
+        typeof savedVariable.macroName === 'string'
+          ? savedVariable.macroName
+          : macroNameFromSymbolicVariableName(name)
+      if (typeof savedVariable.macroName !== 'string') {
+        warnings.push(
+          `Saved variable ${index + 1} macro name was regenerated from its name.`,
+        )
+      }
+
+      const macroName = rawMacroName.trim()
+      if (!isSymbolicVariableMacroName(macroName)) {
+        errors.push(
+          `${variablePath}.macroName Variable macro names must contain letters only, without a leading backslash, and must not be reserved.`,
+        )
+        return []
+      }
+
+      if (typeof savedVariable.previewValue !== 'number') {
+        warnings.push(
+          `Saved variable ${index + 1} preview value will be recalculated on import.`,
+        )
+      } else if (!Number.isFinite(savedVariable.previewValue)) {
+        warnings.push(
+          `Saved variable ${index + 1} preview value will be recalculated on import.`,
+        )
+      }
+
+      addLoadedVariableUnique(
+        savedVariable.id.trim(),
+        `${variablePath}.id`,
+        seenIds,
+        'Variable id',
+        errors,
+      )
+      addLoadedVariableUnique(
+        name,
+        `${variablePath}.name`,
+        seenNames,
+        'Variable name',
+        errors,
+      )
+      addLoadedVariableUnique(
+        macroName,
+        `${variablePath}.macroName`,
+        seenMacroNames,
+        'Variable macro name',
+        errors,
+      )
+
+      return [
+        {
+          id: savedVariable.id.trim(),
+          name,
+          macroName,
+          expression,
+          previewValue:
+            typeof savedVariable.previewValue === 'number' &&
+            Number.isFinite(savedVariable.previewValue)
+              ? savedVariable.previewValue
+              : 0,
+        },
+      ]
+    },
+  )
+
+  return {
+    ...(variables.length === 0 ? {} : { variables }),
+    warnings,
+    errors,
+  }
+}
+
+function addLoadedVariableUnique(
+  value: string,
+  path: string,
+  seen: Map<string, string>,
+  label: string,
+  errors: string[],
+): void {
+  const previousPath = seen.get(value)
+
+  if (previousPath === undefined) {
+    seen.set(value, path)
+    return
+  }
+
+  errors.push(`${path} ${label} must be unique; already used at ${previousPath}.`)
 }
 
 function loadedStylePresetName(

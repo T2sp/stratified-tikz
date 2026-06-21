@@ -38,6 +38,12 @@ The source paths are not modified. The created ruled surface stores copied
 boundary geometry, not live references, so later source-path edits do not move
 the surface.
 
+Saved JSON may contain symbolic boundary coordinates in the copied snapshots.
+When such a file is loaded, StratifiedTikZ asks for the referenced variable
+values before committing the diagram. The preview and mesh sampler use the
+resolved finite numeric preview coordinates; the symbolic coordinate
+expressions remain in the saved model where supported.
+
 ## Coons Patch Creation
 
 In a 3D diagram:
@@ -89,6 +95,8 @@ surface primitive and sampling counts. When automatic visibility is enabled,
 the sampled mesh faces can participate in the same approximate painter-style
 depth sorting as other sheet faces, and curves can be sampled into visible and
 hidden runs behind the sheet. Export does not depend on `tikz-3dtools`.
+For symbolic boundary snapshots, this sampled mesh output uses the resolved
+numeric preview values from import or the current variable manager state.
 
 ## Limitations
 
