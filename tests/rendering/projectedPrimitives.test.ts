@@ -38,6 +38,13 @@ import {
   type ProjectedRenderPrimitive,
   type ProjectedSurfaceFace,
 } from '../../src/rendering/projectedPrimitives.ts'
+import { sortProjectedSurfaceFaces } from '../../src/rendering/surfaceDepthSort.ts'
+import {
+  compareSvgRenderItems,
+  svgRenderSortKey,
+  type SvgRenderableSortItem,
+} from '../../src/rendering/svgRenderSort.ts'
+import { sortedSvgSurfaceFaces } from '../../src/rendering/svgSurfaceDepthSort.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 
 const testCamera: Camera3D = {
@@ -208,6 +215,225 @@ test('projected primitive extraction does not mutate diagram or existing SVG/Tik
   )
 })
 
+test('surface faces sort by depth inside the same layer', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near', 0, 1, 0),
+      projectedTestFace('far', 0, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far', 'near'],
+  )
+})
+
+test('layerThenDepth keeps layer order before depth order', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near-upper-layer', 2, 1, 0),
+      projectedTestFace('far-lower-layer', 1, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far-lower-layer', 'near-upper-layer'],
+  )
+})
+
+test('depthThenLayer sorts by depth before layer order', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('near-lower-layer', 1, 1, 0),
+      projectedTestFace('far-upper-layer', 2, 3, 1),
+    ],
+    enabledVisibilityOptions('depthThenLayer'),
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['far-upper-layer', 'near-lower-layer'],
+  )
+})
+
+test('surface face sorting uses original index as stable depth tie breaker', () => {
+  const sorted = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('second', 0, 2, 8),
+      projectedTestFace('first', 0, 2, 3),
+    ],
+    {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      depthEpsilon: 1,
+    },
+  )
+
+  assert.deepEqual(
+    sorted.map((face) => face.sourceId),
+    ['first', 'second'],
+  )
+})
+
+test('SVG surface render order changes only when surface depth sort is enabled', () => {
+  const diagram = twoSurfaceSortDiagram()
+  const disabledFaces = sortedSvgSurfaceFaces(
+    diagram,
+    testCamera,
+    180,
+    {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      enabled: false,
+    },
+  )
+  const enabledFaces = sortedSvgSurfaceFaces(
+    diagram,
+    testCamera,
+    180,
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+
+  assert.equal(disabledFaces, null)
+  assert.deepEqual(
+    enabledFaces?.map((face) => face.sheet.id),
+    ['z-far', 'a-near'],
+  )
+})
+
+test('SVG render comparator is transitive for mixed same-layer surface and curve items', () => {
+  const farSurface = svgSurfaceRenderItem(
+    projectedTestFace('zSurface', 0, 3, 0),
+    0,
+    0,
+    'zSurface',
+  )
+  const nearSurface = svgSurfaceRenderItem(
+    projectedTestFace('aSurface', 0, 1, 1),
+    1,
+    1,
+    'aSurface',
+  )
+  const curve = svgNonSurfaceRenderItem('curve', 'mCurve', 0, 2)
+  const items = [curve, nearSurface, farSurface]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'zSurface',
+    'aSurface',
+    'mCurve',
+  ])
+  assert.equal(compareSvgRenderItems(farSurface, nearSurface) < 0, true)
+  assert.equal(compareSvgRenderItems(nearSurface, curve) < 0, true)
+  assert.equal(compareSvgRenderItems(curve, farSurface) > 0, true)
+  assertSvgRenderComparatorTransitive(items)
+})
+
+test('SVG render comparator preserves sorted same-layer surface face order', () => {
+  const sortedFaces = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('a-near', 0, 1, 0),
+      projectedTestFace('z-far', 0, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+  const items = sortedFaces.map((face, surfaceSortIndex) =>
+    svgSurfaceRenderItem(face, surfaceSortIndex, surfaceSortIndex, face.sourceId),
+  )
+
+  assert.deepEqual(
+    sortedSvgRenderItemIds(items),
+    ['z-far', 'a-near'],
+  )
+})
+
+test('SVG render comparator keeps non-surface same-layer id ordering', () => {
+  const items: SvgRenderableSortItem[] = [
+    svgNonSurfaceRenderItem('curve', 'zCurve', 0, 0),
+    svgNonSurfaceRenderItem('point', 'mPoint', 0, 1),
+    svgNonSurfaceRenderItem('label', 'aLabel', 0, 2),
+  ]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'aLabel',
+    'mPoint',
+    'zCurve',
+  ])
+})
+
+test('SVG render comparator draws same-layer sorted surfaces before other items', () => {
+  const items: SvgRenderableSortItem[] = [
+    svgNonSurfaceRenderItem('point', 'xPoint', 0, 3),
+    svgSurfaceRenderItem(projectedTestFace('zzzSurface', 0, 3, 0), 0, 0),
+    svgNonSurfaceRenderItem('label', 'bLabel', 0, 2),
+    svgSurfaceRenderItem(projectedTestFace('aaaSurface', 0, 1, 1), 1, 1),
+    svgNonSurfaceRenderItem('curve', 'mCurve', 0, 4),
+  ]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'zzzSurface',
+    'aaaSurface',
+    'bLabel',
+    'mCurve',
+    'xPoint',
+  ])
+})
+
+test('SVG render comparator keeps layer order before category and depth order', () => {
+  const lowerLayerCurve = svgNonSurfaceRenderItem('curve', 'zCurve', 0, 2)
+  const upperLayerSurface = svgSurfaceRenderItem(
+    projectedTestFace('aSurface', 1, 3, 0),
+    0,
+    0,
+  )
+
+  assert.deepEqual(
+    sortedSvgRenderItemIds([upperLayerSurface, lowerLayerCurve]),
+    ['zCurve', 'aSurface'],
+  )
+})
+
+test('SVG render comparator uses stable index as deterministic duplicate-id tie breaker', () => {
+  const later = svgNonSurfaceRenderItem('point', 'duplicate', 0, 5)
+  const earlier = svgNonSurfaceRenderItem('curve', 'duplicate', 0, 2)
+
+  assert.deepEqual(
+    sortedSvgRenderItems([later, earlier]).map(
+      (item) => `${item.id}:${item.stableIndex}`,
+    ),
+    ['duplicate:2', 'duplicate:5'],
+  )
+  assert.equal(compareSvgRenderItems(earlier, later) < 0, true)
+})
+
+test('SVG render sort key exposes the mixed item ordering tuple', () => {
+  assert.deepEqual(
+    svgRenderSortKey(
+      svgSurfaceRenderItem(projectedTestFace('surface', 2, 4, 0), 7, 3),
+    ),
+    {
+      layer: 2,
+      categoryRank: 0,
+      surfaceDepthOrder: 7,
+      id: 'surface',
+      stableIndex: 3,
+      kindRank: 0,
+    },
+  )
+  assert.deepEqual(
+    svgRenderSortKey(svgNonSurfaceRenderItem('label', 'label', 2, 4)),
+    {
+      layer: 2,
+      categoryRank: 1,
+      surfaceDepthOrder: 0,
+      id: 'label',
+      stableIndex: 4,
+      kindRank: 5,
+    },
+  )
+})
+
 function primitiveCoverageDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
 
@@ -361,6 +587,50 @@ function primitiveCoverageDiagram(): Diagram {
   return diagram
 }
 
+function twoSurfaceSortDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    testCamera.thetaDeg,
+    testCamera.phiDeg,
+  ).forward
+
+  diagram.camera = testCamera
+  diagram.view = { camera3d: testCamera }
+  diagram.strata = [
+    surfaceSortSheet('a-near', 'Near sheet', '#AA0000', viewDirection, -0.6),
+    surfaceSortSheet('z-far', 'Far sheet', '#00AA00', viewDirection, 0.6),
+  ]
+
+  return diagram
+}
+
+function surfaceSortSheet(
+  id: string,
+  name: string,
+  fillColor: '#AA0000' | '#00AA00',
+  viewDirection: Vec3,
+  depthOffset: number,
+): PolygonSheetStratum {
+  return {
+    id,
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    name,
+    style: {
+      ...defaultSheetStyle,
+      fillColor,
+      strokeColor: fillColor,
+      fillOpacity: 0.5,
+      strokeOpacity: 1,
+    },
+    vertices: squarePoints(-0.5, -0.5, 1, 0).map((point) =>
+      addVec3(point, scaleVec3(viewDirection, depthOffset)),
+    ),
+    layer: 0,
+  }
+}
+
 function polygonSheet(): PolygonSheetStratum {
   return {
     id: 'polygon-sheet',
@@ -420,6 +690,107 @@ function numericRange(min: number, max: number, step: number) {
     max: createNumericScalarInputValue(max),
     step: createNumericScalarInputValue(step),
   }
+}
+
+function projectedTestFace(
+  sourceId: string,
+  layer: number,
+  depth: number,
+  originalIndex: number,
+): ProjectedSurfaceFace {
+  return {
+    kind: 'surfaceFace',
+    sourceId,
+    layer,
+    projectedPolygon: [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ],
+    vertices3D: [
+      { x: 0, y: 0, z: depth },
+      { x: 1, y: 0, z: depth },
+      { x: 1, y: 1, z: depth },
+    ],
+    depth: {
+      min: depth,
+      max: depth,
+      avg: depth,
+    },
+    faceIndex: originalIndex,
+    originalIndex,
+  }
+}
+
+function svgSurfaceRenderItem(
+  face: ProjectedSurfaceFace,
+  surfaceSortIndex: number,
+  stableIndex: number,
+  id = face.sourceId,
+): SvgRenderableSortItem {
+  return {
+    id,
+    layer: face.layer,
+    renderKind: 'surfaceFace',
+    stableIndex,
+    surfaceFace: face,
+    surfaceSortIndex,
+  }
+}
+
+function svgNonSurfaceRenderItem(
+  renderKind: Exclude<SvgRenderableSortItem['renderKind'], 'surfaceFace'>,
+  id: string,
+  layer: number,
+  stableIndex: number,
+): SvgRenderableSortItem {
+  return {
+    id,
+    layer,
+    renderKind,
+    stableIndex,
+  }
+}
+
+function sortedSvgRenderItems(
+  items: readonly SvgRenderableSortItem[],
+): SvgRenderableSortItem[] {
+  return [...items].sort(compareSvgRenderItems)
+}
+
+function sortedSvgRenderItemIds(
+  items: readonly SvgRenderableSortItem[],
+): string[] {
+  return sortedSvgRenderItems(items).map((item) => item.id)
+}
+
+function assertSvgRenderComparatorTransitive(
+  items: readonly SvgRenderableSortItem[],
+): void {
+  for (const first of items) {
+    for (const second of items) {
+      for (const third of items) {
+        if (
+          compareSvgRenderItems(first, second) <= 0 &&
+          compareSvgRenderItems(second, third) <= 0
+        ) {
+          assert.ok(
+            compareSvgRenderItems(first, third) <= 0,
+            `${first.id} <= ${second.id} and ${second.id} <= ${third.id}, but ${first.id} > ${third.id}`,
+          )
+        }
+      }
+    }
+  }
+}
+
+function enabledVisibilityOptions(sortMode: 'layerThenDepth' | 'depthThenLayer') {
+  return {
+    enabled: true,
+    surfaceDepthSort: true,
+    sortMode,
+    depthEpsilon: 1e-9,
+  } as const
 }
 
 function isSurfaceFace(
@@ -483,6 +854,14 @@ function findCurvedSheet(diagram: Diagram, id: string): CurvedSheetStratum {
   assert.notEqual(sheet, undefined)
 
   return sheet
+}
+
+function addVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
 }
 
 function scaleVec3(point: Vec3, scalar: number): Vec3 {

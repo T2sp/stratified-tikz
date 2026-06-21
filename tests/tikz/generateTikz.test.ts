@@ -19,6 +19,7 @@ import type {
   PointShape,
   PointStratum,
   PointStyle,
+  PolygonSheetStratum,
   RegionStyle,
   SheetStyle,
   SymbolicVariable,
@@ -31,6 +32,7 @@ import {
   createInitialCamera3D,
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
+import { cameraBasisFromTikz3dplotAngles } from '../../src/geometry/projection.ts'
 import {
   applyUserStylePresetToLabel,
   applyUserStylePresetToStratum,
@@ -608,6 +610,43 @@ test('3D TikZ output uses diagram view camera metadata by default', () => {
   const tikz = generateTikz(diagram)
 
   assert.match(tikz, /\\tdplotsetmaincoords\{41\}\{-82\}/)
+})
+
+test('surface depth sorting emits farther sheet faces before closer faces', () => {
+  const diagram = createSurfaceDepthSortDiagram()
+  const disabled = generateTikz(diagram)
+  const sorted = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.ok(disabled.indexOf('Near sheet') < disabled.indexOf('Far sheet'))
+  assert.ok(sorted.indexOf('Far sheet') < sorted.indexOf('Near sheet'))
+  assert.match(sorted, /Auto surface face depth sort/)
+  assert.doesNotMatch(sorted, /NaN|Infinity/)
+})
+
+test('disabled surface depth sorting leaves existing TikZ output unchanged', () => {
+  const diagram = createSurfaceDepthSortDiagram()
+
+  assert.equal(
+    generateTikz(diagram, {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        enabled: false,
+      },
+    }),
+    generateTikz(diagram),
+  )
+})
+
+test('inline surface depth sorted TikZ output has no blank lines', () => {
+  const tikz = generateTikz(createSurfaceDepthSortDiagram(), {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto surface face depth sort/)
+  expectNoBlankLines(tikz)
 })
 
 test('current camera option overrides saved diagram camera metadata', () => {
@@ -4433,6 +4472,54 @@ function createThreeDimensionalDiagram(): Diagram {
   return diagram
 }
 
+function createSurfaceDepthSortDiagram(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    camera.thetaDeg,
+    camera.phiDeg,
+  ).forward
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = { camera3d: camera }
+  diagram.strata.push(
+    surfaceDepthSortSheet('a-near', 'Near sheet', '#AA0000', viewDirection, -0.6),
+    surfaceDepthSortSheet('z-far', 'Far sheet', '#00AA00', viewDirection, 0.6),
+  )
+
+  return diagram
+}
+
+function surfaceDepthSortSheet(
+  id: string,
+  name: string,
+  color: '#AA0000' | '#00AA00',
+  viewDirection: Vec3,
+  depthOffset: number,
+): PolygonSheetStratum {
+  return {
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id,
+    name,
+    style: sheetStyle({
+      fillColor: color,
+      strokeColor: color,
+      fillOpacity: 0.5,
+      strokeOpacity: 1,
+    }),
+    vertices: square3D(0, 0, 1, 0).map((point) =>
+      addVec3(point, scaleVec3(viewDirection, depthOffset)),
+    ),
+    layer: 0,
+  }
+}
+
 function createWorkPlaneRelativeCartesianBezierDiagram({
   layer = 0,
 }: {
@@ -4775,6 +4862,40 @@ function createEmptyDiagram({
     strata: [],
     labels: [],
   }
+}
+
+function square3D(x: number, y: number, size: number, z: number): Vec3[] {
+  return [
+    { x, y, z },
+    { x: x + size, y, z },
+    { x: x + size, y: y + size, z },
+    { x, y: y + size, z },
+  ]
+}
+
+function addVec3(first: Vec3, second: Vec3): Vec3 {
+  return {
+    x: first.x + second.x,
+    y: first.y + second.y,
+    z: first.z + second.z,
+  }
+}
+
+function scaleVec3(point: Vec3, scalar: number): Vec3 {
+  return {
+    x: point.x * scalar,
+    y: point.y * scalar,
+    z: point.z * scalar,
+  }
+}
+
+function enabledVisibilityOptions(sortMode: 'layerThenDepth' | 'depthThenLayer') {
+  return {
+    enabled: true,
+    surfaceDepthSort: true,
+    sortMode,
+    depthEpsilon: 1e-9,
+  } as const
 }
 
 function regionStyle(overrides: Partial<RegionStyle> = {}): RegionStyle {

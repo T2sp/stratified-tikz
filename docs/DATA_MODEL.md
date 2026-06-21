@@ -42,6 +42,32 @@ export type Vec2 = {
 };
 ```
 
+## View and visibility options
+
+Diagram view metadata may store optional preview/export settings that do not
+change model coordinates:
+
+```ts
+type DiagramViewOptions = {
+  camera3d?: Camera3D;
+  showCoordinateAxesInTikz?: boolean;
+  exportMode?: "standalone" | "inlineMath";
+  visibility?: VisibilityOptions;
+};
+
+type VisibilityOptions = {
+  enabled: boolean;
+  surfaceDepthSort: boolean;
+  sortMode: "layerThenDepth" | "depthThenLayer";
+  depthEpsilon: number;
+};
+```
+
+Visibility defaults are conservative and are omitted from saved JSON when equal
+to the default. Surface depth sorting is approximate painter ordering for 3D
+sheet faces; it does not mutate geometry and does not implement curve, point, or
+label occlusion.
+
 ## Symbolic scalar expressions
 
 Phase 19A adds a reusable scalar-expression layer for symbolic variables and

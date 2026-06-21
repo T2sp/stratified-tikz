@@ -12,7 +12,11 @@ import type {
   TextLabel,
   Vec2,
   Vec3,
+  VisibilityOptions,
 } from '../model/types'
+import {
+  resolveVisibilityOptions,
+} from '../model/visibility.ts'
 import {
   arcSegmentToCubicBezierSegments,
   circleTemplateRadiusHandlePoint,
@@ -82,6 +86,12 @@ import {
   shouldRenderStratumInSvgPreview,
   shouldRenderTextLabelInSvgPreview,
 } from './svgPreviewPolicy.ts'
+import {
+  compareSvgRenderItems,
+  type SvgRenderItemKind,
+} from './svgRenderSort.ts'
+import type { ProjectedSurfaceFace } from './projectedPrimitives.ts'
+import { sortedSvgSurfaceFaces } from './svgSurfaceDepthSort.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -104,6 +114,7 @@ export type SvgDiagramProps = {
   coordinateSourceHighlights?: CoordinateSourceHighlight[]
   boundaryPathHighlights?: BoundaryPathHighlight[]
   layerFilter?: LayerFilter
+  visibilityOptions?: VisibilityOptions
   showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
   onCurveStratumClick?: (curveId: string) => void
@@ -124,10 +135,20 @@ export type SvgDiagramProps = {
   onCameraDrag?: (delta: Vec2, mode: CameraDragMode) => void
 }
 
-type RenderItem = {
+type RenderItemElement = {
   id: string
   layer: number
   element: ReactElement
+  surfaceFace?: ProjectedSurfaceFace
+  surfaceSortIndex?: number
+}
+
+type RenderItemDraft = RenderItemElement & {
+  renderKind: SvgRenderItemKind
+}
+
+type RenderItem = RenderItemDraft & {
+  stableIndex: number
 }
 
 type SvgWorkPlaneDirectionIndicator = {
@@ -175,6 +196,7 @@ export function SvgDiagram({
   coordinateSourceHighlights,
   boundaryPathHighlights,
   layerFilter = allLayersFilter,
+  visibilityOptions: visibilityOptionsOverride,
   showGeometryHandles = false,
   onSelectionChange,
   onCurveStratumClick,
@@ -204,37 +226,69 @@ export function SvgDiagram({
     viewAdjustment: cameraViewAdjustment,
     extraPointsForFit,
   })
-  const items = [
+  const visibilityOptions = resolveVisibilityOptions(
+    diagram,
+    visibilityOptionsOverride,
+  )
+  const sortedSurfaceItems = renderSortedSurfaceFaces(
+    diagram,
+    camera,
+    height,
+    selectedElement,
+    layerFilter,
+    visibilityOptions,
+    onSelectionChange,
+  )
+  const renderSurfacesAsSortedFaces = sortedSurfaceItems !== null
+  const itemDrafts: RenderItemDraft[] = [
+    ...(sortedSurfaceItems ?? []),
     ...diagram.strata
       .filter((stratum) => shouldRenderStratumInSvgPreview(diagram, stratum))
+      .filter(
+        (stratum) =>
+          !(
+            renderSurfacesAsSortedFaces &&
+            stratum.geometricKind === 'sheet' &&
+            stratum.codim === 1
+          ),
+      )
       .map((stratum) =>
-        renderStratum(
-          diagram,
-          stratum,
-          camera,
-          height,
-          selectedElement,
-          layerFilter,
-          boundaryPathHighlights,
-          onSelectionChange,
-          onCurveStratumClick,
-          onPointStratumClick,
+        withRenderKind(
+          renderStratum(
+            diagram,
+            stratum,
+            camera,
+            height,
+            selectedElement,
+            layerFilter,
+            boundaryPathHighlights,
+            onSelectionChange,
+            onCurveStratumClick,
+            onPointStratumClick,
+          ),
+          stratum.geometricKind,
         ),
       ),
     ...diagram.labels
       .filter((label) => shouldRenderTextLabelInSvgPreview(diagram, label))
       .map((label) =>
-        renderLabel(
-          diagram,
-          label,
-          camera,
-          height,
-          selectedElement,
-          layerFilter,
-          onSelectionChange,
+        withRenderKind(
+          renderLabel(
+            diagram,
+            label,
+            camera,
+            height,
+            selectedElement,
+            layerFilter,
+            onSelectionChange,
+          ),
+          'label',
         ),
       ),
-  ].sort((left, right) => left.layer - right.layer || left.id.localeCompare(right.id))
+  ]
+  const items = itemDrafts
+    .map(withStableRenderIndex)
+    .sort(compareSvgRenderItems)
 
   return (
     <svg
@@ -395,6 +449,121 @@ export function SvgDiagram({
         : null}
     </svg>
   )
+}
+
+function withRenderKind(
+  item: RenderItemElement,
+  renderKind: SvgRenderItemKind,
+): RenderItemDraft {
+  return { ...item, renderKind }
+}
+
+function withStableRenderIndex(
+  item: RenderItemDraft,
+  stableIndex: number,
+): RenderItem {
+  return { ...item, stableIndex }
+}
+
+function renderSortedSurfaceFaces(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+  visibilityOptions: VisibilityOptions,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): RenderItemDraft[] | null {
+  const sortedFaces = sortedSvgSurfaceFaces(
+    diagram,
+    camera,
+    viewportHeight,
+    visibilityOptions,
+  )
+
+  if (sortedFaces === null) {
+    return null
+  }
+
+  return sortedFaces.map(({ sheet, face, points }, surfaceSortIndex) =>
+    withRenderKind(
+      renderSortedSurfaceFace(
+        diagram,
+        sheet,
+        face,
+        points,
+        surfaceSortIndex,
+        selectedElement,
+        layerFilter,
+        onSelectionChange,
+      ),
+      'surfaceFace',
+    ),
+  )
+}
+
+function renderSortedSurfaceFace(
+  diagram: Diagram,
+  sheet: SheetStratum,
+  face: ProjectedSurfaceFace,
+  points: string,
+  surfaceSortIndex: number,
+  selectedElement: SelectedElement,
+  layerFilter: LayerFilter,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): RenderItemElement {
+  const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
+  const isSelectable = isLayerSelectableByLayerFilter(
+    diagram,
+    layerFilter,
+    sheet.layer,
+  )
+  const isSelected = isSelectable && isSelectedStratum(selectedElement, sheet.id)
+  const surfaceAttributes = filledSurfaceStyleToSvgAttributes(
+    sheet.style,
+    sheet.kind === 'curvedSheet' ? 0.85 : undefined,
+  )
+  const key = `${sheet.id}-sorted-face-${face.faceIndex}-${face.originalIndex}`
+
+  return {
+    id: key,
+    layer: face.layer,
+    surfaceFace: face,
+    surfaceSortIndex,
+    element: (
+      <g
+        key={key}
+        className={svgPreviewElementClassName(isIncludedByFilter, isSelectable)}
+        opacity={previewElementOpacity(isIncludedByFilter)}
+        pointerEvents={isSelectable ? undefined : 'none'}
+        data-surface-depth-sorted="true"
+        data-surface-source-id={sheet.id}
+        data-surface-face-index={face.faceIndex}
+        data-surface-depth-avg={face.depth.avg}
+        onClick={(event) =>
+          selectElement(event, { kind: 'stratum', id: sheet.id }, onSelectionChange)
+        }
+      >
+        {isSelected && (
+          <polygon
+            points={points}
+            fill={highlightColor}
+            fillOpacity={0.1}
+            stroke={highlightColor}
+            strokeOpacity={0.9}
+            strokeWidth={5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        )}
+        <polygon
+          points={points}
+          vectorEffect="non-scaling-stroke"
+          {...surfaceAttributes}
+        />
+      </g>
+    ),
+  }
 }
 
 function renderCoordinateSourceHighlights(
@@ -586,7 +755,7 @@ function renderStratum(
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
-): RenderItem {
+): RenderItemElement {
   switch (stratum.geometricKind) {
     case 'region':
       return renderRegion(
@@ -642,7 +811,7 @@ function renderRegion(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): RenderItem {
+): RenderItemElement {
   if (region.kind !== 'filledRegion' || !region.visible) {
     return {
       id: region.id,
@@ -711,7 +880,7 @@ function renderSheet(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): RenderItem {
+): RenderItemElement {
   if (sheet.kind === 'workPlaneFilledSheet') {
     return renderWorkPlaneFilledSheet(
       diagram,
@@ -793,7 +962,7 @@ function renderCurvedSheet(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): RenderItem {
+): RenderItemElement {
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -885,7 +1054,7 @@ function renderWorkPlaneFilledSheet(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): RenderItem {
+): RenderItemElement {
   const pathData = closedBoundariesToSvgPathData(sheet.boundaries, (point) =>
     projectToSvgPoint(camera, point, viewportHeight),
   )
@@ -948,7 +1117,7 @@ function renderCurve(
   boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
-): RenderItem {
+): RenderItemElement {
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
   const pathRuns = curveToSvgPathRuns(curve, camera, viewportHeight)
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
@@ -1131,7 +1300,7 @@ function renderPoint(
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
-): RenderItem {
+): RenderItemElement {
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
   const radius = Math.max(point.style.size * pointRadiusScale, 1)
   const fill = point.style.fill === 'hollow' ? '#ffffff' : point.style.color
@@ -1268,7 +1437,7 @@ function renderLabel(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): RenderItem {
+): RenderItemElement {
   const position = projectToSvgPoint(camera, label.position, viewportHeight)
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, label.layer)
   const isSelectable = isLayerSelectableByLayerFilter(

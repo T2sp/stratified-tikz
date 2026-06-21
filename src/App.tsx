@@ -58,9 +58,15 @@ import type {
   TikzExportMode,
   Vec2,
   Vec3,
+  VisibilityOptions,
+  VisibilitySortMode,
   WorkPlane,
 } from './model/types'
 import { latticePatterns, lineStyles } from './model/types'
+import {
+  cloneVisibilityOptions,
+  defaultVisibilityOptions,
+} from './model/visibility.ts'
 import {
   SvgDiagram,
   svgPointToModelOnWorkPlane,
@@ -509,6 +515,13 @@ const cameraNumericFields: Array<{ field: CameraControlField; label: string }> =
   { field: 'panX', label: 'pan x' },
   { field: 'panY', label: 'pan y' },
 ]
+const visibilitySortModeOptions: Array<{
+  mode: VisibilitySortMode
+  label: string
+}> = [
+  { mode: 'layerThenDepth', label: 'Layer then depth' },
+  { mode: 'depthThenLayer', label: 'Depth then layer' },
+]
 const emptyStyleImportReport: StyleImportReport = {
   status: 'idle',
   sourceName: '',
@@ -670,6 +683,10 @@ function App() {
     useState<boolean>(false)
   const [tikzExportMode, setTikzExportMode] =
     useState<TikzExportMode>(defaultTikzExportMode)
+  const [visibilityOptions, setVisibilityOptions] =
+    useState<VisibilityOptions>(() =>
+      cloneVisibilityOptions(defaultVisibilityOptions),
+    )
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
@@ -780,12 +797,14 @@ function App() {
         includeCoordinateAxesInTikz,
         camera3d:
           editableDiagram.ambientDimension === 3 ? cameraControl : undefined,
+        visibility: visibilityOptions,
       }),
     [
       cameraControl,
       editableDiagram,
       includeCoordinateAxesInTikz,
       tikzExportMode,
+      visibilityOptions,
     ],
   )
   const availableLayers = useMemo(
@@ -974,6 +993,23 @@ function App() {
     setCopyStatus('idle')
   }
 
+  function updateSurfaceDepthSort(enabled: boolean): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      enabled,
+      surfaceDepthSort: enabled,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateVisibilitySortMode(sortMode: VisibilitySortMode): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      sortMode,
+    }))
+    setCopyStatus('idle')
+  }
+
   function updateCameraNumericField(
     field: CameraControlField,
     rawValue: string,
@@ -1038,6 +1074,9 @@ function App() {
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
+    setVisibilityOptions(
+      cloneVisibilityOptions(nextDiagram.view?.visibility ?? defaultVisibilityOptions),
+    )
     if (nextDiagram.ambientDimension === 2 && creationTool === 'createSheet') {
       setCreationTool('select')
     }
@@ -1273,6 +1312,7 @@ function App() {
           exportMode: tikzExportMode,
           includeCoordinateAxesInTikz,
           camera3d: showCameraControls ? cameraControl : undefined,
+          visibility: visibilityOptions,
         }),
       )
       const blob = new Blob([serialized], { type: 'application/json' })
@@ -1444,6 +1484,11 @@ function App() {
         : false,
     )
     setTikzExportMode(result.diagram.view?.exportMode ?? defaultTikzExportMode)
+    setVisibilityOptions(
+      cloneVisibilityOptions(
+        result.diagram.view?.visibility ?? defaultVisibilityOptions,
+      ),
+    )
     setSaveLoadStatus('loaded')
     setSaveLoadMessage(
       result.warnings.length === 0
@@ -6051,6 +6096,7 @@ function App() {
               coordinateSourceHighlights={coordinateSourceHighlights}
               boundaryPathHighlights={boundaryPathHighlights}
               layerFilter={layerFilter}
+              visibilityOptions={visibilityOptions}
               showGeometryHandles={
                 creationTool === 'select' && !workPlanePointPickingState.active
               }
@@ -6294,6 +6340,44 @@ function App() {
                   }
                 />
                 <span>Show xyz axes in TikZ output</span>
+              </label>
+              <label className="tikz-export-checkbox">
+                <input
+                  type="checkbox"
+                  checked={
+                    editableDiagram.ambientDimension === 3 &&
+                    visibilityOptions.enabled &&
+                    visibilityOptions.surfaceDepthSort
+                  }
+                  disabled={editableDiagram.ambientDimension !== 3}
+                  onChange={(event) =>
+                    updateSurfaceDepthSort(event.currentTarget.checked)
+                  }
+                />
+                <span>Sort surface faces</span>
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Surface order:</span>
+                <select
+                  className="toolbar-select"
+                  value={visibilityOptions.sortMode}
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled ||
+                    !visibilityOptions.surfaceDepthSort
+                  }
+                  onChange={(event) =>
+                    updateVisibilitySortMode(
+                      event.currentTarget.value as VisibilitySortMode,
+                    )
+                  }
+                >
+                  {visibilitySortModeOptions.map((option) => (
+                    <option key={option.mode} value={option.mode}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="tikz-export-actions">
                 <button type="button" className="copy-button" onClick={copyTikz}>

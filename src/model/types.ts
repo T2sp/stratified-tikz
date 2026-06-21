@@ -74,10 +74,21 @@ export type DiagramViewOptions = {
   camera3d?: Camera3D
   showCoordinateAxesInTikz?: boolean
   exportMode?: TikzExportMode
+  visibility?: VisibilityOptions
 }
 
 export const tikzExportModes = ['standalone', 'inlineMath'] as const
 export type TikzExportMode = (typeof tikzExportModes)[number]
+
+export const visibilitySortModes = ['layerThenDepth', 'depthThenLayer'] as const
+export type VisibilitySortMode = (typeof visibilitySortModes)[number]
+
+export type VisibilityOptions = {
+  enabled: boolean
+  surfaceDepthSort: boolean
+  sortMode: VisibilitySortMode
+  depthEpsilon: number
+}
 
 export type CoordinateInputMode = 'direct' | 'cursor'
 

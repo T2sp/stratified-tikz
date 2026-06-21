@@ -73,6 +73,28 @@ The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.
 Standalone is used when no saved export mode is present.
 
+## Approximate 3D surface ordering
+
+3D diagrams can opt into approximate surface face depth sorting through
+`diagram.view.visibility` or the TikZ generation option. The default is off, so
+existing exports keep their manual layer and stratum order.
+
+When `enabled` and `surfaceDepthSort` are true, the generator samples sheet
+faces, computes average projected depth with the active orthographic TikZ
+camera, and emits farther faces before closer faces. Each sorted face is emitted
+as a separate `\filldraw` command with the sheet style preserved and a comment
+recording the source sheet, face index, and average depth.
+
+Layer-aware output remains active. In `layerThenDepth` mode, the generator sorts
+by layer first and then depth inside each layer. In `depthThenLayer` mode, depth
+is the shared sorter's first key, but the emitted TikZ still uses `pgfonlayer`
+blocks, so declared layer order remains important for the final drawing.
+
+This is a painter's algorithm approximation. Intersecting surfaces, cyclic
+overlaps, and large coarse faces can still render incorrectly. Increase surface
+sampling or use the layer manager when exact visibility matters. Curve, point,
+and label occlusion are not part of this phase.
+
 ## Variables
 
 Diagram variables export as `\pgfmathsetmacro` definitions. For example:
