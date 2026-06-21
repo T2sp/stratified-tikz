@@ -28,7 +28,7 @@ import {
   normalizeImportedTikzStyleKey,
   normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
-import { tikzExportModes } from './types.ts'
+import { hiddenCurveLineStyles, tikzExportModes } from './types.ts'
 import {
   cloneVisibilityOptions,
   defaultVisibilityOptions,
@@ -45,6 +45,7 @@ import type {
   DiagramValidationResult,
   DiagramViewOptions,
   ExternalTikzStyleSource,
+  HiddenCurveStyle,
   ImportedTikzStyleReference,
   StylePresetKind,
   OrthographicCamera3D,
@@ -1272,11 +1273,42 @@ function visibilityOptionsFromPersistent(
     return null
   }
 
+  const hiddenCurveStyle =
+    'hiddenCurveStyle' in value
+      ? hiddenCurveStyleFromPersistent(value.hiddenCurveStyle)
+      : defaultVisibilityOptions.hiddenCurveStyle
+
+  if (hiddenCurveStyle === null) {
+    return null
+  }
+
   return {
     enabled: value.enabled,
     surfaceDepthSort: value.surfaceDepthSort,
     sortMode: value.sortMode,
     depthEpsilon: value.depthEpsilon,
+    hiddenCurveStyle,
+  }
+}
+
+function hiddenCurveStyleFromPersistent(
+  value: unknown,
+): HiddenCurveStyle | null {
+  if (
+    !isRecord(value) ||
+    typeof value.lineStyle !== 'string' ||
+    !hiddenCurveLineStyles.includes(value.lineStyle as HiddenCurveStyle['lineStyle']) ||
+    typeof value.opacity !== 'number' ||
+    !Number.isFinite(value.opacity) ||
+    value.opacity < 0 ||
+    value.opacity > 1
+  ) {
+    return null
+  }
+
+  return {
+    lineStyle: value.lineStyle as HiddenCurveStyle['lineStyle'],
+    opacity: value.opacity,
   }
 }
 

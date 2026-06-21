@@ -51,6 +51,7 @@ import type {
   Diagram,
   FillRule,
   HexColor,
+  HiddenCurveLineStyle,
   LatticePattern,
   LineStyle,
   OrthographicCamera3D,
@@ -62,9 +63,10 @@ import type {
   VisibilitySortMode,
   WorkPlane,
 } from './model/types'
-import { latticePatterns, lineStyles } from './model/types'
+import { hiddenCurveLineStyles, latticePatterns, lineStyles } from './model/types'
 import {
   cloneVisibilityOptions,
+  defaultHiddenCurveStyle,
   defaultVisibilityOptions,
 } from './model/visibility.ts'
 import {
@@ -522,6 +524,14 @@ const visibilitySortModeOptions: Array<{
   { mode: 'layerThenDepth', label: 'Layer then depth' },
   { mode: 'depthThenLayer', label: 'Depth then layer' },
 ]
+const hiddenCurveLineStyleOptions: Array<{
+  style: HiddenCurveLineStyle
+  label: string
+}> = [
+  { style: 'denselyDotted', label: 'Densely dotted' },
+  { style: 'dotted', label: 'Dotted' },
+  { style: 'dashed', label: 'Dashed' },
+]
 const emptyStyleImportReport: StyleImportReport = {
   status: 'idle',
   sourceName: '',
@@ -530,6 +540,14 @@ const emptyStyleImportReport: StyleImportReport = {
   keys: [],
   warnings: [],
   message: '',
+}
+
+function hiddenCurveLineStyleFromSelectValue(
+  value: string,
+): HiddenCurveLineStyle {
+  return hiddenCurveLineStyles.includes(value as HiddenCurveLineStyle)
+    ? (value as HiddenCurveLineStyle)
+    : defaultHiddenCurveStyle.lineStyle
 }
 
 function App() {
@@ -1006,6 +1024,34 @@ function App() {
     setVisibilityOptions((current) => ({
       ...current,
       sortMode,
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateHiddenCurveLineStyle(lineStyle: HiddenCurveLineStyle): void {
+    setVisibilityOptions((current) => ({
+      ...current,
+      hiddenCurveStyle: {
+        ...(current.hiddenCurveStyle ?? defaultHiddenCurveStyle),
+        lineStyle,
+      },
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateHiddenCurveOpacity(rawValue: string): void {
+    const opacity = Number(rawValue)
+
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+      return
+    }
+
+    setVisibilityOptions((current) => ({
+      ...current,
+      hiddenCurveStyle: {
+        ...(current.hiddenCurveStyle ?? defaultHiddenCurveStyle),
+        opacity,
+      },
     }))
     setCopyStatus('idle')
   }
@@ -6378,6 +6424,56 @@ function App() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Hidden curves:</span>
+                <select
+                  className="toolbar-select"
+                  value={
+                    visibilityOptions.hiddenCurveStyle?.lineStyle ??
+                    defaultHiddenCurveStyle.lineStyle
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled ||
+                    !visibilityOptions.surfaceDepthSort
+                  }
+                  onChange={(event) =>
+                    updateHiddenCurveLineStyle(
+                      hiddenCurveLineStyleFromSelectValue(
+                        event.currentTarget.value,
+                      ),
+                    )
+                  }
+                >
+                  {hiddenCurveLineStyleOptions.map((option) => (
+                    <option key={option.style} value={option.style}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Hidden opacity:</span>
+                <input
+                  className="toolbar-select"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={
+                    visibilityOptions.hiddenCurveStyle?.opacity ??
+                    defaultHiddenCurveStyle.opacity
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled ||
+                    !visibilityOptions.surfaceDepthSort
+                  }
+                  onChange={(event) =>
+                    updateHiddenCurveOpacity(event.currentTarget.value)
+                  }
+                />
               </label>
               <div className="tikz-export-actions">
                 <button type="button" className="copy-button" onClick={copyTikz}>

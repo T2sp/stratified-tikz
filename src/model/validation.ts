@@ -39,7 +39,11 @@ import {
   isTikzStyleTarget,
 } from './importedTikzStyles.ts'
 import { sheetVertices } from './sheets.ts'
-import { tikzExportModes, visibilitySortModes } from './types.ts'
+import {
+  hiddenCurveLineStyles,
+  tikzExportModes,
+  visibilitySortModes,
+} from './types.ts'
 import {
   resolveSymbolicVariables,
   validateSymbolicVariables,
@@ -82,6 +86,7 @@ import type {
   GridParameterRange,
   GridRectangleClip,
   GridStratum,
+  HiddenCurveStyle,
   ImportedTikzStyleReference,
   LabelStyle,
   PartialCurveStyle,
@@ -589,6 +594,46 @@ function validateVisibilityOptions(
       errors,
       `${path}.depthEpsilon`,
       'Visibility depth epsilon must be a finite non-negative number.',
+    )
+  }
+
+  if (visibility.hiddenCurveStyle !== undefined) {
+    validateHiddenCurveStyle(
+      visibility.hiddenCurveStyle,
+      `${path}.hiddenCurveStyle`,
+      errors,
+    )
+  }
+}
+
+function validateHiddenCurveStyle(
+  hiddenCurveStyle: HiddenCurveStyle,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (typeof hiddenCurveStyle !== 'object' || hiddenCurveStyle === null) {
+    pushError(errors, path, 'Hidden curve style must be an object.')
+    return
+  }
+
+  if (!hiddenCurveLineStyles.includes(hiddenCurveStyle.lineStyle)) {
+    pushError(
+      errors,
+      `${path}.lineStyle`,
+      'Hidden curve line style must be dotted, denselyDotted, or dashed.',
+    )
+  }
+
+  if (
+    typeof hiddenCurveStyle.opacity !== 'number' ||
+    !Number.isFinite(hiddenCurveStyle.opacity) ||
+    hiddenCurveStyle.opacity < 0 ||
+    hiddenCurveStyle.opacity > 1
+  ) {
+    pushError(
+      errors,
+      `${path}.opacity`,
+      'Hidden curve opacity must be a finite number between 0 and 1.',
     )
   }
 }

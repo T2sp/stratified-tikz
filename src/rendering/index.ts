@@ -1,6 +1,7 @@
 export * from './SvgDiagram.tsx'
 export * from './svgPreviewPolicy.ts'
 export * from './coordinateAxesGuide.ts'
+export * from './curveOcclusion.ts'
 export * from './curvedSheetMesh.ts'
 export * from './projectedPrimitives.ts'
 export * from './svgCamera.ts'

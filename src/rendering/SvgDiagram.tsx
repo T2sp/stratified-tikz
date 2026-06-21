@@ -15,7 +15,9 @@ import type {
   VisibilityOptions,
 } from '../model/types'
 import {
+  defaultHiddenCurveStyle,
   resolveVisibilityOptions,
+  surfaceDepthSortEnabled,
 } from '../model/visibility.ts'
 import {
   arcSegmentToCubicBezierSegments,
@@ -61,6 +63,7 @@ import { projectToSvgPoint } from './svgProjection'
 import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
+  hiddenCurveStyleToSvgStrokeAttributes,
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { curvedSheetToSvgMesh } from './curvedSheetMesh.ts'
@@ -92,6 +95,10 @@ import {
 } from './svgRenderSort.ts'
 import type { ProjectedSurfaceFace } from './projectedPrimitives.ts'
 import { sortedSvgSurfaceFaces } from './svgSurfaceDepthSort.ts'
+import {
+  classifyCurveOcclusion,
+  type CurveOcclusionResult,
+} from './curveOcclusion.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -166,6 +173,8 @@ type SvgCurvePathRun = {
   strokeDasharray?: string
 }
 
+type CurveOcclusionById = ReadonlyMap<string, CurveOcclusionResult>
+
 type ActiveCameraDrag = {
   mode: CameraDragMode
   lastClientPoint: Vec2
@@ -230,6 +239,11 @@ export function SvgDiagram({
     diagram,
     visibilityOptionsOverride,
   )
+  const curveOcclusionById = createSvgCurveOcclusionMap(
+    diagram,
+    camera,
+    visibilityOptions,
+  )
   const sortedSurfaceItems = renderSortedSurfaceFaces(
     diagram,
     camera,
@@ -262,6 +276,8 @@ export function SvgDiagram({
             selectedElement,
             layerFilter,
             boundaryPathHighlights,
+            curveOcclusionById,
+            visibilityOptions,
             onSelectionChange,
             onCurveStratumClick,
             onPointStratumClick,
@@ -500,6 +516,43 @@ function renderSortedSurfaceFaces(
       'surfaceFace',
     ),
   )
+}
+
+function createSvgCurveOcclusionMap(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  visibilityOptions: VisibilityOptions,
+): CurveOcclusionById {
+  if (
+    diagram.ambientDimension !== 3 ||
+    camera.mode !== '3d' ||
+    !surfaceDepthSortEnabled(visibilityOptions)
+  ) {
+    return new Map()
+  }
+
+  const visibleSheetIds = new Set(
+    diagram.strata
+      .filter(
+        (stratum): stratum is SheetStratum =>
+          stratum.geometricKind === 'sheet' &&
+          stratum.codim === 1 &&
+          shouldRenderStratumInSvgPreview(diagram, stratum),
+      )
+      .map((sheet) => sheet.id),
+  )
+
+  try {
+    return new Map(
+      classifyCurveOcclusion(diagram, {
+        camera,
+        visibility: visibilityOptions,
+        occludingSurfaceIds: visibleSheetIds,
+      }).map((result) => [result.curveId, result]),
+    )
+  } catch {
+    return new Map()
+  }
 }
 
 function renderSortedSurfaceFace(
@@ -752,6 +805,8 @@ function renderStratum(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
+  curveOcclusionById: CurveOcclusionById,
+  visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
@@ -786,6 +841,8 @@ function renderStratum(
         selectedElement,
         layerFilter,
         boundaryPathHighlights,
+        curveOcclusionById,
+        visibilityOptions,
         onSelectionChange,
         onCurveStratumClick,
       )
@@ -1115,11 +1172,20 @@ function renderCurve(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
+  curveOcclusionById: CurveOcclusionById,
+  visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
 ): RenderItemElement {
+  const occlusion = curveOcclusionById.get(curve.id)
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
-  const pathRuns = curveToSvgPathRuns(curve, camera, viewportHeight)
+  const pathRuns = curveToSvgPathRuns(
+    curve,
+    camera,
+    viewportHeight,
+    occlusion,
+    visibilityOptions,
+  )
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -1250,7 +1316,30 @@ function curveToSvgPathRuns(
   curve: CurveStratum,
   camera: Diagram['camera'],
   viewportHeight: number,
+  occlusion: CurveOcclusionResult | undefined,
+  visibilityOptions: VisibilityOptions,
 ): SvgCurvePathRun[] {
+  if (occlusion !== undefined && occlusion.segments.length > 0) {
+    return occlusion.segments.map((segment) => {
+      const attributes =
+        segment.visibility === 'hidden'
+          ? hiddenCurveStyleToSvgStrokeAttributes(
+              segment.style,
+              visibilityOptions.hiddenCurveStyle ?? defaultHiddenCurveStyle,
+            )
+          : curveStyleToSvgStrokeAttributes(segment.style)
+
+      return {
+        key: `${curve.id}-occlusion-${segment.segmentIndex}-${segment.visibility}`,
+        pathData: polylineToSvgPath([
+          projectToSvgPoint(camera, segment.start, viewportHeight),
+          projectToSvgPoint(camera, segment.end, viewportHeight),
+        ]),
+        ...attributes,
+      }
+    })
+  }
+
   if (curve.kind === 'grid') {
     const pathData = curveToSvgPathData(curve, camera, viewportHeight)
 

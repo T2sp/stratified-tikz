@@ -113,6 +113,10 @@ test('visibility options save and load round-trip as view metadata', () => {
       surfaceDepthSort: true,
       sortMode: 'layerThenDepth',
       depthEpsilon: 0.000001,
+      hiddenCurveStyle: {
+        lineStyle: 'dashed',
+        opacity: 0.35,
+      },
     },
   }
   const result = parseSavedDiagramJson(serializeDiagram(diagram))
@@ -123,6 +127,39 @@ test('visibility options save and load round-trip as view metadata', () => {
   }
 
   assert.deepEqual(result.diagram.view?.visibility, diagram.view.visibility)
+})
+
+test('visibility options without hidden curve style load with defaults', () => {
+  const serialized = serializeDiagram(threeDimensionalExample, {
+    visibility: {
+      enabled: true,
+      surfaceDepthSort: true,
+      sortMode: 'layerThenDepth',
+      depthEpsilon: 0.000001,
+    },
+  })
+  const saved = JSON.parse(serialized) as {
+    diagram: {
+      view?: {
+        visibility?: {
+          hiddenCurveStyle?: unknown
+        }
+      }
+    }
+  }
+
+  delete saved.diagram.view?.visibility?.hiddenCurveStyle
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.diagram.view?.visibility?.hiddenCurveStyle, {
+    lineStyle: 'denselyDotted',
+    opacity: 0.45,
+  })
 })
 
 test('invalid saved visibility options are ignored with a warning', () => {

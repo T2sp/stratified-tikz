@@ -649,6 +649,49 @@ test('inline surface depth sorted TikZ output has no blank lines', () => {
   expectNoBlankLines(tikz)
 })
 
+test('curve occlusion TikZ output applies hidden sampled segment style', () => {
+  const diagram = createCurveOcclusionDiagram()
+  const tikz = generateTikz(diagram, {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      hiddenCurveStyle: {
+        lineStyle: 'dashed',
+        opacity: 0.4,
+      },
+    },
+  })
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.match(tikz, /Hidden sampled segment/)
+  assert.match(tikz, /Visible sampled segment/)
+  assert.match(tikz, /dashed/)
+  assert.match(tikz, /draw opacity=0\.4/)
+})
+
+test('disabled curve occlusion visibility preserves normal TikZ output', () => {
+  const diagram = createCurveOcclusionDiagram()
+
+  assert.equal(
+    generateTikz(diagram, {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        enabled: false,
+      },
+    }),
+    generateTikz(diagram),
+  )
+})
+
+test('inline curve occlusion TikZ output has no blank lines', () => {
+  const tikz = generateTikz(createCurveOcclusionDiagram(), {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto curve occlusion/)
+  expectNoBlankLines(tikz)
+})
+
 test('current camera option overrides saved diagram camera metadata', () => {
   const savedCamera = {
     ...createInitialCamera3D(),
@@ -4490,6 +4533,60 @@ function createSurfaceDepthSortDiagram(): Diagram {
     surfaceDepthSortSheet('a-near', 'Near sheet', '#AA0000', viewDirection, -0.6),
     surfaceDepthSortSheet('z-far', 'Far sheet', '#00AA00', viewDirection, 0.6),
   )
+
+  return diagram
+}
+
+function createCurveOcclusionDiagram(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 90,
+    phiDeg: 0,
+  }
+  const diagram = createEmpty3DDiagramWithCamera(camera)
+
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'quadSheet',
+      id: 'occluding-sheet',
+      name: 'Occluding Sheet',
+      style: sheetStyle(),
+      corners: [
+        { x: -1, y: 0, z: -1 },
+        { x: 1, y: 0, z: -1 },
+        { x: 1, y: 0, z: 1 },
+        { x: -1, y: 0, z: 1 },
+      ],
+      layer: 0,
+    },
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'partly-hidden-curve',
+      name: 'Partly Hidden Curve',
+      style: curveStyle(),
+      points: [
+        { x: -2, y: -1, z: 0 },
+        { x: -0.5, y: -1, z: 0 },
+        { x: 0.5, y: -1, z: 0 },
+        { x: 2, y: -1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  return diagram
+}
+
+function createEmpty3DDiagramWithCamera(camera: ReturnType<typeof createInitialCamera3D>): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = { camera3d: camera }
 
   return diagram
 }

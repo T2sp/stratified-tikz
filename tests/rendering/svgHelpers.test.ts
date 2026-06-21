@@ -52,6 +52,7 @@ import { addPolylineCurveStratum } from '../../src/ui/diagramUpdates.ts'
 import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
+  hiddenCurveStyleToSvgStrokeAttributes,
   lineStyleToStrokeDasharray,
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
@@ -418,6 +419,30 @@ test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('dashed'), '8 5')
   assert.equal(lineStyleToStrokeDasharray('dotted'), '1 5')
   assert.equal(lineStyleToStrokeDasharray('denselyDotted'), '1 2')
+})
+
+test('hidden curve style maps to SVG stroke attributes', () => {
+  assert.deepEqual(
+    hiddenCurveStyleToSvgStrokeAttributes(
+      {
+        kind: 'curveStyle',
+        strokeColor: '#123456',
+        strokeOpacity: 0.8,
+        lineWidth: 1.6,
+        lineStyle: 'solid',
+      },
+      {
+        lineStyle: 'dashed',
+        opacity: 0.5,
+      },
+    ),
+    {
+      stroke: '#123456',
+      strokeOpacity: 0.4,
+      strokeWidth: 1.6,
+      strokeDasharray: '8 5',
+    },
+  )
 })
 
 test('segment style override changes resolved SVG stroke attributes', () => {
