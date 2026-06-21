@@ -797,6 +797,10 @@ test('curve occlusion surface face cap TikZ fallback emits original curve only',
   assert.match(tikz, /Auto curve occlusion skipped/)
   assert.match(
     tikz,
+    /\n        % Auto curve occlusion skipped for curve "Partly Hidden Curve" \[partly-hidden-curve\] because surface face count exceeds the maxSurfaceFacesForSorting cap of 1\./,
+  )
+  assert.match(
+    tikz,
     /surface face count exceeds the maxSurfaceFacesForSorting cap of 1/,
   )
   assert.doesNotMatch(tikz, /Hidden sampled segment/)
