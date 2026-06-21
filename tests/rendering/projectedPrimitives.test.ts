@@ -39,6 +39,11 @@ import {
   type ProjectedSurfaceFace,
 } from '../../src/rendering/projectedPrimitives.ts'
 import { sortProjectedSurfaceFaces } from '../../src/rendering/surfaceDepthSort.ts'
+import {
+  compareSvgRenderItems,
+  svgRenderSortKey,
+  type SvgRenderableSortItem,
+} from '../../src/rendering/svgRenderSort.ts'
 import { sortedSvgSurfaceFaces } from '../../src/rendering/svgSurfaceDepthSort.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 
@@ -295,6 +300,137 @@ test('SVG surface render order changes only when surface depth sort is enabled',
   assert.deepEqual(
     enabledFaces?.map((face) => face.sheet.id),
     ['z-far', 'a-near'],
+  )
+})
+
+test('SVG render comparator is transitive for mixed same-layer surface and curve items', () => {
+  const farSurface = svgSurfaceRenderItem(
+    projectedTestFace('zSurface', 0, 3, 0),
+    0,
+    0,
+    'zSurface',
+  )
+  const nearSurface = svgSurfaceRenderItem(
+    projectedTestFace('aSurface', 0, 1, 1),
+    1,
+    1,
+    'aSurface',
+  )
+  const curve = svgNonSurfaceRenderItem('curve', 'mCurve', 0, 2)
+  const items = [curve, nearSurface, farSurface]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'zSurface',
+    'aSurface',
+    'mCurve',
+  ])
+  assert.equal(compareSvgRenderItems(farSurface, nearSurface) < 0, true)
+  assert.equal(compareSvgRenderItems(nearSurface, curve) < 0, true)
+  assert.equal(compareSvgRenderItems(curve, farSurface) > 0, true)
+  assertSvgRenderComparatorTransitive(items)
+})
+
+test('SVG render comparator preserves sorted same-layer surface face order', () => {
+  const sortedFaces = sortProjectedSurfaceFaces(
+    [
+      projectedTestFace('a-near', 0, 1, 0),
+      projectedTestFace('z-far', 0, 3, 1),
+    ],
+    enabledVisibilityOptions('layerThenDepth'),
+  )
+  const items = sortedFaces.map((face, surfaceSortIndex) =>
+    svgSurfaceRenderItem(face, surfaceSortIndex, surfaceSortIndex, face.sourceId),
+  )
+
+  assert.deepEqual(
+    sortedSvgRenderItemIds(items),
+    ['z-far', 'a-near'],
+  )
+})
+
+test('SVG render comparator keeps non-surface same-layer id ordering', () => {
+  const items: SvgRenderableSortItem[] = [
+    svgNonSurfaceRenderItem('curve', 'zCurve', 0, 0),
+    svgNonSurfaceRenderItem('point', 'mPoint', 0, 1),
+    svgNonSurfaceRenderItem('label', 'aLabel', 0, 2),
+  ]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'aLabel',
+    'mPoint',
+    'zCurve',
+  ])
+})
+
+test('SVG render comparator draws same-layer sorted surfaces before other items', () => {
+  const items: SvgRenderableSortItem[] = [
+    svgNonSurfaceRenderItem('point', 'xPoint', 0, 3),
+    svgSurfaceRenderItem(projectedTestFace('zzzSurface', 0, 3, 0), 0, 0),
+    svgNonSurfaceRenderItem('label', 'bLabel', 0, 2),
+    svgSurfaceRenderItem(projectedTestFace('aaaSurface', 0, 1, 1), 1, 1),
+    svgNonSurfaceRenderItem('curve', 'mCurve', 0, 4),
+  ]
+
+  assert.deepEqual(sortedSvgRenderItemIds(items), [
+    'zzzSurface',
+    'aaaSurface',
+    'bLabel',
+    'mCurve',
+    'xPoint',
+  ])
+})
+
+test('SVG render comparator keeps layer order before category and depth order', () => {
+  const lowerLayerCurve = svgNonSurfaceRenderItem('curve', 'zCurve', 0, 2)
+  const upperLayerSurface = svgSurfaceRenderItem(
+    projectedTestFace('aSurface', 1, 3, 0),
+    0,
+    0,
+  )
+
+  assert.deepEqual(
+    sortedSvgRenderItemIds([upperLayerSurface, lowerLayerCurve]),
+    ['zCurve', 'aSurface'],
+  )
+})
+
+test('SVG render comparator uses stable index as deterministic duplicate-id tie breaker', () => {
+  const later = svgNonSurfaceRenderItem('point', 'duplicate', 0, 5)
+  const earlier = svgNonSurfaceRenderItem('curve', 'duplicate', 0, 2)
+
+  assert.deepEqual(
+    sortedSvgRenderItems([later, earlier]).map(
+      (item) => `${item.id}:${item.stableIndex}`,
+    ),
+    ['duplicate:2', 'duplicate:5'],
+  )
+  assert.equal(compareSvgRenderItems(earlier, later) < 0, true)
+})
+
+test('SVG render sort key exposes the mixed item ordering tuple', () => {
+  assert.deepEqual(
+    svgRenderSortKey(
+      svgSurfaceRenderItem(projectedTestFace('surface', 2, 4, 0), 7, 3),
+    ),
+    {
+      layer: 2,
+      categoryRank: 0,
+      surfaceDepthOrder: 7,
+      id: 'surface',
+      stableIndex: 3,
+      kindRank: 0,
+    },
+  )
+  assert.deepEqual(
+    svgRenderSortKey(svgNonSurfaceRenderItem('label', 'label', 2, 4)),
+    {
+      layer: 2,
+      categoryRank: 1,
+      surfaceDepthOrder: 0,
+      id: 'label',
+      stableIndex: 4,
+      kindRank: 5,
+    },
   )
 })
 
@@ -583,6 +719,68 @@ function projectedTestFace(
     },
     faceIndex: originalIndex,
     originalIndex,
+  }
+}
+
+function svgSurfaceRenderItem(
+  face: ProjectedSurfaceFace,
+  surfaceSortIndex: number,
+  stableIndex: number,
+  id = face.sourceId,
+): SvgRenderableSortItem {
+  return {
+    id,
+    layer: face.layer,
+    renderKind: 'surfaceFace',
+    stableIndex,
+    surfaceFace: face,
+    surfaceSortIndex,
+  }
+}
+
+function svgNonSurfaceRenderItem(
+  renderKind: Exclude<SvgRenderableSortItem['renderKind'], 'surfaceFace'>,
+  id: string,
+  layer: number,
+  stableIndex: number,
+): SvgRenderableSortItem {
+  return {
+    id,
+    layer,
+    renderKind,
+    stableIndex,
+  }
+}
+
+function sortedSvgRenderItems(
+  items: readonly SvgRenderableSortItem[],
+): SvgRenderableSortItem[] {
+  return [...items].sort(compareSvgRenderItems)
+}
+
+function sortedSvgRenderItemIds(
+  items: readonly SvgRenderableSortItem[],
+): string[] {
+  return sortedSvgRenderItems(items).map((item) => item.id)
+}
+
+function assertSvgRenderComparatorTransitive(
+  items: readonly SvgRenderableSortItem[],
+): void {
+  for (const first of items) {
+    for (const second of items) {
+      for (const third of items) {
+        if (
+          compareSvgRenderItems(first, second) <= 0 &&
+          compareSvgRenderItems(second, third) <= 0
+        ) {
+          assert.ok(
+            compareSvgRenderItems(first, third) <= 0,
+            `${first.id} <= ${second.id} and ${second.id} <= ${third.id}, but ${first.id} > ${third.id}`,
+          )
+        }
+      }
+    }
   }
 }
 

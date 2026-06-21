@@ -98,13 +98,16 @@ depth is closer to the camera. Ties within `depthEpsilon` are resolved by
 
 `layerThenDepth` keeps manual layer order as the primary key and sorts faces by
 depth inside each layer. `depthThenLayer` is available in the shared sorting
-helper and SVG preview; TikZ output still emits `pgfonlayer` blocks, so PGF
+helper and TikZ export; TikZ output still emits `pgfonlayer` blocks, so PGF
 layer order remains the final layer-aware drawing structure.
 
-Sorted SVG preview renders sheet faces individually and leaves curves, points,
-and labels in their existing non-occluded rendering path. Sorted TikZ export
-emits one `\filldraw` command per sorted face with comments recording the source
-sheet, face index, and average depth.
+Sorted SVG preview renders sheet faces individually, then applies one total
+layer-first render key. Within each layer, sorted surface faces are drawn first
+in their precomputed face order, and curves, points, labels, and other
+non-surface items keep their existing id ordering above those faces. Curve,
+point, and label depth occlusion are intentionally left to later phases. Sorted
+TikZ export emits one `\filldraw` command per sorted face with comments
+recording the source sheet, face index, and average depth.
 
 ## Approximation Goal
 
