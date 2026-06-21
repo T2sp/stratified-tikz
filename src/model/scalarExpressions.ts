@@ -113,6 +113,16 @@ export type CreateScalarInputValueResult =
       error: string
     }
 
+export type DetectScalarExpressionVariablesResult =
+  | {
+      ok: true
+      variables: string[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 const identifierPattern = /^[A-Za-z][A-Za-z0-9_]*$/
 export const DANGEROUS_TEX_CONTROL_SEQUENCE_NAMES = [
   'def',
@@ -366,6 +376,58 @@ export function scalarExpressionVariables(
   collectScalarExpressionVariables(ast, variables)
 
   return [...variables].sort()
+}
+
+export function detectScalarExpressionVariables(
+  source: string,
+): DetectScalarExpressionVariablesResult {
+  const safetyError = validateScalarExpressionSourceSafety(source)
+  if (safetyError !== undefined) {
+    return {
+      ok: false,
+      error: safetyError,
+    }
+  }
+
+  const tokensResult = tokenizeScalarExpression(source)
+  if (!tokensResult.ok) {
+    return tokensResult
+  }
+
+  const variableCandidates = new Set<string>()
+
+  tokensResult.tokens.forEach((token, index) => {
+    if (token.kind !== 'identifier') {
+      return
+    }
+
+    const nextToken = tokensResult.tokens[index + 1]
+    const isFunctionCall = nextToken?.kind === 'leftParen'
+
+    if (
+      isFunctionCall ||
+      isScalarExpressionFunctionName(token.text) ||
+      isScalarExpressionConstantName(token.text) ||
+      !isSafeScalarExpressionVariableName(token.text)
+    ) {
+      return
+    }
+
+    variableCandidates.add(token.text)
+  })
+
+  const parsed = parseScalarExpression(source, {
+    variables: variableCandidates,
+  })
+
+  if (!parsed.ok) {
+    return parsed
+  }
+
+  return {
+    ok: true,
+    variables: scalarExpressionVariables(parsed.expression),
+  }
 }
 
 export function isScalarExpressionVariableName(name: string): boolean {

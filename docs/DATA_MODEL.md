@@ -943,9 +943,13 @@ to the source curve do not mutate the surface. The boundary evaluator supports
 copied concatenated `PathSegment[]` geometry made from line, cubic Bezier, 3D
 arc, and sampled path template segments. Circle and ellipse template paths are
 copied into ordinary path segments at creation time. Boundary snapshots must be
-non-empty, composable, finite, and must sample to finite points. Boundary
-coordinates are numeric-only for this MVP because mesh generation derives
-sampled coordinates.
+non-empty, composable, and must sample to finite points. Boundary coordinate
+components may be numeric or symbolic, but symbolic components must have finite
+numeric preview values after variable resolution because mesh generation
+derives sampled coordinates from the preview model values. JSON import refreshes
+symbolic previews before full diagram validation; TikZ mesh output may use the
+resolved numeric preview mesh while the saved boundary coordinate expressions
+remain in the diagram model.
 
 A ruled surface stores two boundary snapshots with a shared deterministic
 piecewise-uniform boundary parameter `u`. Its sampler uses:

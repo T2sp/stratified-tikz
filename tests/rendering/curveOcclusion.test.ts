@@ -461,14 +461,11 @@ test('curve occlusion surface face cap falls back before sorting projected faces
   ])
   const diagram = occlusionDiagramWithTwoSheets(curve)
   const originalSort = Array.prototype.sort
-  let sortCalled = false
 
   Array.prototype.sort = function sortSpy<T>(
     this: T[],
-    compareFn?: (left: T, right: T) => number,
   ): T[] {
-    sortCalled = true
-    return originalSort.call(this, compareFn)
+    throw new Error(`unexpected sort of ${this.length} projected faces`)
   }
 
   try {
@@ -485,7 +482,6 @@ test('curve occlusion surface face cap falls back before sorting projected faces
     assert.equal(result?.fallbackReason, 'surfaceFaceCapExceeded')
     assert.equal(result?.sampledSegmentCount, 0)
     assert.deepEqual(result?.segments, [])
-    assert.equal(sortCalled, false)
   } finally {
     Array.prototype.sort = originalSort
   }

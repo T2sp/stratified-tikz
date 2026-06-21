@@ -237,6 +237,30 @@ test('ruled surface sampling produces finite mesh vertices and boundary', () => 
   assert.equal(boundaries[0].every(isFiniteVec3), true)
 })
 
+test('validateDiagram accepts ruled surface symbolic boundary previews', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const primitive = symbolicRuledSurface()
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-ruled-validation',
+      primitive,
+    }),
+  )
+
+  assertValid(diagram)
+  assert.equal(sampleRuledSurface(primitive).vertices.every(isFiniteVec3), true)
+})
+
 test('ruled surface boundary closure mismatch is rejected', () => {
   const validation = validateCurvedSheetPrimitive({
     ...validRuledSurface(),
@@ -275,6 +299,53 @@ test('valid Coons patch primitive validates', () => {
   const validation = validateCurvedSheetPrimitive(validCoonsPatch())
 
   assert.equal(validation.valid, true, joinMessages(validation.errors))
+})
+
+test('validateDiagram accepts Coons patch symbolic boundary previews', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const primitive = symbolicCoonsPatch()
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+    {
+      id: 'var-r',
+      name: 'R',
+      macroName: 'R',
+      expression: '1',
+      previewValue: 1,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-coons-validation',
+      primitive,
+    }),
+  )
+
+  assertValid(diagram)
+  assert.equal(sampleCoonsPatch(primitive).vertices.every(isFiniteVec3), true)
+})
+
+test('validateDiagram rejects unresolved symbolic boundary previews', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'unresolved-symbolic-coons',
+      primitive: symbolicCoonsPatch(),
+    }),
+  )
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(joinMessages(validation.errors), /Unknown variable "Len"/)
 })
 
 test('constant Coons boundary helpers use the same point for every endpoint and sample', () => {
@@ -960,6 +1031,23 @@ function validRuledSurface(): RuledSurfacePrimitive {
   }
 }
 
+function symbolicRuledSurface(): RuledSurfacePrimitive {
+  return {
+    kind: 'ruledSurface',
+    boundary0: lineBoundary(
+      'symbolic-ruled-boundary-0',
+      symbolicVec3(-2, 0, 0, { x: '-.5*Len' }),
+      symbolicVec3(2, 0, 0, { x: '.5*Len' }),
+    ),
+    boundary1: lineBoundary(
+      'symbolic-ruled-boundary-1',
+      symbolicVec3(-2, 1, 1, { x: '-.5*Len' }),
+      symbolicVec3(2, 1, 1, { x: '.5*Len' }),
+    ),
+    sampling: { segments: 4 },
+  }
+}
+
 function validCoonsPatch(): CoonsPatchPrimitive {
   return {
     kind: 'coonsPatch',
@@ -982,6 +1070,33 @@ function validCoonsPatch(): CoonsPatchPrimitive {
       'coons-left',
       { x: 0, y: 0, z: 0 },
       { x: 0, y: 1, z: 0 },
+    ),
+    sampling: { uSegments: 4, vSegments: 3 },
+  }
+}
+
+function symbolicCoonsPatch(): CoonsPatchPrimitive {
+  return {
+    kind: 'coonsPatch',
+    bottom: lineBoundary(
+      'symbolic-coons-bottom',
+      symbolicVec3(-2, 0, 0, { x: '-.5*Len' }),
+      symbolicVec3(2, 0, 0, { x: '.5*Len' }),
+    ),
+    right: lineBoundary(
+      'symbolic-coons-right',
+      symbolicVec3(2, 0, 0, { x: '.5*Len' }),
+      symbolicVec3(2, 1, 0, { x: '.5*Len', y: 'R' }),
+    ),
+    top: lineBoundary(
+      'symbolic-coons-top',
+      symbolicVec3(-2, 1, 0, { x: '-.5*Len', y: 'R' }),
+      symbolicVec3(2, 1, 0, { x: '.5*Len', y: 'R' }),
+    ),
+    left: lineBoundary(
+      'symbolic-coons-left',
+      symbolicVec3(-2, 0, 0, { x: '-.5*Len' }),
+      symbolicVec3(-2, 1, 0, { x: '-.5*Len', y: 'R' }),
     ),
     sampling: { uSegments: 4, vSegments: 3 },
   }
@@ -1055,6 +1170,33 @@ function lineSegment(
     kind: 'line',
     start,
     end,
+  }
+}
+
+function symbolicVec3(
+  x: number,
+  y: number,
+  z: number,
+  expressions: Partial<Record<'x' | 'y' | 'z', string>>,
+): Vec3 {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x:
+        expressions.x === undefined
+          ? { kind: 'numeric', value: x }
+          : { kind: 'symbolic', expression: expressions.x, previewValue: x },
+      y:
+        expressions.y === undefined
+          ? { kind: 'numeric', value: y }
+          : { kind: 'symbolic', expression: expressions.y, previewValue: y },
+      z:
+        expressions.z === undefined
+          ? { kind: 'numeric', value: z }
+          : { kind: 'symbolic', expression: expressions.z, previewValue: z },
+    },
   }
 }
 

@@ -24,7 +24,8 @@ import {
 } from './examples'
 import { normalizePointForAmbientDimension } from './geometry'
 import {
-  parseSavedDiagramJson,
+  parseSavedDiagramJsonForImport,
+  resolvePendingSymbolicDiagramImport,
   serializeDiagram,
 } from './model/serialization.ts'
 import { importTikzStyleFile } from './model/importedTikzStyles.ts'
@@ -65,6 +66,9 @@ import type {
   VisibilitySortMode,
   WorkPlane,
 } from './model/types'
+import type {
+  PendingSymbolicDiagramImport,
+} from './model/serialization.ts'
 import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
@@ -296,6 +300,10 @@ type ExampleId =
 type CopyStatus = 'idle' | 'copied' | 'downloaded' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type StyleImportStatus = 'idle' | 'imported' | 'failed'
+type SymbolicImportVariableDraft = {
+  name: string
+  expression: string
+}
 type CreationTool = WorkPlanePreviewTool
 type DirectCreationTool =
   | 'createPoint'
@@ -736,6 +744,12 @@ function App() {
   const [directSourceKey, setDirectSourceKey] = useState<string>('')
   const [saveLoadStatus, setSaveLoadStatus] = useState<SaveLoadStatus>('idle')
   const [saveLoadMessage, setSaveLoadMessage] = useState<string>('')
+  const [pendingSymbolicImport, setPendingSymbolicImport] =
+    useState<PendingSymbolicDiagramImport | null>(null)
+  const [symbolicImportDrafts, setSymbolicImportDrafts] = useState<
+    SymbolicImportVariableDraft[]
+  >([])
+  const [symbolicImportStatus, setSymbolicImportStatus] = useState<string>('')
   const [styleImportReport, setStyleImportReport] = useState<StyleImportReport>(
     emptyStyleImportReport,
   )
@@ -1560,38 +1574,19 @@ function App() {
     })
   }
 
-  async function loadJsonFile(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-
-    if (file === undefined) {
-      return
-    }
-
-    let text: string
-
-    try {
-      text = await file.text()
-    } catch {
-      setSaveLoadStatus('failed')
-      setSaveLoadMessage('Could not read JSON file.')
-      return
-    }
-
-    const result = parseSavedDiagramJson(text)
-
-    if (!result.ok) {
-      setSaveLoadStatus('failed')
-      setSaveLoadMessage(result.error)
-      return
-    }
-
-    setSelectedExampleId(result.diagram.ambientDimension === 2 ? '2d' : '3d')
+  function commitLoadedJsonDiagram(
+    diagram: Diagram,
+    warnings: readonly string[],
+  ): void {
+    setPendingSymbolicImport(null)
+    setSymbolicImportDrafts([])
+    setSymbolicImportStatus('')
+    setSelectedExampleId(diagram.ambientDimension === 2 ? '2d' : '3d')
     setCreationTool('select')
     setEditorState((current) =>
       commitDiagramChange(current, {
         ...current,
-        editableDiagram: result.diagram,
+        editableDiagram: diagram,
         selectedElement: null,
         layerFilter: allLayersFilter,
         polylineDraft: null,
@@ -1615,37 +1610,124 @@ function App() {
     setFillStatus('')
     setDirectLayerInput('0')
     setDirectCoordinateMode('global')
-    setDirectPolylineRows(defaultDirectPolylineRows(result.diagram.ambientDimension))
+    setDirectPolylineRows(defaultDirectPolylineRows(diagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
-    setDirectCubicBezierRows(defaultDirectCubicBezierRows(result.diagram.ambientDimension))
+    setDirectCubicBezierRows(defaultDirectCubicBezierRows(diagram.ambientDimension))
     setDirectSheetRows(defaultDirectSheetRows())
     resetDirectCoordinateSources()
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneStatus('')
-    const loadedCamera = cameraControlStateFromDiagramView(result.diagram)
+    const loadedCamera = cameraControlStateFromDiagramView(diagram)
 
     setCameraControl(loadedCamera)
     setSavedCameraControl(loadedCamera)
     setIsCameraDetailsExpanded(false)
     setCameraStatus('')
     setIncludeCoordinateAxesInTikz(
-      result.diagram.ambientDimension === 3
-        ? result.diagram.view?.showCoordinateAxesInTikz ?? false
+      diagram.ambientDimension === 3
+        ? diagram.view?.showCoordinateAxesInTikz ?? false
         : false,
     )
-    setTikzExportMode(result.diagram.view?.exportMode ?? defaultTikzExportMode)
+    setTikzExportMode(diagram.view?.exportMode ?? defaultTikzExportMode)
     setVisibilityOptions(
       cloneVisibilityOptions(
-        result.diagram.view?.visibility ?? defaultVisibilityOptions,
+        diagram.view?.visibility ?? defaultVisibilityOptions,
       ),
     )
     setSaveLoadStatus('loaded')
     setSaveLoadMessage(
-      result.warnings.length === 0
+      warnings.length === 0
         ? 'JSON loaded.'
-        : `JSON loaded. ${result.warnings.join(' ')}`,
+        : `JSON loaded. ${warnings.join(' ')}`,
     )
+  }
+
+  async function loadJsonFile(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+
+    if (file === undefined) {
+      return
+    }
+
+    let text: string
+
+    try {
+      text = await file.text()
+    } catch {
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage('Could not read JSON file.')
+      return
+    }
+
+    const result = parseSavedDiagramJsonForImport(text)
+
+    if (!result.ok) {
+      setPendingSymbolicImport(null)
+      setSymbolicImportDrafts([])
+      setSymbolicImportStatus('')
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage(result.error)
+      return
+    }
+
+    if (result.kind === 'needsVariableResolution') {
+      setPendingSymbolicImport(result.pendingImport)
+      setSymbolicImportDrafts(
+        result.pendingImport.variables.map((variable) => ({
+          name: variable.name,
+          expression: variable.expression,
+        })),
+      )
+      setSymbolicImportStatus('')
+      setSaveLoadStatus('idle')
+      setSaveLoadMessage(
+        `This diagram uses symbolic variables. Please assign values to: ${result.pendingImport.variables
+          .map((variable) => variable.name)
+          .join(', ')}.`,
+      )
+      return
+    }
+
+    commitLoadedJsonDiagram(result.diagram, result.warnings)
+  }
+
+  function updateSymbolicImportDraft(name: string, expression: string): void {
+    setSymbolicImportDrafts((current) =>
+      current.map((draft) =>
+        draft.name === name ? { ...draft, expression } : draft,
+      ),
+    )
+    setSymbolicImportStatus('')
+  }
+
+  function cancelSymbolicImport(): void {
+    setPendingSymbolicImport(null)
+    setSymbolicImportDrafts([])
+    setSymbolicImportStatus('')
+    setSaveLoadStatus('idle')
+    setSaveLoadMessage('JSON load canceled.')
+  }
+
+  function confirmSymbolicImport(): void {
+    if (pendingSymbolicImport === null) {
+      return
+    }
+
+    const result = resolvePendingSymbolicDiagramImport(
+      pendingSymbolicImport,
+      symbolicImportDrafts,
+    )
+
+    if (!result.ok) {
+      setSymbolicImportStatus(result.error)
+      setSaveLoadStatus('failed')
+      setSaveLoadMessage(result.error)
+      return
+    }
+
+    commitLoadedJsonDiagram(result.diagram, result.warnings)
   }
 
   function updateSelectedElement(selection: SelectedElement): void {
@@ -4961,6 +5043,10 @@ function App() {
     }
   }
 
+  const symbolicImportCanConfirm =
+    pendingSymbolicImport !== null &&
+    symbolicImportDrafts.every((draft) => draft.expression.trim().length > 0)
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -6223,6 +6309,81 @@ function App() {
           </section>
         )}
       </section>
+
+      {pendingSymbolicImport !== null && (
+        <div className="symbolic-import-backdrop">
+          <section
+            className="symbolic-import-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="symbolic-import-heading"
+          >
+            <div className="symbolic-import-heading-row">
+              <div>
+                <h2 id="symbolic-import-heading">Resolve symbolic variables</h2>
+                <p>
+                  This diagram uses symbolic variables. Enter numeric preview
+                  values or expressions.
+                </p>
+              </div>
+            </div>
+            <div className="symbolic-import-variable-list">
+              {pendingSymbolicImport.variables.map((variable) => {
+                const draft =
+                  symbolicImportDrafts.find(
+                    (candidate) => candidate.name === variable.name,
+                  ) ?? {
+                    name: variable.name,
+                    expression: variable.expression,
+                  }
+
+                return (
+                  <label
+                    key={variable.name}
+                    className="symbolic-import-variable-row"
+                  >
+                    <span>{variable.name}</span>
+                    <input
+                      type="text"
+                      value={draft.expression}
+                      spellCheck={false}
+                      placeholder={variable.defined ? undefined : 'required'}
+                      onChange={(event) =>
+                        updateSymbolicImportDraft(
+                          variable.name,
+                          event.currentTarget.value,
+                        )
+                      }
+                    />
+                  </label>
+                )
+              })}
+            </div>
+            {symbolicImportStatus !== '' && (
+              <div className="symbolic-import-error" role="status">
+                {symbolicImportStatus}
+              </div>
+            )}
+            <div className="symbolic-import-actions">
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={cancelSymbolicImport}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!symbolicImportCanConfirm}
+                onClick={confirmSymbolicImport}
+              >
+                Load diagram
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <section className="workspace" aria-label="Preview and TikZ source">
         <article className="workspace-panel preview-panel">

@@ -247,6 +247,11 @@ export function validateSymbolicVec3(
   context: CoordinateExpressionContext | undefined,
   errors: DiagramValidationIssue[],
 ): void {
+  if (!isRecord(point)) {
+    pushError(errors, path, 'Coordinate must be an object.')
+    return
+  }
+
   const symbolic = point.symbolic
 
   if (symbolic === undefined) {
