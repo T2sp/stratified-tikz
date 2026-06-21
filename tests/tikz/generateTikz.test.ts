@@ -704,6 +704,69 @@ test('straight polyline curve occlusion TikZ output splits visible hidden visibl
   assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 
+test('backtracking curve occlusion TikZ output preserves both directions', () => {
+  const tikz = generateTikz(createBacktrackingCurveOcclusionDiagram(), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /Visible sampled segment/g), 2)
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyBacktrackingCurve0Occlusionp0\) at \(0,1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyBacktrackingCurve0Occlusionp1\) at \(1,1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyBacktrackingCurve0Occlusionp2\) at \(1,1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyBacktrackingCurve0Occlusionp3\) at \(0,1,0\);/,
+  )
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('long visible capped curve occlusion TikZ output falls back to original curve', () => {
+  const tikz = generateTikz(createLongCurveOcclusionDiagram('visible'), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.doesNotMatch(tikz, /Auto curve occlusion/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyLongVisibleCurve0p30\) at \(30,1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curvePolyLongVisibleCurve0p29\) -- \(curvePolyLongVisibleCurve0p30\);/,
+  )
+  assert.doesNotMatch(tikz, /21\.333/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('long hidden capped curve occlusion TikZ output falls back to original curve', () => {
+  const tikz = generateTikz(createLongCurveOcclusionDiagram('hidden'), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.doesNotMatch(tikz, /Auto curve occlusion/)
+  assert.doesNotMatch(tikz, /Hidden sampled segment/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyLongHiddenCurve0p30\) at \(30,-1,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curvePolyLongHiddenCurve0p29\) -- \(curvePolyLongHiddenCurve0p30\);/,
+  )
+  assert.doesNotMatch(tikz, /21\.333/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
 test('straight line path occlusion TikZ output preserves style overrides', () => {
   const tikz = generateTikz(
     createStraightCurveOcclusionDiagram('linePath', {
@@ -4698,6 +4761,74 @@ function createStraightCurveOcclusionDiagram(
   ]
 
   return diagram
+}
+
+function createBacktrackingCurveOcclusionDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet === undefined) {
+    throw new Error('Expected occluding sheet.')
+  }
+
+  diagram.strata = [
+    sheet,
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'backtracking-curve',
+      name: 'Backtracking Curve',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: 1, z: 0 },
+        { x: 1, y: 1, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  ]
+
+  return diagram
+}
+
+function createLongCurveOcclusionDiagram(
+  visibility: 'visible' | 'hidden',
+): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const sheet = diagram.strata[0]
+  const y = visibility === 'visible' ? 1 : -1
+  const title = visibility === 'visible' ? 'Long Visible Curve' : 'Long Hidden Curve'
+
+  if (sheet === undefined) {
+    throw new Error('Expected occluding sheet.')
+  }
+
+  diagram.strata = [
+    sheet,
+    {
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: `long-${visibility}-curve`,
+      name: title,
+      style: curveStyle(),
+      points: longPolylinePoints(30, y),
+      styleSegments: [],
+      layer: 0,
+    },
+  ]
+
+  return diagram
+}
+
+function longPolylinePoints(finalX: number, y: number): Vec3[] {
+  return Array.from({ length: finalX + 1 }, (_, index) => ({
+    x: index,
+    y,
+    z: 0,
+  }))
 }
 
 function createEmpty3DDiagramWithCamera(camera: ReturnType<typeof createInitialCamera3D>): Diagram {

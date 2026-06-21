@@ -87,7 +87,7 @@ test('curve partly behind surface produces visible and hidden segments', () => {
 
   assert.deepEqual(
     result?.segments.map((segment) => segment.visibility),
-    ['visible', 'hidden', 'visible'],
+    ['visible', 'hidden', 'hidden', 'hidden', 'visible'],
   )
 })
 
@@ -219,6 +219,130 @@ test('fully visible straight segment remains one visible run', () => {
   assert.deepEqual(visibilityRuns(result), ['visible'])
 })
 
+test('fully visible backtracking polyline preserves both directions', () => {
+  const curve = polylineCurve('visible-backtracking-polyline', [
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 0, y: 1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 1,
+  })
+
+  assert.equal(result?.capped, false)
+  assert.deepEqual(visibilityRuns(result), ['visible', 'visible'])
+  assert.deepEqual(result?.segments.map(segmentEndpoints), [
+    {
+      start: { x: 0, y: 1, z: 0 },
+      end: { x: 1, y: 1, z: 0 },
+    },
+    {
+      start: { x: 1, y: 1, z: 0 },
+      end: { x: 0, y: 1, z: 0 },
+    },
+  ])
+  assert.equal(
+    result?.segments.some((segment) =>
+      vec3ApproximatelyEqual(segment.start, segment.end),
+    ),
+    false,
+  )
+})
+
+test('same-key same-direction collinear subdivisions merge to one run', () => {
+  const curve = polylineCurve('same-key-forward-polyline', [
+    { x: 0, y: 1, z: 0 },
+    { x: 2, y: 1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 2,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 2)
+  assert.deepEqual(result?.segments.map(segmentEndpoints), [
+    {
+      start: { x: 0, y: 1, z: 0 },
+      end: { x: 2, y: 1, z: 0 },
+    },
+  ])
+})
+
+test('different merge keys do not merge adjacent collinear polyline edges', () => {
+  const curve = polylineCurve('different-key-forward-polyline', [
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 2, y: 1, z: 0 },
+  ])
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 1,
+  })
+
+  assert.deepEqual(result?.segments.map(segmentEndpoints), [
+    {
+      start: { x: 0, y: 1, z: 0 },
+      end: { x: 1, y: 1, z: 0 },
+    },
+    {
+      start: { x: 1, y: 1, z: 0 },
+      end: { x: 2, y: 1, z: 0 },
+    },
+  ])
+})
+
+test('different style overrides do not merge adjacent collinear path segments', () => {
+  const curve = createConcatenatedPathStratum({
+    ambientDimension: 3,
+    id: 'different-style-path',
+    name: 'different-style-path',
+    style: defaultCurveStyle,
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 1, z: 0 },
+        end: { x: 1, y: 1, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 1, z: 0 },
+        end: { x: 2, y: 1, z: 0 },
+        styleOverride: {
+          strokeColor: '#AA0033',
+          strokeOpacity: 0.8,
+          lineWidth: 2.4,
+          lineStyle: 'dotted',
+        },
+      },
+    ],
+  })
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    curveSegmentSamples: 1,
+  })
+
+  assert.deepEqual(result?.segments.map(segmentEndpoints), [
+    {
+      start: { x: 0, y: 1, z: 0 },
+      end: { x: 1, y: 1, z: 0 },
+    },
+    {
+      start: { x: 1, y: 1, z: 0 },
+      end: { x: 2, y: 1, z: 0 },
+    },
+  ])
+  assert.equal(
+    result?.segments[0]?.style.strokeColor,
+    defaultCurveStyle.strokeColor,
+  )
+  assert.equal(result?.segments[1]?.style.strokeColor, '#AA0033')
+})
+
 test('fully hidden straight segment remains one hidden run', () => {
   const curve = polylineCurve('fully-hidden-line', [
     { x: -0.5, y: -1, z: 0 },
@@ -325,12 +449,8 @@ test('curve occlusion respects layerThenDepth and depthThenLayer options', () =>
   assert.equal(depthThenLayer[0]?.segments[0]?.visibility, 'hidden')
 })
 
-test('curve occlusion sampling cap prevents excessive sampled segments', () => {
-  const points = Array.from({ length: 40 }, (_, index) => ({
-    x: -0.2 + index * 0.01,
-    y: -1,
-    z: 0,
-  }))
+test('curve occlusion sampling cap falls back instead of exposing a prefix', () => {
+  const points = longPolylinePoints(30, 1)
   const curve = polylineCurve('long-curve', points)
   const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
     camera: occlusionCamera,
@@ -339,8 +459,23 @@ test('curve occlusion sampling cap prevents excessive sampled segments', () => {
   })
 
   assert.equal(result?.sampledSegmentCount, 5)
-  assert.ok((result?.segments.length ?? 0) <= 5)
   assert.equal(result?.capped, true)
+  assert.equal(result?.fallbackReason, 'sampleCapExceeded')
+  assert.deepEqual(result?.segments, [])
+})
+
+test('hidden capped curve also falls back without exposing a prefix', () => {
+  const curve = polylineCurve('long-hidden-curve', longPolylinePoints(30, -1))
+  const [result] = classifyCurveOcclusion(occlusionDiagram(curve), {
+    camera: occlusionCamera,
+    visibility: enabledVisibility(),
+    maxCurveSegmentsPerCurve: 5,
+  })
+
+  assert.equal(result?.sampledSegmentCount, 5)
+  assert.equal(result?.capped, true)
+  assert.equal(result?.fallbackReason, 'sampleCapExceeded')
+  assert.deepEqual(result?.segments, [])
 })
 
 test('curve occlusion does not mutate original curve geometry', () => {
@@ -428,6 +563,16 @@ function visibilityRuns(
   return result?.segments.map((segment) => segment.visibility) ?? []
 }
 
+function segmentEndpoints(segment: { start: Vec3; end: Vec3 }): {
+  start: Vec3
+  end: Vec3
+} {
+  return {
+    start: segment.start,
+    end: segment.end,
+  }
+}
+
 function segmentHasFiniteCoordinates(segment: {
   start: Vec3
   end: Vec3
@@ -446,6 +591,22 @@ function isFiniteVec3(point: Vec3): boolean {
     Number.isFinite(point.y) &&
     Number.isFinite(point.z)
   )
+}
+
+function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
+  return (
+    Math.abs(first.x - second.x) <= 1e-9 &&
+    Math.abs(first.y - second.y) <= 1e-9 &&
+    Math.abs(first.z - second.z) <= 1e-9
+  )
+}
+
+function longPolylinePoints(finalX: number, y: number): Vec3[] {
+  return Array.from({ length: finalX + 1 }, (_, index) => ({
+    x: index,
+    y,
+    z: 0,
+  }))
 }
 
 function enabledVisibility(

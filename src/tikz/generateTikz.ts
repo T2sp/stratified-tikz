@@ -1598,7 +1598,9 @@ function emitOcclusionSegmentedCurves(
       layer: normalizeLayer(item.layer),
       sectionTitle,
       lines:
-        occlusion === undefined || occlusion.segments.length === 0
+        occlusion === undefined ||
+        occlusion.capped ||
+        occlusion.segments.length === 0
           ? emitCurve(item, index, context)
           : emitOcclusionSegmentedCurve(item, index, occlusion, context),
     }
@@ -1611,7 +1613,7 @@ function emitOcclusionSegmentedCurve(
   occlusion: CurveOcclusionResult,
   context: GenerateContext,
 ): string[] {
-  if (!curveHasFiniteCoordinates(curve)) {
+  if (!curveHasFiniteCoordinates(curve) || occlusion.capped) {
     return emitCurve(curve, elementIndex, context)
   }
 

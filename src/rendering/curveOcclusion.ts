@@ -37,6 +37,7 @@ import {
 } from './projectedPrimitives.ts'
 
 export type CurveVisibility = 'visible' | 'hidden'
+export type CurveOcclusionFallbackReason = 'sampleCapExceeded'
 
 export type CurveOcclusionSegment = {
   curveId: string
@@ -60,6 +61,7 @@ export type CurveOcclusionResult = {
   segments: CurveOcclusionSegment[]
   sampledSegmentCount: number
   capped: boolean
+  fallbackReason?: CurveOcclusionFallbackReason
 }
 
 export type CurveOcclusionOptions = {
@@ -158,6 +160,20 @@ export function classifyCurveOcclusion(
       templatePathSamples,
       maxCurveSegmentsPerCurve,
     )
+
+    if (sampled.capped) {
+      return [
+        {
+          curveId: stratum.id,
+          curve: stratum,
+          segments: [],
+          sampledSegmentCount: sampled.segments.length,
+          capped: true,
+          fallbackReason: 'sampleCapExceeded',
+        },
+      ]
+    }
+
     const classifiedSegments = sampled.segments.flatMap(
       (segment, segmentIndex): MergeableCurveOcclusionSegment[] => {
         const classified = classifyCurveSegment(
@@ -526,6 +542,10 @@ function appendSubdividedPointPairSamples(
   mergeKeyPrefix: string,
 ): void {
   for (let index = 0; index < points.length - 1; index += 1) {
+    if (accumulator.capped) {
+      return
+    }
+
     appendSubdividedLineSamples(
       accumulator,
       points[index],
@@ -557,8 +577,13 @@ function appendSubdividedLineSamples(
 
   // Straight segments must be subdivided for midpoint occlusion to detect
   // partial hiding. Sampling is bounded by curveSegmentSamples and the
-  // accumulator max segment cap; this is approximate, not analytic clipping.
+  // accumulator max segment cap; capped curves fall back to original rendering
+  // rather than emitting a truncated sampled prefix.
   for (let index = 1; index <= sampleCount; index += 1) {
+    if (accumulator.capped) {
+      return
+    }
+
     const next =
       index === sampleCount
         ? cloneVec3(end)
@@ -584,6 +609,10 @@ function appendPointPairSamples(
   style: CurveStyle,
 ): void {
   for (let index = 0; index < points.length - 1; index += 1) {
+    if (accumulator.capped) {
+      return
+    }
+
     appendStyledSegment(accumulator, points[index], points[index + 1], style)
   }
 }
@@ -694,14 +723,84 @@ function canMergeClassifiedCurveSegments(
   first: MergeableCurveOcclusionSegment,
   second: MergeableCurveOcclusionSegment,
 ): boolean {
+  // Collinear merge is only safe for same-direction monotonic extensions.
+  // Backtracking paths such as A -> B -> A are valid geometry and must not
+  // collapse into a zero-length A -> A run.
   return (
     first.mergeKey !== undefined &&
     second.mergeKey !== undefined &&
-    (first.mergeKey === second.mergeKey ||
-      collinearVec3(first.start, first.end, second.end)) &&
+    first.mergeKey === second.mergeKey &&
     first.visibility === second.visibility &&
-    vec3ApproximatelyEqual(first.end, second.start) &&
-    curveStylesEqual(first.style, second.style)
+    curveStylesEqual(first.style, second.style) &&
+    occludingFacesCompatible(first.occludingFace, second.occludingFace) &&
+    sameDirectionMonotonicExtension(first, second)
+  )
+}
+
+function occludingFacesCompatible(
+  first: ProjectedSurfaceFace | undefined,
+  second: ProjectedSurfaceFace | undefined,
+): boolean {
+  if (first === undefined || second === undefined) {
+    return first === second
+  }
+
+  return (
+    first.sourceId === second.sourceId &&
+    first.faceIndex === second.faceIndex
+  )
+}
+
+function sameDirectionMonotonicExtension(
+  first: MergeableCurveOcclusionSegment,
+  second: MergeableCurveOcclusionSegment,
+): boolean {
+  if (
+    !isFiniteVec3(first.start) ||
+    !isFiniteVec3(first.end) ||
+    !isFiniteVec3(second.start) ||
+    !isFiniteVec3(second.end) ||
+    !vec3ApproximatelyEqual(first.end, second.start)
+  ) {
+    return false
+  }
+
+  const firstVector = subtractVec3(first.end, first.start)
+  const secondVector = subtractVec3(second.end, second.start)
+  const mergedVector = subtractVec3(second.end, first.start)
+  const firstLength = vec3Length(firstVector)
+  const secondLength = vec3Length(secondVector)
+  const mergedLength = vec3Length(mergedVector)
+
+  if (
+    firstLength <= pointComparisonEpsilon ||
+    secondLength <= pointComparisonEpsilon ||
+    mergedLength <= pointComparisonEpsilon
+  ) {
+    return false
+  }
+
+  const lengthProduct = firstLength * secondLength
+  const directionTolerance = pointComparisonEpsilon * Math.max(1, lengthProduct)
+
+  if (dotVec3(firstVector, secondVector) <= directionTolerance) {
+    return false
+  }
+
+  if (
+    crossMagnitudeVec3(firstVector, secondVector) >
+    pointComparisonEpsilon * Math.max(1, lengthProduct)
+  ) {
+    return false
+  }
+
+  const lengthTolerance =
+    pointComparisonEpsilon *
+    Math.max(1, firstLength, secondLength, mergedLength)
+
+  return (
+    mergedLength + lengthTolerance >= firstLength &&
+    mergedLength + lengthTolerance >= secondLength
   )
 }
 
@@ -970,26 +1069,30 @@ function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
   )
 }
 
-function collinearVec3(first: Vec3, second: Vec3, third: Vec3): boolean {
-  const ab = {
-    x: second.x - first.x,
-    y: second.y - first.y,
-    z: second.z - first.z,
+function subtractVec3(end: Vec3, start: Vec3): Vec3 {
+  return {
+    x: end.x - start.x,
+    y: end.y - start.y,
+    z: end.z - start.z,
   }
-  const ac = {
-    x: third.x - first.x,
-    y: third.y - first.y,
-    z: third.z - first.z,
-  }
+}
+
+function dotVec3(first: Vec3, second: Vec3): number {
+  return first.x * second.x + first.y * second.y + first.z * second.z
+}
+
+function crossMagnitudeVec3(first: Vec3, second: Vec3): number {
   const cross = {
-    x: ab.y * ac.z - ab.z * ac.y,
-    y: ab.z * ac.x - ab.x * ac.z,
-    z: ab.x * ac.y - ab.y * ac.x,
+    x: first.y * second.z - first.z * second.y,
+    y: first.z * second.x - first.x * second.z,
+    z: first.x * second.y - first.y * second.x,
   }
 
-  return (
-    Math.hypot(cross.x, cross.y, cross.z) <= pointComparisonEpsilon
-  )
+  return vec3Length(cross)
+}
+
+function vec3Length(vector: Vec3): number {
+  return Math.hypot(vector.x, vector.y, vector.z)
 }
 
 function cloneCurveStyle(style: CurveStyle): CurveStyle {

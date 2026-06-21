@@ -1319,7 +1319,11 @@ function curveToSvgPathRuns(
   occlusion: CurveOcclusionResult | undefined,
   visibilityOptions: VisibilityOptions,
 ): SvgCurvePathRun[] {
-  if (occlusion !== undefined && occlusion.segments.length > 0) {
+  if (
+    occlusion !== undefined &&
+    !occlusion.capped &&
+    occlusion.segments.length > 0
+  ) {
     return occlusion.segments.map((segment) => {
       const attributes =
         segment.visibility === 'hidden'
