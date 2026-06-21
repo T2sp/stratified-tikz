@@ -77,6 +77,10 @@ type VisibilityOptions = {
   surfaceDepthSort: boolean;
   sortMode: "layerThenDepth" | "depthThenLayer";
   depthEpsilon: number;
+  hiddenCurveStyle?: {
+    lineStyle: "dotted" | "denselyDotted" | "dashed";
+    opacity: number;
+  };
 };
 ```
 
@@ -87,7 +91,11 @@ The default is conservative:
   enabled: false,
   surfaceDepthSort: true,
   sortMode: "layerThenDepth",
-  depthEpsilon: 1e-9
+  depthEpsilon: 1e-9,
+  hiddenCurveStyle: {
+    lineStyle: "denselyDotted",
+    opacity: 0.45
+  }
 }
 ```
 
@@ -109,6 +117,35 @@ point, and label depth occlusion are intentionally left to later phases. Sorted
 TikZ export emits one `\filldraw` command per sorted face with comments
 recording the source sheet, face index, and average depth.
 
+## Curve Occlusion
+
+Phase 20F adds optional sampled curve occlusion behind projected surface faces.
+The implementation lives in `src/rendering/curveOcclusion.ts` and is shared by
+SVG preview and TikZ export.
+
+For each sampled curve segment, StratifiedTikZ:
+
+1. computes the segment midpoint in model coordinates;
+2. projects that midpoint into camera screen coordinates;
+3. finds projected surface faces whose polygon contains the midpoint;
+4. estimates the face depth at that projected point using triangle
+   barycentric interpolation, with average face depth as a fallback;
+5. marks the segment hidden when the curve midpoint is farther than the face by
+   more than `depthEpsilon`.
+
+Hidden segments keep the curve stroke color and line width. The hidden style
+overrides the line style and multiplies the original stroke opacity by
+`hiddenCurveStyle.opacity`. The default is densely dotted at 45% of the curve's
+own opacity.
+
+`layerThenDepth` preserves manual layer order for occlusion: only surfaces on
+the same or a higher layer can hide a curve. `depthThenLayer` lets depth decide
+across layers. SVG preview ignores hidden-layer sheets as occluders. TikZ
+export considers exported sheets and emits sampled visible/hidden `\draw`
+commands when visibility is enabled; when visibility is disabled, exact curve
+export, saved paths, local plane scopes, symbolic-friendly commands, and grid
+foreach output are unchanged.
+
 ## Approximation Goal
 
 This model is a foundation for automatic visibility. It provides finite
@@ -124,7 +161,11 @@ projected coordinates and finite depth metadata that can support:
 - Surface sorting is a painter's algorithm, not exact hidden-surface removal.
 - Intersecting surfaces or cyclic overlaps may still sort incorrectly.
 - Large faces may need finer sampling before depth sorting looks right.
-- It does not compute curve/surface intersections or hidden segments.
+- Curve occlusion is midpoint sampled; it does not compute exact
+  curve/surface intersections or clipped split points.
+- Sampled curve occlusion export is numeric and approximate. Disable
+  visibility when exact symbolic paths, saved paths, or grid foreach output are
+  more important than preview-matched hidden segments.
 - Work-plane filled sheets with holes are represented as separate boundary-loop
   face primitives rather than triangulated polygons with holes.
 - Labels are not emitted as primitives yet.

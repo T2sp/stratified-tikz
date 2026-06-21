@@ -71,7 +71,9 @@ import {
   resolveSymbolicVariables,
 } from '../model/variables.ts'
 import {
+  defaultHiddenCurveStyle,
   defaultVisibilityOptions,
+  hiddenCurveStyleFromBase,
   resolveVisibilityOptions,
   surfaceDepthSortEnabled,
 } from '../model/visibility.ts'
@@ -82,6 +84,11 @@ import {
   extractProjectedRenderPrimitives,
   type ProjectedSurfaceFace,
 } from '../rendering/projectedPrimitives.ts'
+import {
+  classifyCurveOcclusion,
+  type CurveOcclusionResult,
+  type CurveOcclusionSegment,
+} from '../rendering/curveOcclusion.ts'
 import { formatScalarExpressionForTikz } from './expressionFormatter.ts'
 
 const defaultLabelStyleValues: LabelStyle = {
@@ -388,16 +395,19 @@ export function generateTikz3D(
         ),
         (sheet, index) => emitSheet(sheet, index, context),
       )
+  const curveCommands = surfaceDepthSortEnabled(context.visibility)
+    ? emitOcclusionSegmentedCurves(diagram, curveSectionTitle, context)
+    : emitLayeredItems(
+        curveSectionTitle,
+        diagram.strata.filter(
+          (stratum): stratum is CurveStratum =>
+            stratum.geometricKind === 'curve' && stratum.codim === 2,
+        ),
+        (curve, index) => emitCurve(curve, index, context),
+      )
   const drawingCommands = [
     ...sheetCommands,
-    ...emitLayeredItems(
-      curveSectionTitle,
-      diagram.strata.filter(
-        (stratum): stratum is CurveStratum =>
-          stratum.geometricKind === 'curve' && stratum.codim === 2,
-      ),
-      (curve, index) => emitCurve(curve, index, context),
-    ),
+    ...curveCommands,
     ...emitLayeredItems(
       pointSectionTitle,
       diagram.strata.filter(
@@ -807,6 +817,12 @@ function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
 
 function commentLineText(value: string): string {
   return normalizeSingleLineCommentText(value, 'external TikZ style source')
+}
+
+function capitalize(value: string): string {
+  return value.length === 0
+    ? value
+    : `${value[0].toUpperCase()}${value.slice(1)}`
 }
 
 function createVariableExportContext(
@@ -1532,6 +1548,155 @@ function emitCurve(
     ...formatTikzOptions(options),
     ']',
     indentLine(`${formatCurvePath(curve, coordinates, context.mode)};`),
+    '',
+  ]
+}
+
+function emitOcclusionSegmentedCurves(
+  diagram: Diagram,
+  sectionTitle: string,
+  context: GenerateContext,
+): LayeredTikzCommand[] {
+  if (context.camera3d === undefined) {
+    return emitLayeredItems(
+      sectionTitle,
+      diagram.strata.filter(
+        (stratum): stratum is CurveStratum =>
+          stratum.geometricKind === 'curve' && stratum.codim === 2,
+      ),
+      (curve, index) => emitCurve(curve, index, context),
+    )
+  }
+
+  const curves = sortByLayer(
+    diagram.strata.filter(
+      (stratum): stratum is CurveStratum =>
+        stratum.geometricKind === 'curve' && stratum.codim === 2,
+    ),
+  )
+  let occlusionByCurveId: Map<string, CurveOcclusionResult>
+
+  try {
+    occlusionByCurveId = new Map(
+      classifyCurveOcclusion(diagram, {
+        camera: context.camera3d,
+        visibility: context.visibility,
+      }).map((result) => [result.curveId, result]),
+    )
+  } catch {
+    return curves.map(({ item }, index) => ({
+      layer: normalizeLayer(item.layer),
+      sectionTitle,
+      lines: emitCurve(item, index, context),
+    }))
+  }
+
+  return curves.map(({ item }, index) => {
+    const occlusion = occlusionByCurveId.get(item.id)
+
+    return {
+      layer: normalizeLayer(item.layer),
+      sectionTitle,
+      lines:
+        occlusion === undefined ||
+        occlusion.capped ||
+        occlusion.segments.length === 0
+          ? emitCurve(item, index, context)
+          : emitOcclusionSegmentedCurve(item, index, occlusion, context),
+    }
+  })
+}
+
+function emitOcclusionSegmentedCurve(
+  curve: CurveStratum,
+  elementIndex: number,
+  occlusion: CurveOcclusionResult,
+  context: GenerateContext,
+): string[] {
+  if (!curveHasFiniteCoordinates(curve) || occlusion.capped) {
+    return emitCurve(curve, elementIndex, context)
+  }
+
+  const coordinateBaseName = `${curveCoordinateBaseName(
+    curve,
+    elementIndex,
+  )}Occlusion`
+  const hiddenStyle = context.visibility.hiddenCurveStyle ?? defaultHiddenCurveStyle
+  const segmentLines = occlusion.segments.flatMap((segment, index) =>
+    emitOcclusionSegmentedCurveDraw(
+      curve,
+      segment,
+      coordinateBaseName,
+      index,
+      hiddenStyle,
+      context,
+    ),
+  )
+
+  return [
+    `% Auto curve occlusion: curve "${curve.name}" [${curve.id}] sampled into ${occlusion.sampledSegmentCount} segment${occlusion.sampledSegmentCount === 1 ? '' : 's'}.`,
+    '% Hidden segments are approximate midpoint classifications against projected surface faces.',
+    ...(occlusion.capped
+      ? [
+          `% Curve sampling was capped at ${occlusion.sampledSegmentCount} segments for this export.`,
+        ]
+      : []),
+    ...(curve.pathLabel === undefined
+      ? []
+      : [
+          `% Saved path label "${commentLineText(curve.pathLabel)}" is not emitted in sampled occlusion mode.`,
+        ]),
+    ...segmentLines,
+  ]
+}
+
+function emitOcclusionSegmentedCurveDraw(
+  curve: CurveStratum,
+  segment: CurveOcclusionSegment,
+  coordinateBaseName: string,
+  segmentIndex: number,
+  hiddenStyle: NonNullable<VisibilityOptions['hiddenCurveStyle']>,
+  context: GenerateContext,
+): string[] {
+  const start = context.coordinates.define(
+    coordinateBaseName,
+    segmentIndex * 2,
+    segment.start,
+  )
+  const end = context.coordinates.define(
+    coordinateBaseName,
+    segmentIndex * 2 + 1,
+    segment.end,
+  )
+  const style =
+    segment.visibility === 'hidden'
+      ? hiddenCurveStyleFromBase(segment.style, hiddenStyle)
+      : segment.style
+  const options =
+    segment.visibility === 'hidden'
+      ? curveStyleTikzOptions(
+          style,
+          `Curve${curve.id}Hidden${segment.segmentIndex + 1}`,
+          context,
+        )
+      : curveStyleOptionsForElement(
+          curve.stylePresetId,
+          curve.importedTikzStyleReferenceId,
+          style,
+          `Curve${curve.id}Visible${segment.segmentIndex + 1}`,
+          context,
+        )
+  const faceComment =
+    segment.occludingFace === undefined
+      ? ''
+      : ` behind sheet [${segment.occludingFace.sourceId}] face ${segment.occludingFace.faceIndex}`
+
+  return [
+    `% ${capitalize(segment.visibility)} sampled segment ${segment.segmentIndex + 1}${faceComment}.`,
+    '\\draw[',
+    ...formatTikzOptions(options),
+    ']',
+    indentLine(`(${start}) -- (${end});`),
     '',
   ]
 }

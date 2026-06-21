@@ -1,10 +1,12 @@
 import type {
   CurveStyle,
+  HiddenCurveStyle,
   LabelAnchor,
   LineStyle,
   RegionStyle,
   SheetStyle,
 } from '../model/types'
+import { hiddenCurveStyleFromBase } from '../model/visibility.ts'
 
 export type SvgCurveStrokeAttributes = {
   stroke: string
@@ -54,6 +56,15 @@ export function curveStyleToSvgStrokeAttributes(
     strokeWidth: style.lineWidth,
     ...(strokeDasharray === undefined ? {} : { strokeDasharray }),
   }
+}
+
+export function hiddenCurveStyleToSvgStrokeAttributes(
+  baseStyle: CurveStyle,
+  hiddenStyle: HiddenCurveStyle,
+): SvgCurveStrokeAttributes {
+  return curveStyleToSvgStrokeAttributes(
+    hiddenCurveStyleFromBase(baseStyle, hiddenStyle),
+  )
 }
 
 export function filledSurfaceStyleToSvgAttributes(

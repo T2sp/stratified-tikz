@@ -83,11 +83,20 @@ export type TikzExportMode = (typeof tikzExportModes)[number]
 export const visibilitySortModes = ['layerThenDepth', 'depthThenLayer'] as const
 export type VisibilitySortMode = (typeof visibilitySortModes)[number]
 
+export const hiddenCurveLineStyles = ['dotted', 'denselyDotted', 'dashed'] as const
+export type HiddenCurveLineStyle = (typeof hiddenCurveLineStyles)[number]
+
+export type HiddenCurveStyle = {
+  lineStyle: HiddenCurveLineStyle
+  opacity: Opacity
+}
+
 export type VisibilityOptions = {
   enabled: boolean
   surfaceDepthSort: boolean
   sortMode: VisibilitySortMode
   depthEpsilon: number
+  hiddenCurveStyle?: HiddenCurveStyle
 }
 
 export type CoordinateInputMode = 'direct' | 'cursor'
