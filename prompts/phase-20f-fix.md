@@ -1,4 +1,4 @@
-# Phase 20F Fix Prompt: Subdivide straight line/polyline segments for curve occlusion
+# Phase 20F Fix Prompt: Prevent backtracking merge erasure and avoid truncating capped occlusion samples
 
 ## Environment
 
@@ -36,45 +36,84 @@ Review result:
 - Tests pass.
 - Build passes.
 - No Critical issues.
-- One Medium issue remains.
+- Two Medium issues remain.
 
-## Medium issue
+## Medium issue 1: Backtracking curves can be erased by collinear merge
 
-Straight polyline and line path segments are not subdivided before occlusion classification.
+In `src/rendering/curveOcclusion.ts`, adjacent collinear runs are merged even when the curve reverses direction.
 
-Current behavior:
-
-- `src/rendering/curveOcclusion.ts` samples polylines only by existing point pairs.
-- Line path segments return only start/end.
-- The midpoint classifier then marks the entire straight segment as either hidden or visible.
-- A simple straight line crossing behind a surface cannot split into:
+Example:
 
 ```text
-visible -> hidden -> visible
+A -> B -> A
 ```
 
-unless the user manually inserted vertices around the occlusion interval.
-
-This affects both:
-
-- SVG preview, because it consumes the same occlusion result;
-- TikZ export, because hidden/visible segment output consumes the same occlusion result.
-
-The review spot-check found a straight line crossing behind a test sheet returned:
+If the whole curve is visible, this valid polyline can be merged into a single zero-length segment:
 
 ```text
-hidden 1
+A -> A
 ```
 
-instead of split visible/hidden/visible segments.
+Result:
+
+- SVG occlusion output erases the curve;
+- TikZ occlusion output erases the curve.
+
+Root cause:
+
+- collinear merge checks geometry too weakly;
+- it does not check same-direction / monotonic extension;
+- it may merge runs across different source/merge keys;
+- it collapses a backtracking path.
+
+Required fix:
+
+- prevent cross-key collinear merges when the next segment reverses direction;
+- do not merge if the merged result would collapse the run;
+- do not merge across incompatible `mergeKey`s;
+- preserve valid backtracking geometry.
+
+## Medium issue 2: Capped sampling truncates long curves
+
+In `src/rendering/curveOcclusion.ts`, capped sampling currently returns only the sampled prefix.
+
+Callers render/export that prefix when non-empty.
+
+With default settings, a 30-edge visible polyline emitted only through something like:
+
+```text
+x = 21.333...
+```
+
+instead of the original:
+
+```text
+x = 30
+```
+
+This became reachable after Phase 20F started subdividing straight line/polyline segments.
+
+Required fix:
+
+- capped occlusion classification must not silently truncate curves;
+- if occlusion sampling would exceed the cap, either:
+  - fall back to original curve rendering/export; or
+  - include/preserve the unsampled remainder safely.
+- The preferred fix is to fall back to original non-occluded rendering/export for that curve and optionally report/mark occlusion as skipped.
+- Do not emit only a sampled prefix.
 
 ## Goal
 
-Fix Phase 20F line/polyline occlusion sampling.
+Fix Phase 20F curve occlusion so that:
 
-Straight polyline and line path segments should be subdivided using the bounded `curveSegmentSamples` setting before midpoint occlusion classification.
-
-A single straight segment crossing behind a surface should be able to split into visible/hidden/visible runs.
+1. Valid backtracking curves such as `A -> B -> A` are preserved.
+2. Collinear merge only merges same-direction, monotonic, compatible segments.
+3. Sampling caps never truncate curves.
+4. When a curve exceeds the occlusion sampling cap, output remains complete and safe.
+5. SVG and TikZ output remain consistent.
+6. Disabled visibility behavior remains unchanged.
+7. Inline TikZ output still has no blank lines.
+8. TikZ indentation remains 4 spaces.
 
 ## Scope
 
@@ -82,313 +121,352 @@ This is a targeted Phase 20F fix.
 
 Implement:
 
-- subdivision of straight polyline segments;
-- subdivision of line path segments;
-- preservation of existing bounded sampling and caps;
-- preservation of style overrides;
-- preservation of `maxCurveSegmentsPerCurve`;
-- tests for a single straight segment crossing behind a surface and splitting into visible/hidden/visible;
-- SVG/TikZ hidden output regression tests.
+- safe collinear merge logic;
+- `mergeKey`-compatible merging only;
+- non-reversing / monotonic-extension check;
+- cap behavior that preserves complete curve output;
+- tests for backtracking curves and long capped polylines.
 
 Do not implement:
 
-- exact analytic line/surface intersection;
-- exact clipping at the true occlusion boundary;
+- exact analytic curve/surface intersection;
+- exact clipping at true occlusion boundaries;
 - BSP splitting;
 - new visibility UI;
 - new curve kinds;
-- new dependencies;
-- broad rendering/export refactors.
+- new geometry features;
+- broad SVG/TikZ export refactors;
+- new dependencies.
 
 Do not change:
 
-- curve occlusion enable/disable semantics;
-- surface point-in-projected-face logic;
-- depth comparison convention;
-- hidden style semantics;
-- layer/depth mode behavior;
+- visibility option semantics;
+- hidden curve style semantics;
+- surface face depth logic;
+- point-in-projected-face logic;
 - original curve geometry;
 - save/load format;
-- non-occluded curve output when visibility is disabled.
+- disabled visibility output behavior;
+- layer/depth mode semantics.
 
-## 1. Inspect current curve occlusion sampling
+## 1. Inspect current occlusion run merging
 
 Inspect:
 
 - `src/rendering/curveOcclusion.ts`;
-- polyline sampling around the current point-pair logic;
-- line path segment sampling;
-- cubic/arc/template sampling;
-- `curveSegmentSamples` option;
-- `maxCurveSegmentsPerCurve` handling;
-- SVG occlusion rendering path in `SvgDiagram.tsx`;
-- TikZ hidden/visible export path in `generateTikz.ts`.
+- run grouping logic;
+- collinear merge logic around the reviewed line;
+- `mergeKey` or equivalent source/style identity;
+- SVG path consumption in `SvgDiagram.tsx`;
+- TikZ occlusion export consumption in `generateTikz.ts`.
 
-Identify where:
+Find where adjacent visible/hidden segments are merged.
 
-- polylines are converted to occlusion segments;
-- line path segments are converted to occlusion segments;
-- midpoint classification is applied;
-- visible/hidden adjacent sampled segments are grouped into runs.
+The merge must not:
 
-## 2. Subdivide straight polyline segments
+- merge segments with different `mergeKey`;
+- merge segments with different visibility class;
+- merge segments with different style override context;
+- merge segments when direction reverses;
+- produce a zero-length or collapsed segment unless the original geometry was zero-length and already handled safely.
 
-For each polyline edge:
+## 2. Add same-direction / monotonic-extension check
+
+For adjacent line-like sampled subsegments:
 
 ```text
-P0 -> P1
+s1: A -> B
+s2: B -> C
 ```
 
-generate multiple subsegments using `curveSegmentSamples`.
-
-For example, if `curveSegmentSamples = n`, generate points:
+It is safe to merge into:
 
 ```text
-P(t_i) = (1 - t_i) P0 + t_i P1
+A -> C
 ```
 
-for:
+only if:
 
-```text
-t_i = i / n, i = 0..n
-```
+1. `B` matches the end of `s1` and start of `s2`;
+2. the direction vectors point the same way;
+3. the combined segment length is not smaller than either component in a way that indicates backtracking;
+4. the merge does not collapse to zero;
+5. all merge identity/style keys match.
 
-and subsegments:
+Suggested vector check:
 
-```text
-P(t_0) -> P(t_1)
-P(t_1) -> P(t_2)
-...
-P(t_{n-1}) -> P(t_n)
-```
-
-Requirements:
-
-- `n` must be finite positive integer after validation/clamping;
-- no NaN/Infinity generated;
-- original polyline geometry is not mutated;
-- subsegments preserve source curve ID and style context;
-- subsegments are in path order;
-- zero-length edges are skipped or handled safely according to existing policy.
-
-## 3. Subdivide straight line path segments
-
-For each concatenated path line segment:
-
-```text
-start -> end
-```
-
-generate the same kind of bounded subsegments.
-
-Requirements:
-
-- line segment style override, if present, is preserved on all generated subsegments;
-- segment order is preserved;
-- start/end exactly preserved at the boundary of sampled points;
-- no generated non-finite points.
-
-## 4. Preserve cubic/arc/template sampling behavior
-
-Do not regress existing sampling for:
-
-- cubic Bézier segments;
-- arc segments;
-- circle/ellipse templates;
-- grid curves if they participate;
-- other sampled curve types.
-
-If these already use `curveSegmentSamples`, keep behavior.
-
-If they use a different bounded setting, do not change it unless necessary.
-
-## 5. Preserve maxCurveSegmentsPerCurve
-
-The subdivision fix must respect the existing cap:
-
-```text
-maxCurveSegmentsPerCurve
+```ts
+v1 = B - A
+v2 = C - B
+dot(v1, v2) > epsilon
+crossMagnitude(v1, v2) <= collinearTolerance
 ```
 
 or equivalent.
 
-Requirements:
-
-- generated subsegments per curve must be bounded;
-- if a curve has many polyline edges, total emitted occlusion segments must not exceed the cap;
-- when the cap is reached, fail safely or coarsen sampling according to existing policy;
-- do not freeze the editor/export for large polylines.
-
-Preferred behavior:
-
-- calculate an effective samples-per-edge based on both `curveSegmentSamples` and `maxCurveSegmentsPerCurve`;
-- or generate until cap and report/truncate consistently.
-
-Document chosen behavior in code/report.
-
-## 6. Preserve style overrides
-
-If a path segment has a style override:
-
-- every sampled subsegment from that original segment should carry the same style override;
-- visible/hidden output should use:
-  - original style for visible subsegments;
-  - hidden style merged/overlaid according to existing hidden style policy for hidden subsegments.
-
-Do not lose segment-level style information during subdivision.
-
-This matters for:
-
-- concatenated paths;
-- mixed-style paths;
-- line segments with custom style;
-- future grid/path outputs.
-
-## 7. Visible/hidden run grouping
-
-After subdivision and midpoint classification:
-
-- adjacent sampled subsegments with the same visibility class should be grouped into runs;
-- a line crossing behind a surface should produce multiple runs when classification changes;
-- run order must follow the original curve direction.
-
-Expected for the key regression:
+For backtracking:
 
 ```text
-visible run
-hidden run
-visible run
+A -> B -> A
 ```
 
-depending on geometry.
+the dot product is negative, so do not merge.
 
-Do not output each tiny sample as an isolated draw command if adjacent classifications match. Preserve or improve existing grouping.
+If existing geometry helpers support vector dot/cross/length, reuse them.
 
-## 8. SVG output
+## 3. Respect mergeKey
 
-SVG should use the corrected occlusion result.
+The review explicitly mentions:
+
+> Cross-key merging needs a same-direction/monotonic-extension check, or should only merge segments with the same `mergeKey`.
+
+Implement both if practical:
+
+- only merge if `mergeKey` is identical;
+- only merge if direction is same/monotonic;
+- only merge if visibility class and style context are identical.
+
+If `mergeKey` is currently missing for some segment types, define a stable one that captures at least:
+
+- source curve id;
+- source segment index;
+- style override identity;
+- visibility class if not otherwise checked.
+
+Do not merge across different source path segments if that can erase meaningful vertices or style changes.
+
+For a polyline `A -> B -> C` with same direction and same style, merging may be fine.
+
+For a polyline `A -> B -> A`, merging must not happen.
+
+## 4. Avoid zero-length merged output
+
+After any proposed merge, check the resulting segment length.
+
+Reject merge if:
+
+- merged start and end are approximately equal;
+- merged length is smaller than expected due to reversal/collapse;
+- either input segment is non-finite.
+
+Zero-length original subsegments should be skipped or handled according to existing policy, but merging must not create a zero-length visible run from nonzero input geometry.
+
+## 5. Fix capped sampling behavior
+
+Inspect sampling cap logic around `curveSegmentSamples` and `maxCurveSegmentsPerCurve`.
+
+Current bad behavior:
+
+- sampling stops at cap;
+- returns non-empty prefix;
+- callers render/export the prefix;
+- rest of the curve disappears.
+
+Required behavior:
+
+A capped curve must never be partially emitted as if complete.
+
+Choose one of the following policies.
+
+### Preferred policy: fallback to original rendering/export for that curve
+
+If occlusion sampling would exceed cap:
+
+- mark occlusion classification for that curve as skipped/fallback;
+- SVG renders the original curve normally, without hidden segmentation;
+- TikZ exports the original curve normally, without hidden segmentation;
+- no curve geometry is lost;
+- optionally include/report status in debug/test helper;
+- do not mutate diagram.
+
+This is the safest MVP.
+
+### Alternative policy: preserve unsampled remainder
+
+If implementing fallback is hard:
+
+- classify sampled prefix;
+- append unsampled remainder as visible/original style;
+- ensure final output reaches the original curve end;
+- clearly document approximation.
+
+This is acceptable only if output is complete and deterministic.
+
+Do not keep the current behavior of emitting only the sampled prefix.
+
+## 6. Add explicit result state for cap fallback
+
+If useful, change the occlusion classification result to distinguish:
+
+```ts
+type CurveOcclusionResult =
+  | { kind: "segmented"; runs: OccludedCurveRun[] }
+  | { kind: "fallbackOriginal"; reason: "sampleCapExceeded" };
+```
+
+or equivalent.
+
+Then callers can handle it safely.
 
 Requirements:
 
-- visible runs render with normal style;
-- hidden runs render with hidden style;
-- straight partially hidden curve visibly splits;
-- original curve is not mutated;
-- disabled visibility mode preserves normal output.
+- SVG caller renders original curve for fallback;
+- TikZ caller exports original curve for fallback;
+- tests cover the fallback path.
 
-## 9. TikZ output
+If changing the result shape is too broad, add a flag:
 
-TikZ export should use the corrected occlusion result.
+```ts
+sampleCapExceeded: boolean
+```
 
-Requirements:
+and ensure callers check it before using partial runs.
 
-- visible runs emit normal draw/path commands;
-- hidden runs emit hidden style draw/path commands;
-- partially hidden straight segment exports both visible and hidden pieces;
-- style overrides preserved;
-- inline math output still has no blank lines;
-- indentation remains 4 spaces;
-- no NaN/Infinity output;
-- disabled visibility mode preserves prior output.
+## 7. Preserve hidden segmentation when under cap
 
-It is acceptable that sampled straight pieces produce multiple shorter TikZ line segments in auto-visibility mode.
+The cap fallback should only apply when the cap is exceeded.
 
-## 10. Tests
+For normal curves under cap:
+
+- visible/hidden segmentation still works;
+- straight partially hidden lines still split;
+- hidden style still applies;
+- style overrides still apply;
+- run grouping still works.
+
+## 8. Preserve style overrides
+
+Both fixes must preserve style behavior.
+
+For merging:
+
+- do not merge across style override boundaries;
+- if a segment style override differs, keep separate runs.
+
+For cap fallback:
+
+- original rendering/export should preserve existing style overrides as it did before occlusion;
+- do not flatten style information.
+
+## 9. Tests
 
 Add focused tests.
 
-### Sampling tests
+### Backtracking merge tests
 
-1. Polyline edge subdivision creates more than one subsegment when `curveSegmentSamples > 1`.
-2. Line path segment subdivision creates more than one subsegment when `curveSegmentSamples > 1`.
-3. Subdivision preserves first start and final end exactly.
-4. Subdivision produces finite points.
-5. Zero-length line segment is handled safely.
-6. `maxCurveSegmentsPerCurve` is respected.
+1. A fully visible polyline:
 
-### Occlusion regression tests
+```text
+A -> B -> A
+```
 
-7. A single straight polyline segment crossing behind a surface splits into visible/hidden/visible runs.
+must not collapse to a zero-length run.
 
-8. A single straight line path segment crossing behind a surface splits into visible/hidden/visible runs.
+Expected:
 
-9. The same geometry with visibility disabled does not split into hidden runs.
+- output contains two visible segments or an equivalent non-collapsed representation;
+- start/end sequence preserves the backtracking geometry.
 
-10. A fully visible straight segment remains visible.
+2. Same test for TikZ output:
 
-11. A fully hidden straight segment remains hidden.
+- generated TikZ should include both directions or otherwise represent the backtracking curve;
+- it should not render/export as a single `A -> A` segment.
 
-### Style tests
+3. Same test for SVG helper/output.
 
-12. A line path segment style override is preserved after subdivision.
+4. Adjacent same-direction collinear segments:
 
-13. Hidden style is applied to hidden subdivided line segments.
+```text
+A -> B -> C
+```
 
-14. Visible style is applied to visible subdivided line segments.
+may still merge into `A -> C` if style/mergeKey compatible.
 
-### SVG/TikZ tests
+5. Adjacent collinear segments with different `mergeKey` do not merge.
 
-15. SVG hidden output includes hidden style attributes for the hidden run.
+6. Adjacent collinear segments with different style overrides do not merge.
 
-16. TikZ hidden output includes hidden style for the hidden run.
+### Cap behavior tests
 
-17. TikZ output includes both visible and hidden draw/path commands for the partially hidden straight segment.
+7. Long visible polyline exceeding default sampled segment cap falls back to original rendering/export or preserves unsampled remainder.
 
-18. Inline TikZ output with subdivided hidden segments has no blank lines.
+Expected:
 
-19. TikZ output contains no NaN/Infinity.
+- final SVG/TikZ output reaches the original final endpoint.
+- no truncation at an intermediate x value.
+
+8. Long hidden/partially hidden polyline exceeding cap still outputs complete curve using fallback policy.
+
+9. Classification result indicates fallback/skipped occlusion if the chosen model supports it.
+
+10. Normal shorter polyline under cap still uses occlusion segmentation.
 
 ### Regression tests
 
-20. Existing cubic curve occlusion tests still pass.
-21. Existing arc/template occlusion tests still pass if present.
-22. Existing layer-vs-depth mode tests still pass.
-23. Existing disabled-mode preservation tests still pass.
+11. Straight partially occluded segment under cap still splits into visible/hidden/visible.
 
-## 11. Constructing the key test geometry
+12. Cubic occlusion tests still pass.
 
-Use a simple deterministic geometry where a straight segment crosses behind a rectangular sheet.
+13. Arc/template occlusion tests still pass if present.
 
-Example concept:
+14. Hidden style applied in SVG/TikZ still works.
 
-- a surface face projects to a square in the middle of the screen;
-- a straight curve crosses through that projected square;
-- the curve is behind the surface inside the square;
-- the curve is in front/outside or not covered at both ends.
+15. Disabled visibility mode still preserves normal output.
 
-The expected occlusion classification should have at least three runs:
+16. Inline TikZ output has no blank lines.
 
-```text
-visible, hidden, visible
-```
+17. TikZ indentation remains 4 spaces.
 
-If the actual geometry produces:
+18. No NaN/Infinity in output.
+
+## 10. Constructing test examples
+
+### Backtracking test
+
+Use simple coordinates:
 
 ```text
-visible, hidden
+A = (0, 0, 0)
+B = (1, 0, 0)
+A = (0, 0, 0)
 ```
 
-or:
+No surface occlusion needed, or use a situation where all segments classify as visible.
+
+The test should catch that output does not collapse to `A -> A`.
+
+### Cap test
+
+Use a polyline with enough edges to exceed current default cap after per-edge subdivision.
+
+Example:
 
 ```text
-hidden, visible
+(0,0,0) -> (1,0,0) -> ... -> (30,0,0)
 ```
 
-because of endpoints, adjust geometry to cross through and out of the surface projection.
+Expected:
 
-The test should not depend on fragile pixel rendering; test the pure occlusion result if possible.
+- output reaches `(30,0,0)`;
+- no silent truncation.
 
-## 12. Documentation/comments
+If comparing exact TikZ coordinates is brittle, test the pure classification/export helper result and ensure the final endpoint is present.
 
-Add a short comment near the sampling function:
+## 11. Documentation/comments
 
-- straight segments must be subdivided for midpoint occlusion to detect partial occlusion;
-- subdivision is bounded by `curveSegmentSamples` and `maxCurveSegmentsPerCurve`;
-- this is still approximate, not analytic clipping.
+Add comments near merge logic:
 
-Update docs only if Phase 20F docs mention sampling limitations.
+- collinear merge is only safe for same-direction monotonic extension;
+- backtracking curves must not be collapsed.
 
-## 13. Manual verification checklist
+Add comments near cap logic:
+
+- if occlusion sampling exceeds cap, use fallback/original rendering rather than truncating;
+- this preserves correctness over approximate occlusion.
+
+Update docs only if Phase 20F docs mention cap behavior.
+
+## 12. Manual verification checklist
 
 After implementation, run:
 
@@ -396,38 +474,48 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Manual test:
+Backtracking:
 
-1. Create or open a 3D diagram with a surface sheet.
-2. Create one long straight curve crossing behind the surface.
-3. Enable curve occlusion / auto visibility.
-4. Confirm the curve has visible portions outside the surface and hidden/dotted portion behind it.
-5. Confirm the user does not need to insert vertices around the hidden interval.
-6. Generate TikZ.
-7. Confirm hidden and visible segments are both emitted.
-8. Switch visibility off.
-9. Confirm the curve renders as a normal uninterrupted curve.
+1. Create a polyline/path `A -> B -> A`.
+2. Enable auto visibility/curve occlusion.
+3. Confirm the curve is still visible as an out-and-back segment.
+4. Generate TikZ.
+5. Confirm it does not collapse to a single zero-length command.
 
-## 14. Preserve existing behavior
+Cap:
+
+6. Create a long visible polyline with many segments.
+7. Enable auto visibility.
+8. Confirm the entire polyline remains visible through its final endpoint.
+9. Generate TikZ.
+10. Confirm output reaches the final endpoint and is not truncated.
+
+Regression:
+
+11. Create a straight line partially hidden behind a surface.
+12. Confirm it still splits into visible/hidden/visible.
+13. Disable visibility.
+14. Confirm normal output returns.
+
+## 13. Preserve existing behavior
 
 Do not regress:
 
-- visibility options;
-- hidden curve style persistence;
-- SVG stroke mapping;
-- TikZ hidden style emission;
-- depth comparison;
-- point-in-projected-face testing;
+- visible/hidden classification;
+- curve sampling under cap;
+- hidden style persistence;
+- SVG hidden style attributes;
+- TikZ hidden style output;
+- disabled-mode preservation;
+- style overrides;
+- layer-vs-depth behavior;
 - mutation avoidance;
-- disabled export behavior;
-- inline no-blank-line behavior;
+- inline no-blank-lines;
 - 4-space indentation;
-- curve/path style overrides;
-- layer/depth mode behavior;
 - save/load;
 - undo/redo.
 
-## 15. Verification
+## 14. Verification
 
 Run:
 
@@ -437,17 +525,17 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 16. Report after implementation
+## 15. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of the unsplit straight-segment occlusion;
-- how polyline edges are subdivided;
-- how line path segments are subdivided;
-- how `curveSegmentSamples` is used;
-- how `maxCurveSegmentsPerCurve` is preserved;
-- how style overrides are preserved;
+- root cause of backtracking curve collapse;
+- new merge safety checks;
+- mergeKey/style compatibility behavior;
+- root cause of cap truncation;
+- chosen cap fallback/remainder policy;
+- how SVG/TikZ callers handle capped curves;
 - tests added/updated;
 - test results;
 - build results;
