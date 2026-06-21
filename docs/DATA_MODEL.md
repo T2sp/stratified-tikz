@@ -167,11 +167,11 @@ expression unknown.
 
 The Phase 19C MVP supports symbolic global coordinates for point positions,
 free-label positions, polyline and cubic/path vertices, filled-boundary path
-coordinates, 2D template centers, and polygon/quad sheet vertices. Active
+coordinates, 2D template centers, polygon/quad sheet vertices, and copied
+boundary-surface path snapshots for ruled surfaces and Coons patches. Active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
-and boundary-surface path snapshots remain numeric-only for now; symbolic
-plane-local input is rejected instead of being converted through a symbolic
-frame or sampled-surface algebra.
+remain numeric-only for now; symbolic plane-local input is rejected instead of
+being converted through a symbolic frame or sampled-surface algebra.
 
 ## Grid strata
 

@@ -177,10 +177,10 @@ mode; users type `$...$` themselves when desired.
 Expressions reject unknown variables, raw TeX/backslashes, braces, semicolons,
 newlines, unsupported functions, invalid syntax, division by zero, and
 non-finite preview values. In 2D diagrams z remains numeric 0. In the Phase 19C
-MVP, symbolic input is supported for global coordinate fields; active
-work-plane-local direct input, 3D template centers, curved sheet anchors, and
-sampled boundary-surface path snapshots remain numeric-only and reject symbolic
-values.
+MVP, symbolic input is supported for global coordinate fields and copied
+boundary-surface path snapshots when variables resolve to finite preview
+values; active work-plane-local direct input, 3D template centers, and curved
+sheet anchors remain numeric-only and reject symbolic values.
 
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
@@ -353,8 +353,11 @@ Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
 The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
 template geometry. Circle and ellipse templates are copied into ordinary path
 segments at creation time. Boundaries must be non-empty, composable, finite, and
-sample to finite points. Boundary-surface coordinates are numeric-only for now
-because preview and export derive sampled mesh coordinates.
+sample to finite points. Boundary-surface coordinates may be symbolic when
+loading saved JSON, but they must resolve to finite numeric preview values
+before the diagram is committed. Preview and sampled-mesh TikZ output use those
+preview coordinates while the saved model preserves symbolic expressions where
+supported.
 
 A ruled surface from boundaries `C0` and `C1` uses:
 

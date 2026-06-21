@@ -4,6 +4,10 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import {
+  sampleCoonsPatch,
+  sampleRuledSurface,
+} from '../../src/geometry/curvedSheets.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
@@ -29,6 +33,7 @@ import type {
   CoonsPatchPrimitive,
   Diagram,
   PerspectiveCamera3D,
+  RuledSurfacePrimitive,
   Vec3,
   WorkPlane,
 } from '../../src/model/types.ts'
@@ -1449,6 +1454,28 @@ test('parseSavedDiagramJsonForImport loads numeric-only diagrams immediately', (
   assert.deepEqual(result.diagram, ensureLayerMetadata(twoDimensionalExample))
 })
 
+test('parseSavedDiagramJson refreshes valid symbolic Coons boundaries with saved variables', () => {
+  const diagram = symbolicCoonsDiagram()
+  const primitive = resolvedCoonsPrimitive(diagram)
+
+  coonsPathBoundary(primitive.bottom).segments[0].end.x = -99
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const resolvedPrimitive = resolvedCoonsPrimitive(result.diagram)
+
+  assert.equal(coonsPathBoundary(resolvedPrimitive.bottom).segments[0].end.x, 2)
+  assert.equal(
+    sampleCoonsPatch(resolvedPrimitive).vertices.every(isFinitePoint),
+    true,
+  )
+})
+
 test('resolvePendingSymbolicDiagramImport refreshes symbolic Coons previews', () => {
   const pending = pendingImportForDiagram(symbolicCoonsDiagram())
   const resolved = resolvePendingSymbolicDiagramImport(pending, [
@@ -1486,6 +1513,24 @@ test('resolvePendingSymbolicDiagramImport uses edited import values before valid
   const primitive = resolvedCoonsPrimitive(resolved.diagram)
   assert.equal(coonsPathBoundary(primitive.bottom).segments[0].start.x, -3)
   assert.equal(coonsPathBoundary(primitive.bottom).segments[0].end.x, 3)
+})
+
+test('resolvePendingSymbolicDiagramImport refreshes symbolic ruled previews', () => {
+  const pending = pendingImportForDiagram(symbolicRuledDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '6' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedRuledPrimitive(resolved.diagram)
+
+  assert.equal(primitive.boundary0.segments[0].start.x, -3)
+  assert.equal(primitive.boundary0.segments[0].end.x, 3)
+  assert.equal(sampleRuledSurface(primitive).vertices.every(isFinitePoint), true)
 })
 
 test('resolvePendingSymbolicDiagramImport rejects invalid values without mutating pending diagram', () => {
@@ -1674,6 +1719,41 @@ function symbolicCoonsDiagram(): Diagram {
   return diagram
 }
 
+function symbolicRuledDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-ruled',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: lineBoundarySnapshot(
+          'ruled-bottom',
+          symbolicPoint(-2, 0, 0, { x: '-.5*Len' }),
+          symbolicPoint(2, 0, 0, { x: '.5*Len' }),
+        ),
+        boundary1: lineBoundarySnapshot(
+          'ruled-top',
+          symbolicPoint(-2, 1, 1, { x: '-.5*Len' }),
+          symbolicPoint(2, 1, 1, { x: '.5*Len' }),
+        ),
+        sampling: { segments: 2 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
 function pendingImportForDiagram(diagram: Diagram): PendingSymbolicDiagramImport {
   const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
 
@@ -1695,6 +1775,16 @@ function resolvedCoonsPrimitive(diagram: Diagram): CoonsPatchPrimitive {
   return sheet.primitive
 }
 
+function resolvedRuledPrimitive(diagram: Diagram): RuledSurfacePrimitive {
+  const sheet = diagram.strata[0]
+
+  if (sheet?.kind !== 'curvedSheet' || sheet.primitive.kind !== 'ruledSurface') {
+    throw new Error('Expected a ruled surface.')
+  }
+
+  return sheet.primitive
+}
+
 function coonsPathBoundary(
   boundary: CoonsPatchPrimitive['bottom'],
 ): BoundaryPathSnapshot {
@@ -1703,6 +1793,14 @@ function coonsPathBoundary(
   }
 
   throw new Error('Expected a Coons path boundary.')
+}
+
+function isFinitePoint(point: Vec3): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    Number.isFinite(point.z)
+  )
 }
 
 function symbolicPoint(
