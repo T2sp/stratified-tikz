@@ -4,8 +4,11 @@ import {
   createEmptyDiagram,
   createFilledRegion2DStratum,
   createPointStratum,
+  createSheetStratum,
   createTextLabel,
 } from '../model/constructors.ts'
+import { createInitialCamera3D } from '../model/camera.ts'
+import { defaultVisibilityOptions } from '../model/visibility.ts'
 import { symbolicGridExampleDiagrams } from './symbolicGridExamples.ts'
 import {
   cloneStylePreset,
@@ -49,11 +52,22 @@ export const saddlePatchExample: Diagram = createSaddlePatchExample()
 export const evenOddFilledBoundaryExample: Diagram =
   createEvenOddFilledBoundaryExample()
 
+export const ruledSurfaceOcclusionExample: Diagram =
+  createRuledSurfaceOcclusionExample()
+
+export const coonsPatchExample: Diagram = createCoonsPatchExample()
+
+export const translucentSortedSheetsExample: Diagram =
+  createTranslucentSortedSheetsExample()
+
 export const referenceExampleDiagrams = [
   translucentFilledStrataExample,
   hemispherePatchExample,
   saddlePatchExample,
   evenOddFilledBoundaryExample,
+  ruledSurfaceOcclusionExample,
+  coonsPatchExample,
+  translucentSortedSheetsExample,
   ...symbolicGridExampleDiagrams,
 ] as const satisfies readonly Diagram[]
 
@@ -407,6 +421,196 @@ function createEvenOddFilledBoundaryExample(): Diagram {
   return diagram
 }
 
+function createRuledSurfaceOcclusionExample(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 90,
+    phiDeg: 0,
+  }
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = {
+    camera3d: camera,
+    visibility: {
+      ...defaultVisibilityOptions,
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: true,
+    },
+  }
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'ruled-occlusion-sheet',
+      name: 'Ruled occluding sheet',
+      style: blueSheetStyle,
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: lineBoundarySnapshot(
+          'ruled-lower-boundary',
+          'lower boundary',
+          vec3(-1.2, 0, -1),
+          vec3(1.2, 0, -1),
+        ),
+        boundary1: lineBoundarySnapshot(
+          'ruled-upper-boundary',
+          'upper boundary',
+          vec3(-1.2, 0, 1),
+          vec3(1.2, 0, 1),
+        ),
+        sampling: { segments: 6 },
+      },
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'ruled-behind-curve',
+      name: 'Curve passing behind ruled sheet',
+      style: solidCurveStyle,
+      points: [
+        vec3(-2, -1, 0),
+        vec3(-0.5, -1, 0),
+        vec3(0.5, -1, 0),
+        vec3(2, -1, 0),
+      ],
+      layer: 0,
+    }),
+  )
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 3,
+      id: 'ruled-occlusion-label',
+      name: 'Ruled surface label',
+      text: '$R$',
+      position: vec3(-1.35, 0, 1.2),
+      layer: 1,
+    }),
+  )
+
+  return diagram
+}
+
+function createCoonsPatchExample(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'coons-reference-sheet',
+      name: 'Coons patch',
+      style: redSheetStyle,
+      primitive: {
+        kind: 'coonsPatch',
+        bottom: lineBoundarySnapshot(
+          'coons-bottom',
+          'bottom',
+          vec3(-1.4, -1, 0),
+          vec3(1.4, -1, 0.2),
+        ),
+        right: lineBoundarySnapshot(
+          'coons-right',
+          'right',
+          vec3(1.4, -1, 0.2),
+          vec3(1.4, 1, -0.2),
+        ),
+        top: lineBoundarySnapshot(
+          'coons-top',
+          'top',
+          vec3(-1.4, 1, 0.35),
+          vec3(1.4, 1, -0.2),
+        ),
+        left: lineBoundarySnapshot(
+          'coons-left',
+          'left',
+          vec3(-1.4, -1, 0),
+          vec3(-1.4, 1, 0.35),
+        ),
+        sampling: { uSegments: 5, vSegments: 4 },
+      },
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'coons-diagonal',
+      name: 'Coons diagonal',
+      style: solidCurveStyle,
+      points: [
+        vec3(-1.4, -1, 0),
+        vec3(-0.25, -0.2, 0.18),
+        vec3(1.4, 1, -0.2),
+      ],
+      layer: 1,
+    }),
+  )
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 3,
+      id: 'coons-label',
+      name: 'Coons patch label',
+      text: '$C$',
+      position: vec3(0, 0, 0.45),
+      layer: 2,
+    }),
+  )
+
+  return diagram
+}
+
+function createTranslucentSortedSheetsExample(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 90,
+    phiDeg: 0,
+  }
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = {
+    camera3d: camera,
+    visibility: {
+      ...defaultVisibilityOptions,
+      enabled: true,
+      surfaceDepthSort: true,
+      curveOcclusion: false,
+    },
+  }
+  diagram.strata.push(
+    createSheetStratum({
+      ambientDimension: 3,
+      id: 'sorted-near-sheet',
+      name: 'Near translucent sheet',
+      style: {
+        ...blueSheetStyle,
+        fillOpacity: 0.32,
+      },
+      corners: [
+        vec3(-1.25, 0.25, -1),
+        vec3(1.25, 0.25, -1),
+        vec3(1.25, 0.25, 1),
+        vec3(-1.25, 0.25, 1),
+      ],
+      layer: 0,
+    }),
+    createSheetStratum({
+      ambientDimension: 3,
+      id: 'sorted-far-sheet',
+      name: 'Far translucent sheet',
+      style: {
+        ...redSheetStyle,
+        fillOpacity: 0.3,
+      },
+      corners: [
+        vec3(-0.85, -0.45, -1.2),
+        vec3(1.65, -0.45, -1.2),
+        vec3(1.65, -0.45, 0.8),
+        vec3(-0.85, -0.45, 0.8),
+      ],
+      layer: 0,
+    }),
+  )
+
+  return diagram
+}
+
 function lensBoundary2D(id: string): ClosedPathBoundary {
   return {
     id,
@@ -424,6 +628,25 @@ function lensBoundary2D(id: string): ClosedPathBoundary {
         control1: vec3(1.1, -1.4),
         control2: vec3(-1.15, -1.35),
         end: vec3(-2.15, -0.55),
+      },
+    ],
+  }
+}
+
+function lineBoundarySnapshot(
+  id: string,
+  name: string,
+  start: Vec3,
+  end: Vec3,
+): ClosedPathBoundary {
+  return {
+    id,
+    name,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
       },
     ],
   }

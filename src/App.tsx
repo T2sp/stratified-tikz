@@ -75,7 +75,13 @@ import {
 import {
   cloneVisibilityOptions,
   defaultHiddenCurveStyle,
+  defaultMaxCurveSamples,
+  defaultMaxSurfaceFacesForSorting,
   defaultVisibilityOptions,
+  hardMaxCurveSamples,
+  hardMaxSurfaceFacesForSorting,
+  normalizeVisibilityMaxCurveSamples,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
 } from './model/visibility.ts'
 import {
   SvgDiagram,
@@ -1122,6 +1128,35 @@ function App() {
         ...(current.hiddenCurveStyle ?? defaultHiddenCurveStyle),
         opacity,
       },
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateMaxSurfaceFacesForSorting(rawValue: string): void {
+    const value = Number(rawValue)
+
+    if (!Number.isFinite(value) || value < 1) {
+      return
+    }
+
+    setVisibilityOptions((current) => ({
+      ...current,
+      maxSurfaceFacesForSorting:
+        normalizeVisibilityMaxSurfaceFacesForSorting(value),
+    }))
+    setCopyStatus('idle')
+  }
+
+  function updateMaxCurveSamples(rawValue: string): void {
+    const value = Number(rawValue)
+
+    if (!Number.isFinite(value) || value < 1) {
+      return
+    }
+
+    setVisibilityOptions((current) => ({
+      ...current,
+      maxCurveSamples: normalizeVisibilityMaxCurveSamples(value),
     }))
     setCopyStatus('idle')
   }
@@ -6527,6 +6562,50 @@ function App() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Surface face cap:</span>
+                <input
+                  className="toolbar-select"
+                  type="number"
+                  min="1"
+                  max={hardMaxSurfaceFacesForSorting}
+                  step="1"
+                  value={
+                    visibilityOptions.maxSurfaceFacesForSorting ??
+                    defaultMaxSurfaceFacesForSorting
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled
+                  }
+                  onChange={(event) =>
+                    updateMaxSurfaceFacesForSorting(
+                      event.currentTarget.value,
+                    )
+                  }
+                />
+              </label>
+              <label className="tikz-export-mode-control">
+                <span>Curve sample cap:</span>
+                <input
+                  className="toolbar-select"
+                  type="number"
+                  min="1"
+                  max={hardMaxCurveSamples}
+                  step="1"
+                  value={
+                    visibilityOptions.maxCurveSamples ?? defaultMaxCurveSamples
+                  }
+                  disabled={
+                    editableDiagram.ambientDimension !== 3 ||
+                    !visibilityOptions.enabled ||
+                    !visibilityOptions.curveOcclusion
+                  }
+                  onChange={(event) =>
+                    updateMaxCurveSamples(event.currentTarget.value)
+                  }
+                />
               </label>
               <label className="tikz-export-mode-control">
                 <span>Hidden curves:</span>

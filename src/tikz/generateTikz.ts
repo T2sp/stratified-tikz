@@ -78,6 +78,8 @@ import {
   hiddenCurveStyleFromBase,
   hiddenPointStyleFromBase,
   labelAutoVisibilityEnabled,
+  normalizeVisibilityMaxCurveSamples,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
   pointAutoVisibilityEnabled,
   resolveVisibilityOptions,
   surfaceDepthSortEnabled,
@@ -1142,7 +1144,24 @@ function emitDepthSortedSurfaceFaces(
     )
   }
 
-  const oversizedSheetIds = sheetIdsWithTooManySortedFaces(faces)
+  const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
+    context.visibility.maxSurfaceFacesForSorting,
+  )
+
+  if (faces.length > maxSortedSurfaceFaces) {
+    return emitDepthSortFaceCapFallback(
+      sectionTitle,
+      sheets.map(({ item }) => item),
+      faces.length,
+      maxSortedSurfaceFaces,
+      context,
+    )
+  }
+
+  const oversizedSheetIds = sheetIdsWithTooManySortedFaces(
+    faces,
+    maxSortedSurfaceFaces,
+  )
   const oversizedSheetCommands = [...oversizedSheetIds].flatMap(
     (sheetId): LayeredTikzCommand[] => {
       const source = sheetSources.get(sheetId)
@@ -1154,7 +1173,7 @@ function emitDepthSortedSurfaceFaces(
               layer: normalizeLayer(source.sheet.layer),
               sectionTitle,
               lines: [
-                `% Sheet "${source.sheet.name}" [${source.sheet.id}] omitted because surface depth sorting would emit more than ${maxCurvedSheetTikzFaces} faces.`,
+                `% Sheet "${source.sheet.name}" [${source.sheet.id}] omitted because surface depth sorting would emit more than ${maxSortedSurfaceFaces} faces.`,
                 `% Reduce sampling or disable surface depth sorting for readable TikZ export.`,
                 '',
               ],
@@ -1197,6 +1216,34 @@ function emitDepthSortedSurfaceFaces(
   ]
 }
 
+function emitDepthSortFaceCapFallback(
+  sectionTitle: string,
+  sheets: SheetStratum[],
+  faceCount: number,
+  maxSortedSurfaceFaces: number,
+  context: GenerateContext,
+): LayeredTikzCommand[] {
+  const fallbackCommands = emitLayeredItems(
+    sectionTitle,
+    sheets,
+    (sheet, index) => emitSheet(sheet, index, context),
+  )
+  const warningLayer = fallbackCommands[0]?.layer ?? 0
+
+  return [
+    {
+      layer: warningLayer,
+      sectionTitle,
+      lines: [
+        `% Auto surface face depth sort skipped because ${faceCount} faces exceed the maxSurfaceFacesForSorting cap of ${maxSortedSurfaceFaces}.`,
+        '% Manual layer-aware sheet export follows; reduce sampling or raise the cap to sort these faces.',
+        '',
+      ],
+    },
+    ...fallbackCommands,
+  ]
+}
+
 function depthSortedSurfaceStyleOptions(
   sheet: SheetStratum,
   optionsBySheetId: Map<string, string[]>,
@@ -1223,6 +1270,7 @@ function depthSortedSurfaceStyleOptions(
 
 function sheetIdsWithTooManySortedFaces(
   faces: readonly ProjectedSurfaceFace[],
+  maxSortedSurfaceFaces: number,
 ): Set<string> {
   const faceCounts = new Map<string, number>()
 
@@ -1232,7 +1280,7 @@ function sheetIdsWithTooManySortedFaces(
 
   return new Set(
     [...faceCounts]
-      .filter(([, count]) => count > maxCurvedSheetTikzFaces)
+      .filter(([, count]) => count > maxSortedSurfaceFaces)
       .map(([sheetId]) => sheetId),
   )
 }
@@ -1595,6 +1643,9 @@ function emitOcclusionSegmentedCurves(
       classifyCurveOcclusion(diagram, {
         camera: context.camera3d,
         visibility: context.visibility,
+        maxCurveSegmentsPerCurve: normalizeVisibilityMaxCurveSamples(
+          context.visibility.maxCurveSamples,
+        ),
       }).map((result) => [result.curveId, result]),
     )
   } catch {
@@ -1612,11 +1663,13 @@ function emitOcclusionSegmentedCurves(
       layer: normalizeLayer(item.layer),
       sectionTitle,
       lines:
-        occlusion === undefined ||
-        occlusion.capped ||
-        occlusion.segments.length === 0
+        occlusion === undefined
           ? emitCurve(item, index, context)
-          : emitOcclusionSegmentedCurve(item, index, occlusion, context),
+          : occlusion.capped
+            ? emitCurveOcclusionCapFallback(item, index, occlusion, context)
+            : occlusion.segments.length === 0
+              ? emitCurve(item, index, context)
+              : emitOcclusionSegmentedCurve(item, index, occlusion, context),
     }
   })
 }
@@ -1727,6 +1780,31 @@ function emitOcclusionSegmentedCurve(
           `% Saved path label "${commentLineText(curve.pathLabel)}" is not emitted in sampled occlusion mode.`,
         ]),
     ...segmentLines,
+  ]
+}
+
+function emitCurveOcclusionCapFallback(
+  curve: CurveStratum,
+  elementIndex: number,
+  occlusion: CurveOcclusionResult,
+  context: GenerateContext,
+): string[] {
+  const maxCurveSamples = normalizeVisibilityMaxCurveSamples(
+    context.visibility.maxCurveSamples,
+  )
+  const maxSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
+    context.visibility.maxSurfaceFacesForSorting,
+  )
+  const reason =
+    occlusion.fallbackReason === 'surfaceFaceCapExceeded'
+      ? `surface face count exceeds the maxSurfaceFacesForSorting cap of ${maxSurfaceFaces}`
+      : `curve sampling reached the maxCurveSamples cap of ${maxCurveSamples}`
+
+  return [
+    `% Auto curve occlusion skipped for curve "${curve.name}" [${curve.id}] because ${reason}.`,
+    '% Original curve export follows; reduce sampling, simplify geometry, raise the cap, or disable curve occlusion.',
+    '',
+    ...emitCurve(curve, elementIndex, context),
   ]
 }
 

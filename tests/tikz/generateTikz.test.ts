@@ -649,6 +649,82 @@ test('inline surface depth sorted TikZ output has no blank lines', () => {
   expectNoBlankLines(tikz)
 })
 
+test('ruled surface with hidden curve exports sorted faces and hidden segments', () => {
+  const tikz = generateTikz(createRuledSurfaceOcclusionDiagram(), {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(tikz, /Auto surface face depth sort/)
+  assert.match(tikz, /Ruled Occluding Sheet/)
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.match(tikz, /Hidden sampled segment/)
+  assert.match(tikz, /Visible sampled segment/)
+  assert.match(tikz, /densely dotted/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('Coons patch exports finite sampled mesh TikZ', () => {
+  const tikz = generateTikz(createCoonsPatchDiagram())
+
+  assert.match(tikz, /Coons patch generated/)
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=4, v=3; faces=12/)
+  assert.equal((tikz.match(/\\filldraw/g) ?? []).length, 12)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('auto visibility enabled changes representative output deterministically', () => {
+  const diagram = createRuledSurfaceOcclusionDiagram()
+  const disabled = generateTikz(diagram)
+  const first = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const second = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.equal(first, second)
+  assert.notEqual(first, disabled)
+  assert.match(first, /Auto surface face depth sort/)
+  assert.match(first, /Auto curve occlusion/)
+})
+
+test('surface face sorting cap falls back with a TikZ warning comment', () => {
+  const tikz = generateTikz(createCurvedHemisphereSheetDiagram(), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      maxSurfaceFacesForSorting: 4,
+    },
+  })
+
+  assert.match(tikz, /Auto surface face depth sort skipped/)
+  assert.match(tikz, /32 faces exceed the maxSurfaceFacesForSorting cap of 4/)
+  assert.match(tikz, /Curved sheet "Curved Hemisphere"/)
+  assert.doesNotMatch(tikz, /Auto surface face depth sort: sheet/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('auto visibility preserves layer-aware TikZ output', () => {
+  const diagram = createRuledSurfaceOcclusionDiagram()
+
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.geometricKind === 'sheet'
+      ? { ...stratum, layer: 2 }
+      : { ...stratum, layer: 1 },
+  )
+
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const sheetLayer = extractLayerBlock(tikz, 'stratifiedLayer2')
+  const curveLayer = extractLayerBlock(tikz, 'stratifiedLayer1')
+
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer1,stratifiedLayer2,main\}/)
+  assert.match(sheetLayer, /Auto surface face depth sort/)
+  assert.match(curveLayer, /Auto curve occlusion/)
+  assert.match(curveLayer, /Hidden sampled segment/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
 test('curve occlusion TikZ output applies hidden sampled segment style', () => {
   const diagram = createCurveOcclusionDiagram()
   const tikz = generateTikz(diagram, {
@@ -690,6 +766,24 @@ test('inline curve occlusion TikZ output has no blank lines', () => {
 
   assert.match(tikz, /Auto curve occlusion/)
   expectNoBlankLines(tikz)
+})
+
+test('curve sample cap falls back with a TikZ warning comment', () => {
+  const tikz = generateTikz(createStraightCurveOcclusionDiagram('polyline'), {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      maxCurveSamples: 2,
+    },
+  })
+
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.match(tikz, /maxCurveSamples cap of 2/)
+  assert.doesNotMatch(tikz, /Hidden sampled segment/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyStraightOcclusionPolyline0p0\) at \(-2,-1,0\);/,
+  )
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 
 test('straight polyline curve occlusion TikZ output splits visible hidden visible runs', () => {
@@ -735,7 +829,8 @@ test('long visible capped curve occlusion TikZ output falls back to original cur
     visibility: enabledVisibilityOptions('layerThenDepth'),
   })
 
-  assert.doesNotMatch(tikz, /Auto curve occlusion/)
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.match(tikz, /maxCurveSamples cap of 512/)
   assert.match(
     tikz,
     /\\coordinate \(curvePolyLongVisibleCurve0p30\) at \(30,1,0\);/,
@@ -753,7 +848,8 @@ test('long hidden capped curve occlusion TikZ output falls back to original curv
     visibility: enabledVisibilityOptions('layerThenDepth'),
   })
 
-  assert.doesNotMatch(tikz, /Auto curve occlusion/)
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.match(tikz, /maxCurveSamples cap of 512/)
   assert.doesNotMatch(tikz, /Hidden sampled segment/)
   assert.match(
     tikz,
@@ -4782,6 +4878,48 @@ function createCurveOcclusionDiagram(): Diagram {
   return diagram
 }
 
+function createRuledSurfaceOcclusionDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+  const curve = diagram.strata[1]
+
+  if (curve === undefined || curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  diagram.strata = [
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'curvedSheet',
+      id: 'ruled-occluding-sheet',
+      name: 'Ruled Occluding Sheet',
+      style: sheetStyle(),
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: lineBoundarySnapshot(
+          'ruled-lower-boundary',
+          { x: -1, y: 0, z: -1 },
+          { x: 1, y: 0, z: -1 },
+        ),
+        boundary1: lineBoundarySnapshot(
+          'ruled-upper-boundary',
+          { x: -1, y: 0, z: 1 },
+          { x: 1, y: 0, z: 1 },
+        ),
+        sampling: { segments: 4 },
+      },
+      layer: 0,
+    },
+    {
+      ...curve,
+      id: 'ruled-hidden-curve',
+      name: 'Ruled Hidden Curve',
+    },
+  ]
+
+  return diagram
+}
+
 function createPointAndLabelVisibilityDiagram(): Diagram {
   const diagram = createCurveOcclusionDiagram()
   const sheet = diagram.strata[0]
@@ -5192,6 +5330,46 @@ function createCurvedSaddleSheetDiagram({
   return diagram
 }
 
+function createCoonsPatchDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.strata.push({
+    id: 'coons-patch',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Coons Patch',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: lineBoundarySnapshot(
+        'coons-bottom',
+        { x: -1, y: -1, z: 0 },
+        { x: 1, y: -1, z: 0.2 },
+      ),
+      right: lineBoundarySnapshot(
+        'coons-right',
+        { x: 1, y: -1, z: 0.2 },
+        { x: 1, y: 1, z: -0.2 },
+      ),
+      top: lineBoundarySnapshot(
+        'coons-top',
+        { x: -1, y: 1, z: 0.35 },
+        { x: 1, y: 1, z: -0.2 },
+      ),
+      left: lineBoundarySnapshot(
+        'coons-left',
+        { x: -1, y: -1, z: 0 },
+        { x: -1, y: 1, z: 0.35 },
+      ),
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+    layer: 0,
+  })
+
+  return diagram
+}
+
 function squareBoundary2D(
   id: string,
   x = 0,
@@ -5257,6 +5435,23 @@ function nonFiniteBoundary3D(id: string): ClosedPathBoundary {
     { x: 1, y: 1, z: 2 },
     { x: 0, y: 1, z: 2 },
   ])
+}
+
+function lineBoundarySnapshot(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): ClosedPathBoundary {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+      },
+    ],
+  }
 }
 
 function squareBoundaryFromPoints(

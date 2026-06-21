@@ -51,6 +51,10 @@ import {
   validateSymbolicVariables,
 } from './variables.ts'
 import {
+  hardMaxCurveSamples,
+  hardMaxSurfaceFacesForSorting,
+} from './visibility.ts'
+import {
   hasSymbolicVec3Coordinates,
   validateSymbolicVec3,
   type CoordinateExpressionContext,
@@ -623,11 +627,53 @@ function validateVisibilityOptions(
     )
   }
 
+  if (visibility.maxSurfaceFacesForSorting !== undefined) {
+    validateVisibilityLimit(
+      visibility.maxSurfaceFacesForSorting,
+      `${path}.maxSurfaceFacesForSorting`,
+      hardMaxSurfaceFacesForSorting,
+      'Maximum sorted surface face count',
+      errors,
+    )
+  }
+
+  if (visibility.maxCurveSamples !== undefined) {
+    validateVisibilityLimit(
+      visibility.maxCurveSamples,
+      `${path}.maxCurveSamples`,
+      hardMaxCurveSamples,
+      'Maximum curve sample count',
+      errors,
+    )
+  }
+
   if (visibility.hiddenCurveStyle !== undefined) {
     validateHiddenCurveStyle(
       visibility.hiddenCurveStyle,
       `${path}.hiddenCurveStyle`,
       errors,
+    )
+  }
+}
+
+function validateVisibilityLimit(
+  value: number,
+  path: string,
+  maximum: number,
+  label: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > maximum
+  ) {
+    pushError(
+      errors,
+      path,
+      `${label} must be an integer between 1 and ${maximum}.`,
     )
   }
 }

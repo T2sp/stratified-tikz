@@ -10,6 +10,8 @@ import { sheetVertices } from '../model/sheets.ts'
 import { curveStylesEqual } from '../model/styles.ts'
 import {
   curveOcclusionEnabled,
+  normalizeVisibilityMaxCurveSamples,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
   resolveVisibilityOptions,
 } from '../model/visibility.ts'
 import type {
@@ -37,7 +39,9 @@ import {
 } from './projectedPrimitives.ts'
 
 export type CurveVisibility = 'visible' | 'hidden'
-export type CurveOcclusionFallbackReason = 'sampleCapExceeded'
+export type CurveOcclusionFallbackReason =
+  | 'sampleCapExceeded'
+  | 'surfaceFaceCapExceeded'
 
 export type CurveOcclusionSegment = {
   curveId: string
@@ -128,8 +132,8 @@ export function classifyCurveOcclusion(
     defaultTemplatePathSamples,
     maxCurveOcclusionTemplatePathSamples,
   )
-  const maxCurveSegmentsPerCurve = normalizedMaxSegments(
-    options.maxCurveSegmentsPerCurve,
+  const maxCurveSegmentsPerCurve = normalizeVisibilityMaxCurveSamples(
+    options.maxCurveSegmentsPerCurve ?? visibility.maxCurveSamples,
   )
   const faces = projectedSurfaceFacesForDiagram(
     diagram,
@@ -142,6 +146,34 @@ export function classifyCurveOcclusion(
 
   if (faces.length === 0) {
     return []
+  }
+
+  const maxSurfaceFacesForSorting =
+    normalizeVisibilityMaxSurfaceFacesForSorting(
+      visibility.maxSurfaceFacesForSorting,
+    )
+
+  if (faces.length > maxSurfaceFacesForSorting) {
+    return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
+      if (
+        stratum.geometricKind !== 'curve' ||
+        stratum.codim !== 2 ||
+        (options.curveIds !== undefined && !options.curveIds.has(stratum.id))
+      ) {
+        return []
+      }
+
+      return [
+        {
+          curveId: stratum.id,
+          curve: stratum,
+          segments: [],
+          sampledSegmentCount: 0,
+          capped: true,
+          fallbackReason: 'surfaceFaceCapExceeded',
+        },
+      ]
+    })
   }
 
   return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
@@ -1027,14 +1059,6 @@ function normalizedSampleCount(
   }
 
   return Math.min(maximum, Math.max(1, Math.floor(value)))
-}
-
-function normalizedMaxSegments(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) {
-    return defaultMaxCurveOcclusionSegmentsPerCurve
-  }
-
-  return Math.max(1, Math.floor(value))
 }
 
 function midpointVec3(start: Vec3, end: Vec3): Vec3 {

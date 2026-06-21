@@ -1,6 +1,7 @@
 import { projectVec3 } from '../geometry/projection.ts'
 import {
   labelAutoVisibilityEnabled,
+  normalizeVisibilityMaxSurfaceFacesForSorting,
   pointAutoVisibilityEnabled,
   resolveVisibilityOptions,
 } from '../model/visibility.ts'
@@ -131,13 +132,24 @@ function projectedSurfaceFacesForDiagram(
   visibility: VisibilityOptions,
   occludingSurfaceIds: ReadonlySet<string> | undefined,
 ): ProjectedSurfaceFace[] {
-  return extractProjectedRenderPrimitives(diagram, { camera })
+  const faces = extractProjectedRenderPrimitives(diagram, { camera })
     .filter(
       (primitive): primitive is ProjectedSurfaceFace =>
         primitive.kind === 'surfaceFace' &&
         (occludingSurfaceIds === undefined ||
           occludingSurfaceIds.has(primitive.sourceId)),
     )
+
+  if (
+    faces.length >
+    normalizeVisibilityMaxSurfaceFacesForSorting(
+      visibility.maxSurfaceFacesForSorting,
+    )
+  ) {
+    return []
+  }
+
+  return faces
     .sort((left, right) =>
       compareProjectedSurfaceFaces(left, right, visibility),
     )

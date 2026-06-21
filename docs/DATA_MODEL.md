@@ -58,15 +58,26 @@ type DiagramViewOptions = {
 type VisibilityOptions = {
   enabled: boolean;
   surfaceDepthSort: boolean;
+  curveOcclusion: boolean;
+  pointVisibility: "dimHidden" | "hideHidden";
+  labelVisibility: "alwaysForeground" | "autoDim" | "autoHide";
   sortMode: "layerThenDepth" | "depthThenLayer";
   depthEpsilon: number;
+  maxSurfaceFacesForSorting?: number;
+  maxCurveSamples?: number;
+  hiddenCurveStyle?: {
+    lineStyle: "dotted" | "denselyDotted" | "dashed";
+    opacity: number;
+  };
 };
 ```
 
 Visibility defaults are conservative and are omitted from saved JSON when equal
 to the default. Surface depth sorting is approximate painter ordering for 3D
-sheet faces; it does not mutate geometry and does not implement curve, point, or
-label occlusion.
+sheet faces. Curve occlusion, point visibility, and label visibility are also
+approximate projected tests. The caps bound how many surface faces and sampled
+curve segments are considered so preview/export can fall back instead of doing
+unbounded work. Visibility does not mutate model coordinates.
 
 ## Symbolic scalar expressions
 
@@ -1828,8 +1839,10 @@ SVG preview and TikZ export currently use the sampled finite quad mesh
 approximation: each sampled face is rendered/exported as a flat polygon with
 the sheet style. This is a display/export approximation, not a new saved mesh
 representation. Advanced frame editing, boundary repair workflows,
-hidden-surface sorting, boolean operations, and true smooth vector surface
-export are deferred.
+exact hidden-surface removal, boolean operations, and true smooth vector
+surface export are deferred. Optional automatic visibility uses approximate
+depth sorting and sampled curve midpoint tests; manual layer order remains
+available.
 
 ### Curve stratum
 
