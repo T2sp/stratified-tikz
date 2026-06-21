@@ -992,7 +992,7 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
         `${path}.frame`,
         errors,
         coordinateExpressionContext,
-        'numericOnly',
+        'finitePreview',
       )
       return
     case 'saddle':
@@ -1001,7 +1001,7 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
         `${path}.frame`,
         errors,
         coordinateExpressionContext,
-        'numericOnly',
+        'finitePreview',
       )
       return
     case 'ruledSurface':
@@ -1089,7 +1089,7 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
         `${path}.segments[${segmentIndex}].frame`,
         errors,
         coordinateExpressionContext,
-        'numericOnly',
+        'finitePreview',
       )
     }
   })
@@ -1786,7 +1786,7 @@ function validatePathSegment(
         `${path}.controlMode`,
         errors,
         coordinateExpressionContext,
-        'numericOnly',
+        'finitePreview',
       )
       return
     case 'arc':
@@ -1863,7 +1863,7 @@ function validateArcPathSegment(
         `${path}.frame`,
         errors,
         coordinateExpressionContext,
-        'numericOnly',
+        'finitePreview',
       )
       validatePointOnFrame(segment.center, segment.frame, `${path}.center`, errors)
       validatePointOnFrame(segment.start, segment.frame, `${path}.start`, errors)
@@ -1875,7 +1875,7 @@ function validateArcPathSegment(
       `${path}.frame`,
       errors,
       coordinateExpressionContext,
-      'numericOnly',
+      'finitePreview',
     )
   }
 
@@ -2035,7 +2035,7 @@ function validateTemplateFrame(
     `${path}.frame`,
     errors,
     coordinateExpressionContext,
-    ambientDimension === 3 ? 'planeScope' : 'numericOnly',
+    ambientDimension === 3 ? 'planeScope' : 'finitePreview',
   )
   templatePathCoordinates(template).forEach((point, index) => {
     validatePointOnFrame(point, templatePathFrame(template), `${path}.points[${index}]`, errors)
@@ -2342,7 +2342,7 @@ function validateWorkPlaneRelativePolarControlMode(
   }
 }
 
-type WorkPlaneFrameSymbolicPolicy = 'planeScope' | 'numericOnly'
+type WorkPlaneFrameSymbolicPolicy = 'planeScope' | 'finitePreview'
 
 function validateWorkPlaneFrameSnapshot(
   frame: WorkPlaneFrameSnapshot,
@@ -2391,7 +2391,7 @@ function validateWorkPlaneFrameSnapshot(
     pushError(
       errors,
       path,
-      'Work-plane-local Bezier frame must be an orthonormal right-handed frame.',
+      'Work-plane frame is invalid after evaluating symbolic variables; it must be an orthonormal right-handed frame.',
     )
   }
 }
@@ -2402,15 +2402,15 @@ function validateWorkPlaneFrameSymbolicPolicy(
   errors: DiagramValidationIssue[],
   symbolicPolicy: WorkPlaneFrameSymbolicPolicy,
 ): void {
-  if (symbolicPolicy === 'numericOnly') {
+  if (symbolicPolicy === 'finitePreview') {
     const frameFields = ['origin', 'u', 'v', 'normal'] as const
 
     frameFields.forEach((field) => {
-      if (hasSymbolicVec3Coordinates(frame[field])) {
+      if (!isFiniteVec3(frame[field])) {
         pushError(
           errors,
           `${path}.${field}`,
-          'Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.',
+          'Work-plane frame coordinates must have finite preview values after variable resolution.',
         )
       }
     })

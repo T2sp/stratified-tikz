@@ -423,7 +423,7 @@ test('parseSavedDiagramJson rejects malformed symbolic work-plane frame metadata
   )
 })
 
-test('parseSavedDiagramJson rejects symbolic arc frames because arc export derives numeric coordinates', () => {
+test('parseSavedDiagramJson refreshes symbolic arc frame previews', () => {
   const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
     diagram: Diagram
   }
@@ -445,8 +445,8 @@ test('parseSavedDiagramJson rejects symbolic arc frames because arc export deriv
         endAngleDeg: 90,
         direction: 'counterclockwise',
         frame: {
-          origin: symbolicPoint(2, 0, 0, 'R'),
-          u: { x: 1, y: 0, z: 0 },
+          origin: symbolicPoint(-99, 0, 0, 'R'),
+          u: symbolicPoint(1, 0, 0, '1'),
           v: { x: 0, y: 1, z: 0 },
           normal: { x: 0, y: 0, z: 1 },
         },
@@ -456,13 +456,33 @@ test('parseSavedDiagramJson rejects symbolic arc frames because arc export deriv
     layer: 0,
   })
 
-  assertParseError(
-    parseSavedDiagramJson(JSON.stringify(saved)),
-    /Work-plane frame coordinates must be numeric/,
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const stratum = parsed.diagram.strata.find(
+    (candidate) => candidate.id === 'symbolic-arc-frame',
   )
+
+  if (stratum?.kind !== 'concatenatedPath') {
+    throw new Error('Expected symbolic arc frame path.')
+  }
+  const segment = stratum.segments[0]
+
+  if (segment?.kind !== 'arc' || segment.frame === undefined) {
+    throw new Error('Expected symbolic arc frame segment.')
+  }
+  assert.equal(segment.frame.origin.x, 2)
+  assert.equal(segment.frame.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(segment.frame.origin.symbolic.x.previewValue, 2)
+  assert.equal(segment.frame.u.symbolic?.x.kind, 'symbolic')
+  assert.equal(segment.frame.u.symbolic.x.previewValue, 1)
 })
 
-test('parseSavedDiagramJson rejects symbolic concatenated Bezier control-mode frames', () => {
+test('parseSavedDiagramJson refreshes symbolic concatenated Bezier control-mode frames', () => {
   const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
     diagram: Diagram
   }
@@ -483,7 +503,7 @@ test('parseSavedDiagramJson rejects symbolic concatenated Bezier control-mode fr
         controlMode: {
           kind: 'workPlaneRelativeCartesian',
           frame: {
-            origin: symbolicPoint(2, 0, 0, 'R'),
+            origin: symbolicPoint(-99, 0, 0, 'R'),
             u: { x: 1, y: 0, z: 0 },
             v: { x: 0, y: 1, z: 0 },
             normal: { x: 0, y: 0, z: 1 },
@@ -500,13 +520,34 @@ test('parseSavedDiagramJson rejects symbolic concatenated Bezier control-mode fr
     layer: 0,
   })
 
-  assertParseError(
-    parseSavedDiagramJson(JSON.stringify(saved)),
-    /Work-plane frame coordinates must be numeric/,
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const stratum = parsed.diagram.strata.find(
+    (candidate) => candidate.id === 'symbolic-segment-frame',
   )
+
+  if (stratum?.kind !== 'concatenatedPath') {
+    throw new Error('Expected symbolic Bezier frame path.')
+  }
+  const segment = stratum.segments[0]
+
+  if (
+    segment?.kind !== 'cubicBezier' ||
+    segment.controlMode?.kind !== 'workPlaneRelativeCartesian'
+  ) {
+    throw new Error('Expected symbolic Bezier frame control mode.')
+  }
+  assert.equal(segment.controlMode.frame.origin.x, 2)
+  assert.equal(segment.controlMode.frame.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(segment.controlMode.frame.origin.symbolic.x.previewValue, 2)
 })
 
-test('parseSavedDiagramJson rejects symbolic curved sheet frames because mesh export samples previews', () => {
+test('parseSavedDiagramJson refreshes symbolic curved sheet frames for mesh previews', () => {
   const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
     diagram: Diagram
   }
@@ -520,7 +561,69 @@ test('parseSavedDiagramJson rejects symbolic curved sheet frames because mesh ex
     primitive: {
       kind: 'saddle',
       frame: {
-        origin: symbolicPoint(2, 0, 0, 'R'),
+        origin: symbolicPoint(-99, 0, 0, 'R'),
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: {
+          x: 0,
+          y: 0,
+          z: -99,
+          symbolic: {
+            x: { kind: 'numeric', value: 0 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'symbolic', expression: '1', previewValue: -99 },
+          },
+        },
+      },
+      width: 2,
+      depth: 2,
+      height: 1,
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+    layer: 0,
+  })
+
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const stratum = parsed.diagram.strata.find(
+    (candidate) => candidate.id === 'symbolic-curved-frame',
+  )
+
+  if (stratum?.kind !== 'curvedSheet' || stratum.primitive.kind !== 'saddle') {
+    throw new Error('Expected symbolic saddle frame sheet.')
+  }
+  assert.equal(stratum.primitive.frame.origin.x, 2)
+  assert.equal(stratum.primitive.frame.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(stratum.primitive.frame.normal.z, 1)
+  assert.equal(stratum.primitive.frame.normal.symbolic?.z.kind, 'symbolic')
+  assert.equal(stratum.primitive.frame.normal.symbolic.z.previewValue, 1)
+
+  const tikz = generateTikz(parsed.diagram, { exportMode: 'inlineMath' })
+
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  assert.doesNotMatch(tikz, /\n\s*\n/)
+})
+
+test('parseSavedDiagramJson rejects unresolved symbolic frame variables cleanly', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    id: 'unresolved-symbolic-frame',
+    name: 'Unresolved Symbolic Frame',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'saddle',
+      frame: {
+        origin: symbolicPoint(2, 0, 0, 'Missing'),
         u: { x: 1, y: 0, z: 0 },
         v: { x: 0, y: 1, z: 0 },
         normal: { x: 0, y: 0, z: 1 },
@@ -535,7 +638,7 @@ test('parseSavedDiagramJson rejects symbolic curved sheet frames because mesh ex
 
   assertParseError(
     parseSavedDiagramJson(JSON.stringify(saved)),
-    /Work-plane frame coordinates must be numeric/,
+    /primitive\.frame\.origin\.symbolic\.x\.expression Unknown variable "Missing"/,
   )
 })
 

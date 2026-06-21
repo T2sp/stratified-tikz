@@ -4,6 +4,10 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import {
+  sampleCoonsPatch,
+  sampleRuledSurface,
+} from '../../src/geometry/curvedSheets.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
@@ -29,8 +33,10 @@ import type {
   CoonsPatchPrimitive,
   Diagram,
   PerspectiveCamera3D,
+  RuledSurfacePrimitive,
   Vec3,
   WorkPlane,
+  WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 
 test('serializeDiagram includes format, version, and diagram data', () => {
@@ -1401,6 +1407,27 @@ test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variable
   )
 })
 
+test('parseSavedDiagramJsonForImport detects variables in boundary frame coordinates', () => {
+  const diagram = symbolicCoonsFrameDiagram()
+  delete diagram.variables
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected frame variable import to need resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [{ name: 'Len', expression: '', defined: false }],
+  )
+})
+
 test('parseSavedDiagramJsonForImport does not treat function names as variables', () => {
   const diagram = symbolicCoonsDiagram()
   diagram.variables = [
@@ -1449,6 +1476,28 @@ test('parseSavedDiagramJsonForImport loads numeric-only diagrams immediately', (
   assert.deepEqual(result.diagram, ensureLayerMetadata(twoDimensionalExample))
 })
 
+test('parseSavedDiagramJson refreshes valid symbolic Coons boundaries with saved variables', () => {
+  const diagram = symbolicCoonsDiagram()
+  const primitive = resolvedCoonsPrimitive(diagram)
+
+  coonsPathBoundary(primitive.bottom).segments[0].end.x = -99
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const resolvedPrimitive = resolvedCoonsPrimitive(result.diagram)
+
+  assert.equal(coonsPathBoundary(resolvedPrimitive.bottom).segments[0].end.x, 2)
+  assert.equal(
+    sampleCoonsPatch(resolvedPrimitive).vertices.every(isFinitePoint),
+    true,
+  )
+})
+
 test('resolvePendingSymbolicDiagramImport refreshes symbolic Coons previews', () => {
   const pending = pendingImportForDiagram(symbolicCoonsDiagram())
   const resolved = resolvePendingSymbolicDiagramImport(pending, [
@@ -1486,6 +1535,91 @@ test('resolvePendingSymbolicDiagramImport uses edited import values before valid
   const primitive = resolvedCoonsPrimitive(resolved.diagram)
   assert.equal(coonsPathBoundary(primitive.bottom).segments[0].start.x, -3)
   assert.equal(coonsPathBoundary(primitive.bottom).segments[0].end.x, 3)
+})
+
+test('resolvePendingSymbolicDiagramImport refreshes symbolic ruled previews', () => {
+  const pending = pendingImportForDiagram(symbolicRuledDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '6' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedRuledPrimitive(resolved.diagram)
+
+  assert.equal(primitive.boundary0.segments[0].start.x, -3)
+  assert.equal(primitive.boundary0.segments[0].end.x, 3)
+  assert.equal(sampleRuledSurface(primitive).vertices.every(isFinitePoint), true)
+})
+
+test('resolvePendingSymbolicDiagramImport refreshes symbolic Coons boundary frame previews', () => {
+  const pending = pendingImportForDiagram(symbolicCoonsFrameDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedCoonsPrimitive(resolved.diagram)
+  const frame = coonsPathBoundary(primitive.bottom).segments[0].frame
+
+  assert.equal(frame?.origin.x, -2)
+  assert.equal(frame?.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(frame?.origin.symbolic.x.previewValue, -2)
+  assert.equal(sampleCoonsPatch(primitive).vertices.every(isFinitePoint), true)
+
+  const tikz = generateTikz(resolved.diagram, { exportMode: 'inlineMath' })
+
+  assert.equal(tikz.includes('\n\n'), false)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('resolvePendingSymbolicDiagramImport refreshes symbolic ruled boundary frame previews', () => {
+  const pending = pendingImportForDiagram(symbolicRuledFrameDiagram())
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const primitive = resolvedRuledPrimitive(resolved.diagram)
+  const frame = primitive.boundary0.segments[0].frame
+
+  assert.equal(frame?.origin.x, -2)
+  assert.equal(frame?.origin.symbolic?.x.kind, 'symbolic')
+  assert.equal(frame?.origin.symbolic.x.previewValue, -2)
+  assert.equal(sampleRuledSurface(primitive).vertices.every(isFinitePoint), true)
+})
+
+test('resolvePendingSymbolicDiagramImport rejects invalid boundary frame geometry', () => {
+  const diagram = symbolicCoonsFrameDiagram()
+  const primitive = resolvedCoonsPrimitive(diagram)
+  const segment = coonsPathBoundary(primitive.bottom).segments[0]
+
+  if (segment.frame === undefined) {
+    throw new Error('Expected symbolic frame.')
+  }
+  segment.frame.u = symbolicPoint(2, 0, 0, { x: '.5*Len' })
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pendingImportForDiagram(diagram),
+    [{ name: 'Len', expression: '4' }],
+  )
+
+  assert.equal(resolved.ok, false)
+  if (resolved.ok) {
+    throw new Error('Expected invalid frame geometry to fail.')
+  }
+  assert.match(resolved.error, /frame.*orthonormal right-handed frame/)
 })
 
 test('resolvePendingSymbolicDiagramImport rejects invalid values without mutating pending diagram', () => {
@@ -1674,6 +1808,128 @@ function symbolicCoonsDiagram(): Diagram {
   return diagram
 }
 
+function symbolicRuledDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-ruled',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: lineBoundarySnapshot(
+          'ruled-bottom',
+          symbolicPoint(-2, 0, 0, { x: '-.5*Len' }),
+          symbolicPoint(2, 0, 0, { x: '.5*Len' }),
+        ),
+        boundary1: lineBoundarySnapshot(
+          'ruled-top',
+          symbolicPoint(-2, 1, 1, { x: '-.5*Len' }),
+          symbolicPoint(2, 1, 1, { x: '.5*Len' }),
+        ),
+        sampling: { segments: 2 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function symbolicCoonsFrameDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-coons-frame',
+      primitive: {
+        kind: 'coonsPatch',
+        bottom: arcBoundarySnapshot(
+          'coons-bottom-frame',
+          symbolicBoundaryFrame(),
+        ),
+        right: lineBoundarySnapshot(
+          'coons-right-frame',
+          { x: 2, y: 0, z: 0 },
+          { x: 2, y: 1, z: 0 },
+        ),
+        top: lineBoundarySnapshot(
+          'coons-top-frame',
+          { x: -2, y: 1, z: 0 },
+          { x: 2, y: 1, z: 0 },
+        ),
+        left: lineBoundarySnapshot(
+          'coons-left-frame',
+          { x: -2, y: 0, z: 0 },
+          { x: -2, y: 1, z: 0 },
+        ),
+        sampling: { uSegments: 2, vSegments: 2 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function symbolicRuledFrameDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'symbolic-ruled-frame',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0: arcBoundarySnapshot(
+          'ruled-bottom-frame',
+          symbolicBoundaryFrame(),
+        ),
+        boundary1: lineBoundarySnapshot(
+          'ruled-top-frame',
+          { x: -2, y: 1, z: 1 },
+          { x: 2, y: 1, z: 1 },
+        ),
+        sampling: { segments: 2 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function symbolicBoundaryFrame(): WorkPlaneFrameSnapshot {
+  return {
+    origin: symbolicPoint(-99, 0, 0, { x: '-.5*Len' }),
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
 function pendingImportForDiagram(diagram: Diagram): PendingSymbolicDiagramImport {
   const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
 
@@ -1695,6 +1951,16 @@ function resolvedCoonsPrimitive(diagram: Diagram): CoonsPatchPrimitive {
   return sheet.primitive
 }
 
+function resolvedRuledPrimitive(diagram: Diagram): RuledSurfacePrimitive {
+  const sheet = diagram.strata[0]
+
+  if (sheet?.kind !== 'curvedSheet' || sheet.primitive.kind !== 'ruledSurface') {
+    throw new Error('Expected a ruled surface.')
+  }
+
+  return sheet.primitive
+}
+
 function coonsPathBoundary(
   boundary: CoonsPatchPrimitive['bottom'],
 ): BoundaryPathSnapshot {
@@ -1703,6 +1969,14 @@ function coonsPathBoundary(
   }
 
   throw new Error('Expected a Coons path boundary.')
+}
+
+function isFinitePoint(point: Vec3): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    Number.isFinite(point.z)
+  )
 }
 
 function symbolicPoint(
@@ -1744,6 +2018,28 @@ function lineBoundarySnapshot(
         kind: 'line',
         start,
         end,
+      },
+    ],
+  }
+}
+
+function arcBoundarySnapshot(
+  id: string,
+  frame: WorkPlaneFrameSnapshot,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: -2, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: 2,
+        startAngleDeg: 180,
+        endAngleDeg: 0,
+        direction: 'clockwise',
+        frame,
       },
     ],
   }

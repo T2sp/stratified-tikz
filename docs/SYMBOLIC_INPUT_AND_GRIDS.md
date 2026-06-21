@@ -105,7 +105,10 @@ all symbolic preview coordinates before the diagram is committed.
 Canceling the dialog leaves the current editor diagram unchanged. Boundary
 surface snapshots are included in this refresh, so symbolic Coons or ruled
 boundary coordinates such as `.5*Len`, `-.5*Len`, and `R` can load as long as
-the confirmed variables produce finite numeric preview values.
+the confirmed variables produce finite numeric preview values. Work-plane frame
+snapshots nested in those boundary segments are refreshed at the same time; a
+symbolic frame is accepted only when `origin`, `u`, `v`, and `normal` evaluate
+to finite preview vectors and the evaluated frame is geometrically valid.
 
 ## Grid Generation
 

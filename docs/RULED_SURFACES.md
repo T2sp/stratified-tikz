@@ -38,11 +38,12 @@ The source paths are not modified. The created ruled surface stores copied
 boundary geometry, not live references, so later source-path edits do not move
 the surface.
 
-Saved JSON may contain symbolic boundary coordinates in the copied snapshots.
-When such a file is loaded, StratifiedTikZ asks for the referenced variable
-values before committing the diagram. The preview and mesh sampler use the
-resolved finite numeric preview coordinates; the symbolic coordinate
-expressions remain in the saved model where supported.
+Saved JSON may contain symbolic boundary coordinates in the copied snapshots,
+and 3D arc boundary segment frame snapshots may contain symbolic `origin`, `u`,
+`v`, or `normal` components. When such a file is loaded, StratifiedTikZ asks for
+the referenced variable values before committing the diagram. The preview and
+mesh sampler use the resolved finite numeric preview coordinates; symbolic
+coordinate and frame expressions remain in the saved model where supported.
 
 ## Coons Patch Creation
 

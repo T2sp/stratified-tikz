@@ -167,11 +167,11 @@ expression unknown.
 
 The Phase 19C MVP supports symbolic global coordinates for point positions,
 free-label positions, polyline and cubic/path vertices, filled-boundary path
-coordinates, 2D template centers, and polygon/quad sheet vertices. Active
+coordinates, 2D template centers, polygon/quad sheet vertices, and copied
+boundary-surface path snapshots for ruled surfaces and Coons patches. Active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
-and boundary-surface path snapshots remain numeric-only for now; symbolic
-plane-local input is rejected instead of being converted through a symbolic
-frame or sampled-surface algebra.
+remain numeric-only for now; symbolic plane-local input is rejected instead of
+being converted through a symbolic frame or sampled-surface algebra.
 
 ## Grid strata
 
@@ -944,12 +944,14 @@ copied concatenated `PathSegment[]` geometry made from line, cubic Bezier, 3D
 arc, and sampled path template segments. Circle and ellipse template paths are
 copied into ordinary path segments at creation time. Boundary snapshots must be
 non-empty, composable, and must sample to finite points. Boundary coordinate
-components may be numeric or symbolic, but symbolic components must have finite
-numeric preview values after variable resolution because mesh generation
-derives sampled coordinates from the preview model values. JSON import refreshes
-symbolic previews before full diagram validation; TikZ mesh output may use the
-resolved numeric preview mesh while the saved boundary coordinate expressions
-remain in the diagram model.
+components may be numeric or symbolic, and nested work-plane frame snapshots on
+boundary segments may also store symbolic `origin`, `u`, `v`, or `normal`
+components. Symbolic components must have finite numeric preview values after
+variable resolution because mesh generation derives sampled coordinates from
+the preview model values. JSON import refreshes symbolic previews before full
+diagram validation; TikZ mesh output may use the resolved numeric preview mesh
+while the saved boundary coordinate and frame expressions remain in the diagram
+model.
 
 A ruled surface stores two boundary snapshots with a shared deterministic
 piecewise-uniform boundary parameter `u`. Its sampler uses:
