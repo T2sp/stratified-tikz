@@ -25,6 +25,15 @@ import {
   nextLayerManagerExpandedState,
   shouldShowLayerManagerDetails,
 } from '../../src/ui/layerManagerFold.ts'
+import {
+  createLayerThumbnail,
+  layerButtonLabel,
+  layerCreationInputForLayer,
+  layerPaletteRows,
+  nextLayerPaletteOpenState,
+  resolveLayerDropSwap,
+  selectedLayerActionTarget,
+} from '../../src/ui/layerPalette.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
@@ -164,6 +173,51 @@ test('layer manager summary counts layers and elements', () => {
   )
 })
 
+test('layer palette button displays creation layer value and total count', () => {
+  assert.equal(layerButtonLabel('2', 7), 'L2 / 7')
+  assert.equal(layerButtonLabel('2.5', 7), 'L2.5 / 7')
+  assert.equal(layerButtonLabel('', 7), 'L? / 7')
+})
+
+test('layer palette rows keep creation layer and filter state separate', () => {
+  const rows = layerPaletteRows(
+    createTwoLayerDiagram(),
+    { kind: 'layer', layer: 1 },
+    '0',
+  )
+
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].layer.value, 0)
+  assert.equal(rows[0].isCreationLayer, true)
+  assert.equal(rows[0].isFilterActive, false)
+  assert.equal(rows[1].layer.value, 1)
+  assert.equal(rows[1].isCreationLayer, false)
+  assert.equal(rows[1].isFilterActive, true)
+  assert.equal(layerCreationInputForLayer(rows[1].layer.value), '1')
+})
+
+test('layer palette drag/drop resolves to a layer swap only for valid targets', () => {
+  assert.deepEqual(resolveLayerDropSwap(0, 1), {
+    ok: true,
+    leftLayerValue: 0,
+    rightLayerValue: 1,
+  })
+  assert.deepEqual(resolveLayerDropSwap(1, 1), { ok: false })
+  assert.deepEqual(resolveLayerDropSwap(null, 1), { ok: false })
+})
+
+test('selected layer action target stays scoped to the selected layer', () => {
+  const layers = [
+    { value: 0, name: 'Layer 0' },
+    { value: 2, name: 'Layer 2' },
+  ]
+
+  assert.equal(selectedLayerActionTarget(layers, 2, '0'), 2)
+  assert.equal(selectedLayerActionTarget(layers, 99, '2'), 2)
+  assert.equal(selectedLayerActionTarget(layers, 99, '99'), 0)
+  assert.equal(selectedLayerActionTarget([], 99, '99'), null)
+})
+
 test('layer manager fold helpers do not affect generated TikZ', () => {
   const diagram = createTwoLayerDiagram()
   const before = generateTikz(diagram)
@@ -173,6 +227,42 @@ test('layer manager fold helpers do not affect generated TikZ', () => {
   layerManagerSummary([{ value: 0, name: 'Layer 0' }], new Map([[0, 1]]))
 
   assert.equal(generateTikz(diagram), before)
+})
+
+test('layer palette open state does not affect generated TikZ', () => {
+  const diagram = createTwoLayerDiagram()
+  const before = generateTikz(diagram)
+
+  nextLayerPaletteOpenState(false)
+  nextLayerPaletteOpenState(true)
+  layerButtonLabel('0', 2)
+
+  assert.equal(generateTikz(diagram), before)
+})
+
+test('layer thumbnail handles empty layers and caps many elements', () => {
+  const emptyLayerDiagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    layers: [{ value: 5, name: 'Empty' }],
+  }
+  let manyElementDiagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  for (let index = 0; index < 21; index += 1) {
+    manyElementDiagram = addPointStratumWithResult(
+      manyElementDiagram,
+      { x: index, y: 0, z: 0 },
+      { id: `point-${index}`, layer: 0 },
+    ).diagram
+  }
+
+  const emptyThumbnail = createLayerThumbnail(emptyLayerDiagram, 5)
+  const cappedThumbnail = createLayerThumbnail(manyElementDiagram, 0, 5)
+
+  assert.equal(emptyThumbnail.totalElementCount, 0)
+  assert.equal(emptyThumbnail.marks.length, 0)
+  assert.equal(cappedThumbnail.totalElementCount, 21)
+  assert.equal(cappedThumbnail.marks.length, 5)
+  assert.equal(cappedThumbnail.hiddenElementCount, 16)
 })
 
 test('duplicate operation reports missing huge-layer default without mutation', () => {
