@@ -817,6 +817,7 @@ function App() {
       selectionKey: selectedElementDisclosureKey(null),
       expanded: false,
     })
+  const [isLayerManagerExpanded, setIsLayerManagerExpanded] = useState(false)
   const selectedInspectorKey = selectedElementDisclosureKey(selectedElement)
   const isInspectorExpanded =
     inspectorDisclosure.selectionKey === selectedInspectorKey &&
@@ -6369,8 +6370,12 @@ function App() {
         </div>
       )}
 
-      <section className="workspace" aria-label="Preview and TikZ source">
-        <article className="workspace-panel preview-panel">
+      <section
+        className="workspace"
+        aria-label="Preview, inspector, and TikZ source"
+      >
+        <div className="preview-inspector-row">
+          <article className="workspace-panel preview-panel">
           <div className="panel-heading">
             <div>
               <h2>SVG Preview</h2>
@@ -6562,9 +6567,9 @@ function App() {
               </section>
             )}
           </div>
-        </article>
+          </article>
 
-        <article className="workspace-panel inspector-panel">
+          <article className="workspace-panel inspector-panel">
           <div className="panel-heading">
             <div>
               <h2>Inspector</h2>
@@ -6576,6 +6581,8 @@ function App() {
             layerFilter={layerFilter}
             creationLayerInput={directLayerInput}
             statusMessage={layerOperationStatus}
+            expanded={isLayerManagerExpanded}
+            onExpandedChange={setIsLayerManagerExpanded}
             onRenameLayer={renameDiagramLayer}
             onSwapLayers={swapDiagramLayers}
             onDuplicateLayer={duplicateDiagramLayer}
@@ -6592,7 +6599,8 @@ function App() {
             expanded={isInspectorExpanded}
             onExpandedChange={updateInspectorExpanded}
           />
-        </article>
+          </article>
+        </div>
 
         <article className="workspace-panel source-panel">
           <div className="panel-heading">

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import type { Diagram, PointStratum, TextLabel, Vec3 } from '../../src/model/types.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addPointStratumWithResult,
   addTextLabelWithResult,
@@ -19,6 +20,11 @@ import {
   duplicateLayerTargetInput,
   resolveDuplicateLayerTarget,
 } from '../../src/ui/layerDuplicateTarget.ts'
+import {
+  layerManagerSummary,
+  nextLayerManagerExpandedState,
+  shouldShowLayerManagerDetails,
+} from '../../src/ui/layerManagerFold.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
@@ -128,6 +134,45 @@ test('duplicate target helper rejects invalid and same-layer manual targets', ()
     ok: false,
     message: 'Duplicate target must differ from the source layer.',
   })
+})
+
+test('layer manager fold helpers toggle and hide details predictably', () => {
+  assert.equal(nextLayerManagerExpandedState(false), true)
+  assert.equal(nextLayerManagerExpandedState(true), false)
+  assert.equal(shouldShowLayerManagerDetails(false, 2), false)
+  assert.equal(shouldShowLayerManagerDetails(true, 0), false)
+  assert.equal(shouldShowLayerManagerDetails(true, 2), true)
+})
+
+test('layer manager summary counts layers and elements', () => {
+  assert.equal(
+    layerManagerSummary(
+      [
+        { value: 0, name: 'Layer 0' },
+        { value: 2, name: 'Layer 2' },
+      ],
+      new Map([
+        [0, 3],
+        [2, 1],
+      ]),
+    ),
+    '2 layers, 4 elements',
+  )
+  assert.equal(
+    layerManagerSummary([{ value: 0, name: 'Layer 0' }], new Map([[0, 1]])),
+    '1 layer, 1 element',
+  )
+})
+
+test('layer manager fold helpers do not affect generated TikZ', () => {
+  const diagram = createTwoLayerDiagram()
+  const before = generateTikz(diagram)
+
+  nextLayerManagerExpandedState(false)
+  shouldShowLayerManagerDetails(false, 2)
+  layerManagerSummary([{ value: 0, name: 'Layer 0' }], new Map([[0, 1]]))
+
+  assert.equal(generateTikz(diagram), before)
 })
 
 test('duplicate operation reports missing huge-layer default without mutation', () => {

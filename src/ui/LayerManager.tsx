@@ -8,6 +8,11 @@ import {
 } from '../model/layers.ts'
 import type { Diagram, DiagramLayer, Vec3 } from '../model/types.ts'
 import {
+  layerManagerSummary,
+  nextLayerManagerExpandedState,
+  shouldShowLayerManagerDetails,
+} from './layerManagerFold.ts'
+import {
   canSubmitLayerDuplicateTarget,
   duplicateLayerTargetInput,
   resolveDuplicateLayerTarget,
@@ -21,6 +26,8 @@ export type LayerManagerProps = {
   layerFilter: LayerFilter
   creationLayerInput: string
   statusMessage: string
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
   onRenameLayer: (layerValue: number, name: string) => void
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
@@ -36,6 +43,8 @@ export function LayerManager({
   layerFilter,
   creationLayerInput,
   statusMessage,
+  expanded,
+  onExpandedChange,
   onRenameLayer,
   onSwapLayers,
   onDuplicateLayer,
@@ -48,59 +57,89 @@ export function LayerManager({
   const layers = getLayerMetadata(diagram)
   const counts = countElementsByLayer(diagram)
   const creationLayer = parseOptionalLayerValue(creationLayerInput)
+  const summary = layerManagerSummary(layers, counts)
+  const detailsId = 'layer-manager-details'
+  const showsDetails = shouldShowLayerManagerDetails(expanded, layers.length)
 
   return (
-    <section className="layer-manager" aria-labelledby="layer-manager-heading">
+    <section
+      className={[
+        'layer-manager',
+        expanded ? 'is-expanded' : 'is-collapsed',
+      ].join(' ')}
+      aria-labelledby="layer-manager-heading"
+    >
       <div className="layer-manager-heading">
-        <div>
-          <h3 id="layer-manager-heading">Layer Manager</h3>
-          <span>
-            {layers.length} diagram {layers.length === 1 ? 'layer' : 'layers'}
+        <button
+          type="button"
+          className="layer-manager-toggle"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() =>
+            onExpandedChange(nextLayerManagerExpandedState(expanded))
+          }
+        >
+          <span className="layer-manager-disclosure" aria-hidden="true">
+            {expanded ? 'v' : '>'}
           </span>
-        </div>
-        <dl className="layer-manager-state" aria-label="Layer UI state">
-          <div>
-            <dt>Filter</dt>
-            <dd>{layerFilterLabel(layerFilter)}</dd>
-          </div>
-          <div>
-            <dt>New</dt>
-            <dd>{creationLayerInput}</dd>
-          </div>
-        </dl>
+          <span id="layer-manager-heading" className="layer-manager-title">
+            Layer Manager
+          </span>
+          <span className="layer-manager-summary">{summary}</span>
+        </button>
+        {!expanded && statusMessage !== '' && (
+          <span className="layer-manager-collapsed-status" role="status">
+            {statusMessage}
+          </span>
+        )}
       </div>
-      {statusMessage !== '' && (
-        <p className="layer-manager-status" role="status" aria-live="polite">
-          {statusMessage}
-        </p>
-      )}
 
-      {layers.length === 0 ? (
-        <p className="layer-manager-empty">No layer metadata yet.</p>
-      ) : (
-        <div className="layer-manager-list" role="list">
-          {layers.map((layer) => (
-            <LayerManagerRow
-              key={formatLayerValue(layer.value)}
-              diagram={diagram}
-              layer={layer}
-              layers={layers}
-              elementCount={counts.get(layer.value) ?? 0}
-              isFilterActive={
-                layerFilter.kind === 'layer' &&
-                normalizeLayerValue(layerFilter.layer) === layer.value
-              }
-              isCreationLayer={creationLayer === layer.value}
-              onRenameLayer={onRenameLayer}
-              onSwapLayers={onSwapLayers}
-              onDuplicateLayer={onDuplicateLayer}
-              onTranslateLayer={onTranslateLayer}
-              onSetLayerVisibility={onSetLayerVisibility}
-              onSetLayerLock={onSetLayerLock}
-              onDeleteLayer={onDeleteLayer}
-              onStatusMessage={onStatusMessage}
-            />
-          ))}
+      {expanded && (
+        <div id={detailsId} className="layer-manager-details">
+          <dl className="layer-manager-state" aria-label="Layer UI state">
+            <div>
+              <dt>Filter</dt>
+              <dd>{layerFilterLabel(layerFilter)}</dd>
+            </div>
+            <div>
+              <dt>New</dt>
+              <dd>{creationLayerInput}</dd>
+            </div>
+          </dl>
+          {statusMessage !== '' && (
+            <p className="layer-manager-status" role="status" aria-live="polite">
+              {statusMessage}
+            </p>
+          )}
+
+          {showsDetails ? (
+            <div className="layer-manager-list" role="list">
+              {layers.map((layer) => (
+                <LayerManagerRow
+                  key={formatLayerValue(layer.value)}
+                  diagram={diagram}
+                  layer={layer}
+                  layers={layers}
+                  elementCount={counts.get(layer.value) ?? 0}
+                  isFilterActive={
+                    layerFilter.kind === 'layer' &&
+                    normalizeLayerValue(layerFilter.layer) === layer.value
+                  }
+                  isCreationLayer={creationLayer === layer.value}
+                  onRenameLayer={onRenameLayer}
+                  onSwapLayers={onSwapLayers}
+                  onDuplicateLayer={onDuplicateLayer}
+                  onTranslateLayer={onTranslateLayer}
+                  onSetLayerVisibility={onSetLayerVisibility}
+                  onSetLayerLock={onSetLayerLock}
+                  onDeleteLayer={onDeleteLayer}
+                  onStatusMessage={onStatusMessage}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="layer-manager-empty">No layer metadata yet.</p>
+          )}
         </div>
       )}
     </section>

@@ -1008,14 +1008,22 @@
 
 .workspace {
   display: grid;
-  grid-template-columns:
-    minmax(360px, 1.15fr)
-    minmax(320px, 0.82fr)
-    minmax(360px, 1fr);
+  grid-template-rows: auto auto;
   gap: 20px;
-  max-width: 1280px;
+  max-width: 1480px;
   margin: 0 auto;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.preview-inspector-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 420px);
+  align-items: stretch;
+  gap: 20px;
+  min-width: 0;
+  min-height: 0;
+  height: clamp(560px, 72vh, 840px);
 }
 
 .workspace-panel {
@@ -1033,41 +1041,76 @@
 }
 
 .preview-panel,
-.source-panel {
-  min-height: 560px;
+.inspector-panel {
+  height: 100%;
+  min-height: 0;
 }
 
 .preview-stage {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 420px;
+  min-height: 0;
 }
 
 .inspector-panel {
   grid-template-rows: auto auto minmax(0, 1fr);
-  max-height: min(76vh, 760px);
   overflow: hidden;
 }
 
 .layer-manager {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 9px;
   min-width: 0;
   min-height: 0;
-  max-height: min(42vh, 360px);
   overflow: hidden;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
 
+.layer-manager.is-collapsed {
+  grid-template-rows: auto;
+}
+
+.layer-manager.is-expanded {
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(44vh, 380px);
+}
+
 .layer-manager-heading {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
+}
+
+.layer-manager-toggle {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.layer-manager-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.layer-manager-disclosure {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
 }
 
 .layer-manager-heading h3 {
@@ -1077,12 +1120,51 @@
   line-height: 1.25;
 }
 
+.layer-manager-title {
+  color: var(--text-h);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.layer-manager-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .layer-manager-heading span,
 .layer-manager-empty,
 .layer-manager-status {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.layer-manager-collapsed-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-manager-details {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .layer-manager-status {
@@ -1624,7 +1706,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  min-height: 0;
   color: var(--preview-wash);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2160,7 +2242,9 @@
 .tikz-source {
   width: 100%;
   min-width: 0;
-  min-height: 420px;
+  height: min(42vh, 460px);
+  min-height: 280px;
+  max-height: 460px;
   resize: none;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2220,16 +2304,24 @@
   }
 
   .workspace {
-    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
   }
 
-  .preview-panel,
-  .source-panel {
-    min-height: 480px;
+  .preview-inspector-row {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .preview-panel {
+    min-height: 520px;
   }
 
   .inspector-panel {
-    max-height: min(70vh, 620px);
+    height: min(70vh, 620px);
+  }
+
+  .source-panel {
+    min-height: 0;
   }
 
   .inspector-field {
@@ -2284,8 +2376,17 @@
   }
 
   .preview-panel,
-  .source-panel {
-    min-height: 360px;
+  .inspector-panel {
+    min-height: 420px;
+  }
+
+  .preview-panel {
+    min-height: 380px;
+  }
+
+  .tikz-source {
+    height: min(42vh, 340px);
+    min-height: 240px;
   }
 
   .inspector-summary {
