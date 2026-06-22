@@ -1080,7 +1080,18 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
     ) {
       const segmentRecord = segment as Record<string, unknown>
 
-      if (segmentRecord.kind !== 'arc' || segmentRecord.frame === undefined) {
+      if (segmentRecord.kind !== 'arc') {
+        return
+      }
+
+      validateBoundaryArcScalarInputValues(
+        segmentRecord,
+        `${path}.segments[${segmentIndex}]`,
+        errors,
+        coordinateExpressionContext,
+      )
+
+      if (segmentRecord.frame === undefined) {
         return
       }
 
@@ -1093,6 +1104,39 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
       )
     }
   })
+}
+
+function validateBoundaryArcScalarInputValues(
+  segment: Record<string, unknown>,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  const radius = validateArcScalarInputValue(
+    segment.radius,
+    `${path}.radius`,
+    'Arc radius',
+    errors,
+    coordinateExpressionContext,
+  )
+  validateArcScalarInputValue(
+    segment.startAngleDeg,
+    `${path}.startAngleDeg`,
+    'Arc start angle',
+    errors,
+    coordinateExpressionContext,
+  )
+  validateArcScalarInputValue(
+    segment.endAngleDeg,
+    `${path}.endAngleDeg`,
+    'Arc end angle',
+    errors,
+    coordinateExpressionContext,
+  )
+
+  if (radius !== null && radius <= 0) {
+    pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
+  }
 }
 
 function validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(

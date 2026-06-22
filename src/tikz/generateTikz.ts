@@ -91,7 +91,7 @@ import {
   compareProjectedSurfaceFaces,
 } from '../rendering/surfaceDepthSort.ts'
 import {
-  extractProjectedRenderPrimitives,
+  collectProjectedSurfaceFacesForSorting,
   type ProjectedSurfaceFace,
 } from '../rendering/projectedPrimitives.ts'
 import {
@@ -1136,34 +1136,34 @@ function emitDepthSortedSurfaceFaces(
       },
     ]),
   )
+  const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
+    context.visibility.maxSurfaceFacesForSorting,
+  )
   let faces: ProjectedSurfaceFace[]
 
   try {
-    faces = extractProjectedRenderPrimitives(diagram, {
+    const collectedFaces = collectProjectedSurfaceFacesForSorting(diagram, {
       camera: context.camera3d,
-    }).filter(
-      (primitive): primitive is ProjectedSurfaceFace =>
-        primitive.kind === 'surfaceFace' && sheetSources.has(primitive.sourceId),
-    )
+      maxSurfaceFacesForSorting: maxSortedSurfaceFaces,
+      sourceIds: new Set(sheetSources.keys()),
+    })
+
+    if (collectedFaces.kind === 'capExceeded') {
+      return emitDepthSortFaceCapFallback(
+        sectionTitle,
+        sheets.map(({ item }) => item),
+        collectedFaces.observedCount,
+        collectedFaces.cap,
+        context,
+      )
+    }
+
+    faces = collectedFaces.faces
   } catch {
     return emitLayeredItems(
       sectionTitle,
       sheets.map(({ item }) => item),
       (sheet, index) => emitSheet(sheet, index, context),
-    )
-  }
-
-  const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
-    context.visibility.maxSurfaceFacesForSorting,
-  )
-
-  if (faces.length > maxSortedSurfaceFaces) {
-    return emitDepthSortFaceCapFallback(
-      sectionTitle,
-      sheets.map(({ item }) => item),
-      faces.length,
-      maxSortedSurfaceFaces,
-      context,
     )
   }
 
@@ -1244,7 +1244,7 @@ function emitDepthSortFaceCapFallback(
       layer: warningLayer,
       sectionTitle,
       lines: [
-        `% Auto surface face depth sort skipped because ${faceCount} faces exceed the maxSurfaceFacesForSorting cap of ${maxSortedSurfaceFaces}.`,
+        `% Auto surface face depth sort skipped because at least ${faceCount} faces exceed the maxSurfaceFacesForSorting cap of ${maxSortedSurfaceFaces}.`,
         '% Manual layer-aware sheet export follows; reduce sampling or raise the cap to sort these faces.',
         '',
       ],

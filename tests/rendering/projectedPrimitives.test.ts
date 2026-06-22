@@ -32,6 +32,7 @@ import type {
 } from '../../src/model/types.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import {
+  collectProjectedSurfaceFacesForSorting,
   extractProjectedRenderPrimitives,
   PROJECTED_DEPTH_CONVENTION,
   projectedDepth,
@@ -84,6 +85,62 @@ test('surface face primitive extraction covers supported 3D sheet kinds with fin
     assert.ok(face.vertices3D.length >= 3)
     assertFinitePrimitive(face)
   }
+})
+
+test('surface-only face collector returns projected faces under cap', () => {
+  const result = collectProjectedSurfaceFacesForSorting(
+    primitiveCoverageDiagram(),
+    {
+      camera: testCamera,
+      curveSegmentSamples: 4,
+      maxSurfaceFacesForSorting: 128,
+      sourceIds: new Set(['polygon-sheet', 'filled-sheet']),
+    },
+  )
+
+  assert.equal(result.kind, 'ok')
+  assert.deepEqual(
+    result.faces.map((face) => face.sourceId),
+    ['polygon-sheet', 'filled-sheet'],
+  )
+  assert.equal(result.observedCount, 2)
+  result.faces.forEach(assertFinitePrimitive)
+})
+
+test('surface-only face collector stops at cap plus one', () => {
+  const result = collectProjectedSurfaceFacesForSorting(
+    surfaceFaceCollectorCapDiagram(),
+    {
+      camera: testCamera,
+      maxSurfaceFacesForSorting: 1,
+    },
+  )
+
+  assert.equal(result.kind, 'capExceeded')
+  assert.equal(result.cap, 1)
+  assert.equal(result.observedCount, 2)
+})
+
+test('surface-only face collector does not touch curve primitive extraction', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = testCamera
+  diagram.view = { camera3d: testCamera }
+  diagram.strata = [
+    throwingCurveStratum(),
+    polygonSheet(),
+  ]
+
+  const result = collectProjectedSurfaceFacesForSorting(diagram, {
+    camera: testCamera,
+    maxSurfaceFacesForSorting: 4,
+  })
+
+  assert.equal(result.kind, 'ok')
+  assert.deepEqual(
+    result.faces.map((face) => face.sourceId),
+    ['polygon-sheet'],
+  )
 })
 
 test('curve segment primitive extraction covers curves, paths, templates, and grids with finite depth', () => {
@@ -602,6 +659,37 @@ function twoSurfaceSortDiagram(): Diagram {
   ]
 
   return diagram
+}
+
+function surfaceFaceCollectorCapDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    testCamera.thetaDeg,
+    testCamera.phiDeg,
+  ).forward
+
+  diagram.camera = testCamera
+  diagram.view = { camera3d: testCamera }
+  diagram.strata = [
+    surfaceSortSheet('collector-sheet-0', 'Collector sheet 0', '#AA0000', viewDirection, 0),
+    surfaceSortSheet('collector-sheet-1', 'Collector sheet 1', '#00AA00', viewDirection, 1),
+    throwingCurveStratum(),
+  ]
+
+  return diagram
+}
+
+function throwingCurveStratum(): Diagram['strata'][number] {
+  return {
+    id: 'throwing-curve',
+    codim: 2,
+    geometricKind: 'curve',
+    name: 'Throwing curve',
+    layer: 0,
+    get kind() {
+      throw new Error('Curve primitives should not be sampled.')
+    },
+  } as unknown as Diagram['strata'][number]
 }
 
 function surfaceSortSheet(

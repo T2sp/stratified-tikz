@@ -78,6 +78,25 @@ export type ProjectedRenderPrimitiveOptions = {
   templatePathSamples?: number
 }
 
+export type ProjectedSurfaceFaceCollectionOptions = {
+  camera?: Camera
+  curveSegmentSamples?: number
+  maxSurfaceFacesForSorting: number
+  sourceIds?: ReadonlySet<string>
+}
+
+export type ProjectedSurfaceFaceCollectionResult =
+  | {
+      kind: 'ok'
+      faces: ProjectedSurfaceFace[]
+      observedCount: number
+    }
+  | {
+      kind: 'capExceeded'
+      cap: number
+      observedCount: number
+    }
+
 type SurfaceFaceSample = {
   vertices3D: Vec3[]
   faceIndex: number
@@ -215,6 +234,74 @@ export function extractProjectedRenderPrimitives(
   return primitives
 }
 
+export function collectProjectedSurfaceFacesForSorting(
+  diagram: Diagram,
+  options: ProjectedSurfaceFaceCollectionOptions,
+): ProjectedSurfaceFaceCollectionResult {
+  const camera = resolvePrimitiveCamera(diagram, options.camera)
+
+  if (camera.mode !== '3d') {
+    return {
+      kind: 'ok',
+      faces: [],
+      observedCount: 0,
+    }
+  }
+
+  const curveSegmentSamples = normalizedSampleCount(
+    options.curveSegmentSamples,
+    defaultCurveSegmentSamples,
+  )
+  const maxSurfaceFacesForSorting = normalizedCollectionCap(
+    options.maxSurfaceFacesForSorting,
+  )
+  const faces: ProjectedSurfaceFace[] = []
+  let nextOriginalIndex = 0
+
+  for (const stratum of diagram.strata) {
+    if (
+      stratum.geometricKind !== 'sheet' ||
+      (options.sourceIds !== undefined && !options.sourceIds.has(stratum.id))
+    ) {
+      continue
+    }
+
+    for (const face of surfaceFacesForSheet(
+      stratum,
+      diagram.ambientDimension,
+      curveSegmentSamples,
+    )) {
+      const primitive = projectedSurfaceFace(
+        camera,
+        stratum,
+        face,
+        nextOriginalIndex,
+      )
+
+      if (primitive === null) {
+        continue
+      }
+
+      faces.push(primitive)
+      nextOriginalIndex += 1
+
+      if (faces.length > maxSurfaceFacesForSorting) {
+        return {
+          kind: 'capExceeded',
+          cap: maxSurfaceFacesForSorting,
+          observedCount: faces.length,
+        }
+      }
+    }
+  }
+
+  return {
+    kind: 'ok',
+    faces,
+    observedCount: faces.length,
+  }
+}
+
 function resolvePrimitiveCamera(diagram: Diagram, camera: Camera | undefined): Camera {
   return (
     camera ??
@@ -237,38 +324,58 @@ function cameraViewDirection(camera: Camera3D): Vec3 {
   ).forward
 }
 
-function surfaceFacesForSheet(
+function* surfaceFacesForSheet(
   sheet: SheetStratum,
   ambientDimension: AmbientDimension,
   curveSegmentSamples: number,
-): SurfaceFaceSample[] {
+): Generator<SurfaceFaceSample> {
   switch (sheet.kind) {
     case 'quadSheet':
     case 'polygonSheet':
-      return [
-        {
-          vertices3D: sheetVertices(sheet).map(cloneVec3),
-          faceIndex: 0,
-        },
-      ]
+      yield {
+        vertices3D: sheetVertices(sheet).map(cloneVec3),
+        faceIndex: 0,
+      }
+      return
     case 'workPlaneFilledSheet':
-      return sheet.boundaries
-        .map((boundary, index) => ({
-          vertices3D: closedBoundaryPolygon(
-            boundary,
-            ambientDimension,
-            curveSegmentSamples,
-          ),
-          faceIndex: index,
-        }))
-        .filter((face) => face.vertices3D.length >= 3)
+      for (let index = 0; index < sheet.boundaries.length; index += 1) {
+        const boundary = sheet.boundaries[index]
+
+        if (boundary === undefined) {
+          continue
+        }
+
+        const vertices3D = closedBoundaryPolygon(
+          boundary,
+          ambientDimension,
+          curveSegmentSamples,
+        )
+
+        if (vertices3D.length >= 3) {
+          yield {
+            vertices3D,
+            faceIndex: index,
+          }
+        }
+      }
+      return
     case 'curvedSheet': {
       const mesh = sampleCurvedSheetPrimitive(sheet.primitive)
 
-      return mesh.faces.map((face, index) => ({
-        vertices3D: face.map((vertexIndex) => cloneVec3(mesh.vertices[vertexIndex])),
-        faceIndex: index,
-      }))
+      for (let index = 0; index < mesh.faces.length; index += 1) {
+        const face = mesh.faces[index]
+
+        if (face === undefined) {
+          continue
+        }
+
+        yield {
+          vertices3D: face.map((vertexIndex) =>
+            cloneVec3(mesh.vertices[vertexIndex]),
+          ),
+          faceIndex: index,
+        }
+      }
     }
   }
 }
@@ -542,6 +649,14 @@ function normalizedSampleCount(value: number | undefined, fallback: number): num
   }
 
   return Math.max(1, Math.floor(value))
+}
+
+function normalizedCollectionCap(value: number): number {
+  if (!Number.isFinite(value)) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  return Math.max(0, Math.floor(value))
 }
 
 function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {

@@ -697,10 +697,32 @@ test('surface face sorting cap falls back with a TikZ warning comment', () => {
   })
 
   assert.match(tikz, /Auto surface face depth sort skipped/)
-  assert.match(tikz, /32 faces exceed the maxSurfaceFacesForSorting cap of 4/)
+  assert.match(
+    tikz,
+    /at least 5 faces exceed the maxSurfaceFacesForSorting cap of 4/,
+  )
   assert.match(tikz, /Curved sheet "Curved Hemisphere"/)
   assert.doesNotMatch(tikz, /Auto surface face depth sort: sheet/)
   assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('inline surface face sorting cap fallback has no blank lines', () => {
+  const tikz = generateTikz(createCurvedHemisphereSheetDiagram(), {
+    exportMode: 'inlineMath',
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      maxSurfaceFacesForSorting: 4,
+    },
+  })
+
+  assert.match(tikz, /Auto surface face depth sort skipped/)
+  assert.match(
+    tikz,
+    /at least 5 faces exceed the maxSurfaceFacesForSorting cap of 4/,
+  )
+  assert.doesNotMatch(tikz, /Auto surface face depth sort: sheet/)
+  expectNoBlankLines(tikz)
+  expectNoTwoSpaceCommandIndent(tikz)
 })
 
 test('auto visibility preserves layer-aware TikZ output', () => {
