@@ -156,14 +156,14 @@
 
 .camera-control {
   position: absolute;
-  top: 12px;
   right: 12px;
-  z-index: 3;
+  bottom: 64px;
+  z-index: var(--z-preview-camera);
   display: grid;
   gap: 8px;
   width: min(360px, calc(100% - 24px));
   min-width: 0;
-  max-height: calc(100% - 24px);
+  max-height: min(52svh, calc(100% - 84px));
   overflow: auto;
   padding: 9px 10px;
   border: 1px solid var(--border);
@@ -174,8 +174,7 @@
 }
 
 .camera-control-aside {
-  top: auto;
-  bottom: 60px;
+  bottom: 64px;
   width: min(230px, calc(100% - 24px));
 }
 
@@ -1088,6 +1087,18 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /*
+   * Preview-local overlay order: SVG canvas; toolbar/history; camera/layer
+   * controls; direct input; inspector. Coordinate highlights and geometry
+   * handles live inside the SVG canvas and remain below the HTML overlays.
+   */
+  --z-preview-toolbar: 30;
+  --z-preview-toolbar-popover: 34;
+  --z-preview-camera: 36;
+  --z-preview-layer: 38;
+  --z-preview-direct: 46;
+  --z-preview-inspector-button: 50;
+  --z-preview-inspector: 60;
 }
 
 .direct-input-drawer {
@@ -1095,7 +1106,7 @@
   top: 62px;
   right: 12px;
   bottom: 12px;
-  z-index: 5;
+  z-index: var(--z-preview-direct);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -1114,7 +1125,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 7;
+  z-index: var(--z-preview-inspector-button);
   pointer-events: auto;
 }
 
@@ -1123,7 +1134,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 9;
+  z-index: var(--z-preview-inspector);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -1341,7 +1352,7 @@
   top: 8px;
   right: 112px;
   left: 8px;
-  z-index: 6;
+  z-index: var(--z-preview-toolbar);
   display: grid;
   justify-items: start;
   gap: 6px;
@@ -1386,6 +1397,7 @@
 }
 
 .preview-history-overlay {
+  z-index: var(--z-preview-toolbar);
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 7px;
@@ -1485,7 +1497,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 8;
+  z-index: var(--z-preview-toolbar-popover);
   display: grid;
   gap: 4px;
   min-width: 190px;
@@ -1566,7 +1578,7 @@
   position: absolute;
   right: 12px;
   bottom: 12px;
-  z-index: 8;
+  z-index: var(--z-preview-layer);
   display: grid;
   justify-items: end;
   pointer-events: none;
@@ -3280,10 +3292,6 @@
     min-height: 420px;
   }
 
-  .preview-panel {
-    min-height: 380px;
-  }
-
   .direct-input-drawer {
     top: 52px;
     right: 8px;
@@ -3301,7 +3309,7 @@
   }
 
   .preview-toolbar-overlay-stack {
-    right: 104px;
+    right: 88px;
   }
 
   .preview-layer-control {
@@ -3309,12 +3317,19 @@
     bottom: 8px;
   }
 
+  .camera-control {
+    right: 8px;
+    bottom: 56px;
+    width: min(360px, calc(100% - 16px));
+    max-height: min(48svh, calc(100% - 72px));
+  }
+
   .camera-control-aside {
-    bottom: 54px;
+    bottom: 56px;
   }
 
   .layer-palette-window {
-    width: calc(100vw - 32px);
+    width: min(520px, calc(100svw - 32px));
     max-height: min(76svh, 520px);
   }
 
