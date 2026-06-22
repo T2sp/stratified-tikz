@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   addPathMenuItems,
+  activeToolSupportsCursorCreation,
   defaultPreviewCoordinateInputMode,
   previewToolbarTopTools,
   runPreviewOverlayAction,
+  shouldHandlePreviewCanvasCreationClick,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   togglePreviewToolbarState,
@@ -83,6 +85,38 @@ test('preview toolbar omits Add sheet in 2D diagrams', () => {
 
 test('cursor input is the default preview coordinate input mode', () => {
   assert.equal(defaultPreviewCoordinateInputMode(), 'cursor')
+})
+
+test('preview canvas creation clicks are disabled for Add grid direct input', () => {
+  assert.equal(activeToolSupportsCursorCreation('createGrid'), false)
+  assert.equal(
+    shouldHandlePreviewCanvasCreationClick('createGrid', 'direct'),
+    false,
+  )
+  assert.equal(
+    shouldHandlePreviewCanvasCreationClick('createGrid', 'cursor'),
+    false,
+  )
+})
+
+test('preview canvas creation clicks require cursor-capable tools in cursor mode', () => {
+  const cursorTools: WorkPlanePreviewTool[] = [
+    'createPoint',
+    'createLabel',
+    'createPolyline',
+    'createCubicBezier',
+    'createPath',
+    'createSheet',
+  ]
+
+  for (const tool of cursorTools) {
+    assert.equal(activeToolSupportsCursorCreation(tool), true, tool)
+    assert.equal(shouldHandlePreviewCanvasCreationClick(tool, 'cursor'), true, tool)
+    assert.equal(shouldHandlePreviewCanvasCreationClick(tool, 'direct'), false, tool)
+  }
+
+  assert.equal(activeToolSupportsCursorCreation('select'), false)
+  assert.equal(shouldHandlePreviewCanvasCreationClick('select', 'cursor'), false)
 })
 
 test('overlay event helper stops propagation', () => {

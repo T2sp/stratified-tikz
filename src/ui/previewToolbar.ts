@@ -42,6 +42,30 @@ export function defaultPreviewCoordinateInputMode(): CoordinateInputMode {
   return 'cursor'
 }
 
+export function activeToolSupportsCursorCreation(
+  tool: WorkPlanePreviewTool,
+): boolean {
+  switch (tool) {
+    case 'createPoint':
+    case 'createLabel':
+    case 'createPolyline':
+    case 'createCubicBezier':
+    case 'createPath':
+    case 'createSheet':
+      return true
+    case 'select':
+    case 'createGrid':
+      return false
+  }
+}
+
+export function shouldHandlePreviewCanvasCreationClick(
+  tool: WorkPlanePreviewTool,
+  inputMode: CoordinateInputMode,
+): boolean {
+  return inputMode !== 'direct' && activeToolSupportsCursorCreation(tool)
+}
+
 export function togglePreviewToolbarState(
   state: PreviewToolbarState,
 ): PreviewToolbarState {

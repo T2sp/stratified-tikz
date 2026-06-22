@@ -251,6 +251,7 @@ import {
   isAddPathTool,
   previewToolbarTopTools,
   runPreviewOverlayAction,
+  shouldHandlePreviewCanvasCreationClick,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   togglePreviewToolbarState,
@@ -823,6 +824,8 @@ function App() {
     inspectorDisclosure.expanded
   const canUndo = history.past.length > 0
   const canRedo = history.future.length > 0
+  const previewCursorCreationClicksEnabled =
+    shouldHandlePreviewCanvasCreationClick(creationTool, coordinateInputMode)
   const boundaryPathClickWorkflow = boundarySurfacePathClickWorkflow({
     tool:
       creationTool === 'select'
@@ -2401,8 +2404,10 @@ function App() {
     }
 
     if (
-      coordinateInputMode === 'direct' &&
-      (creationTool === 'createPoint' || creationTool === 'createLabel')
+      !shouldHandlePreviewCanvasCreationClick(
+        creationTool,
+        coordinateInputMode,
+      )
     ) {
       return
     }
@@ -2457,8 +2462,10 @@ function App() {
     }
 
     if (
-      coordinateInputMode === 'direct' &&
-      (creationTool === 'createPoint' || creationTool === 'createLabel')
+      !shouldHandlePreviewCanvasCreationClick(
+        creationTool,
+        coordinateInputMode,
+      )
     ) {
       return
     }
@@ -2512,23 +2519,71 @@ function App() {
   }
 
   function applyCursorCreationPoint(modelPoint: Vec3): void {
+    const activeCreationTool = creationTool
+
+    switch (activeCreationTool) {
+      case 'select':
+        return
+      case 'createGrid':
+        setDirectCreationStatus('Use the direct input panel to create a grid.')
+        return
+      case 'createPath': {
+        const result =
+          pathDraft === null
+            ? createConcatenatedPathDraft(
+                modelPoint,
+                activeWorkPlane,
+                pathSegmentKind,
+                editableDiagram.ambientDimension,
+                pathWorkPlaneMode,
+              )
+            : appendConcatenatedPathDraftPoint(
+                pathDraft,
+                modelPoint,
+                editableDiagram.ambientDimension,
+              )
+
+        if (!result.ok) {
+          setPathStatus(concatenatedPathDraftPointErrorMessage(result.reason))
+          return
+        }
+
+        setEditorState((current) => ({
+          ...current,
+          polylineDraft: null,
+          cubicBezierDraft: null,
+          pathDraft: result.draft,
+          sheetPolygonDraft: null,
+        }))
+        setPathStatus(concatenatedPathDraftStatusMessage(result.draft))
+        return
+      }
+      case 'createPolyline':
+      case 'createCubicBezier':
+      case 'createSheet':
+      case 'createPoint':
+      case 'createLabel':
+        break
+    }
+
     const nextCubicBezierPointCount =
-      creationTool === 'createCubicBezier'
+      activeCreationTool === 'createCubicBezier'
         ? (cubicBezierDraft?.points.length ?? 0) + 1
         : 0
     const shouldCommitOnClick =
-      creationTool === 'createPoint' ||
-      creationTool === 'createLabel' ||
-      (creationTool === 'createCubicBezier' && nextCubicBezierPointCount >= 4) ||
-      (creationTool === 'createSheet' &&
+      activeCreationTool === 'createPoint' ||
+      activeCreationTool === 'createLabel' ||
+      (activeCreationTool === 'createCubicBezier' &&
+        nextCubicBezierPointCount >= 4) ||
+      (activeCreationTool === 'createSheet' &&
         isAnchorCurvedSheetCreationKind(sheetCreationKind))
     const cursorCreationLayer = shouldCommitOnClick
       ? parseNewElementLayer(
-          creationTool === 'createCubicBezier'
+          activeCreationTool === 'createCubicBezier'
             ? setCubicBezierStatus
-            : creationTool === 'createSheet'
+            : activeCreationTool === 'createSheet'
               ? setSheetStatus
-            : setDirectCreationStatus,
+              : setDirectCreationStatus,
         )
       : null
 
@@ -2537,58 +2592,26 @@ function App() {
     }
 
     const curvedSheetParameters =
-      creationTool === 'createSheet' &&
+      activeCreationTool === 'createSheet' &&
       isAnchorCurvedSheetCreationKind(sheetCreationKind)
         ? parseCurvedSheetCreationParameters(setSheetStatus)
         : null
 
     if (
-      creationTool === 'createSheet' &&
+      activeCreationTool === 'createSheet' &&
       isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
       curvedSheetParameters === null
     ) {
       return
     }
 
-    if (creationTool === 'createPath') {
-      const result =
-        pathDraft === null
-          ? createConcatenatedPathDraft(
-              modelPoint,
-              activeWorkPlane,
-              pathSegmentKind,
-              editableDiagram.ambientDimension,
-              pathWorkPlaneMode,
-            )
-          : appendConcatenatedPathDraftPoint(
-              pathDraft,
-              modelPoint,
-              editableDiagram.ambientDimension,
-            )
-
-      if (!result.ok) {
-        setPathStatus(concatenatedPathDraftPointErrorMessage(result.reason))
-        return
-      }
-
-      setEditorState((current) => ({
-        ...current,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        pathDraft: result.draft,
-        sheetPolygonDraft: null,
-      }))
-      setPathStatus(concatenatedPathDraftStatusMessage(result.draft))
-      return
-    }
-
-    if (creationTool === 'createPolyline') {
+    if (activeCreationTool === 'createPolyline') {
       setPolylineStatus(
         `${(polylineDraft?.points.length ?? 0) + 1} vertices in draft.`,
       )
     }
 
-    if (creationTool === 'createCubicBezier') {
+    if (activeCreationTool === 'createCubicBezier') {
       setCubicBezierStatus(
         nextCubicBezierPointCount >= 4
           ? 'Cubic Bezier created.'
@@ -2596,7 +2619,7 @@ function App() {
       )
     }
 
-    if (creationTool === 'createSheet') {
+    if (activeCreationTool === 'createSheet') {
       setSheetStatus(
         sheetCreationKind === 'polygon'
           ? `${(sheetPolygonDraft?.points.length ?? 0) + 1} sheet vertices in draft.`
@@ -2605,7 +2628,7 @@ function App() {
     }
 
     setEditorState((current) => {
-      if (creationTool === 'createPolyline') {
+      if (activeCreationTool === 'createPolyline') {
         const draftPoints = current.polylineDraft?.points ?? []
 
         return {
@@ -2619,7 +2642,7 @@ function App() {
         }
       }
 
-      if (creationTool === 'createCubicBezier') {
+      if (activeCreationTool === 'createCubicBezier') {
         const draftPoints = current.cubicBezierDraft?.points ?? []
         const nextPoints = [...draftPoints, modelPoint]
 
@@ -2661,7 +2684,7 @@ function App() {
         )
       }
 
-      if (creationTool === 'createSheet') {
+      if (activeCreationTool === 'createSheet') {
         if (current.editableDiagram.ambientDimension !== 3) {
           return current
         }
@@ -2709,7 +2732,7 @@ function App() {
         }
       }
 
-      if (creationTool === 'createPoint') {
+      if (activeCreationTool === 'createPoint') {
         const result = addPointStratumWithResult(
           current.editableDiagram,
           modelPoint,
@@ -2727,24 +2750,28 @@ function App() {
         )
       }
 
-      const result = addTextLabelWithResult(
-        current.editableDiagram,
-        modelPoint,
-        { layer: cursorCreationLayer ?? undefined },
-      )
+      if (activeCreationTool === 'createLabel') {
+        const result = addTextLabelWithResult(
+          current.editableDiagram,
+          modelPoint,
+          { layer: cursorCreationLayer ?? undefined },
+        )
 
-      return commitDiagramChange(
-        current,
-        applyCreatedElementToEditorState(
+        return commitDiagramChange(
           current,
-          result.diagram,
-          { kind: 'label', id: result.id },
-          cursorCreationLayer ?? 0,
-        ),
-      )
+          applyCreatedElementToEditorState(
+            current,
+            result.diagram,
+            { kind: 'label', id: result.id },
+            cursorCreationLayer ?? 0,
+          ),
+        )
+      }
+
+      return current
     })
 
-    if (creationTool !== 'createPolyline') {
+    if (activeCreationTool !== 'createPolyline') {
       setCopyStatus('idle')
     }
   }
@@ -2765,6 +2792,7 @@ function App() {
         break
       case 'createPoint':
       case 'createLabel':
+      case 'createGrid':
       case 'select':
         setDirectCreationStatus(message)
         break
@@ -6568,14 +6596,15 @@ function App() {
                   : undefined
               }
               onCanvasClick={
-                creationTool === 'select' || workPlanePointPickingState.active
+                !previewCursorCreationClicksEnabled ||
+                workPlanePointPickingState.active
                   ? undefined
                   : handlePreviewCreationClick
               }
               onPointStratumClick={
                 workPlanePointPickingState.active
                   ? pickExistingPointForWorkPlane
-                  : creationTool === 'select'
+                  : !previewCursorCreationClicksEnabled
                     ? undefined
                     : handleExistingPointSourceCreationClick
               }
