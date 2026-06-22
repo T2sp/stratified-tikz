@@ -5034,22 +5034,23 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
-        <div>
-          <h1>StratifiedTikZ</h1>
-          <p>Basic preview and TikZ source workspace.</p>
-        </div>
-        <div className="status-strip" aria-label="Current diagram summary">
-          <span>{selectedExample.name}</span>
-          <span>{editableDiagram.ambientDimension}D</span>
-          <span>{coordinateInputMode}</span>
-          <span>{creationTool}</span>
-          <span>{layerFilterStatusLabel(layerFilter)}</span>
-          <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
-        </div>
-      </header>
+      <div className="top-control-area">
+        <header className="app-header">
+          <div>
+            <h1>StratifiedTikZ</h1>
+            <p>Preview-centered TikZ diagram editor.</p>
+          </div>
+          <div className="status-strip" aria-label="Current diagram summary">
+            <span>{selectedExample.name}</span>
+            <span>{editableDiagram.ambientDimension}D</span>
+            <span>{coordinateInputMode}</span>
+            <span>{creationTool}</span>
+            <span>{layerFilterStatusLabel(layerFilter)}</span>
+            <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
+          </div>
+        </header>
 
-      <section className="toolbar" aria-label="Diagram controls">
+        <section className="toolbar" aria-label="Diagram controls">
         <div className="control-stack example-control-stack">
           <div className="control-group example-control-group">
             <span className="control-label">Example</span>
@@ -6293,7 +6294,8 @@ function App() {
             )}
           </section>
         )}
-      </section>
+        </section>
+      </div>
 
       {pendingSymbolicImport !== null && (
         <div className="symbolic-import-backdrop">
@@ -6374,7 +6376,7 @@ function App() {
         className="workspace"
         aria-label="Preview, inspector, and TikZ source"
       >
-        <div className="preview-inspector-row">
+        <div className="preview-inspector-row preview-shell">
           <article className="workspace-panel preview-panel">
           <div className="panel-heading">
             <div>
