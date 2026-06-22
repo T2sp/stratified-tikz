@@ -150,6 +150,7 @@ import {
   coonsPatchBoundaryPathSourceErrorMessage,
   coonsPatchBoundaryPointSourceErrorMessage,
   coonsPatchCornerMismatchMessage,
+  copyTextToClipboard,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
@@ -174,6 +175,7 @@ import {
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
   defaultTikzExportMode,
+  downloadTextFile,
   EditableInspector,
   existingCoordinateSourceKey,
   findSelectedElement,
@@ -1037,32 +1039,24 @@ function App() {
   const showFillPathControls = shouldShowFillPathsForTool(creationTool)
 
   async function copyTikz(): Promise<void> {
-    try {
-      if (!navigator.clipboard) {
-        throw new Error('Clipboard API unavailable.')
-      }
+    const copied = await copyTextToClipboard(tikzSource)
 
-      await navigator.clipboard.writeText(tikzSource)
+    if (copied) {
       setCopyStatus('copied')
-    } catch {
+    } else {
       setCopyStatus('failed')
     }
   }
 
   function downloadTikz(): void {
-    try {
-      const blob = new Blob([tikzSource], { type: 'text/x-tex;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
+    const downloaded = downloadTextFile(tikzSource, {
+      filename: tikzDownloadFilenameForMode(tikzExportMode),
+      mimeType: 'text/x-tex;charset=utf-8',
+    })
 
-      link.href = url
-      link.download = tikzDownloadFilenameForMode(tikzExportMode)
-      document.body.append(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
+    if (downloaded) {
       setCopyStatus('downloaded')
-    } catch {
+    } else {
       setCopyStatus('failed')
     }
   }
@@ -1488,16 +1482,15 @@ function App() {
           visibility: visibilityOptions,
         }),
       )
-      const blob = new Blob([serialized], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
+      const downloaded = downloadTextFile(serialized, {
+        filename: normalizeJsonDownloadFilename(jsonDownloadFilename),
+        mimeType: 'application/json',
+      })
 
-      link.href = url
-      link.download = normalizeJsonDownloadFilename(jsonDownloadFilename)
-      document.body.append(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
+      if (!downloaded) {
+        throw new Error('Download failed.')
+      }
+
       if (showCameraControls) {
         setSavedCameraControl(cameraControl)
       }
@@ -5134,6 +5127,7 @@ function App() {
 
     return (
       <section
+        id="direct-input-drawer"
         className="direct-input-drawer"
         aria-labelledby="direct-input-drawer-heading"
         onClick={stopPreviewOverlayEvent}
@@ -5149,6 +5143,8 @@ function App() {
           <button
             type="button"
             className="preview-overlay-button direct-input-drawer-close"
+            aria-label="Close direct input drawer"
+            aria-controls="direct-input-drawer"
             onClick={(event) =>
               runPreviewOverlayAction(event, closeDirectInputDrawer)
             }
@@ -5168,8 +5164,10 @@ function App() {
         <button
           type="button"
           className="preview-overlay-button inspector-drawer-open-button"
+          aria-label="Open inspector drawer"
           aria-controls="preview-inspector-drawer"
           aria-expanded={false}
+          title="Open inspector"
           onClick={(event) =>
             runPreviewOverlayAction(event, openInspectorDrawer)
           }
@@ -5196,8 +5194,10 @@ function App() {
           <button
             type="button"
             className="preview-overlay-button inspector-drawer-close-button"
+            aria-label="Close inspector drawer"
             aria-controls="preview-inspector-drawer"
             aria-expanded={true}
+            title="Close inspector"
             onClick={(event) =>
               runPreviewOverlayAction(event, closeInspectorDrawer)
             }
@@ -5677,12 +5677,19 @@ function App() {
               className="preview-overlay-button preview-toolbar-collapse-button"
               aria-label="Collapse preview toolbar"
               title="Collapse toolbar"
-              onClick={togglePreviewToolbar}
+              onClick={(event) =>
+                runPreviewOverlayAction(event, togglePreviewToolbar)
+              }
+              onPointerDown={stopPreviewOverlayEvent}
             >
               ↑
             </button>
 
-            <div className="preview-toolbar-primary-tools" role="group">
+            <div
+              className="preview-toolbar-primary-tools"
+              role="group"
+              aria-label="Creation tools"
+            >
               {previewToolbarTopTools(editableDiagram.ambientDimension).map(
                 (tool) => renderPreviewToolbarTool(tool),
               )}
@@ -5723,6 +5730,7 @@ function App() {
             className="preview-overlay-button"
             disabled={!canUndo}
             onClick={(event) => runPreviewOverlayAction(event, undoLastChange)}
+            aria-label="Undo last diagram change"
             title="Undo last diagram change"
           >
             Undo
@@ -5732,6 +5740,7 @@ function App() {
             className="preview-overlay-button"
             disabled={!canRedo}
             onClick={(event) => runPreviewOverlayAction(event, redoLastChange)}
+            aria-label="Redo last undone diagram change"
             title="Redo the last undone diagram change"
           >
             Redo
@@ -5763,7 +5772,7 @@ function App() {
             creationTool === tool.id ? 'is-selected' : ''
           }`}
         >
-          <summary>{tool.label} ▾</summary>
+          <summary aria-label={`${tool.label} menu`}>{tool.label} ▾</summary>
           <div className="preview-toolbar-menu-popover">
             {directTool !== 'createGrid' && (
               <button
@@ -5814,7 +5823,7 @@ function App() {
             isAddPathTool(creationTool) ? 'is-selected' : ''
           }`}
         >
-          <summary>{tool.label} ▾</summary>
+          <summary aria-label="Add path menu">{tool.label} ▾</summary>
           <div className="preview-toolbar-menu-popover">
             {addPathMenuItems().map((item) => (
               <button
@@ -5845,7 +5854,7 @@ function App() {
             creationTool === 'createSheet' ? 'is-selected' : ''
           }`}
         >
-          <summary>{tool.label} ▾</summary>
+          <summary aria-label="Add sheet menu">{tool.label} ▾</summary>
           <div className="preview-toolbar-menu-popover">
             {sheetCreationKinds.map((kind) => (
               <button
@@ -6953,8 +6962,8 @@ function App() {
                     : 'camera-control'
                 }
                 aria-labelledby="camera-heading"
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
+                onClick={stopPreviewOverlayEvent}
+                onPointerDown={stopPreviewOverlayEvent}
               >
                 <div className="camera-summary-row">
                   <button
@@ -6979,6 +6988,7 @@ function App() {
                   <button
                     type="button"
                     className="toolbar-button"
+                    aria-label="Reset camera to initial view"
                     onClick={resetCameraViewToInitial}
                   >
                     Reset
@@ -6987,6 +6997,7 @@ function App() {
                     type="button"
                     className="toolbar-button"
                     disabled={!canResetCameraToSaved}
+                    aria-label="Reset camera to saved JSON view"
                     onClick={resetCameraViewToSaved}
                   >
                     Saved
@@ -6994,6 +7005,7 @@ function App() {
                   <button
                     type="button"
                     className="toolbar-button"
+                    aria-label="Fit camera view"
                     onClick={fitCameraView}
                   >
                     Fit
@@ -7001,6 +7013,11 @@ function App() {
                   <button
                     type="button"
                     className="toolbar-button camera-aside-button"
+                    aria-label={
+                      isCameraPanelAside
+                        ? 'Restore full camera controls'
+                        : 'Compact camera controls'
+                    }
                     onClick={toggleCameraPanelAside}
                   >
                     {isCameraPanelAside ? 'Restore' : 'Aside'}
@@ -7324,12 +7341,20 @@ function App() {
                 </select>
               </label>
               <div className="tikz-export-actions">
-                <button type="button" className="copy-button" onClick={copyTikz}>
+                <button
+                  type="button"
+                  className="copy-button"
+                  aria-label="Copy generated TikZ source"
+                  onClick={copyTikz}
+                >
                   Copy TikZ
                 </button>
                 <button
                   type="button"
                   className="copy-button"
+                  aria-label={`Download generated TikZ source as ${tikzDownloadFilenameForMode(
+                    tikzExportMode,
+                  )}`}
                   onClick={downloadTikz}
                   title={`Download ${tikzDownloadFilenameForMode(tikzExportMode)}`}
                 >

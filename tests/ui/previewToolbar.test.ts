@@ -34,6 +34,31 @@ test('preview toolbar collapse state toggles between expanded and collapsed', ()
   assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
 })
 
+test('preview overlay state is UI-only and not saved in diagram JSON', () => {
+  const serialized = serializeDiagram(emptyTwoDimensionalDiagram)
+  const parsed = JSON.parse(serialized) as {
+    diagram: Record<string, unknown>
+  }
+
+  togglePreviewToolbarState('expanded')
+  openInspectorDrawerState()
+  directInputDrawerStateForInputMode('direct')
+
+  assert.equal('previewToolbarState' in parsed.diagram, false)
+  assert.equal('inspectorDrawerState' in parsed.diagram, false)
+  assert.equal('directInputDrawerState' in parsed.diagram, false)
+  assert.equal('layerWindowOpen' in parsed.diagram, false)
+  assert.equal('cameraPanelOpen' in parsed.diagram, false)
+})
+
+test('toolbar collapse state does not affect generated TikZ', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+
+  assert.equal(togglePreviewToolbarState('expanded'), 'collapsed')
+  assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
+})
+
 test('inspector drawer is closed by default and opens only by explicit action', () => {
   const defaultState = defaultInspectorDrawerState()
   const openState = openInspectorDrawerState()
@@ -85,6 +110,14 @@ test('TikZ output is unaffected by inspector drawer state', () => {
   const drawerState = openInspectorDrawerState()
 
   assert.equal(isInspectorDrawerOpen(drawerState), true)
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
+})
+
+test('TikZ output is unaffected by inspector open and closed states', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+
+  assert.equal(isInspectorDrawerOpen(openInspectorDrawerState()), true)
+  assert.equal(isInspectorDrawerOpen(closeInspectorDrawerState()), false)
   assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
 })
 
@@ -189,6 +222,20 @@ test('direct input drawer state is UI-only and does not change diagram serializa
   assert.equal(drawerState, 'open')
   assert.equal(formKind, 'grid')
   assert.equal(serializeDiagram(emptyTwoDimensionalDiagram), before)
+})
+
+test('direct input drawer open and closed states do not affect TikZ before creation', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+  const openState = directInputDrawerStateForInputMode('direct')
+  const closedInputMode = closeDirectInputDrawerInputMode()
+  const closedState = directInputDrawerStateForInputMode(closedInputMode)
+
+  assert.equal(shouldShowDirectInputDrawer('createPoint', 'direct', openState), true)
+  assert.equal(
+    shouldShowDirectInputDrawer('createPoint', closedInputMode, closedState),
+    false,
+  )
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
 })
 
 test('switching tools follows the drawer policy', () => {

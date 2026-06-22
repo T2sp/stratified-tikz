@@ -107,6 +107,7 @@ export function LayerManager({
   )
   const detailsId = 'preview-layer-palette'
   const titleId = 'preview-layer-palette-title'
+  const actionPanelId = 'preview-layer-palette-actions'
 
   useEffect(() => {
     if (selectedActionLayerValue !== selectedLayerValue) {
@@ -193,6 +194,14 @@ export function LayerManager({
         className="preview-overlay-button layer-palette-toggle-button"
         aria-controls={detailsId}
         aria-expanded={expanded}
+        aria-label={
+          expanded
+            ? 'Close layer window'
+            : `Open layer window. ${layerButtonTitle(
+                creationLayerInput,
+                layers,
+              )}`
+        }
         title={layerButtonTitle(creationLayerInput, layers)}
         onClick={() => changeExpanded(nextLayerPaletteOpenState(expanded))}
       >
@@ -262,7 +271,11 @@ export function LayerManager({
                   }
                 />
               </label>
-              <button type="submit" className="preview-overlay-button">
+              <button
+                type="submit"
+                className="preview-overlay-button"
+                aria-label="Set new element layer"
+              >
                 Set
               </button>
             </form>
@@ -309,13 +322,20 @@ export function LayerManager({
               <button
                 type="button"
                 className="preview-overlay-button layer-palette-actions-toggle"
+                aria-controls={actionPanelId}
                 aria-expanded={actionsExpanded}
+                aria-label={
+                  actionsExpanded
+                    ? 'Hide selected layer actions'
+                    : 'Show selected layer actions'
+                }
                 onClick={() => setActionsExpanded((current) => !current)}
               >
                 Actions
               </button>
               {actionsExpanded && (
                 <SelectedLayerActions
+                  id={actionPanelId}
                   diagram={diagram}
                   layer={selectedRow?.layer ?? null}
                   elementCount={selectedRow?.elementCount ?? 0}
@@ -549,6 +569,7 @@ function LayerThumbnailMarkShape({
 }
 
 type SelectedLayerActionsProps = {
+  id: string
   diagram: Diagram
   layer: DiagramLayer | null
   elementCount: number
@@ -562,6 +583,7 @@ type SelectedLayerActionsProps = {
 }
 
 function SelectedLayerActions({
+  id,
   diagram,
   layer,
   elementCount,
@@ -574,11 +596,16 @@ function SelectedLayerActions({
   onStatusMessage,
 }: SelectedLayerActionsProps) {
   if (layer === null) {
-    return <p className="layer-palette-action-empty">No selected layer.</p>
+    return (
+      <p id={id} className="layer-palette-action-empty">
+        No selected layer.
+      </p>
+    )
   }
 
   return (
     <SelectedLayerActionForms
+      id={id}
       diagram={diagram}
       layer={layer}
       elementCount={elementCount}
@@ -598,6 +625,7 @@ type SelectedLayerActionFormsProps = Omit<SelectedLayerActionsProps, 'layer'> & 
 }
 
 function SelectedLayerActionForms({
+  id,
   diagram,
   layer,
   elementCount,
@@ -652,6 +680,7 @@ function SelectedLayerActionForms({
 
   return (
     <div
+      id={id}
       className="layer-palette-action-panel"
       aria-label={`Actions for layer ${layerKey}`}
     >
@@ -680,6 +709,7 @@ function SelectedLayerActionForms({
             type="button"
             className="toolbar-button"
             aria-pressed={isVisible}
+            aria-label={`${isVisible ? 'Hide' : 'Show'} layer ${layerKey}`}
             onClick={() => onSetLayerVisibility(layer.value, !isVisible)}
           >
             {isVisible ? 'Visible' : 'Hidden'}
@@ -688,6 +718,7 @@ function SelectedLayerActionForms({
             type="button"
             className="toolbar-button"
             aria-pressed={isLocked}
+            aria-label={`${isLocked ? 'Unlock' : 'Lock'} layer ${layerKey}`}
             onClick={() => onSetLayerLock(layer.value, !isLocked)}
           >
             {isLocked ? 'Locked' : 'Unlocked'}
@@ -889,7 +920,11 @@ function LayerNameEditor({
           }
         }}
       />
-      <button type="submit" className="toolbar-button">
+      <button
+        type="submit"
+        className="toolbar-button"
+        aria-label={`Rename layer ${layerKey}`}
+      >
         Rename
       </button>
     </form>

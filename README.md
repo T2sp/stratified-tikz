@@ -31,3 +31,4 @@ git diff --check
 - [Ruled surfaces](docs/RULED_SURFACES.md)
 - [Symbolic input and grids](docs/SYMBOLIC_INPUT_AND_GRIDS.md)
 - [Layer manager](docs/LAYER_MANAGER.md)
+- [Preview UI](docs/PREVIEW_UI.md)
