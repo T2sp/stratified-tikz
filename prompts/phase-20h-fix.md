@@ -1,4 +1,4 @@
-# Phase 20H / Phase 19C Fix Prompt: Support symbolic arc segments and audit remaining numeric-only symbolic-load blockers
+# Phase 20H Fix Prompt: Surface-only face cap before projection/sort and boundary arc scalar validation
 
 ## Environment
 
@@ -29,488 +29,497 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 19G and Phase 20H are complete.
+Phase 20H is under review after symbolic arc fixes and visibility/export hardening.
 
-Recent fixes allowed symbolic boundary coordinates and symbolic work-plane frame coordinates to be resolved at JSON load time by asking the user for variable values.
+Review result:
 
-However, loading the attached JSON still fails with:
+- Tests pass.
+- Build passes.
+- No Critical issues.
+- Two Medium issues remain.
 
-```text
-Could not load diagram: strata[21].segments[0] Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
+## Medium issue 1: TikZ surface-depth sorting cap does not bound pre-fallback work
+
+Review location:
+
+- `src/tikz/generateTikz.ts`
+- `src/rendering/projectedPrimitives.ts`
+
+Current problem:
+
+- `maxSurfaceFacesForSorting` is enforced only after:
+
+```ts
+extractProjectedRenderPrimitives(...)
 ```
 
-The uploaded JSON contains variables such as:
+has already sampled and projected all render primitives.
 
-```text
-Len = 4
-R = 1
+- `extractProjectedRenderPrimitives(...)` also walks curves and points before filtering to surface faces.
+- Therefore, TikZ export for large diagrams still pays expensive pre-fallback work:
+  - surface extraction/projection;
+  - unrelated curve/point primitive extraction;
+  - only then filtering to surface faces;
+  - only then cap fallback.
+- The surface-face cap therefore does not actually bound the work it is intended to bound.
+
+Required fix:
+
+- Make TikZ surface depth sorting use a **surface-only projected face collector**.
+- Enforce `maxSurfaceFacesForSorting` during surface-face collection, before:
+  - unrelated curve/point sampling;
+  - sorting;
+  - any expensive unnecessary projection.
+- Prefer short-circuiting at `cap + 1`.
+
+## Medium issue 2: Boundary arc symbolic scalars are not validated against variables in direct `validateDiagram()`
+
+Review location:
+
+- `src/model/validation.ts`
+- `src/geometry/curvedSheets.ts`
+
+Current problem:
+
+- Symbolic arc scalars inside ruled/Coons boundary snapshots are refreshed on save/load.
+- But direct `validateDiagram()` does not validate those scalar expressions against the diagram variable context.
+- `validateCurvedSheetPrimitive()` accepts finite previews.
+- Therefore an in-memory boundary arc scalar like:
+
+```ts
+{
+  kind: "symbolic",
+  expression: "Missing",
+  previewValue: 1
+}
 ```
 
-and contains many symbolic coordinates. In particular, the failing stratum is a `concatenatedPath` named like `Ufront` whose first segment is an `arc`. The arc has symbolic data such as:
+can validate even though the variable `Missing` is unresolved.
 
-```text
-center.y = -.5*Len
-frame.origin.y = -.5*Len
-```
+This creates a stale-preview validation hole.
 
-Other symbolic data in the same file appears in:
+Required fix:
 
-- arc centers;
-- arc frames;
-- line segment starts/ends;
-- cubic control points;
-- Coons patch boundary segments;
-- filled region boundaries;
-- polygon/sheet vertices;
-- point/label positions.
-
-The current error means the loader/export validation still contains a numeric-only check for arc segments.
-
-This is too strict.
-
-In practical diagrams, arcs and path boundaries are often naturally specified symbolically. The editor should allow symbolic arc segment fields if they can be resolved to finite preview values.
+- Extend curved-sheet boundary validation so symbolic arc scalars:
+  - `radius`;
+  - `startAngleDeg`;
+  - `endAngleDeg`;
+  inside ruled/Coons boundary snapshots are validated against the diagram variable context.
+- Reject unresolved variables and stale previews.
+- Add tests for unresolved and stale preview values.
 
 ## Goal
 
-Allow symbolic input in arc segments, including when loading saved JSON.
+Fix Phase 20H hardening gaps:
 
-An arc segment should be valid if, after variable resolution and symbolic preview refresh, all fields needed for preview/sampling/export have finite preview values and the arc geometry is valid.
-
-Do not reject an arc merely because its center/frame/radius/angles were originally symbolic.
-
-Also audit the codebase for other remaining “must be numeric because …” validations that block symbolic values despite finite preview values, especially in path/surface/export paths.
+1. Surface depth sorting must not call the general projected primitive extractor for TikZ face sorting.
+2. Surface face cap must be enforced during surface-only collection before sorting and before sampling unrelated curves/points.
+3. Ruled/Coons boundary arc symbolic scalar fields must be validated against the diagram variable context during direct `validateDiagram()`, not only during save/load refresh.
+4. Tests must cover both issues.
 
 ## Scope
 
-This is a targeted symbolic-load/export robustness fix.
+This is a targeted Phase 20H fix.
 
 Implement:
 
-- symbolic preview refresh for arc segment fields;
-- finite-preview validation for arc segment fields;
-- JSON load-time variable detection for arc segment expressions;
-- replacement of numeric-only arc validation with finite-preview validation;
-- tests using symbolic arc centers/frames/radius/angles where supported;
-- an audit/fix of other remaining numeric-only symbolic blockers in relevant geometry paths.
+- surface-only projected face collection for TikZ surface depth sorting;
+- cap enforcement during face collection;
+- validation of symbolic arc scalar expressions in ruled/Coons boundary snapshots against variables;
+- tests for cap behavior and boundary arc scalar validation.
 
 Do not implement:
 
-- full TeX evaluation;
-- raw TikZ evaluation;
-- symbolic mesh sampling formulas;
-- new expression syntax;
-- new geometry types;
-- new dependencies;
-- broad save/load redesign.
+- new visibility algorithms;
+- new geometry primitives;
+- exact hidden-surface algorithms;
+- broad projected primitive rewrite beyond necessary extraction helpers;
+- new symbolic expression grammar;
+- new save/load format;
+- new dependencies.
 
 Do not change:
 
-- valid numeric arc behavior;
-- arc mathematical semantics;
-- symbolic variable manager semantics;
-- existing finite-preview boundary/surface fixes;
-- SVG preview semantics except allowing symbolic inputs that evaluate finitely;
-- TikZ export mode semantics;
+- normal under-cap surface sorting order;
+- visibility option semantics;
+- disabled visibility behavior;
+- curve occlusion behavior except avoiding unnecessary work;
+- SVG rendering semantics unless shared helpers require safe refactor;
+- TikZ output format except comments/fallback behavior if already defined;
 - inline no-blank-lines;
 - 4-space indentation.
 
-## 1. Find all remaining numeric-only validation blockers
+## Part 1: Surface-only projected face collector
 
-Run a search such as:
+### 1. Inspect current surface sorting path
 
-```bash
-rg "must be numeric because|coordinates must be numeric|must be numeric" src
-```
+Inspect:
 
-Pay special attention to messages like:
+- `src/tikz/generateTikz.ts`;
+- `src/rendering/projectedPrimitives.ts`;
+- surface sorting helpers from Phase 20D/20E;
+- visibility options and caps;
+- tests for sorted surface export.
 
-```text
-Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
-Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
-Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
-```
-
-Some earlier fixes may have handled boundary and frame messages, but the arc message remains.
-
-For each numeric-only validation found, decide whether the correct policy should be:
-
-```text
-finite preview required
-```
-
-rather than:
-
-```text
-raw numeric input required
-```
-
-In Phase 19+ code, most geometry export/preview paths should accept symbolic values if finite preview values exist.
-
-Do not blindly remove validation. Replace numeric-only checks with finite-preview checks and clear unresolved-variable errors.
-
-## 2. Arc segment fields that should support symbolic input
-
-Update arc segment refresh/validation/export helpers to support symbolic values for all relevant fields.
-
-Arc segment fields may include:
+Find where TikZ export currently does something like:
 
 ```ts
-type ArcPathSegment = {
-  kind: "arc";
-  start: Vec3 | SymbolicVec3;
-  end: Vec3 | SymbolicVec3;
-  center: Vec3 | SymbolicVec3;
-  radius: number | ScalarInputValue;
-  startAngleDeg: number | ScalarInputValue;
-  endAngleDeg: number | ScalarInputValue;
-  direction: "clockwise" | "counterclockwise";
-  frame?: WorkPlaneFrameSnapshot;
-};
+const primitives = extractProjectedRenderPrimitives(...);
+const surfaceFaces = primitives.filter((p) => p.kind === "surfaceFace");
+if (surfaceFaces.length > maxSurfaceFacesForSorting) ...
+surfaceFaces.sort(...)
 ```
 
-Exact types may differ.
+This is the issue.
 
-At minimum, support symbolic preview refresh for:
+### 2. Add a surface-only collector
 
-- `start`;
-- `end`;
-- `center`;
-- `frame.origin`;
-- `frame.u`;
-- `frame.v`;
-- `frame.normal`.
+Add a helper that extracts only projected surface faces.
 
-If the current model allows symbolic scalar values for arc `radius`, `startAngleDeg`, or `endAngleDeg`, support them too.
+Suggested name:
 
-If radius/angle symbolic scalars are not currently modeled, do not crash on them; either:
-
-- implement symbolic scalar support for them; or
-- reject them with a clear expression-specific message.
-
-Preferred: support symbolic scalar fields for radius and angles because Phase 19 already has symbolic scalar expressions.
-
-## 3. Replace arc numeric-only policy with finite-preview policy
-
-### Old policy
-
-```text
-Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
+```ts
+collectProjectedSurfaceFacesForSorting(...)
 ```
 
-### New policy
+or:
 
-```text
-Arc segment coordinates must have finite preview values after variable resolution.
+```ts
+extractProjectedSurfaceFaces(...)
 ```
 
-Allowed:
+Suggested result:
 
-- numeric arc fields;
-- symbolic arc coordinate fields with finite preview values;
-- symbolic arc scalar fields with finite preview values, if supported.
-
-Rejected:
-
-- unknown variable;
-- invalid expression;
-- non-finite preview value;
-- missing preview value;
-- malformed symbolic coordinate/scalar object;
-- invalid radius <= 0;
-- invalid start/end angles;
-- invalid frame after preview evaluation;
-- inconsistent start/end relative to center/radius/angles if the current validation checks consistency.
-
-## 4. Refresh symbolic previews for arcs before validation/export
-
-Ensure arc segment symbolic previews are refreshed:
-
-- during JSON load after variable values are resolved;
-- when variables change in the editor;
-- before SVG preview;
-- before TikZ export;
-- inside boundary snapshots for Coons/ruled/fill surfaces if arcs appear there.
-
-Important paths to inspect:
-
-- `src/model/symbolicCoordinates.ts`;
-- path segment refresh helpers;
-- arc segment validation helpers;
-- boundary snapshot refresh helpers;
-- save/load normalization;
-- TikZ path export helpers;
-- SVG path rendering helpers;
-- curve occlusion sampling helpers.
-
-The failure path is:
-
-```text
-strata[21].segments[0]
+```ts
+type ProjectedSurfaceFaceCollectionResult =
+  | {
+      kind: "ok";
+      faces: ProjectedSurfaceFace[];
+    }
+  | {
+      kind: "capExceeded";
+      cap: number;
+      observedCount: number;
+    };
 ```
 
-so ordinary top-level `concatenatedPath` arc segments must be fixed, not only surface boundaries.
-
-## 5. Variable detection must include arc fields
-
-The load-time variable-resolution dialog should detect variables used in arc fields.
-
-Examples:
-
-```text
-center.y = -.5*Len
-frame.origin.y = -.5*Len
-radius = R
-startAngleDeg = q
-endAngleDeg = q + 90
-```
-
-Variables required:
-
-```text
-Len
-R
-q
-```
-
-Function names such as `sin`, `cos`, etc. should not be treated as variables.
-
-Use the Phase 19 parser/AST rather than fragile regex where possible.
-
-## 6. Arc SVG preview behavior
-
-SVG preview and hit testing should use finite numeric preview values.
+Exact shape can differ.
 
 Requirements:
 
-- symbolic center/frame/radius/angles evaluate to finite numeric values;
-- arc preview renders correctly;
+- collect only surface face primitives;
+- do not walk/sample curves;
+- do not walk/sample points;
+- do not construct label primitives;
+- enforce `maxSurfaceFacesForSorting` while collecting;
+- stop at `cap + 1`;
+- return cap-exceeded fallback before sorting;
+- collect finite projected faces only;
+- preserve source/layer/original-index metadata needed for sorting.
+
+### 3. Enforce cap before sorting
+
+Required flow:
+
+```text
+collect/project surface faces up to cap + 1
+if cap exceeded:
+    return fallback
+else:
+    sort collected faces
+    emit sorted faces
+```
+
+Do not:
+
+```text
+collect all primitives
+filter surface faces
+sort all faces
+then check cap
+```
+
+Do not call the general projected primitive extractor in this TikZ surface sort path if it samples curves/points.
+
+### 4. Preserve under-cap behavior
+
+When surface face count is under the cap:
+
+- sorted surface export should match existing Phase 20E/20H behavior;
+- tie-breakers remain deterministic;
+- layer/depth/original-index semantics preserved;
 - no NaN/Infinity;
-- path selection remains possible;
-- curve occlusion sampling can sample symbolic arcs using preview values;
-- changing variable values updates arc preview.
+- inline/standalone formatting unchanged.
 
-## 7. Arc TikZ export behavior
+### 5. Cap fallback behavior
 
-TikZ export should preserve symbolic intent where practical.
+When surface face count exceeds cap:
 
-Examples:
+- do not sort;
+- do not emit sorted sampled faces through the expensive path;
+- use the existing fallback behavior/comment if present;
+- output should remain complete and valid;
+- no hidden sampled curve segments should be emitted merely because the surface sort cap path was entered;
+- inline output still has no blank lines.
 
-If variables are:
+If existing fallback comment wording exists, preserve it.
 
-```text
-Len -> \Len
-R -> \R
-q -> \q
+## Part 2: Validate symbolic arc scalars in ruled/Coons boundary snapshots
+
+### 6. Identify all boundary arc scalar fields
+
+Arc segments may contain scalar fields such as:
+
+```ts
+radius
+startAngleDeg
+endAngleDeg
 ```
 
-and arc center uses:
+These may be numeric or symbolic scalar values.
 
-```text
-(0, -.5*Len)
+Boundary snapshots may occur in:
+
+- ruled surface primitive:
+  - boundary0;
+  - boundary1;
+- Coons patch primitive:
+  - bottom;
+  - right;
+  - top;
+  - left;
+- potentially constant boundaries or path templates if supported.
+
+The immediate issue concerns symbolic arc scalar values inside ruled/Coons boundary snapshots.
+
+### 7. Validate symbolic scalar expressions against variable context
+
+Direct validation must not rely solely on `previewValue`.
+
+If a scalar is symbolic:
+
+```ts
+{
+  kind: "symbolic",
+  expression: "Missing",
+  previewValue: 1
+}
 ```
 
-then output should prefer:
+then validation should:
 
-```tex
-(0, {-.5 * \Len})
+1. parse/validate expression with the current diagram variable context;
+2. reject if any referenced variable is not defined;
+3. evaluate preview from variables;
+4. compare or refresh stale preview according to existing Phase 19 policy;
+5. reject if evaluated preview is non-finite;
+6. reject if arc-specific constraints fail, e.g. radius <= 0.
+
+Do not accept finite stale previews when expression is unresolved.
+
+### 8. Use existing Phase 19 expression helpers
+
+Reuse existing symbolic expression/variable validation helpers.
+
+Avoid duplicating parser logic.
+
+Expected helpers may include concepts like:
+
+- parse symbolic scalar;
+- collect referenced variables;
+- evaluate scalar expression;
+- refresh symbolic preview;
+- validate scalar input value.
+
+If no suitable helper exists, add a small shared helper for validating symbolic scalar fields in geometry validation.
+
+Suggested:
+
+```ts
+validateScalarInputValueAgainstVariables(
+  scalar,
+  variableContext,
+  path
+): ValidationResult<number>
 ```
 
-or equivalent in the existing formatter.
+or equivalent.
 
-For arc syntax, if the exporter derives start/end or local coordinates numerically from center/radius/angles, it may use preview values only if there is no symbolic export path yet. But it should not reject the diagram solely because the input was symbolic.
+### 9. Update curved-sheet primitive validation
 
-Preferred export policy:
+Update validation call chain:
 
-- use symbolic expressions for coordinate/scalar fields when the arc TikZ syntax can represent them safely;
-- otherwise use finite preview values and document fallback.
+- `validateDiagram(...)`;
+- `validateStratum(...)`;
+- `validateCurvedSheetPrimitive(...)`;
+- boundary path snapshot validation;
+- arc segment validation.
 
-Do not emit broken TikZ.
+Ensure it passes the diagram variable context down to boundary segment validation.
 
-Do not export unresolved variable names without corresponding `\pgfmathsetmacro`.
+Required:
 
-## 8. Check other likely symbolic blockers in the attached JSON
+- ruled/Coons boundary arc `radius` symbolic expression validated;
+- ruled/Coons boundary arc `startAngleDeg` symbolic expression validated;
+- ruled/Coons boundary arc `endAngleDeg` symbolic expression validated;
+- stale preview values rejected or refreshed consistently;
+- finite numeric scalar values still accepted.
 
-The uploaded JSON contains symbolic fields beyond the failing arc:
+### 10. Validate stale previews
 
-- point positions;
-- label positions;
-- polygon/sheet vertices;
-- line endpoints;
-- cubic controls;
-- Coons patch boundary segments;
-- filled region boundaries;
-- arc centers and frames;
-- work-plane frames.
+Add a policy for stale preview values.
 
-After fixing arc segments, the file should not simply fail on the next numeric-only validation.
+Preferred:
 
-Add an audit/fix so any remaining related numeric-only blocker is addressed or produces a clear unresolved-variable error.
+- validation recomputes expected preview from variables and either:
+  - updates via refresh before validation; or
+  - rejects if stored `previewValue` does not match evaluated value within tolerance.
 
-Potential areas to check:
+Since `validateDiagram()` should not mutate if existing validation is pure, it may be better to reject stale preview and ask caller to refresh.
 
-### Path segments
+However, direct in-memory validation should not accept:
 
-- line start/end;
-- cubic start/control1/control2/end;
-- arc start/end/center/frame/radius/angles.
-
-### Template paths
-
-- circle center/radius/frame;
-- ellipse center/radiusX/radiusY/frame/rotation.
-
-### Filled boundaries
-
-- boundaries containing arc segments;
-- work-plane-filled sheets with symbolic frame/local coordinates.
-
-### Ruled/Coons surfaces
-
-- boundary path snapshots containing arc segments;
-- boundary segment frames;
-- constant point boundaries if present.
-
-### Grid
-
-- symbolic ranges/spacing if allowed.
-
-The prompt does not require making every possible field symbolic if the model cannot represent it yet, but it does require not rejecting valid finite-preview symbolic arc/path/surface data merely for being symbolic.
-
-## 9. Error messages
-
-Replace numeric-only arc error with a finite-preview/evaluation error.
-
-Bad:
-
-```text
-Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
+```ts
+expression: "R"
+previewValue: 1
 ```
 
-Good:
+when variable `R = 2`, unless there is an earlier guaranteed refresh step.
 
-```text
-Arc segment coordinates must have finite preview values after variable resolution.
+Choose the policy consistent with existing symbolic coordinate validation.
+
+Document it in code/tests.
+
+## Tests
+
+### A. Surface-only cap enforcement tests
+
+Add tests that would fail if general primitive extraction/sorting still happens before cap enforcement.
+
+1. Surface-only collector under cap returns projected surface faces.
+
+2. Surface-only collector over cap returns cap-exceeded result after `cap + 1`.
+
+3. The TikZ surface depth sorting path does not call/require general projected primitive extraction for curves/points.
+
+If direct spying is hard, structure code so the surface-only helper can be tested directly.
+
+4. Large diagram with many surfaces and many curves:
+   - `maxSurfaceFacesForSorting` low;
+   - export hits cap fallback;
+   - no curve/point primitive extraction is required for deciding surface sort fallback, if testable.
+
+5. TikZ export over cap emits the existing cap fallback warning/comment.
+
+6. TikZ export over cap does not emit hidden sampled segments due to this fallback path.
+
+7. Under-cap sorted surface export remains deterministic.
+
+8. Inline output with cap fallback has no blank lines.
+
+### B. Boundary arc scalar validation tests
+
+9. Ruled boundary arc with symbolic `radius: { expression: "R", previewValue: 1 }` validates when variable `R = 1`.
+
+10. Coons boundary arc with symbolic `radius` validates when variable is defined.
+
+11. Ruled boundary arc with symbolic `startAngleDeg` validates when variable is defined.
+
+12. Coons boundary arc with symbolic `endAngleDeg` validates when variable is defined.
+
+13. Boundary arc with unresolved symbolic radius:
+
+```ts
+expression: "Missing"
+previewValue: 1
 ```
 
-Better with path context:
+makes `validateDiagram()` fail.
+
+14. Boundary arc with unresolved symbolic start angle fails.
+
+15. Boundary arc with unresolved symbolic end angle fails.
+
+16. Boundary arc with stale preview fails or is refreshed according to chosen policy.
+
+Example:
+
+```ts
+variables: R = 2
+radius: { expression: "R", previewValue: 1 }
+```
+
+Expected:
+- fail if validation is pure;
+- or pass only if refresh happens before validation and stored preview is updated in a controlled path.
+
+The test must reflect the chosen policy.
+
+17. Boundary arc symbolic radius evaluating to `0` or negative fails.
+
+18. Boundary arc symbolic radius evaluating to `Infinity`/NaN fails.
+
+19. Ordinary top-level path arc scalar symbolic validation still works.
+
+20. Numeric arc scalars still validate as before.
+
+### C. Regression tests
+
+21. Save/load refresh tests for symbolic arc scalars still pass.
+
+22. Valid Coons/Ruled surfaces still validate.
+
+23. Malformed boundary segment load rejection still passes.
+
+24. Existing symbolic coordinate validation tests still pass.
+
+25. Existing visibility/export tests still pass.
+
+## Implementation notes
+
+### Surface-only collector should not duplicate too much logic
+
+If the existing general extractor has useful surface extraction code, refactor into smaller helpers:
+
+```ts
+extractSurfaceFacePrimitives(...)
+extractCurvePrimitives(...)
+extractPointPrimitives(...)
+```
+
+Then surface sorting can call only:
+
+```ts
+extractSurfaceFacePrimitives(...)
+```
+
+Keep refactor focused.
+
+### Avoid breaking SVG depth model
+
+If SVG rendering still uses the general projected primitive extractor, that is okay.
+
+The review issue specifically concerns TikZ surface sort path and the cap not bounding pre-fallback work.
+
+But if a shared helper improves SVG too, ensure behavior remains equivalent.
+
+### Error messages
+
+For symbolic arc scalar validation, use clear path-aware errors:
 
 ```text
-Could not evaluate strata[21].segments[0].center.y. Variable Len is missing or invalid.
+strata[3].primitive.bottom.segments[0].radius Unknown variable Missing.
 ```
 
 or:
 
 ```text
-Arc segment at strata[21].segments[0] is invalid after evaluating symbolic variables.
+Coons boundary arc radius expression could not be evaluated.
 ```
 
-Avoid raw TypeErrors and misleading numeric-only wording.
+Avoid accepting stale finite preview silently.
 
-## 10. Tests
-
-Add focused tests.
-
-### Arc refresh/validation tests
-
-1. Numeric arc segment still validates.
-
-2. Arc with symbolic center coordinate:
-
-```text
-center.y = -.5*Len
-Len = 4
-```
-
-validates after preview refresh.
-
-3. Arc with symbolic frame origin:
-
-```text
-frame.origin.y = -.5*Len
-```
-
-validates after preview refresh.
-
-4. Arc with symbolic radius `R` validates after preview refresh if symbolic radius is supported.
-
-5. Arc with symbolic start/end angles validates after preview refresh if symbolic angles are supported.
-
-6. Arc with unknown variable fails cleanly.
-
-7. Arc with non-finite evaluated radius fails.
-
-8. Arc with radius <= 0 after evaluation fails.
-
-9. Arc with malformed symbolic center fails cleanly.
-
-10. Arc frame with invalid evaluated geometry fails cleanly.
-
-### JSON load tests
-
-11. Saved diagram with top-level concatenated path arc center using `-.5*Len` loads after variable resolution.
-
-12. Saved diagram with top-level concatenated path arc frame origin using `-.5*Len` loads after variable resolution.
-
-13. Saved diagram with filled region boundary arc using symbolic center/frame loads after variable resolution.
-
-14. Saved diagram with Coons/Ruled boundary arc using symbolic center/frame loads after variable resolution.
-
-15. Attached/minimized `saddle-skeleton` fixture no longer fails with the numeric-only arc error.
-
-16. If the fixture is still invalid for another reason, the error must not be a numeric-only symbolic rejection; it should be a real finite-preview/geometry error.
-
-### Variable detection tests
-
-17. Variable detection finds `Len` in arc center expression.
-
-18. Variable detection finds `R` in arc radius expression if supported.
-
-19. Variable detection finds `q` in arc angle expression if supported.
-
-20. Function names are not treated as variables.
-
-### SVG/TikZ tests
-
-21. SVG preview can render a symbolic arc after variable resolution.
-
-22. TikZ export succeeds for a symbolic arc.
-
-23. Inline TikZ output with symbolic arc has no blank lines.
-
-24. TikZ output includes required `\pgfmathsetmacro` variables before symbolic arc usage.
-
-25. No NaN/Infinity appears in SVG/TikZ output.
-
-### Regression tests
-
-26. Existing numeric arcs still export as before.
-
-27. Existing arc reversal tests still pass.
-
-28. Existing curve occlusion sampling for arcs still passes.
-
-29. Existing symbolic boundary/frame import tests still pass.
-
-30. Existing save/load old diagrams still pass.
-
-## 11. Use the uploaded JSON as a regression guide
-
-The uploaded file `saddle-skeleton.json` triggered:
-
-```text
-strata[21].segments[0] Arc segment coordinates must be numeric...
-```
-
-If practical:
-
-- create a minimized fixture based on that stratum rather than committing the full large file;
-- include variables `Len` and `R`;
-- include one arc segment with symbolic center/frame;
-- assert that it loads after variable resolution.
-
-Do not add a huge fixture if it slows tests.
-
-## 12. Manual verification checklist
+## Manual verification checklist
 
 After implementation, run:
 
@@ -518,54 +527,43 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Manual test with uploaded JSON:
+If practical:
 
-1. Click Load JSON.
-2. Select `saddle-skeleton.json`.
-3. Confirm variable-resolution dialog appears if variables are detected.
-4. Confirm `Len` and `R` are listed/prefilled.
-5. Confirm values.
-6. Confirm the diagram loads and renders.
-7. Confirm the error:
+1. Open a diagram with many surface faces.
+2. Enable surface sorting.
+3. Set `maxSurfaceFacesForSorting` low if UI exposes it.
+4. Generate TikZ.
+5. Confirm export remains responsive and emits cap fallback.
+6. Confirm no hidden sampled segments are emitted due to cap fallback.
 
-```text
-Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
-```
+Symbolic validation:
 
-does not appear.
+7. Create/load a ruled or Coons surface whose boundary arc radius uses variable `R`.
+8. Confirm it validates/renders when `R` is defined.
+9. Remove or rename `R`.
+10. Confirm validation/load fails with a useful unresolved-variable error.
+11. Change `R` so stored preview would be stale.
+12. Confirm refresh or validation behavior matches the chosen policy.
 
-8. Generate TikZ.
-9. Confirm export succeeds.
-10. Switch inline mode.
-11. Confirm inline output has no blank lines.
-12. Save and reload.
-
-Failure test:
-
-13. Load a version where `Len` is missing or invalid.
-14. Confirm a clear variable/evaluation error.
-
-## 13. Preserve existing behavior
+## Preserve existing behavior
 
 Do not regress:
 
-- numeric arc loading/export;
-- symbolic variable manager;
-- symbolic coordinate input;
-- line/cubic segment symbolic support;
-- boundary-surface symbolic coordinate support;
-- work-plane frame symbolic support;
-- Coons/ruled surface loading;
-- filled region loading;
+- surface depth sorting under cap;
+- disabled visibility mode;
+- hidden/visible curve export;
+- inline no-blank-line behavior;
+- 4-space indentation;
+- symbolic save/load refresh;
+- symbolic arc support in ordinary paths;
+- Coons/Ruled sampling;
 - SVG preview;
 - TikZ export;
-- inline no-blank-lines;
-- 4-space indentation;
 - save/load old diagrams;
 - undo/redo;
 - layer/style/camera/work-plane behavior.
 
-## 14. Verification
+## Verification
 
 Run:
 
@@ -575,16 +573,18 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 15. Report after implementation
+## Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of the arc numeric-only rejection;
-- arc fields now supporting symbolic finite previews;
-- whether symbolic radius/angles are supported or explicitly rejected;
-- variable detection for arc fields;
-- other numeric-only blockers found and fixed;
+- root cause of surface-sort cap not bounding work;
+- new surface-only projected face collector behavior;
+- cap enforcement point;
+- whether collection stops at `cap + 1`;
+- root cause of boundary arc scalar validation gap;
+- how symbolic arc `radius`, `startAngleDeg`, `endAngleDeg` are validated against variables;
+- stale preview policy;
 - tests added/updated;
 - test results;
 - build results;
