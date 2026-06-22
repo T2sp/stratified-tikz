@@ -224,7 +224,11 @@ import {
   concatenatedPathDraftCanFinish,
   concatenatedPathDraftNextPointLabel,
   inactiveWorkPlanePointPickingState,
+  closeInspectorDrawerState,
+  defaultInspectorDrawerState,
+  isInspectorDrawerOpen,
   nextInspectorDisclosureStateForSelection,
+  openInspectorDrawerState,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   resolvePointStratumCoordinateForCursorCreation,
@@ -284,6 +288,7 @@ import {
   type CurvedSheetCreationParameters,
   type GeometryHandleTarget,
   type InspectorDisclosureState,
+  type InspectorDrawerState,
   type LayerFilter,
   type PreviewPathMenuItem,
   type PreviewToolbarState,
@@ -825,11 +830,14 @@ function App() {
       selectionKey: selectedElementDisclosureKey(null),
       expanded: false,
     })
+  const [inspectorDrawerState, setInspectorDrawerState] =
+    useState<InspectorDrawerState>(() => defaultInspectorDrawerState())
   const [isLayerManagerExpanded, setIsLayerManagerExpanded] = useState(false)
   const selectedInspectorKey = selectedElementDisclosureKey(selectedElement)
   const isInspectorExpanded =
     inspectorDisclosure.selectionKey === selectedInspectorKey &&
     inspectorDisclosure.expanded
+  const inspectorDrawerOpen = isInspectorDrawerOpen(inspectorDrawerState)
   const canUndo = history.past.length > 0
   const canRedo = history.future.length > 0
   const previewCursorCreationClicksEnabled =
@@ -1751,6 +1759,14 @@ function App() {
     setInspectorDisclosure((current) =>
       setInspectorDisclosureExpanded(current, selectedElement, expanded),
     )
+  }
+
+  function openInspectorDrawer(): void {
+    setInspectorDrawerState(openInspectorDrawerState())
+  }
+
+  function closeInspectorDrawer(): void {
+    setInspectorDrawerState(closeInspectorDrawerState())
   }
 
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
@@ -5157,6 +5173,79 @@ function App() {
     )
   }
 
+  function renderInspectorDrawer() {
+    if (!inspectorDrawerOpen) {
+      return (
+        <button
+          type="button"
+          className="preview-overlay-button inspector-drawer-open-button"
+          aria-controls="preview-inspector-drawer"
+          aria-expanded={false}
+          onClick={(event) =>
+            runPreviewOverlayAction(event, openInspectorDrawer)
+          }
+          onPointerDown={stopPreviewOverlayEvent}
+        >
+          Inspector
+        </button>
+      )
+    }
+
+    return (
+      <aside
+        id="preview-inspector-drawer"
+        className="inspector-drawer"
+        aria-labelledby="preview-inspector-drawer-heading"
+        onClick={stopPreviewOverlayEvent}
+        onPointerDown={stopPreviewOverlayEvent}
+      >
+        <div className="inspector-drawer-heading-row">
+          <div>
+            <h2 id="preview-inspector-drawer-heading">Inspector</h2>
+            <span>basic fields and coordinates</span>
+          </div>
+          <button
+            type="button"
+            className="preview-overlay-button inspector-drawer-close-button"
+            aria-controls="preview-inspector-drawer"
+            aria-expanded={true}
+            onClick={(event) =>
+              runPreviewOverlayAction(event, closeInspectorDrawer)
+            }
+            onPointerDown={stopPreviewOverlayEvent}
+          >
+            Close
+          </button>
+        </div>
+        <div className="inspector-drawer-scroll">
+          <LayerManager
+            diagram={editableDiagram}
+            layerFilter={layerFilter}
+            creationLayerInput={directLayerInput}
+            statusMessage={layerOperationStatus}
+            expanded={isLayerManagerExpanded}
+            onExpandedChange={setIsLayerManagerExpanded}
+            onRenameLayer={renameDiagramLayer}
+            onSwapLayers={swapDiagramLayers}
+            onDuplicateLayer={duplicateDiagramLayer}
+            onTranslateLayer={translateDiagramLayer}
+            onSetLayerVisibility={setDiagramLayerVisibility}
+            onSetLayerLock={setDiagramLayerLock}
+            onDeleteLayer={deleteDiagramLayer}
+            onStatusMessage={setLayerOperationStatus}
+          />
+          <EditableInspector
+            diagram={editableDiagram}
+            selectedElement={selectedElement}
+            onDiagramChange={updateEditableDiagram}
+            expanded={isInspectorExpanded}
+            onExpandedChange={updateInspectorExpanded}
+          />
+        </div>
+      </aside>
+    )
+  }
+
   function renderDirectCreationForm() {
     if (coordinateInputMode !== 'direct' || !isDirectCreationTool(creationTool)) {
       return null
@@ -6811,6 +6900,7 @@ function App() {
           <div className="preview-stage">
             {renderPreviewToolbarOverlay()}
             {renderDirectInputDrawer()}
+            {renderInspectorDrawer()}
             <SvgDiagram
               diagram={editableDiagram}
               fitToView
@@ -6996,38 +7086,6 @@ function App() {
               </section>
             )}
           </div>
-          </article>
-
-          <article className="workspace-panel inspector-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Inspector</h2>
-              <span>basic fields and coordinates</span>
-            </div>
-          </div>
-          <LayerManager
-            diagram={editableDiagram}
-            layerFilter={layerFilter}
-            creationLayerInput={directLayerInput}
-            statusMessage={layerOperationStatus}
-            expanded={isLayerManagerExpanded}
-            onExpandedChange={setIsLayerManagerExpanded}
-            onRenameLayer={renameDiagramLayer}
-            onSwapLayers={swapDiagramLayers}
-            onDuplicateLayer={duplicateDiagramLayer}
-            onTranslateLayer={translateDiagramLayer}
-            onSetLayerVisibility={setDiagramLayerVisibility}
-            onSetLayerLock={setDiagramLayerLock}
-            onDeleteLayer={deleteDiagramLayer}
-            onStatusMessage={setLayerOperationStatus}
-          />
-          <EditableInspector
-            diagram={editableDiagram}
-            selectedElement={selectedElement}
-            onDiagramChange={updateEditableDiagram}
-            expanded={isInspectorExpanded}
-            onExpandedChange={updateInspectorExpanded}
-          />
           </article>
         </div>
 

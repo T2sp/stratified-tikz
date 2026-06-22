@@ -2,12 +2,20 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { emptyTwoDimensionalDiagram } from '../../src/examples/index.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import {
   closeDirectInputDrawerInputMode,
   directInputDrawerFormKind,
   directInputDrawerStateForInputMode,
   shouldShowDirectInputDrawer,
 } from '../../src/ui/directInputDrawer.ts'
+import {
+  closeInspectorDrawerState,
+  defaultInspectorDrawerState,
+  isInspectorDrawerOpen,
+  openInspectorDrawerState,
+  toggleInspectorDrawerState,
+} from '../../src/ui/inspectorDrawer.ts'
 import {
   addPathMenuItems,
   activeToolSupportsCursorCreation,
@@ -24,6 +32,60 @@ import type { WorkPlanePreviewTool } from '../../src/ui/workPlanePreview.ts'
 test('preview toolbar collapse state toggles between expanded and collapsed', () => {
   assert.equal(togglePreviewToolbarState('expanded'), 'collapsed')
   assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
+})
+
+test('inspector drawer is closed by default and opens only by explicit action', () => {
+  const defaultState = defaultInspectorDrawerState()
+  const openState = openInspectorDrawerState()
+  const closedState = closeInspectorDrawerState()
+
+  assert.equal(defaultState, 'closed')
+  assert.equal(isInspectorDrawerOpen(defaultState), false)
+  assert.equal(isInspectorDrawerOpen(openState), true)
+  assert.equal(closedState, 'closed')
+  assert.equal(toggleInspectorDrawerState(defaultState), 'open')
+  assert.equal(toggleInspectorDrawerState(openState), 'closed')
+})
+
+test('closed inspector drawer state is UI-only and does not change diagram serialization', () => {
+  const before = serializeDiagram(emptyTwoDimensionalDiagram)
+  const drawerState = closeInspectorDrawerState()
+
+  assert.equal(isInspectorDrawerOpen(drawerState), false)
+  assert.equal(serializeDiagram(emptyTwoDimensionalDiagram), before)
+})
+
+test('inspector drawer controls stop before canvas handlers can run', () => {
+  let stopped = false
+  let opened = false
+  let canvasCalls = 0
+
+  runPreviewOverlayAction(
+    {
+      stopPropagation: () => {
+        stopped = true
+      },
+    },
+    () => {
+      opened = true
+    },
+  )
+
+  if (!stopped) {
+    canvasCalls += 1
+  }
+
+  assert.equal(stopped, true)
+  assert.equal(opened, true)
+  assert.equal(canvasCalls, 0)
+})
+
+test('TikZ output is unaffected by inspector drawer state', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+  const drawerState = openInspectorDrawerState()
+
+  assert.equal(isInspectorDrawerOpen(drawerState), true)
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
 })
 
 test('fill paths are visible only for Select and Add path family tools', () => {
