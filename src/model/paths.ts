@@ -1,5 +1,6 @@
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { curveStylesEqual, resolveCurveStyle } from './styles.ts'
+import type { ScalarInputValue } from './scalarExpressions.ts'
 import type {
   AmbientDimension,
   ArcDirection,
@@ -22,6 +23,8 @@ import type {
 export const pathEndpointEpsilon = 1e-9
 const fullTurnDegrees = 360
 const maxArcCubicSweepDegrees = 90
+
+export type ArcScalarInputValue = number | ScalarInputValue
 
 export type PathEndpointPair = {
   start: Vec3
@@ -121,9 +124,9 @@ export function clonePathSegment(segment: PathSegment): PathSegment {
         start: cloneVec3(segment.start),
         end: cloneVec3(segment.end),
         center: cloneVec3(segment.center),
-        radius: segment.radius,
-        startAngleDeg: segment.startAngleDeg,
-        endAngleDeg: segment.endAngleDeg,
+        radius: cloneArcScalarInputValue(segment.radius),
+        startAngleDeg: cloneArcScalarInputValue(segment.startAngleDeg),
+        endAngleDeg: cloneArcScalarInputValue(segment.endAngleDeg),
         direction: segment.direction,
         ...(segment.frame === undefined
           ? {}
@@ -163,9 +166,9 @@ export function reversePathSegment(segment: PathSegment): PathSegment {
         start: cloneVec3(segment.end),
         end: cloneVec3(segment.start),
         center: cloneVec3(segment.center),
-        radius: segment.radius,
-        startAngleDeg: segment.endAngleDeg,
-        endAngleDeg: segment.startAngleDeg,
+        radius: cloneArcScalarInputValue(segment.radius),
+        startAngleDeg: cloneArcScalarInputValue(segment.endAngleDeg),
+        endAngleDeg: cloneArcScalarInputValue(segment.startAngleDeg),
         direction: reverseArcDirection(segment.direction),
         ...(segment.frame === undefined
           ? {}
@@ -260,13 +263,14 @@ export function pathSegmentPointAt(
       break
     case 'arc': {
       const sweepDegrees = arcSweepDegrees(segment)
+      const startAngleDeg = arcScalarPreviewValue(segment.startAngleDeg)
 
       point =
-        sweepDegrees === null
+        sweepDegrees === null || !Number.isFinite(startAngleDeg)
           ? null
           : arcPointAtAngle(
               segment,
-              segment.startAngleDeg + sweepDegrees * t,
+              startAngleDeg + sweepDegrees * t,
               ambientDimension,
             )
       break
@@ -515,25 +519,37 @@ export function arcSegmentExpectedStart(
   segment: ArcPathSegment,
   ambientDimension: AmbientDimension,
 ): Vec3 {
-  return arcPointAtAngle(segment, segment.startAngleDeg, ambientDimension)
+  return arcPointAtAngle(
+    segment,
+    arcScalarPreviewValue(segment.startAngleDeg),
+    ambientDimension,
+  )
 }
 
 export function arcSegmentExpectedEnd(
   segment: ArcPathSegment,
   ambientDimension: AmbientDimension,
 ): Vec3 {
-  return arcPointAtAngle(segment, segment.endAngleDeg, ambientDimension)
+  return arcPointAtAngle(
+    segment,
+    arcScalarPreviewValue(segment.endAngleDeg),
+    ambientDimension,
+  )
 }
 
 export function arcSegmentToCubicBezierSegments(
   segment: ArcPathSegment,
   ambientDimension: AmbientDimension,
 ): CubicBezierPathSegment[] | null {
+  const radius = arcScalarPreviewValue(segment.radius)
+  const startAngleDeg = arcScalarPreviewValue(segment.startAngleDeg)
+  const endAngleDeg = arcScalarPreviewValue(segment.endAngleDeg)
+
   if (
-    !Number.isFinite(segment.radius) ||
-    segment.radius <= 0 ||
-    !Number.isFinite(segment.startAngleDeg) ||
-    !Number.isFinite(segment.endAngleDeg)
+    !Number.isFinite(radius) ||
+    radius <= 0 ||
+    !Number.isFinite(startAngleDeg) ||
+    !Number.isFinite(endAngleDeg)
   ) {
     return null
   }
@@ -553,7 +569,7 @@ export function arcSegmentToCubicBezierSegments(
   let start = normalizePointForAmbientDimension(ambientDimension, segment.start)
 
   for (let index = 0; index < segmentCount; index += 1) {
-    const angle0 = segment.startAngleDeg + sweepPerSegment * index
+    const angle0 = startAngleDeg + sweepPerSegment * index
     const angle1 = angle0 + sweepPerSegment
     const cubic = circularArcCubicSegment(
       segment,
@@ -664,9 +680,9 @@ function normalizePathSegment(
           ambientDimension,
           segment.center,
         ),
-        radius: segment.radius,
-        startAngleDeg: segment.startAngleDeg,
-        endAngleDeg: segment.endAngleDeg,
+        radius: cloneArcScalarInputValue(segment.radius),
+        startAngleDeg: cloneArcScalarInputValue(segment.startAngleDeg),
+        endAngleDeg: cloneArcScalarInputValue(segment.endAngleDeg),
         direction: segment.direction,
         ...(segment.frame === undefined
           ? {}
@@ -748,10 +764,12 @@ function arcPointAtAngle(
   angleDeg: number,
   ambientDimension: AmbientDimension,
 ): Vec3 {
+  const radius = arcScalarPreviewValue(segment.radius)
+
   return pointFromFrameLocal(
     segment.center,
-    segment.radius * Math.cos(degreesToRadians(angleDeg)),
-    segment.radius * Math.sin(degreesToRadians(angleDeg)),
+    radius * Math.cos(degreesToRadians(angleDeg)),
+    radius * Math.sin(degreesToRadians(angleDeg)),
     0,
     segment.frame ?? xyTemplateFrame(segment.center),
     ambientDimension,
@@ -815,6 +833,7 @@ function circularArcCubicSegment(
   start: Vec3,
   ambientDimension: AmbientDimension,
 ): CubicBezierPathSegment | null {
+  const radius = arcScalarPreviewValue(segment.radius)
   const startAngle = degreesToRadians(startAngleDeg)
   const endAngle = degreesToRadians(endAngleDeg)
   const sweep = endAngle - startAngle
@@ -823,16 +842,16 @@ function circularArcCubicSegment(
   const frame = segment.frame ?? xyTemplateFrame(segment.center)
   const control1 = pointFromFrameLocal(
     segment.center,
-    segment.radius * (Math.cos(startAngle) - controlScale * Math.sin(startAngle)),
-    segment.radius * (Math.sin(startAngle) + controlScale * Math.cos(startAngle)),
+    radius * (Math.cos(startAngle) - controlScale * Math.sin(startAngle)),
+    radius * (Math.sin(startAngle) + controlScale * Math.cos(startAngle)),
     0,
     frame,
     ambientDimension,
   )
   const control2 = pointFromFrameLocal(
     segment.center,
-    segment.radius * (Math.cos(endAngle) + controlScale * Math.sin(endAngle)),
-    segment.radius * (Math.sin(endAngle) - controlScale * Math.cos(endAngle)),
+    radius * (Math.cos(endAngle) + controlScale * Math.sin(endAngle)),
+    radius * (Math.sin(endAngle) - controlScale * Math.cos(endAngle)),
     0,
     frame,
     ambientDimension,
@@ -867,10 +886,17 @@ function arcSweepDegrees(segment: ArcPathSegment): number | null {
     return null
   }
 
+  const startAngleDeg = arcScalarPreviewValue(segment.startAngleDeg)
+  const endAngleDeg = arcScalarPreviewValue(segment.endAngleDeg)
+
+  if (!Number.isFinite(startAngleDeg) || !Number.isFinite(endAngleDeg)) {
+    return null
+  }
+
   const rawSweep =
     segment.direction === 'counterclockwise'
-      ? segment.endAngleDeg - segment.startAngleDeg
-      : segment.startAngleDeg - segment.endAngleDeg
+      ? endAngleDeg - startAngleDeg
+      : startAngleDeg - endAngleDeg
   const normalizedSweep = positiveModulo(rawSweep, fullTurnDegrees)
 
   if (normalizedSweep === 0) {
@@ -961,6 +987,45 @@ function clonePathSegmentStyleOverride(
   styleOverride: PathSegmentStyleOverride | undefined,
 ): PathSegmentStyleOverride | undefined {
   return styleOverride === undefined ? undefined : { ...styleOverride }
+}
+
+export function arcScalarPreviewValue(value: ArcScalarInputValue): number {
+  if (typeof value === 'number') {
+    return value
+  }
+
+  if (value.kind === 'numeric') {
+    return value.value
+  }
+
+  if (value.kind === 'symbolic') {
+    return value.previewValue
+  }
+
+  return Number.NaN
+}
+
+export function hasSymbolicArcScalarInputValue(
+  value: ArcScalarInputValue,
+): boolean {
+  return typeof value !== 'number' && value.kind === 'symbolic'
+}
+
+function cloneArcScalarInputValue(value: ArcScalarInputValue): ArcScalarInputValue {
+  if (typeof value === 'number') {
+    return value
+  }
+
+  return value.kind === 'numeric'
+    ? {
+        kind: 'numeric',
+        value: value.value,
+      }
+    : {
+        kind: 'symbolic',
+        expression: value.expression,
+        previewValue: value.previewValue,
+      }
 }
 
 function reverseArcDirection(direction: ArcDirection): ArcDirection {

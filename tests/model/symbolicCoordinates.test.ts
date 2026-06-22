@@ -10,6 +10,8 @@ import {
 } from '../../src/model/variables.ts'
 import {
   parseSavedDiagramJson,
+  parseSavedDiagramJsonForImport,
+  resolvePendingSymbolicDiagramImport,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import type {
@@ -19,9 +21,11 @@ import type {
   Diagram,
   PointStratum,
   SheetStyle,
+  Stratum,
   SymbolicVariable,
   Vec3,
 } from '../../src/model/types.ts'
+import type { ScalarInputValue } from '../../src/model/scalarExpressions.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addConcatenatedPathFromDirectInput,
@@ -321,7 +325,7 @@ test('parseSavedDiagramJson loads old Vec3 coordinates without symbolic metadata
   assert.equal(findPoint(parsed.diagram, saved.pointId).position.symbolic, undefined)
 })
 
-test('parseSavedDiagramJson rejects saved symbolic arc coordinates because arc export is numeric-derived', () => {
+test('parseSavedDiagramJson loads saved symbolic arc coordinates after preview refresh', () => {
   const saved = JSON.parse(serializeDiagram(symbolicDiagram())) as {
     diagram: Diagram
   }
@@ -348,13 +352,132 @@ test('parseSavedDiagramJson rejects saved symbolic arc coordinates because arc e
     layer: 0,
   })
 
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const stratum = parsed.diagram.strata.find(
+    (candidate) => candidate.id === 'symbolic-arc',
+  )
+  if (stratum?.kind !== 'concatenatedPath') {
+    throw new Error('Expected symbolic arc path.')
+  }
+  const segment = stratum.segments[0]
+
+  if (segment?.kind !== 'arc') {
+    throw new Error('Expected symbolic arc segment.')
+  }
+  assert.equal(segment.start.x, 3)
+  assert.equal(segment.start.symbolic?.x.kind, 'symbolic')
+  assert.equal(segment.center.x, 2)
+  assert.equal(segment.center.symbolic?.x.kind, 'symbolic')
+  assert.doesNotMatch(generateTikz(parsed.diagram), /NaN|Infinity/)
+})
+
+test('parseSavedDiagramJsonForImport detects variables in symbolic arc scalars', () => {
+  const saved = JSON.parse(serializeDiagram(emptyTwoDimensionalDiagram)) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'symbolic-scalar-arc',
+    name: 'Symbolic Scalar Arc',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: symbolicScalar('R + sin(q)', 1),
+        startAngleDeg: symbolicScalar('q', 0),
+        endAngleDeg: symbolicScalar('q + 90', 90),
+        direction: 'counterclockwise',
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok) {
+    throw new Error(pending.error)
+  }
+  assert.equal(pending.kind, 'needsVariableResolution')
+  if (pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic variable resolution.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => variable.name).sort(),
+    ['R', 'q'],
+  )
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pending.pendingImport,
+    [
+      { name: 'R', expression: '1' },
+      { name: 'q', expression: '0' },
+    ],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  const tikz = generateTikz(resolved.diagram)
+
+  assert.match(tikz, /\\pgfmathsetmacro\{\\R\}\{1\}/)
+  assert.match(tikz, /\\pgfmathsetmacro\{\\q\}\{0\}/)
+  assert.match(tikz, /arc\[start angle=\{\\q\}, end angle=\{\\q \+ 90\}, radius=\{\\R \+ sin\(\\q\)\}\]/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('parseSavedDiagramJson rejects unresolved symbolic arc scalar cleanly', () => {
+  const saved = JSON.parse(serializeDiagram(emptyTwoDimensionalDiagram)) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push(symbolicScalarArcStratum(symbolicScalar('Missing', 1)))
+
   assertParseError(
     parseSavedDiagramJson(JSON.stringify(saved)),
-    /Arc segment coordinates must be numeric/,
+    /strata\[0\]\.segments\[0\]\.radius\.expression Unknown variable "Missing"/,
   )
 })
 
-test('parseSavedDiagramJson rejects saved symbolic 3D template centers because export is local numeric', () => {
+test('parseSavedDiagramJson rejects non-finite symbolic arc scalar evaluation cleanly', () => {
+  const saved = JSON.parse(serializeDiagram(emptyTwoDimensionalDiagram)) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push(
+    symbolicScalarArcStratum(symbolicScalar('sqrt(-1)', 0)),
+  )
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /strata\[0\]\.segments\[0\]\.radius\.expression Expression evaluated to a non-finite number/,
+  )
+})
+
+test('parseSavedDiagramJson rejects non-positive evaluated symbolic arc radius', () => {
+  const saved = JSON.parse(serializeDiagram(symbolicDiagram())) as {
+    diagram: Diagram
+  }
+  saved.diagram.strata.push(symbolicScalarArcStratum(symbolicScalar('-R', -2)))
+
+  assertParseError(
+    parseSavedDiagramJson(JSON.stringify(saved)),
+    /strata\[0\]\.segments\[0\]\.radius Arc radius must be positive/,
+  )
+})
+
+test('parseSavedDiagramJson loads saved symbolic 3D template centers with finite previews', () => {
   const saved = JSON.parse(serializeDiagram(symbolicThreeDimensionalDiagram())) as {
     diagram: Diagram
   }
@@ -380,10 +503,21 @@ test('parseSavedDiagramJson rejects saved symbolic 3D template centers because e
     layer: 0,
   })
 
-  assertParseError(
-    parseSavedDiagramJson(JSON.stringify(saved)),
-    /3D template path centers must be numeric/,
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  const stratum = parsed.diagram.strata.find(
+    (candidate) => candidate.id === 'symbolic-template-3d',
   )
+  if (stratum?.kind !== 'templatePath') {
+    throw new Error('Expected symbolic template path.')
+  }
+  assert.equal(stratum.template.center.x, 2)
+  assert.equal(stratum.template.center.symbolic?.x.kind, 'symbolic')
+  assert.doesNotMatch(generateTikz(parsed.diagram), /NaN|Infinity/)
 })
 
 test('parseSavedDiagramJson rejects malformed symbolic work-plane frame metadata cleanly', () => {
@@ -764,6 +898,42 @@ function symbolicPoint(
         value: z,
       },
     },
+  }
+}
+
+function symbolicScalarArcStratum(radius: ScalarInputValue): Stratum {
+  return {
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'symbolic-scalar-arc',
+    name: 'Symbolic Scalar Arc',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  }
+}
+
+function symbolicScalar(
+  expression: string,
+  previewValue: number,
+): ScalarInputValue {
+  return {
+    kind: 'symbolic',
+    expression,
+    previewValue,
   }
 }
 

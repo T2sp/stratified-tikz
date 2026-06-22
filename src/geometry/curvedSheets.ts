@@ -6,6 +6,7 @@ import {
 } from './workPlane.ts'
 import { isValidWorkPlaneFrameSnapshot } from './bezierControls.ts'
 import {
+  arcScalarPreviewValue,
   arcSegmentExpectedEnd,
   arcSegmentExpectedStart,
   areSegmentsComposable,
@@ -900,6 +901,22 @@ function validateFinite(
   return true
 }
 
+function validateArcScalarPreview(
+  value: unknown,
+  path: string,
+  label: string,
+  errors: SurfaceValidationIssue[],
+): number | null {
+  const previewValue = arcScalarPreviewValueFromUnknown(value)
+
+  if (!Number.isFinite(previewValue)) {
+    pushError(errors, path, `${label} must have a finite preview value.`)
+    return null
+  }
+
+  return previewValue
+}
+
 function validateVec3(
   value: unknown,
   path: string,
@@ -991,9 +1008,28 @@ function validateBoundaryArcSegment(
   validateVec3(segment.start, `${path}.start`, errors)
   validateVec3(segment.end, `${path}.end`, errors)
   validateVec3(segment.center, `${path}.center`, errors)
-  validatePositiveFinite(segment.radius, `${path}.radius`, 'Arc radius', errors)
-  validateFinite(segment.startAngleDeg, `${path}.startAngleDeg`, 'Arc start angle', errors)
-  validateFinite(segment.endAngleDeg, `${path}.endAngleDeg`, 'Arc end angle', errors)
+  const radius = validateArcScalarPreview(
+    segment.radius,
+    `${path}.radius`,
+    'Arc radius',
+    errors,
+  )
+  validateArcScalarPreview(
+    segment.startAngleDeg,
+    `${path}.startAngleDeg`,
+    'Arc start angle',
+    errors,
+  )
+  validateArcScalarPreview(
+    segment.endAngleDeg,
+    `${path}.endAngleDeg`,
+    'Arc end angle',
+    errors,
+  )
+
+  if (radius !== null && radius <= 0) {
+    pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
+  }
 
   if (
     segment.direction !== 'counterclockwise' &&
@@ -1105,17 +1141,32 @@ function isBoundaryArcSegment(value: Record<string, unknown>): value is ArcPathS
     isFiniteBoundaryVec3(value.start) &&
     isFiniteBoundaryVec3(value.end) &&
     isFiniteBoundaryVec3(value.center) &&
-    typeof value.radius === 'number' &&
-    Number.isFinite(value.radius) &&
-    value.radius > 0 &&
-    typeof value.startAngleDeg === 'number' &&
-    Number.isFinite(value.startAngleDeg) &&
-    typeof value.endAngleDeg === 'number' &&
-    Number.isFinite(value.endAngleDeg) &&
+    Number.isFinite(arcScalarPreviewValueFromUnknown(value.radius)) &&
+    arcScalarPreviewValueFromUnknown(value.radius) > 0 &&
+    Number.isFinite(arcScalarPreviewValueFromUnknown(value.startAngleDeg)) &&
+    Number.isFinite(arcScalarPreviewValueFromUnknown(value.endAngleDeg)) &&
     (value.direction === 'counterclockwise' || value.direction === 'clockwise') &&
     value.frame !== undefined &&
     isBoundarySurfaceFrame(value.frame)
   )
+}
+
+function arcScalarPreviewValueFromUnknown(value: unknown): number {
+  if (typeof value === 'number') {
+    return value
+  }
+
+  if (!isRecord(value)) {
+    return Number.NaN
+  }
+
+  if (value.kind === 'numeric' || value.kind === 'symbolic') {
+    return arcScalarPreviewValue(
+      value as Parameters<typeof arcScalarPreviewValue>[0],
+    )
+  }
+
+  return Number.NaN
 }
 
 function isFiniteBoundaryVec3(value: unknown): value is Vec3 {
