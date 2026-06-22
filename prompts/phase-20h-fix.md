@@ -1,4 +1,4 @@
-# Phase 20H Fix Prompt: Allow symbolic work-plane frame coordinates after variable resolution
+# Phase 20H / Phase 19C Fix Prompt: Support symbolic arc segments and audit remaining numeric-only symbolic-load blockers
 
 ## Environment
 
@@ -31,417 +31,486 @@ You are working on the StratifiedTikZ project.
 
 Phase 19G and Phase 20H are complete.
 
-A previous fix changed JSON loading so symbolic boundary path coordinates can be resolved by asking the user for variable values before rendering.
+Recent fixes allowed symbolic boundary coordinates and symbolic work-plane frame coordinates to be resolved at JSON load time by asking the user for variable values.
 
 However, loading the attached JSON still fails with:
 
 ```text
-Could not load diagram: strata[3].primitive.bottom.segments[0].frame.origin Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
+Could not load diagram: strata[21].segments[0] Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
 ```
 
-This means the loader now handles symbolic boundary point coordinates better, but still rejects symbolic coordinates inside work-plane frame snapshots.
+The uploaded JSON contains variables such as:
 
-The uploaded diagram uses symbolic variables such as `Len` and `R`, and at least one Coons/ruled boundary segment carries a work-plane frame whose `origin` or other frame coordinates are symbolic.
+```text
+Len = 4
+R = 1
+```
+
+and contains many symbolic coordinates. In particular, the failing stratum is a `concatenatedPath` named like `Ufront` whose first segment is an `arc`. The arc has symbolic data such as:
+
+```text
+center.y = -.5*Len
+frame.origin.y = -.5*Len
+```
+
+Other symbolic data in the same file appears in:
+
+- arc centers;
+- arc frames;
+- line segment starts/ends;
+- cubic control points;
+- Coons patch boundary segments;
+- filled region boundaries;
+- polygon/sheet vertices;
+- point/label positions.
+
+The current error means the loader/export validation still contains a numeric-only check for arc segments.
 
 This is too strict.
 
-In practice, boundary paths and their associated work-plane frames are often naturally defined symbolically. Loading should succeed after variable values are provided and all symbolic frame coordinates evaluate to finite numeric preview values.
+In practical diagrams, arcs and path boundaries are often naturally specified symbolically. The editor should allow symbolic arc segment fields if they can be resolved to finite preview values.
 
 ## Goal
 
-Update load/validation/rendering so symbolic coordinates in work-plane frame snapshots are allowed when they can be resolved to finite preview values.
+Allow symbolic input in arc segments, including when loading saved JSON.
 
-The error:
+An arc segment should be valid if, after variable resolution and symbolic preview refresh, all fields needed for preview/sampling/export have finite preview values and the arc geometry is valid.
 
-```text
-Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
-```
+Do not reject an arc merely because its center/frame/radius/angles were originally symbolic.
 
-should be replaced by a finite-preview requirement.
-
-New policy:
-
-```text
-Work-plane frame coordinates may be numeric or symbolic.
-They are valid if, after variable resolution and preview refresh, all frame coordinates have finite numeric preview values and the frame is geometrically valid.
-```
+Also audit the codebase for other remaining “must be numeric because …” validations that block symbolic values despite finite preview values, especially in path/surface/export paths.
 
 ## Scope
 
-This is a targeted Phase 20H / symbolic-load fix.
+This is a targeted symbolic-load/export robustness fix.
 
 Implement:
 
-- symbolic preview refresh for work-plane frame snapshots;
-- finite-preview validation for frame `origin`, `u`, `v`, and `normal`;
-- load-time variable resolution covering frame coordinates;
-- tests using symbolic frame coordinates in Coons/ruled boundary snapshots;
-- improved error messages.
+- symbolic preview refresh for arc segment fields;
+- finite-preview validation for arc segment fields;
+- JSON load-time variable detection for arc segment expressions;
+- replacement of numeric-only arc validation with finite-preview validation;
+- tests using symbolic arc centers/frames/radius/angles where supported;
+- an audit/fix of other remaining numeric-only symbolic blockers in relevant geometry paths.
 
 Do not implement:
 
 - full TeX evaluation;
 - raw TikZ evaluation;
-- symbolic surface mesh export formulas;
-- new surface primitives;
+- symbolic mesh sampling formulas;
 - new expression syntax;
-- new dependencies.
+- new geometry types;
+- new dependencies;
+- broad save/load redesign.
 
 Do not change:
 
-- valid numeric work-plane frame behavior;
-- variable manager semantics;
-- existing symbolic boundary coordinate support;
-- Coons/ruled surface formulas;
-- source path copy-on-create policy;
-- TikZ export mode behavior;
+- valid numeric arc behavior;
+- arc mathematical semantics;
+- symbolic variable manager semantics;
+- existing finite-preview boundary/surface fixes;
+- SVG preview semantics except allowing symbolic inputs that evaluate finitely;
+- TikZ export mode semantics;
 - inline no-blank-lines;
 - 4-space indentation.
 
-## 1. Replace numeric-only frame validation with finite-preview validation
+## 1. Find all remaining numeric-only validation blockers
 
-Find the validation that emits:
+Run a search such as:
+
+```bash
+rg "must be numeric because|coordinates must be numeric|must be numeric" src
+```
+
+Pay special attention to messages like:
 
 ```text
+Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
 Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
+Boundary surface path coordinates must be numeric because mesh export derives sampled coordinates.
 ```
 
-This validation is too strict.
+Some earlier fixes may have handled boundary and frame messages, but the arc message remains.
 
-Update it to require finite numeric preview values instead.
-
-### Old policy
+For each numeric-only validation found, decide whether the correct policy should be:
 
 ```text
-Work-plane frame coordinates must be numeric.
+finite preview required
 ```
 
-### New policy
+rather than:
 
 ```text
-Work-plane frame coordinates must have finite preview coordinates after symbolic variable resolution.
+raw numeric input required
 ```
 
-Allowed:
+In Phase 19+ code, most geometry export/preview paths should accept symbolic values if finite preview values exist.
 
-- numeric frame coordinates;
-- symbolic frame coordinates with finite refreshed preview values.
+Do not blindly remove validation. Replace numeric-only checks with finite-preview checks and clear unresolved-variable errors.
 
-Rejected:
+## 2. Arc segment fields that should support symbolic input
 
-- unresolved variable;
-- invalid expression;
-- missing preview value;
-- non-finite preview value;
-- malformed symbolic coordinate object;
-- unsafe raw TeX expression;
-- geometrically invalid frame after preview evaluation.
+Update arc segment refresh/validation/export helpers to support symbolic values for all relevant fields.
 
-## 2. Refresh symbolic previews for frame snapshots
-
-Add or extend helpers so every work-plane frame snapshot can be refreshed using resolved variables.
-
-Frame-like objects may include:
+Arc segment fields may include:
 
 ```ts
-type WorkPlaneFrameSnapshot = {
-  origin: Vec3 | SymbolicVec3;
-  u: Vec3 | SymbolicVec3;
-  v: Vec3 | SymbolicVec3;
-  normal: Vec3 | SymbolicVec3;
+type ArcPathSegment = {
+  kind: "arc";
+  start: Vec3 | SymbolicVec3;
+  end: Vec3 | SymbolicVec3;
+  center: Vec3 | SymbolicVec3;
+  radius: number | ScalarInputValue;
+  startAngleDeg: number | ScalarInputValue;
+  endAngleDeg: number | ScalarInputValue;
+  direction: "clockwise" | "counterclockwise";
+  frame?: WorkPlaneFrameSnapshot;
 };
 ```
 
 Exact types may differ.
 
-Required refresh behavior:
+At minimum, support symbolic preview refresh for:
 
-- refresh `origin`;
-- refresh `u`;
-- refresh `v`;
-- refresh `normal`;
-- return finite preview vectors;
-- do not mutate malformed input into accepted data;
-- return validation failure instead of throwing.
+- `start`;
+- `end`;
+- `center`;
+- `frame.origin`;
+- `frame.u`;
+- `frame.v`;
+- `frame.normal`.
 
-Suggested helper names:
+If the current model allows symbolic scalar values for arc `radius`, `startAngleDeg`, or `endAngleDeg`, support them too.
 
-```ts
-refreshWorkPlaneFrameSymbolicPreview(...)
-refreshSurfaceFrameSymbolicPreview(...)
-refreshBoundarySegmentFrameSymbolicPreview(...)
+If radius/angle symbolic scalars are not currently modeled, do not crash on them; either:
+
+- implement symbolic scalar support for them; or
+- reject them with a clear expression-specific message.
+
+Preferred: support symbolic scalar fields for radius and angles because Phase 19 already has symbolic scalar expressions.
+
+## 3. Replace arc numeric-only policy with finite-preview policy
+
+### Old policy
+
+```text
+Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
 ```
 
-or equivalent.
+### New policy
+
+```text
+Arc segment coordinates must have finite preview values after variable resolution.
+```
+
+Allowed:
+
+- numeric arc fields;
+- symbolic arc coordinate fields with finite preview values;
+- symbolic arc scalar fields with finite preview values, if supported.
+
+Rejected:
+
+- unknown variable;
+- invalid expression;
+- non-finite preview value;
+- missing preview value;
+- malformed symbolic coordinate/scalar object;
+- invalid radius <= 0;
+- invalid start/end angles;
+- invalid frame after preview evaluation;
+- inconsistent start/end relative to center/radius/angles if the current validation checks consistency.
+
+## 4. Refresh symbolic previews for arcs before validation/export
+
+Ensure arc segment symbolic previews are refreshed:
+
+- during JSON load after variable values are resolved;
+- when variables change in the editor;
+- before SVG preview;
+- before TikZ export;
+- inside boundary snapshots for Coons/ruled/fill surfaces if arcs appear there.
 
 Important paths to inspect:
 
 - `src/model/symbolicCoordinates.ts`;
-- Coons/ruled boundary snapshot refresh code;
-- path segment refresh code;
-- arc/circle/ellipse/template path segment refresh code if they contain `frame`;
-- curved sheet primitive refresh code;
-- grid/work-plane frame refresh code if shared.
+- path segment refresh helpers;
+- arc segment validation helpers;
+- boundary snapshot refresh helpers;
+- save/load normalization;
+- TikZ path export helpers;
+- SVG path rendering helpers;
+- curve occlusion sampling helpers.
 
-## 3. Refresh frames inside boundary path snapshots
-
-The failing path is:
-
-```text
-strata[3].primitive.bottom.segments[0].frame.origin
-```
-
-So at minimum, symbolic refresh must cover frames nested inside:
-
-- `BoundaryPathSnapshot.segments[*].frame`;
-- Coons patch boundaries:
-  - bottom;
-  - right;
-  - top;
-  - left;
-- ruled surface boundaries:
-  - boundary0;
-  - boundary1;
-- any arc/path-template segments that store a frame.
-
-Before validation and mesh sampling, all these nested frames should have finite preview values.
-
-## 4. Frame geometric validation after preview refresh
-
-Once frame coordinates are refreshed, validate the numeric preview frame.
-
-Required:
-
-- all preview components finite;
-- `u`, `v`, and `normal` nonzero;
-- `u` and `v` approximately orthogonal;
-- `normal` approximately equals or is consistent with `cross(u, v)`;
-- frame handedness policy preserved;
-- normalization policy preserved.
-
-If the frame is allowed to store non-normalized symbolic vectors, either:
-
-- normalize preview values during validation/usage; or
-- reject non-normalized frames consistently with existing work-plane validation.
-
-Do not accept a frame just because symbolic expressions parse; numeric preview geometry must be valid.
-
-## 5. Load-time variable resolution must include frame expressions
-
-When loading JSON with symbolic variables, variable detection must include expressions inside frame coordinates.
-
-Detect variables from:
-
-- frame origin coordinates;
-- frame `u`;
-- frame `v`;
-- frame `normal`;
-- boundary path coordinates;
-- other symbolic geometry fields;
-- diagram variables.
-
-If a frame coordinate references `Len`, `R`, `q`, etc., those variables must appear in the import resolution dialog.
-
-If saved variable definitions exist, prefill them.
-
-Example:
+The failure path is:
 
 ```text
-frame.origin.x = -.5*Len
+strata[21].segments[0]
 ```
 
-must cause `Len` to be required and evaluated.
+so ordinary top-level `concatenatedPath` arc segments must be fixed, not only surface boundaries.
 
-## 6. Pending import flow behavior
+## 5. Variable detection must include arc fields
 
-The existing variable-resolution dialog should handle this case.
+The load-time variable-resolution dialog should detect variables used in arc fields.
 
-Required behavior:
+Examples:
 
-1. User selects JSON.
-2. Loader detects symbolic variables in boundary coordinates and frame coordinates.
-3. Variable-resolution dialog appears.
-4. Variables are prefilled from saved definitions if available.
-5. User confirms values.
-6. Symbolic previews are refreshed for:
-   - boundary points;
-   - boundary segment frames;
-   - surface frames;
-   - all other symbolic fields.
-7. Full validation runs.
-8. Diagram renders.
+```text
+center.y = -.5*Len
+frame.origin.y = -.5*Len
+radius = R
+startAngleDeg = q
+endAngleDeg = q + 90
+```
 
-Cancel must leave the current diagram unchanged.
+Variables required:
 
-If frame variables are missing/invalid, load must fail gracefully with an informative error.
+```text
+Len
+R
+q
+```
 
-## 7. Mesh sampling/export behavior
+Function names such as `sin`, `cos`, etc. should not be treated as variables.
 
-Coons/ruled mesh sampling needs numeric coordinates.
+Use the Phase 19 parser/AST rather than fragile regex where possible.
 
-Use refreshed preview values for frame-derived numeric computations.
+## 6. Arc SVG preview behavior
+
+SVG preview and hit testing should use finite numeric preview values.
 
 Requirements:
 
-- mesh sampling finite;
+- symbolic center/frame/radius/angles evaluate to finite numeric values;
+- arc preview renders correctly;
 - no NaN/Infinity;
-- symbolic source expressions remain stored where supported;
-- source symbolic expressions are not discarded just because preview values are computed;
-- TikZ export should continue to work.
+- path selection remains possible;
+- curve occlusion sampling can sample symbolic arcs using preview values;
+- changing variable values updates arc preview.
 
-If mesh TikZ export currently outputs numeric sampled faces, it may use preview values. That is acceptable for now.
+## 7. Arc TikZ export behavior
 
-The important fix is:
+TikZ export should preserve symbolic intent where practical.
 
-- do not reject symbolic frame coordinates before preview resolution.
+Examples:
 
-## 8. Error messages
+If variables are:
 
-Replace the current error with a clearer finite-preview message.
+```text
+Len -> \Len
+R -> \R
+q -> \q
+```
+
+and arc center uses:
+
+```text
+(0, -.5*Len)
+```
+
+then output should prefer:
+
+```tex
+(0, {-.5 * \Len})
+```
+
+or equivalent in the existing formatter.
+
+For arc syntax, if the exporter derives start/end or local coordinates numerically from center/radius/angles, it may use preview values only if there is no symbolic export path yet. But it should not reject the diagram solely because the input was symbolic.
+
+Preferred export policy:
+
+- use symbolic expressions for coordinate/scalar fields when the arc TikZ syntax can represent them safely;
+- otherwise use finite preview values and document fallback.
+
+Do not emit broken TikZ.
+
+Do not export unresolved variable names without corresponding `\pgfmathsetmacro`.
+
+## 8. Check other likely symbolic blockers in the attached JSON
+
+The uploaded JSON contains symbolic fields beyond the failing arc:
+
+- point positions;
+- label positions;
+- polygon/sheet vertices;
+- line endpoints;
+- cubic controls;
+- Coons patch boundary segments;
+- filled region boundaries;
+- arc centers and frames;
+- work-plane frames.
+
+After fixing arc segments, the file should not simply fail on the next numeric-only validation.
+
+Add an audit/fix so any remaining related numeric-only blocker is addressed or produces a clear unresolved-variable error.
+
+Potential areas to check:
+
+### Path segments
+
+- line start/end;
+- cubic start/control1/control2/end;
+- arc start/end/center/frame/radius/angles.
+
+### Template paths
+
+- circle center/radius/frame;
+- ellipse center/radiusX/radiusY/frame/rotation.
+
+### Filled boundaries
+
+- boundaries containing arc segments;
+- work-plane-filled sheets with symbolic frame/local coordinates.
+
+### Ruled/Coons surfaces
+
+- boundary path snapshots containing arc segments;
+- boundary segment frames;
+- constant point boundaries if present.
+
+### Grid
+
+- symbolic ranges/spacing if allowed.
+
+The prompt does not require making every possible field symbolic if the model cannot represent it yet, but it does require not rejecting valid finite-preview symbolic arc/path/surface data merely for being symbolic.
+
+## 9. Error messages
+
+Replace numeric-only arc error with a finite-preview/evaluation error.
 
 Bad:
 
 ```text
-Work-plane frame coordinates must be numeric because this export path derives numeric coordinates from the frame.
+Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
 ```
 
 Good:
 
 ```text
-Work-plane frame coordinates must have finite preview values after variable resolution.
+Arc segment coordinates must have finite preview values after variable resolution.
 ```
 
 Better with path context:
 
 ```text
-Could not evaluate strata[3].primitive.bottom.segments[0].frame.origin.x. Variable Len is missing or invalid.
+Could not evaluate strata[21].segments[0].center.y. Variable Len is missing or invalid.
 ```
 
 or:
 
 ```text
-Work-plane frame at strata[3].primitive.bottom.segments[0].frame is invalid after evaluating symbolic variables.
+Arc segment at strata[21].segments[0] is invalid after evaluating symbolic variables.
 ```
 
-Avoid raw TypeError or numeric-only messages for valid symbolic input.
+Avoid raw TypeErrors and misleading numeric-only wording.
 
-## 9. Tests
+## 10. Tests
 
 Add focused tests.
 
-### Frame refresh tests
+### Arc refresh/validation tests
 
-1. Work-plane frame with numeric coordinates refreshes unchanged.
+1. Numeric arc segment still validates.
 
-2. Work-plane frame with symbolic `origin.x = -.5*Len` refreshes to finite preview when `Len = 4`.
+2. Arc with symbolic center coordinate:
 
-3. Work-plane frame with symbolic `u`, `v`, or `normal` refreshes to finite preview when expressions are valid.
+```text
+center.y = -.5*Len
+Len = 4
+```
 
-4. Frame with unknown variable fails cleanly.
+validates after preview refresh.
 
-5. Frame with non-finite evaluated value fails cleanly.
+3. Arc with symbolic frame origin:
 
-6. Frame with malformed symbolic coordinate fails cleanly.
+```text
+frame.origin.y = -.5*Len
+```
 
-### Boundary snapshot tests
+validates after preview refresh.
 
-7. Coons boundary segment frame with symbolic origin refreshes successfully after variable resolution.
+4. Arc with symbolic radius `R` validates after preview refresh if symbolic radius is supported.
 
-8. Ruled boundary segment frame with symbolic origin refreshes successfully after variable resolution.
+5. Arc with symbolic start/end angles validates after preview refresh if symbolic angles are supported.
 
-9. Symbolic frame inside an arc/circle/ellipse segment refreshes successfully if such segments are supported.
+6. Arc with unknown variable fails cleanly.
 
-10. Malformed frame inside boundary snapshot returns validation failure, not thrown exception.
+7. Arc with non-finite evaluated radius fails.
 
-### Load tests
+8. Arc with radius <= 0 after evaluation fails.
 
-11. `parseSavedDiagramJson` or import flow detects variables used in `frame.origin`.
+9. Arc with malformed symbolic center fails cleanly.
 
-12. JSON with symbolic Coons boundary frame loads after providing variable values.
+10. Arc frame with invalid evaluated geometry fails cleanly.
 
-13. JSON with symbolic ruled boundary frame loads after providing variable values.
+### JSON load tests
 
-14. JSON with missing frame variable prompts/requires the missing variable.
+11. Saved diagram with top-level concatenated path arc center using `-.5*Len` loads after variable resolution.
 
-15. JSON with invalid frame variable value fails without mutating current diagram.
+12. Saved diagram with top-level concatenated path arc frame origin using `-.5*Len` loads after variable resolution.
 
-16. Numeric-only saved diagrams still load.
+13. Saved diagram with filled region boundary arc using symbolic center/frame loads after variable resolution.
 
-### Validation/sampling tests
+14. Saved diagram with Coons/Ruled boundary arc using symbolic center/frame loads after variable resolution.
 
-17. `validateCoonsPatchPrimitive` accepts symbolic boundary frame coordinates after finite previews exist.
+15. Attached/minimized `saddle-skeleton` fixture no longer fails with the numeric-only arc error.
 
-18. `validateRuledSurfacePrimitive` accepts symbolic boundary frame coordinates after finite previews exist.
+16. If the fixture is still invalid for another reason, the error must not be a numeric-only symbolic rejection; it should be a real finite-preview/geometry error.
 
-19. Coons patch with symbolic boundary frame samples finite mesh.
+### Variable detection tests
 
-20. Ruled surface with symbolic boundary frame samples finite mesh.
+17. Variable detection finds `Len` in arc center expression.
 
-21. Invalid frame geometry after evaluation is rejected.
+18. Variable detection finds `R` in arc radius expression if supported.
 
-### Export tests
+19. Variable detection finds `q` in arc angle expression if supported.
 
-22. TikZ export after loading symbolic frame Coons patch succeeds.
+20. Function names are not treated as variables.
 
-23. Inline math output after loading symbolic frame diagram has no blank lines.
+### SVG/TikZ tests
 
-24. No NaN/Infinity in SVG/TikZ output.
+21. SVG preview can render a symbolic arc after variable resolution.
+
+22. TikZ export succeeds for a symbolic arc.
+
+23. Inline TikZ output with symbolic arc has no blank lines.
+
+24. TikZ output includes required `\pgfmathsetmacro` variables before symbolic arc usage.
+
+25. No NaN/Infinity appears in SVG/TikZ output.
 
 ### Regression tests
 
-25. Previous symbolic boundary coordinate import tests still pass.
+26. Existing numeric arcs still export as before.
 
-26. Malformed boundary segment load rejection still passes.
+27. Existing arc reversal tests still pass.
 
-27. Existing work-plane validation tests still pass.
+28. Existing curve occlusion sampling for arcs still passes.
 
-## 10. Use uploaded JSON as a regression source if practical
+29. Existing symbolic boundary/frame import tests still pass.
 
-The uploaded file `counit (3).json` triggers:
+30. Existing save/load old diagrams still pass.
+
+## 11. Use the uploaded JSON as a regression guide
+
+The uploaded file `saddle-skeleton.json` triggered:
 
 ```text
-strata[3].primitive.bottom.segments[0].frame.origin
+strata[21].segments[0] Arc segment coordinates must be numeric...
 ```
 
-If possible, create a minimized fixture from it containing:
+If practical:
 
-- variables such as `Len` and `R`;
-- one Coons patch boundary segment with symbolic `frame.origin`;
-- enough geometry to reproduce the old error.
+- create a minimized fixture based on that stratum rather than committing the full large file;
+- include variables `Len` and `R`;
+- include one arc segment with symbolic center/frame;
+- assert that it loads after variable resolution.
 
 Do not add a huge fixture if it slows tests.
 
-A small hand-written fixture is preferred.
-
-## 11. Documentation
-
-Update docs:
-
-- symbolic coordinates are allowed in work-plane/surface frame snapshots if finite preview values can be resolved;
-- load-time variable resolution applies to frame coordinates as well as point coordinates;
-- mesh sampling uses preview values;
-- symbolic expressions are preserved where supported.
-
-## 12. Preserve existing behavior
-
-Do not regress:
-
-- numeric JSON loading;
-- symbolic boundary coordinate loading;
-- variable-resolution dialog;
-- variable manager;
-- symbolic coordinate editing;
-- ruled/Coons surface creation;
-- boundary malformed-data rejection;
-- SVG preview;
-- TikZ export;
-- inline no-blank-lines;
-- 4-space indentation;
-- save/load old diagrams;
-- undo/redo;
-- layer/style/camera/work-plane behavior.
-
-## 13. Manual verification checklist
+## 12. Manual verification checklist
 
 After implementation, run:
 
@@ -452,25 +521,49 @@ PATH=/opt/homebrew/bin:$PATH npm run dev
 Manual test with uploaded JSON:
 
 1. Click Load JSON.
-2. Select the uploaded diagram.
-3. Confirm variable-resolution dialog appears.
-4. Confirm variables such as `Len` and `R` are listed and prefilled if saved.
+2. Select `saddle-skeleton.json`.
+3. Confirm variable-resolution dialog appears if variables are detected.
+4. Confirm `Len` and `R` are listed/prefilled.
 5. Confirm values.
 6. Confirm the diagram loads and renders.
-7. Confirm no error says:
-   - `Boundary surface path coordinates must be numeric`
-   - `Work-plane frame coordinates must be numeric`
+7. Confirm the error:
+
+```text
+Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.
+```
+
+does not appear.
+
 8. Generate TikZ.
 9. Confirm export succeeds.
-10. Switch inline mode if applicable.
+10. Switch inline mode.
 11. Confirm inline output has no blank lines.
+12. Save and reload.
 
 Failure test:
 
-12. Load a version with missing `Len`.
-13. Confirm dialog asks for `Len`.
-14. Enter invalid value.
-15. Confirm useful validation error and current diagram unchanged.
+13. Load a version where `Len` is missing or invalid.
+14. Confirm a clear variable/evaluation error.
+
+## 13. Preserve existing behavior
+
+Do not regress:
+
+- numeric arc loading/export;
+- symbolic variable manager;
+- symbolic coordinate input;
+- line/cubic segment symbolic support;
+- boundary-surface symbolic coordinate support;
+- work-plane frame symbolic support;
+- Coons/ruled surface loading;
+- filled region loading;
+- SVG preview;
+- TikZ export;
+- inline no-blank-lines;
+- 4-space indentation;
+- save/load old diagrams;
+- undo/redo;
+- layer/style/camera/work-plane behavior.
 
 ## 14. Verification
 
@@ -487,11 +580,11 @@ git diff --check
 Please report:
 
 - files modified;
-- root cause of the frame numeric-only rejection;
-- frame symbolic refresh helper behavior;
-- variable detection for frame expressions;
-- load-time variable resolution behavior;
-- finite-preview frame validation behavior;
+- root cause of the arc numeric-only rejection;
+- arc fields now supporting symbolic finite previews;
+- whether symbolic radius/angles are supported or explicitly rejected;
+- variable detection for arc fields;
+- other numeric-only blockers found and fixed;
 - tests added/updated;
 - test results;
 - build results;
