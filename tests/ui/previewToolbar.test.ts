@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { emptyTwoDimensionalDiagram } from '../../src/examples/index.ts'
+import { serializeDiagram } from '../../src/model/serialization.ts'
+import {
+  closeDirectInputDrawerInputMode,
+  directInputDrawerFormKind,
+  directInputDrawerStateForInputMode,
+  shouldShowDirectInputDrawer,
+} from '../../src/ui/directInputDrawer.ts'
 import {
   addPathMenuItems,
   activeToolSupportsCursorCreation,
@@ -85,6 +93,67 @@ test('preview toolbar omits Add sheet in 2D diagrams', () => {
 
 test('cursor input is the default preview coordinate input mode', () => {
   assert.equal(defaultPreviewCoordinateInputMode(), 'cursor')
+})
+
+test('selecting Direct for Add point opens the direct input drawer', () => {
+  const state = directInputDrawerStateForInputMode('direct')
+
+  assert.equal(state, 'open')
+  assert.equal(shouldShowDirectInputDrawer('createPoint', 'direct', state), true)
+  assert.equal(directInputDrawerFormKind('createPoint', 'direct'), 'point')
+})
+
+test('selecting Direct for Add path opens the path direct input form', () => {
+  const state = directInputDrawerStateForInputMode('direct')
+
+  assert.equal(shouldShowDirectInputDrawer('createPath', 'direct', state), true)
+  assert.equal(directInputDrawerFormKind('createPath', 'direct'), 'path')
+})
+
+test('closing the direct input drawer returns the add tool to cursor input', () => {
+  const inputMode = closeDirectInputDrawerInputMode()
+  const state = directInputDrawerStateForInputMode(inputMode)
+
+  assert.equal(inputMode, 'cursor')
+  assert.equal(state, 'closed')
+  assert.equal(shouldShowDirectInputDrawer('createPoint', inputMode, state), false)
+})
+
+test('direct input drawer state is UI-only and does not change diagram serialization', () => {
+  const before = serializeDiagram(emptyTwoDimensionalDiagram)
+  const drawerState = directInputDrawerStateForInputMode('direct')
+  const formKind = directInputDrawerFormKind('createGrid', 'direct')
+
+  assert.equal(drawerState, 'open')
+  assert.equal(formKind, 'grid')
+  assert.equal(serializeDiagram(emptyTwoDimensionalDiagram), before)
+})
+
+test('switching tools follows the drawer policy', () => {
+  const directState = directInputDrawerStateForInputMode('direct')
+  const cursorState = directInputDrawerStateForInputMode('cursor')
+
+  assert.equal(shouldShowDirectInputDrawer('createPath', 'direct', directState), true)
+  assert.equal(shouldShowDirectInputDrawer('createLabel', 'cursor', cursorState), false)
+  assert.equal(directInputDrawerFormKind('select', 'direct'), null)
+})
+
+test('direct input drawer controls stop before canvas handlers can run', () => {
+  let stopped = false
+  let canvasCalls = 0
+
+  stopPreviewOverlayEvent({
+    stopPropagation: () => {
+      stopped = true
+    },
+  })
+
+  if (!stopped) {
+    canvasCalls += 1
+  }
+
+  assert.equal(stopped, true)
+  assert.equal(canvasCalls, 0)
 })
 
 test('preview canvas creation clicks are disabled for Add grid direct input', () => {
