@@ -1,23 +1,41 @@
 .app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(560px, 1fr);
+  gap: 12px;
   min-height: 100svh;
-  padding: 32px clamp(16px, 4vw, 48px);
+  min-width: 0;
+  padding: 12px clamp(12px, 2vw, 28px);
+  overflow-x: hidden;
+}
+
+.top-control-area {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 1680px);
+  min-width: 0;
+  margin: 0 auto;
 }
 
 .app-header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  max-width: 1280px;
-  margin: 0 auto 18px;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
   text-align: left;
 }
 
+.app-header h1 {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.05;
+}
+
 .app-header p {
-  margin-top: 8px;
+  margin-top: 4px;
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .status-strip {
@@ -41,12 +59,16 @@
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
-  gap: 12px 16px;
-  max-width: 1280px;
-  margin: 0 auto 18px;
-  padding: 12px;
+  align-content: flex-start;
+  gap: 8px 10px;
+  width: 100%;
+  max-height: min(34svh, 320px);
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -70,13 +92,16 @@
 }
 
 .example-control-stack {
-  flex-basis: 100%;
+  flex: 2 1 420px;
+  max-height: 142px;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .example-control-group {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
+  align-items: center;
   width: 100%;
 }
 
@@ -280,9 +305,11 @@
 
 .work-plane-control {
   display: grid;
-  flex: 1 1 100%;
+  flex: 1 1 420px;
   gap: 8px;
   min-width: 0;
+  max-height: 220px;
+  overflow: auto;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -480,9 +507,11 @@
 
 .variable-manager {
   display: grid;
-  flex: 1 1 100%;
+  flex: 1 1 380px;
   gap: 8px;
   min-width: 0;
+  max-height: 220px;
+  overflow: auto;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -973,13 +1002,15 @@
 }
 
 .example-segmented-control {
-  display: grid;
-  grid-auto-flow: row;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  display: flex;
+  grid-auto-flow: unset;
+  grid-template-columns: none;
+  overflow-x: auto;
   width: 100%;
 }
 
 .example-segmented-control button {
+  flex: 0 0 min(180px, 46vw);
   min-width: 0;
   line-height: 1.2;
   white-space: normal;
@@ -1008,31 +1039,37 @@
 
 .workspace {
   display: grid;
-  grid-template-rows: auto auto;
-  gap: 20px;
-  max-width: 1480px;
+  grid-template-rows: minmax(560px, auto) auto;
+  gap: 12px;
+  width: min(100%, 1680px);
+  max-width: none;
   margin: 0 auto;
   align-items: stretch;
+  align-self: stretch;
   min-height: 0;
 }
 
 .preview-inspector-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 420px);
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 360px);
   align-items: stretch;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
-  min-height: 0;
-  height: clamp(560px, 72vh, 840px);
+  min-height: 560px;
+  height: clamp(560px, 68svh, 880px);
+}
+
+.preview-shell {
+  min-height: 560px;
 }
 
 .workspace-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
-  padding: 18px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -1051,6 +1088,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .inspector-panel {
@@ -2239,12 +2277,27 @@
   font-size: 14px;
 }
 
+.source-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+  height: min(38svh, 460px);
+  min-height: 280px;
+  max-height: 460px;
+  overflow: hidden;
+}
+
+.source-panel .panel-heading {
+  min-height: 0;
+  max-height: min(16svh, 160px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .tikz-source {
   width: 100%;
   min-width: 0;
-  height: min(42vh, 460px);
-  min-height: 280px;
-  max-height: 460px;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   resize: none;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2259,8 +2312,7 @@
 }
 
 @media (max-width: 920px) {
-  .app-header,
-  .toolbar {
+  .app-header {
     display: grid;
     justify-content: stretch;
   }
@@ -2272,6 +2324,7 @@
 
   .toolbar {
     gap: 12px;
+    max-height: 42svh;
   }
 
   .control-group {
@@ -2309,11 +2362,16 @@
 
   .preview-inspector-row {
     grid-template-columns: 1fr;
+    min-height: 0;
     height: auto;
   }
 
+  .preview-shell {
+    min-height: 0;
+  }
+
   .preview-panel {
-    min-height: 520px;
+    min-height: min(70svh, 620px);
   }
 
   .inspector-panel {
@@ -2321,7 +2379,12 @@
   }
 
   .source-panel {
-    min-height: 0;
+    height: min(42svh, 420px);
+    min-height: 260px;
+  }
+
+  .source-panel .panel-heading {
+    max-height: min(18svh, 150px);
   }
 
   .inspector-field {
@@ -2336,6 +2399,10 @@
 @media (max-width: 540px) {
   .app-shell {
     padding-inline: 12px;
+  }
+
+  .toolbar {
+    max-height: 48svh;
   }
 
   .panel-heading {
@@ -2384,9 +2451,9 @@
     min-height: 380px;
   }
 
-  .tikz-source {
-    height: min(42vh, 340px);
-    min-height: 240px;
+  .source-panel {
+    height: min(48svh, 380px);
+    min-height: 260px;
   }
 
   .inspector-summary {
