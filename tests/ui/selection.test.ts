@@ -39,7 +39,6 @@ import {
   addTextLabelFromDirectInput,
   addTextLabelWithResult,
   cloneDiagram,
-  directCreationLayerOptions,
   makeUniqueId,
   normalizeDirectLabelText,
   parseDirectCoordinateInput,
@@ -908,7 +907,7 @@ test('direct-created 3D point preserves z and has codim 3', () => {
   assert.deepEqual(point.position, { x: 1, y: 2, z: 3.25 })
 })
 
-test('direct-created point uses active layer filter layer and remains selected', () => {
+test('direct-created point on the visible New layer remains selected', () => {
   const activeLayer = 2
   const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
   const result = addPointStratumFromDirectInput(
@@ -916,7 +915,7 @@ test('direct-created point uses active layer filter layer and remains selected',
     { x: '1', y: '2', z: '99' },
     {
       id: 'filtered-direct-point',
-      ...directCreationLayerOptions(layerFilter),
+      layer: activeLayer,
     },
   )
 
@@ -1380,7 +1379,7 @@ test('direct-created label is added to diagram.labels', () => {
   })
 })
 
-test('direct-created label uses active layer filter layer and remains selected', () => {
+test('direct-created label on the visible New layer remains selected', () => {
   const activeLayer = 2
   const layerFilter: LayerFilter = { kind: 'layer', layer: activeLayer }
   const result = addTextLabelFromDirectInput(
@@ -1389,7 +1388,7 @@ test('direct-created label uses active layer filter layer and remains selected',
     '$F$',
     {
       id: 'filtered-direct-label',
-      ...directCreationLayerOptions(layerFilter),
+      layer: activeLayer,
     },
   )
 

@@ -659,7 +659,7 @@ function App() {
   const [directCoordinateMode, setDirectCoordinateMode] =
     useState<DirectCoordinateMode>('global')
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
-  const [directLayerInput, setDirectLayerInput] = useState<string>('0')
+  const [newElementLayerInput, setNewElementLayerInput] = useState<string>('0')
   const [directPolylineRows, setDirectPolylineRows] = useState<string>(
     defaultDirectPolylineRows(2),
   )
@@ -1283,7 +1283,7 @@ function App() {
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
     setFillRule('nonzero')
     setFillStatus('')
-    setDirectLayerInput('0')
+    setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
@@ -1617,7 +1617,7 @@ function App() {
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
     setFillRule('nonzero')
     setFillStatus('')
-    setDirectLayerInput('0')
+    setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(diagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
@@ -2135,12 +2135,6 @@ function App() {
       nextInspectorDisclosureStateForSelection(current, selectedElement),
     )
   }, [selectedElement])
-
-  useEffect(() => {
-    if (layerFilter.kind === 'layer') {
-      setDirectLayerInput(String(layerFilter.layer))
-    }
-  }, [layerFilter])
 
   useEffect(() => {
     setActiveWorkPlane((current) =>
@@ -3265,14 +3259,14 @@ function App() {
   }
 
   function updateNewElementLayerInput(value: string): void {
-    setDirectLayerInput(value)
+    setNewElementLayerInput(value)
     setDirectCreationStatus('')
   }
 
   function parseNewElementLayer(
     setStatus: (message: string) => void,
   ): number | null {
-    const layer = parseDirectLayerInput(directLayerInput)
+    const layer = parseDirectLayerInput(newElementLayerInput)
 
     if (layer === null) {
       setStatus('Layer must be a finite number.')
@@ -5230,7 +5224,7 @@ function App() {
       <LayerManager
         diagram={editableDiagram}
         layerFilter={layerFilter}
-        creationLayerInput={directLayerInput}
+        creationLayerInput={newElementLayerInput}
         statusMessage={layerOperationStatus}
         expanded={isLayerManagerExpanded}
         stackedWithCamera={showCameraControls && isCameraPanelAside}

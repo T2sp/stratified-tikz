@@ -29,6 +29,8 @@ import {
   createLayerThumbnail,
   layerButtonLabel,
   layerCreationInputForLayer,
+  layerFilterFromSelectValue,
+  layerFilterSelectValue,
   layerPaletteRows,
   nextLayerPaletteOpenState,
   resolveLayerDropSwap,
@@ -196,6 +198,34 @@ test('layer palette rows keep creation layer and filter state separate', () => {
   assert.equal(layerCreationInputForLayer(rows[1].layer.value), '1')
 })
 
+test('layer palette View changes do not rewrite the New layer input', () => {
+  const diagram = createThreeLayerDiagram()
+  const creationLayerInput = '0'
+  const viewFilter = layerFilterFromSelectValue('1')
+  const rows = layerPaletteRows(diagram, viewFilter, creationLayerInput)
+
+  assert.deepEqual(viewFilter, { kind: 'layer', layer: 1 })
+  assert.equal(layerButtonLabel(creationLayerInput, rows.length), 'L0 / 3')
+  assert.equal(rows[0].isCreationLayer, true)
+  assert.equal(rows[0].isFilterActive, false)
+  assert.equal(rows[1].isCreationLayer, false)
+  assert.equal(rows[1].isFilterActive, true)
+})
+
+test('layer palette New changes update creation label without changing View', () => {
+  const diagram = createThreeLayerDiagram()
+  const viewFilter = layerFilterFromSelectValue('1')
+  const creationLayerInput = layerCreationInputForLayer(2)
+  const rows = layerPaletteRows(diagram, viewFilter, creationLayerInput)
+
+  assert.deepEqual(viewFilter, { kind: 'layer', layer: 1 })
+  assert.equal(layerFilterSelectValue(viewFilter), '1')
+  assert.equal(layerButtonLabel(creationLayerInput, rows.length), 'L2 / 3')
+  assert.equal(rows[1].isFilterActive, true)
+  assert.equal(rows[2].isCreationLayer, true)
+  assert.equal(rows[2].isFilterActive, false)
+})
+
 test('layer palette drag/drop resolves to a layer swap only for valid targets', () => {
   assert.deepEqual(resolveLayerDropSwap(0, 1), {
     ok: true,
@@ -339,6 +369,14 @@ function createTwoLayerDiagram(): Diagram {
     withSourceLabel,
     { x: -1, y: -2, z: 0 },
     { id: 'other-point', name: 'Other', layer: 1 },
+  ).diagram
+}
+
+function createThreeLayerDiagram(): Diagram {
+  return addPointStratumWithResult(
+    createTwoLayerDiagram(),
+    { x: 0, y: 0, z: 0 },
+    { id: 'third-point', name: 'Third', layer: 2 },
   ).diagram
 }
 
