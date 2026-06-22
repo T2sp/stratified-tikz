@@ -1,4 +1,4 @@
-# Phase 21E Fix Prompt: Decouple layer View filter from new-element layer
+# Phase 21E Additional Fix Prompt: Reject empty/non-internal layer drag-drop payloads
 
 ## Environment
 
@@ -40,36 +40,58 @@ Review result:
 
 ## Medium issue
 
-The new Layer Palette separates:
+Layer drag/drop can incorrectly swap layer `0` when the drop payload has no `text/plain` data.
 
-- `View` layer filter;
-- `New` / new-element layer.
+Current risky behavior:
 
-However, old `App` state synchronization still couples them.
+```ts
+Number(event.dataTransfer.getData("text/plain"))
+```
 
-Review notes:
+When `getData("text/plain")` returns an empty string:
 
-- `src/App.tsx` still has an old effect that copies a specific layer filter into `directLayerInput`.
-- `src/ui/LayerManager.tsx` now presents `View` and `New` as separate controls.
-- The Phase 21E prompt explicitly says layer filter behavior should remain separate unless intentionally combined.
-- Current behavior:
-  - Choosing `View -> L1` silently changes the new-element layer to `L1`.
-  - Later point/path creation can land on the filtered layer instead of the user's chosen creation layer.
+```ts
+Number("") === 0
+```
 
-This conflicts with the new layer-window design.
+Therefore:
+
+- an external/invalid drop;
+- a browser failure to provide the internal payload;
+- or an accidental empty payload
+
+can be interpreted as source layer `0`.
+
+This may call:
+
+```ts
+onSwapLayers(0, targetLayer)
+```
+
+and corrupt layer ordering/membership unexpectedly.
+
+Review location:
+
+```text
+src/ui/LayerManager.tsx
+LayerPaletteListRow
+```
+
+The review specifically says:
+
+> Fix Phase 21E layer drag/drop so empty or non-internal drop payloads cannot resolve to layer 0. In `LayerPaletteListRow`, treat empty `text/plain` as absent, fall back to `draggedLayerValue` only for an active internal drag, reject invalid drops, and add a UI/unit test covering empty payload behavior.
 
 ## Goal
 
-Fix Phase 21E by fully decoupling the layer View filter from the new-element creation layer.
+Make layer drag/drop robust so invalid, external, or empty drop payloads cannot trigger an unintended layer swap.
 
-After the fix:
+Required:
 
-1. Changing the Layer Palette `View` filter does **not** change the new-element layer.
-2. The compact Layer button label does **not** change merely because the View filter changes.
-3. Row click or the `New` control still changes the new-element layer.
-4. New point/path/sheet/etc. objects are created on the explicitly chosen new-element layer.
-5. Existing layer filtering behavior still works for visibility/selection.
-6. Existing layer operations remain functional.
+1. Empty `text/plain` payload must not parse as layer `0`.
+2. Non-internal drops must be rejected.
+3. Fallback to `draggedLayerValue` only when there is an active internal drag.
+4. Invalid source/target layers must not call `onSwapLayers`.
+5. Add tests covering empty payload behavior.
 
 ## Scope
 
@@ -77,229 +99,277 @@ This is a targeted Phase 21E fix.
 
 Implement:
 
-- removal or deactivation of the old `layerFilter -> directLayerInput` synchronization;
-- explicit separation of:
-  - layer filter state;
-  - new-element layer state;
-- tests for the new behavior.
+- safe drag payload parsing;
+- internal drag guard;
+- rejection of empty/non-finite/invalid payloads;
+- tests for empty payload and invalid external drop behavior.
 
 Do not implement:
 
-- new Layer Manager features;
-- new geometry features;
-- broad UI redesign;
+- new layer operations;
+- new drag animation;
+- broad Layer Manager redesign;
 - multi-selection;
-- new layer semantics;
+- new geometry features;
 - new dependencies.
 
 Do not change:
 
-- diagram data model;
-- layer values on existing elements;
-- existing layer filter semantics except decoupling from creation layer;
-- layer swap/duplicate/delete/translate behavior;
-- TikZ layer output semantics;
+- layer swap semantics;
+- layer metadata model;
+- layer creation layer behavior;
+- layer View/New separation;
+- undo/redo behavior;
+- TikZ layer output;
 - save/load format;
-- SVG rendering semantics;
-- undo/redo semantics.
+- SVG rendering semantics.
 
-## 1. Identify and remove old layer-filter synchronization
+## 1. Inspect drag/drop implementation
 
-Inspect `src/App.tsx` around the review-mentioned old effect.
+Inspect:
 
-Look for logic conceptually like:
+- `src/ui/LayerManager.tsx`;
+- `LayerPaletteListRow`;
+- drag start handler;
+- drag over handler;
+- drop handler;
+- `draggedLayerValue` state;
+- `onSwapLayers`;
+- any `dataTransfer.setData(...)` and `getData(...)` usage.
 
-```ts
-useEffect(() => {
-  if (layerFilter.kind === "specific") {
-    setDirectLayerInput(String(layerFilter.layer));
-  }
-}, [layerFilter]);
-```
-
-or any equivalent logic that copies the current layer filter into:
-
-- `directLayerInput`;
-- new-element layer state;
-- creation layer state;
-- direct form layer field.
-
-Remove this automatic synchronization, or make it explicitly opt-in only if a clear UI exists.
-
-Preferred behavior:
-
-- no automatic sync from View filter to new-element layer.
-
-## 2. Preserve explicit new-element layer controls
-
-The new-element layer should change only through explicit user actions intended to change creation layer.
-
-Allowed sources:
-
-- clicking a layer row in the Layer Palette, if Phase 21E uses row click for creation-layer selection;
-- a `New` control/form in the Layer Palette;
-- any explicit "set as new element layer" action;
-- existing direct layer input where still intentionally used.
-
-Not allowed:
-
-- selecting a View filter;
-- hiding/showing layers;
-- locking/unlocking layers;
-- opening/closing the Layer Palette;
-- changing Inspector selection.
-
-## 3. Clarify state names if needed
-
-If current state names are confusing, refactor minimally.
-
-For example:
+Find code like:
 
 ```ts
-layerFilter
-newElementLayer
-directLayerInput
-```
-
-should have clear responsibilities.
-
-Recommended:
-
-- `layerFilter`: controls which layers are visible/selectable in preview.
-- `newElementLayer`: numeric layer value used for newly created elements.
-- `directLayerInput`: UI text field representation of `newElementLayer`, if still needed.
-
-If `directLayerInput` remains a text field, it should sync with `newElementLayer`, not with `layerFilter`.
-
-## 4. Compact Layer button label
-
-The lower-right Layer button should show the new-element layer and total layer count.
-
-Example:
-
-```text
-L0 / 3
+const sourceLayer = Number(event.dataTransfer.getData("text/plain"));
 ```
 
 or equivalent.
 
-After the fix:
+This must be replaced with safe parsing.
 
-- changing `View` filter must not update the first number;
-- changing new-element layer through row click/New control must update the first number;
-- total layer count should still update when layers are added/deleted.
+## 2. Use an explicit internal drag payload
 
-## 5. Layer Palette controls
+Prefer adding an internal drag MIME type in addition to or instead of plain text.
 
-The Layer Palette has separate controls for:
+Example:
 
-- `View`;
-- `New`.
+```ts
+const LAYER_DRAG_MIME = "application/x-stratified-tikz-layer";
+```
 
-Ensure they remain separate in behavior.
+On drag start:
 
-### View control
+```ts
+event.dataTransfer.setData(LAYER_DRAG_MIME, String(layerValue));
+event.dataTransfer.setData("text/plain", String(layerValue));
+```
 
-Changing View:
+On drop:
 
-- filters the preview/selection according to existing layer filter rules;
-- may clear selection if selected element is no longer visible according to existing policy;
-- must not change new-element layer.
+- first read `LAYER_DRAG_MIME`;
+- if absent, treat as non-internal unless `draggedLayerValue` confirms an active internal drag;
+- do not trust empty `text/plain`.
 
-### New control / row click
+If adding a custom MIME type is too invasive, at minimum use a safe parser and `draggedLayerValue` guard.
 
-Changing New:
+## 3. Safe payload parsing
 
-- updates new-element layer;
-- updates compact Layer button label;
-- affects subsequent creation;
-- must not change View filter unless an explicit option says so.
+Add helper:
 
-## 6. Creation behavior
+```ts
+function parseDraggedLayerValue(payload: string): number | null
+```
 
-After changing View filter, creating new objects should still use the previously chosen new-element layer.
+or equivalent.
 
-Example test scenario:
+Required behavior:
 
-1. New layer is `L0`.
-2. View filter is changed to `L1`.
-3. User creates a point.
-4. Created point should be on `L0`, not `L1`.
+```ts
+parseDraggedLayerValue("") === null
+parseDraggedLayerValue("   ") === null
+parseDraggedLayerValue("0") === 0
+parseDraggedLayerValue("1") === 1
+parseDraggedLayerValue("-1") === -1
+parseDraggedLayerValue("abc") === null
+parseDraggedLayerValue("Infinity") === null
+parseDraggedLayerValue("NaN") === null
+```
 
-Then:
+If decimal layer values are supported by the project, allow finite decimals. If layer values are intended to be integers only, reject decimals according to current model policy.
 
-1. User explicitly changes New layer to `L2`.
-2. User creates a path.
-3. Created path should be on `L2`.
+Do not use `Number(payload)` without checking that `payload.trim()` is non-empty.
 
-If layer filter hides the new layer, preserve existing policy. If the app currently ensures created objects remain visible by updating the filter, keep that behavior only if it does not confuse View/New separation. If necessary, document the chosen policy.
+Required:
 
-Preferred:
+- reject empty strings;
+- reject non-finite numbers;
+- reject invalid layer values according to existing validation policy.
 
-- changing New layer may update View only if there is an explicit "show creation layer" behavior already designed.
-- changing View never updates New.
+## 4. Internal drag guard
 
-## 7. Tests
+Drop handling should only call `onSwapLayers` if the source layer comes from a valid internal layer drag.
+
+Suggested logic:
+
+```ts
+const customPayload = event.dataTransfer.getData(LAYER_DRAG_MIME);
+const plainPayload = event.dataTransfer.getData("text/plain");
+
+const parsedFromCustom = parseDraggedLayerValue(customPayload);
+
+const sourceLayer =
+  parsedFromCustom ??
+  (draggedLayerValue !== null ? draggedLayerValue : null);
+
+if (sourceLayer === null) {
+  return;
+}
+```
+
+Important:
+
+- Do not fall back to `text/plain` if it is empty.
+- Do not fall back to `text/plain` from external drags unless you can prove it is internal.
+- `draggedLayerValue` fallback should only be used while an internal drag is active.
+
+If there is a state field such as:
+
+```ts
+draggedLayerValue: number | null
+```
+
+then:
+
+- set it on internal drag start;
+- clear it on drag end/drop/cancel;
+- only allow fallback while it is non-null.
+
+## 5. Validate source and target before swapping
+
+Before calling:
+
+```ts
+onSwapLayers(sourceLayer, targetLayer)
+```
+
+check:
+
+- `sourceLayer` is finite and valid;
+- `targetLayer` is finite and valid;
+- `sourceLayer !== targetLayer`;
+- source layer exists in current layer list;
+- target layer exists in current layer list;
+- the drop is internal.
+
+If any check fails:
+
+- do nothing;
+- optionally set a compact status message;
+- do not throw;
+- do not call `onSwapLayers`.
+
+## 6. Prevent accidental layer 0 fallback
+
+This is the key regression.
+
+Specifically test and ensure:
+
+```ts
+event.dataTransfer.getData("text/plain") === ""
+```
+
+does **not** result in:
+
+```ts
+sourceLayer === 0
+```
+
+unless there is an active internal drag whose actual `draggedLayerValue` is `0`.
+
+Two cases:
+
+### Case A: Empty payload, no active internal drag
+
+Expected:
+
+- no swap;
+- `onSwapLayers` not called.
+
+### Case B: Empty payload, active internal drag from layer 0
+
+Expected:
+
+- if `draggedLayerValue === 0`, fallback to `0` is allowed;
+- swap may occur if target is valid and different.
+
+This distinction is important.
+
+## 7. Clear drag state reliably
+
+Ensure internal drag state is cleared on:
+
+- drop;
+- drag end;
+- drag cancel if handled;
+- component unmount if needed.
+
+This prevents stale `draggedLayerValue` from making later external drops look internal.
+
+## 8. Tests
 
 Add focused tests.
 
-### State/helper tests
+### Pure parser tests
 
-1. Changing layer filter does not change new-element layer.
+1. Empty string parses to `null`.
+2. Whitespace parses to `null`.
+3. `"0"` parses to `0`.
+4. `"1"` parses to `1`.
+5. `"-1"` parses to `-1`.
+6. `"NaN"` parses to `null`.
+7. `"Infinity"` parses to `null`.
+8. `"abc"` parses to `null`.
 
-2. Changing layer filter does not change `directLayerInput` if it mirrors new-element layer.
+### Drop behavior tests
 
-3. Changing new-element layer updates `directLayerInput` or equivalent UI field.
+9. Empty `text/plain` payload with no active internal drag does not call `onSwapLayers`.
 
-4. Changing new-element layer does not change the View filter unless explicitly designed.
+10. Empty `text/plain` payload with active internal `draggedLayerValue = 0` may call `onSwapLayers(0, target)`.
 
-### Layer button tests
+11. External drop with unrelated `text/plain` data does not call `onSwapLayers`.
 
-5. Compact Layer button label remains unchanged when View filter changes.
+12. Invalid numeric payload does not call `onSwapLayers`.
 
-Example:
+13. Dropping on the same layer does not call `onSwapLayers`.
 
-```text
-initial: L0 / 3
-set View to L1
-still:   L0 / 3
-```
+14. Valid internal payload calls `onSwapLayers(source, target)`.
 
-6. Compact Layer button label updates when New layer changes.
-
-Example:
-
-```text
-initial: L0 / 3
-set New to L2
-now:     L2 / 3
-```
-
-### Creation tests
-
-7. Set New layer to `0`; set View filter to `1`; create point. The point is on layer `0`.
-
-8. Set New layer to `2`; create path/label/point. New object is on layer `2`.
-
-9. View filter remains `1` after changing New layer unless existing explicit behavior says otherwise.
+15. Missing custom MIME but active internal drag fallback works if this is the chosen policy.
 
 ### Regression tests
 
-10. View filter still filters visible/selectable elements.
+16. Normal drag-to-swap still works for layer `0` to layer `1`.
 
-11. Layer row click still changes creation layer.
+17. Normal drag-to-swap still works for nonzero layers.
 
-12. Rename/duplicate/delete/translate/swap still work.
+18. Layer window open state remains UI-only.
 
-13. Old direct creation layer behavior still works.
+19. Existing layer rename/duplicate/delete/translate tests still pass.
 
-14. TikZ layer output uses created object's actual layer.
+If full React DnD tests are difficult, extract pure helpers:
 
-15. Save/load unaffected.
+```ts
+resolveLayerDropSource({
+  customPayload,
+  plainPayload,
+  draggedLayerValue,
+  validLayerValues,
+})
+```
 
-If full UI tests are hard, extract pure state helpers and test them. Still wire the actual App/LayerManager interactions through the helpers.
+and test that helper thoroughly. Still wire the actual `LayerPaletteListRow` drop handler to it.
 
-## 8. Manual verification checklist
+## 9. Manual verification checklist
 
 After implementation, run:
 
@@ -307,56 +377,40 @@ After implementation, run:
 PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Manual test:
+Manual tests:
 
-1. Open a diagram with at least two layers.
-2. Open the Layer Palette.
-3. Confirm Layer button shows current New layer / total layers.
-4. Set New layer to `L0`.
-5. Change View filter to `L1`.
-6. Confirm Layer button still shows `L0 / total`.
-7. Create a point/path.
-8. Confirm new object is on `L0`.
-9. Change New layer to `L1` using row click/New control.
-10. Confirm Layer button updates to `L1 / total`.
-11. Create another object.
-12. Confirm it is on `L1`.
-13. Change View filter again.
-14. Confirm New layer remains `L1`.
-15. Confirm View filtering still works.
+1. Open the Layer window.
+2. Drag layer 0 onto layer 1.
+3. Confirm swap works.
+4. Undo.
+5. Drag layer 1 onto layer 0.
+6. Confirm swap works.
+7. Drop something external onto the layer window if easy, such as selected text from outside the app.
+8. Confirm no layer swap occurs.
+9. Confirm no unexpected swap involving layer 0.
+10. Try a normal layer drag again.
+11. Confirm drag state was not broken.
 
-Regression:
-
-16. Swap layers.
-17. Duplicate layer.
-18. Delete layer.
-19. Translate layer.
-20. Confirm creation layer and filter still behave separately.
-
-## 9. Preserve existing behavior
+## 10. Preserve existing behavior
 
 Do not regress:
 
 - Layer Palette button;
-- layer thumbnails;
-- row click creation-layer selection;
-- drag/drop swap;
+- layer window open/close;
+- row click to set new element layer;
+- View/New separation;
+- layer swap via valid drag/drop;
 - rename;
 - duplicate;
 - translate;
 - delete;
 - visibility/lock;
-- layer filter rendering;
-- selection cleanup under filters;
-- creation layer use by all creation tools;
-- direct creation;
-- cursor creation;
-- SVG preview;
+- undo/redo;
 - TikZ layer output;
 - save/load;
-- undo/redo.
+- SVG preview.
 
-## 10. Verification
+## 11. Verification
 
 Run:
 
@@ -372,16 +426,17 @@ Optional:
 PATH=/opt/homebrew/bin:$PATH npm run lint
 ```
 
-Only treat lint as required if it is already clean in the repo.
+Only treat lint as required if the repository is already lint-clean.
 
-## 11. Report after implementation
+## 12. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of View/New coupling;
-- whether old `layerFilter -> directLayerInput` sync was removed or made opt-in;
-- updated state ownership for layer filter vs new-element layer;
+- root cause of the empty-payload-to-layer-0 bug;
+- safe payload parsing behavior;
+- internal drag guard behavior;
+- how stale `draggedLayerValue` is cleared;
 - tests added/updated;
 - test results;
 - build results;
