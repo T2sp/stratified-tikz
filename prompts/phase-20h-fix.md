@@ -575,7 +575,7 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 15. Report after implementation
+## Report after implementation
 
 Please report:
 

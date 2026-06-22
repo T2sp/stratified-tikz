@@ -1080,7 +1080,18 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
     ) {
       const segmentRecord = segment as Record<string, unknown>
 
-      if (segmentRecord.kind !== 'arc' || segmentRecord.frame === undefined) {
+      if (segmentRecord.kind !== 'arc') {
+        return
+      }
+
+      validateBoundaryArcScalarInputValues(
+        segmentRecord,
+        `${path}.segments[${segmentIndex}]`,
+        errors,
+        coordinateExpressionContext,
+      )
+
+      if (segmentRecord.frame === undefined) {
         return
       }
 
@@ -1093,6 +1104,39 @@ function validateBoundaryPathSnapshotSymbolicCoordinatePolicy(
       )
     }
   })
+}
+
+function validateBoundaryArcScalarInputValues(
+  segment: Record<string, unknown>,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  const radius = validateArcScalarInputValue(
+    segment.radius,
+    `${path}.radius`,
+    'Arc radius',
+    errors,
+    coordinateExpressionContext,
+  )
+  validateArcScalarInputValue(
+    segment.startAngleDeg,
+    `${path}.startAngleDeg`,
+    'Arc start angle',
+    errors,
+    coordinateExpressionContext,
+  )
+  validateArcScalarInputValue(
+    segment.endAngleDeg,
+    `${path}.endAngleDeg`,
+    'Arc end angle',
+    errors,
+    coordinateExpressionContext,
+  )
+
+  if (radius !== null && radius <= 0) {
+    pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
+  }
 }
 
 function validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
@@ -1569,6 +1613,86 @@ function validateScalarInputValue(
   }
 }
 
+function validateArcScalarInputValue(
+  value: unknown,
+  path: string,
+  label: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): number | null {
+  if (typeof value === 'number') {
+    validateFinite(value, path, errors)
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (!isRecord(value)) {
+    pushError(errors, path, `${label} must be a finite number or scalar input object.`)
+    return null
+  }
+
+  if (value.kind === 'numeric') {
+    if (typeof value.value !== 'number' || !Number.isFinite(value.value)) {
+      pushError(errors, `${path}.value`, `${label} value must be a finite number.`)
+      return null
+    }
+
+    return value.value
+  }
+
+  if (value.kind !== 'symbolic') {
+    pushError(errors, `${path}.kind`, `${label} kind must be numeric or symbolic.`)
+    return null
+  }
+
+  if (typeof value.expression !== 'string') {
+    pushError(errors, `${path}.expression`, `${label} expression must be a string.`)
+    return null
+  }
+
+  if (typeof value.previewValue !== 'number' || !Number.isFinite(value.previewValue)) {
+    pushError(
+      errors,
+      `${path}.previewValue`,
+      `${label} preview value must be a finite number.`,
+    )
+    return null
+  }
+
+  if (coordinateExpressionContext === undefined) {
+    return value.previewValue
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: coordinateExpressionContext.variableNames,
+  })
+
+  if (!parsed.ok) {
+    pushError(errors, `${path}.expression`, parsed.error)
+    return null
+  }
+
+  const evaluated = evaluateScalarExpression(
+    parsed.expression,
+    coordinateExpressionContext.previewValues,
+  )
+
+  if (!evaluated.ok) {
+    pushError(errors, `${path}.expression`, evaluated.error)
+    return null
+  }
+
+  if (!numbersApproximatelyEqual(value.previewValue, evaluated.value)) {
+    pushError(
+      errors,
+      `${path}.previewValue`,
+      `${label} preview value must match the evaluated expression.`,
+    )
+    return null
+  }
+
+  return value.previewValue
+}
+
 function validateClosedPathBoundaries(
   boundaries: ClosedPathBoundary[],
   ambientDimension: 2 | 3,
@@ -1835,11 +1959,29 @@ function validateArcPathSegment(
     errors,
     coordinateExpressionContext,
   )
-  validateFinite(segment.radius, `${path}.radius`, errors)
-  validateFinite(segment.startAngleDeg, `${path}.startAngleDeg`, errors)
-  validateFinite(segment.endAngleDeg, `${path}.endAngleDeg`, errors)
+  const radius = validateArcScalarInputValue(
+    segment.radius,
+    `${path}.radius`,
+    'Arc radius',
+    errors,
+    coordinateExpressionContext,
+  )
+  const startAngleDeg = validateArcScalarInputValue(
+    segment.startAngleDeg,
+    `${path}.startAngleDeg`,
+    'Arc start angle',
+    errors,
+    coordinateExpressionContext,
+  )
+  const endAngleDeg = validateArcScalarInputValue(
+    segment.endAngleDeg,
+    `${path}.endAngleDeg`,
+    'Arc end angle',
+    errors,
+    coordinateExpressionContext,
+  )
 
-  if (Number.isFinite(segment.radius) && segment.radius <= 0) {
+  if (radius !== null && radius <= 0) {
     pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
   }
 
@@ -1880,25 +2022,13 @@ function validateArcPathSegment(
   }
 
   if (
-    hasSymbolicVec3Coordinates(segment.start) ||
-    hasSymbolicVec3Coordinates(segment.end) ||
-    hasSymbolicVec3Coordinates(segment.center)
-  ) {
-    pushError(
-      errors,
-      path,
-      'Arc segment coordinates must be numeric because arc export derives coordinates from radius and angles.',
-    )
-  }
-
-  if (
     isFiniteVec3(segment.start) &&
     isFiniteVec3(segment.end) &&
     isFiniteVec3(segment.center) &&
-    Number.isFinite(segment.radius) &&
-    Number.isFinite(segment.startAngleDeg) &&
-    Number.isFinite(segment.endAngleDeg) &&
-    segment.radius > 0
+    radius !== null &&
+    startAngleDeg !== null &&
+    endAngleDeg !== null &&
+    radius > 0
   ) {
     const expectedStart = arcSegmentExpectedStart(segment, ambientDimension)
     const expectedEnd = arcSegmentExpectedEnd(segment, ambientDimension)
@@ -1950,7 +2080,6 @@ function validatePathTemplate(
         errors,
         coordinateExpressionContext,
       )
-      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     case 'ellipseTemplate':
       validateVec3ForAmbient(
@@ -1982,7 +2111,6 @@ function validatePathTemplate(
         errors,
         coordinateExpressionContext,
       )
-      validateTemplateSymbolicCoordinatePolicy(template, ambientDimension, path, errors)
       return
     default:
       pushError(
@@ -1991,23 +2119,6 @@ function validatePathTemplate(
         'Template path kind must be circleTemplate or ellipseTemplate.',
       )
   }
-}
-
-function validateTemplateSymbolicCoordinatePolicy(
-  template: PathTemplate,
-  ambientDimension: 2 | 3,
-  path: string,
-  errors: DiagramValidationIssue[],
-): void {
-  if (ambientDimension !== 3 || !hasSymbolicVec3Coordinates(template.center)) {
-    return
-  }
-
-  pushError(
-    errors,
-    `${path}.center`,
-    '3D template path centers must be numeric because template export derives local plane coordinates.',
-  )
 }
 
 function validateTemplateFrame(
@@ -3137,6 +3248,10 @@ function pushError(
   message: string,
 ): void {
   errors.push({ path, message })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function regionStratumKind(stratum: RegionStratum): unknown {

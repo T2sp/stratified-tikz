@@ -4,6 +4,10 @@ import {
   scalarExpressionVariables,
 } from './scalarExpressions.ts'
 import type { ScalarInputValue } from './scalarExpressions.ts'
+import {
+  arcScalarPreviewValue,
+  type ArcScalarInputValue,
+} from './paths.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -1124,20 +1128,23 @@ function validatePathSegmentForSymbolicPreviewRefresh(
         `${path}.center`,
         errors,
       )
-      const radiusIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
-        segment.radius,
+      const radiusValue = segment.radius
+      const radiusIsValid = validateArcScalarForSymbolicPreviewRefresh(
+        radiusValue,
         `${path}.radius`,
         'Arc radius',
         errors,
       )
-      const startAngleIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
-        segment.startAngleDeg,
+      const startAngleValue = segment.startAngleDeg
+      const startAngleIsValid = validateArcScalarForSymbolicPreviewRefresh(
+        startAngleValue,
         `${path}.startAngleDeg`,
         'Arc start angle',
         errors,
       )
-      const endAngleIsValid = validateFiniteNumberForSymbolicPreviewRefresh(
-        segment.endAngleDeg,
+      const endAngleValue = segment.endAngleDeg
+      const endAngleIsValid = validateArcScalarForSymbolicPreviewRefresh(
+        endAngleValue,
         `${path}.endAngleDeg`,
         'Arc end angle',
         errors,
@@ -1155,9 +1162,10 @@ function validatePathSegmentForSymbolicPreviewRefresh(
       }
 
       if (
-        typeof segment.radius === 'number' &&
-        Number.isFinite(segment.radius) &&
-        segment.radius <= 0
+        radiusIsValid &&
+        isArcScalarInputValuePreviewAuthoritative(radiusValue) &&
+        Number.isFinite(arcScalarPreviewValue(radiusValue)) &&
+        arcScalarPreviewValue(radiusValue) <= 0
       ) {
         pushError(errors, `${path}.radius`, 'Arc radius must be positive.')
       }
@@ -1322,6 +1330,24 @@ function refreshPathSegment(
           ambientDimension,
           context,
           `${path}.center`,
+          errors,
+        ),
+        radius: refreshArcScalarInputValuePreview(
+          segment.radius,
+          context,
+          `${path}.radius`,
+          errors,
+        ),
+        startAngleDeg: refreshArcScalarInputValuePreview(
+          segment.startAngleDeg,
+          context,
+          `${path}.startAngleDeg`,
+          errors,
+        ),
+        endAngleDeg: refreshArcScalarInputValuePreview(
+          segment.endAngleDeg,
+          context,
+          `${path}.endAngleDeg`,
           errors,
         ),
         ...(segment.frame === undefined
@@ -1764,6 +1790,63 @@ function validateFiniteNumberForSymbolicPreviewRefresh(
   return true
 }
 
+function validateArcScalarForSymbolicPreviewRefresh(
+  value: unknown,
+  path: string,
+  label: string,
+  errors: DiagramValidationIssue[],
+): value is ArcScalarInputValue {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      pushError(errors, path, `${label} must be a finite number.`)
+      return false
+    }
+
+    return true
+  }
+
+  if (!isRecord(value)) {
+    pushError(errors, path, `${label} must be a finite number or scalar input object.`)
+    return false
+  }
+
+  if (value.kind === 'numeric') {
+    if (typeof value.value !== 'number' || !Number.isFinite(value.value)) {
+      pushError(errors, `${path}.value`, `${label} value must be a finite number.`)
+      return false
+    }
+
+    return true
+  }
+
+  if (value.kind !== 'symbolic') {
+    pushError(errors, `${path}.kind`, `${label} kind must be numeric or symbolic.`)
+    return false
+  }
+
+  if (typeof value.expression !== 'string') {
+    pushError(errors, `${path}.expression`, `${label} expression must be a string.`)
+    return false
+  }
+
+  if (typeof value.previewValue !== 'number' || !Number.isFinite(value.previewValue)) {
+    pushError(
+      errors,
+      `${path}.previewValue`,
+      `${label} preview value must be a finite number.`,
+    )
+    return false
+  }
+
+  return true
+}
+
+function isArcScalarInputValuePreviewAuthoritative(
+  value: ArcScalarInputValue,
+): boolean {
+  return typeof value === 'number' || value.kind === 'numeric'
+}
+
 function refreshVec3SymbolicPreview(
   point: Vec3,
   ambientDimension: AmbientDimension,
@@ -1847,6 +1930,19 @@ function refreshScalarInputValuePreview(
     ...value,
     previewValue: evaluated.value,
   }
+}
+
+function refreshArcScalarInputValuePreview(
+  value: ArcScalarInputValue,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): ArcScalarInputValue {
+  if (typeof value === 'number') {
+    return value
+  }
+
+  return refreshScalarInputValuePreview(value, context, path, errors)
 }
 
 function refreshSymbolicCoordinateComponent(

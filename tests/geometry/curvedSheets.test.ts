@@ -34,6 +34,7 @@ import { refreshDiagramSymbolicCoordinatePreviews } from '../../src/model/symbol
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
+  ArcPathSegment,
   BoundaryPathSnapshot,
   CoonsBoundarySnapshot,
   CoonsPatchPrimitive,
@@ -347,6 +348,117 @@ test('validateDiagram rejects unresolved symbolic boundary previews', () => {
 
   assert.equal(validation.valid, false)
   assert.match(joinMessages(validation.errors), /Unknown variable "Len"/)
+})
+
+test('validateDiagram accepts ruled boundary arc symbolic radius when variable is defined', () => {
+  assertValid(
+    ruledBoundaryArcDiagram(
+      {
+        radius: symbolicScalar('R', 1),
+      },
+      [symbolicNumberVariable('R', 1)],
+    ),
+  )
+})
+
+test('validateDiagram accepts Coons boundary arc symbolic radius when variable is defined', () => {
+  assertValid(
+    coonsBoundaryArcDiagram(
+      {
+        radius: symbolicScalar('R', 1),
+      },
+      [symbolicNumberVariable('R', 1)],
+    ),
+  )
+})
+
+test('validateDiagram accepts ruled boundary arc symbolic start angle when variable is defined', () => {
+  assertValid(
+    ruledBoundaryArcDiagram(
+      {
+        startAngleDeg: symbolicScalar('A', 180),
+      },
+      [symbolicNumberVariable('A', 180)],
+    ),
+  )
+})
+
+test('validateDiagram accepts Coons boundary arc symbolic end angle when variable is defined', () => {
+  assertValid(
+    coonsBoundaryArcDiagram(
+      {
+        endAngleDeg: symbolicScalar('B', 0),
+      },
+      [symbolicNumberVariable('B', 0)],
+    ),
+  )
+})
+
+test('validateDiagram rejects unresolved boundary arc symbolic scalars', () => {
+  const fields = [
+    { name: 'radius', previewValue: 1 },
+    { name: 'startAngleDeg', previewValue: 180 },
+    { name: 'endAngleDeg', previewValue: 0 },
+  ] as const
+
+  fields.forEach(({ name, previewValue }) => {
+    const validation = validateDiagram(
+      ruledBoundaryArcDiagram({
+        [name]: symbolicScalar('Missing', previewValue),
+      }),
+    )
+
+    assert.equal(validation.valid, false, name)
+    assert.match(
+      joinMessages(validation.errors),
+      new RegExp(`${name}\\.expression: Unknown variable "Missing"`),
+    )
+  })
+})
+
+test('validateDiagram rejects stale boundary arc symbolic scalar previews', () => {
+  const validation = validateDiagram(
+    ruledBoundaryArcDiagram(
+      {
+        radius: symbolicScalar('R', 1),
+      },
+      [symbolicNumberVariable('R', 2)],
+    ),
+  )
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    joinMessages(validation.errors),
+    /boundary0\.segments\[0\]\.radius\.previewValue: Arc radius preview value must match the evaluated expression\./,
+  )
+})
+
+test('validateDiagram rejects boundary arc symbolic radius that is not positive', () => {
+  const validation = validateDiagram(
+    ruledBoundaryArcDiagram(
+      {
+        radius: symbolicScalar('R', 0),
+      },
+      [symbolicNumberVariable('R', 0)],
+    ),
+  )
+
+  assert.equal(validation.valid, false)
+  assert.match(joinMessages(validation.errors), /radius: Arc radius must be positive\./)
+})
+
+test('validateDiagram rejects boundary arc symbolic radius with non-finite evaluation', () => {
+  const validation = validateDiagram(
+    ruledBoundaryArcDiagram({
+      radius: symbolicScalar('sqrt(-1)', 1),
+    }),
+  )
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    joinMessages(validation.errors),
+    /radius\.expression: Expression evaluated to a non-finite number\./,
+  )
 })
 
 test('constant Coons boundary helpers use the same point for every endpoint and sample', () => {
@@ -1261,6 +1373,134 @@ function arcBoundary(
   }
 }
 
+function ruledBoundaryArcDiagram(
+  arcScalars: Partial<
+    Pick<ArcPathSegment, 'radius' | 'startAngleDeg' | 'endAngleDeg'>
+  >,
+  variables: SymbolicVariable[] = [],
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const boundary0 = arcBoundaryWithScalars('ruled-symbolic-arc', arcScalars)
+  const segment = boundary0.segments[0]
+
+  if (segment === undefined || segment.kind !== 'arc') {
+    throw new Error('Expected arc boundary segment.')
+  }
+
+  diagram.variables = variables
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'ruled-boundary-arc-validation',
+      primitive: {
+        kind: 'ruledSurface',
+        boundary0,
+        boundary1: lineBoundary(
+          'ruled-symbolic-arc-top',
+          { x: segment.start.x, y: segment.start.y + 1, z: 1 },
+          { x: segment.end.x, y: segment.end.y + 1, z: 1 },
+        ),
+        sampling: { segments: 4 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function coonsBoundaryArcDiagram(
+  arcScalars: Partial<
+    Pick<ArcPathSegment, 'radius' | 'startAngleDeg' | 'endAngleDeg'>
+  >,
+  variables: SymbolicVariable[] = [],
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const bottom = arcBoundaryWithScalars('coons-symbolic-arc-bottom', arcScalars)
+  const segment = bottom.segments[0]
+
+  if (segment === undefined || segment.kind !== 'arc') {
+    throw new Error('Expected arc boundary segment.')
+  }
+
+  const topStart = { x: segment.start.x, y: segment.start.y + 1, z: 0 }
+  const topEnd = { x: segment.end.x, y: segment.end.y + 1, z: 0 }
+
+  diagram.variables = variables
+  diagram.strata.push(
+    createCurvedSheetStratum({
+      id: 'coons-boundary-arc-validation',
+      primitive: {
+        kind: 'coonsPatch',
+        bottom,
+        right: lineBoundary('coons-symbolic-arc-right', segment.end, topEnd),
+        top: lineBoundary('coons-symbolic-arc-top', topStart, topEnd),
+        left: lineBoundary('coons-symbolic-arc-left', segment.start, topStart),
+        sampling: { uSegments: 4, vSegments: 3 },
+      },
+    }),
+  )
+
+  return diagram
+}
+
+function arcBoundaryWithScalars(
+  id: string,
+  scalars: Partial<
+    Pick<ArcPathSegment, 'radius' | 'startAngleDeg' | 'endAngleDeg'>
+  >,
+): BoundaryPathSnapshot {
+  const radius = scalars.radius ?? 1
+  const startAngleDeg = scalars.startAngleDeg ?? 180
+  const endAngleDeg = scalars.endAngleDeg ?? 0
+
+  return {
+    id,
+    segments: [
+      {
+        kind: 'arc',
+        start: arcPoint(scalarPreview(radius), scalarPreview(startAngleDeg)),
+        end: arcPoint(scalarPreview(radius), scalarPreview(endAngleDeg)),
+        center: { x: 0, y: 0, z: 0 },
+        radius,
+        startAngleDeg,
+        endAngleDeg,
+        direction: 'clockwise',
+        frame: xyFrame(),
+      },
+    ],
+  }
+}
+
+function arcPoint(radius: number, angleDeg: number): Vec3 {
+  const angleRadians = (angleDeg / 180) * Math.PI
+
+  return {
+    x: radius * Math.cos(angleRadians),
+    y: radius * Math.sin(angleRadians),
+    z: 0,
+  }
+}
+
+function scalarPreview(
+  scalar: ArcPathSegment['radius'],
+): number {
+  return typeof scalar === 'number'
+    ? scalar
+    : scalar.kind === 'numeric'
+      ? scalar.value
+      : scalar.previewValue
+}
+
+function symbolicScalar(
+  expression: string,
+  previewValue: number,
+): Extract<ArcPathSegment['radius'], { kind: 'symbolic' }> {
+  return {
+    kind: 'symbolic',
+    expression,
+    previewValue,
+  }
+}
+
 function symbolicBoundaryFrame(): SurfaceFrame {
   return {
     origin: symbolicVec3(-99, 0, 0, { x: '-.5*Len' }),
@@ -1277,6 +1517,16 @@ function symbolicLenVariable(): SymbolicVariable {
     macroName: 'Len',
     expression: '4',
     previewValue: 4,
+  }
+}
+
+function symbolicNumberVariable(name: string, value: number): SymbolicVariable {
+  return {
+    id: `var-${name.toLowerCase()}`,
+    name,
+    macroName: name,
+    expression: String(value),
+    previewValue: value,
   }
 }
 

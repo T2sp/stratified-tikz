@@ -41,10 +41,13 @@ import type {
 import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
+  arcScalarPreviewValue,
   arcSegmentToCubicBezierSegments,
+  hasSymbolicArcScalarInputValue,
   pathSegmentStyleRuns,
   templatePathCoordinates,
   templatePathFrame,
+  type ArcScalarInputValue,
   type PathSegmentStyleRun,
 } from '../model/paths.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
@@ -88,7 +91,7 @@ import {
   compareProjectedSurfaceFaces,
 } from '../rendering/surfaceDepthSort.ts'
 import {
-  extractProjectedRenderPrimitives,
+  collectProjectedSurfaceFacesForSorting,
   type ProjectedSurfaceFace,
 } from '../rendering/projectedPrimitives.ts'
 import {
@@ -159,9 +162,9 @@ type PathSegmentCoordinateNames =
       kind: 'arc'
       start: string
       end: string
-      radius: number
-      startAngleDeg: number
-      endAngleDeg: number
+      radius: FormattedArcScalar
+      startAngleDeg: FormattedArcScalar
+      endAngleDeg: FormattedArcScalar
       direction: 'counterclockwise' | 'clockwise'
     }
   | {
@@ -179,6 +182,12 @@ type GridRangeValues = {
   min: number
   max: number
   step: number
+}
+
+type FormattedArcScalar = {
+  value: number
+  tikz: string
+  expression?: string
 }
 
 type GridRangeBounds = {
@@ -1127,34 +1136,34 @@ function emitDepthSortedSurfaceFaces(
       },
     ]),
   )
+  const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
+    context.visibility.maxSurfaceFacesForSorting,
+  )
   let faces: ProjectedSurfaceFace[]
 
   try {
-    faces = extractProjectedRenderPrimitives(diagram, {
+    const collectedFaces = collectProjectedSurfaceFacesForSorting(diagram, {
       camera: context.camera3d,
-    }).filter(
-      (primitive): primitive is ProjectedSurfaceFace =>
-        primitive.kind === 'surfaceFace' && sheetSources.has(primitive.sourceId),
-    )
+      maxSurfaceFacesForSorting: maxSortedSurfaceFaces,
+      sourceIds: new Set(sheetSources.keys()),
+    })
+
+    if (collectedFaces.kind === 'capExceeded') {
+      return emitDepthSortFaceCapFallback(
+        sectionTitle,
+        sheets.map(({ item }) => item),
+        collectedFaces.observedCount,
+        collectedFaces.cap,
+        context,
+      )
+    }
+
+    faces = collectedFaces.faces
   } catch {
     return emitLayeredItems(
       sectionTitle,
       sheets.map(({ item }) => item),
       (sheet, index) => emitSheet(sheet, index, context),
-    )
-  }
-
-  const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
-    context.visibility.maxSurfaceFacesForSorting,
-  )
-
-  if (faces.length > maxSortedSurfaceFaces) {
-    return emitDepthSortFaceCapFallback(
-      sectionTitle,
-      sheets.map(({ item }) => item),
-      faces.length,
-      maxSortedSurfaceFaces,
-      context,
     )
   }
 
@@ -1235,7 +1244,7 @@ function emitDepthSortFaceCapFallback(
       layer: warningLayer,
       sectionTitle,
       lines: [
-        `% Auto surface face depth sort skipped because ${faceCount} faces exceed the maxSurfaceFacesForSorting cap of ${maxSortedSurfaceFaces}.`,
+        `% Auto surface face depth sort skipped because at least ${faceCount} faces exceed the maxSurfaceFacesForSorting cap of ${maxSortedSurfaceFaces}.`,
         '% Manual layer-aware sheet export follows; reduce sampling or raise the cap to sort these faces.',
         '',
       ],
@@ -3207,13 +3216,6 @@ function emitTemplatePath3D(
   options: string[],
   context: GenerateContext,
 ): string[] {
-  if (hasSymbolicVec3Coordinates(curve.template.center)) {
-    return [
-      `% Template path "${curve.name}" [${curve.id}] omitted because 3D template centers use local numeric plane coordinates and cannot preserve symbolic center expressions yet.`,
-      '',
-    ]
-  }
-
   if (curve.template.frame === undefined) {
     return [
       `% Template path "${curve.name}" [${curve.id}] omitted because 3D templates require a stored frame.`,
@@ -4379,9 +4381,9 @@ function definePathSegmentCoordinateNames(
           kind: 'arc',
           start,
           end: context.coordinates.define(baseName, pointIndex, segment.end),
-          radius: segment.radius,
-          startAngleDeg: segment.startAngleDeg,
-          endAngleDeg: segment.endAngleDeg,
+          radius: formatArcScalarForTikz(segment.radius, context),
+          startAngleDeg: formatArcScalarForTikz(segment.startAngleDeg, context),
+          endAngleDeg: formatArcScalarForTikz(segment.endAngleDeg, context),
           direction: segment.direction,
         }
       }
@@ -4477,9 +4479,9 @@ function pathSegmentHasFiniteCoordinates(segment: PathSegment): boolean {
         isFiniteVec3(segment.start) &&
         isFiniteVec3(segment.end) &&
         isFiniteVec3(segment.center) &&
-        Number.isFinite(segment.radius) &&
-        Number.isFinite(segment.startAngleDeg) &&
-        Number.isFinite(segment.endAngleDeg)
+        Number.isFinite(arcScalarPreviewValue(segment.radius)) &&
+        Number.isFinite(arcScalarPreviewValue(segment.startAngleDeg)) &&
+        Number.isFinite(arcScalarPreviewValue(segment.endAngleDeg))
       )
   }
 }
@@ -4502,7 +4504,10 @@ function pathSegmentHasSymbolicCoordinates(segment: PathSegment): boolean {
       return (
         hasSymbolicVec3Coordinates(segment.start) ||
         hasSymbolicVec3Coordinates(segment.end) ||
-        hasSymbolicVec3Coordinates(segment.center)
+        hasSymbolicVec3Coordinates(segment.center) ||
+        hasSymbolicArcScalarInputValue(segment.radius) ||
+        hasSymbolicArcScalarInputValue(segment.startAngleDeg) ||
+        hasSymbolicArcScalarInputValue(segment.endAngleDeg)
       )
   }
 }
@@ -4630,6 +4635,68 @@ function formatClosedBoundaryPath(
   return openPath.length === 0 ? '' : `${openPath} -- cycle`
 }
 
+function formatArcScalarForTikz(
+  value: ArcScalarInputValue,
+  context: GenerateContext,
+): FormattedArcScalar {
+  const previewValue = arcScalarPreviewValue(value)
+  const numericTikz = Number.isFinite(previewValue)
+    ? formatNumber(previewValue)
+    : '0'
+
+  if (typeof value === 'number' || value.kind === 'numeric') {
+    return {
+      value: previewValue,
+      tikz: numericTikz,
+    }
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: context.variables.variableNames,
+  })
+
+  if (!parsed.ok) {
+    return {
+      value: previewValue,
+      tikz: numericTikz,
+    }
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    context.variables.variableMacros,
+  )
+
+  if (!formatted.ok) {
+    return {
+      value: previewValue,
+      tikz: numericTikz,
+    }
+  }
+
+  return {
+    value: previewValue,
+    tikz: `{${formatted.expression}}`,
+    expression: formatted.expression,
+  }
+}
+
+function formatArcScalarWithOffset(
+  scalar: FormattedArcScalar,
+  offset: number,
+): string {
+  if (offset === 0) {
+    return scalar.tikz
+  }
+
+  if (scalar.expression !== undefined) {
+    const operator = offset < 0 ? '-' : '+'
+    return `{${scalar.expression} ${operator} ${formatNumber(Math.abs(offset))}}`
+  }
+
+  return formatNumber(scalar.value + offset)
+}
+
 function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
   switch (segment.kind) {
     case 'line':
@@ -4637,11 +4704,9 @@ function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
     case 'cubicBezier':
       return `.. controls (${segment.control1}) and (${segment.control2}) .. (${segment.end})`
     case 'arc':
-      return `arc[start angle=${formatNumber(
-        segment.startAngleDeg,
-      )}, end angle=${formatNumber(
-        arcEndAngleForDirection(segment),
-      )}, radius=${formatNumber(segment.radius)}]`
+      return `arc[start angle=${segment.startAngleDeg.tikz}, end angle=${arcEndAngleForDirection(
+        segment,
+      )}, radius=${segment.radius.tikz}]`
     case 'arcCubicApproximation':
       return segment.cubics
         .map(
@@ -4654,14 +4719,14 @@ function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
 
 function arcEndAngleForDirection(
   segment: Extract<PathSegmentCoordinateNames, { kind: 'arc' }>,
-): number {
+): string {
   if (segment.direction === 'counterclockwise') {
-    return segment.endAngleDeg
+    return segment.endAngleDeg.tikz
   }
 
-  return segment.endAngleDeg >= segment.startAngleDeg
-    ? segment.endAngleDeg - 360
-    : segment.endAngleDeg
+  return segment.endAngleDeg.value >= segment.startAngleDeg.value
+    ? formatArcScalarWithOffset(segment.endAngleDeg, -360)
+    : segment.endAngleDeg.tikz
 }
 
 function formatWorkPlaneFilledSheetLocalPath(

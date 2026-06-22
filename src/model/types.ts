@@ -548,9 +548,9 @@ export type ArcPathSegment = PathSegmentBase & {
   start: Vec3
   end: Vec3
   center: Vec3
-  radius: number
-  startAngleDeg: number
-  endAngleDeg: number
+  radius: number | ScalarInputValue
+  startAngleDeg: number | ScalarInputValue
+  endAngleDeg: number | ScalarInputValue
   direction: ArcDirection
   frame?: WorkPlaneFrameSnapshot
 }
