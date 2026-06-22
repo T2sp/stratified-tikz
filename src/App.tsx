@@ -149,6 +149,7 @@ import {
   coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryPathSourceErrorMessage,
   coonsPatchBoundaryPointSourceErrorMessage,
+  coonsPatchCornerEquationStatuses,
   coonsPatchCornerMismatchMessage,
   copyTextToClipboard,
   createDirectCoordinateSourceHighlights,
@@ -284,6 +285,7 @@ import {
   type ConcatenatedPathWorkPlaneMode,
   type CoonsPatchBoundaryDraft,
   type CoonsPatchBoundaryRole,
+  type CoonsPatchCornerEquationStatus,
   type CoordinateSourceHighlight,
   type CurvedSheetCreationKind,
   type CurvedSheetCreationParameters,
@@ -5477,6 +5479,43 @@ function App() {
     )
   }
 
+  function renderCoonsPatchCornerEquations() {
+    const statuses = coonsPatchCornerEquationStatuses(
+      editableDiagram,
+      coonsPatchBoundarySelectionsFromDraft(coonsPatchBoundaryDraft),
+    )
+
+    return (
+      <div
+        className="coons-corner-equation-list"
+        aria-label="Coons patch corner equations"
+      >
+        <span className="coons-corner-equation-title">
+          Required corner equations
+        </span>
+        {statuses.map((status) => (
+          <div
+            key={status.id}
+            className={`coons-corner-equation-row ${coonsPatchCornerEquationStatusClass(
+              status.matches,
+            )}`}
+          >
+            <span
+              className="coons-corner-equation-mark"
+              aria-label={coonsPatchCornerEquationStatusLabel(status.matches)}
+            >
+              {coonsPatchCornerEquationStatusText(status.matches)}
+            </span>
+            <span className="coons-corner-equation-label">{status.label}</span>
+            <span className="coons-corner-equation-values">
+              {formatCoonsPatchCornerEquationValues(status)}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   function renderBoundarySurfaceDirectControls() {
     if (sheetCreationKind === 'ruledSurface') {
       return (
@@ -5634,6 +5673,7 @@ function App() {
                 )
               })}
             </div>
+            {renderCoonsPatchCornerEquations()}
           </details>
         </div>
       )
@@ -6210,6 +6250,7 @@ function App() {
                     </div>
                   )
                 })}
+                {renderCoonsPatchCornerEquations()}
               </div>
             </details>
           </>
@@ -7697,6 +7738,47 @@ function coonsPatchBoundaryDraftStatusForUi(
       validation.role,
     )
   )
+}
+
+function coonsPatchCornerEquationStatusClass(
+  matches: CoonsPatchCornerEquationStatus['matches'],
+): string {
+  if (matches === true) {
+    return 'matches'
+  }
+
+  return matches === false ? 'mismatch' : 'pending'
+}
+
+function coonsPatchCornerEquationStatusText(
+  matches: CoonsPatchCornerEquationStatus['matches'],
+): string {
+  if (matches === true) {
+    return 'OK'
+  }
+
+  return matches === false ? 'Fix' : 'Pick'
+}
+
+function coonsPatchCornerEquationStatusLabel(
+  matches: CoonsPatchCornerEquationStatus['matches'],
+): string {
+  if (matches === true) {
+    return 'matching'
+  }
+
+  return matches === false ? 'mismatched' : 'not ready'
+}
+
+function formatCoonsPatchCornerEquationValues(
+  status: CoonsPatchCornerEquationStatus,
+): string {
+  const leftPoint =
+    status.leftPoint === undefined ? '?' : formatCompactVec3(status.leftPoint)
+  const rightPoint =
+    status.rightPoint === undefined ? '?' : formatCompactVec3(status.rightPoint)
+
+  return `${leftPoint} = ${rightPoint}`
 }
 
 function formatCoonsPatchBoundaryDirectionSummary(
