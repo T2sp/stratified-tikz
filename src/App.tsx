@@ -174,7 +174,6 @@ import {
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
   defaultTikzExportMode,
-  deriveAvailableLayers,
   EditableInspector,
   existingCoordinateSourceKey,
   findSelectedElement,
@@ -660,7 +659,7 @@ function App() {
   const [directCoordinateMode, setDirectCoordinateMode] =
     useState<DirectCoordinateMode>('global')
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
-  const [directLayerInput, setDirectLayerInput] = useState<string>('0')
+  const [newElementLayerInput, setNewElementLayerInput] = useState<string>('0')
   const [directPolylineRows, setDirectPolylineRows] = useState<string>(
     defaultDirectPolylineRows(2),
   )
@@ -894,10 +893,6 @@ function App() {
       tikzExportMode,
       visibilityOptions,
     ],
-  )
-  const availableLayers = useMemo(
-    () => deriveAvailableLayers(editableDiagram),
-    [editableDiagram],
   )
   const existingCoordinateSourceOptions = useMemo(
     () => createExistingCoordinateSourceOptions(editableDiagram),
@@ -1288,7 +1283,7 @@ function App() {
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
     setFillRule('nonzero')
     setFillStatus('')
-    setDirectLayerInput('0')
+    setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
@@ -1622,7 +1617,7 @@ function App() {
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
     setFillRule('nonzero')
     setFillStatus('')
-    setDirectLayerInput('0')
+    setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
     setDirectPolylineRows(defaultDirectPolylineRows(diagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
@@ -2140,12 +2135,6 @@ function App() {
       nextInspectorDisclosureStateForSelection(current, selectedElement),
     )
   }, [selectedElement])
-
-  useEffect(() => {
-    if (layerFilter.kind === 'layer') {
-      setDirectLayerInput(String(layerFilter.layer))
-    }
-  }, [layerFilter])
 
   useEffect(() => {
     setActiveWorkPlane((current) =>
@@ -3270,14 +3259,14 @@ function App() {
   }
 
   function updateNewElementLayerInput(value: string): void {
-    setDirectLayerInput(value)
+    setNewElementLayerInput(value)
     setDirectCreationStatus('')
   }
 
   function parseNewElementLayer(
     setStatus: (message: string) => void,
   ): number | null {
-    const layer = parseDirectLayerInput(directLayerInput)
+    const layer = parseDirectLayerInput(newElementLayerInput)
 
     if (layer === null) {
       setStatus('Layer must be a finite number.')
@@ -5218,22 +5207,6 @@ function App() {
           </button>
         </div>
         <div className="inspector-drawer-scroll">
-          <LayerManager
-            diagram={editableDiagram}
-            layerFilter={layerFilter}
-            creationLayerInput={directLayerInput}
-            statusMessage={layerOperationStatus}
-            expanded={isLayerManagerExpanded}
-            onExpandedChange={setIsLayerManagerExpanded}
-            onRenameLayer={renameDiagramLayer}
-            onSwapLayers={swapDiagramLayers}
-            onDuplicateLayer={duplicateDiagramLayer}
-            onTranslateLayer={translateDiagramLayer}
-            onSetLayerVisibility={setDiagramLayerVisibility}
-            onSetLayerLock={setDiagramLayerLock}
-            onDeleteLayer={deleteDiagramLayer}
-            onStatusMessage={setLayerOperationStatus}
-          />
           <EditableInspector
             diagram={editableDiagram}
             selectedElement={selectedElement}
@@ -5243,6 +5216,30 @@ function App() {
           />
         </div>
       </aside>
+    )
+  }
+
+  function renderLayerManagerOverlay() {
+    return (
+      <LayerManager
+        diagram={editableDiagram}
+        layerFilter={layerFilter}
+        creationLayerInput={newElementLayerInput}
+        statusMessage={layerOperationStatus}
+        expanded={isLayerManagerExpanded}
+        stackedWithCamera={showCameraControls && isCameraPanelAside}
+        onExpandedChange={setIsLayerManagerExpanded}
+        onCreationLayerChange={updateNewElementLayerInput}
+        onLayerFilterChange={updateLayerFilter}
+        onRenameLayer={renameDiagramLayer}
+        onSwapLayers={swapDiagramLayers}
+        onDuplicateLayer={duplicateDiagramLayer}
+        onTranslateLayer={translateDiagramLayer}
+        onSetLayerVisibility={setDiagramLayerVisibility}
+        onSetLayerLock={setDiagramLayerLock}
+        onDeleteLayer={deleteDiagramLayer}
+        onStatusMessage={setLayerOperationStatus}
+      />
     )
   }
 
@@ -6014,6 +6011,23 @@ function App() {
       return renderSheetToolbarControls()
     }
 
+    if (
+      directCreationStatus !== '' &&
+      (creationTool === 'createPoint' || creationTool === 'createLabel')
+    ) {
+      return (
+        <div
+          className="preview-toolbar-detail"
+          role="status"
+          aria-label="Creation status"
+        >
+          <span className="preview-toolbar-status">
+            {directCreationStatus}
+          </span>
+        </div>
+      )
+    }
+
     return null
   }
 
@@ -6450,43 +6464,6 @@ function App() {
           onDiagramChange={updateEditableDiagram}
         />
 
-        <div className="control-group new-element-layer-control">
-          <label className="direct-create-field new-element-layer-field">
-            <span>New element layer</span>
-            <input
-              type="number"
-              step="any"
-              value={directLayerInput}
-              onChange={(event) =>
-                updateNewElementLayerInput(event.currentTarget.value)
-              }
-            />
-          </label>
-          {coordinateInputMode !== 'direct' && directCreationStatus !== '' && (
-            <span className="toolbar-status" role="status">
-              {directCreationStatus}
-            </span>
-          )}
-        </div>
-
-        <div className="control-group layer-filter-control">
-          <span className="control-label">Layer</span>
-          <select
-            className="toolbar-select"
-            value={layerFilterSelectValue(layerFilter)}
-            onChange={(event) =>
-              updateLayerFilter(parseLayerFilterSelectValue(event.currentTarget.value))
-            }
-          >
-            <option value="all">All layers</option>
-            {availableLayers.map((layer) => (
-              <option key={layer} value={String(layer)}>
-                Layer {formatLayerValue(layer)}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="control-group file-control">
           <span className="control-label">File</span>
           <div className="file-action-strip">
@@ -6901,6 +6878,7 @@ function App() {
             {renderPreviewToolbarOverlay()}
             {renderDirectInputDrawer()}
             {renderInspectorDrawer()}
+            {renderLayerManagerOverlay()}
             <SvgDiagram
               diagram={editableDiagram}
               fitToView
@@ -8333,20 +8311,6 @@ function workPlaneFixedValue(workPlane: WorkPlane): number {
     case 'custom':
       return 0
   }
-}
-
-function layerFilterSelectValue(layerFilter: LayerFilter): string {
-  return layerFilter.kind === 'all' ? 'all' : String(layerFilter.layer)
-}
-
-function parseLayerFilterSelectValue(value: string): LayerFilter {
-  if (value === 'all') {
-    return allLayersFilter
-  }
-
-  const layer = Number(value)
-
-  return Number.isFinite(layer) ? { kind: 'layer', layer } : allLayersFilter
 }
 
 function directCoordinateAxes(

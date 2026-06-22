@@ -25,6 +25,19 @@ import {
   nextLayerManagerExpandedState,
   shouldShowLayerManagerDetails,
 } from '../../src/ui/layerManagerFold.ts'
+import {
+  createLayerThumbnail,
+  layerButtonLabel,
+  layerCreationInputForLayer,
+  layerFilterFromSelectValue,
+  layerFilterSelectValue,
+  layerPaletteRows,
+  nextLayerPaletteOpenState,
+  parseDraggedLayerValue,
+  resolveLayerDropSource,
+  resolveLayerDropSwap,
+  selectedLayerActionTarget,
+} from '../../src/ui/layerPalette.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
@@ -164,6 +177,214 @@ test('layer manager summary counts layers and elements', () => {
   )
 })
 
+test('layer palette button displays creation layer value and total count', () => {
+  assert.equal(layerButtonLabel('2', 7), 'L2 / 7')
+  assert.equal(layerButtonLabel('2.5', 7), 'L2.5 / 7')
+  assert.equal(layerButtonLabel('', 7), 'L? / 7')
+})
+
+test('layer palette rows keep creation layer and filter state separate', () => {
+  const rows = layerPaletteRows(
+    createTwoLayerDiagram(),
+    { kind: 'layer', layer: 1 },
+    '0',
+  )
+
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].layer.value, 0)
+  assert.equal(rows[0].isCreationLayer, true)
+  assert.equal(rows[0].isFilterActive, false)
+  assert.equal(rows[1].layer.value, 1)
+  assert.equal(rows[1].isCreationLayer, false)
+  assert.equal(rows[1].isFilterActive, true)
+  assert.equal(layerCreationInputForLayer(rows[1].layer.value), '1')
+})
+
+test('layer palette View changes do not rewrite the New layer input', () => {
+  const diagram = createThreeLayerDiagram()
+  const creationLayerInput = '0'
+  const viewFilter = layerFilterFromSelectValue('1')
+  const rows = layerPaletteRows(diagram, viewFilter, creationLayerInput)
+
+  assert.deepEqual(viewFilter, { kind: 'layer', layer: 1 })
+  assert.equal(layerButtonLabel(creationLayerInput, rows.length), 'L0 / 3')
+  assert.equal(rows[0].isCreationLayer, true)
+  assert.equal(rows[0].isFilterActive, false)
+  assert.equal(rows[1].isCreationLayer, false)
+  assert.equal(rows[1].isFilterActive, true)
+})
+
+test('layer palette New changes update creation label without changing View', () => {
+  const diagram = createThreeLayerDiagram()
+  const viewFilter = layerFilterFromSelectValue('1')
+  const creationLayerInput = layerCreationInputForLayer(2)
+  const rows = layerPaletteRows(diagram, viewFilter, creationLayerInput)
+
+  assert.deepEqual(viewFilter, { kind: 'layer', layer: 1 })
+  assert.equal(layerFilterSelectValue(viewFilter), '1')
+  assert.equal(layerButtonLabel(creationLayerInput, rows.length), 'L2 / 3')
+  assert.equal(rows[1].isFilterActive, true)
+  assert.equal(rows[2].isCreationLayer, true)
+  assert.equal(rows[2].isFilterActive, false)
+})
+
+test('layer palette drag/drop resolves to a layer swap only for valid targets', () => {
+  assert.deepEqual(resolveLayerDropSwap(0, 1), {
+    ok: true,
+    leftLayerValue: 0,
+    rightLayerValue: 1,
+  })
+  assert.deepEqual(resolveLayerDropSwap(1, 1), { ok: false })
+  assert.deepEqual(resolveLayerDropSwap(null, 1), { ok: false })
+})
+
+test('layer drag payload parser rejects empty and invalid payloads', () => {
+  assert.equal(parseDraggedLayerValue(''), null)
+  assert.equal(parseDraggedLayerValue('   '), null)
+  assert.equal(parseDraggedLayerValue('0'), 0)
+  assert.equal(parseDraggedLayerValue('1'), 1)
+  assert.equal(parseDraggedLayerValue('-1'), -1)
+  assert.equal(parseDraggedLayerValue('NaN'), null)
+  assert.equal(parseDraggedLayerValue('Infinity'), null)
+  assert.equal(parseDraggedLayerValue('abc'), null)
+})
+
+test('layer drop source rejects empty payloads without an active internal drag', () => {
+  const calls = resolvedLayerSwapCalls({
+    customPayload: '',
+    plainPayload: '',
+    draggedLayerValue: null,
+    targetLayerValue: 1,
+  })
+
+  assert.deepEqual(calls, [])
+})
+
+test('layer drop source allows empty payload fallback during active layer zero drag', () => {
+  const calls = resolvedLayerSwapCalls({
+    customPayload: '',
+    plainPayload: '',
+    draggedLayerValue: 0,
+    targetLayerValue: 1,
+  })
+
+  assert.deepEqual(calls, [[0, 1]])
+})
+
+test('layer drop source rejects external plain text and invalid payloads', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '',
+      plainPayload: 'abc',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: 'Infinity',
+      plainPayload: 'Infinity',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+})
+
+test('layer drop source rejects missing layers and same-layer drops', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '99',
+      plainPayload: '99',
+      draggedLayerValue: null,
+      targetLayerValue: 1,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '0',
+      plainPayload: '0',
+      draggedLayerValue: null,
+      targetLayerValue: 99,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '1',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      targetLayerValue: 1,
+    }),
+    [],
+  )
+})
+
+test('layer drop source accepts valid internal payloads and active fallbacks', () => {
+  assert.equal(
+    resolveLayerDropSource({
+      customPayload: '1',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      validLayerValues: [0, 1, 2],
+    }),
+    1,
+  )
+  assert.equal(
+    resolveLayerDropSource({
+      customPayload: '',
+      plainPayload: '1',
+      draggedLayerValue: 2,
+      validLayerValues: [0, 1, 2],
+    }),
+    2,
+  )
+})
+
+test('layer drag/drop regression preserves normal layer swaps', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '0',
+      plainPayload: '0',
+      draggedLayerValue: 0,
+      targetLayerValue: 1,
+    }),
+    [[0, 1]],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '2',
+      plainPayload: '2',
+      draggedLayerValue: 2,
+      targetLayerValue: 1,
+    }),
+    [[2, 1]],
+  )
+})
+
+test('selected layer action target stays scoped to the selected layer', () => {
+  const layers = [
+    { value: 0, name: 'Layer 0' },
+    { value: 2, name: 'Layer 2' },
+  ]
+
+  assert.equal(selectedLayerActionTarget(layers, 2, '0'), 2)
+  assert.equal(selectedLayerActionTarget(layers, 99, '2'), 2)
+  assert.equal(selectedLayerActionTarget(layers, 99, '99'), 0)
+  assert.equal(selectedLayerActionTarget([], 99, '99'), null)
+})
+
 test('layer manager fold helpers do not affect generated TikZ', () => {
   const diagram = createTwoLayerDiagram()
   const before = generateTikz(diagram)
@@ -173,6 +394,42 @@ test('layer manager fold helpers do not affect generated TikZ', () => {
   layerManagerSummary([{ value: 0, name: 'Layer 0' }], new Map([[0, 1]]))
 
   assert.equal(generateTikz(diagram), before)
+})
+
+test('layer palette open state does not affect generated TikZ', () => {
+  const diagram = createTwoLayerDiagram()
+  const before = generateTikz(diagram)
+
+  nextLayerPaletteOpenState(false)
+  nextLayerPaletteOpenState(true)
+  layerButtonLabel('0', 2)
+
+  assert.equal(generateTikz(diagram), before)
+})
+
+test('layer thumbnail handles empty layers and caps many elements', () => {
+  const emptyLayerDiagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    layers: [{ value: 5, name: 'Empty' }],
+  }
+  let manyElementDiagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  for (let index = 0; index < 21; index += 1) {
+    manyElementDiagram = addPointStratumWithResult(
+      manyElementDiagram,
+      { x: index, y: 0, z: 0 },
+      { id: `point-${index}`, layer: 0 },
+    ).diagram
+  }
+
+  const emptyThumbnail = createLayerThumbnail(emptyLayerDiagram, 5)
+  const cappedThumbnail = createLayerThumbnail(manyElementDiagram, 0, 5)
+
+  assert.equal(emptyThumbnail.totalElementCount, 0)
+  assert.equal(emptyThumbnail.marks.length, 0)
+  assert.equal(cappedThumbnail.totalElementCount, 21)
+  assert.equal(cappedThumbnail.marks.length, 5)
+  assert.equal(cappedThumbnail.hiddenElementCount, 16)
 })
 
 test('duplicate operation reports missing huge-layer default without mutation', () => {
@@ -252,6 +509,14 @@ function createTwoLayerDiagram(): Diagram {
   ).diagram
 }
 
+function createThreeLayerDiagram(): Diagram {
+  return addPointStratumWithResult(
+    createTwoLayerDiagram(),
+    { x: 0, y: 0, z: 0 },
+    { id: 'third-point', name: 'Third', layer: 2 },
+  ).diagram
+}
+
 function createHugeLayerDiagram(): Diagram {
   return addPointStratumWithResult(
     createEmptyDiagram({ ambientDimension: 2 }),
@@ -293,4 +558,31 @@ function hasStratum(diagram: Diagram, id: string): boolean {
 
 function hasLabel(diagram: Diagram, id: string): boolean {
   return diagram.labels.some((label) => label.id === id)
+}
+
+type ResolvedLayerSwapCallInput = {
+  customPayload: string
+  plainPayload: string
+  draggedLayerValue: number | null
+  targetLayerValue: number
+  validLayerValues?: readonly number[]
+}
+
+function resolvedLayerSwapCalls(
+  input: ResolvedLayerSwapCallInput,
+): [number, number][] {
+  const validLayerValues = input.validLayerValues ?? [0, 1, 2]
+  const sourceLayerValue = resolveLayerDropSource({
+    customPayload: input.customPayload,
+    plainPayload: input.plainPayload,
+    draggedLayerValue: input.draggedLayerValue,
+    validLayerValues,
+  })
+  const swap = resolveLayerDropSwap(
+    sourceLayerValue,
+    input.targetLayerValue,
+    validLayerValues,
+  )
+
+  return swap.ok ? [[swap.leftLayerValue, swap.rightLayerValue]] : []
 }

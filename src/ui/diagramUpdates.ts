@@ -583,10 +583,6 @@ export type DirectGridCreationResult =
       message: string
     }
 
-export type DirectCreationLayerOptions = {
-  layer?: number
-}
-
 export type DirectCreationCommitResult = {
   diagram: Diagram
   selectedElement: SelectedElement
@@ -2180,12 +2176,6 @@ export function addPolygonSheetFromDirectInput(
     diagram: result.diagram,
     id: result.id,
   }
-}
-
-export function directCreationLayerOptions(
-  layerFilter: LayerFilter,
-): DirectCreationLayerOptions {
-  return layerFilter.kind === 'layer' ? { layer: layerFilter.layer } : {}
 }
 
 export function commitDirectCreationResult(

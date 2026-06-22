@@ -691,6 +691,56 @@ test('cursor point creation still works on an axis-aligned work plane', () => {
   )
 })
 
+test('cursor point creation uses the New layer when View targets another layer', () => {
+  const state = createState(twoDimensionalExample, { kind: 'layer', layer: 1 })
+  const result = addPointStratumWithResult(
+    state.editableDiagram,
+    { x: 1, y: 2, z: 0 },
+    { layer: 0 },
+  )
+  const committed = commitCursorCreation(state, result.diagram, {
+    kind: 'stratum',
+    id: result.id,
+  }, 0)
+  const point = committed.editableDiagram.strata.find(
+    (candidate) => candidate.id === result.id,
+  )
+
+  assert.equal(point?.geometricKind, 'point')
+  assert.equal(point?.layer, 0)
+  assert.equal(layerFilterIncludesLayer(state.layerFilter, 0), false)
+  assert.deepEqual(committed.selectedElement, { kind: 'stratum', id: result.id })
+  assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 0 })
+})
+
+test('cursor path creation uses the updated New layer under a separate View filter', () => {
+  const state = createState(twoDimensionalExample, { kind: 'layer', layer: 1 })
+  const result = addPolylineCurveStratumWithResult(
+    state.editableDiagram,
+    [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ],
+    { layer: 2 },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected polyline creation to succeed.')
+  }
+
+  const committed = commitCursorCreation(state, result.diagram, {
+    kind: 'stratum',
+    id: result.id,
+  }, 2)
+  const curve = findCurve(committed.editableDiagram, result.id)
+
+  assert.equal(curve.kind, 'polyline')
+  assert.equal(curve.layer, 2)
+  assert.equal(layerFilterIncludesLayer(state.layerFilter, 2), false)
+  assert.match(generateTikz(committed.editableDiagram), /stratifiedLayer2/)
+})
+
 test('cursor creation updates a hidden active layer filter to keep selection visible', () => {
   const state = createState(twoDimensionalExample, { kind: 'layer', layer: 0 })
   const result = addPointStratumWithResult(
