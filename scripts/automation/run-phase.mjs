@@ -111,6 +111,12 @@ const phaseSlugs = {
   "20F": "curve-occlusion-hidden-style",
   "20G": "point-label-visibility-ui",
   "20H": "auto-visibility-export-hardening",
+  "21A": "preview-centered-ui-shell",
+  "21B": "floating-toolbar-tool-model",
+  "21C": "direct-input-drawer",
+  "21D": "inspector-preview-drawer",
+  "21E": "ibis-style-layer-window",
+  "21F": "ui-overhaul-polish",
 };
 
 function makePhaseSpec(phase) {
