@@ -149,7 +149,6 @@ import {
   coonsPatchBoundarySelectionsFromDraft,
   coonsPatchBoundaryPathSourceErrorMessage,
   coonsPatchBoundaryPointSourceErrorMessage,
-  coonsPatchCornerEquationStatuses,
   coonsPatchCornerMismatchMessage,
   createDirectCoordinateSourceHighlights,
   createFillFromClosedPaths,
@@ -246,7 +245,15 @@ import {
   workPlaneDisplayName,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
+  addPathMenuItems,
+  defaultPreviewCoordinateInputMode,
   generateTikzForUi,
+  isAddPathTool,
+  previewToolbarTopTools,
+  runPreviewOverlayAction,
+  shouldShowFillPathsForTool,
+  stopPreviewOverlayEvent,
+  togglePreviewToolbarState,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectConcatenatedPathManualSegmentInput,
@@ -266,7 +273,6 @@ import {
   type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
   type CoonsPatchBoundaryDraft,
-  type CoonsPatchCornerEquationStatus,
   type CoonsPatchBoundaryRole,
   type CoordinateSourceHighlight,
   type CurvedSheetCreationKind,
@@ -274,6 +280,8 @@ import {
   type GeometryHandleTarget,
   type InspectorDisclosureState,
   type LayerFilter,
+  type PreviewPathMenuItem,
+  type PreviewToolbarState,
   type SelectedElement,
   type RuledSurfaceBoundaryDraft,
   type SheetPolygonDraft,
@@ -444,7 +452,6 @@ const exampleOptions: ExampleOption[] = [
   },
 ]
 
-const coordinateInputModes: CoordinateInputMode[] = ['cursor', 'direct']
 const directCoordinateModes: DirectCoordinateMode[] = ['global', 'workPlaneLocal']
 const defaultDirectCoordinates: DirectCoordinateInput = {
   x: '0',
@@ -469,16 +476,6 @@ const defaultDirectGridInput: DirectGridInput = {
     vMax: '2',
   },
 }
-const creationTools: Array<{ id: CreationTool; label: string }> = [
-  { id: 'select', label: 'Select' },
-  { id: 'createPoint', label: 'Add point' },
-  { id: 'createLabel', label: 'Add label' },
-  { id: 'createPolyline', label: 'Add polyline' },
-  { id: 'createCubicBezier', label: 'Add cubic Bezier' },
-  { id: 'createPath', label: 'Add path' },
-  { id: 'createSheet', label: 'Add sheet' },
-  { id: 'createGrid', label: 'Add grid' },
-]
 const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
   { id: 'polygon', label: 'Polygon' },
   { id: 'hemisphere', label: 'Hemisphere' },
@@ -590,8 +587,10 @@ function labelVisibilityPolicyFromSelectValue(
 function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
   const [coordinateInputMode, setCoordinateInputMode] =
-    useState<CoordinateInputMode>('cursor')
+    useState<CoordinateInputMode>(defaultPreviewCoordinateInputMode)
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
+  const [previewToolbarState, setPreviewToolbarState] =
+    useState<PreviewToolbarState>('expanded')
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [pathStatus, setPathStatus] = useState<string>('')
@@ -1013,6 +1012,7 @@ function App() {
   const fillBoundaryStatus = `${pickedPathCountLabel(fillBoundaryPathIds.length)}${
     fillStatus.length === 0 ? '' : ` - ${fillStatus}`
   }`
+  const showFillPathControls = shouldShowFillPathsForTool(creationTool)
 
   async function copyTikz(): Promise<void> {
     try {
@@ -2304,6 +2304,44 @@ function App() {
     setSheetStatus(
       tool === 'createSheet' ? sheetCreationStatusPrompt(sheetCreationKind) : '',
     )
+  }
+
+  function activateCursorCreationTool(tool: CreationTool): void {
+    setCoordinateInputMode(defaultPreviewCoordinateInputMode())
+    updateCreationTool(tool)
+  }
+
+  function activateDirectCreationTool(tool: DirectCreationTool): void {
+    setCoordinateInputMode('direct')
+    updateCreationTool(tool)
+  }
+
+  function activatePathMenuItem(item: PreviewPathMenuItem): void {
+    setCoordinateInputMode(item.inputMode)
+
+    if (item.directPathInputMode !== undefined) {
+      setDirectPathInputMode(item.directPathInputMode)
+      setDirectPathSourceTargetKey(
+        item.directPathInputMode === 'manual' ? 'manual-start' : 'template-center',
+      )
+      setDirectCreationStatus('')
+    }
+
+    updateCreationTool(item.tool)
+
+    if (item.tool === 'createPath' && item.segmentKind !== undefined) {
+      updatePathSegmentKind(item.segmentKind)
+    }
+  }
+
+  function activateSheetCreationKind(kind: SheetCreationKind): void {
+    setCoordinateInputMode(defaultPreviewCoordinateInputMode())
+    updateSheetCreationKind(kind)
+    updateCreationTool('createSheet')
+  }
+
+  function togglePreviewToolbar(): void {
+    setPreviewToolbarState((current) => togglePreviewToolbarState(current))
   }
 
   function updateSheetCreationKind(kind: SheetCreationKind): void {
@@ -5028,6 +5066,755 @@ function App() {
     }
   }
 
+  function renderPreviewToolbarOverlay() {
+    const isCollapsed = previewToolbarState === 'collapsed'
+
+    return (
+      <div
+        className={`preview-toolbar-overlay-stack ${
+          isCollapsed ? 'is-collapsed' : ''
+        }`}
+        aria-label="Preview toolbar overlay"
+      >
+        {isCollapsed ? (
+          <button
+            type="button"
+            className="preview-overlay-button preview-toolbar-expand-button"
+            aria-label="Expand preview toolbar"
+            title="Expand toolbar"
+            onClick={(event) =>
+              runPreviewOverlayAction(event, togglePreviewToolbar)
+            }
+            onPointerDown={stopPreviewOverlayEvent}
+          >
+            ↓
+          </button>
+        ) : (
+          <section
+            className="preview-floating-toolbar"
+            aria-label="Creation toolbar"
+            onClick={stopPreviewOverlayEvent}
+            onPointerDown={stopPreviewOverlayEvent}
+          >
+            <button
+              type="button"
+              className="preview-overlay-button preview-toolbar-collapse-button"
+              aria-label="Collapse preview toolbar"
+              title="Collapse toolbar"
+              onClick={togglePreviewToolbar}
+            >
+              ↑
+            </button>
+
+            <div className="preview-toolbar-primary-tools" role="group">
+              {previewToolbarTopTools(editableDiagram.ambientDimension).map(
+                (tool) => renderPreviewToolbarTool(tool),
+              )}
+            </div>
+
+            {renderActiveCreationControls()}
+
+            {showFillPathControls && renderFillPathToolbarControls()}
+
+            <button
+              type="button"
+              className="preview-overlay-button preview-trash-button"
+              disabled={selectedElement === null}
+              aria-label="Remove selected"
+              title="Remove selected"
+              onClick={(event) =>
+                runPreviewOverlayAction(event, removeCurrentSelection)
+              }
+              onPointerDown={stopPreviewOverlayEvent}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z" />
+                <path d="M6 9h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z" />
+              </svg>
+            </button>
+          </section>
+        )}
+
+        <div
+          className="preview-history-overlay"
+          role="group"
+          aria-label="History"
+          onClick={stopPreviewOverlayEvent}
+          onPointerDown={stopPreviewOverlayEvent}
+        >
+          <button
+            type="button"
+            className="preview-overlay-button"
+            disabled={!canUndo}
+            onClick={(event) => runPreviewOverlayAction(event, undoLastChange)}
+            title="Undo last diagram change"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="preview-overlay-button"
+            disabled={!canRedo}
+            onClick={(event) => runPreviewOverlayAction(event, redoLastChange)}
+            title="Redo the last undone diagram change"
+          >
+            Redo
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  function renderPreviewToolbarTool(
+    tool: ReturnType<typeof previewToolbarTopTools>[number],
+  ) {
+    if (tool.menu === 'direct') {
+      const directTool =
+        tool.id === 'createPoint' ||
+        tool.id === 'createLabel' ||
+        tool.id === 'createGrid'
+          ? tool.id
+          : null
+
+      if (directTool === null) {
+        return null
+      }
+
+      return (
+        <details
+          key={tool.id}
+          className={`preview-toolbar-menu ${
+            creationTool === tool.id ? 'is-selected' : ''
+          }`}
+        >
+          <summary>{tool.label} ▾</summary>
+          <div className="preview-toolbar-menu-popover">
+            {directTool !== 'createGrid' && (
+              <button
+                type="button"
+                className={
+                  creationTool === directTool && coordinateInputMode === 'cursor'
+                    ? 'is-selected'
+                    : undefined
+                }
+                aria-pressed={
+                  creationTool === directTool && coordinateInputMode === 'cursor'
+                }
+                onClick={(event) => {
+                  stopPreviewOverlayEvent(event)
+                  activateCursorCreationTool(directTool)
+                }}
+              >
+                Cursor placement
+              </button>
+            )}
+            <button
+              type="button"
+              className={
+                creationTool === directTool && coordinateInputMode === 'direct'
+                  ? 'is-selected'
+                  : undefined
+              }
+              aria-pressed={
+                creationTool === directTool && coordinateInputMode === 'direct'
+              }
+              onClick={(event) => {
+                stopPreviewOverlayEvent(event)
+                activateDirectCreationTool(directTool)
+              }}
+            >
+              Direct input
+            </button>
+          </div>
+        </details>
+      )
+    }
+
+    if (tool.menu === 'path') {
+      return (
+        <details
+          key={tool.id}
+          className={`preview-toolbar-menu ${
+            isAddPathTool(creationTool) ? 'is-selected' : ''
+          }`}
+        >
+          <summary>{tool.label} ▾</summary>
+          <div className="preview-toolbar-menu-popover">
+            {addPathMenuItems().map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={
+                  isPathMenuItemSelected(item) ? 'is-selected' : undefined
+                }
+                aria-pressed={isPathMenuItemSelected(item)}
+                onClick={(event) => {
+                  stopPreviewOverlayEvent(event)
+                  activatePathMenuItem(item)
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </details>
+      )
+    }
+
+    if (tool.menu === 'sheet') {
+      return (
+        <details
+          key={tool.id}
+          className={`preview-toolbar-menu ${
+            creationTool === 'createSheet' ? 'is-selected' : ''
+          }`}
+        >
+          <summary>{tool.label} ▾</summary>
+          <div className="preview-toolbar-menu-popover">
+            {sheetCreationKinds.map((kind) => (
+              <button
+                key={kind.id}
+                type="button"
+                className={
+                  creationTool === 'createSheet' && sheetCreationKind === kind.id
+                    ? 'is-selected'
+                    : undefined
+                }
+                aria-pressed={
+                  creationTool === 'createSheet' && sheetCreationKind === kind.id
+                }
+                onClick={(event) => {
+                  stopPreviewOverlayEvent(event)
+                  activateSheetCreationKind(kind.id)
+                }}
+              >
+                {kind.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={
+                creationTool === 'createSheet' && coordinateInputMode === 'direct'
+                  ? 'is-selected'
+                  : undefined
+              }
+              aria-pressed={
+                creationTool === 'createSheet' && coordinateInputMode === 'direct'
+              }
+              onClick={(event) => {
+                stopPreviewOverlayEvent(event)
+                activateDirectCreationTool('createSheet')
+              }}
+            >
+              Direct input
+            </button>
+          </div>
+        </details>
+      )
+    }
+
+    return (
+      <button
+        key={tool.id}
+        type="button"
+        className={creationTool === tool.id ? 'is-selected' : undefined}
+        aria-pressed={creationTool === tool.id}
+        onClick={(event) => {
+          stopPreviewOverlayEvent(event)
+          activateCursorCreationTool(tool.id)
+        }}
+      >
+        {tool.label}
+      </button>
+    )
+  }
+
+  function isPathMenuItemSelected(item: PreviewPathMenuItem): boolean {
+    if (creationTool !== item.tool || coordinateInputMode !== item.inputMode) {
+      return false
+    }
+
+    if (item.tool === 'createPath' && item.segmentKind !== undefined) {
+      return pathSegmentKind === item.segmentKind
+    }
+
+    if (item.directPathInputMode !== undefined) {
+      return directPathInputMode === item.directPathInputMode
+    }
+
+    return true
+  }
+
+  function renderActiveCreationControls() {
+    if (creationTool === 'createPolyline') {
+      return (
+        <div className="preview-toolbar-detail" role="group" aria-label="Polyline">
+          <span className="preview-toolbar-label">Polyline</span>
+          <button type="button" onClick={finishPolylineDraft}>
+            Finish
+          </button>
+          <button type="button" onClick={cancelPolylineDraft}>
+            Cancel
+          </button>
+          <span className="preview-toolbar-status" role="status">
+            {polylineStatus}
+          </span>
+        </div>
+      )
+    }
+
+    if (creationTool === 'createCubicBezier') {
+      return (
+        <div
+          className="preview-toolbar-detail"
+          role="group"
+          aria-label="Cubic Bezier"
+        >
+          <span className="preview-toolbar-label">Cubic</span>
+          <button type="button" onClick={cancelCubicBezierDraft}>
+            Cancel
+          </button>
+          <span className="preview-toolbar-status" role="status">
+            {cubicBezierStatus}
+          </span>
+        </div>
+      )
+    }
+
+    if (creationTool === 'createPath') {
+      return (
+        <div className="preview-toolbar-detail" role="group" aria-label="Path">
+          <span className="preview-toolbar-label">Path</span>
+          <div className="preview-mini-segmented" role="group">
+            {concatenatedPathWorkPlaneModes.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                className={pathWorkPlaneMode === mode.id ? 'is-selected' : undefined}
+                aria-pressed={pathWorkPlaneMode === mode.id}
+                disabled={pathDraft !== null}
+                title={mode.label}
+                onClick={() => updatePathWorkPlaneMode(mode.id)}
+              >
+                {mode.id === 'sameWorkPlane' ? 'Same plane' : 'Cross plane'}
+              </button>
+            ))}
+          </div>
+          <div className="preview-mini-segmented" role="group">
+            {concatenatedPathSegmentKinds.map((kind) => (
+              <button
+                key={kind.id}
+                type="button"
+                className={pathSegmentKind === kind.id ? 'is-selected' : undefined}
+                aria-pressed={pathSegmentKind === kind.id}
+                disabled={(pathDraft?.pendingPoints.length ?? 0) > 0}
+                onClick={() => updatePathSegmentKind(kind.id)}
+              >
+                {kind.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={finishPathDraft}>
+            Finish
+          </button>
+          <button type="button" onClick={cancelPathDraft}>
+            Cancel
+          </button>
+          <span className="preview-toolbar-status" role="status">
+            {pathStatus}
+          </span>
+        </div>
+      )
+    }
+
+    if (creationTool === 'createSheet' && editableDiagram.ambientDimension === 3) {
+      return renderSheetToolbarControls()
+    }
+
+    return null
+  }
+
+  function renderSheetToolbarControls() {
+    return (
+      <div className="preview-toolbar-detail" role="group" aria-label="Sheet">
+        <span className="preview-toolbar-label">
+          {sheetCreationKindLabel(sheetCreationKind)}
+        </span>
+        {sheetCreationKind === 'polygon' ? (
+          <>
+            <button type="button" onClick={finishSheetDraft}>
+              Finish
+            </button>
+            <button type="button" onClick={cancelSheetDraft}>
+              Cancel
+            </button>
+          </>
+        ) : sheetCreationKind === 'ruledSurface' ? (
+          <>
+            <label className="preview-toolbar-field">
+              <span>Segments</span>
+              <input
+                type="number"
+                min="1"
+                max={maxCurvedSheetSamplingSegments}
+                step="1"
+                value={ruledSurfaceSegmentsInput}
+                onChange={(event) => {
+                  setRuledSurfaceSegmentsInput(event.currentTarget.value)
+                  setSheetStatus('')
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                ruledSurfaceBoundaryDraftPickedPathIds(ruledSurfaceBoundaryDraft)
+                  .length === 0
+              }
+              onClick={undoRuledSurfaceBoundaryPicking}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={
+                ruledSurfaceBoundaryDraftPickedPathIds(ruledSurfaceBoundaryDraft)
+                  .length === 0
+              }
+              onClick={resetRuledSurfaceBoundaryPicking}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              disabled={!ruledSurfaceBoundaryDraftCanCreate(ruledSurfaceBoundaryDraft)}
+              onClick={() => {
+                const creationLayer = parseNewElementLayer(setSheetStatus)
+
+                if (creationLayer !== null) {
+                  createRuledSurfaceFromPickedPaths(creationLayer, setSheetStatus)
+                }
+              }}
+            >
+              Create
+            </button>
+          </>
+        ) : sheetCreationKind === 'coonsPatch' ? (
+          <>
+            <label className="preview-toolbar-field">
+              <span>U</span>
+              <input
+                type="number"
+                min="1"
+                max={maxCurvedSheetSamplingSegments}
+                step="1"
+                value={coonsPatchUSegmentsInput}
+                onChange={(event) => {
+                  setCoonsPatchUSegmentsInput(event.currentTarget.value)
+                  setSheetStatus('')
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <label className="preview-toolbar-field">
+              <span>V</span>
+              <input
+                type="number"
+                min="1"
+                max={maxCurvedSheetSamplingSegments}
+                step="1"
+                value={coonsPatchVSegmentsInput}
+                onChange={(event) => {
+                  setCoonsPatchVSegmentsInput(event.currentTarget.value)
+                  setSheetStatus('')
+                  setDirectCreationStatus('')
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={
+                coonsPatchBoundaryDraftPickedSourceIds(coonsPatchBoundaryDraft)
+                  .length === 0
+              }
+              onClick={undoCoonsPatchBoundaryPicking}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={
+                coonsPatchBoundaryDraftPickedSourceIds(coonsPatchBoundaryDraft)
+                  .length === 0
+              }
+              onClick={resetCoonsPatchBoundaryPicking}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              disabled={
+                !coonsPatchBoundaryDraftCanCreateWithCurrentDirections(
+                  editableDiagram,
+                  coonsPatchBoundaryDraft,
+                )
+              }
+              onClick={() => {
+                const creationLayer = parseNewElementLayer(setSheetStatus)
+
+                if (creationLayer !== null) {
+                  createCoonsPatchFromPickedPaths(creationLayer, setSheetStatus)
+                }
+              }}
+            >
+              Create
+            </button>
+            <details className="preview-toolbar-menu preview-toolbar-inline-menu">
+              <summary>Directions</summary>
+              <div className="preview-toolbar-menu-popover preview-toolbar-wide-popover">
+                {coonsPatchBoundaryRoles.map((role) => {
+                  const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(
+                    coonsPatchBoundaryDraft,
+                    role,
+                  )
+
+                  return (
+                    <div key={role} className="preview-coons-direction-row">
+                      <span>{coonsPatchBoundaryRoleLabel(role)}</span>
+                      <span>
+                        {formatCoonsPatchBoundaryDirectionSummary(
+                          editableDiagram,
+                          coonsPatchBoundaryDraft,
+                          role,
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={picked === null || picked.kind === 'point'}
+                        aria-pressed={
+                          picked !== null && picked.kind !== 'point'
+                            ? picked.reversed
+                            : false
+                        }
+                        onClick={() => toggleCoonsPatchBoundaryDirection(role)}
+                      >
+                        Reverse
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </details>
+          </>
+        ) : (
+          renderCurvedSheetParameterControls()
+        )}
+        <span className="preview-toolbar-status" role="status">
+          {sheetStatus}
+        </span>
+      </div>
+    )
+  }
+
+  function renderCurvedSheetParameterControls() {
+    if (sheetCreationKind === 'hemisphere') {
+      return (
+        <>
+          <label className="preview-toolbar-field">
+            <span>Radius</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={hemisphereRadiusInput}
+              onChange={(event) => {
+                setHemisphereRadiusInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="preview-toolbar-field">
+            <span>Side</span>
+            <select
+              value={hemisphereSide}
+              onChange={(event) => {
+                setHemisphereSide(event.currentTarget.value as typeof hemisphereSide)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            >
+              <option value="positive">positive</option>
+              <option value="negative">negative</option>
+            </select>
+          </label>
+          <label className="preview-toolbar-field">
+            <span>U</span>
+            <input
+              type="number"
+              min="1"
+              max={maxCurvedSheetSamplingSegments}
+              step="1"
+              value={hemisphereUSegmentsInput}
+              onChange={(event) => {
+                setHemisphereUSegmentsInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="preview-toolbar-field">
+            <span>V</span>
+            <input
+              type="number"
+              min="1"
+              max={maxCurvedSheetSamplingSegments}
+              step="1"
+              value={hemisphereVSegmentsInput}
+              onChange={(event) => {
+                setHemisphereVSegmentsInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <label className="preview-toolbar-field">
+          <span>Width</span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={saddleWidthInput}
+            onChange={(event) => {
+              setSaddleWidthInput(event.currentTarget.value)
+              setSheetStatus('')
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <label className="preview-toolbar-field">
+          <span>Depth</span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={saddleDepthInput}
+            onChange={(event) => {
+              setSaddleDepthInput(event.currentTarget.value)
+              setSheetStatus('')
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <label className="preview-toolbar-field">
+          <span>Height</span>
+          <input
+            type="number"
+            step="any"
+            value={saddleHeightInput}
+            onChange={(event) => {
+              setSaddleHeightInput(event.currentTarget.value)
+              setSheetStatus('')
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <label className="preview-toolbar-field">
+          <span>U</span>
+          <input
+            type="number"
+            min="1"
+            max={maxCurvedSheetSamplingSegments}
+            step="1"
+            value={saddleUSegmentsInput}
+            onChange={(event) => {
+              setSaddleUSegmentsInput(event.currentTarget.value)
+              setSheetStatus('')
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+        <label className="preview-toolbar-field">
+          <span>V</span>
+          <input
+            type="number"
+            min="1"
+            max={maxCurvedSheetSamplingSegments}
+            step="1"
+            value={saddleVSegmentsInput}
+            onChange={(event) => {
+              setSaddleVSegmentsInput(event.currentTarget.value)
+              setSheetStatus('')
+              setDirectCreationStatus('')
+            }}
+          />
+        </label>
+      </>
+    )
+  }
+
+  function renderFillPathToolbarControls() {
+    return (
+      <div
+        className="preview-toolbar-detail preview-fill-path-control"
+        role="group"
+        aria-label="Fill paths"
+      >
+        <span className="preview-toolbar-label">Fill paths</span>
+        <div className="preview-mini-segmented" role="group">
+          {fillRuleOptions.map((rule) => (
+            <button
+              key={rule}
+              type="button"
+              className={fillRule === rule ? 'is-selected' : undefined}
+              aria-pressed={fillRule === rule}
+              onClick={() => {
+                setFillRule(rule)
+                setFillStatus('')
+              }}
+            >
+              {fillRuleLabel(rule)}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={pickSelectedFillBoundaryPath}>
+          Pick
+        </button>
+        <button
+          type="button"
+          disabled={fillBoundaryPathIds.length === 0}
+          onClick={resetFillBoundaryPathPicking}
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          disabled={fillBoundaryPathIds.length === 0}
+          onClick={cancelFillBoundaryPathPicking}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={fillBoundaryPathIds.length === 0}
+          onClick={createFillFromPickedPaths}
+        >
+          Create
+        </button>
+        <span className="preview-toolbar-status" role="status">
+          {fillBoundaryStatus}
+        </span>
+      </div>
+    )
+  }
+
   const symbolicImportCanConfirm =
     pendingSymbolicImport !== null &&
     symbolicImportDrafts.every((draft) => draft.expression.trim().length > 0)
@@ -5073,575 +5860,6 @@ function App() {
           <p className="toolbar-note">
             Edits are temporary in this phase and reset when switching examples.
           </p>
-        </div>
-
-        <div className="control-group">
-          <span className="control-label">Tool</span>
-          <div className="segmented-control">
-            {creationTools
-              .filter(
-                (tool) =>
-                  tool.id !== 'createSheet' || editableDiagram.ambientDimension === 3,
-              )
-              .map((tool) => (
-                <button
-                  key={tool.id}
-                  type="button"
-                  className={creationTool === tool.id ? 'is-selected' : undefined}
-                  aria-pressed={creationTool === tool.id}
-                  onClick={() => updateCreationTool(tool.id)}
-                >
-                  {tool.label}
-                </button>
-              ))}
-          </div>
-        </div>
-
-        {creationTool === 'createPolyline' && (
-          <div className="control-group polyline-draft-control">
-            <span className="control-label">Polyline</span>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={finishPolylineDraft}
-            >
-              Finish polyline
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={cancelPolylineDraft}
-            >
-              Cancel polyline
-            </button>
-            <span className="toolbar-status" role="status">
-              {polylineStatus}
-            </span>
-          </div>
-        )}
-
-        {creationTool === 'createCubicBezier' && (
-          <div className="control-group polyline-draft-control">
-            <span className="control-label">Cubic Bezier</span>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={cancelCubicBezierDraft}
-            >
-              Cancel cubic Bezier
-            </button>
-            <span className="toolbar-status" role="status">
-              {cubicBezierStatus}
-            </span>
-          </div>
-        )}
-
-        {creationTool === 'createPath' && (
-          <div className="control-group polyline-draft-control">
-            <span className="control-label">Path constraint</span>
-            <div className="segmented-control path-work-plane-mode-control">
-              {concatenatedPathWorkPlaneModes.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={
-                    pathWorkPlaneMode === mode.id ? 'is-selected' : undefined
-                  }
-                  aria-pressed={pathWorkPlaneMode === mode.id}
-                  disabled={pathDraft !== null}
-                  onClick={() => updatePathWorkPlaneMode(mode.id)}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <span className="control-label">Path segment</span>
-            <div className="segmented-control">
-              {concatenatedPathSegmentKinds.map((kind) => (
-                <button
-                  key={kind.id}
-                  type="button"
-                  className={
-                    pathSegmentKind === kind.id ? 'is-selected' : undefined
-                  }
-                  aria-pressed={pathSegmentKind === kind.id}
-                  disabled={(pathDraft?.pendingPoints.length ?? 0) > 0}
-                  onClick={() => updatePathSegmentKind(kind.id)}
-                >
-                  {kind.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={finishPathDraft}
-            >
-              Finish path
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={cancelPathDraft}
-            >
-              Cancel path
-            </button>
-            <span className="toolbar-status" role="status">
-              {pathStatus}
-            </span>
-          </div>
-        )}
-
-        {creationTool === 'createSheet' && editableDiagram.ambientDimension === 3 && (
-          <div className="control-group polyline-draft-control">
-            <span className="control-label">Sheet</span>
-            <div className="segmented-control">
-              {sheetCreationKinds.map((kind) => (
-                <button
-                  key={kind.id}
-                  type="button"
-                  className={
-                    sheetCreationKind === kind.id ? 'is-selected' : undefined
-                  }
-                  aria-pressed={sheetCreationKind === kind.id}
-                  onClick={() => updateSheetCreationKind(kind.id)}
-                >
-                  {kind.label}
-                </button>
-              ))}
-            </div>
-            {sheetCreationKind === 'polygon' ? (
-              <>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={finishSheetDraft}
-                >
-                  Finish sheet
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  onClick={cancelSheetDraft}
-                >
-                  Cancel sheet
-                </button>
-              </>
-            ) : sheetCreationKind === 'ruledSurface' ? (
-              <div className="curved-sheet-parameter-grid">
-                <label className="direct-create-field">
-                  <span>Segments</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxCurvedSheetSamplingSegments}
-                    step="1"
-                    value={ruledSurfaceSegmentsInput}
-                    onChange={(event) => {
-                      setRuledSurfaceSegmentsInput(event.currentTarget.value)
-                      setSheetStatus('')
-                      setDirectCreationStatus('')
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    ruledSurfaceBoundaryDraftPickedPathIds(
-                      ruledSurfaceBoundaryDraft,
-                    ).length === 0
-                  }
-                  onClick={undoRuledSurfaceBoundaryPicking}
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    ruledSurfaceBoundaryDraftPickedPathIds(
-                      ruledSurfaceBoundaryDraft,
-                    ).length === 0
-                  }
-                  onClick={resetRuledSurfaceBoundaryPicking}
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    !ruledSurfaceBoundaryDraftCanCreate(
-                      ruledSurfaceBoundaryDraft,
-                    )
-                  }
-                  onClick={() => {
-                    const creationLayer = parseNewElementLayer(setSheetStatus)
-
-                    if (creationLayer !== null) {
-                      createRuledSurfaceFromPickedPaths(
-                        creationLayer,
-                        setSheetStatus,
-                      )
-                    }
-                  }}
-                >
-                  Create
-                </button>
-                <span className="toolbar-status">
-                  {ruledSurfaceBoundaryDraftStatusMessage(
-                    ruledSurfaceBoundaryDraft,
-                  )}{' '}
-                  {formatRuledSurfaceBoundaryPickSummary(
-                    editableDiagram,
-                    ruledSurfaceBoundaryDraft,
-                  )}
-                </span>
-              </div>
-            ) : sheetCreationKind === 'coonsPatch' ? (
-              <div className="curved-sheet-parameter-grid">
-                <label className="direct-create-field">
-                  <span>U segments</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxCurvedSheetSamplingSegments}
-                    step="1"
-                    value={coonsPatchUSegmentsInput}
-                    onChange={(event) => {
-                      setCoonsPatchUSegmentsInput(event.currentTarget.value)
-                      setSheetStatus('')
-                      setDirectCreationStatus('')
-                    }}
-                  />
-                </label>
-                <label className="direct-create-field">
-                  <span>V segments</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxCurvedSheetSamplingSegments}
-                    step="1"
-                    value={coonsPatchVSegmentsInput}
-                    onChange={(event) => {
-                      setCoonsPatchVSegmentsInput(event.currentTarget.value)
-                      setSheetStatus('')
-                      setDirectCreationStatus('')
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    coonsPatchBoundaryDraftPickedSourceIds(
-                      coonsPatchBoundaryDraft,
-                    ).length === 0
-                  }
-                  onClick={undoCoonsPatchBoundaryPicking}
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    coonsPatchBoundaryDraftPickedSourceIds(
-                      coonsPatchBoundaryDraft,
-                    ).length === 0
-                  }
-                  onClick={resetCoonsPatchBoundaryPicking}
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-button"
-                  disabled={
-                    !coonsPatchBoundaryDraftCanCreateWithCurrentDirections(
-                      editableDiagram,
-                      coonsPatchBoundaryDraft,
-                    )
-                  }
-                  onClick={() => {
-                    const creationLayer = parseNewElementLayer(setSheetStatus)
-
-                    if (creationLayer !== null) {
-                      createCoonsPatchFromPickedPaths(
-                        creationLayer,
-                        setSheetStatus,
-                      )
-                    }
-                  }}
-                >
-                  Create
-                </button>
-                <div
-                  className="coons-boundary-direction-list"
-                  aria-label="Coons patch boundaries"
-                >
-                  {coonsPatchBoundaryRoles.map((role) => {
-                    const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(
-                      coonsPatchBoundaryDraft,
-                      role,
-                    )
-
-                    return (
-                      <div key={role} className="coons-boundary-direction-row">
-                        <span className="coons-boundary-direction-label">
-                          {coonsPatchBoundaryRoleLabel(role)}:
-                        </span>
-                        <span className="coons-boundary-direction-text">
-                          {formatCoonsPatchBoundaryDirectionSummary(
-                            editableDiagram,
-                            coonsPatchBoundaryDraft,
-                            role,
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          className="toolbar-button coons-boundary-reverse-button"
-                          disabled={picked === null || picked.kind === 'point'}
-                          aria-pressed={
-                            picked !== null && picked.kind !== 'point'
-                              ? picked.reversed
-                              : false
-                          }
-                          aria-label={`Reverse ${coonsPatchBoundaryRoleLabel(
-                            role,
-                          )} boundary direction`}
-                          onClick={() => toggleCoonsPatchBoundaryDirection(role)}
-                        >
-                          Reverse
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div
-                  className="coons-corner-equation-list"
-                  aria-label="Required Coons corners"
-                >
-                  <div className="coons-corner-equation-title">
-                    Required Coons corners
-                  </div>
-                  {coonsPatchCornerEquationStatuses(
-                    editableDiagram,
-                    coonsPatchBoundarySelectionsFromDraft(
-                      coonsPatchBoundaryDraft,
-                    ),
-                  ).map((status) => (
-                    <div
-                      key={status.id}
-                      className={`coons-corner-equation-row ${coonsPatchCornerEquationClassName(
-                        status.matches,
-                      )}`}
-                    >
-                      <span className="coons-corner-equation-mark">
-                        {coonsPatchCornerEquationMark(status.matches)}
-                      </span>
-                      <span className="coons-corner-equation-label">
-                        {status.label}
-                      </span>
-                      <span className="coons-corner-equation-values">
-                        {formatCoonsPatchCornerEquationStatus(status)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <span className="toolbar-status">
-                  {coonsPatchBoundaryDraftStatusForUi(
-                    editableDiagram,
-                    coonsPatchBoundaryDraft,
-                  )}
-                </span>
-              </div>
-            ) : (
-              <div className="curved-sheet-parameter-grid">
-                {sheetCreationKind === 'hemisphere' ? (
-                  <>
-                    <label className="direct-create-field">
-                      <span>Radius</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={hemisphereRadiusInput}
-                        onChange={(event) => {
-                          setHemisphereRadiusInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>Side</span>
-                      <select
-                        value={hemisphereSide}
-                        onChange={(event) => {
-                          setHemisphereSide(
-                            event.currentTarget.value as typeof hemisphereSide,
-                          )
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      >
-                        <option value="positive">positive</option>
-                        <option value="negative">negative</option>
-                      </select>
-                    </label>
-                    <label className="direct-create-field">
-                      <span>U segments</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxCurvedSheetSamplingSegments}
-                        step="1"
-                        value={hemisphereUSegmentsInput}
-                        onChange={(event) => {
-                          setHemisphereUSegmentsInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>V segments</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxCurvedSheetSamplingSegments}
-                        step="1"
-                        value={hemisphereVSegmentsInput}
-                        onChange={(event) => {
-                          setHemisphereVSegmentsInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <label className="direct-create-field">
-                      <span>Width</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={saddleWidthInput}
-                        onChange={(event) => {
-                          setSaddleWidthInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>Depth</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={saddleDepthInput}
-                        onChange={(event) => {
-                          setSaddleDepthInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>Height</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={saddleHeightInput}
-                        onChange={(event) => {
-                          setSaddleHeightInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>U segments</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxCurvedSheetSamplingSegments}
-                        step="1"
-                        value={saddleUSegmentsInput}
-                        onChange={(event) => {
-                          setSaddleUSegmentsInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                    <label className="direct-create-field">
-                      <span>V segments</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={maxCurvedSheetSamplingSegments}
-                        step="1"
-                        value={saddleVSegmentsInput}
-                        onChange={(event) => {
-                          setSaddleVSegmentsInput(event.currentTarget.value)
-                          setSheetStatus('')
-                          setDirectCreationStatus('')
-                        }}
-                      />
-                    </label>
-                  </>
-                )}
-              </div>
-            )}
-            <span className="toolbar-status" role="status">
-              {sheetStatus}
-            </span>
-          </div>
-        )}
-
-        <div className="control-group">
-          <span className="control-label">Input</span>
-          <div className="segmented-control">
-            {coordinateInputModes.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={coordinateInputMode === mode ? 'is-selected' : undefined}
-                aria-pressed={coordinateInputMode === mode}
-                onClick={() => setCoordinateInputMode(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="control-group history-control">
-          <span className="control-label">History</span>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canUndo}
-            onClick={undoLastChange}
-            title="Undo last diagram change"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canRedo}
-            onClick={redoLastChange}
-            title="Redo the last undone diagram change"
-          >
-            Redo
-          </button>
         </div>
 
         <VariableManager
@@ -5906,72 +6124,6 @@ function App() {
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="control-group">
-          <span className="control-label">Selection</span>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={selectedElement === null}
-            onClick={removeCurrentSelection}
-          >
-            Remove selected
-          </button>
-        </div>
-
-        <div className="control-group fill-from-path-control">
-          <span className="control-label">Fill paths</span>
-          <div className="segmented-control fill-rule-control">
-            {fillRuleOptions.map((rule) => (
-              <button
-                key={rule}
-                type="button"
-                className={fillRule === rule ? 'is-selected' : undefined}
-                aria-pressed={fillRule === rule}
-                onClick={() => {
-                  setFillRule(rule)
-                  setFillStatus('')
-                }}
-              >
-                {fillRuleLabel(rule)}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={pickSelectedFillBoundaryPath}
-          >
-            Pick selected path
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={fillBoundaryPathIds.length === 0}
-            onClick={resetFillBoundaryPathPicking}
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={fillBoundaryPathIds.length === 0}
-            onClick={cancelFillBoundaryPathPicking}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={fillBoundaryPathIds.length === 0}
-            onClick={createFillFromPickedPaths}
-          >
-            Create fill
-          </button>
-          <span className="toolbar-status fill-path-status" role="status">
-            {fillBoundaryStatus}
-          </span>
         </div>
 
         <div className="control-group file-control">
@@ -6385,6 +6537,7 @@ function App() {
             </div>
           </div>
           <div className="preview-stage">
+            {renderPreviewToolbarOverlay()}
             <SvgDiagram
               diagram={editableDiagram}
               fitToView
@@ -7154,29 +7307,6 @@ function createBoundaryPathHighlightsForSheetDraft(
   return []
 }
 
-function formatRuledSurfaceBoundaryPickSummary(
-  diagram: Diagram,
-  draft: RuledSurfaceBoundaryDraft,
-): string {
-  const sourcePathIds = [
-    { label: 'Boundary 1', sourcePathId: draft.boundary0Id },
-    { label: 'Boundary 2', sourcePathId: draft.boundary1Id },
-  ]
-
-  return sourcePathIds
-    .map(({ label, sourcePathId }) => {
-      const source = diagram.strata.find((stratum) => stratum.id === sourcePathId)
-      const sourceLabel = source?.name ?? sourcePathId
-
-      return `${label}: ${
-        sourceLabel === undefined || sourceLabel.trim().length === 0
-          ? 'not picked'
-          : sourceLabel
-      }`
-    })
-    .join('; ')
-}
-
 function coonsPatchBoundaryRoleLabel(role: CoonsPatchBoundaryRole): string {
   switch (role) {
     case 'bottom':
@@ -7317,36 +7447,6 @@ function isConstantCoonsBoundarySnapshot(
   boundary: Parameters<typeof orientedCoonsBoundarySnapshot>[0],
 ): boundary is CoonsConstantPointBoundarySnapshot {
   return 'kind' in boundary && boundary.kind === 'constantPoint'
-}
-
-function coonsPatchCornerEquationClassName(matches: boolean | null): string {
-  if (matches === null) {
-    return 'pending'
-  }
-
-  return matches ? 'matches' : 'mismatch'
-}
-
-function coonsPatchCornerEquationMark(matches: boolean | null): string {
-  if (matches === null) {
-    return '...'
-  }
-
-  return matches ? 'OK' : 'X'
-}
-
-function formatCoonsPatchCornerEquationStatus(
-  status: CoonsPatchCornerEquationStatus,
-): string {
-  if (status.leftPoint === undefined || status.rightPoint === undefined) {
-    return 'waiting for both endpoints'
-  }
-
-  const comparator = status.matches === false ? ' != ' : ' = '
-
-  return `${formatCompactVec3(status.leftPoint)}${comparator}${formatCompactVec3(
-    status.rightPoint,
-  )}`
 }
 
 function formatCompactVec3(point: Vec3): string {
