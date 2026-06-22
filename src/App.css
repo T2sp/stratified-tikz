@@ -1091,6 +1091,182 @@
   overflow: hidden;
 }
 
+.direct-input-drawer {
+  position: absolute;
+  top: 62px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  width: min(420px, calc(100% - 24px));
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: rgba(30, 34, 44, 0.18) 0 10px 28px;
+  backdrop-filter: blur(9px);
+  pointer-events: auto;
+}
+
+.direct-input-drawer-heading-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.direct-input-drawer-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.direct-input-drawer-title h3 {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.direct-input-drawer-close {
+  flex: 0 0 auto;
+}
+
+.direct-input-drawer-form {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.direct-input-drawer .direct-create-field {
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+  width: 100%;
+}
+
+.direct-input-drawer .direct-create-field input,
+.direct-input-drawer .direct-create-field select,
+.direct-input-drawer .direct-coordinate-list textarea,
+.direct-input-drawer .toolbar-text-input {
+  width: 100%;
+  max-width: none;
+}
+
+.direct-input-drawer .direct-coordinate-mode-field,
+.direct-input-drawer .direct-create-text,
+.direct-input-drawer .direct-coordinate-list,
+.direct-input-drawer .direct-coordinate-source-field,
+.direct-input-drawer .direct-path-source-target-field,
+.direct-input-drawer .direct-path-name-field {
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+}
+
+.direct-input-drawer .direct-coordinate-list textarea {
+  min-height: 96px;
+}
+
+.direct-input-drawer .direct-path-form,
+.direct-input-drawer .direct-grid-form,
+.direct-input-drawer .direct-coordinate-source-control,
+.direct-boundary-surface-controls,
+.direct-sheet-parameter-control {
+  display: grid;
+  flex: none;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--control-bg) 92%, transparent);
+}
+
+.direct-input-drawer .direct-path-style-grid,
+.direct-input-drawer .direct-grid-range-grid,
+.direct-input-drawer .direct-path-manual-form,
+.direct-input-drawer .direct-path-template-form,
+.direct-input-drawer .direct-path-segment-actions,
+.direct-sheet-parameter-control,
+.direct-boundary-action-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.direct-input-drawer .direct-path-mode-control {
+  min-width: 0;
+  width: 100%;
+}
+
+.direct-input-drawer .segmented-control {
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-columns: unset;
+  grid-template-columns: 1fr;
+}
+
+.direct-input-drawer .direct-path-segment-list {
+  grid-template-columns: 1fr;
+}
+
+.direct-input-drawer .direct-path-coordinate-group,
+.direct-input-drawer .direct-path-segment-card,
+.direct-input-drawer .direct-grid-field-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+.direct-input-drawer .preview-toolbar-field {
+  display: grid;
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.direct-input-drawer .preview-toolbar-field input,
+.direct-input-drawer .preview-toolbar-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.direct-boundary-directions {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.direct-boundary-directions summary {
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.direct-boundary-direction-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.direct-input-create-button {
+  justify-self: start;
+}
+
 .preview-toolbar-overlay-stack {
   position: absolute;
   top: 8px;
@@ -2675,6 +2851,20 @@
 
   .preview-panel {
     min-height: 380px;
+  }
+
+  .direct-input-drawer {
+    top: 52px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    padding: 8px;
+  }
+
+  .direct-input-drawer .direct-create-field,
+  .direct-input-drawer .preview-toolbar-field {
+    grid-template-columns: 1fr;
   }
 
   .source-panel {

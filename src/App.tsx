@@ -165,9 +165,11 @@ import {
   createDiagramHistory,
   createSheetPolygonDraft,
   defaultCoonsPatchSampling,
+  closeDirectInputDrawerInputMode,
   defaultHemisphereCreationParameters,
   defaultRuledSurfaceSamplingSegments,
   defaultSaddleCreationParameters,
+  directInputDrawerStateForInputMode,
   defaultCustomOriginNormalWorkPlaneInput,
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
@@ -252,6 +254,7 @@ import {
   previewToolbarTopTools,
   runPreviewOverlayAction,
   shouldHandlePreviewCanvasCreationClick,
+  shouldShowDirectInputDrawer,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   togglePreviewToolbarState,
@@ -263,6 +266,7 @@ import {
   type DirectCubicBezierControlMode,
   type DirectGridCreationError,
   type DirectGridInput,
+  type DirectInputDrawerState,
   type DirectPathCreationError,
   type DiagramHistory,
   type ExistingCoordinateSource,
@@ -589,6 +593,10 @@ function App() {
   const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>(defaultPreviewCoordinateInputMode)
+  const [directInputDrawerState, setDirectInputDrawerState] =
+    useState<DirectInputDrawerState>(() =>
+      directInputDrawerStateForInputMode(defaultPreviewCoordinateInputMode()),
+    )
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
   const [previewToolbarState, setPreviewToolbarState] =
     useState<PreviewToolbarState>('expanded')
@@ -826,6 +834,11 @@ function App() {
   const canRedo = history.future.length > 0
   const previewCursorCreationClicksEnabled =
     shouldHandlePreviewCanvasCreationClick(creationTool, coordinateInputMode)
+  const directInputDrawerVisible = shouldShowDirectInputDrawer(
+    creationTool,
+    coordinateInputMode,
+    directInputDrawerState,
+  )
   const boundaryPathClickWorkflow = boundarySurfacePathClickWorkflow({
     tool:
       creationTool === 'select'
@@ -850,7 +863,10 @@ function App() {
     ((sheetCreationKind === 'ruledSurface' &&
       !ruledSurfaceBoundaryDraftCanCreate(ruledSurfaceBoundaryDraft)) ||
       (sheetCreationKind === 'coonsPatch' &&
-        !coonsPatchBoundaryDraftCanCreate(coonsPatchBoundaryDraft)))
+        !coonsPatchBoundaryDraftCanCreateWithCurrentDirections(
+          editableDiagram,
+          coonsPatchBoundaryDraft,
+        )))
   const selectedExample =
     exampleOptions.find((example) => example.id === selectedExampleId) ??
     exampleOptions[0]
@@ -1227,6 +1243,7 @@ function App() {
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
+    updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setVisibilityOptions(
       cloneVisibilityOptions(nextDiagram.view?.visibility ?? defaultVisibilityOptions),
     )
@@ -1571,6 +1588,7 @@ function App() {
     setSymbolicImportStatus('')
     setSelectedExampleId(diagram.ambientDimension === 2 ? '2d' : '3d')
     setCreationTool('select')
+    updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setEditorState((current) =>
       commitDiagramChange(current, {
         ...current,
@@ -2240,6 +2258,16 @@ function App() {
     })
   }
 
+  function updatePreviewCoordinateInputMode(mode: CoordinateInputMode): void {
+    setCoordinateInputMode(mode)
+    setDirectInputDrawerState(directInputDrawerStateForInputMode(mode))
+  }
+
+  function closeDirectInputDrawer(): void {
+    updatePreviewCoordinateInputMode(closeDirectInputDrawerInputMode())
+    setDirectCreationStatus('')
+  }
+
   function updateCreationTool(tool: CreationTool): void {
     if (
       tool === 'createSheet' &&
@@ -2310,17 +2338,17 @@ function App() {
   }
 
   function activateCursorCreationTool(tool: CreationTool): void {
-    setCoordinateInputMode(defaultPreviewCoordinateInputMode())
+    updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     updateCreationTool(tool)
   }
 
   function activateDirectCreationTool(tool: DirectCreationTool): void {
-    setCoordinateInputMode('direct')
+    updatePreviewCoordinateInputMode('direct')
     updateCreationTool(tool)
   }
 
   function activatePathMenuItem(item: PreviewPathMenuItem): void {
-    setCoordinateInputMode(item.inputMode)
+    updatePreviewCoordinateInputMode(item.inputMode)
 
     if (item.directPathInputMode !== undefined) {
       setDirectPathInputMode(item.directPathInputMode)
@@ -2338,7 +2366,7 @@ function App() {
   }
 
   function activateSheetCreationKind(kind: SheetCreationKind): void {
-    setCoordinateInputMode(defaultPreviewCoordinateInputMode())
+    updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     updateSheetCreationKind(kind)
     updateCreationTool('createSheet')
   }
@@ -5094,6 +5122,440 @@ function App() {
     }
   }
 
+  function renderDirectInputDrawer() {
+    if (!directInputDrawerVisible || !isDirectCreationTool(creationTool)) {
+      return null
+    }
+
+    return (
+      <section
+        className="direct-input-drawer"
+        aria-labelledby="direct-input-drawer-heading"
+        onClick={stopPreviewOverlayEvent}
+        onPointerDown={stopPreviewOverlayEvent}
+      >
+        <div className="direct-input-drawer-heading-row">
+          <div className="direct-input-drawer-title">
+            <span className="control-label">Direct input</span>
+            <h3 id="direct-input-drawer-heading">
+              {directCreationTitle(creationTool)}
+            </h3>
+          </div>
+          <button
+            type="button"
+            className="preview-overlay-button direct-input-drawer-close"
+            onClick={(event) =>
+              runPreviewOverlayAction(event, closeDirectInputDrawer)
+            }
+            onPointerDown={stopPreviewOverlayEvent}
+          >
+            Close
+          </button>
+        </div>
+        {renderDirectCreationForm()}
+      </section>
+    )
+  }
+
+  function renderDirectCreationForm() {
+    if (coordinateInputMode !== 'direct' || !isDirectCreationTool(creationTool)) {
+      return null
+    }
+
+    return (
+      <form
+        className="direct-input-drawer-form"
+        aria-label="Direct creation"
+        onSubmit={(event) => {
+          event.preventDefault()
+          createDirectElement()
+        }}
+      >
+        {editableDiagram.ambientDimension === 3 &&
+          creationTool !== 'createGrid' &&
+          (creationTool !== 'createSheet' ||
+            !isBoundarySurfaceSheetCreationKind(sheetCreationKind)) && (
+            <label className="direct-create-field direct-coordinate-mode-field">
+              <span>Coordinate mode</span>
+              <select
+                value={directCoordinateMode}
+                onChange={(event) =>
+                  updateDirectCoordinateMode(
+                    event.currentTarget.value as DirectCoordinateMode,
+                  )
+                }
+              >
+                {directCoordinateModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {directCoordinateModeLabel(mode)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        {creationTool === 'createLabel' && (
+          <label className="direct-create-field direct-create-text">
+            <span>Text</span>
+            <input
+              className="toolbar-text-input"
+              type="text"
+              value={directLabelText}
+              onChange={(event) => {
+                setDirectLabelText(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+        )}
+        {(creationTool === 'createPoint' ||
+          creationTool === 'createLabel' ||
+          (creationTool === 'createSheet' &&
+            isAnchorCurvedSheetCreationKind(sheetCreationKind))) &&
+          directCoordinateAxes(
+            editableDiagram.ambientDimension,
+            effectiveDirectCoordinateMode(
+              editableDiagram.ambientDimension,
+              directCoordinateMode,
+            ),
+          ).map((axis) => (
+            <label key={axis} className="direct-create-field">
+              <span>
+                {directCoordinateAxisLabel(
+                  axis,
+                  editableDiagram.ambientDimension,
+                  directCoordinateMode,
+                )}{' '}
+                {creationTool === 'createSheet' &&
+                  isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
+                  axis === 'x' &&
+                  `(${curvedSheetAnchorLabel(sheetCreationKind)})`}
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                spellCheck={false}
+                value={directCoordinates[axis]}
+                onChange={(event) =>
+                  updateDirectCoordinate(axis, event.currentTarget.value)
+                }
+              />
+            </label>
+          ))}
+        {creationTool === 'createSheet' &&
+          isAnchorCurvedSheetCreationKind(sheetCreationKind) && (
+            <div
+              className="direct-sheet-parameter-control"
+              role="group"
+              aria-label={`${sheetCreationKindLabel(sheetCreationKind)} parameters`}
+            >
+              {renderCurvedSheetParameterControls()}
+            </div>
+          )}
+        {creationTool === 'createSheet' &&
+          isBoundarySurfaceSheetCreationKind(sheetCreationKind) &&
+          renderBoundarySurfaceDirectControls()}
+        {creationTool === 'createPath' && renderDirectPathControls()}
+        {creationTool === 'createGrid' && renderDirectGridControls()}
+        {isDirectPathCreationTool(creationTool) &&
+          (creationTool !== 'createSheet' ||
+            sheetCreationKind === 'polygon') && (
+            <>
+              {creationTool === 'createCubicBezier' && (
+                <label className="direct-create-field">
+                  <span>Controls</span>
+                  <select
+                    value={directCubicBezierControlMode}
+                    onChange={(event) =>
+                      updateDirectCubicBezierControlMode(
+                        event.currentTarget.value as DirectCubicBezierControlMode,
+                      )
+                    }
+                  >
+                    {directCubicBezierControlModeOptions(
+                      editableDiagram.ambientDimension,
+                      effectiveDirectCoordinateMode(
+                        editableDiagram.ambientDimension,
+                        directCoordinateMode,
+                      ),
+                    ).map((mode) => (
+                      <option key={mode} value={mode}>
+                        {directCubicBezierControlModeLabel(mode)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label className="direct-create-field direct-coordinate-list">
+                <span>
+                  {directRowsLabel(creationTool, directCubicBezierControlMode)}
+                </span>
+                <textarea
+                  value={directRowsForCreationToolValue(creationTool)}
+                  rows={directCoordinateRowsTextAreaRows(creationTool)}
+                  spellCheck={false}
+                  placeholder={directCoordinateRowsPlaceholder(
+                    editableDiagram.ambientDimension,
+                    creationTool === 'createCubicBezier'
+                      ? directCubicBezierControlMode
+                      : 'absolute',
+                    effectiveDirectCoordinateMode(
+                      editableDiagram.ambientDimension,
+                      directCoordinateMode,
+                    ),
+                  )}
+                  onChange={(event) =>
+                    updateDirectRowsForCreationTool(
+                      creationTool,
+                      event.currentTarget.value,
+                    )
+                  }
+                />
+              </label>
+              <div
+                className="direct-coordinate-source-control"
+                role="group"
+                aria-label="Copy coordinates from existing element"
+              >
+                <span className="control-label">Copy from existing element</span>
+                <label className="direct-create-field">
+                  <span>Row</span>
+                  <select
+                    value={directSourceTargetRow}
+                    onChange={(event) => {
+                      setDirectSourceTargetRow(event.currentTarget.value)
+                      setDirectCreationStatus('')
+                    }}
+                  >
+                    {directSourceTargetRows(
+                      directRowsForCreationToolValue(creationTool),
+                      creationTool,
+                    ).map((row) => (
+                      <option key={row} value={String(row)}>
+                        {row}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="direct-create-field direct-coordinate-source-field">
+                  <span>Use coordinates from</span>
+                  <select
+                    value={directSourceKey}
+                    onChange={(event) => {
+                      setDirectSourceKey(event.currentTarget.value)
+                      setDirectCreationStatus('')
+                    }}
+                  >
+                    <option value="">Choose source</option>
+                    {existingCoordinateSourceOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  disabled={existingCoordinateSourceOptions.length === 0}
+                  onClick={applyExistingSourceToDirectRow}
+                >
+                  Use selected coordinates
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={clearExistingSourceFromDirectRow}
+                >
+                  Clear row
+                </button>
+                <span className="direct-source-summary">
+                  {directSourceSummary(
+                    directSourcesForCreationToolValue(creationTool),
+                    existingCoordinateSourceOptions,
+                  )}
+                </span>
+              </div>
+            </>
+          )}
+        <button
+          type="submit"
+          className="toolbar-button direct-input-create-button"
+          disabled={directCreateDisabled}
+        >
+          Create
+        </button>
+        <span className="toolbar-status" role="status">
+          {directCreationStatus}
+        </span>
+      </form>
+    )
+  }
+
+  function renderBoundarySurfaceDirectControls() {
+    if (sheetCreationKind === 'ruledSurface') {
+      return (
+        <div
+          className="direct-boundary-surface-controls"
+          role="group"
+          aria-label="Ruled surface direct controls"
+        >
+          <span className="direct-source-summary">
+            {ruledSurfaceBoundaryDraftStatusMessage(ruledSurfaceBoundaryDraft)}
+          </span>
+          <label className="direct-create-field">
+            <span>Segments</span>
+            <input
+              type="number"
+              min="1"
+              max={maxCurvedSheetSamplingSegments}
+              step="1"
+              value={ruledSurfaceSegmentsInput}
+              onChange={(event) => {
+                setRuledSurfaceSegmentsInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <div className="direct-boundary-action-row">
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={
+                ruledSurfaceBoundaryDraftPickedPathIds(ruledSurfaceBoundaryDraft)
+                  .length === 0
+              }
+              onClick={undoRuledSurfaceBoundaryPicking}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={
+                ruledSurfaceBoundaryDraftPickedPathIds(ruledSurfaceBoundaryDraft)
+                  .length === 0
+              }
+              onClick={resetRuledSurfaceBoundaryPicking}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (sheetCreationKind === 'coonsPatch') {
+      return (
+        <div
+          className="direct-boundary-surface-controls"
+          role="group"
+          aria-label="Coons patch direct controls"
+        >
+          <span className="direct-source-summary">
+            {coonsPatchBoundaryDraftStatusForUi(
+              editableDiagram,
+              coonsPatchBoundaryDraft,
+            )}
+          </span>
+          <label className="direct-create-field">
+            <span>U segments</span>
+            <input
+              type="number"
+              min="1"
+              max={maxCurvedSheetSamplingSegments}
+              step="1"
+              value={coonsPatchUSegmentsInput}
+              onChange={(event) => {
+                setCoonsPatchUSegmentsInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <label className="direct-create-field">
+            <span>V segments</span>
+            <input
+              type="number"
+              min="1"
+              max={maxCurvedSheetSamplingSegments}
+              step="1"
+              value={coonsPatchVSegmentsInput}
+              onChange={(event) => {
+                setCoonsPatchVSegmentsInput(event.currentTarget.value)
+                setSheetStatus('')
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+          <div className="direct-boundary-action-row">
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={
+                coonsPatchBoundaryDraftPickedSourceIds(coonsPatchBoundaryDraft)
+                  .length === 0
+              }
+              onClick={undoCoonsPatchBoundaryPicking}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={
+                coonsPatchBoundaryDraftPickedSourceIds(coonsPatchBoundaryDraft)
+                  .length === 0
+              }
+              onClick={resetCoonsPatchBoundaryPicking}
+            >
+              Reset
+            </button>
+          </div>
+          <details className="direct-boundary-directions">
+            <summary>Boundary directions</summary>
+            <div className="direct-boundary-direction-list">
+              {coonsPatchBoundaryRoles.map((role) => {
+                const picked = coonsPatchBoundaryDraftPickedBoundaryForRole(
+                  coonsPatchBoundaryDraft,
+                  role,
+                )
+
+                return (
+                  <div key={role} className="preview-coons-direction-row">
+                    <span>{coonsPatchBoundaryRoleLabel(role)}</span>
+                    <span>
+                      {formatCoonsPatchBoundaryDirectionSummary(
+                        editableDiagram,
+                        coonsPatchBoundaryDraft,
+                        role,
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="toolbar-button"
+                      disabled={picked === null || picked.kind === 'point'}
+                      aria-pressed={
+                        picked !== null && picked.kind !== 'point'
+                          ? picked.reversed
+                          : false
+                      }
+                      onClick={() => toggleCoonsPatchBoundaryDirection(role)}
+                    >
+                      Reverse
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </details>
+        </div>
+      )
+    }
+
+    return null
+  }
+
   function renderPreviewToolbarOverlay() {
     const isCollapsed = previewToolbarState === 'collapsed'
 
@@ -5374,6 +5836,10 @@ function App() {
   }
 
   function renderActiveCreationControls() {
+    if (coordinateInputMode === 'direct') {
+      return null
+    }
+
     if (creationTool === 'createPolyline') {
       return (
         <div className="preview-toolbar-detail" role="group" aria-label="Polyline">
@@ -5914,228 +6380,6 @@ function App() {
           )}
         </div>
 
-        {coordinateInputMode === 'direct' && isDirectCreationTool(creationTool) && (
-            <form
-              className="control-group direct-create-control"
-              aria-label="Direct creation"
-              onSubmit={(event) => {
-                event.preventDefault()
-                createDirectElement()
-              }}
-            >
-              <span className="control-label">{directCreationTitle(creationTool)}</span>
-              {editableDiagram.ambientDimension === 3 &&
-                creationTool !== 'createGrid' &&
-                (creationTool !== 'createSheet' ||
-                  !isBoundarySurfaceSheetCreationKind(sheetCreationKind)) && (
-                <label className="direct-create-field direct-coordinate-mode-field">
-                  <span>Coordinate mode</span>
-                  <select
-                    value={directCoordinateMode}
-                    onChange={(event) =>
-                      updateDirectCoordinateMode(
-                        event.currentTarget.value as DirectCoordinateMode,
-                      )
-                    }
-                  >
-                    {directCoordinateModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {directCoordinateModeLabel(mode)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {creationTool === 'createLabel' && (
-                <label className="direct-create-field direct-create-text">
-                  <span>Text</span>
-                  <input
-                    className="toolbar-text-input"
-                    type="text"
-                    value={directLabelText}
-                    onChange={(event) => {
-                      setDirectLabelText(event.currentTarget.value)
-                      setDirectCreationStatus('')
-                    }}
-                  />
-                </label>
-              )}
-              {(creationTool === 'createPoint' ||
-                creationTool === 'createLabel' ||
-                (creationTool === 'createSheet' &&
-                  isAnchorCurvedSheetCreationKind(sheetCreationKind))) &&
-                directCoordinateAxes(
-                  editableDiagram.ambientDimension,
-                  effectiveDirectCoordinateMode(
-                    editableDiagram.ambientDimension,
-                    directCoordinateMode,
-                  ),
-                ).map((axis) => (
-                  <label key={axis} className="direct-create-field">
-                    <span>
-                      {directCoordinateAxisLabel(
-                        axis,
-                        editableDiagram.ambientDimension,
-                        directCoordinateMode,
-                      )}{' '}
-                      {creationTool === 'createSheet' &&
-                        isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
-                        axis === 'x' &&
-                        `(${curvedSheetAnchorLabel(sheetCreationKind)})`}
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      spellCheck={false}
-                      value={directCoordinates[axis]}
-                      onChange={(event) =>
-                        updateDirectCoordinate(axis, event.currentTarget.value)
-                      }
-                    />
-                  </label>
-                ))}
-              {creationTool === 'createPath' && renderDirectPathControls()}
-              {creationTool === 'createGrid' && renderDirectGridControls()}
-              {isDirectPathCreationTool(creationTool) &&
-                (creationTool !== 'createSheet' ||
-                  sheetCreationKind === 'polygon') && (
-                <>
-                  {creationTool === 'createCubicBezier' && (
-                    <label className="direct-create-field">
-                      <span>Controls</span>
-                      <select
-                        value={directCubicBezierControlMode}
-                        onChange={(event) =>
-                          updateDirectCubicBezierControlMode(
-                            event.currentTarget
-                              .value as DirectCubicBezierControlMode,
-                          )
-                        }
-                      >
-                        {directCubicBezierControlModeOptions(
-                          editableDiagram.ambientDimension,
-                          effectiveDirectCoordinateMode(
-                            editableDiagram.ambientDimension,
-                            directCoordinateMode,
-                          ),
-                        ).map((mode) => (
-                          <option key={mode} value={mode}>
-                            {directCubicBezierControlModeLabel(mode)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <label className="direct-create-field direct-coordinate-list">
-                    <span>
-                      {directRowsLabel(
-                        creationTool,
-                        directCubicBezierControlMode,
-                      )}
-                    </span>
-                    <textarea
-                      value={directRowsForCreationToolValue(creationTool)}
-                      rows={directCoordinateRowsTextAreaRows(creationTool)}
-                      spellCheck={false}
-                      placeholder={directCoordinateRowsPlaceholder(
-                        editableDiagram.ambientDimension,
-                        creationTool === 'createCubicBezier'
-                          ? directCubicBezierControlMode
-                          : 'absolute',
-                        effectiveDirectCoordinateMode(
-                          editableDiagram.ambientDimension,
-                          directCoordinateMode,
-                        ),
-                      )}
-                      onChange={(event) =>
-                        updateDirectRowsForCreationTool(
-                          creationTool,
-                          event.currentTarget.value,
-                        )
-                      }
-                    />
-                  </label>
-                  <div
-                    className="direct-coordinate-source-control"
-                    role="group"
-                    aria-label="Copy coordinates from existing element"
-                  >
-                    <span className="control-label">
-                      Copy from existing element
-                    </span>
-                    <label className="direct-create-field">
-                      <span>Row</span>
-                      <select
-                        value={directSourceTargetRow}
-                        onChange={(event) => {
-                          setDirectSourceTargetRow(event.currentTarget.value)
-                          setDirectCreationStatus('')
-                        }}
-                      >
-                        {directSourceTargetRows(
-                          directRowsForCreationToolValue(creationTool),
-                          creationTool,
-                        ).map((row) => (
-                          <option key={row} value={String(row)}>
-                            {row}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="direct-create-field direct-coordinate-source-field">
-                      <span>Use coordinates from</span>
-                      <select
-                        value={directSourceKey}
-                        onChange={(event) => {
-                          setDirectSourceKey(event.currentTarget.value)
-                          setDirectCreationStatus('')
-                        }}
-                      >
-                        <option value="">Choose source</option>
-                        {existingCoordinateSourceOptions.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="toolbar-button"
-                      disabled={existingCoordinateSourceOptions.length === 0}
-                      onClick={applyExistingSourceToDirectRow}
-                    >
-                      Use selected coordinates
-                    </button>
-                    <button
-                      type="button"
-                      className="toolbar-button"
-                      onClick={clearExistingSourceFromDirectRow}
-                    >
-                      Clear row
-                    </button>
-                    <span className="direct-source-summary">
-                      {directSourceSummary(
-                        directSourcesForCreationToolValue(creationTool),
-                        existingCoordinateSourceOptions,
-                      )}
-                    </span>
-                  </div>
-                </>
-              )}
-              <button
-                type="submit"
-                className="toolbar-button"
-                disabled={directCreateDisabled}
-              >
-                Create
-              </button>
-              <span className="toolbar-status" role="status">
-                {directCreationStatus}
-              </span>
-            </form>
-          )}
-
         <div className="control-group layer-filter-control">
           <span className="control-label">Layer</span>
           <select
@@ -6566,6 +6810,7 @@ function App() {
           </div>
           <div className="preview-stage">
             {renderPreviewToolbarOverlay()}
+            {renderDirectInputDrawer()}
             <SvgDiagram
               diagram={editableDiagram}
               fitToView
