@@ -25,8 +25,10 @@ import {
   layerFilterFromSelectValue,
   layerFilterSelectValue,
   layerPaletteRows,
+  LAYER_DRAG_MIME,
   nextLayerPaletteOpenState,
   parseLayerValueInput,
+  resolveLayerDropSource,
   resolveLayerDropSwap,
   selectedLayerActionTarget,
   type LayerPaletteRow,
@@ -99,6 +101,10 @@ export function LayerManager({
     selectedActionLayerValue === null
       ? null
       : rows.find((row) => row.layer.value === selectedActionLayerValue) ?? null
+  const validLayerValues = useMemo(
+    () => layers.map((layer) => layer.value),
+    [layers],
+  )
   const detailsId = 'preview-layer-palette'
   const titleId = 'preview-layer-palette-title'
 
@@ -122,11 +128,23 @@ export function LayerManager({
     )
   }
 
+  function changeExpanded(nextExpanded: boolean): void {
+    if (!nextExpanded) {
+      setDraggedLayerValue(null)
+    }
+
+    onExpandedChange(nextExpanded)
+  }
+
   function dropLayerOnTarget(
     draggedLayer: number | null,
     targetLayer: number,
   ): void {
-    const swap = resolveLayerDropSwap(draggedLayer, targetLayer)
+    const swap = resolveLayerDropSwap(
+      draggedLayer,
+      targetLayer,
+      validLayerValues,
+    )
 
     setDraggedLayerValue(null)
 
@@ -176,7 +194,7 @@ export function LayerManager({
         aria-controls={detailsId}
         aria-expanded={expanded}
         title={layerButtonTitle(creationLayerInput, layers)}
-        onClick={() => onExpandedChange(nextLayerPaletteOpenState(expanded))}
+        onClick={() => changeExpanded(nextLayerPaletteOpenState(expanded))}
       >
         <span>Layer</span>
         <span className="layer-palette-toggle-count">
@@ -201,7 +219,7 @@ export function LayerManager({
               type="button"
               className="preview-overlay-button layer-palette-close-button"
               aria-label="Close layer window"
-              onClick={() => onExpandedChange(false)}
+              onClick={() => changeExpanded(false)}
             >
               Close
             </button>
@@ -267,6 +285,7 @@ export function LayerManager({
                       selectedActionLayerValue === row.layer.value
                     }
                     draggedLayerValue={draggedLayerValue}
+                    validLayerValues={validLayerValues}
                     onSelectLayer={selectLayerForCreation}
                     onDragStartLayer={setDraggedLayerValue}
                     onDropLayer={dropLayerOnTarget}
@@ -321,6 +340,7 @@ type LayerPaletteListRowProps = {
   row: LayerPaletteRow
   isActionTarget: boolean
   draggedLayerValue: number | null
+  validLayerValues: readonly number[]
   onSelectLayer: (layerValue: number) => void
   onDragStartLayer: (layerValue: number | null) => void
   onDropLayer: (draggedLayerValue: number | null, targetLayerValue: number) => void
@@ -332,6 +352,7 @@ function LayerPaletteListRow({
   row,
   isActionTarget,
   draggedLayerValue,
+  validLayerValues,
   onSelectLayer,
   onDragStartLayer,
   onDropLayer,
@@ -357,8 +378,10 @@ function LayerPaletteListRow({
       role="listitem"
       draggable
       onDragStart={(event) => {
+        const layerPayload = String(row.layer.value)
         event.dataTransfer.effectAllowed = 'move'
-        event.dataTransfer.setData('text/plain', String(row.layer.value))
+        event.dataTransfer.setData(LAYER_DRAG_MIME, layerPayload)
+        event.dataTransfer.setData('text/plain', layerPayload)
         onDragStartLayer(row.layer.value)
       }}
       onDragEnd={() => onDragStartLayer(null)}
@@ -368,10 +391,12 @@ function LayerPaletteListRow({
       }}
       onDrop={(event) => {
         event.preventDefault()
-        const dataLayer = Number(event.dataTransfer.getData('text/plain'))
-        const draggedLayer = Number.isFinite(dataLayer)
-          ? dataLayer
-          : draggedLayerValue
+        const draggedLayer = resolveLayerDropSource({
+          customPayload: event.dataTransfer.getData(LAYER_DRAG_MIME),
+          plainPayload: event.dataTransfer.getData('text/plain'),
+          draggedLayerValue,
+          validLayerValues,
+        })
 
         onDropLayer(draggedLayer, row.layer.value)
       }}

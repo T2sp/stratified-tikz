@@ -33,6 +33,8 @@ import {
   layerFilterSelectValue,
   layerPaletteRows,
   nextLayerPaletteOpenState,
+  parseDraggedLayerValue,
+  resolveLayerDropSource,
   resolveLayerDropSwap,
   selectedLayerActionTarget,
 } from '../../src/ui/layerPalette.ts'
@@ -236,6 +238,141 @@ test('layer palette drag/drop resolves to a layer swap only for valid targets', 
   assert.deepEqual(resolveLayerDropSwap(null, 1), { ok: false })
 })
 
+test('layer drag payload parser rejects empty and invalid payloads', () => {
+  assert.equal(parseDraggedLayerValue(''), null)
+  assert.equal(parseDraggedLayerValue('   '), null)
+  assert.equal(parseDraggedLayerValue('0'), 0)
+  assert.equal(parseDraggedLayerValue('1'), 1)
+  assert.equal(parseDraggedLayerValue('-1'), -1)
+  assert.equal(parseDraggedLayerValue('NaN'), null)
+  assert.equal(parseDraggedLayerValue('Infinity'), null)
+  assert.equal(parseDraggedLayerValue('abc'), null)
+})
+
+test('layer drop source rejects empty payloads without an active internal drag', () => {
+  const calls = resolvedLayerSwapCalls({
+    customPayload: '',
+    plainPayload: '',
+    draggedLayerValue: null,
+    targetLayerValue: 1,
+  })
+
+  assert.deepEqual(calls, [])
+})
+
+test('layer drop source allows empty payload fallback during active layer zero drag', () => {
+  const calls = resolvedLayerSwapCalls({
+    customPayload: '',
+    plainPayload: '',
+    draggedLayerValue: 0,
+    targetLayerValue: 1,
+  })
+
+  assert.deepEqual(calls, [[0, 1]])
+})
+
+test('layer drop source rejects external plain text and invalid payloads', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '',
+      plainPayload: 'abc',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: 'Infinity',
+      plainPayload: 'Infinity',
+      draggedLayerValue: null,
+      targetLayerValue: 0,
+    }),
+    [],
+  )
+})
+
+test('layer drop source rejects missing layers and same-layer drops', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '99',
+      plainPayload: '99',
+      draggedLayerValue: null,
+      targetLayerValue: 1,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '0',
+      plainPayload: '0',
+      draggedLayerValue: null,
+      targetLayerValue: 99,
+    }),
+    [],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '1',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      targetLayerValue: 1,
+    }),
+    [],
+  )
+})
+
+test('layer drop source accepts valid internal payloads and active fallbacks', () => {
+  assert.equal(
+    resolveLayerDropSource({
+      customPayload: '1',
+      plainPayload: '1',
+      draggedLayerValue: null,
+      validLayerValues: [0, 1, 2],
+    }),
+    1,
+  )
+  assert.equal(
+    resolveLayerDropSource({
+      customPayload: '',
+      plainPayload: '1',
+      draggedLayerValue: 2,
+      validLayerValues: [0, 1, 2],
+    }),
+    2,
+  )
+})
+
+test('layer drag/drop regression preserves normal layer swaps', () => {
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '0',
+      plainPayload: '0',
+      draggedLayerValue: 0,
+      targetLayerValue: 1,
+    }),
+    [[0, 1]],
+  )
+  assert.deepEqual(
+    resolvedLayerSwapCalls({
+      customPayload: '2',
+      plainPayload: '2',
+      draggedLayerValue: 2,
+      targetLayerValue: 1,
+    }),
+    [[2, 1]],
+  )
+})
+
 test('selected layer action target stays scoped to the selected layer', () => {
   const layers = [
     { value: 0, name: 'Layer 0' },
@@ -421,4 +558,31 @@ function hasStratum(diagram: Diagram, id: string): boolean {
 
 function hasLabel(diagram: Diagram, id: string): boolean {
   return diagram.labels.some((label) => label.id === id)
+}
+
+type ResolvedLayerSwapCallInput = {
+  customPayload: string
+  plainPayload: string
+  draggedLayerValue: number | null
+  targetLayerValue: number
+  validLayerValues?: readonly number[]
+}
+
+function resolvedLayerSwapCalls(
+  input: ResolvedLayerSwapCallInput,
+): [number, number][] {
+  const validLayerValues = input.validLayerValues ?? [0, 1, 2]
+  const sourceLayerValue = resolveLayerDropSource({
+    customPayload: input.customPayload,
+    plainPayload: input.plainPayload,
+    draggedLayerValue: input.draggedLayerValue,
+    validLayerValues,
+  })
+  const swap = resolveLayerDropSwap(
+    sourceLayerValue,
+    input.targetLayerValue,
+    validLayerValues,
+  )
+
+  return swap.ok ? [[swap.leftLayerValue, swap.rightLayerValue]] : []
 }

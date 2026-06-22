@@ -45,6 +45,17 @@ export type LayerDropSwap =
       ok: false
     }
 
+export const LAYER_DRAG_MIME = 'application/x-stratified-tikz-layer'
+
+export type LayerDropSourceInput = {
+  customPayload: string
+  // Browser-compatible mirror payload; external drops can set it, so it is
+  // never trusted as the source layer without active internal drag state.
+  plainPayload: string
+  draggedLayerValue: number | null
+  validLayerValues: readonly number[]
+}
+
 export function nextLayerPaletteOpenState(open: boolean): boolean {
   return !open
 }
@@ -55,6 +66,18 @@ export function parseLayerValueInput(value: string): number | null {
   }
 
   const layer = Number(value)
+
+  return Number.isFinite(layer) ? normalizeLayerValue(layer) : null
+}
+
+export function parseDraggedLayerValue(payload: string): number | null {
+  const trimmedPayload = payload.trim()
+
+  if (trimmedPayload.length === 0) {
+    return null
+  }
+
+  const layer = Number(trimmedPayload)
 
   return Number.isFinite(layer) ? normalizeLayerValue(layer) : null
 }
@@ -195,6 +218,7 @@ export function selectedLayerActionTarget(
 export function resolveLayerDropSwap(
   draggedLayerValue: number | null,
   targetLayerValue: number,
+  validLayerValues?: readonly number[],
 ): LayerDropSwap {
   if (
     draggedLayerValue === null ||
@@ -206,8 +230,17 @@ export function resolveLayerDropSwap(
 
   const leftLayerValue = normalizeLayerValue(draggedLayerValue)
   const rightLayerValue = normalizeLayerValue(targetLayerValue)
+  const validLayerSet =
+    validLayerValues === undefined
+      ? null
+      : normalizedValidLayerValueSet(validLayerValues)
 
-  if (leftLayerValue === rightLayerValue) {
+  if (
+    leftLayerValue === rightLayerValue ||
+    (validLayerSet !== null &&
+      (!validLayerSet.has(leftLayerValue) ||
+        !validLayerSet.has(rightLayerValue)))
+  ) {
     return { ok: false }
   }
 
@@ -216,6 +249,32 @@ export function resolveLayerDropSwap(
     leftLayerValue,
     rightLayerValue,
   }
+}
+
+export function resolveLayerDropSource(
+  input: LayerDropSourceInput,
+): number | null {
+  const validLayerSet = normalizedValidLayerValueSet(input.validLayerValues)
+
+  if (input.customPayload.length > 0) {
+    const customLayer = parseDraggedLayerValue(input.customPayload)
+
+    return customLayer !== null && validLayerSet.has(customLayer)
+      ? customLayer
+      : null
+  }
+
+  const fallbackLayer = input.draggedLayerValue
+
+  if (fallbackLayer === null || !Number.isFinite(fallbackLayer)) {
+    return null
+  }
+
+  const normalizedFallbackLayer = normalizeLayerValue(fallbackLayer)
+
+  return validLayerSet.has(normalizedFallbackLayer)
+    ? normalizedFallbackLayer
+    : null
 }
 
 export function layerFilterSelectValue(layerFilter: LayerFilter): string {
@@ -232,4 +291,18 @@ export function layerFilterFromSelectValue(value: string): LayerFilter {
   return Number.isFinite(layer)
     ? { kind: 'layer', layer: normalizeLayerValue(layer) }
     : allLayersFilter
+}
+
+function normalizedValidLayerValueSet(
+  layerValues: readonly number[],
+): Set<number> {
+  const validLayerSet = new Set<number>()
+
+  for (const layerValue of layerValues) {
+    if (Number.isFinite(layerValue)) {
+      validLayerSet.add(normalizeLayerValue(layerValue))
+    }
+  }
+
+  return validLayerSet
 }
