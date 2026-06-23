@@ -11,7 +11,11 @@ import './App.css'
 import {
   emptyThreeDimensionalDiagram,
   emptyTwoDimensionalDiagram,
+  arrowStringDiagramExample,
+  braidingCrossingsExample,
   evenOddFilledBoundaryExample,
+  harpoonArrowheadsExample,
+  midArrowDecorationExample,
   symbolicCirclePointExample,
   symbolicPathExample,
   threeDimensionalExample,
@@ -21,6 +25,7 @@ import {
   twoDimensionalExample,
 } from './examples'
 import { normalizePointForAmbientDimension } from './geometry'
+import type { PathIntersectionDetectionStatus } from './geometry'
 import {
   parseSavedDiagramJsonForImport,
   resolvePendingSymbolicDiagramImport,
@@ -314,6 +319,10 @@ type ExampleId =
   | '2d'
   | '3d'
   | 'referenceFilled'
+  | 'arrowString'
+  | 'midArrow'
+  | 'braidingCrossings'
+  | 'harpoonArrows'
   | 'evenOddBoundary'
   | 'symbolicCirclePoint'
   | 'symbolicPath'
@@ -425,6 +434,30 @@ const exampleOptions: ExampleOption[] = [
     name: 'Reference fills',
     summary: 'translucent filled regions with solid and dotted curves',
     diagram: translucentFilledStrataExample,
+  },
+  {
+    id: 'arrowString',
+    name: 'Arrow strings',
+    summary: '2D string diagram paths with endpoint arrows',
+    diagram: arrowStringDiagramExample,
+  },
+  {
+    id: 'midArrow',
+    name: 'Mid arrow',
+    summary: 'mid-path arrow decoration at 0.5',
+    diagram: midArrowDecorationExample,
+  },
+  {
+    id: 'braidingCrossings',
+    name: 'Braiding',
+    summary: 'braiding and anti-braiding crossing states',
+    diagram: braidingCrossingsExample,
+  },
+  {
+    id: 'harpoonArrows',
+    name: 'Harpoons',
+    summary: 'Stealth harpoon mid-arrow heads',
+    diagram: harpoonArrowheadsExample,
   },
   {
     id: 'evenOddBoundary',
@@ -774,6 +807,10 @@ function App() {
     setSelectedPathIntersectionCandidateId,
   ] = useState<string | null>(null)
   const [pathCrossingStatus, setPathCrossingStatus] = useState<string>('')
+  const [
+    pathIntersectionDetectionStatus,
+    setPathIntersectionDetectionStatus,
+  ] = useState<string>('')
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
@@ -1784,6 +1821,13 @@ function App() {
     updateEditableDiagram(result.diagram)
     setPathCrossingStatus(pathCrossingStatusMessage(result.state))
   }
+
+  const handlePathIntersectionDetectionStatusChange = useCallback(
+    (status: PathIntersectionDetectionStatus): void => {
+      setPathIntersectionDetectionStatus(status.message)
+    },
+    [],
+  )
 
   function updateInspectorExpanded(expanded: boolean): void {
     setInspectorDisclosure((current) =>
@@ -6101,7 +6145,12 @@ function App() {
       )
     }
 
-    if (creationTool === 'select' && pathCrossingStatus !== '') {
+    const crossingToolbarStatus =
+      pathCrossingStatus !== ''
+        ? pathCrossingStatus
+        : pathIntersectionDetectionStatus
+
+    if (creationTool === 'select' && crossingToolbarStatus !== '') {
       return (
         <div
           className="preview-toolbar-detail"
@@ -6109,7 +6158,7 @@ function App() {
           aria-label="Crossing status"
         >
           <span className="preview-toolbar-status">
-            {pathCrossingStatus}
+            {crossingToolbarStatus}
           </span>
         </div>
       )
@@ -7039,6 +7088,9 @@ function App() {
                 !workPlanePointPickingState.active
                   ? handlePathIntersectionCandidateClick
                   : undefined
+              }
+              onPathIntersectionDetectionStatusChange={
+                handlePathIntersectionDetectionStatusChange
               }
               onGeometryHandleDrag={
                 creationTool === 'select' && !workPlanePointPickingState.active

@@ -8,6 +8,8 @@ import {
   createTextLabel,
 } from '../model/constructors.ts'
 import { createInitialCamera3D } from '../model/camera.ts'
+import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
+import { pathCrossingStateFromCandidate } from '../model/pathCrossings.ts'
 import { defaultVisibilityOptions } from '../model/visibility.ts'
 import { symbolicGridExampleDiagrams } from './symbolicGridExamples.ts'
 import {
@@ -21,6 +23,7 @@ import type {
   ClosedPathBoundary,
   CurveStyle,
   Diagram,
+  PathArrowOptions,
   PointStyle,
   SurfaceFrame,
   Vec3,
@@ -42,6 +45,46 @@ const dottedCurveStyle = cloneStylePreset(curveStylePresets[1])
 const filledPointStyle = cloneStylePreset(pointStylePresets[0])
 const hollowPointStyle = cloneStylePreset(pointStylePresets[1])
 
+const forwardEndpointArrows: PathArrowOptions = {
+  endpoint: 'forward',
+  mid: {
+    enabled: false,
+    position: 0.5,
+    direction: 'forward',
+    head: 'standard',
+  },
+}
+
+const standardMidArrow: PathArrowOptions = {
+  endpoint: 'none',
+  mid: {
+    enabled: true,
+    position: 0.5,
+    direction: 'forward',
+    head: 'standard',
+  },
+}
+
+const harpoonMidArrow: PathArrowOptions = {
+  endpoint: 'none',
+  mid: {
+    enabled: true,
+    position: 0.5,
+    direction: 'forward',
+    head: 'stealthHarpoon',
+  },
+}
+
+const swappedHarpoonMidArrow: PathArrowOptions = {
+  endpoint: 'none',
+  mid: {
+    enabled: true,
+    position: 0.5,
+    direction: 'backward',
+    head: 'stealthHarpoonSwap',
+  },
+}
+
 export const translucentFilledStrataExample: Diagram =
   createTranslucentFilledStrataExample()
 
@@ -60,6 +103,18 @@ export const coonsPatchExample: Diagram = createCoonsPatchExample()
 export const translucentSortedSheetsExample: Diagram =
   createTranslucentSortedSheetsExample()
 
+export const arrowStringDiagramExample: Diagram =
+  createArrowStringDiagramExample()
+
+export const midArrowDecorationExample: Diagram =
+  createMidArrowDecorationExample()
+
+export const braidingCrossingsExample: Diagram =
+  createBraidingCrossingsExample()
+
+export const harpoonArrowheadsExample: Diagram =
+  createHarpoonArrowheadsExample()
+
 export const referenceExampleDiagrams = [
   translucentFilledStrataExample,
   hemispherePatchExample,
@@ -68,8 +123,233 @@ export const referenceExampleDiagrams = [
   ruledSurfaceOcclusionExample,
   coonsPatchExample,
   translucentSortedSheetsExample,
+  arrowStringDiagramExample,
+  midArrowDecorationExample,
+  braidingCrossingsExample,
+  harpoonArrowheadsExample,
   ...symbolicGridExampleDiagrams,
 ] as const satisfies readonly Diagram[]
+
+function createArrowStringDiagramExample(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'arrow-string-left',
+      name: 'Left arrowed strand',
+      style: solidCurveStyle,
+      points: [vec3(-1.2, -1.4), vec3(-1.2, 1.4)],
+      arrows: forwardEndpointArrows,
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'arrow-string-middle',
+      name: 'Middle arrowed strand',
+      style: solidCurveStyle,
+      points: [vec3(0, -1.4), vec3(0, 1.4)],
+      arrows: forwardEndpointArrows,
+      layer: 1,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'arrow-string-right',
+      name: 'Right arrowed strand',
+      style: solidCurveStyle,
+      points: [vec3(1.2, -1.4), vec3(1.2, 1.4)],
+      arrows: forwardEndpointArrows,
+      layer: 2,
+    }),
+  )
+
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'arrow-string-label-f',
+      name: 'f label',
+      text: '$f$',
+      position: vec3(-1.45, 0),
+      layer: 3,
+    }),
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'arrow-string-label-g',
+      name: 'g label',
+      text: '$g$',
+      position: vec3(0.22, 0),
+      layer: 3,
+    }),
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'arrow-string-label-h',
+      name: 'h label',
+      text: '$h$',
+      position: vec3(1.42, 0),
+      layer: 3,
+    }),
+  )
+
+  return diagram
+}
+
+function createMidArrowDecorationExample(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'mid-arrow-strand',
+      name: 'Mid-arrow strand',
+      style: solidCurveStyle,
+      points: [vec3(-1.7, -0.8), vec3(-0.5, 0.8), vec3(1.7, 0.25)],
+      arrows: standardMidArrow,
+      layer: 0,
+    }),
+  )
+
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'mid-arrow-label',
+      name: 'Mid-arrow label',
+      text: '$\\alpha$',
+      position: vec3(0.3, 0.9),
+      layer: 1,
+    }),
+  )
+
+  return diagram
+}
+
+function createBraidingCrossingsExample(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'braid-a',
+      name: 'Braiding over-strand',
+      style: solidCurveStyle,
+      points: [vec3(-2.2, -0.2), vec3(-0.2, -0.2)],
+      arrows: forwardEndpointArrows,
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'braid-b',
+      name: 'Braiding under-strand',
+      style: solidCurveStyle,
+      points: [vec3(-1.2, -1.15), vec3(-1.2, 0.75)],
+      arrows: forwardEndpointArrows,
+      layer: 1,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'twist-a',
+      name: 'Anti-braiding under-strand',
+      style: solidCurveStyle,
+      points: [vec3(0.2, 0.75), vec3(2.2, 0.75)],
+      arrows: forwardEndpointArrows,
+      layer: 2,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'twist-b',
+      name: 'Anti-braiding over-strand',
+      style: solidCurveStyle,
+      points: [vec3(1.2, -0.2), vec3(1.2, 1.7)],
+      arrows: forwardEndpointArrows,
+      layer: 3,
+    }),
+  )
+
+  const candidates = pathIntersectionCandidatesForDiagram(diagram)
+  const braidCandidate = candidates.find(
+    (candidate) =>
+      candidate.pathAId === 'braid-a' && candidate.pathBId === 'braid-b',
+  )
+  const twistCandidate = candidates.find(
+    (candidate) =>
+      candidate.pathAId === 'twist-a' && candidate.pathBId === 'twist-b',
+  )
+
+  diagram.pathCrossings = [
+    ...(braidCandidate === undefined
+      ? []
+      : [pathCrossingStateFromCandidate(braidCandidate, 'braiding')]),
+    ...(twistCandidate === undefined
+      ? []
+      : [pathCrossingStateFromCandidate(twistCandidate, 'antiBraiding')]),
+  ]
+
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'braiding-label',
+      name: 'Braiding label',
+      text: '$\\beta$',
+      position: vec3(-1.75, 0.62),
+      layer: 4,
+    }),
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'anti-braiding-label',
+      name: 'Anti-braiding label',
+      text: '$\\beta^{-1}$',
+      position: vec3(1.68, -0.05),
+      layer: 4,
+    }),
+  )
+
+  return diagram
+}
+
+function createHarpoonArrowheadsExample(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'harpoon-forward',
+      name: 'Forward harpoon',
+      style: solidCurveStyle,
+      points: [vec3(-1.8, -0.55), vec3(1.8, -0.55)],
+      arrows: harpoonMidArrow,
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'harpoon-swapped',
+      name: 'Swapped backward harpoon',
+      style: dottedCurveStyle,
+      points: [vec3(-1.8, 0.55), vec3(1.8, 0.55)],
+      arrows: swappedHarpoonMidArrow,
+      layer: 1,
+    }),
+  )
+
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'harpoon-forward-label',
+      name: 'Forward harpoon label',
+      text: '$L$',
+      position: vec3(0, -0.95),
+      layer: 2,
+    }),
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'harpoon-swapped-label',
+      name: 'Swapped harpoon label',
+      text: '$R$',
+      position: vec3(0, 0.95),
+      layer: 2,
+    }),
+  )
+
+  return diagram
+}
 
 function createTranslucentFilledStrataExample(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })

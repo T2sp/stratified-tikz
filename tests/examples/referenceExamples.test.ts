@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  arrowStringDiagramExample,
+  braidingCrossingsExample,
   evenOddFilledBoundaryExample,
   coonsPatchExample,
+  harpoonArrowheadsExample,
   hemispherePatchExample,
+  midArrowDecorationExample,
   referenceExampleDiagrams,
   ruledSurfaceOcclusionExample,
   saddlePatchExample,
@@ -31,6 +35,10 @@ const exampleCases = [
   { name: '2D example', diagram: twoDimensionalExample },
   { name: '3D example', diagram: threeDimensionalExample },
   { name: 'reference fills', diagram: translucentFilledStrataExample },
+  { name: 'arrow string diagram', diagram: arrowStringDiagramExample },
+  { name: 'mid-arrow decoration', diagram: midArrowDecorationExample },
+  { name: 'braiding crossings', diagram: braidingCrossingsExample },
+  { name: 'harpoon arrowheads', diagram: harpoonArrowheadsExample },
   { name: 'hemisphere patch', diagram: hemispherePatchExample },
   { name: 'saddle patch', diagram: saddlePatchExample },
   { name: 'even-odd boundary', diagram: evenOddFilledBoundaryExample },
@@ -78,6 +86,22 @@ test('reference filled-strata example exports translucent fills and curve styles
   assert.match(tikz, /line width=1\.2pt/)
   assert.match(tikz, /densely dotted/)
   assert.match(tikz, /\$A\$/)
+})
+
+test('arrow and braiding reference examples export requested features', () => {
+  const arrowTikz = generateTikz(arrowStringDiagramExample)
+  const midArrowTikz = generateTikz(midArrowDecorationExample)
+  const braidingTikz = generateTikz(braidingCrossingsExample)
+  const harpoonTikz = generateTikz(harpoonArrowheadsExample)
+
+  assert.match(arrowTikz, /->/)
+  assert.match(midArrowTikz, /mark=at position 0\.5/)
+  assert.match(braidingTikz, /Braiding crossing: braid-a over braid-b/)
+  assert.match(braidingTikz, /Braiding crossing: twist-b over twist-a/)
+  assert.doesNotMatch(braidingTikz, /\\begin\{knot\}|\\strand|\\flipcrossings/)
+  assert.match(harpoonTikz, /\\arrow\{Stealth\[harpoon\]\}/)
+  assert.match(harpoonTikz, /\\arrowreversed\{Stealth\[harpoon,swap\]\}/)
+  assert.match(harpoonTikz, /\\usetikzlibrary\{arrows\.meta\}/)
 })
 
 test('hemisphere and saddle examples export sampled curved sheets', () => {

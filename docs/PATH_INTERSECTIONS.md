@@ -32,6 +32,14 @@ Grid strata, labels, points, sheets, regions, and 3D curves are ignored.
   dense diagrams can require higher sample counts or can be missed; preview
   sampling options are clamped to finite maxima to keep SVG rendering
   responsive.
+- Preview detection is bounded by additional caps:
+  - at most 48 path-like curves are considered by default;
+  - at most 128 flattened/sample segments are considered per path by default;
+  - at most 384 path pairs are checked by default;
+  - at most 256 crossing candidates are returned by default.
+  Caller-provided higher limits are clamped to hard maxima. When a cap is hit,
+  detection returns the candidates found so far and a status message for the
+  preview toolbar instead of continuing unbounded work.
 - Tangencies are skipped because braided string-diagram crossings require a
   transverse pair of tangents.
 - Candidate IDs are deterministic from path IDs and rounded path parameters,
@@ -50,3 +58,11 @@ Stored crossing states use this convention:
 
 If a saved crossing no longer matches a current candidate with the same id and
 path order, it is treated as stale and removed during load or diagram cleanup.
+If detection is capped while cleaning or validating a dense diagram, exact
+candidate reconciliation is skipped and structurally valid crossing states are
+kept so save/load does not discard persisted braiding data merely because the
+preview detector reached a performance limit.
+
+The preview reports overlapping collinear path segments as ambiguous. They are
+not converted into braiding candidates because a range overlap does not define a
+single transverse crossing point.

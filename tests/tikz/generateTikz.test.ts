@@ -2660,6 +2660,23 @@ test('inline math output with arrow decorations has no blank lines', () => {
   expectNoBlankLines(tikz)
 })
 
+test('3D path arrows export endpoint and mid-arrow options', () => {
+  const tikz = generateTikz(
+    createThreeDimensionalArrowPathDiagram(
+      arrowOptions({
+        endpoint: 'forward',
+        mid: { enabled: true, head: 'stealth' },
+      }),
+    ),
+  )
+
+  assert.match(tikz, /\n\s+->,\n/)
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
 test('numeric path output without arrows has no arrow decoration options', () => {
   const tikz = generateTikz(createArrowPathDiagram())
 
@@ -5173,6 +5190,30 @@ function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
     points: [
       { x: 0, y: 0, z: 0 },
       { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    ...(arrows === undefined ? {} : { arrows }),
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createThreeDimensionalArrowPathDiagram(
+  arrows?: PathArrowOptions,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'arrow-test-path-3d',
+    name: 'Arrow Test Path 3D',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0.5, z: 0.75 },
     ],
     styleSegments: [],
     ...(arrows === undefined ? {} : { arrows }),
