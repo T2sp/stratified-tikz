@@ -28,6 +28,10 @@ import {
 } from './model/serialization.ts'
 import { importTikzStyleFile } from './model/importedTikzStyles.ts'
 import {
+  pathCrossingStatusMessage,
+  togglePathCrossingStateForCandidate,
+} from './model/pathCrossings.ts'
+import {
   elementsOnLayer,
   isLayerLocked,
   isLayerVisible,
@@ -55,6 +59,7 @@ import type {
   LatticePattern,
   LineStyle,
   OrthographicCamera3D,
+  PathIntersectionCandidate,
   PointVisibilityPolicy,
   Stratum,
   TikzExportMode,
@@ -764,6 +769,11 @@ function App() {
     useState<VisibilityOptions>(() =>
       cloneVisibilityOptions(defaultVisibilityOptions),
     )
+  const [
+    selectedPathIntersectionCandidateId,
+    setSelectedPathIntersectionCandidateId,
+  ] = useState<string | null>(null)
+  const [pathCrossingStatus, setPathCrossingStatus] = useState<string>('')
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
@@ -1271,6 +1281,8 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setDirectCreationStatus('')
     setLayerOperationStatus('')
@@ -1404,6 +1416,8 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setDirectCreationStatus('')
     setFillBoundaryPathIds([])
@@ -1435,6 +1449,8 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setDirectCreationStatus('')
     setLayerOperationStatus('')
@@ -1463,6 +1479,8 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setDirectCreationStatus('')
     setLayerOperationStatus('')
@@ -1603,6 +1621,8 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setDirectCreationStatus('')
     setLayerOperationStatus('')
@@ -1745,6 +1765,26 @@ function App() {
     }))
   }
 
+  function handlePathIntersectionCandidateClick(
+    candidate: PathIntersectionCandidate,
+  ): void {
+    const result = togglePathCrossingStateForCandidate(editableDiagram, candidate)
+
+    setSelectedPathIntersectionCandidateId(candidate.id)
+
+    if (!result.ok) {
+      setPathCrossingStatus(
+        result.reason === 'unsupportedAmbientDimension'
+          ? 'Braiding crossings are available only in 2D diagrams.'
+          : 'Crossing candidate changed; click a current crossing marker.',
+      )
+      return
+    }
+
+    updateEditableDiagram(result.diagram)
+    setPathCrossingStatus(pathCrossingStatusMessage(result.state))
+  }
+
   function updateInspectorExpanded(expanded: boolean): void {
     setInspectorDisclosure((current) =>
       setInspectorDisclosureExpanded(current, selectedElement, expanded),
@@ -1797,6 +1837,7 @@ function App() {
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
+    setPathCrossingStatus('')
     setSheetStatus('')
     setCopyStatus('idle')
   }, [selectedElement])
@@ -2278,6 +2319,10 @@ function App() {
 
     setCreationTool(tool)
     setDirectCreationStatus('')
+    if (tool !== 'select') {
+      setPathCrossingStatus('')
+      setSelectedPathIntersectionCandidateId(null)
+    }
 
     if (
       tool !== 'createPolyline' &&
@@ -6056,6 +6101,20 @@ function App() {
       )
     }
 
+    if (creationTool === 'select' && pathCrossingStatus !== '') {
+      return (
+        <div
+          className="preview-toolbar-detail"
+          role="status"
+          aria-label="Crossing status"
+        >
+          <span className="preview-toolbar-status">
+            {pathCrossingStatus}
+          </span>
+        </div>
+      )
+    }
+
     if (creationTool === 'createSheet' && editableDiagram.ambientDimension === 3) {
       return renderSheetToolbarControls()
     }
@@ -6942,6 +7001,9 @@ function App() {
               workPlanePreview={workPlanePreview}
               coordinateSourceHighlights={coordinateSourceHighlights}
               boundaryPathHighlights={boundaryPathHighlights}
+              selectedPathIntersectionCandidateId={
+                selectedPathIntersectionCandidateId
+              }
               layerFilter={layerFilter}
               visibilityOptions={visibilityOptions}
               showGeometryHandles={
@@ -6970,6 +7032,13 @@ function App() {
                   : !previewCursorCreationClicksEnabled
                     ? undefined
                     : handleExistingPointSourceCreationClick
+              }
+              onPathIntersectionCandidateClick={
+                editableDiagram.ambientDimension === 2 &&
+                creationTool === 'select' &&
+                !workPlanePointPickingState.active
+                  ? handlePathIntersectionCandidateClick
+                  : undefined
               }
               onGeometryHandleDrag={
                 creationTool === 'select' && !workPlanePointPickingState.active

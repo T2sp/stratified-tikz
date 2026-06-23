@@ -20,6 +20,7 @@ import type {
   Vec3,
   WorkPlaneFrameSnapshot,
 } from './types.ts'
+import { cleanPathCrossingStates } from './pathCrossings.ts'
 
 export type DiagramLayerElement =
   | { kind: 'stratum'; element: Stratum }
@@ -399,6 +400,10 @@ export function deleteLayer(diagram: Diagram, layerValue: number): Diagram {
     (stratum) => !elementIsOnLayer(stratum, layer),
   )
   const labels = diagram.labels.filter((label) => !elementIsOnLayer(label, layer))
+  const removedCurve = diagram.strata.some(
+    (stratum) =>
+      elementIsOnLayer(stratum, layer) && stratum.geometricKind === 'curve',
+  )
 
   if (
     !hadMetadata &&
@@ -408,12 +413,14 @@ export function deleteLayer(diagram: Diagram, layerValue: number): Diagram {
     return diagram
   }
 
-  return {
+  const nextDiagram = {
     ...diagram,
     strata,
     labels,
     layers: metadata.filter((candidate) => candidate.value !== layer),
   }
+
+  return removedCurve ? cleanPathCrossingStates(nextDiagram) : nextDiagram
 }
 
 export function translateLayer(
@@ -453,13 +460,15 @@ export function translateLayer(
     }
   })
 
-  return changed
-    ? {
-        ...diagram,
-        strata,
-        labels,
-      }
-    : diagram
+  if (!changed) {
+    return diagram
+  }
+
+  return cleanPathCrossingStates({
+    ...diagram,
+    strata,
+    labels,
+  })
 }
 
 export function normalizeLayerMetadataForDiagram(

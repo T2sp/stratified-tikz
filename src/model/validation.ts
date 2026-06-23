@@ -6,6 +6,7 @@ import {
 } from '../geometry/bezierControls.ts'
 import { validateCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
+import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
 import {
   closedPathBoundaryCoordinates,
   isFillRule,
@@ -49,6 +50,7 @@ import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
   pointVisibilityPolicies,
+  crossingKinds,
   tikzExportModes,
   visibilitySortModes,
 } from './types.ts'
@@ -104,6 +106,8 @@ import type {
   MidArrowDecoration,
   PartialCurveStyle,
   PathArrowOptions,
+  PathCrossingState,
+  PathIntersectionCandidate,
   PathSegment,
   PathTemplate,
   PointStratum,
@@ -184,6 +188,7 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     )
   })
 
+  validatePathCrossingStates(diagram, 'pathCrossings', errors)
   validateUserStylePresetReferences(diagram, errors)
   validateImportedTikzStyleReferenceUsages(diagram, errors)
 
@@ -2945,6 +2950,135 @@ function validateCurveStyleSegments(
   }
 }
 
+function validatePathCrossingStates(
+  diagram: Diagram,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  const states = diagram.pathCrossings
+
+  if (states === undefined) {
+    return
+  }
+
+  if (!Array.isArray(states)) {
+    pushError(errors, path, 'Path crossing states must be an array.')
+    return
+  }
+
+  if (diagram.ambientDimension !== 2) {
+    if (states.length > 0) {
+      pushError(errors, path, 'Path crossing states are valid only in 2D diagrams.')
+    }
+    return
+  }
+
+  const curveIds = new Set(
+    diagram.strata
+      .filter(
+        (stratum) =>
+          stratum.geometricKind === 'curve' &&
+          stratum.codim === 1 &&
+          stratum.kind !== 'grid',
+      )
+      .map((stratum) => stratum.id),
+  )
+  const candidatesById = pathIntersectionCandidatesById(diagram)
+
+  states.forEach((state, index) => {
+    const statePath = `${path}[${index}]`
+
+    validatePathCrossingStateShape(state, statePath, errors)
+
+    if (typeof state.pathAId === 'string' && !curveIds.has(state.pathAId)) {
+      pushError(errors, `${statePath}.pathAId`, 'Path A must reference a 2D curve.')
+    }
+
+    if (typeof state.pathBId === 'string' && !curveIds.has(state.pathBId)) {
+      pushError(errors, `${statePath}.pathBId`, 'Path B must reference a 2D curve.')
+    }
+
+    if (
+      typeof state.pathAId === 'string' &&
+      typeof state.pathBId === 'string' &&
+      state.pathAId === state.pathBId
+    ) {
+      pushError(errors, statePath, 'Path crossing state must reference two distinct paths.')
+    }
+
+    if (candidatesById !== null) {
+      validatePathCrossingCandidateReference(
+        state,
+        candidatesById,
+        statePath,
+        errors,
+      )
+    }
+  })
+}
+
+function validatePathCrossingStateShape(
+  state: PathCrossingState,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateStringId(state.id, `${path}.id`, errors)
+  validateStringId(state.pathAId, `${path}.pathAId`, errors)
+  validateStringId(state.pathBId, `${path}.pathBId`, errors)
+  validateVec3ForAmbient(state.point, 2, `${path}.point`, errors)
+  validateUnitIntervalParameter(state.parameterA, `${path}.parameterA`, errors)
+  validateUnitIntervalParameter(state.parameterB, `${path}.parameterB`, errors)
+
+  if (!crossingKinds.some((kind) => kind === state.kind)) {
+    pushError(
+      errors,
+      `${path}.kind`,
+      'Path crossing kind must be none, braiding, or antiBraiding.',
+    )
+  }
+}
+
+function validatePathCrossingCandidateReference(
+  state: PathCrossingState,
+  candidatesById: ReadonlyMap<string, PathIntersectionCandidate>,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (
+    typeof state.id !== 'string' ||
+    typeof state.pathAId !== 'string' ||
+    typeof state.pathBId !== 'string'
+  ) {
+    return
+  }
+
+  const candidate = candidatesById.get(state.id)
+
+  if (candidate === undefined) {
+    pushError(errors, path, 'Path crossing state must match a current 2D path intersection.')
+    return
+  }
+
+  if (candidate.pathAId !== state.pathAId || candidate.pathBId !== state.pathBId) {
+    pushError(errors, path, 'Path crossing state path order is stale.')
+  }
+}
+
+function pathIntersectionCandidatesById(
+  diagram: Diagram,
+): ReadonlyMap<string, PathIntersectionCandidate> | null {
+  try {
+    return new Map(
+      pathIntersectionCandidatesForDiagram(diagram).map((candidate) => [
+        candidate.id,
+        candidate,
+      ]),
+    )
+  } catch {
+    return null
+  }
+}
+
 function validateUniqueIds(
   diagram: Diagram,
   errors: DiagramValidationIssue[],
@@ -2961,6 +3095,12 @@ function validateUniqueIds(
 
   diagram.variables?.forEach((variable, index) => {
     addUniqueId(variable.id, `variables[${index}].id`, seenIds, errors)
+  })
+
+  diagram.pathCrossings?.forEach((state, index) => {
+    if (typeof state.id === 'string') {
+      addUniqueId(state.id, `pathCrossings[${index}].id`, seenIds, errors)
+    }
   })
 }
 
@@ -3251,6 +3391,19 @@ function validateId(
   }
 }
 
+function validateStringId(
+  id: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (typeof id !== 'string') {
+    pushError(errors, path, 'Id must be a string.')
+    return
+  }
+
+  validateId(id, path, errors)
+}
+
 function validateName(
   name: string,
   path: string,
@@ -3289,6 +3442,16 @@ function validateLayer(
   errors: DiagramValidationIssue[],
 ): void {
   validateFinite(layer, path, errors)
+}
+
+function validateUnitIntervalParameter(
+  value: number,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    pushError(errors, path, 'Path crossing parameter must be a finite number in [0, 1].')
+  }
 }
 
 function pointsApproximatelyEqual(

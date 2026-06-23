@@ -3,6 +3,7 @@ import {
   updateCircleTemplateRadiusFromPoint,
   updateEllipseTemplateRadiusFromPoint,
 } from '../model/paths.ts'
+import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import { updateSheetVertex } from '../model/sheets.ts'
 import type { Diagram, SheetStratum, Vec3 } from '../model/types.ts'
 import { updateLabelById } from './diagramUpdates.ts'
@@ -40,54 +41,75 @@ export function updateDiagramGeometryHandle(
     return diagram
   }
 
+  const nextDiagram = (() => {
+    switch (target.kind) {
+      case 'pointPosition':
+        return updatePointPosition(diagram, target.stratumId, normalizedPosition)
+      case 'labelPosition':
+        return updateLabelPosition(diagram, target.labelId, normalizedPosition)
+      case 'curvePoint':
+        return updateCurvePoint(
+          diagram,
+          target.stratumId,
+          target.pointIndex,
+          normalizedPosition,
+        )
+      case 'pathSegmentPoint':
+        return updatePathSegmentPoint(
+          diagram,
+          target.stratumId,
+          target.segmentIndex,
+          target.role,
+          normalizedPosition,
+        )
+      case 'circleTemplateRadius':
+        return updateTemplatePathRadius(
+          diagram,
+          target.stratumId,
+          'circle',
+          normalizedPosition,
+        )
+      case 'ellipseTemplateRadiusX':
+        return updateTemplatePathRadius(
+          diagram,
+          target.stratumId,
+          'ellipseX',
+          normalizedPosition,
+        )
+      case 'ellipseTemplateRadiusY':
+        return updateTemplatePathRadius(
+          diagram,
+          target.stratumId,
+          'ellipseY',
+          normalizedPosition,
+        )
+      case 'sheetVertex':
+        return updateSheetVertexPosition(
+          diagram,
+          target.stratumId,
+          target.vertexIndex,
+          normalizedPosition,
+        )
+    }
+  })()
+
+  return targetChangesCurveGeometry(target)
+    ? cleanPathCrossingStates(nextDiagram)
+    : nextDiagram
+}
+
+function targetChangesCurveGeometry(target: GeometryHandleTarget): boolean {
   switch (target.kind) {
-    case 'pointPosition':
-      return updatePointPosition(diagram, target.stratumId, normalizedPosition)
-    case 'labelPosition':
-      return updateLabelPosition(diagram, target.labelId, normalizedPosition)
     case 'curvePoint':
-      return updateCurvePoint(
-        diagram,
-        target.stratumId,
-        target.pointIndex,
-        normalizedPosition,
-      )
     case 'pathSegmentPoint':
-      return updatePathSegmentPoint(
-        diagram,
-        target.stratumId,
-        target.segmentIndex,
-        target.role,
-        normalizedPosition,
-      )
     case 'circleTemplateRadius':
-      return updateTemplatePathRadius(
-        diagram,
-        target.stratumId,
-        'circle',
-        normalizedPosition,
-      )
     case 'ellipseTemplateRadiusX':
-      return updateTemplatePathRadius(
-        diagram,
-        target.stratumId,
-        'ellipseX',
-        normalizedPosition,
-      )
     case 'ellipseTemplateRadiusY':
-      return updateTemplatePathRadius(
-        diagram,
-        target.stratumId,
-        'ellipseY',
-        normalizedPosition,
-      )
+      return true
+    case 'pointPosition':
+    case 'labelPosition':
     case 'sheetVertex':
-      return updateSheetVertexPosition(
-        diagram,
-        target.stratumId,
-        target.vertexIndex,
-        normalizedPosition,
-      )
+      return false
   }
 }
 

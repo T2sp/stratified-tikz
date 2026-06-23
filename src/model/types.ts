@@ -31,6 +31,33 @@ export type Vec3 = {
   symbolic?: SymbolicVec3
 }
 
+export type PathIntersectionCrossingSign = 'positive' | 'negative'
+
+export type PathIntersectionCandidate = {
+  id: string
+  pathAId: string
+  pathBId: string
+  point: Vec3
+  parameterA: number
+  parameterB: number
+  tangentA: Vec2
+  tangentB: Vec2
+  crossingSign?: PathIntersectionCrossingSign
+}
+
+export const crossingKinds = ['none', 'braiding', 'antiBraiding'] as const
+export type CrossingKind = (typeof crossingKinds)[number]
+
+export type PathCrossingState = {
+  id: string
+  pathAId: string
+  pathBId: string
+  point: Vec3
+  parameterA: number
+  parameterB: number
+  kind: CrossingKind
+}
+
 export type Camera2D = {
   mode: '2d'
   scale: number
@@ -759,6 +786,7 @@ export type Diagram = {
   variables?: SymbolicVariable[]
   strata: Stratum[]
   labels: TextLabel[]
+  pathCrossings?: PathCrossingState[]
 }
 
 export type DiagramValidationIssue = {

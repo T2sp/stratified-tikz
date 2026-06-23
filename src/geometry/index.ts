@@ -1,5 +1,6 @@
 export * from './bezierControls'
 export * from './curvedSheets'
+export * from './pathIntersections'
 export * from './projection'
 export {
   DEFAULT_WORK_PLANE_EPSILON,
