@@ -25,9 +25,11 @@ Grid strata, labels, points, sheets, regions, and 3D curves are ignored.
 - Closed template paths do not treat the duplicated closing point as an
   endpoint, so circle and ellipse crossings at the seam can still be detected.
 - Collinear overlaps are treated as ambiguous and skipped.
-- Cubics, arcs, circles, and ellipses use sampling rather than exact analytic
-  intersection. Very tight curves or near-tangent intersections can require
-  higher sample counts or can be missed.
+- Cubics, arcs, circles, and ellipses use capped sampling rather than exact
+  analytic intersection. Very tight curves, near-tangent intersections, or
+  dense diagrams can require higher sample counts or can be missed; preview
+  sampling options are clamped to finite maxima to keep SVG rendering
+  responsive.
 - Tangencies are skipped because braided string-diagram crossings require a
   transverse pair of tangents.
 - Candidate IDs are deterministic from path IDs and rounded path parameters,

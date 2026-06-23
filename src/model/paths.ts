@@ -23,10 +23,18 @@ import type {
 } from './types.ts'
 
 export const pathEndpointEpsilon = 1e-9
+const minTemplatePathSamples = 8
+// Template path sampling feeds preview and geometry helpers. Keep the exported
+// sampler bounded even when a caller does not provide a feature-specific cap.
+export const MAX_TEMPLATE_PATH_SAMPLES = 1024
 const fullTurnDegrees = 360
 const maxArcCubicSweepDegrees = 90
 
 export type ArcScalarInputValue = number | ScalarInputValue
+
+export type TemplatePathSamplingOptions = {
+  maxSamples?: number
+}
 
 export type PathEndpointPair = {
   start: Vec3
@@ -563,8 +571,9 @@ export function sampleTemplatePathPoints(
   template: PathTemplate,
   ambientDimension: AmbientDimension,
   sampleCount = 64,
+  options: TemplatePathSamplingOptions = {},
 ): Vec3[] {
-  const count = Math.max(8, Math.floor(sampleCount))
+  const count = normalizeTemplatePathSampleCount(sampleCount, options.maxSamples)
   const points: Vec3[] = []
 
   for (let index = 0; index <= count; index += 1) {
@@ -573,6 +582,26 @@ export function sampleTemplatePathPoints(
   }
 
   return points
+}
+
+function normalizeTemplatePathSampleCount(
+  sampleCount: number,
+  maxSamples: number | undefined,
+): number {
+  const finiteSampleCount =
+    Number.isFinite(sampleCount) && sampleCount > 0
+      ? Math.floor(sampleCount)
+      : minTemplatePathSamples
+  const minClampedCount = Math.max(minTemplatePathSamples, finiteSampleCount)
+  const maxClampedCount =
+    maxSamples !== undefined && Number.isFinite(maxSamples) && maxSamples > 0
+      ? Math.min(
+          MAX_TEMPLATE_PATH_SAMPLES,
+          Math.max(minTemplatePathSamples, Math.floor(maxSamples)),
+        )
+      : MAX_TEMPLATE_PATH_SAMPLES
+
+  return Math.min(minClampedCount, maxClampedCount)
 }
 
 export function arcSegmentExpectedStart(

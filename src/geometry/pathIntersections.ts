@@ -22,6 +22,16 @@ export type PathIntersectionDetectionOptions = {
   includeCurve?: (curve: CurveStratum) => boolean
 }
 
+export type NormalizedPathIntersectionDetectionOptions = {
+  cubicSamples: number
+  arcSamples: number
+  templateSamples: number
+  epsilon: number
+  endpointEpsilon: number
+  mergeDistanceEpsilon: number
+  includeCurve?: (curve: CurveStratum) => boolean
+}
+
 export type FlattenedPathSegment2D = {
   pathId: string
   segmentIndex: number
@@ -47,19 +57,16 @@ type SegmentIntersection2D =
     }
   | { kind: 'collinearOverlap' }
 
-type ResolvedPathIntersectionOptions = {
-  cubicSamples: number
-  arcSamples: number
-  templateSamples: number
-  epsilon: number
-  endpointEpsilon: number
-  mergeDistanceEpsilon: number
-  includeCurve?: (curve: CurveStratum) => boolean
-}
+export const DEFAULT_INTERSECTION_CUBIC_SAMPLES = 32
+export const DEFAULT_INTERSECTION_ARC_SAMPLES = 32
+export const DEFAULT_INTERSECTION_TEMPLATE_SAMPLES = 96
 
-const defaultCubicSamples = 32
-const defaultArcSamples = 32
-const defaultTemplateSamples = 96
+// Intersection detection runs in SVG preview. Caller-provided sampling counts
+// are capped so accidental external values cannot create unbounded preview work.
+export const MAX_INTERSECTION_CUBIC_SAMPLES = 128
+export const MAX_INTERSECTION_ARC_SAMPLES = 128
+export const MAX_INTERSECTION_TEMPLATE_SAMPLES = 256
+
 const defaultIntersectionEpsilon = 1e-9
 const defaultEndpointEpsilon = 1e-7
 const defaultMergeDistanceEpsilon = 1e-6
@@ -73,7 +80,7 @@ export function pathIntersectionCandidatesForDiagram(
     return []
   }
 
-  const resolvedOptions = resolveOptions(options)
+  const resolvedOptions = normalizePathIntersectionOptions(options)
   const flattenedPaths = diagram.strata
     .filter(
       (stratum): stratum is CurveStratum =>
@@ -121,7 +128,7 @@ export function flattenCurveFor2DIntersections(
     return null
   }
 
-  const resolvedOptions = resolveOptions(options)
+  const resolvedOptions = normalizePathIntersectionOptions(options)
 
   switch (curve.kind) {
     case 'polyline':
@@ -154,6 +161,7 @@ export function flattenCurveFor2DIntersections(
           curve.template,
           ambientDimension,
           resolvedOptions.templateSamples,
+          { maxSamples: MAX_INTERSECTION_TEMPLATE_SAMPLES },
         ),
         true,
         resolvedOptions,
@@ -166,7 +174,7 @@ export function pathIntersectionsBetweenFlattenedPaths(
   pathB: FlattenedCurvePath2D,
   options: PathIntersectionDetectionOptions = {},
 ): PathIntersectionCandidate[] {
-  const resolvedOptions = resolveOptions(options)
+  const resolvedOptions = normalizePathIntersectionOptions(options)
   const candidates: PathIntersectionCandidate[] = []
 
   for (const segmentA of pathA.segments) {
@@ -241,7 +249,7 @@ function flattenPointPath(
   pathId: string,
   points: readonly Vec3[],
   closed: boolean,
-  options: ResolvedPathIntersectionOptions,
+  options: NormalizedPathIntersectionDetectionOptions,
 ): FlattenedCurvePath2D | null {
   if (points.length < 2) {
     return null
@@ -270,7 +278,7 @@ function flattenPointPath(
 function flattenPathSegments(
   pathId: string,
   sourceSegments: readonly PathSegment[],
-  options: ResolvedPathIntersectionOptions,
+  options: NormalizedPathIntersectionDetectionOptions,
 ): FlattenedCurvePath2D | null {
   if (sourceSegments.length === 0) {
     return null
@@ -487,7 +495,7 @@ function createPathIntersectionCandidate({
 function mergeCandidate(
   candidates: PathIntersectionCandidate[],
   candidate: PathIntersectionCandidate,
-  options: ResolvedPathIntersectionOptions,
+  options: NormalizedPathIntersectionDetectionOptions,
 ): void {
   const existingIndex = candidates.findIndex(
     (existing) =>
@@ -545,7 +553,7 @@ function comparePathIntersectionCandidates(
 function isOpenPathEndpointParameter(
   path: FlattenedCurvePath2D,
   parameter: number,
-  options: ResolvedPathIntersectionOptions,
+  options: NormalizedPathIntersectionDetectionOptions,
 ): boolean {
   return (
     !path.closed &&
@@ -675,18 +683,24 @@ function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, Object.is(value, -0) ? 0 : value))
 }
 
-function resolveOptions(
-  options: PathIntersectionDetectionOptions,
-): ResolvedPathIntersectionOptions {
+export function normalizePathIntersectionOptions(
+  options: PathIntersectionDetectionOptions = {},
+): NormalizedPathIntersectionDetectionOptions {
   return {
-    cubicSamples: positiveIntegerOrDefault(
+    cubicSamples: normalizeIntersectionSampleCount(
       options.cubicSamples,
-      defaultCubicSamples,
+      DEFAULT_INTERSECTION_CUBIC_SAMPLES,
+      MAX_INTERSECTION_CUBIC_SAMPLES,
     ),
-    arcSamples: positiveIntegerOrDefault(options.arcSamples, defaultArcSamples),
-    templateSamples: positiveIntegerOrDefault(
+    arcSamples: normalizeIntersectionSampleCount(
+      options.arcSamples,
+      DEFAULT_INTERSECTION_ARC_SAMPLES,
+      MAX_INTERSECTION_ARC_SAMPLES,
+    ),
+    templateSamples: normalizeIntersectionSampleCount(
       options.templateSamples,
-      defaultTemplateSamples,
+      DEFAULT_INTERSECTION_TEMPLATE_SAMPLES,
+      MAX_INTERSECTION_TEMPLATE_SAMPLES,
     ),
     epsilon: positiveNumberOrDefault(
       options.epsilon,
@@ -706,13 +720,16 @@ function resolveOptions(
   }
 }
 
-function positiveIntegerOrDefault(
+function normalizeIntersectionSampleCount(
   value: number | undefined,
   fallback: number,
+  maxValue: number,
 ): number {
-  return value !== undefined && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : fallback
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
+    return fallback
+  }
+
+  return Math.min(maxValue, Math.max(1, Math.floor(value)))
 }
 
 function positiveNumberOrDefault(

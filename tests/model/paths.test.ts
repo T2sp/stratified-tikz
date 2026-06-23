@@ -7,6 +7,7 @@ import {
   createTemplatePathStratum,
 } from '../../src/model/constructors.ts'
 import {
+  MAX_TEMPLATE_PATH_SAMPLES,
   areSegmentsComposable,
   normalizePathForAmbientDimension,
   pathEndpoints,
@@ -16,6 +17,7 @@ import {
   reverseBoundaryPathSnapshot,
   reverseCurvePathDirection,
   resolvePathSegmentStyle,
+  sampleTemplatePathPoints,
 } from '../../src/model/paths.ts'
 import {
   parseSavedDiagramJson,
@@ -146,6 +148,34 @@ test('template path validation rejects invalid radii and missing 3D frames', () 
   })
 
   assert.equal(validateDiagram(missingFrame).valid, false)
+})
+
+test('template path sampling caps huge counts and preserves default count', () => {
+  const template = {
+    kind: 'circleTemplate' as const,
+    center: { x: 0, y: 0, z: 0 },
+    radius: 1,
+  }
+
+  assert.equal(sampleTemplatePathPoints(template, 2).length, 65)
+  assert.equal(
+    sampleTemplatePathPoints(template, 2, 1_000_000).length,
+    MAX_TEMPLATE_PATH_SAMPLES + 1,
+  )
+  assert.equal(
+    sampleTemplatePathPoints(template, 2, 1_000_000, {
+      maxSamples: 32,
+    }).length,
+    33,
+  )
+  assert.equal(
+    sampleTemplatePathPoints(
+      template,
+      2,
+      Number.POSITIVE_INFINITY,
+    ).length,
+    9,
+  )
 })
 
 test('cross-work-plane 3D concatenated path validates with absolute segment coordinates', () => {
