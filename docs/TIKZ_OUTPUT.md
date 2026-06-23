@@ -129,6 +129,50 @@ decorations. The preview follows the projected path tangent in both 2D and 3D,
 but it does not attempt to reproduce the exact TikZ `Stealth`, `Latex`, or
 harpoon glyphs.
 
+## 2D braiding crossings without knot package
+
+2D path crossings can be marked as no braiding, braiding, or anti-braiding.
+Braiding means path A passes over path B; anti-braiding means path B passes over
+path A. These states are stored in the diagram model and are exported only for
+2D codimension-1 curve crossings.
+
+TikZ export does not use the `knot` package. The generator first emits the full
+paths normally, including their endpoint arrows and mid-arrow decorations. It
+then emits a short explicit overlay for each braided crossing:
+
+```tex
+% Braiding crossing: path-a over path-b; no knot package.
+% Background mask clips the under-strand; over-strand redraw intentionally omits arrow decorations.
+\draw[
+    draw=stzBraidingBackground,
+    draw opacity=1,
+    line width=5.2pt
+]
+    (braidingCrossing0Maskp0) -- (braidingCrossing0Maskp1);
+\draw[
+    draw=stzBraiding0pathaOverStroke,
+    draw opacity=1,
+    line width=1.2pt
+]
+    (braidingCrossing0Overp0) -- (braidingCrossing0Overp1);
+```
+
+The background color defaults to white and is emitted as a local `xcolor`
+definition. The mask stroke width is the under-strand line width plus a 4pt gap.
+The short crossing segment length is currently 0.24 model coordinate units,
+centered at the detected crossing and aligned with the local tangent.
+
+SVG preview uses the same model-space overlay idea: normal paths are drawn first,
+then a background-colored mask is drawn along the under-strand, and then the
+over-strand is redrawn as a short plain stroke. Overlay strokes do not receive
+pointer events, so crossing markers and path controls remain clickable.
+
+The over-strand redraw intentionally omits endpoint arrows and mid-arrow
+decorations to avoid duplicate arrowheads near crossings. The original full path
+still keeps its arrow options. If a mid-arrow lies exactly at the crossing, the
+background mask may partially obscure it; move the arrow position slightly when
+that distinction matters.
+
 The Reverse path direction command reverses supported path geometry while
 preserving the source object ID, name, layer, labels, style, style references,
 and arrow options. Forward arrows remain forward relative to the new path

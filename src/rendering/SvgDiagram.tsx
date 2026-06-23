@@ -65,6 +65,10 @@ import {
   svgPointList,
 } from './svgPath'
 import { curveArrowheadsForSvgPreview } from './svgArrows.ts'
+import {
+  svgPathCrossingOverlayPrimitives,
+  type SvgPathCrossingOverlayPrimitive,
+} from './svgPathCrossings.ts'
 import { projectToSvgPoint } from './svgProjection'
 import {
   curveStyleToSvgStrokeAttributes,
@@ -346,6 +350,15 @@ export function SvgDiagram({
         layerFilterIncludesLayer(layerFilter, curve.layer),
     },
   )
+  const pathCrossingOverlays = svgPathCrossingOverlayPrimitives(
+    diagram,
+    (point) => projectToSvgPoint(camera, point, height),
+    {
+      includeCurve: (curve) =>
+        shouldRenderStratumInSvgPreview(diagram, curve) &&
+        layerFilterIncludesLayer(layerFilter, curve.layer),
+    },
+  )
 
   return (
     <svg
@@ -470,6 +483,7 @@ export function SvgDiagram({
       {renderCoordinateAxesGuide(coordinateAxesGuide, camera, height)}
       {renderWorkPlanePreview(workPlanePreview, camera, height)}
       <g>{items.map((item) => item.element)}</g>
+      {renderPathCrossingOverlays(pathCrossingOverlays)}
       {renderSheetDraft(sheetDraft, camera, height)}
       {renderPolylineDraft(polylineDraft, camera, height)}
       {renderCubicBezierDraft(cubicBezierDraft, camera, height)}
@@ -904,6 +918,41 @@ function renderPathIntersectionCandidates(
           onPathIntersectionCandidateClick,
         ),
       )}
+    </g>
+  )
+}
+
+function renderPathCrossingOverlays(
+  overlays: readonly SvgPathCrossingOverlayPrimitive[],
+): ReactElement | null {
+  if (overlays.length === 0) {
+    return null
+  }
+
+  return (
+    <g
+      key="path-crossing-overlays"
+      className="svg-path-crossing-overlays"
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      {overlays.map((overlay, index) => (
+        <path
+          key={`${overlay.crossingId}-${overlay.kind}-${index}`}
+          d={overlay.pathData}
+          fill="none"
+          stroke={overlay.stroke}
+          strokeOpacity={overlay.strokeOpacity}
+          strokeWidth={overlay.strokeWidth}
+          strokeDasharray={overlay.strokeDasharray}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+          data-svg-path-crossing-overlay={overlay.kind}
+          data-path-intersection-candidate-id={overlay.crossingId}
+          data-path-id={overlay.pathId}
+        />
+      ))}
     </g>
   )
 }
