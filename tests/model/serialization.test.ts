@@ -18,6 +18,8 @@ import {
   applyUserStylePresetToStratum,
   addSymbolicVariableToDiagram,
   createUserStylePresetFromStyle,
+  clonePathArrowOptions,
+  defaultPathArrowOptions,
   parseSavedDiagramJson,
   parseSavedDiagramJsonForImport,
   resolvePendingSymbolicDiagramImport,
@@ -1053,7 +1055,10 @@ test('diagram serialization preserves optional path labels', () => {
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithPathLabel))
+  assert.deepEqual(
+    result.diagram,
+    ensureLayerMetadataAndPathArrowDefaults(diagramWithPathLabel),
+  )
 })
 
 test('parseSavedDiagramJson accepts missing optional path labels', () => {
@@ -1155,7 +1160,10 @@ test('diagram serialization round trips relative Bezier control metadata', () =>
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithRelativeBezier))
+  assert.deepEqual(
+    result.diagram,
+    ensureLayerMetadataAndPathArrowDefaults(diagramWithRelativeBezier),
+  )
 })
 
 test('diagram serialization round trips work-plane-local Bezier control metadata', () => {
@@ -1203,7 +1211,10 @@ test('diagram serialization round trips work-plane-local Bezier control metadata
   if (!result.ok) {
     throw new Error(result.error)
   }
-  assert.deepEqual(result.diagram, ensureLayerMetadata(diagramWithLocalBezier))
+  assert.deepEqual(
+    result.diagram,
+    ensureLayerMetadataAndPathArrowDefaults(diagramWithLocalBezier),
+  )
 })
 
 test('parseSavedDiagramJson rejects invalid relative Bezier metadata', () => {
@@ -1473,7 +1484,10 @@ test('parseSavedDiagramJsonForImport loads numeric-only diagrams immediately', (
     throw new Error('Expected numeric diagram to be ready.')
   }
 
-  assert.deepEqual(result.diagram, ensureLayerMetadata(twoDimensionalExample))
+  assert.deepEqual(
+    result.diagram,
+    ensureLayerMetadataAndPathArrowDefaults(twoDimensionalExample),
+  )
 })
 
 test('parseSavedDiagramJson refreshes valid symbolic Coons boundaries with saved variables', () => {
@@ -2042,6 +2056,22 @@ function arcBoundarySnapshot(
         frame,
       },
     ],
+  }
+}
+
+function ensureLayerMetadataAndPathArrowDefaults(diagram: Diagram): Diagram {
+  const layered = ensureLayerMetadata(diagram)
+
+  return {
+    ...layered,
+    strata: layered.strata.map((stratum) =>
+      stratum.geometricKind === 'curve' && stratum.arrows === undefined
+        ? {
+            ...stratum,
+            arrows: clonePathArrowOptions(defaultPathArrowOptions),
+          }
+        : stratum,
+    ),
   }
 }
 

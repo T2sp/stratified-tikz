@@ -15,6 +15,7 @@ import type {
   GridParameterRange,
   GridRectangleClip,
   GridStratum,
+  PathArrowOptions,
   PerspectiveCamera3D,
   PointShape,
   PointStratum,
@@ -985,6 +986,105 @@ test('disabled straight line path occlusion preserves normal TikZ output', () =>
     }),
     generateTikz(diagram),
   )
+})
+
+test('occlusion segmented curve endpoint arrows use whole-path endpoints', () => {
+  const tikz = generateTikz(
+    withCurveArrows(
+      createStraightCurveOcclusionDiagram('polyline'),
+      arrowOptions({ endpoint: 'both' }),
+    ),
+    { visibility: enabledVisibilityOptions('layerThenDepth') },
+  )
+  const hiddenIndex = tikz.indexOf('Hidden sampled segment')
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /\n\s+<-\n/g), 1)
+  assert.equal(countMatches(tikz, /\n\s+->\n/g), 1)
+  assert.ok(tikz.indexOf('<-') < hiddenIndex)
+  assert.ok(tikz.lastIndexOf('->') > tikz.lastIndexOf('Visible sampled segment'))
+  assert.match(tikz, /densely dotted/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('occlusion segmented curve mid-arrow is emitted once on hidden run', () => {
+  const tikz = generateTikz(
+    withCurveArrows(
+      createStraightCurveOcclusionDiagram('polyline'),
+      arrowOptions({ mid: { enabled: true, head: 'stealth' } }),
+    ),
+    {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        hiddenCurveStyle: {
+          lineStyle: 'dashed',
+          opacity: 0.5,
+        },
+      },
+    },
+  )
+  const hiddenIndex = tikz.indexOf('Hidden sampled segment')
+  const nextVisibleIndex = tikz.indexOf('Visible sampled segment', hiddenIndex)
+  const markIndex = tikz.indexOf('mark=at position')
+  const hiddenBlock = tikz.slice(hiddenIndex, nextVisibleIndex)
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /postaction=\{decorate\}/g), 1)
+  assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  assert.ok(hiddenIndex < markIndex)
+  assert.ok(markIndex < nextVisibleIndex)
+  assert.match(hiddenBlock, /dashed/)
+  assert.match(hiddenBlock, /draw opacity=0\.5/)
+  assert.match(hiddenBlock, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('occlusion cap fallback preserves original path arrows', () => {
+  const tikz = generateTikz(
+    withCurveArrows(
+      createSurfaceFaceCapCurveOcclusionDiagram(),
+      arrowOptions({
+        endpoint: 'forward',
+        mid: { enabled: true, head: 'stealthHarpoon' },
+      }),
+      'partly-hidden-curve',
+    ),
+    {
+      visibility: {
+        ...enabledVisibilityOptions('layerThenDepth'),
+        maxSurfaceFacesForSorting: 1,
+      },
+    },
+  )
+
+  assert.match(tikz, /Auto curve occlusion skipped/)
+  assert.doesNotMatch(tikz, /Hidden sampled segment/)
+  assert.match(tikz, /\n\s+->,\n/)
+  assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon\]\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('inline occlusion segmented curve arrows have no blank lines', () => {
+  const tikz = generateTikz(
+    withCurveArrows(
+      createStraightCurveOcclusionDiagram('polyline'),
+      arrowOptions({ endpoint: 'forward', mid: { enabled: true } }),
+    ),
+    {
+      exportMode: 'inlineMath',
+      visibility: enabledVisibilityOptions('layerThenDepth'),
+    },
+  )
+
+  assert.match(tikz, /Auto curve occlusion/)
+  assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  expectNoBlankLines(tikz)
+  expectNoTwoSpaceCommandIndent(tikz)
 })
 
 test('hidden point visibility dims hidden points by default', () => {
@@ -2444,6 +2544,249 @@ test('denselyDotted maps to densely dotted', () => {
   )
 
   assert.match(generateTikz(diagram), /densely dotted/)
+})
+
+test('endpoint forward arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'forward' })),
+  )
+
+  assert.match(tikz, /\n\s+->\n\s+\]/)
+})
+
+test('endpoint backward arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'backward' })),
+  )
+
+  assert.match(tikz, /\n\s+<-\n\s+\]/)
+})
+
+test('endpoint both arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'both' })),
+  )
+
+  assert.match(tikz, /\n\s+<->\n\s+\]/)
+})
+
+test('mid-arrow default exports position and standard head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ mid: { enabled: true } })),
+  )
+
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{>\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+})
+
+test('mid-arrow backward exports reversed standard head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, direction: 'backward' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{<\}/)
+})
+
+test('Stealth mid-arrow exports Stealth arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealth' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
+test('Latex mid-arrow exports Latex arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'latex' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Latex\}/)
+})
+
+test('Stealth harpoon mid-arrow exports harpoon arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoon' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon\]\}/)
+})
+
+test('Stealth harpoon swap mid-arrow exports swapped harpoon arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoonSwap' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon,swap\]\}/)
+})
+
+test('backward custom mid-arrow exports arrowreversed syntax', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({
+        mid: { enabled: true, direction: 'backward', head: 'stealth' },
+      }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrowreversed\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
+test('inline math output with arrow decorations has no blank lines', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoon' } }),
+    ),
+    { exportMode: 'inlineMath' },
+  )
+
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+  expectNoBlankLines(tikz)
+})
+
+test('numeric path output without arrows has no arrow decoration options', () => {
+  const tikz = generateTikz(createArrowPathDiagram())
+
+  assert.match(tikz, /\(curvePolyArrowTestPath0p0\) -- \(curvePolyArrowTestPath0p1\);/)
+  assert.doesNotMatch(tikz, /postaction=\{decorate\}/)
+  assert.doesNotMatch(tikz, /decorations\.markings/)
+  assert.doesNotMatch(tikz, /arrows\.meta/)
+  assert.doesNotMatch(tikz, /\n\s+(->|<-|<->)\n/)
+})
+
+test('split concatenated path forward endpoint arrow is only on the final run', () => {
+  const tikz = generateTikz(
+    createMixedStyleArrowPathDiagram(arrowOptions({ endpoint: 'forward' })),
+  )
+  const splitDrawSection = tikz.slice(
+    tikz.indexOf('% Segment style overrides split this concatenated path'),
+  )
+
+  assert.equal(countMatches(splitDrawSection, /\n\s+->\n/g), 1)
+  assert.ok(splitDrawSection.indexOf('->') > splitDrawSection.indexOf('% Segment 3'))
+  assert.doesNotMatch(splitDrawSection.slice(0, splitDrawSection.indexOf('% Segment 3')), /->/)
+})
+
+test('split concatenated path backward endpoint arrow is only on the first run', () => {
+  const tikz = generateTikz(
+    createMixedStyleArrowPathDiagram(arrowOptions({ endpoint: 'backward' })),
+  )
+  const splitDrawSection = tikz.slice(
+    tikz.indexOf('% Segment style overrides split this concatenated path'),
+  )
+
+  assert.equal(countMatches(splitDrawSection, /\n\s+<-\n/g), 1)
+  assert.ok(splitDrawSection.indexOf('<-') < splitDrawSection.indexOf('% Segment 2'))
+  assert.doesNotMatch(splitDrawSection.slice(splitDrawSection.indexOf('% Segment 2')), /<-/)
+})
+
+test('split concatenated path both endpoint arrows use first and final runs', () => {
+  const tikz = generateTikz(
+    createMixedStyleArrowPathDiagram(arrowOptions({ endpoint: 'both' })),
+  )
+  const splitDrawSection = tikz.slice(
+    tikz.indexOf('% Segment style overrides split this concatenated path'),
+  )
+
+  assert.equal(countMatches(splitDrawSection, /\n\s+<-\n/g), 1)
+  assert.equal(countMatches(splitDrawSection, /\n\s+->\n/g), 1)
+  assert.doesNotMatch(splitDrawSection, /<->/)
+  assert.ok(splitDrawSection.indexOf('<-') < splitDrawSection.indexOf('% Segment 2'))
+  assert.ok(splitDrawSection.indexOf('->') > splitDrawSection.indexOf('% Segment 3'))
+})
+
+test('split concatenated path mid-arrow is emitted once on the containing run', () => {
+  const tikz = generateTikz(
+    createMixedStyleArrowPathDiagram(arrowOptions({ mid: { enabled: true } })),
+  )
+  const markMatch = tikz.match(/mark=at position ([0-9.]+)/)
+
+  assert.notEqual(markMatch, null)
+
+  const localPosition = Number(markMatch[1])
+  const segment2Index = tikz.indexOf('% Segment 2')
+  const segment3Index = tikz.indexOf('% Segment 3')
+  const markIndex = tikz.indexOf('mark=at position')
+
+  assert.equal(countMatches(tikz, /postaction=\{decorate\}/g), 1)
+  assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  assert.ok(segment2Index < markIndex)
+  assert.ok(markIndex < segment3Index)
+  assert.ok(Number.isFinite(localPosition))
+  assert.ok(localPosition > 0)
+  assert.ok(localPosition < 1)
+  assert.match(tikz, /dotted/)
+  assert.match(tikz, /densely dotted/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('split concatenated path mid-arrow custom heads emit required libraries', () => {
+  const cases: Array<{
+    head: NonNullable<PathArrowOptions['mid']['head']>
+    command: RegExp
+  }> = [
+    { head: 'stealth', command: /\\arrow\{Stealth\}/ },
+    { head: 'latex', command: /\\arrow\{Latex\}/ },
+    { head: 'stealthHarpoon', command: /\\arrow\{Stealth\[harpoon\]\}/ },
+    {
+      head: 'stealthHarpoonSwap',
+      command: /\\arrow\{Stealth\[harpoon,swap\]\}/,
+    },
+  ]
+
+  for (const { head, command } of cases) {
+    const tikz = generateTikz(
+      createMixedStyleArrowPathDiagram(
+        arrowOptions({ mid: { enabled: true, head } }),
+      ),
+    )
+
+    assert.match(tikz, command)
+    assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+    assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+    assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  }
+})
+
+test('inline split concatenated path arrows have no blank lines', () => {
+  const tikz = generateTikz(
+    createMixedStyleArrowPathDiagram(
+      arrowOptions({ endpoint: 'both', mid: { enabled: true, head: 'stealth' } }),
+    ),
+    { exportMode: 'inlineMath' },
+  )
+
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+  expectNoBlankLines(tikz)
+  expectNoTwoSpaceCommandIndent(tikz)
+})
+
+test('split concatenated path without arrows has no arrow decoration options', () => {
+  const tikz = generateTikz(createMixedStyleArrowPathDiagram())
+
+  assert.match(tikz, /% Segment style overrides split this concatenated path/)
+  assert.match(tikz, /dotted/)
+  assert.match(tikz, /densely dotted/)
+  assert.doesNotMatch(tikz, /postaction=\{decorate\}/)
+  assert.doesNotMatch(tikz, /decorations\.markings/)
+  assert.doesNotMatch(tikz, /arrows\.meta/)
+  assert.doesNotMatch(tikz, /\n\s+(->|<-|<->)\n/)
 })
 
 test('curve with empty path label emits no spath save option', () => {
@@ -4729,6 +5072,108 @@ function symbolicVec3(
       x: xComponent,
       y: yComponent,
       z: zComponent,
+    },
+  }
+}
+
+function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'arrow-test-path',
+    name: 'Arrow Test Path',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    ...(arrows === undefined ? {} : { arrows }),
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createMixedStyleArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'split-arrow-path',
+    name: 'Split Arrow Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+        styleOverride: {
+          strokeColor: '#CC0033',
+          strokeOpacity: 0.7,
+          lineWidth: 1.8,
+          lineStyle: 'dotted',
+        },
+      },
+      {
+        kind: 'line',
+        start: { x: 4, y: 0, z: 0 },
+        end: { x: 6, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'denselyDotted' },
+      },
+    ],
+    styleSegments: [],
+    ...(arrows === undefined ? {} : { arrows }),
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function withCurveArrows(
+  diagram: Diagram,
+  arrows: PathArrowOptions,
+  curveId?: string,
+): Diagram {
+  const curve = diagram.strata.find(
+    (stratum) =>
+      stratum.geometricKind === 'curve' &&
+      (curveId === undefined || stratum.id === curveId),
+  )
+
+  if (curve === undefined || curve.geometricKind !== 'curve') {
+    throw new Error('Expected curve fixture.')
+  }
+
+  curve.arrows = arrows
+
+  return diagram
+}
+
+function arrowOptions({
+  endpoint = 'none',
+  mid = {},
+}: {
+  endpoint?: PathArrowOptions['endpoint']
+  mid?: Partial<PathArrowOptions['mid']>
+} = {}): PathArrowOptions {
+  return {
+    endpoint,
+    mid: {
+      enabled: mid.enabled ?? false,
+      position: mid.position ?? 0.5,
+      direction: mid.direction ?? 'forward',
+      head: mid.head ?? 'standard',
     },
   }
 }

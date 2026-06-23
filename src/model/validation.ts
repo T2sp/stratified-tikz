@@ -38,6 +38,12 @@ import {
   hasTikzOptionLineBreak,
   isTikzStyleTarget,
 } from './importedTikzStyles.ts'
+import {
+  isArrowHeadKind,
+  isEndpointArrowMode,
+  isMidArrowDirection,
+  isValidMidArrowPosition,
+} from './pathArrows.ts'
 import { sheetVertices } from './sheets.ts'
 import {
   hiddenCurveLineStyles,
@@ -95,7 +101,9 @@ import type {
   HiddenCurveStyle,
   ImportedTikzStyleReference,
   LabelStyle,
+  MidArrowDecoration,
   PartialCurveStyle,
+  PathArrowOptions,
   PathSegment,
   PathTemplate,
   PointStratum,
@@ -1281,6 +1289,7 @@ function validateCurveStratum(
   validateCurveStyle(stratum.style, `${path}.style`, errors)
   validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
   validateCurveStyleSegments(stratum.styleSegments, `${path}.styleSegments`, errors)
+  validatePathArrowOptions(stratum.arrows, `${path}.arrows`, errors)
 
   switch (stratum.kind) {
     case 'polyline':
@@ -2779,6 +2788,66 @@ function validatePartialCurveStyle(
       `${path}.lineStyle`,
       'Curve line style must be solid, dashed, dotted, or denselyDotted.',
     )
+  }
+}
+
+function validatePathArrowOptions(
+  options: PathArrowOptions | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (options === undefined) {
+    return
+  }
+
+  if (!isRecord(options) || Array.isArray(options)) {
+    pushError(errors, path, 'Path arrow options must be an object.')
+    return
+  }
+
+  if (!isEndpointArrowMode(options.endpoint)) {
+    pushError(
+      errors,
+      `${path}.endpoint`,
+      'Endpoint arrow mode must be none, forward, backward, or both.',
+    )
+  }
+
+  validateMidArrowDecoration(options.mid, `${path}.mid`, errors)
+}
+
+function validateMidArrowDecoration(
+  decoration: MidArrowDecoration,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(decoration) || Array.isArray(decoration)) {
+    pushError(errors, path, 'Mid-arrow decoration must be an object.')
+    return
+  }
+
+  if (typeof decoration.enabled !== 'boolean') {
+    pushError(errors, `${path}.enabled`, 'Mid-arrow enabled flag must be boolean.')
+  }
+
+  if (!isValidMidArrowPosition(decoration.position)) {
+    pushError(
+      errors,
+      `${path}.position`,
+      'Mid-arrow position must be finite and satisfy 0 < position < 1.',
+    )
+  }
+
+  if (!isMidArrowDirection(decoration.direction)) {
+    pushError(
+      errors,
+      `${path}.direction`,
+      'Mid-arrow direction must be forward or backward.',
+    )
+  }
+
+  if (!isArrowHeadKind(decoration.head)) {
+    pushError(errors, `${path}.head`, 'Arrow head kind is not supported.')
   }
 }
 

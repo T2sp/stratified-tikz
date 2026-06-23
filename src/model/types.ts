@@ -165,6 +165,38 @@ export type Opacity = number
 export const lineStyles = ['solid', 'dashed', 'dotted', 'denselyDotted'] as const
 export type LineStyle = (typeof lineStyles)[number]
 
+export const arrowHeadKinds = [
+  'standard',
+  'stealth',
+  'latex',
+  'stealthHarpoon',
+  'stealthHarpoonSwap',
+] as const
+export type ArrowHeadKind = (typeof arrowHeadKinds)[number]
+
+export const endpointArrowModes = [
+  'none',
+  'forward',
+  'backward',
+  'both',
+] as const
+export type EndpointArrowMode = (typeof endpointArrowModes)[number]
+
+export const midArrowDirections = ['forward', 'backward'] as const
+export type MidArrowDirection = (typeof midArrowDirections)[number]
+
+export type MidArrowDecoration = {
+  enabled: boolean
+  position: number
+  direction: MidArrowDirection
+  head: ArrowHeadKind
+}
+
+export type PathArrowOptions = {
+  endpoint: EndpointArrowMode
+  mid: MidArrowDecoration
+}
+
 export const pointShapes = ['circle', 'square', 'triangle', 'star'] as const
 export type PointShape = (typeof pointShapes)[number]
 
@@ -584,6 +616,7 @@ type CurveStratumBase = {
   importedTikzStyleReferenceId?: string
   style: CurveStyle
   styleSegments: CurveStyleSegment[]
+  arrows?: PathArrowOptions
   layer: number
 }
 

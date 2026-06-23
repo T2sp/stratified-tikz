@@ -73,6 +73,50 @@ The selected mode affects only TikZ output. It does not affect SVG preview,
 diagram geometry, layer membership, camera controls, or undo/redo history.
 Standalone is used when no saved export mode is present.
 
+## Path arrows
+
+Curve strata may export endpoint arrows and mid-path arrowhead decorations.
+Endpoint arrows use ordinary TikZ draw options:
+
+```tex
+->    % forward
+<-    % backward
+<->   % both
+```
+
+Mid-path arrows use TikZ `decorations.markings`:
+
+```tex
+postaction={decorate},
+decoration={markings, mark=at position 0.5 with {\arrow{>}}}
+```
+
+The default mid-arrow position is `0.5`. Forward standard arrows export as
+`\arrow{>}` and backward standard arrows export as `\arrow{<}`. Custom mid-arrow
+heads are:
+
+```tex
+\arrow{Stealth}
+\arrow{Latex}
+\arrow{Stealth[harpoon]}
+\arrow{Stealth[harpoon,swap]}
+```
+
+Backward custom heads use TikZ's reversed marking command, for example
+`\arrowreversed{Stealth}`.
+
+Generated output requests the required libraries when needed:
+
+```tex
+\usetikzlibrary{decorations.markings}
+\usetikzlibrary{arrows.meta}
+```
+
+`decorations.markings` is needed for any mid-arrow decoration. `arrows.meta` is
+needed for `Stealth`, `Latex`, and harpoon arrow heads. Inline math output keeps
+these setup lines inside the `tikzpicture` setup section and still removes blank
+physical lines.
+
 ## Approximate 3D surface ordering
 
 3D diagrams can opt into approximate surface face depth sorting through

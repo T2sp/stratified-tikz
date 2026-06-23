@@ -1120,6 +1120,7 @@ type CurveStratumBase = {
   pathLabel?: string;
   style: CurveStyle;
   styleSegments: CurveStyleSegment[];
+  arrows?: PathArrowOptions;
   layer: number;
 };
 
@@ -1209,6 +1210,53 @@ export type TemplatePathStratum = CurveStratumBase & {
   template: CircleTemplatePath | EllipseTemplatePath;
 };
 ```
+
+### Path arrow options
+
+Curve strata may store endpoint arrows and mid-segment arrow decorations:
+
+```ts
+type ArrowHeadKind =
+  | "standard"
+  | "stealth"
+  | "latex"
+  | "stealthHarpoon"
+  | "stealthHarpoonSwap";
+
+type EndpointArrowMode = "none" | "forward" | "backward" | "both";
+
+type MidArrowDecoration = {
+  enabled: boolean;
+  position: number;
+  direction: "forward" | "backward";
+  head: ArrowHeadKind;
+};
+
+type PathArrowOptions = {
+  endpoint: EndpointArrowMode;
+  mid: MidArrowDecoration;
+};
+```
+
+Missing `arrows` fields load as:
+
+```ts
+{
+  endpoint: "none",
+  mid: {
+    enabled: false,
+    position: 0.5,
+    direction: "forward",
+    head: "standard"
+  }
+}
+```
+
+Endpoint arrows are interpreted relative to the stored path direction. Mid-arrow
+`position` is a path parameter and must satisfy `0 < position < 1`; the default
+when enabling a mid-arrow is `0.5`. The supported mid-arrow heads export as
+`\arrow{>}`, `\arrow{Stealth}`, `\arrow{Latex}`,
+`\arrow{Stealth[harpoon]}`, and `\arrow{Stealth[harpoon,swap]}`.
 
 Segment endpoints are stored explicitly on each segment. A path is composable
 only when every segment start after the first matches the previous segment end
