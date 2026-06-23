@@ -31,6 +31,20 @@ export type Vec3 = {
   symbolic?: SymbolicVec3
 }
 
+export type PathIntersectionCrossingSign = 'positive' | 'negative'
+
+export type PathIntersectionCandidate = {
+  id: string
+  pathAId: string
+  pathBId: string
+  point: Vec3
+  parameterA: number
+  parameterB: number
+  tangentA: Vec2
+  tangentB: Vec2
+  crossingSign?: PathIntersectionCrossingSign
+}
+
 export type Camera2D = {
   mode: '2d'
   scale: number

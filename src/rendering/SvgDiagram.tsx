@@ -4,6 +4,7 @@ import type {
   ConcatenatedPathStratum,
   CurveStratum,
   Diagram,
+  PathIntersectionCandidate,
   PathSegment,
   PointStratum,
   RegionStratum,
@@ -108,6 +109,7 @@ import {
   classifyAnchorOcclusion,
   type AnchorOcclusionResult,
 } from './pointOcclusion.ts'
+import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -129,12 +131,16 @@ export type SvgDiagramProps = {
   workPlanePreview?: WorkPlanePreview
   coordinateSourceHighlights?: CoordinateSourceHighlight[]
   boundaryPathHighlights?: BoundaryPathHighlight[]
+  selectedPathIntersectionCandidateId?: string | null
   layerFilter?: LayerFilter
   visibilityOptions?: VisibilityOptions
   showGeometryHandles?: boolean
   onSelectionChange?: (selection: SelectedElement) => void
   onCurveStratumClick?: (curveId: string) => void
   onPointStratumClick?: (pointId: string) => void
+  onPathIntersectionCandidateClick?: (
+    candidate: PathIntersectionCandidate,
+  ) => void
   onCanvasClick?: (
     svgPoint: Vec2,
     viewportHeight: number,
@@ -214,12 +220,14 @@ export function SvgDiagram({
   workPlanePreview,
   coordinateSourceHighlights,
   boundaryPathHighlights,
+  selectedPathIntersectionCandidateId = null,
   layerFilter = allLayersFilter,
   visibilityOptions: visibilityOptionsOverride,
   showGeometryHandles = false,
   onSelectionChange,
   onCurveStratumClick,
   onPointStratumClick,
+  onPathIntersectionCandidateClick,
   onCanvasClick,
   onGeometryHandleDrag,
   onGeometryHandleDragStart,
@@ -328,6 +336,14 @@ export function SvgDiagram({
   const items = itemDrafts
     .map(withStableRenderIndex)
     .sort(compareSvgRenderItems)
+  const pathIntersectionCandidates = pathIntersectionCandidatesForDiagram(
+    diagram,
+    {
+      includeCurve: (curve) =>
+        shouldRenderStratumInSvgPreview(diagram, curve) &&
+        layerFilterIncludesLayer(layerFilter, curve.layer),
+    },
+  )
 
   return (
     <svg
@@ -465,6 +481,15 @@ export function SvgDiagram({
         coordinateSourceHighlights,
         camera,
         height,
+      )}
+      {renderPathIntersectionCandidates(
+        diagram,
+        pathIntersectionCandidates,
+        camera,
+        height,
+        layerFilter,
+        selectedPathIntersectionCandidateId,
+        onPathIntersectionCandidateClick,
       )}
       {shouldRenderSvgGeometryHandles(
         showGeometryHandles,
@@ -842,6 +867,125 @@ function renderCoordinateSourceHighlight(
         </text>
       )}
     </g>
+  )
+}
+
+function renderPathIntersectionCandidates(
+  diagram: Diagram,
+  candidates: readonly PathIntersectionCandidate[],
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  layerFilter: LayerFilter,
+  selectedCandidateId: string | null,
+  onPathIntersectionCandidateClick:
+    | SvgDiagramProps['onPathIntersectionCandidateClick']
+    | undefined,
+): ReactElement | null {
+  if (diagram.ambientDimension !== 2 || candidates.length === 0) {
+    return null
+  }
+
+  return (
+    <g
+      key="path-intersection-candidates"
+      className="svg-path-intersection-candidates"
+      aria-label="Path intersection candidates"
+    >
+      {candidates.map((candidate) =>
+        renderPathIntersectionCandidate(
+          diagram,
+          candidate,
+          camera,
+          viewportHeight,
+          layerFilter,
+          selectedCandidateId === candidate.id,
+          onPathIntersectionCandidateClick,
+        ),
+      )}
+    </g>
+  )
+}
+
+function renderPathIntersectionCandidate(
+  diagram: Diagram,
+  candidate: PathIntersectionCandidate,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  layerFilter: LayerFilter,
+  isSelected: boolean,
+  onPathIntersectionCandidateClick:
+    | SvgDiagramProps['onPathIntersectionCandidateClick']
+    | undefined,
+): ReactElement {
+  const center = projectToSvgPoint(camera, candidate.point, viewportHeight)
+  const color = '#DB2777'
+  const isClickable =
+    onPathIntersectionCandidateClick !== undefined &&
+    pathIntersectionCandidateIsSelectable(diagram, candidate, layerFilter)
+
+  return (
+    <g
+      key={candidate.id}
+      className="svg-path-intersection-candidate"
+      pointerEvents={isClickable ? 'visiblePainted' : 'none'}
+      role="button"
+      aria-label={`Path crossing candidate ${candidate.pathAId} with ${candidate.pathBId}`}
+      data-svg-path-intersection-candidate="true"
+      data-path-intersection-candidate-id={candidate.id}
+      data-path-a-id={candidate.pathAId}
+      data-path-b-id={candidate.pathBId}
+      data-crossing-sign={candidate.crossingSign}
+      onClick={(event) => {
+        if (onPathIntersectionCandidateClick === undefined) {
+          return
+        }
+
+        event.stopPropagation()
+        onPathIntersectionCandidateClick(candidate)
+      }}
+    >
+      <rect
+        x={center.x - 4.8}
+        y={center.y - 4.8}
+        width={9.6}
+        height={9.6}
+        transform={`rotate(45 ${center.x} ${center.y})`}
+        fill={isSelected ? color : '#ffffff'}
+        fillOpacity={isSelected ? 0.96 : 0.9}
+        stroke={color}
+        strokeOpacity={0.92}
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={center.x}
+        cy={center.y}
+        r={1.9}
+        fill={isSelected ? '#ffffff' : color}
+        fillOpacity={0.95}
+        pointerEvents="none"
+      />
+    </g>
+  )
+}
+
+function pathIntersectionCandidateIsSelectable(
+  diagram: Diagram,
+  candidate: PathIntersectionCandidate,
+  layerFilter: LayerFilter,
+): boolean {
+  const pathA = diagram.strata.find(
+    (stratum) => stratum.id === candidate.pathAId,
+  )
+  const pathB = diagram.strata.find(
+    (stratum) => stratum.id === candidate.pathBId,
+  )
+
+  return (
+    pathA !== undefined &&
+    pathB !== undefined &&
+    isLayerSelectableByLayerFilter(diagram, layerFilter, pathA.layer) &&
+    isLayerSelectableByLayerFilter(diagram, layerFilter, pathB.layer)
   )
 }
 

@@ -55,6 +55,7 @@ import type {
   LatticePattern,
   LineStyle,
   OrthographicCamera3D,
+  PathIntersectionCandidate,
   PointVisibilityPolicy,
   Stratum,
   TikzExportMode,
@@ -764,6 +765,10 @@ function App() {
     useState<VisibilityOptions>(() =>
       cloneVisibilityOptions(defaultVisibilityOptions),
     )
+  const [
+    selectedPathIntersectionCandidateId,
+    setSelectedPathIntersectionCandidateId,
+  ] = useState<string | null>(null)
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
@@ -1743,6 +1748,12 @@ function App() {
         current.layerFilter,
       ),
     }))
+  }
+
+  function handlePathIntersectionCandidateClick(
+    candidate: PathIntersectionCandidate,
+  ): void {
+    setSelectedPathIntersectionCandidateId(candidate.id)
   }
 
   function updateInspectorExpanded(expanded: boolean): void {
@@ -6942,6 +6953,9 @@ function App() {
               workPlanePreview={workPlanePreview}
               coordinateSourceHighlights={coordinateSourceHighlights}
               boundaryPathHighlights={boundaryPathHighlights}
+              selectedPathIntersectionCandidateId={
+                selectedPathIntersectionCandidateId
+              }
               layerFilter={layerFilter}
               visibilityOptions={visibilityOptions}
               showGeometryHandles={
@@ -6970,6 +6984,13 @@ function App() {
                   : !previewCursorCreationClicksEnabled
                     ? undefined
                     : handleExistingPointSourceCreationClick
+              }
+              onPathIntersectionCandidateClick={
+                editableDiagram.ambientDimension === 2 &&
+                creationTool === 'select' &&
+                !workPlanePointPickingState.active
+                  ? handlePathIntersectionCandidateClick
+                  : undefined
               }
               onGeometryHandleDrag={
                 creationTool === 'select' && !workPlanePointPickingState.active
