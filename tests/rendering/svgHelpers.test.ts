@@ -15,6 +15,7 @@ import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGui
 import { projectVec3 } from '../../src/geometry/projection.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import {
+  createConcatenatedPathStratum,
   createEmptyDiagram,
   createPointStratum,
   createTextLabel,
@@ -66,6 +67,10 @@ import {
   shouldRenderStratumInSvgPreview,
   shouldRenderTextLabelInSvgPreview,
 } from '../../src/rendering/svgPreviewPolicy.ts'
+import {
+  curveArrowheadsForSvgPreview,
+  type SvgArrowheadPreview,
+} from '../../src/rendering/svgArrows.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -146,6 +151,80 @@ test('pathSegmentsToSvgPath emits a continuous line and cubic path', () => {
     ]),
     'M 0,0 L 1,0 C 1.5,1 2.5,1 3,0',
   )
+})
+
+test('SVG arrow preview coordinates are finite for a 2D path', () => {
+  const curve = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'svg-arrow-2d',
+    name: 'SVG arrow 2D',
+    arrows: {
+      endpoint: 'both',
+      mid: {
+        enabled: true,
+        position: 0.5,
+        direction: 'forward',
+        head: 'stealth',
+      },
+    },
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 2, y: 0, z: 0 },
+        control1: { x: 2.5, y: 1, z: 0 },
+        control2: { x: 3.5, y: 1, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+      },
+    ],
+  })
+  const arrowheads = curveArrowheadsForSvgPreview(curve, 2, (point) => ({
+    x: point.x,
+    y: point.y,
+  }))
+
+  assert.equal(arrowheads.length, 3)
+  assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
+})
+
+test('SVG arrow preview coordinates are finite for a projected 3D path', () => {
+  const camera = createInitialCamera3D()
+  const curve = createConcatenatedPathStratum({
+    ambientDimension: 3,
+    id: 'svg-arrow-3d',
+    name: 'SVG arrow 3D',
+    arrows: {
+      endpoint: 'forward',
+      mid: {
+        enabled: true,
+        position: 0.4,
+        direction: 'backward',
+        head: 'latex',
+      },
+    },
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 1, z: 1 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 1, z: 1 },
+        end: { x: 2, y: 0, z: 2 },
+      },
+    ],
+  })
+  const arrowheads = curveArrowheadsForSvgPreview(curve, 3, (point) =>
+    projectToSvgPoint(camera, point, 160),
+  )
+
+  assert.equal(arrowheads.length, 2)
+  assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
 })
 
 test('2D filled-region boundaries produce non-empty closed SVG path data', () => {
@@ -1171,6 +1250,12 @@ function squareBoundaryFromPoints(
       { kind: 'line', start: points[3], end: points[0] },
     ],
   }
+}
+
+function isFiniteSvgArrowhead(arrowhead: SvgArrowheadPreview): boolean {
+  return [arrowhead.tip, arrowhead.left, arrowhead.right].every(
+    (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+  )
 }
 
 function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {

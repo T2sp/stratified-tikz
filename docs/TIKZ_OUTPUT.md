@@ -117,6 +117,28 @@ needed for `Stealth`, `Latex`, and harpoon arrow heads. Inline math output keeps
 these setup lines inside the `tikzpicture` setup section and still removes blank
 physical lines.
 
+The Inspector shows arrow controls for path-like curve strata: polylines, cubic
+Bezier curves, concatenated paths, and path templates. Grids do not expose these
+controls. The controls edit the persisted `arrows` object, so save/load,
+undo/redo, SVG preview, and TikZ export all use the same arrow options. Mid-arrow
+positions must satisfy `0 < position < 1`; invalid values are ignored by the edit
+helper and rejected by model validation.
+
+SVG preview draws approximate triangular arrowheads for endpoint and mid-arrow
+decorations. The preview follows the projected path tangent in both 2D and 3D,
+but it does not attempt to reproduce the exact TikZ `Stealth`, `Latex`, or
+harpoon glyphs.
+
+The Reverse path direction command reverses supported path geometry while
+preserving the source object ID, name, layer, labels, style, style references,
+and arrow options. Forward arrows remain forward relative to the new path
+direction. Supported reversal targets are polylines, cubic Bezier curves, and
+concatenated paths made from line, cubic Bezier, and arc segments. Arc reversal
+swaps endpoints and start/end angles, and flips clockwise versus
+counterclockwise direction. Template circles and ellipses are not reversible yet
+because the current template model has no orientation metadata; grids and
+surfaces are also not reversed by this command.
+
 ## Approximate 3D surface ordering
 
 3D diagrams can opt into approximate surface face depth sorting through

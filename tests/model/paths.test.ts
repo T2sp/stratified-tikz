@@ -14,6 +14,7 @@ import {
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
   reverseBoundaryPathSnapshot,
+  reverseCurvePathDirection,
   resolvePathSegmentStyle,
 } from '../../src/model/paths.ts'
 import {
@@ -534,6 +535,195 @@ test('boundary snapshot reversal swaps arc endpoints, angles, and direction', ()
     },
   })
   assert.notEqual(reversed.segments[0], boundary.segments[0])
+})
+
+test('curve direction reversal reverses polyline point order', () => {
+  const curve = createCurveStratum({
+    ambientDimension: 2,
+    id: 'reverse-polyline',
+    name: 'Reverse polyline',
+    kind: 'polyline',
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 2, y: 1, z: 0 },
+    ],
+  })
+
+  const reversed = reverseCurvePathDirection(curve)
+
+  assert.equal(reversed?.kind, 'polyline')
+  if (reversed?.kind !== 'polyline') {
+    throw new Error('Expected a reversed polyline.')
+  }
+
+  assert.deepEqual(reversed.points, [
+    { x: 2, y: 1, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0 },
+  ])
+  assert.deepEqual(curve.points, [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 2, y: 1, z: 0 },
+  ])
+})
+
+test('curve direction reversal swaps cubic controls correctly', () => {
+  const curve = createCurveStratum({
+    ambientDimension: 2,
+    id: 'reverse-cubic',
+    name: 'Reverse cubic',
+    kind: 'cubicBezier',
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 2, z: 0 },
+      { x: 3, y: 2, z: 0 },
+      { x: 4, y: 0, z: 0 },
+    ],
+    bezierControls: { kind: 'absolute' },
+  })
+
+  const reversed = reverseCurvePathDirection(curve)
+
+  assert.equal(reversed?.kind, 'cubicBezier')
+  if (reversed?.kind !== 'cubicBezier') {
+    throw new Error('Expected a reversed cubic Bezier.')
+  }
+
+  assert.deepEqual(reversed.points, [
+    { x: 4, y: 0, z: 0 },
+    { x: 3, y: 2, z: 0 },
+    { x: 1, y: 2, z: 0 },
+    { x: 0, y: 0, z: 0 },
+  ])
+  assert.deepEqual(reversed.bezierControls, { kind: 'absolute' })
+})
+
+test('curve direction reversal reverses concatenated path geometry order', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'reverse-path',
+    name: 'Reverse path',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: { x: 1.5, y: 1, z: 0 },
+        control2: { x: 2.5, y: 1, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+      },
+    ],
+  })
+
+  const reversed = reverseCurvePathDirection(path)
+
+  assert.equal(reversed?.kind, 'concatenatedPath')
+  if (reversed?.kind !== 'concatenatedPath') {
+    throw new Error('Expected a reversed concatenated path.')
+  }
+
+  assert.deepEqual(
+    reversed.segments.map((segment) => segment.kind),
+    ['cubicBezier', 'line'],
+  )
+  assert.deepEqual(pathEndpoints(reversed.segments), {
+    start: { x: 3, y: 0, z: 0 },
+    end: { x: 0, y: 0, z: 0 },
+  })
+  assert.equal(areSegmentsComposable(reversed.segments), true)
+})
+
+test('curve direction reversal swaps arc segment direction', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'reverse-arc-path',
+    name: 'Reverse arc path',
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: { x: 0, y: 0, z: 0 },
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+  })
+
+  const reversed = reverseCurvePathDirection(path)
+
+  assert.equal(reversed?.kind, 'concatenatedPath')
+  if (reversed?.kind !== 'concatenatedPath') {
+    throw new Error('Expected a reversed concatenated path.')
+  }
+
+  assert.deepEqual(reversed.segments[0], {
+    kind: 'arc',
+    start: { x: 0, y: 1, z: 0 },
+    end: { x: 1, y: 0, z: 0 },
+    center: { x: 0, y: 0, z: 0 },
+    radius: 1,
+    startAngleDeg: 90,
+    endAngleDeg: 0,
+    direction: 'clockwise',
+  })
+})
+
+test('curve direction reversal preserves style, layer, name, id, labels, and arrows', () => {
+  const path = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'preserved-path',
+    name: 'Preserved path',
+    label: 'attached',
+    pathLabel: 'saved path label',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#123456',
+      strokeOpacity: 0.8,
+      lineWidth: 2,
+      lineStyle: 'dotted',
+    },
+    importedTikzStyleReferenceId: 'imported-style',
+    arrows: {
+      endpoint: 'forward',
+      mid: {
+        enabled: true,
+        position: 0.3,
+        direction: 'backward',
+        head: 'stealth',
+      },
+    },
+    layer: 4,
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+    ],
+  })
+
+  const reversed = reverseCurvePathDirection(path)
+
+  assert.equal(reversed?.id, path.id)
+  assert.equal(reversed?.name, path.name)
+  assert.equal(reversed?.label, path.label)
+  assert.equal(reversed?.pathLabel, path.pathLabel)
+  assert.equal(reversed?.layer, path.layer)
+  assert.deepEqual(reversed?.style, path.style)
+  assert.equal(
+    reversed?.importedTikzStyleReferenceId,
+    path.importedTikzStyleReferenceId,
+  )
+  assert.deepEqual(reversed?.arrows, path.arrows)
 })
 
 test('concatenated paths normalize for ambient dimension without mutating input', () => {
