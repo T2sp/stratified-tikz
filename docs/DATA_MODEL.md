@@ -287,12 +287,16 @@ export type Diagram = {
   variables?: SymbolicVariable[];
   strata: Stratum[];
   labels: Label[];
+  pathCrossings?: PathCrossingState[];
 };
 ```
 
 An empty canvas is represented by the same `Diagram` shape with `strata: []`
 and `labels: []`. Empty 2D and empty 3D diagrams are valid ordinary diagrams,
 not a separate null or draft state.
+
+`pathCrossings` is optional. Missing data means that no crossing has an
+explicit persisted braiding state.
 
 `userStylePresets` is optional for backward compatibility. It stores
 user-created structured style presets that affect export. Built-in presets are
@@ -1640,6 +1644,40 @@ segment-level `styleOverride` is the supported concatenated-path mechanism.
 
 However, the data model should be compatible with it.
 
+## 2D path crossing states
+
+Braided string-diagram crossing state is persisted separately from strata:
+
+```ts
+type CrossingKind = "none" | "braiding" | "antiBraiding";
+
+type PathCrossingState = {
+  id: string;
+  pathAId: string;
+  pathBId: string;
+  point: Vec3;
+  parameterA: number;
+  parameterB: number;
+  kind: CrossingKind;
+};
+```
+
+Crossing states are valid only for `ambientDimension: 2`. The stored `point`
+uses model coordinates with `z: 0`.
+
+The path order is deterministic: crossing candidates are detected between
+curves sorted by path id, so `pathAId` is the lexicographically earlier path id
+and `pathBId` is the later path id. The MVP convention is:
+
+- `braiding`: `pathAId` passes over `pathBId`;
+- `antiBraiding`: `pathBId` passes over `pathAId`;
+- `none`: draw normally, with no braiding gap or mask.
+
+Crossing ids are derived from path ids and rounded path parameters. If path
+geometry changes so that a stored crossing id no longer corresponds to a current
+2D path intersection candidate, the state is invalidated and removed during
+load or diagram cleanup.
+
 ## Curve style segments
 
 A curve may have optional style segments.
@@ -2002,6 +2040,7 @@ export type Diagram = {
   camera: Camera;
   strata: Stratum[];
   labels: TextLabel[];
+  pathCrossings?: PathCrossingState[];
 };
 ```
 

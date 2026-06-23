@@ -55,6 +55,7 @@ import {
   filledSurfaceStyleToSvgAttributes,
   hiddenCurveStyleToSvgStrokeAttributes,
   lineStyleToStrokeDasharray,
+  svgPathCrossingMarkerStyle,
   svgLabelAnchorPlacement,
 } from '../../src/rendering/svgStyle.ts'
 import { mapClientPointToViewBox } from '../../src/rendering/svgViewBox.ts'
@@ -498,6 +499,17 @@ test('line styles map to SVG dash arrays', () => {
   assert.equal(lineStyleToStrokeDasharray('dashed'), '8 5')
   assert.equal(lineStyleToStrokeDasharray('dotted'), '1 5')
   assert.equal(lineStyleToStrokeDasharray('denselyDotted'), '1 2')
+})
+
+test('SVG path crossing marker style differs by crossing state', () => {
+  const none = svgPathCrossingMarkerStyle('none', false)
+  const braiding = svgPathCrossingMarkerStyle('braiding', false)
+  const antiBraiding = svgPathCrossingMarkerStyle('antiBraiding', false)
+
+  assert.notEqual(none.stroke, braiding.stroke)
+  assert.notEqual(braiding.stroke, antiBraiding.stroke)
+  assert.equal(none.strokeDasharray, undefined)
+  assert.equal(antiBraiding.strokeDasharray, '3 2')
 })
 
 test('hidden curve style maps to SVG stroke attributes', () => {

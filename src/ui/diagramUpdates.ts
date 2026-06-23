@@ -30,6 +30,7 @@ import {
   createScalarInputValue,
   type ScalarInputValue,
 } from '../model/scalarExpressions.ts'
+import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import {
   gridPreviewSegments,
   workPlaneGridFrame,
@@ -134,16 +135,27 @@ export function updateStratumById(
   updater: (stratum: Stratum) => Stratum,
 ): Diagram {
   let changed = false
+  let changedCurve = false
   const strata = diagram.strata.map((stratum) => {
     if (stratum.id !== id) {
       return stratum
     }
 
+    const nextStratum = updater(stratum)
     changed = true
-    return updater(stratum)
+    changedCurve =
+      stratum.geometricKind === 'curve' ||
+      nextStratum.geometricKind === 'curve'
+    return nextStratum
   })
 
-  return changed ? { ...diagram, strata } : diagram
+  if (!changed) {
+    return diagram
+  }
+
+  const nextDiagram = { ...diagram, strata }
+
+  return changedCurve ? cleanPathCrossingStates(nextDiagram) : nextDiagram
 }
 
 export function updateLabelById(
@@ -178,17 +190,23 @@ export function removeSelectedElement(
 
   if (selectedElement.kind === 'stratum') {
     let removed = false
+    let removedCurve = false
     const strata = diagram.strata.filter((stratum) => {
       if (!removed && stratum.id === selectedElement.id) {
         removed = true
+        removedCurve = stratum.geometricKind === 'curve'
         return false
       }
 
       return true
     })
+    const nextDiagram = removed ? { ...diagram, strata } : diagram
 
     return {
-      diagram: removed ? { ...diagram, strata } : diagram,
+      diagram:
+        removed && removedCurve
+          ? cleanPathCrossingStates(nextDiagram)
+          : nextDiagram,
       selectedElement: null,
       removed,
     }

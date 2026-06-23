@@ -35,6 +35,10 @@ import {
 } from './importedTikzStyles.ts'
 import { clonePathArrowOptions, defaultPathArrowOptions } from './pathArrows.ts'
 import {
+  cleanPathCrossingStates,
+  normalizeLoadedPathCrossingStates,
+} from './pathCrossings.ts'
+import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
   pointVisibilityPolicies,
@@ -62,6 +66,7 @@ import type {
   ImportedTikzStyleReference,
   StylePresetKind,
   OrthographicCamera3D,
+  PathCrossingState,
   RegionStyle,
   SheetStyle,
   CurveStyle,
@@ -93,6 +98,7 @@ export type PersistentDiagram = {
   variables?: SymbolicVariable[]
   strata: Stratum[]
   labels: TextLabel[]
+  pathCrossings?: PathCrossingState[]
 }
 
 export type SavedDiagramFile = {
@@ -176,6 +182,7 @@ type SavedDiagramInput = {
   variables?: unknown
   strata: unknown[]
   labels: unknown[]
+  pathCrossings?: unknown
 }
 
 type LoadedDiagramNormalization = {
@@ -607,30 +614,38 @@ function toPersistentDiagram(
   diagram: Diagram,
   options: SerializeDiagramOptions,
 ): PersistentDiagram {
-  const view = normalizePersistentView(diagram, options)
-  const layers = normalizePersistentLayers(diagram)
+  const cleanedDiagram = cleanPathCrossingStates(diagram)
+  const view = normalizePersistentView(cleanedDiagram, options)
+  const layers = normalizePersistentLayers(cleanedDiagram)
   const userStylePresets =
-    diagram.userStylePresets === undefined || diagram.userStylePresets.length === 0
+    cleanedDiagram.userStylePresets === undefined ||
+    cleanedDiagram.userStylePresets.length === 0
       ? undefined
-      : diagram.userStylePresets
+      : cleanedDiagram.userStylePresets
   const externalTikzStyleSources =
-    diagram.externalTikzStyleSources === undefined ||
-    diagram.externalTikzStyleSources.length === 0
+    cleanedDiagram.externalTikzStyleSources === undefined ||
+    cleanedDiagram.externalTikzStyleSources.length === 0
       ? undefined
-      : diagram.externalTikzStyleSources
+      : cleanedDiagram.externalTikzStyleSources
   const importedTikzStyleReferences =
-    diagram.importedTikzStyleReferences === undefined ||
-    diagram.importedTikzStyleReferences.length === 0
+    cleanedDiagram.importedTikzStyleReferences === undefined ||
+    cleanedDiagram.importedTikzStyleReferences.length === 0
       ? undefined
-      : diagram.importedTikzStyleReferences
+      : cleanedDiagram.importedTikzStyleReferences
   const variables =
-    diagram.variables === undefined || diagram.variables.length === 0
+    cleanedDiagram.variables === undefined ||
+    cleanedDiagram.variables.length === 0
       ? undefined
-      : diagram.variables
+      : cleanedDiagram.variables
+  const pathCrossings =
+    cleanedDiagram.pathCrossings === undefined ||
+    cleanedDiagram.pathCrossings.length === 0
+      ? undefined
+      : cleanedDiagram.pathCrossings
 
   return {
-    version: diagram.version,
-    ambientDimension: diagram.ambientDimension,
+    version: cleanedDiagram.version,
+    ambientDimension: cleanedDiagram.ambientDimension,
     ...(view === undefined ? {} : { view }),
     ...(layers === undefined ? {} : { layers }),
     ...(userStylePresets === undefined ? {} : { userStylePresets }),
@@ -641,8 +656,9 @@ function toPersistentDiagram(
       ? {}
       : { importedTikzStyleReferences }),
     ...(variables === undefined ? {} : { variables }),
-    strata: diagram.strata,
-    labels: diagram.labels,
+    strata: cleanedDiagram.strata,
+    labels: cleanedDiagram.labels,
+    ...(pathCrossings === undefined ? {} : { pathCrossings }),
   }
 }
 
@@ -810,11 +826,23 @@ function normalizeLoadedDiagram(
   )
   warnings.push(...layerNormalization.warnings)
 
-  const diagram: Diagram = {
+  const diagramWithoutPathCrossings: Diagram = {
     ...diagramWithoutLayers,
     ...(layerNormalization.layers === undefined
       ? {}
       : { layers: layerNormalization.layers }),
+  }
+  const pathCrossingNormalization = normalizeLoadedPathCrossingStates(
+    diagramWithoutPathCrossings,
+    savedDiagram.pathCrossings,
+  )
+  warnings.push(...pathCrossingNormalization.warnings)
+
+  const diagram: Diagram = {
+    ...diagramWithoutPathCrossings,
+    ...(pathCrossingNormalization.pathCrossings === undefined
+      ? {}
+      : { pathCrossings: pathCrossingNormalization.pathCrossings }),
   }
   const symbolicMetadataErrors = validateDiagramSymbolicCoordinateMetadata(diagram)
 
@@ -896,12 +924,17 @@ function refreshLoadedSymbolicCoordinatePreviews(diagram: Diagram): {
     }
   }
 
+  const cleanedRefreshedDiagram = cleanPathCrossingStates(refreshed.diagram)
   const changed =
-    JSON.stringify(diagram.strata) !== JSON.stringify(refreshed.diagram.strata) ||
-    JSON.stringify(diagram.labels) !== JSON.stringify(refreshed.diagram.labels)
+    JSON.stringify(diagram.strata) !==
+      JSON.stringify(cleanedRefreshedDiagram.strata) ||
+    JSON.stringify(diagram.labels) !==
+      JSON.stringify(cleanedRefreshedDiagram.labels) ||
+    JSON.stringify(diagram.pathCrossings) !==
+      JSON.stringify(cleanedRefreshedDiagram.pathCrossings)
 
   return {
-    diagram: refreshed.diagram,
+    diagram: cleanedRefreshedDiagram,
     warnings: changed
       ? ['Saved symbolic coordinate preview values were recalculated.']
       : [],

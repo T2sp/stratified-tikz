@@ -70,6 +70,7 @@ import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
   hiddenCurveStyleToSvgStrokeAttributes,
+  svgPathCrossingMarkerStyle,
   svgLabelAnchorPlacement,
 } from './svgStyle'
 import { curvedSheetToSvgMesh } from './curvedSheetMesh.ts'
@@ -110,6 +111,7 @@ import {
   type AnchorOcclusionResult,
 } from './pointOcclusion.ts'
 import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
+import { pathCrossingKindForCandidate } from '../model/pathCrossings.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -918,7 +920,8 @@ function renderPathIntersectionCandidate(
     | undefined,
 ): ReactElement {
   const center = projectToSvgPoint(camera, candidate.point, viewportHeight)
-  const color = '#DB2777'
+  const crossingKind = pathCrossingKindForCandidate(diagram, candidate)
+  const markerStyle = svgPathCrossingMarkerStyle(crossingKind, isSelected)
   const isClickable =
     onPathIntersectionCandidateClick !== undefined &&
     pathIntersectionCandidateIsSelectable(diagram, candidate, layerFilter)
@@ -929,11 +932,12 @@ function renderPathIntersectionCandidate(
       className="svg-path-intersection-candidate"
       pointerEvents={isClickable ? 'visiblePainted' : 'none'}
       role="button"
-      aria-label={`Path crossing candidate ${candidate.pathAId} with ${candidate.pathBId}`}
+      aria-label={`Path crossing candidate ${candidate.pathAId} with ${candidate.pathBId}: ${crossingKind}`}
       data-svg-path-intersection-candidate="true"
       data-path-intersection-candidate-id={candidate.id}
       data-path-a-id={candidate.pathAId}
       data-path-b-id={candidate.pathBId}
+      data-crossing-kind={crossingKind}
       data-crossing-sign={candidate.crossingSign}
       onClick={(event) => {
         if (onPathIntersectionCandidateClick === undefined) {
@@ -950,18 +954,19 @@ function renderPathIntersectionCandidate(
         width={9.6}
         height={9.6}
         transform={`rotate(45 ${center.x} ${center.y})`}
-        fill={isSelected ? color : '#ffffff'}
-        fillOpacity={isSelected ? 0.96 : 0.9}
-        stroke={color}
-        strokeOpacity={0.92}
-        strokeWidth={2}
+        fill={markerStyle.fill}
+        fillOpacity={markerStyle.fillOpacity}
+        stroke={markerStyle.stroke}
+        strokeOpacity={markerStyle.strokeOpacity}
+        strokeWidth={markerStyle.strokeWidth}
+        strokeDasharray={markerStyle.strokeDasharray}
         vectorEffect="non-scaling-stroke"
       />
       <circle
         cx={center.x}
         cy={center.y}
         r={1.9}
-        fill={isSelected ? '#ffffff' : color}
+        fill={markerStyle.centerFill}
         fillOpacity={0.95}
         pointerEvents="none"
       />

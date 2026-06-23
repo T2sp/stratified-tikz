@@ -1,4 +1,5 @@
 import type {
+  CrossingKind,
   CurveStyle,
   HiddenCurveStyle,
   LabelAnchor,
@@ -28,6 +29,16 @@ export type SvgLabelAnchorPlacement = {
   dominantBaseline: 'middle'
   dx: number
   dy: number
+}
+
+export type SvgPathCrossingMarkerStyle = {
+  fill: string
+  fillOpacity: number
+  stroke: string
+  strokeOpacity: number
+  strokeWidth: number
+  strokeDasharray?: string
+  centerFill: string
 }
 
 export function lineStyleToStrokeDasharray(
@@ -77,6 +88,51 @@ export function filledSurfaceStyleToSvgAttributes(
     stroke: style.strokeColor,
     strokeOpacity: style.strokeOpacity,
     strokeWidth,
+  }
+}
+
+export function svgPathCrossingMarkerStyle(
+  kind: CrossingKind,
+  isSelected: boolean,
+): SvgPathCrossingMarkerStyle {
+  switch (kind) {
+    case 'none': {
+      const color = '#DB2777'
+
+      return {
+        fill: isSelected ? color : '#ffffff',
+        fillOpacity: isSelected ? 0.96 : 0.9,
+        stroke: color,
+        strokeOpacity: 0.92,
+        strokeWidth: 2,
+        centerFill: isSelected ? '#ffffff' : color,
+      }
+    }
+    case 'braiding': {
+      const color = '#0F766E'
+
+      return {
+        fill: isSelected ? color : '#ECFDF5',
+        fillOpacity: isSelected ? 0.96 : 0.95,
+        stroke: color,
+        strokeOpacity: 0.96,
+        strokeWidth: 2.4,
+        centerFill: isSelected ? '#ffffff' : color,
+      }
+    }
+    case 'antiBraiding': {
+      const color = '#7C3AED'
+
+      return {
+        fill: isSelected ? color : '#F5F3FF',
+        fillOpacity: isSelected ? 0.96 : 0.95,
+        stroke: color,
+        strokeOpacity: 0.96,
+        strokeWidth: 2.4,
+        strokeDasharray: '3 2',
+        centerFill: isSelected ? '#ffffff' : color,
+      }
+    }
   }
 }
 

@@ -1,8 +1,10 @@
 # 2D Path Intersection Detection
 
 Path intersection detection is a preview-derived geometry feature used as the
-foundation for future braided string-diagram controls. It does not add data to
-the saved `Diagram` model and it does not affect TikZ export in this phase.
+foundation for braided string-diagram controls. The detector itself is derived
+from current curve geometry. User-selected crossing states are stored separately
+in `Diagram.pathCrossings`, while final TikZ gap/mask output is deferred to the
+braiding export phase.
 
 Detection is enabled only for `ambientDimension: 2`. The output candidates use
 model coordinates with `z: 0`.
@@ -34,3 +36,17 @@ Grid strata, labels, points, sheets, regions, and 3D curves are ignored.
   transverse pair of tangents.
 - Candidate IDs are deterministic from path IDs and rounded path parameters,
   but large geometry changes can legitimately change IDs.
+
+## Crossing State Convention
+
+Crossing candidates are generated from paths sorted by id. Therefore `pathAId`
+is the lexicographically earlier curve id and `pathBId` is the later curve id.
+
+Stored crossing states use this convention:
+
+- `none`: no braiding;
+- `braiding`: `pathAId` passes over `pathBId`;
+- `antiBraiding`: `pathBId` passes over `pathAId`.
+
+If a saved crossing no longer matches a current candidate with the same id and
+path order, it is treated as stale and removed during load or diagram cleanup.
