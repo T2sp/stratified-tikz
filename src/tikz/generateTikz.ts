@@ -46,6 +46,7 @@ import {
   arcScalarPreviewValue,
   arcSegmentToCubicBezierSegments,
   hasSymbolicArcScalarInputValue,
+  pathSegmentPointAt,
   pathSegmentStyleRuns,
   templatePathCoordinates,
   templatePathFrame,
@@ -292,6 +293,15 @@ type GenerateContext = {
   visibility: VisibilityOptions
 }
 
+type LogicalPathRun = {
+  index: number
+  startDistance: number
+  endDistance: number
+  length: number
+  isFirstNonEmpty: boolean
+  isLastNonEmpty: boolean
+}
+
 const coordinateAxesGuideLayerName = 'stratifiedGuideLayer'
 const coordinateAxesGuideColor: HexColor = '#64748B'
 const coordinateAxesGuideLength = 2.5
@@ -302,6 +312,8 @@ const inlineMathCommentSeparatorLine = '%---------------------------------------
 const TIKZ_INDENT = '    '
 export const maxCurvedSheetTikzFaces = 256
 const gridTikzEpsilon = 1e-9
+const pathRunLengthEpsilon = 1e-9
+const pathRunLengthSampleCount = 32
 
 export function generateTikz(
   diagram: Diagram,
@@ -1781,12 +1793,15 @@ function emitOcclusionSegmentedCurve(
     elementIndex,
   )}Occlusion`
   const hiddenStyle = context.visibility.hiddenCurveStyle ?? defaultHiddenCurveStyle
+  const pathRuns = logicalPathRunsFromOcclusionSegments(occlusion.segments)
   const segmentLines = occlusion.segments.flatMap((segment, index) =>
     emitOcclusionSegmentedCurveDraw(
       curve,
       segment,
       coordinateBaseName,
       index,
+      pathRuns[index],
+      pathRuns,
       hiddenStyle,
       context,
     ),
@@ -1839,6 +1854,8 @@ function emitOcclusionSegmentedCurveDraw(
   segment: CurveOcclusionSegment,
   coordinateBaseName: string,
   segmentIndex: number,
+  pathRun: LogicalPathRun | undefined,
+  pathRuns: readonly LogicalPathRun[],
   hiddenStyle: NonNullable<VisibilityOptions['hiddenCurveStyle']>,
   context: GenerateContext,
 ): string[] {
@@ -1870,6 +1887,10 @@ function emitOcclusionSegmentedCurveDraw(
           `Curve${curve.id}Visible${segment.segmentIndex + 1}`,
           context,
         )
+  const arrowOptions =
+    pathRun === undefined
+      ? []
+      : pathArrowTikzOptionsForRun(curve.arrows, pathRun, pathRuns, context)
   const faceComment =
     segment.occludingFace === undefined
       ? ''
@@ -1878,7 +1899,7 @@ function emitOcclusionSegmentedCurveDraw(
   return [
     `% ${capitalize(segment.visibility)} sampled segment ${segment.segmentIndex + 1}${faceComment}.`,
     '\\draw[',
-    ...formatTikzOptions(options),
+    ...formatTikzOptions([...options, ...arrowOptions]),
     ']',
     indentLine(`(${start}) -- (${end});`),
     '',
@@ -3158,8 +3179,16 @@ function emitMixedStyleConcatenatedPath(
   context: GenerateContext,
 ): string[] {
   const savedPath = emitSavedConcatenatedPath(curve.pathLabel, coordinates, context)
-  const drawCommands = styleRuns.flatMap((run) =>
-    emitConcatenatedPathStyleRun(curve, coordinates, run, context),
+  const pathRuns = logicalPathRunsFromStyleRuns(styleRuns, context.mode)
+  const drawCommands = styleRuns.flatMap((run, index) =>
+    emitConcatenatedPathStyleRun(
+      curve,
+      coordinates,
+      run,
+      pathRuns[index],
+      pathRuns,
+      context,
+    ),
   )
 
   return [
@@ -3353,6 +3382,8 @@ function emitConcatenatedPathStyleRun(
   curve: ConcatenatedPathStratum,
   coordinates: PathSegmentCoordinateNames[],
   run: PathSegmentStyleRun,
+  pathRun: LogicalPathRun | undefined,
+  pathRuns: readonly LogicalPathRun[],
   context: GenerateContext,
 ): string[] {
   const runCoordinates = coordinates.slice(
@@ -3366,13 +3397,17 @@ function emitConcatenatedPathStyleRun(
     `Curve${curve.id}Segment${run.startIndex + 1}`,
     context,
   )
+  const arrowOptions =
+    pathRun === undefined
+      ? []
+      : pathArrowTikzOptionsForRun(curve.arrows, pathRun, pathRuns, context)
 
   return [
     `% Segment${run.segments.length === 1 ? '' : 's'} ${formatSegmentRunNumberRange(
       run,
     )}`,
     '\\draw[',
-    ...formatTikzOptions(options),
+    ...formatTikzOptions([...options, ...arrowOptions]),
     ']',
     indentLine(`${formatConcatenatedPath(runCoordinates)};`),
     '',
@@ -4043,6 +4078,122 @@ function curveStyleOptionsForElement(
     : [presetStyleOption, ...importedOptions]
 }
 
+function logicalPathRunsFromStyleRuns(
+  styleRuns: readonly PathSegmentStyleRun[],
+  mode: TikzMode,
+): LogicalPathRun[] {
+  const ambientDimension = mode === '2d' ? 2 : 3
+
+  return logicalPathRunsFromLengths(
+    styleRuns.map((run) =>
+      pathSegmentsApproximateLength(run.segments, ambientDimension),
+    ),
+  )
+}
+
+function logicalPathRunsFromOcclusionSegments(
+  segments: readonly CurveOcclusionSegment[],
+): LogicalPathRun[] {
+  return logicalPathRunsFromLengths(
+    segments.map((segment) => vec3Distance(segment.start, segment.end)),
+  )
+}
+
+function logicalPathRunsFromLengths(lengths: readonly number[]): LogicalPathRun[] {
+  let currentDistance = 0
+  const runs = lengths.map((rawLength, index) => {
+    const length =
+      Number.isFinite(rawLength) && rawLength > pathRunLengthEpsilon
+        ? rawLength
+        : 0
+    const startDistance = currentDistance
+    const endDistance = startDistance + length
+
+    currentDistance = endDistance
+
+    return {
+      index,
+      startDistance,
+      endDistance,
+      length,
+      isFirstNonEmpty: false,
+      isLastNonEmpty: false,
+    }
+  })
+  const nonEmptyRuns = runs.filter((run) => run.length > pathRunLengthEpsilon)
+  const firstNonEmptyRun = nonEmptyRuns[0]
+  const lastNonEmptyRun = nonEmptyRuns[nonEmptyRuns.length - 1]
+
+  return runs.map((run) => ({
+    ...run,
+    isFirstNonEmpty: firstNonEmptyRun?.index === run.index,
+    isLastNonEmpty: lastNonEmptyRun?.index === run.index,
+  }))
+}
+
+function pathSegmentsApproximateLength(
+  segments: readonly PathSegment[],
+  ambientDimension: 2 | 3,
+): number {
+  return segments.reduce(
+    (total, segment) =>
+      total + pathSegmentApproximateLength(segment, ambientDimension),
+    0,
+  )
+}
+
+function pathSegmentApproximateLength(
+  segment: PathSegment,
+  ambientDimension: 2 | 3,
+): number {
+  if (segment.kind === 'line') {
+    return vec3Distance(segment.start, segment.end)
+  }
+
+  let length = 0
+  let previous = pathSegmentPointAt(segment, 0, ambientDimension)
+
+  if (previous === null) {
+    return 0
+  }
+
+  for (let index = 1; index <= pathRunLengthSampleCount; index += 1) {
+    const current = pathSegmentPointAt(
+      segment,
+      index / pathRunLengthSampleCount,
+      ambientDimension,
+    )
+
+    if (current === null) {
+      return 0
+    }
+
+    length += vec3Distance(previous, current)
+    previous = current
+  }
+
+  return length
+}
+
+function pathArrowTikzOptionsForRun(
+  options: PathArrowOptions | undefined,
+  run: LogicalPathRun,
+  allRuns: readonly LogicalPathRun[],
+  context: GenerateContext,
+): string[] {
+  if (run.length <= pathRunLengthEpsilon) {
+    return []
+  }
+
+  const arrows = resolvePathArrowOptions(options)
+  const endpoint = endpointArrowTikzOptionForRun(arrows.endpoint, run)
+
+  return [
+    ...(endpoint === null ? [] : [endpoint]),
+    ...midArrowTikzOptionsForRun(arrows.mid, run, allRuns, context),
+  ]
+}
+
 function pathArrowTikzOptions(
   options: PathArrowOptions | undefined,
   context: GenerateContext,
@@ -4054,6 +4205,32 @@ function pathArrowTikzOptions(
     ...(endpoint === null ? [] : [endpoint]),
     ...midArrowTikzOptions(arrows.mid, context),
   ]
+}
+
+function endpointArrowTikzOptionForRun(
+  mode: PathArrowOptions['endpoint'],
+  run: LogicalPathRun,
+): string | null {
+  switch (mode) {
+    case 'none':
+      return null
+    case 'forward':
+      return run.isLastNonEmpty ? '->' : null
+    case 'backward':
+      return run.isFirstNonEmpty ? '<-' : null
+    case 'both':
+      if (run.isFirstNonEmpty && run.isLastNonEmpty) {
+        return '<->'
+      }
+
+      if (run.isFirstNonEmpty) {
+        return '<-'
+      }
+
+      return run.isLastNonEmpty ? '->' : null
+    default:
+      return null
+  }
 }
 
 function endpointArrowTikzOption(
@@ -4071,6 +4248,101 @@ function endpointArrowTikzOption(
     default:
       return null
   }
+}
+
+function midArrowTikzOptionsForRun(
+  decoration: MidArrowDecoration,
+  run: LogicalPathRun,
+  allRuns: readonly LogicalPathRun[],
+  context: GenerateContext,
+): string[] {
+  if (decoration.enabled !== true) {
+    return []
+  }
+
+  const assignment = midArrowRunAssignment(decoration.position, allRuns)
+
+  if (assignment === null || assignment.runIndex !== run.index) {
+    return []
+  }
+
+  return midArrowTikzOptions(
+    {
+      ...decoration,
+      position: assignment.localPosition,
+    },
+    context,
+  )
+}
+
+function midArrowRunAssignment(
+  position: number,
+  runs: readonly LogicalPathRun[],
+): { runIndex: number; localPosition: number } | null {
+  const nonEmptyRuns = runs.filter((run) => run.length > pathRunLengthEpsilon)
+  const lastRun = nonEmptyRuns[nonEmptyRuns.length - 1]
+
+  if (
+    lastRun === undefined ||
+    !Number.isFinite(position) ||
+    position <= 0 ||
+    position >= 1 ||
+    !Number.isFinite(lastRun.endDistance) ||
+    lastRun.endDistance <= pathRunLengthEpsilon
+  ) {
+    return null
+  }
+
+  const totalLength = lastRun.endDistance
+  const targetDistance = totalLength * position
+  const distanceTolerance = pathRunLengthEpsilon * Math.max(1, totalLength)
+
+  if (!Number.isFinite(targetDistance)) {
+    return null
+  }
+
+  let targetRun = lastRun
+
+  for (let index = 0; index < nonEmptyRuns.length; index += 1) {
+    const run = nonEmptyRuns[index]
+
+    if (targetDistance < run.endDistance - distanceTolerance) {
+      targetRun = run
+      break
+    }
+
+    if (targetDistance <= run.endDistance + distanceTolerance) {
+      targetRun = nonEmptyRuns[index + 1] ?? run
+      break
+    }
+  }
+
+  const localPosition = normalizedRunPosition(
+    (targetDistance - targetRun.startDistance) / targetRun.length,
+  )
+
+  return localPosition === null
+    ? null
+    : {
+        runIndex: targetRun.index,
+        localPosition,
+      }
+}
+
+function normalizedRunPosition(position: number): number | null {
+  if (!Number.isFinite(position)) {
+    return null
+  }
+
+  if (position < 0) {
+    return position >= -pathRunLengthEpsilon ? 0 : null
+  }
+
+  if (position > 1) {
+    return position <= 1 + pathRunLengthEpsilon ? 1 : null
+  }
+
+  return Object.is(position, -0) ? 0 : position
 }
 
 function midArrowTikzOptions(
@@ -5349,6 +5621,14 @@ function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
     Math.abs(first.y - second.y) <= epsilon &&
     Math.abs(first.z - second.z) <= epsilon
   )
+}
+
+function vec3Distance(first: Vec3, second: Vec3): number {
+  const dx = first.x - second.x
+  const dy = first.y - second.y
+  const dz = first.z - second.z
+
+  return Math.sqrt(dx * dx + dy * dy + dz * dz)
 }
 
 function formatNumber(value: number): string {
