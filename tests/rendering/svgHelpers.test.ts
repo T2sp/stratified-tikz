@@ -13,7 +13,9 @@ import {
 } from '../../src/rendering/svgPath.ts'
 import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { projectVec3 } from '../../src/geometry/projection.ts'
+import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
+import { pathCrossingStateFromCandidate } from '../../src/model/pathCrossings.ts'
 import {
   createConcatenatedPathStratum,
   createEmptyDiagram,
@@ -72,6 +74,7 @@ import {
   curveArrowheadsForSvgPreview,
   type SvgArrowheadPreview,
 } from '../../src/rendering/svgArrows.ts'
+import { svgPathCrossingOverlayPrimitives } from '../../src/rendering/svgPathCrossings.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -510,6 +513,41 @@ test('SVG path crossing marker style differs by crossing state', () => {
   assert.notEqual(braiding.stroke, antiBraiding.stroke)
   assert.equal(none.strokeDasharray, undefined)
   assert.equal(antiBraiding.strokeDasharray, '3 2')
+})
+
+test('SVG braiding helper creates a background mask and over-strand redraw', () => {
+  const diagram = createSvgBraidingCrossingDiagram('braiding')
+  const overlays = svgPathCrossingOverlayPrimitives(diagram, (point) => ({
+    x: point.x,
+    y: point.y,
+  }))
+  const mask = overlays.find((overlay) => overlay.kind === 'underMask')
+  const redraw = overlays.find((overlay) => overlay.kind === 'overRedraw')
+  const threeDimensional = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    pathCrossings: diagram.pathCrossings,
+  }
+
+  assert.equal(overlays.length, 2)
+  assert.equal(mask?.pathId, 'path-b')
+  assert.equal(mask?.pathData, 'M 0,-0.12 L 0,0.12')
+  assert.equal(mask?.stroke, '#ffffff')
+  assert.equal(mask?.strokeWidth, 5.2)
+  assert.equal(redraw?.pathId, 'path-a')
+  assert.equal(redraw?.pathData, 'M -0.12,0 L 0.12,0')
+  assert.equal(redraw?.stroke, '#AA0033')
+  assert.equal(redraw?.strokeDasharray, undefined)
+  assert.doesNotMatch(
+    overlays.map((overlay) => overlay.pathData).join('\n'),
+    /NaN|Infinity/,
+  )
+  assert.deepEqual(
+    svgPathCrossingOverlayPrimitives(threeDimensional, (point) => ({
+      x: point.x,
+      y: point.y,
+    })),
+    [],
+  )
 })
 
 test('hidden curve style maps to SVG stroke attributes', () => {
@@ -1200,6 +1238,64 @@ function curvedSaddleSheet(): CurvedSheetStratum {
   }
 }
 
+function createSvgBraidingCrossingDiagram(
+  crossingKind: 'none' | 'braiding' | 'antiBraiding',
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'path-a',
+      name: 'Path A',
+      style: curveStyle({
+        strokeColor: '#AA0033',
+      }),
+      points: [
+        { x: -1, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'path-b',
+      name: 'Path B',
+      style: curveStyle(),
+      points: [
+        { x: 0, y: -1, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+  diagram.pathCrossings = [
+    pathCrossingStateFromCandidate(
+      onlySvgPathIntersectionCandidate(diagram),
+      crossingKind,
+    ),
+  ]
+
+  return diagram
+}
+
+function curveStyle(overrides: Partial<CurveStyle> = {}): CurveStyle {
+  return {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+    ...overrides,
+  }
+}
+
 function sheetStyle(overrides: Partial<SheetStyle> = {}): SheetStyle {
   return {
     kind: 'sheetStyle',
@@ -1209,6 +1305,20 @@ function sheetStyle(overrides: Partial<SheetStyle> = {}): SheetStyle {
     strokeOpacity: 1,
     ...overrides,
   }
+}
+
+function onlySvgPathIntersectionCandidate(diagram: Diagram) {
+  const candidates = pathIntersectionCandidatesForDiagram(diagram)
+
+  assert.equal(candidates.length, 1)
+
+  const candidate = candidates[0]
+
+  if (candidate === undefined) {
+    throw new Error('Expected one path intersection candidate.')
+  }
+
+  return candidate
 }
 
 function xyPlaneFrameAtZ(z: number): SurfaceFrame {

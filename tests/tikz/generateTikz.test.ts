@@ -34,6 +34,8 @@ import {
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
 import { cameraBasisFromTikz3dplotAngles } from '../../src/geometry/projection.ts'
+import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
+import { pathCrossingStateFromCandidate } from '../../src/model/pathCrossings.ts'
 import {
   applyUserStylePresetToLabel,
   applyUserStylePresetToStratum,
@@ -2668,6 +2670,88 @@ test('numeric path output without arrows has no arrow decoration options', () =>
   assert.doesNotMatch(tikz, /\n\s+(->|<-|<->)\n/)
 })
 
+test('no braiding state emits no crossing mask commands', () => {
+  const tikz = generateTikz(createBraidingCrossingDiagram())
+
+  assert.doesNotMatch(tikz, /Background mask clips the under-strand/)
+  assert.doesNotMatch(tikz, /stzBraidingBackground/)
+  assert.doesNotMatch(tikz, /braidingCrossing0/)
+})
+
+test('braiding emits a pathB mask and pathA redraw without knot package', () => {
+  const tikz = generateTikz(createBraidingCrossingDiagram('braiding'))
+  const maskPath = '(braidingCrossing0Maskp0) -- (braidingCrossing0Maskp1);'
+  const redrawPath = '(braidingCrossing0Overp0) -- (braidingCrossing0Overp1);'
+
+  assert.match(tikz, /% Braiding crossing: path-a over path-b; no knot package\./)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Maskp0\) at \(0,-0\.12\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Maskp1\) at \(0,0\.12\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Overp0\) at \(-0\.12,0\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Overp1\) at \(0\.12,0\);/)
+  assert.match(tikz, /draw=stzBraidingBackground/)
+  assert.match(tikz, /line width=5\.2pt/)
+  assert.ok(tikz.indexOf(maskPath) < tikz.indexOf(redrawPath))
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{knot\}/)
+  assert.doesNotMatch(tikz, /\\begin\{knot\}|\\strand|\\flipcrossings/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('anti-braiding emits a pathA mask and pathB redraw', () => {
+  const tikz = generateTikz(createBraidingCrossingDiagram('antiBraiding'))
+
+  assert.match(tikz, /% Braiding crossing: path-b over path-a; no knot package\./)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Maskp0\) at \(-0\.12,0\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Maskp1\) at \(0\.12,0\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Overp0\) at \(0,-0\.12\);/)
+  assert.match(tikz, /\\coordinate \(braidingCrossing0Overp1\) at \(0,0\.12\);/)
+  assert.match(tikz, /draw=stzBraidingBackground/)
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{knot\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('braiding with arrow decorations preserves arrows on the main path only', () => {
+  const tikz = generateTikz(
+    createBraidingCrossingDiagram(
+      'braiding',
+      arrowOptions({ endpoint: 'forward', mid: { enabled: true } }),
+    ),
+  )
+
+  assert.match(tikz, /% Braiding crossing: path-a over path-b/)
+  assert.match(tikz, /\n\s+->,\n/)
+  assert.equal(countMatches(tikz, /postaction=\{decorate\}/g), 1)
+  assert.equal(countMatches(tikz, /mark=at position/g), 1)
+  assert.equal(countMatches(tikz, /\\arrow\{>\}/g), 1)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.doesNotMatch(tikz, /\\usetikzlibrary\{knot\}/)
+})
+
+test('inline braiding output has no blank lines and keeps four-space indentation', () => {
+  const tikz = generateTikz(createBraidingCrossingDiagram('braiding'), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /\n        % Braiding crossing: path-a over path-b/)
+  assert.match(tikz, /\n        \\draw\[/)
+  assert.match(tikz, /\n            draw=stzBraidingBackground/)
+  assert.match(tikz, /\n            \(braidingCrossing0Maskp0\) -- \(braidingCrossing0Maskp1\);/)
+  expectNoBlankLines(tikz)
+  expectNoTwoSpaceCommandIndent(tikz)
+})
+
+test('3D TikZ output ignores saved braiding states', () => {
+  const twoDimensional = createBraidingCrossingDiagram('braiding')
+  const threeDimensional: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    pathCrossings: twoDimensional.pathCrossings,
+  }
+  const tikz = generateTikz(threeDimensional)
+
+  assert.doesNotMatch(tikz, /Braiding crossing:/)
+  assert.doesNotMatch(tikz, /braidingCrossing0/)
+  assert.doesNotMatch(tikz, /stzBraidingBackground/)
+})
+
 test('split concatenated path forward endpoint arrow is only on the final run', () => {
   const tikz = generateTikz(
     createMixedStyleArrowPathDiagram(arrowOptions({ endpoint: 'forward' })),
@@ -5096,6 +5180,73 @@ function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
   })
 
   return diagram
+}
+
+function createBraidingCrossingDiagram(
+  crossingKind?: 'none' | 'braiding' | 'antiBraiding',
+  pathAArrows?: PathArrowOptions,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'path-a',
+      name: 'Path A',
+      style: curveStyle(),
+      points: [
+        { x: -1, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      styleSegments: [],
+      ...(pathAArrows === undefined ? {} : { arrows: pathAArrows }),
+      layer: 0,
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      id: 'path-b',
+      name: 'Path B',
+      style: curveStyle({
+        strokeColor: '#224466',
+        lineWidth: 1.2,
+      }),
+      points: [
+        { x: 0, y: -1, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+  )
+
+  if (crossingKind !== undefined) {
+    diagram.pathCrossings = [
+      pathCrossingStateFromCandidate(
+        onlyPathIntersectionCandidate(diagram),
+        crossingKind,
+      ),
+    ]
+  }
+
+  return diagram
+}
+
+function onlyPathIntersectionCandidate(diagram: Diagram) {
+  const candidates = pathIntersectionCandidatesForDiagram(diagram)
+
+  assert.equal(candidates.length, 1)
+
+  const candidate = candidates[0]
+
+  if (candidate === undefined) {
+    throw new Error('Expected one path intersection candidate.')
+  }
+
+  return candidate
 }
 
 function createMixedStyleArrowPathDiagram(arrows?: PathArrowOptions): Diagram {

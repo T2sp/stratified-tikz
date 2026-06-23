@@ -48,11 +48,17 @@ import {
   hasSymbolicArcScalarInputValue,
   pathSegmentPointAt,
   pathSegmentStyleRuns,
+  resolvePathSegmentStyle,
   templatePathCoordinates,
   templatePathFrame,
   type ArcScalarInputValue,
   type PathSegmentStyleRun,
 } from '../model/paths.ts'
+import {
+  defaultPathCrossingOverlaySegmentLength,
+  pathCrossingOverlaysForDiagram,
+  type PathCrossingOverlay,
+} from '../geometry/pathCrossingOverlays.ts'
 import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import {
   createInitialCamera3D,
@@ -314,6 +320,8 @@ export const maxCurvedSheetTikzFaces = 256
 const gridTikzEpsilon = 1e-9
 const pathRunLengthEpsilon = 1e-9
 const pathRunLengthSampleCount = 32
+const tikzBraidingMaskStrokeGapPt = 4
+const tikzBraidingBackgroundColor: HexColor = '#FFFFFF'
 
 export function generateTikz(
   diagram: Diagram,
@@ -340,11 +348,18 @@ export function generateTikz2D(
   )
   const regionSectionTitle = 'Codimension 0 strata: regions'
   const curveSectionTitle = 'Codimension 1 strata: curves'
+  const braidingSectionTitle = 'Braiding crossing overlays'
   const pointSectionTitle = 'Codimension 2 strata: points'
   const labelSectionTitle = 'Labels'
+  const braidingCommands = emitPathCrossingOverlays(
+    diagram,
+    braidingSectionTitle,
+    context,
+  )
   const sectionTitles = [
     regionSectionTitle,
     curveSectionTitle,
+    ...(braidingCommands.length === 0 ? [] : [braidingSectionTitle]),
     pointSectionTitle,
     labelSectionTitle,
   ]
@@ -368,6 +383,7 @@ export function generateTikz2D(
       ),
       (curve, index) => emitCurve(curve, index, context),
     ),
+    ...braidingCommands,
     ...emitLayeredItems(
       pointSectionTitle,
       diagram.strata.filter(
@@ -1648,6 +1664,142 @@ function emitCurve(
     ...formatTikzOptions(options),
     ']',
     indentLine(`${formatCurvePath(curve, coordinates, context.mode)};`),
+    '',
+  ]
+}
+
+type PathCrossingOverlayEmission = {
+  overlay: PathCrossingOverlay
+  overCurve: CurveStratum
+  underCurve: CurveStratum
+  layer: number
+}
+
+function emitPathCrossingOverlays(
+  diagram: Diagram,
+  sectionTitle: string,
+  context: GenerateContext,
+): LayeredTikzCommand[] {
+  if (diagram.ambientDimension !== 2) {
+    return []
+  }
+
+  const curvesById = new Map(
+    diagram.strata.flatMap((stratum) =>
+      stratum.geometricKind === 'curve' && stratum.codim === 1
+        ? [[stratum.id, stratum] as const]
+        : [],
+    ),
+  )
+  const emissions = pathCrossingOverlaysForDiagram(diagram, {
+    segmentLength: defaultPathCrossingOverlaySegmentLength,
+  }).flatMap((overlay): PathCrossingOverlayEmission[] => {
+    const overCurve = curvesById.get(overlay.overPathId)
+    const underCurve = curvesById.get(overlay.underPathId)
+
+    if (overCurve === undefined || underCurve === undefined) {
+      return []
+    }
+
+    return [
+      {
+        overlay,
+        overCurve,
+        underCurve,
+        layer: Math.max(
+          normalizeLayer(overCurve.layer),
+          normalizeLayer(underCurve.layer),
+        ),
+      },
+    ]
+  })
+
+  if (emissions.length === 0) {
+    return []
+  }
+
+  const backgroundColor = context.colors.define(
+    'BraidingBackground',
+    tikzBraidingBackgroundColor,
+  )
+
+  return emissions.map((emission, index) => ({
+    layer: emission.layer,
+    sectionTitle,
+    lines: emitPathCrossingOverlay(
+      emission.overlay,
+      emission.overCurve,
+      emission.underCurve,
+      index,
+      backgroundColor,
+      context,
+    ),
+  }))
+}
+
+function emitPathCrossingOverlay(
+  overlay: PathCrossingOverlay,
+  overCurve: CurveStratum,
+  underCurve: CurveStratum,
+  overlayIndex: number,
+  backgroundColor: string,
+  context: GenerateContext,
+): string[] {
+  const coordinateBaseName = `braidingCrossing${overlayIndex}`
+  const underMaskStart = context.coordinates.define(
+    `${coordinateBaseName}Mask`,
+    0,
+    overlay.underMask.start,
+  )
+  const underMaskEnd = context.coordinates.define(
+    `${coordinateBaseName}Mask`,
+    1,
+    overlay.underMask.end,
+  )
+  const overRedrawStart = context.coordinates.define(
+    `${coordinateBaseName}Over`,
+    0,
+    overlay.overRedraw.start,
+  )
+  const overRedrawEnd = context.coordinates.define(
+    `${coordinateBaseName}Over`,
+    1,
+    overlay.overRedraw.end,
+  )
+  const underStyle = curveStyleAtPathParameter(
+    underCurve,
+    overlay.underMask.parameter,
+  )
+  const overStyle = curveStyleAtPathParameter(
+    overCurve,
+    overlay.overRedraw.parameter,
+  )
+  const maskLineWidth =
+    positiveLineWidthOrDefault(underStyle.lineWidth) +
+    tikzBraidingMaskStrokeGapPt
+  const overStyleOptions = curveStyleTikzOptions(
+    overStyle,
+    `Braiding${overlayIndex}${overlay.overPathId}Over`,
+    context,
+  )
+
+  return [
+    `% Braiding crossing: ${commentLineText(
+      overlay.overPathId,
+    )} over ${commentLineText(overlay.underPathId)}; no knot package.`,
+    '% Background mask clips the under-strand; over-strand redraw intentionally omits arrow decorations.',
+    '\\draw[',
+    ...formatTikzOptions([
+      `draw=${backgroundColor}`,
+      'draw opacity=1',
+      `line width=${formatNumber(maskLineWidth)}pt`,
+    ]),
+    ']',
+    indentLine(`(${underMaskStart}) -- (${underMaskEnd});`),
+    '\\draw[',
+    ...formatTikzOptions(overStyleOptions),
+    ']',
+    indentLine(`(${overRedrawStart}) -- (${overRedrawEnd});`),
     '',
   ]
 }
@@ -4076,6 +4228,35 @@ function curveStyleOptionsForElement(
   return presetStyleOption === null
     ? [...importedOptions, ...curveStyleTikzOptions(style, colorBaseName, context)]
     : [presetStyleOption, ...importedOptions]
+}
+
+function curveStyleAtPathParameter(
+  curve: CurveStratum,
+  parameter: number,
+): CurveStyle {
+  if (curve.kind !== 'concatenatedPath' || curve.segments.length === 0) {
+    return curve.style
+  }
+
+  const segmentIndex = Math.min(
+    curve.segments.length - 1,
+    Math.max(0, Math.floor(clampUnit(parameter) * curve.segments.length)),
+  )
+  const segment = curve.segments[segmentIndex]
+
+  return segment === undefined
+    ? curve.style
+    : resolvePathSegmentStyle(curve.style, segment)
+}
+
+function positiveLineWidthOrDefault(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 1.2
+}
+
+function clampUnit(value: number): number {
+  return Number.isFinite(value)
+    ? Math.min(1, Math.max(0, Object.is(value, -0) ? 0 : value))
+    : 0
 }
 
 function logicalPathRunsFromStyleRuns(
