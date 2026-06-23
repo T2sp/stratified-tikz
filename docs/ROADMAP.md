@@ -647,8 +647,51 @@ Recommended `phaseSlugs` entries:
 - Add accessibility labels and docs.
 - Run end-to-end regression checks.
 
+### Phase 22A: Path arrow data model and TikZ option generation
 
-## Phase 22: Multi-selection and batch editing
+- Add endpoint and mid-arrow options.
+- Mid-arrow default position is `.5`.
+- Arrow heads:
+  - `\arrow{>}`;
+  - `\arrow{Stealth}`;
+  - `\arrow{Latex}`;
+  - `\arrow{Stealth[harpoon]}`;
+  - `\arrow{Stealth[harpoon,swap]}`.
+- Generate TikZ decoration options and required library hints.
+
+### Phase 22B: Arrow UI, SVG preview, and path direction reversal
+
+- Inspector/UI controls for arrow options.
+- SVG arrowhead preview.
+- Reverse path direction command.
+
+### Phase 22C: 2D path intersection detection for string diagrams
+
+- Detect intersections between 2D paths.
+- Show crossing candidates in SVG preview.
+- No 3D braiding.
+
+### Phase 22D: Braiding crossing state and click-to-toggle UI
+
+- Persist crossing states:
+  - no braiding;
+  - braiding;
+  - anti-braiding.
+- Click crossing to toggle.
+
+### Phase 22E: TikZ/SVG braiding rendering without knot package
+
+- Render/export braidings using explicit gap/mask strategy.
+- Do not use TikZ knot package.
+- Preserve arrow decorations on main paths.
+
+### Phase 22F: Arrow/braiding polish, docs, and regression hardening
+
+- Add docs/examples.
+- Add performance caps.
+- Harden save/load and combined arrow+braiding output.
+
+## Phase 23: Multi-selection and batch editing
 
 Multi-selection is postponed until after layer manager.
 

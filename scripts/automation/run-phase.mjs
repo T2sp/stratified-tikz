@@ -117,6 +117,12 @@ const phaseSlugs = {
   "21D": "inspector-preview-drawer",
   "21E": "ibis-style-layer-window",
   "21F": "ui-overhaul-polish",
+  "22A": "path-arrow-model-tikz",
+  "22B": "path-arrow-ui-svg-reverse",
+  "22C": "2d-path-intersection-detection",
+  "22D": "braiding-crossing-state-ui",
+  "22E": "braiding-render-export-no-knot",
+  "22F": "arrow-braiding-polish",
 };
 
 function makePhaseSpec(phase) {
