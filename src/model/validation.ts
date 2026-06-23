@@ -6,7 +6,10 @@ import {
 } from '../geometry/bezierControls.ts'
 import { validateCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
-import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
+import {
+  is2DPathLikeCurveForIntersections,
+  pathIntersectionDetectionForDiagram,
+} from '../geometry/pathIntersections.ts'
 import {
   closedPathBoundaryCoordinates,
   isFillRule,
@@ -2978,8 +2981,10 @@ function validatePathCrossingStates(
       .filter(
         (stratum) =>
           stratum.geometricKind === 'curve' &&
-          stratum.codim === 1 &&
-          stratum.kind !== 'grid',
+          is2DPathLikeCurveForIntersections(
+            stratum,
+            diagram.ambientDimension,
+          ),
       )
       .map((stratum) => stratum.id),
   )

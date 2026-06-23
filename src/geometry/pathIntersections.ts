@@ -131,6 +131,13 @@ export function pathIntersectionCandidatesForDiagram(
   return pathIntersectionDetectionForDiagram(diagram, options).candidates
 }
 
+export function is2DPathLikeCurveForIntersections(
+  curve: CurveStratum,
+  ambientDimension: AmbientDimension,
+): boolean {
+  return ambientDimension === 2 && curve.codim === 1 && curve.kind !== 'grid'
+}
+
 export function pathIntersectionDetectionForDiagram(
   diagram: Diagram,
   options: PathIntersectionDetectionOptions = {},
@@ -157,7 +164,11 @@ export function pathIntersectionDetectionForDiagram(
   const pathCurves = diagram.strata
     .filter(
       (stratum): stratum is CurveStratum =>
-        stratum.geometricKind === 'curve' && stratum.codim === 1,
+        stratum.geometricKind === 'curve' &&
+        is2DPathLikeCurveForIntersections(
+          stratum,
+          diagram.ambientDimension,
+        ),
     )
     .filter((curve) => resolvedOptions.includeCurve?.(curve) ?? true)
     .sort((first, second) => first.id.localeCompare(second.id))
@@ -250,7 +261,7 @@ export function flattenCurveFor2DIntersections(
   ambientDimension: AmbientDimension,
   options: PathIntersectionDetectionOptions = {},
 ): FlattenedCurvePath2D | null {
-  if (ambientDimension !== 2 || curve.codim !== 1 || curve.kind === 'grid') {
+  if (!is2DPathLikeCurveForIntersections(curve, ambientDimension)) {
     return null
   }
 
@@ -292,6 +303,8 @@ export function flattenCurveFor2DIntersections(
         true,
         resolvedOptions,
       )
+    case 'grid':
+      return null
   }
 }
 

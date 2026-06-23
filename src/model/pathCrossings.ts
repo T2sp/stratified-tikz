@@ -1,4 +1,7 @@
-import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
+import {
+  is2DPathLikeCurveForIntersections,
+  pathIntersectionDetectionForDiagram,
+} from '../geometry/pathIntersections.ts'
 import { crossingKinds } from './types.ts'
 import type {
   CrossingKind,
@@ -120,7 +123,10 @@ export function togglePathCrossingStateForCandidate(
   statesById.set(state.id, state)
 
   const pathCrossings = detection.status.capped
-    ? structurallyValidPathCrossingStates([...statesById.values()])
+    ? filterPathCrossingStatesForExisting2DCurves(
+        [...statesById.values()],
+        cleanedDiagram,
+      )
     : candidates.flatMap((candidateForDiagram) => {
         const storedState = statesById.get(candidateForDiagram.id)
 
@@ -218,9 +224,13 @@ export function normalizePathCrossingStatesForDiagram(
 
   const detection = pathIntersectionDetectionForDiagram(diagram)
   const candidates = detection.candidates
+  const referenceValidStates = filterPathCrossingStatesForExisting2DCurves(
+    states,
+    diagram,
+  )
 
   if (detection.status.capped) {
-    return structurallyValidPathCrossingStates(states)
+    return referenceValidStates
   }
 
   const candidatesById = new Map(
@@ -243,11 +253,7 @@ export function normalizePathCrossingStatesForDiagram(
   const statesById = new Map<string, PathCrossingState>()
   const usedCandidateIds = new Set<string>()
 
-  states.forEach((state) => {
-    if (!isValidPathCrossingStateShape(state)) {
-      return
-    }
-
+  referenceValidStates.forEach((state) => {
     const candidate = candidatesById.get(state.id)
 
     if (
@@ -289,6 +295,31 @@ export function normalizePathCrossingStatesForDiagram(
 
     return state === undefined ? [] : [state]
   })
+}
+
+export function filterPathCrossingStatesForExisting2DCurves(
+  states: readonly PathCrossingState[],
+  diagram: Diagram,
+): PathCrossingState[] {
+  if (diagram.ambientDimension !== 2) {
+    return []
+  }
+
+  const eligibleCurveIds = new Set(
+    diagram.strata.flatMap((stratum) =>
+      stratum.geometricKind === 'curve' &&
+      is2DPathLikeCurveForIntersections(stratum, diagram.ambientDimension)
+        ? [stratum.id]
+        : [],
+    ),
+  )
+
+  return structurallyValidPathCrossingStates(states).filter(
+    (state) =>
+      state.pathAId !== state.pathBId &&
+      eligibleCurveIds.has(state.pathAId) &&
+      eligibleCurveIds.has(state.pathBId),
+  )
 }
 
 function structurallyValidPathCrossingStates(

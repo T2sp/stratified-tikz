@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
+import { deleteLayer } from '../../src/model/layers.ts'
 import {
   createCurveStratum,
   createEmptyDiagram,
+  createGridStratum,
+  createPointStratum,
+  createSheetStratum,
 } from '../../src/model/constructors.ts'
 import {
+  createNumericScalarInputValue,
+  xyGridFrame,
+} from '../../src/model/grids.ts'
+import {
   cleanPathCrossingStates,
+  filterPathCrossingStatesForExisting2DCurves,
   pathCrossingStateFromCandidate,
   pathCrossingKindForCandidate,
   togglePathCrossingStateForCandidate,
@@ -16,12 +25,16 @@ import {
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import { removeSelectedElement } from '../../src/ui/diagramUpdates.ts'
 import { findSelectedElement } from '../../src/ui/selection.ts'
 import type {
   CurveStratum,
   Diagram,
+  GridParameterRange,
   PathArrowOptions,
+  PathCrossingState,
   PathIntersectionCandidate,
+  Stratum,
   Vec3,
 } from '../../src/model/types.ts'
 
@@ -299,6 +312,132 @@ test('cleanup removes crossing state with missing referenced path', () => {
   assert.equal(cleaned.pathCrossings, undefined)
 })
 
+test('reference-aware crossing filter removes states with missing path A', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const state = pathCrossingStateFromCandidate(candidate, 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [{ ...state, pathAId: 'missing-path' }],
+    diagram,
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter removes states with missing path B', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const state = pathCrossingStateFromCandidate(candidate, 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [{ ...state, pathBId: 'missing-path' }],
+    diagram,
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter removes states referencing one path twice', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const state = pathCrossingStateFromCandidate(candidate, 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [{ ...state, pathBId: state.pathAId }],
+    diagram,
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter removes states referencing a point', () => {
+  const pathA = lineCurve('path-a', point(-1, 0), point(1, 0))
+  const pointB = createPointStratum({
+    ambientDimension: 2,
+    id: 'point-b',
+    name: 'Point B',
+    position: point(0, 0),
+  })
+  const state = crossingStateForIds('path-a', 'point-b', 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [state],
+    diagramWithStrata([pathA, pointB]),
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter removes states referencing a sheet', () => {
+  const pathA = lineCurve('path-a', point(-1, 0), point(1, 0))
+  const sheetB = createSheetStratum({
+    ambientDimension: 3,
+    id: 'sheet-b',
+    name: 'Sheet B',
+    corners: [
+      point(-1, -1),
+      point(1, -1),
+      point(1, 1),
+      point(-1, 1),
+    ],
+  })
+  const state = crossingStateForIds('path-a', 'sheet-b', 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [state],
+    diagramWithStrata([pathA, sheetB]),
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter removes states referencing a grid', () => {
+  const pathA = lineCurve('path-a', point(-1, 0), point(1, 0))
+  const gridB = gridCurve('grid-b')
+  const state = crossingStateForIds('path-a', 'grid-b', 'braiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves(
+    [state],
+    diagramWithStrata([pathA, gridB]),
+  )
+
+  assert.deepEqual(filtered, [])
+})
+
+test('reference-aware crossing filter keeps distinct existing 2D curves', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const state = pathCrossingStateFromCandidate(candidate, 'antiBraiding')
+  const filtered = filterPathCrossingStatesForExisting2DCurves([state], diagram)
+
+  assert.equal(filtered.length, 1)
+  assert.equal(filtered[0]?.pathAId, state.pathAId)
+  assert.equal(filtered[0]?.pathBId, state.pathBId)
+  assert.equal(filtered[0]?.kind, 'antiBraiding')
+})
+
+test('reference-aware crossing filter removes states from 3D diagrams', () => {
+  const state = pathCrossingStateFromCandidate(
+    onlyCandidate(crossingDiagram()),
+    'braiding',
+  )
+  const diagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'path-a',
+        name: 'Path A',
+        points: [point(-1, 0), point(1, 0)],
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'path-b',
+        name: 'Path B',
+        points: [point(0, -1), point(0, 1)],
+      }),
+    ],
+  }
+  const filtered = filterPathCrossingStatesForExisting2DCurves([state], diagram)
+
+  assert.deepEqual(filtered, [])
+})
+
 test('cleanup removes crossing states from 3D diagrams', () => {
   const candidate = onlyCandidate(crossingDiagram())
   const diagram: Diagram = {
@@ -312,24 +451,14 @@ test('cleanup removes crossing states from 3D diagrams', () => {
   assert.equal(cleaned.pathCrossings, undefined)
 })
 
-test('cleanup preserves structurally valid crossing states when detection is capped', () => {
-  const curves = Array.from({ length: 50 }, (_, index) =>
-    lineCurve(
-      `path-${index.toString().padStart(2, '0')}`,
-      point(-1, index),
-      point(1, index),
-    ),
-  )
-  const diagram = diagramWithCurves(curves)
-  const cappedState = {
-    id: 'crossing:path-48:path-49:0p500000:0p500000',
-    pathAId: 'path-48',
-    pathBId: 'path-49',
-    point: point(0, 48.5),
-    parameterA: 0.5,
-    parameterB: 0.5,
-    kind: 'braiding' as const,
+test('cleanup preserves reference-valid crossing states when detection is capped', () => {
+  const diagram = denseCappedCrossingDiagram('braiding')
+  const cappedState = diagram.pathCrossings?.[0]
+
+  if (cappedState === undefined) {
+    throw new Error('Expected capped crossing fixture to contain a state.')
   }
+
   const cleaned = cleanPathCrossingStates({
     ...diagram,
     pathCrossings: [cappedState],
@@ -344,6 +473,80 @@ test('cleanup preserves structurally valid crossing states when detection is cap
     throw new Error(loaded.error)
   }
   assert.equal(loaded.diagram.pathCrossings?.[0]?.id, cappedState.id)
+})
+
+test('capped cleanup preserves anti-braiding kind for kept states', () => {
+  const diagram = denseCappedCrossingDiagram('antiBraiding')
+  const cleaned = cleanPathCrossingStates(diagram)
+
+  assert.equal(cleaned.pathCrossings?.length, 1)
+  assert.equal(cleaned.pathCrossings?.[0]?.kind, 'antiBraiding')
+  assert.equal(validateDiagram(cleaned).valid, true)
+})
+
+test('capped cleanup removes stale crossings after deleting path A', () => {
+  const diagram = denseCappedCrossingDiagram('braiding')
+  const removed = removeSelectedElement(diagram, {
+    kind: 'stratum',
+    id: 'path-a',
+  })
+
+  assert.equal(removed.removed, true)
+  assert.equal(removed.diagram.pathCrossings, undefined)
+  assertNoPathCrossingReference(removed.diagram, 'path-a')
+  assertValidDiagram(removed.diagram)
+})
+
+test('capped cleanup removes stale crossings after deleting path B', () => {
+  const diagram = denseCappedCrossingDiagram('braiding')
+  const removed = removeSelectedElement(diagram, {
+    kind: 'stratum',
+    id: 'path-b',
+  })
+
+  assert.equal(removed.removed, true)
+  assert.equal(removed.diagram.pathCrossings, undefined)
+  assertNoPathCrossingReference(removed.diagram, 'path-b')
+  assertValidDiagram(removed.diagram)
+})
+
+test('capped cleanup removes stale crossings after deleting both crossed paths', () => {
+  const diagram = denseCappedCrossingDiagram('braiding')
+  const cleaned = cleanPathCrossingStates({
+    ...diagram,
+    strata: diagram.strata.filter(
+      (stratum) => stratum.id !== 'path-a' && stratum.id !== 'path-b',
+    ),
+  })
+
+  assert.equal(cleaned.pathCrossings, undefined)
+  assertNoPathCrossingReference(cleaned, 'path-a')
+  assertNoPathCrossingReference(cleaned, 'path-b')
+  assertValidDiagram(cleaned)
+})
+
+test('capped cleanup removes stale crossings after deleting a layer with one crossed path', () => {
+  const diagram = denseCappedCrossingDiagram('braiding', {
+    pathALayer: 7,
+  })
+  const deleted = deleteLayer(diagram, 7)
+
+  assert.equal(deleted.pathCrossings, undefined)
+  assertNoPathCrossingReference(deleted, 'path-a')
+  assertValidDiagram(deleted)
+})
+
+test('capped cleanup removes stale crossings after deleting a layer with both crossed paths', () => {
+  const diagram = denseCappedCrossingDiagram('braiding', {
+    pathALayer: 7,
+    pathBLayer: 7,
+  })
+  const deleted = deleteLayer(diagram, 7)
+
+  assert.equal(deleted.pathCrossings, undefined)
+  assertNoPathCrossingReference(deleted, 'path-a')
+  assertNoPathCrossingReference(deleted, 'path-b')
+  assertValidDiagram(deleted)
 })
 
 test('toggling a crossing does not disturb existing selection targets', () => {
@@ -376,6 +579,13 @@ function diagramWithCurves(curves: CurveStratum[]): Diagram {
   return diagram
 }
 
+function diagramWithStrata(strata: Stratum[]): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(...strata)
+
+  return diagram
+}
+
 function lineCurve(
   id: string,
   start: Vec3,
@@ -389,6 +599,78 @@ function lineCurve(
     points: [start, end],
     ...(arrows === undefined ? {} : { arrows }),
   })
+}
+
+function gridCurve(id: string): CurveStratum {
+  return createGridStratum({
+    ambientDimension: 2,
+    id,
+    name: id,
+    frame: xyGridFrame(),
+    uRange: gridRange(-1, 1, 1),
+    vRange: gridRange(-1, 1, 1),
+    clip: {
+      kind: 'rectangle',
+      uMin: createNumericScalarInputValue(-1),
+      uMax: createNumericScalarInputValue(1),
+      vMin: createNumericScalarInputValue(-1),
+      vMax: createNumericScalarInputValue(1),
+    },
+  })
+}
+
+function gridRange(
+  min: number,
+  max: number,
+  step: number,
+): GridParameterRange {
+  return {
+    min: createNumericScalarInputValue(min),
+    max: createNumericScalarInputValue(max),
+    step: createNumericScalarInputValue(step),
+  }
+}
+
+function denseCappedCrossingDiagram(
+  kind: 'braiding' | 'antiBraiding',
+  layers: { pathALayer?: number; pathBLayer?: number } = {},
+): Diagram {
+  const pathA = lineCurve('path-a', point(-1, 0), point(1, 0))
+  const pathB = lineCurve('path-b', point(0, -1), point(0, 1))
+  const baseDiagram = diagramWithCurves([pathA, pathB])
+  const candidate = onlyCandidate(baseDiagram)
+  const crossingState = pathCrossingStateFromCandidate(candidate, kind)
+  const layeredPathA = { ...pathA, layer: layers.pathALayer ?? pathA.layer }
+  const layeredPathB = { ...pathB, layer: layers.pathBLayer ?? pathB.layer }
+  const fillers = Array.from({ length: 50 }, (_, index) =>
+    lineCurve(
+      `filler-${index.toString().padStart(2, '0')}`,
+      point(10, index + 10),
+      point(11, index + 10),
+    ),
+  )
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    strata: [layeredPathA, layeredPathB, ...fillers],
+    pathCrossings: [crossingState],
+  }
+}
+
+function crossingStateForIds(
+  pathAId: string,
+  pathBId: string,
+  kind: 'braiding' | 'antiBraiding',
+): PathCrossingState {
+  return {
+    id: `crossing:${pathAId}:${pathBId}:0p500000:0p500000`,
+    pathAId,
+    pathBId,
+    point: point(0, 0),
+    parameterA: 0.5,
+    parameterB: 0.5,
+    kind,
+  }
 }
 
 function onlyCandidate(diagram: Diagram): PathIntersectionCandidate {
@@ -407,4 +689,23 @@ function onlyCandidate(diagram: Diagram): PathIntersectionCandidate {
 
 function point(x: number, y: number, z = 0): Vec3 {
   return { x, y, z }
+}
+
+function assertNoPathCrossingReference(diagram: Diagram, pathId: string): void {
+  assert.equal(
+    diagram.pathCrossings?.some(
+      (state) => state.pathAId === pathId || state.pathBId === pathId,
+    ) ?? false,
+    false,
+  )
+}
+
+function assertValidDiagram(diagram: Diagram): void {
+  const validation = validateDiagram(diagram)
+
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors.map((issue) => `${issue.path}: ${issue.message}`).join('\n'),
+  )
 }
