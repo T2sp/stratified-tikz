@@ -9,8 +9,10 @@ import type {
   CircleTemplatePath,
   ConcatenatedPathStratum,
   CurveStyle,
+  CurveStratum,
   CubicBezierControlMode,
   CubicBezierPathSegment,
+  CurveStyleSegment,
   EllipseTemplatePath,
   LinePathSegment,
   PathTemplate,
@@ -36,6 +38,11 @@ export type PathSegmentStyleRun = {
   segments: PathSegment[]
   style: CurveStyle
 }
+
+export type ReversibleCurveStratum = Extract<
+  CurveStratum,
+  { kind: 'polyline' | 'cubicBezier' | 'concatenatedPath' }
+>
 
 export function pathSegmentsFromPolyline(
   points: readonly Vec3[],
@@ -156,6 +163,9 @@ export function reversePathSegment(segment: PathSegment): PathSegment {
         control1: cloneVec3(segment.control2),
         control2: cloneVec3(segment.control1),
         end: cloneVec3(segment.start),
+        ...(segment.controlMode === undefined
+          ? {}
+          : { controlMode: { kind: 'absolute' } as CubicBezierControlMode }),
         ...(segment.styleOverride === undefined
           ? {}
           : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
@@ -177,6 +187,56 @@ export function reversePathSegment(segment: PathSegment): PathSegment {
           ? {}
           : { styleOverride: clonePathSegmentStyleOverride(segment.styleOverride) }),
       }
+  }
+}
+
+export function canReverseCurvePathDirection(
+  curve: CurveStratum,
+): curve is ReversibleCurveStratum {
+  return (
+    curve.kind === 'polyline' ||
+    curve.kind === 'cubicBezier' ||
+    curve.kind === 'concatenatedPath'
+  )
+}
+
+export function reverseCurvePathDirection(
+  curve: CurveStratum,
+): CurveStratum | null {
+  switch (curve.kind) {
+    case 'polyline':
+      return {
+        ...curve,
+        points: [...curve.points].reverse().map(cloneVec3),
+        styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+      }
+    case 'cubicBezier':
+      if (curve.points.length !== 4) {
+        return null
+      }
+
+      return {
+        ...curve,
+        points: [
+          cloneVec3(curve.points[3]),
+          cloneVec3(curve.points[2]),
+          cloneVec3(curve.points[1]),
+          cloneVec3(curve.points[0]),
+        ],
+        ...(curve.bezierControls === undefined
+          ? {}
+          : { bezierControls: { kind: 'absolute' } as CubicBezierControlMode }),
+        styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+      }
+    case 'concatenatedPath':
+      return {
+        ...curve,
+        segments: [...curve.segments].reverse().map(reversePathSegment),
+        styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+      }
+    case 'templatePath':
+    case 'grid':
+      return null
   }
 }
 
@@ -977,6 +1037,17 @@ function isFiniteVec3(point: Vec3): boolean {
 
 function positiveModulo(value: number, modulus: number): number {
   return ((value % modulus) + modulus) % modulus
+}
+
+function reverseCurveStyleSegments(
+  segments: readonly CurveStyleSegment[],
+): CurveStyleSegment[] {
+  return [...segments].reverse().map((segment) => ({
+    ...segment,
+    from: 1 - segment.to,
+    to: 1 - segment.from,
+    style: { ...segment.style },
+  }))
 }
 
 function degreesToRadians(degrees: number): number {

@@ -63,6 +63,7 @@ import {
   type SvgPathSegment,
   svgPointList,
 } from './svgPath'
+import { curveArrowheadsForSvgPreview } from './svgArrows.ts'
 import { projectToSvgPoint } from './svgProjection'
 import {
   curveStyleToSvgStrokeAttributes,
@@ -1302,6 +1303,11 @@ function renderCurve(
     occlusion,
     visibilityOptions,
   )
+  const arrowheads = curveArrowheadsForSvgPreview(
+    curve,
+    diagram.ambientDimension,
+    (point) => projectToSvgPoint(camera, point, viewportHeight),
+  )
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -1370,6 +1376,22 @@ function renderCurve(
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {arrowheads.map((arrowhead, index) => (
+          <polygon
+            key={`${curve.id}-arrowhead-${index}`}
+            points={svgPointList([arrowhead.tip, arrowhead.left, arrowhead.right])}
+            fill={arrowhead.color}
+            fillOpacity={arrowhead.opacity}
+            stroke={arrowhead.color}
+            strokeOpacity={arrowhead.opacity}
+            strokeWidth={0.8}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            aria-hidden="true"
+            data-svg-arrow-preview={arrowhead.kind}
+            data-svg-arrow-head={arrowhead.head}
           />
         ))}
       </g>
