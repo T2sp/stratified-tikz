@@ -8,9 +8,11 @@ import {
   sampleCoonsPatch,
   sampleRuledSurface,
 } from '../../src/geometry/curvedSheets.ts'
+import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import {
+  createCurveStratum,
   createCurvedSheetStratum,
   createEmptyDiagram,
 } from '../../src/model/constructors.ts'
@@ -20,6 +22,7 @@ import {
   createUserStylePresetFromStyle,
   clonePathArrowOptions,
   defaultPathArrowOptions,
+  pathCrossingStateFromCandidate,
   parseSavedDiagramJson,
   parseSavedDiagramJsonForImport,
   resolvePendingSymbolicDiagramImport,
@@ -33,6 +36,7 @@ import type {
   Camera3D,
   BoundaryPathSnapshot,
   CoonsPatchPrimitive,
+  CrossingKind,
   Diagram,
   PerspectiveCamera3D,
   RuledSurfacePrimitive,
@@ -1551,6 +1555,45 @@ test('resolvePendingSymbolicDiagramImport uses edited import values before valid
   assert.equal(coonsPathBoundary(primitive.bottom).segments[0].end.x, 3)
 })
 
+test('resolvePendingSymbolicDiagramImport reconciles stale path crossing parameters', () => {
+  const pending = pendingImportForDiagram(symbolicPathCrossingDiagram('none'))
+  const staleCrossing = pending.diagram.pathCrossings?.[0]
+  const resolved = resolvePendingSymbolicDiagramImport(pending, [
+    { name: 'Len', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const currentCandidate = onlyPathIntersectionCandidate(resolved.diagram)
+
+  assert.equal(currentCandidate.parameterA, 0.25)
+  assert.notEqual(staleCrossing?.id, currentCandidate.id)
+  assert.equal(resolved.diagram.pathCrossings?.length, 1)
+  assert.equal(resolved.diagram.pathCrossings?.[0]?.id, currentCandidate.id)
+  assert.equal(resolved.diagram.pathCrossings?.[0]?.kind, 'none')
+})
+
+test('resolvePendingSymbolicDiagramImport preserves braiding kind when rebinding a stale crossing', () => {
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pendingImportForDiagram(symbolicPathCrossingDiagram('braiding')),
+    [{ name: 'Len', expression: '4' }],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const currentCandidate = onlyPathIntersectionCandidate(resolved.diagram)
+
+  assert.equal(resolved.diagram.pathCrossings?.length, 1)
+  assert.equal(resolved.diagram.pathCrossings?.[0]?.id, currentCandidate.id)
+  assert.equal(resolved.diagram.pathCrossings?.[0]?.kind, 'braiding')
+})
+
 test('resolvePendingSymbolicDiagramImport refreshes symbolic ruled previews', () => {
   const pending = pendingImportForDiagram(symbolicRuledDiagram())
   const resolved = resolvePendingSymbolicDiagramImport(pending, [
@@ -1822,6 +1865,42 @@ function symbolicCoonsDiagram(): Diagram {
   return diagram
 }
 
+function symbolicPathCrossingDiagram(kind: CrossingKind): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.variables = [
+    {
+      id: 'var-len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.strata.push(
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'path-a',
+      name: 'Path A',
+      points: [
+        point(0, 0, 0),
+        symbolicPoint(2, 0, 0, { x: 'Len' }),
+      ],
+    }),
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'path-b',
+      name: 'Path B',
+      points: [point(1, -1, 0), point(1, 1, 0)],
+    }),
+  )
+  diagram.pathCrossings = [
+    pathCrossingStateFromCandidate(onlyPathIntersectionCandidate(diagram), kind),
+  ]
+
+  return diagram
+}
+
 function symbolicRuledDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
 
@@ -1955,6 +2034,20 @@ function pendingImportForDiagram(diagram: Diagram): PendingSymbolicDiagramImport
   return result.pendingImport
 }
 
+function onlyPathIntersectionCandidate(diagram: Diagram) {
+  const candidates = pathIntersectionCandidatesForDiagram(diagram)
+
+  assert.equal(candidates.length, 1)
+
+  const candidate = candidates[0]
+
+  if (candidate === undefined) {
+    throw new Error('Expected one path intersection candidate.')
+  }
+
+  return candidate
+}
+
 function resolvedCoonsPrimitive(diagram: Diagram): CoonsPatchPrimitive {
   const sheet = diagram.strata[0]
 
@@ -1991,6 +2084,10 @@ function isFinitePoint(point: Vec3): boolean {
     Number.isFinite(point.y) &&
     Number.isFinite(point.z)
   )
+}
+
+function point(x: number, y: number, z: number): Vec3 {
+  return { x, y, z }
 }
 
 function symbolicPoint(

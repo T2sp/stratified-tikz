@@ -26,6 +26,12 @@ export type LoadedPathCrossingNormalization = {
   warnings: string[]
 }
 
+export type PathCrossingStateCleanupOptions = {
+  reconcileStalePathPairs?: boolean
+}
+
+const pathCrossingReconcileDistanceEpsilon = 1e-6
+
 export function isCrossingKind(value: unknown): value is CrossingKind {
   return crossingKinds.some((kind) => kind === value)
 }
@@ -126,7 +132,10 @@ export function togglePathCrossingStateForCandidate(
   }
 }
 
-export function cleanPathCrossingStates(diagram: Diagram): Diagram {
+export function cleanPathCrossingStates(
+  diagram: Diagram,
+  options: PathCrossingStateCleanupOptions = {},
+): Diagram {
   if (diagram.pathCrossings === undefined) {
     return diagram
   }
@@ -134,6 +143,7 @@ export function cleanPathCrossingStates(diagram: Diagram): Diagram {
   const pathCrossings = normalizePathCrossingStatesForDiagram(
     diagram,
     diagram.pathCrossings,
+    options,
   )
 
   if (pathCrossingStateArraysEqual(diagram.pathCrossings, pathCrossings)) {
@@ -197,6 +207,7 @@ export function normalizeLoadedPathCrossingStates(
 export function normalizePathCrossingStatesForDiagram(
   diagram: Diagram,
   states: readonly PathCrossingState[],
+  options: PathCrossingStateCleanupOptions = {},
 ): PathCrossingState[] {
   if (diagram.ambientDimension !== 2 || states.length === 0) {
     return []
@@ -206,7 +217,22 @@ export function normalizePathCrossingStatesForDiagram(
   const candidatesById = new Map(
     candidates.map((candidate) => [candidate.id, candidate]),
   )
+  const candidatesByPathPair = new Map<string, PathIntersectionCandidate[]>()
+
+  candidates.forEach((candidate) => {
+    const key = pathCrossingPairKey(candidate.pathAId, candidate.pathBId)
+    const candidatesForPair = candidatesByPathPair.get(key)
+
+    if (candidatesForPair === undefined) {
+      candidatesByPathPair.set(key, [candidate])
+      return
+    }
+
+    candidatesForPair.push(candidate)
+  })
+
   const statesById = new Map<string, PathCrossingState>()
+  const usedCandidateIds = new Set<string>()
 
   states.forEach((state) => {
     if (!isValidPathCrossingStateShape(state)) {
@@ -220,6 +246,25 @@ export function normalizePathCrossingStatesForDiagram(
       candidate.pathAId !== state.pathAId ||
       candidate.pathBId !== state.pathBId
     ) {
+      if (!options.reconcileStalePathPairs) {
+        return
+      }
+
+      const reconciledCandidate = reconcileStalePathCrossingCandidate(
+        state,
+        candidatesByPathPair,
+        usedCandidateIds,
+      )
+
+      if (reconciledCandidate === null) {
+        return
+      }
+
+      statesById.set(
+        reconciledCandidate.id,
+        pathCrossingStateFromCandidate(reconciledCandidate, state.kind),
+      )
+      usedCandidateIds.add(reconciledCandidate.id)
       return
     }
 
@@ -227,6 +272,7 @@ export function normalizePathCrossingStatesForDiagram(
       state.id,
       pathCrossingStateFromCandidate(candidate, state.kind),
     )
+    usedCandidateIds.add(candidate.id)
   })
 
   return candidates.flatMap((candidate) => {
@@ -234,6 +280,46 @@ export function normalizePathCrossingStatesForDiagram(
 
     return state === undefined ? [] : [state]
   })
+}
+
+function reconcileStalePathCrossingCandidate(
+  state: PathCrossingState,
+  candidatesByPathPair: ReadonlyMap<string, readonly PathIntersectionCandidate[]>,
+  usedCandidateIds: ReadonlySet<string>,
+): PathIntersectionCandidate | null {
+  const candidates = (
+    candidatesByPathPair.get(pathCrossingPairKey(state.pathAId, state.pathBId)) ??
+    []
+  ).filter((candidate) => !usedCandidateIds.has(candidate.id))
+
+  if (candidates.length === 0) {
+    return null
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0] ?? null
+  }
+
+  const epsilonSquared =
+    pathCrossingReconcileDistanceEpsilon *
+    pathCrossingReconcileDistanceEpsilon
+  const nearbyCandidates = candidates
+    .map((candidate) => ({
+      candidate,
+      distanceSquared: distanceSquaredVec3(candidate.point, state.point),
+    }))
+    .filter(({ distanceSquared }) => distanceSquared <= epsilonSquared)
+    .sort((first, second) => first.distanceSquared - second.distanceSquared)
+
+  if (nearbyCandidates.length === 1) {
+    return nearbyCandidates[0]?.candidate ?? null
+  }
+
+  return null
+}
+
+function pathCrossingPairKey(pathAId: string, pathBId: string): string {
+  return `${pathAId}\u0000${pathBId}`
 }
 
 export function pathCrossingStatusMessage(
@@ -331,6 +417,14 @@ function pathCrossingStateArraysEqual(
 
 function cloneVec3(point: Vec3): Vec3 {
   return { x: point.x, y: point.y, z: point.z }
+}
+
+function distanceSquaredVec3(first: Vec3, second: Vec3): number {
+  const dx = first.x - second.x
+  const dy = first.y - second.y
+  const dz = first.z - second.z
+
+  return dx * dx + dy * dy + dz * dz
 }
 
 function isFiniteVec3Record(value: unknown): value is Vec3 {

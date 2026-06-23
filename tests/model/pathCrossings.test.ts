@@ -7,6 +7,7 @@ import {
 } from '../../src/model/constructors.ts'
 import {
   cleanPathCrossingStates,
+  pathCrossingStateFromCandidate,
   pathCrossingKindForCandidate,
   togglePathCrossingStateForCandidate,
 } from '../../src/model/pathCrossings.ts'
@@ -187,6 +188,83 @@ test('stale crossing state is invalidated when curve geometry changes', () => {
     ),
   }
   const cleaned = cleanPathCrossingStates(moved)
+
+  assert.equal(cleaned.pathCrossings, undefined)
+})
+
+test('valid crossing state is preserved by cleanup', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const state = pathCrossingStateFromCandidate(candidate, 'braiding')
+  const cleaned = cleanPathCrossingStates({
+    ...diagram,
+    pathCrossings: [state],
+  })
+
+  assert.equal(cleaned.pathCrossings?.length, 1)
+  assert.equal(cleaned.pathCrossings?.[0]?.id, candidate.id)
+  assert.equal(cleaned.pathCrossings?.[0]?.kind, 'braiding')
+})
+
+test('stale crossing state can be reconciled by path pair when requested', () => {
+  const diagram = diagramWithCurves([
+    lineCurve('path-a', point(0, 0), point(2, 0)),
+    lineCurve('path-b', point(1, -1), point(1, 1)),
+  ])
+  const oldCandidate = onlyCandidate(diagram)
+  const staleState = pathCrossingStateFromCandidate(oldCandidate, 'braiding')
+  const stretched: Diagram = {
+    ...diagram,
+    strata: diagram.strata.map((stratum) =>
+      stratum.id === 'path-a' && stratum.geometricKind === 'curve'
+        ? lineCurve('path-a', point(0, 0), point(4, 0))
+        : stratum,
+    ),
+    pathCrossings: [staleState],
+  }
+
+  assert.equal(validateDiagram(stretched).valid, false)
+
+  const cleaned = cleanPathCrossingStates(stretched, {
+    reconcileStalePathPairs: true,
+  })
+  const currentCandidate = onlyCandidate(cleaned)
+
+  assert.equal(cleaned.pathCrossings?.length, 1)
+  assert.equal(cleaned.pathCrossings?.[0]?.id, currentCandidate.id)
+  assert.equal(cleaned.pathCrossings?.[0]?.parameterA, 0.25)
+  assert.equal(cleaned.pathCrossings?.[0]?.kind, 'braiding')
+  assert.equal(validateDiagram(cleaned).valid, true)
+})
+
+test('cleanup removes crossing state with missing referenced path', () => {
+  const diagram = crossingDiagram()
+  const candidate = onlyCandidate(diagram)
+  const cleaned = cleanPathCrossingStates(
+    {
+      ...diagram,
+      pathCrossings: [
+        {
+          ...pathCrossingStateFromCandidate(candidate, 'antiBraiding'),
+          pathAId: 'missing-path',
+        },
+      ],
+    },
+    { reconcileStalePathPairs: true },
+  )
+
+  assert.equal(cleaned.pathCrossings, undefined)
+})
+
+test('cleanup removes crossing states from 3D diagrams', () => {
+  const candidate = onlyCandidate(crossingDiagram())
+  const diagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    pathCrossings: [pathCrossingStateFromCandidate(candidate, 'braiding')],
+  }
+  const cleaned = cleanPathCrossingStates(diagram, {
+    reconcileStalePathPairs: true,
+  })
 
   assert.equal(cleaned.pathCrossings, undefined)
 })

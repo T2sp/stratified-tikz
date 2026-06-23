@@ -376,7 +376,13 @@ export function resolvePendingSymbolicDiagramImport(
     return symbolicImportError(refreshed.errors)
   }
 
-  const validation = validateDiagram(refreshed.diagram)
+  // Variable resolution can change path geometry and intersection parameters.
+  // Clean/reconcile crossing states before validation so stale crossing IDs do
+  // not reject otherwise valid imports.
+  const diagram = cleanPathCrossingStates(refreshed.diagram, {
+    reconcileStalePathPairs: true,
+  })
+  const validation = validateDiagram(diagram)
 
   if (!validation.valid) {
     return symbolicImportError(validation.errors)
@@ -384,7 +390,7 @@ export function resolvePendingSymbolicDiagramImport(
 
   return {
     ok: true,
-    diagram: refreshed.diagram,
+    diagram,
     warnings: pendingImport.warnings,
   }
 }
