@@ -20,6 +20,7 @@ import { findSelectedElement } from '../../src/ui/selection.ts'
 import type {
   CurveStratum,
   Diagram,
+  PathArrowOptions,
   PathIntersectionCandidate,
   Vec3,
 } from '../../src/model/types.ts'
@@ -76,6 +77,48 @@ test('crossing state saves and loads', () => {
   assert.equal(loaded.diagram.pathCrossings?.length, 1)
   assert.equal(loaded.diagram.pathCrossings?.[0]?.kind, 'braiding')
   assert.equal(loaded.diagram.pathCrossings?.[0]?.id, candidate.id)
+})
+
+test('crossing state saves and loads with path arrows', () => {
+  const arrows: PathArrowOptions = {
+    endpoint: 'both',
+    mid: {
+      enabled: true,
+      position: 0.5,
+      direction: 'forward',
+      head: 'stealthHarpoon',
+    },
+  }
+  const diagram = diagramWithCurves([
+    lineCurve('path-a', point(-1, 0), point(1, 0), arrows),
+    lineCurve('path-b', point(0, -1), point(0, 1)),
+  ])
+  const candidate = onlyCandidate(diagram)
+  const toggled = togglePathCrossingStateForCandidate(diagram, candidate)
+
+  assert.equal(toggled.ok, true)
+  if (!toggled.ok) {
+    throw new Error(toggled.reason)
+  }
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(toggled.diagram))
+
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+
+  const loadedPathA = loaded.diagram.strata.find(
+    (stratum) => stratum.id === 'path-a',
+  )
+
+  assert.equal(loaded.diagram.pathCrossings?.length, 1)
+  assert.equal(loaded.diagram.pathCrossings?.[0]?.kind, 'braiding')
+  assert.equal(loadedPathA?.geometricKind, 'curve')
+  if (loadedPathA?.geometricKind !== 'curve') {
+    throw new Error('Expected path-a to load as a curve.')
+  }
+  assert.deepEqual(loadedPathA.arrows, arrows)
 })
 
 test('invalid referenced path is rejected by validation and cleaned on load', () => {
@@ -269,6 +312,40 @@ test('cleanup removes crossing states from 3D diagrams', () => {
   assert.equal(cleaned.pathCrossings, undefined)
 })
 
+test('cleanup preserves structurally valid crossing states when detection is capped', () => {
+  const curves = Array.from({ length: 50 }, (_, index) =>
+    lineCurve(
+      `path-${index.toString().padStart(2, '0')}`,
+      point(-1, index),
+      point(1, index),
+    ),
+  )
+  const diagram = diagramWithCurves(curves)
+  const cappedState = {
+    id: 'crossing:path-48:path-49:0p500000:0p500000',
+    pathAId: 'path-48',
+    pathBId: 'path-49',
+    point: point(0, 48.5),
+    parameterA: 0.5,
+    parameterB: 0.5,
+    kind: 'braiding' as const,
+  }
+  const cleaned = cleanPathCrossingStates({
+    ...diagram,
+    pathCrossings: [cappedState],
+  })
+  const loaded = parseSavedDiagramJson(serializeDiagram(cleaned))
+
+  assert.equal(cleaned.pathCrossings?.length, 1)
+  assert.equal(cleaned.pathCrossings?.[0]?.id, cappedState.id)
+  assert.equal(validateDiagram(cleaned).valid, true)
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+  assert.equal(loaded.diagram.pathCrossings?.[0]?.id, cappedState.id)
+})
+
 test('toggling a crossing does not disturb existing selection targets', () => {
   const diagram = crossingDiagram()
   const candidate = onlyCandidate(diagram)
@@ -299,12 +376,18 @@ function diagramWithCurves(curves: CurveStratum[]): Diagram {
   return diagram
 }
 
-function lineCurve(id: string, start: Vec3, end: Vec3): CurveStratum {
+function lineCurve(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+  arrows?: PathArrowOptions,
+): CurveStratum {
   return createCurveStratum({
     ambientDimension: 2,
     id,
     name: id,
     points: [start, end],
+    ...(arrows === undefined ? {} : { arrows }),
   })
 }
 

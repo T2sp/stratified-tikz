@@ -59,7 +59,7 @@ export function PathArrowEditor({
       <h3>Arrows</h3>
       <div className="inspector-form">
         <LabeledSelectField<EndpointArrowMode>
-          label="Endpoint"
+          label="End"
           value={arrows.endpoint}
           options={endpointArrowModes}
           optionLabel={(option) => option}
@@ -72,7 +72,7 @@ export function PathArrowEditor({
           }
         />
         <LabeledSelectField<MidArrowEnabledMode>
-          label="Mid arrow"
+          label="Mid"
           value={arrows.mid.enabled ? 'on' : 'off'}
           options={midArrowEnabledModes}
           optionLabel={(option) => option}
@@ -85,7 +85,7 @@ export function PathArrowEditor({
           }
         />
         <EditableNumberField
-          label="Position"
+          label="Pos"
           value={arrows.mid.position}
           onChange={(position) =>
             onDiagramChange((currentDiagram) =>
@@ -96,7 +96,7 @@ export function PathArrowEditor({
           }
         />
         <LabeledSelectField<MidArrowDirection>
-          label="Direction"
+          label="Dir"
           value={arrows.mid.direction}
           options={midArrowDirections}
           optionLabel={(option) => option}
@@ -127,9 +127,10 @@ export function PathArrowEditor({
             type="button"
             className="toolbar-button"
             disabled={!reverseSupported}
+            aria-label="Reverse path direction"
             title={
               reverseSupported
-                ? 'Reverse path direction'
+                ? 'Reverse path direction; arrows remain relative to the new direction.'
                 : reverseUnsupportedMessage(curve)
             }
             onClick={() =>
@@ -144,7 +145,7 @@ export function PathArrowEditor({
               )
             }
           >
-            Reverse path direction
+            Reverse
           </button>
         </div>
         {!reverseSupported && (
@@ -153,10 +154,6 @@ export function PathArrowEditor({
             value={reverseUnsupportedMessage(curve)}
           />
         )}
-        <ReadOnlyField
-          label="Preview"
-          value="SVG arrowheads are approximate."
-        />
       </div>
     </section>
   )

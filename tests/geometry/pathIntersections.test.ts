@@ -4,12 +4,21 @@ import {
   DEFAULT_INTERSECTION_ARC_SAMPLES,
   DEFAULT_INTERSECTION_CUBIC_SAMPLES,
   DEFAULT_INTERSECTION_TEMPLATE_SAMPLES,
+  DEFAULT_MAX_INTERSECTION_CANDIDATES,
+  DEFAULT_MAX_INTERSECTION_PATH_PAIRS,
+  DEFAULT_MAX_INTERSECTION_PATHS,
+  DEFAULT_MAX_INTERSECTION_SEGMENTS_PER_PATH,
+  HARD_MAX_INTERSECTION_CANDIDATES,
+  HARD_MAX_INTERSECTION_PATH_PAIRS,
+  HARD_MAX_INTERSECTION_PATHS,
+  HARD_MAX_INTERSECTION_SEGMENTS_PER_PATH,
   MAX_INTERSECTION_ARC_SAMPLES,
   MAX_INTERSECTION_CUBIC_SAMPLES,
   MAX_INTERSECTION_TEMPLATE_SAMPLES,
   flattenCurveFor2DIntersections,
   normalizePathIntersectionOptions,
   pathIntersectionCandidatesForDiagram,
+  pathIntersectionDetectionForDiagram,
 } from '../../src/geometry/pathIntersections.ts'
 import {
   createConcatenatedPathStratum,
@@ -204,16 +213,34 @@ test('path intersection option normalization preserves defaults and caps samples
   assert.equal(defaults.cubicSamples, DEFAULT_INTERSECTION_CUBIC_SAMPLES)
   assert.equal(defaults.arcSamples, DEFAULT_INTERSECTION_ARC_SAMPLES)
   assert.equal(defaults.templateSamples, DEFAULT_INTERSECTION_TEMPLATE_SAMPLES)
+  assert.equal(defaults.maxPaths, DEFAULT_MAX_INTERSECTION_PATHS)
+  assert.equal(
+    defaults.maxSegmentsPerPath,
+    DEFAULT_MAX_INTERSECTION_SEGMENTS_PER_PATH,
+  )
+  assert.equal(defaults.maxPathPairs, DEFAULT_MAX_INTERSECTION_PATH_PAIRS)
+  assert.equal(defaults.maxCandidates, DEFAULT_MAX_INTERSECTION_CANDIDATES)
 
   const excessive = normalizePathIntersectionOptions({
     cubicSamples: 1_000_000,
     arcSamples: 1_000_000,
     templateSamples: 1_000_000,
+    maxPaths: 1_000_000,
+    maxSegmentsPerPath: 1_000_000,
+    maxPathPairs: 1_000_000,
+    maxCandidates: 1_000_000,
   })
 
   assert.equal(excessive.cubicSamples, MAX_INTERSECTION_CUBIC_SAMPLES)
   assert.equal(excessive.arcSamples, MAX_INTERSECTION_ARC_SAMPLES)
   assert.equal(excessive.templateSamples, MAX_INTERSECTION_TEMPLATE_SAMPLES)
+  assert.equal(excessive.maxPaths, HARD_MAX_INTERSECTION_PATHS)
+  assert.equal(
+    excessive.maxSegmentsPerPath,
+    HARD_MAX_INTERSECTION_SEGMENTS_PER_PATH,
+  )
+  assert.equal(excessive.maxPathPairs, HARD_MAX_INTERSECTION_PATH_PAIRS)
+  assert.equal(excessive.maxCandidates, HARD_MAX_INTERSECTION_CANDIDATES)
 })
 
 test('path intersection option normalization handles invalid and fractional samples', () => {
@@ -236,9 +263,100 @@ test('path intersection option normalization handles invalid and fractional samp
   assert.equal(fractional.cubicSamples, 7)
   assert.equal(fractional.arcSamples, 1)
   assert.equal(fractional.templateSamples, 12)
+  assert.equal(fractional.maxPaths, DEFAULT_MAX_INTERSECTION_PATHS)
+  assert.equal(
+    fractional.maxSegmentsPerPath,
+    DEFAULT_MAX_INTERSECTION_SEGMENTS_PER_PATH,
+  )
+  assert.equal(fractional.maxPathPairs, DEFAULT_MAX_INTERSECTION_PATH_PAIRS)
+  assert.equal(fractional.maxCandidates, DEFAULT_MAX_INTERSECTION_CANDIDATES)
   assert.equal(Number.isInteger(fractional.cubicSamples), true)
   assert.equal(Number.isInteger(fractional.arcSamples), true)
   assert.equal(Number.isInteger(fractional.templateSamples), true)
+})
+
+test('detector reports ambiguous overlapping segments', () => {
+  const detection = pathIntersectionDetectionForDiagram(
+    twoDimensionalDiagramWithCurves([
+      lineCurve('line-a', point(0, 0), point(2, 0)),
+      lineCurve('line-b', point(1, 0), point(3, 0)),
+    ]),
+  )
+
+  assert.equal(detection.candidates.length, 0)
+  assert.equal(detection.status.capped, false)
+  assert.equal(detection.status.stats.ambiguousOverlapCount, 1)
+  assert.match(detection.status.message, /ambiguous overlapping/)
+})
+
+test('detector caps dense path lists and path pairs', () => {
+  const diagram = twoDimensionalDiagramWithCurves(
+    Array.from({ length: 8 }, (_, index) =>
+      lineCurve(
+        `path-${index.toString().padStart(2, '0')}`,
+        point(-1, index),
+        point(1, index),
+      ),
+    ),
+  )
+  const pathCap = pathIntersectionDetectionForDiagram(diagram, {
+    maxPaths: 3,
+  })
+  const pairCap = pathIntersectionDetectionForDiagram(diagram, {
+    maxPaths: 8,
+    maxPathPairs: 4,
+  })
+
+  assert.equal(pathCap.status.capped, true)
+  assert.equal(pathCap.status.capReason, 'tooManyPaths')
+  assert.equal(pathCap.status.stats.skippedPathCount, 5)
+  assert.match(pathCap.status.message, /considered 3 of 8 paths/)
+  assert.equal(pairCap.status.capped, true)
+  assert.equal(pairCap.status.capReason, 'tooManyPathPairs')
+  assert.equal(pairCap.status.stats.pathPairCount, 4)
+  assert.equal(pairCap.status.stats.skippedPathPairCount > 0, true)
+})
+
+test('detector caps sampled segments per path', () => {
+  const diagram = twoDimensionalDiagramWithCurves([
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'long-polyline',
+      name: 'Long polyline',
+      points: Array.from({ length: 12 }, (_, index) => point(index, 0)),
+    }),
+  ])
+  const detection = pathIntersectionDetectionForDiagram(diagram, {
+    maxSegmentsPerPath: 4,
+  })
+  const flattened = flattenCurveFor2DIntersections(
+    diagram.strata[0] as CurveStratum,
+    2,
+    { maxSegmentsPerPath: 4 },
+  )
+
+  assert.equal(flattened?.segments.length, 4)
+  assert.equal(flattened?.segmentsCapped, true)
+  assert.equal(detection.status.capped, true)
+  assert.equal(detection.status.capReason, 'tooManySegments')
+})
+
+test('detector caps crossing candidates on dense grids', () => {
+  const horizontals = Array.from({ length: 4 }, (_, index) =>
+    lineCurve(`h-${index}`, point(-1, index), point(6, index)),
+  )
+  const verticals = Array.from({ length: 4 }, (_, index) =>
+    lineCurve(`v-${index}`, point(index, -1), point(index, 6)),
+  )
+  const detection = pathIntersectionDetectionForDiagram(
+    twoDimensionalDiagramWithCurves([...horizontals, ...verticals]),
+    { maxCandidates: 5 },
+  )
+
+  assert.equal(detection.candidates.length, 5)
+  assert.equal(detection.status.capped, true)
+  assert.equal(detection.status.capReason, 'tooManyCandidates')
+  assert.match(detection.status.message, /stopped after 5 crossing candidates/)
 })
 
 test('excessive cubic sampling flattens to the documented cap', () => {
@@ -270,6 +388,21 @@ test('excessive template sampling flattens to the documented cap', () => {
   assert.notEqual(flattened, null)
   assert.equal(
     flattened?.segments.length,
+    DEFAULT_MAX_INTERSECTION_SEGMENTS_PER_PATH,
+  )
+  assert.equal(flattened?.segmentsCapped, true)
+
+  const raisedSegmentCap = flattenCurveFor2DIntersections(
+    circleTemplateCurve(),
+    2,
+    {
+      templateSamples: 1_000_000,
+      maxSegmentsPerPath: MAX_INTERSECTION_TEMPLATE_SAMPLES,
+    },
+  )
+
+  assert.equal(
+    raisedSegmentCap?.segments.length,
     MAX_INTERSECTION_TEMPLATE_SAMPLES,
   )
 })

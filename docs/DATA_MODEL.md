@@ -1262,6 +1262,12 @@ when enabling a mid-arrow is `0.5`. The supported mid-arrow heads export as
 `\arrow{>}`, `\arrow{Stealth}`, `\arrow{Latex}`,
 `\arrow{Stealth[harpoon]}`, and `\arrow{Stealth[harpoon,swap]}`.
 
+Path reversal changes supported path geometry while preserving the `arrows`
+object. Therefore a forward endpoint arrow remains forward with respect to the
+new stored path direction. The reverse command currently supports polylines,
+cubic Bezier curves, and concatenated paths made from line, cubic Bezier, and
+arc segments; template paths do not yet carry orientation metadata.
+
 Segment endpoints are stored explicitly on each segment. A path is composable
 only when every segment start after the first matches the previous segment end
 within the model endpoint tolerance, currently `1e-9`. This duplicate-endpoint
@@ -1677,6 +1683,13 @@ Crossing ids are derived from path ids and rounded path parameters. If path
 geometry changes so that a stored crossing id no longer corresponds to a current
 2D path intersection candidate, the state is invalidated and removed during
 load or diagram cleanup.
+
+Dense diagrams use bounded intersection detection. If cleanup or validation
+hits a detector cap, exact candidate reconciliation is skipped and structurally
+valid crossing states with existing curve references are retained. This keeps
+save/load from dropping persisted braiding choices merely because preview
+detection reached a performance cap. The TikZ/SVG crossing overlay still only
+renders crossings whose current candidate can be found within the active cap.
 
 ## Curve style segments
 

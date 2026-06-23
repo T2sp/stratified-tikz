@@ -1,4 +1,4 @@
-import { useRef, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, type ReactElement } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import type {
   ConcatenatedPathStratum,
@@ -114,7 +114,10 @@ import {
   classifyAnchorOcclusion,
   type AnchorOcclusionResult,
 } from './pointOcclusion.ts'
-import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
+import {
+  pathIntersectionDetectionForDiagram,
+  type PathIntersectionDetectionStatus,
+} from '../geometry/pathIntersections.ts'
 import { pathCrossingKindForCandidate } from '../model/pathCrossings.ts'
 
 export type BoundaryPathHighlight = {
@@ -146,6 +149,9 @@ export type SvgDiagramProps = {
   onPointStratumClick?: (pointId: string) => void
   onPathIntersectionCandidateClick?: (
     candidate: PathIntersectionCandidate,
+  ) => void
+  onPathIntersectionDetectionStatusChange?: (
+    status: PathIntersectionDetectionStatus,
   ) => void
   onCanvasClick?: (
     svgPoint: Vec2,
@@ -234,6 +240,7 @@ export function SvgDiagram({
   onCurveStratumClick,
   onPointStratumClick,
   onPathIntersectionCandidateClick,
+  onPathIntersectionDetectionStatusChange,
   onCanvasClick,
   onGeometryHandleDrag,
   onGeometryHandleDragStart,
@@ -342,14 +349,17 @@ export function SvgDiagram({
   const items = itemDrafts
     .map(withStableRenderIndex)
     .sort(compareSvgRenderItems)
-  const pathIntersectionCandidates = pathIntersectionCandidatesForDiagram(
-    diagram,
-    {
+  const pathIntersectionDetection = useMemo(
+    () => pathIntersectionDetectionForDiagram(diagram, {
       includeCurve: (curve) =>
         shouldRenderStratumInSvgPreview(diagram, curve) &&
         layerFilterIncludesLayer(layerFilter, curve.layer),
-    },
+    }),
+    [diagram, layerFilter],
   )
+  const pathIntersectionDetectionStatusKey =
+    pathIntersectionDetectionStatusCacheKey(pathIntersectionDetection.status)
+  const pathIntersectionCandidates = pathIntersectionDetection.candidates
   const pathCrossingOverlays = svgPathCrossingOverlayPrimitives(
     diagram,
     (point) => projectToSvgPoint(camera, point, height),
@@ -359,6 +369,14 @@ export function SvgDiagram({
         layerFilterIncludesLayer(layerFilter, curve.layer),
     },
   )
+
+  useEffect(() => {
+    onPathIntersectionDetectionStatusChange?.(pathIntersectionDetection.status)
+  }, [
+    onPathIntersectionDetectionStatusChange,
+    pathIntersectionDetectionStatusKey,
+    pathIntersectionDetection.status,
+  ])
 
   return (
     <svg
@@ -529,6 +547,26 @@ export function SvgDiagram({
         : null}
     </svg>
   )
+}
+
+function pathIntersectionDetectionStatusCacheKey(
+  status: PathIntersectionDetectionStatus,
+): string {
+  const stats = status.stats
+
+  return [
+    status.capped ? 'capped' : 'ok',
+    status.capReason ?? '',
+    status.message,
+    stats.inputPathCount,
+    stats.consideredPathCount,
+    stats.skippedPathCount,
+    stats.pathPairCount,
+    stats.skippedPathPairCount,
+    stats.candidateCount,
+    stats.ambiguousOverlapCount,
+    stats.segmentCappedPathCount,
+  ].join('|')
 }
 
 function withRenderKind(
@@ -971,6 +1009,7 @@ function renderPathIntersectionCandidate(
   const center = projectToSvgPoint(camera, candidate.point, viewportHeight)
   const crossingKind = pathCrossingKindForCandidate(diagram, candidate)
   const markerStyle = svgPathCrossingMarkerStyle(crossingKind, isSelected)
+  const title = pathIntersectionCandidateTooltip(candidate, crossingKind)
   const isClickable =
     onPathIntersectionCandidateClick !== undefined &&
     pathIntersectionCandidateIsSelectable(diagram, candidate, layerFilter)
@@ -997,11 +1036,25 @@ function renderPathIntersectionCandidate(
         onPathIntersectionCandidateClick(candidate)
       }}
     >
+      <title>{title}</title>
       <rect
-        x={center.x - 4.8}
-        y={center.y - 4.8}
-        width={9.6}
-        height={9.6}
+        x={center.x - 7.2}
+        y={center.y - 7.2}
+        width={14.4}
+        height={14.4}
+        transform={`rotate(45 ${center.x} ${center.y})`}
+        fill="none"
+        stroke="#ffffff"
+        strokeOpacity={0.96}
+        strokeWidth={markerStyle.strokeWidth + 3.2}
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
+      <rect
+        x={center.x - 5.8}
+        y={center.y - 5.8}
+        width={11.6}
+        height={11.6}
         transform={`rotate(45 ${center.x} ${center.y})`}
         fill={markerStyle.fill}
         fillOpacity={markerStyle.fillOpacity}
@@ -1014,13 +1067,27 @@ function renderPathIntersectionCandidate(
       <circle
         cx={center.x}
         cy={center.y}
-        r={1.9}
+        r={2.35}
         fill={markerStyle.centerFill}
         fillOpacity={0.95}
         pointerEvents="none"
       />
     </g>
   )
+}
+
+function pathIntersectionCandidateTooltip(
+  candidate: PathIntersectionCandidate,
+  crossingKind: ReturnType<typeof pathCrossingKindForCandidate>,
+): string {
+  switch (crossingKind) {
+    case 'none':
+      return `No braiding: click to set ${candidate.pathAId} over ${candidate.pathBId}.`
+    case 'braiding':
+      return `Braiding: ${candidate.pathAId} over ${candidate.pathBId}. Click for anti-braiding.`
+    case 'antiBraiding':
+      return `Anti-braiding: ${candidate.pathBId} over ${candidate.pathAId}. Click for no braiding.`
+  }
 }
 
 function pathIntersectionCandidateIsSelectable(

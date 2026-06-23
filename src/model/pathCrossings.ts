@@ -1,4 +1,4 @@
-import { pathIntersectionCandidatesForDiagram } from '../geometry/pathIntersections.ts'
+import { pathIntersectionDetectionForDiagram } from '../geometry/pathIntersections.ts'
 import { crossingKinds } from './types.ts'
 import type {
   CrossingKind,
@@ -90,7 +90,8 @@ export function togglePathCrossingStateForCandidate(
     }
   }
 
-  const candidates = pathIntersectionCandidatesForDiagram(cleanedDiagram)
+  const detection = pathIntersectionDetectionForDiagram(cleanedDiagram)
+  const candidates = detection.candidates
   const currentCandidate = candidates.find(
     (candidateForDiagram) =>
       candidateForDiagram.id === candidate.id &&
@@ -118,11 +119,13 @@ export function togglePathCrossingStateForCandidate(
   )
   statesById.set(state.id, state)
 
-  const pathCrossings = candidates.flatMap((candidateForDiagram) => {
-    const storedState = statesById.get(candidateForDiagram.id)
+  const pathCrossings = detection.status.capped
+    ? structurallyValidPathCrossingStates([...statesById.values()])
+    : candidates.flatMap((candidateForDiagram) => {
+        const storedState = statesById.get(candidateForDiagram.id)
 
-    return storedState === undefined ? [] : [storedState]
-  })
+        return storedState === undefined ? [] : [storedState]
+      })
 
   return {
     ok: true,
@@ -213,7 +216,13 @@ export function normalizePathCrossingStatesForDiagram(
     return []
   }
 
-  const candidates = pathIntersectionCandidatesForDiagram(diagram)
+  const detection = pathIntersectionDetectionForDiagram(diagram)
+  const candidates = detection.candidates
+
+  if (detection.status.capped) {
+    return structurallyValidPathCrossingStates(states)
+  }
+
   const candidatesById = new Map(
     candidates.map((candidate) => [candidate.id, candidate]),
   )
@@ -280,6 +289,26 @@ export function normalizePathCrossingStatesForDiagram(
 
     return state === undefined ? [] : [state]
   })
+}
+
+function structurallyValidPathCrossingStates(
+  states: readonly PathCrossingState[],
+): PathCrossingState[] {
+  return states.flatMap((state) =>
+    isValidPathCrossingStateShape(state)
+      ? [
+          {
+            id: state.id,
+            pathAId: state.pathAId,
+            pathBId: state.pathBId,
+            point: cloneVec3(state.point),
+            parameterA: state.parameterA,
+            parameterB: state.parameterB,
+            kind: state.kind,
+          },
+        ]
+      : [],
+  )
 }
 
 function reconcileStalePathCrossingCandidate(

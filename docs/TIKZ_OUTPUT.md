@@ -124,6 +124,13 @@ undo/redo, SVG preview, and TikZ export all use the same arrow options. Mid-arro
 positions must satisfy `0 < position < 1`; invalid values are ignored by the edit
 helper and rejected by model validation.
 
+The arrow controls are intentionally compact:
+
+- endpoint direction is one select (`none`, `forward`, `backward`, `both`);
+- mid-arrow enablement, position, direction, and head are edited separately;
+- the Reverse path direction command gives button feedback through its disabled
+  state and tooltip when a path kind cannot be reversed.
+
 SVG preview draws approximate triangular arrowheads for endpoint and mid-arrow
 decorations. The preview follows the projected path tangent in both 2D and 3D,
 but it does not attempt to reproduce the exact TikZ `Stealth`, `Latex`, or
@@ -135,6 +142,17 @@ harpoon glyphs.
 Braiding means path A passes over path B; anti-braiding means path B passes over
 path A. These states are stored in the diagram model and are exported only for
 2D codimension-1 curve crossings.
+
+In the SVG preview, crossing markers cycle on click:
+
+1. no braiding;
+2. braiding (`pathAId` over `pathBId`);
+3. anti-braiding (`pathBId` over `pathAId`);
+4. back to no braiding.
+
+Markers use a visible diamond with a white halo and an SVG tooltip describing
+the current state and the next click. The preview toolbar reports the most
+recent toggle and also reports capped detection or skipped ambiguous overlaps.
 
 TikZ export does not use the `knot` package. The generator first emits the full
 paths normally, including their endpoint arrows and mid-arrow decorations. It
@@ -182,6 +200,16 @@ swaps endpoints and start/end angles, and flips clockwise versus
 counterclockwise direction. Template circles and ellipses are not reversible yet
 because the current template model has no orientation metadata; grids and
 surfaces are also not reversed by this command.
+
+Current limitations:
+
+- braiding is 2D-only and is not exported for 3D diagrams;
+- crossing detection is sampled, so it does not solve exact symbolic
+  intersections;
+- collinear overlaps are reported as ambiguous and skipped;
+- dense diagrams are bounded by path, segment, path-pair, and candidate caps;
+- the explicit no-knot overlay is local to the crossing and is not a full knot
+  theory engine.
 
 ## Approximate 3D surface ordering
 
@@ -395,7 +423,11 @@ The app ships editable reference examples for common export patterns:
 - a 2D translucent filled-region diagram with solid and densely dotted curves;
 - a 3D hemisphere patch with paths, point markers, and free labels;
 - a 3D saddle patch with crossing paths, point markers, and free labels;
-- a 2D even-odd compound filled boundary.
+- a 2D even-odd compound filled boundary;
+- a 2D string diagram with endpoint arrows;
+- a 2D path with a mid-arrow decoration at position `0.5`;
+- a 2D braiding and anti-braiding crossing diagram using no knot package;
+- a 2D harpoon arrowhead diagram.
 
 The `generate:tikz-examples` script writes these references alongside the base
 2D and 3D examples:
