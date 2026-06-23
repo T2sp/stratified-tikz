@@ -19,6 +19,10 @@ import {
 } from './paths.ts'
 import { cloneCurvedSheetPrimitive } from './sheets.ts'
 import {
+  createPathArrowOptions,
+  type PathArrowOptionsInput,
+} from './pathArrows.ts'
+import {
   cloneGridFrame,
   cloneGridParameterRange,
   cloneGridRectangleClip,
@@ -152,6 +156,7 @@ export type CreateCurveStratumInput = {
   points: Vec3[]
   bezierControls?: CubicBezierControlMode
   styleSegments?: CurveStyleSegment[]
+  arrows?: PathArrowOptionsInput
   layer?: number
 }
 
@@ -165,6 +170,7 @@ export type CreateConcatenatedPathStratumInput = {
   importedTikzStyleReferenceId?: string
   segments: PathSegment[]
   styleSegments?: CurveStyleSegment[]
+  arrows?: PathArrowOptionsInput
   layer?: number
 }
 
@@ -178,6 +184,7 @@ export type CreateTemplatePathStratumInput = {
   importedTikzStyleReferenceId?: string
   template: PathTemplate
   styleSegments?: CurveStyleSegment[]
+  arrows?: PathArrowOptionsInput
   layer?: number
 }
 
@@ -195,6 +202,7 @@ export type CreateGridStratumInput = {
   vRange: GridParameterRange
   clip: GridRectangleClip
   styleSegments?: CurveStyleSegment[]
+  arrows?: PathArrowOptionsInput
   layer?: number
 }
 
@@ -428,6 +436,7 @@ export function createCurveStratum({
   points,
   bezierControls,
   styleSegments = [],
+  arrows,
   layer = 0,
 }: CreateCurveStratumInput): CurveStratum {
   if (kind === 'cubicBezier') {
@@ -445,6 +454,7 @@ export function createCurveStratum({
         normalizePointForAmbientDimension(ambientDimension, point),
       ),
       styleSegments: styleSegments.map(cloneCurveStyleSegment),
+      arrows: createPathArrowOptions(arrows),
       layer,
     }
 
@@ -473,6 +483,7 @@ export function createCurveStratum({
       normalizePointForAmbientDimension(ambientDimension, point),
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    arrows: createPathArrowOptions(arrows),
     layer,
   }
 
@@ -493,6 +504,7 @@ export function createConcatenatedPathStratum({
   importedTikzStyleReferenceId,
   segments,
   styleSegments = [],
+  arrows,
   layer = 0,
 }: CreateConcatenatedPathStratumInput): ConcatenatedPathStratum {
   const path: Omit<ConcatenatedPathStratum, 'label'> = {
@@ -510,6 +522,7 @@ export function createConcatenatedPathStratum({
       ambientDimension,
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    arrows: createPathArrowOptions(arrows),
     layer,
   }
 
@@ -530,6 +543,7 @@ export function createTemplatePathStratum({
   importedTikzStyleReferenceId,
   template,
   styleSegments = [],
+  arrows,
   layer = 0,
 }: CreateTemplatePathStratumInput): TemplatePathStratum {
   const path: Omit<TemplatePathStratum, 'label'> = {
@@ -547,6 +561,7 @@ export function createTemplatePathStratum({
       ambientDimension,
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    arrows: createPathArrowOptions(arrows),
     layer,
   }
 
@@ -571,6 +586,7 @@ export function createGridStratum({
   vRange,
   clip,
   styleSegments = [],
+  arrows,
   layer = 0,
 }: CreateGridStratumInput): GridStratum {
   const grid: Omit<GridStratum, 'label'> = {
@@ -589,6 +605,7 @@ export function createGridStratum({
     vRange: cloneGridParameterRange(vRange),
     clip: cloneGridRectangleClip(clip),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
+    arrows: createPathArrowOptions(arrows),
     layer,
   }
 

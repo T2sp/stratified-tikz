@@ -17,6 +17,8 @@ import type {
   LabelStyle,
   LatticePattern,
   LineStyle,
+  MidArrowDecoration,
+  PathArrowOptions,
   PointShape,
   PointStratum,
   PointStyle,
@@ -73,6 +75,7 @@ import {
   isSymbolicVariableMacroName,
   resolveSymbolicVariables,
 } from '../model/variables.ts'
+import { resolvePathArrowOptions } from '../model/pathArrows.ts'
 import {
   curveOcclusionEnabled,
   defaultHiddenCurveStyle,
@@ -282,6 +285,8 @@ type GenerateContext = {
   externalTikzStyleUsage: ExternalTikzStyleUsageRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
+  requiresDecorationsMarkingsLibrary: boolean
+  requiresArrowsMetaLibrary: boolean
   includeCoordinateAxes: boolean
   exportMode: TikzExportMode
   visibility: VisibilityOptions
@@ -543,6 +548,8 @@ function createContext(
     externalTikzStyleUsage: new ExternalTikzStyleUsageRegistry(),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
+    requiresDecorationsMarkingsLibrary: false,
+    requiresArrowsMetaLibrary: false,
     includeCoordinateAxes:
       mode === '3d' && options.includeCoordinateAxes === true,
     exportMode: options.exportMode ?? 'standalone',
@@ -809,6 +816,14 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
       '% \\usetikzlibrary{spath3}',
       '',
     )
+  }
+
+  if (context.requiresDecorationsMarkingsLibrary) {
+    lines.push('\\usetikzlibrary{decorations.markings}', '')
+  }
+
+  if (context.requiresArrowsMetaLibrary) {
+    lines.push('\\usetikzlibrary{arrows.meta}', '')
   }
 
   if (context.requiresTikz3dLibrary) {
@@ -1580,6 +1595,7 @@ function emitCurve(
         `Curve${curve.id}`,
         context,
       ),
+      ...pathArrowTikzOptions(curve.arrows, context),
       ...spathSaveOptions(curve.pathLabel, context),
     ]
 
@@ -1600,6 +1616,7 @@ function emitCurve(
       `Curve${curve.id}`,
       context,
     ),
+    ...pathArrowTikzOptions(curve.arrows, context),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
   const scopedCurve = emitScopedWorkPlaneRelativeBezierCurve(
@@ -1885,13 +1902,17 @@ function emitGrid(
     `Curve${grid.id}`,
     context,
   )
+  const drawOptions = [
+    ...options,
+    ...pathArrowTikzOptions(grid.arrows, context),
+  ]
   const loopVariables = gridLoopVariables(context)
   const scopeBody = emitGridPatternScopeBody(
     grid,
     pattern.pattern,
     context,
     loopVariables,
-    options,
+    drawOptions,
   )
 
   if (!scopeBody.ok) {
@@ -3161,6 +3182,7 @@ function emitTemplatePath(
       `Curve${curve.id}`,
       context,
     ),
+    ...pathArrowTikzOptions(curve.arrows, context),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
 
@@ -4019,6 +4041,93 @@ function curveStyleOptionsForElement(
   return presetStyleOption === null
     ? [...importedOptions, ...curveStyleTikzOptions(style, colorBaseName, context)]
     : [presetStyleOption, ...importedOptions]
+}
+
+function pathArrowTikzOptions(
+  options: PathArrowOptions | undefined,
+  context: GenerateContext,
+): string[] {
+  const arrows = resolvePathArrowOptions(options)
+  const endpoint = endpointArrowTikzOption(arrows.endpoint)
+
+  return [
+    ...(endpoint === null ? [] : [endpoint]),
+    ...midArrowTikzOptions(arrows.mid, context),
+  ]
+}
+
+function endpointArrowTikzOption(
+  mode: PathArrowOptions['endpoint'],
+): string | null {
+  switch (mode) {
+    case 'none':
+      return null
+    case 'forward':
+      return '->'
+    case 'backward':
+      return '<-'
+    case 'both':
+      return '<->'
+    default:
+      return null
+  }
+}
+
+function midArrowTikzOptions(
+  decoration: MidArrowDecoration,
+  context: GenerateContext,
+): string[] {
+  if (decoration.enabled !== true) {
+    return []
+  }
+
+  context.requiresDecorationsMarkingsLibrary = true
+
+  if (arrowHeadRequiresArrowsMetaLibrary(decoration.head)) {
+    context.requiresArrowsMetaLibrary = true
+  }
+
+  return [
+    'postaction={decorate}',
+    `decoration={markings, mark=at position ${formatNumber(
+      decoration.position,
+    )} with {${midArrowCommand(decoration)}}}`,
+  ]
+}
+
+function midArrowCommand(decoration: MidArrowDecoration): string {
+  const head = arrowHeadTikzName(decoration.head)
+
+  if (decoration.direction === 'forward') {
+    return `\\arrow{${head}}`
+  }
+
+  return decoration.head === 'standard'
+    ? '\\arrow{<}'
+    : `\\arrowreversed{${head}}`
+}
+
+function arrowHeadTikzName(head: MidArrowDecoration['head']): string {
+  switch (head) {
+    case 'standard':
+      return '>'
+    case 'stealth':
+      return 'Stealth'
+    case 'latex':
+      return 'Latex'
+    case 'stealthHarpoon':
+      return 'Stealth[harpoon]'
+    case 'stealthHarpoonSwap':
+      return 'Stealth[harpoon,swap]'
+    default:
+      return '>'
+  }
+}
+
+function arrowHeadRequiresArrowsMetaLibrary(
+  head: MidArrowDecoration['head'],
+): boolean {
+  return head !== 'standard'
 }
 
 function filledSurfaceStyleTikzOptions(

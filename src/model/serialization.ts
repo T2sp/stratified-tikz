@@ -33,6 +33,7 @@ import {
   normalizeImportedTikzStyleKey,
   normalizeImportedTikzStyleOptions,
 } from './importedTikzStyles.ts'
+import { clonePathArrowOptions, defaultPathArrowOptions } from './pathArrows.ts'
 import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
@@ -738,6 +739,7 @@ function normalizeLoadedDiagram(
       ? normalizeLoadedVariablesStructurally(savedDiagram.variables)
       : normalizeLoadedVariables(savedDiagram.variables)
   warnings.push(...variableNormalization.warnings)
+  const strata = normalizeLoadedStrata(savedDiagram.strata)
 
   const styleMetadataErrors = [
     ...sourceNormalization.errors,
@@ -768,7 +770,7 @@ function normalizeLoadedDiagram(
         ...(variableNormalization.variables === undefined
           ? {}
           : { variables: variableNormalization.variables }),
-        strata: savedDiagram.strata as Stratum[],
+        strata,
         labels: savedDiagram.labels as TextLabel[],
       },
       warnings,
@@ -799,7 +801,7 @@ function normalizeLoadedDiagram(
     ...(variableNormalization.variables === undefined
       ? {}
       : { variables: variableNormalization.variables }),
-    strata: savedDiagram.strata as Stratum[],
+    strata,
     labels: savedDiagram.labels as TextLabel[],
   }
   const layerNormalization = normalizeLoadedLayers(
@@ -844,6 +846,25 @@ function normalizeLoadedDiagram(
     diagram: coordinateRefresh.diagram,
     warnings,
     errors: [...layerNormalization.errors, ...coordinateRefresh.errors],
+  }
+}
+
+function normalizeLoadedStrata(savedStrata: unknown[]): Stratum[] {
+  return savedStrata.map(normalizeLoadedStratum) as Stratum[]
+}
+
+function normalizeLoadedStratum(stratum: unknown): unknown {
+  if (!isRecord(stratum) || stratum.geometricKind !== 'curve') {
+    return stratum
+  }
+
+  if (stratum.arrows !== undefined) {
+    return stratum
+  }
+
+  return {
+    ...stratum,
+    arrows: clonePathArrowOptions(defaultPathArrowOptions),
   }
 }
 

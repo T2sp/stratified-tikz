@@ -15,6 +15,7 @@ import type {
   GridParameterRange,
   GridRectangleClip,
   GridStratum,
+  PathArrowOptions,
   PerspectiveCamera3D,
   PointShape,
   PointStratum,
@@ -2446,6 +2447,128 @@ test('denselyDotted maps to densely dotted', () => {
   assert.match(generateTikz(diagram), /densely dotted/)
 })
 
+test('endpoint forward arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'forward' })),
+  )
+
+  assert.match(tikz, /\n\s+->\n\s+\]/)
+})
+
+test('endpoint backward arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'backward' })),
+  )
+
+  assert.match(tikz, /\n\s+<-\n\s+\]/)
+})
+
+test('endpoint both arrow exports arrow option', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ endpoint: 'both' })),
+  )
+
+  assert.match(tikz, /\n\s+<->\n\s+\]/)
+})
+
+test('mid-arrow default exports position and standard head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(arrowOptions({ mid: { enabled: true } })),
+  )
+
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{>\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+})
+
+test('mid-arrow backward exports reversed standard head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, direction: 'backward' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{<\}/)
+})
+
+test('Stealth mid-arrow exports Stealth arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealth' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
+test('Latex mid-arrow exports Latex arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'latex' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Latex\}/)
+})
+
+test('Stealth harpoon mid-arrow exports harpoon arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoon' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon\]\}/)
+})
+
+test('Stealth harpoon swap mid-arrow exports swapped harpoon arrow head', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoonSwap' } }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon,swap\]\}/)
+})
+
+test('backward custom mid-arrow exports arrowreversed syntax', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({
+        mid: { enabled: true, direction: 'backward', head: 'stealth' },
+      }),
+    ),
+  )
+
+  assert.match(tikz, /\\arrowreversed\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
+test('inline math output with arrow decorations has no blank lines', () => {
+  const tikz = generateTikz(
+    createArrowPathDiagram(
+      arrowOptions({ mid: { enabled: true, head: 'stealthHarpoon' } }),
+    ),
+    { exportMode: 'inlineMath' },
+  )
+
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+  expectNoBlankLines(tikz)
+})
+
+test('numeric path output without arrows has no arrow decoration options', () => {
+  const tikz = generateTikz(createArrowPathDiagram())
+
+  assert.match(tikz, /\(curvePolyArrowTestPath0p0\) -- \(curvePolyArrowTestPath0p1\);/)
+  assert.doesNotMatch(tikz, /postaction=\{decorate\}/)
+  assert.doesNotMatch(tikz, /decorations\.markings/)
+  assert.doesNotMatch(tikz, /arrows\.meta/)
+  assert.doesNotMatch(tikz, /\n\s+(->|<-|<->)\n/)
+})
+
 test('curve with empty path label emits no spath save option', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.strata.push(
@@ -4729,6 +4852,46 @@ function symbolicVec3(
       x: xComponent,
       y: yComponent,
       z: zComponent,
+    },
+  }
+}
+
+function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'arrow-test-path',
+    name: 'Arrow Test Path',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    ...(arrows === undefined ? {} : { arrows }),
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function arrowOptions({
+  endpoint = 'none',
+  mid = {},
+}: {
+  endpoint?: PathArrowOptions['endpoint']
+  mid?: Partial<PathArrowOptions['mid']>
+} = {}): PathArrowOptions {
+  return {
+    endpoint,
+    mid: {
+      enabled: mid.enabled ?? false,
+      position: mid.position ?? 0.5,
+      direction: mid.direction ?? 'forward',
+      head: mid.head ?? 'standard',
     },
   }
 }
