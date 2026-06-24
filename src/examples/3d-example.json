@@ -1,0 +1,6338 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 1,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 3,
+    "view": {
+      "camera3d": {
+        "mode": "3d",
+        "kind": "orthographic",
+        "thetaDeg": 65,
+        "phiDeg": 30,
+        "zoom": 1,
+        "pan": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "showCoordinateAxesInTikz": false,
+      "exportMode": "standalone"
+    },
+    "layers": [
+      {
+        "value": 0,
+        "name": "workingLayer-codim0"
+      },
+      {
+        "value": 1,
+        "name": "workingLayer-codim1"
+      },
+      {
+        "value": 2,
+        "name": "workingLayer-codim2"
+      },
+      {
+        "value": 3,
+        "name": "workingLayer-codim3"
+      },
+      {
+        "value": 4,
+        "name": "boundaryPaths",
+        "visible": false
+      },
+      {
+        "value": 5,
+        "name": "invisibleCoordinates",
+        "visible": false
+      },
+      {
+        "value": 6,
+        "name": "boundaryCoords",
+        "visible": false
+      },
+      {
+        "value": 7,
+        "name": "labels"
+      }
+    ],
+    "userStylePresets": [
+      {
+        "id": "user-curve-3cat-phys-0strata-color-default",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "user-sheet-3cat-phys-0strata-color-default",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "user-region-3cat-phys-0strata-color-default",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "user-label-3cat-phys-0strata-color-default",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#CCCCCC",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "user-point-3cat-phys-0strata-color-default",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#CCCCCC",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-default",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-default",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#B3B3B3",
+          "fillOpacity": 0.4,
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-default",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#B3B3B3",
+          "fillOpacity": 0.4,
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-default",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#B3B3B3",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-default",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#B3B3B3",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-x",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-x",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-x",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-x",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#FF6666",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-x",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#FF6666",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-y",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-y",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-y",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-y",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#6666FF",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-y",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#6666FF",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-z",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-z",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#66FF66",
+          "fillOpacity": 0.4,
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-z",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#66FF66",
+          "fillOpacity": 0.4,
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-z",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#66FF66",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-z",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#66FF66",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z"
+      },
+      {
+        "id": "user-point-3cat-phys-2strata-shape-default",
+        "name": "3cat: phys/2strata/shape/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys2strataShapeDefault",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-2strata-shape-default"
+      },
+      {
+        "id": "user-label-3cat-phys-2strata-shape-default",
+        "name": "3cat: phys/2strata/shape/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys2strataShapeDefault2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-2strata-shape-default"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-default",
+        "name": "3cat: phys/3strata/shape/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeDefault",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-default"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-default",
+        "name": "3cat: phys/3strata/shape/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeDefault2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-default"
+      },
+      {
+        "id": "user-curve-3cat-phys-3strata-shape-l",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l"
+      },
+      {
+        "id": "user-sheet-3cat-phys-3strata-shape-l",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l"
+      },
+      {
+        "id": "user-region-3cat-phys-3strata-shape-l",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-l",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-l",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l"
+      },
+      {
+        "id": "user-curve-3cat-phys-3strata-shape-r",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r"
+      },
+      {
+        "id": "user-sheet-3cat-phys-3strata-shape-r",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR2",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r"
+      },
+      {
+        "id": "user-region-3cat-phys-3strata-shape-r",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-r",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-r",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "square",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR5",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r"
+      },
+      {
+        "id": "user-curve-3cat-phys-0strata-color-default-2",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-0strata-color-default-2",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default-2"
+      },
+      {
+        "id": "user-region-3cat-phys-0strata-color-default-2",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default-2"
+      },
+      {
+        "id": "user-label-3cat-phys-0strata-color-default-2",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#CCCCCC",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default-2"
+      },
+      {
+        "id": "user-point-3cat-phys-0strata-color-default-2",
+        "name": "3cat: phys/0strata/color/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#CCCCCC",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys0strataColorDefault10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-default-2",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-default-2",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#B3B3B3",
+          "fillOpacity": 0.4,
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default-2"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-default-2",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#B3B3B3",
+          "fillOpacity": 0.4,
+          "strokeColor": "#B3B3B3",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default-2"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-default-2",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#B3B3B3",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default-2"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-default-2",
+        "name": "3cat: phys/1strata/color/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#B3B3B3",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorDefault10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-default-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-x-2",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-x-2",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x-2"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-x-2",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x-2"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-x-2",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#FF6666",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x-2"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-x-2",
+        "name": "3cat: phys/1strata/color/x",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#FF6666",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorX10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-y-2",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-y-2",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y-2"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-y-2",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y-2"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-y-2",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#6666FF",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y-2"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-y-2",
+        "name": "3cat: phys/1strata/color/y",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#6666FF",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorY10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-1strata-color-z-2",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-1strata-color-z-2",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#66FF66",
+          "fillOpacity": 0.4,
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z-2"
+      },
+      {
+        "id": "user-region-3cat-phys-1strata-color-z-2",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#66FF66",
+          "fillOpacity": 0.4,
+          "strokeColor": "#66FF66",
+          "strokeOpacity": 0.4
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z-2"
+      },
+      {
+        "id": "user-label-3cat-phys-1strata-color-z-2",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#66FF66",
+          "opacity": 0.4,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z-2"
+      },
+      {
+        "id": "user-point-3cat-phys-1strata-color-z-2",
+        "name": "3cat: phys/1strata/color/z",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#66FF66",
+          "opacity": 0.4,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys1strataColorZ10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-z-2"
+      },
+      {
+        "id": "user-point-3cat-phys-2strata-shape-default-2",
+        "name": "3cat: phys/2strata/shape/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys2strataShapeDefault3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-2strata-shape-default-2"
+      },
+      {
+        "id": "user-label-3cat-phys-2strata-shape-default-2",
+        "name": "3cat: phys/2strata/shape/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys2strataShapeDefault4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-2strata-shape-default-2"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-default-2",
+        "name": "3cat: phys/3strata/shape/default",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeDefault3",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-default-2"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-default-2",
+        "name": "3cat: phys/3strata/shape/default",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeDefault4",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-default-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-3strata-shape-l-2",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-3strata-shape-l-2",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l-2"
+      },
+      {
+        "id": "user-region-3cat-phys-3strata-shape-l-2",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l-2"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-l-2",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l-2"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-l-2",
+        "name": "3cat: phys/3strata/shape/L",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeL10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-l-2"
+      },
+      {
+        "id": "user-curve-3cat-phys-3strata-shape-r-2",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR6",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r-2"
+      },
+      {
+        "id": "user-sheet-3cat-phys-3strata-shape-r-2",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR7",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r-2"
+      },
+      {
+        "id": "user-region-3cat-phys-3strata-shape-r-2",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0.35,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR8",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r-2"
+      },
+      {
+        "id": "user-label-3cat-phys-3strata-shape-r-2",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR9",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r-2"
+      },
+      {
+        "id": "user-point-3cat-phys-3strata-shape-r-2",
+        "name": "3cat: phys/3strata/shape/R",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "square",
+          "fill": "filled",
+          "size": 3
+        },
+        "tikzStyleName": "stratifiedStyle3catPhys3strataShapeR10",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-3strata-shape-r-2"
+      }
+    ],
+    "externalTikzStyleSources": [
+      {
+        "id": "external-style-source-my3category-sty",
+        "name": "my3category.sty",
+        "loadHint": "\\input{my3category.sty}"
+      },
+      {
+        "id": "external-style-source-my3category-sty-2",
+        "name": "my3category.sty",
+        "loadHint": "\\input{my3category.sty}"
+      }
+    ],
+    "importedTikzStyleReferences": [
+      {
+        "id": "imported-style-3cat-phys-0strata-color-default",
+        "key": "3cat/phys/0strata/color/default",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/0strata/color/default",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "gray!40,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-default",
+        "key": "3cat/phys/1strata/color/default",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/1strata/color/default",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "gray!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-x",
+        "key": "3cat/phys/1strata/color/x",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/1strata/color/x",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "red!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-y",
+        "key": "3cat/phys/1strata/color/y",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/1strata/color/y",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "blue!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-z",
+        "key": "3cat/phys/1strata/color/z",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/1strata/color/z",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "green!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-2strata-shape-default",
+        "key": "3cat/phys/2strata/shape/default",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/2strata/shape/default",
+        "targets": [
+          "node",
+          "point",
+          "label"
+        ],
+        "options": "thick"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-default",
+        "key": "3cat/phys/3strata/shape/default",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/3strata/shape/default",
+        "targets": [
+          "node",
+          "point",
+          "label"
+        ],
+        "options": "circle,fill,inner sep=1.5pt"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-l",
+        "key": "3cat/phys/3strata/shape/L",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/3strata/shape/L",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "circle,draw=black,thick,fill=white,inner sep=1.5pt"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-r",
+        "key": "3cat/phys/3strata/shape/R",
+        "sourceId": "external-style-source-my3category-sty",
+        "displayName": "3cat: phys/3strata/shape/R",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "rectangle,draw=black,thick,fill=white,inner sep=1.5pt"
+      },
+      {
+        "id": "imported-style-3cat-phys-0strata-color-default-2",
+        "key": "3cat/phys/0strata/color/default",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/0strata/color/default",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "gray!40,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-default-2",
+        "key": "3cat/phys/1strata/color/default",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/1strata/color/default",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "gray!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-x-2",
+        "key": "3cat/phys/1strata/color/x",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/1strata/color/x",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "red!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-y-2",
+        "key": "3cat/phys/1strata/color/y",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/1strata/color/y",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "blue!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-1strata-color-z-2",
+        "key": "3cat/phys/1strata/color/z",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/1strata/color/z",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "green!60,opacity=.4"
+      },
+      {
+        "id": "imported-style-3cat-phys-2strata-shape-default-2",
+        "key": "3cat/phys/2strata/shape/default",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/2strata/shape/default",
+        "targets": [
+          "node",
+          "point",
+          "label"
+        ],
+        "options": "thick"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-default-2",
+        "key": "3cat/phys/3strata/shape/default",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/3strata/shape/default",
+        "targets": [
+          "node",
+          "point",
+          "label"
+        ],
+        "options": "circle,fill,inner sep=1.5pt"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-l-2",
+        "key": "3cat/phys/3strata/shape/L",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/3strata/shape/L",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "circle,draw=black,thick,fill=white,inner sep=1.5pt"
+      },
+      {
+        "id": "imported-style-3cat-phys-3strata-shape-r-2",
+        "key": "3cat/phys/3strata/shape/R",
+        "sourceId": "external-style-source-my3category-sty-2",
+        "displayName": "3cat: phys/3strata/shape/R",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "rectangle,draw=black,thick,fill=white,inner sep=1.5pt"
+      }
+    ],
+    "variables": [
+      {
+        "id": "variable-1",
+        "name": "Len",
+        "macroName": "Len",
+        "expression": "4",
+        "previewValue": 4
+      },
+      {
+        "id": "variable-2",
+        "name": "R",
+        "macroName": "R",
+        "expression": "1",
+        "previewValue": 1
+      }
+    ],
+    "strata": [
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-1",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-2",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-3",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-4",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-5",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": 2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-6",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": 2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-7",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": -2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-8",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": -2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 5
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-9-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len - R",
+              "previewValue": 1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-10-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": -1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "- .5*Len + R",
+              "previewValue": -1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-11-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "- .5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-12-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-13-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-14-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-15-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-16-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-17-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": -2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-18-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": -2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-19-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-20-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": 2,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-21-copy",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            }
+          }
+        },
+        "layer": 3
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-1",
+        "name": "Ufront",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "arc",
+            "start": {
+              "x": 1,
+              "y": -2,
+              "z": 0
+            },
+            "end": {
+              "x": 6.123233995736766e-17,
+              "y": -1,
+              "z": 0
+            },
+            "center": {
+              "x": 0,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "radius": 1,
+            "startAngleDeg": 0,
+            "endAngleDeg": 90,
+            "direction": "counterclockwise",
+            "frame": {
+              "origin": {
+                "x": 0,
+                "y": -2,
+                "z": 0,
+                "symbolic": {
+                  "x": {
+                    "kind": "numeric",
+                    "value": 0
+                  },
+                  "y": {
+                    "kind": "symbolic",
+                    "expression": "-.5*Len",
+                    "previewValue": -2
+                  },
+                  "z": {
+                    "kind": "numeric",
+                    "value": 0
+                  }
+                }
+              },
+              "u": {
+                "x": 1,
+                "y": 0,
+                "z": 0
+              },
+              "v": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "normal": {
+                "x": 0,
+                "y": 0,
+                "z": 1
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-2",
+        "name": "ULfront",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "arc",
+            "start": {
+              "x": 6.123233995736766e-17,
+              "y": -1,
+              "z": 0
+            },
+            "end": {
+              "x": -1,
+              "y": -1.9999999999999998,
+              "z": 0
+            },
+            "center": {
+              "x": 0,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "radius": 1,
+            "startAngleDeg": 90,
+            "endAngleDeg": 180,
+            "direction": "counterclockwise",
+            "frame": {
+              "origin": {
+                "x": 0,
+                "y": -2,
+                "z": 0,
+                "symbolic": {
+                  "x": {
+                    "kind": "numeric",
+                    "value": 0
+                  },
+                  "y": {
+                    "kind": "symbolic",
+                    "expression": "-.5*Len",
+                    "previewValue": -2
+                  },
+                  "z": {
+                    "kind": "numeric",
+                    "value": 0
+                  }
+                }
+              },
+              "u": {
+                "x": 1,
+                "y": 0,
+                "z": 0
+              },
+              "v": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "normal": {
+                "x": 0,
+                "y": 0,
+                "z": 1
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-3",
+        "name": "Uback",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "arc",
+            "start": {
+              "x": 6.123233995736766e-17,
+              "y": 1,
+              "z": 0
+            },
+            "end": {
+              "x": 1,
+              "y": 2,
+              "z": 0
+            },
+            "center": {
+              "x": 0,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "radius": 1,
+            "startAngleDeg": -90,
+            "endAngleDeg": 0,
+            "direction": "counterclockwise",
+            "frame": {
+              "origin": {
+                "x": 0,
+                "y": 2,
+                "z": 0,
+                "symbolic": {
+                  "x": {
+                    "kind": "numeric",
+                    "value": 0
+                  },
+                  "y": {
+                    "kind": "symbolic",
+                    "expression": ".5*Len",
+                    "previewValue": 2
+                  },
+                  "z": {
+                    "kind": "numeric",
+                    "value": 0
+                  }
+                }
+              },
+              "u": {
+                "x": 1,
+                "y": 0,
+                "z": 0
+              },
+              "v": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "normal": {
+                "x": 0,
+                "y": 0,
+                "z": 1
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-4",
+        "name": "ULback",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "arc",
+            "start": {
+              "x": -1,
+              "y": 2,
+              "z": 0
+            },
+            "end": {
+              "x": 6.123233995736766e-17,
+              "y": 1,
+              "z": 0
+            },
+            "center": {
+              "x": 0,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "radius": 1,
+            "startAngleDeg": 180,
+            "endAngleDeg": -90,
+            "direction": "counterclockwise",
+            "frame": {
+              "origin": {
+                "x": 0,
+                "y": 2,
+                "z": 0,
+                "symbolic": {
+                  "x": {
+                    "kind": "numeric",
+                    "value": 0
+                  },
+                  "y": {
+                    "kind": "symbolic",
+                    "expression": ".5*Len",
+                    "previewValue": 2
+                  },
+                  "z": {
+                    "kind": "numeric",
+                    "value": 0
+                  }
+                }
+              },
+              "u": {
+                "x": 1,
+                "y": 0,
+                "z": 0
+              },
+              "v": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "normal": {
+                "x": 0,
+                "y": 0,
+                "z": 1
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-9",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": 1,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len - R",
+              "previewValue": 1
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-10",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": 2,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len - R",
+              "previewValue": 1
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-11",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": -1,
+          "z": 2,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "- .5*Len + R",
+              "previewValue": -1
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-12",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": -1,
+          "z": 1,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "- .5*Len + R",
+              "previewValue": -1
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-5",
+        "name": "phi",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": 0,
+            "y": -1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "- .5*Len + R",
+                "previewValue": -1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": -1,
+            "z": 1,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "- .5*Len + R",
+                "previewValue": -1
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": -1,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "- .5*Len + R",
+                "previewValue": -1
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 2,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-6",
+        "name": "eta",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len - R",
+                "previewValue": 1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len - R",
+                "previewValue": 1
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len - R",
+                "previewValue": 1
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 2,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-13",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": 0,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-14",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 0,
+          "z": 4,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len",
+              "previewValue": 4
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-7",
+        "name": "cornerUfront",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": 1,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": 1,
+              "y": -2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": 1,
+              "y": -2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            },
+            "end": {
+              "x": 1,
+              "y": 0,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-8",
+        "name": "cornerULfront",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": -1,
+              "y": 0,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            },
+            "end": {
+              "x": -1,
+              "y": -2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": -1,
+              "y": -2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            },
+            "end": {
+              "x": -1,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "- .5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-9",
+        "name": "cornerUback",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": 1,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": 1,
+              "y": 2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": 1,
+              "y": 2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            },
+            "end": {
+              "x": 1,
+              "y": 0,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-10",
+        "name": "cornerULback",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": -1,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -1,
+              "y": 2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": -1,
+              "y": 2,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            },
+            "end": {
+              "x": -1,
+              "y": 0,
+              "z": 4,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "numeric",
+                  "value": 0
+                },
+                "z": {
+                  "kind": "symbolic",
+                  "expression": "Len",
+                  "previewValue": 4
+                }
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-15",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 0,
+          "z": 3,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len - R",
+              "previewValue": 3
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-16",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": 0,
+          "z": 3,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": "Len - R",
+              "previewValue": 3
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-17",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": 0,
+          "z": 2,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 3,
+        "geometricKind": "point",
+        "id": "point-18",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 0,
+          "z": 2,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            }
+          }
+        },
+        "layer": 6
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-11",
+        "name": "cuttingUL",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": -1,
+            "y": 0,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": -1,
+            "y": 0,
+            "z": 3,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len - R",
+                "previewValue": 3
+              }
+            }
+          },
+          {
+            "x": -1,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 2,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-12",
+        "name": "cuttingU",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 3,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len - R",
+                "previewValue": 3
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "symbolic": {
+              "x": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "y": {
+                "kind": "numeric",
+                "value": 0
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 4,
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": false,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "id": "sheet-1",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "curvedSheet",
+        "name": "Coons patch",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "primitive": {
+          "kind": "coonsPatch",
+          "bottom": {
+            "id": "curve-2",
+            "name": "ULfront",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": -1,
+                  "y": -1.9999999999999998,
+                  "z": 0
+                },
+                "end": {
+                  "x": 6.123233995736766e-17,
+                  "y": -1,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 180,
+                "endAngleDeg": 90,
+                "direction": "clockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": -2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": "-.5*Len",
+                        "previewValue": -2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": 1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 1
+                  }
+                }
+              }
+            ]
+          },
+          "right": {
+            "id": "curve-5",
+            "name": "phi",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 1,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "top": {
+            "id": "curve-11",
+            "name": "cuttingUL",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "control1": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 3,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len - R",
+                      "previewValue": 3
+                    }
+                  }
+                },
+                "control2": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "left": {
+            "id": "curve-8",
+            "name": "cornerULfront",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "sampling": {
+            "uSegments": 8,
+            "vSegments": 8
+          }
+        },
+        "layer": 1,
+        "stylePresetId": "user-sheet-3cat-phys-1strata-color-x",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "sheet-2",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "curvedSheet",
+        "name": "Coons patch",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#FF6666",
+          "fillOpacity": 0.4,
+          "strokeColor": "#FF6666",
+          "strokeOpacity": 0.4
+        },
+        "primitive": {
+          "kind": "coonsPatch",
+          "bottom": {
+            "id": "curve-4",
+            "name": "ULback",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": -1,
+                  "y": 2,
+                  "z": 0
+                },
+                "end": {
+                  "x": 6.123233995736766e-17,
+                  "y": 1,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 180,
+                "endAngleDeg": -90,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": 2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": ".5*Len",
+                        "previewValue": 2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": 1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 1
+                  }
+                }
+              }
+            ]
+          },
+          "right": {
+            "id": "curve-6",
+            "name": "eta",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 1,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "top": {
+            "id": "curve-11",
+            "name": "cuttingUL",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "control1": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 3,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len - R",
+                      "previewValue": 3
+                    }
+                  }
+                },
+                "control2": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "left": {
+            "id": "curve-10",
+            "name": "cornerULback",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": -1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": 2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -1,
+                  "y": 2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "sampling": {
+            "uSegments": 8,
+            "vSegments": 8
+          }
+        },
+        "layer": 1,
+        "stylePresetId": "user-sheet-3cat-phys-1strata-color-x",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-x"
+      },
+      {
+        "id": "sheet-3",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "curvedSheet",
+        "name": "Coons patch",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "primitive": {
+          "kind": "coonsPatch",
+          "bottom": {
+            "id": "curve-3",
+            "name": "Uback",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": 6.123233995736766e-17,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": -90,
+                "endAngleDeg": 0,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": 2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": ".5*Len",
+                        "previewValue": 2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": 1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 1
+                  }
+                }
+              }
+            ]
+          },
+          "right": {
+            "id": "curve-9",
+            "name": "cornerUback",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "top": {
+            "id": "curve-12",
+            "name": "cuttingU",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 3,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len - R",
+                      "previewValue": 3
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "left": {
+            "id": "curve-6",
+            "name": "eta",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 1,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len - R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "sampling": {
+            "uSegments": 8,
+            "vSegments": 8
+          }
+        },
+        "layer": 1,
+        "stylePresetId": "user-sheet-3cat-phys-1strata-color-y",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "id": "sheet-4",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "curvedSheet",
+        "name": "Coons patch",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#6666FF",
+          "fillOpacity": 0.4,
+          "strokeColor": "#6666FF",
+          "strokeOpacity": 0.4
+        },
+        "primitive": {
+          "kind": "coonsPatch",
+          "bottom": {
+            "id": "curve-1",
+            "name": "Ufront",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": 6.123233995736766e-17,
+                  "y": -1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 90,
+                "endAngleDeg": 0,
+                "direction": "clockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": -2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": "-.5*Len",
+                        "previewValue": -2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": 1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 1
+                  }
+                }
+              }
+            ]
+          },
+          "right": {
+            "id": "curve-7",
+            "name": "cornerUfront",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "top": {
+            "id": "curve-12",
+            "name": "cuttingU",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 3,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len - R",
+                      "previewValue": 3
+                    }
+                  }
+                },
+                "end": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 4,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "Len",
+                      "previewValue": 4
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "left": {
+            "id": "curve-5",
+            "name": "phi",
+            "segments": [
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 1,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    }
+                  }
+                },
+                "control2": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len + R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 2,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "z": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "sampling": {
+            "uSegments": 8,
+            "vSegments": 8
+          }
+        },
+        "layer": 1,
+        "stylePresetId": "user-sheet-3cat-phys-1strata-color-y",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-1strata-color-y"
+      },
+      {
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "polygonSheet",
+        "id": "sheet-5",
+        "name": "Sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "vertices": [
+          {
+            "x": -1,
+            "y": -2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": -1,
+            "y": -2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "- .5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": -2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": -2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          }
+        ],
+        "layer": 0,
+        "stylePresetId": "user-sheet-3cat-phys-0strata-color-default",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "polygonSheet",
+        "id": "sheet-6",
+        "name": "Sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "vertices": [
+          {
+            "x": -1,
+            "y": 2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": -1,
+            "y": 2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "layer": 0,
+        "stylePresetId": "user-sheet-3cat-phys-0strata-color-default",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "polygonSheet",
+        "id": "sheet-7",
+        "name": "Sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "vertices": [
+          {
+            "x": -1,
+            "y": 2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": -1,
+            "y": -2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": -2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 4,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "symbolic",
+                "expression": "Len",
+                "previewValue": 4
+              }
+            }
+          }
+        ],
+        "layer": 0,
+        "stylePresetId": "user-sheet-3cat-phys-0strata-color-default",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "filled-sheet-1",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "workPlaneFilledSheet",
+        "name": "Filled sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "planeFrame": {
+          "origin": {
+            "x": -1,
+            "y": -2,
+            "z": 0
+          },
+          "u": {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          "v": {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          }
+        },
+        "boundaries": [
+          {
+            "id": "curve-13",
+            "name": "Path",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0
+                },
+                "end": {
+                  "x": 6.123233995736766e-17,
+                  "y": -1,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 180,
+                "endAngleDeg": -90,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": -2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": "-.5*Len",
+                        "previewValue": -2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": -1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": -1
+                  }
+                }
+              },
+              {
+                "kind": "arc",
+                "start": {
+                  "x": 6.123233995736766e-17,
+                  "y": -1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": -90,
+                "endAngleDeg": 0,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": -2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": "-.5*Len",
+                        "previewValue": -2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": -1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": -1
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": -2,
+                  "z": 0
+                },
+                "end": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "- .5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "fillRule": "nonzero",
+        "layer": 0,
+        "stylePresetId": "user-sheet-3cat-phys-0strata-color-default",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      },
+      {
+        "id": "filled-sheet-2",
+        "codim": 1,
+        "geometricKind": "sheet",
+        "kind": "workPlaneFilledSheet",
+        "name": "Filled sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#CCCCCC",
+          "fillOpacity": 0.4,
+          "strokeColor": "#CCCCCC",
+          "strokeOpacity": 0.4
+        },
+        "planeFrame": {
+          "origin": {
+            "x": 1,
+            "y": 2,
+            "z": 0
+          },
+          "u": {
+            "x": -1,
+            "y": 0,
+            "z": 0
+          },
+          "v": {
+            "x": 0,
+            "y": -1,
+            "z": 0
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          }
+        },
+        "boundaries": [
+          {
+            "id": "curve-14",
+            "name": "Path",
+            "segments": [
+              {
+                "kind": "arc",
+                "start": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0
+                },
+                "end": {
+                  "x": 6.123233995736766e-17,
+                  "y": 1,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 0,
+                "endAngleDeg": 90,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": 2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": ".5*Len",
+                        "previewValue": 2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": -1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": -1
+                  }
+                }
+              },
+              {
+                "kind": "arc",
+                "start": {
+                  "x": 6.123233995736766e-17,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": -1,
+                  "y": 1.9999999999999998,
+                  "z": 0
+                },
+                "center": {
+                  "x": 0,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "numeric",
+                      "value": 0
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "radius": 1,
+                "startAngleDeg": 90,
+                "endAngleDeg": 180,
+                "direction": "counterclockwise",
+                "frame": {
+                  "origin": {
+                    "x": 0,
+                    "y": 2,
+                    "z": 0,
+                    "symbolic": {
+                      "x": {
+                        "kind": "numeric",
+                        "value": 0
+                      },
+                      "y": {
+                        "kind": "symbolic",
+                        "expression": ".5*Len",
+                        "previewValue": 2
+                      },
+                      "z": {
+                        "kind": "numeric",
+                        "value": 0
+                      }
+                    }
+                  },
+                  "u": {
+                    "x": 1,
+                    "y": 0,
+                    "z": 0
+                  },
+                  "v": {
+                    "x": 0,
+                    "y": -1,
+                    "z": 0
+                  },
+                  "normal": {
+                    "x": 0,
+                    "y": 0,
+                    "z": -1
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -1,
+                  "y": 1.9999999999999998,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "fillRule": "nonzero",
+        "layer": 0,
+        "stylePresetId": "user-sheet-3cat-phys-0strata-color-default",
+        "importedTikzStyleReferenceId": "imported-style-3cat-phys-0strata-color-default"
+      }
+    ],
+    "labels": [
+      {
+        "id": "label-1",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "$p$",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 2.3,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "z": {
+              "kind": "symbolic",
+              "expression": ".5*Len + .3",
+              "previewValue": 2.3
+            }
+          }
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 7
+      },
+      {
+        "id": "label-2",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "$\\phi$",
+        "position": {
+          "x": 0,
+          "y": -0.7,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len + R + .3",
+              "previewValue": -0.7
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 7
+      },
+      {
+        "id": "label-3",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "$\\eta$",
+        "position": {
+          "x": 0,
+          "y": 0.7,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "numeric",
+              "value": 0
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len - R - .3",
+              "previewValue": 0.7
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 7
+      }
+    ]
+  }
+}

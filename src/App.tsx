@@ -9,20 +9,11 @@ import {
 } from 'react'
 import './App.css'
 import {
-  emptyThreeDimensionalDiagram,
-  emptyTwoDimensionalDiagram,
-  arrowStringDiagramExample,
-  braidingCrossingsExample,
-  evenOddFilledBoundaryExample,
-  harpoonArrowheadsExample,
-  midArrowDecorationExample,
-  symbolicCirclePointExample,
-  symbolicPathExample,
-  threeDimensionalExample,
-  threeDimensionalWorkPlaneGridExample,
-  translucentFilledStrataExample,
-  twoDimensionalGridExample,
-  twoDimensionalExample,
+  defaultExampleId,
+  exampleIdForAmbientDimension,
+  exampleOptions,
+  getExampleOption,
+  type ExampleId,
 } from './examples'
 import { normalizePointForAmbientDimension } from './geometry'
 import type { PathIntersectionDetectionStatus } from './geometry'
@@ -313,21 +304,6 @@ import {
   type WorkPlanePreviewTool,
 } from './ui'
 
-type ExampleId =
-  | 'empty2d'
-  | 'empty3d'
-  | '2d'
-  | '3d'
-  | 'referenceFilled'
-  | 'arrowString'
-  | 'midArrow'
-  | 'braidingCrossings'
-  | 'harpoonArrows'
-  | 'evenOddBoundary'
-  | 'symbolicCirclePoint'
-  | 'symbolicPath'
-  | 'grid2d'
-  | 'workPlaneGrid3d'
 type CopyStatus = 'idle' | 'copied' | 'downloaded' | 'failed'
 type SaveLoadStatus = 'idle' | 'saved' | 'loaded' | 'failed'
 type StyleImportStatus = 'idle' | 'imported' | 'failed'
@@ -408,100 +384,6 @@ type EditableEditorState = {
   layerOperationStatus: string
   history: DiagramHistory
 }
-
-type ExampleOption = {
-  id: ExampleId
-  name: string
-  summary: string
-  diagram: Diagram
-}
-
-const exampleOptions: ExampleOption[] = [
-  {
-    id: '2d',
-    name: '2D example',
-    summary: 'codim 1 curves, codim 2 points',
-    diagram: twoDimensionalExample,
-  },
-  {
-    id: '3d',
-    name: '3D example',
-    summary: 'codim 1 sheets, codim 2 curves, codim 3 points',
-    diagram: threeDimensionalExample,
-  },
-  {
-    id: 'referenceFilled',
-    name: 'Reference fills',
-    summary: 'translucent filled regions with solid and dotted curves',
-    diagram: translucentFilledStrataExample,
-  },
-  {
-    id: 'arrowString',
-    name: 'Arrow strings',
-    summary: '2D string diagram paths with endpoint arrows',
-    diagram: arrowStringDiagramExample,
-  },
-  {
-    id: 'midArrow',
-    name: 'Mid arrow',
-    summary: 'mid-path arrow decoration at 0.5',
-    diagram: midArrowDecorationExample,
-  },
-  {
-    id: 'braidingCrossings',
-    name: 'Braiding',
-    summary: 'braiding and anti-braiding crossing states',
-    diagram: braidingCrossingsExample,
-  },
-  {
-    id: 'harpoonArrows',
-    name: 'Harpoons',
-    summary: 'Stealth harpoon mid-arrow heads',
-    diagram: harpoonArrowheadsExample,
-  },
-  {
-    id: 'evenOddBoundary',
-    name: 'Even-odd boundary',
-    summary: 'compound filled boundary using the even-odd rule',
-    diagram: evenOddFilledBoundaryExample,
-  },
-  {
-    id: 'symbolicCirclePoint',
-    name: 'Symbolic point',
-    summary: 'point at R*cos(q), R*sin(q)',
-    diagram: symbolicCirclePointExample,
-  },
-  {
-    id: 'symbolicPath',
-    name: 'Symbolic path',
-    summary: 'path vertices driven by variables',
-    diagram: symbolicPathExample,
-  },
-  {
-    id: 'grid2d',
-    name: '2D grid',
-    summary: 'foreach grid with rectangular clip',
-    diagram: twoDimensionalGridExample,
-  },
-  {
-    id: 'workPlaneGrid3d',
-    name: '3D work-plane grid',
-    summary: 'foreach grid in a local work-plane frame',
-    diagram: threeDimensionalWorkPlaneGridExample,
-  },
-  {
-    id: 'empty2d',
-    name: 'Empty 2D',
-    summary: 'blank 2D canvas',
-    diagram: emptyTwoDimensionalDiagram,
-  },
-  {
-    id: 'empty3d',
-    name: 'Empty 3D',
-    summary: 'blank 3D canvas',
-    diagram: emptyThreeDimensionalDiagram,
-  },
-]
 
 const directCoordinateModes: DirectCoordinateMode[] = ['global', 'workPlaneLocal']
 const defaultDirectCoordinates: DirectCoordinateInput = {
@@ -636,7 +518,8 @@ function labelVisibilityPolicyFromSelectValue(
 }
 
 function App() {
-  const [selectedExampleId, setSelectedExampleId] = useState<ExampleId>('2d')
+  const [selectedExampleId, setSelectedExampleId] =
+    useState<ExampleId>(defaultExampleId)
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>(defaultPreviewCoordinateInputMode)
   const [directInputDrawerState, setDirectInputDrawerState] =
@@ -842,7 +725,9 @@ function App() {
   const [isCameraPanelAside, setIsCameraPanelAside] = useState<boolean>(false)
   const [cameraStatus, setCameraStatus] = useState<string>('')
   const [editorState, setEditorState] = useState<EditableEditorState>(() => {
-    const initialDiagram = cloneDiagram(exampleOptions[0].diagram)
+    const initialDiagram = cloneDiagram(
+      getExampleOption(defaultExampleId).diagram,
+    )
 
     return {
       editableDiagram: initialDiagram,
@@ -925,9 +810,7 @@ function App() {
           editableDiagram,
           coonsPatchBoundaryDraft,
         )))
-  const selectedExample =
-    exampleOptions.find((example) => example.id === selectedExampleId) ??
-    exampleOptions[0]
+  const selectedExample = getExampleOption(selectedExampleId)
   const tikzSource = useMemo(
     () =>
       generateTikzForUi(editableDiagram, {
@@ -1284,8 +1167,7 @@ function App() {
   }
 
   function selectExample(exampleId: ExampleId): void {
-    const nextExample =
-      exampleOptions.find((example) => example.id === exampleId) ?? exampleOptions[0]
+    const nextExample = getExampleOption(exampleId)
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
@@ -1475,7 +1357,9 @@ function App() {
 
     const previousDiagram = history.past[history.past.length - 1]
 
-    setSelectedExampleId(previousDiagram.ambientDimension === 2 ? '2d' : '3d')
+    setSelectedExampleId(
+      exampleIdForAmbientDimension(previousDiagram.ambientDimension),
+    )
     geometryDragUndoDiagramRef.current = null
     setEditorState((current) => undoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
@@ -1505,7 +1389,7 @@ function App() {
 
     const nextDiagram = history.future[0]
 
-    setSelectedExampleId(nextDiagram.ambientDimension === 2 ? '2d' : '3d')
+    setSelectedExampleId(exampleIdForAmbientDimension(nextDiagram.ambientDimension))
     geometryDragUndoDiagramRef.current = null
     setEditorState((current) => redoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
@@ -1639,7 +1523,7 @@ function App() {
     setPendingSymbolicImport(null)
     setSymbolicImportDrafts([])
     setSymbolicImportStatus('')
-    setSelectedExampleId(diagram.ambientDimension === 2 ? '2d' : '3d')
+    setSelectedExampleId(exampleIdForAmbientDimension(diagram.ambientDimension))
     setCreationTool('select')
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setEditorState((current) =>

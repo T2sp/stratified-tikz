@@ -1,4 +1,6 @@
 export * from './emptyDiagrams.ts'
+export * from './curatedExamples.ts'
+export * from './catalog.ts'
 export * from './twoDimensionalExample.ts'
 export * from './threeDimensionalExample.ts'
 export * from './labelAnchorCheckExample.ts'
