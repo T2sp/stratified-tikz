@@ -13,6 +13,10 @@ import {
   cameraPresetIdForCamera,
   cameraPresetIds,
   cameraPresetOptions,
+  cameraControlSliderBounds,
+  cameraControlSliderFields,
+  cameraControlSliderValue,
+  cameraFieldDraftsFromCamera,
   cameraViewAdjustmentFromControls,
   createCameraPresetCamera,
   createInitialCameraControlState,
@@ -217,6 +221,95 @@ test('camera control field values use theta and phi camera state', () => {
   assert.equal(cameraControlFieldValue(camera, 'thetaDeg'), '70')
   assert.equal(cameraControlFieldValue(camera, 'phiDeg'), '110')
   assert.equal(cameraControlFieldValue(camera, 'zoom'), '1')
+})
+
+test('camera slider specs expose orientation and view controls in panel order', () => {
+  assert.deepEqual(
+    cameraControlSliderFields.map((field) => field.field),
+    ['thetaDeg', 'phiDeg', 'zoom', 'panX', 'panY'],
+  )
+  assert.deepEqual(
+    cameraControlSliderFields
+      .filter((field) => field.group === 'orientation')
+      .map((field) => [field.field, field.min, field.max, field.step]),
+    [
+      ['thetaDeg', 0, 180, 1],
+      ['phiDeg', -180, 180, 1],
+    ],
+  )
+  assert.deepEqual(
+    cameraControlSliderFields
+      .filter((field) => field.group === 'view')
+      .map((field) => field.field),
+    ['zoom', 'panX', 'panY'],
+  )
+})
+
+test('camera slider values are synchronized with camera state', () => {
+  const camera = expectCameraInputOk(
+    expectCameraInputOk(
+      expectCameraInputOk(
+        expectCameraInputOk(
+          expectCameraInputOk(createInitialCameraControlState(), 'thetaDeg', '80'),
+          'phiDeg',
+          '120',
+        ),
+        'zoom',
+        '1.75',
+      ),
+      'panX',
+      '-12',
+    ),
+    'panY',
+    '9',
+  )
+
+  assert.equal(cameraControlSliderValue(camera, 'thetaDeg'), 80)
+  assert.equal(cameraControlSliderValue(camera, 'phiDeg'), 120)
+  assert.equal(cameraControlSliderValue(camera, 'zoom'), 1.75)
+  assert.equal(cameraControlSliderValue(camera, 'panX'), -12)
+  assert.equal(cameraControlSliderValue(camera, 'panY'), 9)
+})
+
+test('camera slider bounds expand around valid custom camera values', () => {
+  const camera = expectCameraInputOk(
+    expectCameraInputOk(
+      expectCameraInputOk(createInitialCameraControlState(), 'thetaDeg', '220'),
+      'zoom',
+      '6',
+    ),
+    'panX',
+    '-150',
+  )
+
+  assert.deepEqual(cameraControlSliderBounds(camera, 'thetaDeg'), {
+    min: 0,
+    max: 220,
+  })
+  assert.deepEqual(cameraControlSliderBounds(camera, 'zoom'), {
+    min: 0.1,
+    max: 6,
+  })
+  assert.deepEqual(cameraControlSliderBounds(camera, 'panX'), {
+    min: -150,
+    max: 120,
+  })
+})
+
+test('camera numeric field drafts mirror formatted camera values', () => {
+  const camera = expectCameraInputOk(
+    expectCameraInputOk(createCameraPresetCamera('isometric'), 'zoom', '1.25'),
+    'panY',
+    '-4',
+  )
+
+  assert.deepEqual(cameraFieldDraftsFromCamera(camera), {
+    thetaDeg: '70',
+    phiDeg: '110',
+    zoom: '1.25',
+    panX: '0',
+    panY: '-4',
+  })
 })
 
 test('camera orbit drag updates theta and phi without changing zoom or pan', () => {

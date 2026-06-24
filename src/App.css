@@ -155,42 +155,12 @@
   min-width: 0;
 }
 
-.camera-control {
-  position: absolute;
-  right: 12px;
-  bottom: 64px;
-  z-index: var(--z-preview-camera);
-  display: grid;
+.camera-panel {
+  grid-template-rows: auto;
   gap: 8px;
-  width: min(360px, calc(100% - 24px));
-  min-width: 0;
-  max-height: min(52svh, calc(100% - 84px));
+  max-height: min(34svh, 300px);
   overflow: auto;
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--panel) 94%, transparent);
-  box-shadow: rgba(30, 34, 44, 0.16) 0 6px 20px;
-  backdrop-filter: blur(7px);
-}
-
-.camera-control-aside {
-  bottom: 64px;
-  width: min(230px, calc(100% - 24px));
-}
-
-.camera-control-aside .camera-summary {
-  display: none;
-}
-
-.camera-control-aside .camera-summary-toggle {
-  flex: 0 0 auto;
-}
-
-.camera-control-aside .camera-details,
-.camera-control-aside .camera-help,
-.camera-control-aside .camera-status {
-  display: none;
+  padding: 10px 12px;
 }
 
 .camera-summary-row {
@@ -250,17 +220,24 @@
 }
 
 .camera-details {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(300px, 1.2fr) minmax(190px, 0.45fr);
+  align-items: start;
   gap: 8px;
+  min-width: 0;
+}
+
+.camera-orientation-panel {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) 150px;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
 .camera-field-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  flex: 1 1 100%;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 7px;
   min-width: 0;
 }
@@ -268,7 +245,7 @@
 .camera-field,
 .camera-preset-field {
   display: inline-grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -277,7 +254,21 @@
   font-weight: 650;
 }
 
-.camera-field input,
+.camera-slider-inputs {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 72px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.camera-slider {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.camera-number-input,
 .camera-preset-field select {
   width: 100%;
   min-width: 0;
@@ -293,7 +284,38 @@
 
 .camera-preset-field {
   grid-template-columns: auto minmax(120px, 1fr);
-  flex: 1 1 100%;
+}
+
+.camera-reference-graphic {
+  width: 150px;
+  max-width: 100%;
+  aspect-ratio: 15 / 11;
+  color: var(--muted);
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.camera-reference-axis {
+  fill: none;
+  stroke-width: 2;
+}
+
+.camera-reference-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.camera-reference-origin {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.camera-reference-graphic text {
+  fill: var(--text-h);
+  stroke: none;
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
 .camera-help {
@@ -1041,7 +1063,7 @@
 
 .workspace {
   display: grid;
-  grid-template-rows: minmax(560px, auto) auto;
+  grid-template-rows: minmax(560px, auto) auto auto;
   gap: 12px;
   width: min(100%, 1680px);
   max-width: none;
@@ -1091,13 +1113,12 @@
   min-height: 0;
   overflow: hidden;
   /*
-   * Preview-local overlay order: SVG canvas; toolbar/history; camera/layer
-   * controls; direct input; inspector. Coordinate highlights and geometry
-   * handles live inside the SVG canvas and remain below the HTML overlays.
+   * Preview-local overlay order: SVG canvas; toolbar/history; layer controls;
+   * direct input; inspector. Coordinate highlights and geometry handles live
+   * inside the SVG canvas and remain below the HTML overlays.
    */
   --z-preview-toolbar: 30;
   --z-preview-toolbar-popover: 34;
-  --z-preview-camera: 36;
   --z-preview-layer: 38;
   --z-preview-direct: 46;
   --z-preview-inspector-button: 50;
@@ -3258,6 +3279,14 @@
     flex: 1 1 100%;
   }
 
+  .camera-details {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-orientation-panel {
+    grid-template-columns: minmax(0, 1fr) 132px;
+  }
+
   .camera-field-grid {
     min-width: 0;
   }
@@ -3276,7 +3305,7 @@
   }
 
   .workspace {
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
   }
 
   .preview-inspector-row {
@@ -3343,6 +3372,23 @@
     width: 100%;
   }
 
+  .camera-panel {
+    max-height: none;
+  }
+
+  .camera-orientation-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-reference-graphic {
+    justify-self: start;
+    width: 132px;
+  }
+
+  .camera-slider-inputs {
+    grid-template-columns: minmax(0, 1fr) 68px;
+  }
+
   .work-plane-section-heading,
   .work-plane-vector-row {
     grid-template-columns: 1fr;
@@ -3384,17 +3430,6 @@
   .preview-layer-control {
     right: 8px;
     bottom: 8px;
-  }
-
-  .camera-control {
-    right: 8px;
-    bottom: 56px;
-    width: min(360px, calc(100% - 16px));
-    max-height: min(48svh, calc(100% - 72px));
-  }
-
-  .camera-control-aside {
-    bottom: 56px;
   }
 
   .layer-palette-window {
