@@ -231,7 +231,54 @@ export function LayerManager({
             </button>
           </div>
 
-          <div className="layer-palette-state-row">
+          {statusMessage !== '' && (
+            <p className="layer-palette-status" role="status" aria-live="polite">
+              {statusMessage}
+            </p>
+          )}
+
+          <div className="layer-palette-body">
+            {rows.length > 0 ? (
+              <div className="layer-palette-list" role="list">
+                {rows.map((row) => (
+                  <LayerPaletteListRow
+                    key={formatLayerValue(row.layer.value)}
+                    row={row}
+                    isActionTarget={
+                      selectedActionLayerValue === row.layer.value
+                    }
+                    draggedLayerValue={draggedLayerValue}
+                    validLayerValues={validLayerValues}
+                    onSelectLayer={selectLayerForCreation}
+                    onDragStartLayer={setDraggedLayerValue}
+                    onDropLayer={dropLayerOnTarget}
+                    onSetLayerVisibility={onSetLayerVisibility}
+                    onSetLayerLock={onSetLayerLock}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="layer-palette-empty">No layer metadata yet.</p>
+            )}
+
+            {actionsExpanded && (
+              <SelectedLayerActions
+                id={actionPanelId}
+                diagram={diagram}
+                layer={selectedRow?.layer ?? null}
+                elementCount={selectedRow?.elementCount ?? 0}
+                onRenameLayer={onRenameLayer}
+                onDuplicateLayer={onDuplicateLayer}
+                onTranslateLayer={onTranslateLayer}
+                onSetLayerVisibility={onSetLayerVisibility}
+                onSetLayerLock={onSetLayerLock}
+                onDeleteLayer={onDeleteLayer}
+                onStatusMessage={onStatusMessage}
+              />
+            )}
+          </div>
+
+          <div className="layer-palette-footer">
             <label className="layer-palette-filter-field">
               <span>View</span>
               <select
@@ -276,76 +323,20 @@ export function LayerManager({
                 Set
               </button>
             </form>
-          </div>
-
-          {statusMessage !== '' && (
-            <p className="layer-palette-status" role="status" aria-live="polite">
-              {statusMessage}
-            </p>
-          )}
-
-          <div className="layer-palette-body">
-            {rows.length > 0 ? (
-              <div className="layer-palette-list" role="list">
-                {rows.map((row) => (
-                  <LayerPaletteListRow
-                    key={formatLayerValue(row.layer.value)}
-                    row={row}
-                    isActionTarget={
-                      selectedActionLayerValue === row.layer.value
-                    }
-                    draggedLayerValue={draggedLayerValue}
-                    validLayerValues={validLayerValues}
-                    onSelectLayer={selectLayerForCreation}
-                    onDragStartLayer={setDraggedLayerValue}
-                    onDropLayer={dropLayerOnTarget}
-                    onSetLayerVisibility={onSetLayerVisibility}
-                    onSetLayerLock={onSetLayerLock}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="layer-palette-empty">No layer metadata yet.</p>
-            )}
-
-            <aside
-              className={[
-                'layer-palette-action-dock',
-                actionsExpanded ? 'is-expanded' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
+            <button
+              type="button"
+              className="preview-overlay-button layer-palette-actions-toggle"
+              aria-controls={actionPanelId}
+              aria-expanded={actionsExpanded}
+              aria-label={
+                actionsExpanded
+                  ? 'Hide selected layer actions'
+                  : 'Show selected layer actions'
+              }
+              onClick={() => setActionsExpanded((current) => !current)}
             >
-              <button
-                type="button"
-                className="preview-overlay-button layer-palette-actions-toggle"
-                aria-controls={actionPanelId}
-                aria-expanded={actionsExpanded}
-                aria-label={
-                  actionsExpanded
-                    ? 'Hide selected layer actions'
-                    : 'Show selected layer actions'
-                }
-                onClick={() => setActionsExpanded((current) => !current)}
-              >
-                Actions
-              </button>
-              {actionsExpanded && (
-                <SelectedLayerActions
-                  id={actionPanelId}
-                  diagram={diagram}
-                  layer={selectedRow?.layer ?? null}
-                  elementCount={selectedRow?.elementCount ?? 0}
-                  onRenameLayer={onRenameLayer}
-                  onDuplicateLayer={onDuplicateLayer}
-                  onTranslateLayer={onTranslateLayer}
-                  onSetLayerVisibility={onSetLayerVisibility}
-                  onSetLayerLock={onSetLayerLock}
-                  onDeleteLayer={onDeleteLayer}
-                  onStatusMessage={onStatusMessage}
-                />
-              )}
-            </aside>
+              Actions
+            </button>
           </div>
         </section>
       )}

@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const layerManagerSource = readFileSync(
+  new URL('../../src/ui/LayerManager.tsx', import.meta.url),
+  'utf8',
+)
+const appCss = readFileSync(new URL('../../src/App.css', import.meta.url), 'utf8')
+
+test('layer palette keeps View, New, and Actions in the footer', () => {
+  const bodyStart = layerManagerSource.indexOf('className="layer-palette-body"')
+  const footerStart = layerManagerSource.indexOf(
+    'className="layer-palette-footer"',
+  )
+  const footerEnd = layerManagerSource.indexOf('</div>', footerStart)
+  const footerSource = layerManagerSource.slice(footerStart, footerEnd)
+
+  assert.ok(bodyStart >= 0)
+  assert.ok(footerStart > bodyStart)
+  assert.match(footerSource, /<span>View<\/span>/)
+  assert.match(footerSource, /className="layer-palette-new-layer-form"/)
+  assert.match(footerSource, /layer-palette-actions-toggle/)
+})
+
+test('layer palette keeps close controls in the header and actions above the footer', () => {
+  const headerStart = layerManagerSource.indexOf(
+    'className="layer-palette-heading"',
+  )
+  const bodyStart = layerManagerSource.indexOf('className="layer-palette-body"')
+  const footerStart = layerManagerSource.indexOf(
+    'className="layer-palette-footer"',
+  )
+  const closeButton = layerManagerSource.indexOf(
+    'className="preview-overlay-button layer-palette-close-button"',
+    headerStart,
+  )
+  const actionsPanel = layerManagerSource.indexOf(
+    '<SelectedLayerActions',
+    bodyStart,
+  )
+
+  assert.ok(headerStart >= 0)
+  assert.ok(closeButton > headerStart)
+  assert.ok(closeButton < bodyStart)
+  assert.ok(actionsPanel > bodyStart)
+  assert.ok(actionsPanel < footerStart)
+})
+
+test('layer palette CSS reserves an inspector-safe top area and bounds the window', () => {
+  const previewStageRule = cssRule('.preview-stage')
+  const controlRule = cssRule('.preview-layer-control')
+  const windowRule = cssRule('.layer-palette-window')
+
+  assert.match(previewStageRule, /--preview-overlay-top-safe-area:\s*52px;/)
+  assert.match(previewStageRule, /--preview-layer-toggle-offset:\s*42px;/)
+  assert.match(controlRule, /top:\s*var\(--preview-overlay-top-safe-area\);/)
+  assert.match(controlRule, /left:\s*12px;/)
+  assert.match(controlRule, /bottom:\s*12px;/)
+  assert.match(windowRule, /bottom:\s*var\(--preview-layer-toggle-offset\);/)
+  assert.match(windowRule, /display:\s*flex;/)
+  assert.match(windowRule, /flex-direction:\s*column;/)
+  assert.match(
+    windowRule,
+    /max-height:\s*calc\(100% - var\(--preview-layer-toggle-offset\)\);/,
+  )
+  assert.match(windowRule, /overflow:\s*hidden;/)
+})
+
+test('layer palette CSS scrolls the layer list between fixed header and footer', () => {
+  const headingRule = cssRule('.layer-palette-heading')
+  const bodyRule = cssRule('.layer-palette-body')
+  const listRule = cssRule('.layer-palette-list')
+  const footerRule = cssRule('.layer-palette-footer')
+
+  assert.match(headingRule, /flex:\s*0 0 auto;/)
+  assert.match(bodyRule, /flex:\s*1 1 auto;/)
+  assert.match(bodyRule, /min-height:\s*0;/)
+  assert.match(bodyRule, /overflow:\s*hidden;/)
+  assert.match(listRule, /min-height:\s*0;/)
+  assert.match(listRule, /overflow-y:\s*auto;/)
+  assert.match(listRule, /overflow-x:\s*hidden;/)
+  assert.match(footerRule, /display:\s*flex;/)
+  assert.match(footerRule, /flex:\s*0 0 auto;/)
+  assert.match(footerRule, /flex-wrap:\s*wrap;/)
+})
+
+function cssRule(selector: string): string {
+  const start = appCss.indexOf(`${selector} {`)
+
+  assert.notEqual(start, -1, `Missing CSS rule for ${selector}.`)
+
+  const end = appCss.indexOf('\n}', start)
+
+  assert.notEqual(end, -1, `Missing CSS rule end for ${selector}.`)
+
+  return appCss.slice(start, end + 2)
+}
