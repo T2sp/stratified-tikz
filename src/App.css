@@ -92,16 +92,17 @@
 }
 
 .example-control-stack {
-  flex: 2 1 420px;
-  max-height: 142px;
-  overflow: auto;
-  padding-right: 2px;
+  flex: 1 0 100%;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .example-control-group {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+  gap: 10px;
   width: 100%;
 }
 
@@ -1002,14 +1003,16 @@
 
 .example-segmented-control {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   grid-auto-flow: unset;
   grid-template-columns: none;
-  overflow-x: auto;
+  overflow-x: visible;
   width: 100%;
 }
 
 .example-segmented-control button {
-  flex: 0 0 min(180px, 46vw);
+  flex: 1 1 112px;
   min-width: 0;
   line-height: 1.2;
   white-space: normal;

@@ -1,0 +1,2229 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 1,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 2,
+    "view": {
+      "exportMode": "standalone"
+    },
+    "layers": [
+      {
+        "value": 0,
+        "name": "workingLayer-codim0"
+      },
+      {
+        "value": 1,
+        "name": "workingLayer-codim1"
+      },
+      {
+        "value": 2,
+        "name": "workingLayer-codim2"
+      },
+      {
+        "value": 3,
+        "name": "boundaryPaths",
+        "visible": false
+      },
+      {
+        "value": 4,
+        "name": "invisibleCoordinates",
+        "visible": false
+      },
+      {
+        "value": 5,
+        "name": "Layer 5"
+      }
+    ],
+    "variables": [
+      {
+        "id": "variable-1",
+        "name": "Len",
+        "macroName": "Len",
+        "expression": "4",
+        "previewValue": 4
+      },
+      {
+        "id": "variable-2",
+        "name": "R",
+        "macroName": "R",
+        "expression": "1",
+        "previewValue": 1
+      }
+    ],
+    "strata": [
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-1",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-2",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-3",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 2,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-4",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -2,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-5",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-6",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 0.5,
+          "y": -1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*R",
+              "previewValue": 0.5
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-7",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -0.5,
+          "y": 1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*R",
+              "previewValue": -0.5
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-8",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": 1,
+          "y": 2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": ".5*Len",
+              "previewValue": 2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-9",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -1,
+          "y": -2,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-.5*Len",
+              "previewValue": -2
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 4
+      },
+      {
+        "codim": 1,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-1",
+        "name": "boundary",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": -2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": -2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": 2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": 2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": 2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": 2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 3
+      },
+      {
+        "codim": 1,
+        "geometricKind": "curve",
+        "kind": "concatenatedPath",
+        "id": "curve-2",
+        "name": "Path",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "segments": [
+          {
+            "kind": "line",
+            "start": {
+              "x": 1,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": -2,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "line",
+            "start": {
+              "x": -2,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "end": {
+              "x": -1,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            }
+          },
+          {
+            "kind": "cubicBezier",
+            "start": {
+              "x": -1,
+              "y": -2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-.5*Len",
+                  "previewValue": -2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "control1": {
+              "x": -0.9999999999999999,
+              "y": -1,
+              "z": 0
+            },
+            "control2": {
+              "x": -1,
+              "y": 1,
+              "z": 0
+            },
+            "end": {
+              "x": -0.5,
+              "y": 1,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*R",
+                  "previewValue": -0.5
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "controlMode": {
+              "kind": "relativePolar",
+              "firstControl": {
+                "angleDegrees": 90,
+                "radius": 1
+              },
+              "secondControl": {
+                "angleDegrees": 180,
+                "radius": 0.5
+              },
+              "secondOffsetReference": "end"
+            }
+          },
+          {
+            "kind": "cubicBezier",
+            "start": {
+              "x": -0.5,
+              "y": 1,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "-.5*R",
+                  "previewValue": -0.5
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "control1": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "control2": {
+              "x": 0,
+              "y": -1,
+              "z": 0
+            },
+            "end": {
+              "x": 0.5,
+              "y": -1,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*R",
+                  "previewValue": 0.5
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "controlMode": {
+              "kind": "relativePolar",
+              "firstControl": {
+                "angleDegrees": 0,
+                "radius": 0.5
+              },
+              "secondControl": {
+                "angleDegrees": -180,
+                "radius": 0.5
+              },
+              "secondOffsetReference": "end"
+            }
+          },
+          {
+            "kind": "cubicBezier",
+            "start": {
+              "x": 0.5,
+              "y": -1,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": ".5*R",
+                  "previewValue": 0.5
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": "-R",
+                  "previewValue": -1
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "control1": {
+              "x": 1,
+              "y": -1,
+              "z": 0
+            },
+            "control2": {
+              "x": 1,
+              "y": 1,
+              "z": 0
+            },
+            "end": {
+              "x": 1,
+              "y": 2,
+              "z": 0,
+              "symbolic": {
+                "x": {
+                  "kind": "symbolic",
+                  "expression": "R",
+                  "previewValue": 1
+                },
+                "y": {
+                  "kind": "symbolic",
+                  "expression": ".5*Len",
+                  "previewValue": 2
+                },
+                "z": {
+                  "kind": "numeric",
+                  "value": 0
+                }
+              }
+            },
+            "controlMode": {
+              "kind": "relativePolar",
+              "firstControl": {
+                "angleDegrees": 0,
+                "radius": 0.5
+              },
+              "secondControl": {
+                "angleDegrees": -90,
+                "radius": 1
+              },
+              "secondOffsetReference": "end"
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 3
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-10",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3
+        },
+        "position": {
+          "x": -0.5,
+          "y": 1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": "-.5*R",
+              "previewValue": -0.5
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "R",
+              "previewValue": 1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 2
+      },
+      {
+        "codim": 2,
+        "geometricKind": "point",
+        "id": "point-11",
+        "name": "Point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "hollow",
+          "size": 3
+        },
+        "position": {
+          "x": 0.5,
+          "y": -1,
+          "z": 0,
+          "symbolic": {
+            "x": {
+              "kind": "symbolic",
+              "expression": ".5*R",
+              "previewValue": 0.5
+            },
+            "y": {
+              "kind": "symbolic",
+              "expression": "-R",
+              "previewValue": -1
+            },
+            "z": {
+              "kind": "numeric",
+              "value": 0
+            }
+          }
+        },
+        "layer": 2
+      },
+      {
+        "id": "filled-region-1",
+        "codim": 0,
+        "geometricKind": "region",
+        "kind": "filledRegion",
+        "name": "Filled region",
+        "visible": true,
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#4D9DE0",
+          "fillOpacity": 0.35,
+          "strokeColor": "#4D9DE0",
+          "strokeOpacity": 1
+        },
+        "boundaries": [
+          {
+            "id": "curve-2",
+            "name": "Path",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": -0.9999999999999999,
+                  "y": -1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": -1,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": -0.5,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*R",
+                      "previewValue": -0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 90,
+                    "radius": 1
+                  },
+                  "secondControl": {
+                    "angleDegrees": 180,
+                    "radius": 0.5
+                  },
+                  "secondOffsetReference": "end"
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -0.5,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*R",
+                      "previewValue": -0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 0.5,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*R",
+                      "previewValue": 0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 0,
+                    "radius": 0.5
+                  },
+                  "secondControl": {
+                    "angleDegrees": -180,
+                    "radius": 0.5
+                  },
+                  "secondOffsetReference": "end"
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0.5,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*R",
+                      "previewValue": 0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 1,
+                  "y": -1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": 1,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 0,
+                    "radius": 0.5
+                  },
+                  "secondControl": {
+                    "angleDegrees": -90,
+                    "radius": 1
+                  },
+                  "secondOffsetReference": "end"
+                }
+              }
+            ]
+          }
+        ],
+        "fillRule": "nonzero",
+        "layer": 0
+      },
+      {
+        "id": "filled-region-2",
+        "codim": 0,
+        "geometricKind": "region",
+        "kind": "filledRegion",
+        "name": "Filled region",
+        "visible": true,
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#E76F51",
+          "fillOpacity": 0.28,
+          "strokeColor": "#C44536",
+          "strokeOpacity": 0.9
+        },
+        "boundaries": [
+          {
+            "id": "curve-2",
+            "name": "Path",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -1,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": -0.9999999999999999,
+                  "y": -1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": -1,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": -0.5,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*R",
+                      "previewValue": -0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 90,
+                    "radius": 1
+                  },
+                  "secondControl": {
+                    "angleDegrees": 180,
+                    "radius": 0.5
+                  },
+                  "secondOffsetReference": "end"
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": -0.5,
+                  "y": 1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*R",
+                      "previewValue": -0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": 0,
+                  "y": -1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 0.5,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*R",
+                      "previewValue": 0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 0,
+                    "radius": 0.5
+                  },
+                  "secondControl": {
+                    "angleDegrees": -180,
+                    "radius": 0.5
+                  },
+                  "secondOffsetReference": "end"
+                }
+              },
+              {
+                "kind": "cubicBezier",
+                "start": {
+                  "x": 0.5,
+                  "y": -1,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*R",
+                      "previewValue": 0.5
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-R",
+                      "previewValue": -1
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "control1": {
+                  "x": 1,
+                  "y": -1,
+                  "z": 0
+                },
+                "control2": {
+                  "x": 1,
+                  "y": 1,
+                  "z": 0
+                },
+                "end": {
+                  "x": 1,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "R",
+                      "previewValue": 1
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "controlMode": {
+                  "kind": "relativePolar",
+                  "firstControl": {
+                    "angleDegrees": 0,
+                    "radius": 0.5
+                  },
+                  "secondControl": {
+                    "angleDegrees": -90,
+                    "radius": 1
+                  },
+                  "secondOffsetReference": "end"
+                }
+              }
+            ]
+          },
+          {
+            "id": "curve-1",
+            "name": "boundary",
+            "segments": [
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": -2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": 2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": 2,
+                  "y": -2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": 2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "line",
+                "start": {
+                  "x": 2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                },
+                "end": {
+                  "x": -2,
+                  "y": 2,
+                  "z": 0,
+                  "symbolic": {
+                    "x": {
+                      "kind": "symbolic",
+                      "expression": "-.5*Len",
+                      "previewValue": -2
+                    },
+                    "y": {
+                      "kind": "symbolic",
+                      "expression": ".5*Len",
+                      "previewValue": 2
+                    },
+                    "z": {
+                      "kind": "numeric",
+                      "value": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "fillRule": "evenOdd",
+        "layer": 0
+      },
+      {
+        "codim": 1,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-3",
+        "name": "Cubic Bezier",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": -1,
+            "y": -2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-.5*Len",
+                "previewValue": -2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": -0.9999999999999999,
+            "y": -1,
+            "z": 0
+          },
+          {
+            "x": -1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": -0.5,
+            "y": 1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-.5*R",
+                "previewValue": -0.5
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 1,
+        "bezierControls": {
+          "kind": "relativePolar",
+          "firstControl": {
+            "angleDegrees": 90,
+            "radius": 1
+          },
+          "secondControl": {
+            "angleDegrees": 180,
+            "radius": 0.5
+          },
+          "secondOffsetReference": "end"
+        },
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": true,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 1,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-4",
+        "name": "Cubic Bezier",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": -0.5,
+            "y": 1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "-.5*R",
+                "previewValue": -0.5
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 0,
+            "y": -0.9999999999999999,
+            "z": 0
+          },
+          {
+            "x": 0.5,
+            "y": -1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": ".5*R",
+                "previewValue": 0.5
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 1,
+        "bezierControls": {
+          "kind": "relativePolar",
+          "firstControl": {
+            "angleDegrees": 0,
+            "radius": 0.5
+          },
+          "secondControl": {
+            "angleDegrees": 180,
+            "radius": 0.5
+          },
+          "secondOffsetReference": "end"
+        },
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": true,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      },
+      {
+        "codim": 1,
+        "geometricKind": "curve",
+        "kind": "cubicBezier",
+        "id": "curve-5",
+        "name": "Cubic Bezier",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "points": [
+          {
+            "x": 0.5,
+            "y": -1,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": ".5*R",
+                "previewValue": 0.5
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": "-R",
+                "previewValue": -1
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          },
+          {
+            "x": 1,
+            "y": -1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 0,
+            "symbolic": {
+              "x": {
+                "kind": "symbolic",
+                "expression": "R",
+                "previewValue": 1
+              },
+              "y": {
+                "kind": "symbolic",
+                "expression": ".5*Len",
+                "previewValue": 2
+              },
+              "z": {
+                "kind": "numeric",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "styleSegments": [],
+        "layer": 1,
+        "bezierControls": {
+          "kind": "relativePolar",
+          "firstControl": {
+            "angleDegrees": 0,
+            "radius": 0.5
+          },
+          "secondControl": {
+            "angleDegrees": -90,
+            "radius": 1
+          },
+          "secondOffsetReference": "end"
+        },
+        "arrows": {
+          "endpoint": "none",
+          "mid": {
+            "enabled": true,
+            "position": 0.5,
+            "direction": "forward",
+            "head": "standard"
+          }
+        }
+      }
+    ],
+    "labels": [
+      {
+        "id": "label-1",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "$\\mathcal{C}$",
+        "position": {
+          "x": -1.3754775990632897,
+          "y": 1.310795664633019,
+          "z": 0
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 5
+      },
+      {
+        "id": "label-2",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "Label",
+        "position": {
+          "x": 4.663194444444445,
+          "y": -2.4477548992420037,
+          "z": 0
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 5
+      },
+      {
+        "id": "label-3",
+        "geometricKind": "label",
+        "name": "Label",
+        "text": "$\\mathcal{D}$",
+        "position": {
+          "x": 1.3123783096718729,
+          "y": -1.3489536135769211,
+          "z": 0
+        },
+        "style": {
+          "kind": "labelStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "layer": 5
+      }
+    ]
+  }
+}
