@@ -1592,7 +1592,40 @@
   font-size: 12px;
 }
 
+.preview-bezier-menu-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+
+.preview-bezier-menu-handle {
+  fill: none;
+  stroke: color-mix(in srgb, currentColor 46%, transparent);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-dasharray: 2 2;
+}
+
+.preview-bezier-menu-curve {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+}
+
+.preview-bezier-menu-endpoint {
+  fill: currentColor;
+}
+
+.preview-bezier-menu-control {
+  fill: color-mix(in srgb, currentColor 58%, #ffffff);
+  stroke: currentColor;
+  stroke-width: 0.7;
+}
+
 .preview-path-menu-button[data-path-action='directPathInput']
+  .preview-path-menu-icon,
+.preview-path-menu-button[data-sheet-action='directSheetInput']
   .preview-path-menu-icon {
   color: #2a4f7f;
   background: color-mix(in srgb, #4d9de0 18%, #ffffff);

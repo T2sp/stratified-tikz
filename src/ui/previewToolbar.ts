@@ -53,6 +53,27 @@ export type PreviewPathMenuItem = {
   directPathInputMode?: PreviewPathInputMode
 }
 
+export type PreviewSheetCreationKind =
+  | 'polygon'
+  | 'coonsPatch'
+  | 'ruledSurface'
+  | 'hemisphere'
+
+export type PreviewSheetMenuItem = {
+  id:
+    | 'polygonSheet'
+    | 'coonsPatch'
+    | 'ruledSurface'
+    | 'hemisphere'
+    | 'directSheetInput'
+  label: string
+  icon: string
+  group: PreviewPathMenuGroup
+  tool: 'createSheet'
+  inputMode: CoordinateInputMode
+  sheetCreationKind?: PreviewSheetCreationKind
+}
+
 export type PreviewOverlayEvent = {
   stopPropagation: () => void
 }
@@ -187,8 +208,8 @@ export function addPathMenuItems(): PreviewPathMenuItem[] {
     },
     {
       id: 'cubicBezier',
-      label: 'Cubic Bezier',
-      icon: 'B',
+      label: 'Cubic Bézier',
+      icon: 'bezierCurve',
       group: 'cursorCreation',
       tool: 'createCubicBezier',
       inputMode: 'cursor',
@@ -208,6 +229,59 @@ export function addPathMenuItems(): PreviewPathMenuItem[] {
       icon: '⌨',
       group: 'directInput',
       tool: 'createPath',
+      inputMode: 'direct',
+    },
+  ]
+}
+
+export function addSheetMenuGroups(): PreviewPathMenuGroupDefinition[] {
+  return addPathMenuGroups()
+}
+
+export function addSheetMenuItems(): PreviewSheetMenuItem[] {
+  return [
+    {
+      id: 'polygonSheet',
+      label: 'Polygon',
+      icon: '▱',
+      group: 'cursorCreation',
+      tool: 'createSheet',
+      inputMode: 'cursor',
+      sheetCreationKind: 'polygon',
+    },
+    {
+      id: 'coonsPatch',
+      label: 'Coons',
+      icon: '◇',
+      group: 'cursorCreation',
+      tool: 'createSheet',
+      inputMode: 'cursor',
+      sheetCreationKind: 'coonsPatch',
+    },
+    {
+      id: 'ruledSurface',
+      label: 'Ruled',
+      icon: '≋',
+      group: 'cursorCreation',
+      tool: 'createSheet',
+      inputMode: 'cursor',
+      sheetCreationKind: 'ruledSurface',
+    },
+    {
+      id: 'hemisphere',
+      label: 'Hemisphere',
+      icon: '◠',
+      group: 'cursorCreation',
+      tool: 'createSheet',
+      inputMode: 'cursor',
+      sheetCreationKind: 'hemisphere',
+    },
+    {
+      id: 'directSheetInput',
+      label: 'Direct input',
+      icon: '⌨',
+      group: 'directInput',
+      tool: 'createSheet',
       inputMode: 'direct',
     },
   ]

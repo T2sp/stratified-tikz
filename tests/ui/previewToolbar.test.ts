@@ -19,6 +19,8 @@ import {
 import {
   addPathMenuGroups,
   addPathMenuItems,
+  addSheetMenuGroups,
+  addSheetMenuItems,
   activeToolSupportsCursorCreation,
   directPathInputModeItems,
   closeToolbarPalette,
@@ -177,14 +179,26 @@ test('fill paths are visible only for Select and Add path family tools', () => {
   }
 })
 
-test('Add path menu exposes polyline and cubic Bezier options', () => {
+test('Add path menu exposes polyline and cubic Bézier options', () => {
   const labels = addPathMenuItems().map((item) => item.label)
 
   assert.ok(labels.includes('Polyline'))
-  assert.ok(labels.includes('Cubic Bezier'))
+  assert.ok(labels.includes('Cubic Bézier'))
   assert.ok(labels.includes('Line/manual path'))
   assert.ok(labels.includes('Arc segment path'))
   assert.ok(labels.includes('Direct input...'))
+})
+
+test('Add path Cubic Bézier menu item uses the curve icon sentinel', () => {
+  const cubicBezierItem = addPathMenuItems().find(
+    (item) => item.id === 'cubicBezier',
+  )
+
+  assert.notEqual(cubicBezierItem, undefined)
+  assert.equal(cubicBezierItem?.label, 'Cubic Bézier')
+  assert.equal(cubicBezierItem?.icon, 'bezierCurve')
+  assert.equal(cubicBezierItem?.tool, 'createCubicBezier')
+  assert.equal(cubicBezierItem?.inputMode, 'cursor')
 })
 
 test('Add path menu contains exactly one Direct input item', () => {
@@ -205,6 +219,58 @@ test('Add path menu groups and icons distinguish path actions', () => {
   assert.equal(icons.size, items.length)
   assert.deepEqual(
     items.map((item) => item.group),
+    [
+      'cursorCreation',
+      'cursorCreation',
+      'cursorCreation',
+      'cursorCreation',
+      'directInput',
+    ],
+  )
+})
+
+test('Add sheet menu exposes exactly the visible items in palette order', () => {
+  assert.deepEqual(
+    addSheetMenuItems().map((item) => item.label),
+    ['Polygon', 'Coons', 'Ruled', 'Hemisphere', 'Direct input'],
+  )
+})
+
+test('Add sheet menu removes Saddle while preserving remaining creation targets', () => {
+  const items = addSheetMenuItems()
+
+  assert.equal(items.some((item) => item.label === 'Saddle'), false)
+  assert.deepEqual(
+    items.map((item) => item.sheetCreationKind ?? 'direct'),
+    ['polygon', 'coonsPatch', 'ruledSurface', 'hemisphere', 'direct'],
+  )
+  assert.deepEqual(
+    items.map((item) => item.tool),
+    ['createSheet', 'createSheet', 'createSheet', 'createSheet', 'createSheet'],
+  )
+})
+
+test('Add sheet menu contains exactly one Direct input item', () => {
+  const directItems = addSheetMenuItems().filter((item) =>
+    item.label.toLowerCase().includes('direct'),
+  )
+
+  assert.equal(directItems.length, 1)
+  assert.equal(directItems[0]?.id, 'directSheetInput')
+  assert.equal(directItems[0]?.inputMode, 'direct')
+})
+
+test('Add sheet menu uses the same grouped palette structure as Add path', () => {
+  assert.deepEqual(
+    addSheetMenuGroups().map((group) => group.id),
+    ['cursorCreation', 'directInput'],
+  )
+  assert.deepEqual(
+    addSheetMenuGroups().map((group) => group.label),
+    addPathMenuGroups().map((group) => group.label),
+  )
+  assert.deepEqual(
+    addSheetMenuItems().map((item) => item.group),
     [
       'cursorCreation',
       'cursorCreation',
@@ -286,6 +352,36 @@ test('selecting Add path Direct input item closes palette and opens path drawer 
     true,
   )
   assert.equal(directInputDrawerFormKind(directItem.tool, directItem.inputMode), 'path')
+})
+
+test('selecting Add sheet Direct input item closes palette and opens sheet drawer policy', () => {
+  const directItem = addSheetMenuItems().find(
+    (item) => item.id === 'directSheetInput',
+  )
+
+  assert.notEqual(directItem, undefined)
+  if (directItem === undefined) {
+    return
+  }
+
+  const state = directInputDrawerStateForInputMode(directItem.inputMode)
+
+  assert.equal(toolbarPaletteAfterCommandSelection(), null)
+  assert.equal(directItem.tool, 'createSheet')
+  assert.equal(directItem.inputMode, 'direct')
+  assert.equal(
+    shouldShowDirectInputDrawer(directItem.tool, directItem.inputMode, state),
+    true,
+  )
+  assert.equal(
+    directInputDrawerFormKind(directItem.tool, directItem.inputMode),
+    'sheet',
+  )
+})
+
+test('opening Add sheet and Add path palettes remains exclusive', () => {
+  assert.equal(toggleToolbarPalette('addPath', 'addSheet'), 'addSheet')
+  assert.equal(toggleToolbarPalette('addSheet', 'addPath'), 'addPath')
 })
 
 test('closing the direct input drawer returns the add tool to cursor input', () => {

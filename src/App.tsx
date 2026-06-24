@@ -261,6 +261,8 @@ import {
   workPlaneSummaryLabel,
   addPathMenuGroups,
   addPathMenuItems,
+  addSheetMenuGroups,
+  addSheetMenuItems,
   defaultPreviewCoordinateInputMode,
   directPathInputModeItems,
   generateTikzForUi,
@@ -305,6 +307,8 @@ import {
   type LayerFilter,
   type PreviewPathInputMode,
   type PreviewPathMenuItem,
+  type PreviewSheetCreationKind,
+  type PreviewSheetMenuItem,
   type PreviewToolbarPalette,
   type PreviewToolbarPaletteId,
   type PreviewToolbarState,
@@ -334,10 +338,8 @@ type DirectCreationTool =
   | 'createGrid'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type SheetCreationKind =
-  | 'polygon'
-  | CurvedSheetCreationKind
-  | 'ruledSurface'
-  | 'coonsPatch'
+  | PreviewSheetCreationKind
+  | Extract<CurvedSheetCreationKind, 'saddle'>
 type DirectPathInputMode = PreviewPathInputMode
 type DirectPathManualCoordinateRole = 'center' | 'control1' | 'control2' | 'end'
 type DirectPathManualSegmentDraft = {
@@ -421,13 +423,6 @@ const defaultDirectGridInput: DirectGridInput = {
     vMax: '2',
   },
 }
-const sheetCreationKinds: Array<{ id: SheetCreationKind; label: string }> = [
-  { id: 'polygon', label: 'Polygon' },
-  { id: 'hemisphere', label: 'Hemisphere' },
-  { id: 'saddle', label: 'Saddle' },
-  { id: 'ruledSurface', label: 'Ruled' },
-  { id: 'coonsPatch', label: 'Coons' },
-]
 const concatenatedPathSegmentKinds: Array<{
   id: ConcatenatedPathSegmentKind
   label: string
@@ -2403,6 +2398,17 @@ function App() {
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     updateSheetCreationKind(kind)
     updateCreationTool('createSheet')
+  }
+
+  function activateSheetMenuItem(item: PreviewSheetMenuItem): void {
+    if (item.sheetCreationKind !== undefined) {
+      activateSheetCreationKind(item.sheetCreationKind)
+      return
+    }
+
+    setOpenToolbarPalette(toolbarPaletteAfterCommandSelection())
+    updatePreviewCoordinateInputMode(item.inputMode)
+    updateCreationTool(item.tool)
   }
 
   function togglePreviewToolbar(): void {
@@ -6186,7 +6192,7 @@ function App() {
                         }}
                       >
                         <span className="preview-path-menu-icon" aria-hidden="true">
-                          {item.icon}
+                          {renderPreviewMenuIcon(item.icon)}
                         </span>
                         <span className="preview-path-menu-label">
                           {item.label}
@@ -6209,6 +6215,7 @@ function App() {
         return null
       }
       const isOpen = openToolbarPalette === palette
+      const sheetMenuItems = addSheetMenuItems()
 
       return (
         <details
@@ -6227,44 +6234,51 @@ function App() {
           >
             {tool.label} ▾
           </summary>
-          <div className="preview-toolbar-menu-popover">
-            {sheetCreationKinds.map((kind) => (
-              <button
-                key={kind.id}
-                type="button"
-                className={
-                  creationTool === 'createSheet' && sheetCreationKind === kind.id
-                    ? 'is-selected'
-                    : undefined
-                }
-                aria-pressed={
-                  creationTool === 'createSheet' && sheetCreationKind === kind.id
-                }
-                onClick={(event) => {
-                  stopPreviewOverlayEvent(event)
-                  activateSheetCreationKind(kind.id)
-                }}
-              >
-                {kind.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={
-                creationTool === 'createSheet' && coordinateInputMode === 'direct'
-                  ? 'is-selected'
-                  : undefined
+          <div className="preview-toolbar-menu-popover preview-path-menu-popover">
+            {addSheetMenuGroups().map((group) => {
+              const groupItems = sheetMenuItems.filter(
+                (item) => item.group === group.id,
+              )
+
+              if (groupItems.length === 0) {
+                return null
               }
-              aria-pressed={
-                creationTool === 'createSheet' && coordinateInputMode === 'direct'
-              }
-              onClick={(event) => {
-                stopPreviewOverlayEvent(event)
-                activateDirectCreationTool('createSheet')
-              }}
-            >
-              Direct input
-            </button>
+
+              return (
+                <div key={group.id} className="preview-path-menu-group">
+                  <span className="preview-path-menu-group-label">
+                    {group.label}
+                  </span>
+                  {groupItems.map((item) => {
+                    const isSelected = isSheetMenuItemSelected(item)
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`preview-path-menu-button ${
+                          isSelected ? 'is-selected' : ''
+                        }`}
+                        data-sheet-action={item.id}
+                        aria-label={item.label}
+                        aria-pressed={isSelected}
+                        onClick={(event) => {
+                          stopPreviewOverlayEvent(event)
+                          activateSheetMenuItem(item)
+                        }}
+                      >
+                        <span className="preview-path-menu-icon" aria-hidden="true">
+                          {renderPreviewMenuIcon(item.icon)}
+                        </span>
+                        <span className="preview-path-menu-label">
+                          {item.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
         </details>
       )
@@ -6297,6 +6311,18 @@ function App() {
 
     if (item.directPathInputMode !== undefined) {
       return directPathInputMode === item.directPathInputMode
+    }
+
+    return true
+  }
+
+  function isSheetMenuItemSelected(item: PreviewSheetMenuItem): boolean {
+    if (creationTool !== item.tool || coordinateInputMode !== item.inputMode) {
+      return false
+    }
+
+    if (item.sheetCreationKind !== undefined) {
+      return sheetCreationKind === item.sheetCreationKind
     }
 
     return true
@@ -7658,6 +7684,33 @@ function App() {
         </article>
       </section>
     </main>
+  )
+}
+
+function renderPreviewMenuIcon(icon: string) {
+  if (icon === 'bezierCurve') {
+    return <CubicBezierMenuIcon />
+  }
+
+  return icon
+}
+
+function CubicBezierMenuIcon() {
+  return (
+    <svg
+      className="preview-bezier-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path className="preview-bezier-menu-handle" d="M5 17 L9 5" />
+      <path className="preview-bezier-menu-handle" d="M19 7 L15 19" />
+      <path className="preview-bezier-menu-curve" d="M5 17 C9 5 15 19 19 7" />
+      <circle className="preview-bezier-menu-endpoint" cx="5" cy="17" r="2" />
+      <circle className="preview-bezier-menu-endpoint" cx="19" cy="7" r="2" />
+      <circle className="preview-bezier-menu-control" cx="9" cy="5" r="1.6" />
+      <circle className="preview-bezier-menu-control" cx="15" cy="19" r="1.6" />
+    </svg>
   )
 }
 
