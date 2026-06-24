@@ -42,7 +42,6 @@ export type LayerManagerProps = {
   creationLayerInput: string
   statusMessage: string
   expanded: boolean
-  stackedWithCamera: boolean
   onExpandedChange: (expanded: boolean) => void
   onCreationLayerChange: (layerInput: string) => void
   onLayerFilterChange: (layerFilter: LayerFilter) => void
@@ -62,7 +61,6 @@ export function LayerManager({
   creationLayerInput,
   statusMessage,
   expanded,
-  stackedWithCamera,
   onExpandedChange,
   onCreationLayerChange,
   onLayerFilterChange,
@@ -182,7 +180,6 @@ export function LayerManager({
       className={[
         'preview-layer-control',
         expanded ? 'is-expanded' : '',
-        stackedWithCamera ? 'is-stacked-with-camera' : '',
       ]
         .filter(Boolean)
         .join(' ')}

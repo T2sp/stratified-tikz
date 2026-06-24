@@ -22,6 +22,16 @@ export const cameraPresetIds = [
 export type CameraPresetId = (typeof cameraPresetIds)[number]
 export type CameraControlField = 'thetaDeg' | 'phiDeg' | 'zoom' | 'panX' | 'panY'
 export type CameraDragMode = 'orbit' | 'pan'
+export type CameraControlSliderGroup = 'orientation' | 'view'
+
+export type CameraControlSliderSpec = {
+  field: CameraControlField
+  label: string
+  group: CameraControlSliderGroup
+  min: number
+  max: number
+  step: number
+}
 
 export type CameraDragStartInput = {
   cameraDragEnabled: boolean
@@ -60,6 +70,49 @@ export const cameraPresetOptions: CameraPresetOption[] = [
   { id: 'front', label: 'Front (xz)' },
   { id: 'side', label: 'Side (yz)' },
   { id: 'isometric', label: 'Isometric' },
+]
+
+export const cameraControlSliderFields: readonly CameraControlSliderSpec[] = [
+  {
+    field: 'thetaDeg',
+    label: 'theta',
+    group: 'orientation',
+    min: 0,
+    max: 180,
+    step: 1,
+  },
+  {
+    field: 'phiDeg',
+    label: 'phi',
+    group: 'orientation',
+    min: -180,
+    max: 180,
+    step: 1,
+  },
+  {
+    field: 'zoom',
+    label: 'zoom',
+    group: 'view',
+    min: 0.1,
+    max: 4,
+    step: 0.05,
+  },
+  {
+    field: 'panX',
+    label: 'pan x',
+    group: 'view',
+    min: -120,
+    max: 120,
+    step: 1,
+  },
+  {
+    field: 'panY',
+    label: 'pan y',
+    group: 'view',
+    min: -120,
+    max: 120,
+    step: 1,
+  },
 ]
 
 export function shouldShowCameraControls(
@@ -268,6 +321,63 @@ export function cameraControlFieldValue(
       return formatCameraNumber(camera.pan.x)
     case 'panY':
       return formatCameraNumber(camera.pan.y)
+  }
+}
+
+export function cameraControlSliderValue(
+  camera: OrthographicCamera3D,
+  field: CameraControlField,
+): number {
+  switch (field) {
+    case 'thetaDeg':
+      return camera.thetaDeg
+    case 'phiDeg':
+      return camera.phiDeg
+    case 'zoom':
+      return camera.zoom
+    case 'panX':
+      return camera.pan.x
+    case 'panY':
+      return camera.pan.y
+  }
+}
+
+export function cameraControlSliderBounds(
+  camera: OrthographicCamera3D,
+  field: CameraControlField,
+): { min: number; max: number } {
+  const spec = cameraControlSliderSpec(field)
+  const value = cameraControlSliderValue(camera, field)
+
+  return {
+    min: Math.min(spec.min, value),
+    max: Math.max(spec.max, value),
+  }
+}
+
+export function cameraControlSliderSpec(
+  field: CameraControlField,
+): CameraControlSliderSpec {
+  const spec = cameraControlSliderFields.find(
+    (candidate) => candidate.field === field,
+  )
+
+  if (spec === undefined) {
+    throw new Error(`Unknown camera control field: ${field}`)
+  }
+
+  return spec
+}
+
+export function cameraFieldDraftsFromCamera(
+  camera: OrthographicCamera3D,
+): Record<CameraControlField, string> {
+  return {
+    thetaDeg: cameraControlFieldValue(camera, 'thetaDeg'),
+    phiDeg: cameraControlFieldValue(camera, 'phiDeg'),
+    zoom: cameraControlFieldValue(camera, 'zoom'),
+    panX: cameraControlFieldValue(camera, 'panX'),
+    panY: cameraControlFieldValue(camera, 'panY'),
   }
 }
 
