@@ -2543,13 +2543,6 @@
   opacity: 0.58;
 }
 
-.tikz-export-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
 .copy-button {
   padding: 6px 12px;
   border: 1px solid var(--border);
@@ -3285,6 +3278,34 @@
   padding-right: 2px;
 }
 
+.tikz-source-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--source-bg);
+  overflow: hidden;
+}
+
+.tikz-source-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--panel) 94%, var(--source-bg));
+}
+
+.tikz-source-actions .copy-status {
+  margin-left: auto;
+  text-align: right;
+}
+
 .tikz-source {
   width: 100%;
   min-width: 0;
@@ -3292,8 +3313,8 @@
   min-height: 0;
   max-height: none;
   resize: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 0;
   padding: 14px;
   color: var(--source-text);
   background: var(--source-bg);

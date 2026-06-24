@@ -63,3 +63,63 @@ test('camera panel collapse state is not serialized as diagram data', () => {
   assert.equal(saveSource.includes('cameraFieldDrafts'), false)
   assert.equal(saveSource.includes('cameraStatus'), false)
 })
+
+test('TikZ copy actions are rendered in the source shell before the source textarea', () => {
+  const sourcePanel = appSource.indexOf(
+    'className="workspace-panel source-panel"',
+  )
+  const copyControls = appSource.indexOf('className="copy-controls"', sourcePanel)
+  const visibilityControls = appSource.indexOf('3D Visibility', copyControls)
+  const sourceShell = appSource.indexOf(
+    'className="tikz-source-shell"',
+    visibilityControls,
+  )
+  const sourceActions = appSource.indexOf(
+    'className="tikz-source-actions"',
+    sourceShell,
+  )
+  const copyButton = appSource.indexOf('Copy TikZ', sourceActions)
+  const downloadButton = appSource.indexOf('Download TikZ', sourceActions)
+  const sourceTextarea = appSource.indexOf('className="tikz-source"', sourceActions)
+  const optionsSource = appSource.slice(copyControls, sourceShell)
+
+  assert.ok(sourcePanel >= 0)
+  assert.ok(copyControls > sourcePanel)
+  assert.ok(visibilityControls > copyControls)
+  assert.ok(sourceShell > visibilityControls)
+  assert.ok(sourceActions > sourceShell)
+  assert.ok(copyButton > sourceActions)
+  assert.ok(downloadButton > copyButton)
+  assert.ok(sourceTextarea > downloadButton)
+  assert.equal(optionsSource.includes('Copy TikZ'), false)
+  assert.equal(optionsSource.includes('Download TikZ'), false)
+})
+
+test('TikZ source shell keeps actions fixed above the internally scrolling code area', () => {
+  const sourcePanelRule = cssRule('.source-panel')
+  const headingRule = cssRule('.source-panel .panel-heading')
+  const shellRule = cssRule('.tikz-source-shell')
+  const actionRule = cssRule('.tikz-source-actions')
+  const textareaRule = cssRule('.tikz-source')
+
+  assert.match(sourcePanelRule, /grid-template-rows:\s*auto minmax\(0, 1fr\);/)
+  assert.match(headingRule, /overflow:\s*auto;/)
+  assert.match(shellRule, /grid-template-rows:\s*auto minmax\(0, 1fr\);/)
+  assert.match(shellRule, /overflow:\s*hidden;/)
+  assert.match(actionRule, /flex-wrap:\s*wrap;/)
+  assert.match(actionRule, /border-bottom:/)
+  assert.match(textareaRule, /overflow:\s*auto;/)
+  assert.match(textareaRule, /border:\s*0;/)
+})
+
+function cssRule(selector: string): string {
+  const start = appCss.indexOf(`${selector} {`)
+
+  assert.notEqual(start, -1, `Missing CSS rule for ${selector}.`)
+
+  const end = appCss.indexOf('\n}', start)
+
+  assert.notEqual(end, -1, `Missing CSS rule end for ${selector}.`)
+
+  return appCss.slice(start, end + 2)
+}

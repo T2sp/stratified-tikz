@@ -7646,41 +7646,43 @@ function App() {
                   ))}
                 </select>
               </label>
-              <div className="tikz-export-actions">
-                <button
-                  type="button"
-                  className="copy-button"
-                  aria-label="Copy generated TikZ source"
-                  onClick={copyTikz}
-                >
-                  Copy TikZ
-                </button>
-                <button
-                  type="button"
-                  className="copy-button"
-                  aria-label={`Download generated TikZ source as ${tikzDownloadFilenameForMode(
-                    tikzExportMode,
-                  )}`}
-                  onClick={downloadTikz}
-                  title={`Download ${tikzDownloadFilenameForMode(tikzExportMode)}`}
-                >
-                  Download TikZ
-                </button>
-              </div>
+            </div>
+          </div>
+          <div className="tikz-source-shell">
+            <div className="tikz-source-actions" aria-label="TikZ source actions">
+              <button
+                type="button"
+                className="copy-button"
+                aria-label="Copy generated TikZ source"
+                onClick={copyTikz}
+              >
+                Copy TikZ
+              </button>
+              <button
+                type="button"
+                className="copy-button"
+                aria-label={`Download generated TikZ source as ${tikzDownloadFilenameForMode(
+                  tikzExportMode,
+                )}`}
+                onClick={downloadTikz}
+                title={`Download ${tikzDownloadFilenameForMode(tikzExportMode)}`}
+              >
+                Download TikZ
+              </button>
               <span className="copy-status" role="status">
                 {copyStatus === 'copied' && 'Copied'}
                 {copyStatus === 'downloaded' && 'Downloaded'}
                 {copyStatus === 'failed' && 'Copy/download failed'}
               </span>
             </div>
+            <textarea
+              className="tikz-source"
+              value={tikzSource}
+              readOnly
+              spellCheck={false}
+              aria-label="Generated TikZ source"
+            />
           </div>
-          <textarea
-            className="tikz-source"
-            value={tikzSource}
-            readOnly
-            spellCheck={false}
-            aria-label="Generated TikZ source"
-          />
         </article>
       </section>
     </main>
