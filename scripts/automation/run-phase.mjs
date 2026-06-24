@@ -123,6 +123,9 @@ const phaseSlugs = {
   "22D": "braiding-crossing-state-ui",
   "22E": "braiding-render-export-no-knot",
   "22F": "arrow-braiding-polish",
+  "23A": "example-bar-curated-layout",
+  "23B": "toolbar-palette-add-path-polish",
+  "23C": "camera-panel-below-preview",
 };
 
 function makePhaseSpec(phase) {
