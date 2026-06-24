@@ -17,14 +17,19 @@ import {
   toggleInspectorDrawerState,
 } from '../../src/ui/inspectorDrawer.ts'
 import {
+  addPathMenuGroups,
   addPathMenuItems,
   activeToolSupportsCursorCreation,
+  directPathInputModeItems,
+  closeToolbarPalette,
   defaultPreviewCoordinateInputMode,
   previewToolbarTopTools,
   runPreviewOverlayAction,
   shouldHandlePreviewCanvasCreationClick,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
+  toolbarPaletteAfterCommandSelection,
+  toggleToolbarPalette,
   togglePreviewToolbarState,
 } from '../../src/ui/previewToolbar.ts'
 import type { WorkPlanePreviewTool } from '../../src/ui/workPlanePreview.ts'
@@ -34,6 +39,23 @@ test('preview toolbar collapse state toggles between expanded and collapsed', ()
   assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
 })
 
+test('opening Add point palette sets the open toolbar palette', () => {
+  assert.equal(toggleToolbarPalette(null, 'addPoint'), 'addPoint')
+})
+
+test('opening Add path while Add point is open replaces the open palette', () => {
+  assert.equal(toggleToolbarPalette('addPoint', 'addPath'), 'addPath')
+})
+
+test('clicking the open Add path palette closes it', () => {
+  assert.equal(toggleToolbarPalette('addPath', 'addPath'), null)
+})
+
+test('selecting a toolbar palette command closes the open palette', () => {
+  assert.equal(toolbarPaletteAfterCommandSelection(), null)
+  assert.equal(closeToolbarPalette(), null)
+})
+
 test('preview overlay state is UI-only and not saved in diagram JSON', () => {
   const serialized = serializeDiagram(emptyTwoDimensionalDiagram)
   const parsed = JSON.parse(serialized) as {
@@ -41,10 +63,12 @@ test('preview overlay state is UI-only and not saved in diagram JSON', () => {
   }
 
   togglePreviewToolbarState('expanded')
+  toggleToolbarPalette(null, 'addPath')
   openInspectorDrawerState()
   directInputDrawerStateForInputMode('direct')
 
   assert.equal('previewToolbarState' in parsed.diagram, false)
+  assert.equal('openToolbarPalette' in parsed.diagram, false)
   assert.equal('inspectorDrawerState' in parsed.diagram, false)
   assert.equal('directInputDrawerState' in parsed.diagram, false)
   assert.equal('layerWindowOpen' in parsed.diagram, false)
@@ -56,6 +80,15 @@ test('toolbar collapse state does not affect generated TikZ', () => {
 
   assert.equal(togglePreviewToolbarState('expanded'), 'collapsed')
   assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
+})
+
+test('toolbar palette state does not affect generated TikZ', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+
+  assert.equal(toggleToolbarPalette(null, 'addPoint'), 'addPoint')
+  assert.equal(toggleToolbarPalette('addPoint', 'addPath'), 'addPath')
+  assert.equal(closeToolbarPalette(), null)
   assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
 })
 
@@ -150,12 +183,40 @@ test('Add path menu exposes polyline and cubic Bezier options', () => {
   assert.ok(labels.includes('Polyline'))
   assert.ok(labels.includes('Cubic Bezier'))
   assert.ok(labels.includes('Line/manual path'))
+  assert.ok(labels.includes('Arc segment path'))
+  assert.ok(labels.includes('Direct input...'))
 })
 
-test('Add path menu exposes existing direct path templates', () => {
-  const directModes = addPathMenuItems()
-    .filter((item) => item.inputMode === 'direct')
-    .map((item) => item.directPathInputMode)
+test('Add path menu contains exactly one Direct input item', () => {
+  const directItems = addPathMenuItems().filter((item) =>
+    item.label.toLowerCase().includes('direct'),
+  )
+
+  assert.equal(directItems.length, 1)
+  assert.equal(directItems[0]?.id, 'directPathInput')
+})
+
+test('Add path menu groups and icons distinguish path actions', () => {
+  const groups = addPathMenuGroups().map((group) => group.id)
+  const items = addPathMenuItems()
+  const icons = new Set(items.map((item) => item.icon))
+
+  assert.deepEqual(groups, ['cursorCreation', 'directInput'])
+  assert.equal(icons.size, items.length)
+  assert.deepEqual(
+    items.map((item) => item.group),
+    [
+      'cursorCreation',
+      'cursorCreation',
+      'cursorCreation',
+      'cursorCreation',
+      'directInput',
+    ],
+  )
+})
+
+test('Add path direct drawer still exposes direct path creation choices', () => {
+  const directModes = directPathInputModeItems().map((item) => item.id)
 
   assert.deepEqual(directModes, ['manual', 'circle', 'ellipse', 'arc'])
 })
@@ -203,6 +264,28 @@ test('selecting Direct for Add path opens the path direct input form', () => {
 
   assert.equal(shouldShowDirectInputDrawer('createPath', 'direct', state), true)
   assert.equal(directInputDrawerFormKind('createPath', 'direct'), 'path')
+})
+
+test('selecting Add path Direct input item closes palette and opens path drawer policy', () => {
+  const directItem = addPathMenuItems().find(
+    (item) => item.id === 'directPathInput',
+  )
+
+  assert.notEqual(directItem, undefined)
+  if (directItem === undefined) {
+    return
+  }
+
+  const state = directInputDrawerStateForInputMode(directItem.inputMode)
+
+  assert.equal(toolbarPaletteAfterCommandSelection(), null)
+  assert.equal(directItem.tool, 'createPath')
+  assert.equal(directItem.inputMode, 'direct')
+  assert.equal(
+    shouldShowDirectInputDrawer(directItem.tool, directItem.inputMode, state),
+    true,
+  )
+  assert.equal(directInputDrawerFormKind(directItem.tool, directItem.inputMode), 'path')
 })
 
 test('closing the direct input drawer returns the add tool to cursor input', () => {
