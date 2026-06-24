@@ -1516,6 +1516,72 @@
   min-width: min(520px, calc(100vw - 48px));
 }
 
+.preview-path-menu-popover {
+  min-width: 220px;
+  gap: 6px;
+}
+
+.preview-path-menu-group {
+  display: grid;
+  gap: 4px;
+}
+
+.preview-path-menu-group + .preview-path-menu-group {
+  padding-top: 5px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+}
+
+.preview-path-menu-group-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.preview-toolbar-menu-popover .preview-path-menu-button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  justify-items: start;
+  min-height: 32px;
+  padding: 5px 7px;
+  text-align: left;
+}
+
+.preview-path-menu-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 5px;
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--button-hover) 52%, #ffffff);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.preview-path-menu-button[data-path-action='cubicBezier'] .preview-path-menu-icon {
+  font-family: var(--sans);
+  font-size: 12px;
+}
+
+.preview-path-menu-button[data-path-action='directPathInput']
+  .preview-path-menu-icon {
+  color: #2a4f7f;
+  background: color-mix(in srgb, #4d9de0 18%, #ffffff);
+}
+
+.preview-path-menu-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preview-toolbar-inline-menu .preview-toolbar-menu-popover {
   right: 0;
   left: auto;

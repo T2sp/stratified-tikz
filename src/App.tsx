@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type MouseEvent,
   type SetStateAction,
 } from 'react'
 import './App.css'
@@ -254,8 +255,10 @@ import {
   workPlaneDisplayName,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
+  addPathMenuGroups,
   addPathMenuItems,
   defaultPreviewCoordinateInputMode,
+  directPathInputModeItems,
   generateTikzForUi,
   isAddPathTool,
   previewToolbarTopTools,
@@ -264,6 +267,8 @@ import {
   shouldShowDirectInputDrawer,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
+  toolbarPaletteAfterCommandSelection,
+  toggleToolbarPalette,
   togglePreviewToolbarState,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
@@ -294,7 +299,10 @@ import {
   type InspectorDisclosureState,
   type InspectorDrawerState,
   type LayerFilter,
+  type PreviewPathInputMode,
   type PreviewPathMenuItem,
+  type PreviewToolbarPalette,
+  type PreviewToolbarPaletteId,
   type PreviewToolbarState,
   type SelectedElement,
   type RuledSurfaceBoundaryDraft,
@@ -326,7 +334,7 @@ type SheetCreationKind =
   | CurvedSheetCreationKind
   | 'ruledSurface'
   | 'coonsPatch'
-type DirectPathInputMode = 'manual' | 'circle' | 'ellipse' | 'arc'
+type DirectPathInputMode = PreviewPathInputMode
 type DirectPathManualCoordinateRole = 'center' | 'control1' | 'control2' | 'end'
 type DirectPathManualSegmentDraft = {
   kind: ConcatenatedPathSegmentKind
@@ -439,12 +447,7 @@ const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
   'relativeCartesian',
   'relativePolar',
 ]
-const directPathInputModes: Array<{ id: DirectPathInputMode; label: string }> = [
-  { id: 'manual', label: 'Manual segments' },
-  { id: 'circle', label: 'Circle' },
-  { id: 'ellipse', label: 'Ellipse' },
-  { id: 'arc', label: 'Arc' },
-]
+const directPathInputModes = directPathInputModeItems()
 const fillRuleOptions: FillRule[] = ['nonzero', 'evenOdd']
 const cameraNumericFields: Array<{ field: CameraControlField; label: string }> = [
   { field: 'thetaDeg', label: 'theta' },
@@ -529,6 +532,8 @@ function App() {
   const [creationTool, setCreationTool] = useState<CreationTool>('select')
   const [previewToolbarState, setPreviewToolbarState] =
     useState<PreviewToolbarState>('expanded')
+  const [openToolbarPalette, setOpenToolbarPalette] =
+    useState<PreviewToolbarPalette>(null)
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [pathStatus, setPathStatus] = useState<string>('')
@@ -2208,6 +2213,27 @@ function App() {
     }
   }, [canRedo, canUndo, redoLastChange, undoLastChange])
 
+  useEffect(() => {
+    function handleToolbarPaletteEscape(event: KeyboardEvent): void {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        openToolbarPalette === null
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      setOpenToolbarPalette(null)
+    }
+
+    window.addEventListener('keydown', handleToolbarPaletteEscape)
+
+    return () => {
+      window.removeEventListener('keydown', handleToolbarPaletteEscape)
+    }
+  }, [openToolbarPalette])
+
   function updateLayerFilter(nextFilter: LayerFilter): void {
     setEditorState((current) => {
       const normalizedFilter = normalizeLayerFilterForDiagram(
@@ -2311,16 +2337,19 @@ function App() {
   }
 
   function activateCursorCreationTool(tool: CreationTool): void {
+    setOpenToolbarPalette(toolbarPaletteAfterCommandSelection())
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     updateCreationTool(tool)
   }
 
   function activateDirectCreationTool(tool: DirectCreationTool): void {
+    setOpenToolbarPalette(toolbarPaletteAfterCommandSelection())
     updatePreviewCoordinateInputMode('direct')
     updateCreationTool(tool)
   }
 
   function activatePathMenuItem(item: PreviewPathMenuItem): void {
+    setOpenToolbarPalette(toolbarPaletteAfterCommandSelection())
     updatePreviewCoordinateInputMode(item.inputMode)
 
     if (item.directPathInputMode !== undefined) {
@@ -2339,13 +2368,28 @@ function App() {
   }
 
   function activateSheetCreationKind(kind: SheetCreationKind): void {
+    setOpenToolbarPalette(toolbarPaletteAfterCommandSelection())
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     updateSheetCreationKind(kind)
     updateCreationTool('createSheet')
   }
 
   function togglePreviewToolbar(): void {
+    setOpenToolbarPalette(null)
     setPreviewToolbarState((current) => togglePreviewToolbarState(current))
+  }
+
+  function togglePreviewToolbarPalette(palette: PreviewToolbarPaletteId): void {
+    setOpenToolbarPalette((current) => toggleToolbarPalette(current, palette))
+  }
+
+  function handlePreviewToolbarPaletteSummaryClick(
+    event: MouseEvent<HTMLElement>,
+    palette: PreviewToolbarPaletteId,
+  ): void {
+    event.preventDefault()
+    stopPreviewOverlayEvent(event)
+    togglePreviewToolbarPalette(palette)
   }
 
   function updateSheetCreationKind(kind: SheetCreationKind): void {
@@ -5767,6 +5811,7 @@ function App() {
     tool: ReturnType<typeof previewToolbarTopTools>[number],
   ) {
     if (tool.menu === 'direct') {
+      const palette = tool.palette
       const directTool =
         tool.id === 'createPoint' ||
         tool.id === 'createLabel' ||
@@ -5774,18 +5819,28 @@ function App() {
           ? tool.id
           : null
 
-      if (directTool === null) {
+      if (directTool === null || palette === null) {
         return null
       }
+      const isOpen = openToolbarPalette === palette
 
       return (
         <details
           key={tool.id}
+          open={isOpen}
           className={`preview-toolbar-menu ${
             creationTool === tool.id ? 'is-selected' : ''
           }`}
         >
-          <summary aria-label={`${tool.label} menu`}>{tool.label} ▾</summary>
+          <summary
+            aria-label={`${tool.label} menu`}
+            aria-expanded={isOpen}
+            onClick={(event) =>
+              handlePreviewToolbarPaletteSummaryClick(event, palette)
+            }
+          >
+            {tool.label} ▾
+          </summary>
           <div className="preview-toolbar-menu-popover">
             {directTool !== 'createGrid' && (
               <button
@@ -5829,45 +5884,106 @@ function App() {
     }
 
     if (tool.menu === 'path') {
+      const palette = tool.palette
+
+      if (palette === null) {
+        return null
+      }
+      const isOpen = openToolbarPalette === palette
+      const pathMenuItems = addPathMenuItems()
+
       return (
         <details
           key={tool.id}
+          open={isOpen}
           className={`preview-toolbar-menu ${
             isAddPathTool(creationTool) ? 'is-selected' : ''
           }`}
         >
-          <summary aria-label="Add path menu">{tool.label} ▾</summary>
-          <div className="preview-toolbar-menu-popover">
-            {addPathMenuItems().map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={
-                  isPathMenuItemSelected(item) ? 'is-selected' : undefined
-                }
-                aria-pressed={isPathMenuItemSelected(item)}
-                onClick={(event) => {
-                  stopPreviewOverlayEvent(event)
-                  activatePathMenuItem(item)
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+          <summary
+            aria-label="Add path menu"
+            aria-expanded={isOpen}
+            onClick={(event) =>
+              handlePreviewToolbarPaletteSummaryClick(event, palette)
+            }
+          >
+            {tool.label} ▾
+          </summary>
+          <div className="preview-toolbar-menu-popover preview-path-menu-popover">
+            {addPathMenuGroups().map((group) => {
+              const groupItems = pathMenuItems.filter(
+                (item) => item.group === group.id,
+              )
+
+              if (groupItems.length === 0) {
+                return null
+              }
+
+              return (
+                <div key={group.id} className="preview-path-menu-group">
+                  <span className="preview-path-menu-group-label">
+                    {group.label}
+                  </span>
+                  {groupItems.map((item) => {
+                    const isSelected = isPathMenuItemSelected(item)
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`preview-path-menu-button ${
+                          isSelected ? 'is-selected' : ''
+                        }`}
+                        data-path-action={item.id}
+                        aria-label={item.label}
+                        aria-pressed={isSelected}
+                        onClick={(event) => {
+                          stopPreviewOverlayEvent(event)
+                          activatePathMenuItem(item)
+                        }}
+                      >
+                        <span className="preview-path-menu-icon" aria-hidden="true">
+                          {item.icon}
+                        </span>
+                        <span className="preview-path-menu-label">
+                          {item.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
         </details>
       )
     }
 
     if (tool.menu === 'sheet') {
+      const palette = tool.palette
+
+      if (palette === null) {
+        return null
+      }
+      const isOpen = openToolbarPalette === palette
+
       return (
         <details
           key={tool.id}
+          open={isOpen}
           className={`preview-toolbar-menu ${
             creationTool === 'createSheet' ? 'is-selected' : ''
           }`}
         >
-          <summary aria-label="Add sheet menu">{tool.label} ▾</summary>
+          <summary
+            aria-label="Add sheet menu"
+            aria-expanded={isOpen}
+            onClick={(event) =>
+              handlePreviewToolbarPaletteSummaryClick(event, palette)
+            }
+          >
+            {tool.label} ▾
+          </summary>
           <div className="preview-toolbar-menu-popover">
             {sheetCreationKinds.map((kind) => (
               <button
