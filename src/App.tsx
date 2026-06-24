@@ -7690,11 +7690,22 @@ function App() {
 }
 
 function renderPreviewMenuIcon(icon: string) {
-  if (icon === 'bezierCurve') {
-    return <CubicBezierMenuIcon />
+  switch (icon) {
+    case 'bezierCurve':
+      return <CubicBezierMenuIcon />
+    case 'sheetPolygon':
+      return <PolygonSheetMenuIcon />
+    case 'sheetCoonsPatch':
+      return <CoonsPatchMenuIcon />
+    case 'sheetRuledSurface':
+      return <RuledSurfaceMenuIcon />
+    case 'sheetHemisphere':
+      return <HemisphereMenuIcon />
+    case 'sheetDirectInput':
+      return <DirectInputMenuIcon />
+    default:
+      return icon
   }
-
-  return icon
 }
 
 function CubicBezierMenuIcon() {
@@ -7712,6 +7723,148 @@ function CubicBezierMenuIcon() {
       <circle className="preview-bezier-menu-endpoint" cx="19" cy="7" r="2" />
       <circle className="preview-bezier-menu-control" cx="9" cy="5" r="1.6" />
       <circle className="preview-bezier-menu-control" cx="15" cy="19" r="1.6" />
+    </svg>
+  )
+}
+
+function PolygonSheetMenuIcon() {
+  return (
+    <svg
+      className="preview-sheet-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon
+        className="preview-sheet-menu-fill"
+        points="5 8 16 5 20 15 8 19"
+      />
+      <polygon
+        className="preview-sheet-menu-outline"
+        points="5 8 16 5 20 15 8 19"
+      />
+      <path className="preview-sheet-menu-detail" d="M5 8 L20 15" />
+      <circle className="preview-sheet-menu-point" cx="5" cy="8" r="1.4" />
+      <circle className="preview-sheet-menu-point" cx="16" cy="5" r="1.4" />
+      <circle className="preview-sheet-menu-point" cx="20" cy="15" r="1.4" />
+      <circle className="preview-sheet-menu-point" cx="8" cy="19" r="1.4" />
+    </svg>
+  )
+}
+
+function CoonsPatchMenuIcon() {
+  return (
+    <svg
+      className="preview-sheet-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        className="preview-sheet-menu-fill"
+        d="M6 8 C9 4 15 4 19 8 C21 11 19 17 14 19 C10 20 4 15 6 8 Z"
+      />
+      <path
+        className="preview-sheet-menu-outline"
+        d="M6 8 C9 4 15 4 19 8"
+      />
+      <path
+        className="preview-sheet-menu-outline"
+        d="M19 8 C21 11 19 17 14 19"
+      />
+      <path
+        className="preview-sheet-menu-outline"
+        d="M14 19 C10 20 4 15 6 8"
+      />
+      <path
+        className="preview-sheet-menu-detail"
+        d="M8 10 C11 8 15 8 18 10 M7 13 C10 15 14 15 17 13"
+      />
+    </svg>
+  )
+}
+
+function RuledSurfaceMenuIcon() {
+  return (
+    <svg
+      className="preview-sheet-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        className="preview-sheet-menu-outline"
+        d="M4 8 C8 5 15 5 20 8"
+      />
+      <path
+        className="preview-sheet-menu-outline"
+        d="M4 17 C8 14 15 14 20 17"
+      />
+      <path
+        className="preview-sheet-menu-ruling"
+        d="M5 8.2 L5 17.2 M10 6.6 L10 15.6 M15 6.5 L15 15.7 M19 7.6 L19 16.7"
+      />
+    </svg>
+  )
+}
+
+function HemisphereMenuIcon() {
+  return (
+    <svg
+      className="preview-sheet-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        className="preview-sheet-menu-fill"
+        d="M5 16 A7 7 0 0 1 19 16 Z"
+      />
+      <path
+        className="preview-sheet-menu-outline"
+        d="M5 16 A7 7 0 0 1 19 16"
+      />
+      <path className="preview-sheet-menu-outline" d="M5 16 H19" />
+      <path
+        className="preview-sheet-menu-detail"
+        d="M12 16 C9.4 13 9.4 10 12 7 C14.6 10 14.6 13 12 16"
+      />
+      <path
+        className="preview-sheet-menu-detail"
+        d="M7.2 13 C10 14.6 14 14.6 16.8 13"
+      />
+    </svg>
+  )
+}
+
+function DirectInputMenuIcon() {
+  return (
+    <svg
+      className="preview-sheet-menu-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect
+        className="preview-sheet-menu-fill"
+        x="4"
+        y="5"
+        width="16"
+        height="14"
+        rx="2"
+      />
+      <rect
+        className="preview-sheet-menu-outline"
+        x="4"
+        y="5"
+        width="16"
+        height="14"
+        rx="2"
+      />
+      <path
+        className="preview-sheet-menu-detail"
+        d="M7 9 H17 M7 12 H15 M7 15 H10 M12 15 H15 M17 15 H18"
+      />
     </svg>
   )
 }

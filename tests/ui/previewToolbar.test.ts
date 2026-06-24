@@ -260,6 +260,19 @@ test('Add sheet menu contains exactly one Direct input item', () => {
   assert.equal(directItems[0]?.inputMode, 'direct')
 })
 
+test('Add sheet menu uses distinct semantic icon keys', () => {
+  assert.deepEqual(
+    addSheetMenuItems().map((item) => item.icon),
+    [
+      'sheetPolygon',
+      'sheetCoonsPatch',
+      'sheetRuledSurface',
+      'sheetHemisphere',
+      'sheetDirectInput',
+    ],
+  )
+})
+
 test('Add sheet menu uses the same grouped palette structure as Add path', () => {
   assert.deepEqual(
     addSheetMenuGroups().map((group) => group.id),

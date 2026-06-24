@@ -243,7 +243,7 @@ export function addSheetMenuItems(): PreviewSheetMenuItem[] {
     {
       id: 'polygonSheet',
       label: 'Polygon',
-      icon: '▱',
+      icon: 'sheetPolygon',
       group: 'cursorCreation',
       tool: 'createSheet',
       inputMode: 'cursor',
@@ -252,7 +252,7 @@ export function addSheetMenuItems(): PreviewSheetMenuItem[] {
     {
       id: 'coonsPatch',
       label: 'Coons',
-      icon: '◇',
+      icon: 'sheetCoonsPatch',
       group: 'cursorCreation',
       tool: 'createSheet',
       inputMode: 'cursor',
@@ -261,7 +261,7 @@ export function addSheetMenuItems(): PreviewSheetMenuItem[] {
     {
       id: 'ruledSurface',
       label: 'Ruled',
-      icon: '≋',
+      icon: 'sheetRuledSurface',
       group: 'cursorCreation',
       tool: 'createSheet',
       inputMode: 'cursor',
@@ -270,7 +270,7 @@ export function addSheetMenuItems(): PreviewSheetMenuItem[] {
     {
       id: 'hemisphere',
       label: 'Hemisphere',
-      icon: '◠',
+      icon: 'sheetHemisphere',
       group: 'cursorCreation',
       tool: 'createSheet',
       inputMode: 'cursor',
@@ -279,7 +279,7 @@ export function addSheetMenuItems(): PreviewSheetMenuItem[] {
     {
       id: 'directSheetInput',
       label: 'Direct input',
-      icon: '⌨',
+      icon: 'sheetDirectInput',
       group: 'directInput',
       tool: 'createSheet',
       inputMode: 'direct',

@@ -1623,6 +1623,41 @@
   stroke-width: 0.7;
 }
 
+.preview-sheet-menu-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+
+.preview-sheet-menu-fill {
+  fill: color-mix(in srgb, currentColor 13%, transparent);
+}
+
+.preview-sheet-menu-outline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.preview-sheet-menu-detail,
+.preview-sheet-menu-ruling {
+  fill: none;
+  stroke: color-mix(in srgb, currentColor 58%, transparent);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.preview-sheet-menu-ruling {
+  stroke: color-mix(in srgb, currentColor 72%, transparent);
+}
+
+.preview-sheet-menu-point {
+  fill: currentColor;
+}
+
 .preview-path-menu-button[data-path-action='directPathInput']
   .preview-path-menu-icon,
 .preview-path-menu-button[data-sheet-action='directSheetInput']
