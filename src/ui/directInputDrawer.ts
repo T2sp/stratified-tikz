@@ -1,4 +1,5 @@
-import type { CoordinateInputMode } from '../model/types.ts'
+import type { AmbientDimension, CoordinateInputMode } from '../model/types.ts'
+import type { DirectCoordinateMode } from './diagramUpdates.ts'
 import type { WorkPlanePreviewTool } from './workPlanePreview.ts'
 
 export type DirectInputDrawerState = 'open' | 'closed'
@@ -9,6 +10,12 @@ export type DirectInputDrawerFormKind =
   | 'path'
   | 'sheet'
   | 'grid'
+
+export function directCoordinateModesForAmbientDimension(
+  ambientDimension: AmbientDimension,
+): DirectCoordinateMode[] {
+  return ambientDimension === 3 ? ['global', 'workPlaneLocal'] : ['global']
+}
 
 export function directInputDrawerStateForInputMode(
   inputMode: CoordinateInputMode,

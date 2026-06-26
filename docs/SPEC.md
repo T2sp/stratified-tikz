@@ -176,11 +176,26 @@ mode; users type `$...$` themselves when desired.
 
 Expressions reject unknown variables, raw TeX/backslashes, braces, semicolons,
 newlines, unsupported functions, invalid syntax, division by zero, and
-non-finite preview values. In 2D diagrams z remains numeric 0. In the Phase 19C
-MVP, symbolic input is supported for global coordinate fields and copied
-boundary-surface path snapshots when variables resolve to finite preview
-values; active work-plane-local direct input, 3D template centers, and curved
-sheet anchors remain numeric-only and reject symbolic values.
+non-finite preview values. In 2D diagrams z remains numeric 0.
+
+In 3D direct input, point and free-label creation support two coordinate modes:
+
+- Global xyz;
+- Active work-plane local.
+
+Active work-plane local point and label input exposes the local plane
+coordinates as `Plane x / a` and `Plane y / b`. These fields accept the same
+numeric and symbolic scalar expressions as global coordinate fields. The editor
+stores a snapshot of the active work-plane frame at creation time together with
+the local scalar expressions. SVG preview uses the finite evaluated global
+point, while the saved model preserves the local source metadata. Changing the
+active work plane later does not move an existing local-source point or label.
+Direct and symbolic input are not affected by cursor snapping.
+
+Phase 25B local symbolic direct input is intentionally limited to point strata
+and free text labels. Existing path, sheet, template, curved-surface anchor, and
+grid direct helpers keep their earlier numeric/global behavior until their local
+coordinate editors and export paths are implemented.
 
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a

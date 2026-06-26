@@ -43,11 +43,29 @@ The drawer edits pending creation fields only. It does not change the diagram,
 saved JSON, undo history, or TikZ output until the user creates an element.
 Closing the drawer returns creation to cursor input.
 
+In 3D point and free-label creation, the drawer offers a coordinate mode:
+`Global 3D coordinates` or `Active work-plane local coordinates`. The local mode
+shows `Plane x / a` and `Plane y / b` fields. These fields accept numeric or
+symbolic scalar expressions, display the evaluated local preview values, and
+display the resulting global preview point. Creating the point or label stores a
+snapshot of the active work-plane frame plus the local scalar expressions.
+
+In 2D diagrams, direct input remains global x/y input only; no work-plane-local
+coordinate mode is shown.
+
 ## Inspector Drawer
 
 The Inspector button opens the right-side inspector drawer. Opening, closing, or
 expanding inspector sections is UI state only. Coordinates and styles change the
 diagram only when the inspector fields themselves commit edits.
+
+For selected point strata or free text labels whose position is stored as a
+work-plane-local coordinate source, the Inspector shows `Coordinate source:
+Work-plane local`, editable `Plane x / a` and `Plane y / b` expressions, the
+evaluated global preview point, and a compact stored-frame summary. Editing a
+valid local expression updates the local source and recomputes the global
+preview. Invalid local expressions are rejected and do not silently convert the
+position to global xyz coordinates.
 
 For multi-selection, the inspector supports bulk style, layer, delete, and
 duplicate operations for the selected objects. Style fields are shown only for

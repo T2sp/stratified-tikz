@@ -198,6 +198,7 @@ import {
   defaultCustomThreePointWorkPlaneInput,
   defaultJsonDownloadFilename,
   defaultTikzExportMode,
+  directCoordinateModesForAmbientDimension,
   downloadTextFile,
   EditableInspector,
   existingCoordinateSourceKey,
@@ -213,6 +214,7 @@ import {
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
   parseDirectCoordinateInput,
+  parseDirectCoordinateInputWithCoordinateSource,
   parseDirectCoordinateRows,
   parseFiniteNumber,
   parseOpacity,
@@ -238,6 +240,7 @@ import {
   shouldShowWorkPlaneControls,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
+  workPlaneLocalCoordinateAxisLabel,
   VariableManager,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
@@ -420,7 +423,6 @@ type EditableEditorState = {
   history: DiagramHistory
 }
 
-const directCoordinateModes: DirectCoordinateMode[] = ['global', 'workPlaneLocal']
 const defaultDirectCoordinates: DirectCoordinateInput = {
   x: '0',
   y: '0',
@@ -5735,6 +5737,47 @@ function App() {
     )
   }
 
+  function renderDirectPointLikeCoordinatePreview() {
+    if (
+      editableDiagram.ambientDimension !== 3 ||
+      (creationTool !== 'createPoint' && creationTool !== 'createLabel') ||
+      effectiveDirectCoordinateMode(
+        editableDiagram.ambientDimension,
+        directCoordinateMode,
+      ) !== 'workPlaneLocal'
+    ) {
+      return null
+    }
+
+    const point = parseDirectCoordinateInputWithCoordinateSource(
+      directCoordinates,
+      editableDiagram.ambientDimension,
+      directCreationCoordinateOptions({ diagram: editableDiagram }),
+    )
+    const source = point?.symbolic?.source
+
+    if (point === null || source?.kind !== 'workPlaneLocal') {
+      return (
+        <span
+          className="direct-coordinate-preview direct-coordinate-preview-invalid"
+          role="status"
+        >
+          Local preview unavailable
+        </span>
+      )
+    }
+
+    return (
+      <div className="direct-coordinate-preview" role="status">
+        <span>
+          Local preview: a {formatCompactNumber(directScalarPreview(source.local.a))},
+          b {formatCompactNumber(directScalarPreview(source.local.b))}
+        </span>
+        <span>Global preview: {formatCompactVec3(point)}</span>
+      </div>
+    )
+  }
+
   function renderDirectCreationForm() {
     if (coordinateInputMode !== 'direct' || !isDirectCreationTool(creationTool)) {
       return null
@@ -5763,7 +5806,9 @@ function App() {
                   )
                 }
               >
-                {directCoordinateModes.map((mode) => (
+                {directCoordinateModesForAmbientDimension(
+                  editableDiagram.ambientDimension,
+                ).map((mode) => (
                   <option key={mode} value={mode}>
                     {directCoordinateModeLabel(mode)}
                   </option>
@@ -5819,6 +5864,7 @@ function App() {
               />
             </label>
           ))}
+        {renderDirectPointLikeCoordinatePreview()}
         {creationTool === 'createSheet' &&
           isAnchorCurvedSheetCreationKind(sheetCreationKind) && (
             <div
@@ -9186,10 +9232,24 @@ function directCoordinateAxisLabel(
     ambientDimension === 3 &&
     coordinateMode === 'workPlaneLocal'
   ) {
-    return axis === 'x' ? 'a' : 'b'
+    return axis === 'x'
+      ? workPlaneLocalCoordinateAxisLabel('a')
+      : axis === 'y'
+        ? workPlaneLocalCoordinateAxisLabel('b')
+        : axis
   }
 
   return axis
+}
+
+function directScalarPreview(value: {
+  kind: 'numeric'
+  value: number
+} | {
+  kind: 'symbolic'
+  previewValue: number
+}): number {
+  return value.kind === 'numeric' ? value.value : value.previewValue
 }
 
 function effectiveDirectCoordinateMode(

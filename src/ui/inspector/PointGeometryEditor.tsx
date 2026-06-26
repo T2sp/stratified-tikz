@@ -2,6 +2,7 @@ import type { Diagram, PointStratum } from '../../model/types.ts'
 import {
   updateStratumById,
   updateVec3Coordinate,
+  updateWorkPlaneLocalCoordinate,
 } from '../diagramUpdates.ts'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import { ReadOnlyField } from './InspectorField.tsx'
@@ -45,6 +46,25 @@ export function PointGeometryEditor({
                     currentDiagram.ambientDimension,
                   ),
                 }
+              }),
+            )
+          }
+          onWorkPlaneLocalCoordinateChange={(axis, value) =>
+            onDiagramChange((currentDiagram) =>
+              updateStratumById(currentDiagram, point.id, (current) => {
+                if (current.geometricKind !== 'point') {
+                  return current
+                }
+
+                const position = updateWorkPlaneLocalCoordinate(
+                  current.position,
+                  axis,
+                  value,
+                  currentDiagram.ambientDimension,
+                  { diagram: currentDiagram },
+                )
+
+                return position === null ? current : { ...current, position }
               }),
             )
           }

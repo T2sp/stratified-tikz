@@ -2,6 +2,7 @@ import type { Diagram, TextLabel } from '../../model/types.ts'
 import {
   updateLabelById,
   updateVec3Coordinate,
+  updateWorkPlaneLocalCoordinate,
 } from '../diagramUpdates.ts'
 import {
   formatVec3,
@@ -81,6 +82,21 @@ export function TextLabelInspector({
                     currentDiagram.ambientDimension,
                   ),
                 })),
+              )
+            }
+            onWorkPlaneLocalCoordinateChange={(axis, value) =>
+              onDiagramChange((currentDiagram) =>
+                updateLabelById(currentDiagram, label.id, (current) => {
+                  const position = updateWorkPlaneLocalCoordinate(
+                    current.position,
+                    axis,
+                    value,
+                    currentDiagram.ambientDimension,
+                    { diagram: currentDiagram },
+                  )
+
+                  return position === null ? current : { ...current, position }
+                }),
               )
             }
           />

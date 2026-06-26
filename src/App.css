@@ -816,6 +816,26 @@
   resize: vertical;
 }
 
+.direct-coordinate-preview {
+  display: grid;
+  gap: 3px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.direct-coordinate-preview-invalid {
+  color: #9f1239;
+}
+
 .direct-coordinate-source-control {
   display: flex;
   align-items: center;
@@ -3396,6 +3416,21 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
   gap: 8px 10px;
+  min-width: 0;
+}
+
+.work-plane-local-coordinate-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.work-plane-local-coordinate-summary span {
   min-width: 0;
 }
 
