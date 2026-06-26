@@ -14,6 +14,11 @@ import {
   resolvePendingSymbolicDiagramImport,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
+import {
+  detectWorkPlaneLocalCoordinateVariables,
+  evaluateWorkPlaneLocalCoordinate,
+  type WorkPlaneLocalCoordinateExpressionContext,
+} from '../../src/model/workPlaneLocalCoordinates.ts'
 import type {
   ClosedPathBoundary,
   CoordinateComponent,
@@ -24,6 +29,8 @@ import type {
   Stratum,
   SymbolicVariable,
   Vec3,
+  WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinateSource,
 } from '../../src/model/types.ts'
 import type { ScalarInputValue } from '../../src/model/scalarExpressions.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
@@ -811,6 +818,291 @@ test('inline math output with symbolic coordinates has no blank lines', () => {
   assert.match(tikz, /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
 })
 
+test('numeric work-plane-local coordinate evaluates to a finite global preview', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    localCoordinateSource({
+      frame: xyFrame({ x: 1, y: 2, z: 3 }),
+      a: numericScalar(4),
+      b: numericScalar(-1),
+    }),
+  )
+
+  assert.equal(evaluated.ok, true)
+  if (!evaluated.ok) {
+    throw new Error(evaluated.errors[0]?.message ?? 'Expected evaluation.')
+  }
+
+  assert.deepEqual(evaluated.point, { x: 5, y: 1, z: 3 })
+})
+
+test('symbolic work-plane-local coordinate evaluates with variables', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    localCoordinateSource({
+      frame: xyFrame(),
+      a: symbolicScalar('R*cos(q)', Math.sqrt(3)),
+      b: symbolicScalar('R*sin(q)', 1),
+    }),
+    symbolicContext([
+      ['R', 2],
+      ['q', 30],
+    ]),
+  )
+
+  assert.equal(evaluated.ok, true)
+  if (!evaluated.ok) {
+    throw new Error(evaluated.errors[0]?.message ?? 'Expected evaluation.')
+  }
+
+  assertClose(evaluated.point.x, Math.sqrt(3))
+  assertClose(evaluated.point.y, 1)
+  assert.equal(evaluated.point.z, 0)
+})
+
+test('work-plane-local variable detection finds local and frame variables', () => {
+  const detected = detectWorkPlaneLocalCoordinateVariables(
+    localCoordinateSource({
+      frame: {
+        ...xyFrame(symbolicPoint(2, 0, 0, 'R')),
+        u: symbolicPoint(1, 0, 0, '1'),
+      },
+      a: symbolicScalar('R*cos(q)', Math.sqrt(3)),
+      b: symbolicScalar('sqrt(R) + sin(q)', Math.sqrt(2) + 0.5),
+    }),
+  )
+
+  assert.equal(detected.ok, true)
+  if (!detected.ok) {
+    throw new Error(detected.errors[0]?.message ?? 'Expected detection.')
+  }
+
+  assert.deepEqual(detected.variables, ['R', 'q'])
+})
+
+test('work-plane-local source rejects unknown variables', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    localCoordinateSource({
+      frame: xyFrame(),
+      a: symbolicScalar('Missing', 0),
+      b: numericScalar(0),
+    }),
+    symbolicContext([]),
+  )
+
+  assert.equal(evaluated.ok, false)
+  if (evaluated.ok) {
+    throw new Error('Expected unknown variable rejection.')
+  }
+  assert.match(
+    evaluated.errors[0]?.message ?? '',
+    /Unknown variable "Missing"/,
+  )
+})
+
+test('work-plane-local coordinate evaluates symbolic frame origin', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    localCoordinateSource({
+      frame: xyFrame(symbolicPoint(2, 0, 0, 'R')),
+      a: numericScalar(1),
+      b: numericScalar(2),
+    }),
+    symbolicContext([['R', 2]]),
+  )
+
+  assert.equal(evaluated.ok, true)
+  if (!evaluated.ok) {
+    throw new Error(evaluated.errors[0]?.message ?? 'Expected evaluation.')
+  }
+
+  assert.deepEqual(evaluated.point, { x: 3, y: 2, z: 0 })
+})
+
+test('work-plane-local source rejects invalid frames', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    localCoordinateSource({
+      frame: {
+        ...xyFrame(),
+        u: { x: 2, y: 0, z: 0 },
+      },
+      a: numericScalar(0),
+      b: numericScalar(0),
+    }),
+  )
+
+  assert.equal(evaluated.ok, false)
+  if (evaluated.ok) {
+    throw new Error('Expected invalid frame rejection.')
+  }
+  assert.match(evaluated.errors[0]?.message ?? '', /Work-plane frame is invalid/)
+})
+
+test('work-plane-local source rejects non-finite local scalars', () => {
+  const evaluated = evaluateWorkPlaneLocalCoordinate({
+    kind: 'workPlaneLocal',
+    frame: xyFrame(),
+    local: {
+      a: { kind: 'numeric', value: Number.POSITIVE_INFINITY },
+      b: numericScalar(0),
+    },
+  })
+
+  assert.equal(evaluated.ok, false)
+  if (evaluated.ok) {
+    throw new Error('Expected non-finite scalar rejection.')
+  }
+  assert.match(evaluated.errors[0]?.path ?? '', /local\.a\.value/)
+})
+
+test('work-plane-local source save and load round-trip preserves local expressions', () => {
+  const diagram = symbolicThreeDimensionalDiagramWithRq()
+  const position = workPlaneLocalPoint(
+    Math.sqrt(3),
+    1,
+    0,
+    localCoordinateSource({
+      frame: xyFrame(),
+      a: symbolicScalar('R*cos(q)', Math.sqrt(3)),
+      b: symbolicScalar('R*sin(q)', 1),
+    }),
+  )
+  diagram.strata.push({
+    id: 'local-symbolic-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Local Symbolic Point',
+    style: pointStyle(),
+    position,
+    layer: 0,
+  })
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const point = findPoint(parsed.diagram, 'local-symbolic-point')
+  const source = point.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(source?.local.a.kind === 'symbolic' ? source.local.a.expression : '', 'R*cos(q)')
+  assert.equal(source?.local.b.kind, 'symbolic')
+  assert.equal(source?.local.b.kind === 'symbolic' ? source.local.b.expression : '', 'R*sin(q)')
+  assertClose(point.position.x, Math.sqrt(3))
+  assertClose(point.position.y, 1)
+})
+
+test('work-plane-local source variables use import variable-resolution flow', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'import-local-symbolic-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Import Local Symbolic Point',
+    style: pointStyle(),
+    position: workPlaneLocalPoint(
+      Math.sqrt(3),
+      1,
+      0,
+      localCoordinateSource({
+        frame: xyFrame(),
+        a: symbolicScalar('R*cos(q)', Math.sqrt(3)),
+        b: symbolicScalar('R*sin(q)', 1),
+      }),
+    ),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok) {
+    throw new Error(pending.error)
+  }
+  assert.equal(pending.kind, 'needsVariableResolution')
+  if (pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected variable resolution.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => variable.name).sort(),
+    ['R', 'q'],
+  )
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pending.pendingImport,
+    [
+      { name: 'R', expression: '2' },
+      { name: 'q', expression: '30' },
+    ],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  assertClose(
+    findPoint(resolved.diagram, 'import-local-symbolic-point').position.x,
+    Math.sqrt(3),
+  )
+})
+
+test('old global-coordinate 3D diagram still loads', () => {
+  const parsed = parseSavedDiagramJson(serializeDiagram(emptyThreeDimensionalDiagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  assert.equal(parsed.diagram.ambientDimension, 3)
+})
+
+test('malformed work-plane-local source returns a clean validation error', () => {
+  const diagram = symbolicThreeDimensionalDiagramWithRq()
+  const source = localCoordinateSource({
+    frame: xyFrame(),
+    a: numericScalar(0),
+    b: numericScalar(0),
+  }) as unknown as { local: Record<string, unknown> }
+  delete source.local.b
+  diagram.strata.push({
+    id: 'malformed-local-source-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Malformed Local Source Point',
+    style: pointStyle(),
+    position: workPlaneLocalPoint(0, 0, 0, source as WorkPlaneLocalCoordinateSource),
+    layer: 0,
+  })
+
+  assertParseError(
+    parseSavedDiagramJson(serializeDiagram(diagram)),
+    /symbolic\.source\.local\.b Work-plane-local scalar must be a scalar input object/,
+  )
+})
+
+test('work-plane-local variable detection does not treat function names as variables', () => {
+  const detected = detectWorkPlaneLocalCoordinateVariables(
+    localCoordinateSource({
+      frame: xyFrame(),
+      a: symbolicScalar('sqrt(R) + sin(q)', Math.sqrt(2) + 0.5),
+      b: symbolicScalar('cos(q)', Math.sqrt(3) / 2),
+    }),
+  )
+
+  assert.equal(detected.ok, true)
+  if (!detected.ok) {
+    throw new Error(detected.errors[0]?.message ?? 'Expected detection.')
+  }
+
+  assert.deepEqual(detected.variables, ['R', 'q'])
+})
+
 function symbolicDiagram(): Diagram {
   const withR = expectVariableDiagramOk(
     addSymbolicVariableToDiagram(emptyTwoDimensionalDiagram, variable('var-R', 'R', '2')),
@@ -828,6 +1120,66 @@ function symbolicThreeDimensionalDiagram(): Diagram {
       variable('var-R', 'R', '2'),
     ),
   )
+}
+
+function symbolicThreeDimensionalDiagramWithRq(): Diagram {
+  const withR = symbolicThreeDimensionalDiagram()
+
+  return expectVariableDiagramOk(
+    addSymbolicVariableToDiagram(withR, variable('var-q', 'q', '30')),
+  )
+}
+
+function symbolicContext(
+  values: readonly (readonly [string, number])[],
+): WorkPlaneLocalCoordinateExpressionContext {
+  return {
+    variableNames: values.map(([name]) => name),
+    previewValues: new Map(values),
+  }
+}
+
+function xyFrame(origin: Vec3 = { x: 0, y: 0, z: 0 }): WorkPlaneFrameSnapshot {
+  return {
+    origin,
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function localCoordinateSource(input: {
+  frame: WorkPlaneFrameSnapshot
+  a: ScalarInputValue
+  b: ScalarInputValue
+}): WorkPlaneLocalCoordinateSource {
+  return {
+    kind: 'workPlaneLocal',
+    frame: input.frame,
+    local: {
+      a: input.a,
+      b: input.b,
+    },
+  }
+}
+
+function workPlaneLocalPoint(
+  x: number,
+  y: number,
+  z: number,
+  source: WorkPlaneLocalCoordinateSource,
+): Vec3 {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+      source,
+    },
+  }
 }
 
 type MutableSavedDiagramFile = {
@@ -937,6 +1289,13 @@ function symbolicScalar(
   }
 }
 
+function numericScalar(value: number): ScalarInputValue {
+  return {
+    kind: 'numeric',
+    value,
+  }
+}
+
 function variable(
   id: string,
   name: string,
@@ -993,6 +1352,17 @@ function sheetStyle(): SheetStyle {
     fillOpacity: 0.35,
     strokeColor: '#4D9DE0',
     strokeOpacity: 1,
+  }
+}
+
+function pointStyle() {
+  return {
+    kind: 'pointStyle' as const,
+    color: '#000000' as const,
+    opacity: 1,
+    shape: 'circle' as const,
+    fill: 'filled' as const,
+    size: 3,
   }
 }
 

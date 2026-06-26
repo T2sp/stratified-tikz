@@ -5,6 +5,13 @@ import {
 } from './scalarExpressions.ts'
 import type { ScalarInputValue } from './scalarExpressions.ts'
 import {
+  cloneWorkPlaneLocalCoordinateSource,
+  evaluateWorkPlaneLocalCoordinate,
+  refreshWorkPlaneLocalCoordinateSource,
+  validateWorkPlaneLocalCoordinateSource,
+  validateWorkPlaneLocalCoordinateSourceForPoint,
+} from './workPlaneLocalCoordinates.ts'
+import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
 } from './paths.ts'
@@ -25,6 +32,7 @@ import type {
   SymbolicVec3,
   Vec3,
   WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinateSource,
 } from './types.ts'
 
 export type CoordinateAxis = 'x' | 'y' | 'z'
@@ -194,11 +202,12 @@ export function hasSymbolicVec3Coordinates(point: Vec3): boolean {
 
   return (
     isRecord(symbolic) &&
-    coordinateAxes.some((axis) => {
-      const component = symbolic[axis]
+    (symbolic.source !== undefined ||
+      coordinateAxes.some((axis) => {
+        const component = symbolic[axis]
 
-      return isRecord(component) && component.kind === 'symbolic'
-    })
+        return isRecord(component) && component.kind === 'symbolic'
+      }))
   )
 }
 
@@ -305,6 +314,15 @@ export function validateSymbolicVec3(
       )
     }
   })
+
+  if (symbolic.source !== undefined) {
+    validateWorkPlaneLocalCoordinateSourceForPoint(
+      symbolic.source,
+      point,
+      `${path}.symbolic.source`,
+      context,
+    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+  }
 }
 
 export function validateDiagramSymbolicCoordinateMetadata(
@@ -800,6 +818,14 @@ function validateSymbolicVec3Metadata(
       )
     }
   })
+
+  if (symbolic.source !== undefined) {
+    validateWorkPlaneLocalCoordinateSource(
+      symbolic.source,
+      `${path}.symbolic.source`,
+      undefined,
+    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+  }
 }
 
 function refreshStratumSymbolicCoordinatePreviews(
@@ -1862,6 +1888,58 @@ function refreshVec3SymbolicPreview(
     return normalizePreviewPoint(point, ambientDimension)
   }
 
+  if (point.symbolic.source !== undefined) {
+    const refreshedSource = refreshWorkPlaneLocalCoordinateSource(
+      point.symbolic.source,
+      context,
+      `${path}.symbolic.source`,
+    )
+
+    if (!refreshedSource.ok) {
+      refreshedSource.errors.forEach((issue) =>
+        pushError(errors, issue.path, issue.message),
+      )
+      return point
+    }
+
+    const evaluated = evaluateWorkPlaneLocalCoordinate(
+      refreshedSource.source,
+      context,
+      `${path}.symbolic.source`,
+    )
+
+    if (!evaluated.ok) {
+      evaluated.errors.forEach((issue) =>
+        pushError(errors, issue.path, issue.message),
+      )
+      return point
+    }
+
+    const previewPoint = normalizePreviewPoint(evaluated.point, ambientDimension)
+
+    if (
+      ambientDimension === 2 &&
+      !numbersApproximatelyEqual(evaluated.point.z, 0)
+    ) {
+      pushError(
+        errors,
+        `${path}.symbolic.source`,
+        '2D work-plane-local coordinate previews must have z = 0.',
+      )
+      return point
+    }
+
+    return {
+      ...previewPoint,
+      symbolic: {
+        x: numericCoordinateComponent(previewPoint.x),
+        y: numericCoordinateComponent(previewPoint.y),
+        z: numericCoordinateComponent(previewPoint.z),
+        source: refreshedSource.source,
+      },
+    }
+  }
+
   const components = symbolicVec3ComponentsFromPoint(point)
 
   if (ambientDimension === 2 && components.z.kind === 'symbolic') {
@@ -1993,7 +2071,7 @@ function vec3FromCoordinateComponents(
     ambientDimension,
   )
 
-  if (!symbolicVec3HasSymbolic(normalizedComponents)) {
+  if (!symbolicVec3HasMetadata(normalizedComponents)) {
     return point
   }
 
@@ -2015,6 +2093,9 @@ function normalizeSymbolicVec3ForAmbientDimension(
     x: cloneCoordinateComponent(components.x),
     y: cloneCoordinateComponent(components.y),
     z: numericCoordinateComponent(0),
+    ...(components.source === undefined
+      ? {}
+      : { source: cloneWorkPlaneLocalCoordinateSource(components.source) }),
   }
 }
 
@@ -2023,6 +2104,8 @@ function symbolicVec3ComponentsFromPoint(point: Vec3): SymbolicVec3 {
   const symbolicX = coordinateComponentFromUnknown(symbolic?.x)
   const symbolicY = coordinateComponentFromUnknown(symbolic?.y)
   const symbolicZ = coordinateComponentFromUnknown(symbolic?.z)
+
+  const source = coordinateSourceFromUnknown(symbolic?.source)
 
   return {
     x:
@@ -2037,6 +2120,7 @@ function symbolicVec3ComponentsFromPoint(point: Vec3): SymbolicVec3 {
       symbolicZ?.kind === 'symbolic'
         ? cloneCoordinateComponent(symbolicZ)
         : numericCoordinateComponent(point.z),
+    ...(source === null ? {} : { source }),
   }
 }
 
@@ -2071,8 +2155,21 @@ function coordinateComponentFromUnknown(
     : null
 }
 
-function symbolicVec3HasSymbolic(symbolic: SymbolicVec3): boolean {
-  return coordinateAxes.some((axis) => symbolic[axis].kind === 'symbolic')
+function coordinateSourceFromUnknown(
+  source: unknown,
+): WorkPlaneLocalCoordinateSource | null {
+  if (!isRecord(source) || source.kind !== 'workPlaneLocal') {
+    return null
+  }
+
+  return source as unknown as WorkPlaneLocalCoordinateSource
+}
+
+function symbolicVec3HasMetadata(symbolic: SymbolicVec3): boolean {
+  return (
+    symbolic.source !== undefined ||
+    coordinateAxes.some((axis) => symbolic[axis].kind === 'symbolic')
+  )
 }
 
 function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
@@ -2080,6 +2177,9 @@ function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
     x: cloneCoordinateComponent(symbolic.x),
     y: cloneCoordinateComponent(symbolic.y),
     z: cloneCoordinateComponent(symbolic.z),
+    ...(symbolic.source === undefined
+      ? {}
+      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
   }
 }
 
