@@ -133,6 +133,12 @@ const phaseSlugs = {
   "24E": "path-concatenation",
   "24F": "layer-merge-symbolic-translation",
   "24G": "editing-polish-hardening",
+  "25A": "work-plane-local-symbolic-model",
+  "25B": "work-plane-local-symbolic-ui",
+  "25C": "work-plane-local-preview-import",
+  "25D": "work-plane-local-tikz-export",
+  "25E": "work-plane-local-editing-translation",
+  "25F": "work-plane-local-polish",
 };
 
 function makePhaseSpec(phase) {
