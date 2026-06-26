@@ -313,28 +313,29 @@ same frame, TikZ export preserves the local scalar expressions inside a TikZ
 
 ```tex
 \begin{scope}[
-    plane origin={(0,0,1)},
-    plane x={(1,0,1)},
-    plane y={(0,1,1)},
+    plane origin={(0,0,0)},
+    plane x={(1,0,0)},
+    plane y={(0,0,1)},
     canvas is plane
 ]
     \draw ({\R * cos(\q)},{\R * sin(\q)}) -- ({\R + 1},0);
 \end{scope}
 ```
 
-Same-frame detection compares a frame ID when one is available; otherwise it
-compares the finite preview numeric `origin`, `u`, `v`, and `normal` vectors
-within tolerance. Local scalar expressions use the same variable macro
-formatter as global symbolic coordinates, so `R*cos(q)` becomes
-`{\R * cos(\q)}`. The frame itself is emitted through the existing safe
-TikZ-plane formatter; symbolic frame origins and basis vectors are used only
-when they pass that formatter.
+Same-frame detection compares the finite preview numeric `origin`, `u`, `v`,
+and `normal` vectors within tolerance and also compares the saved symbolic frame
+metadata. Local scalar expressions use the same variable macro formatter as
+global symbolic coordinates, so `R*cos(q)` becomes `{\R * cos(\q)}`. The frame
+itself is emitted through the existing safe TikZ-plane formatter; symbolic
+frame origins and basis vectors are used only when they pass that formatter.
 
 If a path or sheet mixes global coordinates with work-plane-local coordinates,
 uses multiple local frames, or contains a local symbolic arc segment that cannot
 yet be represented safely, the MVP exporter falls back to global preview
 coordinates with an explicit warning comment. It does not expand local symbolic
-expressions into global symbolic formulas. Single points and labels with
+expressions into global symbolic formulas. Sampled mesh outputs for curved
+sheets, ruled surfaces, and Coons patches use finite numeric preview samples
+when symbolic mesh formulas are unavailable. Single points and labels with
 malformed local sources are omitted with a clear comment instead of silently
 using previews.
 

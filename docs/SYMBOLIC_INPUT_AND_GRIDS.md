@@ -94,6 +94,66 @@ and inspector editing can also store symbolic work-plane-local coordinates
 `(a,b)` against a saved work-plane frame snapshot. SVG preview still uses the
 finite global `Vec3` obtained from that local source.
 
+## Work-Plane-Local Symbolic Coordinates
+
+In 3D direct input, choose `Active work-plane local coordinates` to enter local
+plane scalars instead of global `x,y,z`. The visible fields are `Plane x / a`
+and `Plane y / b`; `z` is not an editable local coordinate. The entered scalars
+use the same expression grammar and variable table as global symbolic
+coordinates. For example, with:
+
+```text
+R = 2
+q = 45
+```
+
+the direct local input:
+
+```text
+a = R*cos(q)
+b = R*sin(q)
+```
+
+stores a snapshot of the active work-plane frame and evaluates the preview point
+as:
+
+```text
+P = frame.origin + preview(a)*frame.u + preview(b)*frame.v
+```
+
+The Inspector uses the same local model for selected points and free labels
+whose positions were saved with a `workPlaneLocal` source. Editing `a` or `b`
+changes the local scalar expression and recomputes the finite global preview;
+it does not convert the coordinate to global symbolic `x,y,z` expressions.
+
+Cursor snap is unrelated to this direct symbolic workflow. Snap can quantize
+cursor placement and drag handles, but direct numeric input, direct symbolic
+input, Inspector symbolic edits, JSON load, and TikZ export are not silently
+snapped.
+
+TikZ export preserves same-frame local expressions where practical by entering
+a TikZ `3d` library plane scope and writing the geometry in local `(a,b)`
+coordinates:
+
+```tex
+\begin{scope}[
+    plane origin={(0,0,0)},
+    plane x={(1,0,0)},
+    plane y={(0,0,1)},
+    canvas is plane
+]
+    \draw ({\R * cos(\q)},{\R * sin(\q)}) -- ({\R + 1},0);
+\end{scope}
+```
+
+If a path or sheet mixes global coordinates with local coordinates, uses
+multiple stored frames, or reaches a sampled mesh output path, export falls back
+to finite global preview coordinates with an explicit comment. It does not
+expand local symbolic expressions into global symbolic formulas. Sampled curved
+surface, ruled-surface, and Coons-patch mesh exports currently use numeric
+preview samples even when their saved boundary snapshots contain local symbolic
+source metadata.
+
 ## Symbolic Translation Policy
 
 Phase 24D implements translation as the only geometric transform. General
