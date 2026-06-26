@@ -1,4 +1,5 @@
 export * from './bezierControls'
+export * from './cursorSnap'
 export * from './curvedSheets'
 export * from './pathIntersections'
 export * from './projection'

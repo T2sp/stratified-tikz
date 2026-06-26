@@ -12,6 +12,13 @@ collapsed with the arrow button and expanded again without changing the diagram
 or generated TikZ. Undo and Redo sit directly below the toolbar as preview
 overlay buttons.
 
+The Snap control is editor preference state, not diagram geometry. It applies
+only to cursor placement and geometry-handle drag editing. Direct coordinate
+input, symbolic expression input, JSON load, programmatic updates, and generated
+TikZ are not snapped. In 2D mode snapping rounds cursor-derived `x` and `y`
+coordinates and keeps `z = 0`; in 3D mode snapping rounds the active work-plane
+local coordinates before reconstructing the model point.
+
 ## Add Path
 
 Path-related creation tools are consolidated under Add path:
