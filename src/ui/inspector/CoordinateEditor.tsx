@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  createScalarInputValue,
+  type ScalarInputValue,
+} from '../../model/scalarExpressions.ts'
+import {
   createCoordinateComponentFromInput,
   emptyCoordinateExpressionContext,
   numericCoordinateComponent,
@@ -16,6 +20,9 @@ import {
   coordinateAxesForAmbientDimension,
   parseFiniteNumber,
   type CoordinateAxis,
+  type WorkPlaneLocalCoordinateAxis,
+  workPlaneLocalCoordinateAxisLabel,
+  workPlaneLocalCoordinateInspectorView,
 } from '../diagramUpdates.ts'
 import { formatSymbolicInputError } from '../symbolicInputMessages.ts'
 import { formatNumberInput } from './InspectorField.tsx'
@@ -27,6 +34,10 @@ export type CoordinateEditorProps = {
   variables?: readonly SymbolicVariable[]
   allowSymbolic?: boolean
   onCoordinateChange: (axis: CoordinateAxis, value: CoordinateComponent) => void
+  onWorkPlaneLocalCoordinateChange?: (
+    axis: WorkPlaneLocalCoordinateAxis,
+    value: ScalarInputValue,
+  ) => void
 }
 
 export function CoordinateEditor({
@@ -36,11 +47,24 @@ export function CoordinateEditor({
   variables,
   allowSymbolic = false,
   onCoordinateChange,
+  onWorkPlaneLocalCoordinateChange,
 }: CoordinateEditorProps) {
   const expressionContext = useMemo(
     () => coordinateExpressionContextFromVariables(variables ?? []),
     [variables],
   )
+  const localView = workPlaneLocalCoordinateInspectorView(point, ambientDimension)
+
+  if (localView !== null) {
+    return (
+      <WorkPlaneLocalCoordinateEditor
+        label={label}
+        view={localView}
+        expressionContext={expressionContext}
+        onWorkPlaneLocalCoordinateChange={onWorkPlaneLocalCoordinateChange}
+      />
+    )
+  }
 
   return (
     <fieldset className="coordinate-group">
@@ -61,10 +85,115 @@ export function CoordinateEditor({
   )
 }
 
+function WorkPlaneLocalCoordinateEditor({
+  label,
+  view,
+  expressionContext,
+  onWorkPlaneLocalCoordinateChange,
+}: {
+  label: string
+  view: NonNullable<ReturnType<typeof workPlaneLocalCoordinateInspectorView>>
+  expressionContext: CoordinateExpressionContext
+  onWorkPlaneLocalCoordinateChange:
+    | ((axis: WorkPlaneLocalCoordinateAxis, value: ScalarInputValue) => void)
+    | undefined
+}) {
+  return (
+    <fieldset className="coordinate-group">
+      <legend>{label}</legend>
+      <div className="work-plane-local-coordinate-summary">
+        <span>Coordinate source: {view.coordinateSource}</span>
+        <span>Global preview: {formatEditorVec3(view.globalPreview)}</span>
+        <span>Frame: {view.frameSummary}</span>
+      </div>
+      <div className="coordinate-grid">
+        {(['a', 'b'] as const).map((axis) => (
+          <WorkPlaneLocalAxisInput
+            key={axis}
+            axis={axis}
+            inputValue={view.local[axis].inputValue}
+            previewValue={view.local[axis].previewValue}
+            expressionContext={expressionContext}
+            onWorkPlaneLocalCoordinateChange={onWorkPlaneLocalCoordinateChange}
+          />
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
+function WorkPlaneLocalAxisInput({
+  axis,
+  inputValue,
+  previewValue,
+  expressionContext,
+  onWorkPlaneLocalCoordinateChange,
+}: {
+  axis: WorkPlaneLocalCoordinateAxis
+  inputValue: string
+  previewValue: number
+  expressionContext: CoordinateExpressionContext
+  onWorkPlaneLocalCoordinateChange:
+    | ((axis: WorkPlaneLocalCoordinateAxis, value: ScalarInputValue) => void)
+    | undefined
+}) {
+  const [draft, setDraft] = useState(inputValue)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDraft(inputValue)
+    setError('')
+  }, [inputValue])
+
+  return (
+    <label className="coordinate-input-row">
+      <span>{workPlaneLocalCoordinateAxisLabel(axis)}</span>
+      <input
+        className="inspector-input"
+        type="text"
+        inputMode="decimal"
+        spellCheck={false}
+        value={draft}
+        readOnly={onWorkPlaneLocalCoordinateChange === undefined}
+        aria-invalid={error !== ''}
+        onChange={(event) => {
+          const nextDraft = event.currentTarget.value
+          const parsed = parseWorkPlaneLocalDraft(nextDraft, expressionContext)
+
+          setDraft(nextDraft)
+          setError(parsed.ok ? '' : parsed.error)
+
+          if (parsed.ok && onWorkPlaneLocalCoordinateChange !== undefined) {
+            onWorkPlaneLocalCoordinateChange(axis, parsed.scalar)
+          }
+        }}
+      />
+      <span className="coordinate-preview">
+        preview: {formatNumberInput(previewValue)}
+      </span>
+      {error !== '' && (
+        <span className="coordinate-input-error" role="status">
+          {error}
+        </span>
+      )}
+    </label>
+  )
+}
+
 type CoordinateDraftParseResult =
   | {
       ok: true
       component: CoordinateComponent
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type WorkPlaneLocalDraftParseResult =
+  | {
+      ok: true
+      scalar: ScalarInputValue
     }
   | {
       ok: false
@@ -135,6 +264,26 @@ function CoordinateAxisInput({
   )
 }
 
+function parseWorkPlaneLocalDraft(
+  rawValue: string,
+  expressionContext: CoordinateExpressionContext,
+): WorkPlaneLocalDraftParseResult {
+  const parsed = createScalarInputValue(rawValue, {
+    variables: expressionContext.variableNames,
+    previewValues: expressionContext.previewValues,
+  })
+
+  return parsed.ok
+    ? {
+        ok: true,
+        scalar: parsed.scalar,
+      }
+    : {
+        ok: false,
+        error: formatSymbolicInputError(parsed.error),
+      }
+}
+
 function parseCoordinateDraft(
   rawValue: string,
   allowSymbolic: boolean,
@@ -165,6 +314,12 @@ function parseCoordinateDraft(
         ok: false,
         error: formatSymbolicInputError(parsed.error),
       }
+}
+
+function formatEditorVec3(point: Vec3): string {
+  return `(${formatNumberInput(point.x)}, ${formatNumberInput(
+    point.y,
+  )}, ${formatNumberInput(point.z)})`
 }
 
 function coordinateInputValue(point: Vec3, axis: CoordinateAxis): string {

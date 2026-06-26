@@ -30,6 +30,10 @@ import {
   createScalarInputValue,
   type ScalarInputValue,
 } from '../model/scalarExpressions.ts'
+import {
+  cloneWorkPlaneLocalCoordinateSource,
+  evaluateWorkPlaneLocalCoordinate,
+} from '../model/workPlaneLocalCoordinates.ts'
 import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import {
   gridPreviewSegments,
@@ -94,6 +98,7 @@ import type {
   WorkPlane,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
+  WorkPlaneLocalCoordinateSource,
   WorkPlaneLocalOffset,
 } from '../model/types.ts'
 import {
@@ -443,10 +448,32 @@ export type DirectCoordinateInput = {
 
 export type DirectCoordinateMode = 'global' | 'workPlaneLocal'
 
+export type WorkPlaneLocalCoordinateAxis = 'a' | 'b'
+
 export type DirectCoordinateParseOptions = {
   coordinateMode?: DirectCoordinateMode
   workPlane?: WorkPlane
   diagram?: Diagram
+}
+
+export type ParseWorkPlaneLocalScalarResult =
+  | {
+      ok: true
+      scalar: ScalarInputValue
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+export type WorkPlaneLocalCoordinateInspectorView = {
+  coordinateSource: 'Work-plane local'
+  local: {
+    a: { inputValue: string; previewValue: number }
+    b: { inputValue: string; previewValue: number }
+  }
+  globalPreview: Vec3
+  frameSummary: string
 }
 
 export type DirectCubicBezierControlMode =
@@ -1056,7 +1083,7 @@ export function addPointStratumFromDirectInput(
   coordinates: DirectCoordinateInput,
   options: AddPointStratumOptions & DirectCoordinateParseOptions = {},
 ): DirectPointCreationResult {
-  const position = parseDirectCoordinateInput(
+  const position = parseDirectCoordinateInputWithCoordinateSource(
     coordinates,
     diagram.ambientDimension,
     directCoordinateParseOptionsForDiagram(diagram, options),
@@ -1084,7 +1111,7 @@ export function addTextLabelFromDirectInput(
   text: string,
   options: AddTextLabelOptions & DirectCoordinateParseOptions = {},
 ): DirectLabelCreationResult {
-  const position = parseDirectCoordinateInput(
+  const position = parseDirectCoordinateInputWithCoordinateSource(
     coordinates,
     diagram.ambientDimension,
     directCoordinateParseOptionsForDiagram(diagram, options),
@@ -2716,6 +2743,99 @@ export function updateVec3Coordinate(
   )
 }
 
+export function parseWorkPlaneLocalScalarInput(
+  source: string,
+  options: DirectCoordinateParseOptions = {},
+): ParseWorkPlaneLocalScalarResult {
+  const context = coordinateExpressionContextForOptions(options)
+  const parsed = createScalarInputValue(source, {
+    variables: context.variableNames,
+    previewValues: context.previewValues,
+  })
+
+  return parsed.ok
+    ? {
+        ok: true,
+        scalar: parsed.scalar,
+      }
+    : {
+        ok: false,
+        error: parsed.error,
+      }
+}
+
+export function updateWorkPlaneLocalCoordinate(
+  point: Vec3,
+  axis: WorkPlaneLocalCoordinateAxis,
+  value: ScalarInputValue,
+  ambientDimension: AmbientDimension,
+  options: DirectCoordinateParseOptions = {},
+): Vec3 | null {
+  const source = point.symbolic?.source
+
+  if (ambientDimension !== 3 || source?.kind !== 'workPlaneLocal') {
+    return null
+  }
+
+  const nextSource = cloneWorkPlaneLocalCoordinateSource(source)
+  nextSource.local[axis] = cloneScalarInputValueForDirectInput(value)
+
+  return vec3FromWorkPlaneLocalCoordinateSource(
+    nextSource,
+    ambientDimension,
+    coordinateExpressionContextForOptions(options),
+  )
+}
+
+export function workPlaneLocalCoordinateInspectorView(
+  point: Vec3,
+  ambientDimension: AmbientDimension,
+): WorkPlaneLocalCoordinateInspectorView | null {
+  const source = point.symbolic?.source
+
+  if (ambientDimension !== 3 || source?.kind !== 'workPlaneLocal') {
+    return null
+  }
+
+  return {
+    coordinateSource: 'Work-plane local',
+    local: {
+      a: scalarInputDisplay(source.local.a),
+      b: scalarInputDisplay(source.local.b),
+    },
+    globalPreview: {
+      x: point.x,
+      y: point.y,
+      z: point.z,
+    },
+    frameSummary: `origin ${formatCompactVec3ForDirectInput(source.frame.origin)}, u ${formatCompactVec3ForDirectInput(
+      source.frame.u,
+    )}, v ${formatCompactVec3ForDirectInput(source.frame.v)}`,
+  }
+}
+
+export function workPlaneLocalCoordinateAxisLabel(
+  axis: WorkPlaneLocalCoordinateAxis,
+): string {
+  return axis === 'a' ? 'Plane x / a' : 'Plane y / b'
+}
+
+export function parseDirectCoordinateInputWithCoordinateSource(
+  coordinates: DirectCoordinateInput,
+  ambientDimension: AmbientDimension,
+  options: DirectCoordinateParseOptions = {},
+): Vec3 | null {
+  if (
+    coordinates.source === undefined &&
+    ambientDimension === 3 &&
+    options.coordinateMode === 'workPlaneLocal'
+  ) {
+    return parseWorkPlaneLocalCoordinateInputWithSource(coordinates, options)
+  }
+
+  return parseDirectCoordinateInput(coordinates, ambientDimension, options)
+}
+
 export function parseDirectCoordinateInput(
   coordinates: DirectCoordinateInput,
   ambientDimension: AmbientDimension,
@@ -2863,6 +2983,32 @@ function parseWorkPlaneLocalCoordinateInput(
   }
 }
 
+function parseWorkPlaneLocalCoordinateInputWithSource(
+  coordinates: DirectCoordinateInput,
+  options: DirectCoordinateParseOptions,
+): Vec3 | null {
+  const a = parseWorkPlaneLocalScalarInput(coordinates.x, options)
+  const b = parseWorkPlaneLocalScalarInput(coordinates.y, options)
+  const frame = workPlaneFrameSnapshotFromWorkPlane(options.workPlane)
+
+  if (!a.ok || !b.ok || frame === null) {
+    return null
+  }
+
+  return vec3FromWorkPlaneLocalCoordinateSource(
+    {
+      kind: 'workPlaneLocal',
+      frame,
+      local: {
+        a: a.scalar,
+        b: b.scalar,
+      },
+    },
+    3,
+    coordinateExpressionContextForOptions(options),
+  )
+}
+
 function parseWorkPlaneLocalOffsetInput(
   coordinates: DirectCoordinateInput,
 ): WorkPlaneLocalOffset | null {
@@ -2996,6 +3142,80 @@ function coordinateExpressionContextForOptions(
     variableNames: resolved.variables.map((variable) => variable.name),
     previewValues: resolved.values,
   }
+}
+
+function vec3FromWorkPlaneLocalCoordinateSource(
+  source: WorkPlaneLocalCoordinateSource,
+  ambientDimension: AmbientDimension,
+  context: CoordinateExpressionContext,
+): Vec3 | null {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(source, context)
+
+  if (!evaluated.ok) {
+    return null
+  }
+
+  const point = normalizePointForAmbientDimension(ambientDimension, evaluated.point)
+
+  if (!isFiniteVec3(point)) {
+    return null
+  }
+
+  return {
+    ...point,
+    symbolic: {
+      x: numericCoordinateComponent(point.x),
+      y: numericCoordinateComponent(point.y),
+      z: numericCoordinateComponent(point.z),
+      source: cloneWorkPlaneLocalCoordinateSource(source),
+    },
+  }
+}
+
+function cloneScalarInputValueForDirectInput(
+  value: ScalarInputValue,
+): ScalarInputValue {
+  return value.kind === 'numeric'
+    ? {
+        kind: 'numeric',
+        value: value.value,
+      }
+    : {
+        kind: 'symbolic',
+        expression: value.expression,
+        previewValue: value.previewValue,
+      }
+}
+
+function scalarInputDisplay(value: ScalarInputValue): {
+  inputValue: string
+  previewValue: number
+} {
+  return value.kind === 'numeric'
+    ? {
+        inputValue: String(value.value),
+        previewValue: value.value,
+      }
+    : {
+        inputValue: value.expression,
+        previewValue: value.previewValue,
+      }
+}
+
+function formatCompactVec3ForDirectInput(point: Vec3): string {
+  return `(${formatCompactNumberForDirectInput(point.x)}, ${formatCompactNumberForDirectInput(
+    point.y,
+  )}, ${formatCompactNumberForDirectInput(point.z)})`
+}
+
+function formatCompactNumberForDirectInput(value: number): string {
+  const normalized = Math.abs(value) < 1e-9 ? 0 : value
+
+  if (Number.isInteger(normalized)) {
+    return String(normalized)
+  }
+
+  return normalized.toFixed(3).replace(/\.?0+$/, '')
 }
 
 function directCoordinateParseOptionsForDiagram(

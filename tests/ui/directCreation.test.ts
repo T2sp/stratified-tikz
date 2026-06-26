@@ -49,11 +49,15 @@ import {
   localDirectCoordinateInputFromExistingSource,
   parseDirectCoordinateRows,
   parseDirectLayerInput,
+  parseWorkPlaneLocalScalarInput,
   updateCurvedSheetPrimitiveById,
   updateStratumById,
   updateStratumStyleById,
+  updateWorkPlaneLocalCoordinate,
+  workPlaneLocalCoordinateInspectorView,
   type DirectCoordinateInput,
 } from '../../src/ui/diagramUpdates.ts'
+import { directCoordinateModesForAmbientDimension } from '../../src/ui/directInputDrawer.ts'
 import { gridPreviewSegments } from '../../src/model/grids.ts'
 import {
   createExistingCoordinateSourceOptions,
@@ -2159,11 +2163,15 @@ test('plane-local point direct creation converts input through a custom work pla
     throw new Error('Expected plane-local point creation to succeed.')
   }
 
-  assert.deepEqual(findPoint(result.diagram, result.id).position, {
+  const point = findPoint(result.diagram, result.id)
+
+  assert.deepEqual(globalPreview(point.position), {
     x: 12,
     y: 20,
     z: 33,
   })
+  assert.equal(point.position.symbolic?.source?.kind, 'workPlaneLocal')
+  assert.deepEqual(point.position.symbolic?.source?.frame, expectedFrameSnapshot)
 })
 
 test('plane-local label direct creation converts the label position', () => {
@@ -2182,11 +2190,332 @@ test('plane-local label direct creation converts the label position', () => {
     throw new Error('Expected plane-local label creation to succeed.')
   }
 
-  assert.deepEqual(findLabel(result.diagram, result.id).position, {
+  const label = findLabel(result.diagram, result.id)
+
+  assert.deepEqual(globalPreview(label.position), {
     x: 6,
     y: 20,
     z: 35,
   })
+  assert.equal(label.position.symbolic?.source?.kind, 'workPlaneLocal')
+  assert.deepEqual(label.position.symbolic?.source?.frame, expectedFrameSnapshot)
+})
+
+test('direct point creation stores symbolic active work-plane local coordinates', () => {
+  const diagram = createSymbolicThreeDimensionalDiagramWithRq()
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '99' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id)
+  const source = point.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q)',
+  )
+  assert.equal(source?.local.b.kind, 'symbolic')
+  assert.equal(
+    source?.local.b.kind === 'symbolic' ? source.local.b.expression : '',
+    'R*sin(q)',
+  )
+  assert.deepEqual(source?.frame, expectedFrameSnapshot)
+  assertVec3ApproximatelyEqual(point.position, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
+test('direct label creation stores symbolic active work-plane local coordinates', () => {
+  const diagram = createSymbolicThreeDimensionalDiagramWithRq()
+  const result = addTextLabelFromDirectInput(
+    diagram,
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '99' },
+    '$F$',
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic label creation to succeed.')
+  }
+
+  const label = findLabel(result.diagram, result.id)
+  const source = label.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q)',
+  )
+  assert.equal(source?.local.b.kind, 'symbolic')
+  assert.equal(
+    source?.local.b.kind === 'symbolic' ? source.local.b.expression : '',
+    'R*sin(q)',
+  )
+  assert.equal(label.text, '$F$')
+  assertVec3ApproximatelyEqual(label.position, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
+test('Inspector view displays work-plane local expressions for a local point', () => {
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic point creation to succeed.')
+  }
+
+  const view = workPlaneLocalCoordinateInspectorView(
+    findPoint(result.diagram, result.id).position,
+    3,
+  )
+
+  assert.notEqual(view, null)
+  assert.equal(view?.coordinateSource, 'Work-plane local')
+  assert.equal(view?.local.a.inputValue, 'R*cos(q)')
+  assert.equal(view?.local.b.inputValue, 'R*sin(q)')
+  assert.equal(view?.frameSummary.includes('(10, 20, 30)'), true)
+  assertVec3ApproximatelyEqual(view?.globalPreview ?? { x: 0, y: 0, z: 0 }, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
+test('editing local a updates the stored local expression and global preview', () => {
+  const diagram = createSymbolicThreeDimensionalDiagramWithRq()
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic point creation to succeed.')
+  }
+
+  const parsed = parseWorkPlaneLocalScalarInput('R*cos(q) + 1', {
+    diagram: result.diagram,
+  })
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const updated = updateWorkPlaneLocalCoordinate(
+    findPoint(result.diagram, result.id).position,
+    'a',
+    parsed.scalar,
+    3,
+    { diagram: result.diagram },
+  )
+
+  assert.notEqual(updated, null)
+  assertVec3ApproximatelyEqual(updated ?? { x: 0, y: 0, z: 0 }, {
+    x: 11 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+  const source = updated?.symbolic?.source
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q) + 1',
+  )
+})
+
+test('invalid local symbolic expression is rejected before commit', () => {
+  const diagram = createSymbolicThreeDimensionalDiagramWithRq()
+  const invalidDirect = addPointStratumFromDirectInput(
+    diagram,
+    { x: 'R*', y: '0', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+  const invalidInspector = parseWorkPlaneLocalScalarInput('R*', {
+    diagram,
+  })
+
+  assert.equal(invalidDirect.ok, false)
+  assert.equal(invalidInspector.ok, false)
+})
+
+test('active work-plane frame snapshot is stored at local point creation time', () => {
+  const workPlane = structuredClone(testCustomWorkPlane) as WorkPlane
+  const result = addPointStratumFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    { x: '2', y: '3', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local point creation to succeed.')
+  }
+
+  if (workPlane.kind !== 'custom') {
+    throw new Error('Expected custom work plane.')
+  }
+  workPlane.origin.x = 999
+  workPlane.v.z = 2
+
+  const source = findPoint(result.diagram, result.id).position.symbolic?.source
+
+  assert.deepEqual(source?.frame, expectedFrameSnapshot)
+})
+
+test('changing active work plane later does not move existing local coordinates', () => {
+  const diagram = createSymbolicThreeDimensionalDiagramWithRq()
+  const result = addPointStratumFromDirectInput(
+    diagram,
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local point creation to succeed.')
+  }
+
+  const laterActiveWorkPlane: WorkPlane = { kind: 'xy', z: 999 }
+  const point = findPoint(result.diagram, result.id).position
+
+  assert.equal(laterActiveWorkPlane.z, 999)
+  assert.deepEqual(point.symbolic?.source?.frame, expectedFrameSnapshot)
+  assertVec3ApproximatelyEqual(point, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
+test('cursor snap does not alter direct local symbolic input', () => {
+  const snap = { enabled: true, step: 1 }
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R + 0.26', y: '0.74', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(snap.enabled, true)
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id).position
+  const source = point.symbolic?.source
+
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R + 0.26',
+  )
+  assertVec3ApproximatelyEqual(point, { x: 12.26, y: 20, z: 30.74 })
+})
+
+test('2D direct input does not expose work-plane-local coordinate mode', () => {
+  assert.deepEqual(directCoordinateModesForAmbientDimension(2), ['global'])
+  assert.deepEqual(directCoordinateModesForAmbientDimension(3), [
+    'global',
+    'workPlaneLocal',
+  ])
+
+  const result = addPointStratumFromDirectInput(
+    emptyTwoDimensionalDiagram,
+    { x: '1', y: '2', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected 2D point creation to stay global.')
+  }
+  assert.deepEqual(findPoint(result.diagram, result.id).position, {
+    x: 1,
+    y: 2,
+    z: 0,
+  })
+})
+
+test('save and load preserves UI-created local coordinate source metadata', () => {
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R*cos(q)', y: 'R*sin(q)', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic point creation to succeed.')
+  }
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const source = findPoint(parsed.diagram, result.id).position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q)',
+  )
+  assert.deepEqual(source?.frame, expectedFrameSnapshot)
 })
 
 test('plane-local polyline direct creation converts every vertex', () => {
@@ -3460,7 +3789,7 @@ function createPlaneLocalPoint(
     throw new Error('Expected axis-aligned plane-local point creation to succeed.')
   }
 
-  return findPoint(result.diagram, result.id).position
+  return globalPreview(findPoint(result.diagram, result.id).position)
 }
 
 function createSymbolicTwoDimensionalDiagram(): Diagram {
@@ -3490,6 +3819,36 @@ function createSymbolicThreeDimensionalDiagram(): Diagram {
         previewValue: 10,
       },
     ],
+  }
+}
+
+function createSymbolicThreeDimensionalDiagramWithRq(): Diagram {
+  return {
+    ...emptyThreeDimensionalDiagram,
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '2',
+        previewValue: 2,
+      },
+      {
+        id: 'var-q',
+        name: 'q',
+        macroName: 'q',
+        expression: '30',
+        previewValue: 30,
+      },
+    ],
+  }
+}
+
+function globalPreview(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
   }
 }
 
