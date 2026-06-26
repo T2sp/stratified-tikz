@@ -1,4 +1,4 @@
-# Phase 25D Fix Prompt: Align symbolic import coverage and guard pending import validation
+# Phase 25D Fix Prompt: Compare symbolic work-plane frame metadata, not only preview values
 
 ## Environment
 
@@ -29,435 +29,404 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 25D is under review, but the remaining issues are in the symbolic JSON import / validation path introduced around Phase 25C and still blocking Phase 25D completion.
+Phase 25D implements TikZ export for work-plane-local symbolic coordinates using `canvas is plane` scopes.
 
 Review result:
 
 - Tests pass.
 - Build passes.
 - No Critical issues.
-- Two Medium issues remain.
+- One Medium issue remains.
 
-## Medium issue 1: Unsupported nested symbolic/local sources can be accepted with stale previews
+## Medium issue
+
+`sameWorkPlaneFrame(...)` compares frame previews, not symbolic frame metadata.
+
+Review location:
+
+```text
+src/tikz/generateTikz.ts
+sameWorkPlaneFrame
+```
 
 Current problem:
 
-- `src/model/serialization.ts` recursively collects every object shaped like:
+- Two work-plane-local frames with different symbolic origins or basis expressions can have equal preview values.
+- The exporter treats them as the same frame because it compares only numeric preview values.
+- It then emits one `canvas is plane` scope using only one frame's symbolic/numeric data.
+- This silently drops the symbolic intent of the other frame.
 
-```ts
-{ kind: "symbolic", expression: ... }
-```
+Reproduced example:
 
-under `strata` / `labels`.
+- Point A uses a local frame whose origin expression is `R`.
+- Point B uses a local frame whose origin expression is `S`.
+- Both variables currently preview to `2`.
+- The exporter merges both points into one `canvas is plane` scope using only `\R`.
+- The `\S`-based frame is lost in the generated TikZ.
 
-- Refresh and validation only walk supported geometry fields in `src/model/symbolicCoordinates.ts`.
-
-- Therefore, JSON import can ask for variables found in unsupported nested data, but those unsupported symbolic/local fields are never refreshed or validated.
-
-Reproduced case:
-
-- A valid point contains an extra unsupported local-symbolic coordinate.
-- Import asks for `R`.
-- User resolves `R = 4`.
-- Import returns `ok: true`.
-- Serialized output still contains stale:
-
-```ts
-previewValue: 2
-```
-
-This violates the Phase 25 requirement:
+This matches the Phase 25D checklist issue:
 
 ```text
-unsupported cases rejected
-no stale previews accepted
+mixed-frame symbolic loss
 ```
-
-## Medium issue 2: Pending symbolic JSON import can throw instead of returning clean error
-
-Current problem:
-
-- `parseSavedDiagramJson` catches malformed validation.
-- But `resolvePendingSymbolicDiagramImport` calls `validateDiagram` without a guard.
-- Reproduced case:
-  - local-symbolic import with missing stratum `id`;
-  - after variable resolution, validation throws:
-
-```text
-Cannot read properties of undefined (reading 'trim')
-```
-
-from validation code.
-
-Required behavior:
-
-- `resolvePendingSymbolicDiagramImport` should return:
-
-```ts
-{ ok: false, ... }
-```
-
-or the project's equivalent failure result.
-
-It must not throw raw exceptions into the UI.
 
 ## Goal
 
-Fix the symbolic JSON import pipeline so that:
+Fix Phase 25D mixed symbolic frame detection.
 
-1. Symbolic expression detection, refresh, and validation use the same supported local-coordinate coverage.
-2. Unsupported nested symbolic/local coordinate sources are rejected or explicitly stripped.
-3. Successful import cannot preserve stale preview values from unsupported symbolic/local data.
-4. `resolvePendingSymbolicDiagramImport` returns `ok: false` for malformed pending imports instead of throwing.
-5. Regression tests cover both reported issues.
+Work-plane frame equality for local-symbolic TikZ export must compare symbolic coordinate metadata/expressions, not only preview values.
+
+Required behavior:
+
+1. Frames with identical numeric preview values but different symbolic frame metadata must be treated as mixed/different frames.
+2. The exporter must not merge those coordinates into one `canvas is plane` scope.
+3. The generated TikZ must not silently drop one frame's symbol.
+4. Identical frames should still be recognized as identical when their symbolic metadata and preview values match.
+5. Numeric-only frames should continue to compare by existing tolerance-based preview equality.
+6. Add regression tests for equal-preview frames with origins `R` and `S`.
 
 ## Scope
 
-This is a targeted Phase 25D blocker fix.
+This is a targeted Phase 25D fix.
 
 Implement:
 
-- supported-field-only symbolic expression detection;
-- unsupported nested symbolic/local source rejection or safe stripping;
-- post-refresh stale-preview validation;
-- guarded pending symbolic import validation;
-- regression tests.
+- symbolic-aware work-plane frame equality/signature;
+- safer grouping of local coordinates by frame;
+- tests for equal-preview but symbolically different frames;
+- preservation of existing numeric-frame and identical-symbolic-frame behavior.
 
 Do not implement:
 
-- new symbolic expression grammar;
-- new work-plane-local geometry fields beyond existing supported coverage;
+- new work-plane model;
+- new symbolic expression simplifier;
+- new global symbolic expansion;
 - new UI features;
-- broad save/load redesign;
-- new dependencies;
-- TikZ export changes unless required by validation consistency.
+- broad TikZ generator rewrite;
+- new dependencies.
 
 Do not change:
 
-- valid work-plane-local symbolic coordinate behavior;
-- valid global symbolic coordinate behavior;
-- variable-resolution dialog behavior;
-- direct/Inspector local coordinate UI;
-- valid save/load format;
-- SVG preview semantics;
-- TikZ output semantics;
-- inline/standalone formatting.
+- work-plane-local coordinate data model unless a tiny helper field is unavoidable;
+- valid same-frame local TikZ export behavior;
+- variable macro emission;
+- layer-aware output;
+- inline/standalone export formatting;
+- 4-space indentation;
+- inline no-blank-lines invariant;
+- SVG preview behavior;
+- save/load behavior.
 
-## 1. Replace arbitrary recursive symbolic collection with supported-field traversal
+## 1. Inspect current frame comparison and grouping
 
 Inspect:
 
-- `src/model/serialization.ts`;
-- recursive symbolic expression collection code;
-- `resolvePendingSymbolicDiagramImport`;
-- `parseSavedDiagramJson`;
-- `src/model/symbolicCoordinates.ts`;
-- supported symbolic refresh helpers;
-- local-coordinate validation helpers.
+- `src/tikz/generateTikz.ts`;
+- `sameWorkPlaneFrame(...)`;
+- local-symbolic coordinate grouping logic;
+- `canvas is plane` scope generation;
+- frame serialization / frame snapshot type;
+- symbolic coordinate/scalar types.
 
-The current detector is too broad:
+Find all places where work-plane frames are compared for local TikZ export.
+
+The review specifically points to `sameWorkPlaneFrame(...)`, but there may also be frame grouping keys or helper functions elsewhere.
+
+## 2. Define symbolic-aware frame equality
+
+A work-plane frame contains, conceptually:
 
 ```text
-recursively collects every { kind: "symbolic", expression } under strata/labels
+origin
+u
+v
+normal
 ```
 
-but refresh/validation are model-aware and only support known geometry fields.
+Each of these may include:
 
-Fix this mismatch.
+- numeric preview coordinates;
+- symbolic coordinate metadata;
+- local/source metadata;
+- scalar expressions.
 
-### Required design
+Frame equality for TikZ local-scope grouping should use both:
 
-Create or reuse a model-aware traversal that walks only supported symbolic/local-coordinate fields.
+1. numeric preview equality within tolerance; and
+2. symbolic/source metadata equality.
 
-Use this same supported coverage for:
+### Required policy
 
-- variable detection;
-- preview refresh;
-- validation;
-- stale-preview checks.
+Two frames are considered the same for `canvas is plane` grouping only if:
 
-Suggested conceptual helpers:
+- their preview `origin`, `u`, `v`, and `normal` are equal within tolerance; and
+- their symbolic/source metadata for those fields is equivalent.
+
+If any symbolic/source metadata differs, treat frames as different.
+
+Examples:
+
+### Same numeric frame
+
+```text
+origin = (2,0,0) numeric
+origin = (2,0,0) numeric
+```
+
+Same, if all basis vectors match.
+
+### Identical symbolic frame
+
+```text
+origin.x = R
+origin.x = R
+```
+
+Same, if previews and all other frame fields match.
+
+### Different symbolic frame with equal preview
+
+```text
+origin.x = R, preview 2
+origin.x = S, preview 2
+```
+
+Different.
+
+### Numeric vs symbolic with equal preview
+
+```text
+origin.x = 2
+origin.x = R, preview 2
+```
+
+Conservative policy: different.
+
+This avoids silently dropping the symbolic expression.
+
+## 3. Add frame signature helper
+
+Add a helper such as:
 
 ```ts
-collectSupportedSymbolicExpressions(diagram): SymbolicExpressionReference[]
-refreshSupportedSymbolicPreviews(diagram, variableContext): Result<Diagram>
-validateNoUnsupportedSymbolicSources(diagram): ValidationResult
+workPlaneFrameSymbolicSignature(frame): string
 ```
 
-Exact names can differ.
+or:
 
-Core invariant:
-
-```text
-If import asks for a variable because it detected an expression, that expression must be in a field that refresh/validation also supports.
+```ts
+compareWorkPlaneFrameSources(a, b): boolean
 ```
 
-Do not collect arbitrary nested symbolic expressions that the app cannot refresh.
+or both.
 
-## 2. Reject or strip unsupported nested symbolic/local sources
+The signature should include all relevant fields:
 
-Choose and implement a clear policy.
-
-### Preferred policy: reject unsupported symbolic/local sources
-
-If saved JSON contains symbolic/local-coordinate objects in unsupported fields:
-
-- return `ok: false`;
-- include the unsupported path in the error message;
-- do not accept stale preview data;
-- do not silently drop user-authored data.
-
-Example error:
-
-```text
-Unsupported symbolic coordinate source at strata[0].extraLocalSource.
-```
-
-### Alternative policy: strip unsupported sources
-
-Only acceptable if those fields are clearly non-model extension data and safe to discard.
-
-If stripping is chosen:
-
-- document it;
-- test it;
-- ensure stripped data cannot affect geometry/export;
-- do not strip supported geometry fields.
-
-Preferred: reject.
-
-## 3. Add post-refresh no-stale-preview validation
-
-After resolving variables and refreshing supported previews, a successful import must not contain stale unsupported symbolic/local coordinate data.
-
-For supported symbolic data:
-
-- every symbolic scalar/vector/local coordinate should have preview values consistent with the resolved variables according to existing Phase 19/25 policy;
-- stale previews should be refreshed or rejected consistently;
-- unresolved variables should fail.
-
-For unsupported symbolic/local coordinate-looking data:
-
-- reject or strip according to the chosen policy.
-
-The reproduced case must no longer be possible:
-
-```text
-valid point + unsupported local-symbolic coordinate
-R = 4
-stale previewValue = 2
-import returns ok: true
-```
-
-Expected after fix:
-
-- import returns `ok: false`; or
-- stale unsupported field is stripped and cannot appear in serialized result.
-
-## 4. Guard `resolvePendingSymbolicDiagramImport`
-
-Update `resolvePendingSymbolicDiagramImport` so malformed pending imports produce clean failure results.
-
-Current bad flow:
-
-```text
-resolvePendingSymbolicDiagramImport
--> refresh symbolic previews
--> validateDiagram
--> throw raw TypeError
-```
-
-Required flow:
-
-```text
-resolvePendingSymbolicDiagramImport
--> refresh symbolic previews
--> validate supported/unsupported symbolic coverage
--> validateDiagram inside guarded path
--> return ok:false on malformed data
-```
+- origin x/y/z source/expression;
+- u x/y/z source/expression;
+- v x/y/z source/expression;
+- normal x/y/z source/expression.
 
 Requirements:
 
-- `validateDiagram` exceptions are caught and converted into failure result;
-- error message is useful;
-- current active diagram is not replaced on failure;
-- UI confirm handler can display the failure instead of crashing.
+- deterministic;
+- includes symbolic expressions and numeric values;
+- does not rely only on preview values;
+- handles missing/legacy numeric-only frames;
+- rejects or treats malformed metadata as unequal rather than merging.
 
-Good error examples:
+Do not over-normalize expressions.
+
+For MVP, string equality of canonical stored expression text is acceptable.
+
+Examples:
 
 ```text
-Could not resolve pending symbolic import: strata[0].id is missing or invalid.
+R
+(R)
+R + 0
 ```
 
-```text
-Unsupported symbolic coordinate source at strata[0].metadata.foo.
+may be treated as different unless the existing expression parser has canonicalization. That is acceptable and safer.
+
+## 4. Update `sameWorkPlaneFrame(...)`
+
+Update `sameWorkPlaneFrame(...)` or equivalent so it:
+
+1. first checks numeric preview equality within tolerance;
+2. then checks symbolic/source metadata equality;
+3. returns false if metadata differs.
+
+This function should not consider equal previews alone sufficient.
+
+If the function is also used outside TikZ export for UI/preview grouping, be careful. If some callers truly need preview-only equality, split into two helpers:
+
+```ts
+sameWorkPlaneFramePreview(...)
+sameWorkPlaneFrameForTikzLocalScope(...)
 ```
 
-Avoid raw TypeError messages.
+Use the symbolic-aware one for TikZ export grouping.
 
-## 5. Preserve current active diagram on failure
+## 5. Update local-scope grouping behavior
 
-If pending import confirmation fails after variable resolution:
+When a path/sheet/collection has local coordinates whose frames are not symbolically identical:
 
-- do not replace current editor diagram;
-- do not push undo history;
-- do not partially commit variables/geometry;
-- keep or close the dialog according to existing policy, but show a clear error.
+- do not merge them into a single `canvas is plane` scope.
 
-This should match existing behavior for normal validation failures.
+Use the existing mixed-frame policy.
 
-## 6. Tests
+Preferred behavior:
+
+- emit explicit mixed-frame fallback/comment;
+- or emit separate local scopes when possible;
+- but never silently use one frame for all.
+
+If the existing mixed-frame policy falls back to numeric/global preview output with a comment, use that policy.
+
+Important:
+
+- generated TikZ should not lose a symbol silently.
+- In the `R` vs `S` equal-preview repro, output should either:
+  - contain separate scopes preserving both `\R` and `\S` where possible; or
+  - use the existing mixed-frame fallback with an explicit policy comment.
+- It must not emit one scope using only `\R` for both points.
+
+## 6. Variable macro emission
+
+Ensure variable macro emission remains correct.
+
+For the repro:
+
+- if output preserves both frames symbolically, macros for both `\R` and `\S` should be emitted before use.
+- if mixed-frame fallback uses numeric preview values, the output should include a comment explaining the fallback and should not pretend the second point uses `\R`.
+
+Do not emit unresolved variables.
+
+## 7. Tests
 
 Add focused regression tests.
 
-### Unsupported nested symbolic/local source tests
+### Frame equality tests
 
-1. A valid point with an unsupported nested work-plane-local coordinate source under an extra field fails import with `ok: false`.
+1. Numeric identical frames compare equal.
 
-Example conceptual fixture:
+2. Numeric frames with different preview values compare different.
 
-```json
-{
-  "strata": [
-    {
-      "id": "p",
-      "name": "p",
-      "geometricKind": "point",
-      "position": { "...": "valid supported point position" },
-      "unsupportedLocal": {
-        "kind": "workPlaneLocal",
-        "local": {
-          "a": { "kind": "symbolic", "expression": "R", "previewValue": 2 },
-          "b": { "kind": "numeric", "value": 0 }
-        },
-        "preview": { "...": "stale preview" }
-      }
-    }
-  ],
-  "variables": [
-    { "name": "R", "expression": "4" }
-  ]
-}
+3. Identical symbolic frames compare equal.
+
+Example:
+
+```text
+origin.x = R
+origin.x = R
 ```
 
-Expected:
+4. Symbolically different frames with equal previews compare different.
 
-- import does not return `ok: true` with stale data.
+Example:
 
-2. Unsupported nested `{ kind: "symbolic", expression: "R", previewValue: 2 }` in an unknown field is not collected as a variable unless it is also rejected as unsupported.
-
-3. Supported symbolic local coordinates still import and refresh successfully.
-
-4. Supported global symbolic coordinates still import and refresh successfully.
-
-5. Function names such as `sin`, `cos`, `sqrt` are not treated as variables.
-
-### Stale-preview tests
-
-6. Supported symbolic coordinate with stale preview is refreshed or rejected according to existing policy.
-
-7. Unsupported symbolic coordinate with stale preview cannot survive successful import.
-
-8. Work-plane-local `a/b` stale preview cannot survive successful import.
-
-### Pending import no-throw tests
-
-9. `resolvePendingSymbolicDiagramImport` with missing stratum `id` returns `ok: false`, not thrown TypeError.
-
-Use:
-
-```ts
-expect(() => resolvePendingSymbolicDiagramImport(...)).not.toThrow();
-expect(result.ok).toBe(false);
+```text
+frameA.origin.x = R, R preview 2
+frameB.origin.x = S, S preview 2
 ```
 
-10. Pending import with malformed local-symbolic source returns `ok: false`, not throw.
+5. Numeric frame and symbolic frame with equal preview compare different under the conservative TikZ grouping policy.
 
-11. UI-level confirm handler, if testable, handles `ok: false` without replacing the current diagram.
+Example:
+
+```text
+origin.x = 2
+origin.x = R, preview 2
+```
+
+6. Difference in basis symbolic metadata also makes frames different:
+
+```text
+u.x = A
+u.x = B
+```
+
+even if previews match.
+
+### TikZ export tests
+
+7. Two local points with same symbolic frame `R` export in one `canvas is plane` scope, preserving local expressions.
+
+8. Two local points with frame origins `R` and `S` with equal previews do **not** merge into one `canvas is plane` scope using only `\R`.
+
+Assert one of the following, depending on chosen policy:
+
+- output contains separate scopes and both `\R` and `\S`; or
+- output uses mixed-frame fallback/comment and does not incorrectly use only `\R`.
+
+9. A local path whose vertices have symbolically different equal-preview frames triggers mixed-frame policy.
+
+10. A local sheet whose vertices have symbolically different equal-preview frames triggers mixed-frame policy.
+
+11. Required variables are emitted before use when both symbolic frames are preserved.
+
+12. Inline output remains blank-line-free.
+
+13. 4-space indentation preserved.
 
 ### Regression tests
 
-12. Valid pending symbolic import still succeeds.
+14. Existing same-frame path/sheet local TikZ export tests still pass.
 
-13. Valid work-plane-local symbolic import still succeeds.
+15. Numerically different mixed-frame local paths still fall back with existing policy.
 
-14. Valid JSON with supported labels/points/path/sheet/grid/Coons/Ruled local sources still succeeds.
+16. Numeric/global export unchanged.
 
-15. Cancel path still leaves current diagram unchanged.
+17. Layer-aware output preserved.
 
-16. Old numeric diagrams still load.
+## 8. Avoid false positives from preview-only tests
 
-17. Phase 25D TikZ export tests still pass.
+The review issue exists because preview-only equality made tests pass.
 
-## 7. Implementation guidance
+Add tests that specifically assert symbolic metadata matters.
 
-### Do not use arbitrary recursive variable collection over model data
-
-Avoid:
+Do not write only:
 
 ```ts
-walkEverythingAndCollectAnyKindSymbolic(...)
+expect(frameA.preview).toEqual(frameB.preview)
 ```
 
-unless it is paired with explicit unsupported-field rejection.
+Instead assert:
 
-### Prefer model-aware traversal
+```ts
+expect(sameWorkPlaneFrameForTikzLocalScope(frameA, frameB)).toBe(false)
+```
 
-Use known diagram schema fields, such as:
+for `R` vs `S`.
 
-- points;
-- labels;
-- path segment coordinates;
-- arc/circle/ellipse fields;
-- polygon/sheet vertices;
-- filled boundaries;
-- work-plane sheet frames;
-- grid/lattice frames/ranges;
-- ruled/Coons boundary snapshots;
-- constant point boundaries;
-- supported work-plane-local coordinate sources.
+## 9. Documentation/comments
 
-If a future field is added, it should be added to the traversal intentionally.
-
-### Make validation path-aware
-
-For unsupported local/symbolic source rejection, include a path string such as:
+Add a code comment near the frame comparison helper:
 
 ```text
-strata[0].unsupportedLocal
-labels[1].metadata.foo
+TikZ local-scope grouping must compare symbolic frame metadata, not only preview values. Equal previews can come from different symbolic expressions, and merging them would drop symbolic intent.
 ```
 
-This makes JSON import errors debuggable.
+Update docs only if there is user-visible mixed-frame behavior clarification.
 
-## 8. Documentation/comments
-
-Add a short code comment near the supported traversal:
-
-```text
-Variable detection must use the same model-aware coverage as preview refresh/validation. Arbitrary recursive collection can accept unsupported symbolic objects with stale previews.
-```
-
-Update user docs only if needed.
-
-## 9. Preserve existing behavior
+## 10. Preserve existing behavior
 
 Do not regress:
 
-- valid work-plane-local symbolic import;
-- valid global symbolic import;
-- variable-resolution dialog;
-- direct/Inspector local coordinate UI;
-- TikZ export for local coordinates;
-- canvas-is-plane export;
-- save/load old diagrams;
-- SVG preview;
+- same-frame local symbolic points/labels/paths/sheets;
+- local expression preservation;
+- variable macro emission;
+- layer-aware output;
+- `canvas is plane` scope syntax;
 - inline no-blank-lines;
 - 4-space indentation;
+- numeric/global export;
+- SVG preview;
+- save/load;
 - undo/redo.
 
-## 10. Verification
+## 11. Verification
 
 Run:
 
@@ -467,16 +436,16 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 11. Report after implementation
+## 12. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of unsupported stale preview acceptance;
-- new supported-field traversal strategy;
-- chosen policy for unsupported nested symbolic/local sources;
-- root cause of pending import throw;
-- how `resolvePendingSymbolicDiagramImport` now returns `ok: false`;
+- root cause of symbolic frame merging;
+- new frame equality/signature policy;
+- how numeric-only frames compare;
+- how symbolic frames compare;
+- mixed-frame export behavior for equal-preview different-symbol frames;
 - tests added/updated;
 - test results;
 - build results;
