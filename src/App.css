@@ -2141,6 +2141,7 @@
 
 .layer-palette-action-panel .layer-manager-name-form,
 .layer-palette-action-panel .layer-manager-duplicate-form,
+.layer-palette-action-panel .layer-manager-merge-form,
 .layer-palette-action-panel .layer-manager-translate-form,
 .layer-palette-action-panel .layer-manager-state-controls {
   flex-wrap: wrap;
@@ -2420,6 +2421,7 @@
 .layer-manager-name-form,
 .layer-manager-swap-form,
 .layer-manager-duplicate-form,
+.layer-manager-merge-form,
 .layer-manager-translate-form,
 .layer-manager-state-controls {
   display: flex;
@@ -2436,10 +2438,15 @@
   flex-wrap: wrap;
 }
 
+.layer-manager-merge-form {
+  flex-wrap: wrap;
+}
+
 .layer-manager-state-controls {
   flex-wrap: wrap;
 }
 
+.layer-manager-merge-field,
 .layer-manager-translation-field {
   display: flex;
   flex: 1 1 64px;
@@ -2497,6 +2504,7 @@
 .layer-manager-name-form .toolbar-button,
 .layer-manager-swap-form .toolbar-button,
 .layer-manager-duplicate-form .toolbar-button,
+.layer-manager-merge-form .toolbar-button,
 .layer-manager-translate-form .toolbar-button,
 .layer-manager-state-controls .toolbar-button,
 .layer-manager-delete-button {

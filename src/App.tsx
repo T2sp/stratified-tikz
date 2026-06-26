@@ -36,8 +36,10 @@ import {
 } from './model/pathCrossings.ts'
 import {
   elementsOnLayer,
+  getLayerMetadata,
   isLayerLocked,
   isLayerVisible,
+  normalizeLayerValue,
   renameLayer,
   setLayerLock,
   setLayerVisibility,
@@ -125,6 +127,7 @@ import {
   applyDirectCreationCommitToEditorState,
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
+  applyMergeLayersToEditorState,
   applySwapLayersToEditorState,
   applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
@@ -201,6 +204,7 @@ import {
   formatExistingCoordinateSourceLabel,
   fitCameraControlState,
   isLayerSelectableByLayerFilter,
+  layerCreationInputAfterLayerMerge,
   LayerManager,
   maxCurvedSheetSamplingSegments,
   normalizeLayerFilterForDiagram,
@@ -1357,7 +1361,43 @@ function App() {
     setCopyStatus('idle')
   }
 
-  function translateDiagramLayer(layerValue: number, translation: Vec3): void {
+  function mergeDiagramLayers(
+    sourceLayerValue: number,
+    targetLayerValue: number,
+  ): void {
+    const sourceLayer = normalizeLayerValue(sourceLayerValue)
+    const targetLayer = normalizeLayerValue(targetLayerValue)
+    const existingLayerValues = new Set(
+      getLayerMetadata(editableDiagram).map((layer) => layer.value),
+    )
+    const canRetargetCreationLayer =
+      Number.isFinite(sourceLayerValue) &&
+      Number.isFinite(targetLayerValue) &&
+      sourceLayer !== targetLayer &&
+      existingLayerValues.has(sourceLayer) &&
+      existingLayerValues.has(targetLayer)
+
+    setEditorState((current) =>
+      applyMergeLayersToEditorState(current, sourceLayerValue, targetLayerValue),
+    )
+
+    if (canRetargetCreationLayer) {
+      setNewElementLayerInput((currentInput) =>
+        layerCreationInputAfterLayerMerge(
+          currentInput,
+          sourceLayer,
+          targetLayer,
+        ),
+      )
+    }
+
+    setCopyStatus('idle')
+  }
+
+  function translateDiagramLayer(
+    layerValue: number,
+    translation: TranslationVector,
+  ): void {
     setEditorState((current) =>
       applyTranslateLayerToEditorState(current, layerValue, translation),
     )
@@ -5454,6 +5494,7 @@ function App() {
         onRenameLayer={renameDiagramLayer}
         onSwapLayers={swapDiagramLayers}
         onDuplicateLayer={duplicateDiagramLayer}
+        onMergeLayer={mergeDiagramLayers}
         onTranslateLayer={translateDiagramLayer}
         onSetLayerVisibility={setDiagramLayerVisibility}
         onSetLayerLock={setDiagramLayerLock}

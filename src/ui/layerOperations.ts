@@ -3,6 +3,8 @@ import {
   duplicateLayer,
   elementsOnLayer,
   formatLayerValue,
+  type LayerTranslationVector,
+  mergeLayers,
   normalizeLayerValue,
   swapLayers,
   translateLayer,
@@ -13,6 +15,10 @@ import {
   normalizeLayerFilterForDiagram,
   type LayerFilter,
 } from './layerFilter.ts'
+import {
+  layerCreationInputForLayer,
+  parseLayerValueInput,
+} from './layerPalette.ts'
 import {
   commitDiagramChange,
   type UndoableEditorState,
@@ -125,7 +131,7 @@ export function applyTranslateLayerToEditorState<
 >(
   current: T,
   layerValue: number,
-  translation: Vec3,
+  translation: LayerTranslationVector,
 ): T {
   try {
     const nextDiagram = translateLayer(
@@ -133,6 +139,7 @@ export function applyTranslateLayerToEditorState<
       layerValue,
       translation,
     )
+    const preview = layerTranslationVectorPreview(translation)
 
     return commitDiagramChange(current, {
       ...current,
@@ -140,7 +147,7 @@ export function applyTranslateLayerToEditorState<
       layerOperationStatus:
         nextDiagram === current.editableDiagram
           ? `Layer ${formatLayerValue(layerValue)} was not moved.`
-          : `Translated layer ${formatLayerValue(layerValue)} by (${translation.x}, ${translation.y}, ${translation.z}).`,
+          : `Translated layer ${formatLayerValue(layerValue)} by (${preview.x}, ${preview.y}, ${preview.z}).`,
     })
   } catch (error) {
     return {
@@ -148,6 +155,64 @@ export function applyTranslateLayerToEditorState<
       layerOperationStatus: layerOperationErrorMessage(
         error,
         'Translate layer failed.',
+      ),
+    }
+  }
+}
+
+export function applyMergeLayersToEditorState<
+  T extends LayerOperationEditorState,
+>(
+  current: T,
+  sourceLayerValue: number,
+  targetLayerValue: number,
+): T {
+  if (
+    normalizeLayerValue(sourceLayerValue) ===
+    normalizeLayerValue(targetLayerValue)
+  ) {
+    return {
+      ...current,
+      layerOperationStatus: 'Choose two different layers to merge.',
+    }
+  }
+
+  try {
+    const result = mergeLayers(
+      current.editableDiagram,
+      sourceLayerValue,
+      targetLayerValue,
+    )
+    const nextLayerFilter = normalizeLayerFilterForDiagram(
+      result.diagram,
+      mergeLayerFilterForLayerMerge(
+        current.layerFilter,
+        result.sourceLayer,
+        result.targetLayer,
+      ),
+    )
+
+    return commitDiagramChange(current, {
+      ...current,
+      editableDiagram: result.diagram,
+      selectedElement: clearSelectionForLayerFilter(
+        result.diagram,
+        current.selectedElement,
+        nextLayerFilter,
+      ),
+      layerFilter: nextLayerFilter,
+      layerOperationStatus: `Merged layer ${formatLayerValue(
+        result.sourceLayer,
+      )} into layer ${formatLayerValue(result.targetLayer)} (${layerElementCountLabel(
+        result.movedStrata + result.movedLabels,
+      )}).`,
+    })
+  } catch (error) {
+    return {
+      ...current,
+      layerOperationStatus: layerOperationErrorMessage(
+        error,
+        'Merge layers failed.',
       ),
     }
   }
@@ -195,6 +260,25 @@ export function applyDeleteLayerToEditorState<
   }
 }
 
+export function layerCreationInputAfterLayerMerge(
+  currentCreationLayerInput: string,
+  sourceLayerValue: number,
+  targetLayerValue: number,
+): string {
+  const currentLayer = parseLayerValueInput(currentCreationLayerInput)
+
+  if (currentLayer === null) {
+    return currentCreationLayerInput
+  }
+
+  const sourceLayer = normalizeLayerValue(sourceLayerValue)
+  const targetLayer = normalizeLayerValue(targetLayerValue)
+
+  return normalizeLayerValue(currentLayer) === sourceLayer
+    ? layerCreationInputForLayer(targetLayer)
+    : currentCreationLayerInput
+}
+
 function swapLayerFilterForLayerSwap(
   layerFilter: LayerFilter,
   leftLayerValue: number,
@@ -221,6 +305,53 @@ function swapLayerFilterForLayerSwap(
   }
 
   return layerFilter
+}
+
+function mergeLayerFilterForLayerMerge(
+  layerFilter: LayerFilter,
+  sourceLayerValue: number,
+  targetLayerValue: number,
+): LayerFilter {
+  if (layerFilter.kind === 'all') {
+    return layerFilter
+  }
+
+  const layer = normalizeLayerValue(layerFilter.layer)
+  const sourceLayer = normalizeLayerValue(sourceLayerValue)
+
+  return layer === sourceLayer
+    ? { kind: 'layer', layer: normalizeLayerValue(targetLayerValue) }
+    : layerFilter
+}
+
+function layerTranslationVectorPreview(translation: LayerTranslationVector): {
+  x: number
+  y: number
+  z: number
+} {
+  return isNumericLayerTranslationVector(translation)
+    ? translation
+    : {
+        x: translation.x.kind === 'numeric'
+          ? translation.x.value
+          : translation.x.previewValue,
+        y: translation.y.kind === 'numeric'
+          ? translation.y.value
+          : translation.y.previewValue,
+        z: translation.z.kind === 'numeric'
+          ? translation.z.value
+          : translation.z.previewValue,
+      }
+}
+
+function isNumericLayerTranslationVector(
+  translation: LayerTranslationVector,
+): translation is Vec3 {
+  return (
+    typeof translation.x === 'number' &&
+    typeof translation.y === 'number' &&
+    typeof translation.z === 'number'
+  )
 }
 
 function layerElementCountLabel(count: number): string {

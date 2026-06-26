@@ -11,10 +11,13 @@ import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import {
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
+  applyMergeLayersToEditorState,
   applySwapLayersToEditorState,
   applyTranslateLayerToEditorState,
+  layerCreationInputAfterLayerMerge,
   type LayerOperationEditorState,
 } from '../../src/ui/layerOperations.ts'
+import { parseTranslationVectorFromInputs } from '../../src/model/translation.ts'
 import {
   canSubmitLayerDuplicateTarget,
   duplicateLayerTargetInput,
@@ -41,6 +44,7 @@ import {
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   createDiagramHistory,
+  redoLastDiagramChange,
   undoLastDiagramChange,
 } from '../../src/ui/undo.ts'
 
@@ -133,6 +137,98 @@ test('delete layer cleans stale ids from multi-selection', () => {
 
   assert.equal(hasStratum(next.editableDiagram, 'source-point'), false)
   assert.deepEqual(next.selectedElement, { kind: 'stratum', id: 'other-point' })
+})
+
+test('merge layer moves source elements to target and retargets source view filter', () => {
+  const state = createLayerOperationState(
+    createTwoLayerDiagram(),
+    { kind: 'stratum', id: 'source-point' },
+    { kind: 'layer', layer: 0 },
+  )
+  const next = applyMergeLayersToEditorState(state, 0, 1)
+
+  assert.equal(findPoint(next.editableDiagram, 'source-point').layer, 1)
+  assert.equal(findLabel(next.editableDiagram, 'source-label').layer, 1)
+  assert.equal(findPoint(next.editableDiagram, 'other-point').layer, 1)
+  assert.deepEqual(next.layerFilter, { kind: 'layer', layer: 1 })
+  assert.deepEqual(next.selectedElement, { kind: 'stratum', id: 'source-point' })
+  assert.equal(next.history.past.length, 1)
+  assert.equal(next.layerOperationStatus, 'Merged layer 0 into layer 1 (2 elements).')
+})
+
+test('merge layer updates New layer input when source was the creation layer', () => {
+  assert.equal(layerCreationInputAfterLayerMerge('0', 0, 1), '1')
+  assert.equal(layerCreationInputAfterLayerMerge('2', 0, 1), '2')
+  assert.equal(layerCreationInputAfterLayerMerge('bad', 0, 1), 'bad')
+})
+
+test('merge layer clears selection that becomes hidden by target layer metadata', () => {
+  const diagram: Diagram = {
+    ...createTwoLayerDiagram(),
+    layers: [
+      { value: 0, name: 'Source' },
+      { value: 1, name: 'Hidden target', visible: false },
+    ],
+  }
+  const state = createLayerOperationState(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'source-point' },
+        { kind: 'label', id: 'source-label' },
+      ],
+    },
+  )
+  const next = applyMergeLayersToEditorState(state, 0, 1)
+
+  assert.equal(findPoint(next.editableDiagram, 'source-point').layer, 1)
+  assert.equal(next.selectedElement, null)
+})
+
+test('merge layer rejects source equal to target without mutation', () => {
+  const state = createLayerOperationState(createTwoLayerDiagram())
+  const next = applyMergeLayersToEditorState(state, 0, 0)
+
+  assert.equal(next.editableDiagram, state.editableDiagram)
+  assert.equal(next.history.past.length, 0)
+  assert.equal(next.layerOperationStatus, 'Choose two different layers to merge.')
+})
+
+test('merge layer undo and redo restore layer membership', () => {
+  const state = createLayerOperationState(createTwoLayerDiagram())
+  const merged = applyMergeLayersToEditorState(state, 0, 1)
+  const undone = undoLastDiagramChange(merged)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(findPoint(merged.editableDiagram, 'source-point').layer, 1)
+  assert.equal(findPoint(undone.editableDiagram, 'source-point').layer, 0)
+  assert.equal(findLabel(undone.editableDiagram, 'source-label').layer, 0)
+  assert.equal(findPoint(redone.editableDiagram, 'source-point').layer, 1)
+})
+
+test('layer operation translation accepts symbolic deltas for symbolic points', () => {
+  const diagram = createSymbolicLayerOperationDiagram()
+  const parsed = parseTranslationVectorFromInputs(diagram, {
+    dx: 'Len/2',
+    dy: '0',
+    dz: '0',
+  })
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const state = createLayerOperationState(diagram)
+  const next = applyTranslateLayerToEditorState(state, 3, parsed.translation)
+  const point = findPoint(next.editableDiagram, 'symbolic-point')
+
+  assert.equal(point.position.x, 5)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic.x.expression, '(R) + (Len/2)')
+  assert.equal(point.position.symbolic.x.previewValue, 5)
+  assert.equal(next.layerOperationStatus, 'Translated layer 3 by (2, 0, 0).')
 })
 
 test('duplicate target helper disables blank submits when no default exists', () => {
@@ -540,6 +636,43 @@ function createHugeLayerDiagram(): Diagram {
       name: 'Huge point',
       layer: 9_007_199_254_740_992,
     },
+  ).diagram
+}
+
+function createSymbolicLayerOperationDiagram(): Diagram {
+  const diagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    variables: [
+      {
+        id: 'var-r',
+        name: 'R',
+        macroName: 'R',
+        expression: '3',
+        previewValue: 3,
+      },
+      {
+        id: 'var-len',
+        name: 'Len',
+        macroName: 'Len',
+        expression: '4',
+        previewValue: 4,
+      },
+    ],
+  }
+
+  return addPointStratumWithResult(
+    diagram,
+    {
+      x: 3,
+      y: 0,
+      z: 0,
+      symbolic: {
+        x: { kind: 'symbolic', expression: 'R', previewValue: 3 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+    { id: 'symbolic-point', name: 'Symbolic', layer: 3 },
   ).diagram
 }
 
