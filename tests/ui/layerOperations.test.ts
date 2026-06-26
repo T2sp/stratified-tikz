@@ -14,6 +14,7 @@ import {
   applyMergeLayersToEditorState,
   applySwapLayersToEditorState,
   applyTranslateLayerToEditorState,
+  layerMergeWarningMessage,
   layerCreationInputAfterLayerMerge,
   type LayerOperationEditorState,
 } from '../../src/ui/layerOperations.ts'
@@ -184,6 +185,22 @@ test('merge layer clears selection that becomes hidden by target layer metadata'
 
   assert.equal(findPoint(next.editableDiagram, 'source-point').layer, 1)
   assert.equal(next.selectedElement, null)
+  assert.match(next.layerOperationStatus, /target layer is hidden/)
+})
+
+test('merge layer warns when the target layer is locked', () => {
+  const diagram: Diagram = {
+    ...createTwoLayerDiagram(),
+    layers: [
+      { value: 0, name: 'Source' },
+      { value: 1, name: 'Locked target', locked: true },
+    ],
+  }
+  const state = createLayerOperationState(diagram)
+  const next = applyMergeLayersToEditorState(state, 0, 1)
+
+  assert.match(next.layerOperationStatus, /target layer is locked/)
+  assert.match(layerMergeWarningMessage(diagram, 1), /unlock it before editing/)
 })
 
 test('merge layer rejects source equal to target without mutation', () => {

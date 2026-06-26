@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  cursorSnapHelpText,
   parseCursorSnapStep,
   snapCoordinateToStep,
   snapCursorPoint,
@@ -84,6 +85,17 @@ test('invalid snap steps are rejected', () => {
       },
     ),
     null,
+  )
+})
+
+test('snap help distinguishes cursor-only scope from direct input', () => {
+  assert.equal(
+    cursorSnapHelpText({ enabled: true, step: 0.5 }, 2),
+    'Snap step 0.5. Cursor placement and drag handles round x/y; z stays 0. Direct and symbolic input are unchanged.',
+  )
+  assert.equal(
+    cursorSnapHelpText({ enabled: false, step: 1 }, 3),
+    'Snap is off. Cursor placement and drag handles round active work-plane local coordinates. Direct and symbolic input are unchanged.',
   )
 })
 

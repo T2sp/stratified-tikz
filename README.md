@@ -30,5 +30,6 @@ git diff --check
 - [TikZ output](docs/TIKZ_OUTPUT.md)
 - [Ruled surfaces](docs/RULED_SURFACES.md)
 - [Symbolic input and grids](docs/SYMBOLIC_INPUT_AND_GRIDS.md)
+- [Editing fundamentals](docs/EDITING.md)
 - [Layer manager](docs/LAYER_MANAGER.md)
 - [Preview UI](docs/PREVIEW_UI.md)

@@ -17,6 +17,7 @@ import {
   type ExampleId,
 } from './examples'
 import {
+  cursorSnapHelpText,
   cursorSnapPresetSteps,
   defaultCursorSnapSettings,
   parseCursorSnapStep,
@@ -255,6 +256,7 @@ import {
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   resolvePointStratumCoordinateForCursorCreation,
+  selectedElementCount,
   shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneDetails,
   startWorkPlanePointPicking,
@@ -1891,6 +1893,18 @@ function App() {
 
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
     if (selectedElement === null) {
+      return
+    }
+
+    const count = selectedElementCount(selectedElement)
+    const objectLabel = count === 1 ? 'object' : 'objects'
+
+    if (
+      !window.confirm(
+        `Delete ${count} selected ${objectLabel}? This can be undone.`,
+      )
+    ) {
+      setLayerOperationStatus('Bulk delete canceled.')
       return
     }
 
@@ -6268,17 +6282,23 @@ function App() {
     const customStepInvalid =
       cursorSnapControlValue === 'custom' &&
       parseCursorSnapStep(cursorSnapCustomStepInput) === null
+    const snapHelp = cursorSnapHelpText(
+      cursorSnapSettings,
+      editableDiagram.ambientDimension,
+    )
 
     return (
       <div
         className="preview-snap-control"
         role="group"
         aria-label="Cursor snap"
+        title={snapHelp}
       >
         <label className="preview-toolbar-field preview-snap-select-field">
           <span>Snap</span>
           <select
             value={cursorSnapControlValue}
+            title={snapHelp}
             onChange={(event) =>
               updateCursorSnapControlValue(event.currentTarget.value)
             }
@@ -6301,6 +6321,7 @@ function App() {
               step="any"
               inputMode="decimal"
               aria-invalid={customStepInvalid}
+              title={snapHelp}
               value={cursorSnapCustomStepInput}
               onChange={(event) =>
                 updateCursorSnapCustomStepInput(event.currentTarget.value)

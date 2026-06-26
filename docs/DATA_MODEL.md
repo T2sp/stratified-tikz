@@ -450,9 +450,10 @@ Only `diagram` data is persisted. Mathematical geometry is stored as strata and
 free labels. Diagram-level layer names, visibility, and locking may be stored
 under `diagram.layers`. Diagram-level view metadata may also be stored under
 `diagram.view`, but it is not geometry. UI/editor state such as the selected
-element, active creation tool, coordinate input mode, active work plane, draft
-geometry, current layer filter, expanded/collapsed panels, copy status,
-undo/redo history, and transient preview state is not saved.
+element or multi-selection, active creation tool, coordinate input mode, cursor
+snap settings, active work plane, draft geometry, current layer filter,
+expanded/collapsed panels, copy status, undo/redo history, and transient preview
+state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.
@@ -471,6 +472,7 @@ that omit export mode load with the standalone default.
 
 For the user-facing layer operation semantics, see
 [Layer Manager](./LAYER_MANAGER.md).
+For Phase 24 editing semantics, see [Editing Fundamentals](./EDITING.md).
 
 ## Camera
 

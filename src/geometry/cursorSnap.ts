@@ -55,6 +55,25 @@ export function normalizeCursorSnapSettings(
   }
 }
 
+export function cursorSnapHelpText(
+  settings: CursorSnapSettings,
+  ambientDimension: AmbientDimension,
+): string {
+  const scope =
+    ambientDimension === 2
+      ? 'Cursor placement and drag handles round x/y; z stays 0.'
+      : 'Cursor placement and drag handles round active work-plane local coordinates.'
+  const prefix = settings.enabled
+    ? `Snap step ${formatCursorSnapStep(settings.step)}.`
+    : 'Snap is off.'
+
+  return `${prefix} ${scope} Direct and symbolic input are unchanged.`
+}
+
+function formatCursorSnapStep(step: number): string {
+  return Number.isFinite(step) ? String(step) : '?'
+}
+
 export function snapCursorPoint(
   point: Vec3,
   options: CursorSnapPointOptions,

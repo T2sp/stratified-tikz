@@ -47,7 +47,6 @@ import {
   type LayerFilter,
 } from './layerFilter.ts'
 import {
-  findSelectedElement,
   selectedElementFromElements,
   selectedElements,
   type SelectableGeometricKind,
@@ -1376,20 +1375,40 @@ function existingSelectedElements(
   selection: SelectedElement,
 ): SelectedDiagramElement[] {
   const seen = new Set<string>()
+  const elements: SelectedDiagramElement[] = []
+  const strataById = new Map(
+    diagram.strata.map((stratum) => [stratum.id, stratum]),
+  )
+  const labelsById = new Map(
+    diagram.labels.map((label) => [label.id, label]),
+  )
 
-  return selectedElements(selection).flatMap((selectedElement) => {
+  for (const selectedElement of selectedElements(selection)) {
     const key = selectedElementKey(selectedElement)
 
     if (seen.has(key)) {
-      return []
+      continue
     }
 
     seen.add(key)
 
-    const element = findSelectedElement(diagram, selectedElement)
+    if (selectedElement.kind === 'stratum') {
+      const element = strataById.get(selectedElement.id)
 
-    return element === null ? [] : [element]
-  })
+      if (element !== undefined) {
+        elements.push({ kind: 'stratum', element })
+      }
+      continue
+    }
+
+    const element = labelsById.get(selectedElement.id)
+
+    if (element !== undefined) {
+      elements.push({ kind: 'label', element })
+    }
+  }
+
+  return elements
 }
 
 function selectedElementKeySet(selection: SelectedElement): Set<string> {
@@ -1401,7 +1420,11 @@ function selectedElementKey(element: SingleSelectedElement): string {
 }
 
 function bulkOperationErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback
+  const message = error instanceof Error ? error.message : fallback
+
+  return message.startsWith('Unsupported ')
+    ? `${message} Translation supports saved geometry with absolute coordinates; rotate, scale, shear, and other affine transforms are deferred.`
+    : message
 }
 
 function duplicateSelectedStratum(
