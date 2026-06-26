@@ -252,6 +252,7 @@ export type RegionStyle = {
   fillOpacity: Opacity
   strokeColor: HexColor
   strokeOpacity: Opacity
+  lineWidth?: number
 }
 
 export type SheetStyle = {
@@ -260,6 +261,7 @@ export type SheetStyle = {
   fillOpacity: Opacity
   strokeColor: HexColor
   strokeOpacity: Opacity
+  lineWidth?: number
 }
 
 export type CurveStyle = {

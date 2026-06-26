@@ -324,7 +324,7 @@ test('inspector summary displays multi-selection count and kind', () => {
   assert.equal(summary?.layer, 'multiple')
   assert.equal(
     summary?.detail,
-    'Bulk editing arrives in later Phase 24 steps.',
+    'Bulk style, layer, delete, and duplicate available.',
   )
 })
 

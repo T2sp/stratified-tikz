@@ -4599,6 +4599,9 @@ function filledSurfaceStyleTikzOptions(
     `fill opacity=${formatNumber(style.fillOpacity)}`,
     `draw=${strokeColor}`,
     `draw opacity=${formatNumber(style.strokeOpacity)}`,
+    ...(style.lineWidth === undefined
+      ? []
+      : [`line width=${formatNumber(style.lineWidth)}pt`]),
   ]
 }
 

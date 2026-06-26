@@ -1,10 +1,12 @@
 import type { Diagram } from '../../model/types.ts'
+import { createBulkStyleEditorModel } from '../bulkEditing.ts'
 import { createInspectorCompactSummary } from '../inspectorSummary.ts'
 import {
   findSelectedElement,
   isMultiSelectedElement,
   type SelectedElement,
 } from '../selection.ts'
+import { BulkSelectionInspector } from './BulkSelectionInspector.tsx'
 import { StratumInspector } from './StratumInspector.tsx'
 import { TextLabelInspector } from './TextLabelInspector.tsx'
 import type { DiagramChangeHandler } from './types.ts'
@@ -15,6 +17,9 @@ export type EditableInspectorProps = {
   onDiagramChange: DiagramChangeHandler
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
+  onBulkLayerChange: (layer: number) => void
+  onBulkDelete: () => void
+  onBulkDuplicate: () => void
 }
 
 export function EditableInspector({
@@ -23,6 +28,9 @@ export function EditableInspector({
   onDiagramChange,
   expanded,
   onExpandedChange,
+  onBulkLayerChange,
+  onBulkDelete,
+  onBulkDuplicate,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
     const summary = createInspectorCompactSummary(diagram, selectedElement)
@@ -35,6 +43,8 @@ export function EditableInspector({
         </div>
       )
     }
+
+    const bulkStyleModel = createBulkStyleEditorModel(diagram, selectedElement)
 
     return (
       <div className="editable-inspector-shell">
@@ -49,7 +59,29 @@ export function EditableInspector({
               {summary.detail !== null && <span>{summary.detail}</span>}
             </span>
           </div>
+          <button
+            type="button"
+            className="toolbar-button inspector-toggle-button"
+            aria-expanded={expanded}
+            aria-controls="inspector-details"
+            onClick={() => onExpandedChange(!expanded)}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </button>
         </div>
+        {expanded && (
+          <div id="inspector-details" className="inspector-details-scroll">
+            <BulkSelectionInspector
+              diagram={diagram}
+              selection={selectedElement}
+              model={bulkStyleModel}
+              onDiagramChange={onDiagramChange}
+              onBulkLayerChange={onBulkLayerChange}
+              onBulkDelete={onBulkDelete}
+              onBulkDuplicate={onBulkDuplicate}
+            />
+          </div>
+        )}
       </div>
     )
   }

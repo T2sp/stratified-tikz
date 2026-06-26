@@ -336,7 +336,8 @@ export function stylePresetStylesEqual(
         first.fillColor === second.fillColor &&
         first.fillOpacity === second.fillOpacity &&
         first.strokeColor === second.strokeColor &&
-        first.strokeOpacity === second.strokeOpacity
+        first.strokeOpacity === second.strokeOpacity &&
+        first.lineWidth === second.lineWidth
       )
     case 'sheetStyle':
       return (
@@ -344,7 +345,8 @@ export function stylePresetStylesEqual(
         first.fillColor === second.fillColor &&
         first.fillOpacity === second.fillOpacity &&
         first.strokeColor === second.strokeColor &&
-        first.strokeOpacity === second.strokeOpacity
+        first.strokeOpacity === second.strokeOpacity &&
+        first.lineWidth === second.lineWidth
       )
     case 'curveStyle':
       return (

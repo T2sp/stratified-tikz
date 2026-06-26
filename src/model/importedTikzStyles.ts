@@ -869,6 +869,7 @@ function filledSurfaceStyleFromPreview<TStyle extends RegionStyle | SheetStyle>(
       defaultStyle.strokeColor,
     strokeOpacity:
       preview.drawOpacity ?? preview.opacity ?? defaultStyle.strokeOpacity,
+    ...(preview.lineWidth === undefined ? {} : { lineWidth: preview.lineWidth }),
   }
 }
 

@@ -45,6 +45,24 @@ The Inspector button opens the right-side inspector drawer. Opening, closing, or
 expanding inspector sections is UI state only. Coordinates and styles change the
 diagram only when the inspector fields themselves commit edits.
 
+For multi-selection, the inspector supports bulk style, layer, delete, and
+duplicate operations for the selected objects. Style fields are shown only for
+safe common fields of the selected geometric kind. If every selected object has
+the same value for a field, that value is shown; otherwise the field displays
+`Mixed`, and editing that field applies only the edited value to every selected
+object. Curve selections expose stroke color, opacity, line width, line style,
+and arrow options when every selected curve supports arrows. Sheet and region
+selections expose fill color, fill opacity, stroke color, stroke opacity, and
+line width. Point selections expose color, opacity, size, shape, and fill mode.
+Label selections expose text color, opacity, font size, and anchor.
+
+Bulk layer changes move every selected object to the chosen layer and update
+layer metadata as needed. Bulk delete clears the selection and removes stale
+crossing states that depended on deleted curves. Bulk duplicate preserves
+geometry, styles, symbolic coordinate metadata, and layer values while assigning
+new object ids; copied path labels are disambiguated using the same copy naming
+policy as layer duplication. Crossing states are not duplicated by the MVP.
+
 ## Layer Window
 
 The Layer button opens a floating bottom-right layer window. The window controls
