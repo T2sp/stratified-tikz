@@ -34,7 +34,13 @@ import {
 import { sheetVertices } from '../model/sheets.ts'
 import { gridPreviewSegments } from '../model/grids.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
-import type { SelectedElement } from '../ui/selection'
+import {
+  isSelectedElement,
+  isSingleSelectedElement,
+  type SelectedElement,
+  type SelectionClickMode,
+  type SingleSelectedElement,
+} from '../ui/selection'
 import type {
   WorkPlaneDirectionIndicator,
   WorkPlanePreview,
@@ -144,7 +150,10 @@ export type SvgDiagramProps = {
   layerFilter?: LayerFilter
   visibilityOptions?: VisibilityOptions
   showGeometryHandles?: boolean
-  onSelectionChange?: (selection: SelectedElement) => void
+  onSelectionChange?: (
+    selection: SelectedElement,
+    options?: SvgSelectionChangeOptions,
+  ) => void
   onCurveStratumClick?: (curveId: string) => void
   onPointStratumClick?: (pointId: string) => void
   onPathIntersectionCandidateClick?: (
@@ -167,6 +176,10 @@ export type SvgDiagramProps = {
   onGeometryHandleDragStart?: (target: GeometryHandleTarget) => void
   onGeometryHandleDragEnd?: () => void
   onCameraDrag?: (delta: Vec2, mode: CameraDragMode) => void
+}
+
+export type SvgSelectionChangeOptions = {
+  mode: SelectionClickMode
 }
 
 type RenderItemElement = {
@@ -488,7 +501,9 @@ export function SvgDiagram({
           return
         }
 
-        onSelectionChange?.(null)
+        onSelectionChange?.(null, {
+          mode: selectionClickModeFromMouseEvent(event),
+        })
       }}
     >
       <rect
@@ -2002,8 +2017,7 @@ function renderLabel(
   )
   const isSelected =
     isSelectable &&
-    selectedElement?.kind === 'label' &&
-    selectedElement.id === label.id
+    isSelectedElement(selectedElement, { kind: 'label', id: label.id })
   const fontSize = style.fontSize * 1.35
   const anchorPlacement = svgLabelAnchorPlacement(style.anchor, fontSize)
 
@@ -2592,7 +2606,7 @@ function renderSelectedGeometryHandles(
     target: GeometryHandleTarget,
   ) => void,
 ): ReactElement | null {
-  if (selectedElement === null) {
+  if (!isSingleSelectedElement(selectedElement)) {
     return null
   }
 
@@ -2844,7 +2858,7 @@ function geometryHandleKey(target: GeometryHandleTarget): string {
 
 function selectElement(
   event: MouseEvent<SVGGElement>,
-  selection: NonNullable<SelectedElement>,
+  selection: SingleSelectedElement,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): void {
   if (onSelectionChange === undefined) {
@@ -2852,7 +2866,7 @@ function selectElement(
   }
 
   event.stopPropagation()
-  onSelectionChange(selection)
+  onSelectionChange(selection, { mode: selectionClickModeFromMouseEvent(event) })
 }
 
 function selectCurveElement(
@@ -2930,7 +2944,13 @@ function isSelectedStratum(
   selectedElement: SelectedElement,
   id: string,
 ): boolean {
-  return selectedElement?.kind === 'stratum' && selectedElement.id === id
+  return isSelectedElement(selectedElement, { kind: 'stratum', id })
+}
+
+function selectionClickModeFromMouseEvent(
+  event: MouseEvent<SVGElement>,
+): SelectionClickMode {
+  return event.shiftKey || event.metaKey || event.ctrlKey ? 'toggle' : 'replace'
 }
 
 function previewElementOpacity(isIncludedByFilter: boolean): number | undefined {

@@ -96,7 +96,11 @@ import type {
   WorkPlaneLocalCoordinate,
   WorkPlaneLocalOffset,
 } from '../model/types.ts'
-import type { SelectedElement } from './selection.ts'
+import {
+  clearSelectionIfMissing,
+  isSingleSelectedElement,
+  type SelectedElement,
+} from './selection.ts'
 import { areFinitePoints, arePointsOnWorkPlane } from './sheetDraft.ts'
 import {
   resolveExistingCoordinateForDirectCreation,
@@ -180,10 +184,10 @@ export function removeSelectedElement(
   diagram: Diagram,
   selectedElement: SelectedElement,
 ): RemoveSelectedElementResult {
-  if (selectedElement === null) {
+  if (!isSingleSelectedElement(selectedElement)) {
     return {
       diagram,
-      selectedElement: null,
+      selectedElement: clearSelectionIfMissing(diagram, selectedElement),
       removed: false,
     }
   }
@@ -2670,7 +2674,7 @@ export function updateSelectedElement(
   selectedElement: SelectedElement,
   updaters: SelectedElementUpdaters,
 ): Diagram {
-  if (selectedElement === null) {
+  if (!isSingleSelectedElement(selectedElement)) {
     return diagram
   }
 

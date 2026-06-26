@@ -252,6 +252,7 @@ import {
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
   inlineMathTikzExportHelp,
+  isSingleSelectedElement,
   tikzDownloadFilenameForMode,
   tikzExportModeFromSelectValue,
   tikzExportModeOptions,
@@ -282,6 +283,7 @@ import {
   toolbarPaletteAfterCommandSelection,
   toggleToolbarPalette,
   togglePreviewToolbarState,
+  updateSelectionForBackgroundClick,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectConcatenatedPathManualSegmentInput,
@@ -318,12 +320,14 @@ import {
   type PreviewToolbarPalette,
   type PreviewToolbarPaletteId,
   type PreviewToolbarState,
+  type SelectionClickMode,
   type SelectedElement,
   type RuledSurfaceBoundaryDraft,
   type SheetPolygonDraft,
   type WorkPlanePointPickingState,
   type WorkPlaneSelectValue,
   type WorkPlanePreviewTool,
+  updateSelectionForClick,
 } from './ui'
 
 type CopyStatus = 'idle' | 'copied' | 'downloaded' | 'failed'
@@ -1716,15 +1720,39 @@ function App() {
     commitLoadedJsonDiagram(result.diagram, result.warnings)
   }
 
-  function updateSelectedElement(selection: SelectedElement): void {
-    setEditorState((current) => ({
-      ...current,
-      selectedElement: clearSelectionForLayerFilter(
-        current.editableDiagram,
-        selection,
-        current.layerFilter,
-      ),
-    }))
+  function updateSelectedElement(
+    selection: SelectedElement,
+    options?: { mode: SelectionClickMode },
+  ): void {
+    setEditorState((current) => {
+      if (selection === null) {
+        return {
+          ...current,
+          selectedElement: updateSelectionForBackgroundClick(
+            current.selectedElement,
+            options?.mode ?? 'replace',
+          ),
+        }
+      }
+
+      const nextSelection = isSingleSelectedElement(selection)
+        ? updateSelectionForClick(
+            current.editableDiagram,
+            current.selectedElement,
+            selection,
+            options?.mode ?? 'replace',
+          )
+        : selection
+
+      return {
+        ...current,
+        selectedElement: clearSelectionForLayerFilter(
+          current.editableDiagram,
+          nextSelection,
+          current.layerFilter,
+        ),
+      }
+    })
   }
 
   function handlePathIntersectionCandidateClick(
@@ -1769,7 +1797,7 @@ function App() {
   }
 
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
-    if (selectedElement === null) {
+    if (!isSingleSelectedElement(selectedElement)) {
       return
     }
 
@@ -2205,7 +2233,7 @@ function App() {
         event.defaultPrevented ||
         (event.key !== 'Delete' && event.key !== 'Backspace') ||
         isEditableKeyboardTarget(event.target) ||
-        selectedElement === null
+        !isSingleSelectedElement(selectedElement)
       ) {
         return
       }
@@ -2273,6 +2301,28 @@ function App() {
       window.removeEventListener('keydown', handleToolbarPaletteEscape)
     }
   }, [openToolbarPalette])
+
+  useEffect(() => {
+    function handleSelectionEscape(event: KeyboardEvent): void {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        isEditableKeyboardTarget(event.target) ||
+        selectedElement === null
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      updateSelectedElement(null)
+    }
+
+    window.addEventListener('keydown', handleSelectionEscape)
+
+    return () => {
+      window.removeEventListener('keydown', handleSelectionEscape)
+    }
+  }, [selectedElement])
 
   function updateLayerFilter(nextFilter: LayerFilter): void {
     setEditorState((current) => {
@@ -6095,9 +6145,13 @@ function App() {
             <button
               type="button"
               className="preview-overlay-button preview-trash-button"
-              disabled={selectedElement === null}
+              disabled={!isSingleSelectedElement(selectedElement)}
               aria-label="Remove selected"
-              title="Remove selected"
+              title={
+                isSingleSelectedElement(selectedElement)
+                  ? 'Remove selected'
+                  : 'Bulk delete arrives in a later Phase 24 step'
+              }
               onClick={(event) =>
                 runPreviewOverlayAction(event, removeCurrentSelection)
               }
@@ -6997,7 +7051,7 @@ function App() {
             <span>{coordinateInputMode}</span>
             <span>{creationTool}</span>
             <span>{layerFilterStatusLabel(layerFilter)}</span>
-            <span>{selectedElement === null ? 'no selection' : selectedElement.id}</span>
+            <span>{selectionStatusLabel(selectedElement)}</span>
           </div>
         </header>
 
@@ -8018,6 +8072,16 @@ function workPlaneLabel(kind: AxisAlignedWorkPlaneName): string {
     case 'yz':
       return 'yz plane'
   }
+}
+
+function selectionStatusLabel(selection: SelectedElement): string {
+  if (selection === null) {
+    return 'no selection'
+  }
+
+  return selection.kind === 'multi'
+    ? `${selection.elements.length} selected`
+    : selection.id
 }
 
 function geometryHandleTargetsSelection(

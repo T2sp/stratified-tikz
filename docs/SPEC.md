@@ -653,6 +653,26 @@ The default point style is:
 - opacity: 1
 - size: 3pt
 
+## Selection UI
+
+Selection is editor/UI state and is not stored in `Diagram` JSON. A normal click
+in Select mode replaces the current selection with the clicked stratum or free
+text label. Shift-click, Command-click, and Ctrl-click toggle a clicked object.
+
+Phase 24B multi-selection uses a same-`geometricKind` policy. Toggling another
+object of the same geometric kind adds it to the selection; toggling an already
+selected object removes it. Toggling an object of a different geometric kind
+replaces the current selection with that object instead of creating a mixed
+selection. This applies to `region`, `sheet`, `curve`, `point`, and free text
+`label` objects.
+
+Background clicks clear the selection; modifier-background clicks preserve it.
+Hidden, locked, filtered, deleted, or missing objects are removed from selection
+state. The Inspector shows a compact multi-selection summary such as
+`3 curves selected`; detailed bulk editing controls are reserved for later Phase
+24 subphases. SVG preview highlighting is applied to every selected id, while
+geometry drag handles remain single-selection only.
+
 ## Style editing UI
 
 When a stratum is selected, the inspector should show style controls appropriate to its `geometricKind`.

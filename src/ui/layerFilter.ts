@@ -6,6 +6,9 @@ import {
 } from '../model/layers.ts'
 import {
   findSelectedElement,
+  normalizeSelectedElement,
+  selectedElementFromElements,
+  selectedElements,
   type SelectedElement,
 } from './selection.ts'
 
@@ -93,15 +96,27 @@ export function isSelectionCompatibleWithLayerFilter(
   selection: SelectedElement,
   filter: LayerFilter,
 ): boolean {
-  const selected = findSelectedElement(diagram, selection)
-
-  if (selected === null) {
-    return selection === null
+  if (selection === null) {
+    return true
   }
 
-  return selected.kind === 'stratum'
-    ? isStratumSelectableInEditor(diagram, selected.element, filter)
-    : isTextLabelSelectableInEditor(diagram, selected.element, filter)
+  const elements = selectedElements(selection)
+
+  if (elements.length === 0) {
+    return false
+  }
+
+  return elements.every((element) => {
+    const selected = findSelectedElement(diagram, element)
+
+    if (selected === null) {
+      return false
+    }
+
+    return selected.kind === 'stratum'
+      ? isStratumSelectableInEditor(diagram, selected.element, filter)
+      : isTextLabelSelectableInEditor(diagram, selected.element, filter)
+  })
 }
 
 export function clearSelectionForLayerFilter(
@@ -109,7 +124,24 @@ export function clearSelectionForLayerFilter(
   selection: SelectedElement,
   filter: LayerFilter,
 ): SelectedElement {
-  return isSelectionCompatibleWithLayerFilter(diagram, selection, filter)
-    ? selection
-    : null
+  if (selection === null) {
+    return null
+  }
+
+  return normalizeSelectedElement(
+    diagram,
+    selectedElementFromElements(
+      selectedElements(selection).filter((element) => {
+        const selected = findSelectedElement(diagram, element)
+
+        if (selected === null) {
+          return false
+        }
+
+        return selected.kind === 'stratum'
+          ? isStratumSelectableInEditor(diagram, selected.element, filter)
+          : isTextLabelSelectableInEditor(diagram, selected.element, filter)
+      }),
+    ),
+  )
 }
