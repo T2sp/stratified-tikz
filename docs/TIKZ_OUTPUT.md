@@ -1625,13 +1625,15 @@ non-drawing `\path[spath/save=...]` command for the full continuous path before
 the styled draw commands. This preserves the saved path while keeping visual
 styles split into maintainable draw blocks.
 
-3D concatenated paths export from their stored absolute `Vec3` segment
-coordinates. Same-work-plane and cross-work-plane creation modes do not change
-TikZ syntax after the path is committed: segment order is preserved, shared
-endpoint coordinate names are reused, and no work-plane-local 2D relative syntax
-or `canvas is plane` scope is emitted for ordinary free 3D concatenated paths.
-This keeps free 3D paths readable and prevents transient active work-plane UI
-state from affecting export.
+3D concatenated paths export from their stored segment coordinates. If those
+coordinates carry compatible `workPlaneLocal` source metadata for one saved
+frame, the path is emitted in a `canvas is plane` scope and the local `(a,b)`
+expressions are preserved. If the path mixes global coordinates, unsupported
+local arc forms, or multiple local frame snapshots, export falls back to finite
+global preview coordinates with a warning comment. It does not expand local
+symbolic expressions into global symbolic formulas. Segment order is preserved,
+shared endpoint coordinate names are reused for global fallback output, and
+transient active work-plane UI state never affects export.
 
 Circular arc path segments are preserved in the model. In 2D, arc segments
 export with readable TikZ `arc[start angle=..., end angle=..., radius=...]`

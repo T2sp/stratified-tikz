@@ -7,6 +7,10 @@ import {
   numericCoordinateComponent,
   type CoordinateExpressionContext,
 } from './symbolicCoordinates.ts'
+import {
+  cloneWorkPlaneLocalCoordinateSource,
+  evaluateWorkPlaneLocalCoordinate,
+} from './workPlaneLocalCoordinates.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -27,6 +31,7 @@ import type {
   TextLabel,
   Vec3,
   WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinateSource,
 } from './types.ts'
 import { resolveSymbolicVariables } from './variables.ts'
 
@@ -250,6 +255,14 @@ export function translateVec3(
   translation: TranslationVector,
   context: DiagramTranslationContext,
 ): Vec3 {
+  if (point.symbolic?.source?.kind === 'workPlaneLocal') {
+    return translateWorkPlaneLocalVec3(
+      point.symbolic.source,
+      translation,
+      context,
+    )
+  }
+
   const components: SymbolicVec3 =
     context.ambientDimension === 2
       ? {
@@ -289,6 +302,22 @@ export function translateVec3(
         }
 
   return vec3FromCoordinateComponents(components, context.ambientDimension)
+}
+
+export function translateWorkPlaneLocalCoordinateSource(
+  source: WorkPlaneLocalCoordinateSource,
+  translation: TranslationVector,
+  context: DiagramTranslationContext,
+): WorkPlaneLocalCoordinateSource {
+  const translatedSource = cloneWorkPlaneLocalCoordinateSource(source)
+
+  translatedSource.frame = translateFrameOrigin(
+    source.frame,
+    translation,
+    context,
+  )
+
+  return translatedSource
 }
 
 export function translatePathSegment(
@@ -773,6 +802,56 @@ function translateCoordinateComponent(
   }
 }
 
+function translateWorkPlaneLocalVec3(
+  source: WorkPlaneLocalCoordinateSource,
+  translation: TranslationVector,
+  context: DiagramTranslationContext,
+): Vec3 {
+  const translatedSource = translateWorkPlaneLocalCoordinateSource(
+    source,
+    translation,
+    context,
+  )
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    translatedSource,
+    context.coordinateExpressionContext,
+  )
+
+  if (!evaluated.ok) {
+    const firstError = evaluated.errors[0]
+    throw new Error(
+      firstError === undefined
+        ? 'Translated work-plane-local coordinate is invalid.'
+        : `${firstError.path}: ${firstError.message}`,
+    )
+  }
+
+  const preview =
+    context.ambientDimension === 2
+      ? {
+          x: evaluated.point.x,
+          y: evaluated.point.y,
+          z: 0,
+        }
+      : evaluated.point
+
+  if (!isFiniteVec3(preview)) {
+    throw new Error(
+      'Translation would create a non-finite work-plane-local coordinate.',
+    )
+  }
+
+  return {
+    ...preview,
+    symbolic: {
+      x: numericCoordinateComponent(preview.x),
+      y: numericCoordinateComponent(preview.y),
+      z: numericCoordinateComponent(preview.z),
+      source: translatedSource,
+    },
+  }
+}
+
 function additionExpression(
   component: CoordinateComponent,
   delta: CoordinateComponent,
@@ -902,8 +981,19 @@ function cloneVec3(point: Vec3): Vec3 {
         x: point.x,
         y: point.y,
         z: point.z,
-        symbolic: cloneTranslationVector(point.symbolic),
+        symbolic: cloneSymbolicVec3(point.symbolic),
       }
+}
+
+function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
+  return {
+    x: cloneCoordinateComponent(symbolic.x),
+    y: cloneCoordinateComponent(symbolic.y),
+    z: cloneCoordinateComponent(symbolic.z),
+    ...(symbolic.source === undefined
+      ? {}
+      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
+  }
 }
 
 function hasSymbolicComponent(components: SymbolicVec3): boolean {
