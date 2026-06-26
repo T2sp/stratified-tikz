@@ -19,6 +19,7 @@ import {
   translucentFilledStrataExample,
   twoDimensionalGridExample,
   twoDimensionalExample,
+  workPlaneLocalSymbolicExample,
 } from '../../src/examples/index.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
@@ -49,6 +50,7 @@ const exampleCases = [
   { name: 'symbolic path', diagram: symbolicPathExample },
   { name: '2D grid', diagram: twoDimensionalGridExample },
   { name: '3D work-plane grid', diagram: threeDimensionalWorkPlaneGridExample },
+  { name: '3D local symbolic', diagram: workPlaneLocalSymbolicExample },
 ] as const
 
 test('existing and reference examples validate', () => {
@@ -159,6 +161,19 @@ test('symbolic and grid examples export macros and foreach grids', () => {
   assert.match(grid2dTikz, /\\clip \(-2,-2\) rectangle \(2,2\);/)
   assert.match(grid3dTikz, /canvas is plane/)
   assert.match(grid3dTikz, /\\foreach \\stzGridV/)
+})
+
+test('work-plane-local symbolic example preserves local expressions in TikZ', () => {
+  const tikz = generateTikz(workPlaneLocalSymbolicExample)
+
+  assert.match(tikz, /Local symbolic radius path/)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /\(\{\\R \* cos\(\\q\)\},\{\\R \* sin\(\\q\)\}\)/)
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /\\usetikzlibrary\{decorations\.markings\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
 })
 
 test('reference examples produce finite SVG helper geometry', () => {

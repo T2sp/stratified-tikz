@@ -19,6 +19,7 @@ const expectedExampleNames = [
   '2D example',
   '3D example',
   'braiding',
+  '3D local symbolic',
 ] as const
 
 test('main example catalog contains exactly the curated examples in order', () => {
@@ -26,7 +27,7 @@ test('main example catalog contains exactly the curated examples in order', () =
     exampleOptions.map((example) => example.name),
     expectedExampleNames,
   )
-  assert.equal(new Set(exampleOptions.map((example) => example.name)).size, 5)
+  assert.equal(new Set(exampleOptions.map((example) => example.name)).size, 6)
 })
 
 test('Empty 2D is the default and precedes Empty 3D', () => {

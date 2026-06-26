@@ -49,6 +49,8 @@ shows `Plane x / a` and `Plane y / b` fields. These fields accept numeric or
 symbolic scalar expressions, display the evaluated local preview values, and
 display the resulting global preview point. Creating the point or label stores a
 snapshot of the active work-plane frame plus the local scalar expressions.
+Cursor snap does not modify these direct local expressions; snapping applies
+only to cursor-derived placement and drag coordinates.
 
 In 2D diagrams, direct input remains global x/y input only; no work-plane-local
 coordinate mode is shown.
@@ -66,6 +68,10 @@ evaluated global preview point, and a compact stored-frame summary. Editing a
 valid local expression updates the local source and recomputes the global
 preview. Invalid local expressions are rejected and do not silently convert the
 position to global xyz coordinates.
+
+See [Symbolic Input And Grids](./SYMBOLIC_INPUT_AND_GRIDS.md) for variable
+resolution, translation policy, and TikZ `canvas is plane` export behavior for
+work-plane-local symbolic coordinates.
 
 For multi-selection, the inspector supports bulk style, layer, delete, and
 duplicate operations for the selected objects. Style fields are shown only for

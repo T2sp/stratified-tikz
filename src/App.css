@@ -3421,17 +3421,37 @@
 
 .work-plane-local-coordinate-summary {
   display: grid;
-  gap: 4px;
+  gap: 4px 8px;
   min-width: 0;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
-.work-plane-local-coordinate-summary span {
+.work-plane-local-coordinate-summary div,
+.work-plane-local-coordinate-summary dt,
+.work-plane-local-coordinate-summary dd {
   min-width: 0;
+}
+
+.work-plane-local-coordinate-summary div {
+  display: grid;
+  grid-template-columns: minmax(78px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.work-plane-local-coordinate-summary dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.work-plane-local-coordinate-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--mono);
 }
 
 .coordinate-input-row {

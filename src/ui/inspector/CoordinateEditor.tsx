@@ -101,11 +101,20 @@ function WorkPlaneLocalCoordinateEditor({
   return (
     <fieldset className="coordinate-group">
       <legend>{label}</legend>
-      <div className="work-plane-local-coordinate-summary">
-        <span>Coordinate source: {view.coordinateSource}</span>
-        <span>Global preview: {formatEditorVec3(view.globalPreview)}</span>
-        <span>Frame: {view.frameSummary}</span>
-      </div>
+      <dl className="work-plane-local-coordinate-summary">
+        <div>
+          <dt>Source</dt>
+          <dd>{view.coordinateSource}</dd>
+        </div>
+        <div>
+          <dt>Preview</dt>
+          <dd>{formatEditorVec3(view.globalPreview)}</dd>
+        </div>
+        <div>
+          <dt>Stored frame</dt>
+          <dd>{view.frameSummary}</dd>
+        </div>
+      </dl>
       <div className="coordinate-grid">
         {(['a', 'b'] as const).map((axis) => (
           <WorkPlaneLocalAxisInput

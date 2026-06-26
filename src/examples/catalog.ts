@@ -7,9 +7,16 @@ import {
   curatedTwoDimensionalExample,
 } from './curatedExamples.ts'
 import { braidingCrossingsExample } from './referenceExamples.ts'
+import { workPlaneLocalSymbolicExample } from './workPlaneLocalSymbolicExample.ts'
 import type { AmbientDimension, Diagram } from '../model/types.ts'
 
-export type ExampleId = 'empty2d' | 'empty3d' | '2d' | '3d' | 'braiding'
+export type ExampleId =
+  | 'empty2d'
+  | 'empty3d'
+  | '2d'
+  | '3d'
+  | 'braiding'
+  | 'localSymbolic3d'
 
 export type ExampleOption = {
   id: ExampleId
@@ -50,6 +57,12 @@ export const exampleOptions: readonly ExampleOption[] = [
     name: 'braiding',
     summary: 'braiding and anti-braiding crossing states',
     diagram: braidingCrossingsExample,
+  },
+  {
+    id: 'localSymbolic3d',
+    name: '3D local symbolic',
+    summary: 'work-plane-local symbolic point and arrowed path',
+    diagram: workPlaneLocalSymbolicExample,
   },
 ]
 
