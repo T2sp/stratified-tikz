@@ -116,6 +116,9 @@ import {
   addPointStratumFromDirectInput,
   addTextLabelWithResult,
   addTextLabelFromDirectInput,
+  applyBulkDeleteToEditorState,
+  applyBulkDuplicateToEditorState,
+  applyBulkLayerChangeToEditorState,
   applyDirectCreationCommitToEditorState,
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
@@ -212,7 +215,6 @@ import {
   pickRuledSurfaceBoundaryDraftPath,
   parseDirectLayerInput,
   redoLastDiagramChange,
-  removeSelectedElementWithLayerFilter,
   resetCameraControlState,
   resetCoonsPatchBoundaryDraft,
   toggleCoonsPatchBoundaryDraftReverse,
@@ -1796,45 +1798,35 @@ function App() {
     setInspectorDrawerState(closeInspectorDrawerState())
   }
 
-  const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
-    if (!isSingleSelectedElement(selectedElement)) {
-      return
-    }
+  function changeCurrentSelectionLayer(layer: number): void {
+    setEditorState((current) =>
+      applyBulkLayerChangeToEditorState(current, layer),
+    )
+    setCopyStatus('idle')
+  }
 
-    setEditorState((current) => {
-      const result = removeSelectedElementWithLayerFilter(
-        current.editableDiagram,
-        current.selectedElement,
-        current.layerFilter,
-      )
-
-      if (
-        !result.removed &&
-        current.selectedElement === result.selectedElement &&
-        current.layerFilter === result.layerFilter &&
-        current.polylineDraft === null &&
-        current.cubicBezierDraft === null &&
-        current.pathDraft === null &&
-        current.sheetPolygonDraft === null
-      ) {
-        return current
-      }
-
-      return commitDiagramChange(current, {
-        ...current,
-        editableDiagram: result.diagram,
-        selectedElement: result.selectedElement,
-        layerFilter: result.layerFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        pathDraft: null,
-        sheetPolygonDraft: null,
-      })
-    })
+  function duplicateCurrentSelection(): void {
+    setEditorState((current) => applyBulkDuplicateToEditorState(current))
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
     setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+  }
+
+  const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
+    if (selectedElement === null) {
+      return
+    }
+
+    setEditorState((current) => applyBulkDeleteToEditorState(current))
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setCopyStatus('idle')
   }, [selectedElement])
@@ -2233,7 +2225,7 @@ function App() {
         event.defaultPrevented ||
         (event.key !== 'Delete' && event.key !== 'Backspace') ||
         isEditableKeyboardTarget(event.target) ||
-        !isSingleSelectedElement(selectedElement)
+        selectedElement === null
       ) {
         return
       }
@@ -5404,6 +5396,9 @@ function App() {
             onDiagramChange={updateEditableDiagram}
             expanded={isInspectorExpanded}
             onExpandedChange={updateInspectorExpanded}
+            onBulkLayerChange={changeCurrentSelectionLayer}
+            onBulkDelete={removeCurrentSelection}
+            onBulkDuplicate={duplicateCurrentSelection}
           />
         </div>
       </aside>
@@ -6145,13 +6140,9 @@ function App() {
             <button
               type="button"
               className="preview-overlay-button preview-trash-button"
-              disabled={!isSingleSelectedElement(selectedElement)}
+              disabled={selectedElement === null}
               aria-label="Remove selected"
-              title={
-                isSingleSelectedElement(selectedElement)
-                  ? 'Remove selected'
-                  : 'Bulk delete arrives in a later Phase 24 step'
-              }
+              title={selectedElement === null ? 'Select objects to remove' : 'Remove selected'}
               onClick={(event) =>
                 runPreviewOverlayAction(event, removeCurrentSelection)
               }

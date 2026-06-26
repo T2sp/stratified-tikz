@@ -130,7 +130,7 @@ function createMultiSelectionCompactSummary(
   return {
     title: `${selected.length} ${kindLabel} selected`,
     layer: 'multiple',
-    detail: 'Bulk editing arrives in later Phase 24 steps.',
+    detail: 'Bulk style, layer, delete, and duplicate available.',
   }
 }
 

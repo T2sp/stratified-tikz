@@ -87,7 +87,7 @@ export function filledSurfaceStyleToSvgAttributes(
     fillOpacity: style.fillOpacity,
     stroke: style.strokeColor,
     strokeOpacity: style.strokeOpacity,
-    strokeWidth,
+    strokeWidth: style.lineWidth ?? strokeWidth,
   }
 }
 

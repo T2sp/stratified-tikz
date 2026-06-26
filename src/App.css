@@ -3163,6 +3163,32 @@
   line-height: 1.35;
 }
 
+.bulk-field-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bulk-mixed-value {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.bulk-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bulk-delete-button {
+  border-color: #d0a4a4;
+  color: #8f2d2d;
+}
+
 .path-segment-operations {
   display: flex;
   flex-wrap: wrap;

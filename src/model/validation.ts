@@ -2730,6 +2730,9 @@ function validateRegionStyle(
   validateOpacity(style.fillOpacity, `${path}.fillOpacity`, errors)
   validateColor(style.strokeColor, `${path}.strokeColor`, errors)
   validateOpacity(style.strokeOpacity, `${path}.strokeOpacity`, errors)
+  if (style.lineWidth !== undefined) {
+    validatePositiveFinite(style.lineWidth, `${path}.lineWidth`, errors)
+  }
 }
 
 function validateSheetStyle(
@@ -2745,6 +2748,9 @@ function validateSheetStyle(
   validateOpacity(style.fillOpacity, `${path}.fillOpacity`, errors)
   validateColor(style.strokeColor, `${path}.strokeColor`, errors)
   validateOpacity(style.strokeOpacity, `${path}.strokeOpacity`, errors)
+  if (style.lineWidth !== undefined) {
+    validatePositiveFinite(style.lineWidth, `${path}.lineWidth`, errors)
+  }
 }
 
 function validateCurveStyle(

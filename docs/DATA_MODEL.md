@@ -1550,6 +1550,7 @@ export type RegionStyle = {
   fillOpacity: Opacity;
   strokeColor: HexColor;
   strokeOpacity: Opacity;
+  lineWidth?: number;
 };
 ```
 
@@ -1565,6 +1566,10 @@ export const defaultRegionStyle: RegionStyle = {
 };
 ```
 
+`lineWidth` is optional for backward compatibility. When absent, preview uses
+the filled-surface default stroke width; if a user edits the field, the saved
+style stores the explicit positive width and TikZ export emits `line width=...pt`.
+
 ## Sheet style
 
 A sheet style is used for geometric 2-dimensional strata.
@@ -1578,6 +1583,7 @@ export type SheetStyle = {
   fillOpacity: Opacity;
   strokeColor: HexColor;
   strokeOpacity: Opacity;
+  lineWidth?: number;
 };
 ```
 
@@ -1592,6 +1598,10 @@ export const defaultSheetStyle: SheetStyle = {
   strokeOpacity: 1,
 };
 ```
+
+`lineWidth` is optional for backward compatibility. When absent, preview uses
+the filled-surface default stroke width; if a user edits the field, the saved
+style stores the explicit positive width and TikZ export emits `line width=...pt`.
 
 ## Curve style
 

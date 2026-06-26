@@ -1400,7 +1400,7 @@ function renderSheet(
           fillOpacity={sheet.style.fillOpacity}
           stroke={sheet.style.strokeColor}
           strokeOpacity={sheet.style.strokeOpacity}
-          strokeWidth={1.5}
+          strokeWidth={sheet.style.lineWidth ?? 1.5}
           vectorEffect="non-scaling-stroke"
         />
       </g>
