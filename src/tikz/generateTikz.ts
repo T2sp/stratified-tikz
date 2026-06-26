@@ -1,5 +1,7 @@
 import type {
+  BoundaryPathSnapshot,
   ClosedPathBoundary,
+  CoonsBoundarySnapshot,
   ConcatenatedPathStratum,
   CoordinateComponent,
   CubicBezierCurveStratum,
@@ -7,6 +9,7 @@ import type {
   Camera3D,
   CurveStyle,
   CurveStratum,
+  CurvedSheetPrimitive,
   Diagram,
   ExternalTikzStyleSource,
   FilledRegion2DStratum,
@@ -37,6 +40,7 @@ import type {
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinate,
+  WorkPlaneLocalCoordinateSource,
   WorkPlaneLocalOffset,
   VisibilityOptions,
 } from '../model/types'
@@ -272,6 +276,83 @@ type GridForeachSequenceResult =
       error: string
     }
 
+type WorkPlaneLocalFrameAnalysis =
+  | {
+      kind: 'none'
+    }
+  | {
+      kind: 'sameFrame'
+      frame: WorkPlaneFrameSnapshot
+    }
+  | {
+      kind: 'fallback'
+      reason: string
+    }
+
+type LocalTikzEmissionResult =
+  | {
+      kind: 'notApplicable'
+    }
+  | {
+      kind: 'emitted'
+      lines: string[]
+    }
+  | {
+      kind: 'fallback'
+      lines: string[]
+    }
+
+type FormatLocalCoordinateSourceResult =
+  | {
+      ok: true
+      coordinate: string
+      inner: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type FormatLocalPathCoordinatesResult =
+  | {
+      ok: true
+      coordinates: PathSegmentCoordinateNames[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type FormatLocalPathSegmentCoordinateNamesResult =
+  | {
+      ok: true
+      coordinates: PathSegmentCoordinateNames
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type FormatLocalClosedBoundaryResult =
+  | {
+      ok: true
+      path: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type ScopedCanvasPlaneLinesResult =
+  | {
+      ok: true
+      lines: string[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type GenerateTikzOptions = {
   includeCoordinateAxes?: boolean
   camera3d?: Camera3D
@@ -320,6 +401,7 @@ export const maxCurvedSheetTikzFaces = 256
 const gridTikzEpsilon = 1e-9
 const pathRunLengthEpsilon = 1e-9
 const pathRunLengthSampleCount = 32
+const workPlaneFrameComparisonEpsilon = 1e-6
 const tikzBraidingMaskStrokeGapPt = 4
 const tikzBraidingBackgroundColor: HexColor = '#FFFFFF'
 
@@ -1114,6 +1196,15 @@ function emitSheet(
     ]
   }
 
+  const scopedLocalSheet = emitScopedWorkPlaneLocalVertexSheet(
+    sheet,
+    context,
+  )
+
+  if (scopedLocalSheet.kind === 'emitted') {
+    return scopedLocalSheet.lines
+  }
+
   const coordinates = sheetVertices(sheet).map((vertex, index) =>
     context.coordinates.define(
       sheetCoordinateBaseName(sheet, elementIndex),
@@ -1137,6 +1228,7 @@ function emitSheet(
   ]
 
   return [
+    ...(scopedLocalSheet.kind === 'fallback' ? scopedLocalSheet.lines : []),
     `% Filled sheet "${sheet.name}" [${sheet.id}] from stored ${sheet.kind === 'quadSheet' ? 'quad' : 'polygon'} vertices.`,
     `\\filldraw[`,
     ...formatTikzOptions(options),
@@ -1429,6 +1521,11 @@ function emitCurvedSheet(
     ...(sheet.primitive.kind === 'coonsPatch'
       ? ['% Coons patch generated from copied bottom, right, top, and left boundary paths.']
       : []),
+    ...(curvedSheetPrimitiveHasWorkPlaneLocalSources(sheet.primitive)
+      ? [
+          '% Work-plane-local symbolic boundary coordinates are preserved in the saved model; sampled mesh TikZ uses finite numeric preview coordinates.',
+        ]
+      : []),
     `% Primitive: ${sheet.primitive.kind}; sampling: u=${mesh.uSegments}, v=${mesh.vSegments}; faces=${mesh.faces.length}.`,
     '% Each sampled face is emitted as one filled polygon; hidden-surface sorting is not applied.',
     '\\begin{scope}[',
@@ -1502,6 +1599,16 @@ function emitWorkPlaneFilledSheet(
   const hasSymbolicBoundaryCoordinates = closedBoundariesHaveSymbolicCoordinates(
     sheet.boundaries,
   )
+  const scopedLocalBoundaries = emitScopedWorkPlaneLocalFilledSheet(
+    sheet,
+    options,
+    context,
+  )
+
+  if (scopedLocalBoundaries.kind === 'emitted') {
+    return scopedLocalBoundaries.lines
+  }
+
   const scopedPath = hasSymbolicBoundaryCoordinates
     ? null
     : formatWorkPlaneFilledSheetLocalPath(sheet)
@@ -1545,9 +1652,13 @@ function emitWorkPlaneFilledSheet(
   )
 
   return [
-    hasSymbolicBoundaryCoordinates
-      ? `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates to preserve symbolic boundary expressions.`
-      : `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
+    ...(scopedLocalBoundaries.kind === 'fallback'
+      ? scopedLocalBoundaries.lines
+      : [
+          hasSymbolicBoundaryCoordinates
+            ? `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates to preserve symbolic boundary expressions.`
+            : `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
+        ]),
     `% Fill rule: ${sheet.fillRule}.`,
     ...emitFillDrawClosedBoundaries(coordinates, options),
   ]
@@ -1599,6 +1710,15 @@ function emitCurve(
   }
 
   if (curve.kind === 'concatenatedPath') {
+    const scopedLocalPath = emitScopedWorkPlaneLocalConcatenatedPath(
+      curve,
+      context,
+    )
+
+    if (scopedLocalPath.kind === 'emitted') {
+      return scopedLocalPath.lines
+    }
+
     const coordinates = defineConcatenatedPathCoordinates(
       curve,
       elementIndex,
@@ -1607,12 +1727,15 @@ function emitCurve(
     const styleRuns = pathSegmentStyleRuns(curve.segments, curve.style)
 
     if (styleRuns.length > 1) {
-      return emitMixedStyleConcatenatedPath(
-        curve,
-        coordinates,
-        styleRuns,
-        context,
-      )
+      return [
+        ...(scopedLocalPath.kind === 'fallback' ? scopedLocalPath.lines : []),
+        ...emitMixedStyleConcatenatedPath(
+          curve,
+          coordinates,
+          styleRuns,
+          context,
+        ),
+      ]
     }
     const continuousStyle = styleRuns[0]?.style ?? curve.style
     const continuousOptions = [
@@ -1628,6 +1751,7 @@ function emitCurve(
     ]
 
     return [
+      ...(scopedLocalPath.kind === 'fallback' ? scopedLocalPath.lines : []),
       '\\draw[',
       ...formatTikzOptions(continuousOptions),
       ']',
@@ -1647,6 +1771,16 @@ function emitCurve(
     ...pathArrowTikzOptions(curve.arrows, context),
     ...spathSaveOptions(curve.pathLabel, context),
   ]
+  const scopedLocalCurve = emitScopedWorkPlaneLocalPointCurve(
+    curve,
+    options,
+    context,
+  )
+
+  if (scopedLocalCurve.kind === 'emitted') {
+    return scopedLocalCurve.lines
+  }
+
   const scopedCurve = emitScopedWorkPlaneRelativeBezierCurve(
     curve,
     options,
@@ -1660,6 +1794,7 @@ function emitCurve(
   const coordinates = defineCurveCoordinates(curve, elementIndex, context)
 
   return [
+    ...(scopedLocalCurve.kind === 'fallback' ? scopedLocalCurve.lines : []),
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
@@ -3427,10 +3562,26 @@ function emitTemplatePath3D(
   }
 
   const frame = templatePathFrame(curve.template)
+  const localCenterSource = workPlaneLocalCoordinateSourceForPoint(
+    curve.template.center,
+  )
   const localCenter = workPlaneLocalCoordinateFromPoint(frame, curve.template.center)
+  const formattedLocalCenter =
+    localCenterSource !== null &&
+    sameWorkPlaneFrame(localCenterSource.frame, frame)
+      ? formatWorkPlaneLocalCoordinateSource(
+          localCenterSource,
+          context,
+          `template path "${curve.name}" [${curve.id}] center`,
+        )
+      : null
+  const centerCoordinate =
+    formattedLocalCenter?.ok === true
+      ? formattedLocalCenter.coordinate
+      : `(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})`
   const drawCommand = formatTemplatePathCommand(
     curve.template,
-    `(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})`,
+    centerCoordinate,
   )
 
   if (drawCommand === null) {
@@ -3462,7 +3613,7 @@ function emitTemplatePath3D(
           indentLine(
             `\\begin{scope}[rotate around={${formatNumber(
               curve.template.rotationDeg ?? 0,
-            )}:(${formatNumber(localCenter.a)},${formatNumber(localCenter.b)})}]`,
+            )}:${centerCoordinate}}]`,
           ),
           indentLine('\\draw[', 2),
           ...indentLines(formatTikzOptions(options), 2),
@@ -3479,6 +3630,11 @@ function emitTemplatePath3D(
 
   return [
     `% Template path "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope.`,
+    ...(localCenterSource !== null && formattedLocalCenter?.ok !== true
+      ? [
+          `% Template center uses numeric local preview coordinates because its work-plane-local source frame differs or its local expressions could not be formatted safely.`,
+        ]
+      : []),
     '\\begin{scope}[',
     ...frameOptions.options.map((option) => indentLine(option)),
     ']',
@@ -3571,6 +3727,1018 @@ function formatSegmentRunNumberRange(run: PathSegmentStyleRun): string {
   const last = run.startIndex + run.segments.length
 
   return first === last ? String(first) : `${first}-${last}`
+}
+
+function emitScopedWorkPlaneLocalVertexSheet(
+  sheet: SheetStratum,
+  context: GenerateContext,
+): LocalTikzEmissionResult {
+  if (
+    context.mode !== '3d' ||
+    (sheet.kind !== 'polygonSheet' && sheet.kind !== 'quadSheet')
+  ) {
+    return { kind: 'notApplicable' }
+  }
+
+  const vertices = sheetVertices(sheet)
+  const subject = `Sheet "${sheet.name}" [${sheet.id}]`
+  const frameAnalysis = analyzeWorkPlaneLocalFrame(vertices, subject)
+
+  if (frameAnalysis.kind === 'none') {
+    return { kind: 'notApplicable' }
+  }
+
+  if (frameAnalysis.kind === 'fallback') {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, frameAnalysis.reason),
+    }
+  }
+
+  const localCoordinates = formatLocalCoordinatesForPoints(
+    vertices,
+    context,
+    `sheet "${sheet.name}" [${sheet.id}] vertices`,
+  )
+
+  if (!localCoordinates.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, localCoordinates.error),
+    }
+  }
+
+  const options = [
+    ...filledSurfaceStyleOptionsForElement(
+      'sheet',
+      sheet.stylePresetId,
+      sheet.importedTikzStyleReferenceId,
+      sheet.style,
+      `Sheet${sheet.id}`,
+      context,
+    ),
+    ...spathSaveOptions(
+      sheet.kind === 'polygonSheet' ? sheet.pathLabel : undefined,
+      context,
+    ),
+  ]
+  const scopedLines = emitCanvasPlaneScopeLines(
+    frameAnalysis.frame,
+    context,
+    `sheet "${sheet.name}" [${sheet.id}] work-plane-local frame`,
+    [
+      '\\filldraw[',
+      ...formatTikzOptions(options),
+      ']',
+      indentLine(
+        `${localCoordinates.coordinates
+          .map((coordinate) => `(${coordinate})`)
+          .join(' -- ')} -- cycle;`,
+      ),
+    ],
+  )
+
+  if (!scopedLines.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, scopedLines.error),
+    }
+  }
+
+  return {
+    kind: 'emitted',
+    lines: [
+      `% Filled sheet "${sheet.name}" [${sheet.id}] exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+      ...scopedLines.lines,
+    ],
+  }
+}
+
+function emitScopedWorkPlaneLocalFilledSheet(
+  sheet: Extract<SheetStratum, { kind: 'workPlaneFilledSheet' }>,
+  options: string[],
+  context: GenerateContext,
+): LocalTikzEmissionResult {
+  if (context.mode !== '3d') {
+    return { kind: 'notApplicable' }
+  }
+
+  const subject = `Work-plane filled sheet "${sheet.name}" [${sheet.id}]`
+  const points = closedBoundariesPoints(sheet.boundaries)
+  const frameAnalysis = analyzeWorkPlaneLocalFrame(points, subject)
+
+  if (frameAnalysis.kind === 'none') {
+    return { kind: 'notApplicable' }
+  }
+
+  if (frameAnalysis.kind === 'fallback') {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, frameAnalysis.reason),
+    }
+  }
+
+  const paths: string[] = []
+
+  for (const [boundaryIndex, boundary] of sheet.boundaries.entries()) {
+    const formatted = formatClosedBoundaryLocalPathFromSources(
+      boundary,
+      context,
+      `${subject} boundary ${boundaryIndex}`,
+    )
+
+    if (!formatted.ok) {
+      return {
+        kind: 'fallback',
+        lines: localPreviewFallbackLines(subject, formatted.error),
+      }
+    }
+
+    paths.push(formatted.path)
+  }
+
+  const scopedLines = emitCanvasPlaneScopeLines(
+    frameAnalysis.frame,
+    context,
+    `${subject} work-plane-local frame`,
+    [
+      '\\filldraw[',
+      ...formatTikzOptions(options),
+      ']',
+      ...formatClosedBoundaryPathLines(paths),
+    ],
+  )
+
+  if (!scopedLines.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, scopedLines.error),
+    }
+  }
+
+  return {
+    kind: 'emitted',
+    lines: [
+      `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+      `% Fill rule: ${sheet.fillRule}.`,
+      ...scopedLines.lines,
+    ],
+  }
+}
+
+function emitScopedWorkPlaneLocalConcatenatedPath(
+  curve: ConcatenatedPathStratum,
+  context: GenerateContext,
+): LocalTikzEmissionResult {
+  if (context.mode !== '3d') {
+    return { kind: 'notApplicable' }
+  }
+
+  const subject = `Curve "${curve.name}" [${curve.id}]`
+  const frameAnalysis = analyzeWorkPlaneLocalFrame(
+    pathSegmentsPoints(curve.segments),
+    subject,
+  )
+
+  if (frameAnalysis.kind === 'none') {
+    return { kind: 'notApplicable' }
+  }
+
+  if (frameAnalysis.kind === 'fallback') {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, frameAnalysis.reason),
+    }
+  }
+
+  const coordinates = defineLocalConcatenatedPathCoordinates(curve, context)
+
+  if (!coordinates.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, coordinates.error),
+    }
+  }
+
+  const styleRuns = pathSegmentStyleRuns(curve.segments, curve.style)
+  const bodyLines =
+    styleRuns.length > 1
+      ? emitMixedStyleConcatenatedPath(
+          curve,
+          coordinates.coordinates,
+          styleRuns,
+          context,
+        )
+      : emitContinuousConcatenatedPathBody(
+          curve,
+          coordinates.coordinates,
+          styleRuns[0]?.style ?? curve.style,
+          context,
+        )
+  const scopedLines = emitCanvasPlaneScopeLines(
+    frameAnalysis.frame,
+    context,
+    `curve "${curve.name}" [${curve.id}] work-plane-local frame`,
+    bodyLines,
+  )
+
+  if (!scopedLines.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, scopedLines.error),
+    }
+  }
+
+  return {
+    kind: 'emitted',
+    lines: [
+      `% Curve "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+      ...scopedLines.lines,
+    ],
+  }
+}
+
+function emitContinuousConcatenatedPathBody(
+  curve: ConcatenatedPathStratum,
+  coordinates: PathSegmentCoordinateNames[],
+  style: CurveStyle,
+  context: GenerateContext,
+): string[] {
+  const options = [
+    ...curveStyleOptionsForElement(
+      curve.stylePresetId,
+      curve.importedTikzStyleReferenceId,
+      style,
+      `Curve${curve.id}`,
+      context,
+    ),
+    ...pathArrowTikzOptions(curve.arrows, context),
+    ...spathSaveOptions(curve.pathLabel, context),
+  ]
+
+  return [
+    '\\draw[',
+    ...formatTikzOptions(options),
+    ']',
+    indentLine(`${formatConcatenatedPath(coordinates)};`),
+  ]
+}
+
+function emitScopedWorkPlaneLocalPointCurve(
+  curve: CurveStratum,
+  options: string[],
+  context: GenerateContext,
+): LocalTikzEmissionResult {
+  if (
+    context.mode !== '3d' ||
+    (curve.kind !== 'polyline' && curve.kind !== 'cubicBezier')
+  ) {
+    return { kind: 'notApplicable' }
+  }
+
+  const subject = `Curve "${curve.name}" [${curve.id}]`
+  const frameAnalysis = analyzeWorkPlaneLocalFrame(curve.points, subject)
+
+  if (frameAnalysis.kind === 'none') {
+    return { kind: 'notApplicable' }
+  }
+
+  if (frameAnalysis.kind === 'fallback') {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, frameAnalysis.reason),
+    }
+  }
+
+  const localCoordinates = formatLocalCoordinatesForPoints(
+    curve.points,
+    context,
+    `curve "${curve.name}" [${curve.id}] points`,
+  )
+
+  if (!localCoordinates.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, localCoordinates.error),
+    }
+  }
+
+  const scopedLines = emitCanvasPlaneScopeLines(
+    frameAnalysis.frame,
+    context,
+    `curve "${curve.name}" [${curve.id}] work-plane-local frame`,
+    [
+      '\\draw[',
+      ...formatTikzOptions(options),
+      ']',
+      indentLine(
+        `${formatCurvePath(
+          curve,
+          localCoordinates.coordinates,
+          context.mode,
+        )};`,
+      ),
+    ],
+  )
+
+  if (!scopedLines.ok) {
+    return {
+      kind: 'fallback',
+      lines: localPreviewFallbackLines(subject, scopedLines.error),
+    }
+  }
+
+  return {
+    kind: 'emitted',
+    lines: [
+      `% Curve "${curve.name}" [${curve.id}] exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+      ...scopedLines.lines,
+    ],
+  }
+}
+
+function emitScopedWorkPlaneLocalPoint(
+  point: PointStratum,
+  options: string[],
+  visibilityComment: string | null,
+  context: GenerateContext,
+): string[] | null {
+  if (context.mode !== '3d') {
+    return null
+  }
+
+  const source = workPlaneLocalCoordinateSourceForPoint(point.position)
+
+  if (source === null) {
+    return null
+  }
+
+  const subject = `Point "${point.name}" [${point.id}]`
+  const localCoordinate = formatWorkPlaneLocalCoordinateSourceForPoint(
+    point.position,
+    context,
+    subject,
+  )
+
+  if (!localCoordinate.ok) {
+    return [
+      `% ${subject} omitted because its work-plane-local coordinate cannot be exported safely.`,
+      `% ${commentLineText(localCoordinate.error)}`,
+      '',
+    ]
+  }
+
+  const scopedLines = emitCanvasPlaneScopeLines(
+    source.frame,
+    context,
+    `${subject} work-plane-local frame`,
+    [
+      '\\node[',
+      ...formatTikzOptions(options),
+      `] at ${localCoordinate.coordinate} {};`,
+    ],
+  )
+
+  if (!scopedLines.ok) {
+    return [
+      `% ${subject} omitted because its work-plane-local frame cannot be exported safely.`,
+      `% ${commentLineText(scopedLines.error)}`,
+      '',
+    ]
+  }
+
+  return [
+    ...(visibilityComment === null ? [] : [visibilityComment]),
+    `% ${subject} exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+    ...scopedLines.lines,
+  ]
+}
+
+function emitScopedWorkPlaneLocalLabel(
+  label: TextLabel,
+  options: string[],
+  labelText: string,
+  visibilityComment: string[],
+  context: GenerateContext,
+): string[] | null {
+  if (context.mode !== '3d') {
+    return null
+  }
+
+  const source = workPlaneLocalCoordinateSourceForPoint(label.position)
+
+  if (source === null) {
+    return null
+  }
+
+  const subject = `Label "${label.name}" [${label.id}]`
+  const localCoordinate = formatWorkPlaneLocalCoordinateSourceForPoint(
+    label.position,
+    context,
+    subject,
+  )
+
+  if (!localCoordinate.ok) {
+    return [
+      `% ${subject} omitted because its work-plane-local coordinate cannot be exported safely.`,
+      `% ${commentLineText(localCoordinate.error)}`,
+      '',
+    ]
+  }
+
+  const bodyLines =
+    options.length === 0
+      ? [`\\node at ${localCoordinate.coordinate} {${labelText}};`]
+      : [
+          '\\node[',
+          ...formatTikzOptions(options),
+          `] at ${localCoordinate.coordinate} {${labelText}};`,
+        ]
+  const scopedLines = emitCanvasPlaneScopeLines(
+    source.frame,
+    context,
+    `${subject} work-plane-local frame`,
+    bodyLines,
+  )
+
+  if (!scopedLines.ok) {
+    return [
+      `% ${subject} omitted because its work-plane-local frame cannot be exported safely.`,
+      `% ${commentLineText(scopedLines.error)}`,
+      '',
+    ]
+  }
+
+  return [
+    ...visibilityComment,
+    `% ${subject} exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+    ...scopedLines.lines,
+  ]
+}
+
+function emitCanvasPlaneScopeLines(
+  frame: WorkPlaneFrameSnapshot,
+  context: GenerateContext,
+  frameDescription: string,
+  bodyLines: string[],
+): ScopedCanvasPlaneLinesResult {
+  const frameOptions = formatTikzPlaneScopeOptions(
+    frame,
+    context,
+    frameDescription,
+  )
+
+  if (!frameOptions.ok) {
+    return frameOptions
+  }
+
+  context.requiresTikz3dLibrary = true
+
+  return {
+    ok: true,
+    lines: [
+      '\\begin{scope}[',
+      ...frameOptions.options.map((option) => indentLine(option)),
+      ']',
+      ...indentLines(bodyLines),
+      '\\end{scope}',
+      '',
+    ],
+  }
+}
+
+function localPreviewFallbackLines(subject: string, reason: string): string[] {
+  return [
+    `% ${subject} uses global preview coordinates because ${commentLineText(reason)}.`,
+    '% Work-plane-local symbolic expressions are not expanded into global symbolic coordinates by this exporter.',
+  ]
+}
+
+function analyzeWorkPlaneLocalFrame(
+  points: readonly Vec3[],
+  subject: string,
+): WorkPlaneLocalFrameAnalysis {
+  const sources = points
+    .map(workPlaneLocalCoordinateSourceForPoint)
+    .filter((source): source is WorkPlaneLocalCoordinateSource => source !== null)
+
+  if (sources.length === 0) {
+    return { kind: 'none' }
+  }
+
+  if (sources.length !== points.length) {
+    return {
+      kind: 'fallback',
+      reason: `${subject} mixes work-plane-local and global coordinates`,
+    }
+  }
+
+  const firstSource = sources[0]
+
+  if (firstSource === undefined) {
+    return { kind: 'none' }
+  }
+
+  for (const source of sources.slice(1)) {
+    if (!sameWorkPlaneFrame(firstSource.frame, source.frame)) {
+      return {
+        kind: 'fallback',
+        reason: `${subject} uses multiple work-plane-local frames`,
+      }
+    }
+  }
+
+  return {
+    kind: 'sameFrame',
+    frame: firstSource.frame,
+  }
+}
+
+function defineLocalConcatenatedPathCoordinates(
+  path: ConcatenatedPathStratum,
+  context: GenerateContext,
+): FormatLocalPathCoordinatesResult {
+  let previousEnd: string | null = null
+
+  const coordinates: PathSegmentCoordinateNames[] = []
+
+  for (const [segmentIndex, segment] of path.segments.entries()) {
+    const start =
+      previousEnd ??
+      formatLocalCoordinateInnerForPoint(
+        segment.start,
+        context,
+        `curve "${path.name}" [${path.id}] segment ${segmentIndex}.start`,
+      )
+
+    if (typeof start !== 'string') {
+      return start
+    }
+
+    const names = defineLocalPathSegmentCoordinateNames(
+      segment,
+      start,
+      context,
+      `curve "${path.name}" [${path.id}] segment ${segmentIndex}`,
+    )
+
+    if (!names.ok) {
+      return names
+    }
+
+    previousEnd = names.coordinates.end
+    coordinates.push(names.coordinates)
+  }
+
+  return {
+    ok: true,
+    coordinates,
+  }
+}
+
+function defineLocalPathSegmentCoordinateNames(
+  segment: PathSegment,
+  start: string,
+  context: GenerateContext,
+  path: string,
+): FormatLocalPathSegmentCoordinateNamesResult {
+  switch (segment.kind) {
+    case 'line': {
+      const end = formatLocalCoordinateInnerForPoint(
+        segment.end,
+        context,
+        `${path}.end`,
+      )
+
+      return typeof end === 'string'
+        ? {
+            ok: true,
+            coordinates: {
+              kind: 'line',
+              start,
+              end,
+            },
+          }
+        : end
+    }
+    case 'cubicBezier': {
+      const control1 = formatLocalCoordinateInnerForPoint(
+        segment.control1,
+        context,
+        `${path}.control1`,
+      )
+      const control2 = formatLocalCoordinateInnerForPoint(
+        segment.control2,
+        context,
+        `${path}.control2`,
+      )
+      const end = formatLocalCoordinateInnerForPoint(
+        segment.end,
+        context,
+        `${path}.end`,
+      )
+
+      if (typeof control1 !== 'string') {
+        return control1
+      }
+
+      if (typeof control2 !== 'string') {
+        return control2
+      }
+
+      if (typeof end !== 'string') {
+        return end
+      }
+
+      return {
+        ok: true,
+        coordinates: {
+          kind: 'cubicBezier',
+          start,
+          control1,
+          control2,
+          end,
+        },
+      }
+    }
+    case 'arc':
+      return {
+        ok: false,
+        error:
+          'work-plane-local symbolic arc segments currently fall back to global preview coordinates',
+      }
+  }
+}
+
+function formatClosedBoundaryLocalPathFromSources(
+  boundary: ClosedPathBoundary,
+  context: GenerateContext,
+  path: string,
+): FormatLocalClosedBoundaryResult {
+  if (boundary.segments.length === 0) {
+    return {
+      ok: false,
+      error: `${path} has no path segments`,
+    }
+  }
+
+  const coordinates = defineLocalBoundaryCoordinateNames(boundary, context, path)
+
+  if (!coordinates.ok) {
+    return coordinates
+  }
+
+  return {
+    ok: true,
+    path: formatClosedBoundaryPath(coordinates.coordinates),
+  }
+}
+
+function defineLocalBoundaryCoordinateNames(
+  boundary: ClosedPathBoundary,
+  context: GenerateContext,
+  path: string,
+): FormatLocalPathCoordinatesResult {
+  let previousEnd: string | null = null
+  const coordinates: PathSegmentCoordinateNames[] = []
+
+  for (const [segmentIndex, segment] of boundary.segments.entries()) {
+    const start =
+      previousEnd ??
+      formatLocalCoordinateInnerForPoint(
+        segment.start,
+        context,
+        `${path}.segments[${segmentIndex}].start`,
+      )
+
+    if (typeof start !== 'string') {
+      return start
+    }
+
+    const names = defineLocalPathSegmentCoordinateNames(
+      segment,
+      start,
+      context,
+      `${path}.segments[${segmentIndex}]`,
+    )
+
+    if (!names.ok) {
+      return names
+    }
+
+    previousEnd = names.coordinates.end
+    coordinates.push(names.coordinates)
+  }
+
+  return {
+    ok: true,
+    coordinates,
+  }
+}
+
+function formatLocalCoordinatesForPoints(
+  points: readonly Vec3[],
+  context: GenerateContext,
+  path: string,
+):
+  | {
+      ok: true
+      coordinates: string[]
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const coordinates: string[] = []
+
+  for (const [index, point] of points.entries()) {
+    const formatted = formatLocalCoordinateInnerForPoint(
+      point,
+      context,
+      `${path}[${index}]`,
+    )
+
+    if (typeof formatted !== 'string') {
+      return formatted
+    }
+
+    coordinates.push(formatted)
+  }
+
+  return {
+    ok: true,
+    coordinates,
+  }
+}
+
+function formatLocalCoordinateInnerForPoint(
+  point: Vec3,
+  context: GenerateContext,
+  path: string,
+): string | { ok: false; error: string } {
+  const formatted = formatWorkPlaneLocalCoordinateSourceForPoint(
+    point,
+    context,
+    path,
+  )
+
+  return formatted.ok ? formatted.inner : formatted
+}
+
+function formatWorkPlaneLocalCoordinateSourceForPoint(
+  point: Vec3,
+  context: GenerateContext,
+  path: string,
+): FormatLocalCoordinateSourceResult {
+  const source = workPlaneLocalCoordinateSourceForPoint(point)
+
+  if (source === null) {
+    return {
+      ok: false,
+      error: `${path} is not a work-plane-local coordinate`,
+    }
+  }
+
+  const previewCoordinate = workPlaneLocalPreviewCoordinate(source)
+
+  if (previewCoordinate === null) {
+    return {
+      ok: false,
+      error: `${path} has a non-finite work-plane-local preview coordinate`,
+    }
+  }
+
+  const previewPoint = pointFromWorkPlaneLocalCoordinate(
+    source.frame,
+    previewCoordinate,
+  )
+
+  if (!isFiniteVec3(previewPoint) || !vec3ApproximatelyEqual(previewPoint, point)) {
+    return {
+      ok: false,
+      error: `${path} preview does not match its work-plane-local source`,
+    }
+  }
+
+  return formatWorkPlaneLocalCoordinateSource(source, context, path)
+}
+
+function formatWorkPlaneLocalCoordinateSource(
+  source: WorkPlaneLocalCoordinateSource,
+  context: GenerateContext,
+  path: string,
+): FormatLocalCoordinateSourceResult {
+  const a = formatLocalScalarInputValueForTikz(
+    source.local.a,
+    context,
+    `${path}.local.a`,
+  )
+  const b = formatLocalScalarInputValueForTikz(
+    source.local.b,
+    context,
+    `${path}.local.b`,
+  )
+
+  if (!a.ok) {
+    return a
+  }
+
+  if (!b.ok) {
+    return b
+  }
+
+  return {
+    ok: true,
+    coordinate: `(${a.value},${b.value})`,
+    inner: `${a.value},${b.value}`,
+  }
+}
+
+function formatLocalScalarInputValueForTikz(
+  value: ScalarInputValue,
+  context: GenerateContext,
+  path: string,
+):
+  | {
+      ok: true
+      value: string
+    }
+  | {
+      ok: false
+      error: string
+    } {
+  const previewValue = scalarInputPreviewValue(value)
+
+  if (!Number.isFinite(previewValue)) {
+    return {
+      ok: false,
+      error: `${path} preview value is not finite`,
+    }
+  }
+
+  if (value.kind === 'numeric') {
+    return {
+      ok: true,
+      value: formatNumber(value.value),
+    }
+  }
+
+  const parsed = parseScalarExpression(value.expression, {
+    variables: context.variables.variableNames,
+  })
+
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: `${path} ${parsed.error}`,
+    }
+  }
+
+  const formatted = formatScalarExpressionForTikz(
+    parsed.expression,
+    context.variables.variableMacros,
+  )
+
+  if (!formatted.ok) {
+    return {
+      ok: false,
+      error: `${path} ${formatted.error}`,
+    }
+  }
+
+  return {
+    ok: true,
+    value: `{${formatted.expression}}`,
+  }
+}
+
+function scalarInputPreviewValue(value: ScalarInputValue): number {
+  return value.kind === 'numeric' ? value.value : value.previewValue
+}
+
+function workPlaneLocalPreviewCoordinate(
+  source: WorkPlaneLocalCoordinateSource,
+): WorkPlaneLocalCoordinate | null {
+  const a = scalarInputPreviewValue(source.local.a)
+  const b = scalarInputPreviewValue(source.local.b)
+
+  return Number.isFinite(a) && Number.isFinite(b) ? { a, b } : null
+}
+
+function workPlaneLocalCoordinateSourceForPoint(
+  point: Vec3,
+): WorkPlaneLocalCoordinateSource | null {
+  const source = point.symbolic?.source
+
+  return source?.kind === 'workPlaneLocal' ? source : null
+}
+
+function sameWorkPlaneFrame(
+  first: WorkPlaneFrameSnapshot,
+  second: WorkPlaneFrameSnapshot,
+): boolean {
+  const firstId = workPlaneFrameId(first)
+  const secondId = workPlaneFrameId(second)
+
+  if (firstId !== undefined && secondId !== undefined) {
+    return firstId === secondId
+  }
+
+  return (
+    vec3ApproximatelyEqual(
+      first.origin,
+      second.origin,
+      workPlaneFrameComparisonEpsilon,
+    ) &&
+    vec3ApproximatelyEqual(first.u, second.u, workPlaneFrameComparisonEpsilon) &&
+    vec3ApproximatelyEqual(first.v, second.v, workPlaneFrameComparisonEpsilon) &&
+    vec3ApproximatelyEqual(
+      first.normal,
+      second.normal,
+      workPlaneFrameComparisonEpsilon,
+    )
+  )
+}
+
+function workPlaneFrameId(frame: WorkPlaneFrameSnapshot): string | undefined {
+  const frameWithOptionalId = frame as WorkPlaneFrameSnapshot & {
+    id?: unknown
+    sourceId?: unknown
+  }
+
+  if (typeof frameWithOptionalId.id === 'string') {
+    return frameWithOptionalId.id
+  }
+
+  return typeof frameWithOptionalId.sourceId === 'string'
+    ? frameWithOptionalId.sourceId
+    : undefined
+}
+
+function closedBoundariesPoints(
+  boundaries: readonly ClosedPathBoundary[],
+): Vec3[] {
+  return boundaries.flatMap((boundary) => pathSegmentsPoints(boundary.segments))
+}
+
+function pathSegmentsPoints(segments: readonly PathSegment[]): Vec3[] {
+  return segments.flatMap(pathSegmentPoints)
+}
+
+function pathSegmentPoints(segment: PathSegment): Vec3[] {
+  switch (segment.kind) {
+    case 'line':
+      return [segment.start, segment.end]
+    case 'cubicBezier':
+      return [segment.start, segment.control1, segment.control2, segment.end]
+    case 'arc':
+      return [segment.start, segment.end, segment.center]
+  }
+}
+
+function curvedSheetPrimitiveHasWorkPlaneLocalSources(
+  primitive: CurvedSheetPrimitive,
+): boolean {
+  return curvedSheetPrimitivePoints(primitive).some(
+    (point) => workPlaneLocalCoordinateSourceForPoint(point) !== null,
+  )
+}
+
+function curvedSheetPrimitivePoints(primitive: CurvedSheetPrimitive): Vec3[] {
+  switch (primitive.kind) {
+    case 'hemisphere':
+      return [primitive.center, ...workPlaneFramePoints(primitive.frame)]
+    case 'saddle':
+      return workPlaneFramePoints(primitive.frame)
+    case 'ruledSurface':
+      return [
+        ...boundarySnapshotPoints(primitive.boundary0),
+        ...boundarySnapshotPoints(primitive.boundary1),
+      ]
+    case 'coonsPatch':
+      return [
+        ...coonsBoundarySnapshotPoints(primitive.bottom),
+        ...coonsBoundarySnapshotPoints(primitive.right),
+        ...coonsBoundarySnapshotPoints(primitive.top),
+        ...coonsBoundarySnapshotPoints(primitive.left),
+      ]
+  }
+}
+
+function workPlaneFramePoints(frame: WorkPlaneFrameSnapshot): Vec3[] {
+  return [frame.origin, frame.u, frame.v, frame.normal]
+}
+
+function boundarySnapshotPoints(boundary: BoundaryPathSnapshot): Vec3[] {
+  return pathSegmentsPoints(boundary.segments)
+}
+
+function coonsBoundarySnapshotPoints(boundary: CoonsBoundarySnapshot): Vec3[] {
+  if ('kind' in boundary) {
+    return [boundary.point]
+  }
+
+  return boundarySnapshotPoints(boundary)
 }
 
 function emitScopedWorkPlaneRelativeBezierCurve(
@@ -3943,17 +5111,30 @@ function emitPoint(
   const style = isHiddenBySurface
     ? hiddenPointStyleFromBase(point.style)
     : point.style
-  const coordinate = context.coordinates.define(
-    pointCoordinateBaseName(point, elementIndex),
-    0,
-    point.position,
-  )
   const options = pointStyleOptionsForElement(
     point.stylePresetId,
     point.importedTikzStyleReferenceId,
     style,
     `Point${point.id}`,
     context,
+  )
+  const scopedLocalPoint = emitScopedWorkPlaneLocalPoint(
+    point,
+    options,
+    isHiddenBySurface
+      ? `% Auto point visibility: point "${point.name}" [${point.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`
+      : null,
+    context,
+  )
+
+  if (scopedLocalPoint !== null) {
+    return scopedLocalPoint
+  }
+
+  const coordinate = context.coordinates.define(
+    pointCoordinateBaseName(point, elementIndex),
+    0,
+    point.position,
   )
 
   return [
@@ -4016,6 +5197,17 @@ function emitLabel(
           `% Auto label visibility: label "${label.name}" [${label.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`,
         ]
       : []
+  const scopedLocalLabel = emitScopedWorkPlaneLocalLabel(
+    effectiveLabel,
+    options,
+    labelText,
+    visibilityComment,
+    context,
+  )
+
+  if (scopedLocalLabel !== null) {
+    return scopedLocalLabel
+  }
 
   if (options.length === 0) {
     return [
@@ -5797,9 +6989,11 @@ function numbersApproximatelyEqual(first: number, second: number): boolean {
   return Math.abs(first - second) <= 1e-9
 }
 
-function vec3ApproximatelyEqual(first: Vec3, second: Vec3): boolean {
-  const epsilon = 1e-6
-
+function vec3ApproximatelyEqual(
+  first: Vec3,
+  second: Vec3,
+  epsilon = 1e-6,
+): boolean {
   return (
     Math.abs(first.x - second.x) <= epsilon &&
     Math.abs(first.y - second.y) <= epsilon &&

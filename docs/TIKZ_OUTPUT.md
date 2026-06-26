@@ -305,25 +305,59 @@ The same coordinate formatting is used for point coordinates, label positions,
 ordinary curve vertices, absolute cubic controls, filled-region boundaries, and
 sheet vertices. In 3D mode the third component is emitted in the same way.
 
-For 3D work-plane-filled sheets, symbolic boundary coordinates are exported as
-absolute 3D coordinates instead of the compact local `canvas is plane` form, so
-the saved symbolic expressions are preserved. Numeric work-plane-filled sheets
-continue to use the local plane scope when possible.
+3D coordinates may also store a `workPlaneLocal` source: a saved work-plane frame
+snapshot plus local scalar coordinates `(a,b)`. When all coordinates needed for
+a point, label, path, polygon/quad sheet, or work-plane-filled sheet use the
+same frame, TikZ export preserves the local scalar expressions inside a TikZ
+`3d` library plane scope:
+
+```tex
+\begin{scope}[
+    plane origin={(0,0,1)},
+    plane x={(1,0,1)},
+    plane y={(0,1,1)},
+    canvas is plane
+]
+    \draw ({\R * cos(\q)},{\R * sin(\q)}) -- ({\R + 1},0);
+\end{scope}
+```
+
+Same-frame detection compares a frame ID when one is available; otherwise it
+compares the finite preview numeric `origin`, `u`, `v`, and `normal` vectors
+within tolerance. Local scalar expressions use the same variable macro
+formatter as global symbolic coordinates, so `R*cos(q)` becomes
+`{\R * cos(\q)}`. The frame itself is emitted through the existing safe
+TikZ-plane formatter; symbolic frame origins and basis vectors are used only
+when they pass that formatter.
+
+If a path or sheet mixes global coordinates with work-plane-local coordinates,
+uses multiple local frames, or contains a local symbolic arc segment that cannot
+yet be represented safely, the MVP exporter falls back to global preview
+coordinates with an explicit warning comment. It does not expand local symbolic
+expressions into global symbolic formulas. Single points and labels with
+malformed local sources are omitted with a clear comment instead of silently
+using previews.
+
+Path templates in 3D already export in a local plane scope. If the template
+center has a matching `workPlaneLocal` source, its local `(a,b)` expressions are
+preserved; otherwise the center is exported with numeric local preview
+coordinates and a comment explains the limitation.
 
 Ruled surfaces and Coons patches may load copied boundary snapshots with
 symbolic coordinates, including symbolic work-plane frame snapshot components
 on 3D arc boundary segments, when those expressions resolve to finite preview
 values and the evaluated frame is geometrically valid. Their current TikZ
-surface output is a sampled mesh, so each emitted face uses the resolved numeric
-preview mesh coordinates. The saved diagram still keeps the symbolic boundary
-coordinate and frame expressions for later editing and round-tripping.
+surface output is a sampled mesh, so each emitted face uses the resolved finite
+numeric preview mesh coordinates. If the saved boundary snapshots contain
+work-plane-local symbolic coordinates, the generated TikZ includes a limitation
+comment; the saved diagram still keeps the local symbolic boundary coordinate
+and frame expressions for later editing and round-tripping.
 
-Standalone arc segment coordinates and 3D template centers are currently
-numeric-derived exports and are rejected by validation when symbolic coordinate
-metadata is present. Copied boundary snapshots for boundary-surface meshes use
-finite preview values for sampling. In 2D template paths, symbolic centers
-export through the named center coordinate, but template radii and rotation
-fields are still numeric in the MVP data model.
+Standalone 3D arc segment local-symbolic formulas are not expanded in the MVP.
+Copied boundary snapshots for boundary-surface meshes use finite preview values
+for sampling. In 2D template paths, symbolic centers export through the named
+center coordinate, but template radii and rotation fields are still numeric in
+the MVP data model.
 
 ## Grid export
 
@@ -392,8 +426,9 @@ frame can be emitted safely, the grid uses the TikZ `3d` library plane scope:
 
 Inside that scope, grid paths are local 2D `(u,v)` coordinates. The plane scope
 is the only place the 3D frame is described. `\usetikzlibrary{3d}` is emitted
-when at least one work-plane-local grid, work-plane-filled sheet, 3D template
-path, or work-plane-local relative Bézier curve needs this scope form.
+when at least one work-plane-local grid, work-plane-filled sheet, local-symbolic
+point/label/path/sheet, 3D template path, or work-plane-local relative Bézier
+curve needs this scope form.
 
 MVP symbolic policy: rectangular `\foreach` range triplets (`min`, `max`, and
 `step`) must be numeric so the generator can produce safe
