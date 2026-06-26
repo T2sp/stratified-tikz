@@ -1623,10 +1623,25 @@ function emitWorkPlaneFilledSheet(
     )
 
     if (!frameOptions.ok) {
+      if (!workPlaneFrameHasUnsupportedSymbolicSource(sheet.planeFrame)) {
+        return [
+          `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] omitted because its local plane frame cannot be exported safely.`,
+          `% ${frameOptions.error}`,
+          '',
+        ]
+      }
+
+      const coordinates = defineClosedBoundariesCoordinateNames(
+        sheet.boundaries,
+        sheetCoordinateBaseName(sheet, elementIndex),
+        context,
+      )
+
       return [
-        `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] omitted because its local plane frame cannot be exported safely.`,
+        `% Work-plane filled sheet "${sheet.name}" [${sheet.id}] uses absolute 3D coordinates because its local plane scope could not be used.`,
         `% ${frameOptions.error}`,
-        '',
+        `% Fill rule: ${sheet.fillRule}.`,
+        ...emitFillDrawClosedBoundaries(coordinates, options),
       ]
     }
 
@@ -4676,6 +4691,20 @@ export function sameWorkPlaneFrameForTikzLocalScope(
   )
 }
 
+export function frameCoordinateHasUnsupportedSymbolicSource(point: Vec3): boolean {
+  const symbolic = point.symbolic
+
+  return isRecord(symbolic) && symbolic.source !== undefined
+}
+
+export function workPlaneFrameHasUnsupportedSymbolicSource(
+  frame: WorkPlaneFrameSnapshot,
+): boolean {
+  return workPlaneFrameFields.some((field) =>
+    frameCoordinateHasUnsupportedSymbolicSource(frame[field]),
+  )
+}
+
 export function workPlaneFrameSymbolicSignature(
   frame: WorkPlaneFrameSnapshot,
 ): string | null {
@@ -5024,6 +5053,15 @@ function formatTikzPlaneScopeOptions(
   context: GenerateContext,
   frameDescription: string,
 ): FormatTikzPlaneScopeOptionsResult {
+  const unsupportedSourceField = unsupportedFrameSymbolicSourceField(frame)
+
+  if (unsupportedSourceField !== null) {
+    return {
+      ok: false,
+      error: `${frameDescription}.${unsupportedSourceField} contains work-plane-local symbolic source metadata that cannot be represented by TikZ plane scope frame options; using numeric preview coordinates would drop symbolic intent.`,
+    }
+  }
+
   const origin = formatFrameCoordinate(
     frame.origin,
     context,
@@ -5127,6 +5165,16 @@ function formatFrameCoordinate(
   context: GenerateContext,
   path: string,
 ): FormatFrameCoordinateResult {
+  // Frame coordinates may carry symbolic.source metadata. This formatter only
+  // supports per-axis symbolic components, so it must not silently emit numeric
+  // previews for non-axis sources and drop symbolic intent.
+  if (frameCoordinateHasUnsupportedSymbolicSource(point)) {
+    return {
+      ok: false,
+      error: `${path} contains work-plane-local symbolic source metadata that cannot be represented by the per-axis frame coordinate formatter.`,
+    }
+  }
+
   const components = [
     formatFrameCoordinateComponent(point, 'x', context, `${path}.x`),
     formatFrameCoordinateComponent(point, 'y', context, `${path}.y`),
@@ -5145,6 +5193,18 @@ function formatFrameCoordinate(
     ok: true,
     coordinate: `(${values.join(',')})`,
   }
+}
+
+function unsupportedFrameSymbolicSourceField(
+  frame: WorkPlaneFrameSnapshot,
+): (typeof workPlaneFrameFields)[number] | null {
+  for (const field of workPlaneFrameFields) {
+    if (frameCoordinateHasUnsupportedSymbolicSource(frame[field])) {
+      return field
+    }
+  }
+
+  return null
 }
 
 type FormatFrameCoordinateComponentResult =

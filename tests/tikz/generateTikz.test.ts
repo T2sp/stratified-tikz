@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   generateTikz,
+  frameCoordinateHasUnsupportedSymbolicSource,
   layerToTikzLayerName,
   maxCurvedSheetTikzFaces,
   sanitizeTikzSpathSaveName,
   sanitizeTikzNameStem,
   sameWorkPlaneFrameForTikzLocalScope,
+  workPlaneFrameHasUnsupportedSymbolicSource,
 } from '../../src/tikz/index.ts'
 import type {
   ClosedPathBoundary,
@@ -1884,6 +1886,54 @@ test('TikZ local frame equality compares symbolic metadata after preview values'
   )
 })
 
+test('TikZ plane-scope frame detection rejects source-only symbolic metadata', () => {
+  const numericFrame = xyFrame3D({ x: 2, y: 0, z: 0 })
+  const perAxisSymbolicFrame = xyFrame3D(
+    symbolicVec3(symbolicComponent('R', 2), 0, 0),
+  )
+  const sourceOnlyCoordinate = sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0)
+
+  assert.equal(frameCoordinateHasUnsupportedSymbolicSource(numericFrame.origin), false)
+  assert.equal(
+    frameCoordinateHasUnsupportedSymbolicSource(perAxisSymbolicFrame.origin),
+    false,
+  )
+  assert.equal(
+    frameCoordinateHasUnsupportedSymbolicSource(sourceOnlyCoordinate),
+    true,
+  )
+  assert.equal(workPlaneFrameHasUnsupportedSymbolicSource(numericFrame), false)
+  assert.equal(workPlaneFrameHasUnsupportedSymbolicSource(perAxisSymbolicFrame), false)
+  assert.equal(
+    workPlaneFrameHasUnsupportedSymbolicSource({
+      ...xyFrame3D(),
+      origin: sourceOnlyCoordinate,
+    }),
+    true,
+  )
+  assert.equal(
+    workPlaneFrameHasUnsupportedSymbolicSource({
+      ...xyFrame3D(),
+      u: sourceOnlyWorkPlaneLocalCoordinate(1, 0, 0),
+    }),
+    true,
+  )
+  assert.equal(
+    workPlaneFrameHasUnsupportedSymbolicSource({
+      ...xyFrame3D(),
+      v: sourceOnlyWorkPlaneLocalCoordinate(0, 1, 0),
+    }),
+    true,
+  )
+  assert.equal(
+    workPlaneFrameHasUnsupportedSymbolicSource({
+      ...xyFrame3D(),
+      normal: sourceOnlyWorkPlaneLocalCoordinate(0, 0, 1),
+    }),
+    true,
+  )
+})
+
 test('same-frame local symbolic path emits one canvas-is-plane scope with local expressions', () => {
   const diagram = createLocalSymbolicThreeDimensionalDiagram()
   const frame = xyFrame3D({ x: 0, y: 0, z: 1 })
@@ -2100,6 +2150,114 @@ test('equal-preview symbolic frame path falls back instead of dropping frame sym
   assert.ok(sMacroIndex < fallbackIndex)
 })
 
+test('source-only symbolic frame origin path falls back instead of exporting numeric plane origin', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'source-frame-local-path',
+    name: 'Source Frame Local Path',
+    style: curveStyle(),
+    points: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(1), numericScalar(0)),
+      ),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /uses global preview coordinates because curve "Source Frame Local Path" \[source-frame-local-path\] work-plane-local frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.match(
+    tikz,
+    /Work-plane-local symbolic expressions are not expanded into global symbolic coordinates/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolySourceFrameLocalPath0p0\) at \(2,0,0\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
+})
+
+test('inline source-only symbolic frame fallback preserves layer and indentation', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'inline-source-frame-local-path',
+    name: 'Inline Source Frame Local Path',
+    style: curveStyle(),
+    points: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(1), numericScalar(0)),
+      ),
+    ],
+    styleSegments: [],
+    layer: 4,
+  })
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer4')
+
+  expectNoBlankLines(tikz)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer4,main\}/)
+  assert.match(
+    tikz,
+    /\n            % Curve "Inline Source Frame Local Path" \[inline-source-frame-local-path\] uses global preview coordinates/,
+  )
+  assert.match(layerBlock, /\\draw\[/)
+  assert.doesNotMatch(layerBlock, /canvas is plane/)
+})
+
+test('source-only symbolic grid frame origin is omitted with an explicit frame comment', () => {
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+  const tikz = generateTikz(
+    createThreeDimensionalGridDiagram({
+      frame: {
+        kind: 'workPlane',
+        frame,
+      },
+    }),
+  )
+
+  assert.match(
+    tikz,
+    /Grid "3D Grid" \[grid-3d\] omitted: its local plane frame cannot be exported safely\. grid "3D Grid" \[grid-3d\] frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
+})
+
 test('local symbolic polygon sheet preserves layer and local coordinates in a canvas scope', () => {
   const diagram = createLocalSymbolicThreeDimensionalDiagram()
   const frame = xyFrame3D()
@@ -2145,6 +2303,55 @@ test('local symbolic polygon sheet preserves layer and local coordinates in a ca
     layerBlock,
     /\(\{\\R\},0\) -- \(\{\\R \+ 1\},0\) -- \(\{\\R \+ 1\},\{\\S\}\) -- cycle;/,
   )
+})
+
+test('source-only symbolic polygon sheet frame origin falls back explicitly', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: 'source-frame-local-sheet',
+    name: 'Source Frame Local Sheet',
+    style: sheetStyle(),
+    vertices: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(1), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        1,
+        0,
+        localCoordinateSource(frame, numericScalar(1), numericScalar(1)),
+      ),
+    ],
+    pathLabel: 'source frame local sheet path',
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /uses global preview coordinates because sheet "Source Frame Local Sheet" \[source-frame-local-sheet\] work-plane-local frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetPolySourceFrameLocalSheet0p0\) at \(2,0,0\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
 })
 
 test('equal-preview symbolic frame sheet falls back instead of using one frame scope', () => {
@@ -4344,6 +4551,34 @@ test('3D workPlaneFilledSheet falls back to absolute coordinates when local scop
   )
 })
 
+test('3D workPlaneFilledSheet source-only symbolic frame origin falls back with a comment', () => {
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+  const diagram = createWorkPlaneFilledSheetDiagram({
+    boundaries: [squareBoundary3D('source-frame-boundary', 0, 2, 0, 1)],
+  })
+  const sheet = diagram.strata[0]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+
+  sheet.planeFrame = frame
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /uses absolute 3D coordinates because its local plane scope could not be used/,
+  )
+  assert.match(
+    tikz,
+    /work-plane filled sheet "Filled Sheet" \[filled-sheet\] frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.match(tikz, /\\coordinate \(sheetFilledFilledSheet0b0p0\) at \(2,0,0\);/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
+})
+
 test('3D workPlaneFilledSheet TikZ preserves fill and stroke color opacity', () => {
   const tikz = generateTikz(
     createWorkPlaneFilledSheetDiagram({
@@ -5850,6 +6085,19 @@ function workPlaneLocalPoint(
       source,
     },
   }
+}
+
+function sourceOnlyWorkPlaneLocalCoordinate(x: number, y: number, z: number): Vec3 {
+  return workPlaneLocalPoint(
+    x,
+    y,
+    z,
+    localCoordinateSource(
+      xyFrame3D({ x, y, z }),
+      symbolicScalar('R', 0),
+      numericScalar(0),
+    ),
+  )
 }
 
 function xyFrame3D(origin: Vec3 = { x: 0, y: 0, z: 0 }): WorkPlaneFrameSnapshot {
