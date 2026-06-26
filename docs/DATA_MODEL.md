@@ -169,10 +169,10 @@ expression unknown.
 The Phase 19C MVP supports symbolic global coordinates for point positions,
 free-label positions, polyline and cubic/path vertices, filled-boundary path
 coordinates, 2D template centers, polygon/quad sheet vertices, and copied
-boundary-surface path snapshots for ruled surfaces and Coons patches. Active
-work-plane-local direct input, 3D template centers, and curved sheet anchors
-remain numeric-only for now; symbolic plane-local input is rejected instead of
-being converted through a symbolic frame or sampled-surface algebra.
+boundary-surface path snapshots for ruled surfaces and Coons patches. Phase 25
+extends 3D point, label, path, and sheet coordinates with symbolic
+work-plane-local source metadata. 3D template centers and curved sheet anchors
+that do not store local source metadata remain numeric preview geometry.
 
 Phase 25A adds persistent work-plane-local coordinate source metadata without
 changing the preview contract: every committed coordinate is still a finite
@@ -206,6 +206,24 @@ Unknown variables, unsafe tokens, stale previews, invalid frames, and
 non-finite local previews reject validation cleanly. During JSON import, local
 scalar expressions and symbolic frame components participate in the existing
 variable-resolution flow before preview refresh.
+
+Global translation of a work-plane-local coordinate moves the coordinate's
+stored frame snapshot origin and leaves the local scalar expressions and basis
+vectors unchanged:
+
+```text
+frame.origin' = frame.origin + d
+a' = a
+b' = b
+u' = u
+v' = v
+normal' = normal
+```
+
+The active work plane is not mutated. If several saved coordinates contain
+copied frame snapshots, translation updates each saved snapshot origin as model
+data. The operation does not expand local symbolic expressions into global
+symbolic coordinate formulas.
 
 ## Grid strata
 
@@ -465,8 +483,10 @@ segments, work-plane-filled sheet boundary points and plane-frame origins, and
 curved sheet primitive centers/origins and copied boundary-surface path
 snapshots. Stored work-plane frame basis vectors and local/relative coordinates
 are not rotated, scaled, or otherwise changed; only frame origins and copied
-absolute path coordinates are translated. In 2D, only `dx` and `dy` are
-accepted and all translated coordinates remain on `z = 0`.
+absolute path coordinates are translated. Coordinates with `workPlaneLocal`
+source metadata follow the Phase 25 policy above: their own stored frame
+origins move, while local `a,b` expressions remain unchanged. In 2D, only `dx`
+and `dy` are accepted and all translated coordinates remain on `z = 0`.
 
 ## Saved diagram file
 
@@ -1348,7 +1368,13 @@ that can be converted exactly to two circular arc segments. Ellipse templates
 and grids are rejected because the current path segment model has no exact
 single-path representation for them. Source paths are never mutated; symbolic
 coordinate metadata is cloned with the relevant model coordinates, including
-when a later path is reversed.
+when a later path is reversed. Work-plane-local coordinate sources are cloned as
+coordinate metadata rather than converted to preview numbers. When all local
+coordinates in the result share a compatible frame, TikZ export can preserve
+their local expressions in a `canvas is plane` scope. When frames differ, the
+model still preserves the sources and TikZ export falls back to preview
+coordinates with an explicit comment instead of expanding local symbolic
+expressions globally.
 
 The new concatenated path uses the first selected path's explicit curve style,
 arrow options, and layer. It starts with no `pathLabel`, no `styleSegments`, and

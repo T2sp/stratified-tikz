@@ -89,8 +89,10 @@ value. In 2D diagrams, `z` remains hidden or locked to numeric `0`.
 Symbolic global coordinates are supported for point positions, free-label
 positions, ordinary curve vertices, absolute cubic controls, filled-boundary
 path coordinates, 2D template centers, sheet vertices, and copied boundary
-snapshots used by ruled surfaces and Coons patches. Active work-plane local
-symbolic input and 3D template centers remain numeric-only in the MVP.
+snapshots used by ruled surfaces and Coons patches. In 3D mode, direct input
+and inspector editing can also store symbolic work-plane-local coordinates
+`(a,b)` against a saved work-plane frame snapshot. SVG preview still uses the
+finite global `Vec3` obtained from that local source.
 
 ## Symbolic Translation Policy
 
@@ -128,6 +130,22 @@ Stored work-plane or surface frames translate only their `origin`. Basis vectors
 scale, or shear frames. This applies to arc and path-template frames, grid
 frames, work-plane-filled sheets, ruled and Coons boundary snapshots, and curved
 surface frames.
+
+For coordinates with `workPlaneLocal` source metadata, global translation uses
+the stored local model directly:
+
+```text
+P = frame.origin + a*u + b*v
+P' = (frame.origin + d) + a*u + b*v
+```
+
+The local scalar expressions `a` and `b` are left unchanged, including symbolic
+expressions. The stored frame snapshot is object data, not the active work
+plane, so translation moves each coordinate's own copied frame origin and never
+mutates the active/global work-plane UI state. Work-plane-local translation, when
+performed by editing local coordinates, updates `a` and `b`; the global
+translation operation does not rewrite local coordinates into global symbolic
+formulas.
 
 ## JSON Import With Symbolic Variables
 

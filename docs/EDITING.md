@@ -65,6 +65,14 @@ Translation moves absolute coordinates and frame origins. It does not rotate or
 scale frame basis vectors, relative/local control metadata, or sheet parameter
 directions.
 
+For a coordinate stored with a `workPlaneLocal` source,
+`P = frame.origin + a*u + b*v`, global translation moves that coordinate's own
+stored frame snapshot origin by the global vector and leaves `a`, `b`, `u`,
+`v`, and `normal` unchanged. The active work plane is not a live reference and
+is never mutated by translation; each saved coordinate/frame snapshot is copied
+and moved as diagram data. This keeps local symbolic expressions available for
+TikZ plane-scope export after translation.
+
 ## Path Concatenation
 
 Path concatenation joins selected path-like curves in selection order. The next
@@ -76,6 +84,12 @@ The generated concatenated path uses the first selected path's style, arrows,
 and layer. Later source-path styles and segment overrides are intentionally not
 preserved in Phase 24. The user may keep the original paths or remove them; if
 the originals are removed, stale crossing states are cleaned.
+
+When source path coordinates carry work-plane-local symbolic metadata,
+concatenation clones that metadata with the segment coordinates. Same-frame
+local coordinates remain eligible for local TikZ plane-scope export. Mixed-frame
+local coordinates are not expanded into global symbolic formulas; TikZ export
+falls back to finite preview coordinates with a policy comment.
 
 ## Layer Merge And Translation
 
