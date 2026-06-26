@@ -22,7 +22,13 @@ import {
   applyConcatenateSelectedPathsToEditorState,
   concatenateSelectedPaths,
   concatenateSelectedPathsSuccessMessage,
+  createPathConcatenationDirectionDraft,
+  orientPathsForConcatenation,
+  orientPathsForConcatenationWithDirections,
+  pathConcatenationEndpointChecks,
+  togglePathConcatenationDraftDirection,
   type PathConcatenationEditorState,
+  type PathLikeSnapshot,
 } from '../../src/ui/pathConcatenation.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
@@ -115,6 +121,169 @@ test('concatenate selected paths auto-reverses the next path when its end matche
     end: point(2, 0),
   })
   assert.deepEqual(findCurve(diagram, 'path-b'), sourceB)
+})
+
+test('concatenate selected paths auto-reverses the first path when needed', () => {
+  const sourceA = linePath('path-a', point(1, 0), point(0, 0))
+  const sourceB = linePath('path-b', point(1, 0), point(2, 0))
+  const diagram = diagramWithStrata([sourceA, sourceB])
+  const beforeA = structuredClone(sourceA) as CurveStratum
+  const result = concatenateSelectedPaths(diagram, selection('path-a', 'path-b'), {
+    id: 'joined-path',
+  })
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.deepEqual(result.reversedSourcePathIds, ['path-a'])
+  assert.deepEqual(path.segments[0], {
+    kind: 'line',
+    start: point(0, 0),
+    end: point(1, 0),
+  })
+  assert.deepEqual(path.segments[1], {
+    kind: 'line',
+    start: point(1, 0),
+    end: point(2, 0),
+  })
+  assert.deepEqual(findCurve(diagram, 'path-a'), beforeA)
+})
+
+test('concatenate selected paths auto-orients three paths with reversed middle path', () => {
+  const result = concatenateSelectedPaths(
+    diagramWithStrata([
+      linePath('path-a', point(0, 0), point(1, 0)),
+      linePath('path-b', point(2, 0), point(1, 0)),
+      linePath('path-c', point(2, 0), point(3, 0)),
+    ]),
+    selection('path-a', 'path-b', 'path-c'),
+    { id: 'joined-path' },
+  )
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.deepEqual(result.reversedSourcePathIds, ['path-b'])
+  assert.deepEqual(path.segments.map((segment) => segment.end), [
+    point(1, 0),
+    point(2, 0),
+    point(3, 0),
+  ])
+})
+
+test('concatenate selected paths auto-orients multiple reversed paths', () => {
+  const result = concatenateSelectedPaths(
+    diagramWithStrata([
+      linePath('path-a', point(1, 0), point(0, 0)),
+      linePath('path-b', point(1, 0), point(2, 0)),
+      linePath('path-c', point(3, 0), point(2, 0)),
+    ]),
+    selection('path-a', 'path-b', 'path-c'),
+    { id: 'joined-path' },
+  )
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.deepEqual(result.reversedSourcePathIds, ['path-a', 'path-c'])
+  assert.deepEqual(path.segments.map((segment) => segment.start), [
+    point(0, 0),
+    point(1, 0),
+    point(2, 0),
+  ])
+  assert.deepEqual(path.segments.map((segment) => segment.end), [
+    point(1, 0),
+    point(2, 0),
+    point(3, 0),
+  ])
+})
+
+test('path concatenation orientation tie-break prefers keeping earlier paths forward', () => {
+  const paths = [
+    lineSnapshot('path-a', point(0, 0), point(1, 0)),
+    lineSnapshot('path-b', point(0, 0), point(1, 0)),
+  ]
+  const before = structuredClone(paths) as PathLikeSnapshot[]
+  const result = orientPathsForConcatenation(paths)
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(result.reversed, [false, true])
+  assert.deepEqual(paths, before)
+})
+
+test('manual direction draft reports endpoint equations and updates on reverse', () => {
+  const paths = [
+    lineSnapshot('path-a', point(0, 0), point(1, 0)),
+    lineSnapshot('path-b', point(2, 0), point(1, 0)),
+  ]
+  const draft = createPathConcatenationDirectionDraft(paths, [false, false])
+
+  assert.equal(draft.canCreate, false)
+  assert.deepEqual(
+    draft.endpointChecks.map((check) => check.equation),
+    ['path 1 end = path 2 start'],
+  )
+  assert.equal(draft.endpointChecks[0]?.matches, false)
+
+  const toggled = togglePathConcatenationDraftDirection(draft, 1)
+
+  assert.equal(toggled.canCreate, true)
+  assert.deepEqual(toggled.reversed, [false, true])
+  assert.equal(toggled.endpointChecks[0]?.matches, true)
+})
+
+test('manual direction flags reject failing checks and create after reversal', () => {
+  const paths = [
+    lineSnapshot('path-a', point(0, 0), point(1, 0)),
+    lineSnapshot('path-b', point(2, 0), point(1, 0)),
+  ]
+  const invalid = orientPathsForConcatenationWithDirections(paths, [false, false])
+  const valid = orientPathsForConcatenationWithDirections(paths, [false, true])
+
+  assert.equal(invalid.ok, false)
+  if (invalid.ok) {
+    throw new Error('Expected manual direction validation to fail.')
+  }
+  assert.equal(invalid.error, 'endpointMismatch')
+  assert.equal(valid.ok, true)
+
+  const diagram = diagramWithStrata([
+    linePath('path-a', point(0, 0), point(1, 0)),
+    linePath('path-b', point(2, 0), point(1, 0)),
+  ])
+  const failedCreate = concatenateSelectedPaths(
+    diagram,
+    selection('path-a', 'path-b'),
+    { id: 'failed-path', directionReversed: [false, false] },
+  )
+  const created = concatenateSelectedPaths(
+    diagram,
+    selection('path-a', 'path-b'),
+    { id: 'joined-path', directionReversed: [false, true] },
+  )
+
+  assert.equal(failedCreate.ok, false)
+  assert.equal(failedCreate.error, 'endpointMismatch')
+  assert.equal(created.ok, true)
+  assert.deepEqual(expectConcatenatedPath(created, 'joined-path').segments[1], {
+    kind: 'line',
+    start: point(1, 0),
+    end: point(2, 0),
+  })
+})
+
+test('endpoint check helper returns adjacent equations for a chain', () => {
+  const checks = pathConcatenationEndpointChecks([
+    lineSnapshot('path-a', point(0, 0), point(1, 0)),
+    lineSnapshot('path-b', point(1, 0), point(2, 0)),
+    lineSnapshot('path-c', point(3, 0), point(4, 0)),
+  ])
+
+  assert.deepEqual(
+    checks.map((check) => [check.equation, check.matches]),
+    [
+      ['path 1 end = path 2 start', true],
+      ['path 2 end = path 3 start', false],
+    ],
+  )
 })
 
 test('concatenate selected paths rejects non-connected paths without mutation', () => {
@@ -289,6 +458,30 @@ test('concatenate selected paths preserves symbolic coordinate expressions', () 
   assert.equal(path.segments[1].start.symbolic?.x.expression, 'a')
   assert.equal(path.segments[1].end.symbolic?.x.kind, 'symbolic')
   assert.equal(path.segments[1].end.symbolic?.x.expression, 'b')
+})
+
+test('concatenate selected paths preserves symbolic expressions when auto-reversing', () => {
+  const symbolicEnd = symbolicPoint('b', 1)
+  const symbolicStart = symbolicPoint('c', 2)
+  const result = concatenateSelectedPaths(
+    diagramWithStrata([
+      linePath('path-a', point(0, 0), point(1, 0)),
+      linePath('path-b', symbolicStart, symbolicEnd),
+    ]),
+    selection('path-a', 'path-b'),
+    { id: 'joined-path' },
+  )
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.deepEqual(result.reversedSourcePathIds, ['path-b'])
+  assert.equal(path.segments[1].kind, 'line')
+  if (path.segments[1].kind !== 'line') {
+    throw new Error('Expected a line segment.')
+  }
+  assert.equal(path.segments[1].start.symbolic?.x.kind, 'symbolic')
+  assert.equal(path.segments[1].start.symbolic?.x.expression, 'b')
+  assert.equal(path.segments[1].end.symbolic?.x.kind, 'symbolic')
+  assert.equal(path.segments[1].end.symbolic?.x.expression, 'c')
 })
 
 test('concatenate selected paths cleans crossing states when originals are removed', () => {
@@ -530,6 +723,20 @@ function symbolicPoint(expression: string, previewValue: number): Vec3 {
         value: 0,
       },
     },
+  }
+}
+
+function lineSnapshot(id: string, start: Vec3, end: Vec3): PathLikeSnapshot {
+  return {
+    id,
+    name: id,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+      },
+    ],
   }
 }
 

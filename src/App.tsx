@@ -1874,9 +1874,13 @@ function App() {
     setCopyStatus('idle')
   }
 
-  function concatenateCurrentSelection(keepOriginals: boolean): string {
+  function concatenateCurrentSelection(
+    keepOriginals: boolean,
+    directionReversed?: readonly boolean[],
+  ): string {
     const nextState = applyConcatenateSelectedPathsToEditorState(editorState, {
       keepOriginals,
+      directionReversed,
     })
 
     setEditorState(nextState)

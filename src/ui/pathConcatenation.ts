@@ -2,6 +2,7 @@ import { createConcatenatedPathStratum } from '../model/constructors.ts'
 import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import {
   arcScalarPreviewValue,
+  cloneBoundaryPathSnapshot,
   clonePathSegment,
   createArcPathSegmentFromAngles,
   pathCoordinates,
@@ -9,10 +10,12 @@ import {
   pathEndpoints,
   pathSegmentsFromCubicBezier,
   pathSegmentsFromPolyline,
+  reverseBoundaryPathSnapshot,
   reversePathSegment,
 } from '../model/paths.ts'
 import type {
   AmbientDimension,
+  BoundaryPathSnapshot,
   CurveStratum,
   Diagram,
   PathSegment,
@@ -36,6 +39,7 @@ import {
 
 export type ConcatenateSelectedPathsOptions = {
   keepOriginals?: boolean
+  directionReversed?: readonly boolean[]
   id?: string
   name?: string
 }
@@ -71,6 +75,67 @@ export type PathConcatenationEditorState = UndoableEditorState & {
   layerOperationStatus: string
 }
 
+export type PathLikeSnapshot = BoundaryPathSnapshot
+
+export type PathConcatenationSource = {
+  path: CurveStratum
+  snapshot: PathLikeSnapshot
+}
+
+export type ResolveSelectedPathSnapshotsForConcatenationResult =
+  | {
+      ok: true
+      sources: PathConcatenationSource[]
+    }
+  | {
+      ok: false
+      error: ConcatenateSelectedPathsError
+      sourcePathId?: string
+    }
+
+export type PathConcatenationEndpointCheck = {
+  index: number
+  previousPathIndex: number
+  nextPathIndex: number
+  previousPathId?: string
+  nextPathId?: string
+  previousEnd: Vec3 | null
+  nextStart: Vec3 | null
+  matches: boolean
+  equation: string
+}
+
+export type OrientPathsForConcatenationResult =
+  | {
+      ok: true
+      oriented: PathLikeSnapshot[]
+      reversed: boolean[]
+      endpointChecks: PathConcatenationEndpointCheck[]
+    }
+  | {
+      ok: false
+      error: 'emptySourcePath' | 'sourceNonFinite' | 'endpointMismatch'
+      sourcePathId?: string
+      endpointChecks: PathConcatenationEndpointCheck[]
+    }
+
+export type PathConcatenationDirectionDraftPath = {
+  id?: string
+  name?: string
+  reversed: boolean
+  start: Vec3 | null
+  end: Vec3 | null
+}
+
+export type PathConcatenationDirectionDraft = {
+  sourceSnapshots: PathLikeSnapshot[]
+  oriented: PathLikeSnapshot[]
+  reversed: boolean[]
+  paths: PathConcatenationDirectionDraftPath[]
+  endpointChecks: PathConcatenationEndpointCheck[]
+  canCreate: boolean
+}
+
 type SourcePathSegmentsResult =
   | {
       ok: true
@@ -92,84 +157,34 @@ export function concatenateSelectedPaths(
   selection: SelectedElement,
   options: ConcatenateSelectedPathsOptions = {},
 ): ConcatenateSelectedPathsResult {
-  const selected = selectedElements(selection)
+  const sources = resolveSelectedPathSnapshotsForConcatenation(diagram, selection)
 
-  if (selected.length < 2) {
+  if (!sources.ok) {
     return {
       ok: false,
       diagram,
-      error: 'tooFewPaths',
+      error: sources.error,
+      sourcePathId: sources.sourcePathId,
     }
   }
 
-  const sourceIds = new Set<string>()
-  const sourcePaths: CurveStratum[] = []
-  const sourceSegments: PathSegment[][] = []
-
-  for (const selectedElement of selected) {
-    if (selectedElement.kind !== 'stratum') {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNotPath',
-      }
-    }
-
-    if (sourceIds.has(selectedElement.id)) {
-      return {
-        ok: false,
-        diagram,
-        error: 'duplicateSourcePath',
-        sourcePathId: selectedElement.id,
-      }
-    }
-
-    const found = findSelectedElement(diagram, selectedElement)
-
-    if (found === null) {
-      return {
-        ok: false,
-        diagram,
-        error: 'missingSourcePath',
-        sourcePathId: selectedElement.id,
-      }
-    }
-
-    if (found.kind !== 'stratum' || found.element.geometricKind !== 'curve') {
-      return {
-        ok: false,
-        diagram,
-        error: 'sourceNotPath',
-        sourcePathId: selectedElement.id,
-      }
-    }
-
-    const segments = sourcePathSegments(
-      found.element,
-      diagram.ambientDimension,
-    )
-
-    if (!segments.ok) {
-      return {
-        ok: false,
-        diagram,
-        error: segments.error,
-        sourcePathId: found.element.id,
-      }
-    }
-
-    sourceIds.add(found.element.id)
-    sourcePaths.push(found.element)
-    sourceSegments.push(segments.segments)
-  }
-
-  const ordered = orderComposableSegments(sourcePaths, sourceSegments)
+  const sourcePaths = sources.sources.map((source) => source.path)
+  const sourceSnapshots = sources.sources.map((source) => source.snapshot)
+  const sourceIds = new Set(sourcePaths.map((path) => path.id))
+  const ordered =
+    options.directionReversed === undefined
+      ? orientPathsForConcatenation(sourceSnapshots, pathEndpointEpsilon)
+      : orientPathsForConcatenationWithDirections(
+          sourceSnapshots,
+          options.directionReversed,
+          pathEndpointEpsilon,
+        )
 
   if (!ordered.ok) {
     return {
       ok: false,
       diagram,
-      error: 'endpointMismatch',
+      error: ordered.error,
       sourcePathId: ordered.sourcePathId,
     }
   }
@@ -190,7 +205,7 @@ export function concatenateSelectedPaths(
     id,
     name: options.name ?? 'Concatenated path',
     style: firstPath.style,
-    segments: ordered.segments,
+    segments: concatenatedSegmentsFromSnapshots(ordered.oriented),
     styleSegments: [],
     arrows: firstPath.arrows,
     layer: firstPath.layer,
@@ -215,8 +230,292 @@ export function concatenateSelectedPaths(
     id,
     selectedElement: { kind: 'stratum', id },
     sourcePathCount: sourcePaths.length,
-    reversedSourcePathIds: ordered.reversedSourcePathIds,
+    reversedSourcePathIds: sourcePaths
+      .filter((_, index) => ordered.reversed[index] === true)
+      .map((path) => path.id),
   }
+}
+
+export function resolveSelectedPathSnapshotsForConcatenation(
+  diagram: Diagram,
+  selection: SelectedElement,
+): ResolveSelectedPathSnapshotsForConcatenationResult {
+  const selected = selectedElements(selection)
+
+  if (selected.length < 2) {
+    return {
+      ok: false,
+      error: 'tooFewPaths',
+    }
+  }
+
+  const sourceIds = new Set<string>()
+  const sources: PathConcatenationSource[] = []
+
+  for (const selectedElement of selected) {
+    if (selectedElement.kind !== 'stratum') {
+      return {
+        ok: false,
+        error: 'sourceNotPath',
+      }
+    }
+
+    if (sourceIds.has(selectedElement.id)) {
+      return {
+        ok: false,
+        error: 'duplicateSourcePath',
+        sourcePathId: selectedElement.id,
+      }
+    }
+
+    const found = findSelectedElement(diagram, selectedElement)
+
+    if (found === null) {
+      return {
+        ok: false,
+        error: 'missingSourcePath',
+        sourcePathId: selectedElement.id,
+      }
+    }
+
+    if (found.kind !== 'stratum' || found.element.geometricKind !== 'curve') {
+      return {
+        ok: false,
+        error: 'sourceNotPath',
+        sourcePathId: selectedElement.id,
+      }
+    }
+
+    const segments = sourcePathSegments(
+      found.element,
+      diagram.ambientDimension,
+    )
+
+    if (!segments.ok) {
+      return {
+        ok: false,
+        error: segments.error,
+        sourcePathId: found.element.id,
+      }
+    }
+
+    sourceIds.add(found.element.id)
+    sources.push({
+      path: found.element,
+      snapshot: {
+        id: found.element.id,
+        name: found.element.name,
+        segments: segments.segments,
+      },
+    })
+  }
+
+  return {
+    ok: true,
+    sources,
+  }
+}
+
+export function getPathStart(pathLike: PathLikeSnapshot): Vec3 | null {
+  return pathEndpoints(pathLike.segments)?.start ?? null
+}
+
+export function getPathEnd(pathLike: PathLikeSnapshot): Vec3 | null {
+  return pathEndpoints(pathLike.segments)?.end ?? null
+}
+
+export function reversePathSegments(
+  segments: readonly PathSegment[],
+): PathSegment[] {
+  return [...segments].reverse().map(reversePathSegment)
+}
+
+export function reversePathLikeSnapshot(
+  pathLike: PathLikeSnapshot,
+): PathLikeSnapshot {
+  return reverseBoundaryPathSnapshot(pathLike)
+}
+
+export function orientPathsForConcatenation(
+  paths: readonly PathLikeSnapshot[],
+  epsilon = pathEndpointEpsilon,
+): OrientPathsForConcatenationResult {
+  const validation = validatePathLikeSnapshots(paths)
+
+  if (!validation.ok) {
+    return validation
+  }
+
+  const [firstPath] = paths
+
+  if (firstPath === undefined) {
+    return {
+      ok: true,
+      oriented: [],
+      reversed: [],
+      endpointChecks: [],
+    }
+  }
+
+  const attempts = [false, true].flatMap((reverseFirst) =>
+    orientPathAttempt(paths, reverseFirst, epsilon),
+  )
+
+  if (attempts.length === 0) {
+    return {
+      ok: false,
+      error: 'endpointMismatch',
+      sourcePathId: paths[1]?.id,
+      endpointChecks: [],
+    }
+  }
+
+  const [best] = [...attempts].sort(compareOrientationAttempts)
+
+  if (best === undefined) {
+    return {
+      ok: false,
+      error: 'endpointMismatch',
+      sourcePathId: paths[1]?.id,
+      endpointChecks: [],
+    }
+  }
+
+  return {
+    ok: true,
+    oriented: best.oriented,
+    reversed: best.reversed,
+    endpointChecks: pathConcatenationEndpointChecks(best.oriented, epsilon),
+  }
+}
+
+export function orientPathsForConcatenationWithDirections(
+  paths: readonly PathLikeSnapshot[],
+  reversed: readonly boolean[],
+  epsilon = pathEndpointEpsilon,
+): OrientPathsForConcatenationResult {
+  const validation = validatePathLikeSnapshots(paths)
+
+  if (!validation.ok) {
+    return validation
+  }
+
+  if (reversed.length !== paths.length) {
+    return {
+      ok: false,
+      error: 'endpointMismatch',
+      sourcePathId: paths[reversed.length]?.id,
+      endpointChecks: [],
+    }
+  }
+
+  const oriented = paths.map((path, index) =>
+    reversed[index] === true
+      ? reversePathLikeSnapshot(path)
+      : cloneBoundaryPathSnapshot(path),
+  )
+  const endpointChecks = pathConcatenationEndpointChecks(oriented, epsilon)
+  const firstFailingCheck = endpointChecks.find((check) => !check.matches)
+
+  if (firstFailingCheck !== undefined) {
+    return {
+      ok: false,
+      error: 'endpointMismatch',
+      sourcePathId: firstFailingCheck.nextPathId,
+      endpointChecks,
+    }
+  }
+
+  return {
+    ok: true,
+    oriented,
+    reversed: [...reversed],
+    endpointChecks,
+  }
+}
+
+export function pathConcatenationEndpointChecks(
+  paths: readonly PathLikeSnapshot[],
+  epsilon = pathEndpointEpsilon,
+): PathConcatenationEndpointCheck[] {
+  return paths.slice(0, -1).map((path, index) => {
+    const nextPath = paths[index + 1]
+    const previousEnd = getPathEnd(path)
+    const nextStart =
+      nextPath === undefined ? null : getPathStart(nextPath)
+
+    return {
+      index,
+      previousPathIndex: index,
+      nextPathIndex: index + 1,
+      ...(path.id === undefined ? {} : { previousPathId: path.id }),
+      ...(nextPath?.id === undefined ? {} : { nextPathId: nextPath.id }),
+      previousEnd,
+      nextStart,
+      matches:
+        previousEnd !== null &&
+        nextStart !== null &&
+        vec3ApproximatelyEqual(previousEnd, nextStart, epsilon),
+      equation: `path ${index + 1} end = path ${index + 2} start`,
+    }
+  })
+}
+
+export function createPathConcatenationDirectionDraft(
+  paths: readonly PathLikeSnapshot[],
+  reversed: readonly boolean[] = [],
+  epsilon = pathEndpointEpsilon,
+): PathConcatenationDirectionDraft {
+  const sourceSnapshots = paths.map(cloneBoundaryPathSnapshot)
+  const directionFlags = sourceSnapshots.map(
+    (_, index) => reversed[index] === true,
+  )
+  const oriented = sourceSnapshots.map((path, index) =>
+    directionFlags[index] === true
+      ? reversePathLikeSnapshot(path)
+      : cloneBoundaryPathSnapshot(path),
+  )
+  const endpointChecks = pathConcatenationEndpointChecks(oriented, epsilon)
+  const pathsWithEndpoints = oriented.map((path, index) => ({
+    ...(path.id === undefined ? {} : { id: path.id }),
+    ...(path.name === undefined ? {} : { name: path.name }),
+    reversed: directionFlags[index] === true,
+    start: getPathStart(path),
+    end: getPathEnd(path),
+  }))
+
+  return {
+    sourceSnapshots,
+    oriented,
+    reversed: directionFlags,
+    paths: pathsWithEndpoints,
+    endpointChecks,
+    canCreate:
+      oriented.length >= 2 &&
+      pathsWithEndpoints.every(
+        (path) => path.start !== null && path.end !== null,
+      ) &&
+      sourceSnapshots.every((path) => segmentsHaveFinitePreview(path.segments)) &&
+      endpointChecks.every((check) => check.matches),
+  }
+}
+
+export function togglePathConcatenationDraftDirection(
+  draft: PathConcatenationDirectionDraft,
+  pathIndex: number,
+  epsilon = pathEndpointEpsilon,
+): PathConcatenationDirectionDraft {
+  if (pathIndex < 0 || pathIndex >= draft.reversed.length) {
+    return draft
+  }
+
+  return createPathConcatenationDirectionDraft(
+    draft.sourceSnapshots,
+    draft.reversed.map((reversed, index) =>
+      index === pathIndex ? !reversed : reversed,
+    ),
+    epsilon,
+  )
 }
 
 export function applyConcatenateSelectedPathsToEditorState<
@@ -433,97 +732,136 @@ function validateSourceSegments(
   }
 }
 
-function orderComposableSegments(
-  sourcePaths: readonly CurveStratum[],
-  sourceSegments: readonly PathSegment[][],
-):
-  | {
-      ok: true
-      segments: PathSegment[]
-      reversedSourcePathIds: string[]
-    }
-  | {
-      ok: false
-      sourcePathId: string
-    } {
-  const [firstSegments, ...remainingSegments] = sourceSegments
-  const [firstPath, ...remainingPaths] = sourcePaths
+type OrientationAttempt = {
+  oriented: PathLikeSnapshot[]
+  reversed: boolean[]
+}
 
-  if (firstSegments === undefined || firstPath === undefined) {
-    return {
-      ok: false,
-      sourcePathId: '',
-    }
-  }
-
-  const orderedSegments = firstSegments.map(cloneSegmentWithoutStyleOverride)
-  const reversedSourcePathIds: string[] = []
-
-  for (let index = 0; index < remainingSegments.length; index += 1) {
-    const nextSegments = remainingSegments[index]
-    const nextPath = remainingPaths[index]
-    const currentEndpoints = pathEndpoints(orderedSegments)
-    const nextEndpoints =
-      nextSegments === undefined ? null : pathEndpoints(nextSegments)
-
-    if (
-      nextSegments === undefined ||
-      nextPath === undefined ||
-      currentEndpoints === null ||
-      nextEndpoints === null
-    ) {
+function validatePathLikeSnapshots(
+  paths: readonly PathLikeSnapshot[],
+): OrientPathsForConcatenationResult {
+  for (const path of paths) {
+    if (path.segments.length === 0) {
       return {
         ok: false,
-        sourcePathId: nextPath?.id ?? '',
+        error: 'emptySourcePath',
+        sourcePathId: path.id,
+        endpointChecks: [],
       }
     }
 
-    if (
-      vec3ApproximatelyEqual(
-        currentEndpoints.end,
-        nextEndpoints.start,
-        pathEndpointEpsilon,
-      )
-    ) {
-      orderedSegments.push(...nextSegments.map(cloneSegmentWithoutStyleOverride))
-      continue
-    }
-
-    if (
-      vec3ApproximatelyEqual(
-        currentEndpoints.end,
-        nextEndpoints.end,
-        pathEndpointEpsilon,
-      )
-    ) {
-      orderedSegments.push(
-        ...[...nextSegments]
-          .reverse()
-          .map(reverseSegmentWithoutStyleOverride),
-      )
-      reversedSourcePathIds.push(nextPath.id)
-      continue
-    }
-
-    return {
-      ok: false,
-      sourcePathId: nextPath.id,
+    if (!segmentsHaveFinitePreview(path.segments)) {
+      return {
+        ok: false,
+        error: 'sourceNonFinite',
+        sourcePathId: path.id,
+        endpointChecks: [],
+      }
     }
   }
 
   return {
     ok: true,
-    segments: orderedSegments,
-    reversedSourcePathIds,
+    oriented: [],
+    reversed: [],
+    endpointChecks: [],
   }
+}
+
+function orientPathAttempt(
+  paths: readonly PathLikeSnapshot[],
+  reverseFirst: boolean,
+  epsilon: number,
+): OrientationAttempt[] {
+  const [firstPath] = paths
+
+  if (firstPath === undefined) {
+    return []
+  }
+
+  const firstOriented = reverseFirst
+    ? reversePathLikeSnapshot(firstPath)
+    : cloneBoundaryPathSnapshot(firstPath)
+  const oriented: PathLikeSnapshot[] = [firstOriented]
+  const reversed: boolean[] = [reverseFirst]
+
+  for (let index = 1; index < paths.length; index += 1) {
+    const previousEnd = getPathEnd(oriented[index - 1] ?? firstOriented)
+    const nextPath = paths[index]
+
+    if (previousEnd === null || nextPath === undefined) {
+      return []
+    }
+
+    const nextStart = getPathStart(nextPath)
+    const nextEnd = getPathEnd(nextPath)
+
+    if (
+      nextStart !== null &&
+      vec3ApproximatelyEqual(previousEnd, nextStart, epsilon)
+    ) {
+      oriented.push(cloneBoundaryPathSnapshot(nextPath))
+      reversed.push(false)
+      continue
+    }
+
+    if (
+      nextEnd !== null &&
+      vec3ApproximatelyEqual(previousEnd, nextEnd, epsilon)
+    ) {
+      oriented.push(reversePathLikeSnapshot(nextPath))
+      reversed.push(true)
+      continue
+    }
+
+    return []
+  }
+
+  return [
+    {
+      oriented,
+      reversed,
+    },
+  ]
+}
+
+function compareOrientationAttempts(
+  first: OrientationAttempt,
+  second: OrientationAttempt,
+): number {
+  const reversalCountDifference =
+    countReversals(first.reversed) - countReversals(second.reversed)
+
+  if (reversalCountDifference !== 0) {
+    return reversalCountDifference
+  }
+
+  for (let index = 0; index < first.reversed.length; index += 1) {
+    const firstReversed = first.reversed[index] === true
+    const secondReversed = second.reversed[index] === true
+
+    if (firstReversed !== secondReversed) {
+      return firstReversed ? 1 : -1
+    }
+  }
+
+  return 0
+}
+
+function countReversals(reversed: readonly boolean[]): number {
+  return reversed.filter(Boolean).length
+}
+
+function concatenatedSegmentsFromSnapshots(
+  snapshots: readonly PathLikeSnapshot[],
+): PathSegment[] {
+  return snapshots.flatMap((snapshot) =>
+    snapshot.segments.map(cloneSegmentWithoutStyleOverride),
+  )
 }
 
 function cloneSegmentWithoutStyleOverride(segment: PathSegment): PathSegment {
   return withoutStyleOverride(clonePathSegment(segment))
-}
-
-function reverseSegmentWithoutStyleOverride(segment: PathSegment): PathSegment {
-  return withoutStyleOverride(reversePathSegment(segment))
 }
 
 function withoutStyleOverride(segment: PathSegment): PathSegment {

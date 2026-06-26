@@ -12,13 +12,20 @@ import {
   type BulkStyleEditorModel,
   type BulkStyleField,
 } from '../bulkEditing.ts'
-import type { Diagram } from '../../model/types.ts'
+import type { Diagram, Vec3 } from '../../model/types.ts'
 import {
   parseTranslationVectorFromInputs,
   type TranslationVector,
 } from '../../model/translation.ts'
 import { normalizeColorInputValue } from '../colorInput.ts'
 import { parseFiniteNumber, parseOpacity, parsePositiveFiniteNumber } from '../diagramUpdates.ts'
+import {
+  createPathConcatenationDirectionDraft,
+  orientPathsForConcatenation,
+  resolveSelectedPathSnapshotsForConcatenation,
+  type PathConcatenationDirectionDraft,
+  type PathLikeSnapshot,
+} from '../pathConcatenation.ts'
 import type { MultiSelectedElement } from '../selection.ts'
 import { formatNumberInput, ReadOnlyField } from './InspectorField.tsx'
 import type { DiagramChangeHandler } from './types.ts'
@@ -32,7 +39,10 @@ export type BulkSelectionInspectorProps = {
   onBulkDelete: () => void
   onBulkDuplicate: () => void
   onBulkTranslate: (translation: TranslationVector) => void
-  onBulkConcatenatePaths: (keepOriginals: boolean) => string
+  onBulkConcatenatePaths: (
+    keepOriginals: boolean,
+    directionReversed?: readonly boolean[],
+  ) => string
 }
 
 export function BulkSelectionInspector({
@@ -101,6 +111,8 @@ export function BulkSelectionInspector({
       />
 
       <BulkPathConcatenationSection
+        diagram={diagram}
+        selection={selection}
         enabled={model?.geometricKind === 'curve' && selection.elements.length >= 2}
         onBulkConcatenatePaths={onBulkConcatenatePaths}
       />
@@ -155,17 +167,96 @@ function objectCountLabel(count: number): string {
 }
 
 function BulkPathConcatenationSection({
+  diagram,
+  selection,
   enabled,
   onBulkConcatenatePaths,
 }: {
+  diagram: Diagram
+  selection: MultiSelectedElement
   enabled: boolean
-  onBulkConcatenatePaths: (keepOriginals: boolean) => string
+  onBulkConcatenatePaths: (
+    keepOriginals: boolean,
+    directionReversed?: readonly boolean[],
+  ) => string
 }) {
   const [keepOriginals, setKeepOriginals] = useState(true)
   const [status, setStatus] = useState('')
+  const [directionPanelOpen, setDirectionPanelOpen] = useState(false)
+  const [manualDirectionState, setManualDirectionState] =
+    useState<ManualDirectionState | null>(null)
+  const sourceResult = useMemo(
+    () =>
+      enabled
+        ? resolveSelectedPathSnapshotsForConcatenation(diagram, selection)
+        : null,
+    [diagram, enabled, selection],
+  )
+  const sourceSnapshots = sourceResult?.ok
+    ? sourceResult.sources.map((source) => source.snapshot)
+    : []
+  const sourceKey = sourceSnapshots.map(pathSnapshotKey).join('|')
+  const autoOrientation = useMemo(
+    () =>
+      sourceSnapshots.length >= 2
+        ? orientPathsForConcatenation(sourceSnapshots)
+        : null,
+    [sourceSnapshots],
+  )
+  const defaultDirectionReversed =
+    autoOrientation?.ok === true
+      ? autoOrientation.reversed
+      : sourceSnapshots.map(() => false)
+  const manualDirectionReversed =
+    manualDirectionState?.key === sourceKey
+      ? normalizeDirectionFlags(
+          manualDirectionState.reversed,
+          sourceSnapshots.length,
+        )
+      : defaultDirectionReversed
+  const directionDraft =
+    sourceSnapshots.length >= 2
+      ? createPathConcatenationDirectionDraft(
+          sourceSnapshots,
+          manualDirectionReversed,
+        )
+      : null
+  const directionControlsVisible =
+    sourceResult?.ok === true &&
+    (directionPanelOpen || autoOrientation?.ok === false)
+  const autoReversalCount =
+    autoOrientation?.ok === true
+      ? autoOrientation.reversed.filter(Boolean).length
+      : 0
+  const createDisabled =
+    !enabled ||
+    (directionControlsVisible && directionDraft?.canCreate !== true)
 
   function concatenate(): void {
-    setStatus(onBulkConcatenatePaths(keepOriginals))
+    setStatus(
+      onBulkConcatenatePaths(
+        keepOriginals,
+        directionControlsVisible ? directionDraft?.reversed : undefined,
+      ),
+    )
+  }
+
+  function toggleDirection(pathIndex: number): void {
+    const nextReversed = manualDirectionReversed.map((reversed, index) =>
+      index === pathIndex ? !reversed : reversed,
+    )
+
+    setManualDirectionState({
+      key: sourceKey,
+      reversed: nextReversed,
+    })
+  }
+
+  function resetDirections(): void {
+    setManualDirectionState({
+      key: sourceKey,
+      reversed: defaultDirectionReversed,
+    })
   }
 
   return (
@@ -188,7 +279,7 @@ function BulkPathConcatenationSection({
           <button
             type="button"
             className="toolbar-button"
-            disabled={!enabled}
+            disabled={createDisabled}
             title={
               enabled
                 ? 'Concatenate selected paths; the new path uses the first path style.'
@@ -199,6 +290,32 @@ function BulkPathConcatenationSection({
             Concatenate
           </button>
         </div>
+        <div className="inspector-field">
+          <span className="inspector-field-label">Direction</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={sourceResult?.ok !== true}
+            aria-pressed={directionControlsVisible}
+            onClick={() => setDirectionPanelOpen((open) => !open)}
+          >
+            Adjust
+          </button>
+        </div>
+        {autoReversalCount > 0 && !directionControlsVisible && (
+          <p className="inspector-status" role="status">
+            Auto orientation will reverse {autoReversalCount}{' '}
+            {autoReversalCount === 1 ? 'path' : 'paths'}.
+          </p>
+        )}
+        {directionControlsVisible && directionDraft !== null && (
+          <PathConcatenationDirectionControls
+            draft={directionDraft}
+            onToggleDirection={toggleDirection}
+            onResetDirections={resetDirections}
+            onCreate={concatenate}
+          />
+        )}
         {status !== '' && (
           <p className="inspector-status" role="status" aria-live="polite">
             {status}
@@ -207,6 +324,131 @@ function BulkPathConcatenationSection({
       </div>
     </section>
   )
+}
+
+type ManualDirectionState = {
+  key: string
+  reversed: boolean[]
+}
+
+function PathConcatenationDirectionControls({
+  draft,
+  onToggleDirection,
+  onResetDirections,
+  onCreate,
+}: {
+  draft: PathConcatenationDirectionDraft
+  onToggleDirection: (pathIndex: number) => void
+  onResetDirections: () => void
+  onCreate: () => void
+}) {
+  return (
+    <div className="path-concat-direction-controls">
+      <div className="path-concat-direction-list">
+        {draft.paths.map((path, index) => (
+          <div
+            className="path-concat-direction-row"
+            key={path.id ?? `path-${index}`}
+          >
+            <span className="path-concat-direction-label">
+              {index + 1}. {path.name ?? path.id ?? `path ${index + 1}`}
+            </span>
+            <span className="path-concat-direction-text">
+              {path.reversed ? 'end -> start' : 'start -> end'}:{' '}
+              {formatEndpoint(path.start)}
+              {' -> '}
+              {formatEndpoint(path.end)}
+            </span>
+            <button
+              type="button"
+              className="toolbar-button path-concat-reverse-button"
+              aria-pressed={path.reversed}
+              onClick={() => onToggleDirection(index)}
+            >
+              Reverse
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="path-concat-endpoint-check-list">
+        {draft.endpointChecks.map((check) => (
+          <div
+            className={
+              check.matches
+                ? 'path-concat-endpoint-check path-concat-endpoint-check-ok'
+                : 'path-concat-endpoint-check path-concat-endpoint-check-fail'
+            }
+            key={check.index}
+          >
+            <span className="path-concat-endpoint-state">
+              {check.matches ? 'OK' : 'Mismatch'}
+            </span>
+            <span>
+              {check.equation}: {formatEndpoint(check.previousEnd)} ={' '}
+              {formatEndpoint(check.nextStart)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="path-concat-direction-actions">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={onResetDirections}
+        >
+          Reset directions
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          disabled={!draft.canCreate}
+          onClick={onCreate}
+        >
+          Create concatenated path
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function normalizeDirectionFlags(
+  reversed: readonly boolean[],
+  count: number,
+): boolean[] {
+  return Array.from({ length: count }, (_, index) => reversed[index] === true)
+}
+
+function pathSnapshotKey(snapshot: PathLikeSnapshot): string {
+  return [
+    snapshot.id ?? '',
+    snapshot.segments.length,
+    formatEndpointForKey(snapshot.segments[0]?.start ?? null),
+    formatEndpointForKey(snapshot.segments[snapshot.segments.length - 1]?.end ?? null),
+  ].join(':')
+}
+
+function formatEndpoint(point: Vec3 | null): string {
+  if (point === null) {
+    return '(unavailable)'
+  }
+
+  return `(${formatCoordinate(point.x)},${formatCoordinate(
+    point.y,
+  )},${formatCoordinate(point.z)})`
+}
+
+function formatEndpointForKey(point: Vec3 | null): string {
+  return point === null ? '' : `${point.x},${point.y},${point.z}`
+}
+
+function formatCoordinate(value: number): string {
+  if (!Number.isFinite(value)) {
+    return 'NaN'
+  }
+
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
 }
 
 function BulkTranslationSection({

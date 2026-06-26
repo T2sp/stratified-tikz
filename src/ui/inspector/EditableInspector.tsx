@@ -22,7 +22,10 @@ export type EditableInspectorProps = {
   onBulkDelete: () => void
   onBulkDuplicate: () => void
   onBulkTranslate: (translation: TranslationVector) => void
-  onBulkConcatenatePaths: (keepOriginals: boolean) => string
+  onBulkConcatenatePaths: (
+    keepOriginals: boolean,
+    directionReversed?: readonly boolean[],
+  ) => string
 }
 
 export function EditableInspector({
