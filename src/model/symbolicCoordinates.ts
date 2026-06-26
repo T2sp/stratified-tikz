@@ -383,6 +383,9 @@ export function validateDiagramSymbolicCoordinateMetadata(
 export function collectDiagramSupportedSymbolicExpressionSources(
   diagram: Diagram,
 ): CollectSupportedSymbolicExpressionSourcesResult {
+  // Variable detection must use the same model-aware coverage as preview
+  // refresh/validation; recursive collection can accept unsupported symbolic
+  // objects with stale previews.
   const inspection = inspectDiagramSupportedSymbolicCoordinateSources(diagram)
 
   if (inspection.errors.length > 0) {

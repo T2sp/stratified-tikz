@@ -1298,6 +1298,58 @@ test('pending symbolic import refreshes supported work-plane-local stale preview
   )
 })
 
+test('pending symbolic import rejects unsupported stale local sources after variable resolution', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'pending-unsupported-local-source',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Pending Unsupported Local Source',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected work-plane-local variable resolution.')
+  }
+
+  const point = pending.pendingImport.diagram.strata[0] as unknown as Record<
+    string,
+    unknown
+  >
+  point.extraLocal = localCoordinateSource({
+    frame: xyFrame(),
+    a: symbolicScalar('R', 2),
+    b: numericScalar(0),
+  })
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '4' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok !== false) {
+    throw new Error('Expected pending resolution failure.')
+  }
+  assert.match(
+    resolved.error,
+    /strata\[0\]\.extraLocal Unsupported work-plane-local coordinate source/,
+  )
+})
+
 test('resolvePendingSymbolicDiagramImport reports missing stratum id without throwing', () => {
   const diagram = {
     ...emptyThreeDimensionalDiagram,
