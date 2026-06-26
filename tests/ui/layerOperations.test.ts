@@ -121,6 +121,20 @@ test('sequential duplicate then delete does not resurrect stale state', () => {
   assert.equal(hasLabel(undone.editableDiagram, 'source-label-copy'), true)
 })
 
+test('delete layer cleans stale ids from multi-selection', () => {
+  const state = createLayerOperationState(createTwoLayerDiagram(), {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'source-point' },
+      { kind: 'stratum', id: 'other-point' },
+    ],
+  })
+  const next = applyDeleteLayerToEditorState(state, 0)
+
+  assert.equal(hasStratum(next.editableDiagram, 'source-point'), false)
+  assert.deepEqual(next.selectedElement, { kind: 'stratum', id: 'other-point' })
+})
+
 test('duplicate target helper disables blank submits when no default exists', () => {
   const sourceLayer = 9_007_199_254_740_992
   const defaultTarget = null

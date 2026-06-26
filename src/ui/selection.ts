@@ -1,19 +1,40 @@
 import type { Diagram, Stratum, TextLabel } from '../model/types'
 
-export type SelectedElement =
+export type SingleSelectedElement =
   | { kind: 'stratum'; id: string }
   | { kind: 'label'; id: string }
+
+export type MultiSelectedElement = {
+  kind: 'multi'
+  id?: never
+  elements: SingleSelectedElement[]
+}
+
+export type SelectedElement =
+  | SingleSelectedElement
+  | MultiSelectedElement
   | null
+
+export type Selection =
+  | { kind: 'none' }
+  | { kind: 'single'; id: string }
+  | { kind: 'multi'; ids: string[] }
 
 export type SelectedDiagramElement =
   | { kind: 'stratum'; element: Stratum }
   | { kind: 'label'; element: TextLabel }
 
+export type SelectableGeometricKind =
+  | Stratum['geometricKind']
+  | TextLabel['geometricKind']
+
+export type SelectionClickMode = 'replace' | 'toggle'
+
 export function findSelectedElement(
   diagram: Diagram,
   selection: SelectedElement,
 ): SelectedDiagramElement | null {
-  if (selection === null) {
+  if (!isSingleSelectedElement(selection)) {
     return null
   }
 
@@ -26,16 +47,229 @@ export function findSelectedElement(
   return label === undefined ? null : { kind: 'label', element: label }
 }
 
+export function findSelectedElements(
+  diagram: Diagram,
+  selection: SelectedElement,
+): SelectedDiagramElement[] {
+  return selectedElements(selection).flatMap((element) => {
+    const selected = findSelectedElement(diagram, element)
+
+    return selected === null ? [] : [selected]
+  })
+}
+
 export function selectionExistsInDiagram(
   diagram: Diagram,
   selection: SelectedElement,
 ): boolean {
-  return findSelectedElement(diagram, selection) !== null
+  if (selection === null) {
+    return false
+  }
+
+  const elements = selectedElements(selection)
+
+  return (
+    elements.length > 0 &&
+    elements.every((element) => findSelectedElement(diagram, element) !== null)
+  )
 }
 
 export function clearSelectionIfMissing(
   diagram: Diagram,
   selection: SelectedElement,
 ): SelectedElement {
-  return selectionExistsInDiagram(diagram, selection) ? selection : null
+  return normalizeSelectedElement(diagram, selection)
+}
+
+export function normalizeSelectedElement(
+  diagram: Diagram,
+  selection: SelectedElement,
+): SelectedElement {
+  const normalized = selectedElements(selection)
+    .reduce<SingleSelectedElement[]>((elements, element) => {
+      if (findSelectedElement(diagram, element) === null) {
+        return elements
+      }
+
+      if (
+        elements.some(
+          (candidate) =>
+            candidate.kind === element.kind && candidate.id === element.id,
+        )
+      ) {
+        return elements
+      }
+
+      return [...elements, element]
+    }, [])
+
+  return selectedElementFromElements(filterSameGeometricKind(diagram, normalized))
+}
+
+export function updateSelectionForClick(
+  diagram: Diagram,
+  currentSelection: SelectedElement,
+  clickedElement: SingleSelectedElement,
+  mode: SelectionClickMode,
+): SelectedElement {
+  if (findSelectedElement(diagram, clickedElement) === null) {
+    return normalizeSelectedElement(diagram, currentSelection)
+  }
+
+  if (mode === 'replace') {
+    return clickedElement
+  }
+
+  const currentElements = selectedElements(
+    normalizeSelectedElement(diagram, currentSelection),
+  )
+
+  if (currentElements.length === 0) {
+    return clickedElement
+  }
+
+  const clickedKind = selectedElementGeometricKind(diagram, clickedElement)
+  const currentKind = selectedElementGeometricKind(
+    diagram,
+    currentElements[0] ?? null,
+  )
+
+  if (clickedKind === null || currentKind === null || clickedKind !== currentKind) {
+    return clickedElement
+  }
+
+  const existingIndex = currentElements.findIndex(
+    (element) =>
+      element.kind === clickedElement.kind && element.id === clickedElement.id,
+  )
+
+  if (existingIndex >= 0) {
+    return selectedElementFromElements(
+      currentElements.filter((_, index) => index !== existingIndex),
+    )
+  }
+
+  return selectedElementFromElements([...currentElements, clickedElement])
+}
+
+export function updateSelectionForBackgroundClick(
+  currentSelection: SelectedElement,
+  mode: SelectionClickMode,
+): SelectedElement {
+  return mode === 'toggle' ? currentSelection : null
+}
+
+export function selectedElements(
+  selection: SelectedElement,
+): SingleSelectedElement[] {
+  if (selection === null) {
+    return []
+  }
+
+  return selection.kind === 'multi' ? selection.elements : [selection]
+}
+
+export function selectedElementIds(selection: SelectedElement): string[] {
+  return selectedElements(selection).map((element) => element.id)
+}
+
+export function selectedElementCount(selection: SelectedElement): number {
+  return selectedElements(selection).length
+}
+
+export function isSingleSelectedElement(
+  selection: SelectedElement,
+): selection is SingleSelectedElement {
+  return (
+    selection !== null &&
+    (selection.kind === 'stratum' || selection.kind === 'label')
+  )
+}
+
+export function isMultiSelectedElement(
+  selection: SelectedElement,
+): selection is MultiSelectedElement {
+  return selection?.kind === 'multi'
+}
+
+export function isSelectedElement(
+  selectedElement: SelectedElement,
+  element: SingleSelectedElement,
+): boolean {
+  return selectedElements(selectedElement).some(
+    (candidate) => candidate.kind === element.kind && candidate.id === element.id,
+  )
+}
+
+export function selectedElementGeometricKind(
+  diagram: Diagram,
+  selection: SelectedElement,
+): SelectableGeometricKind | null {
+  const selected = findSelectedElement(diagram, selection)
+
+  return selected?.element.geometricKind ?? null
+}
+
+export function selectionGeometricKind(
+  diagram: Diagram,
+  selection: SelectedElement,
+): SelectableGeometricKind | null {
+  const [first] = selectedElements(selection)
+
+  return first === undefined ? null : selectedElementGeometricKind(diagram, first)
+}
+
+export function selectedElementFromElements(
+  elements: readonly SingleSelectedElement[],
+): SelectedElement {
+  if (elements.length === 0) {
+    return null
+  }
+
+  if (elements.length === 1) {
+    return elements[0] ?? null
+  }
+
+  return {
+    kind: 'multi',
+    elements: [...elements],
+  }
+}
+
+export function selectionToSerializableModel(
+  selection: SelectedElement,
+): Selection {
+  const ids = selectedElementIds(selection)
+
+  if (ids.length === 0) {
+    return { kind: 'none' }
+  }
+
+  if (ids.length === 1) {
+    return { kind: 'single', id: ids[0] ?? '' }
+  }
+
+  return { kind: 'multi', ids }
+}
+
+function filterSameGeometricKind(
+  diagram: Diagram,
+  elements: readonly SingleSelectedElement[],
+): SingleSelectedElement[] {
+  let expectedKind: SelectableGeometricKind | null = null
+
+  return elements.filter((element) => {
+    const geometricKind = selectedElementGeometricKind(diagram, element)
+
+    if (geometricKind === null) {
+      return false
+    }
+
+    if (expectedKind === null) {
+      expectedKind = geometricKind
+      return true
+    }
+
+    return geometricKind === expectedKind
+  })
 }

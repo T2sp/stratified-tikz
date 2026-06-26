@@ -4,6 +4,7 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
+import { serializeDiagram } from '../../src/model/serialization.ts'
 import { setLayerLock } from '../../src/model/layers.ts'
 import {
   applyUserStylePresetToStratum,
@@ -62,8 +63,13 @@ import {
 import {
   clearSelectionIfMissing,
   findSelectedElement,
+  isSelectedElement,
+  selectedElements,
   selectionExistsInDiagram,
+  selectionToSerializableModel,
   type SelectedElement,
+  updateSelectionForBackgroundClick,
+  updateSelectionForClick,
 } from '../../src/ui/selection.ts'
 import {
   clearSelectionForLayerFilter,
@@ -206,6 +212,175 @@ test('clearSelectionIfMissing clears selection when switching diagrams', () => {
     clearSelectionIfMissing(threeDimensionalSelectionExample, selection),
     null,
   )
+})
+
+test('single click selects one object', () => {
+  const selection = updateSelectionForClick(
+    twoDimensionalExample,
+    null,
+    { kind: 'stratum', id: 'visibleWire' },
+    'replace',
+  )
+
+  assert.deepEqual(selection, { kind: 'stratum', id: 'visibleWire' })
+})
+
+test('Shift-click adds a same-geometric-kind object to multi-selection', () => {
+  const selection = updateSelectionForClick(
+    twoDimensionalExample,
+    { kind: 'stratum', id: 'visibleWire' },
+    { kind: 'stratum', id: 'dashedMorphism' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+    ],
+  })
+})
+
+test('Shift-click selected object removes it from multi-selection', () => {
+  const selection = updateSelectionForClick(
+    twoDimensionalExample,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'visibleWire' },
+        { kind: 'stratum', id: 'dashedMorphism' },
+      ],
+    },
+    { kind: 'stratum', id: 'dashedMorphism' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'stratum', id: 'visibleWire' })
+})
+
+test('modifier-clicking a different geometric kind replaces selection', () => {
+  const selection = updateSelectionForClick(
+    twoDimensionalExample,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'visibleWire' },
+        { kind: 'stratum', id: 'dashedMorphism' },
+      ],
+    },
+    { kind: 'stratum', id: 'circlePoint' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'stratum', id: 'circlePoint' })
+})
+
+test('background click clears multi-selection while modifier background preserves it', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+    ],
+  }
+
+  assert.equal(updateSelectionForBackgroundClick(selection, 'replace'), null)
+  assert.equal(updateSelectionForBackgroundClick(selection, 'toggle'), selection)
+})
+
+test('deleting an object cleans stale selected ids from multi-selection', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+    ],
+  }
+  const removed = removeSelectedElement(twoDimensionalExample, {
+    kind: 'stratum',
+    id: 'visibleWire',
+  })
+
+  assert.equal(removed.removed, true)
+  assert.deepEqual(clearSelectionIfMissing(removed.diagram, selection), {
+    kind: 'stratum',
+    id: 'dashedMorphism',
+  })
+})
+
+test('inspector summary displays multi-selection count and kind', () => {
+  const summary = createInspectorCompactSummary(twoDimensionalExample, {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+      { kind: 'stratum', id: 'hiddenWire' },
+    ],
+  })
+
+  assert.notEqual(summary, null)
+  assert.equal(summary?.title, '3 curves selected')
+  assert.equal(summary?.layer, 'multiple')
+  assert.equal(
+    summary?.detail,
+    'Bulk editing arrives in later Phase 24 steps.',
+  )
+})
+
+test('selected highlighting helper includes all multi-selected ids', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+    ],
+  }
+
+  assert.equal(
+    isSelectedElement(selection, { kind: 'stratum', id: 'visibleWire' }),
+    true,
+  )
+  assert.equal(
+    isSelectedElement(selection, { kind: 'stratum', id: 'dashedMorphism' }),
+    true,
+  )
+  assert.equal(
+    isSelectedElement(selection, { kind: 'stratum', id: 'circlePoint' }),
+    false,
+  )
+})
+
+test('selection state is not saved to diagram JSON', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'visibleWire' },
+      { kind: 'stratum', id: 'dashedMorphism' },
+    ],
+  }
+  const serialized = serializeDiagram(twoDimensionalExample)
+  const parsed = JSON.parse(serialized) as Record<string, unknown>
+
+  assert.deepEqual(selectionToSerializableModel(selection), {
+    kind: 'multi',
+    ids: ['visibleWire', 'dashedMorphism'],
+  })
+  assert.equal('selectedElement' in parsed, false)
+  assert.equal('selection' in parsed, false)
+})
+
+test('TikZ output is unaffected by selection operations', () => {
+  const before = generateTikz(twoDimensionalExample)
+  const selection = updateSelectionForClick(
+    twoDimensionalExample,
+    { kind: 'stratum', id: 'visibleWire' },
+    { kind: 'stratum', id: 'dashedMorphism' },
+    'toggle',
+  )
+
+  assert.equal(selectedElements(selection).length, 2)
+  assert.equal(generateTikz(twoDimensionalExample), before)
 })
 
 test('formatVec3 formats 2D coordinates without z', () => {

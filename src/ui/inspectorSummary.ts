@@ -23,7 +23,13 @@ import {
 import { pathCoordinates, pathEndpoints } from '../model/paths.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import type { FilledBoundaryStratum } from './filledStratumEditing.ts'
-import { findSelectedElement, type SelectedElement } from './selection.ts'
+import {
+  findSelectedElement,
+  findSelectedElements,
+  isMultiSelectedElement,
+  type SelectableGeometricKind,
+  type SelectedElement,
+} from './selection.ts'
 
 export type InspectorField = {
   label: string
@@ -50,6 +56,10 @@ export function createInspectorSections(
   diagram: Diagram,
   selection: SelectedElement,
 ): InspectorSection[] {
+  if (isMultiSelectedElement(selection)) {
+    return []
+  }
+
   const selected = findSelectedElement(diagram, selection)
 
   if (selected === null) {
@@ -65,6 +75,10 @@ export function createInspectorCompactSummary(
   diagram: Diagram,
   selection: SelectedElement,
 ): InspectorCompactSummary | null {
+  if (isMultiSelectedElement(selection)) {
+    return createMultiSelectionCompactSummary(diagram, selection)
+  }
+
   const selected = findSelectedElement(diagram, selection)
 
   if (selected === null) {
@@ -89,6 +103,34 @@ export function createInspectorCompactSummary(
     title: `Label: ${titleText} [${label.id}]`,
     layer: formatNumber(label.layer),
     detail: `position ${formatVec3(label.position, diagram.ambientDimension)}`,
+  }
+}
+
+function createMultiSelectionCompactSummary(
+  diagram: Diagram,
+  selection: SelectedElement,
+): InspectorCompactSummary | null {
+  const selected = findSelectedElements(diagram, selection)
+
+  if (selected.length === 0) {
+    return null
+  }
+
+  const geometricKind = selected[0]?.element.geometricKind ?? null
+  const sameKind =
+    geometricKind !== null &&
+    selected.every((candidate) => candidate.element.geometricKind === geometricKind)
+  const kindLabel =
+    sameKind && geometricKind !== null
+      ? pluralGeometricKindLabel(geometricKind, selected.length)
+      : selected.length === 1
+        ? 'object'
+        : 'objects'
+
+  return {
+    title: `${selected.length} ${kindLabel} selected`,
+    layer: 'multiple',
+    detail: 'Bulk editing arrives in later Phase 24 steps.',
   }
 }
 
@@ -524,6 +566,28 @@ function stratumKindLabel(stratum: Stratum): string {
       return 'Curve'
     case 'point':
       return 'Point'
+  }
+}
+
+function pluralGeometricKindLabel(
+  geometricKind: SelectableGeometricKind,
+  count: number,
+): string {
+  if (count === 1) {
+    return geometricKind
+  }
+
+  switch (geometricKind) {
+    case 'curve':
+      return 'curves'
+    case 'label':
+      return 'labels'
+    case 'point':
+      return 'points'
+    case 'region':
+      return 'regions'
+    case 'sheet':
+      return 'sheets'
   }
 }
 

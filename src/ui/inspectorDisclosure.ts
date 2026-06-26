@@ -1,4 +1,8 @@
-import type { SelectedElement } from './selection.ts'
+import {
+  isMultiSelectedElement,
+  selectedElements,
+  type SelectedElement,
+} from './selection.ts'
 
 export type InspectorDisclosureState = {
   selectionKey: string | null
@@ -8,7 +12,17 @@ export type InspectorDisclosureState = {
 export function selectedElementDisclosureKey(
   selection: SelectedElement,
 ): string | null {
-  return selection === null ? null : `${selection.kind}:${selection.id}`
+  if (selection === null) {
+    return null
+  }
+
+  if (isMultiSelectedElement(selection)) {
+    return `multi:${selectedElements(selection)
+      .map((element) => `${element.kind}:${element.id}`)
+      .join('|')}`
+  }
+
+  return `${selection.kind}:${selection.id}`
 }
 
 export function nextInspectorDisclosureStateForSelection(
