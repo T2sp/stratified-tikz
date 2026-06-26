@@ -13,9 +13,11 @@ import { cleanPathCrossingStates } from './pathCrossings.ts'
 import {
   diagramTranslationContext,
   isZeroTranslationVector,
+  normalizeTranslationVectorForDiagram,
   translateStratum,
   translateTextLabel,
   translationVectorFromNumericVec3,
+  type TranslationVector,
 } from './translation.ts'
 
 export type DiagramLayerElement =
@@ -53,7 +55,15 @@ export type DuplicateLayerResult = {
   pathLabelChanges: DuplicateLayerPathLabelChange[]
 }
 
-export type LayerTranslationVector = Vec3
+export type MergeLayersResult = {
+  diagram: Diagram
+  sourceLayer: number
+  targetLayer: number
+  movedStrata: number
+  movedLabels: number
+}
+
+export type LayerTranslationVector = Vec3 | TranslationVector
 
 export function normalizeLayerValue(layer: number): number {
   return Object.is(layer, -0) ? 0 : layer
@@ -419,17 +429,103 @@ export function deleteLayer(diagram: Diagram, layerValue: number): Diagram {
   return removedCurve ? cleanPathCrossingStates(nextDiagram) : nextDiagram
 }
 
+export function mergeLayers(
+  diagram: Diagram,
+  sourceLayerValue: number,
+  targetLayerValue: number,
+): MergeLayersResult {
+  const sourceLayer = normalizedFiniteLayerValue(
+    sourceLayerValue,
+    'sourceLayerValue',
+  )
+  const targetLayer = normalizedFiniteLayerValue(
+    targetLayerValue,
+    'targetLayerValue',
+  )
+
+  if (sourceLayer === targetLayer) {
+    throw new Error('targetLayerValue must differ from sourceLayerValue.')
+  }
+
+  const existingLayerValues = new Set(
+    getLayerMetadata(diagram).map((layer) => layer.value),
+  )
+
+  if (!existingLayerValues.has(sourceLayer)) {
+    throw new Error('sourceLayerValue must refer to an existing layer.')
+  }
+
+  if (!existingLayerValues.has(targetLayer)) {
+    throw new Error('targetLayerValue must refer to an existing layer.')
+  }
+
+  let movedStrata = 0
+  let movedLabels = 0
+  const strata = diagram.strata.map((stratum) => {
+    if (!elementIsOnLayer(stratum, sourceLayer)) {
+      return stratum
+    }
+
+    movedStrata += 1
+    return {
+      ...stratum,
+      layer: targetLayer,
+    }
+  })
+  const labels = diagram.labels.map((label) => {
+    if (!elementIsOnLayer(label, sourceLayer)) {
+      return label
+    }
+
+    movedLabels += 1
+    return {
+      ...label,
+      layer: targetLayer,
+    }
+  })
+  const metadata = layerMetadataIncluding(diagram, [targetLayer])
+    .filter((layer) => layer.value !== sourceLayer)
+    .sort((left, right) => left.value - right.value)
+
+  const nextDiagram =
+    movedStrata === 0 && movedLabels === 0
+      ? {
+          ...diagram,
+          layers: metadata,
+        }
+      : cleanPathCrossingStates({
+          ...diagram,
+          strata,
+          labels,
+          layers: metadata,
+        })
+
+  return {
+    diagram: nextDiagram,
+    sourceLayer,
+    targetLayer,
+    movedStrata,
+    movedLabels,
+  }
+}
+
 export function translateLayer(
   diagram: Diagram,
   layerValue: number,
   translation: LayerTranslationVector,
 ): Diagram {
   const layer = normalizedFiniteLayerValue(layerValue, 'layerValue')
-  const normalizedTranslation = translationVectorFromNumericVec3(
-    diagram,
-    translation,
-    { reject2DNonZeroZ: true },
-  )
+  const normalizedTranslation = isTranslationVector(translation)
+    ? normalizeTranslationVectorForDiagram(
+        diagram,
+        translation,
+        { reject2DNonZeroZ: true },
+      )
+    : translationVectorFromNumericVec3(
+        diagram,
+        translation,
+        { reject2DNonZeroZ: true },
+      )
 
   if (isZeroTranslationVector(normalizedTranslation)) {
     return diagram
@@ -680,6 +776,23 @@ function elementIsOnLayer(element: { layer: number }, layer: number): boolean {
   return (
     Number.isFinite(element.layer) &&
     normalizeLayerValue(element.layer) === layer
+  )
+}
+
+function isTranslationVector(
+  translation: LayerTranslationVector,
+): translation is TranslationVector {
+  return (
+    isCoordinateComponent(translation.x) &&
+    isCoordinateComponent(translation.y) &&
+    isCoordinateComponent(translation.z)
+  )
+}
+
+function isCoordinateComponent(value: unknown): value is TranslationVector['x'] {
+  return (
+    isRecord(value) &&
+    (value.kind === 'numeric' || value.kind === 'symbolic')
   )
 }
 

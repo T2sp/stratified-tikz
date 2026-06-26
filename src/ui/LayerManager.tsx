@@ -8,8 +8,13 @@ import {
   formatLayerValue,
   getLayerMetadata,
   nextUnusedLayerValue,
+  normalizeLayerValue,
 } from '../model/layers.ts'
-import type { Diagram, DiagramLayer, Vec3 } from '../model/types.ts'
+import {
+  parseTranslationVectorFromInputs,
+  type TranslationVector,
+} from '../model/translation.ts'
+import type { Diagram, DiagramLayer } from '../model/types.ts'
 import {
   canSubmitLayerDuplicateTarget,
   duplicateLayerTargetInput,
@@ -48,7 +53,8 @@ export type LayerManagerProps = {
   onRenameLayer: (layerValue: number, name: string) => void
   onSwapLayers: (leftLayerValue: number, rightLayerValue: number) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
-  onTranslateLayer: (layerValue: number, translation: Vec3) => void
+  onMergeLayer: (sourceLayerValue: number, targetLayerValue: number) => void
+  onTranslateLayer: (layerValue: number, translation: TranslationVector) => void
   onSetLayerVisibility: (layerValue: number, visible: boolean) => void
   onSetLayerLock: (layerValue: number, locked: boolean) => void
   onDeleteLayer: (layerValue: number) => void
@@ -67,6 +73,7 @@ export function LayerManager({
   onRenameLayer,
   onSwapLayers,
   onDuplicateLayer,
+  onMergeLayer,
   onTranslateLayer,
   onSetLayerVisibility,
   onSetLayerLock,
@@ -269,6 +276,7 @@ export function LayerManager({
                 elementCount={selectedRow?.elementCount ?? 0}
                 onRenameLayer={onRenameLayer}
                 onDuplicateLayer={onDuplicateLayer}
+                onMergeLayer={onMergeLayer}
                 onTranslateLayer={onTranslateLayer}
                 onSetLayerVisibility={onSetLayerVisibility}
                 onSetLayerLock={onSetLayerLock}
@@ -563,7 +571,8 @@ type SelectedLayerActionsProps = {
   elementCount: number
   onRenameLayer: (layerValue: number, name: string) => void
   onDuplicateLayer: (sourceLayerValue: number, targetLayerValue?: number) => void
-  onTranslateLayer: (layerValue: number, translation: Vec3) => void
+  onMergeLayer: (sourceLayerValue: number, targetLayerValue: number) => void
+  onTranslateLayer: (layerValue: number, translation: TranslationVector) => void
   onSetLayerVisibility: (layerValue: number, visible: boolean) => void
   onSetLayerLock: (layerValue: number, locked: boolean) => void
   onDeleteLayer: (layerValue: number) => void
@@ -577,6 +586,7 @@ function SelectedLayerActions({
   elementCount,
   onRenameLayer,
   onDuplicateLayer,
+  onMergeLayer,
   onTranslateLayer,
   onSetLayerVisibility,
   onSetLayerLock,
@@ -599,6 +609,7 @@ function SelectedLayerActions({
       elementCount={elementCount}
       onRenameLayer={onRenameLayer}
       onDuplicateLayer={onDuplicateLayer}
+      onMergeLayer={onMergeLayer}
       onTranslateLayer={onTranslateLayer}
       onSetLayerVisibility={onSetLayerVisibility}
       onSetLayerLock={onSetLayerLock}
@@ -619,6 +630,7 @@ function SelectedLayerActionForms({
   elementCount,
   onRenameLayer,
   onDuplicateLayer,
+  onMergeLayer,
   onTranslateLayer,
   onSetLayerVisibility,
   onSetLayerLock,
@@ -626,14 +638,27 @@ function SelectedLayerActionForms({
   onStatusMessage,
 }: SelectedLayerActionFormsProps) {
   const layerKey = formatLayerValue(layer.value)
+  const actionLayers = useMemo(() => getLayerMetadata(diagram), [diagram])
   const defaultDuplicateTarget = nextUnusedLayerValue(diagram, layer.value)
   const defaultDuplicateTargetInput = duplicateLayerTargetInput(
     defaultDuplicateTarget,
   )
+  const defaultMergeSourceInput = layerCreationInputForLayer(layer.value)
+  const defaultMergeTarget = firstDifferentLayerValue(actionLayers, layer.value)
+  const defaultMergeTargetInput =
+    defaultMergeTarget === null
+      ? ''
+      : layerCreationInputForLayer(defaultMergeTarget)
   const isVisible = layer.visible !== false
   const isLocked = layer.locked === true
   const [duplicateTargetInput, setDuplicateTargetInput] = useState(
     defaultDuplicateTargetInput,
+  )
+  const [mergeSourceInput, setMergeSourceInput] = useState(
+    defaultMergeSourceInput,
+  )
+  const [mergeTargetInput, setMergeTargetInput] = useState(
+    defaultMergeTargetInput,
   )
   const [dxInput, setDxInput] = useState('0')
   const [dyInput, setDyInput] = useState('0')
@@ -643,10 +668,29 @@ function SelectedLayerActionForms({
     duplicateTargetInput,
     defaultDuplicateTarget,
   )
-  const dx = parseRequiredFiniteNumber(dxInput)
-  const dy = parseRequiredFiniteNumber(dyInput)
-  const dz =
-    diagram.ambientDimension === 2 ? 0 : parseRequiredFiniteNumber(dzInput)
+  const mergeSourceLayer = parseLayerValueInput(mergeSourceInput)
+  const mergeTargetLayer = parseLayerValueInput(mergeTargetInput)
+  const mergeSourceExists = layerExists(actionLayers, mergeSourceLayer)
+  const mergeTargetExists = layerExists(actionLayers, mergeTargetLayer)
+  const canMerge =
+    mergeSourceLayer !== null &&
+    mergeTargetLayer !== null &&
+    mergeSourceExists &&
+    mergeTargetExists &&
+    normalizeLayerFormValue(mergeSourceLayer) !==
+      normalizeLayerFormValue(mergeTargetLayer)
+  const parsedTranslation = useMemo(
+    () =>
+      parseTranslationVectorFromInputs(diagram, {
+        dx: dxInput,
+        dy: dyInput,
+        dz: dzInput,
+      }),
+    [diagram, dxInput, dyInput, dzInput],
+  )
+  const translationIsZero =
+    parsedTranslation.ok &&
+    isZeroTranslation(parsedTranslation.preview)
   const canDuplicate = canSubmitLayerDuplicateTarget(
     layer.value,
     duplicateTargetInput,
@@ -654,17 +698,22 @@ function SelectedLayerActionForms({
   )
   const canTranslate =
     elementCount > 0 &&
-    dx !== null &&
-    dy !== null &&
-    dz !== null &&
-    !isZeroTranslation({ x: dx, y: dy, z: dz })
+    parsedTranslation.ok &&
+    !translationIsZero
 
   useEffect(() => {
     setDuplicateTargetInput(defaultDuplicateTargetInput)
+    setMergeSourceInput(defaultMergeSourceInput)
+    setMergeTargetInput(defaultMergeTargetInput)
     setDxInput('0')
     setDyInput('0')
     setDzInput('0')
-  }, [defaultDuplicateTargetInput, layer.value])
+  }, [
+    defaultDuplicateTargetInput,
+    defaultMergeSourceInput,
+    defaultMergeTargetInput,
+    layer.value,
+  ])
 
   return (
     <div
@@ -722,7 +771,7 @@ function SelectedLayerActionForms({
             submitLayerTranslate(
               event,
               layer.value,
-              { dx, dy, dz },
+              parsedTranslation,
               onTranslateLayer,
               onStatusMessage,
             )
@@ -732,11 +781,12 @@ function SelectedLayerActionForms({
             <span>dx</span>
             <input
               name="dx"
-              type="number"
-              step="any"
+              type="text"
               className="layer-manager-translation-input"
               aria-label={`Translate layer ${layerKey} by dx`}
-              aria-invalid={dx === null}
+              aria-invalid={
+                !parsedTranslation.ok && parsedTranslation.error.startsWith('dx:')
+              }
               value={dxInput}
               inputMode="decimal"
               onChange={(event) => setDxInput(event.currentTarget.value)}
@@ -746,11 +796,12 @@ function SelectedLayerActionForms({
             <span>dy</span>
             <input
               name="dy"
-              type="number"
-              step="any"
+              type="text"
               className="layer-manager-translation-input"
               aria-label={`Translate layer ${layerKey} by dy`}
-              aria-invalid={dy === null}
+              aria-invalid={
+                !parsedTranslation.ok && parsedTranslation.error.startsWith('dy:')
+              }
               value={dyInput}
               inputMode="decimal"
               onChange={(event) => setDyInput(event.currentTarget.value)}
@@ -761,11 +812,13 @@ function SelectedLayerActionForms({
               <span>dz</span>
               <input
                 name="dz"
-                type="number"
-                step="any"
+                type="text"
                 className="layer-manager-translation-input"
                 aria-label={`Translate layer ${layerKey} by dz`}
-                aria-invalid={dz === null}
+                aria-invalid={
+                  !parsedTranslation.ok &&
+                  parsedTranslation.error.startsWith('dz:')
+                }
                 value={dzInput}
                 inputMode="decimal"
                 onChange={(event) => setDzInput(event.currentTarget.value)}
@@ -780,10 +833,92 @@ function SelectedLayerActionForms({
             title={
               elementCount === 0
                 ? 'No elements on this layer.'
-                : 'Enter a non-zero finite translation.'
+                : parsedTranslation.ok
+                  ? 'Enter a non-zero finite translation.'
+                  : parsedTranslation.error
             }
           >
             Translate
+          </button>
+        </form>
+      </div>
+
+      <div className="layer-manager-action-group">
+        <span className="layer-manager-action-heading">Merge layers</span>
+        <form
+          className="layer-manager-merge-form"
+          onSubmit={(event) =>
+            submitLayerMerge(
+              event,
+              { source: mergeSourceLayer, target: mergeTargetLayer },
+              { sourceExists: mergeSourceExists, targetExists: mergeTargetExists },
+              onMergeLayer,
+              onStatusMessage,
+            )
+          }
+        >
+          <label className="layer-manager-merge-field">
+            <span>Source</span>
+            <select
+              name="sourceLayer"
+              className="layer-manager-swap-select"
+              aria-label="Source layer to merge"
+              aria-invalid={mergeSourceLayer === null || !mergeSourceExists}
+              value={mergeSourceInput}
+              onChange={(event) =>
+                setMergeSourceInput(event.currentTarget.value)
+              }
+            >
+              {actionLayers.map((candidate) => (
+                <option
+                  key={`source-${formatLayerValue(candidate.value)}`}
+                  value={layerCreationInputForLayer(candidate.value)}
+                >
+                  L{formatLayerValue(candidate.value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="layer-manager-merge-field">
+            <span>Target</span>
+            <select
+              name="targetLayer"
+              className="layer-manager-swap-select"
+              aria-label="Target layer for merge"
+              aria-invalid={mergeTargetLayer === null || !mergeTargetExists}
+              value={mergeTargetInput}
+              onChange={(event) =>
+                setMergeTargetInput(event.currentTarget.value)
+              }
+            >
+              {defaultMergeTarget === null && (
+                <option value="" disabled>
+                  None
+                </option>
+              )}
+              {actionLayers.map((candidate) => (
+                <option
+                  key={`target-${formatLayerValue(candidate.value)}`}
+                  value={layerCreationInputForLayer(candidate.value)}
+                >
+                  L{formatLayerValue(candidate.value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="toolbar-button"
+            aria-label={`Merge layer ${mergeSourceInput} into ${mergeTargetInput}`}
+            disabled={!canMerge}
+            title={mergeSubmitTitle(
+              mergeSourceLayer,
+              mergeTargetLayer,
+              mergeSourceExists,
+              mergeTargetExists,
+            )}
+          >
+            Merge
           </button>
         </form>
       </div>
@@ -922,29 +1057,58 @@ function LayerNameEditor({
 function submitLayerTranslate(
   event: FormEvent<HTMLFormElement>,
   layerValue: number,
-  parsed: {
-    dx: number | null
-    dy: number | null
-    dz: number | null
-  },
-  onTranslateLayer: (layerValue: number, translation: Vec3) => void,
+  parsed: ReturnType<typeof parseTranslationVectorFromInputs>,
+  onTranslateLayer: (layerValue: number, translation: TranslationVector) => void,
   onStatusMessage: (message: string) => void,
 ): void {
   event.preventDefault()
 
-  const { dx, dy, dz } = parsed
-
-  if (dx === null || dy === null || dz === null) {
-    onStatusMessage('Enter a finite translation vector.')
+  if (!parsed.ok) {
+    onStatusMessage(parsed.error)
     return
   }
 
-  if (isZeroTranslation({ x: dx, y: dy, z: dz })) {
+  if (isZeroTranslation(parsed.preview)) {
     onStatusMessage('Enter a non-zero translation vector.')
     return
   }
 
-  onTranslateLayer(layerValue, { x: dx, y: dy, z: dz })
+  onTranslateLayer(layerValue, parsed.translation)
+}
+
+function submitLayerMerge(
+  event: FormEvent<HTMLFormElement>,
+  layers: {
+    source: number | null
+    target: number | null
+  },
+  existence: {
+    sourceExists: boolean
+    targetExists: boolean
+  },
+  onMergeLayer: (sourceLayerValue: number, targetLayerValue: number) => void,
+  onStatusMessage: (message: string) => void,
+): void {
+  event.preventDefault()
+
+  if (layers.source === null || !existence.sourceExists) {
+    onStatusMessage('Choose an existing source layer.')
+    return
+  }
+
+  if (layers.target === null || !existence.targetExists) {
+    onStatusMessage('Choose an existing target layer.')
+    return
+  }
+
+  if (
+    normalizeLayerValue(layers.source) === normalizeLayerValue(layers.target)
+  ) {
+    onStatusMessage('Choose two different layers to merge.')
+    return
+  }
+
+  onMergeLayer(layers.source, layers.target)
 }
 
 function submitLayerDuplicate(
@@ -964,16 +1128,62 @@ function submitLayerDuplicate(
   onDuplicateLayer(layerValue, targetLayer.targetLayerValue)
 }
 
-function parseRequiredFiniteNumber(value: string): number | null {
-  if (value.trim().length === 0) {
-    return null
-  }
+function firstDifferentLayerValue(
+  layers: readonly DiagramLayer[],
+  layerValue: number,
+): number | null {
+  const sourceLayer = normalizeLayerValue(layerValue)
+  const target = layers.find(
+    (candidate) => normalizeLayerValue(candidate.value) !== sourceLayer,
+  )
 
-  const number = Number(value)
-
-  return Number.isFinite(number) ? number : null
+  return target?.value ?? null
 }
 
-function isZeroTranslation(translation: Vec3): boolean {
+function layerExists(
+  layers: readonly DiagramLayer[],
+  layerValue: number | null,
+): boolean {
+  if (layerValue === null) {
+    return false
+  }
+
+  const normalizedLayer = normalizeLayerValue(layerValue)
+
+  return layers.some(
+    (candidate) => normalizeLayerValue(candidate.value) === normalizedLayer,
+  )
+}
+
+function mergeSubmitTitle(
+  sourceLayer: number | null,
+  targetLayer: number | null,
+  sourceExists: boolean,
+  targetExists: boolean,
+): string | undefined {
+  if (sourceLayer === null || !sourceExists) {
+    return 'Choose an existing source layer.'
+  }
+
+  if (targetLayer === null || !targetExists) {
+    return 'Choose an existing target layer.'
+  }
+
+  if (normalizeLayerValue(sourceLayer) === normalizeLayerValue(targetLayer)) {
+    return 'Choose two different layers.'
+  }
+
+  return undefined
+}
+
+function normalizeLayerFormValue(layerValue: number | null): number | null {
+  return layerValue === null ? null : normalizeLayerValue(layerValue)
+}
+
+function isZeroTranslation(translation: {
+  x: number
+  y: number
+  z: number
+}): boolean {
   return translation.x === 0 && translation.y === 0 && translation.z === 0
 }

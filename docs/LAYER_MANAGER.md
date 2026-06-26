@@ -38,11 +38,23 @@ Duplicate copies all strata and free text labels on the source layer to a target
 numeric layer. Copied top-level element IDs, nested boundary IDs, curve style
 segment IDs, and non-empty path labels are regenerated to avoid collisions.
 
-Translate adds a finite vector to all absolute coordinates on the layer. In 2D
-only `dx` and `dy` are accepted and all translated coordinates remain at
-`z = 0`. In 3D, `dx`, `dy`, and `dz` are accepted. Frame basis vectors and
-relative/local coordinates are preserved; frame origins and absolute points are
-moved.
+Merge moves all strata and free text labels from an existing source layer to an
+existing target layer. The source layer metadata entry is removed. Target layer
+metadata is preserved, including its name, visibility, and lock state. Merging a
+layer into itself is rejected. If the current new-element layer is the source,
+it becomes the target. If the current view filter is the source, it becomes the
+target. Existing selected elements are preserved when they remain selectable
+after the merge; selections that become hidden or otherwise invalid are cleared.
+
+Translate adds a finite vector to all absolute coordinates on the layer. The
+translation fields accept numeric values or symbolic scalar expressions using
+the diagram variables. Symbolic coordinates are updated by adding the
+translation expression and refreshing previews. In 2D only `dx` and `dy` are
+accepted and all translated coordinates remain at `z = 0`. In 3D, `dx`, `dy`,
+and `dz` are accepted. Frame basis vectors and relative/local coordinates are
+preserved; frame origins and absolute points are moved. This includes points,
+free text labels, path segments, grids, filled boundaries, ruled surfaces, and
+Coons patches.
 
 Delete removes all strata and free text labels on the numeric layer and removes
 that layer metadata entry. Other layer metadata, including empty guide layers,
@@ -55,6 +67,7 @@ diagram changes:
 
 - rename, visibility, locking, swap, duplicate, translate, and delete can be
   undone and redone;
+- merge is undoable and redoable as one diagram change;
 - delete also clears selection, drafts, and transient source-picking state;
 - hiding or locking a selected layer clears that selected element.
 
@@ -81,7 +94,7 @@ saved.
 ## TikZ Export
 
 TikZ output is driven by element `layer` values, not by layer names or preview
-flags. Renaming a layer does not change export. Swapping, duplicating,
+flags. Renaming a layer does not change export. Swapping, duplicating, merging,
 translating, or deleting layers changes export only because those operations
 change element membership or coordinates.
 
@@ -91,7 +104,8 @@ readable PGF layer blocks such as `stratifiedLayer0` and
 
 ## Current Limits
 
-The Layer Manager does not implement multi-selection, affine transforms, layer
-style overrides, or new geometry features. Curves currently support one primary
-style per curve; partial style segments are model-ready but remain outside the
-Layer Manager MVP.
+The Layer Manager does not implement layer rotation, scaling, shear, general
+affine transforms, layer style overrides, or new geometry features. General
+layer affine transforms are deferred to a later phase; Phase 24 supports
+translation only. Curves currently support one primary style per curve; partial
+style segments are model-ready but remain outside the Layer Manager MVP.

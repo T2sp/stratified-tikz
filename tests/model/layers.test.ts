@@ -9,6 +9,7 @@ import {
   getUsedLayerValues,
   isLayerLocked,
   isLayerVisible,
+  mergeLayers,
   nextUnusedLayerValue,
   normalizeLayerMetadataForDiagram,
   renameLayer,
@@ -607,6 +608,46 @@ test('deleting a layer clears stale selection and validates a deleted layer filt
   assert.equal(nextSelection, null)
 })
 
+test('merging a layer moves strata and labels into an existing target layer', () => {
+  const result = mergeLayers(createLayerOperationDiagram(), 5, 1)
+
+  assert.equal(result.sourceLayer, 5)
+  assert.equal(result.targetLayer, 1)
+  assert.equal(result.movedStrata, 8)
+  assert.equal(result.movedLabels, 1)
+  assert.equal(findPoint(result.diagram, 'source-point').layer, 1)
+  assert.equal(findLabel(result.diagram, 'source-label').layer, 1)
+  assert.equal(findCurve(result.diagram, 'other-curve').layer, 1)
+  assert.equal(findLabel(result.diagram, 'other-label').layer, 1)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('merging a layer removes source metadata and preserves target metadata', () => {
+  const result = mergeLayers(createLayerOperationDiagram(), 5, 1)
+
+  assert.deepEqual(result.diagram.layers, [
+    { value: 1, name: 'Other' },
+    { value: 99, name: 'Empty guide layer' },
+  ])
+})
+
+test('merging a layer rejects same and missing layer values', () => {
+  const diagram = createLayerOperationDiagram()
+
+  assert.throws(
+    () => mergeLayers(diagram, 5, 5),
+    /targetLayerValue must differ/,
+  )
+  assert.throws(
+    () => mergeLayers(diagram, 5, 123),
+    /targetLayerValue must refer to an existing layer/,
+  )
+  assert.throws(
+    () => mergeLayers(diagram, 123, 1),
+    /sourceLayerValue must refer to an existing layer/,
+  )
+})
+
 test('TikZ output reflects duplicated and deleted layer contents', () => {
   const duplicated = duplicateLayer(createLayerOperationDiagram(), 5, {
     targetLayerValue: 6,
@@ -620,6 +661,17 @@ test('TikZ output reflects duplicated and deleted layer contents', () => {
   assert.match(targetLayerBlock, /spath\/save=sharedPathCopy2/)
   assert.doesNotMatch(deletedTikz, /stratifiedLayer6/)
   assert.match(deletedTikz, /stratifiedLayer5/)
+})
+
+test('TikZ output reflects merged layer contents', () => {
+  const merged = mergeLayers(createLayerOperationDiagram(), 5, 1).diagram
+  const tikz = generateTikz(merged)
+  const targetLayerBlock = tikzLayerBlock(tikz, 'stratifiedLayer1')
+
+  assert.doesNotMatch(tikz, /stratifiedLayer5/)
+  assert.match(targetLayerBlock, /source label/)
+  assert.match(targetLayerBlock, /other label/)
+  assert.match(targetLayerBlock, /spath\/save=sharedPath/)
 })
 
 test('translating a layer moves points and labels while preserving identity and other layers', () => {
@@ -941,6 +993,30 @@ test('layer translation moves ruled and Coons boundary snapshots', () => {
     y: 0,
     z: -1,
   })
+})
+
+test('layer translation moves symbolic ruled and Coons boundary expressions', () => {
+  const diagram = createSymbolicBoundarySurfaceTranslationDiagram()
+  const translated = translateLayer(diagram, 4, { x: 2, y: 0, z: 0 })
+  const ruled = findCurvedSheet(translated, 'symbolic-ruled-surface')
+  const coons = findCurvedSheet(translated, 'symbolic-coons-patch')
+
+  if (
+    ruled.primitive.kind !== 'ruledSurface' ||
+    coons.primitive.kind !== 'coonsPatch'
+  ) {
+    throw new Error('Expected symbolic ruled and Coons primitives.')
+  }
+
+  const ruledStart = ruled.primitive.boundary0.segments[0]?.start
+  const coonsStart = coons.primitive.bottom.segments[0]?.start
+
+  assert.equal(ruledStart?.symbolic?.x.kind, 'symbolic')
+  assert.equal(ruledStart?.symbolic?.x.expression, '(R) + 2')
+  assert.equal(ruledStart?.symbolic?.x.previewValue, 5)
+  assert.equal(coonsStart?.symbolic?.x.kind, 'symbolic')
+  assert.equal(coonsStart?.symbolic?.x.expression, '(R) + 2')
+  assert.equal(coonsStart?.symbolic?.x.previewValue, 5)
 })
 
 test('layer translation moves grid frame origins without changing basis vectors', () => {
@@ -1754,6 +1830,58 @@ function createBoundarySurfaceTranslationDiagram(): Diagram {
           bottom: boundary0,
           right: boundary1,
           top: squareBoundary3D('boundary-top', 0),
+          left: {
+            kind: 'constantPoint',
+            point: { x: 0, y: 0, z: 0 },
+          },
+          sampling: { uSegments: 4, vSegments: 4 },
+        },
+        layer: 4,
+      }),
+    ],
+    labels: [],
+  }
+}
+
+function createSymbolicBoundarySurfaceTranslationDiagram(): Diagram {
+  const boundary0 = squareBoundary3D('symbolic-boundary-0', 0)
+  const boundary1 = squareBoundary3D('symbolic-boundary-1', 1)
+  const symbolicStart = symbolicXPoint(3, 0, 0, 'R')
+
+  boundary0.segments[0] = {
+    ...boundary0.segments[0],
+    start: symbolicStart,
+  }
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '3',
+        previewValue: 3,
+      },
+    ],
+    strata: [
+      createCurvedSheetStratum({
+        id: 'symbolic-ruled-surface',
+        primitive: {
+          kind: 'ruledSurface',
+          boundary0,
+          boundary1,
+          sampling: { segments: 4 },
+        },
+        layer: 4,
+      }),
+      createCurvedSheetStratum({
+        id: 'symbolic-coons-patch',
+        primitive: {
+          kind: 'coonsPatch',
+          bottom: boundary0,
+          right: boundary1,
+          top: squareBoundary3D('symbolic-boundary-top', 0),
           left: {
             kind: 'constantPoint',
             point: { x: 0, y: 0, z: 0 },
