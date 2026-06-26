@@ -22,6 +22,7 @@ export type SymbolicVec3 = {
   x: CoordinateComponent
   y: CoordinateComponent
   z: CoordinateComponent
+  source?: CoordinateSource
 }
 
 export type Vec3 = {
@@ -294,6 +295,17 @@ export type WorkPlaneFrameSnapshot = {
   v: Vec3
   normal: Vec3
 }
+
+export type WorkPlaneLocalCoordinateSource = {
+  kind: 'workPlaneLocal'
+  frame: WorkPlaneFrameSnapshot
+  local: {
+    a: ScalarInputValue
+    b: ScalarInputValue
+  }
+}
+
+export type CoordinateSource = WorkPlaneLocalCoordinateSource
 
 export type SurfaceFrame = WorkPlaneFrameSnapshot
 

@@ -104,6 +104,7 @@ type SymbolicVec3 = {
   x: ScalarInputValue;
   y: ScalarInputValue;
   z: ScalarInputValue;
+  source?: CoordinateSource;
 };
 ```
 
@@ -172,6 +173,39 @@ boundary-surface path snapshots for ruled surfaces and Coons patches. Active
 work-plane-local direct input, 3D template centers, and curved sheet anchors
 remain numeric-only for now; symbolic plane-local input is rejected instead of
 being converted through a symbolic frame or sampled-surface algebra.
+
+Phase 25A adds persistent work-plane-local coordinate source metadata without
+changing the preview contract: every committed coordinate is still a finite
+global `Vec3`, while optional source metadata preserves local symbolic intent:
+
+```ts
+type WorkPlaneLocalCoordinateSource = {
+  kind: "workPlaneLocal";
+  frame: WorkPlaneFrameSnapshot;
+  local: {
+    a: ScalarInputValue;
+    b: ScalarInputValue;
+  };
+};
+
+type CoordinateSource = WorkPlaneLocalCoordinateSource;
+```
+
+For such a coordinate, the preview point is validated as:
+
+```text
+P = frame.origin + preview(a) * frame.u + preview(b) * frame.v
+```
+
+The stored frame is a snapshot, not a reference to the active work plane. Its
+origin, `u`, `v`, and `normal` may contain symbolic coordinate metadata, but
+after variable resolution they must evaluate to finite preview vectors forming
+an orthonormal right-handed frame. Local `a` and `b` use the same scalar
+expression rules as variables, grid ranges, and symbolic coordinate components.
+Unknown variables, unsafe tokens, stale previews, invalid frames, and
+non-finite local previews reject validation cleanly. During JSON import, local
+scalar expressions and symbolic frame components participate in the existing
+variable-resolution flow before preview refresh.
 
 ## Grid strata
 
