@@ -402,6 +402,8 @@ const gridTikzEpsilon = 1e-9
 const pathRunLengthEpsilon = 1e-9
 const pathRunLengthSampleCount = 32
 const workPlaneFrameComparisonEpsilon = 1e-6
+const workPlaneFrameFields = ['origin', 'u', 'v', 'normal'] as const
+const vec3ComponentAxes = ['x', 'y', 'z'] as const
 const tikzBraidingMaskStrokeGapPt = 4
 const tikzBraidingBackgroundColor: HexColor = '#FFFFFF'
 
@@ -3568,7 +3570,7 @@ function emitTemplatePath3D(
   const localCenter = workPlaneLocalCoordinateFromPoint(frame, curve.template.center)
   const formattedLocalCenter =
     localCenterSource !== null &&
-    sameWorkPlaneFrame(localCenterSource.frame, frame)
+    sameWorkPlaneFrameForTikzLocalScope(localCenterSource.frame, frame)
       ? formatWorkPlaneLocalCoordinateSource(
           localCenterSource,
           context,
@@ -4240,7 +4242,7 @@ function analyzeWorkPlaneLocalFrame(
   }
 
   for (const source of sources.slice(1)) {
-    if (!sameWorkPlaneFrame(firstSource.frame, source.frame)) {
+    if (!sameWorkPlaneFrameForTikzLocalScope(firstSource.frame, source.frame)) {
       return {
         kind: 'fallback',
         reason: `${subject} uses multiple work-plane-local frames`,
@@ -4633,17 +4635,10 @@ function workPlaneLocalCoordinateSourceForPoint(
   return source?.kind === 'workPlaneLocal' ? source : null
 }
 
-function sameWorkPlaneFrame(
+export function sameWorkPlaneFramePreview(
   first: WorkPlaneFrameSnapshot,
   second: WorkPlaneFrameSnapshot,
 ): boolean {
-  const firstId = workPlaneFrameId(first)
-  const secondId = workPlaneFrameId(second)
-
-  if (firstId !== undefined && secondId !== undefined) {
-    return firstId === secondId
-  }
-
   return (
     vec3ApproximatelyEqual(
       first.origin,
@@ -4660,19 +4655,210 @@ function sameWorkPlaneFrame(
   )
 }
 
-function workPlaneFrameId(frame: WorkPlaneFrameSnapshot): string | undefined {
-  const frameWithOptionalId = frame as WorkPlaneFrameSnapshot & {
-    id?: unknown
-    sourceId?: unknown
+export function sameWorkPlaneFrameForTikzLocalScope(
+  first: WorkPlaneFrameSnapshot,
+  second: WorkPlaneFrameSnapshot,
+): boolean {
+  // TikZ local-scope grouping must compare symbolic frame metadata, not only
+  // preview values. Equal previews can come from different symbolic expressions,
+  // and merging them would drop symbolic intent.
+  if (!sameWorkPlaneFramePreview(first, second)) {
+    return false
   }
 
-  if (typeof frameWithOptionalId.id === 'string') {
-    return frameWithOptionalId.id
+  const firstSignature = workPlaneFrameSymbolicSignature(first)
+  const secondSignature = workPlaneFrameSymbolicSignature(second)
+
+  return (
+    firstSignature !== null &&
+    secondSignature !== null &&
+    firstSignature === secondSignature
+  )
+}
+
+export function workPlaneFrameSymbolicSignature(
+  frame: WorkPlaneFrameSnapshot,
+): string | null {
+  return workPlaneFrameSymbolicSignatureInternal(frame, new WeakSet<object>())
+}
+
+function workPlaneFrameSymbolicSignatureInternal(
+  frame: WorkPlaneFrameSnapshot,
+  seen: WeakSet<object>,
+): string | null {
+  const fieldSignatures: Array<[(typeof workPlaneFrameFields)[number], string]> = []
+
+  for (const field of workPlaneFrameFields) {
+    const signature = vec3SymbolicMetadataSignature(frame[field], seen)
+
+    if (signature === null) {
+      return null
+    }
+
+    fieldSignatures.push([field, signature])
   }
 
-  return typeof frameWithOptionalId.sourceId === 'string'
-    ? frameWithOptionalId.sourceId
-    : undefined
+  return JSON.stringify(fieldSignatures)
+}
+
+function vec3SymbolicMetadataSignature(
+  point: Vec3,
+  seen: WeakSet<object>,
+): string | null {
+  if (!isFiniteVec3(point)) {
+    return null
+  }
+
+  const componentSignatures: Array<[(typeof vec3ComponentAxes)[number], string]> = []
+
+  for (const axis of vec3ComponentAxes) {
+    const signature = coordinateComponentMetadataSignature(point, axis)
+
+    if (signature === null) {
+      return null
+    }
+
+    componentSignatures.push([axis, signature])
+  }
+
+  const sourceSignature = coordinateSourceMetadataSignature(
+    point.symbolic?.source,
+    seen,
+  )
+
+  if (sourceSignature === null) {
+    return null
+  }
+
+  return JSON.stringify({
+    components: componentSignatures,
+    source: sourceSignature,
+  })
+}
+
+function coordinateComponentMetadataSignature(
+  point: Vec3,
+  axis: (typeof vec3ComponentAxes)[number],
+): string | null {
+  const rawComponent = point.symbolic?.[axis]
+
+  if (rawComponent === undefined) {
+    return JSON.stringify(['numeric'])
+  }
+
+  if (!isCoordinateComponent(rawComponent)) {
+    return null
+  }
+
+  if (rawComponent.kind === 'numeric') {
+    return numbersApproximatelyEqual(rawComponent.value, point[axis])
+      ? JSON.stringify(['numeric'])
+      : null
+  }
+
+  if (!numbersApproximatelyEqual(rawComponent.previewValue, point[axis])) {
+    return null
+  }
+
+  return JSON.stringify(['symbolic', rawComponent.expression])
+}
+
+function coordinateSourceMetadataSignature(
+  source: unknown,
+  seen: WeakSet<object>,
+): string | null {
+  if (source === undefined) {
+    return JSON.stringify(['none'])
+  }
+
+  if (!isRecord(source) || source.kind !== 'workPlaneLocal') {
+    return null
+  }
+
+  if (seen.has(source)) {
+    return null
+  }
+
+  seen.add(source)
+
+  try {
+    if (!isRecord(source.local) || !isWorkPlaneFrameSnapshotRecord(source.frame)) {
+      return null
+    }
+
+    const frameSignature = workPlaneFrameSymbolicSignatureInternal(
+      source.frame,
+      seen,
+    )
+    const aSignature = scalarInputValueMetadataSignature(source.local.a)
+    const bSignature = scalarInputValueMetadataSignature(source.local.b)
+
+    if (
+      frameSignature === null ||
+      aSignature === null ||
+      bSignature === null
+    ) {
+      return null
+    }
+
+    return JSON.stringify([
+      'workPlaneLocal',
+      frameSignature,
+      aSignature,
+      bSignature,
+    ])
+  } finally {
+    seen.delete(source)
+  }
+}
+
+function scalarInputValueMetadataSignature(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (value.kind === 'numeric') {
+    return typeof value.value === 'number' && Number.isFinite(value.value)
+      ? JSON.stringify(['numeric', formatNumber(value.value)])
+      : null
+  }
+
+  return (
+    value.kind === 'symbolic' &&
+    typeof value.expression === 'string' &&
+    typeof value.previewValue === 'number' &&
+    Number.isFinite(value.previewValue)
+  )
+    ? JSON.stringify(['symbolic', value.expression, formatNumber(value.previewValue)])
+    : null
+}
+
+function isWorkPlaneFrameSnapshotRecord(
+  value: unknown,
+): value is WorkPlaneFrameSnapshot {
+  return (
+    isRecord(value) &&
+    isVec3Record(value.origin) &&
+    isVec3Record(value.u) &&
+    isVec3Record(value.v) &&
+    isVec3Record(value.normal)
+  )
+}
+
+function isVec3Record(value: unknown): value is Vec3 {
+  return (
+    isRecord(value) &&
+    typeof value.x === 'number' &&
+    Number.isFinite(value.x) &&
+    typeof value.y === 'number' &&
+    Number.isFinite(value.y) &&
+    typeof value.z === 'number' &&
+    Number.isFinite(value.z)
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function closedBoundariesPoints(

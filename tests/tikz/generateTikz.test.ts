@@ -6,6 +6,7 @@ import {
   maxCurvedSheetTikzFaces,
   sanitizeTikzSpathSaveName,
   sanitizeTikzNameStem,
+  sameWorkPlaneFrameForTikzLocalScope,
 } from '../../src/tikz/index.ts'
 import type {
   ClosedPathBoundary,
@@ -1830,6 +1831,59 @@ test('local symbolic label exports in a canvas-is-plane scope without wrapping t
   assert.match(layerBlock, /\\node at \(\{\\R\},\{\\R \/ 2\}\) \{\$F\^\{\(1\)\}L\$\};/)
 })
 
+test('TikZ local frame equality compares symbolic metadata after preview values', () => {
+  const numericFrame = xyFrame3D({ x: 2, y: 0, z: 0 })
+  const sameNumericFrame = xyFrame3D({ x: 2, y: 0, z: 0 })
+  const toleranceEqualNumericFrame = xyFrame3D({ x: 2.0000005, y: 0, z: 0 })
+  const differentNumericFrame = xyFrame3D({ x: 2.01, y: 0, z: 0 })
+  const symbolicFrameR = xyFrame3D(
+    symbolicVec3(symbolicComponent('R', 2), 0, 0),
+  )
+  const sameSymbolicFrameR = xyFrame3D(
+    symbolicVec3(symbolicComponent('R', 2), 0, 0),
+  )
+  const symbolicFrameS = xyFrame3D(
+    symbolicVec3(symbolicComponent('S', 2), 0, 0),
+  )
+  const symbolicBasisA = {
+    ...xyFrame3D(),
+    u: symbolicVec3(symbolicComponent('A', 1), 0, 0),
+  }
+  const symbolicBasisB = {
+    ...xyFrame3D(),
+    u: symbolicVec3(symbolicComponent('B', 1), 0, 0),
+  }
+
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(numericFrame, sameNumericFrame),
+    true,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(numericFrame, toleranceEqualNumericFrame),
+    true,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(numericFrame, differentNumericFrame),
+    false,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(symbolicFrameR, sameSymbolicFrameR),
+    true,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(symbolicFrameR, symbolicFrameS),
+    false,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(numericFrame, symbolicFrameR),
+    false,
+  )
+  assert.equal(
+    sameWorkPlaneFrameForTikzLocalScope(symbolicBasisA, symbolicBasisB),
+    false,
+  )
+})
+
 test('same-frame local symbolic path emits one canvas-is-plane scope with local expressions', () => {
   const diagram = createLocalSymbolicThreeDimensionalDiagram()
   const frame = xyFrame3D({ x: 0, y: 0, z: 1 })
@@ -1889,6 +1943,49 @@ test('same-frame local symbolic path emits one canvas-is-plane scope with local 
   assert.doesNotMatch(tikz, /\\coordinate \(curvePolyLocalSymbolicPath0p0\)/)
 })
 
+test('same symbolic work-plane frame local path emits one canvas scope with frame symbols', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(symbolicVec3(symbolicComponent('R', 2), 0, 0))
+
+  diagram.variables = equalPreviewFrameVariables()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'same-symbolic-frame-local-path',
+    name: 'Same Symbolic Frame Local Path',
+    style: curveStyle(),
+    points: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(frame, numericScalar(1), numericScalar(0)),
+      ),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+  const macroIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const originIndex = tikz.indexOf('plane origin={({\\R},0,0)}')
+
+  assert.equal(countMatches(layerBlock, /canvas is plane/g), 1)
+  assert.match(layerBlock, /plane origin=\{\(\{\\R\},0,0\)\}/)
+  assert.match(layerBlock, /\(0,0\) -- \(1,0\);/)
+  assert.notEqual(macroIndex, -1)
+  assert.notEqual(originIndex, -1)
+  assert.ok(macroIndex < originIndex)
+})
+
 test('mixed-frame local symbolic path falls back with an explicit policy comment', () => {
   const diagram = createLocalSymbolicThreeDimensionalDiagram()
   const firstFrame = xyFrame3D()
@@ -1936,6 +2033,73 @@ test('mixed-frame local symbolic path falls back with an explicit policy comment
   assert.doesNotMatch(tikz, /canvas is plane/)
 })
 
+test('equal-preview symbolic frame path falls back instead of dropping frame symbols', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const firstFrame = xyFrame3D(
+    symbolicVec3(symbolicComponent('R', 2), 0, 0),
+  )
+  const secondFrame = xyFrame3D(
+    symbolicVec3(symbolicComponent('S', 2), 0, 0),
+  )
+
+  diagram.variables = equalPreviewFrameVariables()
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'equal-preview-mixed-frame-path',
+    name: 'Equal Preview Mixed Frame Path',
+    style: curveStyle(),
+    points: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(firstFrame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(secondFrame, numericScalar(1), numericScalar(0)),
+      ),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const rMacroIndex = tikz.indexOf('\\pgfmathsetmacro{\\R}{2}')
+  const sMacroIndex = tikz.indexOf('\\pgfmathsetmacro{\\S}{2}')
+  const fallbackIndex = tikz.indexOf(
+    '% Curve "Equal Preview Mixed Frame Path" [equal-preview-mixed-frame-path] uses global preview coordinates',
+  )
+
+  assert.match(
+    tikz,
+    /uses global preview coordinates because Curve "Equal Preview Mixed Frame Path" \[equal-preview-mixed-frame-path\] uses multiple work-plane-local frames/,
+  )
+  assert.match(
+    tikz,
+    /Work-plane-local symbolic expressions are not expanded into global symbolic coordinates/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyEqualPreviewMixedFramePath0p0\) at \(2,0,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(curvePolyEqualPreviewMixedFramePath0p1\) at \(3,0,0\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(\{\\R\},0,0\)\}/)
+  assert.notEqual(rMacroIndex, -1)
+  assert.notEqual(sMacroIndex, -1)
+  assert.notEqual(fallbackIndex, -1)
+  assert.ok(rMacroIndex < fallbackIndex)
+  assert.ok(sMacroIndex < fallbackIndex)
+})
+
 test('local symbolic polygon sheet preserves layer and local coordinates in a canvas scope', () => {
   const diagram = createLocalSymbolicThreeDimensionalDiagram()
   const frame = xyFrame3D()
@@ -1981,6 +2145,65 @@ test('local symbolic polygon sheet preserves layer and local coordinates in a ca
     layerBlock,
     /\(\{\\R\},0\) -- \(\{\\R \+ 1\},0\) -- \(\{\\R \+ 1\},\{\\S\}\) -- cycle;/,
   )
+})
+
+test('equal-preview symbolic frame sheet falls back instead of using one frame scope', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const firstFrame = xyFrame3D(
+    symbolicVec3(symbolicComponent('R', 2), 0, 0),
+  )
+  const secondFrame = xyFrame3D(
+    symbolicVec3(symbolicComponent('S', 2), 0, 0),
+  )
+
+  diagram.variables = equalPreviewFrameVariables()
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: 'equal-preview-mixed-frame-sheet',
+    name: 'Equal Preview Mixed Frame Sheet',
+    style: sheetStyle(),
+    vertices: [
+      workPlaneLocalPoint(
+        2,
+        0,
+        0,
+        localCoordinateSource(firstFrame, numericScalar(0), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        0,
+        0,
+        localCoordinateSource(secondFrame, numericScalar(1), numericScalar(0)),
+      ),
+      workPlaneLocalPoint(
+        3,
+        1,
+        0,
+        localCoordinateSource(secondFrame, numericScalar(1), numericScalar(1)),
+      ),
+    ],
+    pathLabel: 'equal preview mixed frame sheet path',
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /uses global preview coordinates because Sheet "Equal Preview Mixed Frame Sheet" \[equal-preview-mixed-frame-sheet\] uses multiple work-plane-local frames/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetPolyEqualPreviewMixedFrameSheet0p0\) at \(2,0,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(sheetPolyEqualPreviewMixedFrameSheet0p1\) at \(3,0,0\);/,
+  )
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(\{\\R\},0,0\)\}/)
 })
 
 test('local symbolic 3D template center uses local expressions when frames match', () => {
@@ -5488,6 +5711,25 @@ function symbolicFrameVariables(): SymbolicVariable[] {
       id: 'var-R',
       name: 'R',
       macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+}
+
+function equalPreviewFrameVariables(): SymbolicVariable[] {
+  return [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+    {
+      id: 'var-S',
+      name: 'S',
+      macroName: 'S',
       expression: '2',
       previewValue: 2,
     },
