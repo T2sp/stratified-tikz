@@ -4076,6 +4076,7 @@ function emitScopedWorkPlaneLocalPointCurve(
 
 function emitScopedWorkPlaneLocalPoint(
   point: PointStratum,
+  elementIndex: number,
   options: string[],
   visibilityComment: string | null,
   context: GenerateContext,
@@ -4117,9 +4118,22 @@ function emitScopedWorkPlaneLocalPoint(
   )
 
   if (!scopedLines.ok) {
+    const coordinate = context.coordinates.define(
+      pointCoordinateBaseName(point, elementIndex),
+      0,
+      numericPreviewVec3(point.position),
+    )
+
+    // Points and labels have finite absolute preview positions. If their local
+    // frame cannot be emitted as a canvas-is-plane scope, preserve visible
+    // content by falling back to global preview coordinates with an explicit
+    // symbolic-intent warning.
     return [
-      `% ${subject} omitted because its work-plane-local frame cannot be exported safely.`,
-      `% ${commentLineText(scopedLines.error)}`,
+      ...(visibilityComment === null ? [] : [visibilityComment]),
+      ...localPreviewFallbackLines(subject, scopedLines.error),
+      '\\node[',
+      ...formatTikzOptions(options),
+      `] at (${coordinate}) {};`,
       '',
     ]
   }
@@ -4179,9 +4193,18 @@ function emitScopedWorkPlaneLocalLabel(
   )
 
   if (!scopedLines.ok) {
+    // Points and labels have finite absolute preview positions. If their local
+    // frame cannot be emitted as a canvas-is-plane scope, preserve visible
+    // content by falling back to global preview coordinates with an explicit
+    // symbolic-intent warning.
     return [
-      `% ${subject} omitted because its work-plane-local frame cannot be exported safely.`,
-      `% ${commentLineText(scopedLines.error)}`,
+      ...visibilityComment,
+      ...localPreviewFallbackLines(subject, scopedLines.error),
+      ...formatGlobalPreviewLabelLines(
+        options,
+        formatGlobalPreviewCoordinate(label.position, context.mode),
+        labelText,
+      ),
       '',
     ]
   }
@@ -4229,6 +4252,20 @@ function localPreviewFallbackLines(subject: string, reason: string): string[] {
     `% ${subject} uses global preview coordinates because ${commentLineText(reason)}.`,
     '% Work-plane-local symbolic expressions are not expanded into global symbolic coordinates by this exporter.',
   ]
+}
+
+function formatGlobalPreviewLabelLines(
+  options: string[],
+  coordinate: string,
+  labelText: string,
+): string[] {
+  return options.length === 0
+    ? [`\\node at ${coordinate} {${labelText}};`]
+    : [
+        '\\node[',
+        ...formatTikzOptions(options),
+        `] at ${coordinate} {${labelText}};`,
+      ]
 }
 
 function analyzeWorkPlaneLocalFrame(
@@ -5366,6 +5403,7 @@ function emitPoint(
   )
   const scopedLocalPoint = emitScopedWorkPlaneLocalPoint(
     point,
+    elementIndex,
     options,
     isHiddenBySurface
       ? `% Auto point visibility: point "${point.name}" [${point.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`
@@ -7076,6 +7114,18 @@ function formatCoordinate(
   }
 
   return `(${x},${y},${formatCoordinateComponent(point, 'z', context)})`
+}
+
+function formatGlobalPreviewCoordinate(point: Vec3, mode: TikzMode): string {
+  return formatCoordinate(numericPreviewVec3(point), mode)
+}
+
+function numericPreviewVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+  }
 }
 
 function formatCoordinateComponent(

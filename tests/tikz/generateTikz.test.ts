@@ -2239,6 +2239,156 @@ test('inline source-only symbolic frame fallback preserves layer and indentation
   assert.doesNotMatch(layerBlock, /canvas is plane/)
 })
 
+test('source-only symbolic point frame falls back to global preview coordinates', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'source-frame-local-point',
+    name: 'Source Frame Local Point',
+    style: pointStyle(),
+    position: workPlaneLocalPoint(
+      2,
+      0,
+      0,
+      localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+    ),
+    layer: 5,
+  })
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer5')
+
+  assert.match(
+    tikz,
+    /Point "Source Frame Local Point" \[source-frame-local-point\] uses global preview coordinates because Point "Source Frame Local Point" \[source-frame-local-point\] work-plane-local frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.match(
+    tikz,
+    /Work-plane-local symbolic expressions are not expanded into global symbolic coordinates/,
+  )
+  assert.match(
+    tikz,
+    /\\coordinate \(pointSourceFrameLocalPoint0p0\) at \(2,0,0\);/,
+  )
+  assert.match(layerBlock, /\] at \(pointSourceFrameLocalPoint0p0\) \{\};/)
+  assert.doesNotMatch(tikz, /Point "Source Frame Local Point" \[source-frame-local-point\] omitted/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('source-only symbolic label frame falls back to global preview coordinates', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'source-frame-local-label',
+    name: 'Source Frame Local Label',
+    text: '$F$',
+    position: workPlaneLocalPoint(
+      2,
+      0,
+      0,
+      localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+    ),
+    style: defaultLabelStyle(),
+    layer: 6,
+  })
+
+  const tikz = generateTikz(diagram)
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer6')
+
+  assert.match(
+    tikz,
+    /Label "Source Frame Local Label" \[source-frame-local-label\] uses global preview coordinates because Label "Source Frame Local Label" \[source-frame-local-label\] work-plane-local frame\.origin contains work-plane-local symbolic source metadata/,
+  )
+  assert.match(
+    tikz,
+    /Work-plane-local symbolic expressions are not expanded into global symbolic coordinates/,
+  )
+  assert.match(layerBlock, /\\node at \(2,0,0\) \{\$F\$\};/)
+  assert.doesNotMatch(tikz, /Label "Source Frame Local Label" \[source-frame-local-label\] omitted/)
+  assert.doesNotMatch(tikz, /canvas is plane/)
+  assert.doesNotMatch(tikz, /plane origin=\{\(2,0,0\)\}/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('inline source-only symbolic point fallback has no blank lines and stays layered', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'inline-source-frame-local-point',
+    name: 'Inline Source Frame Local Point',
+    style: pointStyle(),
+    position: workPlaneLocalPoint(
+      2,
+      0,
+      0,
+      localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+    ),
+    layer: 7,
+  })
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer7')
+
+  expectNoBlankLines(tikz)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer7,main\}/)
+  assert.match(
+    tikz,
+    /\n            % Point "Inline Source Frame Local Point" \[inline-source-frame-local-point\] uses global preview coordinates/,
+  )
+  assert.match(
+    tikz,
+    /\n            \\node\[\n                circle,/,
+  )
+  assert.match(layerBlock, /\] at \(pointInlineSourceFrameLocalPoint0p0\) \{\};/)
+  assert.doesNotMatch(layerBlock, /canvas is plane/)
+})
+
+test('inline source-only symbolic label fallback has no blank lines and stays layered', () => {
+  const diagram = createLocalSymbolicThreeDimensionalDiagram()
+  const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
+
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'inline-source-frame-local-label',
+    name: 'Inline Source Frame Local Label',
+    text: '$F^{(1)}L$',
+    position: workPlaneLocalPoint(
+      2,
+      0,
+      0,
+      localCoordinateSource(frame, numericScalar(0), numericScalar(0)),
+    ),
+    style: defaultLabelStyle(),
+    layer: 8,
+  })
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer8')
+
+  expectNoBlankLines(tikz)
+  assert.match(tikz, /\\pgfsetlayers\{stratifiedLayer8,main\}/)
+  assert.match(
+    tikz,
+    /\n            % Label "Inline Source Frame Local Label" \[inline-source-frame-local-label\] uses global preview coordinates/,
+  )
+  assert.match(
+    tikz,
+    /\n            \\node at \(2,0,0\) \{\$F\^\{\(1\)\}L\$\};/,
+  )
+  assert.match(layerBlock, /\$F\^\{\(1\)\}L\$/)
+  assert.doesNotMatch(layerBlock, /canvas is plane/)
+})
+
 test('source-only symbolic grid frame origin is omitted with an explicit frame comment', () => {
   const frame = xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0))
   const tikz = generateTikz(
