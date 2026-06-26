@@ -126,6 +126,13 @@ const phaseSlugs = {
   "23A": "example-bar-curated-layout",
   "23B": "toolbar-palette-add-path-polish",
   "23C": "camera-panel-below-preview",
+  "24A": "cursor-snap-coordinate-quantization",
+  "24B": "multi-selection-state-ui",
+  "24C": "bulk-style-layer-delete-duplicate",
+  "24D": "bulk-symbolic-translation",
+  "24E": "path-concatenation",
+  "24F": "layer-merge-symbolic-translation",
+  "24G": "editing-polish-hardening",
 };
 
 function makePhaseSpec(phase) {
