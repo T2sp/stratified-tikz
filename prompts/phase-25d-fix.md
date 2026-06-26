@@ -1,4 +1,4 @@
-# Phase 25D Fix Prompt: Compare symbolic work-plane frame metadata, not only preview values
+# Phase 25D Fix Prompt: Preserve or explicitly fallback for work-plane-local symbolic frame coordinates in TikZ plane scopes
 
 ## Environment
 
@@ -37,53 +37,58 @@ Review result:
 - Build passes.
 - No Critical issues.
 - One Medium issue remains.
+- One Low-priority test coverage issue remains.
 
 ## Medium issue
 
-`sameWorkPlaneFrame(...)` compares frame previews, not symbolic frame metadata.
+`plane origin`, `plane x`, and `plane y` can silently drop work-plane-local symbolic source metadata from stored frame coordinates.
 
-Review location:
+Review details:
 
-```text
-src/tikz/generateTikz.ts
-sameWorkPlaneFrame
+- `src/tikz/generateTikz.ts` formats frame coordinates through `formatFrameCoordinate`.
+- `formatFrameCoordinate` currently preserves per-axis symbolic components.
+- However, it does not preserve symbolic metadata stored as `Vec3.symbolic.source`, especially when the source is work-plane-local.
+- If a frame origin is stored as a work-plane-local symbolic source with numeric global preview components, TikZ export emits only the numeric preview.
+
+Observed example:
+
+- A grid frame origin has work-plane-local symbolic metadata involving `R`.
+- Its global preview is numerically `(2,0,0)`.
+- Export currently emits:
+
+```tex
+plane origin={(2,0,0)}
 ```
 
-Current problem:
+instead of preserving symbolic intent or explicitly falling back.
 
-- Two work-plane-local frames with different symbolic origins or basis expressions can have equal preview values.
-- The exporter treats them as the same frame because it compares only numeric preview values.
-- It then emits one `canvas is plane` scope using only one frame's symbolic/numeric data.
-- This silently drops the symbolic intent of the other frame.
+This silently loses the symbolic source metadata.
 
-Reproduced example:
+This is a Phase 25D issue because local symbolic frame data can affect exported geometry while being reduced to preview numbers without warning.
 
-- Point A uses a local frame whose origin expression is `R`.
-- Point B uses a local frame whose origin expression is `S`.
-- Both variables currently preview to `2`.
-- The exporter merges both points into one `canvas is plane` scope using only `\R`.
-- The `\S`-based frame is lost in the generated TikZ.
+## Low-priority issue
 
-This matches the Phase 25D checklist issue:
+There is no targeted TikZ test for a stored frame coordinate whose symbolic metadata is only in:
 
-```text
-mixed-frame symbolic loss
+```ts
+Vec3.symbolic.source
 ```
+
+rather than per-axis symbolic components.
 
 ## Goal
 
-Fix Phase 25D mixed symbolic frame detection.
-
-Work-plane frame equality for local-symbolic TikZ export must compare symbolic coordinate metadata/expressions, not only preview values.
+Fix Phase 25D TikZ frame-coordinate export so `formatTikzPlaneScopeOptions` and related helpers do not silently emit numeric previews for frame coordinates that contain work-plane-local symbolic source metadata.
 
 Required behavior:
 
-1. Frames with identical numeric preview values but different symbolic frame metadata must be treated as mixed/different frames.
-2. The exporter must not merge those coordinates into one `canvas is plane` scope.
-3. The generated TikZ must not silently drop one frame's symbol.
-4. Identical frames should still be recognized as identical when their symbolic metadata and preview values match.
-5. Numeric-only frames should continue to compare by existing tolerance-based preview equality.
-6. Add regression tests for equal-preview frames with origins `R` and `S`.
+1. Detect when `plane origin`, `plane x`, or `plane y` has symbolic/source metadata that is not representable by the current per-axis formatter.
+2. Either:
+   - preserve such frame coordinates symbolically when safe; or
+   - explicitly fall back / omit local canvas-scope export with a clear policy comment.
+3. Do not silently export numeric preview coordinates as if symbolic intent did not exist.
+4. Add targeted tests for grid/path/sheet canvas scopes whose stored frame origin has only work-plane-local symbolic source metadata.
+5. Preserve existing correct local canvas-scope behavior for ordinary numeric and per-axis symbolic frames.
 
 ## Scope
 
@@ -91,25 +96,26 @@ This is a targeted Phase 25D fix.
 
 Implement:
 
-- symbolic-aware work-plane frame equality/signature;
-- safer grouping of local coordinates by frame;
-- tests for equal-preview but symbolically different frames;
-- preservation of existing numeric-frame and identical-symbolic-frame behavior.
+- symbolic-source-aware frame coordinate formatting;
+- detection of unsupported `Vec3.symbolic.source` metadata in frame coordinates;
+- explicit fallback policy when symbolic frame source cannot be safely represented;
+- targeted TikZ tests.
 
 Do not implement:
 
-- new work-plane model;
-- new symbolic expression simplifier;
-- new global symbolic expansion;
-- new UI features;
+- full symbolic frame algebra if too large;
+- broad coordinate model refactor;
+- new work-plane UI;
+- new symbolic expression grammar;
+- new TikZ export modes;
 - broad TikZ generator rewrite;
 - new dependencies.
 
 Do not change:
 
-- work-plane-local coordinate data model unless a tiny helper field is unavoidable;
-- valid same-frame local TikZ export behavior;
-- variable macro emission;
+- local coordinate data model unless unavoidable;
+- existing same-frame local path/sheet/point/label export behavior;
+- existing variable macro emission;
 - layer-aware output;
 - inline/standalone export formatting;
 - 4-space indentation;
@@ -117,308 +123,318 @@ Do not change:
 - SVG preview behavior;
 - save/load behavior.
 
-## 1. Inspect current frame comparison and grouping
+## 1. Inspect current frame-coordinate export path
 
 Inspect:
 
 - `src/tikz/generateTikz.ts`;
-- `sameWorkPlaneFrame(...)`;
-- local-symbolic coordinate grouping logic;
-- `canvas is plane` scope generation;
-- frame serialization / frame snapshot type;
-- symbolic coordinate/scalar types.
+- `formatTikzPlaneScopeOptions`;
+- `formatFrameCoordinate`;
+- helpers that format `plane origin`, `plane x`, and `plane y`;
+- local `canvas is plane` scope export helpers for:
+  - points;
+  - labels;
+  - paths;
+  - sheets;
+  - filled sheets;
+  - grids/lattices;
+  - any work-plane-local template/path export;
+- frame equality helpers from the previous Phase 25D fix.
 
-Find all places where work-plane frames are compared for local TikZ export.
+Find where frame coordinates are reduced to preview numbers.
 
-The review specifically points to `sameWorkPlaneFrame(...)`, but there may also be frame grouping keys or helper functions elsewhere.
-
-## 2. Define symbolic-aware frame equality
-
-A work-plane frame contains, conceptually:
-
-```text
-origin
-u
-v
-normal
-```
-
-Each of these may include:
-
-- numeric preview coordinates;
-- symbolic coordinate metadata;
-- local/source metadata;
-- scalar expressions.
-
-Frame equality for TikZ local-scope grouping should use both:
-
-1. numeric preview equality within tolerance; and
-2. symbolic/source metadata equality.
-
-### Required policy
-
-Two frames are considered the same for `canvas is plane` grouping only if:
-
-- their preview `origin`, `u`, `v`, and `normal` are equal within tolerance; and
-- their symbolic/source metadata for those fields is equivalent.
-
-If any symbolic/source metadata differs, treat frames as different.
-
-Examples:
-
-### Same numeric frame
+The review specifically points to the path:
 
 ```text
-origin = (2,0,0) numeric
-origin = (2,0,0) numeric
+formatTikzPlaneScopeOptions
+-> formatFrameCoordinate
+-> per-axis symbolic formatting only
+-> numeric preview fallback
 ```
 
-Same, if all basis vectors match.
+## 2. Clarify supported frame-coordinate export cases
 
-### Identical symbolic frame
+Define a clear policy.
+
+### Case A: Numeric frame coordinate
+
+Example:
+
+```ts
+origin = { x: 2, y: 0, z: 0 }
+```
+
+Export as before:
+
+```tex
+plane origin={(2,0,0)}
+```
+
+### Case B: Per-axis symbolic components
+
+Example:
+
+```ts
+origin.x = { kind: "symbolic", expression: "R", previewValue: 2 }
+origin.y = 0
+origin.z = 0
+```
+
+Export symbolically as before or improve if needed:
+
+```tex
+plane origin={({\R},0,0)}
+```
+
+or existing equivalent.
+
+### Case C: `Vec3.symbolic.source` work-plane-local metadata
+
+Example:
+
+```ts
+origin.preview = (2,0,0)
+origin.symbolic.source = {
+  kind: "workPlaneLocal",
+  frame: ...,
+  local: { a: { expression: "R" }, b: 0 }
+}
+```
+
+This must **not** silently export as:
+
+```tex
+plane origin={(2,0,0)}
+```
+
+Acceptable policies:
+
+#### Preferred policy: preserve if safely representable
+
+If the source can be converted to a valid global symbolic expression, export it symbolically.
+
+For example, if the source is:
 
 ```text
-origin.x = R
-origin.x = R
+origin = sourceFrame.origin + R * sourceFrame.u + 0 * sourceFrame.v
 ```
 
-Same, if previews and all other frame fields match.
+and `sourceFrame` itself is numeric/per-axis-symbolic enough to format safely, then export:
 
-### Different symbolic frame with equal preview
-
-```text
-origin.x = R, preview 2
-origin.x = S, preview 2
+```tex
+plane origin={({... + \R * ...}, ...)}
 ```
 
-Different.
+This may be too complex for MVP.
 
-### Numeric vs symbolic with equal preview
+#### Safe MVP policy: explicit fallback
 
-```text
-origin.x = 2
-origin.x = R, preview 2
+If `Vec3.symbolic.source` work-plane-local metadata is present and cannot be safely represented by `formatFrameCoordinate`, do not emit a local `canvas is plane` scope that relies on this frame.
+
+Instead:
+
+- trigger the existing mixed-frame / unsupported-local-frame fallback policy;
+- emit a clear comment;
+- export using numeric preview fallback only if the existing policy explicitly comments that symbolic frame source could not be preserved;
+- or reject local-scope export for that object if the current export path can surface a clear error/comment.
+
+The key is: **no silent numeric preview export.**
+
+Preferred MVP:
+
+```tex
+% Work-plane-local frame source contains nested symbolic metadata that cannot be represented in a canvas-is-plane scope; using numeric preview fallback for this object.
 ```
 
-Conservative policy: different.
+or equivalent existing policy comment.
 
-This avoids silently dropping the symbolic expression.
-
-## 3. Add frame signature helper
+## 3. Add detection helper
 
 Add a helper such as:
 
 ```ts
-workPlaneFrameSymbolicSignature(frame): string
+hasUnsupportedFrameSymbolicSource(vec: SymbolicVec3 | Vec3): boolean
 ```
 
 or:
 
 ```ts
-compareWorkPlaneFrameSources(a, b): boolean
+frameCoordinateHasNonAxisSymbolicSource(coord): boolean
 ```
 
-or both.
+It should detect cases where:
 
-The signature should include all relevant fields:
+- a coordinate has `symbolic.source`;
+- the source is work-plane-local or otherwise non-axis metadata;
+- the current formatter would ignore it and use numeric previews.
 
-- origin x/y/z source/expression;
-- u x/y/z source/expression;
-- v x/y/z source/expression;
-- normal x/y/z source/expression.
+Also add a frame-level helper:
+
+```ts
+workPlaneFrameHasUnsupportedSymbolicSource(frame): boolean
+```
+
+that checks:
+
+- `origin`;
+- `u`;
+- `v`;
+- `normal` if relevant for export decisions.
 
 Requirements:
 
 - deterministic;
-- includes symbolic expressions and numeric values;
-- does not rely only on preview values;
-- handles missing/legacy numeric-only frames;
-- rejects or treats malformed metadata as unequal rather than merging.
+- handles legacy numeric frames;
+- handles per-axis symbolic frames as supported;
+- handles malformed metadata by returning unsupported or validation failure rather than silently numeric.
 
-Do not over-normalize expressions.
+## 4. Integrate detection into `formatTikzPlaneScopeOptions`
 
-For MVP, string equality of canonical stored expression text is acceptable.
-
-Examples:
+Before formatting:
 
 ```text
-R
-(R)
-R + 0
+plane origin
+plane x
+plane y
 ```
 
-may be treated as different unless the existing expression parser has canonicalization. That is acceptable and safer.
+check whether the frame contains unsupported symbolic source metadata.
 
-## 4. Update `sameWorkPlaneFrame(...)`
+If unsupported metadata exists:
 
-Update `sameWorkPlaneFrame(...)` or equivalent so it:
+- do not call `formatFrameCoordinate` and let it drop the metadata;
+- use the explicit fallback policy.
 
-1. first checks numeric preview equality within tolerance;
-2. then checks symbolic/source metadata equality;
-3. returns false if metadata differs.
-
-This function should not consider equal previews alone sufficient.
-
-If the function is also used outside TikZ export for UI/preview grouping, be careful. If some callers truly need preview-only equality, split into two helpers:
+Depending on current generator architecture, return a result object:
 
 ```ts
-sameWorkPlaneFramePreview(...)
-sameWorkPlaneFrameForTikzLocalScope(...)
+type PlaneScopeFormatResult =
+  | { kind: "ok"; options: string[]; requiredLibraries: string[] }
+  | { kind: "unsupportedSymbolicFrameSource"; reason: string };
 ```
 
-Use the symbolic-aware one for TikZ export grouping.
+or equivalent.
 
-## 5. Update local-scope grouping behavior
+If changing return shape is too broad, add a higher-level guard before calling `formatTikzPlaneScopeOptions`.
 
-When a path/sheet/collection has local coordinates whose frames are not symbolically identical:
+## 5. Fallback behavior
 
-- do not merge them into a single `canvas is plane` scope.
+Apply the existing mixed-frame/local export fallback if possible.
 
-Use the existing mixed-frame policy.
+For example, if local scope export is not safe:
 
-Preferred behavior:
+- export the object using global/numeric preview coordinates, with an explicit comment;
+- or use existing global symbolic fallback if available;
+- or skip local scope grouping and output separate scopes where safe.
 
-- emit explicit mixed-frame fallback/comment;
-- or emit separate local scopes when possible;
-- but never silently use one frame for all.
-
-If the existing mixed-frame policy falls back to numeric/global preview output with a comment, use that policy.
+The chosen policy must be tested.
 
 Important:
 
-- generated TikZ should not lose a symbol silently.
-- In the `R` vs `S` equal-preview repro, output should either:
-  - contain separate scopes preserving both `\R` and `\S` where possible; or
-  - use the existing mixed-frame fallback with an explicit policy comment.
-- It must not emit one scope using only `\R` for both points.
+- If using numeric preview fallback, it must be accompanied by an explicit comment.
+- The output should not look like a normal symbolic-preserving canvas scope.
+- It should not silently omit a variable macro that is still referenced.
+- It should not emit unresolved variables.
 
-## 6. Variable macro emission
+## 6. Ensure variable macro behavior is correct
 
-Ensure variable macro emission remains correct.
+If symbolic source metadata is preserved:
 
-For the repro:
+- emit needed macros, e.g. `\R`.
 
-- if output preserves both frames symbolically, macros for both `\R` and `\S` should be emitted before use.
-- if mixed-frame fallback uses numeric preview values, the output should include a comment explaining the fallback and should not pretend the second point uses `\R`.
+If fallback uses numeric previews:
 
-Do not emit unresolved variables.
+- do not emit unused macros solely because the fallback no longer references them, unless the project's variable emission policy emits all variables.
+- But do include a comment explaining why symbolic frame source was not preserved.
+
+If the object still uses local symbolic `a,b` expressions in coordinates, preserve their macros as before.
 
 ## 7. Tests
 
-Add focused regression tests.
+Add targeted tests.
 
-### Frame equality tests
+### Frame coordinate formatting tests
 
-1. Numeric identical frames compare equal.
+1. Numeric frame coordinate exports numeric as before.
 
-2. Numeric frames with different preview values compare different.
+2. Per-axis symbolic frame coordinate exports symbolically as before.
 
-3. Identical symbolic frames compare equal.
+3. Frame origin with `Vec3.symbolic.source.kind = "workPlaneLocal"` is detected as unsupported by the plain per-axis frame formatter.
 
-Example:
+4. Frame `u` with work-plane-local symbolic source is detected as unsupported.
 
-```text
-origin.x = R
-origin.x = R
-```
+5. Frame `v` with work-plane-local symbolic source is detected as unsupported.
 
-4. Symbolically different frames with equal previews compare different.
-
-Example:
-
-```text
-frameA.origin.x = R, R preview 2
-frameB.origin.x = S, S preview 2
-```
-
-5. Numeric frame and symbolic frame with equal preview compare different under the conservative TikZ grouping policy.
-
-Example:
-
-```text
-origin.x = 2
-origin.x = R, preview 2
-```
-
-6. Difference in basis symbolic metadata also makes frames different:
-
-```text
-u.x = A
-u.x = B
-```
-
-even if previews match.
+6. Frame `normal` with work-plane-local symbolic source is detected if normal participates in same-frame/signature/export safety.
 
 ### TikZ export tests
 
-7. Two local points with same symbolic frame `R` export in one `canvas is plane` scope, preserving local expressions.
+7. Grid with frame origin carrying only work-plane-local symbolic source metadata does not export silently as:
 
-8. Two local points with frame origins `R` and `S` with equal previews do **not** merge into one `canvas is plane` scope using only `\R`.
+```tex
+plane origin={(2,0,0)}
+```
 
-Assert one of the following, depending on chosen policy:
+without a fallback comment.
 
-- output contains separate scopes and both `\R` and `\S`; or
-- output uses mixed-frame fallback/comment and does not incorrectly use only `\R`.
+Expected:
+- either symbolic expression involving `\R` is preserved; or
+- output contains explicit fallback comment and does not emit a misleading normal local scope.
 
-9. A local path whose vertices have symbolically different equal-preview frames triggers mixed-frame policy.
+8. Path with a canvas-scope frame origin carrying only work-plane-local symbolic source metadata triggers the same safe behavior.
 
-10. A local sheet whose vertices have symbolically different equal-preview frames triggers mixed-frame policy.
+9. Sheet or filled sheet with such a frame triggers the same safe behavior.
 
-11. Required variables are emitted before use when both symbolic frames are preserved.
+10. Same object with numeric frame still exports normal `canvas is plane` scope.
 
-12. Inline output remains blank-line-free.
+11. Same object with per-axis symbolic frame still exports normal symbolic frame scope.
+
+12. Inline output with fallback comment has no blank lines.
 
 13. 4-space indentation preserved.
 
+14. Layer-aware output preserved around fallback/scopes.
+
 ### Regression tests
 
-14. Existing same-frame path/sheet local TikZ export tests still pass.
+15. Existing same-frame local symbolic path/sheet/point/label export tests still pass.
 
-15. Numerically different mixed-frame local paths still fall back with existing policy.
+16. Equal-preview but symbolically different frames still do not merge.
 
-16. Numeric/global export unchanged.
+17. Numeric/global coordinate export unchanged.
 
-17. Layer-aware output preserved.
+18. Variable macro emission tests still pass.
 
-## 8. Avoid false positives from preview-only tests
+## 8. Avoid silent loss in future helpers
 
-The review issue exists because preview-only equality made tests pass.
+Search for similar fallback behavior in frame formatting:
 
-Add tests that specifically assert symbolic metadata matters.
-
-Do not write only:
-
-```ts
-expect(frameA.preview).toEqual(frameB.preview)
+```bash
+rg "formatFrameCoordinate|plane origin|plane x|plane y|symbolic.source|preview" src/tikz src/model src/rendering
 ```
 
-Instead assert:
-
-```ts
-expect(sameWorkPlaneFrameForTikzLocalScope(frameA, frameB)).toBe(false)
-```
-
-for `R` vs `S`.
+If another frame formatting path silently reduces `Vec3.symbolic.source` to numeric preview, apply the same policy or document why it is safe.
 
 ## 9. Documentation/comments
 
-Add a code comment near the frame comparison helper:
+Add a code comment near the frame formatter:
 
 ```text
-TikZ local-scope grouping must compare symbolic frame metadata, not only preview values. Equal previews can come from different symbolic expressions, and merging them would drop symbolic intent.
+Frame coordinates may carry symbolic.source metadata. If the formatter only supports per-axis symbolic components, it must not silently emit numeric previews for non-axis sources because that drops symbolic intent.
 ```
 
-Update docs only if there is user-visible mixed-frame behavior clarification.
+Update user docs only if the fallback policy is user-visible.
 
 ## 10. Preserve existing behavior
 
 Do not regress:
 
-- same-frame local symbolic points/labels/paths/sheets;
+- same-frame local symbolic point/label/path/sheet export;
 - local expression preservation;
+- `canvas is plane` scope syntax;
+- `\usetikzlibrary{3d}` handling;
 - variable macro emission;
 - layer-aware output;
-- `canvas is plane` scope syntax;
 - inline no-blank-lines;
 - 4-space indentation;
 - numeric/global export;
@@ -441,11 +457,14 @@ git diff --check
 Please report:
 
 - files modified;
-- root cause of symbolic frame merging;
-- new frame equality/signature policy;
-- how numeric-only frames compare;
-- how symbolic frames compare;
-- mixed-frame export behavior for equal-preview different-symbol frames;
+- root cause of frame source metadata loss;
+- whether unsupported `Vec3.symbolic.source` is preserved or triggers explicit fallback;
+- fallback comment/policy;
+- affected frame fields:
+  - plane origin;
+  - plane x;
+  - plane y;
+  - normal if relevant;
 - tests added/updated;
 - test results;
 - build results;
