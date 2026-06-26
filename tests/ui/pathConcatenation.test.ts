@@ -21,6 +21,7 @@ import { generateTikz } from '../../src/tikz/index.ts'
 import {
   applyConcatenateSelectedPathsToEditorState,
   concatenateSelectedPaths,
+  concatenateSelectedPathsSuccessMessage,
   type PathConcatenationEditorState,
 } from '../../src/ui/pathConcatenation.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
@@ -333,6 +334,17 @@ test('concatenate selected paths works with undo and redo', () => {
   assert.equal(hasStratum(undone.editableDiagram, 'path-a'), true)
   assert.equal(hasStratum(redone.editableDiagram, 'joined-path'), true)
   assert.equal(hasStratum(redone.editableDiagram, 'path-a'), false)
+})
+
+test('concatenate selected paths status reports removal and reversal details', () => {
+  assert.equal(
+    concatenateSelectedPathsSuccessMessage(3, ['path-b'], false),
+    'Concatenated 3 paths. Original paths removed; stale crossing data cleaned. Reversed 1 path to match endpoints.',
+  )
+  assert.equal(
+    concatenateSelectedPathsSuccessMessage(2, [], true),
+    'Concatenated 2 paths. Original paths kept.',
+  )
 })
 
 test('concatenated path TikZ output is valid and readable', () => {

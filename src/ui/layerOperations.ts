@@ -3,13 +3,14 @@ import {
   duplicateLayer,
   elementsOnLayer,
   formatLayerValue,
+  getLayerMetadata,
   type LayerTranslationVector,
   mergeLayers,
   normalizeLayerValue,
   swapLayers,
   translateLayer,
 } from '../model/layers.ts'
-import type { Vec3 } from '../model/types.ts'
+import type { Diagram, Vec3 } from '../model/types.ts'
 import {
   clearSelectionForLayerFilter,
   normalizeLayerFilterForDiagram,
@@ -178,6 +179,10 @@ export function applyMergeLayersToEditorState<
   }
 
   try {
+    const warning = layerMergeWarningMessage(
+      current.editableDiagram,
+      targetLayerValue,
+    )
     const result = mergeLayers(
       current.editableDiagram,
       sourceLayerValue,
@@ -201,11 +206,11 @@ export function applyMergeLayersToEditorState<
         nextLayerFilter,
       ),
       layerFilter: nextLayerFilter,
-      layerOperationStatus: `Merged layer ${formatLayerValue(
+      layerOperationStatus: `${mergeLayersStatusMessage(
         result.sourceLayer,
-      )} into layer ${formatLayerValue(result.targetLayer)} (${layerElementCountLabel(
+        result.targetLayer,
         result.movedStrata + result.movedLabels,
-      )}).`,
+      )}${warning}`,
     })
   } catch (error) {
     return {
@@ -216,6 +221,37 @@ export function applyMergeLayersToEditorState<
       ),
     }
   }
+}
+
+export function mergeLayersStatusMessage(
+  sourceLayer: number,
+  targetLayer: number,
+  movedElementCount: number,
+): string {
+  return `Merged layer ${formatLayerValue(sourceLayer)} into layer ${formatLayerValue(
+    targetLayer,
+  )} (${layerElementCountLabel(movedElementCount)}).`
+}
+
+export function layerMergeWarningMessage(
+  diagram: Diagram,
+  targetLayerValue: number,
+): string {
+  const targetLayer = getLayerMetadata(diagram).find(
+    (layer) =>
+      normalizeLayerValue(layer.value) === normalizeLayerValue(targetLayerValue),
+  )
+  const warnings: string[] = []
+
+  if (targetLayer?.visible === false) {
+    warnings.push('target layer is hidden; moved objects may disappear from preview')
+  }
+
+  if (targetLayer?.locked === true) {
+    warnings.push('target layer is locked; unlock it before editing moved objects')
+  }
+
+  return warnings.length === 0 ? '' : ` Warning: ${warnings.join('. ')}.`
 }
 
 export function applyDeleteLayerToEditorState<

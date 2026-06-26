@@ -275,8 +275,32 @@ export function applyConcatenateSelectedPathsToEditorState<
     cubicBezierDraft: null,
     pathDraft: null,
     sheetPolygonDraft: null,
-    layerOperationStatus: `Concatenated ${result.sourcePathCount} paths.`,
+    layerOperationStatus: concatenateSelectedPathsSuccessMessage(
+      result.sourcePathCount,
+      result.reversedSourcePathIds,
+      options.keepOriginals ?? true,
+    ),
   })
+}
+
+export function concatenateSelectedPathsSuccessMessage(
+  sourcePathCount: number,
+  reversedSourcePathIds: readonly string[],
+  keepOriginals: boolean,
+): string {
+  const originalPolicy = keepOriginals
+    ? 'Original paths kept.'
+    : 'Original paths removed; stale crossing data cleaned.'
+  const reversed =
+    reversedSourcePathIds.length === 0
+      ? ''
+      : ` Reversed ${reversedSourcePathIds.length} ${pathCountLabel(
+          reversedSourcePathIds.length,
+        )} to match endpoints.`
+
+  return `Concatenated ${sourcePathCount} ${pathCountLabel(
+    sourcePathCount,
+  )}. ${originalPolicy}${reversed}`
 }
 
 export function concatenateSelectedPathsErrorMessage(
@@ -305,6 +329,10 @@ export function concatenateSelectedPathsErrorMessage(
     case 'endpointMismatch':
       return `Selected paths must connect endpoint-to-endpoint in selection order${suffix}.`
   }
+}
+
+function pathCountLabel(count: number): string {
+  return count === 1 ? 'path' : 'paths'
 }
 
 function sourcePathSegments(

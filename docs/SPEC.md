@@ -312,6 +312,15 @@ The exception is cross-work-plane concatenated path creation, where an existing
 point source may be copied as its finite absolute `Vec3` because the active work
 plane is an editing aid rather than a path-wide constraint.
 
+Cursor snap is a preview/editor preference for cursor-derived coordinates. It
+can quantize cursor placement and drag edits, but it does not change direct
+numeric input, symbolic expression input, loaded JSON, or TikZ generation. In
+2D mode, snap rounds `x` and `y` and keeps `z = 0`; in 3D mode, snap rounds the
+active work-plane local coordinates before committing ordinary model-space
+`Vec3` coordinates. Multi-selection, bulk editing, symbolic translation, path
+concatenation, and layer merge behavior are summarized in
+[Editing Fundamentals](./EDITING.md).
+
 ### Closed-boundary fills
 
 The model supports filled objects whose boundary is one or more closed paths.

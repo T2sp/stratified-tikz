@@ -19,6 +19,10 @@ TikZ are not snapped. In 2D mode snapping rounds cursor-derived `x` and `y`
 coordinates and keeps `z = 0`; in 3D mode snapping rounds the active work-plane
 local coordinates before reconstructing the model point.
 
+See [Editing Fundamentals](./EDITING.md) for Phase 24 snap presets, bulk
+editing behavior, symbolic translation, path concatenation, and deferred affine
+transform scope.
+
 ## Add Path
 
 Path-related creation tools are consolidated under Add path:

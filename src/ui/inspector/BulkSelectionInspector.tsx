@@ -47,6 +47,10 @@ export function BulkSelectionInspector({
   onBulkConcatenatePaths,
 }: BulkSelectionInspectorProps) {
   const layerValue = bulkLayerFieldValue(diagram, selection)
+  const selectionMessage = bulkSelectionMessage(
+    model?.geometricKind ?? null,
+    model?.count ?? selection.elements.length,
+  )
 
   return (
     <div className="inspector-content editable-inspector">
@@ -60,6 +64,10 @@ export function BulkSelectionInspector({
           <ReadOnlyField
             label="Kind"
             value={model?.geometricKind ?? 'mixed'}
+          />
+          <ReadOnlyField
+            label="Bulk edits"
+            value={selectionMessage}
           />
           <BulkNumberField
             label="Layer"
@@ -106,6 +114,9 @@ export function BulkSelectionInspector({
               <button
                 type="button"
                 className="toolbar-button"
+                title={`Duplicate ${selection.elements.length} selected ${objectCountLabel(
+                  selection.elements.length,
+                )}`}
                 onClick={onBulkDuplicate}
               >
                 Duplicate
@@ -113,9 +124,12 @@ export function BulkSelectionInspector({
               <button
                 type="button"
                 className="toolbar-button bulk-delete-button"
+                title={`Delete ${selection.elements.length} selected ${objectCountLabel(
+                  selection.elements.length,
+                )}`}
                 onClick={onBulkDelete}
               >
-                Delete
+                Delete...
               </button>
             </div>
           </div>
@@ -123,6 +137,21 @@ export function BulkSelectionInspector({
       </section>
     </div>
   )
+}
+
+function bulkSelectionMessage(
+  geometricKind: string | null,
+  count: number,
+): string {
+  if (geometricKind === null) {
+    return 'Style edits unavailable'
+  }
+
+  return `${count} ${geometricKind} ${objectCountLabel(count)}`
+}
+
+function objectCountLabel(count: number): string {
+  return count === 1 ? 'object' : 'objects'
 }
 
 function BulkPathConcatenationSection({
@@ -160,7 +189,11 @@ function BulkPathConcatenationSection({
             type="button"
             className="toolbar-button"
             disabled={!enabled}
-            title={enabled ? 'Concatenate selected paths' : 'Select at least two curves'}
+            title={
+              enabled
+                ? 'Concatenate selected paths; the new path uses the first path style.'
+                : 'Select at least two curves'
+            }
             onClick={concatenate}
           >
             Concatenate
