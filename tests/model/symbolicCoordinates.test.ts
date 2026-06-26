@@ -1132,6 +1132,266 @@ test('JSON import detects variables in work-plane-local frame fields', () => {
   assert.equal(findPoint(resolved.diagram, 'import-local-frame-point').position.x, 5)
 })
 
+test('JSON import rejects unsupported nested work-plane-local sources', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '4',
+        previewValue: 4,
+      },
+    ],
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'point-with-unsupported-local',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Point With Unsupported Local',
+    style: pointStyle(),
+    position: { x: 0, y: 0, z: 0 },
+    layer: 0,
+  })
+  const saved = JSON.parse(serializeDiagram(diagram)) as MutableSavedDiagramFile
+  const point = saved.diagram.strata[0] as unknown as Record<string, unknown>
+
+  point.unsupportedLocal = localCoordinateSource({
+    frame: xyFrame(),
+    a: symbolicScalar('R', 2),
+    b: numericScalar(0),
+  })
+
+  const pending = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(pending.ok, false)
+  if (pending.ok) {
+    throw new Error('Expected unsupported local source rejection.')
+  }
+  assert.match(
+    pending.error,
+    /strata\[0\]\.unsupportedLocal Unsupported work-plane-local coordinate source/,
+  )
+})
+
+test('JSON import rejects unsupported nested symbolic scalars instead of collecting them', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'point-with-unsupported-symbolic',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Point With Unsupported Symbolic',
+    style: pointStyle(),
+    position: { x: 0, y: 0, z: 0 },
+    layer: 0,
+  })
+  const saved = JSON.parse(serializeDiagram(diagram)) as MutableSavedDiagramFile
+  const point = saved.diagram.strata[0] as unknown as Record<string, unknown>
+
+  point.metadata = {
+    unsupportedSymbolic: symbolicScalar('R', 2),
+  }
+
+  const pending = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(pending.ok, false)
+  if (pending.ok) {
+    throw new Error('Expected unsupported symbolic source rejection.')
+  }
+  assert.match(
+    pending.error,
+    /strata\[0\]\.metadata\.unsupportedSymbolic Unsupported symbolic coordinate source/,
+  )
+})
+
+test('pending symbolic import refreshes supported global stale previews', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'stale-supported-global-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Stale Supported Global Point',
+    style: pointStyle(),
+    position: symbolicPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic variable resolution.')
+  }
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'R', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  const point = findPoint(resolved.diagram, 'stale-supported-global-point')
+
+  assert.equal(point.position.x, 4)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(
+    point.position.symbolic?.x.kind === 'symbolic'
+      ? point.position.symbolic.x.previewValue
+      : Number.NaN,
+    4,
+  )
+})
+
+test('pending symbolic import refreshes supported work-plane-local stale previews', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'stale-supported-local-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Stale Supported Local Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected work-plane-local variable resolution.')
+  }
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'R', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  const point = findPoint(resolved.diagram, 'stale-supported-local-point')
+  const source = point.position.symbolic?.source
+
+  assert.equal(point.position.x, 4)
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic'
+      ? source.local.a.previewValue
+      : Number.NaN,
+    4,
+  )
+})
+
+test('resolvePendingSymbolicDiagramImport reports missing stratum id without throwing', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'malformed-pending-local-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Malformed Pending Local Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending import.')
+  }
+
+  delete (
+    pending.pendingImport.diagram.strata[0] as unknown as Record<string, unknown>
+  ).id
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '4' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok !== false) {
+    throw new Error('Expected pending resolution failure.')
+  }
+  assert.match(resolved.error, /strata\[0\]\.id Stratum id is missing or invalid/)
+  assert.doesNotMatch(resolved.error, /Cannot read properties/)
+})
+
+test('resolvePendingSymbolicDiagramImport reports malformed local source without throwing', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'malformed-pending-source-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Malformed Pending Source Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending import.')
+  }
+
+  const point = findPoint(
+    pending.pendingImport.diagram,
+    'malformed-pending-source-point',
+  )
+  const source = point.position.symbolic?.source as unknown as {
+    local: Record<string, unknown>
+  }
+
+  delete source.local.b
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '4' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok !== false) {
+    throw new Error('Expected pending resolution failure.')
+  }
+  assert.match(
+    resolved.error,
+    /symbolic\.source\.local\.b Work-plane-local scalar must be a scalar input object/,
+  )
+})
+
 test('pending symbolic import parsing leaves the current diagram unchanged', () => {
   const currentDiagramBefore = serializeDiagram(emptyTwoDimensionalDiagram)
   const imported = {

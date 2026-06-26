@@ -22,8 +22,10 @@ import {
   resolveSymbolicVariables,
 } from './variables.ts'
 import {
+  collectDiagramSupportedSymbolicExpressionSources,
   refreshDiagramSymbolicCoordinatePreviews,
   validateDiagramSymbolicCoordinateMetadata,
+  validateNoUnsupportedSymbolicCoordinateSources,
 } from './symbolicCoordinates.ts'
 import {
   isTikzStyleTarget,
@@ -59,6 +61,7 @@ import type {
   Camera3D,
   Diagram,
   DiagramLayer,
+  DiagramValidationIssue,
   DiagramValidationResult,
   DiagramViewOptions,
   ExternalTikzStyleSource,
@@ -194,11 +197,6 @@ type LoadedDiagramNormalization = {
 type LoadedDiagramNormalizationOptions = {
   variables?: 'resolve' | 'structural'
   refreshSymbolicPreviews?: boolean
-}
-
-type SymbolicExpressionSource = {
-  path: string
-  expression: string
 }
 
 export function serializeDiagram(
@@ -382,7 +380,29 @@ export function resolvePendingSymbolicDiagramImport(
   const diagram = cleanPathCrossingStates(refreshed.diagram, {
     reconcileStalePathPairs: true,
   })
-  const validation = validateDiagram(diagram)
+  const unsupportedSymbolicSources =
+    validateNoUnsupportedSymbolicCoordinateSources(diagram)
+
+  if (unsupportedSymbolicSources.length > 0) {
+    return symbolicImportError(unsupportedSymbolicSources)
+  }
+
+  const structuralIssues = validatePendingImportDiagramStructure(diagram)
+
+  if (structuralIssues.length > 0) {
+    return symbolicImportError(structuralIssues)
+  }
+
+  let validation: DiagramValidationResult
+
+  try {
+    validation = validateDiagram(diagram)
+  } catch {
+    return {
+      ok: false,
+      error: 'Could not load diagram: saved diagram is malformed.',
+    }
+  }
 
   if (!validation.valid) {
     return symbolicImportError(validation.errors)
@@ -463,7 +483,27 @@ function createPendingSymbolicDiagramImport(
       ok: false
       error: string
     } {
-  const symbolicExpressions = collectDiagramSymbolicExpressionSources(diagram)
+  const unsupportedSymbolicSources =
+    validateNoUnsupportedSymbolicCoordinateSources(diagram)
+
+  if (unsupportedSymbolicSources.length > 0) {
+    return {
+      ok: false,
+      error: formatSymbolicImportIssue(unsupportedSymbolicSources[0]),
+    }
+  }
+
+  const collectedExpressions =
+    collectDiagramSupportedSymbolicExpressionSources(diagram)
+
+  if (!collectedExpressions.ok) {
+    return {
+      ok: false,
+      error: formatSymbolicImportIssue(collectedExpressions.errors[0]),
+    }
+  }
+
+  const symbolicExpressions = collectedExpressions.sources
   const hasSymbolicInput =
     (diagram.variables ?? []).length > 0 || symbolicExpressions.length > 0
 
@@ -526,57 +566,6 @@ function createPendingSymbolicDiagramImport(
   }
 }
 
-function collectDiagramSymbolicExpressionSources(
-  diagram: Diagram,
-): SymbolicExpressionSource[] {
-  const sources: SymbolicExpressionSource[] = []
-  const seen = new WeakSet<object>()
-
-  collectSymbolicExpressionSources(diagram.strata, 'strata', sources, seen)
-  collectSymbolicExpressionSources(diagram.labels, 'labels', sources, seen)
-
-  return sources
-}
-
-function collectSymbolicExpressionSources(
-  value: unknown,
-  path: string,
-  sources: SymbolicExpressionSource[],
-  seen: WeakSet<object>,
-): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) =>
-      collectSymbolicExpressionSources(
-        item,
-        `${path}[${index}]`,
-        sources,
-        seen,
-      ),
-    )
-    return
-  }
-
-  if (!isRecord(value)) {
-    return
-  }
-
-  if (seen.has(value)) {
-    return
-  }
-  seen.add(value)
-
-  if (value.kind === 'symbolic' && typeof value.expression === 'string') {
-    sources.push({
-      path,
-      expression: value.expression,
-    })
-  }
-
-  Object.entries(value).forEach(([key, child]) => {
-    collectSymbolicExpressionSources(child, `${path}.${key}`, sources, seen)
-  })
-}
-
 function importVariableReservedIds(diagram: Diagram): Set<string> {
   return new Set([
     ...(diagram.variables ?? []).map((variable) => variable.id),
@@ -614,6 +603,87 @@ function symbolicImportError(
         ? 'Could not load diagram.'
         : `Could not load diagram: ${firstError.path} ${firstError.message}`,
   }
+}
+
+function validatePendingImportDiagramStructure(
+  diagram: Diagram,
+): DiagramValidationIssue[] {
+  const errors: DiagramValidationIssue[] = []
+
+  if (Array.isArray(diagram.strata)) {
+    diagram.strata.forEach((stratum, index) => {
+      const path = `strata[${index}]`
+
+      if (!isRecord(stratum)) {
+        errors.push({
+          path,
+          message: 'Stratum must be an object.',
+        })
+        return
+      }
+
+      if (
+        typeof stratum.id !== 'string' ||
+        stratum.id.trim().length === 0
+      ) {
+        errors.push({
+          path: `${path}.id`,
+          message: 'Stratum id is missing or invalid.',
+        })
+      }
+
+      if (
+        typeof stratum.name !== 'string' ||
+        stratum.name.trim().length === 0
+      ) {
+        errors.push({
+          path: `${path}.name`,
+          message: 'Stratum name is missing or invalid.',
+        })
+      }
+    })
+  }
+
+  if (Array.isArray(diagram.labels)) {
+    diagram.labels.forEach((label, index) => {
+      const path = `labels[${index}]`
+
+      if (!isRecord(label)) {
+        errors.push({
+          path,
+          message: 'Label must be an object.',
+        })
+        return
+      }
+
+      if (typeof label.id !== 'string' || label.id.trim().length === 0) {
+        errors.push({
+          path: `${path}.id`,
+          message: 'Label id is missing or invalid.',
+        })
+      }
+
+      if (
+        typeof label.name !== 'string' ||
+        label.name.trim().length === 0
+      ) {
+        errors.push({
+          path: `${path}.name`,
+          message: 'Label name is missing or invalid.',
+        })
+      }
+    })
+  }
+
+  return errors
+}
+
+function formatSymbolicImportIssue(
+  issue: { path: string; message: string } | undefined,
+): string {
+  return issue === undefined
+    ? 'Could not load diagram.'
+    : `${issue.path} ${issue.message}`
 }
 
 function toPersistentDiagram(
@@ -851,14 +921,20 @@ function normalizeLoadedDiagram(
       : { pathCrossings: pathCrossingNormalization.pathCrossings }),
   }
   const symbolicMetadataErrors = validateDiagramSymbolicCoordinateMetadata(diagram)
+  const unsupportedSymbolicSourceErrors =
+    validateNoUnsupportedSymbolicCoordinateSources(diagram)
+  const symbolicCoordinateErrors = [
+    ...symbolicMetadataErrors,
+    ...unsupportedSymbolicSourceErrors,
+  ]
 
-  if (symbolicMetadataErrors.length > 0) {
+  if (symbolicCoordinateErrors.length > 0) {
     return {
       diagram,
       warnings,
       errors: [
         ...layerNormalization.errors,
-        ...symbolicMetadataErrors.map(
+        ...symbolicCoordinateErrors.map(
           (issue) => `${issue.path} ${issue.message}`,
         ),
       ],
