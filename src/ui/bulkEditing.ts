@@ -12,6 +12,14 @@ import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
 import {
+  diagramTranslationContext,
+  isZeroTranslationVector,
+  translateStratum,
+  translateTextLabel,
+  translationVectorPreview,
+  type TranslationVector,
+} from '../model/translation.ts'
+import {
   isArrowHeadKind,
   isEndpointArrowMode,
   isMidArrowDirection,
@@ -154,6 +162,19 @@ export type BulkDuplicateSelectedElementsResult = {
   idChanges: BulkDuplicateIdChange[]
   pathLabelChanges: BulkDuplicatePathLabelChange[]
 }
+
+export type BulkTranslateSelectedElementsResult =
+  | {
+      ok: true
+      diagram: Diagram
+      translated: boolean
+      translatedCount: number
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: string
+    }
 
 export type BulkOperationEditorState = UndoableEditorState & {
   layerOperationStatus: string
@@ -501,6 +522,88 @@ export function updateSelectedElementsLayer(
   return changed ? ensureLayerMetadata({ ...diagram, strata, labels }) : diagram
 }
 
+export function translateSelectedElements(
+  diagram: Diagram,
+  selection: SelectedElement,
+  translation: TranslationVector,
+): BulkTranslateSelectedElementsResult {
+  const selected = existingSelectedElements(diagram, selection)
+
+  if (selected.length === 0 || isZeroTranslationVector(translation)) {
+    return {
+      ok: true,
+      diagram,
+      translated: false,
+      translatedCount: 0,
+    }
+  }
+
+  const selectedKeys = selectedElementKeySet(selection)
+  let context
+
+  try {
+    context = diagramTranslationContext(diagram)
+  } catch (error) {
+    return {
+      ok: false,
+      diagram,
+      error: bulkOperationErrorMessage(error, 'Translate selected failed.'),
+    }
+  }
+
+  let changed = false
+  let changedCurve = false
+
+  try {
+    const strata = diagram.strata.map((stratum) => {
+      if (!selectedKeys.has(selectedElementKey({ kind: 'stratum', id: stratum.id }))) {
+        return stratum
+      }
+
+      const translated = translateStratum(stratum, translation, context)
+      changed = changed || translated !== stratum
+      changedCurve = changedCurve || stratum.geometricKind === 'curve'
+      return translated
+    })
+    const labels = diagram.labels.map((label) => {
+      if (!selectedKeys.has(selectedElementKey({ kind: 'label', id: label.id }))) {
+        return label
+      }
+
+      changed = true
+      return translateTextLabel(label, translation, context)
+    })
+
+    if (!changed) {
+      return {
+        ok: true,
+        diagram,
+        translated: false,
+        translatedCount: 0,
+      }
+    }
+
+    const nextDiagram = {
+      ...diagram,
+      strata,
+      labels,
+    }
+
+    return {
+      ok: true,
+      diagram: changedCurve ? cleanPathCrossingStates(nextDiagram) : nextDiagram,
+      translated: true,
+      translatedCount: selected.length,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      diagram,
+      error: bulkOperationErrorMessage(error, 'Translate selected failed.'),
+    }
+  }
+}
+
 export function removeSelectedElements(
   diagram: Diagram,
   selection: SelectedElement,
@@ -757,6 +860,69 @@ export function applyBulkDuplicateToEditorState<
       result.duplicatedCount === 0
         ? 'No selected objects duplicated.'
         : `Duplicated ${bulkElementCountLabel(result.duplicatedCount)}.`,
+  })
+}
+
+export function applyBulkTranslateToEditorState<
+  T extends BulkOperationEditorState,
+>(current: T, translation: TranslationVector): T {
+  if (
+    !isSelectionCompatibleWithLayerFilter(
+      current.editableDiagram,
+      current.selectedElement,
+      current.layerFilter,
+    )
+  ) {
+    return {
+      ...current,
+      selectedElement: null,
+      layerFilter: normalizeLayerFilterForDiagram(
+        current.editableDiagram,
+        current.layerFilter,
+      ),
+      layerOperationStatus: 'Selection is not editable in the current layer filter.',
+    }
+  }
+
+  const result = translateSelectedElements(
+    current.editableDiagram,
+    current.selectedElement,
+    translation,
+  )
+
+  if (!result.ok) {
+    return {
+      ...current,
+      layerOperationStatus: result.error,
+    }
+  }
+
+  const nextLayerFilter = normalizeLayerFilterForDiagram(
+    result.diagram,
+    current.layerFilter,
+  )
+  const nextSelection = clearSelectionForLayerFilter(
+    result.diagram,
+    current.selectedElement,
+    nextLayerFilter,
+  )
+  const preview = translationVectorPreview(translation)
+
+  return commitDiagramChange(current, {
+    ...current,
+    editableDiagram: result.diagram,
+    selectedElement: nextSelection,
+    layerFilter: nextLayerFilter,
+    polylineDraft: null,
+    cubicBezierDraft: null,
+    pathDraft: null,
+    sheetPolygonDraft: null,
+    layerOperationStatus:
+      result.translated
+        ? `Translated ${bulkElementCountLabel(
+            result.translatedCount,
+          )} by (${preview.x}, ${preview.y}, ${preview.z}).`
+        : 'No selected objects translated.',
   })
 }
 
@@ -1232,6 +1398,10 @@ function selectedElementKeySet(selection: SelectedElement): Set<string> {
 
 function selectedElementKey(element: SingleSelectedElement): string {
   return `${element.kind}:${element.id}`
+}
+
+function bulkOperationErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
 }
 
 function duplicateSelectedStratum(

@@ -92,6 +92,43 @@ path coordinates, 2D template centers, sheet vertices, and copied boundary
 snapshots used by ruled surfaces and Coons patches. Active work-plane local
 symbolic input and 3D template centers remain numeric-only in the MVP.
 
+## Symbolic Translation Policy
+
+Phase 24D implements translation as the only geometric transform. General
+affine transforms such as rotation, scaling, and shear are intentionally
+deferred.
+
+For every translated coordinate component, the model applies:
+
+```text
+P' = P + d
+```
+
+Numeric components remain numeric when both `P` and `d` are numeric. If either
+side is symbolic, the translated component stores a symbolic addition
+expression, for example:
+
+```text
+R*cos(q) + 1  ->  (R*cos(q)) + 1
+R*cos(q) + a  ->  (R*cos(q)) + (a)
+```
+
+Numeric `+ 0` is omitted. Symbolic deltas are parsed with the same scalar
+expression grammar as coordinate input, evaluated against the diagram's current
+variables, and rejected if they contain unknown variables or non-finite preview
+values. Existing symbolic coordinate previews are refreshed during translation,
+so stale preview values are not carried forward.
+
+In 2D diagrams, translation uses `dz = 0` and keeps every model `z` coordinate
+numeric and equal to `0`. It never creates symbolic `z` metadata for 2D
+objects.
+
+Stored work-plane or surface frames translate only their `origin`. Basis vectors
+`u`, `v`, and `normal` are copied unchanged because Phase 24D does not rotate,
+scale, or shear frames. This applies to arc and path-template frames, grid
+frames, work-plane-filled sheets, ruled and Coons boundary snapshots, and curved
+surface frames.
+
 ## JSON Import With Symbolic Variables
 
 When a saved JSON diagram contains symbolic variables or symbolic coordinate

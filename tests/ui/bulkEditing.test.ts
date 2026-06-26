@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import {
+  createCurveStratum,
+  createEmptyDiagram,
+  createPointStratum,
+} from '../../src/model/constructors.ts'
+import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
+import { pathCrossingStateFromCandidate } from '../../src/model/pathCrossings.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
+import {
+  parseTranslationVectorFromInputs,
+  type TranslationVector,
+} from '../../src/model/translation.ts'
 import type {
   CurveStratum,
   Diagram,
+  PointStratum,
+  Stratum,
   TextLabel,
   Vec3,
 } from '../../src/model/types.ts'
@@ -13,9 +25,11 @@ import {
   applyBulkDeleteToEditorState,
   applyBulkDuplicateToEditorState,
   applyBulkStyleField,
+  applyBulkTranslateToEditorState,
   createBulkStyleEditorModel,
   duplicateSelectedElements,
   removeSelectedElements,
+  translateSelectedElements,
   updateSelectedElementsLayer,
   type BulkOperationEditorState,
 } from '../../src/ui/bulkEditing.ts'
@@ -142,6 +156,155 @@ test('bulk duplicate does not duplicate crossing states', () => {
     ),
     false,
   )
+})
+
+test('bulk translation moves numeric selected points', () => {
+  const diagram = createBulkPointDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    pointSelection(),
+    parseTranslation(diagram, '1', '-2', '3'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.deepEqual(findPoint(result.diagram, 'point-a').position, {
+    x: 2,
+    y: 0,
+    z: 3,
+  })
+  assert.deepEqual(findPoint(result.diagram, 'point-b').position, {
+    x: 3,
+    y: 0,
+    z: 4,
+  })
+})
+
+test('bulk translation adds symbolic deltas to symbolic point expressions', () => {
+  const diagram = createBulkPointDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    { kind: 'stratum', id: 'symbolic-point' },
+    parseTranslation(diagram, 'Len/2', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const point = findPoint(result.diagram, 'symbolic-point')
+
+  assert.equal(point.position.x, 5)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic.x.expression, '(R) + (Len/2)')
+  assert.equal(point.position.symbolic.x.previewValue, 5)
+})
+
+test('bulk translation input rejects unknown symbolic delta variables', () => {
+  const parsed = parseTranslationVectorFromInputs(createBulkPointDiagram(), {
+    dx: 'Missing',
+    dy: '0',
+    dz: '0',
+  })
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected unknown delta variable to be rejected.')
+  }
+  assert.match(parsed.error, /Unknown variable "Missing"/)
+})
+
+test('bulk translation in 2D keeps z numeric and locked to zero', () => {
+  const diagram = createBulkPointDiagram(2)
+  const result = translateSelectedElements(
+    diagram,
+    pointSelection(),
+    parseTranslation(diagram, '1', '1', 'Len'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  for (const id of ['point-a', 'point-b']) {
+    const point = findPoint(result.diagram, id)
+
+    assert.equal(point.position.z, 0)
+    assert.equal(point.position.symbolic?.z.kind, undefined)
+  }
+})
+
+test('bulk translation rejects unsupported objects without partial mutation', () => {
+  const diagram = {
+    ...createBulkPointDiagram(),
+    strata: [
+      ...createBulkPointDiagram().strata,
+      unsupportedCurveStratum(),
+    ],
+  }
+  const original = structuredClone(diagram) as Diagram
+  const result = translateSelectedElements(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'point-a' },
+        { kind: 'stratum', id: 'unsupported-curve' },
+      ],
+    },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, false)
+  assert.deepEqual(result.diagram, original)
+})
+
+test('bulk translation is undoable', () => {
+  const diagram = createBulkPointDiagram()
+  const initial = createBulkState(diagram, pointSelection())
+  const translated = applyBulkTranslateToEditorState(
+    initial,
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+  const undone = undoLastDiagramChange(translated)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.deepEqual(findPoint(translated.editableDiagram, 'point-a').position, {
+    x: 2,
+    y: 2,
+    z: 0,
+  })
+  assert.deepEqual(findPoint(undone.editableDiagram, 'point-a').position, {
+    x: 1,
+    y: 2,
+    z: 0,
+  })
+  assert.deepEqual(findPoint(redone.editableDiagram, 'point-a').position, {
+    x: 2,
+    y: 2,
+    z: 0,
+  })
+  assert.equal(translated.history.past.length, 1)
+})
+
+test('bulk translation runs crossing cleanup for translated paths', () => {
+  const diagram = createCrossingTranslationDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    { kind: 'stratum', id: 'path-a' },
+    parseTranslation(diagram, '0', '2', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.equal(result.diagram.pathCrossings, undefined)
 })
 
 test('undo and redo work for bulk delete', () => {
@@ -336,6 +499,94 @@ function labelA(): TextLabel {
   }
 }
 
+function createBulkPointDiagram(ambientDimension: 2 | 3 = 3): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '3',
+        previewValue: 3,
+      },
+      {
+        id: 'var-Len',
+        name: 'Len',
+        macroName: 'Len',
+        expression: '4',
+        previewValue: 4,
+      },
+    ],
+    strata: [
+      createPointStratum({
+        ambientDimension,
+        id: 'point-a',
+        position: { x: 1, y: 2, z: ambientDimension === 2 ? 0 : 0 },
+        layer: 0,
+      }),
+      createPointStratum({
+        ambientDimension,
+        id: 'point-b',
+        position: { x: 2, y: 2, z: ambientDimension === 2 ? 0 : 1 },
+        layer: 0,
+      }),
+      createPointStratum({
+        ambientDimension,
+        id: 'symbolic-point',
+        position: symbolicRPoint(),
+        layer: 0,
+      }),
+    ],
+    labels: [],
+  }
+}
+
+function createCrossingTranslationDiagram(): Diagram {
+  const base = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    strata: [
+      createCurveStratum({
+        ambientDimension: 2,
+        id: 'path-a',
+        points: [
+          { x: -1, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+      }),
+      createCurveStratum({
+        ambientDimension: 2,
+        id: 'path-b',
+        points: [
+          { x: 0, y: -1, z: 0 },
+          { x: 0, y: 1, z: 0 },
+        ],
+      }),
+    ],
+    labels: [],
+  }
+  const candidate = pathIntersectionCandidatesForDiagram(base)[0]
+
+  if (candidate === undefined) {
+    throw new Error('Expected crossing fixture to have one candidate.')
+  }
+
+  return {
+    ...base,
+    pathCrossings: [pathCrossingStateFromCandidate(candidate, 'braiding')],
+  }
+}
+
+function pointSelection(): SelectedElement {
+  return {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'point-a' },
+      { kind: 'stratum', id: 'point-b' },
+    ],
+  }
+}
+
 function symbolicPoint(): Vec3 {
   return {
     x: 0,
@@ -357,6 +608,64 @@ function symbolicPoint(): Vec3 {
       },
     },
   }
+}
+
+function symbolicRPoint(): Vec3 {
+  return {
+    x: 3,
+    y: 0,
+    z: 0,
+    symbolic: {
+      x: {
+        kind: 'symbolic',
+        expression: 'R',
+        previewValue: 3,
+      },
+      y: {
+        kind: 'numeric',
+        value: 0,
+      },
+      z: {
+        kind: 'numeric',
+        value: 0,
+      },
+    },
+  }
+}
+
+function unsupportedCurveStratum(): Stratum {
+  return {
+    id: 'unsupported-curve',
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'unsupportedCurve',
+    name: 'Unsupported curve',
+    style: {
+      kind: 'curveStyle',
+      strokeColor: '#000000',
+      strokeOpacity: 1,
+      lineWidth: 1.2,
+      lineStyle: 'solid',
+    },
+    styleSegments: [],
+    layer: 0,
+  } as unknown as Stratum
+}
+
+function parseTranslation(
+  diagram: Diagram,
+  dx: string,
+  dy: string,
+  dz: string,
+): TranslationVector {
+  const parsed = parseTranslationVectorFromInputs(diagram, { dx, dy, dz })
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  return parsed.translation
 }
 
 function createBulkState(
@@ -382,6 +691,16 @@ function findCurve(diagram: Diagram, id: string): CurveStratum {
 
   if (stratum === undefined || stratum.geometricKind !== 'curve') {
     throw new Error(`Expected ${id} to be a curve.`)
+  }
+
+  return stratum
+}
+
+function findPoint(diagram: Diagram, id: string): PointStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum === undefined || stratum.geometricKind !== 'point') {
+    throw new Error(`Expected ${id} to be a point.`)
   }
 
   return stratum
