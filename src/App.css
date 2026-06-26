@@ -1404,6 +1404,7 @@
 
 .preview-toolbar-primary-tools,
 .preview-toolbar-detail,
+.preview-snap-control,
 .preview-history-overlay,
 .preview-mini-segmented {
   display: flex;
@@ -1416,6 +1417,19 @@
 .preview-toolbar-detail {
   padding-left: 6px;
   border-left: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.preview-snap-control {
+  padding-left: 6px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.preview-snap-select-field {
+  grid-template-columns: auto minmax(70px, 96px);
+}
+
+.preview-snap-step-field {
+  grid-template-columns: auto minmax(64px, 84px);
 }
 
 .preview-fill-path-control {
@@ -1716,6 +1730,14 @@
   background: #ffffff;
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.preview-toolbar-field input[aria-invalid='true'] {
+  border-color: #b3261e;
+}
+
+.preview-toolbar-field select {
+  font-family: var(--sans);
 }
 
 .preview-coons-direction-row {

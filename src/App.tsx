@@ -16,7 +16,13 @@ import {
   getExampleOption,
   type ExampleId,
 } from './examples'
-import { normalizePointForAmbientDimension } from './geometry'
+import {
+  cursorSnapPresetSteps,
+  defaultCursorSnapSettings,
+  parseCursorSnapStep,
+  snapCursorPoint,
+} from './geometry'
+import type { CursorSnapSettings } from './geometry'
 import type { PathIntersectionDetectionStatus } from './geometry'
 import {
   parseSavedDiagramJsonForImport,
@@ -448,6 +454,7 @@ const directCubicBezierControlModes: DirectCubicBezierControlMode[] = [
 ]
 const directPathInputModes = directPathInputModeItems()
 const fillRuleOptions: FillRule[] = ['nonzero', 'evenOdd']
+const defaultCursorSnapCustomStepInput = '0.25'
 const visibilitySortModeOptions: Array<{
   mode: VisibilitySortMode
   label: string
@@ -526,6 +533,13 @@ function App() {
     useState<PreviewToolbarState>('expanded')
   const [openToolbarPalette, setOpenToolbarPalette] =
     useState<PreviewToolbarPalette>(null)
+  const [cursorSnapSettings, setCursorSnapSettings] =
+    useState<CursorSnapSettings>(() => ({ ...defaultCursorSnapSettings }))
+  const [cursorSnapControlValue, setCursorSnapControlValue] =
+    useState<string>('off')
+  const [cursorSnapCustomStepInput, setCursorSnapCustomStepInput] =
+    useState<string>(defaultCursorSnapCustomStepInput)
+  const [cursorSnapStatus, setCursorSnapStatus] = useState<string>('')
   const [polylineStatus, setPolylineStatus] = useState<string>('')
   const [cubicBezierStatus, setCubicBezierStatus] = useState<string>('')
   const [pathStatus, setPathStatus] = useState<string>('')
@@ -2420,6 +2434,60 @@ function App() {
     setOpenToolbarPalette((current) => toggleToolbarPalette(current, palette))
   }
 
+  function updateCursorSnapControlValue(value: string): void {
+    if (value === 'off') {
+      setCursorSnapControlValue(value)
+      setCursorSnapSettings({ ...defaultCursorSnapSettings })
+      setCursorSnapStatus('')
+      return
+    }
+
+    if (value === 'custom') {
+      setCursorSnapControlValue(value)
+      applyCustomCursorSnapStep(cursorSnapCustomStepInput)
+      return
+    }
+
+    const step = parseCursorSnapStep(value)
+
+    if (step === null) {
+      setCursorSnapStatus('Snap step must be finite and positive.')
+      return
+    }
+
+    setCursorSnapControlValue(value)
+    setCursorSnapSettings({ enabled: true, step })
+    setCursorSnapStatus('')
+  }
+
+  function updateCursorSnapCustomStepInput(value: string): void {
+    setCursorSnapCustomStepInput(value)
+
+    if (cursorSnapControlValue === 'custom') {
+      applyCustomCursorSnapStep(value)
+      return
+    }
+
+    if (parseCursorSnapStep(value) === null) {
+      setCursorSnapStatus('Custom snap step must be finite and positive.')
+      return
+    }
+
+    setCursorSnapStatus('')
+  }
+
+  function applyCustomCursorSnapStep(value: string): void {
+    const step = parseCursorSnapStep(value)
+
+    if (step === null) {
+      setCursorSnapStatus('Custom snap step must be finite and positive.')
+      return
+    }
+
+    setCursorSnapSettings({ enabled: true, step })
+    setCursorSnapStatus('')
+  }
+
   function handlePreviewToolbarPaletteSummaryClick(
     event: MouseEvent<HTMLElement>,
     palette: PreviewToolbarPaletteId,
@@ -2513,15 +2581,24 @@ function App() {
     let modelPoint: Vec3
 
     try {
-      modelPoint = normalizePointForAmbientDimension(
-        editableDiagram.ambientDimension,
-        svgPointToModelOnWorkPlane(
-          previewCamera,
-          svgPoint,
-          viewportHeight,
-          placementWorkPlane,
-        ),
+      const projectedPoint = svgPointToModelOnWorkPlane(
+        previewCamera,
+        svgPoint,
+        viewportHeight,
+        placementWorkPlane,
       )
+      const snappedPoint = snapCursorPoint(projectedPoint, {
+        ambientDimension: editableDiagram.ambientDimension,
+        snap: cursorSnapSettings,
+        workPlane: placementWorkPlane,
+      })
+
+      if (snappedPoint === null) {
+        setCursorCreationSourceStatus('Cursor snap produced invalid coordinates.')
+        return
+      }
+
+      modelPoint = snappedPoint
     } catch {
       setCursorCreationSourceStatus('Click did not intersect the active work plane.')
       return
@@ -2926,15 +3003,23 @@ function App() {
             activeWorkPlane
 
       try {
-        modelPoint = normalizePointForAmbientDimension(
-          current.editableDiagram.ambientDimension,
-          svgPointToModelOnWorkPlane(
-            previewCamera,
-            svgPoint,
-            viewportHeight,
-            handleWorkPlane,
-          ),
+        const projectedPoint = svgPointToModelOnWorkPlane(
+          previewCamera,
+          svgPoint,
+          viewportHeight,
+          handleWorkPlane,
         )
+        const snappedPoint = snapCursorPoint(projectedPoint, {
+          ambientDimension: current.editableDiagram.ambientDimension,
+          snap: cursorSnapSettings,
+          workPlane: handleWorkPlane,
+        })
+
+        if (snappedPoint === null) {
+          return current
+        }
+
+        modelPoint = snappedPoint
       } catch {
         return current
       }
@@ -6001,6 +6086,8 @@ function App() {
               )}
             </div>
 
+            {renderCursorSnapControls()}
+
             {renderActiveCreationControls()}
 
             {showFillPathControls && renderFillPathToolbarControls()}
@@ -6052,6 +6139,59 @@ function App() {
             Redo
           </button>
         </div>
+      </div>
+    )
+  }
+
+  function renderCursorSnapControls() {
+    const customStepInvalid =
+      cursorSnapControlValue === 'custom' &&
+      parseCursorSnapStep(cursorSnapCustomStepInput) === null
+
+    return (
+      <div
+        className="preview-snap-control"
+        role="group"
+        aria-label="Cursor snap"
+      >
+        <label className="preview-toolbar-field preview-snap-select-field">
+          <span>Snap</span>
+          <select
+            value={cursorSnapControlValue}
+            onChange={(event) =>
+              updateCursorSnapControlValue(event.currentTarget.value)
+            }
+          >
+            <option value="off">Off</option>
+            {cursorSnapPresetSteps.map((step) => (
+              <option key={step} value={String(step)}>
+                {step}
+              </option>
+            ))}
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        {cursorSnapControlValue === 'custom' && (
+          <label className="preview-toolbar-field preview-snap-step-field">
+            <span>Step</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              aria-invalid={customStepInvalid}
+              value={cursorSnapCustomStepInput}
+              onChange={(event) =>
+                updateCursorSnapCustomStepInput(event.currentTarget.value)
+              }
+            />
+          </label>
+        )}
+        {cursorSnapStatus !== '' && (
+          <span className="preview-toolbar-status" role="status">
+            {cursorSnapStatus}
+          </span>
+        )}
       </div>
     )
   }
