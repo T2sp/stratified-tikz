@@ -1,4 +1,5 @@
 import type { Diagram } from '../../model/types.ts'
+import type { TranslationVector } from '../../model/translation.ts'
 import { createBulkStyleEditorModel } from '../bulkEditing.ts'
 import { createInspectorCompactSummary } from '../inspectorSummary.ts'
 import {
@@ -20,6 +21,7 @@ export type EditableInspectorProps = {
   onBulkLayerChange: (layer: number) => void
   onBulkDelete: () => void
   onBulkDuplicate: () => void
+  onBulkTranslate: (translation: TranslationVector) => void
 }
 
 export function EditableInspector({
@@ -31,6 +33,7 @@ export function EditableInspector({
   onBulkLayerChange,
   onBulkDelete,
   onBulkDuplicate,
+  onBulkTranslate,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
     const summary = createInspectorCompactSummary(diagram, selectedElement)
@@ -79,6 +82,7 @@ export function EditableInspector({
               onBulkLayerChange={onBulkLayerChange}
               onBulkDelete={onBulkDelete}
               onBulkDuplicate={onBulkDuplicate}
+              onBulkTranslate={onBulkTranslate}
             />
           </div>
         )}

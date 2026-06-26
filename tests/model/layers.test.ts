@@ -24,12 +24,14 @@ import {
   createCurvedSheetStratum,
   createEmptyDiagram,
   createFilledRegion2DStratum,
+  createGridStratum,
   createPointStratum,
   createSheetStratum,
   createTemplatePathStratum,
   createTextLabel,
   createWorkPlaneFilledSheet3DStratum,
 } from '../../src/model/constructors.ts'
+import { createNumericScalarInputValue } from '../../src/model/grids.ts'
 import {
   parseSavedDiagramJson,
   savedDiagramFormat,
@@ -862,6 +864,100 @@ test('non-finite layer translation input and results are rejected without mutati
   )
 })
 
+test('layer translation preserves symbolic point expressions and refreshes previews', () => {
+  const diagram = createSymbolicTranslationDiagram()
+  const translated = translateLayer(diagram, 7, { x: 2, y: 0, z: 0 })
+  const point = findPoint(translated, 'symbolic-point')
+
+  assert.equal(point.position.x, 5)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic?.x.expression, '(R) + 2')
+  assert.equal(point.position.symbolic?.x.previewValue, 5)
+  assert.equal(point.position.symbolic?.z.kind, 'numeric')
+  assert.equal(point.position.symbolic?.z.value, 0)
+})
+
+test('layer translation moves symbolic line cubic and arc segment coordinates', () => {
+  const diagram = createSymbolicTranslationDiagram()
+  const translated = translateLayer(diagram, 7, { x: 1, y: -1, z: 2 })
+  const path = findConcatenatedPath(translated, 'symbolic-path')
+  const line = path.segments[0]
+  const cubic = path.segments[1]
+  const arc = path.segments[2]
+
+  if (
+    line?.kind !== 'line' ||
+    cubic?.kind !== 'cubicBezier' ||
+    arc?.kind !== 'arc' ||
+    arc.frame === undefined
+  ) {
+    throw new Error('Expected symbolic line, cubic, and arc segments.')
+  }
+
+  assert.equal(line.start.symbolic?.x.kind, 'symbolic')
+  assert.equal(line.start.symbolic.x.expression, '(R) + 1')
+  assert.equal(line.start.x, 4)
+  assert.equal(cubic.control1.symbolic?.y.kind, 'symbolic')
+  assert.equal(cubic.control1.symbolic.y.expression, '(R) + -1')
+  assert.equal(cubic.control1.y, 2)
+  assert.equal(arc.center.symbolic?.x.kind, 'symbolic')
+  assert.equal(arc.center.symbolic.x.expression, '(R) + 1')
+  assert.equal(arc.center.x, 4)
+  assert.deepEqual(arc.frame.origin, { x: 1, y: -1, z: 2 })
+  assert.deepEqual(arc.frame.u, { x: 1, y: 0, z: 0 })
+})
+
+test('layer translation moves ruled and Coons boundary snapshots', () => {
+  const diagram = createBoundarySurfaceTranslationDiagram()
+  const translated = translateLayer(diagram, 4, { x: 3, y: 0, z: -1 })
+  const ruled = findCurvedSheet(translated, 'ruled-surface')
+  const coons = findCurvedSheet(translated, 'coons-patch')
+
+  if (
+    ruled.primitive.kind !== 'ruledSurface' ||
+    coons.primitive.kind !== 'coonsPatch' ||
+    coons.primitive.left.kind !== 'constantPoint'
+  ) {
+    throw new Error('Expected ruled and Coons primitives.')
+  }
+
+  assert.deepEqual(ruled.primitive.boundary0.segments[0]?.start, {
+    x: 3,
+    y: 0,
+    z: -1,
+  })
+  assert.deepEqual(ruled.primitive.boundary1.segments[0]?.end, {
+    x: 4,
+    y: 0,
+    z: 0,
+  })
+  assert.deepEqual(coons.primitive.bottom.segments[0]?.start, {
+    x: 3,
+    y: 0,
+    z: -1,
+  })
+  assert.deepEqual(coons.primitive.left.point, {
+    x: 3,
+    y: 0,
+    z: -1,
+  })
+})
+
+test('layer translation moves grid frame origins without changing basis vectors', () => {
+  const diagram = createGridTranslationDiagram()
+  const translated = translateLayer(diagram, 3, { x: 2, y: 3, z: 4 })
+  const grid = findCurve(translated, 'grid-to-translate')
+
+  if (grid.kind !== 'grid') {
+    throw new Error('Expected translated grid.')
+  }
+
+  assert.deepEqual(grid.frame.frame.origin, { x: 2, y: 3, z: 5 })
+  assert.deepEqual(grid.frame.frame.u, { x: 1, y: 0, z: 0 })
+  assert.deepEqual(grid.frame.frame.v, { x: 0, y: 1, z: 0 })
+  assert.deepEqual(grid.frame.frame.normal, { x: 0, y: 0, z: 1 })
+})
+
 test('SVG path data and TikZ output reflect layer translation', () => {
   const diagram = {
     ...createEmptyDiagram({ ambientDimension: 2 }),
@@ -893,6 +989,20 @@ test('SVG path data and TikZ output reflect layer translation', () => {
   assert.notEqual(tikz, generateTikz(diagram))
   assert.match(tikz, /\\coordinate \([^)]+\) at \(2,3\);/)
   assert.match(tikz, /\\coordinate \([^)]+\) at \(3,3\);/)
+})
+
+test('TikZ output preserves translated symbolic expressions without inline blank lines', () => {
+  const translated = translateLayer(
+    createSymbolicTranslationDiagram(),
+    7,
+    { x: 2, y: 0, z: 0 },
+  )
+  const tikz = generateTikz(translated)
+  const inlineTikz = generateTikz(translated, { exportMode: 'inlineMath' })
+
+  assert.match(tikz, /\{\\R \+ 2\}/)
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
+  assert.match(inlineTikz, /\{\\R \+ 2\}/)
 })
 
 test('combined layer operation: rename then save/load preserves metadata', () => {
@@ -1566,6 +1676,128 @@ function createLayerTranslationDiagram(): Diagram {
   }
 }
 
+function createSymbolicTranslationDiagram(): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '3',
+        previewValue: 3,
+      },
+    ],
+    strata: [
+      createPointStratum({
+        ambientDimension: 3,
+        id: 'symbolic-point',
+        position: symbolicXPoint(1, 0, 0, 'R'),
+        layer: 7,
+      }),
+      createConcatenatedPathStratum({
+        ambientDimension: 3,
+        id: 'symbolic-path',
+        segments: [
+          {
+            kind: 'line',
+            start: symbolicXPoint(3, 0, 0, 'R'),
+            end: { x: 1, y: 0, z: 0 },
+          },
+          {
+            kind: 'cubicBezier',
+            start: { x: 1, y: 0, z: 0 },
+            control1: symbolicYPoint(1, 3, 0, 'R'),
+            control2: { x: 2, y: 3, z: 0 },
+            end: { x: 3, y: 0, z: 0 },
+          },
+          {
+            kind: 'arc',
+            start: { x: 2, y: 0, z: 0 },
+            end: { x: 3, y: 1, z: 0 },
+            center: symbolicXPoint(3, 0, 0, 'R'),
+            radius: 1,
+            startAngleDeg: 0,
+            endAngleDeg: 90,
+            direction: 'counterclockwise',
+            frame: xyFrame(0),
+          },
+        ],
+        layer: 7,
+      }),
+    ],
+    labels: [],
+  }
+}
+
+function createBoundarySurfaceTranslationDiagram(): Diagram {
+  const boundary0 = squareBoundary3D('boundary-0', 0)
+  const boundary1 = squareBoundary3D('boundary-1', 1)
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [
+      createCurvedSheetStratum({
+        id: 'ruled-surface',
+        primitive: {
+          kind: 'ruledSurface',
+          boundary0,
+          boundary1,
+          sampling: { segments: 4 },
+        },
+        layer: 4,
+      }),
+      createCurvedSheetStratum({
+        id: 'coons-patch',
+        primitive: {
+          kind: 'coonsPatch',
+          bottom: boundary0,
+          right: boundary1,
+          top: squareBoundary3D('boundary-top', 0),
+          left: {
+            kind: 'constantPoint',
+            point: { x: 0, y: 0, z: 0 },
+          },
+          sampling: { uSegments: 4, vSegments: 4 },
+        },
+        layer: 4,
+      }),
+    ],
+    labels: [],
+  }
+}
+
+function createGridTranslationDiagram(): Diagram {
+  const range = {
+    min: createNumericScalarInputValue(-1),
+    max: createNumericScalarInputValue(1),
+    step: createNumericScalarInputValue(1),
+  }
+  const clip = {
+    kind: 'rectangle' as const,
+    uMin: createNumericScalarInputValue(-1),
+    uMax: createNumericScalarInputValue(1),
+    vMin: createNumericScalarInputValue(-1),
+    vMax: createNumericScalarInputValue(1),
+  }
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [
+      createGridStratum({
+        ambientDimension: 3,
+        id: 'grid-to-translate',
+        frame: { kind: 'workPlane', frame: xyFrame(1) },
+        uRange: range,
+        vRange: range,
+        clip,
+        layer: 3,
+      }),
+    ],
+    labels: [],
+  }
+}
+
 function createTwoDimensionalLayerTranslationDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
 
@@ -1677,6 +1909,42 @@ function xyFrame(z: number): WorkPlaneFrameSnapshot {
     u: { x: 1, y: 0, z: 0 },
     v: { x: 0, y: 1, z: 0 },
     normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function symbolicXPoint(
+  x: number,
+  y: number,
+  z: number,
+  expression: string,
+): WorkPlaneFrameSnapshot['origin'] {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x: { kind: 'symbolic', expression, previewValue: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
+  }
+}
+
+function symbolicYPoint(
+  x: number,
+  y: number,
+  z: number,
+  expression: string,
+): WorkPlaneFrameSnapshot['origin'] {
+  return {
+    x,
+    y,
+    z,
+    symbolic: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'symbolic', expression, previewValue: y },
+      z: { kind: 'numeric', value: z },
+    },
   }
 }
 

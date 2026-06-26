@@ -1,26 +1,22 @@
 import type {
-  BoundaryPathSnapshot,
   ClosedPathBoundary,
-  CoonsBoundarySnapshot,
-  CoonsConstantPointBoundarySnapshot,
   CurveStyleSegment,
   CurveStratum,
-  CubicBezierControlMode,
-  CurvedSheetPrimitive,
   Diagram,
   DiagramLayer,
-  PathSegment,
-  PathTemplate,
   PolygonSheetStratum,
-  QuadSheetStratum,
-  RegionStratum,
-  SheetStratum,
   Stratum,
   TextLabel,
   Vec3,
-  WorkPlaneFrameSnapshot,
 } from './types.ts'
 import { cleanPathCrossingStates } from './pathCrossings.ts'
+import {
+  diagramTranslationContext,
+  isZeroTranslationVector,
+  translateStratum,
+  translateTextLabel,
+  translationVectorFromNumericVec3,
+} from './translation.ts'
 
 export type DiagramLayerElement =
   | { kind: 'stratum'; element: Stratum }
@@ -429,22 +425,24 @@ export function translateLayer(
   translation: LayerTranslationVector,
 ): Diagram {
   const layer = normalizedFiniteLayerValue(layerValue, 'layerValue')
-  const normalizedTranslation = normalizeLayerTranslationForDiagram(
+  const normalizedTranslation = translationVectorFromNumericVec3(
     diagram,
     translation,
+    { reject2DNonZeroZ: true },
   )
 
-  if (isZeroVector(normalizedTranslation)) {
+  if (isZeroTranslationVector(normalizedTranslation)) {
     return diagram
   }
 
+  const context = diagramTranslationContext(diagram)
   let changed = false
   const strata = diagram.strata.map((stratum) => {
     if (!elementIsOnLayer(stratum, layer)) {
       return stratum
     }
 
-    const translated = translateStratum(stratum, normalizedTranslation, diagram)
+    const translated = translateStratum(stratum, normalizedTranslation, context)
     changed = changed || translated !== stratum
     return translated
   })
@@ -454,10 +452,7 @@ export function translateLayer(
     }
 
     changed = true
-    return {
-      ...label,
-      position: translateVec3(label.position, normalizedTranslation, diagram),
-    }
+    return translateTextLabel(label, normalizedTranslation, context)
   })
 
   if (!changed) {
@@ -686,416 +681,6 @@ function elementIsOnLayer(element: { layer: number }, layer: number): boolean {
     Number.isFinite(element.layer) &&
     normalizeLayerValue(element.layer) === layer
   )
-}
-
-function normalizeLayerTranslationForDiagram(
-  diagram: Diagram,
-  translation: LayerTranslationVector,
-): LayerTranslationVector {
-  if (!isFiniteVec3(translation)) {
-    throw new Error('translation must contain finite dx, dy, and dz values.')
-  }
-
-  if (diagram.ambientDimension === 2 && translation.z !== 0) {
-    throw new Error('2D layer translation does not allow dz.')
-  }
-
-  return diagram.ambientDimension === 2
-    ? { x: translation.x, y: translation.y, z: 0 }
-    : { ...translation }
-}
-
-function translateStratum(
-  stratum: Stratum,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): Stratum {
-  switch (stratum.geometricKind) {
-    case 'region':
-      return translateRegionStratum(stratum, translation, diagram)
-    case 'sheet':
-      return translateSheetStratum(stratum, translation, diagram)
-    case 'curve':
-      return translateCurveStratum(stratum, translation, diagram)
-    case 'point':
-      return {
-        ...stratum,
-        position: translateVec3(stratum.position, translation, diagram),
-      }
-  }
-}
-
-function translateRegionStratum(
-  stratum: RegionStratum,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): RegionStratum {
-  if (stratum.kind !== 'filledRegion') {
-    return stratum
-  }
-
-  return {
-    ...stratum,
-    boundaries: translateClosedPathBoundaries(
-      stratum.boundaries,
-      translation,
-      diagram,
-    ),
-  }
-}
-
-function translateSheetStratum(
-  stratum: SheetStratum,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): SheetStratum {
-  switch (stratum.kind) {
-    case 'quadSheet':
-      return {
-        ...stratum,
-        corners: stratum.corners.map((corner) =>
-          translateVec3(corner, translation, diagram),
-        ) as QuadSheetStratum['corners'],
-      }
-    case 'polygonSheet':
-      return {
-        ...stratum,
-        vertices: stratum.vertices.map((vertex) =>
-          translateVec3(vertex, translation, diagram),
-        ),
-      }
-    case 'workPlaneFilledSheet':
-      return {
-        ...stratum,
-        planeFrame: translateFrameOrigin(
-          stratum.planeFrame,
-          translation,
-          diagram,
-        ),
-        boundaries: translateClosedPathBoundaries(
-          stratum.boundaries,
-          translation,
-          diagram,
-        ),
-      }
-    case 'curvedSheet':
-      return {
-        ...stratum,
-        primitive: translateCurvedSheetPrimitive(
-          stratum.primitive,
-          translation,
-          diagram,
-        ),
-      }
-  }
-}
-
-function translateCurveStratum(
-  stratum: CurveStratum,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): CurveStratum {
-  switch (stratum.kind) {
-    case 'polyline':
-      return {
-        ...stratum,
-        points: stratum.points.map((point) =>
-          translateVec3(point, translation, diagram),
-        ),
-      }
-    case 'cubicBezier':
-      return {
-        ...stratum,
-        points: stratum.points.map((point) =>
-          translateVec3(point, translation, diagram),
-        ),
-        ...(stratum.bezierControls === undefined
-          ? {}
-          : {
-              bezierControls: translateCubicBezierControlMode(
-                stratum.bezierControls,
-                translation,
-                diagram,
-              ),
-            }),
-      }
-    case 'concatenatedPath':
-      return {
-        ...stratum,
-        segments: stratum.segments.map((segment) =>
-          translatePathSegment(segment, translation, diagram),
-        ),
-      }
-    case 'templatePath':
-      return {
-        ...stratum,
-        template: translatePathTemplate(stratum.template, translation, diagram),
-      }
-    case 'grid':
-      return {
-        ...stratum,
-        frame: {
-          ...stratum.frame,
-          frame: translateFrameOrigin(stratum.frame.frame, translation, diagram),
-        },
-      }
-  }
-}
-
-function translateClosedPathBoundaries(
-  boundaries: readonly ClosedPathBoundary[],
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): ClosedPathBoundary[] {
-  return boundaries.map((boundary) => ({
-    ...boundary,
-    segments: boundary.segments.map((segment) =>
-      translatePathSegment(segment, translation, diagram),
-    ),
-  }))
-}
-
-function translatePathSegment(
-  segment: PathSegment,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): PathSegment {
-  switch (segment.kind) {
-    case 'line':
-      return {
-        ...segment,
-        start: translateVec3(segment.start, translation, diagram),
-        end: translateVec3(segment.end, translation, diagram),
-      }
-    case 'cubicBezier':
-      return {
-        ...segment,
-        start: translateVec3(segment.start, translation, diagram),
-        control1: translateVec3(segment.control1, translation, diagram),
-        control2: translateVec3(segment.control2, translation, diagram),
-        end: translateVec3(segment.end, translation, diagram),
-        ...(segment.controlMode === undefined
-          ? {}
-          : {
-              controlMode: translateCubicBezierControlMode(
-                segment.controlMode,
-                translation,
-                diagram,
-              ),
-            }),
-      }
-    case 'arc':
-      return {
-        ...segment,
-        start: translateVec3(segment.start, translation, diagram),
-        end: translateVec3(segment.end, translation, diagram),
-        center: translateVec3(segment.center, translation, diagram),
-        ...(segment.frame === undefined
-          ? {}
-          : {
-              frame: translateFrameOrigin(
-                segment.frame,
-                translation,
-                diagram,
-              ),
-            }),
-      }
-  }
-}
-
-function translatePathTemplate(
-  template: PathTemplate,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): PathTemplate {
-  switch (template.kind) {
-    case 'circleTemplate':
-      return {
-        ...template,
-        center: translateVec3(template.center, translation, diagram),
-        ...(template.frame === undefined
-          ? {}
-          : {
-              frame: translateFrameOrigin(
-                template.frame,
-                translation,
-                diagram,
-              ),
-            }),
-      }
-    case 'ellipseTemplate':
-      return {
-        ...template,
-        center: translateVec3(template.center, translation, diagram),
-        ...(template.frame === undefined
-          ? {}
-          : {
-              frame: translateFrameOrigin(
-                template.frame,
-                translation,
-                diagram,
-              ),
-            }),
-      }
-  }
-}
-
-function translateCubicBezierControlMode(
-  controlMode: CubicBezierControlMode,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): CubicBezierControlMode {
-  switch (controlMode.kind) {
-    case 'absolute':
-    case 'relativeCartesian':
-    case 'relativePolar':
-      return controlMode
-    case 'workPlaneRelativeCartesian':
-      return {
-        ...controlMode,
-        frame: translateFrameOrigin(controlMode.frame, translation, diagram),
-      }
-    case 'workPlaneRelativePolar':
-      return {
-        ...controlMode,
-        frame: translateFrameOrigin(controlMode.frame, translation, diagram),
-      }
-  }
-}
-
-function translateCurvedSheetPrimitive(
-  primitive: CurvedSheetPrimitive,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): CurvedSheetPrimitive {
-  switch (primitive.kind) {
-    case 'hemisphere':
-      return {
-        ...primitive,
-        center: translateVec3(primitive.center, translation, diagram),
-        frame: translateFrameOrigin(primitive.frame, translation, diagram),
-      }
-    case 'saddle':
-      return {
-        ...primitive,
-        frame: translateFrameOrigin(primitive.frame, translation, diagram),
-      }
-    case 'ruledSurface':
-      return {
-        ...primitive,
-        boundary0: translateBoundaryPathSnapshot(
-          primitive.boundary0,
-          translation,
-          diagram,
-        ),
-        boundary1: translateBoundaryPathSnapshot(
-          primitive.boundary1,
-          translation,
-          diagram,
-        ),
-      }
-    case 'coonsPatch':
-      return {
-        ...primitive,
-        bottom: translateCoonsBoundarySnapshot(
-          primitive.bottom,
-          translation,
-          diagram,
-        ),
-        right: translateCoonsBoundarySnapshot(
-          primitive.right,
-          translation,
-          diagram,
-        ),
-        top: translateCoonsBoundarySnapshot(
-          primitive.top,
-          translation,
-          diagram,
-        ),
-        left: translateCoonsBoundarySnapshot(
-          primitive.left,
-          translation,
-          diagram,
-        ),
-      }
-  }
-}
-
-function translateBoundaryPathSnapshot(
-  snapshot: BoundaryPathSnapshot,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): BoundaryPathSnapshot {
-  return {
-    ...snapshot,
-    segments: snapshot.segments.map((segment) =>
-      translatePathSegment(segment, translation, diagram),
-    ),
-  }
-}
-
-function translateCoonsBoundarySnapshot(
-  snapshot: CoonsBoundarySnapshot,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): CoonsBoundarySnapshot {
-  if (snapshotIsCoonsConstantPointBoundary(snapshot)) {
-    return {
-      ...snapshot,
-      point: translateVec3(snapshot.point, translation, diagram),
-    }
-  }
-
-  return translateBoundaryPathSnapshot(snapshot, translation, diagram)
-}
-
-function snapshotIsCoonsConstantPointBoundary(
-  snapshot: CoonsBoundarySnapshot,
-): snapshot is CoonsConstantPointBoundarySnapshot {
-  return 'kind' in snapshot && snapshot.kind === 'constantPoint'
-}
-
-function translateFrameOrigin(
-  frame: WorkPlaneFrameSnapshot,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): WorkPlaneFrameSnapshot {
-  return {
-    origin: translateVec3(frame.origin, translation, diagram),
-    u: { ...frame.u },
-    v: { ...frame.v },
-    normal: { ...frame.normal },
-  }
-}
-
-function translateVec3(
-  point: Vec3,
-  translation: LayerTranslationVector,
-  diagram: Diagram,
-): Vec3 {
-  const translated = {
-    x: point.x + translation.x,
-    y: point.y + translation.y,
-    z: diagram.ambientDimension === 2 ? 0 : point.z + translation.z,
-  }
-
-  if (!isFiniteVec3(translated)) {
-    throw new Error('Layer translation would create a non-finite coordinate.')
-  }
-
-  return translated
-}
-
-function isFiniteVec3(point: Vec3): boolean {
-  return (
-    Number.isFinite(point.x) &&
-    Number.isFinite(point.y) &&
-    Number.isFinite(point.z)
-  )
-}
-
-function isZeroVector(point: Vec3): boolean {
-  return point.x === 0 && point.y === 0 && point.z === 0
 }
 
 function layerMetadataForDuplicate(

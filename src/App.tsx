@@ -44,6 +44,7 @@ import {
 } from './model/layers.ts'
 import { defaultCurveStyle, isHexColor } from './model/styles.ts'
 import { hasSymbolicVec3Coordinates } from './model/symbolicCoordinates.ts'
+import type { TranslationVector } from './model/translation.ts'
 import { pathEndpoints } from './model/paths.ts'
 import type {
   AmbientDimension,
@@ -119,6 +120,7 @@ import {
   applyBulkDeleteToEditorState,
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
+  applyBulkTranslateToEditorState,
   applyDirectCreationCommitToEditorState,
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
@@ -1807,6 +1809,19 @@ function App() {
 
   function duplicateCurrentSelection(): void {
     setEditorState((current) => applyBulkDuplicateToEditorState(current))
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+  }
+
+  function translateCurrentSelection(translation: TranslationVector): void {
+    setEditorState((current) =>
+      applyBulkTranslateToEditorState(current, translation),
+    )
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -5399,6 +5414,7 @@ function App() {
             onBulkLayerChange={changeCurrentSelectionLayer}
             onBulkDelete={removeCurrentSelection}
             onBulkDuplicate={duplicateCurrentSelection}
+            onBulkTranslate={translateCurrentSelection}
           />
         </div>
       </aside>

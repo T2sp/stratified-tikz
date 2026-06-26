@@ -2979,6 +2979,16 @@
   overflow-wrap: anywhere;
 }
 
+.inspector-status {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .style-preset-buttons {
   display: flex;
   flex-wrap: wrap;
