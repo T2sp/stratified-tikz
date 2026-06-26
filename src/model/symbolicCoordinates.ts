@@ -474,6 +474,14 @@ function validateStratumSymbolicCoordinateMetadata(
           errors,
         )
       }
+
+      if (stratum.kind === 'grid' && isRecord(stratum.frame)) {
+        validateWorkPlaneFrameSnapshotSymbolicMetadata(
+          stratum.frame.frame,
+          `${path}.frame.frame`,
+          errors,
+        )
+      }
       return
     case 'point':
       validateSymbolicVec3Metadata(
@@ -970,8 +978,27 @@ function refreshStratumSymbolicCoordinatePreviews(
             ),
           }
         case 'grid':
+          if (!isRecord(stratum.frame) || !isRecord(stratum.frame.frame)) {
+            pushError(
+              errors,
+              `${path}.frame.frame`,
+              'Grid frame snapshot must be an object.',
+            )
+
+            return stratum
+          }
+
           return {
             ...stratum,
+            frame: {
+              ...stratum.frame,
+              frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+                stratum.frame.frame as WorkPlaneFrameSnapshot,
+                context,
+                `${path}.frame.frame`,
+                errors,
+              ),
+            },
             uRange: {
               min: refreshScalarInputValuePreview(
                 stratum.uRange.min,

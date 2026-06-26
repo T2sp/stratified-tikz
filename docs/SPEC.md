@@ -197,6 +197,14 @@ and free text labels. Existing path, sheet, template, curved-surface anchor, and
 grid direct helpers keep their earlier numeric/global behavior until their local
 coordinate editors and export paths are implemented.
 
+Persisted work-plane-local coordinate metadata is broader than the direct-input
+UI. JSON import and variable updates refresh local `a,b` previews, symbolic
+frame previews, and the derived global `Vec3` preview before validation. This
+refresh covers point and label positions, path vertices and cubic controls,
+arc centers and frames, polygon sheets, filled boundaries, work-plane-filled
+sheets, grid frame snapshots, and ruled or Coons boundary snapshots. Malformed
+or unsupported local-source placements are rejected during load/validation.
+
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
 rectangular clip. Supported patterns are rectangular, triangular, and

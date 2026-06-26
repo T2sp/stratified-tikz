@@ -147,6 +147,23 @@ snapshots nested in those boundary segments are refreshed at the same time; a
 symbolic frame is accepted only when `origin`, `u`, `v`, and `normal` evaluate
 to finite preview vectors and the evaluated frame is geometrically valid.
 
+Work-plane-local coordinate sources participate in the same import path. The
+loader detects variables in local `a` and `b` scalar expressions and in the
+stored frame snapshot fields. After the variable-resolution dialog is
+confirmed, local scalar previews, symbolic frame previews, and the resulting
+global `Vec3` preview are recalculated before validation and rendering.
+Malformed local sources, unresolved variables, stale non-finite previews, and
+frames that do not evaluate to an orthonormal right-handed frame are rejected
+without replacing the current diagram.
+
+The refresh pass covers local sources stored on point and label positions, path
+segment vertices and cubic controls, arc centers and frames, polygon sheet
+vertices, filled boundary segments, work-plane-filled sheet frames and
+boundaries, grid frame snapshots, and ruled or Coons boundary snapshots,
+including constant-point Coons boundaries. Unsupported or malformed placements
+are rejected during load/validation rather than saved as partially refreshed
+data.
+
 ## Grid Generation
 
 Grid strata are saved as compact generated curve strata. They are not expanded

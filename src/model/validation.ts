@@ -1497,6 +1497,18 @@ function validateGridStratum(
     return
   }
 
+  if (!isRecord(stratum.frame) || !isRecord(stratum.frame.frame)) {
+    pushError(errors, `${path}.frame.frame`, 'Grid frame snapshot must be an object.')
+    return
+  }
+
+  validateWorkPlaneFrameSnapshot(
+    stratum.frame.frame as WorkPlaneFrameSnapshot,
+    `${path}.frame.frame`,
+    errors,
+    coordinateExpressionContext,
+    'finitePreview',
+  )
   validateGridPreview(stratum, ambientDimension, path).forEach((issue) =>
     pushError(errors, issue.path, issue.message),
   )
