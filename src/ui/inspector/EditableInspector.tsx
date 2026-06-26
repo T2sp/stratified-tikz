@@ -22,6 +22,7 @@ export type EditableInspectorProps = {
   onBulkDelete: () => void
   onBulkDuplicate: () => void
   onBulkTranslate: (translation: TranslationVector) => void
+  onBulkConcatenatePaths: (keepOriginals: boolean) => string
 }
 
 export function EditableInspector({
@@ -34,6 +35,7 @@ export function EditableInspector({
   onBulkDelete,
   onBulkDuplicate,
   onBulkTranslate,
+  onBulkConcatenatePaths,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
     const summary = createInspectorCompactSummary(diagram, selectedElement)
@@ -83,6 +85,7 @@ export function EditableInspector({
               onBulkDelete={onBulkDelete}
               onBulkDuplicate={onBulkDuplicate}
               onBulkTranslate={onBulkTranslate}
+              onBulkConcatenatePaths={onBulkConcatenatePaths}
             />
           </div>
         )}

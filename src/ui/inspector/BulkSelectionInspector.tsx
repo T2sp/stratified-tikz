@@ -32,6 +32,7 @@ export type BulkSelectionInspectorProps = {
   onBulkDelete: () => void
   onBulkDuplicate: () => void
   onBulkTranslate: (translation: TranslationVector) => void
+  onBulkConcatenatePaths: (keepOriginals: boolean) => string
 }
 
 export function BulkSelectionInspector({
@@ -43,6 +44,7 @@ export function BulkSelectionInspector({
   onBulkDelete,
   onBulkDuplicate,
   onBulkTranslate,
+  onBulkConcatenatePaths,
 }: BulkSelectionInspectorProps) {
   const layerValue = bulkLayerFieldValue(diagram, selection)
 
@@ -90,6 +92,11 @@ export function BulkSelectionInspector({
         onBulkTranslate={onBulkTranslate}
       />
 
+      <BulkPathConcatenationSection
+        enabled={model?.geometricKind === 'curve' && selection.elements.length >= 2}
+        onBulkConcatenatePaths={onBulkConcatenatePaths}
+      />
+
       <section className="inspector-section">
         <h3>Actions</h3>
         <div className="inspector-form">
@@ -115,6 +122,57 @@ export function BulkSelectionInspector({
         </div>
       </section>
     </div>
+  )
+}
+
+function BulkPathConcatenationSection({
+  enabled,
+  onBulkConcatenatePaths,
+}: {
+  enabled: boolean
+  onBulkConcatenatePaths: (keepOriginals: boolean) => string
+}) {
+  const [keepOriginals, setKeepOriginals] = useState(true)
+  const [status, setStatus] = useState('')
+
+  function concatenate(): void {
+    setStatus(onBulkConcatenatePaths(keepOriginals))
+  }
+
+  return (
+    <section className="inspector-section">
+      <h3>Concatenate paths</h3>
+      <div className="inspector-form">
+        <label className="inspector-field inspector-checkbox-field">
+          <span className="inspector-field-label">Keep original paths</span>
+          <span className="inspector-checkbox-control">
+            <input
+              type="checkbox"
+              checked={keepOriginals}
+              onChange={(event) => setKeepOriginals(event.currentTarget.checked)}
+            />
+            <span>{keepOriginals ? 'On' : 'Off'}</span>
+          </span>
+        </label>
+        <div className="inspector-field">
+          <span className="inspector-field-label">Create</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={!enabled}
+            title={enabled ? 'Concatenate selected paths' : 'Select at least two curves'}
+            onClick={concatenate}
+          >
+            Concatenate
+          </button>
+        </div>
+        {status !== '' && (
+          <p className="inspector-status" role="status" aria-live="polite">
+            {status}
+          </p>
+        )}
+      </div>
+    </section>
   )
 }
 

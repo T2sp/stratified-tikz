@@ -121,6 +121,7 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
+  applyConcatenateSelectedPathsToEditorState,
   applyDirectCreationCommitToEditorState,
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
@@ -1829,6 +1830,23 @@ function App() {
     setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setCopyStatus('idle')
+  }
+
+  function concatenateCurrentSelection(keepOriginals: boolean): string {
+    const nextState = applyConcatenateSelectedPathsToEditorState(editorState, {
+      keepOriginals,
+    })
+
+    setEditorState(nextState)
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return nextState.layerOperationStatus
   }
 
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
@@ -5415,6 +5433,7 @@ function App() {
             onBulkDelete={removeCurrentSelection}
             onBulkDuplicate={duplicateCurrentSelection}
             onBulkTranslate={translateCurrentSelection}
+            onBulkConcatenatePaths={concatenateCurrentSelection}
           />
         </div>
       </aside>
