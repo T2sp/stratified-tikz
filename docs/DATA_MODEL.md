@@ -1296,6 +1296,33 @@ work-plane frame at creation time; circle radii are measured in the local `u/v`
 plane, and ellipse `radiusX` / `radiusY` lie along the stored local axes after
 the optional `rotationDeg`.
 
+Selected path concatenation creates a new `kind: "concatenatedPath"` curve from
+the current multi-selection order. Phase 24 uses the selected order exactly; if
+a future caller lacks ordered selection state, it should sort deterministically
+before calling the concatenation helper. The first selected path fixes the
+initial orientation. Each later path is appended as-is when the current endpoint
+matches its start, or auto-reversed when the current endpoint matches its end,
+using the same endpoint tolerance (`1e-9`) as ordinary segment composition. If
+neither endpoint matches, the operation is rejected without partially creating
+geometry.
+
+The eligible source kinds are polylines, cubic Bézier curves, existing
+concatenated paths made from line/cubic/arc segments, and circle template paths
+that can be converted exactly to two circular arc segments. Ellipse templates
+and grids are rejected because the current path segment model has no exact
+single-path representation for them. Source paths are never mutated; symbolic
+coordinate metadata is cloned with the relevant model coordinates, including
+when a later path is reversed.
+
+The new concatenated path uses the first selected path's explicit curve style,
+arrow options, and layer. It starts with no `pathLabel`, no `styleSegments`, and
+no segment-level `styleOverride` values, so later source styles are not
+preserved as partial overrides. The UI exposes a "Keep original paths" option,
+defaulting on. When enabled, source paths and their crossing states remain and
+the new path has no crossing state. When disabled, the source paths are removed,
+dependent crossing states are cleaned, and the new path is selected. The whole
+operation is one undoable diagram change.
+
 Cursor creation for concatenated paths is editor state until Finish. The draft
 stores completed `segments`, the current `anchor`, any `pendingPoints` for the
 active segment, the `currentSegmentKind` (`"line"` or `"cubicBezier"`), and the
