@@ -1051,6 +1051,510 @@ test('work-plane-local source variables use import variable-resolution flow', ()
   )
 })
 
+test('variable updates recompute work-plane-local coordinate previews', () => {
+  const diagram = symbolicThreeDimensionalDiagram()
+  diagram.strata.push({
+    id: 'local-variable-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Local Variable Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(diagram, 'var-R', {
+      expression: '4',
+    }),
+  )
+  const point = findPoint(updated, 'local-variable-point')
+  const source = point.position.symbolic?.source
+
+  assert.equal(point.position.x, 4)
+  assert.equal(point.position.y, 0)
+  assert.equal(source?.local.a.kind, 'symbolic')
+  if (source?.local.a.kind !== 'symbolic') {
+    throw new Error('Expected symbolic local a coordinate.')
+  }
+  assert.equal(source.local.a.previewValue, 4)
+  assert.doesNotMatch(serializeDiagram(updated), /NaN|Infinity/)
+})
+
+test('JSON import detects variables in work-plane-local frame fields', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'import-local-frame-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Import Local Frame Point',
+    style: pointStyle(),
+    position: workPlaneLocalPoint(
+      3,
+      0,
+      0,
+      localCoordinateSource({
+        frame: xyFrame(symbolicPoint(2, 0, 0, 'Offset')),
+        a: numericScalar(1),
+        b: numericScalar(0),
+      }),
+    ),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected work-plane-local frame variable resolution.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [{ name: 'Offset', expression: '', defined: false }],
+  )
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'Offset', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  assert.equal(findPoint(resolved.diagram, 'import-local-frame-point').position.x, 5)
+})
+
+test('JSON import rejects unsupported nested work-plane-local sources', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '4',
+        previewValue: 4,
+      },
+    ],
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'point-with-unsupported-local',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Point With Unsupported Local',
+    style: pointStyle(),
+    position: { x: 0, y: 0, z: 0 },
+    layer: 0,
+  })
+  const saved = JSON.parse(serializeDiagram(diagram)) as MutableSavedDiagramFile
+  const point = saved.diagram.strata[0] as unknown as Record<string, unknown>
+
+  point.unsupportedLocal = localCoordinateSource({
+    frame: xyFrame(),
+    a: symbolicScalar('R', 2),
+    b: numericScalar(0),
+  })
+
+  const pending = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(pending.ok, false)
+  if (pending.ok) {
+    throw new Error('Expected unsupported local source rejection.')
+  }
+  assert.match(
+    pending.error,
+    /strata\[0\]\.unsupportedLocal Unsupported work-plane-local coordinate source/,
+  )
+})
+
+test('JSON import rejects unsupported nested symbolic scalars instead of collecting them', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'point-with-unsupported-symbolic',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Point With Unsupported Symbolic',
+    style: pointStyle(),
+    position: { x: 0, y: 0, z: 0 },
+    layer: 0,
+  })
+  const saved = JSON.parse(serializeDiagram(diagram)) as MutableSavedDiagramFile
+  const point = saved.diagram.strata[0] as unknown as Record<string, unknown>
+
+  point.metadata = {
+    unsupportedSymbolic: symbolicScalar('R', 2),
+  }
+
+  const pending = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(pending.ok, false)
+  if (pending.ok) {
+    throw new Error('Expected unsupported symbolic source rejection.')
+  }
+  assert.match(
+    pending.error,
+    /strata\[0\]\.metadata\.unsupportedSymbolic Unsupported symbolic coordinate source/,
+  )
+})
+
+test('pending symbolic import refreshes supported global stale previews', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'stale-supported-global-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Stale Supported Global Point',
+    style: pointStyle(),
+    position: symbolicPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic variable resolution.')
+  }
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'R', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  const point = findPoint(resolved.diagram, 'stale-supported-global-point')
+
+  assert.equal(point.position.x, 4)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(
+    point.position.symbolic?.x.kind === 'symbolic'
+      ? point.position.symbolic.x.previewValue
+      : Number.NaN,
+    4,
+  )
+})
+
+test('pending symbolic import refreshes supported work-plane-local stale previews', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'stale-supported-local-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Stale Supported Local Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected work-plane-local variable resolution.')
+  }
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'R', expression: '4' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+  const point = findPoint(resolved.diagram, 'stale-supported-local-point')
+  const source = point.position.symbolic?.source
+
+  assert.equal(point.position.x, 4)
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic'
+      ? source.local.a.previewValue
+      : Number.NaN,
+    4,
+  )
+})
+
+test('resolvePendingSymbolicDiagramImport reports missing stratum id without throwing', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'malformed-pending-local-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Malformed Pending Local Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending import.')
+  }
+
+  delete (
+    pending.pendingImport.diagram.strata[0] as unknown as Record<string, unknown>
+  ).id
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '4' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok !== false) {
+    throw new Error('Expected pending resolution failure.')
+  }
+  assert.match(resolved.error, /strata\[0\]\.id Stratum id is missing or invalid/)
+  assert.doesNotMatch(resolved.error, /Cannot read properties/)
+})
+
+test('resolvePendingSymbolicDiagramImport reports malformed local source without throwing', () => {
+  const diagram = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  diagram.strata.push({
+    id: 'malformed-pending-source-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Malformed Pending Source Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending import.')
+  }
+
+  const point = findPoint(
+    pending.pendingImport.diagram,
+    'malformed-pending-source-point',
+  )
+  const source = point.position.symbolic?.source as unknown as {
+    local: Record<string, unknown>
+  }
+
+  delete source.local.b
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '4' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok !== false) {
+    throw new Error('Expected pending resolution failure.')
+  }
+  assert.match(
+    resolved.error,
+    /symbolic\.source\.local\.b Work-plane-local scalar must be a scalar input object/,
+  )
+})
+
+test('pending symbolic import parsing leaves the current diagram unchanged', () => {
+  const currentDiagramBefore = serializeDiagram(emptyTwoDimensionalDiagram)
+  const imported = {
+    ...emptyThreeDimensionalDiagram,
+    strata: [...emptyThreeDimensionalDiagram.strata],
+    labels: [...emptyThreeDimensionalDiagram.labels],
+  }
+  imported.strata.push({
+    id: 'uncommitted-local-point',
+    codim: 3,
+    geometricKind: 'point',
+    name: 'Uncommitted Local Point',
+    style: pointStyle(),
+    position: localXPoint(2, 0, 0, 'R'),
+    layer: 0,
+  })
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(imported))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected pending import.')
+  }
+  assert.equal(serializeDiagram(emptyTwoDimensionalDiagram), currentDiagramBefore)
+})
+
+test('path and sheet work-plane-local coordinates refresh with variables', () => {
+  const diagram = symbolicThreeDimensionalDiagram()
+  diagram.strata.push(
+    {
+      id: 'local-path-vertex',
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'concatenatedPath',
+      name: 'Local Path Vertex',
+      style: curveStyle(),
+      segments: [
+        {
+          kind: 'cubicBezier',
+          start: localXPoint(2, 0, 0, 'R'),
+          control1: localXPoint(2.5, 0, 0, 'R + .5'),
+          control2: localXPoint(3.5, 0, 0, 'R + 1.5'),
+          end: localXPoint(4, 0, 0, 'R + 2'),
+        },
+      ],
+      styleSegments: [],
+      layer: 0,
+    },
+    {
+      id: 'local-sheet-vertex',
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      name: 'Local Sheet Vertex',
+      style: sheetStyle(),
+      vertices: [
+        localXPoint(2, 0, 0, 'R'),
+        localXPoint(3, 0, 0, 'R + 1'),
+        localXPoint(3, 1, 0, 'R + 1'),
+        localXPoint(2, 1, 0, 'R'),
+      ],
+      layer: 0,
+    },
+  )
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(diagram, 'var-R', {
+      expression: '4',
+    }),
+  )
+  const path = updated.strata.find((stratum) => stratum.id === 'local-path-vertex')
+  const sheet = updated.strata.find((stratum) => stratum.id === 'local-sheet-vertex')
+
+  if (path?.kind !== 'concatenatedPath' || path.segments[0]?.kind !== 'cubicBezier') {
+    throw new Error('Expected local cubic path.')
+  }
+  if (sheet?.kind !== 'polygonSheet') {
+    throw new Error('Expected local polygon sheet.')
+  }
+
+  assert.equal(path.segments[0].start.x, 4)
+  assert.equal(path.segments[0].control1.x, 4.5)
+  assert.equal(path.segments[0].control2.x, 5.5)
+  assert.equal(path.segments[0].end.x, 6)
+  assert.equal(sheet.vertices[0]?.x, 4)
+  assert.equal(sheet.vertices[1]?.x, 5)
+  assert.doesNotMatch(serializeDiagram(updated), /NaN|Infinity/)
+})
+
+test('ruled and Coons boundary work-plane-local coordinates refresh with variables', () => {
+  const diagram = symbolicThreeDimensionalDiagram()
+  diagram.strata.push(localRuledSurfaceStratum(), localCoonsPatchStratum())
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(diagram, 'var-R', {
+      expression: '4',
+    }),
+  )
+  const ruled = updated.strata.find((stratum) => stratum.id === 'local-ruled')
+  const coons = updated.strata.find((stratum) => stratum.id === 'local-coons')
+
+  if (
+    ruled?.kind !== 'curvedSheet' ||
+    ruled.primitive.kind !== 'ruledSurface' ||
+    coons?.kind !== 'curvedSheet' ||
+    coons.primitive.kind !== 'coonsPatch'
+  ) {
+    throw new Error('Expected local boundary surfaces.')
+  }
+  if (
+    !('segments' in coons.primitive.bottom) ||
+    !('segments' in coons.primitive.right)
+  ) {
+    throw new Error('Expected Coons path boundaries.')
+  }
+
+  assert.equal(ruled.primitive.boundary0.segments[0]?.start.x, 4)
+  assert.equal(ruled.primitive.boundary1.segments[0]?.end.x, 5)
+  assert.equal(coons.primitive.bottom.segments[0]?.start.x, 4)
+  assert.equal(coons.primitive.right.segments[0]?.end.x, 5)
+  assert.doesNotMatch(serializeDiagram(updated), /NaN|Infinity/)
+})
+
+test('grid frame work-plane-local previews refresh with variables', () => {
+  const diagram = symbolicThreeDimensionalDiagram()
+  diagram.strata.push({
+    id: 'local-grid-frame',
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'grid',
+    name: 'Local Grid Frame',
+    style: curveStyle(),
+    styleSegments: [],
+    frame: {
+      kind: 'workPlane',
+      frame: {
+        origin: localXPoint(2, 0, 0, 'R'),
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+    uRange: scalarRange(0, 1, 1),
+    vRange: scalarRange(0, 1, 1),
+    clip: scalarClip(0, 1, 0, 1),
+    layer: 0,
+  })
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(diagram, 'var-R', {
+      expression: '4',
+    }),
+  )
+  const grid = updated.strata.find((stratum) => stratum.id === 'local-grid-frame')
+
+  if (grid?.kind !== 'grid') {
+    throw new Error('Expected local grid frame.')
+  }
+  assert.equal(grid.frame.frame.origin.x, 4)
+  assert.equal(grid.frame.frame.origin.symbolic?.source?.local.a.kind, 'symbolic')
+  assert.doesNotMatch(serializeDiagram(updated), /NaN|Infinity/)
+})
+
 test('old global-coordinate 3D diagram still loads', () => {
   const parsed = parseSavedDiagramJson(serializeDiagram(emptyThreeDimensionalDiagram))
 
@@ -1102,6 +1606,126 @@ test('work-plane-local variable detection does not treat function names as varia
 
   assert.deepEqual(detected.variables, ['R', 'q'])
 })
+
+function localXPoint(
+  x: number,
+  y: number,
+  z: number,
+  aExpression: string,
+): Vec3 {
+  return workPlaneLocalPoint(
+    x,
+    y,
+    z,
+    localCoordinateSource({
+      frame: xyFrame({ x: 0, y: 0, z }),
+      a: symbolicScalar(aExpression, x),
+      b: numericScalar(y),
+    }),
+  )
+}
+
+function localRuledSurfaceStratum(): Stratum {
+  return {
+    id: 'local-ruled',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Local Ruled Surface',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'ruledSurface',
+      boundary0: lineBoundarySnapshot(
+        'local-ruled-bottom',
+        localXPoint(2, 0, 0, 'R'),
+        localXPoint(3, 0, 0, 'R + 1'),
+      ),
+      boundary1: lineBoundarySnapshot(
+        'local-ruled-top',
+        localXPoint(2, 1, 1, 'R'),
+        localXPoint(3, 1, 1, 'R + 1'),
+      ),
+      sampling: { segments: 2 },
+    },
+    layer: 0,
+  }
+}
+
+function localCoonsPatchStratum(): Stratum {
+  return {
+    id: 'local-coons',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'Local Coons Patch',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: lineBoundarySnapshot(
+        'local-coons-bottom',
+        localXPoint(2, 0, 0, 'R'),
+        localXPoint(3, 0, 0, 'R + 1'),
+      ),
+      right: lineBoundarySnapshot(
+        'local-coons-right',
+        localXPoint(3, 0, 0, 'R + 1'),
+        localXPoint(3, 1, 0, 'R + 1'),
+      ),
+      top: lineBoundarySnapshot(
+        'local-coons-top',
+        localXPoint(2, 1, 0, 'R'),
+        localXPoint(3, 1, 0, 'R + 1'),
+      ),
+      left: lineBoundarySnapshot(
+        'local-coons-left',
+        localXPoint(2, 0, 0, 'R'),
+        localXPoint(2, 1, 0, 'R'),
+      ),
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+    layer: 0,
+  }
+}
+
+function lineBoundarySnapshot(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+      },
+    ],
+  }
+}
+
+function scalarRange(min: number, max: number, step: number) {
+  return {
+    min: numericScalar(min),
+    max: numericScalar(max),
+    step: numericScalar(step),
+  }
+}
+
+function scalarClip(
+  uMin: number,
+  uMax: number,
+  vMin: number,
+  vMax: number,
+) {
+  return {
+    kind: 'rectangle' as const,
+    uMin: numericScalar(uMin),
+    uMax: numericScalar(uMax),
+    vMin: numericScalar(vMin),
+    vMax: numericScalar(vMax),
+  }
+}
 
 function symbolicDiagram(): Diagram {
   const withR = expectVariableDiagramOk(

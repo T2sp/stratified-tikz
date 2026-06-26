@@ -72,6 +72,27 @@ export type RefreshSymbolicCoordinatePreviewsResult =
       errors: DiagramValidationIssue[]
     }
 
+export type SymbolicExpressionSource = {
+  path: string
+  expression: string
+}
+
+export type CollectSupportedSymbolicExpressionSourcesResult =
+  | {
+      ok: true
+      sources: SymbolicExpressionSource[]
+    }
+  | {
+      ok: false
+      errors: DiagramValidationIssue[]
+    }
+
+type SupportedSymbolicCoordinateInspection = {
+  sources: SymbolicExpressionSource[]
+  errors: DiagramValidationIssue[]
+  supportedSymbolicObjects: WeakSet<object>
+}
+
 export const emptyCoordinateExpressionContext: CoordinateExpressionContext = {
   variableNames: [],
   previewValues: new Map(),
@@ -359,6 +380,855 @@ export function validateDiagramSymbolicCoordinateMetadata(
   return errors
 }
 
+export function collectDiagramSupportedSymbolicExpressionSources(
+  diagram: Diagram,
+): CollectSupportedSymbolicExpressionSourcesResult {
+  const inspection = inspectDiagramSupportedSymbolicCoordinateSources(diagram)
+
+  if (inspection.errors.length > 0) {
+    return {
+      ok: false,
+      errors: inspection.errors,
+    }
+  }
+
+  return {
+    ok: true,
+    sources: inspection.sources,
+  }
+}
+
+export function validateNoUnsupportedSymbolicCoordinateSources(
+  diagram: Diagram,
+): DiagramValidationIssue[] {
+  const inspection = inspectDiagramSupportedSymbolicCoordinateSources(diagram)
+  const errors: DiagramValidationIssue[] = []
+  const seen = new WeakSet<object>()
+
+  if (Array.isArray(diagram.strata)) {
+    findUnsupportedSymbolicCoordinateSources(
+      diagram.strata,
+      'strata',
+      inspection.supportedSymbolicObjects,
+      seen,
+      errors,
+    )
+  }
+
+  if (Array.isArray(diagram.labels)) {
+    findUnsupportedSymbolicCoordinateSources(
+      diagram.labels,
+      'labels',
+      inspection.supportedSymbolicObjects,
+      seen,
+      errors,
+    )
+  }
+
+  return errors
+}
+
+function inspectDiagramSupportedSymbolicCoordinateSources(
+  diagram: Diagram,
+): SupportedSymbolicCoordinateInspection {
+  const inspection: SupportedSymbolicCoordinateInspection = {
+    sources: [],
+    errors: [],
+    supportedSymbolicObjects: new WeakSet<object>(),
+  }
+
+  if (Array.isArray(diagram.strata)) {
+    diagram.strata.forEach((stratum, index) => {
+      collectStratumSupportedSymbolicExpressionSources(
+        stratum,
+        diagram.ambientDimension,
+        `strata[${index}]`,
+        inspection,
+      )
+    })
+  }
+
+  if (Array.isArray(diagram.labels)) {
+    diagram.labels.forEach((label, index) => {
+      if (!isRecord(label)) {
+        return
+      }
+
+      collectVec3SupportedSymbolicExpressionSources(
+        label.position,
+        `labels[${index}].position`,
+        inspection,
+      )
+    })
+  }
+
+  return inspection
+}
+
+function collectStratumSupportedSymbolicExpressionSources(
+  stratum: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(stratum)) {
+    return
+  }
+
+  switch (stratum.geometricKind) {
+    case 'region':
+      if (stratum.kind === 'filledRegion') {
+        collectClosedPathBoundariesSupportedSymbolicExpressionSources(
+          stratum.boundaries,
+          ambientDimension,
+          `${path}.boundaries`,
+          inspection,
+        )
+      }
+      return
+    case 'sheet':
+      if (stratum.kind === 'quadSheet' && Array.isArray(stratum.corners)) {
+        stratum.corners.forEach((corner, index) =>
+          collectVec3SupportedSymbolicExpressionSources(
+            corner,
+            `${path}.corners[${index}]`,
+            inspection,
+          ),
+        )
+        return
+      }
+
+      if (stratum.kind === 'polygonSheet' && Array.isArray(stratum.vertices)) {
+        stratum.vertices.forEach((vertex, index) =>
+          collectVec3SupportedSymbolicExpressionSources(
+            vertex,
+            `${path}.vertices[${index}]`,
+            inspection,
+          ),
+        )
+        return
+      }
+
+      if (stratum.kind === 'workPlaneFilledSheet') {
+        collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+          stratum.planeFrame,
+          `${path}.planeFrame`,
+          inspection,
+        )
+        collectClosedPathBoundariesSupportedSymbolicExpressionSources(
+          stratum.boundaries,
+          ambientDimension,
+          `${path}.boundaries`,
+          inspection,
+        )
+        return
+      }
+
+      if (stratum.kind === 'curvedSheet') {
+        collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
+          stratum.primitive,
+          `${path}.primitive`,
+          inspection,
+        )
+      }
+      return
+    case 'curve':
+      if (
+        (stratum.kind === 'polyline' || stratum.kind === 'cubicBezier') &&
+        Array.isArray(stratum.points)
+      ) {
+        stratum.points.forEach((point, index) =>
+          collectVec3SupportedSymbolicExpressionSources(
+            point,
+            `${path}.points[${index}]`,
+            inspection,
+          ),
+        )
+        if (stratum.kind === 'cubicBezier') {
+          collectCubicBezierControlModeSupportedSymbolicExpressionSources(
+            stratum.bezierControls,
+            `${path}.bezierControls`,
+            inspection,
+          )
+        }
+        return
+      }
+
+      if (stratum.kind === 'concatenatedPath') {
+        collectPathSegmentsSupportedSymbolicExpressionSources(
+          stratum.segments,
+          ambientDimension,
+          `${path}.segments`,
+          inspection,
+        )
+        return
+      }
+
+      if (stratum.kind === 'templatePath') {
+        collectPathTemplateSupportedSymbolicExpressionSources(
+          stratum.template,
+          `${path}.template`,
+          inspection,
+        )
+        return
+      }
+
+      if (stratum.kind === 'grid') {
+        if (isRecord(stratum.frame)) {
+          collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+            stratum.frame.frame,
+            `${path}.frame.frame`,
+            inspection,
+          )
+        }
+        collectGridParameterRangeSupportedSymbolicExpressionSources(
+          stratum.uRange,
+          `${path}.uRange`,
+          inspection,
+        )
+        collectGridParameterRangeSupportedSymbolicExpressionSources(
+          stratum.vRange,
+          `${path}.vRange`,
+          inspection,
+        )
+        collectGridClipSupportedSymbolicExpressionSources(
+          stratum.clip,
+          `${path}.clip`,
+          inspection,
+        )
+      }
+      return
+    case 'point':
+      collectVec3SupportedSymbolicExpressionSources(
+        stratum.position,
+        `${path}.position`,
+        inspection,
+      )
+      return
+    default:
+      return
+  }
+}
+
+function collectClosedPathBoundariesSupportedSymbolicExpressionSources(
+  boundaries: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!Array.isArray(boundaries)) {
+    return
+  }
+
+  boundaries.forEach((boundary, index) => {
+    if (!isRecord(boundary)) {
+      return
+    }
+
+    collectPathSegmentsSupportedSymbolicExpressionSources(
+      boundary.segments,
+      ambientDimension,
+      `${path}[${index}].segments`,
+      inspection,
+    )
+  })
+}
+
+function collectPathSegmentsSupportedSymbolicExpressionSources(
+  segments: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!Array.isArray(segments)) {
+    return
+  }
+
+  segments.forEach((segment, index) =>
+    collectPathSegmentSupportedSymbolicExpressionSources(
+      segment,
+      ambientDimension,
+      `${path}[${index}]`,
+      inspection,
+    ),
+  )
+}
+
+function collectPathSegmentSupportedSymbolicExpressionSources(
+  segment: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(segment)) {
+    return
+  }
+
+  switch (segment.kind) {
+    case 'line':
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.start,
+        `${path}.start`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.end,
+        `${path}.end`,
+        inspection,
+      )
+      return
+    case 'cubicBezier':
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.start,
+        `${path}.start`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.control1,
+        `${path}.control1`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.control2,
+        `${path}.control2`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.end,
+        `${path}.end`,
+        inspection,
+      )
+      collectCubicBezierControlModeSupportedSymbolicExpressionSources(
+        segment.controlMode,
+        `${path}.controlMode`,
+        inspection,
+      )
+      return
+    case 'arc':
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.start,
+        `${path}.start`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.end,
+        `${path}.end`,
+        inspection,
+      )
+      collectVec3SupportedSymbolicExpressionSources(
+        segment.center,
+        `${path}.center`,
+        inspection,
+      )
+      collectScalarInputSupportedSymbolicExpressionSources(
+        segment.radius,
+        `${path}.radius`,
+        'Arc radius',
+        inspection,
+      )
+      collectScalarInputSupportedSymbolicExpressionSources(
+        segment.startAngleDeg,
+        `${path}.startAngleDeg`,
+        'Arc start angle',
+        inspection,
+      )
+      collectScalarInputSupportedSymbolicExpressionSources(
+        segment.endAngleDeg,
+        `${path}.endAngleDeg`,
+        'Arc end angle',
+        inspection,
+      )
+      if (ambientDimension === 3 || segment.frame !== undefined) {
+        collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+          segment.frame,
+          `${path}.frame`,
+          inspection,
+        )
+      }
+      return
+    default:
+      return
+  }
+}
+
+function collectCubicBezierControlModeSupportedSymbolicExpressionSources(
+  controlMode: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(controlMode)) {
+    return
+  }
+
+  if (
+    controlMode.kind === 'workPlaneRelativeCartesian' ||
+    controlMode.kind === 'workPlaneRelativePolar'
+  ) {
+    collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+      controlMode.frame,
+      `${path}.frame`,
+      inspection,
+    )
+  }
+}
+
+function collectPathTemplateSupportedSymbolicExpressionSources(
+  template: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(template)) {
+    return
+  }
+
+  if (template.kind === 'circleTemplate' || template.kind === 'ellipseTemplate') {
+    collectVec3SupportedSymbolicExpressionSources(
+      template.center,
+      `${path}.center`,
+      inspection,
+    )
+    collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+      template.frame,
+      `${path}.frame`,
+      inspection,
+    )
+  }
+}
+
+function collectGridParameterRangeSupportedSymbolicExpressionSources(
+  range: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(range)) {
+    return
+  }
+
+  collectScalarInputSupportedSymbolicExpressionSources(
+    range.min,
+    `${path}.min`,
+    'Grid scalar',
+    inspection,
+  )
+  collectScalarInputSupportedSymbolicExpressionSources(
+    range.max,
+    `${path}.max`,
+    'Grid scalar',
+    inspection,
+  )
+  collectScalarInputSupportedSymbolicExpressionSources(
+    range.step,
+    `${path}.step`,
+    'Grid scalar',
+    inspection,
+  )
+}
+
+function collectGridClipSupportedSymbolicExpressionSources(
+  clip: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(clip)) {
+    return
+  }
+
+  collectScalarInputSupportedSymbolicExpressionSources(
+    clip.uMin,
+    `${path}.uMin`,
+    'Grid scalar',
+    inspection,
+  )
+  collectScalarInputSupportedSymbolicExpressionSources(
+    clip.uMax,
+    `${path}.uMax`,
+    'Grid scalar',
+    inspection,
+  )
+  collectScalarInputSupportedSymbolicExpressionSources(
+    clip.vMin,
+    `${path}.vMin`,
+    'Grid scalar',
+    inspection,
+  )
+  collectScalarInputSupportedSymbolicExpressionSources(
+    clip.vMax,
+    `${path}.vMax`,
+    'Grid scalar',
+    inspection,
+  )
+}
+
+function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
+  primitive: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(primitive)) {
+    return
+  }
+
+  if (primitive.kind === 'hemisphere') {
+    collectVec3SupportedSymbolicExpressionSources(
+      primitive.center,
+      `${path}.center`,
+      inspection,
+    )
+    collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+      primitive.frame,
+      `${path}.frame`,
+      inspection,
+    )
+    return
+  }
+
+  if (primitive.kind === 'saddle') {
+    collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+      primitive.frame,
+      `${path}.frame`,
+      inspection,
+    )
+    return
+  }
+
+  if (primitive.kind === 'ruledSurface') {
+    collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
+      primitive.boundary0,
+      `${path}.boundary0`,
+      inspection,
+    )
+    collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
+      primitive.boundary1,
+      `${path}.boundary1`,
+      inspection,
+    )
+    return
+  }
+
+  if (primitive.kind === 'coonsPatch') {
+    collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
+      primitive.bottom,
+      `${path}.bottom`,
+      inspection,
+    )
+    collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
+      primitive.right,
+      `${path}.right`,
+      inspection,
+    )
+    collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
+      primitive.top,
+      `${path}.top`,
+      inspection,
+    )
+    collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
+      primitive.left,
+      `${path}.left`,
+      inspection,
+    )
+  }
+}
+
+function collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
+  snapshot: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(snapshot)) {
+    return
+  }
+
+  collectPathSegmentsSupportedSymbolicExpressionSources(
+    snapshot.segments,
+    3,
+    `${path}.segments`,
+    inspection,
+  )
+}
+
+function collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
+  snapshot: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (isConstantCoonsBoundarySnapshotLike(snapshot)) {
+    collectVec3SupportedSymbolicExpressionSources(
+      snapshot.point,
+      `${path}.point`,
+      inspection,
+    )
+    return
+  }
+
+  collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
+    snapshot,
+    path,
+    inspection,
+  )
+}
+
+function collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+  frame: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(frame)) {
+    return
+  }
+
+  collectVec3SupportedSymbolicExpressionSources(
+    frame.origin,
+    `${path}.origin`,
+    inspection,
+  )
+  collectVec3SupportedSymbolicExpressionSources(
+    frame.u,
+    `${path}.u`,
+    inspection,
+  )
+  collectVec3SupportedSymbolicExpressionSources(
+    frame.v,
+    `${path}.v`,
+    inspection,
+  )
+  collectVec3SupportedSymbolicExpressionSources(
+    frame.normal,
+    `${path}.normal`,
+    inspection,
+  )
+}
+
+function collectVec3SupportedSymbolicExpressionSources(
+  point: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(point) || point.symbolic === undefined) {
+    return
+  }
+
+  const symbolic = point.symbolic
+
+  if (!isRecord(symbolic)) {
+    pushError(
+      inspection.errors,
+      `${path}.symbolic`,
+      'Symbolic coordinate metadata must be an object.',
+    )
+    return
+  }
+
+  coordinateAxes.forEach((axis) => {
+    collectCoordinateComponentSupportedSymbolicExpressionSources(
+      symbolic[axis],
+      `${path}.symbolic.${axis}`,
+      inspection,
+    )
+  })
+
+  if (symbolic.source !== undefined) {
+    collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+      symbolic.source,
+      `${path}.symbolic.source`,
+      inspection,
+    )
+  }
+}
+
+function collectCoordinateComponentSupportedSymbolicExpressionSources(
+  component: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(component)) {
+    pushError(inspection.errors, path, 'Coordinate component must be an object.')
+    return
+  }
+
+  if (component.kind === 'numeric') {
+    return
+  }
+
+  if (component.kind !== 'symbolic') {
+    pushError(
+      inspection.errors,
+      `${path}.kind`,
+      'Coordinate component kind must be numeric or symbolic.',
+    )
+    return
+  }
+
+  markSupportedSymbolicObject(component, inspection)
+  collectSymbolicExpressionSource(
+    component.expression,
+    `${path}.expression`,
+    inspection,
+  )
+}
+
+function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+  source: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(source)) {
+    pushError(inspection.errors, path, 'Coordinate source must be an object.')
+    return
+  }
+
+  if (source.kind !== 'workPlaneLocal') {
+    pushError(
+      inspection.errors,
+      `${path}.kind`,
+      'Coordinate source kind must be workPlaneLocal.',
+    )
+    return
+  }
+
+  markSupportedSymbolicObject(source, inspection)
+
+  if (!isRecord(source.local)) {
+    pushError(
+      inspection.errors,
+      `${path}.local`,
+      'Work-plane-local coordinate source local field must be an object.',
+    )
+  } else {
+    collectScalarInputSupportedSymbolicExpressionSources(
+      source.local.a,
+      `${path}.local.a`,
+      'Work-plane-local scalar',
+      inspection,
+    )
+    collectScalarInputSupportedSymbolicExpressionSources(
+      source.local.b,
+      `${path}.local.b`,
+      'Work-plane-local scalar',
+      inspection,
+    )
+  }
+
+  collectWorkPlaneFrameSupportedSymbolicExpressionSources(
+    source.frame,
+    `${path}.frame`,
+    inspection,
+  )
+}
+
+function collectScalarInputSupportedSymbolicExpressionSources(
+  value: unknown,
+  path: string,
+  label: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (typeof value === 'number') {
+    return
+  }
+
+  if (!isRecord(value)) {
+    return
+  }
+
+  if (value.kind === 'numeric') {
+    return
+  }
+
+  if (value.kind !== 'symbolic') {
+    pushError(
+      inspection.errors,
+      `${path}.kind`,
+      `${label} kind must be numeric or symbolic.`,
+    )
+    return
+  }
+
+  markSupportedSymbolicObject(value, inspection)
+  collectSymbolicExpressionSource(
+    value.expression,
+    `${path}.expression`,
+    inspection,
+  )
+}
+
+function collectSymbolicExpressionSource(
+  expression: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (typeof expression !== 'string') {
+    pushError(inspection.errors, path, 'Symbolic expression must be a string.')
+    return
+  }
+
+  inspection.sources.push({
+    path: path.slice(0, -'.expression'.length),
+    expression,
+  })
+}
+
+function markSupportedSymbolicObject(
+  value: Record<string, unknown>,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  inspection.supportedSymbolicObjects.add(value)
+}
+
+function findUnsupportedSymbolicCoordinateSources(
+  value: unknown,
+  path: string,
+  supportedSymbolicObjects: WeakSet<object>,
+  seen: WeakSet<object>,
+  errors: DiagramValidationIssue[],
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      findUnsupportedSymbolicCoordinateSources(
+        item,
+        `${path}[${index}]`,
+        supportedSymbolicObjects,
+        seen,
+        errors,
+      ),
+    )
+    return
+  }
+
+  if (!isRecord(value)) {
+    return
+  }
+
+  if (seen.has(value)) {
+    return
+  }
+  seen.add(value)
+
+  const isSupported = supportedSymbolicObjects.has(value)
+
+  if (!isSupported && value.kind === 'workPlaneLocal') {
+    pushError(
+      errors,
+      path,
+      'Unsupported work-plane-local coordinate source.',
+    )
+    return
+  }
+
+  if (!isSupported && value.kind === 'symbolic') {
+    pushError(errors, path, 'Unsupported symbolic coordinate source.')
+    return
+  }
+
+  Object.entries(value).forEach(([key, child]) => {
+    findUnsupportedSymbolicCoordinateSources(
+      child,
+      `${path}.${key}`,
+      supportedSymbolicObjects,
+      seen,
+      errors,
+    )
+  })
+}
+
 function validateStratumSymbolicCoordinateMetadata(
   stratum: unknown,
   ambientDimension: AmbientDimension,
@@ -471,6 +1341,14 @@ function validateStratumSymbolicCoordinateMetadata(
         validatePathTemplateFrameSymbolicMetadata(
           stratum.template,
           `${path}.template`,
+          errors,
+        )
+      }
+
+      if (stratum.kind === 'grid' && isRecord(stratum.frame)) {
+        validateWorkPlaneFrameSnapshotSymbolicMetadata(
+          stratum.frame.frame,
+          `${path}.frame.frame`,
           errors,
         )
       }
@@ -970,8 +1848,27 @@ function refreshStratumSymbolicCoordinatePreviews(
             ),
           }
         case 'grid':
+          if (!isRecord(stratum.frame) || !isRecord(stratum.frame.frame)) {
+            pushError(
+              errors,
+              `${path}.frame.frame`,
+              'Grid frame snapshot must be an object.',
+            )
+
+            return stratum
+          }
+
           return {
             ...stratum,
+            frame: {
+              ...stratum.frame,
+              frame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+                stratum.frame.frame as WorkPlaneFrameSnapshot,
+                context,
+                `${path}.frame.frame`,
+                errors,
+              ),
+            },
             uRange: {
               min: refreshScalarInputValuePreview(
                 stratum.uRange.min,
