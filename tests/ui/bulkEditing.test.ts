@@ -4,6 +4,7 @@ import {
   createCurveStratum,
   createEmptyDiagram,
   createPointStratum,
+  createTextLabel,
 } from '../../src/model/constructors.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
@@ -217,6 +218,54 @@ test('bulk duplicate creates new ids and disambiguates path labels', () => {
       copiedPathLabel: 'alpha path copy',
     },
   ])
+})
+
+test('bulk duplicate reserves coordinate anchor ids for copied strata and labels', () => {
+  const diagram = createBulkDuplicateReservationDiagram()
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'source-point' },
+      { kind: 'label', id: 'source-label' },
+    ],
+  })
+  const copiedPoint = findPoint(result.diagram, 'source-point-copy-1')
+
+  assert.equal(
+    result.idChanges.find((change) => change.sourceId === 'source-point')
+      ?.copiedId,
+    'source-point-copy-1',
+  )
+  assert.equal(
+    result.idChanges.find((change) => change.sourceId === 'source-label')
+      ?.copiedId,
+    'source-label-copy-1',
+  )
+  assert.equal(hasStratum(result.diagram, 'source-point-copy'), false)
+  assert.notEqual(findLabel(result.diagram, 'source-label-copy-1'), undefined)
+  assert.equal(
+    coordinateReferenceSourceForPoint(copiedPoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.deepEqual(
+    result.diagram.coordinateAnchors?.map((anchor) => anchor.id).sort(),
+    ['coord-a', 'source-label-copy', 'source-point-copy'],
+  )
+  assertTopLevelIdsUnique(result.diagram)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('bulk duplicate skips selected coordinate anchors', () => {
+  const diagram = createBulkCoordinateReferenceDiagram()
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+
+  assert.equal(result.duplicatedCount, 0)
+  assert.equal(result.selectedElement, null)
+  assert.deepEqual(result.diagram.coordinateAnchors, diagram.coordinateAnchors)
+  assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
 test('bulk duplicate preserves geometry, style, and symbolic expressions', () => {
@@ -589,6 +638,59 @@ function createBulkCurveDiagram(): Diagram {
     strata: [curveA(), curveB(), curveC()],
     labels: [labelA()],
   }
+}
+
+function createBulkDuplicateReservationDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPositionForBulkTest(2, 0, 0),
+    }),
+  ]
+  diagram.coordinateAnchors.push(
+    createCoordinateAnchor(
+      {
+        ...diagram,
+        coordinateAnchors: diagram.coordinateAnchors,
+      },
+      {
+        id: 'source-point-copy',
+        name: 'Reserved Point Copy',
+        position: globalAnchorPositionForBulkTest(3, 0, 0),
+      },
+    ),
+    createCoordinateAnchor(
+      {
+        ...diagram,
+        coordinateAnchors: diagram.coordinateAnchors,
+      },
+      {
+        id: 'source-label-copy',
+        name: 'Reserved Label Copy',
+        position: globalAnchorPositionForBulkTest(4, 0, 0),
+      },
+    ),
+  )
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'source-point',
+      position: coordinateReferencePointForBulkTest(diagram, 'coord-a'),
+    }),
+  ]
+  diagram.labels = [
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'source-label',
+      text: '$L$',
+      position: { x: 0, y: 1, z: 0 },
+    }),
+  ]
+
+  return diagram
 }
 
 function createBulkCoordinateReferenceDiagram(): Diagram {
@@ -1083,4 +1185,20 @@ function findLabel(diagram: Diagram, id: string): TextLabel {
 
 function hasStratum(diagram: Diagram, id: string): boolean {
   return diagram.strata.some((stratum) => stratum.id === id)
+}
+
+function assertTopLevelIdsUnique(diagram: Diagram): void {
+  const ids = [
+    ...diagram.strata.map((stratum) => stratum.id),
+    ...diagram.labels.map((label) => label.id),
+    ...(diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
+    ...(diagram.variables ?? []).map((variable) => variable.id),
+    ...(diagram.pathCrossings ?? []).map((state) => state.id),
+  ]
+
+  assert.equal(
+    new Set(ids).size,
+    ids.length,
+    'Expected unique top-level diagram ids.',
+  )
 }

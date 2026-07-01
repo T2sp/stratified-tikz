@@ -8,6 +8,7 @@ import {
   pointShapes,
 } from '../model/types.ts'
 import { ensureLayerMetadata, formatLayerValue, normalizeLayerValue } from '../model/layers.ts'
+import { collectTopLevelDiagramIds } from '../model/diagramIds.ts'
 import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
@@ -773,7 +774,9 @@ export function duplicateSelectedElements(
     }
   }
 
-  const topLevelIdAllocator = createUniqueIdAllocator(topLevelElementIds(diagram))
+  const topLevelIdAllocator = createUniqueIdAllocator(
+    collectTopLevelDiagramIds(diagram),
+  )
   const nestedIdAllocator = createUniqueIdAllocator(nestedObjectIds(diagram))
   const pathLabelAllocator = createPathLabelAllocator(diagram)
   const idChanges: BulkDuplicateIdChange[] = []
@@ -1651,13 +1654,6 @@ function duplicatePathLabel<T extends CurveStratum | PolygonSheetStratum>(
   }
 }
 
-function topLevelElementIds(diagram: Diagram): string[] {
-  return [
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-  ]
-}
-
 function nestedObjectIds(diagram: Diagram): string[] {
   return diagram.strata.flatMap((stratum) => {
     if (stratum.geometricKind === 'curve') {
@@ -1679,7 +1675,7 @@ function nestedObjectIds(diagram: Diagram): string[] {
   })
 }
 
-function createUniqueIdAllocator(initialIds: string[]): UniqueIdAllocator {
+function createUniqueIdAllocator(initialIds: Iterable<string>): UniqueIdAllocator {
   const usedIds = new Set(initialIds)
 
   return {

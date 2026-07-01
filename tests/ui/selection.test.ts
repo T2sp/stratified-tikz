@@ -1471,7 +1471,7 @@ test('generated TikZ no longer includes a removed selected element', () => {
   assert.equal(tikz.includes('$F^{(1)}L$'), false)
 })
 
-test('makeUniqueId avoids collisions across strata and labels', () => {
+test('makeUniqueId avoids collisions across top-level diagram ids', () => {
   const diagram = {
     ...twoDimensionalExample,
     strata: [
@@ -1488,9 +1488,20 @@ test('makeUniqueId avoids collisions across strata and labels', () => {
         id: 'point-2',
       },
     ],
+    coordinateAnchors: [
+      createCoordinateAnchor(twoDimensionalExample, {
+        id: 'point-3',
+        name: 'Reserved point id',
+        position: globalAnchorPosition({
+          x: { kind: 'numeric', value: 0 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        }),
+      }),
+    ],
   }
 
-  assert.equal(makeUniqueId(diagram, 'point'), 'point-3')
+  assert.equal(makeUniqueId(diagram, 'point'), 'point-4')
 })
 
 test('addPointStratum returns a new 2D diagram with codim 2 and z normalized', () => {

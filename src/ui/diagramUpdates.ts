@@ -11,6 +11,7 @@ import {
 } from '../geometry/curvedSheets.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { createGridStratum } from '../model/constructors.ts'
+import { collectTopLevelDiagramIds } from '../model/diagramIds.ts'
 import {
   createCoordinateAnchor,
   symbolicVec3FromVec3,
@@ -701,11 +702,7 @@ export type DirectCreationEditorState = {
 }
 
 export function makeUniqueId(diagram: Diagram, prefix: string): string {
-  const existingIds = new Set([
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-    ...(diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
-  ])
+  const existingIds = collectTopLevelDiagramIds(diagram)
   let index = 1
 
   while (existingIds.has(`${prefix}-${index}`)) {

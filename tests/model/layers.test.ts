@@ -412,6 +412,56 @@ test('duplicating a layer copies point strata and labels with new ids on the tar
   assert.equal(findLabel(result.diagram, 'source-label').layer, 5)
 })
 
+test('duplicating a layer reserves coordinate anchor ids for copied strata and labels', () => {
+  const diagram = createLayerOperationDiagram()
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'source-point-copy',
+      name: 'Reserved point copy',
+      position: globalAnchorPositionForLayerTest(0, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'source-label-copy',
+      name: 'Reserved label copy',
+      position: globalAnchorPositionForLayerTest(1, 0, 0),
+    }),
+  ]
+
+  const result = duplicateLayer(diagram, 5, { targetLayerValue: 6 })
+
+  assert.equal(
+    result.idChanges.find((change) => change.sourceId === 'source-point')
+      ?.copiedId,
+    'source-point-copy-1',
+  )
+  assert.equal(
+    result.idChanges.find((change) => change.sourceId === 'source-label')
+      ?.copiedId,
+    'source-label-copy-1',
+  )
+  assert.equal(findPoint(result.diagram, 'source-point-copy-1').layer, 6)
+  assert.equal(findLabel(result.diagram, 'source-label-copy-1').layer, 6)
+  assert.deepEqual(
+    result.diagram.coordinateAnchors?.map((anchor) => anchor.id).sort(),
+    ['source-label-copy', 'source-point-copy'],
+  )
+  assertLayerOperationInvariants(result.diagram)
+})
+
+test('duplicating a layer preserves coordinate refs to existing anchors', () => {
+  const diagram = createLayerDuplicateCoordinateReferenceDiagram()
+  const result = duplicateLayer(diagram, 5, { targetLayerValue: 6 })
+  const copiedPoint = findPoint(result.diagram, 'ref-point-copy')
+
+  assert.equal(result.diagram.coordinateAnchors?.length, 1)
+  assert.equal(
+    coordinateReferenceSourceForPoint(copiedPoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assertLayerOperationInvariants(result.diagram)
+})
+
 test('duplicating a layer deep-clones curve/path geometry and disambiguates path labels', () => {
   const result = duplicateLayer(createLayerOperationDiagram(), 5, {
     targetLayerValue: 6,
@@ -1348,9 +1398,16 @@ function assertNoDuplicateTopLevelElementIds(diagram: Diagram): void {
   const ids = [
     ...diagram.strata.map((stratum) => stratum.id),
     ...diagram.labels.map((label) => label.id),
+    ...(diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
+    ...(diagram.variables ?? []).map((variable) => variable.id),
+    ...(diagram.pathCrossings ?? []).map((state) => state.id),
   ]
 
-  assert.equal(new Set(ids).size, ids.length, 'Expected unique element ids.')
+  assert.equal(
+    new Set(ids).size,
+    ids.length,
+    'Expected unique top-level diagram ids.',
+  )
 }
 
 function assertSelectionAvailableAndVisible(
@@ -1654,6 +1711,28 @@ function createFilledRegionLayerDiagram(): Diagram {
       }),
     ],
   }
+}
+
+function createLayerDuplicateCoordinateReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPositionForLayerTest(1, 1, 0),
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'ref-point',
+      position: coordinateReferencePointForLayerTest(diagram, 'coord-a'),
+      layer: 5,
+    }),
+  ]
+
+  return diagram
 }
 
 function createLayerTranslationDiagram(): Diagram {
