@@ -22,6 +22,7 @@ import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceSourceForPoint,
   coordinateReferenceVec3ForAnchorId,
+  findCoordinateAnchorReferences,
 } from '../../src/model/coordinateReferences.ts'
 import { createArcPathSegmentFromAngles } from '../../src/model/paths.ts'
 import {
@@ -1025,9 +1026,63 @@ test('layer translation detaches coordinate refs from current anchor positions',
     coordinateReferenceSourceForPoint(otherPoint.position)?.coordinateId,
     'coord-a',
   )
+  assert.deepEqual(
+    findCoordinateAnchorReferences(translated, 'coord-a').map(
+      (reference) => reference.owner.id,
+    ),
+    ['other-ref-point'],
+  )
+  assert.equal(validateDiagram(translated).valid, true)
   assert.match(tikz, /\\coordinate \(A\) at \(5,5\);/)
   assert.match(tikz, /\\coordinate \(pointPoint0p0\) at \(6,5\);/)
   assert.match(tikz, /\\node\[[\s\S]*\] at \(pointPoint0p0\) \{\};/)
+})
+
+test('layer coordinate-reference translation is undoable and redoable', () => {
+  const initial = createLayerOperationEditorState(
+    createLayerCoordinateReferenceTranslationDiagram(),
+  )
+  const translated = translateLayer(initial.editableDiagram, 2, {
+    x: 1,
+    y: 0,
+    z: 0,
+  })
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: translated,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+  const undonePoint = findPoint(undone.editableDiagram, 'ref-point')
+  const redonePoint = findPoint(redone.editableDiagram, 'ref-point')
+  const redoneOtherPoint = findPoint(redone.editableDiagram, 'other-ref-point')
+
+  assert.equal(
+    coordinateReferenceSourceForPoint(undonePoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.deepEqual(redonePoint.position, { x: 6, y: 5, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(redonePoint.position), null)
+  assert.equal(
+    coordinateReferenceSourceForPoint(redoneOtherPoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.deepEqual(
+    undone.editableDiagram.coordinateAnchors,
+    initial.editableDiagram.coordinateAnchors,
+  )
+  assert.deepEqual(
+    redone.editableDiagram.coordinateAnchors,
+    initial.editableDiagram.coordinateAnchors,
+  )
+  assert.deepEqual(
+    findCoordinateAnchorReferences(redone.editableDiagram, 'coord-a').map(
+      (reference) => reference.owner.id,
+    ),
+    ['other-ref-point'],
+  )
+  assertLayerOperationInvariants(undone.editableDiagram)
+  assertLayerOperationInvariants(redone.editableDiagram)
 })
 
 test('layer translation detaches coordinate refs with symbolic current anchor source', () => {
