@@ -16,6 +16,7 @@ import {
 import { svgCoordinateAnchorMarkers } from '../../src/rendering/svgCoordinateAnchors.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import { addCoordinateAnchorFromDirectInput } from '../../src/ui/diagramUpdates.ts'
+import { toggleCoordinateAnchorVisibility } from '../../src/ui/previewToolbar.ts'
 import type {
   CoordinateAnchorPosition,
   Diagram,
@@ -157,6 +158,15 @@ test('coordinate anchors are not affected by hidden layer view or new layer crea
   assert.equal(anchor !== undefined && 'layer' in anchor, false)
   assert.match(tikz, /\\coordinate \(LayerlessCoordinate\) at \(3,4\);/)
   assert.doesNotMatch(tikz, /stratifiedLayer12/)
+})
+
+test('coordinate anchor show and hide state does not affect TikZ output', () => {
+  const diagram = createReferencedPathDiagram()
+  const before = generateTikz(diagram)
+
+  assert.equal(toggleCoordinateAnchorVisibility(true), false)
+  assert.equal(toggleCoordinateAnchorVisibility(false), true)
+  assert.equal(generateTikz(diagram), before)
 })
 
 test('coordinate anchor inline output has no blank lines and uses four-space indentation', () => {

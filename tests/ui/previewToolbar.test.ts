@@ -24,6 +24,7 @@ import {
   activeToolSupportsCursorCreation,
   directPathInputModeItems,
   closeToolbarPalette,
+  coordinateAnchorVisibilityButtonLabel,
   defaultPreviewCoordinateInputMode,
   previewToolbarTopTools,
   runPreviewOverlayAction,
@@ -31,6 +32,7 @@ import {
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   toolbarPaletteAfterCommandSelection,
+  toggleCoordinateAnchorVisibility,
   toggleToolbarPalette,
   togglePreviewToolbarState,
 } from '../../src/ui/previewToolbar.ts'
@@ -39,6 +41,13 @@ import type { WorkPlanePreviewTool } from '../../src/ui/workPlanePreview.ts'
 test('preview toolbar collapse state toggles between expanded and collapsed', () => {
   assert.equal(togglePreviewToolbarState('expanded'), 'collapsed')
   assert.equal(togglePreviewToolbarState('collapsed'), 'expanded')
+})
+
+test('coordinate anchor visibility control exposes show and hide labels', () => {
+  assert.equal(toggleCoordinateAnchorVisibility(true), false)
+  assert.equal(toggleCoordinateAnchorVisibility(false), true)
+  assert.equal(coordinateAnchorVisibilityButtonLabel(true), 'Coordinates: Hide')
+  assert.equal(coordinateAnchorVisibilityButtonLabel(false), 'Coordinates: Show')
 })
 
 test('opening Add point palette sets the open toolbar palette', () => {
@@ -75,6 +84,7 @@ test('preview overlay state is UI-only and not saved in diagram JSON', () => {
   assert.equal('directInputDrawerState' in parsed.diagram, false)
   assert.equal('layerWindowOpen' in parsed.diagram, false)
   assert.equal('cameraPanelOpen' in parsed.diagram, false)
+  assert.equal('showCoordinateAnchors' in parsed.diagram, false)
 })
 
 test('toolbar collapse state does not affect generated TikZ', () => {
@@ -91,6 +101,14 @@ test('toolbar palette state does not affect generated TikZ', () => {
   assert.equal(toggleToolbarPalette(null, 'addPoint'), 'addPoint')
   assert.equal(toggleToolbarPalette('addPoint', 'addPath'), 'addPath')
   assert.equal(closeToolbarPalette(), null)
+  assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
+})
+
+test('coordinate anchor visibility state does not affect generated TikZ', () => {
+  const before = generateTikz(emptyTwoDimensionalDiagram)
+
+  assert.equal(toggleCoordinateAnchorVisibility(true), false)
+  assert.equal(toggleCoordinateAnchorVisibility(false), true)
   assert.equal(generateTikz(emptyTwoDimensionalDiagram), before)
 })
 

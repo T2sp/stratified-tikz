@@ -290,6 +290,7 @@ import {
   directPathInputModeItems,
   generateTikzForUi,
   isAddPathTool,
+  coordinateAnchorVisibilityButtonLabel,
   previewToolbarTopTools,
   runPreviewOverlayAction,
   shouldHandlePreviewCanvasCreationClick,
@@ -297,6 +298,7 @@ import {
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   toolbarPaletteAfterCommandSelection,
+  toggleCoordinateAnchorVisibility,
   toggleToolbarPalette,
   togglePreviewToolbarState,
   updateSelectionForBackgroundClick,
@@ -2570,6 +2572,26 @@ function App() {
   function togglePreviewToolbar(): void {
     setOpenToolbarPalette(null)
     setPreviewToolbarState((current) => togglePreviewToolbarState(current))
+  }
+
+  function toggleCoordinateAnchorMarkers(): void {
+    const nextShowCoordinateAnchors =
+      toggleCoordinateAnchorVisibility(showCoordinateAnchors)
+
+    setShowCoordinateAnchors(nextShowCoordinateAnchors)
+
+    if (nextShowCoordinateAnchors) {
+      return
+    }
+
+    setEditorState((current) =>
+      selectionIncludesCoordinateAnchor(current.selectedElement)
+        ? {
+            ...current,
+            selectedElement: null,
+          }
+        : current,
+    )
   }
 
   function togglePreviewToolbarPalette(palette: PreviewToolbarPaletteId): void {
@@ -6307,6 +6329,8 @@ function App() {
 
   function renderPreviewToolbarOverlay() {
     const isCollapsed = previewToolbarState === 'collapsed'
+    const coordinateVisibilityLabel =
+      coordinateAnchorVisibilityButtonLabel(showCoordinateAnchors)
 
     return (
       <div
@@ -6377,13 +6401,11 @@ function App() {
                   : 'Show coordinate anchors'
               }
               onClick={(event) =>
-                runPreviewOverlayAction(event, () =>
-                  setShowCoordinateAnchors((shown) => !shown),
-                )
+                runPreviewOverlayAction(event, toggleCoordinateAnchorMarkers)
               }
               onPointerDown={stopPreviewOverlayEvent}
             >
-              Coordinates
+              {coordinateVisibilityLabel}
             </button>
 
             {renderActiveCreationControls()}
@@ -8370,6 +8392,21 @@ function geometryHandleTargetsSelection(
         selectedElement.id === target.labelId
       )
   }
+}
+
+function selectionIncludesCoordinateAnchor(selection: SelectedElement): boolean {
+  if (selection === null) {
+    return false
+  }
+
+  if (selection.kind === 'coordinate') {
+    return true
+  }
+
+  return (
+    selection.kind === 'multi' &&
+    selection.elements.some((element) => element.kind === 'coordinate')
+  )
 }
 
 function geometryHandleWorkPlaneForTarget(

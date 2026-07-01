@@ -76,7 +76,17 @@ import {
   type SvgArrowheadPreview,
 } from '../../src/rendering/svgArrows.ts'
 import { svgPathCrossingOverlayPrimitives } from '../../src/rendering/svgPathCrossings.ts'
-import { svgCoordinateAnchorMarkers } from '../../src/rendering/svgCoordinateAnchors.ts'
+import {
+  coordinateAnchorMarkerAppearance,
+  coordinateAnchorMarkerClassNames,
+  hitTestSvgCoordinateAnchorMarkers,
+  svgCoordinateAnchorMarkers,
+  svgCoordinateAnchorMarkersForPreview,
+} from '../../src/rendering/svgCoordinateAnchors.ts'
+import {
+  pickSvgPreviewHitTestCandidate,
+  svgPreviewHitTestPriorityRank,
+} from '../../src/rendering/svgHitTesting.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -227,6 +237,113 @@ test('SVG preview renders coordinate anchor marker', () => {
   assert.equal(markers[0]?.hitRadius, 11)
   assert.equal(Number.isFinite(markers[0]?.center.x), true)
   assert.equal(Number.isFinite(markers[0]?.center.y), true)
+})
+
+test('SVG coordinate anchor marker design uses a dot and dotted halo', () => {
+  assert.equal(
+    coordinateAnchorMarkerClassNames.marker,
+    'coordinate-anchor-marker',
+  )
+  assert.equal(
+    coordinateAnchorMarkerClassNames.halo,
+    'coordinate-anchor-marker__halo',
+  )
+  assert.equal(
+    coordinateAnchorMarkerClassNames.dot,
+    'coordinate-anchor-marker__dot',
+  )
+  assert.equal(coordinateAnchorMarkerAppearance.haloStrokeDasharray, '1.5 2')
+  assert.ok(
+    coordinateAnchorMarkerAppearance.dotRadius <
+      coordinateAnchorMarkerAppearance.haloRadius,
+  )
+  assert.ok(
+    coordinateAnchorMarkerAppearance.haloRadius <
+      coordinateAnchorMarkerAppearance.hitRadius,
+  )
+})
+
+test('shown coordinate anchors render preview markers', () => {
+  const diagram = coordinateAnchorPreviewDiagram()
+  const markers = svgCoordinateAnchorMarkersForPreview(
+    diagram,
+    diagram.camera,
+    360,
+    null,
+    true,
+  )
+
+  assert.equal(markers.length, 1)
+  assert.equal(markers[0]?.anchor.id, 'preview-coordinate')
+})
+
+test('hidden coordinate anchors render no preview markers', () => {
+  const diagram = coordinateAnchorPreviewDiagram()
+  const markers = svgCoordinateAnchorMarkersForPreview(
+    diagram,
+    diagram.camera,
+    360,
+    null,
+    false,
+  )
+
+  assert.deepEqual(markers, [])
+})
+
+test('hidden coordinate anchors do not hit-test', () => {
+  const diagram = coordinateAnchorPreviewDiagram()
+  const shownMarkers = svgCoordinateAnchorMarkersForPreview(
+    diagram,
+    diagram.camera,
+    360,
+    null,
+    true,
+  )
+  const hiddenMarkers = svgCoordinateAnchorMarkersForPreview(
+    diagram,
+    diagram.camera,
+    360,
+    null,
+    false,
+  )
+  const center = shownMarkers[0]?.center
+
+  assert.notEqual(center, undefined)
+  if (center === undefined) {
+    throw new Error('Expected a coordinate marker center.')
+  }
+  assert.equal(
+    hitTestSvgCoordinateAnchorMarkers(shownMarkers, center)?.anchor.id,
+    'preview-coordinate',
+  )
+  assert.equal(hitTestSvgCoordinateAnchorMarkers(hiddenMarkers, center), null)
+})
+
+test('shown coordinate anchors have hit-test priority over paths and sheets', () => {
+  const picked = pickSvgPreviewHitTestCandidate([
+    { kind: 'sheetOrRegion', id: 'sheet-under-coordinate', hit: true },
+    { kind: 'curve', id: 'path-under-coordinate', hit: true },
+    { kind: 'coordinateAnchor', id: 'preview-coordinate', hit: true },
+  ])
+  const handlePicked = pickSvgPreviewHitTestCandidate([
+    { kind: 'coordinateAnchor', id: 'preview-coordinate', hit: true },
+    { kind: 'geometryHandle', id: 'active-handle', hit: true },
+  ])
+
+  assert.deepEqual(picked, {
+    kind: 'coordinateAnchor',
+    id: 'preview-coordinate',
+    hit: true,
+  })
+  assert.equal(handlePicked.kind, 'geometryHandle')
+  assert.ok(
+    svgPreviewHitTestPriorityRank('coordinateAnchor') <
+      svgPreviewHitTestPriorityRank('curve'),
+  )
+  assert.ok(
+    svgPreviewHitTestPriorityRank('coordinateAnchor') <
+      svgPreviewHitTestPriorityRank('sheetOrRegion'),
+  )
 })
 
 test('SVG coordinate anchor markers are independent of layer visibility', () => {
@@ -1234,6 +1351,27 @@ test('geometry handle user-facing vertex labels are one-based', () => {
   assert.equal(curveHandleLabel('cubicBezier', 3), 'End')
   assert.equal(curveHandleLabel('cubicBezier', 4), 'Point 5')
 })
+
+function coordinateAnchorPreviewDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const anchor = createCoordinateAnchor(diagram, {
+    id: 'preview-coordinate',
+    name: 'Preview coordinate',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 0 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  })
+
+  return {
+    ...diagram,
+    coordinateAnchors: [anchor],
+  }
+}
 
 function createCameraTestDiagram(): Diagram {
   return {
