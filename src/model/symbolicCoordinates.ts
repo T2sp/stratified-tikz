@@ -12,6 +12,10 @@ import {
   validateWorkPlaneLocalCoordinateSourceForPoint,
 } from './workPlaneLocalCoordinates.ts'
 import {
+  coordinateAnchorPositionToVec3,
+  symbolicVec3FromVec3,
+} from './coordinateAnchors.ts'
+import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
 } from './paths.ts'
@@ -21,6 +25,7 @@ import type {
   ClosedPathBoundary,
   CoonsBoundarySnapshot,
   CoonsConstantPointBoundarySnapshot,
+  CoordinateAnchor,
   CoordinateComponent,
   CubicBezierControlMode,
   CurvedSheetPrimitive,
@@ -256,6 +261,16 @@ export function refreshDiagramSymbolicCoordinatePreviews(
       errors,
     ),
   }))
+  const coordinateAnchors = (diagram.coordinateAnchors ?? []).map(
+    (anchor, index) =>
+      refreshCoordinateAnchorSymbolicCoordinatePreviews(
+        anchor,
+        diagram.ambientDimension,
+        context,
+        `coordinateAnchors[${index}]`,
+        errors,
+      ),
+  )
 
   if (errors.length > 0) {
     return {
@@ -270,6 +285,7 @@ export function refreshDiagramSymbolicCoordinatePreviews(
       ...diagram,
       strata,
       labels,
+      coordinateAnchors,
     },
   }
 }
@@ -377,6 +393,17 @@ export function validateDiagramSymbolicCoordinateMetadata(
     })
   }
 
+  if (Array.isArray(diagram.coordinateAnchors)) {
+    diagram.coordinateAnchors.forEach((anchor, index) => {
+      validateCoordinateAnchorSymbolicMetadata(
+        anchor,
+        diagram.ambientDimension,
+        `coordinateAnchors[${index}]`,
+        errors,
+      )
+    })
+  }
+
   return errors
 }
 
@@ -428,6 +455,16 @@ export function validateNoUnsupportedSymbolicCoordinateSources(
     )
   }
 
+  if (Array.isArray(diagram.coordinateAnchors)) {
+    findUnsupportedSymbolicCoordinateSources(
+      diagram.coordinateAnchors,
+      'coordinateAnchors',
+      inspection.supportedSymbolicObjects,
+      seen,
+      errors,
+    )
+  }
+
   return errors
 }
 
@@ -460,6 +497,17 @@ function inspectDiagramSupportedSymbolicCoordinateSources(
       collectVec3SupportedSymbolicExpressionSources(
         label.position,
         `labels[${index}].position`,
+        inspection,
+      )
+    })
+  }
+
+  if (Array.isArray(diagram.coordinateAnchors)) {
+    diagram.coordinateAnchors.forEach((anchor, index) => {
+      collectCoordinateAnchorSupportedSymbolicExpressionSources(
+        anchor,
+        diagram.ambientDimension,
+        `coordinateAnchors[${index}]`,
         inspection,
       )
     })
@@ -611,6 +659,52 @@ function collectStratumSupportedSymbolicExpressionSources(
     default:
       return
   }
+}
+
+function collectCoordinateAnchorSupportedSymbolicExpressionSources(
+  anchor: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(anchor) || !isRecord(anchor.position)) {
+    return
+  }
+
+  if (anchor.position.kind === 'global') {
+    const point = vec3FromGlobalCoordinateAnchorValue(
+      anchor.position.value,
+      ambientDimension,
+    )
+
+    if (point !== null) {
+      collectVec3SupportedSymbolicExpressionSources(
+        point,
+        `${path}.position.value`,
+        inspection,
+      )
+    }
+    return
+  }
+
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    return
+  }
+
+  collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+    {
+      kind: 'workPlaneLocal',
+      frame: anchor.position.frame,
+      local: anchor.position.local,
+    },
+    `${path}.position`,
+    inspection,
+  )
+  collectVec3SupportedSymbolicExpressionSources(
+    anchor.position.preview,
+    `${path}.position.preview`,
+    inspection,
+  )
 }
 
 function collectClosedPathBoundariesSupportedSymbolicExpressionSources(
@@ -1232,6 +1326,59 @@ function findUnsupportedSymbolicCoordinateSources(
   })
 }
 
+function validateCoordinateAnchorSymbolicMetadata(
+  anchor: unknown,
+  ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(anchor) || !isRecord(anchor.position)) {
+    return
+  }
+
+  if (anchor.position.kind === 'global') {
+    const point = vec3FromGlobalCoordinateAnchorValue(
+      anchor.position.value,
+      ambientDimension,
+    )
+
+    if (point !== null) {
+      validateSymbolicVec3Metadata(
+        point,
+        ambientDimension,
+        `${path}.position.value`,
+        errors,
+      )
+    }
+    return
+  }
+
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    return
+  }
+
+  validateWorkPlaneFrameSnapshotSymbolicMetadata(
+    anchor.position.frame,
+    `${path}.position.frame`,
+    errors,
+  )
+  validateSymbolicVec3Metadata(
+    anchor.position.preview,
+    ambientDimension,
+    `${path}.position.preview`,
+    errors,
+  )
+  validateWorkPlaneLocalCoordinateSource(
+    {
+      kind: 'workPlaneLocal',
+      frame: anchor.position.frame,
+      local: anchor.position.local,
+    },
+    `${path}.position`,
+    undefined,
+  ).forEach((issue) => pushError(errors, issue.path, issue.message))
+}
+
 function validateStratumSymbolicCoordinateMetadata(
   stratum: unknown,
   ambientDimension: AmbientDimension,
@@ -1706,6 +1853,90 @@ function validateSymbolicVec3Metadata(
       `${path}.symbolic.source`,
       undefined,
     ).forEach((issue) => pushError(errors, issue.path, issue.message))
+  }
+}
+
+function refreshCoordinateAnchorSymbolicCoordinatePreviews(
+  anchor: CoordinateAnchor,
+  ambientDimension: AmbientDimension,
+  context: CoordinateExpressionContext,
+  path: string,
+  errors: DiagramValidationIssue[],
+): CoordinateAnchor {
+  if (anchor.position.kind === 'global') {
+    const point = coordinateAnchorPositionToVec3(
+      anchor.position,
+      ambientDimension,
+    )
+    const refreshedPoint = refreshVec3SymbolicPreview(
+      point,
+      ambientDimension,
+      context,
+      `${path}.position.value`,
+      errors,
+    )
+
+    return {
+      ...anchor,
+      position: {
+        kind: 'global',
+        value: symbolicVec3FromVec3(refreshedPoint),
+      },
+    }
+  }
+
+  const refreshedSource = refreshWorkPlaneLocalCoordinateSource(
+    {
+      kind: 'workPlaneLocal',
+      frame: anchor.position.frame,
+      local: anchor.position.local,
+    },
+    context,
+    `${path}.position`,
+  )
+
+  if (!refreshedSource.ok) {
+    refreshedSource.errors.forEach((issue) =>
+      pushError(errors, issue.path, issue.message),
+    )
+    return anchor
+  }
+
+  const evaluated = evaluateWorkPlaneLocalCoordinate(
+    refreshedSource.source,
+    context,
+    `${path}.position`,
+  )
+
+  if (!evaluated.ok) {
+    evaluated.errors.forEach((issue) =>
+      pushError(errors, issue.path, issue.message),
+    )
+    return anchor
+  }
+
+  const preview = normalizePreviewPoint(evaluated.point, ambientDimension)
+
+  if (
+    ambientDimension === 2 &&
+    !numbersApproximatelyEqual(evaluated.point.z, 0)
+  ) {
+    pushError(
+      errors,
+      `${path}.position`,
+      '2D work-plane-local coordinate anchor previews must have z = 0.',
+    )
+    return anchor
+  }
+
+  return {
+    ...anchor,
+    position: {
+      kind: 'workPlaneLocal',
+      frame: refreshedSource.source.frame,
+      local: refreshedSource.source.local,
+      preview,
+    },
   }
 }
 
@@ -3022,6 +3253,25 @@ function symbolicVec3ComponentsFromPoint(point: Vec3): SymbolicVec3 {
         : numericCoordinateComponent(point.z),
     ...(source === null ? {} : { source }),
   }
+}
+
+function vec3FromGlobalCoordinateAnchorValue(
+  value: unknown,
+  ambientDimension: AmbientDimension,
+): Vec3 | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const x = coordinateComponentFromUnknown(value.x)
+  const y = coordinateComponentFromUnknown(value.y)
+  const z = coordinateComponentFromUnknown(value.z)
+
+  if (x === null || y === null || z === null) {
+    return null
+  }
+
+  return vec3FromCoordinateComponents({ x, y, z }, ambientDimension)
 }
 
 function coordinateComponentFromUnknown(

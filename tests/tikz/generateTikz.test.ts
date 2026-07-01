@@ -12,6 +12,7 @@ import {
 } from '../../src/tikz/index.ts'
 import type {
   ClosedPathBoundary,
+  CoordinateAnchorPosition,
   CoordinateComponent,
   CurveStyle,
   Diagram,
@@ -33,6 +34,7 @@ import type {
   WorkPlaneLocalCoordinateSource,
   WorkPlane,
 } from '../../src/model/types.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   createInitialCamera3D,
   resetCameraToInitial,
@@ -53,6 +55,108 @@ test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(0,0\);/)
   assert.match(tikz, /\\coordinate \(curvePolyWire0p1\) at \(1,2\);/)
   assert.doesNotMatch(tikz, /\(0,0,0\)/)
+})
+
+test('coordinate anchors export before drawing coordinates and outside layer blocks', () => {
+  const diagram = createTwoDimensionalDiagram()
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPosition(3, 4, 0),
+    }),
+  ]
+  diagram.layers = [
+    { value: 0, name: 'Layer 0', visible: false },
+    { value: 9, name: 'New layer' },
+  ]
+
+  const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const anchorIndex = tikz.indexOf('\\coordinate (A) at (3,4);')
+  const generatedIndex = tikz.indexOf('\\coordinate (curvePolyWire0p0)')
+  const layerIndex = tikz.indexOf('\\begin{pgfonlayer}')
+  const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+
+  assert.ok(anchorIndex >= 0)
+  assert.ok(anchorIndex < generatedIndex)
+  assert.ok(anchorIndex < layerIndex)
+  assert.doesNotMatch(layerBlock, /\\coordinate \(A\)/)
+  expectNoBlankLines(tikz)
+})
+
+test('3D coordinate anchors export as global 3D coordinates', () => {
+  const diagram = createThreeDimensionalDiagram()
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      position: globalAnchorPosition(1, 2, 3),
+    }),
+  ]
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(B\) at \(1,2,3\);/)
+})
+
+test('coordinate anchor names reserve the generated coordinate namespace', () => {
+  const diagram = createTwoDimensionalDiagram()
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-collision',
+      name: 'Collision',
+      tikzName: 'curvePolyWire0p0',
+      position: globalAnchorPosition(5, 5, 0),
+    },
+  ]
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(5,5\);/)
+  assert.match(tikz, /\\coordinate \(curvePolyWire0p02\) at \(0,0\);/)
+})
+
+test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-local',
+      name: 'Local anchor',
+      tikzName: 'LocalAnchor',
+      position: {
+        kind: 'workPlaneLocal',
+        frame: {
+          origin: { x: 0, y: 0, z: 0 },
+          u: { x: 1, y: 0, z: 0 },
+          v: { x: 0, y: 1, z: 0 },
+          normal: { x: 0, y: 0, z: 1 },
+        },
+        local: {
+          a: { kind: 'symbolic', expression: 'R', previewValue: 2 },
+          b: { kind: 'numeric', value: 1 },
+        },
+        preview: { x: 2, y: 1, z: 0 },
+      },
+    },
+  ]
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /Coordinate anchor "Local anchor" \[coord-local\] exported in a local TikZ 3d plane scope/,
+  )
+  assert.match(tikz, /\\coordinate \(LocalAnchor\) at \(\{\\R\},1\);/)
+  assert.doesNotMatch(tikz, /\\begin\{pgfonlayer\}/)
 })
 
 test('default TikZ export mode is standalone', () => {
@@ -7316,6 +7420,21 @@ function createEmptyDiagram({
         : createInitialCamera3D(),
     strata: [],
     labels: [],
+  }
+}
+
+function globalAnchorPosition(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
   }
 }
 

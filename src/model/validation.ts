@@ -30,6 +30,14 @@ import {
   sanitizeTikzStyleName,
 } from './stylePresets.ts'
 import {
+  coordinateAnchorPositionToVec3,
+  isCoordinateAnchorTikzName,
+  workPlaneLocalCoordinateSourceFromAnchorPosition,
+} from './coordinateAnchors.ts'
+import {
+  validateWorkPlaneLocalCoordinateSourceForPoint,
+} from './workPlaneLocalCoordinates.ts'
+import {
   scalarInputPreviewValue,
   validateGridPreview,
 } from './grids.ts'
@@ -86,6 +94,7 @@ import type {
   BoundaryPathSnapshot,
   Camera,
   ClosedPathBoundary,
+  CoordinateAnchor,
   CurvedSheetPrimitive,
   CurvedSheetStratum,
   CubicBezierCurveStratum,
@@ -170,6 +179,13 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   const coordinateExpressionContext =
     symbolicCoordinateExpressionContextForDiagram(diagram)
   validateUniqueIds(diagram, errors)
+  validateCoordinateAnchors(
+    diagram.coordinateAnchors,
+    diagram.ambientDimension,
+    'coordinateAnchors',
+    errors,
+    coordinateExpressionContext,
+  )
 
   diagram.strata.forEach((stratum, index) => {
     validateStratum(
@@ -198,6 +214,141 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
   return {
     valid: errors.length === 0,
     errors,
+  }
+}
+
+function validateCoordinateAnchors(
+  coordinateAnchors: CoordinateAnchor[] | undefined,
+  ambientDimension: 2 | 3,
+  path: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  if (coordinateAnchors === undefined) {
+    return
+  }
+
+  if (!Array.isArray(coordinateAnchors)) {
+    pushError(errors, path, 'Coordinate anchors must be an array.')
+    return
+  }
+
+  const seenTikzNames = new Map<string, string>()
+
+  coordinateAnchors.forEach((anchor, index) => {
+    const anchorPath = `${path}[${index}]`
+
+    validateId(anchor.id, `${anchorPath}.id`, errors)
+    validateName(anchor.name, `${anchorPath}.name`, errors)
+    validateCoordinateAnchorTikzName(
+      anchor.tikzName,
+      `${anchorPath}.tikzName`,
+      errors,
+    )
+    addUniqueId(
+      anchor.tikzName,
+      `${anchorPath}.tikzName`,
+      seenTikzNames,
+      errors,
+    )
+
+    if (anchor.locked !== undefined && typeof anchor.locked !== 'boolean') {
+      pushError(errors, `${anchorPath}.locked`, 'Coordinate anchor locked flag must be boolean.')
+    }
+
+    if (isRecord(anchor) && 'layer' in anchor) {
+      pushError(errors, `${anchorPath}.layer`, 'Coordinate anchors are global and must not have a layer.')
+    }
+
+    validateCoordinateAnchorPosition(
+      anchor,
+      ambientDimension,
+      anchorPath,
+      errors,
+      coordinateExpressionContext,
+    )
+  })
+}
+
+function validateCoordinateAnchorTikzName(
+  tikzName: string,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (typeof tikzName !== 'string' || tikzName.trim().length === 0) {
+    pushError(errors, path, 'Coordinate anchor TikZ name must be non-empty.')
+    return
+  }
+
+  if (!isCoordinateAnchorTikzName(tikzName)) {
+    pushError(errors, path, 'Coordinate anchor TikZ name must contain only letters and digits and start with a letter.')
+  }
+}
+
+function validateCoordinateAnchorPosition(
+  anchor: CoordinateAnchor,
+  ambientDimension: 2 | 3,
+  anchorPath: string,
+  errors: DiagramValidationIssue[],
+  coordinateExpressionContext: CoordinateExpressionContext | undefined,
+): void {
+  if (!isRecord(anchor.position)) {
+    pushError(errors, `${anchorPath}.position`, 'Coordinate anchor position must be an object.')
+    return
+  }
+
+  switch (anchor.position.kind) {
+    case 'global': {
+      if (!isRecord(anchor.position.value)) {
+        pushError(errors, `${anchorPath}.position.value`, 'Global coordinate anchor value must be an object.')
+        return
+      }
+
+      if (anchor.position.value.source !== undefined) {
+        pushError(errors, `${anchorPath}.position.value.source`, 'Global coordinate anchors must not store work-plane-local source metadata.')
+      }
+
+      let point: Vec3
+      try {
+        point = coordinateAnchorPositionToVec3(
+          anchor.position,
+          ambientDimension,
+        )
+      } catch {
+        pushError(
+          errors,
+          `${anchorPath}.position.value`,
+          'Global coordinate anchor value must contain valid coordinate components.',
+        )
+        return
+      }
+
+      validateVec3ForAmbient(
+        point,
+        ambientDimension,
+        `${anchorPath}.position.value`,
+        errors,
+        coordinateExpressionContext,
+      )
+      return
+    }
+    case 'workPlaneLocal':
+      validateVec3ForAmbient(
+        anchor.position.preview,
+        ambientDimension,
+        `${anchorPath}.position.preview`,
+        errors,
+        coordinateExpressionContext,
+      )
+      validateWorkPlaneLocalCoordinateSourceForPoint(
+        workPlaneLocalCoordinateSourceFromAnchorPosition(anchor.position),
+        anchor.position.preview,
+        `${anchorPath}.position`,
+        coordinateExpressionContext,
+      ).forEach((issue) => pushError(errors, issue.path, issue.message))
+      return
+    default:
+      pushError(errors, `${anchorPath}.position.kind`, 'Coordinate anchor position kind must be global or workPlaneLocal.')
   }
 }
 
@@ -3120,6 +3271,10 @@ function validateUniqueIds(
 
   diagram.labels.forEach((label, index) => {
     addUniqueId(label.id, `labels[${index}].id`, seenIds, errors)
+  })
+
+  diagram.coordinateAnchors?.forEach((anchor, index) => {
+    addUniqueId(anchor.id, `coordinateAnchors[${index}].id`, seenIds, errors)
   })
 
   diagram.variables?.forEach((variable, index) => {

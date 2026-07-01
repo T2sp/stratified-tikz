@@ -37,6 +37,12 @@ import {
 } from './importedTikzStyles.ts'
 import { clonePathArrowOptions, defaultPathArrowOptions } from './pathArrows.ts'
 import {
+  cloneCoordinateAnchor,
+  normalizeCoordinateAnchorName,
+  sanitizeCoordinateAnchorTikzName,
+  uniqueCoordinateAnchorTikzName,
+} from './coordinateAnchors.ts'
+import {
   cleanPathCrossingStates,
   normalizeLoadedPathCrossingStates,
 } from './pathCrossings.ts'
@@ -59,6 +65,7 @@ import type {
   Camera,
   Camera2D,
   Camera3D,
+  CoordinateAnchor,
   Diagram,
   DiagramLayer,
   DiagramValidationIssue,
@@ -99,6 +106,7 @@ export type PersistentDiagram = {
   externalTikzStyleSources?: ExternalTikzStyleSource[]
   importedTikzStyleReferences?: ImportedTikzStyleReference[]
   variables?: SymbolicVariable[]
+  coordinateAnchors?: CoordinateAnchor[]
   strata: Stratum[]
   labels: TextLabel[]
   pathCrossings?: PathCrossingState[]
@@ -183,6 +191,7 @@ type SavedDiagramInput = {
   externalTikzStyleSources?: unknown
   importedTikzStyleReferences?: unknown
   variables?: unknown
+  coordinateAnchors?: unknown
   strata: unknown[]
   labels: unknown[]
   pathCrossings?: unknown
@@ -675,6 +684,37 @@ function validatePendingImportDiagramStructure(
     })
   }
 
+  if (Array.isArray(diagram.coordinateAnchors)) {
+    diagram.coordinateAnchors.forEach((anchor, index) => {
+      const path = `coordinateAnchors[${index}]`
+
+      if (!isRecord(anchor)) {
+        errors.push({
+          path,
+          message: 'Coordinate anchor must be an object.',
+        })
+        return
+      }
+
+      if (typeof anchor.id !== 'string' || anchor.id.trim().length === 0) {
+        errors.push({
+          path: `${path}.id`,
+          message: 'Coordinate anchor id is missing or invalid.',
+        })
+      }
+
+      if (
+        typeof anchor.name !== 'string' ||
+        anchor.name.trim().length === 0
+      ) {
+        errors.push({
+          path: `${path}.name`,
+          message: 'Coordinate anchor name is missing or invalid.',
+        })
+      }
+    })
+  }
+
   return errors
 }
 
@@ -713,6 +753,11 @@ function toPersistentDiagram(
     cleanedDiagram.variables.length === 0
       ? undefined
       : cleanedDiagram.variables
+  const coordinateAnchors =
+    cleanedDiagram.coordinateAnchors === undefined ||
+    cleanedDiagram.coordinateAnchors.length === 0
+      ? undefined
+      : cleanedDiagram.coordinateAnchors.map(cloneCoordinateAnchor)
   const pathCrossings =
     cleanedDiagram.pathCrossings === undefined ||
     cleanedDiagram.pathCrossings.length === 0
@@ -732,6 +777,7 @@ function toPersistentDiagram(
       ? {}
       : { importedTikzStyleReferences }),
     ...(variables === undefined ? {} : { variables }),
+    ...(coordinateAnchors === undefined ? {} : { coordinateAnchors }),
     strata: cleanedDiagram.strata,
     labels: cleanedDiagram.labels,
     ...(pathCrossings === undefined ? {} : { pathCrossings }),
@@ -831,6 +877,10 @@ function normalizeLoadedDiagram(
       ? normalizeLoadedVariablesStructurally(savedDiagram.variables)
       : normalizeLoadedVariables(savedDiagram.variables)
   warnings.push(...variableNormalization.warnings)
+  const coordinateAnchorNormalization = normalizeLoadedCoordinateAnchors(
+    savedDiagram.coordinateAnchors,
+  )
+  warnings.push(...coordinateAnchorNormalization.warnings)
   const strata = normalizeLoadedStrata(savedDiagram.strata)
 
   const styleMetadataErrors = [
@@ -838,6 +888,7 @@ function normalizeLoadedDiagram(
     ...referenceNormalization.errors,
     ...presetNormalization.errors,
     ...variableNormalization.errors,
+    ...coordinateAnchorNormalization.errors,
   ]
 
   if (styleMetadataErrors.length > 0) {
@@ -862,6 +913,7 @@ function normalizeLoadedDiagram(
         ...(variableNormalization.variables === undefined
           ? {}
           : { variables: variableNormalization.variables }),
+        coordinateAnchors: coordinateAnchorNormalization.coordinateAnchors,
         strata,
         labels: savedDiagram.labels as TextLabel[],
       },
@@ -893,6 +945,7 @@ function normalizeLoadedDiagram(
     ...(variableNormalization.variables === undefined
       ? {}
       : { variables: variableNormalization.variables }),
+    coordinateAnchors: coordinateAnchorNormalization.coordinateAnchors,
     strata,
     labels: savedDiagram.labels as TextLabel[],
   }
@@ -978,6 +1031,102 @@ function normalizeLoadedStratum(stratum: unknown): unknown {
   }
 }
 
+function normalizeLoadedCoordinateAnchors(savedAnchors: unknown): {
+  coordinateAnchors: CoordinateAnchor[]
+  warnings: string[]
+  errors: string[]
+} {
+  if (savedAnchors === undefined) {
+    return {
+      coordinateAnchors: [],
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  if (!Array.isArray(savedAnchors)) {
+    return {
+      coordinateAnchors: [],
+      warnings: [],
+      errors: ['coordinateAnchors Coordinate anchors must be an array.'],
+    }
+  }
+
+  const warnings: string[] = []
+  const errors: string[] = []
+  const usedTikzNames: string[] = []
+  const coordinateAnchors = savedAnchors.map((savedAnchor, index) => {
+    const path = `coordinateAnchors[${index}]`
+
+    if (!isRecord(savedAnchor)) {
+      errors.push(`${path} Coordinate anchor must be an object.`)
+      return {
+        id: '',
+        name: normalizeCoordinateAnchorName(''),
+        tikzName: uniqueCoordinateAnchorTikzName(
+          sanitizeCoordinateAnchorTikzName(''),
+          usedTikzNames,
+        ),
+        position: undefined as unknown as CoordinateAnchor['position'],
+      }
+    }
+
+    if ('layer' in savedAnchor) {
+      errors.push(`${path}.layer Coordinate anchors are global and must not have a layer.`)
+    }
+
+    const rawName = typeof savedAnchor.name === 'string' ? savedAnchor.name : ''
+    const name = normalizeCoordinateAnchorName(rawName)
+
+    if (rawName.trim() !== name) {
+      warnings.push(`${path}.name was normalized to "${name}".`)
+    }
+
+    const rawTikzName =
+      typeof savedAnchor.tikzName === 'string' &&
+      savedAnchor.tikzName.trim().length > 0
+        ? savedAnchor.tikzName
+        : name
+    const sanitizedTikzName = sanitizeCoordinateAnchorTikzName(rawTikzName)
+    const tikzName = uniqueCoordinateAnchorTikzName(
+      sanitizedTikzName,
+      usedTikzNames,
+    )
+
+    if (tikzName !== rawTikzName) {
+      warnings.push(`${path}.tikzName was normalized to "${tikzName}".`)
+    }
+
+    usedTikzNames.push(tikzName)
+
+    const id = typeof savedAnchor.id === 'string' ? savedAnchor.id : ''
+    const locked =
+      savedAnchor.locked === undefined
+        ? undefined
+        : typeof savedAnchor.locked === 'boolean'
+          ? savedAnchor.locked
+          : null
+
+    if (locked === null) {
+      errors.push(`${path}.locked Coordinate anchor locked flag must be boolean.`)
+    }
+
+    return {
+      id,
+      name,
+      tikzName,
+      position: savedAnchor.position as CoordinateAnchor['position'],
+      ...(locked === undefined || locked === null ? {} : { locked }),
+    }
+  })
+
+  return {
+    coordinateAnchors,
+    warnings,
+    errors,
+  }
+}
+
 function refreshLoadedSymbolicCoordinatePreviews(diagram: Diagram): {
   diagram: Diagram
   warnings: string[]
@@ -1012,6 +1161,8 @@ function refreshLoadedSymbolicCoordinatePreviews(diagram: Diagram): {
       JSON.stringify(cleanedRefreshedDiagram.strata) ||
     JSON.stringify(diagram.labels) !==
       JSON.stringify(cleanedRefreshedDiagram.labels) ||
+    JSON.stringify(diagram.coordinateAnchors) !==
+      JSON.stringify(cleanedRefreshedDiagram.coordinateAnchors) ||
     JSON.stringify(diagram.pathCrossings) !==
       JSON.stringify(cleanedRefreshedDiagram.pathCrossings)
 
@@ -2200,7 +2351,10 @@ function isDiagramLike(value: unknown): value is SavedDiagramInput {
     Array.isArray(value.strata) &&
     value.strata.every(isRecord) &&
     Array.isArray(value.labels) &&
-    value.labels.every(isRecord)
+    value.labels.every(isRecord) &&
+    (value.coordinateAnchors === undefined ||
+      (Array.isArray(value.coordinateAnchors) &&
+        value.coordinateAnchors.every(isRecord)))
   )
 }
 
