@@ -12,6 +12,10 @@ import {
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import { createGridStratum } from '../model/constructors.ts'
 import {
+  createCoordinateAnchor,
+  symbolicVec3FromVec3,
+} from '../model/coordinateAnchors.ts'
+import {
   isFiniteVec3,
   projectPointToWorkPlaneCoordinates,
   pointOnWorkPlane,
@@ -70,6 +74,7 @@ import type {
   AmbientDimension,
   ArcDirection,
   CoordinateComponent,
+  CoordinateAnchorPosition,
   CubicBezierPolarControl,
   CubicBezierControlMode,
   CubicBezierPathSegment,
@@ -221,6 +226,24 @@ export function removeSelectedElement(
     }
   }
 
+  if (selectedElement.kind === 'coordinate') {
+    let removed = false
+    const coordinateAnchors = (diagram.coordinateAnchors ?? []).filter((anchor) => {
+      if (!removed && anchor.id === selectedElement.id) {
+        removed = true
+        return false
+      }
+
+      return true
+    })
+
+    return {
+      diagram: removed ? { ...diagram, coordinateAnchors } : diagram,
+      selectedElement: null,
+      removed,
+    }
+  }
+
   let removed = false
   const labels = diagram.labels.filter((label) => {
     if (!removed && label.id === selectedElement.id) {
@@ -322,6 +345,17 @@ export type AddPointStratumOptions = {
   layer?: number
 }
 
+export type AddCoordinateAnchorOptions = {
+  id?: string
+  name?: string
+  tikzName?: string
+}
+
+export type AddCoordinateAnchorFromCursorOptions =
+  AddCoordinateAnchorOptions & {
+    workPlane?: WorkPlane
+  }
+
 export type AddTextLabelOptions = {
   id?: string
   name?: string
@@ -394,6 +428,11 @@ export type CurvedSheetCreationParameters =
 export type CurvedSheetCreationKind = CurvedSheetCreationParameters['kind']
 
 export type AddPointStratumResult = {
+  diagram: Diagram
+  id: string
+}
+
+export type AddCoordinateAnchorResult = {
   diagram: Diagram
   id: string
 }
@@ -582,6 +621,17 @@ export type DirectPointCreationResult =
       diagram: Diagram
     }
 
+export type DirectCoordinateAnchorCreationResult =
+  | {
+      ok: true
+      diagram: Diagram
+      id: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+    }
+
 export type DirectLabelCreationResult =
   | {
       ok: true
@@ -648,6 +698,7 @@ export function makeUniqueId(diagram: Diagram, prefix: string): string {
   const existingIds = new Set([
     ...diagram.strata.map((stratum) => stratum.id),
     ...diagram.labels.map((label) => label.id),
+    ...(diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
   ])
   let index = 1
 
@@ -707,6 +758,39 @@ export function addPointStratumWithResult(
     },
     id: point.id,
   }
+}
+
+export function addCoordinateAnchorWithResult(
+  diagram: Diagram,
+  position: CoordinateAnchorPosition,
+  options: AddCoordinateAnchorOptions = {},
+): AddCoordinateAnchorResult {
+  const anchor = createCoordinateAnchor(diagram, {
+    id: options.id ?? makeUniqueId(diagram, 'coordinate'),
+    name: options.name ?? 'Coordinate',
+    position,
+    ...(options.tikzName === undefined ? {} : { tikzName: options.tikzName }),
+  })
+
+  return {
+    diagram: {
+      ...diagram,
+      coordinateAnchors: [...(diagram.coordinateAnchors ?? []), anchor],
+    },
+    id: anchor.id,
+  }
+}
+
+export function addCoordinateAnchorFromCursorPoint(
+  diagram: Diagram,
+  point: Vec3,
+  options: AddCoordinateAnchorFromCursorOptions = {},
+): AddCoordinateAnchorResult {
+  return addCoordinateAnchorWithResult(
+    diagram,
+    coordinateAnchorPositionFromCursorPoint(diagram, point, options.workPlane),
+    options,
+  )
 }
 
 export function addTextLabel(
@@ -1097,6 +1181,33 @@ export function addPointStratumFromDirectInput(
   }
 
   const result = addPointStratumWithResult(diagram, position, options)
+
+  return {
+    ok: true,
+    diagram: result.diagram,
+    id: result.id,
+  }
+}
+
+export function addCoordinateAnchorFromDirectInput(
+  diagram: Diagram,
+  coordinates: DirectCoordinateInput,
+  options: AddCoordinateAnchorOptions & DirectCoordinateParseOptions = {},
+): DirectCoordinateAnchorCreationResult {
+  const position = parseDirectCoordinateAnchorPosition(
+    coordinates,
+    diagram,
+    options,
+  )
+
+  if (position === null) {
+    return {
+      ok: false,
+      diagram,
+    }
+  }
+
+  const result = addCoordinateAnchorWithResult(diagram, position, options)
 
   return {
     ok: true,
@@ -2711,6 +2822,10 @@ export function updateSelectedElement(
       : updateStratumById(diagram, selectedElement.id, updaters.stratum)
   }
 
+  if (selectedElement.kind === 'coordinate') {
+    return diagram
+  }
+
   return updaters.label === undefined
     ? diagram
     : updateLabelById(diagram, selectedElement.id, updaters.label)
@@ -2818,6 +2933,76 @@ export function workPlaneLocalCoordinateAxisLabel(
   axis: WorkPlaneLocalCoordinateAxis,
 ): string {
   return axis === 'a' ? 'Plane x / a' : 'Plane y / b'
+}
+
+export function coordinateAnchorPositionFromCursorPoint(
+  diagram: Diagram,
+  point: Vec3,
+  workPlane?: WorkPlane,
+): CoordinateAnchorPosition {
+  const normalizedPoint = normalizePointForAmbientDimension(
+    diagram.ambientDimension,
+    point,
+  )
+
+  if (diagram.ambientDimension === 3 && workPlane !== undefined) {
+    const localPosition = workPlaneLocalCoordinateAnchorPositionFromPoint(
+      normalizedPoint,
+      workPlane,
+    )
+
+    if (localPosition !== null) {
+      return localPosition
+    }
+  }
+
+  return {
+    kind: 'global',
+    value: symbolicVec3FromVec3(normalizedPoint),
+  }
+}
+
+export function parseDirectCoordinateAnchorPosition(
+  coordinates: DirectCoordinateInput,
+  diagram: Diagram,
+  options: DirectCoordinateParseOptions = {},
+): CoordinateAnchorPosition | null {
+  const parseOptions = directCoordinateParseOptionsForDiagram(diagram, options)
+  const coordinateMode = effectiveCoordinateModeForAmbientDimension(
+    diagram.ambientDimension,
+    parseOptions.coordinateMode,
+  )
+  const point = parseDirectCoordinateInputWithCoordinateSource(
+    coordinates,
+    diagram.ambientDimension,
+    parseOptions,
+  )
+
+  if (point === null || !isFiniteVec3(point)) {
+    return null
+  }
+
+  if (coordinateMode === 'workPlaneLocal') {
+    const source = point.symbolic?.source
+
+    if (source?.kind !== 'workPlaneLocal') {
+      return null
+    }
+
+    return {
+      kind: 'workPlaneLocal',
+      frame: source.frame,
+      local: source.local,
+      preview: normalizePointForAmbientDimension(3, point),
+    }
+  }
+
+  return {
+    kind: 'global',
+    value: symbolicVec3FromVec3(
+      normalizePointForAmbientDimension(diagram.ambientDimension, point),
+    ),
+  }
 }
 
 export function parseDirectCoordinateInputWithCoordinateSource(
@@ -2983,6 +3168,37 @@ function parseWorkPlaneLocalCoordinateInput(
   }
 }
 
+function workPlaneLocalCoordinateAnchorPositionFromPoint(
+  point: Vec3,
+  workPlane: WorkPlane,
+): Extract<CoordinateAnchorPosition, { kind: 'workPlaneLocal' }> | null {
+  const frame = workPlaneFrameSnapshotFromWorkPlane(workPlane)
+
+  if (frame === null) {
+    return null
+  }
+
+  try {
+    const local = projectPointToWorkPlaneCoordinates(point, workPlane)
+
+    if (!Number.isFinite(local.a) || !Number.isFinite(local.b)) {
+      return null
+    }
+
+    return {
+      kind: 'workPlaneLocal',
+      frame,
+      local: {
+        a: { kind: 'numeric', value: local.a },
+        b: { kind: 'numeric', value: local.b },
+      },
+      preview: normalizePointForAmbientDimension(3, point),
+    }
+  } catch {
+    return null
+  }
+}
+
 function parseWorkPlaneLocalCoordinateInputWithSource(
   coordinates: DirectCoordinateInput,
   options: DirectCoordinateParseOptions,
@@ -3007,6 +3223,13 @@ function parseWorkPlaneLocalCoordinateInputWithSource(
     3,
     coordinateExpressionContextForOptions(options),
   )
+}
+
+function effectiveCoordinateModeForAmbientDimension(
+  ambientDimension: AmbientDimension,
+  coordinateMode: DirectCoordinateMode | undefined,
+): DirectCoordinateMode {
+  return ambientDimension === 3 ? (coordinateMode ?? 'global') : 'global'
 }
 
 function parseWorkPlaneLocalOffsetInput(

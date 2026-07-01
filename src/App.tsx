@@ -103,6 +103,8 @@ import {
   type BoundaryPathHighlight,
 } from './rendering'
 import {
+  addCoordinateAnchorFromCursorPoint,
+  addCoordinateAnchorFromDirectInput,
   addConcatenatedPathStratumWithResult,
   addArcPathFromDirectInput,
   addCirclePathFromDirectInput,
@@ -353,6 +355,7 @@ type SymbolicImportVariableDraft = {
 }
 type CreationTool = WorkPlanePreviewTool
 type DirectCreationTool =
+  | 'createCoordinate'
   | 'createPoint'
   | 'createLabel'
   | 'createPolyline'
@@ -609,6 +612,8 @@ function App() {
   const [directCoordinates, setDirectCoordinates] = useState<DirectCoordinateInput>(
     defaultDirectCoordinates,
   )
+  const [directCoordinateAnchorName, setDirectCoordinateAnchorName] =
+    useState<string>('Coordinate')
   const [directCoordinateMode, setDirectCoordinateMode] =
     useState<DirectCoordinateMode>('global')
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
@@ -2739,7 +2744,7 @@ function App() {
       return
     }
 
-    applyCursorCreationPoint(modelPoint)
+    applyCursorCreationPoint(modelPoint, placementWorkPlane)
   }
 
   function handleExistingPointSourceCreationClick(pointId: string): void {
@@ -2802,7 +2807,7 @@ function App() {
       return
     }
 
-    applyCursorCreationPoint(sourceResult.point)
+    applyCursorCreationPoint(sourceResult.point, placementWorkPlane)
     setCursorCreationSourceStatus(
       `Copied ${formatExistingCoordinateSourceLabel(
         editableDiagram,
@@ -2812,7 +2817,10 @@ function App() {
     )
   }
 
-  function applyCursorCreationPoint(modelPoint: Vec3): void {
+  function applyCursorCreationPoint(
+    modelPoint: Vec3,
+    placementWorkPlane: WorkPlane = activeWorkPlane,
+  ): void {
     const activeCreationTool = creationTool
 
     switch (activeCreationTool) {
@@ -2820,6 +2828,27 @@ function App() {
         return
       case 'createGrid':
         setDirectCreationStatus('Use the direct input panel to create a grid.')
+        return
+      case 'createCoordinate':
+        setEditorState((current) => {
+          const result = addCoordinateAnchorFromCursorPoint(
+            current.editableDiagram,
+            modelPoint,
+            { workPlane: placementWorkPlane },
+          )
+
+          return commitDiagramChange(current, {
+            ...current,
+            editableDiagram: result.diagram,
+            selectedElement: { kind: 'coordinate', id: result.id },
+            polylineDraft: null,
+            cubicBezierDraft: null,
+            pathDraft: null,
+            sheetPolygonDraft: null,
+          })
+        })
+        setDirectCreationStatus('Coordinate created.')
+        setCopyStatus('idle')
         return
       case 'createPath': {
         const result =
@@ -3085,6 +3114,7 @@ function App() {
         setSheetStatus(message)
         break
       case 'createPoint':
+      case 'createCoordinate':
       case 'createLabel':
       case 'createGrid':
       case 'select':
@@ -3120,6 +3150,10 @@ function App() {
         }
       }
 
+      if (selected.kind === 'coordinate') {
+        return current
+      }
+
       if (
         !isLayerSelectableByLayerFilter(
           current.editableDiagram,
@@ -3132,7 +3166,7 @@ function App() {
 
       let modelPoint: Vec3
       const handleWorkPlane =
-        selected.element.geometricKind === 'label'
+        selected.kind === 'label'
           ? activeWorkPlane
           : geometryHandleWorkPlaneForTarget(target, selected.element) ??
             activeWorkPlane
@@ -3623,6 +3657,27 @@ function App() {
       return
     }
 
+    if (creationTool === 'createCoordinate') {
+      const result = addCoordinateAnchorFromDirectInput(
+        editableDiagram,
+        directCoordinates,
+        directCreationCoordinateOptions({
+          name: directCoordinateAnchorName,
+          diagram: editableDiagram,
+        }),
+      )
+
+      if (!result.ok) {
+        setDirectCreationStatus('Coordinates must be valid finite expressions.')
+        return
+      }
+
+      commitCreatedCoordinate(result.diagram, result.id)
+      setDirectCreationStatus('Coordinate created.')
+      setCopyStatus('idle')
+      return
+    }
+
     const directLayer = parseNewElementLayer(setDirectCreationStatus)
 
     if (directLayer === null) {
@@ -4023,6 +4078,21 @@ function App() {
         current,
         applyCreatedElementToEditorState(current, diagram, selection, layer),
       ),
+    )
+  }
+
+  function commitCreatedCoordinate(diagram: Diagram, coordinateId: string): void {
+    setEditorState((current) =>
+      commitDiagramChange(current, {
+        ...current,
+        editableDiagram: diagram,
+        selectedElement: { kind: 'coordinate', id: coordinateId },
+        layerFilter: current.layerFilter,
+        polylineDraft: null,
+        cubicBezierDraft: null,
+        pathDraft: null,
+        sheetPolygonDraft: null,
+      }),
     )
   }
 
@@ -5740,7 +5810,9 @@ function App() {
   function renderDirectPointLikeCoordinatePreview() {
     if (
       editableDiagram.ambientDimension !== 3 ||
-      (creationTool !== 'createPoint' && creationTool !== 'createLabel') ||
+      (creationTool !== 'createCoordinate' &&
+        creationTool !== 'createPoint' &&
+        creationTool !== 'createLabel') ||
       effectiveDirectCoordinateMode(
         editableDiagram.ambientDimension,
         directCoordinateMode,
@@ -5816,6 +5888,20 @@ function App() {
               </select>
             </label>
           )}
+        {creationTool === 'createCoordinate' && (
+          <label className="direct-create-field direct-create-text">
+            <span>Name</span>
+            <input
+              className="toolbar-text-input"
+              type="text"
+              value={directCoordinateAnchorName}
+              onChange={(event) => {
+                setDirectCoordinateAnchorName(event.currentTarget.value)
+                setDirectCreationStatus('')
+              }}
+            />
+          </label>
+        )}
         {creationTool === 'createLabel' && (
           <label className="direct-create-field direct-create-text">
             <span>Text</span>
@@ -5830,7 +5916,8 @@ function App() {
             />
           </label>
         )}
-        {(creationTool === 'createPoint' ||
+        {(creationTool === 'createCoordinate' ||
+          creationTool === 'createPoint' ||
           creationTool === 'createLabel' ||
           (creationTool === 'createSheet' &&
             isAnchorCurvedSheetCreationKind(sheetCreationKind))) &&
@@ -6394,6 +6481,7 @@ function App() {
     if (tool.menu === 'direct') {
       const palette = tool.palette
       const directTool =
+        tool.id === 'createCoordinate' ||
         tool.id === 'createPoint' ||
         tool.id === 'createLabel' ||
         tool.id === 'createGrid'
@@ -6771,7 +6859,9 @@ function App() {
 
     if (
       directCreationStatus !== '' &&
-      (creationTool === 'createPoint' || creationTool === 'createLabel')
+      (creationTool === 'createCoordinate' ||
+        creationTool === 'createPoint' ||
+        creationTool === 'createLabel')
     ) {
       return (
         <div
@@ -8284,6 +8374,7 @@ function geometryHandleWorkPlaneForTarget(
 
 function isDirectCreationTool(tool: CreationTool): tool is DirectCreationTool {
   return (
+    tool === 'createCoordinate' ||
     tool === 'createPoint' ||
     tool === 'createLabel' ||
     tool === 'createPolyline' ||
@@ -8316,6 +8407,8 @@ function usesDirectCoordinateRows(
 
 function directCreationTitle(tool: DirectCreationTool): string {
   switch (tool) {
+    case 'createCoordinate':
+      return 'Coordinate'
     case 'createPoint':
       return 'Point'
     case 'createLabel':

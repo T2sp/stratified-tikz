@@ -101,6 +101,7 @@ test('custom work plane guide is not exported to TikZ', () => {
 
 const allPreviewTools: WorkPlanePreviewTool[] = [
   'select',
+  'createCoordinate',
   'createPoint',
   'createLabel',
   'createPolyline',

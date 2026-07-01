@@ -179,6 +179,11 @@ export type BulkOperationEditorState = UndoableEditorState & {
   layerOperationStatus: string
 }
 
+type LayerBoundSelectedDiagramElement = Extract<
+  SelectedDiagramElement,
+  { kind: 'stratum' | 'label' }
+>
+
 const midArrowEnabledModes = ['off', 'on'] as const
 
 export function createBulkStyleEditorModel(
@@ -621,6 +626,7 @@ export function removeSelectedElements(
   let removedCurve = false
   let removedStrata = 0
   let removedLabels = 0
+  let removedCoordinates = 0
   const strata = diagram.strata.filter((stratum) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'stratum', id: stratum.id }),
@@ -644,7 +650,19 @@ export function removeSelectedElements(
     removedLabels += 1
     return false
   })
-  const removedCount = removedStrata + removedLabels
+  const coordinateAnchors = (diagram.coordinateAnchors ?? []).filter((anchor) => {
+    const selected = selectedKeys.has(
+      selectedElementKey({ kind: 'coordinate', id: anchor.id }),
+    )
+
+    if (!selected) {
+      return true
+    }
+
+    removedCoordinates += 1
+    return false
+  })
+  const removedCount = removedStrata + removedLabels + removedCoordinates
 
   if (removedCount === 0) {
     return {
@@ -657,6 +675,7 @@ export function removeSelectedElements(
 
   const nextDiagram = {
     ...diagram,
+    coordinateAnchors,
     strata,
     labels,
   }
@@ -1373,9 +1392,9 @@ function clearStyleReferences<
 function existingSelectedElements(
   diagram: Diagram,
   selection: SelectedElement,
-): SelectedDiagramElement[] {
+): LayerBoundSelectedDiagramElement[] {
   const seen = new Set<string>()
-  const elements: SelectedDiagramElement[] = []
+  const elements: LayerBoundSelectedDiagramElement[] = []
   const strataById = new Map(
     diagram.strata.map((stratum) => [stratum.id, stratum]),
   )
@@ -1398,6 +1417,10 @@ function existingSelectedElements(
       if (element !== undefined) {
         elements.push({ kind: 'stratum', element })
       }
+      continue
+    }
+
+    if (selectedElement.kind !== 'label') {
       continue
     }
 

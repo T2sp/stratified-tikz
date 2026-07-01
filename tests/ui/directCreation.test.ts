@@ -10,6 +10,7 @@ import type {
   BoundaryPathSnapshot,
   CoonsBoundarySnapshot,
   ConcatenatedPathStratum,
+  CoordinateAnchor,
   CurvedSheetStratum,
   CurveStratum,
   Diagram,
@@ -30,6 +31,7 @@ import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addArcPathFromDirectInput,
+  addCoordinateAnchorFromDirectInput,
   addCirclePathFromDirectInput,
   addConcatenatedPathFromDirectInput,
   addCurvedSheetStratumWithResult,
@@ -164,6 +166,112 @@ test('direct point creation uses the New layer when View targets another layer',
   assert.deepEqual(committed.selectedElement, { kind: 'stratum', id: result.id })
   assert.deepEqual(committed.layerFilter, { kind: 'layer', layer: 0 })
   assert.match(generateTikz(committed.editableDiagram), /stratifiedLayer0/)
+})
+
+test('direct global coordinate creation supports symbolic expression', () => {
+  const result = addCoordinateAnchorFromDirectInput(
+    createSymbolicThreeDimensionalDiagram(),
+    { x: 'R + 0.25', y: '1', z: '2' },
+    { id: 'coord-symbolic', name: 'A', diagram: createSymbolicThreeDimensionalDiagram() },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct coordinate creation to succeed.')
+  }
+
+  const anchor = findCoordinateAnchor(result.diagram, result.id)
+
+  assert.equal(result.diagram.strata.some((stratum) => stratum.id === result.id), false)
+  assert.equal(anchor.position.kind, 'global')
+  if (anchor.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor position.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'symbolic')
+  assert.equal(anchor.position.value.x.kind === 'symbolic' ? anchor.position.value.x.expression : '', 'R + 0.25')
+  assert.equal(anchor.position.value.x.kind === 'symbolic' ? anchor.position.value.x.previewValue : 0, 10.25)
+  const tikz = generateTikz(result.diagram)
+  assert.match(tikz, /\\coordinate \(A\) at /)
+  assert.match(tikz, /\\R/)
+})
+
+test('direct work-plane-local coordinate creation stores frame snapshot and local expressions', () => {
+  const diagram = createSymbolicThreeDimensionalDiagram()
+  const workPlane: WorkPlane = { kind: 'xz', y: 3 }
+  const result = addCoordinateAnchorFromDirectInput(
+    diagram,
+    { x: 'R - 8', y: '1.5', z: '0' },
+    {
+      id: 'coord-local',
+      name: 'Local anchor',
+      coordinateMode: 'workPlaneLocal',
+      workPlane,
+      diagram,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct local coordinate creation to succeed.')
+  }
+
+  const anchor = findCoordinateAnchor(result.diagram, result.id)
+
+  assert.equal(anchor.position.kind, 'workPlaneLocal')
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate anchor position.')
+  }
+  assert.deepEqual(anchor.position.frame.origin, { x: 0, y: 3, z: 0 })
+  assert.equal(anchor.position.local.a.kind, 'symbolic')
+  assert.equal(
+    anchor.position.local.a.kind === 'symbolic'
+      ? anchor.position.local.a.expression
+      : '',
+    'R - 8',
+  )
+  assert.deepEqual(globalPreview(anchor.position.preview), { x: 2, y: 3, z: 1.5 })
+})
+
+test('created coordinate has unique TikZ name and is selected without changing layer view', () => {
+  const initialState = createTestEditorState(twoDimensionalExample, {
+    kind: 'layer',
+    layer: 1,
+  })
+  const first = addCoordinateAnchorFromDirectInput(
+    initialState.editableDiagram,
+    { x: '0', y: '0', z: '9' },
+    { id: 'coord-a', name: 'A' },
+  )
+
+  assert.equal(first.ok, true)
+  if (!first.ok) {
+    throw new Error('Expected first coordinate creation to succeed.')
+  }
+
+  const second = addCoordinateAnchorFromDirectInput(
+    first.diagram,
+    { x: '1', y: '1', z: '9' },
+    { id: 'coord-b', name: 'A' },
+  )
+
+  assert.equal(second.ok, true)
+  if (!second.ok) {
+    throw new Error('Expected second coordinate creation to succeed.')
+  }
+
+  const committed = commitCoordinateCreationToTestState(initialState, second)
+  const firstAnchor = findCoordinateAnchor(second.diagram, first.id)
+  const secondAnchor = findCoordinateAnchor(second.diagram, second.id)
+
+  assert.equal(firstAnchor.tikzName, 'A')
+  assert.equal(secondAnchor.tikzName, 'A2')
+  assert.deepEqual(committed.selectedElement, {
+    kind: 'coordinate',
+    id: second.id,
+  })
+  assert.deepEqual(committed.layerFilter, initialState.layerFilter)
+  assert.equal(committed.draftMarker, initialState.draftMarker)
+  assert.match(generateTikz(committed.editableDiagram), /\\coordinate \(A2\) at \(1,1\);/)
 })
 
 test('global direct point coordinates accept scientific notation', () => {
@@ -3754,6 +3862,18 @@ function findLabel(diagram: Diagram, id: string): TextLabel {
   return label
 }
 
+function findCoordinateAnchor(diagram: Diagram, id: string): CoordinateAnchor {
+  const anchor = (diagram.coordinateAnchors ?? []).find(
+    (candidate) => candidate.id === id,
+  )
+
+  if (anchor === undefined) {
+    throw new Error(`Coordinate anchor ${id} was not created.`)
+  }
+
+  return anchor
+}
+
 function assertVec3ApproximatelyEqual(
   actual: Vec3,
   expected: Vec3,
@@ -3904,4 +4024,15 @@ function commitDirectCreationToTestState(
       state.layerFilter,
     ),
   )
+}
+
+function commitCoordinateCreationToTestState(
+  state: TestEditorState,
+  result: { diagram: Diagram; id: string },
+): TestEditorState {
+  return {
+    ...state,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'coordinate', id: result.id },
+  }
 }

@@ -4,6 +4,7 @@ import type { AmbientDimension, Vec3, WorkPlane } from '../model/types'
 
 export type WorkPlanePreviewTool =
   | 'select'
+  | 'createCoordinate'
   | 'createPoint'
   | 'createLabel'
   | 'createPolyline'
@@ -42,6 +43,7 @@ export function shouldShowWorkPlanePreview(
 ): boolean {
   switch (tool) {
     case 'select':
+    case 'createCoordinate':
     case 'createPoint':
     case 'createLabel':
     case 'createPolyline':

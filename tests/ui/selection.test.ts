@@ -6,6 +6,7 @@ import {
 } from '../../src/examples/index.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import { setLayerLock } from '../../src/model/layers.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   applyUserStylePresetToStratum,
   createUserStylePresetFromStyle,
@@ -180,6 +181,28 @@ function createEmptyDiagramForTest(ambientDimension: AmbientDimension): Diagram 
   }
 }
 
+function createCoordinateSelectionDiagram(): Diagram {
+  const diagram = createEmptyDiagramForTest(2)
+
+  return {
+    ...diagram,
+    coordinateAnchors: [
+      createCoordinateAnchor(diagram, {
+        id: 'coordA',
+        name: 'A',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 0 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+    ],
+  }
+}
+
 test('findSelectedElement finds a selected stratum by id', () => {
   const selected = findSelectedElement(twoDimensionalExample, {
     kind: 'stratum',
@@ -198,6 +221,27 @@ test('findSelectedElement finds a selected label by id', () => {
 
   assert.equal(selected?.kind, 'label')
   assert.equal(selected?.element.id, 'mathMorphismLabel')
+})
+
+test('findSelectedElement finds a selected coordinate anchor by id', () => {
+  const diagram = createCoordinateSelectionDiagram()
+  const selected = findSelectedElement(diagram, {
+    kind: 'coordinate',
+    id: 'coordA',
+  })
+
+  assert.equal(selected?.kind, 'coordinate')
+  assert.equal(selected?.element.id, 'coordA')
+})
+
+test('coordinate selection is not cleared by layer filter', () => {
+  const diagram = createCoordinateSelectionDiagram()
+  const selection: SelectedElement = { kind: 'coordinate', id: 'coordA' }
+
+  assert.deepEqual(
+    clearSelectionForLayerFilter(diagram, selection, { kind: 'layer', layer: 99 }),
+    selection,
+  )
 })
 
 test('clearSelectionIfMissing clears selection when switching diagrams', () => {

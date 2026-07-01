@@ -8,6 +8,7 @@ import type { WorkPlanePreviewTool } from './workPlanePreview.ts'
 export type PreviewToolbarState = 'expanded' | 'collapsed'
 
 export type PreviewToolbarPaletteId =
+  | 'addCoordinate'
   | 'addPoint'
   | 'addLabel'
   | 'addPath'
@@ -88,6 +89,7 @@ export function activeToolSupportsCursorCreation(
   tool: WorkPlanePreviewTool,
 ): boolean {
   switch (tool) {
+    case 'createCoordinate':
     case 'createPoint':
     case 'createLabel':
     case 'createPolyline':
@@ -134,6 +136,12 @@ export function previewToolbarTopTools(
 ): PreviewToolbarTopTool[] {
   return [
     { id: 'select', label: 'Select', menu: 'none', palette: null },
+    {
+      id: 'createCoordinate',
+      label: 'Add coordinate',
+      menu: 'direct',
+      palette: 'addCoordinate',
+    },
     {
       id: 'createPoint',
       label: 'Add point',
