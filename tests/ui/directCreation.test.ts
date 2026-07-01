@@ -2953,6 +2953,56 @@ test('existing point coordinate source copies the current point position', () =>
   })
 })
 
+test('existing coordinate anchor source creates direct coordinate references', () => {
+  const anchorResult = addCoordinateAnchorFromDirectInput(
+    emptyTwoDimensionalDiagram,
+    { x: '4', y: '5', z: '0' },
+    { id: 'coord-a', name: 'A' },
+  )
+
+  assert.equal(anchorResult.ok, true)
+  if (!anchorResult.ok) {
+    throw new Error('Expected coordinate anchor creation to succeed.')
+  }
+
+  const source: ExistingCoordinateSource = {
+    kind: 'coordinateAnchor',
+    coordinateId: 'coord-a',
+  }
+  const options = createExistingCoordinateSourceOptions(anchorResult.diagram)
+  const resolved = resolveExistingCoordinateSource(anchorResult.diagram, source)
+  const pathResult = addPolylineCurveFromDirectInput(
+    anchorResult.diagram,
+    [
+      sourceInput(source),
+      { x: '6', y: '7', z: '0' },
+    ],
+    { id: 'ref-from-anchor' },
+  )
+
+  assert.equal(options[0]?.source.kind, 'coordinateAnchor')
+  assert.match(options[0]?.label ?? '', /Coordinate: A \(A\).*@ \(4, 5\)/)
+  assert.deepEqual(resolved === null ? null : globalPreview(resolved), {
+    x: 4,
+    y: 5,
+    z: 0,
+  })
+  assert.equal(pathResult.ok, true)
+  if (!pathResult.ok) {
+    throw new Error(pathResult.error)
+  }
+
+  const firstPoint = findCurve(pathResult.diagram, pathResult.id).points[0]
+  assert.deepEqual(globalPreview(firstPoint), { x: 4, y: 5, z: 0 })
+  assert.equal(firstPoint.symbolic?.source?.kind, 'coordinateRef')
+  if (firstPoint.symbolic?.source?.kind !== 'coordinateRef') {
+    throw new Error('Expected direct coordinate source to create a coordinateRef.')
+  }
+  assert.equal(firstPoint.symbolic.source.coordinateId, 'coord-a')
+  assert.match(generateTikz(pathResult.diagram), /\\coordinate \(A\) at \(4,5\);/)
+  assert.match(generateTikz(pathResult.diagram), /\(A\) -- \(curvePoly[^)]*p1\);/)
+})
+
 test('existing coordinate source labels disambiguate duplicate point names', () => {
   const firstPointResult = addPointStratumWithResult(
     emptyTwoDimensionalDiagram,

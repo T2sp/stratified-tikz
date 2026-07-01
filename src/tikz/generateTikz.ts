@@ -50,6 +50,10 @@ import {
   sanitizeCoordinateAnchorTikzName,
   workPlaneLocalCoordinateSourceFromAnchorPosition,
 } from '../model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  resolveDiagramCoordinateRefs,
+} from '../model/coordinateReferences.ts'
 import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
@@ -371,6 +375,7 @@ type GenerateContext = {
   camera3d?: OrthographicCamera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
+  coordinateAnchorNames: Map<string, string>
   variables: VariableExportContext
   userStylePresets: Map<string, UserStylePreset>
   localStyles: LocalStyleRegistry
@@ -426,6 +431,7 @@ export function generateTikz2D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
+  diagram = resolveDiagramCoordinateRefs(diagram)
   const context = createContext(
     '2d',
     options,
@@ -514,6 +520,7 @@ export function generateTikz3D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
+  diagram = resolveDiagramCoordinateRefs(diagram)
   const context = createContext(
     '3d',
     options,
@@ -657,6 +664,7 @@ function createContext(
     ...(mode === '3d' && camera3d !== undefined ? { camera3d } : {}),
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
+    coordinateAnchorNames: new Map(),
     variables: createVariableExportContext(variables),
     userStylePresets: new Map(
       (userStylePresets ?? []).map((preset) => [preset.id, preset]),
@@ -1100,6 +1108,7 @@ function emitCoordinateAnchorDefinitions(
 ): string[] {
   return anchors.flatMap((anchor) => {
     const tikzName = context.coordinates.reserve(anchor.tikzName)
+    context.coordinateAnchorNames.set(anchor.id, tikzName)
 
     return emitCoordinateAnchorDefinition(anchor, tikzName, context)
   })
@@ -1353,10 +1362,11 @@ function emitSheet(
   }
 
   const coordinates = sheetVertices(sheet).map((vertex, index) =>
-    context.coordinates.define(
+    coordinateNameForPoint(
+      vertex,
       sheetCoordinateBaseName(sheet, elementIndex),
       index,
-      vertex,
+      context,
     ),
   )
   const options = [
@@ -3668,10 +3678,11 @@ function emitTemplatePath(
     return emitTemplatePath3D(curve, options, context)
   }
 
-  const center = context.coordinates.define(
+  const center = coordinateNameForPoint(
+    curve.template.center,
     curveCoordinateBaseName(curve, elementIndex),
     0,
-    curve.template.center,
+    context,
   )
   const drawCommand = formatTemplatePathCommand(
     curve.template,
@@ -5560,10 +5571,11 @@ function emitPoint(
     return scopedLocalPoint
   }
 
-  const coordinate = context.coordinates.define(
+  const coordinate = coordinateNameForPoint(
+    point.position,
     pointCoordinateBaseName(point, elementIndex),
     0,
-    point.position,
+    context,
   )
 
   return [
@@ -6442,14 +6454,42 @@ function defineCurveCoordinates(
 
   if (usesRelativeBezierControls(curve, context.mode)) {
     return [
-      context.coordinates.define(baseName, 0, curve.points[0]),
-      context.coordinates.define(baseName, 3, curve.points[3]),
+      coordinateNameForPoint(curve.points[0], baseName, 0, context),
+      coordinateNameForPoint(curve.points[3], baseName, 3, context),
     ]
   }
 
   return curve.points.map((point, index) =>
-    context.coordinates.define(baseName, index, point),
+    coordinateNameForPoint(point, baseName, index, context),
   )
+}
+
+function coordinateNameForPoint(
+  point: Vec3,
+  baseName: string,
+  index: number,
+  context: GenerateContext,
+): string {
+  const referenceName = coordinateReferenceTikzName(point, context)
+
+  return referenceName ?? context.coordinates.define(baseName, index, point)
+}
+
+function coordinateReferenceTikzName(
+  point: Vec3,
+  context: GenerateContext | undefined,
+): string | null {
+  if (context === undefined) {
+    return null
+  }
+
+  const source = coordinateReferenceSourceForPoint(point)
+
+  if (source === null) {
+    return null
+  }
+
+  return context.coordinateAnchorNames.get(source.coordinateId) ?? null
 }
 
 function defineConcatenatedPathCoordinates(
@@ -6464,7 +6504,7 @@ function defineConcatenatedPathCoordinates(
   return path.segments.map((segment) => {
     const start =
       previousEnd ??
-      context.coordinates.define(baseName, pointIndex, segment.start)
+      coordinateNameForPoint(segment.start, baseName, pointIndex, context)
 
     if (previousEnd === null) {
       pointIndex += 1
@@ -6510,7 +6550,7 @@ function defineClosedBoundaryCoordinateNames(
   return boundary.segments.map((segment) => {
     const start =
       previousEnd ??
-      context.coordinates.define(baseName, pointIndex, segment.start)
+      coordinateNameForPoint(segment.start, baseName, pointIndex, context)
 
     if (previousEnd === null) {
       pointIndex += 1
@@ -6543,30 +6583,32 @@ function definePathSegmentCoordinateNames(
       return {
         kind: 'line',
         start,
-        end: context.coordinates.define(baseName, pointIndex, segment.end),
+        end: coordinateNameForPoint(segment.end, baseName, pointIndex, context),
       }
     case 'cubicBezier':
       return {
         kind: 'cubicBezier',
         start,
-        control1: context.coordinates.define(
+        control1: coordinateNameForPoint(
+          segment.control1,
           baseName,
           pointIndex,
-          segment.control1,
+          context,
         ),
-        control2: context.coordinates.define(
+        control2: coordinateNameForPoint(
+          segment.control2,
           baseName,
           pointIndex + 1,
-          segment.control2,
+          context,
         ),
-        end: context.coordinates.define(baseName, pointIndex + 2, segment.end),
+        end: coordinateNameForPoint(segment.end, baseName, pointIndex + 2, context),
       }
     case 'arc':
       if (context.mode === '2d') {
         return {
           kind: 'arc',
           start,
-          end: context.coordinates.define(baseName, pointIndex, segment.end),
+          end: coordinateNameForPoint(segment.end, baseName, pointIndex, context),
           radius: formatArcScalarForTikz(segment.radius, context),
           startAngleDeg: formatArcScalarForTikz(segment.startAngleDeg, context),
           endAngleDeg: formatArcScalarForTikz(segment.endAngleDeg, context),
@@ -7251,6 +7293,12 @@ function formatCoordinate(
   mode: TikzMode,
   context?: GenerateContext,
 ): string {
+  const referenceName = coordinateReferenceTikzName(point, context)
+
+  if (referenceName !== null) {
+    return `(${referenceName})`
+  }
+
   const x = formatCoordinateComponent(point, 'x', context)
   const y = formatCoordinateComponent(point, 'y', context)
 

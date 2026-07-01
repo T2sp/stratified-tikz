@@ -11,6 +11,7 @@ import {
   cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
 } from './workPlaneLocalCoordinates.ts'
+import { cloneCoordinateSource } from './coordinateReferences.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -992,7 +993,7 @@ function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
     z: cloneCoordinateComponent(symbolic.z),
     ...(symbolic.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
+      : { source: cloneCoordinateSource(symbolic.source) }),
   }
 }
 

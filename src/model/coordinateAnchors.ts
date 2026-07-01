@@ -4,6 +4,7 @@ import type {
   CoordinateAnchor,
   CoordinateAnchorPosition,
   CoordinateComponent,
+  CoordinateSource,
   Diagram,
   SymbolicVec3,
   Vec3,
@@ -210,7 +211,20 @@ function cloneSymbolicVec3(value: SymbolicVec3): SymbolicVec3 {
     z: cloneCoordinateComponent(value.z),
     ...(value.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(value.source) }),
+      : { source: cloneCoordinateSource(value.source) }),
+  }
+}
+
+function cloneCoordinateSource(source: CoordinateSource): CoordinateSource {
+  switch (source.kind) {
+    case 'workPlaneLocal':
+      return cloneWorkPlaneLocalCoordinateSource(source)
+    case 'coordinateRef':
+      return {
+        kind: 'coordinateRef',
+        coordinateId: source.coordinateId,
+        preview: cloneVec3(source.preview),
+      }
   }
 }
 

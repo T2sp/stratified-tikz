@@ -35,6 +35,9 @@ import {
   workPlaneLocalCoordinateSourceFromAnchorPosition,
 } from './coordinateAnchors.ts'
 import {
+  validateDiagramCoordinateReferences,
+} from './coordinateReferences.ts'
+import {
   validateWorkPlaneLocalCoordinateSourceForPoint,
 } from './workPlaneLocalCoordinates.ts'
 import {
@@ -207,6 +210,9 @@ export function validateDiagram(diagram: Diagram): DiagramValidationResult {
     )
   })
 
+  validateDiagramCoordinateReferences(diagram).forEach((issue) =>
+    pushError(errors, issue.path, issue.message),
+  )
   validatePathCrossingStates(diagram, 'pathCrossings', errors)
   validateUserStylePresetReferences(diagram, errors)
   validateImportedTikzStyleReferenceUsages(diagram, errors)
@@ -305,7 +311,7 @@ function validateCoordinateAnchorPosition(
       }
 
       if (anchor.position.value.source !== undefined) {
-        pushError(errors, `${anchorPath}.position.value.source`, 'Global coordinate anchors must not store work-plane-local source metadata.')
+        pushError(errors, `${anchorPath}.position.value.source`, 'Global coordinate anchors must not store coordinate source metadata.')
       }
 
       let point: Vec3
@@ -333,6 +339,9 @@ function validateCoordinateAnchorPosition(
       return
     }
     case 'workPlaneLocal':
+      if (anchor.position.preview.symbolic?.source !== undefined) {
+        pushError(errors, `${anchorPath}.position.preview.symbolic.source`, 'Coordinate anchor previews must not store coordinate source metadata.')
+      }
       validateVec3ForAmbient(
         anchor.position.preview,
         ambientDimension,

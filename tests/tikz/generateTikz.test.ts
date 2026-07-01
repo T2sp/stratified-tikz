@@ -36,6 +36,14 @@ import type {
 } from '../../src/model/types.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
+  coordinateReferenceVec3ForAnchorId,
+  resolveDiagramCoordinateRefs,
+} from '../../src/model/coordinateReferences.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
+import {
   createInitialCamera3D,
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
@@ -114,6 +122,221 @@ test('coordinate anchor names reserve the generated coordinate namespace', () =>
 
   assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(5,5\);/)
   assert.match(tikz, /\\coordinate \(curvePolyWire0p02\) at \(0,0\);/)
+})
+
+test('path endpoints can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 2, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'ref-path',
+    name: 'Referenced path',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (0,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B);')
+
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePolyReferencedPath0p0\)/)
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  expectNoBlankLines(inlineTikz)
+})
+
+test('label positions can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'label-ref',
+    name: 'Reference label',
+    text: '$F$',
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    style: defaultLabelStyle(),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(1,2\);/)
+  assert.match(tikz, /at \(A\) \{\$F\$\};/)
+  assert.doesNotMatch(tikz, /at \(1,2\) \{\$F\$\};/)
+})
+
+test('point positions can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'point-ref',
+    name: 'Reference point',
+    style: pointStyle(),
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(1,2\);/)
+  assert.match(tikz, /at \(A\) \{\};/)
+  assert.doesNotMatch(tikz, /at \(1,2\) \{\};/)
+})
+
+test('sheet vertices can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 1, y: 0, z: 0 },
+    { id: 'coord-c', name: 'C', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: 'sheet-ref',
+    name: 'Reference sheet',
+    style: sheetStyle(),
+    vertices: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+      coordinateReferencePoint(diagram, 'coord-c'),
+    ],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
+  assert.match(tikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetReferenceSheet0p0\)/)
+})
+
+test('coordinate reference previews resolve from the current anchor position', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'point-ref',
+    name: 'Reference point',
+    style: pointStyle(),
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    layer: 0,
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'label-ref',
+    name: 'Reference label',
+    text: '$F$',
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    style: defaultLabelStyle(),
+    layer: 0,
+  })
+
+  const movedDiagram: Diagram = {
+    ...diagram,
+    coordinateAnchors: [
+      {
+        ...diagram.coordinateAnchors[0],
+        position: globalAnchorPosition(7, 8, 0),
+      },
+    ],
+  }
+  const resolved = resolveDiagramCoordinateRefs(movedDiagram)
+  const point = resolved.strata.find((stratum) => stratum.id === 'point-ref')
+
+  assert.equal(validateDiagram(movedDiagram).valid, true)
+  assert.equal(point?.geometricKind, 'point')
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected point reference stratum.')
+  }
+  assert.deepEqual(point.position, coordinateReferencePoint(movedDiagram, 'coord-a'))
+  assert.deepEqual(
+    resolved.labels.find((label) => label.id === 'label-ref')?.position,
+    coordinateReferencePoint(movedDiagram, 'coord-a'),
+  )
+})
+
+test('missing coordinate references are rejected by validation', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'missing-ref',
+    name: 'Missing reference',
+    style: pointStyle(),
+    position: rawCoordinateReferencePoint('missing-coordinate', { x: 0, y: 0, z: 0 }),
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
+test('coordinate references round-trip through save and load', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+    { id: 'coord-b', name: 'B', x: 3, y: 4, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'roundtrip-path',
+    name: 'Roundtrip path',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  const loadedCurve = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'roundtrip-path',
+  )
+  assert.equal(loadedCurve?.geometricKind, 'curve')
+  assert.equal(loadedCurve?.kind, 'polyline')
+  if (loadedCurve?.geometricKind !== 'curve' || loadedCurve.kind !== 'polyline') {
+    throw new Error('Expected loaded polyline.')
+  }
+  assert.equal(requireCoordinateReferenceSource(loadedCurve.points[0]).coordinateId, 'coord-a')
+  assert.equal(requireCoordinateReferenceSource(loadedCurve.points[1]).coordinateId, 'coord-b')
 })
 
 test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {
@@ -7436,6 +7659,77 @@ function globalAnchorPosition(
       z: { kind: 'numeric', value: z },
     },
   }
+}
+
+function testCoordinateAnchors(
+  diagram: Diagram,
+  specs: readonly Array<{
+    id: string
+    name: string
+    x: number
+    y: number
+    z: number
+  }>,
+): NonNullable<Diagram['coordinateAnchors']> {
+  const coordinateAnchors: NonNullable<Diagram['coordinateAnchors']> = []
+
+  for (const spec of specs) {
+    coordinateAnchors.push(
+      createCoordinateAnchor(
+        {
+          ...diagram,
+          coordinateAnchors,
+        },
+        {
+          id: spec.id,
+          name: spec.name,
+          position: globalAnchorPosition(spec.x, spec.y, spec.z),
+        },
+      ),
+    )
+  }
+
+  return coordinateAnchors
+}
+
+function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
+}
+
+function rawCoordinateReferencePoint(
+  coordinateId: string,
+  preview: Vec3,
+): Vec3 {
+  return {
+    ...preview,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'coordinateRef',
+        coordinateId,
+        preview,
+      },
+    },
+  }
+}
+
+function requireCoordinateReferenceSource(point: Vec3) {
+  const source = point.symbolic?.source
+
+  assert.equal(source?.kind, 'coordinateRef')
+  if (source?.kind !== 'coordinateRef') {
+    throw new Error('Expected coordinate reference source.')
+  }
+
+  return source
 }
 
 function square3D(x: number, y: number, size: number, z: number): Vec3[] {

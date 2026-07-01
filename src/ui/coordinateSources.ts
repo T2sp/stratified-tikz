@@ -8,11 +8,19 @@ import {
   validateWorkPlane,
   workPlaneToBasis,
 } from '../geometry/workPlane.ts'
+import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
+import {
+  coordinateReferenceVec3ForAnchorId,
+} from '../model/coordinateReferences.ts'
 import { normalizePointForAmbientDimension } from '../geometry/projection.ts'
 import type { AmbientDimension, Diagram, Vec3, WorkPlane } from '../model/types.ts'
 import { formatVec3 } from './inspectorSummary.ts'
 
 export type ExistingCoordinateSource =
+  | {
+      kind: 'coordinateAnchor'
+      coordinateId: string
+    }
   | {
       kind: 'pointStratum'
       stratumId: string
@@ -68,6 +76,23 @@ export function resolveExistingCoordinateSource(
   source: ExistingCoordinateSource,
 ): Vec3 | null {
   switch (source.kind) {
+    case 'coordinateAnchor': {
+      const anchor = (diagram.coordinateAnchors ?? []).find(
+        (candidate) => candidate.id === source.coordinateId,
+      )
+
+      if (anchor === undefined) {
+        return null
+      }
+
+      try {
+        return cloneFiniteVec3(
+          coordinateAnchorPositionPreview(anchor.position, diagram.ambientDimension),
+        )
+      } catch {
+        return null
+      }
+    }
     case 'pointStratum': {
       const stratum = diagram.strata.find(
         (candidate) => candidate.id === source.stratumId,
@@ -120,6 +145,10 @@ export function resolveExistingCoordinateForDirectCreation(
   source: ExistingCoordinateSource,
   options: ResolveExistingCoordinateForModeOptions,
 ): Vec3 | null {
+  if (source.kind === 'coordinateAnchor') {
+    return coordinateReferenceVec3ForAnchorId(diagram, source.coordinateId)
+  }
+
   const modelPoint = resolveExistingCoordinateSource(diagram, source)
 
   if (modelPoint === null) {
@@ -210,6 +239,23 @@ export function createExistingCoordinateSourceOptions(
   diagram: Diagram,
 ): ExistingCoordinateSourceOption[] {
   const options: ExistingCoordinateSourceOption[] = []
+
+  for (const anchor of diagram.coordinateAnchors ?? []) {
+    const source: ExistingCoordinateSource = {
+      kind: 'coordinateAnchor',
+      coordinateId: anchor.id,
+    }
+
+    options.push({
+      key: existingCoordinateSourceKey(source),
+      label: formatExistingCoordinateSourceLabel(
+        diagram,
+        source,
+        diagram.ambientDimension,
+      ),
+      source,
+    })
+  }
 
   for (const stratum of diagram.strata) {
     if (stratum.geometricKind === 'point') {
@@ -303,6 +349,18 @@ export function formatExistingCoordinateSourceLabel(
 ): string {
   try {
     switch (source.kind) {
+      case 'coordinateAnchor': {
+        const anchor = (diagram.coordinateAnchors ?? []).find(
+          (candidate) => candidate.id === source.coordinateId,
+        )
+        const point = resolveExistingCoordinateSource(diagram, source)
+
+        if (anchor === undefined || point === null) {
+          return `Missing source: ${source.coordinateId}`
+        }
+
+        return `Coordinate: ${sourceObjectName(anchor.name, anchor.id)} (${anchor.tikzName}) [${shortSourceId(anchor.id)}] @ ${formatVec3(point, ambientDimension)}`
+      }
       case 'pointStratum': {
         const stratum = diagram.strata.find(
           (candidate) => candidate.id === source.stratumId,
@@ -373,6 +431,8 @@ export function existingCoordinateSourceKey(
   source: ExistingCoordinateSource,
 ): string {
   switch (source.kind) {
+    case 'coordinateAnchor':
+      return `coordinateAnchor:${source.coordinateId}`
     case 'pointStratum':
       return `pointStratum:${source.stratumId}`
     case 'polylineVertex':
@@ -467,6 +527,8 @@ function shortSourceId(id: string): string {
 
 function sourceIdForLabelFallback(source: ExistingCoordinateSource): string {
   switch (source.kind) {
+    case 'coordinateAnchor':
+      return source.coordinateId
     case 'pointStratum':
       return source.stratumId
     case 'polylineVertex':

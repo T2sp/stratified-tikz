@@ -5,7 +5,6 @@ import {
 } from './scalarExpressions.ts'
 import type { ScalarInputValue } from './scalarExpressions.ts'
 import {
-  cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
   refreshWorkPlaneLocalCoordinateSource,
   validateWorkPlaneLocalCoordinateSource,
@@ -15,6 +14,10 @@ import {
   coordinateAnchorPositionToVec3,
   symbolicVec3FromVec3,
 } from './coordinateAnchors.ts'
+import {
+  cloneCoordinateSource,
+  isCoordinateReferenceSource,
+} from './coordinateReferences.ts'
 import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
@@ -27,6 +30,7 @@ import type {
   CoonsConstantPointBoundarySnapshot,
   CoordinateAnchor,
   CoordinateComponent,
+  CoordinateSource,
   CubicBezierControlMode,
   CurvedSheetPrimitive,
   Diagram,
@@ -353,12 +357,30 @@ export function validateSymbolicVec3(
   })
 
   if (symbolic.source !== undefined) {
-    validateWorkPlaneLocalCoordinateSourceForPoint(
-      symbolic.source,
-      point,
-      `${path}.symbolic.source`,
-      context,
-    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+    if (symbolic.source.kind === 'workPlaneLocal') {
+      validateWorkPlaneLocalCoordinateSourceForPoint(
+        symbolic.source,
+        point,
+        `${path}.symbolic.source`,
+        context,
+      ).forEach((issue) => pushError(errors, issue.path, issue.message))
+      return
+    }
+
+    if (symbolic.source.kind === 'coordinateRef') {
+      validateCoordinateReferenceSourceShape(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        errors,
+      )
+      return
+    }
+
+    pushError(
+      errors,
+      `${path}.symbolic.source.kind`,
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
+    )
   }
 }
 
@@ -405,6 +427,48 @@ export function validateDiagramSymbolicCoordinateMetadata(
   }
 
   return errors
+}
+
+function validateCoordinateReferenceSourceShape(
+  source: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(source)) {
+    pushError(errors, path, 'Coordinate reference source must be an object.')
+    return
+  }
+
+  if (source.kind !== 'coordinateRef') {
+    pushError(errors, `${path}.kind`, 'Coordinate reference source kind must be coordinateRef.')
+    return
+  }
+
+  if (
+    typeof source.coordinateId !== 'string' ||
+    source.coordinateId.trim().length === 0
+  ) {
+    pushError(errors, `${path}.coordinateId`, 'Coordinate reference id must be non-empty.')
+  }
+
+  const preview = source.preview
+
+  if (!isRecord(preview)) {
+    pushError(errors, `${path}.preview`, 'Coordinate reference preview must be an object.')
+    return
+  }
+
+  coordinateAxes.forEach((axis) => {
+    const value = preview[axis]
+
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      pushError(
+        errors,
+        `${path}.preview.${axis}`,
+        'Coordinate reference preview components must be finite numbers.',
+      )
+    }
+  })
 }
 
 export function collectDiagramSupportedSymbolicExpressionSources(
@@ -682,7 +746,7 @@ function collectCoordinateAnchorSupportedSymbolicExpressionSources(
     return
   }
 
-  collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+  collectCoordinateSourceSupportedSymbolicExpressionSources(
     anchor.position,
     `${path}.position`,
     inspection,
@@ -712,7 +776,7 @@ function collectGlobalCoordinateAnchorValueSupportedSymbolicExpressionSources(
     pushError(
       inspection.errors,
       `${path}.source`,
-      'Global coordinate anchors must not store work-plane-local source metadata.',
+      'Global coordinate anchors must not store coordinate source metadata.',
     )
   }
 
@@ -1142,7 +1206,7 @@ function collectVec3SupportedSymbolicExpressionSources(
   })
 
   if (symbolic.source !== undefined) {
-    collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+    collectCoordinateSourceSupportedSymbolicExpressionSources(
       symbolic.source,
       `${path}.symbolic.source`,
       inspection,
@@ -1181,7 +1245,7 @@ function collectCoordinateComponentSupportedSymbolicExpressionSources(
   )
 }
 
-function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+function collectCoordinateSourceSupportedSymbolicExpressionSources(
   source: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
@@ -1191,11 +1255,16 @@ function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
     return
   }
 
+  if (source.kind === 'coordinateRef') {
+    markSupportedSymbolicObject(source, inspection)
+    return
+  }
+
   if (source.kind !== 'workPlaneLocal') {
     pushError(
       inspection.errors,
       `${path}.kind`,
-      'Coordinate source kind must be workPlaneLocal.',
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
     )
     return
   }
@@ -1325,6 +1394,11 @@ function findUnsupportedSymbolicCoordinateSources(
       path,
       'Unsupported work-plane-local coordinate source.',
     )
+    return
+  }
+
+  if (!isSupported && value.kind === 'coordinateRef') {
+    pushError(errors, path, 'Unsupported coordinate reference source.')
     return
   }
 
@@ -1868,11 +1942,38 @@ function validateSymbolicVec3Metadata(
   })
 
   if (symbolic.source !== undefined) {
-    validateWorkPlaneLocalCoordinateSource(
-      symbolic.source,
-      `${path}.symbolic.source`,
-      undefined,
-    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+    if (!isRecord(symbolic.source)) {
+      pushError(
+        errors,
+        `${path}.symbolic.source`,
+        'Coordinate source must be an object.',
+      )
+      return
+    }
+
+    if (symbolic.source.kind === 'coordinateRef') {
+      validateCoordinateReferenceSourceShape(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        errors,
+      )
+      return
+    }
+
+    if (symbolic.source.kind === 'workPlaneLocal') {
+      validateWorkPlaneLocalCoordinateSource(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        undefined,
+      ).forEach((issue) => pushError(errors, issue.path, issue.message))
+      return
+    }
+
+    pushError(
+      errors,
+      `${path}.symbolic.source.kind`,
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
+    )
   }
 }
 
@@ -3048,6 +3149,25 @@ function refreshVec3SymbolicPreview(
     return normalizePreviewPoint(point, ambientDimension)
   }
 
+  if (point.symbolic.source?.kind === 'coordinateRef') {
+    const normalizedPoint = normalizePreviewPoint(point, ambientDimension)
+    const source = cloneCoordinateSource(point.symbolic.source)
+
+    if (source.kind === 'coordinateRef') {
+      source.preview = normalizePreviewPoint(source.preview, ambientDimension)
+    }
+
+    return {
+      ...normalizedPoint,
+      symbolic: {
+        x: numericCoordinateComponent(normalizedPoint.x),
+        y: numericCoordinateComponent(normalizedPoint.y),
+        z: numericCoordinateComponent(normalizedPoint.z),
+        source,
+      },
+    }
+  }
+
   if (point.symbolic.source !== undefined) {
     const refreshedSource = refreshWorkPlaneLocalCoordinateSource(
       point.symbolic.source,
@@ -3255,7 +3375,7 @@ function normalizeSymbolicVec3ForAmbientDimension(
     z: numericCoordinateComponent(0),
     ...(components.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(components.source) }),
+      : { source: cloneCoordinateSource(components.source) }),
   }
 }
 
@@ -3299,7 +3419,7 @@ function readGlobalCoordinateAnchorValue(
     pushError(
       errors,
       `${path}.source`,
-      'Global coordinate anchors must not store work-plane-local source metadata.',
+      'Global coordinate anchors must not store coordinate source metadata.',
     )
   }
 
@@ -3347,12 +3467,20 @@ function coordinateComponentFromUnknown(
 
 function coordinateSourceFromUnknown(
   source: unknown,
-): WorkPlaneLocalCoordinateSource | null {
-  if (!isRecord(source) || source.kind !== 'workPlaneLocal') {
+): CoordinateSource | null {
+  if (!isRecord(source)) {
     return null
   }
 
-  return source as unknown as WorkPlaneLocalCoordinateSource
+  if (source.kind === 'workPlaneLocal') {
+    return source as unknown as WorkPlaneLocalCoordinateSource
+  }
+
+  if (isCoordinateReferenceSource(source)) {
+    return source
+  }
+
+  return null
 }
 
 function symbolicVec3HasMetadata(symbolic: SymbolicVec3): boolean {
@@ -3369,7 +3497,7 @@ function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
     z: cloneCoordinateComponent(symbolic.z),
     ...(symbolic.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
+      : { source: cloneCoordinateSource(symbolic.source) }),
   }
 }
 

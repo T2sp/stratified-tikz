@@ -4574,9 +4574,9 @@ function App() {
       <div
         className="direct-coordinate-source-control"
         role="group"
-        aria-label="Copy direct path coordinates from existing element"
+        aria-label="Choose direct path coordinate source"
       >
-        <span className="control-label">Copy from existing element</span>
+        <span className="control-label">Coordinate source</span>
         <label className="direct-create-field direct-path-source-target-field">
           <span>Coordinate</span>
           <select
@@ -4594,7 +4594,7 @@ function App() {
           </select>
         </label>
         <label className="direct-create-field direct-coordinate-source-field">
-          <span>Use coordinates from</span>
+          <span>Use coordinate from</span>
           <select
             value={directSourceKey}
             onChange={(event) => {
@@ -4616,7 +4616,7 @@ function App() {
           disabled={existingCoordinateSourceOptions.length === 0}
           onClick={applyExistingSourceToDirectPathCoordinate}
         >
-          Use selected coordinates
+          Use selected source
         </button>
         <button
           type="button"
@@ -6025,9 +6025,9 @@ function App() {
               <div
                 className="direct-coordinate-source-control"
                 role="group"
-                aria-label="Copy coordinates from existing element"
+                aria-label="Choose coordinate source"
               >
-                <span className="control-label">Copy from existing element</span>
+                <span className="control-label">Coordinate source</span>
                 <label className="direct-create-field">
                   <span>Row</span>
                   <select
@@ -6048,7 +6048,7 @@ function App() {
                   </select>
                 </label>
                 <label className="direct-create-field direct-coordinate-source-field">
-                  <span>Use coordinates from</span>
+                  <span>Use coordinate from</span>
                   <select
                     value={directSourceKey}
                     onChange={(event) => {
@@ -6070,7 +6070,7 @@ function App() {
                   disabled={existingCoordinateSourceOptions.length === 0}
                   onClick={applyExistingSourceToDirectRow}
                 >
-                  Use selected coordinates
+                  Use selected source
                 </button>
                 <button
                   type="button"

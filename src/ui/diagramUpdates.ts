@@ -2967,6 +2967,10 @@ export function parseDirectCoordinateAnchorPosition(
   diagram: Diagram,
   options: DirectCoordinateParseOptions = {},
 ): CoordinateAnchorPosition | null {
+  if (coordinates.source !== undefined) {
+    return null
+  }
+
   const parseOptions = directCoordinateParseOptionsForDiagram(diagram, options)
   const coordinateMode = effectiveCoordinateModeForAmbientDimension(
     diagram.ambientDimension,
