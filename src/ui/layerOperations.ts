@@ -8,7 +8,7 @@ import {
   mergeLayers,
   normalizeLayerValue,
   swapLayers,
-  translateLayer,
+  translateLayerWithResult,
 } from '../model/layers.ts'
 import type { Diagram, Vec3 } from '../model/types.ts'
 import {
@@ -135,11 +135,12 @@ export function applyTranslateLayerToEditorState<
   translation: LayerTranslationVector,
 ): T {
   try {
-    const nextDiagram = translateLayer(
+    const result = translateLayerWithResult(
       current.editableDiagram,
       layerValue,
       translation,
     )
+    const nextDiagram = result.diagram
     const preview = layerTranslationVectorPreview(translation)
 
     return commitDiagramChange(current, {
@@ -148,7 +149,11 @@ export function applyTranslateLayerToEditorState<
       layerOperationStatus:
         nextDiagram === current.editableDiagram
           ? `Layer ${formatLayerValue(layerValue)} was not moved.`
-          : `Translated layer ${formatLayerValue(layerValue)} by (${preview.x}, ${preview.y}, ${preview.z}).`,
+          : layerTranslationStatusMessage(
+              layerValue,
+              preview,
+              result.detachedCoordinateReferenceCount,
+            ),
     })
   } catch (error) {
     return {
@@ -159,6 +164,20 @@ export function applyTranslateLayerToEditorState<
       ),
     }
   }
+}
+
+function layerTranslationStatusMessage(
+  layerValue: number,
+  preview: Vec3,
+  detachedCoordinateReferenceCount: number,
+): string {
+  const translated = `Translated layer ${formatLayerValue(layerValue)} by (${preview.x}, ${preview.y}, ${preview.z})`
+
+  return detachedCoordinateReferenceCount === 0
+    ? `${translated}.`
+    : `${translated} and detached ${coordinateReferenceCountLabel(
+        detachedCoordinateReferenceCount,
+      )}.`
 }
 
 export function applyMergeLayersToEditorState<
@@ -392,6 +411,10 @@ function isNumericLayerTranslationVector(
 
 function layerElementCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'element' : 'elements'}`
+}
+
+function coordinateReferenceCountLabel(count: number): string {
+  return `${count} coordinate ${count === 1 ? 'reference' : 'references'}`
 }
 
 function layerOperationErrorMessage(error: unknown, fallback: string): string {

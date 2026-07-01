@@ -24,6 +24,7 @@ import {
   activeToolSupportsCursorCreation,
   directPathInputModeItems,
   closeToolbarPalette,
+  coordinateAnchorVisibilityAriaLabel,
   coordinateAnchorVisibilityButtonLabel,
   defaultPreviewCoordinateInputMode,
   previewToolbarTopTools,
@@ -48,6 +49,14 @@ test('coordinate anchor visibility control exposes show and hide labels', () => 
   assert.equal(toggleCoordinateAnchorVisibility(false), true)
   assert.equal(coordinateAnchorVisibilityButtonLabel(true), 'Coordinates: Hide')
   assert.equal(coordinateAnchorVisibilityButtonLabel(false), 'Coordinates: Show')
+  assert.equal(
+    coordinateAnchorVisibilityAriaLabel(true),
+    'Hide coordinate anchors in preview',
+  )
+  assert.equal(
+    coordinateAnchorVisibilityAriaLabel(false),
+    'Show coordinate anchors in preview',
+  )
 })
 
 test('opening Add point palette sets the open toolbar palette', () => {

@@ -1026,7 +1026,7 @@ function renderCoordinateAnchor(
       key={anchor.id}
       className={className}
       role="button"
-      aria-label={`Coordinate ${anchor.name}`}
+      aria-label={`Coordinate anchor ${anchor.name}, TikZ name ${anchor.tikzName}`}
       data-svg-coordinate-anchor="true"
       data-coordinate-anchor-id={anchor.id}
       data-coordinate-anchor-name={anchor.name}
@@ -1039,7 +1039,7 @@ function renderCoordinateAnchor(
         )
       }
     >
-      <title>{`${anchor.name} (${anchor.tikzName})`}</title>
+      <title>{`Coordinate anchor ${anchor.name}; TikZ name ${anchor.tikzName}`}</title>
       <circle
         cx={center.x}
         cy={center.y}

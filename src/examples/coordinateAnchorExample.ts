@@ -1,6 +1,7 @@
 import {
   createCurveStratum,
   createEmptyDiagram,
+  createPointStratum,
   createTextLabel,
 } from '../model/constructors.ts'
 import { createCoordinateAnchor } from '../model/coordinateAnchors.ts'
@@ -61,6 +62,7 @@ function createCoordinateAnchorExample(): Diagram {
   const start = requiredCoordinateReference(diagram, 'coord-a')
   const end = requiredCoordinateReference(diagram, 'coord-b')
   const labelPosition = requiredCoordinateReference(diagram, 'coord-local')
+  const visiblePointPosition = requiredCoordinateReference(diagram, 'coord-b')
 
   diagram.strata.push(
     createCurveStratum({
@@ -69,6 +71,13 @@ function createCoordinateAnchorExample(): Diagram {
       name: 'Referenced anchor path',
       points: [start, end],
       layer: 0,
+    }),
+    createPointStratum({
+      ambientDimension: 3,
+      id: 'coordinate-anchor-visible-point',
+      name: 'Visible point at anchor B',
+      position: visiblePointPosition,
+      layer: 1,
     }),
   )
   diagram.labels.push(

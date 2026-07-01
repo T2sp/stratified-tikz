@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
 import type { Diagram, PointStratum, TextLabel, Vec3 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -181,6 +185,19 @@ test('merge layer does not move or delete global coordinate anchors', () => {
   assert.equal(hasCoordinateAnchor(next.editableDiagram, 'coord-a'), true)
   assert.deepEqual(next.editableDiagram.coordinateAnchors, diagram.coordinateAnchors)
   assert.match(generateTikz(next.editableDiagram), /\\coordinate \(A\) at \(10,0\);/)
+})
+
+test('layer translation status reports detached coordinate references', () => {
+  const state = createLayerOperationState(createLayerCoordinateReferenceDiagram())
+  const next = applyTranslateLayerToEditorState(state, 0, { x: 1, y: 0, z: 0 })
+  const point = findPoint(next.editableDiagram, 'reference-point')
+
+  assert.equal(coordinateReferenceSourceForPoint(point.position), null)
+  assert.deepEqual(point.position, { x: 11, y: 0, z: 0 })
+  assert.equal(
+    next.layerOperationStatus,
+    'Translated layer 0 by (1, 0, 0) and detached 1 coordinate reference.',
+  )
 })
 
 test('merge layer updates New layer input when source was the creation layer', () => {
@@ -737,6 +754,23 @@ function addLayerOperationCoordinateAnchor(diagram: Diagram): Diagram {
       }),
     ],
   }
+}
+
+function createLayerCoordinateReferenceDiagram(): Diagram {
+  const diagram = addLayerOperationCoordinateAnchor(
+    createEmptyDiagram({ ambientDimension: 2 }),
+  )
+  const reference = coordinateReferenceVec3ForAnchorId(diagram, 'coord-a')
+
+  if (reference === null) {
+    throw new Error('Expected coordinate reference.')
+  }
+
+  return addPointStratumWithResult(
+    diagram,
+    reference,
+    { id: 'reference-point', name: 'Reference point', layer: 0 },
+  ).diagram
 }
 
 function findPoint(diagram: Diagram, id: string): PointStratum {

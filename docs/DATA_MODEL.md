@@ -188,7 +188,15 @@ type WorkPlaneLocalCoordinateSource = {
   };
 };
 
-type CoordinateSource = WorkPlaneLocalCoordinateSource;
+type CoordinateReferenceSource = {
+  kind: "coordinateRef";
+  coordinateId: string;
+  preview: Vec3;
+};
+
+type CoordinateSource =
+  | WorkPlaneLocalCoordinateSource
+  | CoordinateReferenceSource;
 ```
 
 For such a coordinate, the preview point is validated as:
@@ -337,6 +345,7 @@ export type Diagram = {
   externalTikzStyleSources?: ExternalTikzStyleSource[];
   importedTikzStyleReferences?: ImportedTikzStyleReference[];
   variables?: SymbolicVariable[];
+  coordinateAnchors?: CoordinateAnchor[];
   strata: Stratum[];
   labels: Label[];
   pathCrossings?: PathCrossingState[];
@@ -349,6 +358,13 @@ not a separate null or draft state.
 
 `pathCrossings` is optional. Missing data means that no crossing has an
 explicit persisted braiding state.
+
+`coordinateAnchors` stores global TikZ reference anchors. Coordinate anchors
+are not strata, are not layer-bound, and export as `\coordinate` definitions
+before layer drawing commands. Layer-bound geometry and labels may reference an
+anchor through `Vec3.symbolic.source.kind === "coordinateRef"`. Deleting a
+referenced anchor or translating a layer detaches references first so saved
+diagrams do not contain dangling coordinate IDs.
 
 `userStylePresets` is optional for backward compatibility. It stores
 user-created structured style presets that affect export. Built-in presets are
