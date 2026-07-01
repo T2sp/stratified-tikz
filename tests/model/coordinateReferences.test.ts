@@ -6,6 +6,7 @@ import {
   coordinateReferenceSourceForPoint,
   coordinateReferenceVec3ForAnchorId,
   detachCoordinateAnchorReferences,
+  detachCoordinateAnchorReferencesMany,
   findCoordinateAnchorReferences,
 } from '../../src/model/coordinateReferences.ts'
 import {
@@ -72,6 +73,39 @@ test('findCoordinateAnchorReferences inventories coordinate-ref-enabled fields',
   assert.equal(byPath.get('strata[4].frame.frame.origin')?.exportPreserved, false)
 })
 
+test('findCoordinateAnchorReferences inventories work-plane-local source frame references', () => {
+  const diagram = createNestedWorkPlaneLocalFrameReferenceDiagram()
+  const originalJson = JSON.stringify(diagram)
+  const references = findCoordinateAnchorReferences(diagram, 'coord-a')
+  const byPath = new Map(references.map((reference) => [reference.path, reference]))
+
+  assert.equal(references.length, 4)
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-b').length, 0)
+  assert.equal(
+    byPath.get(
+      'labels[0].position.symbolic.source.frame.origin',
+    )?.location,
+    'workPlaneFrameField',
+  )
+  assert.equal(
+    byPath.get('labels[0].position.symbolic.source.frame.u')?.location,
+    'workPlaneFrameField',
+  )
+  assert.equal(
+    byPath.get('labels[0].position.symbolic.source.frame.v')?.location,
+    'workPlaneFrameField',
+  )
+  assert.equal(
+    byPath.get('labels[0].position.symbolic.source.frame.normal')?.location,
+    'workPlaneFrameField',
+  )
+  assert.equal(
+    byPath.get('labels[0].position.symbolic.source.frame.origin')?.exportPreserved,
+    false,
+  )
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
 test('detachCoordinateAnchorReferences detaches global numeric references', () => {
   const diagram = createReferencedPolylineDiagram(globalAnchorPosition(1, 2, 0))
   const originalJson = JSON.stringify(diagram)
@@ -91,6 +125,38 @@ test('detachCoordinateAnchorReferences detaches global numeric references', () =
   assert.equal(findCoordinateAnchorReferences(result.value.diagram, 'coord-a').length, 0)
   assert.equal(JSON.stringify(result.value.diagram).includes('"coordinateId":"coord-a"'), false)
   assert.equal(JSON.stringify(diagram), originalJson)
+})
+
+test('detachCoordinateAnchorReferences detaches work-plane-local source frame references', () => {
+  for (const field of workPlaneFrameFieldNames) {
+    const diagram = createNestedWorkPlaneLocalFrameDetachDiagram(field)
+    const originalJson = JSON.stringify(diagram)
+    const result = detachCoordinateAnchorReferences(diagram, 'coord-a')
+
+    assert.equal(result.ok, true)
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+
+    const position = requiredPoint(result.value.diagram.labels[0]?.position)
+    const source = position.symbolic?.source
+
+    assert.equal(result.value.detachedCount, 1)
+    assert.equal(source?.kind, 'workPlaneLocal')
+    if (source?.kind !== 'workPlaneLocal') {
+      throw new Error('Expected work-plane-local source.')
+    }
+    assert.deepEqual(source.frame[field], frameFieldReplacement(field))
+    assert.equal(coordinateReferenceSourceForPoint(source.frame[field]), null)
+    assert.deepEqual(source.local.a, { kind: 'numeric', value: 2 })
+    assert.deepEqual(source.local.b, { kind: 'numeric', value: 3 })
+    assert.equal(Number.isFinite(position.x), true)
+    assert.equal(Number.isFinite(position.y), true)
+    assert.equal(Number.isFinite(position.z), true)
+    assert.equal(findCoordinateAnchorReferences(result.value.diagram, 'coord-a').length, 0)
+    assert.equal(JSON.stringify(result.value.diagram).includes('"coordinateId":"coord-a"'), false)
+    assert.equal(JSON.stringify(diagram), originalJson)
+  }
 })
 
 test('detachCoordinateAnchorReferences preserves global symbolic coordinates', () => {
@@ -215,6 +281,63 @@ test('detachCoordinateAnchorReferences fails atomically when fallback is unavail
   assert.equal(JSON.stringify(diagram), originalJson)
 })
 
+test('detachCoordinateAnchorReferences fails atomically for nested source frame refs', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: globalAnchorPosition(Number.NaN, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      tikzName: 'B',
+      position: globalAnchorPosition(1, 0, 0),
+    }),
+  ]
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'direct-ref-point',
+    name: 'Direct reference point',
+    style: { ...defaultPointStyle },
+    position: reference(diagram, 'coord-b'),
+    layer: 0,
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'nested-ref-label',
+    name: 'Nested reference label',
+    text: '$p$',
+    position: workPlaneLocalPoint(
+      frame(coordinateReferencePoint('coord-a', 0, 0, 0)),
+    ),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferencesMany(
+    diagram,
+    ['coord-b', 'coord-a'],
+  )
+  const firstStratum = diagram.strata[0]
+
+  assert.equal(result.ok, false)
+  assert.equal(JSON.stringify(diagram), originalJson)
+  assert.equal(firstStratum?.geometricKind, 'point')
+  if (firstStratum?.geometricKind !== 'point') {
+    throw new Error('Expected a point stratum.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(firstStratum.position)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-b').length, 1)
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-a').length, 1)
+})
+
 test('reference inventory does not change existing coordinate-ref export', () => {
   const diagram = createReferencedPolylineDiagram(globalAnchorPosition(0, 0, 0))
   addAnchor(diagram, {
@@ -232,6 +355,8 @@ test('reference inventory does not change existing coordinate-ref export', () =>
   assert.match(before, /\\coordinate \(A\) at \(0,0\);/)
   assert.match(before, /\(A\) -- \(B\);/)
 })
+
+const workPlaneFrameFieldNames = ['origin', 'u', 'v', 'normal'] as const
 
 function createInventoryDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
@@ -258,6 +383,58 @@ function createInventoryDiagram(): Diagram {
     name: 'Reference label',
     text: '$A$',
     position: reference(diagram, 'coord-a'),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createNestedWorkPlaneLocalFrameReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(1, 2, 3),
+  })
+
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'nested-frame-label',
+    name: 'Nested frame label',
+    text: '$p$',
+    position: workPlaneLocalPoint({
+      origin: reference(diagram, 'coord-a'),
+      u: reference(diagram, 'coord-a'),
+      v: reference(diagram, 'coord-a'),
+      normal: reference(diagram, 'coord-a'),
+    }),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createNestedWorkPlaneLocalFrameDetachDiagram(
+  field: (typeof workPlaneFrameFieldNames)[number],
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPositionForFrameField(field),
+  })
+  const sourceFrame = frameWithField(field, reference(diagram, 'coord-a'))
+
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: `nested-frame-${field}-label`,
+    name: `Nested frame ${field} label`,
+    text: '$p$',
+    position: workPlaneLocalPoint(sourceFrame),
     style: { ...defaultLabelStyle },
     layer: 0,
   })
@@ -516,6 +693,68 @@ function frame(origin: Vec3 = { x: 0, y: 0, z: 0 }): WorkPlaneFrameSnapshot {
     u: { x: 1, y: 0, z: 0 },
     v: { x: 0, y: 1, z: 0 },
     normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function frameWithField(
+  field: (typeof workPlaneFrameFieldNames)[number],
+  point: Vec3,
+): WorkPlaneFrameSnapshot {
+  const sourceFrame = frame()
+  sourceFrame[field] = point
+
+  return sourceFrame
+}
+
+function globalAnchorPositionForFrameField(
+  field: (typeof workPlaneFrameFieldNames)[number],
+): CoordinateAnchorPosition {
+  const replacement = frameFieldReplacement(field)
+
+  return globalAnchorPosition(replacement.x, replacement.y, replacement.z)
+}
+
+function frameFieldReplacement(
+  field: (typeof workPlaneFrameFieldNames)[number],
+): Vec3 {
+  switch (field) {
+    case 'origin':
+      return { x: 5, y: 5, z: 0 }
+    case 'u':
+      return { x: 1, y: 0, z: 0 }
+    case 'v':
+      return { x: 0, y: 1, z: 0 }
+    case 'normal':
+      return { x: 0, y: 0, z: 1 }
+  }
+}
+
+function workPlaneLocalPoint(
+  sourceFrame: WorkPlaneFrameSnapshot,
+  a = 2,
+  b = 3,
+): Vec3 {
+  const preview = {
+    x: sourceFrame.origin.x + a * sourceFrame.u.x + b * sourceFrame.v.x,
+    y: sourceFrame.origin.y + a * sourceFrame.u.y + b * sourceFrame.v.y,
+    z: sourceFrame.origin.z + a * sourceFrame.u.z + b * sourceFrame.v.z,
+  }
+
+  return {
+    ...preview,
+    symbolic: {
+      x: numericComponent(preview.x),
+      y: numericComponent(preview.y),
+      z: numericComponent(preview.z),
+      source: {
+        kind: 'workPlaneLocal',
+        frame: sourceFrame,
+        local: {
+          a: { kind: 'numeric', value: a },
+          b: { kind: 'numeric', value: b },
+        },
+      },
+    },
   }
 }
 

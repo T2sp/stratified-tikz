@@ -882,17 +882,46 @@ function collectCoordinateReferencePoint(
 ): void {
   const source = coordinateReferenceSourceForPoint(point)
 
-  if (source?.coordinateId !== coordinateId) {
+  if (source?.coordinateId === coordinateId) {
+    locations.push({
+      coordinateId,
+      path,
+      location,
+      owner,
+      exportPreserved: isCoordinateRefSupportedAtLocation(location),
+    })
+  }
+
+  collectCoordinateReferencePointSourceFrame(
+    point,
+    coordinateId,
+    path,
+    owner,
+    locations,
+  )
+}
+
+function collectCoordinateReferencePointSourceFrame(
+  point: Vec3,
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  const source = point.symbolic?.source
+
+  if (source?.kind !== 'workPlaneLocal') {
     return
   }
 
-  locations.push({
+  collectWorkPlaneFrameCoordinateReferences(
+    source.frame,
     coordinateId,
-    path,
-    location,
+    `${path}.symbolic.source.frame`,
+    'workPlaneFrameField',
     owner,
-    exportPreserved: isCoordinateRefSupportedAtLocation(location),
-  })
+    locations,
+  )
 }
 
 export function detachCoordinateAnchorReferences(
@@ -2013,48 +2042,81 @@ function detachCoordinateReferencePoint(
 ): DetachPointResult {
   const source = coordinateReferenceSourceForPoint(point)
 
-  if (source === null) {
-    return {
-      ok: true,
-      point,
-    }
-  }
+  if (source !== null) {
+    const anchor = context.anchorsById.get(source.coordinateId)
 
-  const anchor = context.anchorsById.get(source.coordinateId)
+    if (anchor === undefined) {
+      if (context.requireReplacement) {
+        return {
+          ok: false,
+          error: {
+            path,
+            message: `Could not detach coordinate reference "${source.coordinateId}" because its coordinate anchor does not exist.`,
+          },
+        }
+      }
 
-  if (anchor === undefined) {
-    if (context.requireReplacement) {
       return {
-        ok: false,
-        error: {
-          path,
-          message: `Could not detach coordinate reference "${source.coordinateId}" because its coordinate anchor does not exist.`,
-        },
+        ok: true,
+        point,
       }
     }
 
+    const replacement = detachedCoordinatePointForAnchor(
+      anchor,
+      context.ambientDimension,
+      path,
+      location,
+    )
+
+    if (!replacement.ok) {
+      return replacement
+    }
+
+    context.detachedCount += 1
+
+    return {
+      ok: true,
+      point: cloneVec3(replacement.point),
+    }
+  }
+
+  const symbolic = point.symbolic
+
+  if (symbolic === undefined || symbolic.source?.kind !== 'workPlaneLocal') {
     return {
       ok: true,
       point,
     }
   }
 
-  const replacement = detachedCoordinatePointForAnchor(
-    anchor,
-    context.ambientDimension,
-    path,
-    location,
+  const workPlaneLocalSource = symbolic.source
+
+  // Coordinate references inside work-plane-local source frames are detached as
+  // frame-field fallback locations, not as ordinary TikZ-preserved references.
+  const frame = detachWorkPlaneFrameCoordinateReferences(
+    workPlaneLocalSource.frame,
+    context,
+    `${path}.symbolic.source.frame`,
+    'workPlaneFrameField',
   )
 
-  if (!replacement.ok) {
-    return replacement
+  if (!frame.ok) {
+    return frame
   }
-
-  context.detachedCount += 1
 
   return {
     ok: true,
-    point: cloneVec3(replacement.point),
+    point: {
+      ...point,
+      symbolic: {
+        ...symbolic,
+        source: {
+          ...workPlaneLocalSource,
+          frame: frame.frame,
+        },
+      },
+    },
   }
 }
 

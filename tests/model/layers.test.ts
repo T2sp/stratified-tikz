@@ -1074,6 +1074,30 @@ test('layer translation detaches work-plane-local coordinate refs and moves copi
   assert.deepEqual(anchor.position.frame.origin, { x: 0, y: 0, z: 0 })
 })
 
+test('layer translation detaches nested work-plane-local source frame refs', () => {
+  const diagram = createNestedLocalFrameReferenceTranslationDiagram()
+  const originalAnchorJson = JSON.stringify(diagram.coordinateAnchors?.[0])
+  const translated = translateLayer(diagram, 2, { x: 1, y: 0, z: 0 })
+  const movedPoint = findPoint(translated, 'nested-local-ref-point')
+  const source = movedPoint.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  if (source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected detached work-plane-local source.')
+  }
+  assert.equal(coordinateReferenceSourceForPoint(source.frame.origin), null)
+  assert.deepEqual(source.frame.origin, { x: 6, y: 5, z: 0 })
+  assert.deepEqual(
+    { x: movedPoint.position.x, y: movedPoint.position.y, z: movedPoint.position.z },
+    { x: 8, y: 8, z: 0 },
+  )
+  assert.equal(
+    JSON.stringify(translated.coordinateAnchors?.[0]),
+    originalAnchorJson,
+  )
+  assert.equal(JSON.stringify(translated).includes('"coordinateId":"coord-a"'), false)
+})
+
 test('raw point translation rejects coordinate refs before stale previews can move', () => {
   const diagram = createLayerCoordinateReferenceTranslationDiagram()
   const point = coordinateReferencePointForLayerTest(diagram, 'coord-a')
@@ -2047,6 +2071,33 @@ function createLocalCoordinateReferenceTranslationDiagram(): Diagram {
   return diagram
 }
 
+function createNestedLocalFrameReferenceTranslationDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPositionForLayerTest(5, 5, 0),
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 3,
+      id: 'nested-local-ref-point',
+      position: workPlaneLocalPointForLayerTest({
+        origin: coordinateReferencePointForLayerTest(diagram, 'coord-a'),
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      }),
+      layer: 2,
+    }),
+  ]
+
+  return diagram
+}
+
 function createSymbolicTranslationDiagram(): Diagram {
   return {
     ...createEmptyDiagram({ ambientDimension: 3 }),
@@ -2366,6 +2417,35 @@ function coordinateReferencePointForLayerTest(
   }
 
   return point
+}
+
+function workPlaneLocalPointForLayerTest(
+  frame: WorkPlaneFrameSnapshot,
+  a = 2,
+  b = 3,
+): WorkPlaneFrameSnapshot['origin'] {
+  const preview = {
+    x: frame.origin.x + a * frame.u.x + b * frame.v.x,
+    y: frame.origin.y + a * frame.u.y + b * frame.v.y,
+    z: frame.origin.z + a * frame.u.z + b * frame.v.z,
+  }
+
+  return {
+    ...preview,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'workPlaneLocal',
+        frame,
+        local: {
+          a: { kind: 'numeric', value: a },
+          b: { kind: 'numeric', value: b },
+        },
+      },
+    },
+  }
 }
 
 function symbolicXPoint(
