@@ -9,6 +9,7 @@ import type {
   CoordinateComponent,
   CoonsBoundarySnapshot,
   CoordinateAnchor,
+  CoordinateAnchorPosition,
   CoordinateReferenceSource,
   CoordinateSource,
   CubicBezierControlMode,
@@ -34,6 +35,28 @@ export type CoordinateRefLocationKind =
   | 'curvedSheetPrimitive'
   | 'derivedCoordinate'
 
+export type CoordinateReferenceLocationOwner =
+  | {
+      kind: 'stratum'
+      id: string
+    }
+  | {
+      kind: 'label'
+      id: string
+    }
+  | {
+      kind: 'coordinateAnchor'
+      id: string
+    }
+
+export type CoordinateReferenceLocation = {
+  coordinateId: string
+  path: string
+  location: CoordinateRefLocationKind
+  owner: CoordinateReferenceLocationOwner
+  exportPreserved: boolean
+}
+
 const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
   new Set([
     'pathCoordinate',
@@ -43,6 +66,11 @@ const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
   ])
 
 const workPlaneFrameFields = ['origin', 'u', 'v', 'normal'] as const
+
+type CoordinateReferenceDetachPolicy = {
+  preserveGlobalSymbolic: boolean
+  preserveWorkPlaneLocal: boolean
+}
 
 export type DetachCoordinateAnchorReferencesResult =
   | {
@@ -58,7 +86,8 @@ export type DetachCoordinateAnchorReferencesResult =
     }
 
 type DetachCoordinateReferenceContext = {
-  replacements: ReadonlyMap<string, Vec3>
+  anchorsById: ReadonlyMap<string, CoordinateAnchor>
+  ambientDimension: AmbientDimension
   requireReplacement: boolean
   detachedCount: number
 }
@@ -123,6 +152,66 @@ type DetachPathSegmentsResult =
       error: DiagramValidationIssue
     }
 
+type DetachWorkPlaneFrameResult =
+  | {
+      ok: true
+      frame: WorkPlaneFrameSnapshot
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachCurvedSheetPrimitiveResult =
+  | {
+      ok: true
+      primitive: CurvedSheetPrimitive
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachBoundaryPathSnapshotResult =
+  | {
+      ok: true
+      snapshot: BoundaryPathSnapshot
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachCoonsBoundarySnapshotResult =
+  | {
+      ok: true
+      snapshot: CoonsBoundarySnapshot
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachCubicBezierControlModeResult =
+  | {
+      ok: true
+      controlMode: CubicBezierControlMode | undefined
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachCoordinateAnchorPositionResult =
+  | {
+      ok: true
+      position: CoordinateAnchorPosition
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
 // CoordinateRef support is narrower than symbolic coordinate support because
 // TikZ export must preserve `(name)` references. Frame fields, derived previews,
 // and sampled curved sheets are rejected until reference-preserving export exists.
@@ -155,7 +244,7 @@ export function coordinateAnchorReferenceCount(
   diagram: Diagram,
   coordinateId: string,
 ): number {
-  return countCoordinateReferenceSources(diagram, coordinateId, new WeakSet())
+  return findCoordinateAnchorReferences(diagram, coordinateId).length
 }
 
 export function cloneCoordinateSource(source: CoordinateSource): CoordinateSource {
@@ -183,42 +272,627 @@ export function cloneCoordinateSource(source: CoordinateSource): CoordinateSourc
   }
 }
 
-function countCoordinateReferenceSources(
-  value: unknown,
+export function findCoordinateAnchorReferences(
+  diagram: Diagram,
   coordinateId: string,
-  seen: WeakSet<object>,
-): number {
-  if (!isRecord(value)) {
-    if (Array.isArray(value)) {
-      return value.reduce(
-        (count, item) =>
-          count + countCoordinateReferenceSources(item, coordinateId, seen),
-        0,
-      )
-    }
+): CoordinateReferenceLocation[] {
+  const locations: CoordinateReferenceLocation[] = []
 
-    return 0
-  }
-
-  if (seen.has(value)) {
-    return 0
-  }
-
-  seen.add(value)
-
-  const ownCount =
-    isCoordinateReferenceSource(value) && value.coordinateId === coordinateId
-      ? 1
-      : 0
-
-  return (
-    ownCount +
-    Object.values(value as Record<string, unknown>).reduce<number>(
-      (count, item) =>
-        count + countCoordinateReferenceSources(item, coordinateId, seen),
-      0,
+  diagram.strata.forEach((stratum, index) => {
+    collectStratumCoordinateReferences(
+      stratum,
+      coordinateId,
+      `strata[${index}]`,
+      {
+        kind: 'stratum',
+        id: stratum.id,
+      },
+      locations,
     )
+  })
+
+  diagram.labels.forEach((label, index) => {
+    collectCoordinateReferencePoint(
+      label.position,
+      coordinateId,
+      `labels[${index}].position`,
+      'labelPosition',
+      {
+        kind: 'label',
+        id: label.id,
+      },
+      locations,
+    )
+  })
+
+  const coordinateAnchors = diagram.coordinateAnchors ?? []
+
+  coordinateAnchors.forEach((anchor, index) => {
+    collectCoordinateAnchorPositionReferences(
+      anchor.position,
+      coordinateId,
+      `coordinateAnchors[${index}].position`,
+      {
+        kind: 'coordinateAnchor',
+        id: anchor.id,
+      },
+      locations,
+    )
+  })
+
+  return locations
+}
+
+function collectStratumCoordinateReferences(
+  stratum: Stratum,
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  switch (stratum.geometricKind) {
+    case 'region':
+      if (stratum.kind === 'filledRegion') {
+        collectClosedPathBoundariesCoordinateReferences(
+          stratum.boundaries,
+          coordinateId,
+          `${path}.boundaries`,
+          owner,
+          locations,
+        )
+      }
+      return
+    case 'sheet':
+      switch (stratum.kind) {
+        case 'quadSheet':
+          collectVec3ArrayCoordinateReferences(
+            stratum.corners,
+            coordinateId,
+            `${path}.corners`,
+            'simpleSheetVertex',
+            owner,
+            locations,
+          )
+          return
+        case 'polygonSheet':
+          collectVec3ArrayCoordinateReferences(
+            stratum.vertices,
+            coordinateId,
+            `${path}.vertices`,
+            'simpleSheetVertex',
+            owner,
+            locations,
+          )
+          return
+        case 'workPlaneFilledSheet':
+          collectWorkPlaneFrameCoordinateReferences(
+            stratum.planeFrame,
+            coordinateId,
+            `${path}.planeFrame`,
+            'workPlaneFrameField',
+            owner,
+            locations,
+          )
+          collectClosedPathBoundariesCoordinateReferences(
+            stratum.boundaries,
+            coordinateId,
+            `${path}.boundaries`,
+            owner,
+            locations,
+          )
+          return
+        case 'curvedSheet':
+          collectCurvedSheetPrimitiveCoordinateReferences(
+            stratum.primitive,
+            coordinateId,
+            `${path}.primitive`,
+            owner,
+            locations,
+          )
+          return
+      }
+    case 'curve':
+      switch (stratum.kind) {
+        case 'polyline':
+          collectVec3ArrayCoordinateReferences(
+            stratum.points,
+            coordinateId,
+            `${path}.points`,
+            'pathCoordinate',
+            owner,
+            locations,
+          )
+          return
+        case 'cubicBezier':
+          collectVec3ArrayCoordinateReferences(
+            stratum.points,
+            coordinateId,
+            `${path}.points`,
+            'pathCoordinate',
+            owner,
+            locations,
+          )
+          collectCubicBezierControlModeCoordinateReferences(
+            stratum.bezierControls,
+            coordinateId,
+            `${path}.bezierControls`,
+            'workPlaneFrameField',
+            owner,
+            locations,
+          )
+          return
+        case 'concatenatedPath':
+          collectPathSegmentsCoordinateReferences(
+            stratum.segments,
+            coordinateId,
+            `${path}.segments`,
+            'pathCoordinate',
+            owner,
+            locations,
+          )
+          return
+        case 'templatePath':
+          collectPathTemplateCoordinateReferences(
+            stratum.template,
+            coordinateId,
+            `${path}.template`,
+            owner,
+            locations,
+          )
+          return
+        case 'grid':
+          collectWorkPlaneFrameCoordinateReferences(
+            stratum.frame.frame,
+            coordinateId,
+            `${path}.frame.frame`,
+            'workPlaneFrameField',
+            owner,
+            locations,
+          )
+          return
+      }
+    case 'point':
+      collectCoordinateReferencePoint(
+        stratum.position,
+        coordinateId,
+        `${path}.position`,
+        'pointPosition',
+        owner,
+        locations,
+      )
+      return
+  }
+}
+
+function collectCoordinateAnchorPositionReferences(
+  position: CoordinateAnchorPosition,
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  if (position.kind !== 'workPlaneLocal') {
+    return
+  }
+
+  collectWorkPlaneFrameCoordinateReferences(
+    position.frame,
+    coordinateId,
+    `${path}.frame`,
+    'workPlaneFrameField',
+    owner,
+    locations,
   )
+  collectCoordinateReferencePoint(
+    position.preview,
+    coordinateId,
+    `${path}.preview`,
+    'derivedCoordinate',
+    owner,
+    locations,
+  )
+}
+
+function collectPathTemplateCoordinateReferences(
+  template: PathTemplate,
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  collectCoordinateReferencePoint(
+    template.center,
+    coordinateId,
+    `${path}.center`,
+    'pathTemplateCenter',
+    owner,
+    locations,
+  )
+
+  if (template.frame !== undefined) {
+    collectWorkPlaneFrameCoordinateReferences(
+      template.frame,
+      coordinateId,
+      `${path}.frame`,
+      'workPlaneFrameField',
+      owner,
+      locations,
+    )
+  }
+}
+
+function collectClosedPathBoundariesCoordinateReferences(
+  boundaries: readonly ClosedPathBoundary[],
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  boundaries.forEach((boundary, index) => {
+    collectPathSegmentsCoordinateReferences(
+      boundary.segments,
+      coordinateId,
+      `${path}[${index}].segments`,
+      'pathCoordinate',
+      owner,
+      locations,
+    )
+  })
+}
+
+function collectPathSegmentsCoordinateReferences(
+  segments: readonly PathSegment[],
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  segments.forEach((segment, index) => {
+    collectPathSegmentCoordinateReferences(
+      segment,
+      coordinateId,
+      `${path}[${index}]`,
+      location,
+      owner,
+      locations,
+    )
+  })
+}
+
+function collectPathSegmentCoordinateReferences(
+  segment: PathSegment,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  switch (segment.kind) {
+    case 'line':
+      collectCoordinateReferencePoint(
+        segment.start,
+        coordinateId,
+        `${path}.start`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.end,
+        coordinateId,
+        `${path}.end`,
+        location,
+        owner,
+        locations,
+      )
+      return
+    case 'cubicBezier':
+      collectCoordinateReferencePoint(
+        segment.start,
+        coordinateId,
+        `${path}.start`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.control1,
+        coordinateId,
+        `${path}.control1`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.control2,
+        coordinateId,
+        `${path}.control2`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.end,
+        coordinateId,
+        `${path}.end`,
+        location,
+        owner,
+        locations,
+      )
+      collectCubicBezierControlModeCoordinateReferences(
+        segment.controlMode,
+        coordinateId,
+        `${path}.controlMode`,
+        pathFrameLocationForPathLocation(location),
+        owner,
+        locations,
+      )
+      return
+    case 'arc':
+      collectCoordinateReferencePoint(
+        segment.start,
+        coordinateId,
+        `${path}.start`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.end,
+        coordinateId,
+        `${path}.end`,
+        location,
+        owner,
+        locations,
+      )
+      collectCoordinateReferencePoint(
+        segment.center,
+        coordinateId,
+        `${path}.center`,
+        arcCenterLocationForPathLocation(location),
+        owner,
+        locations,
+      )
+      if (segment.frame !== undefined) {
+        collectWorkPlaneFrameCoordinateReferences(
+          segment.frame,
+          coordinateId,
+          `${path}.frame`,
+          pathFrameLocationForPathLocation(location),
+          owner,
+          locations,
+        )
+      }
+      return
+  }
+}
+
+function collectCubicBezierControlModeCoordinateReferences(
+  controlMode: CubicBezierControlMode | undefined,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  if (
+    controlMode?.kind !== 'workPlaneRelativeCartesian' &&
+    controlMode?.kind !== 'workPlaneRelativePolar'
+  ) {
+    return
+  }
+
+  collectWorkPlaneFrameCoordinateReferences(
+    controlMode.frame,
+    coordinateId,
+    `${path}.frame`,
+    location,
+    owner,
+    locations,
+  )
+}
+
+function collectCurvedSheetPrimitiveCoordinateReferences(
+  primitive: CurvedSheetPrimitive,
+  coordinateId: string,
+  path: string,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  switch (primitive.kind) {
+    case 'hemisphere':
+      collectCoordinateReferencePoint(
+        primitive.center,
+        coordinateId,
+        `${path}.center`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      collectWorkPlaneFrameCoordinateReferences(
+        primitive.frame,
+        coordinateId,
+        `${path}.frame`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      return
+    case 'saddle':
+      collectWorkPlaneFrameCoordinateReferences(
+        primitive.frame,
+        coordinateId,
+        `${path}.frame`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      return
+    case 'ruledSurface':
+      collectBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary0,
+        coordinateId,
+        `${path}.boundary0`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      collectBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary1,
+        coordinateId,
+        `${path}.boundary1`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      return
+    case 'coonsPatch':
+      collectCoonsBoundarySnapshotCoordinateReferences(
+        primitive.bottom,
+        coordinateId,
+        `${path}.bottom`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      collectCoonsBoundarySnapshotCoordinateReferences(
+        primitive.right,
+        coordinateId,
+        `${path}.right`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      collectCoonsBoundarySnapshotCoordinateReferences(
+        primitive.top,
+        coordinateId,
+        `${path}.top`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      collectCoonsBoundarySnapshotCoordinateReferences(
+        primitive.left,
+        coordinateId,
+        `${path}.left`,
+        'curvedSheetPrimitive',
+        owner,
+        locations,
+      )
+      return
+  }
+}
+
+function collectBoundaryPathSnapshotCoordinateReferences(
+  snapshot: BoundaryPathSnapshot,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  collectPathSegmentsCoordinateReferences(
+    snapshot.segments,
+    coordinateId,
+    `${path}.segments`,
+    location,
+    owner,
+    locations,
+  )
+}
+
+function collectCoonsBoundarySnapshotCoordinateReferences(
+  snapshot: CoonsBoundarySnapshot,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  if ('kind' in snapshot) {
+    collectCoordinateReferencePoint(
+      snapshot.point,
+      coordinateId,
+      `${path}.point`,
+      location,
+      owner,
+      locations,
+    )
+    return
+  }
+
+  collectBoundaryPathSnapshotCoordinateReferences(
+    snapshot,
+    coordinateId,
+    path,
+    location,
+    owner,
+    locations,
+  )
+}
+
+function collectWorkPlaneFrameCoordinateReferences(
+  frame: WorkPlaneFrameSnapshot,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  workPlaneFrameFields.forEach((field) => {
+    collectCoordinateReferencePoint(
+      frame[field],
+      coordinateId,
+      `${path}.${field}`,
+      location,
+      owner,
+      locations,
+    )
+  })
+}
+
+function collectVec3ArrayCoordinateReferences(
+  points: readonly Vec3[],
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  points.forEach((point, index) => {
+    collectCoordinateReferencePoint(
+      point,
+      coordinateId,
+      `${path}[${index}]`,
+      location,
+      owner,
+      locations,
+    )
+  })
+}
+
+function collectCoordinateReferencePoint(
+  point: Vec3,
+  coordinateId: string,
+  path: string,
+  location: CoordinateRefLocationKind,
+  owner: CoordinateReferenceLocationOwner,
+  locations: CoordinateReferenceLocation[],
+): void {
+  const source = coordinateReferenceSourceForPoint(point)
+
+  if (source?.coordinateId !== coordinateId) {
+    return
+  }
+
+  locations.push({
+    coordinateId,
+    path,
+    location,
+    owner,
+    exportPreserved: isCoordinateRefSupportedAtLocation(location),
+  })
 }
 
 export function detachCoordinateAnchorReferences(
@@ -244,7 +918,7 @@ export function detachCoordinateAnchorReferencesMany(
     }
   }
 
-  const replacements = coordinateReferenceReplacementMapForAnchorIds(
+  const replacements = coordinateReferenceAnchorMapForAnchorIds(
     diagram,
     uniqueCoordinateIds,
   )
@@ -254,7 +928,8 @@ export function detachCoordinateAnchorReferencesMany(
   }
 
   const context: DetachCoordinateReferenceContext = {
-    replacements: replacements.replacements,
+    anchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
     requireReplacement: false,
     detachedCount: 0,
   }
@@ -281,6 +956,7 @@ export function detachCoordinateAnchorReferencesMany(
       label.position,
       context,
       `labels[${index}].position`,
+      'labelPosition',
     )
 
     if (!detached.ok) {
@@ -297,11 +973,21 @@ export function detachCoordinateAnchorReferencesMany(
     )
   }
 
+  const coordinateAnchors = detachCoordinateAnchorReferencesInAnchors(
+    diagram.coordinateAnchors ?? [],
+    context,
+  )
+
+  if (!coordinateAnchors.ok) {
+    return coordinateAnchors
+  }
+
   return {
     ok: true,
     value: {
       diagram: {
         ...diagram,
+        coordinateAnchors: coordinateAnchors.anchors,
         strata,
         labels,
       },
@@ -331,14 +1017,15 @@ export function detachCoordinateReferencesInElements(
     }
   }
 
-  const replacements = coordinateReferenceReplacementMapForExistingAnchors(diagram)
+  const replacements = coordinateReferenceAnchorMapForExistingAnchors(diagram)
 
   if (!replacements.ok) {
     return replacements
   }
 
   const context: DetachCoordinateReferenceContext = {
-    replacements: replacements.replacements,
+    anchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
     requireReplacement: true,
     detachedCount: 0,
   }
@@ -375,6 +1062,7 @@ export function detachCoordinateReferencesInElements(
       label.position,
       context,
       `labels[${index}].position`,
+      'labelPosition',
     )
 
     if (!detached.ok) {
@@ -628,14 +1316,26 @@ function detachedCoordinatePointForAnchor(
   anchor: CoordinateAnchor,
   ambientDimension: AmbientDimension,
   path: string,
+  location: CoordinateRefLocationKind,
 ): DetachPointResult {
+  const policy = coordinateReferenceDetachPolicy(location)
   let point: Vec3
 
   try {
-    point =
-      anchor.position.kind === 'workPlaneLocal' && ambientDimension !== 3
-        ? coordinateAnchorPositionPreview(anchor.position, ambientDimension)
-        : coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
+    if (
+      anchor.position.kind === 'global' &&
+      policy.preserveGlobalSymbolic
+    ) {
+      point = coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
+    } else if (
+      anchor.position.kind === 'workPlaneLocal' &&
+      ambientDimension === 3 &&
+      policy.preserveWorkPlaneLocal
+    ) {
+      point = coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
+    } else {
+      point = coordinateAnchorPositionPreview(anchor.position, ambientDimension)
+    }
   } catch {
     return {
       ok: false,
@@ -662,19 +1362,43 @@ function detachedCoordinatePointForAnchor(
   }
 }
 
-function coordinateReferenceReplacementMapForAnchorIds(
+function coordinateReferenceDetachPolicy(
+  location: CoordinateRefLocationKind,
+): CoordinateReferenceDetachPolicy {
+  switch (location) {
+    case 'workPlaneFrameField':
+    case 'derivedCoordinate':
+      return {
+        preserveGlobalSymbolic: false,
+        preserveWorkPlaneLocal: false,
+      }
+    case 'pathCoordinate':
+    case 'pathTemplateCenter':
+    case 'arcCenter':
+    case 'labelPosition':
+    case 'pointPosition':
+    case 'simpleSheetVertex':
+    case 'curvedSheetPrimitive':
+      return {
+        preserveGlobalSymbolic: true,
+        preserveWorkPlaneLocal: true,
+      }
+  }
+}
+
+function coordinateReferenceAnchorMapForAnchorIds(
   diagram: Diagram,
   coordinateIds: readonly string[],
 ):
   | {
       ok: true
-      replacements: Map<string, Vec3>
+      anchorsById: Map<string, CoordinateAnchor>
     }
   | {
       ok: false
       error: DiagramValidationIssue
     } {
-  const replacements = new Map<string, Vec3>()
+  const anchorsById = new Map<string, CoordinateAnchor>()
 
   for (const coordinateId of coordinateIds) {
     const anchorIndex = (diagram.coordinateAnchors ?? []).findIndex(
@@ -703,37 +1427,27 @@ function coordinateReferenceReplacementMapForAnchorIds(
       }
     }
 
-    const detachedPoint = detachedCoordinatePointForAnchor(
-      anchor,
-      diagram.ambientDimension,
-      `coordinateAnchors[${anchorIndex}].position`,
-    )
-
-    if (!detachedPoint.ok) {
-      return detachedPoint
-    }
-
-    replacements.set(coordinateId, detachedPoint.point)
+    anchorsById.set(coordinateId, anchor)
   }
 
   return {
     ok: true,
-    replacements,
+    anchorsById,
   }
 }
 
-function coordinateReferenceReplacementMapForExistingAnchors(
+function coordinateReferenceAnchorMapForExistingAnchors(
   diagram: Diagram,
 ):
   | {
       ok: true
-      replacements: Map<string, Vec3>
+      anchorsById: Map<string, CoordinateAnchor>
     }
   | {
       ok: false
       error: DiagramValidationIssue
     } {
-  return coordinateReferenceReplacementMapForAnchorIds(
+  return coordinateReferenceAnchorMapForAnchorIds(
     diagram,
     (diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
   )
@@ -777,6 +1491,7 @@ function detachStratumCoordinateReferences(
             stratum.corners,
             context,
             `${path}.corners`,
+            'simpleSheetVertex',
           )
 
           if (!corners.ok) {
@@ -796,6 +1511,7 @@ function detachStratumCoordinateReferences(
             stratum.vertices,
             context,
             `${path}.vertices`,
+            'simpleSheetVertex',
           )
 
           if (!vertices.ok) {
@@ -810,13 +1526,21 @@ function detachStratumCoordinateReferences(
             },
           }
         }
-        case 'workPlaneFilledSheet':
-        {
+        case 'workPlaneFilledSheet': {
+          const planeFrame = detachWorkPlaneFrameCoordinateReferences(
+            stratum.planeFrame,
+            context,
+            `${path}.planeFrame`,
+          )
           const boundaries = detachClosedPathBoundariesCoordinateReferences(
             stratum.boundaries,
             context,
             `${path}.boundaries`,
           )
+
+          if (!planeFrame.ok) {
+            return planeFrame
+          }
 
           if (!boundaries.ok) {
             return boundaries
@@ -826,15 +1550,30 @@ function detachStratumCoordinateReferences(
             ok: true,
             stratum: {
               ...stratum,
+              planeFrame: planeFrame.frame,
               boundaries: boundaries.boundaries,
             },
           }
         }
-        case 'curvedSheet':
+        case 'curvedSheet': {
+          const primitive = detachCurvedSheetPrimitiveCoordinateReferences(
+            stratum.primitive,
+            context,
+            `${path}.primitive`,
+          )
+
+          if (!primitive.ok) {
+            return primitive
+          }
+
           return {
             ok: true,
-            stratum,
+            stratum: {
+              ...stratum,
+              primitive: primitive.primitive,
+            },
           }
+        }
         default:
           return {
             ok: true,
@@ -850,9 +1589,22 @@ function detachStratumCoordinateReferences(
             context,
             `${path}.points`,
           )
+          const bezierControls =
+            stratum.kind === 'cubicBezier'
+              ? detachCubicBezierControlModeCoordinateReferences(
+                  stratum.bezierControls,
+                  context,
+                  `${path}.bezierControls`,
+                  'workPlaneFrameField',
+                )
+              : null
 
           if (!points.ok) {
             return points
+          }
+
+          if (bezierControls !== null && !bezierControls.ok) {
+            return bezierControls
           }
 
           return {
@@ -860,6 +1612,9 @@ function detachStratumCoordinateReferences(
             stratum: {
               ...stratum,
               points: points.points,
+              ...(bezierControls === null
+                ? {}
+                : { bezierControls: bezierControls.controlMode }),
             },
           }
         }
@@ -902,10 +1657,28 @@ function detachStratumCoordinateReferences(
           }
         }
         case 'grid':
+        {
+          const frame = detachWorkPlaneFrameCoordinateReferences(
+            stratum.frame.frame,
+            context,
+            `${path}.frame.frame`,
+          )
+
+          if (!frame.ok) {
+            return frame
+          }
+
           return {
             ok: true,
-            stratum,
+            stratum: {
+              ...stratum,
+              frame: {
+                ...stratum.frame,
+                frame: frame.frame,
+              },
+            },
           }
+        }
         default:
           return {
             ok: true,
@@ -917,6 +1690,7 @@ function detachStratumCoordinateReferences(
         stratum.position,
         context,
         `${path}.position`,
+        'pointPosition',
       )
 
       if (!position.ok) {
@@ -943,10 +1717,23 @@ function detachPathTemplateCoordinateReferences(
     template.center,
     context,
     `${path}.center`,
+    'pathTemplateCenter',
   )
+  const frame =
+    template.frame === undefined
+      ? null
+      : detachWorkPlaneFrameCoordinateReferences(
+          template.frame,
+          context,
+          `${path}.frame`,
+        )
 
   if (!center.ok) {
     return center
+  }
+
+  if (frame !== null && !frame.ok) {
+    return frame
   }
 
   return {
@@ -954,6 +1741,7 @@ function detachPathTemplateCoordinateReferences(
     template: {
       ...template,
       center: center.point,
+      ...(frame === null ? {} : { frame: frame.frame }),
     },
   }
 }
@@ -992,6 +1780,7 @@ function detachPathSegmentsCoordinateReferences(
   segments: readonly PathSegment[],
   context: DetachCoordinateReferenceContext,
   path: string,
+  location: CoordinateRefLocationKind = 'pathCoordinate',
 ): DetachPathSegmentsResult {
   const detachedSegments: PathSegment[] = []
 
@@ -1000,6 +1789,7 @@ function detachPathSegmentsCoordinateReferences(
       segment,
       context,
       `${path}[${index}]`,
+      location,
     )
 
     if (!detached.ok) {
@@ -1019,6 +1809,7 @@ function detachPathSegmentCoordinateReferences(
   segment: PathSegment,
   context: DetachCoordinateReferenceContext,
   path: string,
+  location: CoordinateRefLocationKind,
 ): DetachPathSegmentResult {
   switch (segment.kind) {
     case 'line': {
@@ -1026,11 +1817,13 @@ function detachPathSegmentCoordinateReferences(
         segment.start,
         context,
         `${path}.start`,
+        location,
       )
       const end = detachCoordinateReferencePoint(
         segment.end,
         context,
         `${path}.end`,
+        location,
       )
 
       if (!start.ok) {
@@ -1055,21 +1848,31 @@ function detachPathSegmentCoordinateReferences(
         segment.start,
         context,
         `${path}.start`,
+        location,
       )
       const control1 = detachCoordinateReferencePoint(
         segment.control1,
         context,
         `${path}.control1`,
+        location,
       )
       const control2 = detachCoordinateReferencePoint(
         segment.control2,
         context,
         `${path}.control2`,
+        location,
       )
       const end = detachCoordinateReferencePoint(
         segment.end,
         context,
         `${path}.end`,
+        location,
+      )
+      const controlMode = detachCubicBezierControlModeCoordinateReferences(
+        segment.controlMode,
+        context,
+        `${path}.controlMode`,
+        pathFrameLocationForPathLocation(location),
       )
 
       if (!start.ok) {
@@ -1088,6 +1891,10 @@ function detachPathSegmentCoordinateReferences(
         return end
       }
 
+      if (!controlMode.ok) {
+        return controlMode
+      }
+
       return {
         ok: true,
         segment: {
@@ -1096,6 +1903,9 @@ function detachPathSegmentCoordinateReferences(
           control1: control1.point,
           control2: control2.point,
           end: end.point,
+          ...(controlMode.controlMode === undefined
+            ? {}
+            : { controlMode: controlMode.controlMode }),
         },
       }
     }
@@ -1104,17 +1914,29 @@ function detachPathSegmentCoordinateReferences(
         segment.start,
         context,
         `${path}.start`,
+        location,
       )
       const end = detachCoordinateReferencePoint(
         segment.end,
         context,
         `${path}.end`,
+        location,
       )
       const center = detachCoordinateReferencePoint(
         segment.center,
         context,
         `${path}.center`,
+        arcCenterLocationForPathLocation(location),
       )
+      const frame =
+        segment.frame === undefined
+          ? null
+          : detachWorkPlaneFrameCoordinateReferences(
+              segment.frame,
+              context,
+              `${path}.frame`,
+              pathFrameLocationForPathLocation(location),
+            )
 
       if (!start.ok) {
         return start
@@ -1128,6 +1950,10 @@ function detachPathSegmentCoordinateReferences(
         return center
       }
 
+      if (frame !== null && !frame.ok) {
+        return frame
+      }
+
       return {
         ok: true,
         segment: {
@@ -1135,6 +1961,7 @@ function detachPathSegmentCoordinateReferences(
           start: start.point,
           end: end.point,
           center: center.point,
+          ...(frame === null ? {} : { frame: frame.frame }),
         },
       }
     }
@@ -1145,6 +1972,7 @@ function detachVec3ArrayCoordinateReferences(
   points: readonly Vec3[],
   context: DetachCoordinateReferenceContext,
   path: string,
+  location: CoordinateRefLocationKind = 'pathCoordinate',
 ):
   | {
       ok: true
@@ -1161,6 +1989,7 @@ function detachVec3ArrayCoordinateReferences(
       point,
       context,
       `${path}[${index}]`,
+      location,
     )
 
     if (!detached.ok) {
@@ -1180,6 +2009,7 @@ function detachCoordinateReferencePoint(
   point: Vec3,
   context: DetachCoordinateReferenceContext,
   path: string,
+  location: CoordinateRefLocationKind,
 ): DetachPointResult {
   const source = coordinateReferenceSourceForPoint(point)
 
@@ -1190,9 +2020,9 @@ function detachCoordinateReferencePoint(
     }
   }
 
-  const replacement = context.replacements.get(source.coordinateId)
+  const anchor = context.anchorsById.get(source.coordinateId)
 
-  if (replacement === undefined) {
+  if (anchor === undefined) {
     if (context.requireReplacement) {
       return {
         ok: false,
@@ -1209,21 +2039,404 @@ function detachCoordinateReferencePoint(
     }
   }
 
-  if (!isFiniteVec3(replacement)) {
-    return {
-      ok: false,
-      error: {
-        path,
-        message: `Could not detach coordinate reference "${source.coordinateId}" because its replacement point is not finite.`,
-      },
-    }
+  const replacement = detachedCoordinatePointForAnchor(
+    anchor,
+    context.ambientDimension,
+    path,
+    location,
+  )
+
+  if (!replacement.ok) {
+    return replacement
   }
 
   context.detachedCount += 1
 
   return {
     ok: true,
-    point: cloneVec3(replacement),
+    point: cloneVec3(replacement.point),
+  }
+}
+
+function detachCoordinateAnchorReferencesInAnchors(
+  anchors: readonly CoordinateAnchor[],
+  context: DetachCoordinateReferenceContext,
+):
+  | {
+      ok: true
+      anchors: CoordinateAnchor[]
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    } {
+  const detachedAnchors: CoordinateAnchor[] = []
+
+  for (const [index, anchor] of anchors.entries()) {
+    const position = detachCoordinateAnchorPositionCoordinateReferences(
+      anchor.position,
+      context,
+      `coordinateAnchors[${index}].position`,
+    )
+
+    if (!position.ok) {
+      return position
+    }
+
+    detachedAnchors.push(
+      position.position === anchor.position
+        ? anchor
+        : {
+            ...anchor,
+            position: position.position,
+          },
+    )
+  }
+
+  return {
+    ok: true,
+    anchors: detachedAnchors,
+  }
+}
+
+function detachCoordinateAnchorPositionCoordinateReferences(
+  position: CoordinateAnchorPosition,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachCoordinateAnchorPositionResult {
+  if (position.kind !== 'workPlaneLocal') {
+    return {
+      ok: true,
+      position,
+    }
+  }
+
+  const frame = detachWorkPlaneFrameCoordinateReferences(
+    position.frame,
+    context,
+    `${path}.frame`,
+  )
+  const preview = detachCoordinateReferencePoint(
+    position.preview,
+    context,
+    `${path}.preview`,
+    'derivedCoordinate',
+  )
+
+  if (!frame.ok) {
+    return frame
+  }
+
+  if (!preview.ok) {
+    return preview
+  }
+
+  return {
+    ok: true,
+    position: {
+      ...position,
+      frame: frame.frame,
+      preview: preview.point,
+    },
+  }
+}
+
+function detachWorkPlaneFrameCoordinateReferences(
+  frame: WorkPlaneFrameSnapshot,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+  location: CoordinateRefLocationKind = 'workPlaneFrameField',
+): DetachWorkPlaneFrameResult {
+  const origin = detachCoordinateReferencePoint(
+    frame.origin,
+    context,
+    `${path}.origin`,
+    location,
+  )
+  const u = detachCoordinateReferencePoint(
+    frame.u,
+    context,
+    `${path}.u`,
+    location,
+  )
+  const v = detachCoordinateReferencePoint(
+    frame.v,
+    context,
+    `${path}.v`,
+    location,
+  )
+  const normal = detachCoordinateReferencePoint(
+    frame.normal,
+    context,
+    `${path}.normal`,
+    location,
+  )
+
+  if (!origin.ok) {
+    return origin
+  }
+
+  if (!u.ok) {
+    return u
+  }
+
+  if (!v.ok) {
+    return v
+  }
+
+  if (!normal.ok) {
+    return normal
+  }
+
+  return {
+    ok: true,
+    frame: {
+      origin: origin.point,
+      u: u.point,
+      v: v.point,
+      normal: normal.point,
+    },
+  }
+}
+
+function detachCurvedSheetPrimitiveCoordinateReferences(
+  primitive: CurvedSheetPrimitive,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachCurvedSheetPrimitiveResult {
+  switch (primitive.kind) {
+    case 'hemisphere': {
+      const center = detachCoordinateReferencePoint(
+        primitive.center,
+        context,
+        `${path}.center`,
+        'curvedSheetPrimitive',
+      )
+      const frame = detachWorkPlaneFrameCoordinateReferences(
+        primitive.frame,
+        context,
+        `${path}.frame`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!center.ok) {
+        return center
+      }
+
+      if (!frame.ok) {
+        return frame
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          center: center.point,
+          frame: frame.frame,
+        },
+      }
+    }
+    case 'saddle': {
+      const frame = detachWorkPlaneFrameCoordinateReferences(
+        primitive.frame,
+        context,
+        `${path}.frame`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!frame.ok) {
+        return frame
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          frame: frame.frame,
+        },
+      }
+    }
+    case 'ruledSurface': {
+      const boundary0 = detachBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary0,
+        context,
+        `${path}.boundary0`,
+        'curvedSheetPrimitive',
+      )
+      const boundary1 = detachBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary1,
+        context,
+        `${path}.boundary1`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!boundary0.ok) {
+        return boundary0
+      }
+
+      if (!boundary1.ok) {
+        return boundary1
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          boundary0: boundary0.snapshot,
+          boundary1: boundary1.snapshot,
+        },
+      }
+    }
+    case 'coonsPatch': {
+      const bottom = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.bottom,
+        context,
+        `${path}.bottom`,
+        'curvedSheetPrimitive',
+      )
+      const right = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.right,
+        context,
+        `${path}.right`,
+        'curvedSheetPrimitive',
+      )
+      const top = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.top,
+        context,
+        `${path}.top`,
+        'curvedSheetPrimitive',
+      )
+      const left = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.left,
+        context,
+        `${path}.left`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!bottom.ok) {
+        return bottom
+      }
+
+      if (!right.ok) {
+        return right
+      }
+
+      if (!top.ok) {
+        return top
+      }
+
+      if (!left.ok) {
+        return left
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          bottom: bottom.snapshot,
+          right: right.snapshot,
+          top: top.snapshot,
+          left: left.snapshot,
+        },
+      }
+    }
+  }
+}
+
+function detachBoundaryPathSnapshotCoordinateReferences(
+  snapshot: BoundaryPathSnapshot,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+  location: CoordinateRefLocationKind,
+): DetachBoundaryPathSnapshotResult {
+  const segments = detachPathSegmentsCoordinateReferences(
+    snapshot.segments,
+    context,
+    `${path}.segments`,
+    location,
+  )
+
+  if (!segments.ok) {
+    return segments
+  }
+
+  return {
+    ok: true,
+    snapshot: {
+      ...snapshot,
+      segments: segments.segments,
+    },
+  }
+}
+
+function detachCoonsBoundarySnapshotCoordinateReferences(
+  snapshot: CoonsBoundarySnapshot,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+  location: CoordinateRefLocationKind,
+): DetachCoonsBoundarySnapshotResult {
+  if ('kind' in snapshot) {
+    const point = detachCoordinateReferencePoint(
+      snapshot.point,
+      context,
+      `${path}.point`,
+      location,
+    )
+
+    if (!point.ok) {
+      return point
+    }
+
+    return {
+      ok: true,
+      snapshot: {
+        ...snapshot,
+        point: point.point,
+      },
+    }
+  }
+
+  return detachBoundaryPathSnapshotCoordinateReferences(
+    snapshot,
+    context,
+    path,
+    location,
+  )
+}
+
+function detachCubicBezierControlModeCoordinateReferences(
+  controlMode: CubicBezierControlMode | undefined,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+  location: CoordinateRefLocationKind,
+): DetachCubicBezierControlModeResult {
+  if (
+    controlMode?.kind !== 'workPlaneRelativeCartesian' &&
+    controlMode?.kind !== 'workPlaneRelativePolar'
+  ) {
+    return {
+      ok: true,
+      controlMode,
+    }
+  }
+
+  const frame = detachWorkPlaneFrameCoordinateReferences(
+    controlMode.frame,
+    context,
+    `${path}.frame`,
+    location,
+  )
+
+  if (!frame.ok) {
+    return frame
+  }
+
+  return {
+    ok: true,
+    controlMode: {
+      ...controlMode,
+      frame: frame.frame,
+    },
   }
 }
 
@@ -1875,6 +3088,12 @@ function arcCenterLocationForPathLocation(
   location: CoordinateRefLocationKind,
 ): CoordinateRefLocationKind {
   return location === 'pathCoordinate' ? 'arcCenter' : location
+}
+
+function pathFrameLocationForPathLocation(
+  location: CoordinateRefLocationKind,
+): CoordinateRefLocationKind {
+  return location === 'pathCoordinate' ? 'workPlaneFrameField' : location
 }
 
 function vec3FromCoordinateReference(
