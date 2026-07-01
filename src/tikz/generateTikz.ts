@@ -7356,11 +7356,27 @@ function usesRelativeBezierControls(
     return false
   }
 
+  if (cubicBezierControlPointsContainCoordinateRef(curve)) {
+    return false
+  }
+
   if (curve.bezierControls.kind === 'relativeCartesian') {
     return true
   }
 
   return curve.bezierControls.kind === 'relativePolar' && mode !== '3d'
+}
+
+function cubicBezierControlPointsContainCoordinateRef(
+  curve: CubicBezierCurveStratum,
+): boolean {
+  const firstControl = curve.points[1]
+  const secondControl = curve.points[2]
+
+  return (
+    (firstControl !== undefined && pointContainsCoordinateRef(firstControl)) ||
+    (secondControl !== undefined && pointContainsCoordinateRef(secondControl))
+  )
 }
 
 function formatRelativeBezierControls(

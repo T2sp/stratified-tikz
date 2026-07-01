@@ -5813,6 +5813,284 @@ test('relative polar cubic Bezier export uses TikZ polar control syntax', () => 
   assert.doesNotMatch(tikz, /curveBezierRelativePolar0p2/)
 })
 
+test('relative cubic Bezier control coordinateRefs fall back to absolute control syntax', () => {
+  const diagram = createRelativeCartesianBezierControlReferenceDiagram()
+  const validation = validateDiagram(diagram)
+
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors.map(formatValidationIssue).join('\n'),
+  )
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const path = '(Start) .. controls (C1) and (C2) .. (End);'
+  const pathIndex = tikz.indexOf(path)
+
+  assert.ok(pathIndex >= 0)
+  for (const definition of [
+    '\\coordinate (Start) at (0,0);',
+    '\\coordinate (C1) at (1,2);',
+    '\\coordinate (C2) at (7,14);',
+    '\\coordinate (End) at (10,10);',
+  ]) {
+    const definitionIndex = tikz.indexOf(definition)
+
+    assert.ok(definitionIndex >= 0, definition)
+    assert.ok(definitionIndex < pathIndex, definition)
+  }
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierRelativeControlRefs0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierRelativeControlRefs0p2\)/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
+test('relative cubic Bezier with one coordinateRef control preserves the reference and numeric control', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'mixed-control-ref',
+    name: 'Mixed Control Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      coordinateReferencePoint(diagram, 'coord-c1'),
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(C1\) at \(1,2\);/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierMixedControlRef0p2\) at \(7,14\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierMixedControlRef0p0\) \.\. controls \(C1\) and \(curveBezierMixedControlRef0p2\) \.\. \(curveBezierMixedControlRef0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierMixedControlRef0p1\)/)
+})
+
+test('relative polar cubic Bezier with a second coordinateRef control falls back absolutely', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c2', name: 'C2', x: 5, y: 8, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'polar-second-ref',
+    name: 'Polar Second Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+      coordinateReferencePoint(diagram, 'coord-c2'),
+      { x: 5, y: 5, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativePolar',
+      firstControl: { angleDegrees: 0, radius: 2 },
+      secondControl: { angleDegrees: 90, radius: 3 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(C2\) at \(5,8\);/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierPolarSecondRef0p1\) at \(2,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierPolarSecondRef0p0\) \.\. controls \(curveBezierPolarSecondRef0p1\) and \(C2\) \.\. \(curveBezierPolarSecondRef0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+\(0:2\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierPolarSecondRef0p2\)/)
+})
+
+test('concatenated cubic path control coordinateRefs preserve refs and arrows', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1.5, y: 1, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 2.5, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'ref-composite-path',
+    name: 'Ref Composite Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: coordinateReferencePoint(diagram, 'coord-c1'),
+        control2: coordinateReferencePoint(diagram, 'coord-c2'),
+        end: { x: 3, y: 0, z: 0 },
+        controlMode: {
+          kind: 'relativeCartesian',
+          firstControlOffset: { x: 0.5, y: 1, z: 0 },
+          secondControlOffset: { x: -0.5, y: 1, z: 0 },
+          secondOffsetReference: 'end',
+        },
+      },
+    ],
+    styleSegments: [],
+    arrows: arrowOptions({ endpoint: 'forward' }),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\n\s+->\n/)
+  assert.match(
+    tikz,
+    /\(curvePathRefCompositePath0p0\) -- \(curvePathRefCompositePath0p1\) \.\. controls \(C1\) and \(C2\) \.\. \(curvePathRefCompositePath0p4\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+})
+
+test('split style-run concatenated cubic path preserves control coordinateRefs', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1.5, y: 1, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 2.5, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'split-ref-path',
+    name: 'Split Ref Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: coordinateReferencePoint(diagram, 'coord-c1'),
+        control2: coordinateReferencePoint(diagram, 'coord-c2'),
+        end: { x: 3, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'dotted' },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /% Segment style overrides split this concatenated path/)
+  assert.match(tikz, /% Segment 2/)
+  assert.match(
+    tikz,
+    /\(curvePathSplitRefPath0p1\) \.\. controls \(C1\) and \(C2\) \.\. \(curvePathSplitRefPath0p4\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+})
+
+test('cubic Bezier control coordinateRefs round trip through save and load', () => {
+  const diagram = createRelativeCartesianBezierControlReferenceDiagram()
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const loadedCurve = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'relative-control-refs',
+  )
+
+  assert.equal(loadedCurve?.geometricKind, 'curve')
+  assert.equal(loadedCurve?.kind, 'cubicBezier')
+  if (loadedCurve?.geometricKind !== 'curve' || loadedCurve.kind !== 'cubicBezier') {
+    throw new Error('Expected loaded cubic Bezier curve.')
+  }
+
+  assert.equal(
+    requireCoordinateReferenceSource(loadedCurve.points[1]).coordinateId,
+    'coord-c1',
+  )
+  assert.equal(
+    requireCoordinateReferenceSource(loadedCurve.points[2]).coordinateId,
+    'coord-c2',
+  )
+  assert.match(
+    generateTikz(parsed.diagram),
+    /\(Start\) \.\. controls \(C1\) and \(C2\) \.\. \(End\);/,
+  )
+})
+
+test('missing cubic Bezier control coordinateRef is rejected by validation', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'missing-control-ref',
+    name: 'Missing Control Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      rawCoordinateReferencePoint('missing-control', { x: 1, y: 2, z: 0 }),
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /points\[1\]\.symbolic\.source\.coordinateId.*Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
 test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scope', () => {
   const tikz = generateTikz(createWorkPlaneRelativePolarBezierDiagram())
 
@@ -7723,6 +8001,40 @@ function createWorkPlaneRelativePolarBezierDiagram({
     },
     styleSegments: [],
     layer,
+  })
+
+  return diagram
+}
+
+function createRelativeCartesianBezierControlReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-start', name: 'Start', x: 0, y: 0, z: 0 },
+    { id: 'coord-c1', name: 'C1', x: 1, y: 2, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 7, y: 14, z: 0 },
+    { id: 'coord-end', name: 'End', x: 10, y: 10, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'relative-control-refs',
+    name: 'Relative Control Refs',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-start'),
+      coordinateReferencePoint(diagram, 'coord-c1'),
+      coordinateReferencePoint(diagram, 'coord-c2'),
+      coordinateReferencePoint(diagram, 'coord-end'),
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
   })
 
   return diagram
