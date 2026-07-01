@@ -16,7 +16,9 @@ import {
 } from '../model/coordinateAnchors.ts'
 import {
   coordinateAnchorReferenceCount,
+  findCoordinateAnchorReferences,
   resolveDiagramCoordinateRefs,
+  type CoordinateReferenceLocation,
 } from '../model/coordinateReferences.ts'
 import type { ScalarInputValue } from '../model/scalarExpressions.ts'
 import {
@@ -88,13 +90,17 @@ export type CoordinateAnchorInspectorModel = {
   deleteDisabled: boolean
   deleteMessage: string | null
   referenceCount: number
+  usageCount: number
+  usageMessage: string
 }
 
 export function createCoordinateAnchorInspectorModel(
   diagram: Diagram,
   anchor: CoordinateAnchor,
 ): CoordinateAnchorInspectorModel {
-  const referenceCount = coordinateAnchorReferenceCount(diagram, anchor.id)
+  const references = findCoordinateAnchorReferences(diagram, anchor.id)
+  const referenceCount = references.length
+  const usageCount = coordinateAnchorUsageCount(references)
   const coordinateLabels =
     anchor.position.kind === 'workPlaneLocal'
       ? ['Plane x / a', 'Plane y / b']
@@ -108,6 +114,7 @@ export function createCoordinateAnchorInspectorModel(
       { label: 'Source' },
       ...coordinateLabels.map((label) => ({ label })),
       { label: 'Preview' },
+      { label: 'Usage' },
       { label: 'Delete coordinate' },
     ],
     sourceLabel:
@@ -118,11 +125,11 @@ export function createCoordinateAnchorInspectorModel(
     deleteDisabled: false,
     deleteMessage:
       referenceCount > 0
-        ? `Used by ${coordinateReferenceCountLabel(
-            referenceCount,
-          )}. Deleting will detach ${referenceCount === 1 ? 'it' : 'them'}.`
+        ? `Deleting will detach ${coordinateReferenceCountLabel(referenceCount)}.`
         : null,
     referenceCount,
+    usageCount,
+    usageMessage: `Used by ${coordinateUsageCountLabel(usageCount)}`,
   }
 }
 
@@ -397,6 +404,20 @@ function coordinateAxesForInspector(
 
 function coordinateReferenceCountLabel(count: number): string {
   return `${count} coordinate ${count === 1 ? 'reference' : 'references'}`
+}
+
+function coordinateUsageCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'object' : 'objects'}`
+}
+
+function coordinateAnchorUsageCount(
+  references: readonly CoordinateReferenceLocation[],
+): number {
+  return new Set(
+    references.map(
+      (reference) => `${reference.owner.kind}:${reference.owner.id}`,
+    ),
+  ).size
 }
 
 function coordinateExpressionContextForDiagram(
