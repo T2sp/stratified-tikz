@@ -238,6 +238,7 @@ export function createEmptyDiagram({
     ambientDimension,
     camera,
     ...(camera.mode === '3d' ? { view: { camera3d: cloneCamera3D(camera) } } : {}),
+    coordinateAnchors: [],
     strata: [],
     labels: [],
   }

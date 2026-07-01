@@ -7,6 +7,7 @@ import type {
   CubicBezierCurveStratum,
   CubicBezierControlMode,
   Camera3D,
+  CoordinateAnchor,
   CurveStyle,
   CurveStratum,
   CurvedSheetPrimitive,
@@ -44,6 +45,11 @@ import type {
   WorkPlaneLocalOffset,
   VisibilityOptions,
 } from '../model/types'
+import {
+  coordinateAnchorPositionToVec3,
+  sanitizeCoordinateAnchorTikzName,
+  workPlaneLocalCoordinateSourceFromAnchorPosition,
+} from '../model/coordinateAnchors.ts'
 import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
@@ -435,6 +441,10 @@ export function generateTikz2D(
   const braidingSectionTitle = 'Braiding crossing overlays'
   const pointSectionTitle = 'Codimension 2 strata: points'
   const labelSectionTitle = 'Labels'
+  const coordinateAnchorLines = emitCoordinateAnchorDefinitions(
+    diagram.coordinateAnchors ?? [],
+    context,
+  )
   const braidingCommands = emitPathCrossingOverlays(
     diagram,
     braidingSectionTitle,
@@ -488,7 +498,7 @@ export function generateTikz2D(
     bodySections: [
       section(
         'Coordinates',
-        emitCoordinateDefinitions(context),
+        [...coordinateAnchorLines, ...emitCoordinateDefinitions(context)],
         context.exportMode,
       ),
       section(
@@ -518,6 +528,10 @@ export function generateTikz3D(
   const curveSectionTitle = 'Codimension 2 strata: curves'
   const pointSectionTitle = 'Codimension 3 strata: points'
   const labelSectionTitle = 'Labels'
+  const coordinateAnchorLines = emitCoordinateAnchorDefinitions(
+    diagram.coordinateAnchors ?? [],
+    context,
+  )
   const sectionTitles = [
     sheetSectionTitle,
     curveSectionTitle,
@@ -571,7 +585,7 @@ export function generateTikz3D(
     bodySections: [
       section(
         'Coordinates',
-        emitCoordinateDefinitions(context),
+        [...coordinateAnchorLines, ...emitCoordinateDefinitions(context)],
         context.exportMode,
       ),
       ...(coordinateAxesGuide.length === 0
@@ -1077,6 +1091,137 @@ function emitTikzLayerDeclarations(
   return [
     ...declarations,
     '',
+  ]
+}
+
+function emitCoordinateAnchorDefinitions(
+  anchors: readonly CoordinateAnchor[],
+  context: GenerateContext,
+): string[] {
+  return anchors.flatMap((anchor) => {
+    const tikzName = context.coordinates.reserve(anchor.tikzName)
+
+    return emitCoordinateAnchorDefinition(anchor, tikzName, context)
+  })
+}
+
+function emitCoordinateAnchorDefinition(
+  anchor: CoordinateAnchor,
+  tikzName: string,
+  context: GenerateContext,
+): string[] {
+  const subject = `Coordinate anchor "${anchor.name}" [${anchor.id}]`
+
+  if (anchor.position.kind === 'workPlaneLocal') {
+    return emitWorkPlaneLocalCoordinateAnchorDefinition(
+      anchor,
+      tikzName,
+      subject,
+      context,
+    )
+  }
+
+  let point: Vec3
+  try {
+    point = coordinateAnchorPositionToVec3(
+      anchor.position,
+      context.mode === '2d' ? 2 : 3,
+    )
+  } catch {
+    return [
+      `% ${subject} omitted because its global coordinate value is malformed.`,
+      '',
+    ]
+  }
+
+  if (!isFiniteVec3(point)) {
+    return [
+      `% ${subject} omitted because its position contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
+  return [
+    `\\coordinate (${tikzName}) at ${formatCoordinate(
+      point,
+      context.mode,
+      context,
+    )};`,
+  ]
+}
+
+function emitWorkPlaneLocalCoordinateAnchorDefinition(
+  anchor: CoordinateAnchor,
+  tikzName: string,
+  subject: string,
+  context: GenerateContext,
+): string[] {
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    return [
+      `% ${subject} omitted because its position is not work-plane-local.`,
+      '',
+    ]
+  }
+
+  const source = workPlaneLocalCoordinateSourceFromAnchorPosition(anchor.position)
+  const preview = anchor.position.preview
+
+  if (!isFiniteVec3(preview)) {
+    return [
+      `% ${subject} omitted because its work-plane-local preview contains non-finite coordinates.`,
+      '',
+    ]
+  }
+
+  if (context.mode !== '3d') {
+    return [
+      ...localPreviewFallbackLines(
+        subject,
+        '2D TikZ export does not use local 3D canvas plane scopes',
+      ),
+      `\\coordinate (${tikzName}) at ${formatGlobalPreviewCoordinate(
+        preview,
+        context.mode,
+      )};`,
+    ]
+  }
+
+  const localCoordinate = formatWorkPlaneLocalCoordinateSource(
+    source,
+    context,
+    subject,
+  )
+
+  if (!localCoordinate.ok) {
+    return [
+      ...localPreviewFallbackLines(subject, localCoordinate.error),
+      `\\coordinate (${tikzName}) at ${formatGlobalPreviewCoordinate(
+        preview,
+        context.mode,
+      )};`,
+    ]
+  }
+
+  const scopedLines = emitCanvasPlaneScopeLines(
+    source.frame,
+    context,
+    `${subject} work-plane-local frame`,
+    [`\\coordinate (${tikzName}) at ${localCoordinate.coordinate};`],
+  )
+
+  if (!scopedLines.ok) {
+    return [
+      ...localPreviewFallbackLines(subject, scopedLines.error),
+      `\\coordinate (${tikzName}) at ${formatGlobalPreviewCoordinate(
+        preview,
+        context.mode,
+      )};`,
+    ]
+  }
+
+  return [
+    `% ${subject} exported in a local TikZ 3d plane scope preserving work-plane-local coordinates.`,
+    ...scopedLines.lines,
   ]
 }
 
@@ -7456,6 +7601,10 @@ class CoordinateRegistry {
   readonly definitions: CoordinateDefinition[] = []
   hasNonCircularPointShape = false
   private readonly usedNames = new Set<string>()
+
+  reserve(preferredName: string): string {
+    return this.uniqueName(sanitizeCoordinateAnchorTikzName(preferredName))
+  }
 
   define(baseName: string, index: number, position: Vec3): string {
     const base = toIdentifierPart(`${baseName}p${index}`, 'p')

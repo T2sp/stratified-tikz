@@ -8,6 +8,7 @@ export const twoDimensionalExample: Diagram = {
     scale: 1,
     origin: { x: 0, y: 0 },
   },
+  coordinateAnchors: [],
   strata: [
     {
       id: 'visibleWire',

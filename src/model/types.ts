@@ -22,7 +22,7 @@ export type SymbolicVec3 = {
   x: CoordinateComponent
   y: CoordinateComponent
   z: CoordinateComponent
-  source?: CoordinateSource
+  source?: WorkPlaneLocalCoordinateSource
 }
 
 export type Vec3 = {
@@ -306,6 +306,19 @@ export type WorkPlaneLocalCoordinateSource = {
 }
 
 export type CoordinateSource = WorkPlaneLocalCoordinateSource
+
+export type GlobalCoordinateAnchorPosition = {
+  kind: 'global'
+  value: SymbolicVec3
+}
+
+export type WorkPlaneLocalCoordinateAnchorPosition = WorkPlaneLocalCoordinateSource & {
+  preview: Vec3
+}
+
+export type CoordinateAnchorPosition =
+  | GlobalCoordinateAnchorPosition
+  | WorkPlaneLocalCoordinateAnchorPosition
 
 export type SurfaceFrame = WorkPlaneFrameSnapshot
 
@@ -773,6 +786,14 @@ export type TextLabel = {
   layer: number
 }
 
+export type CoordinateAnchor = {
+  id: string
+  name: string
+  tikzName: string
+  position: CoordinateAnchorPosition
+  locked?: boolean
+}
+
 export type DiagramLayer = {
   value: number
   name: string
@@ -798,6 +819,7 @@ export type Diagram = {
   externalTikzStyleSources?: ExternalTikzStyleSource[]
   importedTikzStyleReferences?: ImportedTikzStyleReference[]
   variables?: SymbolicVariable[]
+  coordinateAnchors?: CoordinateAnchor[]
   strata: Stratum[]
   labels: TextLabel[]
   pathCrossings?: PathCrossingState[]

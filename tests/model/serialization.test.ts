@@ -19,6 +19,7 @@ import {
 import {
   applyUserStylePresetToStratum,
   addSymbolicVariableToDiagram,
+  createCoordinateAnchor,
   createUserStylePresetFromStyle,
   clonePathArrowOptions,
   defaultPathArrowOptions,
@@ -29,6 +30,7 @@ import {
   savedDiagramFormat,
   savedDiagramVersion,
   serializeDiagram,
+  validateDiagram,
   type PendingSymbolicDiagramImport,
 } from '../../src/model/index.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
@@ -36,6 +38,7 @@ import type {
   Camera3D,
   BoundaryPathSnapshot,
   CoonsPatchPrimitive,
+  CoordinateAnchorPosition,
   CrossingKind,
   Diagram,
   PerspectiveCamera3D,
@@ -66,6 +69,361 @@ test('serializeDiagram includes format, version, and diagram data', () => {
   assert.equal('camera' in parsed.diagram, false)
   assert.deepEqual(parsed.diagram.strata, twoDimensionalExample.strata)
   assert.deepEqual(parsed.diagram.labels, twoDimensionalExample.labels)
+})
+
+test('old saved diagram without coordinate anchors loads with an empty anchor list', () => {
+  const saved = JSON.parse(
+    serializeDiagram(createEmptyDiagram({ ambientDimension: 2 })),
+  ) as {
+    diagram: {
+      coordinateAnchors?: unknown
+    }
+  }
+
+  delete saved.diagram.coordinateAnchors
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram.coordinateAnchors, [])
+})
+
+test('parseSavedDiagramJson rejects malformed global coordinate anchor positions without throwing', () => {
+  const validComponent = savedNumericCoordinateComponent(0)
+  const malformedCases: {
+    name: string
+    position: unknown
+    expectedPath: RegExp
+  }[] = [
+    {
+      name: 'empty global value',
+      position: { kind: 'global', value: {} },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x/,
+    },
+    {
+      name: 'missing x',
+      position: {
+        kind: 'global',
+        value: { y: validComponent, z: validComponent },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x/,
+    },
+    {
+      name: 'missing y',
+      position: {
+        kind: 'global',
+        value: { x: validComponent, z: validComponent },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.y/,
+    },
+    {
+      name: 'missing z',
+      position: {
+        kind: 'global',
+        value: { x: validComponent, y: validComponent },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.z/,
+    },
+    {
+      name: 'undefined x',
+      position: {
+        kind: 'global',
+        value: { x: undefined, y: validComponent, z: validComponent },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x/,
+    },
+    {
+      name: 'malformed x component',
+      position: {
+        kind: 'global',
+        value: { x: {}, y: validComponent, z: validComponent },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x/,
+    },
+    {
+      name: 'non-finite x component',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'numeric', value: Number.POSITIVE_INFINITY },
+          y: validComponent,
+          z: validComponent,
+        },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x\.value/,
+    },
+    {
+      name: 'unsupported symbolic component shape',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'coordinateReference', coordinateName: 'A' },
+          y: validComponent,
+          z: validComponent,
+        },
+      },
+      expectedPath: /coordinateAnchors\[0\]\.position\.value\.x\.kind/,
+    },
+  ]
+
+  malformedCases.forEach(({ name, position, expectedPath }) => {
+    const result = parseRawSavedDiagramWithoutThrow(
+      savedDiagramWithRawCoordinateAnchor(position),
+    )
+
+    assert.equal(result.ok, false, name)
+    if (result.ok) {
+      throw new Error(`Expected ${name} to be rejected.`)
+    }
+    assert.match(result.error, expectedPath, name)
+    assert.doesNotMatch(result.error, /Cannot read properties/, name)
+  })
+})
+
+test('parseSavedDiagramJson loads valid symbolic and work-plane-local coordinate anchors', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-symbolic',
+      name: 'Symbolic',
+      tikzName: 'S',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'symbolic', expression: 'R + 1', previewValue: 99 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      },
+    },
+    {
+      id: 'coord-local',
+      name: 'Local',
+      tikzName: 'L',
+      position: workPlaneLocalAnchorPosition(),
+    },
+  ]
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const symbolicAnchor = result.diagram.coordinateAnchors?.[0]
+  const localAnchor = result.diagram.coordinateAnchors?.[1]
+
+  if (
+    symbolicAnchor === undefined ||
+    symbolicAnchor.position.kind !== 'global' ||
+    symbolicAnchor.position.value.x.kind !== 'symbolic'
+  ) {
+    throw new Error('Expected symbolic global coordinate anchor to load.')
+  }
+
+  assert.equal(symbolicAnchor.position.value.x.previewValue, 3)
+  assert.equal(localAnchor?.position.kind, 'workPlaneLocal')
+})
+
+test('parseSavedDiagramJson rejects coordinate anchors with forbidden layers', () => {
+  const saved = savedDiagramWithRawCoordinateAnchor(globalAnchorPosition(0, 0, 0))
+
+  if (!Array.isArray(saved.diagram.coordinateAnchors)) {
+    throw new Error('Expected coordinate anchors fixture.')
+  }
+
+  const anchor = saved.diagram.coordinateAnchors[0]
+  if (typeof anchor !== 'object' || anchor === null || Array.isArray(anchor)) {
+    throw new Error('Expected coordinate anchor object fixture.')
+  }
+  const mutableAnchor = anchor as Record<string, unknown>
+  mutableAnchor.layer = 2
+
+  const result = parseRawSavedDiagramWithoutThrow(saved)
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected coordinate anchor layer to be rejected.')
+  }
+  assert.match(result.error, /coordinateAnchors\[0\]\.layer/)
+})
+
+test('coordinate anchor validation accepts valid anchors and rejects duplicate ids', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const anchor = createCoordinateAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    position: globalAnchorPosition(0, 0, 0),
+  })
+
+  diagram.coordinateAnchors = [anchor]
+  assert.equal(validateDiagram(diagram).valid, true)
+
+  diagram.coordinateAnchors = [
+    anchor,
+    {
+      ...anchor,
+      name: 'B',
+      tikzName: 'B',
+    },
+  ]
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.ok(
+    validation.errors.some((issue) =>
+      /Id must be unique/.test(issue.message),
+    ),
+  )
+})
+
+test('coordinate anchor TikZ names are generated safely and manual duplicates are rejected', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const first = createCoordinateAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    position: globalAnchorPosition(0, 0, 0),
+  })
+  const second = createCoordinateAnchor(
+    { ...diagram, coordinateAnchors: [first] },
+    {
+      id: 'coord-b',
+      name: 'A',
+      position: globalAnchorPosition(1, 0, 0),
+    },
+  )
+
+  assert.equal(first.tikzName, 'A')
+  assert.equal(second.tikzName, 'A2')
+
+  const duplicateDiagram = {
+    ...diagram,
+    coordinateAnchors: [
+      first,
+      {
+        ...second,
+        tikzName: 'A',
+      },
+    ],
+  }
+  const duplicateValidation = validateDiagram(duplicateDiagram)
+
+  assert.equal(duplicateValidation.valid, false)
+  assert.ok(
+    duplicateValidation.errors.some(
+      (issue) =>
+        issue.path === 'coordinateAnchors[1].tikzName' &&
+        /Id must be unique/.test(issue.message),
+    ),
+  )
+
+  const invalidValidation = validateDiagram({
+    ...diagram,
+    coordinateAnchors: [
+      {
+        ...first,
+        tikzName: '1bad',
+      },
+    ],
+  })
+
+  assert.equal(invalidValidation.valid, false)
+  assert.ok(
+    invalidValidation.errors.some(
+      (issue) => issue.path === 'coordinateAnchors[0].tikzName',
+    ),
+  )
+})
+
+test('invalid loaded coordinate anchor TikZ names are sanitized deterministically', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: '1 invalid',
+      position: globalAnchorPosition(0, 0, 0),
+    },
+  ]
+  const saved = JSON.parse(serializeDiagram(diagram)) as {
+    diagram: Diagram
+  }
+  const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.equal(result.diagram.coordinateAnchors?.[0]?.tikzName, 'coord1Invalid')
+})
+
+test('coordinate anchors validate global symbolic and work-plane-local positions', () => {
+  const symbolicDiagram = createEmptyDiagram({ ambientDimension: 3 })
+  symbolicDiagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  symbolicDiagram.coordinateAnchors = [
+    {
+      id: 'coord-symbolic',
+      name: 'Symbolic',
+      tikzName: 'S',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'symbolic', expression: 'R + 1', previewValue: 3 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      },
+    },
+    {
+      id: 'coord-local',
+      name: 'Local',
+      tikzName: 'L',
+      position: workPlaneLocalAnchorPosition(),
+    },
+  ]
+
+  assert.equal(validateDiagram(symbolicDiagram).valid, true)
+})
+
+test('coordinate anchor save and load round-trip preserves anchors', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPosition(1, 2, 3),
+      locked: true,
+    }),
+  ]
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  assert.deepEqual(result.diagram.coordinateAnchors, diagram.coordinateAnchors)
 })
 
 test('serializeDiagram writes 3D camera as view metadata', () => {
@@ -2169,6 +2527,90 @@ function ensureLayerMetadataAndPathArrowDefaults(diagram: Diagram): Diagram {
           }
         : stratum,
     ),
+  }
+}
+
+type RawSavedDiagramFixture = {
+  format: unknown
+  version: unknown
+  diagram: {
+    coordinateAnchors?: unknown
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+function savedDiagramWithRawCoordinateAnchor(
+  position: unknown,
+): RawSavedDiagramFixture {
+  const saved = JSON.parse(
+    serializeDiagram(createEmptyDiagram({ ambientDimension: 3 })),
+  ) as RawSavedDiagramFixture
+
+  saved.diagram.coordinateAnchors = [
+    {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position,
+    },
+  ]
+
+  return saved
+}
+
+function parseRawSavedDiagramWithoutThrow(
+  saved: unknown,
+): ReturnType<typeof parseSavedDiagramJson> {
+  let result: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+  assert.doesNotThrow(() => {
+    result = parseSavedDiagramJson(JSON.stringify(saved))
+  })
+
+  if (result === undefined) {
+    throw new Error('Expected parseSavedDiagramJson to return a result.')
+  }
+
+  return result
+}
+
+function savedNumericCoordinateComponent(value: number): unknown {
+  return {
+    kind: 'numeric',
+    value,
+  }
+}
+
+function globalAnchorPosition(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
+  }
+}
+
+function workPlaneLocalAnchorPosition(): CoordinateAnchorPosition {
+  return {
+    kind: 'workPlaneLocal',
+    frame: {
+      origin: { x: 0, y: 0, z: 0 },
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    local: {
+      a: { kind: 'numeric', value: 1 },
+      b: { kind: 'numeric', value: 2 },
+    },
+    preview: { x: 1, y: 2, z: 0 },
   }
 }
 
