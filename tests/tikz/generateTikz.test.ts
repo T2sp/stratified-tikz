@@ -310,6 +310,34 @@ test('missing coordinate references are rejected by validation', () => {
   )
 })
 
+test('dangling coordinate refs do not export as stale numeric helper coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'missing-ref-path',
+    name: 'Missing reference path',
+    style: curveStyle(),
+    points: [
+      rawCoordinateReferencePoint('missing-coordinate', { x: 0, y: 0, z: 0 }),
+      { x: 2, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validateDiagram(diagram).valid, false)
+  assert.match(
+    tikz,
+    /Curve "Missing reference path" \[missing-ref-path\] omitted because its path contains non-finite coordinates/,
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePolyMissingReferencePath0p0\) at \(0,0\);/)
+  assert.doesNotMatch(tikz, /unresolvedCoordinateRefmissingcoordinate/)
+})
+
 test('coordinate references round-trip through save and load', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.coordinateAnchors = testCoordinateAnchors(diagram, [

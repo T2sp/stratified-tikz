@@ -8,6 +8,11 @@ import { serializeDiagram } from '../../src/model/serialization.ts'
 import { setLayerLock } from '../../src/model/layers.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+  resolveDiagramCoordinateRefs,
+} from '../../src/model/coordinateReferences.ts'
+import {
   applyUserStylePresetToStratum,
   createUserStylePresetFromStyle,
 } from '../../src/model/stylePresets.ts'
@@ -25,7 +30,18 @@ import {
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
 } from '../../src/ui/inspectorDisclosure.ts'
-import type { AmbientDimension, CurveStyle, Diagram } from '../../src/model/types.ts'
+import type {
+  AmbientDimension,
+  CoordinateComponent,
+  CoordinateAnchorPosition,
+  CurveStyle,
+  Diagram,
+  LabelStyle,
+  PointStyle,
+  SheetStyle,
+  Vec3,
+  WorkPlaneFrameSnapshot,
+} from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addCubicBezierCurveStratum,
@@ -203,6 +219,294 @@ function createCoordinateSelectionDiagram(): Diagram {
   }
 }
 
+function createReferencedCoordinateDeletionDiagram(): Diagram {
+  const diagram = createEmptyDiagramForTest(3)
+
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPosition({
+        x: { kind: 'symbolic', expression: 'R', previewValue: 2 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      }),
+    }),
+  ]
+  diagram.coordinateAnchors.push(
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      position: globalAnchorPosition({
+        x: { kind: 'numeric', value: 4 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      }),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-c',
+      name: 'C',
+      position: globalAnchorPosition({
+        x: { kind: 'numeric', value: 2 },
+        y: { kind: 'numeric', value: 2 },
+        z: { kind: 'numeric', value: 0 },
+      }),
+    }),
+  )
+
+  diagram.strata = [
+    {
+      id: 'ref-path',
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      name: 'Reference path',
+      style: defaultCurveStyleForTest(),
+      styleSegments: [],
+      points: [
+        coordinateReferencePoint(diagram, 'coord-a'),
+        coordinateReferencePoint(diagram, 'coord-b'),
+      ],
+      layer: 0,
+    },
+    {
+      id: 'ref-point',
+      codim: 3,
+      geometricKind: 'point',
+      name: 'Reference point',
+      style: defaultPointStyleForTest(),
+      position: coordinateReferencePoint(diagram, 'coord-a'),
+      layer: 0,
+    },
+    {
+      id: 'ref-sheet',
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      name: 'Reference sheet',
+      style: defaultSheetStyleForTest(),
+      vertices: [
+        coordinateReferencePoint(diagram, 'coord-a'),
+        coordinateReferencePoint(diagram, 'coord-b'),
+        coordinateReferencePoint(diagram, 'coord-c'),
+      ],
+      layer: 0,
+    },
+  ]
+  diagram.labels = [
+    {
+      id: 'ref-label',
+      geometricKind: 'label',
+      name: 'Reference label',
+      text: '$F$',
+      position: coordinateReferencePoint(diagram, 'coord-a'),
+      style: defaultLabelStyleForTest(),
+      layer: 0,
+    },
+  ]
+
+  return diagram
+}
+
+function createLocalCoordinateDeletionDiagram(): Diagram {
+  const diagram = createEmptyDiagramForTest(3)
+  const frame = xyFrameForTest()
+
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-p',
+      name: 'P',
+      tikzName: 'P',
+      position: {
+        kind: 'workPlaneLocal',
+        frame,
+        local: {
+          a: { kind: 'symbolic', expression: 'R', previewValue: 2 },
+          b: { kind: 'numeric', value: 1 },
+        },
+        preview: { x: 2, y: 1, z: 0 },
+      },
+    },
+  ]
+  diagram.strata = [
+    {
+      id: 'local-path',
+      codim: 2,
+      geometricKind: 'curve',
+      kind: 'polyline',
+      name: 'Local path',
+      style: defaultCurveStyleForTest(),
+      styleSegments: [],
+      points: [
+        coordinateReferencePoint(diagram, 'coord-p'),
+        workPlaneLocalPointForTest(frame, 3, 1),
+      ],
+      layer: 0,
+    },
+  ]
+
+  return diagram
+}
+
+function globalAnchorPosition(
+  value: Record<'x' | 'y' | 'z', CoordinateComponent>,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value,
+  }
+}
+
+function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
+}
+
+function xyFrameForTest(): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 0, y: 0, z: 0 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function workPlaneLocalPointForTest(
+  frame: WorkPlaneFrameSnapshot,
+  a: number,
+  b: number,
+): Vec3 {
+  return {
+    x: a,
+    y: b,
+    z: 0,
+    symbolic: {
+      x: { kind: 'numeric', value: a },
+      y: { kind: 'numeric', value: b },
+      z: { kind: 'numeric', value: 0 },
+      source: {
+        kind: 'workPlaneLocal',
+        frame: structuredClone(frame) as WorkPlaneFrameSnapshot,
+        local: {
+          a: { kind: 'numeric', value: a },
+          b: { kind: 'numeric', value: b },
+        },
+      },
+    },
+  }
+}
+
+function defaultCurveStyleForTest(): CurveStyle {
+  return {
+    kind: 'curveStyle',
+    strokeColor: '#000000',
+    strokeOpacity: 1,
+    lineWidth: 1.2,
+    lineStyle: 'solid',
+  }
+}
+
+function defaultPointStyleForTest(): PointStyle {
+  return {
+    kind: 'pointStyle',
+    color: '#000000',
+    opacity: 1,
+    shape: 'circle',
+    fill: 'filled',
+    size: 3,
+  }
+}
+
+function defaultSheetStyleForTest(): SheetStyle {
+  return {
+    kind: 'sheetStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#4D9DE0',
+    strokeOpacity: 1,
+  }
+}
+
+function defaultLabelStyleForTest(): LabelStyle {
+  return {
+    kind: 'labelStyle',
+    color: '#000000',
+    opacity: 1,
+    fontSize: 10,
+    anchor: 'center',
+  }
+}
+
+function findPolylineCurveForTest(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { geometricKind: 'curve'; kind: 'polyline' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'curve' ||
+    stratum.kind !== 'polyline'
+  ) {
+    throw new Error(`Expected ${id} to be a polyline curve.`)
+  }
+
+  return stratum
+}
+
+function findPointStratumForTest(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { geometricKind: 'point' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum === undefined || stratum.geometricKind !== 'point') {
+    throw new Error(`Expected ${id} to be a point.`)
+  }
+
+  return stratum
+}
+
+function findPolygonSheetForTest(
+  diagram: Diagram,
+  id: string,
+): Extract<Diagram['strata'][number], { geometricKind: 'sheet'; kind: 'polygonSheet' }> {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum === undefined ||
+    stratum.geometricKind !== 'sheet' ||
+    stratum.kind !== 'polygonSheet'
+  ) {
+    throw new Error(`Expected ${id} to be a polygon sheet.`)
+  }
+
+  return stratum
+}
+
 test('findSelectedElement finds a selected stratum by id', () => {
   const selected = findSelectedElement(twoDimensionalExample, {
     kind: 'stratum',
@@ -242,6 +546,119 @@ test('coordinate selection is not cleared by layer filter', () => {
     clearSelectionForLayerFilter(diagram, selection, { kind: 'layer', layer: 99 }),
     selection,
   )
+})
+
+test('removeSelectedElement deletes an unused coordinate anchor', () => {
+  const result = removeSelectedElement(createCoordinateSelectionDiagram(), {
+    kind: 'coordinate',
+    id: 'coordA',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.detachedCoordinateReferenceCount, 0)
+  assert.equal(result.selectedElement, null)
+  assert.equal(result.diagram.coordinateAnchors?.length, 0)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('removeSelectedElement detaches coordinate refs before deleting a referenced coordinate', () => {
+  const result = removeSelectedElement(createReferencedCoordinateDeletionDiagram(), {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.detachedCoordinateReferenceCount, 4)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(
+    result.diagram.coordinateAnchors?.some((anchor) => anchor.id === 'coord-a'),
+    false,
+  )
+  assert.equal(JSON.stringify(result.diagram).includes('"coordinateId":"coord-a"'), false)
+
+  const curve = findPolylineCurveForTest(result.diagram, 'ref-path')
+  const detachedEndpoint = curve.points[0]
+
+  assert.equal(coordinateReferenceSourceForPoint(detachedEndpoint), null)
+  assert.equal(detachedEndpoint.x, 2)
+  assert.equal(detachedEndpoint.symbolic?.x.kind, 'symbolic')
+  assert.equal(
+    detachedEndpoint.symbolic?.x.kind === 'symbolic'
+      ? detachedEndpoint.symbolic.x.expression
+      : '',
+    'R',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.points[1])?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findPointStratumForTest(result.diagram, 'ref-point').position,
+    ),
+    null,
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findPolygonSheetForTest(result.diagram, 'ref-sheet').vertices[0],
+    ),
+    null,
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      result.diagram.labels.find((label) => label.id === 'ref-label')?.position ??
+        { x: 0, y: 0, z: 0 },
+    ),
+    null,
+  )
+
+  const resolved = resolveDiagramCoordinateRefs(result.diagram)
+  const resolvedCurve = findPolylineCurveForTest(resolved, 'ref-path')
+  const tikz = generateTikz(result.diagram)
+
+  assert.deepEqual(
+    {
+      x: resolvedCurve.points[0].x,
+      y: resolvedCurve.points[0].y,
+      z: resolvedCurve.points[0].z,
+    },
+    { x: 2, y: 0, z: 0 },
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(A\)/)
+  assert.doesNotMatch(tikz, /\(A\)/)
+  assert.doesNotMatch(tikz, /unresolvedCoordinateRef/)
+  assert.match(tikz, /\(\{\\R\},0,0\)/)
+})
+
+test('removeSelectedElement preserves work-plane-local source when detaching a local coordinate', () => {
+  const diagram = createLocalCoordinateDeletionDiagram()
+  const originalPosition = diagram.coordinateAnchors?.[0]?.position
+  const originalFrame =
+    originalPosition?.kind === 'workPlaneLocal' ? originalPosition.frame : null
+  const result = removeSelectedElement(diagram, {
+    kind: 'coordinate',
+    id: 'coord-p',
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.detachedCoordinateReferenceCount, 1)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+
+  const curve = findPolylineCurveForTest(result.diagram, 'local-path')
+  const source = curve.points[0].symbolic?.source
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  if (source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected detached local source.')
+  }
+  assert.equal(source.local.a.kind, 'symbolic')
+  assert.equal(source.local.a.kind === 'symbolic' ? source.local.a.expression : '', 'R')
+  assert.deepEqual(source.frame, xyFrameForTest())
+  assert.notEqual(source.frame, originalFrame)
+  assert.doesNotMatch(tikz, /\\coordinate \(P\)/)
+  assert.doesNotMatch(tikz, /\(P\)/)
+  assert.match(tikz, /\(\{\\R\},1\) -- \(3,1\)/)
 })
 
 test('clearSelectionIfMissing clears selection when switching diagrams', () => {

@@ -12,6 +12,9 @@ import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
 import {
+  detachCoordinateAnchorReferencesMany,
+} from '../model/coordinateReferences.ts'
+import {
   diagramTranslationContext,
   isZeroTranslationVector,
   translateStratum,
@@ -137,6 +140,8 @@ export type BulkRemoveSelectedElementsResult = {
   selectedElement: SelectedElement
   removed: boolean
   removedCount: number
+  detachedCoordinateReferenceCount?: number
+  error?: string
 }
 
 export type BulkRemoveSelectedElementsWithLayerFilterResult =
@@ -627,7 +632,34 @@ export function removeSelectedElements(
   let removedStrata = 0
   let removedLabels = 0
   let removedCoordinates = 0
-  const strata = diagram.strata.filter((stratum) => {
+  const selectedCoordinateIds = (diagram.coordinateAnchors ?? [])
+    .filter((anchor) =>
+      selectedKeys.has(selectedElementKey({ kind: 'coordinate', id: anchor.id })),
+    )
+    .map((anchor) => anchor.id)
+  const detached =
+    selectedCoordinateIds.length === 0
+      ? {
+          ok: true as const,
+          value: {
+            diagram,
+            detachedCount: 0,
+          },
+        }
+      : detachCoordinateAnchorReferencesMany(diagram, selectedCoordinateIds)
+
+  if (!detached.ok) {
+    return {
+      diagram,
+      selectedElement: selection,
+      removed: false,
+      removedCount: 0,
+      error: `Could not delete selected coordinates: ${detached.error.message}`,
+    }
+  }
+
+  const detachedDiagram = detached.value.diagram
+  const strata = detachedDiagram.strata.filter((stratum) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'stratum', id: stratum.id }),
     )
@@ -640,7 +672,7 @@ export function removeSelectedElements(
     removedCurve = removedCurve || stratum.geometricKind === 'curve'
     return false
   })
-  const labels = diagram.labels.filter((label) => {
+  const labels = detachedDiagram.labels.filter((label) => {
     const selected = selectedKeys.has(selectedElementKey({ kind: 'label', id: label.id }))
 
     if (!selected) {
@@ -650,7 +682,7 @@ export function removeSelectedElements(
     removedLabels += 1
     return false
   })
-  const coordinateAnchors = (diagram.coordinateAnchors ?? []).filter((anchor) => {
+  const coordinateAnchors = (detachedDiagram.coordinateAnchors ?? []).filter((anchor) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'coordinate', id: anchor.id }),
     )
@@ -674,7 +706,7 @@ export function removeSelectedElements(
   }
 
   const nextDiagram = {
-    ...diagram,
+    ...detachedDiagram,
     coordinateAnchors,
     strata,
     labels,
@@ -685,6 +717,7 @@ export function removeSelectedElements(
     selectedElement: null,
     removed: true,
     removedCount,
+    detachedCoordinateReferenceCount: detached.value.detachedCount,
   }
 }
 
@@ -824,9 +857,15 @@ export function applyBulkDeleteToEditorState<T extends BulkOperationEditorState>
     cubicBezierDraft: null,
     pathDraft: null,
     sheetPolygonDraft: null,
-    layerOperationStatus: result.removed
-      ? `Deleted ${bulkElementCountLabel(result.removedCount)}.`
-      : 'No selected objects deleted.',
+    layerOperationStatus:
+      result.error !== undefined
+        ? result.error
+        : result.removed
+          ? bulkDeleteStatusMessage(
+              result.removedCount,
+              result.detachedCoordinateReferenceCount ?? 0,
+            )
+          : 'No selected objects deleted.',
   })
 }
 
@@ -1722,6 +1761,23 @@ function cloneDiagramValue<T>(value: T): T {
 
 function bulkElementCountLabel(count: number): string {
   return `${count} selected ${count === 1 ? 'object' : 'objects'}`
+}
+
+function bulkCoordinateReferenceCountLabel(count: number): string {
+  return `${count} coordinate ${count === 1 ? 'reference' : 'references'}`
+}
+
+function bulkDeleteStatusMessage(
+  removedCount: number,
+  detachedCoordinateReferenceCount: number,
+): string {
+  const deleted = `Deleted ${bulkElementCountLabel(removedCount)}`
+
+  return detachedCoordinateReferenceCount === 0
+    ? `${deleted}.`
+    : `${deleted} and detached ${bulkCoordinateReferenceCountLabel(
+        detachedCoordinateReferenceCount,
+      )}.`
 }
 
 type UniqueIdAllocator = {

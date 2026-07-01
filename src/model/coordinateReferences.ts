@@ -1,8 +1,12 @@
-import { coordinateAnchorPositionPreview } from './coordinateAnchors.ts'
+import {
+  coordinateAnchorPositionPreview,
+  coordinateAnchorPositionToVec3,
+} from './coordinateAnchors.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
   ClosedPathBoundary,
+  CoordinateComponent,
   CoonsBoundarySnapshot,
   CoordinateAnchor,
   CoordinateReferenceSource,
@@ -14,6 +18,7 @@ import type {
   PathSegment,
   PathTemplate,
   Stratum,
+  TextLabel,
   Vec3,
   WorkPlaneFrameSnapshot,
 } from './types.ts'
@@ -38,6 +43,84 @@ const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
   ])
 
 const workPlaneFrameFields = ['origin', 'u', 'v', 'normal'] as const
+
+export type DetachCoordinateAnchorReferencesResult =
+  | {
+      ok: true
+      value: {
+        diagram: Diagram
+        detachedCount: number
+      }
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachCoordinateReferenceContext = {
+  replacements: ReadonlyMap<string, Vec3>
+  detachedCount: number
+}
+
+type DetachPointResult =
+  | {
+      ok: true
+      point: Vec3
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachPathSegmentResult =
+  | {
+      ok: true
+      segment: PathSegment
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachPathTemplateResult =
+  | {
+      ok: true
+      template: PathTemplate
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachStratumResult =
+  | {
+      ok: true
+      stratum: Stratum
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachClosedPathBoundariesResult =
+  | {
+      ok: true
+      boundaries: ClosedPathBoundary[]
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type DetachPathSegmentsResult =
+  | {
+      ok: true
+      segments: PathSegment[]
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
 
 // CoordinateRef support is narrower than symbolic coordinate support because
 // TikZ export must preserve `(name)` references. Frame fields, derived previews,
@@ -92,6 +175,127 @@ export function cloneCoordinateSource(source: CoordinateSource): CoordinateSourc
   }
 }
 
+export function detachCoordinateAnchorReferences(
+  diagram: Diagram,
+  coordinateId: string,
+): DetachCoordinateAnchorReferencesResult {
+  return detachCoordinateAnchorReferencesMany(diagram, [coordinateId])
+}
+
+export function detachCoordinateAnchorReferencesMany(
+  diagram: Diagram,
+  coordinateIds: readonly string[],
+): DetachCoordinateAnchorReferencesResult {
+  const uniqueCoordinateIds = [...new Set(coordinateIds)]
+
+  if (uniqueCoordinateIds.length === 0) {
+    return {
+      ok: true,
+      value: {
+        diagram,
+        detachedCount: 0,
+      },
+    }
+  }
+
+  const replacements = new Map<string, Vec3>()
+
+  for (const coordinateId of uniqueCoordinateIds) {
+    const anchorIndex = (diagram.coordinateAnchors ?? []).findIndex(
+      (anchor) => anchor.id === coordinateId,
+    )
+
+    if (anchorIndex < 0) {
+      return {
+        ok: false,
+        error: {
+          path: 'coordinateAnchors',
+          message: `Coordinate anchor "${coordinateId}" does not exist.`,
+        },
+      }
+    }
+
+    const anchor = diagram.coordinateAnchors?.[anchorIndex]
+
+    if (anchor === undefined) {
+      return {
+        ok: false,
+        error: {
+          path: `coordinateAnchors[${anchorIndex}]`,
+          message: `Coordinate anchor "${coordinateId}" does not exist.`,
+        },
+      }
+    }
+
+    const detachedPoint = detachedCoordinatePointForAnchor(
+      anchor,
+      diagram.ambientDimension,
+      `coordinateAnchors[${anchorIndex}].position`,
+    )
+
+    if (!detachedPoint.ok) {
+      return detachedPoint
+    }
+
+    replacements.set(coordinateId, detachedPoint.point)
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    replacements,
+    detachedCount: 0,
+  }
+  const strata: Stratum[] = []
+
+  for (const [index, stratum] of diagram.strata.entries()) {
+    const detached = detachStratumCoordinateReferences(
+      stratum,
+      context,
+      `strata[${index}]`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    strata.push(detached.stratum)
+  }
+
+  const labels: TextLabel[] = []
+
+  for (const [index, label] of diagram.labels.entries()) {
+    const detached = detachCoordinateReferencePoint(
+      label.position,
+      context,
+      `labels[${index}].position`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    labels.push(
+      detached.point === label.position
+        ? label
+        : {
+            ...label,
+            position: detached.point,
+          },
+    )
+  }
+
+  return {
+    ok: true,
+    value: {
+      diagram: {
+        ...diagram,
+        strata,
+        labels,
+      },
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
 export function coordinateReferenceVec3ForAnchor(
   anchor: CoordinateAnchor,
   ambientDimension: AmbientDimension,
@@ -122,7 +326,10 @@ export function resolveCoordinateReferencePoint(
     return point
   }
 
-  return coordinateReferenceVec3ForAnchorId(diagram, source.coordinateId) ?? point
+  return (
+    coordinateReferenceVec3ForAnchorId(diagram, source.coordinateId) ??
+    unresolvedCoordinateReferenceVec3(source)
+  )
 }
 
 export function resolveDiagramCoordinateRefs(diagram: Diagram): Diagram {
@@ -306,6 +513,512 @@ function resolvePathSegmentCoordinateRefs(
         end: resolveCoordinateReferencePoint(diagram, segment.end),
         center: resolveCoordinateReferencePoint(diagram, segment.center),
       }
+  }
+}
+
+function detachedCoordinatePointForAnchor(
+  anchor: CoordinateAnchor,
+  ambientDimension: AmbientDimension,
+  path: string,
+): DetachPointResult {
+  let point: Vec3
+
+  try {
+    point =
+      anchor.position.kind === 'workPlaneLocal' && ambientDimension !== 3
+        ? coordinateAnchorPositionPreview(anchor.position, ambientDimension)
+        : coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
+  } catch {
+    return {
+      ok: false,
+      error: {
+        path,
+        message: `Could not detach coordinate "${anchor.name}" because its position is malformed.`,
+      },
+    }
+  }
+
+  if (!isFiniteVec3(point)) {
+    return {
+      ok: false,
+      error: {
+        path,
+        message: `Could not detach coordinate "${anchor.name}" because its position is not finite.`,
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    point,
+  }
+}
+
+function detachStratumCoordinateReferences(
+  stratum: Stratum,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachStratumResult {
+  switch (stratum.geometricKind) {
+    case 'region':
+      if (stratum.kind !== 'filledRegion') {
+        return {
+          ok: true,
+          stratum,
+        }
+      }
+
+      const boundaries = detachClosedPathBoundariesCoordinateReferences(
+        stratum.boundaries,
+        context,
+        `${path}.boundaries`,
+      )
+
+      if (!boundaries.ok) {
+        return boundaries
+      }
+
+      return {
+        ok: true,
+        stratum: {
+          ...stratum,
+          boundaries: boundaries.boundaries,
+        },
+      }
+    case 'sheet':
+      switch (stratum.kind) {
+        case 'quadSheet': {
+          const corners = detachVec3ArrayCoordinateReferences(
+            stratum.corners,
+            context,
+            `${path}.corners`,
+          )
+
+          if (!corners.ok) {
+            return corners
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              corners: corners.points as typeof stratum.corners,
+            },
+          }
+        }
+        case 'polygonSheet': {
+          const vertices = detachVec3ArrayCoordinateReferences(
+            stratum.vertices,
+            context,
+            `${path}.vertices`,
+          )
+
+          if (!vertices.ok) {
+            return vertices
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              vertices: vertices.points,
+            },
+          }
+        }
+        case 'workPlaneFilledSheet':
+        {
+          const boundaries = detachClosedPathBoundariesCoordinateReferences(
+            stratum.boundaries,
+            context,
+            `${path}.boundaries`,
+          )
+
+          if (!boundaries.ok) {
+            return boundaries
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              boundaries: boundaries.boundaries,
+            },
+          }
+        }
+        case 'curvedSheet':
+          return {
+            ok: true,
+            stratum,
+          }
+      }
+    case 'curve':
+      switch (stratum.kind) {
+        case 'polyline':
+        case 'cubicBezier': {
+          const points = detachVec3ArrayCoordinateReferences(
+            stratum.points,
+            context,
+            `${path}.points`,
+          )
+
+          if (!points.ok) {
+            return points
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              points: points.points,
+            },
+          }
+        }
+        case 'concatenatedPath': {
+          const segments = detachPathSegmentsCoordinateReferences(
+            stratum.segments,
+            context,
+            `${path}.segments`,
+          )
+
+          if (!segments.ok) {
+            return segments
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              segments: segments.segments,
+            },
+          }
+        }
+        case 'templatePath': {
+          const template = detachPathTemplateCoordinateReferences(
+            stratum.template,
+            context,
+            `${path}.template`,
+          )
+
+          if (!template.ok) {
+            return template
+          }
+
+          return {
+            ok: true,
+            stratum: {
+              ...stratum,
+              template: template.template,
+            },
+          }
+        }
+        case 'grid':
+          return {
+            ok: true,
+            stratum,
+          }
+      }
+    case 'point': {
+      const position = detachCoordinateReferencePoint(
+        stratum.position,
+        context,
+        `${path}.position`,
+      )
+
+      if (!position.ok) {
+        return position
+      }
+
+      return {
+        ok: true,
+        stratum: {
+          ...stratum,
+          position: position.point,
+        },
+      }
+    }
+  }
+}
+
+function detachPathTemplateCoordinateReferences(
+  template: PathTemplate,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachPathTemplateResult {
+  const center = detachCoordinateReferencePoint(
+    template.center,
+    context,
+    `${path}.center`,
+  )
+
+  if (!center.ok) {
+    return center
+  }
+
+  return {
+    ok: true,
+    template: {
+      ...template,
+      center: center.point,
+    },
+  }
+}
+
+function detachClosedPathBoundariesCoordinateReferences(
+  boundaries: readonly ClosedPathBoundary[],
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachClosedPathBoundariesResult {
+  const detachedBoundaries: ClosedPathBoundary[] = []
+
+  for (const [index, boundary] of boundaries.entries()) {
+    const segments = detachPathSegmentsCoordinateReferences(
+      boundary.segments,
+      context,
+      `${path}[${index}].segments`,
+    )
+
+    if (!segments.ok) {
+      return segments
+    }
+
+    detachedBoundaries.push({
+      ...boundary,
+      segments: segments.segments,
+    })
+  }
+
+  return {
+    ok: true,
+    boundaries: detachedBoundaries,
+  }
+}
+
+function detachPathSegmentsCoordinateReferences(
+  segments: readonly PathSegment[],
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachPathSegmentsResult {
+  const detachedSegments: PathSegment[] = []
+
+  for (const [index, segment] of segments.entries()) {
+    const detached = detachPathSegmentCoordinateReferences(
+      segment,
+      context,
+      `${path}[${index}]`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    detachedSegments.push(detached.segment)
+  }
+
+  return {
+    ok: true,
+    segments: detachedSegments,
+  }
+}
+
+function detachPathSegmentCoordinateReferences(
+  segment: PathSegment,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachPathSegmentResult {
+  switch (segment.kind) {
+    case 'line': {
+      const start = detachCoordinateReferencePoint(
+        segment.start,
+        context,
+        `${path}.start`,
+      )
+      const end = detachCoordinateReferencePoint(
+        segment.end,
+        context,
+        `${path}.end`,
+      )
+
+      if (!start.ok) {
+        return start
+      }
+
+      if (!end.ok) {
+        return end
+      }
+
+      return {
+        ok: true,
+        segment: {
+          ...segment,
+          start: start.point,
+          end: end.point,
+        },
+      }
+    }
+    case 'cubicBezier': {
+      const start = detachCoordinateReferencePoint(
+        segment.start,
+        context,
+        `${path}.start`,
+      )
+      const control1 = detachCoordinateReferencePoint(
+        segment.control1,
+        context,
+        `${path}.control1`,
+      )
+      const control2 = detachCoordinateReferencePoint(
+        segment.control2,
+        context,
+        `${path}.control2`,
+      )
+      const end = detachCoordinateReferencePoint(
+        segment.end,
+        context,
+        `${path}.end`,
+      )
+
+      if (!start.ok) {
+        return start
+      }
+
+      if (!control1.ok) {
+        return control1
+      }
+
+      if (!control2.ok) {
+        return control2
+      }
+
+      if (!end.ok) {
+        return end
+      }
+
+      return {
+        ok: true,
+        segment: {
+          ...segment,
+          start: start.point,
+          control1: control1.point,
+          control2: control2.point,
+          end: end.point,
+        },
+      }
+    }
+    case 'arc': {
+      const start = detachCoordinateReferencePoint(
+        segment.start,
+        context,
+        `${path}.start`,
+      )
+      const end = detachCoordinateReferencePoint(
+        segment.end,
+        context,
+        `${path}.end`,
+      )
+      const center = detachCoordinateReferencePoint(
+        segment.center,
+        context,
+        `${path}.center`,
+      )
+
+      if (!start.ok) {
+        return start
+      }
+
+      if (!end.ok) {
+        return end
+      }
+
+      if (!center.ok) {
+        return center
+      }
+
+      return {
+        ok: true,
+        segment: {
+          ...segment,
+          start: start.point,
+          end: end.point,
+          center: center.point,
+        },
+      }
+    }
+  }
+}
+
+function detachVec3ArrayCoordinateReferences(
+  points: readonly Vec3[],
+  context: DetachCoordinateReferenceContext,
+  path: string,
+):
+  | {
+      ok: true
+      points: Vec3[]
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    } {
+  const detachedPoints: Vec3[] = []
+
+  for (const [index, point] of points.entries()) {
+    const detached = detachCoordinateReferencePoint(
+      point,
+      context,
+      `${path}[${index}]`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    detachedPoints.push(detached.point)
+  }
+
+  return {
+    ok: true,
+    points: detachedPoints,
+  }
+}
+
+function detachCoordinateReferencePoint(
+  point: Vec3,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachPointResult {
+  const source = coordinateReferenceSourceForPoint(point)
+
+  if (source === null) {
+    return {
+      ok: true,
+      point,
+    }
+  }
+
+  const replacement = context.replacements.get(source.coordinateId)
+
+  if (replacement === undefined) {
+    return {
+      ok: true,
+      point,
+    }
+  }
+
+  if (!isFiniteVec3(replacement)) {
+    return {
+      ok: false,
+      error: {
+        path,
+        message: `Could not detach coordinate reference "${source.coordinateId}" because its replacement point is not finite.`,
+      },
+    }
+  }
+
+  context.detachedCount += 1
+
+  return {
+    ok: true,
+    point: cloneVec3(replacement),
   }
 }
 
@@ -966,6 +1679,28 @@ function vec3FromCoordinateReference(
   }
 }
 
+function unresolvedCoordinateReferenceVec3(
+  source: CoordinateReferenceSource,
+): Vec3 {
+  const preview = cloneVec3(source.preview)
+
+  return {
+    x: Number.NaN,
+    y: Number.NaN,
+    z: Number.NaN,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'coordinateRef',
+        coordinateId: source.coordinateId,
+        preview,
+      },
+    },
+  }
+}
+
 function findCoordinateAnchorById(
   diagram: Diagram,
   coordinateId: string,
@@ -976,11 +1711,40 @@ function findCoordinateAnchorById(
 }
 
 function cloneVec3(point: Vec3): Vec3 {
-  return {
+  const cloned = {
     x: point.x,
     y: point.y,
     z: point.z,
   }
+
+  return point.symbolic === undefined
+    ? cloned
+    : {
+        ...cloned,
+        symbolic: {
+          x: cloneCoordinateComponent(point.symbolic.x),
+          y: cloneCoordinateComponent(point.symbolic.y),
+          z: cloneCoordinateComponent(point.symbolic.z),
+          ...(point.symbolic.source === undefined
+            ? {}
+            : { source: cloneCoordinateSource(point.symbolic.source) }),
+        },
+      }
+}
+
+function cloneCoordinateComponent(
+  component: CoordinateComponent,
+): CoordinateComponent {
+  return component.kind === 'numeric'
+    ? {
+        kind: 'numeric',
+        value: component.value,
+      }
+    : {
+        kind: 'symbolic',
+        expression: component.expression,
+        previewValue: component.previewValue,
+      }
 }
 
 function isFiniteVec3(point: unknown): point is Vec3 {

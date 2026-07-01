@@ -6633,7 +6633,10 @@ function coordinateReferenceTikzName(
     return null
   }
 
-  return context.coordinateAnchorNames.get(source.coordinateId) ?? null
+  return (
+    context.coordinateAnchorNames.get(source.coordinateId) ??
+    `unresolvedCoordinateRef${toIdentifierPart(source.coordinateId, 'Missing')}`
+  )
 }
 
 function defineConcatenatedPathCoordinates(

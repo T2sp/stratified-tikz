@@ -35,6 +35,9 @@ import {
   type ScalarInputValue,
 } from '../model/scalarExpressions.ts'
 import {
+  detachCoordinateAnchorReferences,
+} from '../model/coordinateReferences.ts'
+import {
   cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
 } from '../model/workPlaneLocalCoordinates.ts'
@@ -132,6 +135,8 @@ export type RemoveSelectedElementResult = {
   diagram: Diagram
   selectedElement: SelectedElement
   removed: boolean
+  detachedCoordinateReferenceCount?: number
+  error?: string
 }
 
 export type RemoveSelectedElementWithLayerFilterResult =
@@ -227,20 +232,48 @@ export function removeSelectedElement(
   }
 
   if (selectedElement.kind === 'coordinate') {
-    let removed = false
-    const coordinateAnchors = (diagram.coordinateAnchors ?? []).filter((anchor) => {
-      if (!removed && anchor.id === selectedElement.id) {
-        removed = true
-        return false
-      }
+    const selectedAnchor = (diagram.coordinateAnchors ?? []).find(
+      (anchor) => anchor.id === selectedElement.id,
+    )
 
-      return true
-    })
+    if (selectedAnchor === undefined) {
+      return {
+        diagram,
+        selectedElement: null,
+        removed: false,
+      }
+    }
+
+    const detached = detachCoordinateAnchorReferences(diagram, selectedElement.id)
+
+    if (!detached.ok) {
+      return {
+        diagram,
+        selectedElement,
+        removed: false,
+        error: `Could not delete coordinate "${selectedAnchor.name}": ${detached.error.message}`,
+      }
+    }
+
+    let removed = false
+    const coordinateAnchors = (detached.value.diagram.coordinateAnchors ?? []).filter(
+      (anchor) => {
+        if (!removed && anchor.id === selectedElement.id) {
+          removed = true
+          return false
+        }
+
+        return true
+      },
+    )
 
     return {
-      diagram: removed ? { ...diagram, coordinateAnchors } : diagram,
+      diagram: removed
+        ? { ...detached.value.diagram, coordinateAnchors }
+        : diagram,
       selectedElement: null,
       removed,
+      detachedCoordinateReferenceCount: detached.value.detachedCount,
     }
   }
 
