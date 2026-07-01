@@ -282,6 +282,134 @@ test('detachCoordinateAnchorReferences preserves work-plane-local coordinate sou
   assert.deepEqual(source.local.b, { kind: 'numeric', value: 2 })
 })
 
+test('detachCoordinateAnchorReferences sanitizes self-referential replacement work-plane-local sources', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const sourceFrame = frame(coordinateReferencePoint('coord-a', 10, 20, 30))
+
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: workPlaneLocalAnchorPositionWithFrame(sourceFrame, 2, 3),
+  })
+  const originalPreview = pointPreview(requiredPoint(reference(diagram, 'coord-a')))
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'self-replacement-label',
+    name: 'Self replacement label',
+    text: '$A$',
+    position: reference(diagram, 'coord-a'),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferences(diagram, 'coord-a')
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  const position = requiredPoint(result.value.diagram.labels[0]?.position)
+
+  assert.equal(result.value.detachedCount, 3)
+  assert.equal(position.symbolic, undefined)
+  assert.deepEqual(pointPreview(position), originalPreview)
+  assertNoReferences(result.value.diagram, ['coord-a'])
+  assert.equal(JSON.stringify(result.value.diagram).includes('"coordinateId":"coord-a"'), false)
+  assertDiagramValid(result.value.diagram)
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
+test('detachCoordinateAnchorReferencesMany sanitizes batch replacement work-plane-local frame refs', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  addAnchor(diagram, {
+    id: 'coord-b',
+    name: 'B',
+    tikzName: 'B',
+    position: globalAnchorPosition(5, 5, 0),
+  })
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: workPlaneLocalAnchorPositionWithFrame(
+      frame(reference(diagram, 'coord-b')),
+      2,
+      3,
+    ),
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'batch-replacement-label',
+    name: 'Batch replacement label',
+    text: '$A$',
+    position: reference(diagram, 'coord-a'),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferencesMany(diagram, [
+    'coord-a',
+    'coord-b',
+  ])
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  const position = requiredPoint(result.value.diagram.labels[0]?.position)
+  const source = position.symbolic?.source
+
+  assert.equal(result.value.detachedCount, 3)
+  assert.equal(source?.kind, 'workPlaneLocal')
+  if (source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected a work-plane-local source.')
+  }
+  assert.deepEqual(source.frame.origin, { x: 5, y: 5, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(source.frame.origin), null)
+  assert.deepEqual(pointPreview(position), { x: 7, y: 8, z: 0 })
+  assertNoReferences(result.value.diagram, ['coord-a', 'coord-b'])
+  assertDiagramValid(result.value.diagram)
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
+test('detachCoordinateAnchorReferences fails atomically when replacement source frame ref is missing', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: workPlaneLocalAnchorPositionWithFrame(
+      frame(coordinateReferencePoint('coord-missing', 1, 1, 0)),
+      2,
+      3,
+    ),
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'missing-replacement-label',
+    name: 'Missing replacement label',
+    text: '$A$',
+    position: reference(diagram, 'coord-a'),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferences(diagram, 'coord-a')
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected detach to fail.')
+  }
+  assert.match(result.error.message, /does not exist/)
+  assert.equal(JSON.stringify(diagram), originalJson)
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-a').length, 1)
+})
+
 test('detachCoordinateAnchorReferences falls back for frame fields', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   addAnchor(diagram, {
@@ -1108,4 +1236,13 @@ function assertDiagramValid(diagram: Diagram): void {
   const validation = validateDiagram(diagram)
 
   assert.equal(validation.valid, true, JSON.stringify(validation.errors))
+}
+
+function assertNoReferences(
+  diagram: Diagram,
+  coordinateIds: readonly string[],
+): void {
+  for (const coordinateId of coordinateIds) {
+    assert.equal(findCoordinateAnchorReferences(diagram, coordinateId).length, 0)
+  }
 }

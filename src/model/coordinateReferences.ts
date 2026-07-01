@@ -89,6 +89,7 @@ export type DetachCoordinateAnchorReferencesResult =
 
 type DetachCoordinateReferenceContext = {
   anchorsById: ReadonlyMap<string, CoordinateAnchor>
+  replacementAnchorsById: ReadonlyMap<string, CoordinateAnchor>
   ambientDimension: AmbientDimension
   requireReplacement: boolean
   detachedCount: number
@@ -968,8 +969,17 @@ export function detachCoordinateAnchorReferencesMany(
     return replacements
   }
 
+  const replacementAnchors = coordinateReferenceAnchorMapForExistingAnchors(
+    diagram,
+  )
+
+  if (!replacementAnchors.ok) {
+    return replacementAnchors
+  }
+
   const context: DetachCoordinateReferenceContext = {
     anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacementAnchors.anchorsById,
     ambientDimension: diagram.ambientDimension,
     requireReplacement: false,
     detachedCount: 0,
@@ -1023,15 +1033,31 @@ export function detachCoordinateAnchorReferencesMany(
     return coordinateAnchors
   }
 
+  const nextDiagram = {
+    ...diagram,
+    coordinateAnchors: coordinateAnchors.anchors,
+    strata,
+    labels,
+  }
+  const remainingReference = firstRemainingDetachedCoordinateReference(
+    nextDiagram,
+    uniqueCoordinateIds,
+  )
+
+  if (remainingReference !== null) {
+    return {
+      ok: false,
+      error: {
+        path: remainingReference.path,
+        message: `Could not detach coordinate "${remainingReference.coordinateId}": replacement source still references a coordinate being detached.`,
+      },
+    }
+  }
+
   return {
     ok: true,
     value: {
-      diagram: {
-        ...diagram,
-        coordinateAnchors: coordinateAnchors.anchors,
-        strata,
-        labels,
-      },
+      diagram: nextDiagram,
       detachedCount: context.detachedCount,
     },
   }
@@ -1066,6 +1092,7 @@ export function detachCoordinateReferencesInElements(
 
   const context: DetachCoordinateReferenceContext = {
     anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacements.anchorsById,
     ambientDimension: diagram.ambientDimension,
     requireReplacement: true,
     detachedCount: 0,
@@ -1375,7 +1402,9 @@ function detachedCoordinatePointForAnchor(
     ) {
       point = coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
     } else {
-      point = coordinateAnchorPositionPreview(anchor.position, ambientDimension)
+      point = concreteVec3(
+        coordinateAnchorPositionPreview(anchor.position, ambientDimension),
+      )
     }
   } catch {
     return {
@@ -1492,6 +1521,21 @@ function coordinateReferenceAnchorMapForExistingAnchors(
     diagram,
     (diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
   )
+}
+
+function firstRemainingDetachedCoordinateReference(
+  diagram: Diagram,
+  coordinateIds: readonly string[],
+): CoordinateReferenceLocation | null {
+  for (const coordinateId of coordinateIds) {
+    const reference = findCoordinateAnchorReferences(diagram, coordinateId)[0]
+
+    if (reference !== undefined) {
+      return reference
+    }
+  }
+
+  return null
 }
 
 function detachStratumCoordinateReferences(
@@ -2085,11 +2129,22 @@ function detachCoordinateReferencePoint(
       return replacement
     }
 
+    const sanitizedReplacement = sanitizeDetachedCoordinateReplacement(
+      replacement.point,
+      anchor,
+      context,
+      path,
+    )
+
+    if (!sanitizedReplacement.ok) {
+      return sanitizedReplacement
+    }
+
     context.detachedCount += 1
 
     return {
       ok: true,
-      point: cloneVec3(replacement.point),
+      point: cloneVec3(sanitizedReplacement.point),
     }
   }
 
@@ -2149,6 +2204,138 @@ function detachCoordinateReferencePoint(
       },
     },
   }
+}
+
+function sanitizeDetachedCoordinateReplacement(
+  point: Vec3,
+  anchor: CoordinateAnchor,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachPointResult {
+  const source = point.symbolic?.source
+
+  if (source?.kind !== 'workPlaneLocal') {
+    return {
+      ok: true,
+      point,
+    }
+  }
+
+  const referencesReplacementAnchor = workPlaneFrameContainsCoordinateRef(
+    source.frame,
+    anchor.id,
+  )
+  const frameContext = replacementFrameDetachContext(context)
+  const frame = detachWorkPlaneFrameCoordinateReferences(
+    source.frame,
+    frameContext,
+    `${path}.symbolic.source.frame`,
+    'workPlaneFrameField',
+  )
+  context.detachedCount = frameContext.detachedCount
+
+  if (!frame.ok) {
+    return frame
+  }
+
+  if (referencesReplacementAnchor) {
+    const concretePoint = concreteVec3(point)
+
+    if (!isFiniteVec3(concretePoint)) {
+      return {
+        ok: false,
+        error: {
+          path,
+          message: `Could not detach coordinate "${anchor.name}": cyclic replacement preview is not finite.`,
+        },
+      }
+    }
+
+    return {
+      ok: true,
+      point: concretePoint,
+    }
+  }
+
+  if (frame.frame === source.frame) {
+    return {
+      ok: true,
+      point,
+    }
+  }
+
+  const refreshedSource = {
+    ...source,
+    frame: frame.frame,
+  }
+  const preview = recomputeWorkPlaneLocalPreview(
+    refreshedSource,
+    `${path}.symbolic.source`,
+  )
+
+  if (!preview.ok) {
+    return preview
+  }
+
+  return {
+    ok: true,
+    point: {
+      ...preview.preview,
+      symbolic: {
+        x: numericCoordinateComponent(preview.preview.x),
+        y: numericCoordinateComponent(preview.preview.y),
+        z: numericCoordinateComponent(preview.preview.z),
+        source: refreshedSource,
+      },
+    },
+  }
+}
+
+function replacementFrameDetachContext(
+  context: DetachCoordinateReferenceContext,
+): DetachCoordinateReferenceContext {
+  return {
+    ...context,
+    anchorsById: context.replacementAnchorsById,
+    requireReplacement: true,
+  }
+}
+
+function workPlaneFrameContainsCoordinateRef(
+  frame: WorkPlaneFrameSnapshot,
+  coordinateId: string,
+): boolean {
+  const seen = new WeakSet<object>()
+
+  return workPlaneFrameFields.some((field) =>
+    pointContainsCoordinateRef(frame[field], coordinateId, seen),
+  )
+}
+
+function pointContainsCoordinateRef(
+  point: Vec3,
+  coordinateId: string,
+  seen: WeakSet<object>,
+): boolean {
+  if (seen.has(point)) {
+    return false
+  }
+
+  seen.add(point)
+
+  const source = point.symbolic?.source
+
+  if (source?.kind === 'coordinateRef') {
+    return source.coordinateId === coordinateId
+  }
+
+  if (source?.kind !== 'workPlaneLocal') {
+    return false
+  }
+
+  return workPlaneFrameFields.some((field) =>
+    pointContainsCoordinateRef(source.frame[field], coordinateId, seen),
+  )
 }
 
 function detachCoordinateAnchorReferencesInAnchors(
@@ -3334,6 +3521,14 @@ function cloneVec3(point: Vec3): Vec3 {
             : { source: cloneCoordinateSource(point.symbolic.source) }),
         },
       }
+}
+
+function concreteVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+  }
 }
 
 function cloneCoordinateComponent(
