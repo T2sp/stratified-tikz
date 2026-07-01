@@ -237,6 +237,16 @@ export function selectionGeometricKind(
 export function selectedElementFromElements(
   elements: readonly SingleSelectedElement[],
 ): SelectedElement {
+  const coordinateSelection = elements.filter(
+    (element) => element.kind === 'coordinate',
+  )
+
+  // Coordinate anchors are global reference handles. For the MVP, keep their
+  // selection single-only so layer-bound bulk operations never receive them.
+  if (coordinateSelection.length > 0) {
+    return coordinateSelection[coordinateSelection.length - 1] ?? null
+  }
+
   if (elements.length === 0) {
     return null
   }

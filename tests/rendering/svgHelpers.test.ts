@@ -229,6 +229,55 @@ test('SVG preview renders coordinate anchor marker', () => {
   assert.equal(Number.isFinite(markers[0]?.center.y), true)
 })
 
+test('SVG coordinate anchor markers are independent of layer visibility', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const anchor = createCoordinateAnchor(diagram, {
+    id: 'svg-global-coordinate-anchor',
+    name: 'Global coordinate',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 2 },
+        y: { kind: 'numeric', value: 1 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  })
+  const hiddenLayerDiagram = setLayerVisibility(
+    {
+      ...diagram,
+      coordinateAnchors: [anchor],
+      strata: [
+        createPointStratum({
+          ambientDimension: 2,
+          id: 'hidden-point',
+          name: 'Hidden point',
+          position: { x: 0, y: 0, z: 0 },
+          layer: 7,
+        }),
+      ],
+    },
+    7,
+    false,
+  )
+  const markers = svgCoordinateAnchorMarkers(
+    hiddenLayerDiagram,
+    hiddenLayerDiagram.camera,
+    360,
+    null,
+  )
+
+  assert.equal(
+    shouldRenderStratumInSvgPreview(
+      hiddenLayerDiagram,
+      hiddenLayerDiagram.strata[0],
+    ),
+    false,
+  )
+  assert.equal(markers.length, 1)
+  assert.equal(markers[0]?.anchor.id, 'svg-global-coordinate-anchor')
+})
+
 test('SVG arrow preview coordinates are finite for a projected 3D path', () => {
   const camera = createInitialCamera3D()
   const curve = createConcatenatedPathStratum({

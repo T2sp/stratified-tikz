@@ -712,6 +712,8 @@ function App() {
   )
   const [includeCoordinateAxesInTikz, setIncludeCoordinateAxesInTikz] =
     useState<boolean>(false)
+  const [showCoordinateAnchors, setShowCoordinateAnchors] =
+    useState<boolean>(true)
   const [tikzExportMode, setTikzExportMode] =
     useState<TikzExportMode>(defaultTikzExportMode)
   const [visibilityOptions, setVisibilityOptions] =
@@ -6358,6 +6360,32 @@ function App() {
 
             {renderCursorSnapControls()}
 
+            <button
+              type="button"
+              className={`preview-overlay-button ${
+                showCoordinateAnchors ? 'is-selected' : ''
+              }`}
+              aria-pressed={showCoordinateAnchors}
+              aria-label={
+                showCoordinateAnchors
+                  ? 'Hide coordinate anchors'
+                  : 'Show coordinate anchors'
+              }
+              title={
+                showCoordinateAnchors
+                  ? 'Hide coordinate anchors'
+                  : 'Show coordinate anchors'
+              }
+              onClick={(event) =>
+                runPreviewOverlayAction(event, () =>
+                  setShowCoordinateAnchors((shown) => !shown),
+                )
+              }
+              onPointerDown={stopPreviewOverlayEvent}
+            >
+              Coordinates
+            </button>
+
             {renderActiveCreationControls()}
 
             {showFillPathControls && renderFillPathToolbarControls()}
@@ -7744,6 +7772,7 @@ function App() {
                 }
                 layerFilter={layerFilter}
                 visibilityOptions={visibilityOptions}
+                showCoordinateAnchors={showCoordinateAnchors}
                 showGeometryHandles={
                   creationTool === 'select' && !workPlanePointPickingState.active
                 }

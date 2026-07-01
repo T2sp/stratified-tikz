@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import type { Diagram, PointStratum, TextLabel, Vec3 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -155,6 +156,31 @@ test('merge layer moves source elements to target and retargets source view filt
   assert.deepEqual(next.selectedElement, { kind: 'stratum', id: 'source-point' })
   assert.equal(next.history.past.length, 1)
   assert.equal(next.layerOperationStatus, 'Merged layer 0 into layer 1 (2 elements).')
+})
+
+test('delete layer does not delete global coordinate anchors', () => {
+  const diagram = addLayerOperationCoordinateAnchor(createTwoLayerDiagram())
+  const state = createLayerOperationState(diagram, {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const next = applyDeleteLayerToEditorState(state, 0)
+
+  assert.equal(hasStratum(next.editableDiagram, 'source-point'), false)
+  assert.equal(hasCoordinateAnchor(next.editableDiagram, 'coord-a'), true)
+  assert.deepEqual(next.selectedElement, { kind: 'coordinate', id: 'coord-a' })
+  assert.match(generateTikz(next.editableDiagram), /\\coordinate \(A\) at \(10,0\);/)
+})
+
+test('merge layer does not move or delete global coordinate anchors', () => {
+  const diagram = addLayerOperationCoordinateAnchor(createTwoLayerDiagram())
+  const state = createLayerOperationState(diagram)
+  const next = applyMergeLayersToEditorState(state, 0, 1)
+
+  assert.equal(findPoint(next.editableDiagram, 'source-point').layer, 1)
+  assert.equal(hasCoordinateAnchor(next.editableDiagram, 'coord-a'), true)
+  assert.deepEqual(next.editableDiagram.coordinateAnchors, diagram.coordinateAnchors)
+  assert.match(generateTikz(next.editableDiagram), /\\coordinate \(A\) at \(10,0\);/)
 })
 
 test('merge layer updates New layer input when source was the creation layer', () => {
@@ -693,6 +719,26 @@ function createSymbolicLayerOperationDiagram(): Diagram {
   ).diagram
 }
 
+function addLayerOperationCoordinateAnchor(diagram: Diagram): Diagram {
+  return {
+    ...diagram,
+    coordinateAnchors: [
+      createCoordinateAnchor(diagram, {
+        id: 'coord-a',
+        name: 'A',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 10 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+    ],
+  }
+}
+
 function findPoint(diagram: Diagram, id: string): PointStratum {
   const point = diagram.strata.find(
     (stratum): stratum is PointStratum =>
@@ -704,6 +750,10 @@ function findPoint(diagram: Diagram, id: string): PointStratum {
   }
 
   return point
+}
+
+function hasCoordinateAnchor(diagram: Diagram, id: string): boolean {
+  return (diagram.coordinateAnchors ?? []).some((anchor) => anchor.id === id)
 }
 
 function findLabel(diagram: Diagram, id: string): TextLabel {

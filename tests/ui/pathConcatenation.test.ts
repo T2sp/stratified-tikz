@@ -6,6 +6,11 @@ import {
   createEmptyDiagram,
   createTemplatePathStratum,
 } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
 import type {
   ConcatenatedPathStratum,
   CurveStratum,
@@ -484,6 +489,99 @@ test('concatenate selected paths preserves symbolic expressions when auto-revers
   assert.equal(path.segments[1].end.symbolic?.x.expression, 'c')
 })
 
+test('concatenate selected paths preserves coordinate refs when endpoints match', () => {
+  const diagram = diagramWithCoordinateAnchors([
+    { id: 'coord-a', name: 'A', point: point(0, 0) },
+    { id: 'coord-b', name: 'B', point: point(1, 0) },
+    { id: 'coord-c', name: 'C', point: point(2, 0) },
+  ])
+  diagram.strata.push(
+    linePath(
+      'path-a',
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ),
+    linePath(
+      'path-b',
+      coordinateReferencePoint(diagram, 'coord-b'),
+      coordinateReferencePoint(diagram, 'coord-c'),
+    ),
+  )
+
+  const result = concatenateSelectedPaths(
+    diagram,
+    selection('path-a', 'path-b'),
+    { id: 'joined-path' },
+  )
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.equal(path.segments[0]?.kind, 'line')
+  assert.equal(path.segments[1]?.kind, 'line')
+  if (path.segments[0]?.kind !== 'line' || path.segments[1]?.kind !== 'line') {
+    throw new Error('Expected line segments.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[0].start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[0].end)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[1].start)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[1].end)?.coordinateId,
+    'coord-c',
+  )
+})
+
+test('path concatenation endpoint matching uses coordinate preview coordinates', () => {
+  const diagram = diagramWithCoordinateAnchors([
+    { id: 'coord-a', name: 'A', point: point(0, 0) },
+    { id: 'coord-b', name: 'B', point: point(1, 0) },
+    { id: 'coord-c', name: 'C', point: point(1, 0) },
+    { id: 'coord-d', name: 'D', point: point(2, 0) },
+  ])
+  diagram.strata.push(
+    linePath(
+      'path-a',
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ),
+    linePath(
+      'path-b',
+      coordinateReferencePoint(diagram, 'coord-c'),
+      coordinateReferencePoint(diagram, 'coord-d'),
+    ),
+  )
+
+  const result = concatenateSelectedPaths(
+    diagram,
+    selection('path-a', 'path-b'),
+    { id: 'joined-path' },
+  )
+  const path = expectConcatenatedPath(result, 'joined-path')
+
+  assert.equal(path.segments[0]?.kind, 'line')
+  assert.equal(path.segments[1]?.kind, 'line')
+  if (path.segments[0]?.kind !== 'line' || path.segments[1]?.kind !== 'line') {
+    throw new Error('Expected line segments.')
+  }
+  assert.deepEqual(result.reversedSourcePathIds, [])
+  assert.equal(path.segments[0].end.x, path.segments[1].start.x)
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[0].end)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(path.segments[1].start)?.coordinateId,
+    'coord-c',
+  )
+})
+
 test('concatenate selected paths cleans crossing states when originals are removed', () => {
   const diagram = diagramWithStrata([
     linePath('path-a', point(0, 0), point(1, 0)),
@@ -651,6 +749,51 @@ function diagramWithStrata(strata: Stratum[]): Diagram {
 
   diagram.strata.push(...strata)
   return diagram
+}
+
+function diagramWithCoordinateAnchors(
+  anchors: readonly { id: string; name: string; point: Vec3 }[],
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const coordinateAnchors: NonNullable<Diagram['coordinateAnchors']> = []
+
+  for (const anchor of anchors) {
+    coordinateAnchors.push(
+      createCoordinateAnchor(
+        {
+          ...diagram,
+          coordinateAnchors,
+        },
+        {
+          id: anchor.id,
+          name: anchor.name,
+          position: {
+            kind: 'global',
+            value: {
+              x: { kind: 'numeric', value: anchor.point.x },
+              y: { kind: 'numeric', value: anchor.point.y },
+              z: { kind: 'numeric', value: anchor.point.z },
+            },
+          },
+        },
+      ),
+    )
+  }
+
+  return {
+    ...diagram,
+    coordinateAnchors,
+  }
+}
+
+function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Missing coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
 }
 
 function selection(...ids: string[]): SelectedElement {
