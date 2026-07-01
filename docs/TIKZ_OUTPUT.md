@@ -682,6 +682,11 @@ Free text labels are separate diagram objects. Their `name` fields do not
 create coordinate-name stems; labels are emitted directly as TikZ nodes at their
 stored model coordinates.
 
+Global coordinate anchors in `diagram.coordinateAnchors` use their stored
+`tikzName` values instead of generated stratum coordinate names. They are
+emitted before generated helper coordinates and before all layer drawing
+commands. For details, see [Coordinate Anchors](./COORDINATE_ANCHORS.md).
+
 ## Saved path labels
 
 Path-like strata may also carry an optional `pathLabel` field. This field is

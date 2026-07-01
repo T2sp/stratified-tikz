@@ -13,6 +13,7 @@ import { pathCrossingStateFromCandidate } from '../model/pathCrossings.ts'
 import { defaultVisibilityOptions } from '../model/visibility.ts'
 import { symbolicGridExampleDiagrams } from './symbolicGridExamples.ts'
 import { workPlaneLocalSymbolicExample } from './workPlaneLocalSymbolicExample.ts'
+import { coordinateAnchorExample } from './coordinateAnchorExample.ts'
 import {
   cloneStylePreset,
   curveStylePresets,
@@ -129,6 +130,7 @@ export const referenceExampleDiagrams = [
   braidingCrossingsExample,
   harpoonArrowheadsExample,
   workPlaneLocalSymbolicExample,
+  coordinateAnchorExample,
   ...symbolicGridExampleDiagrams,
 ] as const satisfies readonly Diagram[]
 

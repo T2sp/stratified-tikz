@@ -8,6 +8,7 @@ import {
 } from './curatedExamples.ts'
 import { braidingCrossingsExample } from './referenceExamples.ts'
 import { workPlaneLocalSymbolicExample } from './workPlaneLocalSymbolicExample.ts'
+import { coordinateAnchorExample } from './coordinateAnchorExample.ts'
 import type { AmbientDimension, Diagram } from '../model/types.ts'
 
 export type ExampleId =
@@ -17,6 +18,7 @@ export type ExampleId =
   | '3d'
   | 'braiding'
   | 'localSymbolic3d'
+  | 'coordinateAnchors'
 
 export type ExampleOption = {
   id: ExampleId
@@ -63,6 +65,12 @@ export const exampleOptions: readonly ExampleOption[] = [
     name: '3D local symbolic',
     summary: 'work-plane-local symbolic point and arrowed path',
     diagram: workPlaneLocalSymbolicExample,
+  },
+  {
+    id: 'coordinateAnchors',
+    name: 'Coordinate anchors',
+    summary: 'global anchors referenced by a path and local symbolic label',
+    diagram: coordinateAnchorExample,
   },
 ]
 
