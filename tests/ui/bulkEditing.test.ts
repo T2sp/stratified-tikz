@@ -294,6 +294,86 @@ test('bulk translation adds symbolic deltas to symbolic point expressions', () =
   assert.equal(point.position.symbolic.x.previewValue, 5)
 })
 
+test('bulk translation detaches coordinate refs from current anchor positions', () => {
+  const diagram = createBulkStaleCoordinateReferenceDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coord-a' },
+        { kind: 'stratum', id: 'ref-path' },
+      ],
+    },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, 'ref-path')
+  const otherPoint = findPoint(result.diagram, 'ref-point-c')
+  const anchor = result.diagram.coordinateAnchors?.find(
+    (candidate) => candidate.id === 'coord-a',
+  )
+
+  assert.equal(curve.kind, 'polyline')
+  if (curve.kind !== 'polyline') {
+    throw new Error('Expected referenced polyline.')
+  }
+  assert.deepEqual(pointPreviewForBulkTest(curve.points[0]), {
+    x: 6,
+    y: 5,
+    z: 0,
+  })
+  assert.deepEqual(pointPreviewForBulkTest(curve.points[1]), {
+    x: 3,
+    y: 0,
+    z: 0,
+  })
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[1]), null)
+  assert.equal(
+    coordinateReferenceSourceForPoint(otherPoint.position)?.coordinateId,
+    'coord-c',
+  )
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.x.kind === 'numeric'
+      ? anchor.position.value.x.value
+      : NaN,
+    5,
+  )
+})
+
+test('bulk translation detaches symbolic coordinate refs before translating', () => {
+  const diagram = createBulkSymbolicCoordinateReferenceDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    { kind: 'stratum', id: 'symbolic-ref-point' },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const point = findPoint(result.diagram, 'symbolic-ref-point')
+
+  assert.equal(coordinateReferenceSourceForPoint(point.position), null)
+  assert.equal(point.position.x, 6)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic.x.expression, '(R) + 1')
+  assert.equal(point.position.symbolic.x.previewValue, 6)
+})
+
 test('bulk translation input rejects unknown symbolic delta variables', () => {
   const parsed = parseTranslationVectorFromInputs(createBulkPointDiagram(), {
     dx: 'Missing',
@@ -564,6 +644,60 @@ function createBulkCoordinateReferenceDiagram(): Diagram {
       ambientDimension: 2,
       id: 'ordinary-point',
       position: { x: 0, y: 1, z: 0 },
+    }),
+  ]
+
+  return diagram
+}
+
+function createBulkStaleCoordinateReferenceDiagram(): Diagram {
+  const diagram = createBulkCoordinateReferenceDiagram()
+
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPositionForBulkTest(5, 5, 0),
+        }
+      : anchor,
+  )
+
+  return diagram
+}
+
+function createBulkSymbolicCoordinateReferenceDiagram(): Diagram {
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '5',
+        previewValue: 5,
+      },
+    ],
+  }
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-symbolic',
+      name: 'A',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'symbolic', expression: 'R', previewValue: 5 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      },
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'symbolic-ref-point',
+      position: coordinateReferencePointForBulkTest(diagram, 'coord-symbolic'),
     }),
   ]
 

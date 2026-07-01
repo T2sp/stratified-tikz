@@ -26,6 +26,7 @@ import type {
 export type CoordinateRefLocationKind =
   | 'pathCoordinate'
   | 'pathTemplateCenter'
+  | 'arcCenter'
   | 'labelPosition'
   | 'pointPosition'
   | 'simpleSheetVertex'
@@ -36,7 +37,6 @@ export type CoordinateRefLocationKind =
 const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
   new Set([
     'pathCoordinate',
-    'pathTemplateCenter',
     'labelPosition',
     'pointPosition',
     'simpleSheetVertex',
@@ -59,6 +59,7 @@ export type DetachCoordinateAnchorReferencesResult =
 
 type DetachCoordinateReferenceContext = {
   replacements: ReadonlyMap<string, Vec3>
+  requireReplacement: boolean
   detachedCount: number
 }
 
@@ -198,50 +199,18 @@ export function detachCoordinateAnchorReferencesMany(
     }
   }
 
-  const replacements = new Map<string, Vec3>()
+  const replacements = coordinateReferenceReplacementMapForAnchorIds(
+    diagram,
+    uniqueCoordinateIds,
+  )
 
-  for (const coordinateId of uniqueCoordinateIds) {
-    const anchorIndex = (diagram.coordinateAnchors ?? []).findIndex(
-      (anchor) => anchor.id === coordinateId,
-    )
-
-    if (anchorIndex < 0) {
-      return {
-        ok: false,
-        error: {
-          path: 'coordinateAnchors',
-          message: `Coordinate anchor "${coordinateId}" does not exist.`,
-        },
-      }
-    }
-
-    const anchor = diagram.coordinateAnchors?.[anchorIndex]
-
-    if (anchor === undefined) {
-      return {
-        ok: false,
-        error: {
-          path: `coordinateAnchors[${anchorIndex}]`,
-          message: `Coordinate anchor "${coordinateId}" does not exist.`,
-        },
-      }
-    }
-
-    const detachedPoint = detachedCoordinatePointForAnchor(
-      anchor,
-      diagram.ambientDimension,
-      `coordinateAnchors[${anchorIndex}].position`,
-    )
-
-    if (!detachedPoint.ok) {
-      return detachedPoint
-    }
-
-    replacements.set(coordinateId, detachedPoint.point)
+  if (!replacements.ok) {
+    return replacements
   }
 
   const context: DetachCoordinateReferenceContext = {
-    replacements,
+    replacements: replacements.replacements,
+    requireReplacement: false,
     detachedCount: 0,
   }
   const strata: Stratum[] = []
@@ -263,6 +232,100 @@ export function detachCoordinateAnchorReferencesMany(
   const labels: TextLabel[] = []
 
   for (const [index, label] of diagram.labels.entries()) {
+    const detached = detachCoordinateReferencePoint(
+      label.position,
+      context,
+      `labels[${index}].position`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    labels.push(
+      detached.point === label.position
+        ? label
+        : {
+            ...label,
+            position: detached.point,
+          },
+    )
+  }
+
+  return {
+    ok: true,
+    value: {
+      diagram: {
+        ...diagram,
+        strata,
+        labels,
+      },
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
+export function detachCoordinateReferencesInElements(
+  diagram: Diagram,
+  elements: readonly (
+    | { kind: 'stratum'; id: string }
+    | { kind: 'label'; id: string }
+  )[],
+): DetachCoordinateAnchorReferencesResult {
+  const selectedKeys = new Set(
+    elements.map((element) => `${element.kind}:${element.id}`),
+  )
+
+  if (selectedKeys.size === 0) {
+    return {
+      ok: true,
+      value: {
+        diagram,
+        detachedCount: 0,
+      },
+    }
+  }
+
+  const replacements = coordinateReferenceReplacementMapForExistingAnchors(diagram)
+
+  if (!replacements.ok) {
+    return replacements
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    replacements: replacements.replacements,
+    requireReplacement: true,
+    detachedCount: 0,
+  }
+  const strata: Stratum[] = []
+
+  for (const [index, stratum] of diagram.strata.entries()) {
+    if (!selectedKeys.has(`stratum:${stratum.id}`)) {
+      strata.push(stratum)
+      continue
+    }
+
+    const detached = detachStratumCoordinateReferences(
+      stratum,
+      context,
+      `strata[${index}]`,
+    )
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    strata.push(detached.stratum)
+  }
+
+  const labels: TextLabel[] = []
+
+  for (const [index, label] of diagram.labels.entries()) {
+    if (!selectedKeys.has(`label:${label.id}`)) {
+      labels.push(label)
+      continue
+    }
+
     const detached = detachCoordinateReferencePoint(
       label.position,
       context,
@@ -554,6 +617,83 @@ function detachedCoordinatePointForAnchor(
   }
 }
 
+function coordinateReferenceReplacementMapForAnchorIds(
+  diagram: Diagram,
+  coordinateIds: readonly string[],
+):
+  | {
+      ok: true
+      replacements: Map<string, Vec3>
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    } {
+  const replacements = new Map<string, Vec3>()
+
+  for (const coordinateId of coordinateIds) {
+    const anchorIndex = (diagram.coordinateAnchors ?? []).findIndex(
+      (anchor) => anchor.id === coordinateId,
+    )
+
+    if (anchorIndex < 0) {
+      return {
+        ok: false,
+        error: {
+          path: 'coordinateAnchors',
+          message: `Coordinate anchor "${coordinateId}" does not exist.`,
+        },
+      }
+    }
+
+    const anchor = diagram.coordinateAnchors?.[anchorIndex]
+
+    if (anchor === undefined) {
+      return {
+        ok: false,
+        error: {
+          path: `coordinateAnchors[${anchorIndex}]`,
+          message: `Coordinate anchor "${coordinateId}" does not exist.`,
+        },
+      }
+    }
+
+    const detachedPoint = detachedCoordinatePointForAnchor(
+      anchor,
+      diagram.ambientDimension,
+      `coordinateAnchors[${anchorIndex}].position`,
+    )
+
+    if (!detachedPoint.ok) {
+      return detachedPoint
+    }
+
+    replacements.set(coordinateId, detachedPoint.point)
+  }
+
+  return {
+    ok: true,
+    replacements,
+  }
+}
+
+function coordinateReferenceReplacementMapForExistingAnchors(
+  diagram: Diagram,
+):
+  | {
+      ok: true
+      replacements: Map<string, Vec3>
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    } {
+  return coordinateReferenceReplacementMapForAnchorIds(
+    diagram,
+    (diagram.coordinateAnchors ?? []).map((anchor) => anchor.id),
+  )
+}
+
 function detachStratumCoordinateReferences(
   stratum: Stratum,
   context: DetachCoordinateReferenceContext,
@@ -650,6 +790,11 @@ function detachStratumCoordinateReferences(
             ok: true,
             stratum,
           }
+        default:
+          return {
+            ok: true,
+            stratum,
+          }
       }
     case 'curve':
       switch (stratum.kind) {
@@ -712,6 +857,11 @@ function detachStratumCoordinateReferences(
           }
         }
         case 'grid':
+          return {
+            ok: true,
+            stratum,
+          }
+        default:
           return {
             ok: true,
             stratum,
@@ -998,6 +1148,16 @@ function detachCoordinateReferencePoint(
   const replacement = context.replacements.get(source.coordinateId)
 
   if (replacement === undefined) {
+    if (context.requireReplacement) {
+      return {
+        ok: false,
+        error: {
+          path,
+          message: `Could not detach coordinate reference "${source.coordinateId}" because its coordinate anchor does not exist.`,
+        },
+      }
+    }
+
     return {
       ok: true,
       point,
@@ -1375,7 +1535,7 @@ function validatePathSegmentCoordinateReferences(
         segment.center,
         `${path}.center`,
         errors,
-        'pathCoordinate',
+        'arcCenter',
       )
       if (segment.frame !== undefined) {
         validateWorkPlaneFrameCoordinateReferences(
@@ -1458,7 +1618,7 @@ function validatePathSegmentCoordinateReferencesAtLocation(
         segment.center,
         `${path}.center`,
         errors,
-        location,
+        arcCenterLocationForPathLocation(location),
       )
       if (segment.frame !== undefined) {
         validateWorkPlaneFrameCoordinateReferencesAtLocation(
@@ -1647,6 +1807,14 @@ function unsupportedCoordinateReferenceMessage(
     return 'Coordinate references are not currently supported inside curved sheet primitives because TikZ export samples them to numeric mesh coordinates.'
   }
 
+  if (location === 'pathTemplateCenter') {
+    return 'Coordinate references are not currently supported for path template centers because 3D template export cannot preserve the anchor reference.'
+  }
+
+  if (location === 'arcCenter') {
+    return 'Coordinate references are not currently supported for arc centers because arc export does not preserve center references.'
+  }
+
   if (location === 'workPlaneFrameField') {
     return `coordinateRef is not supported at ${path}; use a concrete coordinate value instead.`
   }
@@ -1656,6 +1824,12 @@ function unsupportedCoordinateReferenceMessage(
   }
 
   return `coordinateRef is not supported at ${path}.`
+}
+
+function arcCenterLocationForPathLocation(
+  location: CoordinateRefLocationKind,
+): CoordinateRefLocationKind {
+  return location === 'pathCoordinate' ? 'arcCenter' : location
 }
 
 function vec3FromCoordinateReference(

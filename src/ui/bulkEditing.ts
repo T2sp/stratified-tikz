@@ -13,6 +13,7 @@ import {
 } from '../model/pathCrossings.ts'
 import {
   detachCoordinateAnchorReferencesMany,
+  detachCoordinateReferencesInElements,
 } from '../model/coordinateReferences.ts'
 import {
   diagramTranslationContext,
@@ -548,10 +549,28 @@ export function translateSelectedElements(
   }
 
   const selectedKeys = selectedElementKeySet(selection)
+  const selectedLayerBoundElements = selected.map((element) => ({
+    kind: element.kind,
+    id: element.element.id,
+  }))
+  const detached = detachCoordinateReferencesInElements(
+    diagram,
+    selectedLayerBoundElements,
+  )
+
+  if (!detached.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: `Translate selected failed: ${detached.error.message}`,
+    }
+  }
+
+  const detachedDiagram = detached.value.diagram
   let context
 
   try {
-    context = diagramTranslationContext(diagram)
+    context = diagramTranslationContext(detachedDiagram)
   } catch (error) {
     return {
       ok: false,
@@ -564,7 +583,7 @@ export function translateSelectedElements(
   let changedCurve = false
 
   try {
-    const strata = diagram.strata.map((stratum) => {
+    const strata = detachedDiagram.strata.map((stratum) => {
       if (!selectedKeys.has(selectedElementKey({ kind: 'stratum', id: stratum.id }))) {
         return stratum
       }
@@ -574,7 +593,7 @@ export function translateSelectedElements(
       changedCurve = changedCurve || stratum.geometricKind === 'curve'
       return translated
     })
-    const labels = diagram.labels.map((label) => {
+    const labels = detachedDiagram.labels.map((label) => {
       if (!selectedKeys.has(selectedElementKey({ kind: 'label', id: label.id }))) {
         return label
       }
@@ -593,7 +612,7 @@ export function translateSelectedElements(
     }
 
     const nextDiagram = {
-      ...diagram,
+      ...detachedDiagram,
       strata,
       labels,
     }

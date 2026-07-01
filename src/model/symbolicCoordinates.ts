@@ -919,7 +919,7 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
         segment.center,
         `${path}.center`,
         inspection,
-        coordinateRefLocation,
+        arcCenterLocationForPathLocation(coordinateRefLocation),
       )
       collectScalarInputSupportedSymbolicExpressionSources(
         segment.radius,
@@ -953,6 +953,12 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
     default:
       return
   }
+}
+
+function arcCenterLocationForPathLocation(
+  location: CoordinateRefLocationKind,
+): CoordinateRefLocationKind {
+  return location === 'pathCoordinate' ? 'arcCenter' : location
 }
 
 function collectCubicBezierControlModeSupportedSymbolicExpressionSources(

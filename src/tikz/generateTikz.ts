@@ -1952,6 +1952,13 @@ function emitCurve(
   }
 
   if (curve.kind === 'concatenatedPath') {
+    if (pathSegmentsContainArcCenterCoordinateRef(curve.segments)) {
+      return [
+        `% Curve "${curve.name}" [${curve.id}] omitted because coordinate references for arc centers cannot be preserved by arc export.`,
+        '',
+      ]
+    }
+
     const scopedLocalPath = emitScopedWorkPlaneLocalConcatenatedPath(
       curve,
       context,
@@ -3750,6 +3757,13 @@ function emitTemplatePath(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (pointContainsCoordinateRef(curve.template.center)) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because coordinate references for path template centers cannot be preserved by every template export path.`,
+      '',
+    ]
+  }
+
   const options = [
     ...curveStyleOptionsForElement(
       curve.stylePresetId,
@@ -5234,6 +5248,14 @@ function pathSegmentsContainCoordinateRef(
   segments: readonly PathSegment[],
 ): boolean {
   return segments.some(pathSegmentContainsCoordinateRef)
+}
+
+function pathSegmentsContainArcCenterCoordinateRef(
+  segments: readonly PathSegment[],
+): boolean {
+  return segments.some(
+    (segment) => segment.kind === 'arc' && pointContainsCoordinateRef(segment.center),
+  )
 }
 
 function pathSegmentContainsCoordinateRef(segment: PathSegment): boolean {

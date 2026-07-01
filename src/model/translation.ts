@@ -256,6 +256,12 @@ export function translateVec3(
   translation: TranslationVector,
   context: DiagramTranslationContext,
 ): Vec3 {
+  if (point.symbolic?.source?.kind === 'coordinateRef') {
+    throw new Error(
+      'Coordinate references must be detached before translation.',
+    )
+  }
+
   if (point.symbolic?.source?.kind === 'workPlaneLocal') {
     return translateWorkPlaneLocalVec3(
       point.symbolic.source,
