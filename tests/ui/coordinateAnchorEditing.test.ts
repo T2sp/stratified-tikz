@@ -73,9 +73,13 @@ test('coordinate inspector model shows coordinate fields without layer or style 
     'y',
     'z',
     'Preview',
+    'Usage',
     'Delete coordinate',
   ])
   assert.equal(model.sourceLabel, 'Global xyz')
+  assert.equal(model.referenceCount, 0)
+  assert.equal(model.usageCount, 0)
+  assert.equal(model.usageMessage, 'Used by 0 objects')
   assert.equal(labels.includes('Layer'), false)
   assert.equal(labels.includes('Codimension'), false)
   assert.equal(labels.some((label) => label.toLowerCase().includes('style')), false)
@@ -209,6 +213,39 @@ test('moving a coordinate anchor updates referenced path preview', () => {
   assert.match(generateTikz(moved), /\\coordinate \(A\) at \(3,4\);/)
 })
 
+test('coordinate inspector usage count counts distinct referencing objects', () => {
+  const diagram = createReferencedPathDiagram()
+  const curve = findCurve(diagram, 'ref-path')
+
+  if (curve.kind !== 'polyline') {
+    throw new Error('Expected a polyline path.')
+  }
+
+  curve.points = [
+    requiredCoordinateReference(diagram, 'coord-a'),
+    requiredCoordinateReference(diagram, 'coord-a'),
+  ]
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'ref-point',
+    name: 'Reference point',
+    style: { ...defaultPointStyle },
+    position: requiredCoordinateReference(diagram, 'coord-a'),
+    layer: 0,
+  })
+
+  const model = createCoordinateAnchorInspectorModel(
+    diagram,
+    findAnchor(diagram, 'coord-a'),
+  )
+
+  assert.equal(model.referenceCount, 3)
+  assert.equal(model.usageCount, 2)
+  assert.equal(model.usageMessage, 'Used by 2 objects')
+  assert.equal(model.deleteMessage, 'Deleting will detach 3 coordinate references.')
+})
+
 test('coordinate inspector model allows referenced coordinate deletion', () => {
   const diagram = createReferencedPathDiagram()
   const model = createCoordinateAnchorInspectorModel(
@@ -217,10 +254,12 @@ test('coordinate inspector model allows referenced coordinate deletion', () => {
   )
 
   assert.equal(model.referenceCount, 1)
+  assert.equal(model.usageCount, 1)
+  assert.equal(model.usageMessage, 'Used by 1 object')
   assert.equal(model.deleteDisabled, false)
   assert.equal(
     model.deleteMessage,
-    'Used by 1 coordinate reference. Deleting will detach it.',
+    'Deleting will detach 1 coordinate reference.',
   )
 })
 
@@ -275,6 +314,22 @@ test('delete referenced coordinate detaches references and removes it', () => {
   assert.doesNotMatch(tikz, /\(A\)/)
   assert.match(tikz, /\\coordinate \(curvePolyReferencePath0p0\) at \(0,0\);/)
   assert.match(tikz, /\(curvePolyReferencePath0p0\) -- \(B\);/)
+})
+
+test('inline TikZ after referenced coordinate delete has no blank lines', () => {
+  const diagram = createReferencedPathDiagram()
+  const result = deleteCoordinateAnchorWithDetach(diagram, 'coord-a')
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const inlineTikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+
+  assert.doesNotMatch(inlineTikz, /\\coordinate \(A\)/)
+  assert.match(inlineTikz, /\\coordinate \(curvePolyReferencePath0p0\) at \(0,0\);/)
+  assert.doesNotMatch(inlineTikz, /\n[ \t]*\n/)
 })
 
 test('delete coordinate detaches nested work-plane-local source frame references', () => {

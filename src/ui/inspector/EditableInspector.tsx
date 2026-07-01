@@ -281,6 +281,7 @@ function CoordinateAnchorInspector({
             />
           )}
           <ReadOnlyField label="Preview" value={model.preview} />
+          <ReadOnlyField label="Usage" value={model.usageMessage} />
           <div className="inspector-field inspector-field-with-note">
             <span className="inspector-field-label">Delete coordinate</span>
             <button
