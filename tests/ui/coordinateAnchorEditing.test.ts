@@ -309,6 +309,7 @@ test('delete coordinate detaches nested work-plane-local source frame references
     y: 5,
     z: 0,
   })
+  assert.deepEqual(pointPreview(point.position), { x: 7, y: 8, z: 0 })
   assert.equal(
     coordinateReferenceSourceForPoint(point.position.symbolic.source.frame.origin),
     null,
@@ -522,7 +523,7 @@ function createNestedWorkPlaneLocalReferenceDiagram(): Diagram {
     id: 'coord-a',
     name: 'A',
     tikzName: 'A',
-    position: globalAnchorPosition(5, 5, 0),
+    position: globalAnchorPosition(1, 1, 0),
   })
   const origin = coordinateReferenceVec3ForAnchorId(diagram, 'coord-a')
 
@@ -530,6 +531,14 @@ function createNestedWorkPlaneLocalReferenceDiagram(): Diagram {
     throw new Error('Expected coordinate reference point.')
   }
 
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPosition(5, 5, 0),
+        }
+      : anchor,
+  )
   diagram.strata.push({
     codim: 3,
     geometricKind: 'point',

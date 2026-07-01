@@ -16,6 +16,7 @@ import {
   defaultRegionStyle,
   defaultSheetStyle,
 } from '../../src/model/styles.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   ClosedPathBoundary,
   CoordinateAnchor,
@@ -150,13 +151,80 @@ test('detachCoordinateAnchorReferences detaches work-plane-local source frame re
     assert.equal(coordinateReferenceSourceForPoint(source.frame[field]), null)
     assert.deepEqual(source.local.a, { kind: 'numeric', value: 2 })
     assert.deepEqual(source.local.b, { kind: 'numeric', value: 3 })
-    assert.equal(Number.isFinite(position.x), true)
-    assert.equal(Number.isFinite(position.y), true)
-    assert.equal(Number.isFinite(position.z), true)
+    assert.deepEqual(pointPreview(position), workPlaneLocalPreview(source.frame, 2, 3))
+    assert.deepEqual(position.symbolic?.x, numericComponent(position.x))
+    assert.deepEqual(position.symbolic?.y, numericComponent(position.y))
+    assert.deepEqual(position.symbolic?.z, numericComponent(position.z))
     assert.equal(findCoordinateAnchorReferences(result.value.diagram, 'coord-a').length, 0)
     assert.equal(JSON.stringify(result.value.diagram).includes('"coordinateId":"coord-a"'), false)
+    assertDiagramValid(result.value.diagram)
     assert.equal(JSON.stringify(diagram), originalJson)
   }
+})
+
+test('detachCoordinateAnchorReferences recomputes nested work-plane-local preview from moved anchor', () => {
+  const diagram = createMovedNestedWorkPlaneLocalFrameReferenceDiagram()
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferences(diagram, 'coord-a')
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  const position = requiredPoint(result.value.diagram.labels[0]?.position)
+  const source = position.symbolic?.source
+
+  assert.equal(result.value.detachedCount, 1)
+  assert.equal(source?.kind, 'workPlaneLocal')
+  if (source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected a work-plane-local source.')
+  }
+  assert.deepEqual(source.frame.origin, { x: 5, y: 5, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(source.frame.origin), null)
+  assert.deepEqual(source.local.a, { kind: 'numeric', value: 2 })
+  assert.deepEqual(source.local.b, { kind: 'numeric', value: 3 })
+  assert.deepEqual(pointPreview(position), { x: 7, y: 8, z: 0 })
+  assert.deepEqual(position.symbolic?.x, numericComponent(7))
+  assert.deepEqual(position.symbolic?.y, numericComponent(8))
+  assert.deepEqual(position.symbolic?.z, numericComponent(0))
+  assert.deepEqual(pointPreview(position), workPlaneLocalPreview(source.frame, 2, 3))
+  assert.equal(JSON.stringify(result.value.diagram).includes('"x":3'), false)
+  assert.equal(JSON.stringify(result.value.diagram).includes('"y":4'), false)
+  assert.equal(findCoordinateAnchorReferences(result.value.diagram, 'coord-a').length, 0)
+  assertDiagramValid(result.value.diagram)
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
+test('detachCoordinateAnchorReferences recomputes work-plane-local anchor preview from moved nested frame ref', () => {
+  const diagram = createMovedNestedWorkPlaneLocalAnchorPositionDiagram()
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferences(diagram, 'coord-a')
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  const anchor = requiredAnchor(result.value.diagram, 'coord-local')
+
+  assert.equal(result.value.detachedCount, 1)
+  assert.equal(anchor.position.kind, 'workPlaneLocal')
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected a work-plane-local coordinate anchor position.')
+  }
+  assert.deepEqual(anchor.position.frame.origin, { x: 5, y: 5, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(anchor.position.frame.origin), null)
+  assert.deepEqual(anchor.position.local.a, { kind: 'numeric', value: 2 })
+  assert.deepEqual(anchor.position.local.b, { kind: 'numeric', value: 3 })
+  assert.deepEqual(pointPreview(anchor.position.preview), { x: 7, y: 8, z: 0 })
+  assert.deepEqual(
+    pointPreview(anchor.position.preview),
+    workPlaneLocalPreview(anchor.position.frame, 2, 3),
+  )
+  assert.equal(findCoordinateAnchorReferences(result.value.diagram, 'coord-a').length, 0)
+  assertDiagramValid(result.value.diagram)
+  assert.equal(JSON.stringify(diagram), originalJson)
 })
 
 test('detachCoordinateAnchorReferences preserves global symbolic coordinates', () => {
@@ -338,6 +406,67 @@ test('detachCoordinateAnchorReferences fails atomically for nested source frame 
   assert.equal(findCoordinateAnchorReferences(diagram, 'coord-a').length, 1)
 })
 
+test('detachCoordinateAnchorReferences fails atomically when nested frame recomputation fails', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: globalAnchorPosition(2, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      tikzName: 'B',
+      position: globalAnchorPosition(1, 0, 0),
+    }),
+  ]
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'direct-ref-point',
+    name: 'Direct reference point',
+    style: { ...defaultPointStyle },
+    position: reference(diagram, 'coord-b'),
+    layer: 0,
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'invalid-nested-frame-label',
+    name: 'Invalid nested frame label',
+    text: '$p$',
+    position: workPlaneLocalPoint(
+      frameWithField('u', reference(diagram, 'coord-a')),
+    ),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = detachCoordinateAnchorReferencesMany(
+    diagram,
+    ['coord-b', 'coord-a'],
+  )
+  const firstStratum = diagram.strata[0]
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected detach to fail.')
+  }
+  assert.match(result.error.message, /failed to recompute work-plane-local preview/)
+  assert.equal(JSON.stringify(diagram), originalJson)
+  assert.equal(firstStratum?.geometricKind, 'point')
+  if (firstStratum?.geometricKind !== 'point') {
+    throw new Error('Expected a point stratum.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(firstStratum.position)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-b').length, 1)
+  assert.equal(findCoordinateAnchorReferences(diagram, 'coord-a').length, 1)
+})
+
 test('reference inventory does not change existing coordinate-ref export', () => {
   const diagram = createReferencedPolylineDiagram(globalAnchorPosition(0, 0, 0))
   addAnchor(diagram, {
@@ -438,6 +567,51 @@ function createNestedWorkPlaneLocalFrameDetachDiagram(
     style: { ...defaultLabelStyle },
     layer: 0,
   })
+
+  return diagram
+}
+
+function createMovedNestedWorkPlaneLocalFrameReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(1, 1, 0),
+  })
+  const origin = reference(diagram, 'coord-a')
+
+  moveAnchor(diagram, 'coord-a', globalAnchorPosition(5, 5, 0))
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'moved-nested-frame-label',
+    name: 'Moved nested frame label',
+    text: '$p$',
+    position: workPlaneLocalPoint(frame(origin)),
+    style: { ...defaultLabelStyle },
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createMovedNestedWorkPlaneLocalAnchorPositionDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(1, 1, 0),
+  })
+  const origin = reference(diagram, 'coord-a')
+
+  addAnchor(diagram, {
+    id: 'coord-local',
+    name: 'Local',
+    tikzName: 'Local',
+    position: workPlaneLocalAnchorPositionWithFrame(frame(origin), 2, 3),
+  })
+  moveAnchor(diagram, 'coord-a', globalAnchorPosition(5, 5, 0))
 
   return diagram
 }
@@ -734,11 +908,7 @@ function workPlaneLocalPoint(
   a = 2,
   b = 3,
 ): Vec3 {
-  const preview = {
-    x: sourceFrame.origin.x + a * sourceFrame.u.x + b * sourceFrame.v.x,
-    y: sourceFrame.origin.y + a * sourceFrame.u.y + b * sourceFrame.v.y,
-    z: sourceFrame.origin.z + a * sourceFrame.u.z + b * sourceFrame.v.z,
-  }
+  const preview = workPlaneLocalPreview(sourceFrame, a, b)
 
   return {
     ...preview,
@@ -758,6 +928,18 @@ function workPlaneLocalPoint(
   }
 }
 
+function workPlaneLocalPreview(
+  sourceFrame: WorkPlaneFrameSnapshot,
+  a: number,
+  b: number,
+): Vec3 {
+  return {
+    x: sourceFrame.origin.x + a * sourceFrame.u.x + b * sourceFrame.v.x,
+    y: sourceFrame.origin.y + a * sourceFrame.u.y + b * sourceFrame.v.y,
+    z: sourceFrame.origin.z + a * sourceFrame.u.z + b * sourceFrame.v.z,
+  }
+}
+
 function addAnchor(
   diagram: Diagram,
   input: {
@@ -771,6 +953,21 @@ function addAnchor(
   diagram.coordinateAnchors = [...(diagram.coordinateAnchors ?? []), anchor]
 
   return anchor
+}
+
+function moveAnchor(
+  diagram: Diagram,
+  coordinateId: string,
+  position: CoordinateAnchorPosition,
+): void {
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === coordinateId
+      ? {
+          ...anchor,
+          position,
+        }
+      : anchor,
+  )
 }
 
 function reference(diagram: Diagram, coordinateId: string): Vec3 {
@@ -846,6 +1043,22 @@ function workPlaneLocalAnchorPosition(): CoordinateAnchorPosition {
   }
 }
 
+function workPlaneLocalAnchorPositionWithFrame(
+  sourceFrame: WorkPlaneFrameSnapshot,
+  a: number,
+  b: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'workPlaneLocal',
+    frame: sourceFrame,
+    local: {
+      a: { kind: 'numeric', value: a },
+      b: { kind: 'numeric', value: b },
+    },
+    preview: workPlaneLocalPreview(sourceFrame, a, b),
+  }
+}
+
 function numericComponent(value: number): CoordinateComponent {
   return {
     kind: 'numeric',
@@ -871,10 +1084,28 @@ function requiredPoint(point: Vec3 | undefined): Vec3 {
   return point
 }
 
+function requiredAnchor(diagram: Diagram, coordinateId: string): CoordinateAnchor {
+  const anchor = (diagram.coordinateAnchors ?? []).find(
+    (candidate) => candidate.id === coordinateId,
+  )
+
+  if (anchor === undefined) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return anchor
+}
+
 function pointPreview(point: Vec3): Vec3 {
   return {
     x: point.x,
     y: point.y,
     z: point.z,
   }
+}
+
+function assertDiagramValid(diagram: Diagram): void {
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, true, JSON.stringify(validation.errors))
 }

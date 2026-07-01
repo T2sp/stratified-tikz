@@ -2,6 +2,7 @@ import {
   coordinateAnchorPositionPreview,
   coordinateAnchorPositionToVec3,
 } from './coordinateAnchors.ts'
+import { evaluateWorkPlaneLocalCoordinate } from './workPlaneLocalCoordinates.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -22,6 +23,7 @@ import type {
   TextLabel,
   Vec3,
   WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinateSource,
 } from './types.ts'
 
 export type CoordinateRefLocationKind =
@@ -206,6 +208,16 @@ type DetachCoordinateAnchorPositionResult =
   | {
       ok: true
       position: CoordinateAnchorPosition
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+type RecomputeWorkPlaneLocalPreviewResult =
+  | {
+      ok: true
+      preview: Vec3
     }
   | {
       ok: false
@@ -2105,16 +2117,35 @@ function detachCoordinateReferencePoint(
     return frame
   }
 
+  if (frame.frame === workPlaneLocalSource.frame) {
+    return {
+      ok: true,
+      point,
+    }
+  }
+
+  const refreshedSource = {
+    ...workPlaneLocalSource,
+    frame: frame.frame,
+  }
+  const preview = recomputeWorkPlaneLocalPreview(
+    refreshedSource,
+    `${path}.symbolic.source`,
+  )
+
+  if (!preview.ok) {
+    return preview
+  }
+
   return {
     ok: true,
     point: {
-      ...point,
+      ...preview.preview,
       symbolic: {
-        ...symbolic,
-        source: {
-          ...workPlaneLocalSource,
-          frame: frame.frame,
-        },
+        x: numericCoordinateComponent(preview.preview.x),
+        y: numericCoordinateComponent(preview.preview.y),
+        z: numericCoordinateComponent(preview.preview.z),
+        source: refreshedSource,
       },
     },
   }
@@ -2178,6 +2209,11 @@ function detachCoordinateAnchorPositionCoordinateReferences(
     context,
     `${path}.frame`,
   )
+
+  if (!frame.ok) {
+    return frame
+  }
+
   const preview = detachCoordinateReferencePoint(
     position.preview,
     context,
@@ -2185,12 +2221,32 @@ function detachCoordinateAnchorPositionCoordinateReferences(
     'derivedCoordinate',
   )
 
-  if (!frame.ok) {
-    return frame
-  }
-
   if (!preview.ok) {
     return preview
+  }
+
+  if (frame.frame !== position.frame) {
+    const recomputed = recomputeWorkPlaneLocalPreview(
+      {
+        kind: 'workPlaneLocal',
+        frame: frame.frame,
+        local: position.local,
+      },
+      path,
+    )
+
+    if (!recomputed.ok) {
+      return recomputed
+    }
+
+    return {
+      ok: true,
+      position: {
+        ...position,
+        frame: frame.frame,
+        preview: recomputed.preview,
+      },
+    }
   }
 
   return {
@@ -2252,12 +2308,18 @@ function detachWorkPlaneFrameCoordinateReferences(
 
   return {
     ok: true,
-    frame: {
-      origin: origin.point,
-      u: u.point,
-      v: v.point,
-      normal: normal.point,
-    },
+    frame:
+      origin.point === frame.origin &&
+      u.point === frame.u &&
+      v.point === frame.v &&
+      normal.point === frame.normal
+        ? frame
+        : {
+            origin: origin.point,
+            u: u.point,
+            v: v.point,
+            normal: normal.point,
+          },
   }
 }
 
@@ -3210,6 +3272,48 @@ function findCoordinateAnchorById(
   )
 }
 
+function recomputeWorkPlaneLocalPreview(
+  source: WorkPlaneLocalCoordinateSource,
+  path: string,
+): RecomputeWorkPlaneLocalPreviewResult {
+  const evaluated = evaluateWorkPlaneLocalCoordinate(source, undefined, path)
+
+  if (!evaluated.ok) {
+    const firstError = evaluated.errors[0]
+
+    return {
+      ok: false,
+      error: {
+        path: firstError?.path ?? path,
+        message:
+          firstError === undefined
+            ? 'Could not detach coordinate reference in work-plane-local frame: failed to recompute work-plane-local preview after detach.'
+            : `Could not detach coordinate reference in work-plane-local frame: failed to recompute work-plane-local preview after detach. ${firstError.message}`,
+      },
+    }
+  }
+
+  if (!isFiniteVec3(evaluated.point)) {
+    return {
+      ok: false,
+      error: {
+        path,
+        message:
+          'Could not detach coordinate reference in work-plane-local frame: recomputed preview is non-finite.',
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    preview: {
+      x: evaluated.point.x,
+      y: evaluated.point.y,
+      z: evaluated.point.z,
+    },
+  }
+}
+
 function cloneVec3(point: Vec3): Vec3 {
   const cloned = {
     x: point.x,
@@ -3245,6 +3349,13 @@ function cloneCoordinateComponent(
         expression: component.expression,
         previewValue: component.previewValue,
       }
+}
+
+function numericCoordinateComponent(value: number): CoordinateComponent {
+  return {
+    kind: 'numeric',
+    value,
+  }
 }
 
 function isFiniteVec3(point: unknown): point is Vec3 {

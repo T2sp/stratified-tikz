@@ -1091,6 +1091,7 @@ test('layer translation detaches nested work-plane-local source frame refs', () 
     { x: movedPoint.position.x, y: movedPoint.position.y, z: movedPoint.position.z },
     { x: 8, y: 8, z: 0 },
   )
+  assert.equal(validateDiagram(translated).valid, true)
   assert.equal(
     JSON.stringify(translated.coordinateAnchors?.[0]),
     originalAnchorJson,
@@ -2078,15 +2079,25 @@ function createNestedLocalFrameReferenceTranslationDiagram(): Diagram {
     createCoordinateAnchor(diagram, {
       id: 'coord-a',
       name: 'A',
-      position: globalAnchorPositionForLayerTest(5, 5, 0),
+      position: globalAnchorPositionForLayerTest(1, 1, 0),
     }),
   ]
+  const origin = coordinateReferencePointForLayerTest(diagram, 'coord-a')
+
+  diagram.coordinateAnchors = diagram.coordinateAnchors.map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPositionForLayerTest(5, 5, 0),
+        }
+      : anchor,
+  )
   diagram.strata = [
     createPointStratum({
       ambientDimension: 3,
       id: 'nested-local-ref-point',
       position: workPlaneLocalPointForLayerTest({
-        origin: coordinateReferencePointForLayerTest(diagram, 'coord-a'),
+        origin,
         u: { x: 1, y: 0, z: 0 },
         v: { x: 0, y: 1, z: 0 },
         normal: { x: 0, y: 0, z: 1 },
