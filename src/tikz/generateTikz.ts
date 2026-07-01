@@ -1449,8 +1449,8 @@ function emitDepthSortedSurfaceFaces(
           ]
         : [],
   )
-  const sampledSheetCommands = sheets.flatMap(
-    ({ item }, index): LayeredTikzCommand[] =>
+  const emitSampledSheetFallbackCommands = (): LayeredTikzCommand[] =>
+    sheets.flatMap(({ item }, index): LayeredTikzCommand[] =>
       coordinateRefSheetIds.has(item.id)
         ? []
         : [
@@ -1460,7 +1460,7 @@ function emitDepthSortedSurfaceFaces(
               lines: emitSheet(item, index, context),
             },
           ],
-  )
+    )
   const sampledSheetIds = new Set(
     sheets
       .map(({ item }) => item.id)
@@ -1502,7 +1502,7 @@ function emitDepthSortedSurfaceFaces(
   } catch {
     return [
       ...coordinateRefSheetCommands,
-      ...sampledSheetCommands,
+      ...emitSampledSheetFallbackCommands(),
     ]
   }
 

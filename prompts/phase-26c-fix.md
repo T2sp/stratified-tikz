@@ -1,4 +1,4 @@
-# Phase 26C Fix Prompt: Generate sampled-sheet fallback commands lazily in depth-sorted surface export
+# Phase 26C Fix Prompt: Detach coordinate-anchor references before coordinate deletion
 
 ## Environment
 
@@ -29,9 +29,13 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 26C introduced coordinate-anchor references (`coordinateRef`) and added safeguards so coordinate refs are preserved in normal TikZ output rather than silently degrading to numeric helper coordinates.
+Phase 26C introduced coordinate-anchor references (`coordinateRef`) so supported geometry fields can reference global TikZ coordinate anchors and export readable TikZ such as:
 
-A recent Phase 26C fix added fallback behavior for coordinateRef geometry under 3D auto-visibility export.
+```tex
+\coordinate (A) at (...);
+\draw (A) -- (B);
+\node at (A) {...};
+```
 
 Review result:
 
@@ -42,328 +46,459 @@ Review result:
 
 ## Medium issue
 
-`emitDepthSortedSurfaceFaces` eagerly builds ordinary sampled-sheet fallback commands even when the fallback is never used.
+Deleting a referenced coordinate anchor leaves dangling `coordinateRef` metadata and silently degrades to stale numeric output.
 
 Review details:
 
-- In `src/tikz/generateTikz.ts`, `sampledSheetCommands` is built eagerly.
-- That eager build calls `emitSheet(...)`.
-- `emitSheet(...)` mutates the shared TikZ coordinate context, especially:
-
-```ts
-context.coordinates
-```
-
-- Even when depth-sorted surface output succeeds and the ordinary fallback is not returned, the eager fallback generation has already registered ordinary sampled sheet vertex coordinates.
+- Single delete removes the coordinate anchor only in `src/ui/diagramUpdates.ts`.
+- Bulk delete removes coordinate anchors similarly in `src/ui/bulkEditing.ts`.
+- References to the deleted coordinate remain in supported geometry fields.
+- The coordinate-reference resolver then falls back to the stored point when the anchor is missing.
+- TikZ export then falls back to generated helper coordinates when no anchor name exists.
 - Result:
-  - numeric depth-sorted sheets emit unused ordinary vertex coordinate definitions;
-  - then they also emit depth-sorted face coordinate definitions.
+  - the diagram contains dangling coordinate refs;
+  - validation/preview/export can silently use stale numeric preview values;
+  - TikZ source loses the intended `(A)` reference without an explicit detach operation.
 
-Observed output example for one numeric 3D sheet:
-
-```text
-sheetPolyNumericSheet0p0
-sheetPolyNumericSheet0Face0p0
-```
-
-Only the `Face` coordinates are referenced.
-
-This regresses existing numeric depth-sorted TikZ readability and violates the checklist item:
+This violates the Phase 26 requirement:
 
 ```text
-existing direct/numeric fields unaffected
+Deleting a referenced coordinate should detach references rather than leaving dangling refs.
 ```
 
 ## Goal
 
-Fix `emitDepthSortedSurfaceFaces` so ordinary sampled-sheet fallback commands are generated lazily only when the fallback is actually returned.
+Fix coordinate-anchor deletion so removing a coordinate anchor detaches all references to that coordinate across supported fields before the anchor is removed.
 
-Specifically:
+Required behavior:
 
-1. Do not call `emitSheet(...)` for non-coordinateRef sheets during successful depth sorting.
-2. Do not mutate the shared TikZ coordinate context while merely preparing a fallback that will not be used.
-3. Preserve coordinateRef fallback behavior.
-4. Preserve successful depth-sorted numeric surface output.
-5. Remove unused ordinary sampled-sheet coordinate definitions from successful depth-sorted output.
-6. Add regression tests.
+1. Single coordinate delete detaches all references to the coordinate, then deletes the coordinate.
+2. Bulk delete involving coordinate anchors detaches all references to those coordinates, then deletes the anchors.
+3. Detach preserves the current resolved coordinate value/source as much as possible:
+   - preserve global symbolic source when supported;
+   - preserve work-plane-local symbolic source when supported;
+   - otherwise use finite global preview coordinate as explicit fallback.
+4. No dangling `coordinateRef` metadata remains after delete.
+5. Preview continues to show the same geometry as much as practical.
+6. TikZ output no longer defines the deleted coordinate anchor.
+7. TikZ output for former references uses concrete coordinates/sources, not generated stale fallback from missing refs.
+8. Validation catches any remaining dangling refs.
+9. Add regression tests for single delete, bulk delete, validation, preview, and TikZ output.
 
 ## Scope
 
-This is a targeted Phase 26C export fix.
+This is a targeted Phase 26C fix.
 
 Implement:
 
-- lazy fallback generation for sampled-sheet commands;
-- no shared context mutation unless fallback is actually emitted;
-- tests for numeric depth-sorted surface output;
-- tests preserving coordinateRef fallback output.
+- coordinate-reference detach before coordinate-anchor deletion;
+- integration into single delete path;
+- integration into bulk delete path;
+- stronger validation/no-silent-missing-ref behavior if needed;
+- tests.
 
 Do not implement:
 
-- new coordinateRef model behavior;
-- new visibility algorithm;
-- new surface geometry;
-- new TikZ output mode;
-- broad TikZ generator rewrite;
+- new coordinate anchor UI beyond needed status messages;
+- advanced reference manager;
+- layer-translation detach unless already implemented or trivially shared;
+- new coordinate reference field support;
+- broad save/load redesign;
 - new dependencies.
 
 Do not change:
 
-- normal non-depth-sorted sheet export;
-- coordinateRef ordinary sheet/path/point/label export;
-- coordinate anchor definitions;
-- depth sorting order;
-- layer-aware output semantics;
-- inline/standalone formatting;
+- coordinate anchor model;
+- supported coordinateRef locations;
+- normal coordinateRef export when anchor exists;
+- coordinate anchor TikZ definitions;
+- point/path/sheet/label geometry semantics except intentional detach-on-delete;
+- inline/standalone TikZ formatting;
 - 4-space indentation;
 - inline no-blank-lines invariant;
-- SVG preview behavior;
-- save/load behavior.
+- SVG rendering semantics except resolved references after detach.
 
-## 1. Inspect current depth-sorted surface export path
+## 1. Inspect current delete paths
 
-Inspect `src/tikz/generateTikz.ts`.
+Inspect:
 
-Focus on:
+- `src/ui/diagramUpdates.ts`;
+- `src/ui/bulkEditing.ts`;
+- `src/model/coordinateReferences.ts`;
+- coordinate-reference validation helpers;
+- coordinate-reference resolution helpers;
+- TikZ coordinateRef formatting in `src/tikz/generateTikz.ts`;
+- tests for coordinate deletion, bulk deletion, and coordinateRef save/load/export.
 
-- `emitDepthSortedSurfaceFaces`;
-- `sampledSheetCommands`;
-- calls to `emitSheet(...)`;
-- coordinateRef fallback logic;
-- ordinary depth-sorted face emission;
-- `context.coordinates.define(...)`;
-- layer-aware wrapping.
+Find all code paths that remove coordinate anchors.
 
-Find where fallback commands are currently built eagerly.
+Known review locations:
 
-The problematic pattern is conceptually:
-
-```ts
-const sampledSheetCommands = emitSheet(...); // mutates context.coordinates
-
-if (shouldFallback) {
-  return sampledSheetCommands;
-}
-
-return depthSortedFaceCommands;
+```text
+src/ui/diagramUpdates.ts
+src/ui/bulkEditing.ts
 ```
 
-This must become lazy.
+Both must detach refs before deleting anchors.
 
-## 2. Generate fallback commands only when needed
+## 2. Use or add a pure detach helper
 
-Preferred approach:
+If a helper already exists from later Phase 26 work, use it.
 
-Use a thunk / callback:
+Otherwise add one now.
+
+Suggested API:
 
 ```ts
-const emitSampledSheetFallback = () => emitSheet(...);
+detachCoordinateAnchorReferences(
+  diagram: Diagram,
+  coordinateId: string
+): Result<{
+  diagram: Diagram;
+  detachedCount: number;
+}, ValidationError>
 ```
 
-Then only call it in fallback branches:
+For bulk deletion:
 
 ```ts
-if (shouldFallback) {
-  return emitSampledSheetFallback();
-}
+detachCoordinateAnchorReferencesMany(
+  diagram: Diagram,
+  coordinateIds: string[]
+): Result<{
+  diagram: Diagram;
+  detachedCount: number;
+}, ValidationError>
+```
 
-return emitDepthSortedFaces(...);
+or loop over the single-coordinate helper.
+
+Requirements:
+
+- input diagram is not mutated;
+- all supported coordinateRef fields are traversed;
+- all refs to the target coordinate are replaced;
+- refs to other coordinates remain unchanged;
+- no dangling refs to deleted coordinate remain;
+- return detached count for status/tests;
+- operation is atomic:
+  - if any detach fails, do not partially delete/mutate.
+
+## 3. Detach semantics
+
+When replacing a `coordinateRef`, use the current coordinate anchor position.
+
+Preferred priority:
+
+### A. Preserve coordinate source if the target field supports it
+
+If the coordinate anchor has a global symbolic source:
+
+```text
+Coordinate A:
+  x = R
+  y = 0
+  z = 0
+
+Path endpoint before:
+  coordinateRef(A)
+
+Path endpoint after detach:
+  global symbolic x=R, y=0, z=0
+```
+
+If the coordinate anchor has a work-plane-local symbolic source and the target field supports work-plane-local sources:
+
+```text
+Coordinate P:
+  frame snapshot
+  a = R*cos(q)
+  b = R*sin(q)
+
+Sheet vertex before:
+  coordinateRef(P)
+
+Sheet vertex after detach:
+  workPlaneLocal(frame copy, a=R*cos(q), b=R*sin(q))
+```
+
+### B. Fallback to finite global preview coordinate
+
+If the target field cannot support the anchor's source type:
+
+```text
+target field = finite global preview coordinate
 ```
 
 Requirements:
 
-- if depth sorting succeeds, fallback thunk is never called;
-- shared `context.coordinates` is not mutated by fallback code;
-- ordinary fallback commands are not generated;
-- ordinary fallback coordinate definitions are not registered.
+- fallback must be finite;
+- no NaN/Infinity;
+- symbolic expressions preserved whenever supported;
+- work-plane-local frames deep-copied when preserved;
+- coordinate anchor itself is not mutated before deletion;
+- preview geometry remains stable as much as practical.
 
-## 3. Avoid context mutation during fallback probing
+## 4. Single coordinate delete behavior
 
-Do not use a pattern that still calls `emitSheet(...)` into the real context just to inspect output.
+Update the single delete path so that when the deleted object is a coordinate anchor:
 
-If any fallback decision currently depends on `sampledSheetCommands`, refactor the decision so it uses non-mutating predicates instead.
-
-Examples of predicates:
-
-```ts
-sheetContainsCoordinateRef(sheet)
-surfaceDepthSortUnsupportedForSheet(sheet)
-shouldUseCoordinateRefPreservingFallback(sheet)
-```
-
-These should inspect the source object, not generate TikZ.
-
-If a fallback really needs generated commands, generate them after the decision is made.
-
-## 4. CoordinateRef fallback behavior must remain
-
-The previous Phase 26C fix likely introduced fallback behavior:
+1. find references to that coordinate;
+2. detach them;
+3. remove the coordinate anchor;
+4. clean selection;
+5. produce one undoable operation;
+6. optionally show a status message:
 
 ```text
-If a sheet contains coordinateRef sources and surface depth sorting would sample it numerically, skip sampled depth sorting for that sheet and emit ordinary reference-preserving export with a comment.
+Deleted coordinate "A" and detached 3 references.
 ```
 
-Preserve that behavior.
+If the coordinate is unused:
 
-Required:
+- simply delete it.
 
-- coordinateRef sheet with surfaceDepthSort enabled still exports `(A)`, `(B)`, etc.;
-- fallback comment remains;
-- ordinary fallback commands are emitted only for that coordinateRef sheet;
-- coordinate anchor definitions appear before references.
+If detach fails:
 
-## 5. Numeric depth-sorted sheets must not leak ordinary fallback coordinates
+- do not delete the coordinate;
+- return/show clear error;
+- do not partially mutate diagram.
 
-For a numeric sheet with surfaceDepthSort enabled and successful depth sorting:
+## 5. Bulk delete behavior
 
-Required:
+Update bulk delete when one or more selected/deleted objects are coordinate anchors.
 
-- output includes depth-sorted face coordinate definitions if that is existing behavior;
-- output does **not** include ordinary sampled sheet coordinate definitions created only by unused fallback;
-- no `sheetPoly...p0` ordinary fallback coordinates unless actually referenced by successful output;
-- only the intended `Face...` helper coordinates appear, if that is the current depth-sorted naming policy.
+Required flow:
 
-The key test should fail before the fix and pass after.
+1. collect all coordinate anchors that will be deleted;
+2. detach references to those anchors across the diagram;
+3. remove the coordinate anchors;
+4. remove any other selected objects;
+5. clean crossing/braiding states and selection according to existing bulk-delete policy;
+6. commit as one undoable operation.
 
-## 6. Consider temporary context only if necessary
+Important edge cases:
 
-If there is an unavoidable need to generate fallback commands for analysis, do not use the real shared context.
+### Coordinate and referencing object both deleted
 
-Use a temporary isolated context or dry-run mode.
+If an object that references coordinate `A` is also deleted in the same bulk delete:
 
-However, preferred solution is simpler:
+- no need to detach refs inside that object if it is removed;
+- but detaching first is acceptable as long as final result has no dangling refs and no partial mutation.
+- Prefer a helper that can skip target object ids slated for deletion for efficiency, but not required.
 
-```text
-do not generate fallback until returning fallback
+### Multiple coordinates deleted
+
+If an object references several deleted coordinates:
+
+- detach all of them.
+- refs to coordinates not being deleted remain refs.
+
+### Coordinate refs inside objects being kept
+
+Must be detached.
+
+## 6. Resolver should not silently accept missing anchors
+
+The review says the resolver currently falls back to the stored point when an anchor is missing.
+
+That can hide dangling refs.
+
+Adjust policy carefully.
+
+### Required validation policy
+
+`validateDiagram` should reject dangling coordinate refs.
+
+This may already happen for supported fields; confirm it.
+
+### Resolver policy
+
+For normal preview/export resolution:
+
+- if a referenced coordinate id is missing, do not silently use stale stored preview as if valid.
+- Prefer returning an unresolved/error status or leaving validation to reject before export.
+- If resolver must fallback for UI tolerance, make sure validation/export never treats it as valid.
+
+The key is: after delete, refs should be detached, so missing-anchor fallback should not be needed for valid diagrams.
+
+Add tests that a dangling ref fails validation.
+
+## 7. TikZ export behavior after detach
+
+After deleting coordinate `A`:
+
+- output should not contain:
+
+```tex
+\coordinate (A)
 ```
 
-If a temporary context is used, ensure:
+- former references should not output:
 
-- no coordinate definitions leak into real output;
-- no library requirements or style metadata leak accidentally;
-- tests cover no unused coordinates.
+```tex
+(A)
+```
 
-## 7. Layer-aware output
+- former references should output concrete coordinates/sources.
 
-Preserve current layer-aware behavior.
+Example:
 
-Requirements:
+Before delete:
 
-- depth-sorted numeric faces remain in the correct layer block;
-- coordinateRef fallback sheet remains in the correct layer block;
-- no duplicate layer wrapping;
-- indentation remains 4 spaces;
-- inline output has no blank lines.
+```tex
+\coordinate (A) at ({\R},0);
+\draw (A) -- (B);
+```
 
-## 8. Tests
+After detach+delete:
+
+```tex
+\draw ({\R},0) -- (B);
+```
+
+or existing coordinate formatting equivalent.
+
+Do not rely on generated helper coordinates because the anchor name is missing.
+
+## 8. Preview behavior after detach
+
+Preview should remain visually stable.
+
+Example:
+
+- path endpoint referencing `A` at `(2,0)` should remain at `(2,0)` immediately after delete.
+- moving/deleting `A` should not leave the path endpoint stale-linked to a missing anchor.
+
+## 9. Tests
 
 Add focused tests.
 
-### Numeric depth-sorted sheet regression tests
+### Single delete tests
 
-1. A simple numeric 3D polygon/quad sheet with `surfaceDepthSort` enabled exports depth-sorted face coordinates.
+1. Delete unused coordinate anchor removes it.
 
-2. The same output does **not** include unused ordinary fallback coordinate definitions.
+2. Delete referenced coordinate anchor detaches path endpoint ref and removes anchor.
 
-Example assertion concept:
+3. Delete referenced coordinate anchor detaches label position ref.
 
-```ts
-expect(output).toContain("Face0p0");
-expect(output).not.toContain("NumericSheet0p0");
+4. Delete referenced coordinate anchor detaches point position ref if supported.
+
+5. Delete referenced coordinate anchor detaches simple sheet vertex ref if supported.
+
+6. After delete, `validateDiagram(...)` passes.
+
+7. After delete, no `coordinateRef` remains with the deleted coordinate id.
+
+8. Preview/resolved geometry remains at the coordinate's current position.
+
+9. TikZ output no longer contains `\coordinate (A)`.
+
+10. TikZ output no longer contains `(A)` references.
+
+11. TikZ output preserves global symbolic expression when detaching a global symbolic coordinate.
+
+12. TikZ output preserves work-plane-local source or uses documented finite global fallback when detaching local coordinate.
+
+### Bulk delete tests
+
+13. Bulk delete coordinate anchor and keep referencing path:
+    - path ref detaches;
+    - coordinate removed;
+    - validation passes.
+
+14. Bulk delete multiple coordinate anchors:
+    - refs to each are detached;
+    - refs to non-deleted coordinates remain refs.
+
+15. Bulk delete coordinate anchor and referencing object:
+    - final diagram has no dangling refs;
+    - operation succeeds.
+
+16. Bulk delete coordinate anchor plus ordinary point/path still deletes all selected objects and detaches kept refs.
+
+17. Bulk delete undo/redo restores/detaches correctly.
+
+### Dangling ref validation tests
+
+18. A diagram with a coordinateRef pointing to a missing anchor fails validation.
+
+19. Save/load with dangling coordinateRef returns `ok: false`.
+
+20. Resolver/export does not silently produce valid TikZ from dangling refs without validation.
+
+### Regression tests
+
+21. Existing supported coordinateRef export with existing anchor still uses `(A)`.
+
+22. Coordinate anchor definitions still emitted before references.
+
+23. Inline output no blank lines.
+
+24. 4-space indentation preserved.
+
+25. Existing coordinateRef unsupported-location rejection still works.
+
+26. Existing bulk delete behavior for non-coordinate objects unchanged.
+
+## 10. Error/status messages
+
+Good status:
+
+```text
+Deleted coordinate "A" and detached 3 references.
 ```
 
-Use actual stable naming patterns from the project.
+Good error:
 
-3. No unreferenced ordinary sheet helper coordinates are emitted.
-
-If exact naming is brittle, assert that every generated coordinate definition without `Face` is referenced, or use a helper if available.
-
-4. The depth-sorted output remains deterministic.
-
-### CoordinateRef fallback preservation tests
-
-5. A polygon/quad sheet with coordinateRef vertices and `surfaceDepthSort` enabled still emits ordinary reference-preserving fallback.
-
-6. Output contains `(A)` / `(B)` references.
-
-7. Output contains fallback comment.
-
-8. Output does not emit sampled numeric face helper coordinates for that coordinateRef sheet.
-
-9. Coordinate anchor definitions appear before use.
-
-### Mixed diagram tests
-
-10. Diagram with one numeric sheet and one coordinateRef sheet:
-    - numeric sheet uses depth-sorted face output;
-    - coordinateRef sheet uses fallback ordinary output;
-    - numeric sheet does not leak ordinary fallback coordinates;
-    - coordinateRef sheet preserves refs.
-
-### Formatting/regression tests
-
-11. Inline output has no blank lines.
-
-12. 4-space indentation preserved.
-
-13. Layer-aware output preserved.
-
-14. Non-depth-sorted ordinary sheet export unchanged.
-
-15. Existing auto-visibility tests for non-ref surfaces still pass.
-
-16. Existing coordinateRef path/point/label/simple sheet tests still pass.
-
-## 9. Defensive checks
-
-Search for similar eager fallback generation patterns in TikZ export:
-
-```bash
-rg "fallback|emitSheet|sampledSheetCommands|emitDepthSortedSurfaceFaces" src/tikz/generateTikz.ts
+```text
+Could not delete coordinate "A": failed to detach reference in path "f".
 ```
 
-If other branches eagerly generate fallback output into shared context and discard it, consider fixing them if they are clearly the same bug.
+Avoid silently deleting the anchor while refs remain.
 
-Keep the fix focused.
-
-## 10. Manual verification checklist
+## 11. Manual verification checklist
 
 After implementation, run:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH npm test
-PATH=/opt/homebrew/bin:$PATH npm run build
-git diff --check
+PATH=/opt/homebrew/bin:$PATH npm run dev
 ```
 
-Manual-style checks if practical:
+Manual test:
 
-1. Create a 3D numeric polygon sheet.
-2. Enable surface depth sorting.
-3. Generate TikZ.
-4. Confirm only depth-sorted face helper coordinates appear.
-5. Confirm no unused ordinary `sheetPoly...p0` coordinates appear.
-6. Create a sheet with coordinateRef vertices.
-7. Enable surface depth sorting.
-8. Confirm fallback comment appears and `(A)` references are preserved.
+1. Create coordinate anchor `A`.
+2. Create path endpoint referencing `A`.
+3. Export TikZ and confirm `(A)` appears.
+4. Delete `A`.
+5. Confirm path remains visually in place.
+6. Confirm `A` marker disappears.
+7. Export TikZ.
+8. Confirm `\coordinate (A)` is gone.
+9. Confirm `(A)` references are gone.
+10. Confirm concrete coordinate appears instead.
+11. Undo.
+12. Confirm `A` and `(A)` refs return.
+13. Bulk delete `A` together with another object and confirm no dangling refs.
 
-## 11. Preserve existing behavior
+## 12. Preserve existing behavior
 
 Do not regress:
 
-- ordinary sheet export;
-- coordinateRef sheet fallback;
-- surface depth sorting for non-ref sheets;
+- normal coordinateRef export;
 - coordinate anchor definitions;
-- layer-aware output;
+- coordinateRef validation for existing anchors;
+- supported coordinateRef locations;
+- unsupported coordinateRef rejection;
+- preview resolution when anchor exists;
+- bulk delete for non-coordinate objects;
+- undo/redo;
+- save/load;
 - inline no-blank-lines;
 - 4-space indentation;
-- SVG preview;
-- save/load;
-- undo/redo;
-- existing coordinateRef validation/export behavior.
+- SVG preview.
 
-## 12. Verification
+## 13. Verification
 
 Run:
 
@@ -373,15 +508,17 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 13. Report after implementation
+## 14. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of unused ordinary coordinates leaking;
-- how fallback generation is now lazy;
-- whether a thunk, predicate, or temporary context was used;
-- how coordinateRef fallback remains preserved;
+- root cause of dangling ref delete behavior;
+- detach helper used/added;
+- single delete behavior;
+- bulk delete behavior;
+- symbolic/global/local preservation policy;
+- resolver/validation missing-anchor policy;
 - tests added/updated;
 - test results;
 - build results;

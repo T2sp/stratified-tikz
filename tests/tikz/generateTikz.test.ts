@@ -1055,6 +1055,32 @@ test('surface depth sorting emits farther sheet faces before closer faces', () =
   assert.doesNotMatch(sorted, /NaN|Infinity/)
 })
 
+test('numeric surface depth sorting does not emit unused sampled-sheet fallback coordinates', () => {
+  const diagram = createSurfaceDepthSortDiagram()
+  const first = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const second = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const sortedSheetCoordinateNames = extractCoordinateNames(first).filter(
+    (name) =>
+      name.startsWith('sheetPolyNearSheet0') ||
+      name.startsWith('sheetPolyFarSheet1'),
+  )
+
+  assert.match(first, /\\coordinate \(sheetPolyNearSheet0Face0p0\) at /)
+  assert.match(first, /\\coordinate \(sheetPolyFarSheet1Face0p0\) at /)
+  assert.doesNotMatch(first, /\\coordinate \(sheetPolyNearSheet0p0\) at /)
+  assert.doesNotMatch(first, /\\coordinate \(sheetPolyFarSheet1p0\) at /)
+  assert.equal(sortedSheetCoordinateNames.length > 0, true)
+  assert.equal(
+    sortedSheetCoordinateNames.every((name) => name.includes('Face')),
+    true,
+  )
+  assert.equal(first, second)
+})
+
 test('disabled surface depth sorting leaves existing TikZ output unchanged', () => {
   const diagram = createSurfaceDepthSortDiagram()
 
@@ -1207,10 +1233,13 @@ test('surface depth sorting falls back per coordinate-ref sheet', () => {
   assert.ok(referenceIndex >= 0)
   assert.ok(definitionIndex < referenceIndex)
   assert.doesNotMatch(tikz, /sheetPolyReferenceSortedSheet\d+Face0p0/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetPolyReferenceSortedSheet\d+p0\)/)
   assert.match(
     tikz,
     /Auto surface face depth sort: sheet "Numeric Sorted Sheet" \[numeric-sorted-sheet\]/,
   )
+  assert.match(tikz, /\\coordinate \(sheetPolyNumericSortedSheet0Face0p0\) at /)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetPolyNumericSortedSheet0p0\) at /)
   assert.match(referenceLayer, /Surface depth sorting skipped/)
   assert.match(referenceLayer, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
   assert.doesNotMatch(tikz, /NaN|Infinity/)
