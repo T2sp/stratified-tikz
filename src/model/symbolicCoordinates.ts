@@ -506,7 +506,6 @@ function inspectDiagramSupportedSymbolicCoordinateSources(
     diagram.coordinateAnchors.forEach((anchor, index) => {
       collectCoordinateAnchorSupportedSymbolicExpressionSources(
         anchor,
-        diagram.ambientDimension,
         `coordinateAnchors[${index}]`,
         inspection,
       )
@@ -663,7 +662,6 @@ function collectStratumSupportedSymbolicExpressionSources(
 
 function collectCoordinateAnchorSupportedSymbolicExpressionSources(
   anchor: unknown,
-  ambientDimension: AmbientDimension,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
 ): void {
@@ -672,18 +670,11 @@ function collectCoordinateAnchorSupportedSymbolicExpressionSources(
   }
 
   if (anchor.position.kind === 'global') {
-    const point = vec3FromGlobalCoordinateAnchorValue(
+    collectGlobalCoordinateAnchorValueSupportedSymbolicExpressionSources(
       anchor.position.value,
-      ambientDimension,
+      `${path}.position.value`,
+      inspection,
     )
-
-    if (point !== null) {
-      collectVec3SupportedSymbolicExpressionSources(
-        point,
-        `${path}.position.value`,
-        inspection,
-      )
-    }
     return
   }
 
@@ -692,11 +683,7 @@ function collectCoordinateAnchorSupportedSymbolicExpressionSources(
   }
 
   collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
-    {
-      kind: 'workPlaneLocal',
-      frame: anchor.position.frame,
-      local: anchor.position.local,
-    },
+    anchor.position,
     `${path}.position`,
     inspection,
   )
@@ -705,6 +692,37 @@ function collectCoordinateAnchorSupportedSymbolicExpressionSources(
     `${path}.position.preview`,
     inspection,
   )
+}
+
+function collectGlobalCoordinateAnchorValueSupportedSymbolicExpressionSources(
+  value: unknown,
+  path: string,
+  inspection: SupportedSymbolicCoordinateInspection,
+): void {
+  if (!isRecord(value)) {
+    pushError(
+      inspection.errors,
+      path,
+      'Global coordinate anchor value must be an object.',
+    )
+    return
+  }
+
+  if (value.source !== undefined) {
+    pushError(
+      inspection.errors,
+      `${path}.source`,
+      'Global coordinate anchors must not store work-plane-local source metadata.',
+    )
+  }
+
+  coordinateAxes.forEach((axis) => {
+    collectCoordinateComponentSupportedSymbolicExpressionSources(
+      value[axis],
+      `${path}.${axis}`,
+      inspection,
+    )
+  })
 }
 
 function collectClosedPathBoundariesSupportedSymbolicExpressionSources(
@@ -1337,9 +1355,11 @@ function validateCoordinateAnchorSymbolicMetadata(
   }
 
   if (anchor.position.kind === 'global') {
-    const point = vec3FromGlobalCoordinateAnchorValue(
+    const point = readGlobalCoordinateAnchorValue(
       anchor.position.value,
       ambientDimension,
+      `${path}.position.value`,
+      errors,
     )
 
     if (point !== null) {
@@ -1864,10 +1884,19 @@ function refreshCoordinateAnchorSymbolicCoordinatePreviews(
   errors: DiagramValidationIssue[],
 ): CoordinateAnchor {
   if (anchor.position.kind === 'global') {
-    const point = coordinateAnchorPositionToVec3(
-      anchor.position,
-      ambientDimension,
-    )
+    let point: Vec3
+
+    try {
+      point = coordinateAnchorPositionToVec3(anchor.position, ambientDimension)
+    } catch {
+      pushError(
+        errors,
+        `${path}.position.value`,
+        'Global coordinate anchor value must contain valid coordinate components.',
+      )
+      return anchor
+    }
+
     const refreshedPoint = refreshVec3SymbolicPreview(
       point,
       ambientDimension,
@@ -3255,17 +3284,28 @@ function symbolicVec3ComponentsFromPoint(point: Vec3): SymbolicVec3 {
   }
 }
 
-function vec3FromGlobalCoordinateAnchorValue(
+function readGlobalCoordinateAnchorValue(
   value: unknown,
   ambientDimension: AmbientDimension,
+  path: string,
+  errors: DiagramValidationIssue[],
 ): Vec3 | null {
   if (!isRecord(value)) {
+    pushError(errors, path, 'Global coordinate anchor value must be an object.')
     return null
   }
 
-  const x = coordinateComponentFromUnknown(value.x)
-  const y = coordinateComponentFromUnknown(value.y)
-  const z = coordinateComponentFromUnknown(value.z)
+  if (value.source !== undefined) {
+    pushError(
+      errors,
+      `${path}.source`,
+      'Global coordinate anchors must not store work-plane-local source metadata.',
+    )
+  }
+
+  const x = readCoordinateComponent(value.x, `${path}.x`, undefined, errors)
+  const y = readCoordinateComponent(value.y, `${path}.y`, undefined, errors)
+  const z = readCoordinateComponent(value.z, `${path}.z`, undefined, errors)
 
   if (x === null || y === null || z === null) {
     return null

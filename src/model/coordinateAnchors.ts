@@ -116,8 +116,12 @@ export function coordinateAnchorPositionPreview(
   position: CoordinateAnchorPosition,
   ambientDimension: AmbientDimension,
 ): Vec3 {
+  assertCoordinateAnchorPositionRecord(position)
+
   switch (position.kind) {
-    case 'global':
+    case 'global': {
+      assertSymbolicVec3(position.value, 'Global coordinate anchor value')
+
       return normalizeAnchorPreviewPoint(
         {
           x: coordinateComponentPreviewValue(position.value.x),
@@ -126,8 +130,11 @@ export function coordinateAnchorPositionPreview(
         },
         ambientDimension,
       )
+    }
     case 'workPlaneLocal':
       return normalizeAnchorPreviewPoint(position.preview, ambientDimension)
+    default:
+      throw new Error('Coordinate anchor position kind must be global or workPlaneLocal.')
   }
 }
 
@@ -279,6 +286,59 @@ function cloneScalarInputValue(value: ScalarInputValue): ScalarInputValue {
         expression: value.expression,
         previewValue: value.previewValue,
       }
+}
+
+function assertCoordinateAnchorPositionRecord(
+  position: CoordinateAnchorPosition,
+): asserts position is CoordinateAnchorPosition {
+  if (!isRecord(position)) {
+    throw new Error('Coordinate anchor position must be an object.')
+  }
+}
+
+function assertSymbolicVec3(value: SymbolicVec3, label: string): void {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object.`)
+  }
+
+  assertCoordinateComponent(value.x, `${label}.x`)
+  assertCoordinateComponent(value.y, `${label}.y`)
+  assertCoordinateComponent(value.z, `${label}.z`)
+}
+
+function assertCoordinateComponent(
+  component: CoordinateComponent,
+  label: string,
+): void {
+  if (!isRecord(component)) {
+    throw new Error(`${label} must be a coordinate component object.`)
+  }
+
+  if (component.kind === 'numeric') {
+    if (typeof component.value !== 'number' || !Number.isFinite(component.value)) {
+      throw new Error(`${label}.value must be a finite number.`)
+    }
+    return
+  }
+
+  if (component.kind === 'symbolic') {
+    if (typeof component.expression !== 'string') {
+      throw new Error(`${label}.expression must be a string.`)
+    }
+    if (
+      typeof component.previewValue !== 'number' ||
+      !Number.isFinite(component.previewValue)
+    ) {
+      throw new Error(`${label}.previewValue must be finite.`)
+    }
+    return
+  }
+
+  throw new Error(`${label}.kind must be numeric or symbolic.`)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function toIdentifier(rawName: string): string {
