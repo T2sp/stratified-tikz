@@ -139,6 +139,17 @@ const phaseSlugs = {
   "25D": "work-plane-local-tikz-export",
   "25E": "work-plane-local-editing-translation",
   "25F": "work-plane-local-polish",
+  "26A": "coordinate-anchor-model-tikz",
+  "26B": "add-coordinate-input-preview",
+  "26C": "coordinate-references",
+  "26D": "coordinate-inspector-editing",
+  "26E": "coordinate-editing-integration",
+  "26F": "coordinate-core-polish",
+  "26G": "coordinate-preview-hide-hit-test",
+  "26H": "coordinate-reference-detach-helpers",
+  "26I": "coordinate-delete-detach-usage",
+  "26J": "layer-translation-detach-coordinate-refs",
+  "26K": "coordinate-detach-polish",
 };
 
 function makePhaseSpec(phase) {
