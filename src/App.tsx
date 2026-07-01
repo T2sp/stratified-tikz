@@ -290,6 +290,7 @@ import {
   directPathInputModeItems,
   generateTikzForUi,
   isAddPathTool,
+  coordinateAnchorVisibilityAriaLabel,
   coordinateAnchorVisibilityButtonLabel,
   previewToolbarTopTools,
   runPreviewOverlayAction,
@@ -6390,11 +6391,9 @@ function App() {
                 showCoordinateAnchors ? 'is-selected' : ''
               }`}
               aria-pressed={showCoordinateAnchors}
-              aria-label={
-                showCoordinateAnchors
-                  ? 'Hide coordinate anchors'
-                  : 'Show coordinate anchors'
-              }
+              aria-label={coordinateAnchorVisibilityAriaLabel(
+                showCoordinateAnchors,
+              )}
               title={
                 showCoordinateAnchors
                   ? 'Hide coordinate anchors'

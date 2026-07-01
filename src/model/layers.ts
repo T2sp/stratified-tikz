@@ -67,6 +67,13 @@ export type MergeLayersResult = {
 
 export type LayerTranslationVector = Vec3 | TranslationVector
 
+export type TranslateLayerResult = {
+  diagram: Diagram
+  layer: number
+  translated: boolean
+  detachedCoordinateReferenceCount: number
+}
+
 export function normalizeLayerValue(layer: number): number {
   return Object.is(layer, -0) ? 0 : layer
 }
@@ -518,6 +525,14 @@ export function translateLayer(
   layerValue: number,
   translation: LayerTranslationVector,
 ): Diagram {
+  return translateLayerWithResult(diagram, layerValue, translation).diagram
+}
+
+export function translateLayerWithResult(
+  diagram: Diagram,
+  layerValue: number,
+  translation: LayerTranslationVector,
+): TranslateLayerResult {
   const layer = normalizedFiniteLayerValue(layerValue, 'layerValue')
   const normalizedTranslation = isTranslationVector(translation)
     ? normalizeTranslationVectorForDiagram(
@@ -532,7 +547,12 @@ export function translateLayer(
       )
 
   if (isZeroTranslationVector(normalizedTranslation)) {
-    return diagram
+    return {
+      diagram,
+      layer,
+      translated: false,
+      detachedCoordinateReferenceCount: 0,
+    }
   }
 
   const layerElements = [
@@ -573,14 +593,24 @@ export function translateLayer(
   })
 
   if (!changed) {
-    return diagram
+    return {
+      diagram,
+      layer,
+      translated: false,
+      detachedCoordinateReferenceCount: 0,
+    }
   }
 
-  return cleanPathCrossingStates({
-    ...detachedDiagram,
-    strata,
-    labels,
-  })
+  return {
+    diagram: cleanPathCrossingStates({
+      ...detachedDiagram,
+      strata,
+      labels,
+    }),
+    layer,
+    translated: true,
+    detachedCoordinateReferenceCount: detached.value.detachedCount,
+  }
 }
 
 export function normalizeLayerMetadataForDiagram(

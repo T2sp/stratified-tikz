@@ -128,6 +128,14 @@ export function coordinateAnchorVisibilityButtonLabel(
   return showCoordinateAnchors ? 'Coordinates: Hide' : 'Coordinates: Show'
 }
 
+export function coordinateAnchorVisibilityAriaLabel(
+  showCoordinateAnchors: boolean,
+): string {
+  return showCoordinateAnchors
+    ? 'Hide coordinate anchors in preview'
+    : 'Show coordinate anchors in preview'
+}
+
 export function toggleToolbarPalette(
   current: PreviewToolbarPalette,
   palette: PreviewToolbarPaletteId,
