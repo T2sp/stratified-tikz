@@ -1,6 +1,7 @@
 export * from './camera.ts'
 export * from './constructors.ts'
 export * from './coordinateAnchors.ts'
+export * from './coordinateReferences.ts'
 export * from './filledBoundaries.ts'
 export * from './grids.ts'
 export * from './importedTikzStyles.ts'

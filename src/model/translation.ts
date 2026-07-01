@@ -11,6 +11,7 @@ import {
   cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
 } from './workPlaneLocalCoordinates.ts'
+import { cloneCoordinateSource } from './coordinateReferences.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -255,6 +256,12 @@ export function translateVec3(
   translation: TranslationVector,
   context: DiagramTranslationContext,
 ): Vec3 {
+  if (point.symbolic?.source?.kind === 'coordinateRef') {
+    throw new Error(
+      'Coordinate references must be detached before translation.',
+    )
+  }
+
   if (point.symbolic?.source?.kind === 'workPlaneLocal') {
     return translateWorkPlaneLocalVec3(
       point.symbolic.source,
@@ -992,7 +999,7 @@ function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
     z: cloneCoordinateComponent(symbolic.z),
     ...(symbolic.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
+      : { source: cloneCoordinateSource(symbolic.source) }),
   }
 }
 

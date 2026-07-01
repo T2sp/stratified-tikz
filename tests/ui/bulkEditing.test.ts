@@ -5,14 +5,22 @@ import {
   createEmptyDiagram,
   createPointStratum,
 } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
 import { pathIntersectionCandidatesForDiagram } from '../../src/geometry/pathIntersections.ts'
 import { pathCrossingStateFromCandidate } from '../../src/model/pathCrossings.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import {
   parseTranslationVectorFromInputs,
   type TranslationVector,
 } from '../../src/model/translation.ts'
 import type {
+  CoordinateAnchorPosition,
+  CoordinateComponent,
   CurveStratum,
   Diagram,
   PointStratum,
@@ -114,6 +122,88 @@ test('bulk delete removes all selected objects and clears selection', () => {
   assert.equal(hasStratum(result.diagram, 'curve-c'), true)
 })
 
+test('bulk delete detaches kept references to deleted coordinate anchors', () => {
+  const result = removeSelectedElements(createBulkCoordinateReferenceDiagram(), {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const curve = findCurve(result.diagram, 'ref-path')
+
+  assert.equal(result.removed, true)
+  assert.equal(result.removedCount, 1)
+  assert.equal(result.detachedCoordinateReferenceCount, 1)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(result.diagram.coordinateAnchors?.some((anchor) => anchor.id === 'coord-a'), false)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.deepEqual(pointPreviewForBulkTest(curve.points[0]), { x: 1, y: 0, z: 0 })
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.points[1])?.coordinateId,
+    'coord-b',
+  )
+})
+
+test('bulk delete multiple coordinate anchors detaches each and keeps other refs', () => {
+  const result = removeSelectedElements(createBulkCoordinateReferenceDiagram(), {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'coordinate', id: 'coord-b' },
+    ],
+  })
+  const curve = findCurve(result.diagram, 'ref-path')
+  const point = findPoint(result.diagram, 'ref-point-c')
+
+  assert.equal(result.removed, true)
+  assert.equal(result.removedCount, 2)
+  assert.equal(result.detachedCoordinateReferenceCount, 2)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[1]), null)
+  assert.deepEqual(curve.points.map(pointPreviewForBulkTest), [
+    { x: 1, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+  ])
+  assert.equal(
+    coordinateReferenceSourceForPoint(point.position)?.coordinateId,
+    'coord-c',
+  )
+})
+
+test('bulk delete coordinate anchor and referencing object succeeds without dangling refs', () => {
+  const result = removeSelectedElements(createBulkCoordinateReferenceDiagram(), {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'stratum', id: 'ref-path' },
+    ],
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(result.removedCount, 2)
+  assert.equal(result.detachedCoordinateReferenceCount, 1)
+  assert.equal(hasStratum(result.diagram, 'ref-path'), false)
+  assert.equal(JSON.stringify(result.diagram).includes('"coordinateId":"coord-a"'), false)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('bulk delete coordinate anchor plus ordinary point deletes both and detaches kept refs', () => {
+  const result = removeSelectedElements(createBulkCoordinateReferenceDiagram(), {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'stratum', id: 'ordinary-point' },
+    ],
+  })
+  const curve = findCurve(result.diagram, 'ref-path')
+
+  assert.equal(result.removed, true)
+  assert.equal(result.removedCount, 2)
+  assert.equal(result.detachedCoordinateReferenceCount, 1)
+  assert.equal(hasStratum(result.diagram, 'ordinary-point'), false)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
 test('bulk duplicate creates new ids and disambiguates path labels', () => {
   const result = duplicateSelectedElements(createBulkCurveDiagram(), curveSelection())
   const copiedIds = result.idChanges.map((change) => change.copiedId)
@@ -202,6 +292,86 @@ test('bulk translation adds symbolic deltas to symbolic point expressions', () =
   assert.equal(point.position.symbolic?.x.kind, 'symbolic')
   assert.equal(point.position.symbolic.x.expression, '(R) + (Len/2)')
   assert.equal(point.position.symbolic.x.previewValue, 5)
+})
+
+test('bulk translation detaches coordinate refs from current anchor positions', () => {
+  const diagram = createBulkStaleCoordinateReferenceDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coord-a' },
+        { kind: 'stratum', id: 'ref-path' },
+      ],
+    },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, 'ref-path')
+  const otherPoint = findPoint(result.diagram, 'ref-point-c')
+  const anchor = result.diagram.coordinateAnchors?.find(
+    (candidate) => candidate.id === 'coord-a',
+  )
+
+  assert.equal(curve.kind, 'polyline')
+  if (curve.kind !== 'polyline') {
+    throw new Error('Expected referenced polyline.')
+  }
+  assert.deepEqual(pointPreviewForBulkTest(curve.points[0]), {
+    x: 6,
+    y: 5,
+    z: 0,
+  })
+  assert.deepEqual(pointPreviewForBulkTest(curve.points[1]), {
+    x: 3,
+    y: 0,
+    z: 0,
+  })
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[1]), null)
+  assert.equal(
+    coordinateReferenceSourceForPoint(otherPoint.position)?.coordinateId,
+    'coord-c',
+  )
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.x.kind === 'numeric'
+      ? anchor.position.value.x.value
+      : NaN,
+    5,
+  )
+})
+
+test('bulk translation detaches symbolic coordinate refs before translating', () => {
+  const diagram = createBulkSymbolicCoordinateReferenceDiagram()
+  const result = translateSelectedElements(
+    diagram,
+    { kind: 'stratum', id: 'symbolic-ref-point' },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const point = findPoint(result.diagram, 'symbolic-ref-point')
+
+  assert.equal(coordinateReferenceSourceForPoint(point.position), null)
+  assert.equal(point.position.x, 6)
+  assert.equal(point.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(point.position.symbolic.x.expression, '(R) + 1')
+  assert.equal(point.position.symbolic.x.previewValue, 6)
 })
 
 test('bulk translation input rejects unknown symbolic delta variables', () => {
@@ -319,6 +489,47 @@ test('undo and redo work for bulk delete', () => {
   assert.equal(hasStratum(redone.editableDiagram, 'curve-a'), false)
 })
 
+test('undo and redo restore coordinate refs around bulk coordinate delete', () => {
+  const initial = createBulkState(createBulkCoordinateReferenceDiagram(), {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const deleted = applyBulkDeleteToEditorState(initial)
+  const undone = undoLastDiagramChange(deleted)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(deleted.editableDiagram, 'ref-path').points[0],
+    ),
+    null,
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(undone.editableDiagram, 'ref-path').points[0],
+    )?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(redone.editableDiagram, 'ref-path').points[0],
+    ),
+    null,
+  )
+  assert.equal(
+    deleted.editableDiagram.coordinateAnchors?.some((anchor) => anchor.id === 'coord-a'),
+    false,
+  )
+  assert.equal(
+    undone.editableDiagram.coordinateAnchors?.some((anchor) => anchor.id === 'coord-a'),
+    true,
+  )
+  assert.match(
+    deleted.layerOperationStatus,
+    /Deleted 1 selected object and detached 1 coordinate reference\./,
+  )
+})
+
 test('undo and redo work for bulk duplicate', () => {
   const initial = createBulkState(createBulkCurveDiagram(), curveSelection())
   const duplicated = applyBulkDuplicateToEditorState(initial)
@@ -377,6 +588,160 @@ function createBulkCurveDiagram(): Diagram {
     ],
     strata: [curveA(), curveB(), curveC()],
     labels: [labelA()],
+  }
+}
+
+function createBulkCoordinateReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPositionForBulkTest(1, 0, 0),
+    }),
+  ]
+  diagram.coordinateAnchors.push(
+    createCoordinateAnchor(
+      {
+        ...diagram,
+        coordinateAnchors: diagram.coordinateAnchors,
+      },
+      {
+        id: 'coord-b',
+        name: 'B',
+        position: globalAnchorPositionForBulkTest(2, 0, 0),
+      },
+    ),
+    createCoordinateAnchor(
+      {
+        ...diagram,
+        coordinateAnchors: diagram.coordinateAnchors,
+      },
+      {
+        id: 'coord-c',
+        name: 'C',
+        position: globalAnchorPositionForBulkTest(3, 0, 0),
+      },
+    ),
+  )
+  diagram.strata = [
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'ref-path',
+      name: 'Reference Path',
+      points: [
+        coordinateReferencePointForBulkTest(diagram, 'coord-a'),
+        coordinateReferencePointForBulkTest(diagram, 'coord-b'),
+      ],
+    }),
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'ref-point-c',
+      position: coordinateReferencePointForBulkTest(diagram, 'coord-c'),
+    }),
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'ordinary-point',
+      position: { x: 0, y: 1, z: 0 },
+    }),
+  ]
+
+  return diagram
+}
+
+function createBulkStaleCoordinateReferenceDiagram(): Diagram {
+  const diagram = createBulkCoordinateReferenceDiagram()
+
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPositionForBulkTest(5, 5, 0),
+        }
+      : anchor,
+  )
+
+  return diagram
+}
+
+function createBulkSymbolicCoordinateReferenceDiagram(): Diagram {
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '5',
+        previewValue: 5,
+      },
+    ],
+  }
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-symbolic',
+      name: 'A',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'symbolic', expression: 'R', previewValue: 5 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      },
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'symbolic-ref-point',
+      position: coordinateReferencePointForBulkTest(diagram, 'coord-symbolic'),
+    }),
+  ]
+
+  return diagram
+}
+
+function globalAnchorPositionForBulkTest(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  const component = (value: number): CoordinateComponent => ({
+    kind: 'numeric',
+    value,
+  })
+
+  return {
+    kind: 'global',
+    value: {
+      x: component(x),
+      y: component(y),
+      z: component(z),
+    },
+  }
+}
+
+function coordinateReferencePointForBulkTest(
+  diagram: Diagram,
+  coordinateId: string,
+): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
+}
+
+function pointPreviewForBulkTest(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
   }
 }
 

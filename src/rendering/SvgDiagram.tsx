@@ -16,6 +16,7 @@ import type {
   VisibilityOptions,
 } from '../model/types'
 import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
+import { resolveDiagramCoordinateRefs } from '../model/coordinateReferences.ts'
 import {
   curveOcclusionEnabled,
   defaultHiddenCurveStyle,
@@ -236,7 +237,7 @@ const handleStrokeColor = '#1D4ED8'
 const handleRadius = 5.6
 
 export function SvgDiagram({
-  diagram,
+  diagram: sourceDiagram,
   width = defaultWidth,
   height = defaultHeight,
   fitToView = false,
@@ -268,6 +269,10 @@ export function SvgDiagram({
   const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
   const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
+  const diagram = useMemo(
+    () => resolveDiagramCoordinateRefs(sourceDiagram),
+    [sourceDiagram],
+  )
   const coordinateAxesGuide = createCoordinateAxesGuide(diagram.ambientDimension)
   const extraPointsForFit = [
     ...(coordinateAxesGuide?.fitPoints ?? []),

@@ -12,6 +12,10 @@ import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
 import {
+  detachCoordinateAnchorReferencesMany,
+  detachCoordinateReferencesInElements,
+} from '../model/coordinateReferences.ts'
+import {
   diagramTranslationContext,
   isZeroTranslationVector,
   translateStratum,
@@ -137,6 +141,8 @@ export type BulkRemoveSelectedElementsResult = {
   selectedElement: SelectedElement
   removed: boolean
   removedCount: number
+  detachedCoordinateReferenceCount?: number
+  error?: string
 }
 
 export type BulkRemoveSelectedElementsWithLayerFilterResult =
@@ -543,10 +549,28 @@ export function translateSelectedElements(
   }
 
   const selectedKeys = selectedElementKeySet(selection)
+  const selectedLayerBoundElements = selected.map((element) => ({
+    kind: element.kind,
+    id: element.element.id,
+  }))
+  const detached = detachCoordinateReferencesInElements(
+    diagram,
+    selectedLayerBoundElements,
+  )
+
+  if (!detached.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: `Translate selected failed: ${detached.error.message}`,
+    }
+  }
+
+  const detachedDiagram = detached.value.diagram
   let context
 
   try {
-    context = diagramTranslationContext(diagram)
+    context = diagramTranslationContext(detachedDiagram)
   } catch (error) {
     return {
       ok: false,
@@ -559,7 +583,7 @@ export function translateSelectedElements(
   let changedCurve = false
 
   try {
-    const strata = diagram.strata.map((stratum) => {
+    const strata = detachedDiagram.strata.map((stratum) => {
       if (!selectedKeys.has(selectedElementKey({ kind: 'stratum', id: stratum.id }))) {
         return stratum
       }
@@ -569,7 +593,7 @@ export function translateSelectedElements(
       changedCurve = changedCurve || stratum.geometricKind === 'curve'
       return translated
     })
-    const labels = diagram.labels.map((label) => {
+    const labels = detachedDiagram.labels.map((label) => {
       if (!selectedKeys.has(selectedElementKey({ kind: 'label', id: label.id }))) {
         return label
       }
@@ -588,7 +612,7 @@ export function translateSelectedElements(
     }
 
     const nextDiagram = {
-      ...diagram,
+      ...detachedDiagram,
       strata,
       labels,
     }
@@ -627,7 +651,34 @@ export function removeSelectedElements(
   let removedStrata = 0
   let removedLabels = 0
   let removedCoordinates = 0
-  const strata = diagram.strata.filter((stratum) => {
+  const selectedCoordinateIds = (diagram.coordinateAnchors ?? [])
+    .filter((anchor) =>
+      selectedKeys.has(selectedElementKey({ kind: 'coordinate', id: anchor.id })),
+    )
+    .map((anchor) => anchor.id)
+  const detached =
+    selectedCoordinateIds.length === 0
+      ? {
+          ok: true as const,
+          value: {
+            diagram,
+            detachedCount: 0,
+          },
+        }
+      : detachCoordinateAnchorReferencesMany(diagram, selectedCoordinateIds)
+
+  if (!detached.ok) {
+    return {
+      diagram,
+      selectedElement: selection,
+      removed: false,
+      removedCount: 0,
+      error: `Could not delete selected coordinates: ${detached.error.message}`,
+    }
+  }
+
+  const detachedDiagram = detached.value.diagram
+  const strata = detachedDiagram.strata.filter((stratum) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'stratum', id: stratum.id }),
     )
@@ -640,7 +691,7 @@ export function removeSelectedElements(
     removedCurve = removedCurve || stratum.geometricKind === 'curve'
     return false
   })
-  const labels = diagram.labels.filter((label) => {
+  const labels = detachedDiagram.labels.filter((label) => {
     const selected = selectedKeys.has(selectedElementKey({ kind: 'label', id: label.id }))
 
     if (!selected) {
@@ -650,7 +701,7 @@ export function removeSelectedElements(
     removedLabels += 1
     return false
   })
-  const coordinateAnchors = (diagram.coordinateAnchors ?? []).filter((anchor) => {
+  const coordinateAnchors = (detachedDiagram.coordinateAnchors ?? []).filter((anchor) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'coordinate', id: anchor.id }),
     )
@@ -674,7 +725,7 @@ export function removeSelectedElements(
   }
 
   const nextDiagram = {
-    ...diagram,
+    ...detachedDiagram,
     coordinateAnchors,
     strata,
     labels,
@@ -685,6 +736,7 @@ export function removeSelectedElements(
     selectedElement: null,
     removed: true,
     removedCount,
+    detachedCoordinateReferenceCount: detached.value.detachedCount,
   }
 }
 
@@ -824,9 +876,15 @@ export function applyBulkDeleteToEditorState<T extends BulkOperationEditorState>
     cubicBezierDraft: null,
     pathDraft: null,
     sheetPolygonDraft: null,
-    layerOperationStatus: result.removed
-      ? `Deleted ${bulkElementCountLabel(result.removedCount)}.`
-      : 'No selected objects deleted.',
+    layerOperationStatus:
+      result.error !== undefined
+        ? result.error
+        : result.removed
+          ? bulkDeleteStatusMessage(
+              result.removedCount,
+              result.detachedCoordinateReferenceCount ?? 0,
+            )
+          : 'No selected objects deleted.',
   })
 }
 
@@ -1722,6 +1780,23 @@ function cloneDiagramValue<T>(value: T): T {
 
 function bulkElementCountLabel(count: number): string {
   return `${count} selected ${count === 1 ? 'object' : 'objects'}`
+}
+
+function bulkCoordinateReferenceCountLabel(count: number): string {
+  return `${count} coordinate ${count === 1 ? 'reference' : 'references'}`
+}
+
+function bulkDeleteStatusMessage(
+  removedCount: number,
+  detachedCoordinateReferenceCount: number,
+): string {
+  const deleted = `Deleted ${bulkElementCountLabel(removedCount)}`
+
+  return detachedCoordinateReferenceCount === 0
+    ? `${deleted}.`
+    : `${deleted} and detached ${bulkCoordinateReferenceCountLabel(
+        detachedCoordinateReferenceCount,
+      )}.`
 }
 
 type UniqueIdAllocator = {

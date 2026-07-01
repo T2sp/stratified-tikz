@@ -21,6 +21,7 @@ import {
   addSymbolicVariableToDiagram,
   createCoordinateAnchor,
   createUserStylePresetFromStyle,
+  coordinateReferenceVec3ForAnchorId,
   clonePathArrowOptions,
   defaultPathArrowOptions,
   pathCrossingStateFromCandidate,
@@ -424,6 +425,48 @@ test('coordinate anchor save and load round-trip preserves anchors', () => {
     throw new Error(result.error)
   }
   assert.deepEqual(result.diagram.coordinateAnchors, diagram.coordinateAnchors)
+})
+
+test('parseSavedDiagramJson rejects dangling coordinate refs after anchor removal', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPosition(1, 2, 0),
+    }),
+  ]
+  const referencePoint = coordinateReferenceVec3ForAnchorId(diagram, 'coord-a')
+
+  if (referencePoint === null) {
+    throw new Error('Expected coordinate reference point.')
+  }
+
+  diagram.strata = [
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'ref-path',
+      points: [referencePoint, { x: 3, y: 2, z: 0 }],
+    }),
+  ]
+
+  const saved = JSON.parse(serializeDiagram(diagram)) as {
+    diagram: {
+      coordinateAnchors: unknown[]
+    }
+  }
+  saved.diagram.coordinateAnchors = []
+  const parsed = parseSavedDiagramJson(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected dangling coordinate ref to fail.')
+  }
+  assert.match(
+    parsed.error,
+    /Coordinate reference must point to an existing coordinate anchor/,
+  )
 })
 
 test('serializeDiagram writes 3D camera as view metadata', () => {

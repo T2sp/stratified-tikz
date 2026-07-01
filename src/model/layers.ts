@@ -10,6 +10,7 @@ import type {
   Vec3,
 } from './types.ts'
 import { cleanPathCrossingStates } from './pathCrossings.ts'
+import { detachCoordinateReferencesInElements } from './coordinateReferences.ts'
 import {
   diagramTranslationContext,
   isZeroTranslationVector,
@@ -531,9 +532,26 @@ export function translateLayer(
     return diagram
   }
 
-  const context = diagramTranslationContext(diagram)
+  const layerElements = [
+    ...diagram.strata
+      .filter((stratum) => elementIsOnLayer(stratum, layer))
+      .map((stratum) => ({ kind: 'stratum' as const, id: stratum.id })),
+    ...diagram.labels
+      .filter((label) => elementIsOnLayer(label, layer))
+      .map((label) => ({ kind: 'label' as const, id: label.id })),
+  ]
+  const detached = detachCoordinateReferencesInElements(diagram, layerElements)
+
+  if (!detached.ok) {
+    throw new Error(
+      `Could not translate layer ${formatLayerValue(layer)}: ${detached.error.path}: ${detached.error.message}`,
+    )
+  }
+
+  const detachedDiagram = detached.value.diagram
+  const context = diagramTranslationContext(detachedDiagram)
   let changed = false
-  const strata = diagram.strata.map((stratum) => {
+  const strata = detachedDiagram.strata.map((stratum) => {
     if (!elementIsOnLayer(stratum, layer)) {
       return stratum
     }
@@ -542,7 +560,7 @@ export function translateLayer(
     changed = changed || translated !== stratum
     return translated
   })
-  const labels = diagram.labels.map((label) => {
+  const labels = detachedDiagram.labels.map((label) => {
     if (!elementIsOnLayer(label, layer)) {
       return label
     }
@@ -556,7 +574,7 @@ export function translateLayer(
   }
 
   return cleanPathCrossingStates({
-    ...diagram,
+    ...detachedDiagram,
     strata,
     labels,
   })

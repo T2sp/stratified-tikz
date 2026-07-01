@@ -22,7 +22,7 @@ export type SymbolicVec3 = {
   x: CoordinateComponent
   y: CoordinateComponent
   z: CoordinateComponent
-  source?: WorkPlaneLocalCoordinateSource
+  source?: CoordinateSource
 }
 
 export type Vec3 = {
@@ -305,7 +305,15 @@ export type WorkPlaneLocalCoordinateSource = {
   }
 }
 
-export type CoordinateSource = WorkPlaneLocalCoordinateSource
+export type CoordinateReferenceSource = {
+  kind: 'coordinateRef'
+  coordinateId: string
+  preview: Vec3
+}
+
+export type CoordinateSource =
+  | WorkPlaneLocalCoordinateSource
+  | CoordinateReferenceSource
 
 export type GlobalCoordinateAnchorPosition = {
   kind: 'global'

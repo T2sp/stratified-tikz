@@ -18,6 +18,11 @@ import {
   swapLayers,
   translateLayer,
 } from '../../src/model/layers.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
 import { createArcPathSegmentFromAngles } from '../../src/model/paths.ts'
 import {
   createConcatenatedPathStratum,
@@ -43,6 +48,8 @@ import { defaultCurveStyle, defaultSheetStyle } from '../../src/model/styles.ts'
 import { polylineToSvgPath } from '../../src/rendering/svgPath.ts'
 import type {
   ClosedPathBoundary,
+  CoordinateAnchorPosition,
+  CoordinateComponent,
   CurveStratum,
   Diagram,
   PointStratum,
@@ -51,6 +58,11 @@ import type {
   WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import {
+  diagramTranslationContext,
+  translateVec3,
+  translationVectorFromNumericVec3,
+} from '../../src/model/translation.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   allLayersFilter,
@@ -929,6 +941,103 @@ test('layer translation preserves symbolic point expressions and refreshes previ
   assert.equal(point.position.symbolic?.z.value, 0)
 })
 
+test('layer translation detaches coordinate refs from current anchor positions', () => {
+  const diagram = createLayerCoordinateReferenceTranslationDiagram()
+  const translated = translateLayer(diagram, 2, { x: 1, y: 0, z: 0 })
+  const movedPoint = findPoint(translated, 'ref-point')
+  const otherPoint = findPoint(translated, 'other-ref-point')
+  const anchor = translated.coordinateAnchors?.find(
+    (candidate) => candidate.id === 'coord-a',
+  )
+  const tikz = generateTikz(translated)
+
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(anchor.position.value.y.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.x.kind === 'numeric'
+      ? anchor.position.value.x.value
+      : NaN,
+    5,
+  )
+  assert.equal(
+    anchor.position.value.y.kind === 'numeric'
+      ? anchor.position.value.y.value
+      : NaN,
+    5,
+  )
+  assert.deepEqual(movedPoint.position, { x: 6, y: 5, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(movedPoint.position), null)
+  assert.equal(
+    coordinateReferenceSourceForPoint(otherPoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.match(tikz, /\\coordinate \(A\) at \(5,5\);/)
+  assert.match(tikz, /\\coordinate \(pointPoint0p0\) at \(6,5\);/)
+  assert.match(tikz, /\\node\[[\s\S]*\] at \(pointPoint0p0\) \{\};/)
+})
+
+test('layer translation detaches coordinate refs with symbolic current anchor source', () => {
+  const diagram = createSymbolicCoordinateReferenceTranslationDiagram()
+  const translated = translateLayer(diagram, 2, { x: 1, y: 0, z: 0 })
+  const movedPoint = findPoint(translated, 'symbolic-ref-point')
+
+  assert.equal(coordinateReferenceSourceForPoint(movedPoint.position), null)
+  assert.equal(movedPoint.position.x, 6)
+  assert.equal(movedPoint.position.symbolic?.x.kind, 'symbolic')
+  assert.equal(movedPoint.position.symbolic.x.expression, '(R) + 1')
+  assert.equal(movedPoint.position.symbolic.x.previewValue, 6)
+})
+
+test('layer translation detaches work-plane-local coordinate refs and moves copied frame origin', () => {
+  const diagram = createLocalCoordinateReferenceTranslationDiagram()
+  const translated = translateLayer(diagram, 2, { x: 1, y: 0, z: 0 })
+  const movedPoint = findPoint(translated, 'local-ref-point')
+  const source = movedPoint.position.symbolic?.source
+  const anchor = translated.coordinateAnchors?.find(
+    (candidate) => candidate.id === 'coord-local',
+  )
+
+  assert.equal(coordinateReferenceSourceForPoint(movedPoint.position), null)
+  assert.equal(source?.kind, 'workPlaneLocal')
+  if (source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected detached work-plane-local source.')
+  }
+  assert.deepEqual(source.frame.origin, { x: 1, y: 0, z: 0 })
+  assert.equal(source.local.a.kind, 'numeric')
+  assert.equal(source.local.b.kind, 'numeric')
+  assert.equal(
+    source.local.a.kind === 'numeric' ? source.local.a.value : NaN,
+    2,
+  )
+  assert.equal(
+    source.local.b.kind === 'numeric' ? source.local.b.value : NaN,
+    3,
+  )
+  assert.equal(anchor?.position.kind, 'workPlaneLocal')
+  if (anchor?.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected original local coordinate anchor.')
+  }
+  assert.deepEqual(anchor.position.frame.origin, { x: 0, y: 0, z: 0 })
+})
+
+test('raw point translation rejects coordinate refs before stale previews can move', () => {
+  const diagram = createLayerCoordinateReferenceTranslationDiagram()
+  const point = coordinateReferencePointForLayerTest(diagram, 'coord-a')
+  const translation = translationVectorFromNumericVec3(
+    diagram,
+    { x: 1, y: 0, z: 0 },
+  )
+
+  assert.throws(
+    () => translateVec3(point, translation, diagramTranslationContext(diagram)),
+    /Coordinate references must be detached before translation/,
+  )
+})
+
 test('layer translation moves symbolic line cubic and arc segment coordinates', () => {
   const diagram = createSymbolicTranslationDiagram()
   const translated = translateLayer(diagram, 7, { x: 1, y: -1, z: 2 })
@@ -1752,6 +1861,113 @@ function createLayerTranslationDiagram(): Diagram {
   }
 }
 
+function createLayerCoordinateReferenceTranslationDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPositionForLayerTest(1, 1, 0),
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'ref-point',
+      position: coordinateReferencePointForLayerTest(diagram, 'coord-a'),
+      layer: 2,
+    }),
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'other-ref-point',
+      position: coordinateReferencePointForLayerTest(diagram, 'coord-a'),
+      layer: 3,
+    }),
+  ]
+  diagram.coordinateAnchors = diagram.coordinateAnchors.map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPositionForLayerTest(5, 5, 0),
+        }
+      : anchor,
+  )
+
+  return diagram
+}
+
+function createSymbolicCoordinateReferenceTranslationDiagram(): Diagram {
+  const diagram = {
+    ...createEmptyDiagram({ ambientDimension: 2 }),
+    variables: [
+      {
+        id: 'var-R',
+        name: 'R',
+        macroName: 'R',
+        expression: '5',
+        previewValue: 5,
+      },
+    ],
+  }
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-symbolic',
+      name: 'A',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'symbolic', expression: 'R', previewValue: 5 },
+          y: { kind: 'numeric', value: 5 },
+          z: { kind: 'numeric', value: 0 },
+        },
+      },
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'symbolic-ref-point',
+      position: coordinateReferencePointForLayerTest(diagram, 'coord-symbolic'),
+      layer: 2,
+    }),
+  ]
+
+  return diagram
+}
+
+function createLocalCoordinateReferenceTranslationDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const frame = xyFrame(0)
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-local',
+      name: 'L',
+      position: {
+        kind: 'workPlaneLocal',
+        frame,
+        local: {
+          a: { kind: 'numeric', value: 2 },
+          b: { kind: 'numeric', value: 3 },
+        },
+        preview: { x: 2, y: 3, z: 0 },
+      },
+    }),
+  ]
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 3,
+      id: 'local-ref-point',
+      position: coordinateReferencePointForLayerTest(diagram, 'coord-local'),
+      layer: 2,
+    }),
+  ]
+
+  return diagram
+}
+
 function createSymbolicTranslationDiagram(): Diagram {
   return {
     ...createEmptyDiagram({ ambientDimension: 3 }),
@@ -2038,6 +2254,39 @@ function xyFrame(z: number): WorkPlaneFrameSnapshot {
     v: { x: 0, y: 1, z: 0 },
     normal: { x: 0, y: 0, z: 1 },
   }
+}
+
+function globalAnchorPositionForLayerTest(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  const component = (value: number): CoordinateComponent => ({
+    kind: 'numeric',
+    value,
+  })
+
+  return {
+    kind: 'global',
+    value: {
+      x: component(x),
+      y: component(y),
+      z: component(z),
+    },
+  }
+}
+
+function coordinateReferencePointForLayerTest(
+  diagram: Diagram,
+  coordinateId: string,
+): WorkPlaneFrameSnapshot['origin'] {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
 }
 
 function symbolicXPoint(

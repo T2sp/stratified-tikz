@@ -36,6 +36,15 @@ import type {
 } from '../../src/model/types.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
+  coordinateReferenceVec3ForAnchorId,
+  isCoordinateRefSupportedAtLocation,
+  resolveDiagramCoordinateRefs,
+} from '../../src/model/coordinateReferences.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
+import {
   createInitialCamera3D,
   resetCameraToInitial,
 } from '../../src/model/camera.ts'
@@ -114,6 +123,435 @@ test('coordinate anchor names reserve the generated coordinate namespace', () =>
 
   assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(5,5\);/)
   assert.match(tikz, /\\coordinate \(curvePolyWire0p02\) at \(0,0\);/)
+})
+
+test('coordinateRef support boundary matches export-preserved locations', () => {
+  assert.equal(isCoordinateRefSupportedAtLocation('pathCoordinate'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('pathTemplateCenter'), false)
+  assert.equal(isCoordinateRefSupportedAtLocation('arcCenter'), false)
+  assert.equal(isCoordinateRefSupportedAtLocation('labelPosition'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('pointPosition'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('simpleSheetVertex'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('workPlaneFrameField'), false)
+  assert.equal(isCoordinateRefSupportedAtLocation('curvedSheetPrimitive'), false)
+})
+
+test('path endpoints can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 2, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'ref-path',
+    name: 'Referenced path',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (0,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B);')
+
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePolyReferencedPath0p0\)/)
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  expectNoBlankLines(inlineTikz)
+})
+
+test('label positions can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'label-ref',
+    name: 'Reference label',
+    text: '$F$',
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    style: defaultLabelStyle(),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(1,2\);/)
+  assert.match(tikz, /at \(A\) \{\$F\$\};/)
+  assert.doesNotMatch(tikz, /at \(1,2\) \{\$F\$\};/)
+})
+
+test('point positions can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'point-ref',
+    name: 'Reference point',
+    style: pointStyle(),
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(1,2\);/)
+  assert.match(tikz, /at \(A\) \{\};/)
+  assert.doesNotMatch(tikz, /at \(1,2\) \{\};/)
+})
+
+test('sheet vertices can reference coordinate anchors in TikZ output', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 1, y: 0, z: 0 },
+    { id: 'coord-c', name: 'C', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'polygonSheet',
+    id: 'sheet-ref',
+    name: 'Reference sheet',
+    style: sheetStyle(),
+    vertices: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+      coordinateReferencePoint(diagram, 'coord-c'),
+    ],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
+  assert.match(tikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetReferenceSheet0p0\)/)
+})
+
+test('coordinate reference previews resolve from the current anchor position', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'point-ref',
+    name: 'Reference point',
+    style: pointStyle(),
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    layer: 0,
+  })
+  diagram.labels.push({
+    geometricKind: 'label',
+    id: 'label-ref',
+    name: 'Reference label',
+    text: '$F$',
+    position: coordinateReferencePoint(diagram, 'coord-a'),
+    style: defaultLabelStyle(),
+    layer: 0,
+  })
+
+  const movedDiagram: Diagram = {
+    ...diagram,
+    coordinateAnchors: [
+      {
+        ...diagram.coordinateAnchors[0],
+        position: globalAnchorPosition(7, 8, 0),
+      },
+    ],
+  }
+  const resolved = resolveDiagramCoordinateRefs(movedDiagram)
+  const point = resolved.strata.find((stratum) => stratum.id === 'point-ref')
+
+  assert.equal(validateDiagram(movedDiagram).valid, true)
+  assert.equal(point?.geometricKind, 'point')
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected point reference stratum.')
+  }
+  assert.deepEqual(point.position, coordinateReferencePoint(movedDiagram, 'coord-a'))
+  assert.deepEqual(
+    resolved.labels.find((label) => label.id === 'label-ref')?.position,
+    coordinateReferencePoint(movedDiagram, 'coord-a'),
+  )
+})
+
+test('missing coordinate references are rejected by validation', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'point',
+    id: 'missing-ref',
+    name: 'Missing reference',
+    style: pointStyle(),
+    position: rawCoordinateReferencePoint('missing-coordinate', { x: 0, y: 0, z: 0 }),
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
+test('dangling coordinate refs do not export as stale numeric helper coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'missing-ref-path',
+    name: 'Missing reference path',
+    style: curveStyle(),
+    points: [
+      rawCoordinateReferencePoint('missing-coordinate', { x: 0, y: 0, z: 0 }),
+      { x: 2, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validateDiagram(diagram).valid, false)
+  assert.match(
+    tikz,
+    /Curve "Missing reference path" \[missing-ref-path\] omitted because its path contains non-finite coordinates/,
+  )
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePolyMissingReferencePath0p0\) at \(0,0\);/)
+  assert.doesNotMatch(tikz, /unresolvedCoordinateRefmissingcoordinate/)
+})
+
+test('coordinate references round-trip through save and load', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 2, z: 0 },
+    { id: 'coord-b', name: 'B', x: 3, y: 4, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'roundtrip-path',
+    name: 'Roundtrip path',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  const loadedCurve = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'roundtrip-path',
+  )
+  assert.equal(loadedCurve?.geometricKind, 'curve')
+  assert.equal(loadedCurve?.kind, 'polyline')
+  if (loadedCurve?.geometricKind !== 'curve' || loadedCurve.kind !== 'polyline') {
+    throw new Error('Expected loaded polyline.')
+  }
+  assert.equal(requireCoordinateReferenceSource(loadedCurve.points[0]).coordinateId, 'coord-a')
+  assert.equal(requireCoordinateReferenceSource(loadedCurve.points[1]).coordinateId, 'coord-b')
+})
+
+test('hemisphere center coordinateRef is rejected because curved sheets sample meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'hemisphere',
+    center: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.center\.symbolic\.source.*curved sheet primitives.*samples them to numeric mesh coordinates/,
+  )
+})
+
+test('ruled surface boundary coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'ruledSurface',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.boundary0\.segments\[0\]\.start\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('Coons patch boundary coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'coonsPatch',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.bottom\.segments\[0\]\.start\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('saddle frame coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'saddle',
+    frameOrigin: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.frame\.origin\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('curved sheet coordinateRef does not silently export as numeric sampled mesh', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'hemisphere',
+    center: coordinateReferencePoint,
+  })
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
+  assert.match(tikz, /omitted because coordinate references inside curved sheet primitives cannot be preserved/)
+  assert.doesNotMatch(tikz, /sampled mesh export/)
+  assert.doesNotMatch(tikz, /\\filldraw .*\(sheetCurved/)
+})
+
+test('saved curved sheet coordinateRef is rejected cleanly without throwing', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'ruledSurface',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected saved curved sheet coordinateRef to fail.')
+  }
+  assert.match(
+    parsed.error,
+    /primitive\.boundary0\.segments\[0\]\.start\.symbolic\.source.*coordinateRef is not supported/,
+  )
+})
+
+test('path template center coordinateRef is rejected because template export cannot always preserve it', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'template-center-ref',
+    name: 'Template Center Ref',
+    style: curveStyle(),
+    template: {
+      kind: 'circleTemplate',
+      center: coordinateReferencePoint(diagram, 'coord-a'),
+      radius: 1,
+      frame: {
+        origin: { x: 0, y: 0, z: 0 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /template\.center\.symbolic\.source.*path template centers.*cannot preserve the anchor reference/,
+  )
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected saved path template center coordinateRef to fail.')
+  }
+  assert.match(parsed.error, /template\.center\.symbolic\.source.*coordinateRef is not supported/)
+  assert.match(tikz, /path template centers cannot be preserved/)
+})
+
+test('arc center coordinateRef is rejected because arc export cannot preserve it', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'arc-center-ref',
+    name: 'Arc Center Ref',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 0, y: 1, z: 0 },
+        center: coordinateReferencePoint(diagram, 'coord-a'),
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+  const tikz = generateTikz(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /segments\[0\]\.center\.symbolic\.source.*arc centers.*does not preserve center references/,
+  )
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected saved arc center coordinateRef to fail.')
+  }
+  assert.match(parsed.error, /segments\[0\]\.center\.symbolic\.source.*coordinateRef is not supported/)
+  assert.match(tikz, /arc centers cannot be preserved/)
 })
 
 test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {
@@ -736,6 +1174,32 @@ test('surface depth sorting emits farther sheet faces before closer faces', () =
   assert.doesNotMatch(sorted, /NaN|Infinity/)
 })
 
+test('numeric surface depth sorting does not emit unused sampled-sheet fallback coordinates', () => {
+  const diagram = createSurfaceDepthSortDiagram()
+  const first = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const second = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const sortedSheetCoordinateNames = extractCoordinateNames(first).filter(
+    (name) =>
+      name.startsWith('sheetPolyNearSheet0') ||
+      name.startsWith('sheetPolyFarSheet1'),
+  )
+
+  assert.match(first, /\\coordinate \(sheetPolyNearSheet0Face0p0\) at /)
+  assert.match(first, /\\coordinate \(sheetPolyFarSheet1Face0p0\) at /)
+  assert.doesNotMatch(first, /\\coordinate \(sheetPolyNearSheet0p0\) at /)
+  assert.doesNotMatch(first, /\\coordinate \(sheetPolyFarSheet1p0\) at /)
+  assert.equal(sortedSheetCoordinateNames.length > 0, true)
+  assert.equal(
+    sortedSheetCoordinateNames.every((name) => name.includes('Face')),
+    true,
+  )
+  assert.equal(first, second)
+})
+
 test('disabled surface depth sorting leaves existing TikZ output unchanged', () => {
   const diagram = createSurfaceDepthSortDiagram()
 
@@ -856,6 +1320,93 @@ test('auto visibility preserves layer-aware TikZ output', () => {
   assert.match(curveLayer, /Auto curve occlusion/)
   assert.match(curveLayer, /Hidden sampled segment/)
   assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('surface depth sorting falls back per coordinate-ref sheet', () => {
+  const diagram = createCoordinateRefSurfaceDepthSortDiagram()
+  const normalTikz = generateTikz(diagram, {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      surfaceDepthSort: false,
+    },
+  })
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const inlineTikz = generateTikz(diagram, {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (0,0,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B) -- (C) -- cycle;')
+  const referenceLayer = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.match(normalTikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(normalTikz, /Surface depth sorting skipped/)
+  assert.match(
+    tikz,
+    /Surface depth sorting skipped for sheet "Reference Sorted Sheet" \[ref-sorted-sheet\]: coordinate references preserved by ordinary export\./,
+  )
+  assert.match(tikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /sheetPolyReferenceSortedSheet\d+Face0p0/)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetPolyReferenceSortedSheet\d+p0\)/)
+  assert.match(
+    tikz,
+    /Auto surface face depth sort: sheet "Numeric Sorted Sheet" \[numeric-sorted-sheet\]/,
+  )
+  assert.match(tikz, /\\coordinate \(sheetPolyNumericSortedSheet0Face0p0\) at /)
+  assert.doesNotMatch(tikz, /\\coordinate \(sheetPolyNumericSortedSheet0p0\) at /)
+  assert.match(referenceLayer, /Surface depth sorting skipped/)
+  assert.match(referenceLayer, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
+test('curve occlusion falls back per coordinate-ref path', () => {
+  const diagram = createCoordinateRefCurveOcclusionDiagram()
+  const normalTikz = generateTikz(diagram, {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      curveOcclusion: false,
+    },
+  })
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const inlineTikz = generateTikz(diagram, {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (-2,-1,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B);')
+  const referenceLayer = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.match(normalTikz, /\(A\) -- \(B\);/)
+  assert.doesNotMatch(normalTikz, /Curve occlusion skipped/)
+  assert.match(
+    tikz,
+    /Curve occlusion skipped for curve "Reference Curve" \[reference-curve\]: coordinate references preserved by ordinary export\./,
+  )
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /curvePolyReferenceCurve\d+Occlusionp0/)
+  assert.match(tikz, /Auto curve occlusion: curve "Partly Hidden Curve"/)
+  assert.match(tikz, /Hidden sampled segment/)
+  assert.match(tikz, /densely dotted/)
+  assert.match(tikz, /\n\s+->,\n/)
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(referenceLayer, /Curve occlusion skipped/)
+  assert.match(referenceLayer, /\(A\) -- \(B\);/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
 })
 
 test('curve occlusion TikZ output applies hidden sampled segment style', () => {
@@ -5262,6 +5813,284 @@ test('relative polar cubic Bezier export uses TikZ polar control syntax', () => 
   assert.doesNotMatch(tikz, /curveBezierRelativePolar0p2/)
 })
 
+test('relative cubic Bezier control coordinateRefs fall back to absolute control syntax', () => {
+  const diagram = createRelativeCartesianBezierControlReferenceDiagram()
+  const validation = validateDiagram(diagram)
+
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors.map(formatValidationIssue).join('\n'),
+  )
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const path = '(Start) .. controls (C1) and (C2) .. (End);'
+  const pathIndex = tikz.indexOf(path)
+
+  assert.ok(pathIndex >= 0)
+  for (const definition of [
+    '\\coordinate (Start) at (0,0);',
+    '\\coordinate (C1) at (1,2);',
+    '\\coordinate (C2) at (7,14);',
+    '\\coordinate (End) at (10,10);',
+  ]) {
+    const definitionIndex = tikz.indexOf(definition)
+
+    assert.ok(definitionIndex >= 0, definition)
+    assert.ok(definitionIndex < pathIndex, definition)
+  }
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierRelativeControlRefs0p1\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierRelativeControlRefs0p2\)/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
+test('relative cubic Bezier with one coordinateRef control preserves the reference and numeric control', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1, y: 2, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'mixed-control-ref',
+    name: 'Mixed Control Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      coordinateReferencePoint(diagram, 'coord-c1'),
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(C1\) at \(1,2\);/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierMixedControlRef0p2\) at \(7,14\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierMixedControlRef0p0\) \.\. controls \(C1\) and \(curveBezierMixedControlRef0p2\) \.\. \(curveBezierMixedControlRef0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierMixedControlRef0p1\)/)
+})
+
+test('relative polar cubic Bezier with a second coordinateRef control falls back absolutely', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c2', name: 'C2', x: 5, y: 8, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'polar-second-ref',
+    name: 'Polar Second Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+      coordinateReferencePoint(diagram, 'coord-c2'),
+      { x: 5, y: 5, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativePolar',
+      firstControl: { angleDegrees: 0, radius: 2 },
+      secondControl: { angleDegrees: 90, radius: 3 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(C2\) at \(5,8\);/)
+  assert.match(
+    tikz,
+    /\\coordinate \(curveBezierPolarSecondRef0p1\) at \(2,0\);/,
+  )
+  assert.match(
+    tikz,
+    /\(curveBezierPolarSecondRef0p0\) \.\. controls \(curveBezierPolarSecondRef0p1\) and \(C2\) \.\. \(curveBezierPolarSecondRef0p3\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+\(0:2\)/)
+  assert.doesNotMatch(tikz, /\\coordinate \(curveBezierPolarSecondRef0p2\)/)
+})
+
+test('concatenated cubic path control coordinateRefs preserve refs and arrows', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1.5, y: 1, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 2.5, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'ref-composite-path',
+    name: 'Ref Composite Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: coordinateReferencePoint(diagram, 'coord-c1'),
+        control2: coordinateReferencePoint(diagram, 'coord-c2'),
+        end: { x: 3, y: 0, z: 0 },
+        controlMode: {
+          kind: 'relativeCartesian',
+          firstControlOffset: { x: 0.5, y: 1, z: 0 },
+          secondControlOffset: { x: -0.5, y: 1, z: 0 },
+          secondOffsetReference: 'end',
+        },
+      },
+    ],
+    styleSegments: [],
+    arrows: arrowOptions({ endpoint: 'forward' }),
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\n\s+->\n/)
+  assert.match(
+    tikz,
+    /\(curvePathRefCompositePath0p0\) -- \(curvePathRefCompositePath0p1\) \.\. controls \(C1\) and \(C2\) \.\. \(curvePathRefCompositePath0p4\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+})
+
+test('split style-run concatenated cubic path preserves control coordinateRefs', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-c1', name: 'C1', x: 1.5, y: 1, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 2.5, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'split-ref-path',
+    name: 'Split Ref Path',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'cubicBezier',
+        start: { x: 1, y: 0, z: 0 },
+        control1: coordinateReferencePoint(diagram, 'coord-c1'),
+        control2: coordinateReferencePoint(diagram, 'coord-c2'),
+        end: { x: 3, y: 0, z: 0 },
+        styleOverride: { lineStyle: 'dotted' },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /% Segment style overrides split this concatenated path/)
+  assert.match(tikz, /% Segment 2/)
+  assert.match(
+    tikz,
+    /\(curvePathSplitRefPath0p1\) \.\. controls \(C1\) and \(C2\) \.\. \(curvePathSplitRefPath0p4\);/,
+  )
+  assert.doesNotMatch(tikz, /\.\. controls \+/)
+})
+
+test('cubic Bezier control coordinateRefs round trip through save and load', () => {
+  const diagram = createRelativeCartesianBezierControlReferenceDiagram()
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const loadedCurve = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'relative-control-refs',
+  )
+
+  assert.equal(loadedCurve?.geometricKind, 'curve')
+  assert.equal(loadedCurve?.kind, 'cubicBezier')
+  if (loadedCurve?.geometricKind !== 'curve' || loadedCurve.kind !== 'cubicBezier') {
+    throw new Error('Expected loaded cubic Bezier curve.')
+  }
+
+  assert.equal(
+    requireCoordinateReferenceSource(loadedCurve.points[1]).coordinateId,
+    'coord-c1',
+  )
+  assert.equal(
+    requireCoordinateReferenceSource(loadedCurve.points[2]).coordinateId,
+    'coord-c2',
+  )
+  assert.match(
+    generateTikz(parsed.diagram),
+    /\(Start\) \.\. controls \(C1\) and \(C2\) \.\. \(End\);/,
+  )
+})
+
+test('missing cubic Bezier control coordinateRef is rejected by validation', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'missing-control-ref',
+    name: 'Missing Control Ref',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      rawCoordinateReferencePoint('missing-control', { x: 1, y: 2, z: 0 }),
+      { x: 7, y: 14, z: 0 },
+      { x: 10, y: 10, z: 0 },
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /points\[1\]\.symbolic\.source\.coordinateId.*Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
 test('work-plane-local relative polar 3D Bezier exports in a TikZ 3d canvas scope', () => {
   const tikz = generateTikz(createWorkPlaneRelativePolarBezierDiagram())
 
@@ -6724,6 +7553,52 @@ function createSurfaceDepthSortDiagram(): Diagram {
   return diagram
 }
 
+function createCoordinateRefSurfaceDepthSortDiagram(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    camera.thetaDeg,
+    camera.phiDeg,
+  ).forward
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = { camera3d: camera }
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 1, y: 0, z: 0 },
+    { id: 'coord-c', name: 'C', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push(
+    surfaceDepthSortSheet(
+      'numeric-sorted-sheet',
+      'Numeric Sorted Sheet',
+      '#00AA00',
+      viewDirection,
+      0.6,
+    ),
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      id: 'ref-sorted-sheet',
+      name: 'Reference Sorted Sheet',
+      style: sheetStyle(),
+      vertices: [
+        coordinateReferencePoint(diagram, 'coord-a'),
+        coordinateReferencePoint(diagram, 'coord-b'),
+        coordinateReferencePoint(diagram, 'coord-c'),
+      ],
+      layer: 2,
+    },
+  )
+
+  return diagram
+}
+
 function createCurveOcclusionDiagram(): Diagram {
   const camera = {
     ...createInitialCamera3D(),
@@ -6765,6 +7640,35 @@ function createCurveOcclusionDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createCoordinateRefCurveOcclusionDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: -2, y: -1, z: 0 },
+    { id: 'coord-b', name: 'B', x: 2, y: -1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'reference-curve',
+    name: 'Reference Curve',
+    style: curveStyle({ strokeColor: '#AA00AA' }),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    arrows: arrowOptions({
+      endpoint: 'forward',
+      mid: { enabled: true, head: 'stealth' },
+    }),
+    layer: 2,
+  })
 
   return diagram
 }
@@ -7097,6 +8001,40 @@ function createWorkPlaneRelativePolarBezierDiagram({
     },
     styleSegments: [],
     layer,
+  })
+
+  return diagram
+}
+
+function createRelativeCartesianBezierControlReferenceDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-start', name: 'Start', x: 0, y: 0, z: 0 },
+    { id: 'coord-c1', name: 'C1', x: 1, y: 2, z: 0 },
+    { id: 'coord-c2', name: 'C2', x: 7, y: 14, z: 0 },
+    { id: 'coord-end', name: 'End', x: 10, y: 10, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'cubicBezier',
+    id: 'relative-control-refs',
+    name: 'Relative Control Refs',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-start'),
+      coordinateReferencePoint(diagram, 'coord-c1'),
+      coordinateReferencePoint(diagram, 'coord-c2'),
+      coordinateReferencePoint(diagram, 'coord-end'),
+    ],
+    bezierControls: {
+      kind: 'relativeCartesian',
+      firstControlOffset: { x: 1, y: 2, z: 0 },
+      secondControlOffset: { x: -3, y: 4, z: 0 },
+      secondOffsetReference: 'end',
+    },
+    styleSegments: [],
+    layer: 0,
   })
 
   return diagram
@@ -7436,6 +8374,193 @@ function globalAnchorPosition(
       z: { kind: 'numeric', value: z },
     },
   }
+}
+
+function testCoordinateAnchors(
+  diagram: Diagram,
+  specs: readonly Array<{
+    id: string
+    name: string
+    x: number
+    y: number
+    z: number
+  }>,
+): NonNullable<Diagram['coordinateAnchors']> {
+  const coordinateAnchors: NonNullable<Diagram['coordinateAnchors']> = []
+
+  for (const spec of specs) {
+    coordinateAnchors.push(
+      createCoordinateAnchor(
+        {
+          ...diagram,
+          coordinateAnchors,
+        },
+        {
+          id: spec.id,
+          name: spec.name,
+          position: globalAnchorPosition(spec.x, spec.y, spec.z),
+        },
+      ),
+    )
+  }
+
+  return coordinateAnchors
+}
+
+type ReferencePointFactory = (diagram: Diagram, coordinateId: string) => Vec3
+
+type CurvedSheetReferenceSpec =
+  | {
+      kind: 'hemisphere'
+      center: ReferencePointFactory
+    }
+  | {
+      kind: 'saddle'
+      frameOrigin: ReferencePointFactory
+    }
+  | {
+      kind: 'ruledSurface'
+      boundaryStart: ReferencePointFactory
+    }
+  | {
+      kind: 'coonsPatch'
+      boundaryStart: ReferencePointFactory
+    }
+
+function createCurvedSheetReferenceDiagram(
+  spec: CurvedSheetReferenceSpec,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+  ])
+  const referencePoint = (factory: ReferencePointFactory) =>
+    factory(diagram, 'coord-a')
+  const primitive =
+    spec.kind === 'hemisphere'
+      ? {
+          kind: 'hemisphere' as const,
+          center: referencePoint(spec.center),
+          radius: 1,
+          frame: xyFrame3D(),
+          hemisphereSide: 'positive' as const,
+          sampling: { uSegments: 4, vSegments: 2 },
+        }
+      : spec.kind === 'saddle'
+        ? {
+            kind: 'saddle' as const,
+            frame: {
+              ...xyFrame3D(),
+              origin: referencePoint(spec.frameOrigin),
+            },
+            width: 2,
+            depth: 2,
+            height: 1,
+            sampling: { uSegments: 2, vSegments: 2 },
+          }
+        : spec.kind === 'ruledSurface'
+          ? {
+              kind: 'ruledSurface' as const,
+              boundary0: curvedSheetLineBoundary(
+                'ruled-ref-bottom',
+                referencePoint(spec.boundaryStart),
+                { x: 2, y: 0, z: 0 },
+              ),
+              boundary1: curvedSheetLineBoundary(
+                'ruled-ref-top',
+                { x: 0, y: 1, z: 1 },
+                { x: 2, y: 1, z: 1 },
+              ),
+              sampling: { segments: 2 },
+            }
+          : {
+              kind: 'coonsPatch' as const,
+              bottom: curvedSheetLineBoundary(
+                'coons-ref-bottom',
+                referencePoint(spec.boundaryStart),
+                { x: 2, y: 0, z: 0 },
+              ),
+              right: curvedSheetLineBoundary(
+                'coons-ref-right',
+                { x: 2, y: 0, z: 0 },
+                { x: 2, y: 1, z: 0 },
+              ),
+              top: curvedSheetLineBoundary(
+                'coons-ref-top',
+                { x: 0, y: 1, z: 0 },
+                { x: 2, y: 1, z: 0 },
+              ),
+              left: curvedSheetLineBoundary(
+                'coons-ref-left',
+                { x: 0, y: 0, z: 0 },
+                { x: 0, y: 1, z: 0 },
+              ),
+              sampling: { uSegments: 2, vSegments: 2 },
+            }
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    id: 'curved-coordinate-ref',
+    name: 'Curved Coordinate Ref',
+    style: sheetStyle(),
+    primitive,
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function curvedSheetLineBoundary(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): { id: string; segments: [{ kind: 'line'; start: Vec3; end: Vec3 }] } {
+  return {
+    id,
+    segments: [{ kind: 'line', start, end }],
+  }
+}
+
+function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
+}
+
+function rawCoordinateReferencePoint(
+  coordinateId: string,
+  preview: Vec3,
+): Vec3 {
+  return {
+    ...preview,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'coordinateRef',
+        coordinateId,
+        preview,
+      },
+    },
+  }
+}
+
+function requireCoordinateReferenceSource(point: Vec3) {
+  const source = point.symbolic?.source
+
+  assert.equal(source?.kind, 'coordinateRef')
+  if (source?.kind !== 'coordinateRef') {
+    throw new Error('Expected coordinate reference source.')
+  }
+
+  return source
 }
 
 function square3D(x: number, y: number, size: number, z: number): Vec3[] {

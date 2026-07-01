@@ -50,6 +50,10 @@ import {
   sanitizeCoordinateAnchorTikzName,
   workPlaneLocalCoordinateSourceFromAnchorPosition,
 } from '../model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  resolveDiagramCoordinateRefs,
+} from '../model/coordinateReferences.ts'
 import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
@@ -371,6 +375,7 @@ type GenerateContext = {
   camera3d?: OrthographicCamera3D
   colors: ColorRegistry
   coordinates: CoordinateRegistry
+  coordinateAnchorNames: Map<string, string>
   variables: VariableExportContext
   userStylePresets: Map<string, UserStylePreset>
   localStyles: LocalStyleRegistry
@@ -426,6 +431,7 @@ export function generateTikz2D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
+  diagram = resolveDiagramCoordinateRefs(diagram)
   const context = createContext(
     '2d',
     options,
@@ -514,6 +520,7 @@ export function generateTikz3D(
   diagram: Diagram,
   options: GenerateTikzOptions = {},
 ): string {
+  diagram = resolveDiagramCoordinateRefs(diagram)
   const context = createContext(
     '3d',
     options,
@@ -657,6 +664,7 @@ function createContext(
     ...(mode === '3d' && camera3d !== undefined ? { camera3d } : {}),
     colors: new ColorRegistry(),
     coordinates: new CoordinateRegistry(),
+    coordinateAnchorNames: new Map(),
     variables: createVariableExportContext(variables),
     userStylePresets: new Map(
       (userStylePresets ?? []).map((preset) => [preset.id, preset]),
@@ -1100,6 +1108,7 @@ function emitCoordinateAnchorDefinitions(
 ): string[] {
   return anchors.flatMap((anchor) => {
     const tikzName = context.coordinates.reserve(anchor.tikzName)
+    context.coordinateAnchorNames.set(anchor.id, tikzName)
 
     return emitCoordinateAnchorDefinition(anchor, tikzName, context)
   })
@@ -1353,10 +1362,11 @@ function emitSheet(
   }
 
   const coordinates = sheetVertices(sheet).map((vertex, index) =>
-    context.coordinates.define(
+    coordinateNameForPoint(
+      vertex,
       sheetCoordinateBaseName(sheet, elementIndex),
       index,
-      vertex,
+      context,
     ),
   )
   const options = [
@@ -1418,6 +1428,49 @@ function emitDepthSortedSurfaceFaces(
       },
     ]),
   )
+  const coordinateRefSheetIds = new Set(
+    sheets
+      .filter(({ item }) => sheetContainsCoordinateRef(item))
+      .map(({ item }) => item.id),
+  )
+  const coordinateRefSheetCommands = sheets.flatMap(
+    ({ item }, index): LayeredTikzCommand[] =>
+      coordinateRefSheetIds.has(item.id)
+        ? [
+            {
+              layer: normalizeLayer(item.layer),
+              sectionTitle,
+              lines: emitSurfaceDepthSortCoordinateRefFallback(
+                item,
+                index,
+                context,
+              ),
+            },
+          ]
+        : [],
+  )
+  const emitSampledSheetFallbackCommands = (): LayeredTikzCommand[] =>
+    sheets.flatMap(({ item }, index): LayeredTikzCommand[] =>
+      coordinateRefSheetIds.has(item.id)
+        ? []
+        : [
+            {
+              layer: normalizeLayer(item.layer),
+              sectionTitle,
+              lines: emitSheet(item, index, context),
+            },
+          ],
+    )
+  const sampledSheetIds = new Set(
+    sheets
+      .map(({ item }) => item.id)
+      .filter((sheetId) => !coordinateRefSheetIds.has(sheetId)),
+  )
+
+  if (sampledSheetIds.size === 0) {
+    return coordinateRefSheetCommands
+  }
+
   const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
     context.visibility.maxSurfaceFacesForSorting,
   )
@@ -1427,26 +1480,30 @@ function emitDepthSortedSurfaceFaces(
     const collectedFaces = collectProjectedSurfaceFacesForSorting(diagram, {
       camera: context.camera3d,
       maxSurfaceFacesForSorting: maxSortedSurfaceFaces,
-      sourceIds: new Set(sheetSources.keys()),
+      sourceIds: sampledSheetIds,
     })
 
     if (collectedFaces.kind === 'capExceeded') {
-      return emitDepthSortFaceCapFallback(
-        sectionTitle,
-        sheets.map(({ item }) => item),
-        collectedFaces.observedCount,
-        collectedFaces.cap,
-        context,
-      )
+      return [
+        ...coordinateRefSheetCommands,
+        ...emitDepthSortFaceCapFallback(
+          sectionTitle,
+          sheets
+            .map(({ item }) => item)
+            .filter((sheet) => sampledSheetIds.has(sheet.id)),
+          collectedFaces.observedCount,
+          collectedFaces.cap,
+          context,
+        ),
+      ]
     }
 
     faces = collectedFaces.faces
   } catch {
-    return emitLayeredItems(
-      sectionTitle,
-      sheets.map(({ item }) => item),
-      (sheet, index) => emitSheet(sheet, index, context),
-    )
+    return [
+      ...coordinateRefSheetCommands,
+      ...emitSampledSheetFallbackCommands(),
+    ]
   }
 
   const oversizedSheetIds = sheetIdsWithTooManySortedFaces(
@@ -1480,6 +1537,7 @@ function emitDepthSortedSurfaceFaces(
   const optionsBySheetId = new Map<string, string[]>()
 
   return [
+    ...coordinateRefSheetCommands,
     ...oversizedSheetCommands,
     ...sortedFaces.flatMap((face): LayeredTikzCommand[] => {
       const source = sheetSources.get(face.sourceId)
@@ -1504,6 +1562,20 @@ function emitDepthSortedSurfaceFaces(
             },
           ]
     }),
+  ]
+}
+
+function emitSurfaceDepthSortCoordinateRefFallback(
+  sheet: SheetStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  return [
+    `% Surface depth sorting skipped for sheet "${sheet.name}" [${sheet.id}]: coordinate references preserved by ordinary export.`,
+    // Sampled auto-visibility export would replace coordinateRef sources with
+    // generated numeric helper coordinates. For coordinate-ref geometry we
+    // prefer ordinary reference-preserving export with an explicit comment.
+    ...emitSheet(sheet, elementIndex, context),
   ]
 }
 
@@ -1615,6 +1687,14 @@ function emitCurvedSheet(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (curvedSheetPrimitiveHasCoordinateReferenceSources(sheet.primitive)) {
+    return [
+      `% Curved sheet "${sheet.name}" [${sheet.id}] omitted because coordinate references inside curved sheet primitives cannot be preserved by sampled mesh TikZ export.`,
+      '% Use concrete coordinates for curved sheet primitives or use polygon/quad sheet vertices when coordinate anchors must be preserved.',
+      '',
+    ]
+  }
+
   let mesh: ReturnType<typeof sampleCurvedSheetPrimitive>
 
   try {
@@ -1872,6 +1952,13 @@ function emitCurve(
   }
 
   if (curve.kind === 'concatenatedPath') {
+    if (pathSegmentsContainArcCenterCoordinateRef(curve.segments)) {
+      return [
+        `% Curve "${curve.name}" [${curve.id}] omitted because coordinate references for arc centers cannot be preserved by arc export.`,
+        '',
+      ]
+    }
+
     const scopedLocalPath = emitScopedWorkPlaneLocalConcatenatedPath(
       curve,
       context,
@@ -2139,7 +2226,9 @@ function emitOcclusionSegmentedCurves(
     return curves.map(({ item }, index) => ({
       layer: normalizeLayer(item.layer),
       sectionTitle,
-      lines: emitCurve(item, index, context),
+      lines: curveContainsCoordinateRef(item)
+        ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+        : emitCurve(item, index, context),
     }))
   }
 
@@ -2150,7 +2239,9 @@ function emitOcclusionSegmentedCurves(
       layer: normalizeLayer(item.layer),
       sectionTitle,
       lines:
-        occlusion === undefined
+        curveContainsCoordinateRef(item)
+          ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+          : occlusion === undefined
           ? emitCurve(item, index, context)
           : occlusion.capped
             ? emitCurveOcclusionCapFallback(item, index, occlusion, context)
@@ -2159,6 +2250,20 @@ function emitOcclusionSegmentedCurves(
               : emitOcclusionSegmentedCurve(item, index, occlusion, context),
     }
   })
+}
+
+function emitCurveOcclusionCoordinateRefFallback(
+  curve: CurveStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  return [
+    `% Curve occlusion skipped for curve "${curve.name}" [${curve.id}]: coordinate references preserved by ordinary export.`,
+    // Sampled auto-visibility export would replace coordinateRef sources with
+    // generated numeric helper coordinates. For coordinate-ref geometry we
+    // prefer ordinary reference-preserving export with an explicit comment.
+    ...emitCurve(curve, elementIndex, context),
+  ]
 }
 
 function createTikzPointOcclusionMap(
@@ -3652,6 +3757,13 @@ function emitTemplatePath(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (pointContainsCoordinateRef(curve.template.center)) {
+    return [
+      `% Template path "${curve.name}" [${curve.id}] omitted because coordinate references for path template centers cannot be preserved by every template export path.`,
+      '',
+    ]
+  }
+
   const options = [
     ...curveStyleOptionsForElement(
       curve.stylePresetId,
@@ -3668,10 +3780,11 @@ function emitTemplatePath(
     return emitTemplatePath3D(curve, options, context)
   }
 
-  const center = context.coordinates.define(
+  const center = coordinateNameForPoint(
+    curve.template.center,
     curveCoordinateBaseName(curve, elementIndex),
     0,
-    curve.template.center,
+    context,
   )
   const drawCommand = formatTemplatePathCommand(
     curve.template,
@@ -5093,11 +5206,75 @@ function pathSegmentPoints(segment: PathSegment): Vec3[] {
   }
 }
 
+function pointContainsCoordinateRef(point: Vec3): boolean {
+  return coordinateReferenceSourceForPoint(point) !== null
+}
+
+function sheetContainsCoordinateRef(sheet: SheetStratum): boolean {
+  switch (sheet.kind) {
+    case 'quadSheet':
+    case 'polygonSheet':
+      return sheetVertices(sheet).some(pointContainsCoordinateRef)
+    case 'workPlaneFilledSheet':
+      return closedBoundariesContainCoordinateRef(sheet.boundaries)
+    case 'curvedSheet':
+      return curvedSheetPrimitiveHasCoordinateReferenceSources(sheet.primitive)
+  }
+}
+
+function curveContainsCoordinateRef(curve: CurveStratum): boolean {
+  switch (curve.kind) {
+    case 'polyline':
+    case 'cubicBezier':
+      return curve.points.some(pointContainsCoordinateRef)
+    case 'concatenatedPath':
+      return pathSegmentsContainCoordinateRef(curve.segments)
+    case 'templatePath':
+      return pointContainsCoordinateRef(curve.template.center)
+    case 'grid':
+      return false
+  }
+}
+
+function closedBoundariesContainCoordinateRef(
+  boundaries: readonly ClosedPathBoundary[],
+): boolean {
+  return boundaries.some((boundary) =>
+    pathSegmentsContainCoordinateRef(boundary.segments),
+  )
+}
+
+function pathSegmentsContainCoordinateRef(
+  segments: readonly PathSegment[],
+): boolean {
+  return segments.some(pathSegmentContainsCoordinateRef)
+}
+
+function pathSegmentsContainArcCenterCoordinateRef(
+  segments: readonly PathSegment[],
+): boolean {
+  return segments.some(
+    (segment) => segment.kind === 'arc' && pointContainsCoordinateRef(segment.center),
+  )
+}
+
+function pathSegmentContainsCoordinateRef(segment: PathSegment): boolean {
+  return pathSegmentPoints(segment).some(pointContainsCoordinateRef)
+}
+
 function curvedSheetPrimitiveHasWorkPlaneLocalSources(
   primitive: CurvedSheetPrimitive,
 ): boolean {
   return curvedSheetPrimitivePoints(primitive).some(
     (point) => workPlaneLocalCoordinateSourceForPoint(point) !== null,
+  )
+}
+
+function curvedSheetPrimitiveHasCoordinateReferenceSources(
+  primitive: CurvedSheetPrimitive,
+): boolean {
+  return curvedSheetPrimitivePoints(primitive).some(
+    (point) => coordinateReferenceSourceForPoint(point) !== null,
   )
 }
 
@@ -5560,10 +5737,11 @@ function emitPoint(
     return scopedLocalPoint
   }
 
-  const coordinate = context.coordinates.define(
+  const coordinate = coordinateNameForPoint(
+    point.position,
     pointCoordinateBaseName(point, elementIndex),
     0,
-    point.position,
+    context,
   )
 
   return [
@@ -6442,13 +6620,44 @@ function defineCurveCoordinates(
 
   if (usesRelativeBezierControls(curve, context.mode)) {
     return [
-      context.coordinates.define(baseName, 0, curve.points[0]),
-      context.coordinates.define(baseName, 3, curve.points[3]),
+      coordinateNameForPoint(curve.points[0], baseName, 0, context),
+      coordinateNameForPoint(curve.points[3], baseName, 3, context),
     ]
   }
 
   return curve.points.map((point, index) =>
-    context.coordinates.define(baseName, index, point),
+    coordinateNameForPoint(point, baseName, index, context),
+  )
+}
+
+function coordinateNameForPoint(
+  point: Vec3,
+  baseName: string,
+  index: number,
+  context: GenerateContext,
+): string {
+  const referenceName = coordinateReferenceTikzName(point, context)
+
+  return referenceName ?? context.coordinates.define(baseName, index, point)
+}
+
+function coordinateReferenceTikzName(
+  point: Vec3,
+  context: GenerateContext | undefined,
+): string | null {
+  if (context === undefined) {
+    return null
+  }
+
+  const source = coordinateReferenceSourceForPoint(point)
+
+  if (source === null) {
+    return null
+  }
+
+  return (
+    context.coordinateAnchorNames.get(source.coordinateId) ??
+    `unresolvedCoordinateRef${toIdentifierPart(source.coordinateId, 'Missing')}`
   )
 }
 
@@ -6464,7 +6673,7 @@ function defineConcatenatedPathCoordinates(
   return path.segments.map((segment) => {
     const start =
       previousEnd ??
-      context.coordinates.define(baseName, pointIndex, segment.start)
+      coordinateNameForPoint(segment.start, baseName, pointIndex, context)
 
     if (previousEnd === null) {
       pointIndex += 1
@@ -6510,7 +6719,7 @@ function defineClosedBoundaryCoordinateNames(
   return boundary.segments.map((segment) => {
     const start =
       previousEnd ??
-      context.coordinates.define(baseName, pointIndex, segment.start)
+      coordinateNameForPoint(segment.start, baseName, pointIndex, context)
 
     if (previousEnd === null) {
       pointIndex += 1
@@ -6543,30 +6752,32 @@ function definePathSegmentCoordinateNames(
       return {
         kind: 'line',
         start,
-        end: context.coordinates.define(baseName, pointIndex, segment.end),
+        end: coordinateNameForPoint(segment.end, baseName, pointIndex, context),
       }
     case 'cubicBezier':
       return {
         kind: 'cubicBezier',
         start,
-        control1: context.coordinates.define(
+        control1: coordinateNameForPoint(
+          segment.control1,
           baseName,
           pointIndex,
-          segment.control1,
+          context,
         ),
-        control2: context.coordinates.define(
+        control2: coordinateNameForPoint(
+          segment.control2,
           baseName,
           pointIndex + 1,
-          segment.control2,
+          context,
         ),
-        end: context.coordinates.define(baseName, pointIndex + 2, segment.end),
+        end: coordinateNameForPoint(segment.end, baseName, pointIndex + 2, context),
       }
     case 'arc':
       if (context.mode === '2d') {
         return {
           kind: 'arc',
           start,
-          end: context.coordinates.define(baseName, pointIndex, segment.end),
+          end: coordinateNameForPoint(segment.end, baseName, pointIndex, context),
           radius: formatArcScalarForTikz(segment.radius, context),
           startAngleDeg: formatArcScalarForTikz(segment.startAngleDeg, context),
           endAngleDeg: formatArcScalarForTikz(segment.endAngleDeg, context),
@@ -7145,11 +7356,27 @@ function usesRelativeBezierControls(
     return false
   }
 
+  if (cubicBezierControlPointsContainCoordinateRef(curve)) {
+    return false
+  }
+
   if (curve.bezierControls.kind === 'relativeCartesian') {
     return true
   }
 
   return curve.bezierControls.kind === 'relativePolar' && mode !== '3d'
+}
+
+function cubicBezierControlPointsContainCoordinateRef(
+  curve: CubicBezierCurveStratum,
+): boolean {
+  const firstControl = curve.points[1]
+  const secondControl = curve.points[2]
+
+  return (
+    (firstControl !== undefined && pointContainsCoordinateRef(firstControl)) ||
+    (secondControl !== undefined && pointContainsCoordinateRef(secondControl))
+  )
 }
 
 function formatRelativeBezierControls(
@@ -7251,6 +7478,12 @@ function formatCoordinate(
   mode: TikzMode,
   context?: GenerateContext,
 ): string {
+  const referenceName = coordinateReferenceTikzName(point, context)
+
+  if (referenceName !== null) {
+    return `(${referenceName})`
+  }
+
   const x = formatCoordinateComponent(point, 'x', context)
   const y = formatCoordinateComponent(point, 'y', context)
 

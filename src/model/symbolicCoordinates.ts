@@ -5,7 +5,6 @@ import {
 } from './scalarExpressions.ts'
 import type { ScalarInputValue } from './scalarExpressions.ts'
 import {
-  cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
   refreshWorkPlaneLocalCoordinateSource,
   validateWorkPlaneLocalCoordinateSource,
@@ -15,6 +14,12 @@ import {
   coordinateAnchorPositionToVec3,
   symbolicVec3FromVec3,
 } from './coordinateAnchors.ts'
+import {
+  cloneCoordinateSource,
+  isCoordinateRefSupportedAtLocation,
+  isCoordinateReferenceSource,
+  type CoordinateRefLocationKind,
+} from './coordinateReferences.ts'
 import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
@@ -27,6 +32,7 @@ import type {
   CoonsConstantPointBoundarySnapshot,
   CoordinateAnchor,
   CoordinateComponent,
+  CoordinateSource,
   CubicBezierControlMode,
   CurvedSheetPrimitive,
   Diagram,
@@ -353,12 +359,30 @@ export function validateSymbolicVec3(
   })
 
   if (symbolic.source !== undefined) {
-    validateWorkPlaneLocalCoordinateSourceForPoint(
-      symbolic.source,
-      point,
-      `${path}.symbolic.source`,
-      context,
-    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+    if (symbolic.source.kind === 'workPlaneLocal') {
+      validateWorkPlaneLocalCoordinateSourceForPoint(
+        symbolic.source,
+        point,
+        `${path}.symbolic.source`,
+        context,
+      ).forEach((issue) => pushError(errors, issue.path, issue.message))
+      return
+    }
+
+    if (symbolic.source.kind === 'coordinateRef') {
+      validateCoordinateReferenceSourceShape(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        errors,
+      )
+      return
+    }
+
+    pushError(
+      errors,
+      `${path}.symbolic.source.kind`,
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
+    )
   }
 }
 
@@ -405,6 +429,48 @@ export function validateDiagramSymbolicCoordinateMetadata(
   }
 
   return errors
+}
+
+function validateCoordinateReferenceSourceShape(
+  source: unknown,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(source)) {
+    pushError(errors, path, 'Coordinate reference source must be an object.')
+    return
+  }
+
+  if (source.kind !== 'coordinateRef') {
+    pushError(errors, `${path}.kind`, 'Coordinate reference source kind must be coordinateRef.')
+    return
+  }
+
+  if (
+    typeof source.coordinateId !== 'string' ||
+    source.coordinateId.trim().length === 0
+  ) {
+    pushError(errors, `${path}.coordinateId`, 'Coordinate reference id must be non-empty.')
+  }
+
+  const preview = source.preview
+
+  if (!isRecord(preview)) {
+    pushError(errors, `${path}.preview`, 'Coordinate reference preview must be an object.')
+    return
+  }
+
+  coordinateAxes.forEach((axis) => {
+    const value = preview[axis]
+
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      pushError(
+        errors,
+        `${path}.preview.${axis}`,
+        'Coordinate reference preview components must be finite numbers.',
+      )
+    }
+  })
 }
 
 export function collectDiagramSupportedSymbolicExpressionSources(
@@ -498,6 +564,7 @@ function inspectDiagramSupportedSymbolicCoordinateSources(
         label.position,
         `labels[${index}].position`,
         inspection,
+        'labelPosition',
       )
     })
   }
@@ -543,6 +610,7 @@ function collectStratumSupportedSymbolicExpressionSources(
             corner,
             `${path}.corners[${index}]`,
             inspection,
+            'simpleSheetVertex',
           ),
         )
         return
@@ -554,6 +622,7 @@ function collectStratumSupportedSymbolicExpressionSources(
             vertex,
             `${path}.vertices[${index}]`,
             inspection,
+            'simpleSheetVertex',
           ),
         )
         return
@@ -564,6 +633,7 @@ function collectStratumSupportedSymbolicExpressionSources(
           stratum.planeFrame,
           `${path}.planeFrame`,
           inspection,
+          'workPlaneFrameField',
         )
         collectClosedPathBoundariesSupportedSymbolicExpressionSources(
           stratum.boundaries,
@@ -592,6 +662,7 @@ function collectStratumSupportedSymbolicExpressionSources(
             point,
             `${path}.points[${index}]`,
             inspection,
+            'pathCoordinate',
           ),
         )
         if (stratum.kind === 'cubicBezier') {
@@ -653,6 +724,7 @@ function collectStratumSupportedSymbolicExpressionSources(
         stratum.position,
         `${path}.position`,
         inspection,
+        'pointPosition',
       )
       return
     default:
@@ -682,15 +754,17 @@ function collectCoordinateAnchorSupportedSymbolicExpressionSources(
     return
   }
 
-  collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+  collectCoordinateSourceSupportedSymbolicExpressionSources(
     anchor.position,
     `${path}.position`,
     inspection,
+    'derivedCoordinate',
   )
   collectVec3SupportedSymbolicExpressionSources(
     anchor.position.preview,
     `${path}.position.preview`,
     inspection,
+    'derivedCoordinate',
   )
 }
 
@@ -712,7 +786,7 @@ function collectGlobalCoordinateAnchorValueSupportedSymbolicExpressionSources(
     pushError(
       inspection.errors,
       `${path}.source`,
-      'Global coordinate anchors must not store work-plane-local source metadata.',
+      'Global coordinate anchors must not store coordinate source metadata.',
     )
   }
 
@@ -754,6 +828,7 @@ function collectPathSegmentsSupportedSymbolicExpressionSources(
   ambientDimension: AmbientDimension,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind = 'pathCoordinate',
 ): void {
   if (!Array.isArray(segments)) {
     return
@@ -765,6 +840,7 @@ function collectPathSegmentsSupportedSymbolicExpressionSources(
       ambientDimension,
       `${path}[${index}]`,
       inspection,
+      coordinateRefLocation,
     ),
   )
 }
@@ -774,6 +850,7 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
   ambientDimension: AmbientDimension,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind,
 ): void {
   if (!isRecord(segment)) {
     return
@@ -785,11 +862,13 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
         segment.start,
         `${path}.start`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.end,
         `${path}.end`,
         inspection,
+        coordinateRefLocation,
       )
       return
     case 'cubicBezier':
@@ -797,21 +876,25 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
         segment.start,
         `${path}.start`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.control1,
         `${path}.control1`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.control2,
         `${path}.control2`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.end,
         `${path}.end`,
         inspection,
+        coordinateRefLocation,
       )
       collectCubicBezierControlModeSupportedSymbolicExpressionSources(
         segment.controlMode,
@@ -824,16 +907,19 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
         segment.start,
         `${path}.start`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.end,
         `${path}.end`,
         inspection,
+        coordinateRefLocation,
       )
       collectVec3SupportedSymbolicExpressionSources(
         segment.center,
         `${path}.center`,
         inspection,
+        arcCenterLocationForPathLocation(coordinateRefLocation),
       )
       collectScalarInputSupportedSymbolicExpressionSources(
         segment.radius,
@@ -858,12 +944,21 @@ function collectPathSegmentSupportedSymbolicExpressionSources(
           segment.frame,
           `${path}.frame`,
           inspection,
+          coordinateRefLocation === 'curvedSheetPrimitive'
+            ? 'curvedSheetPrimitive'
+            : 'workPlaneFrameField',
         )
       }
       return
     default:
       return
   }
+}
+
+function arcCenterLocationForPathLocation(
+  location: CoordinateRefLocationKind,
+): CoordinateRefLocationKind {
+  return location === 'pathCoordinate' ? 'arcCenter' : location
 }
 
 function collectCubicBezierControlModeSupportedSymbolicExpressionSources(
@@ -883,6 +978,7 @@ function collectCubicBezierControlModeSupportedSymbolicExpressionSources(
       controlMode.frame,
       `${path}.frame`,
       inspection,
+      'workPlaneFrameField',
     )
   }
 }
@@ -901,11 +997,13 @@ function collectPathTemplateSupportedSymbolicExpressionSources(
       template.center,
       `${path}.center`,
       inspection,
+      'pathTemplateCenter',
     )
     collectWorkPlaneFrameSupportedSymbolicExpressionSources(
       template.frame,
       `${path}.frame`,
       inspection,
+      'workPlaneFrameField',
     )
   }
 }
@@ -988,11 +1086,13 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
       primitive.center,
       `${path}.center`,
       inspection,
+      'curvedSheetPrimitive',
     )
     collectWorkPlaneFrameSupportedSymbolicExpressionSources(
       primitive.frame,
       `${path}.frame`,
       inspection,
+      'curvedSheetPrimitive',
     )
     return
   }
@@ -1002,6 +1102,7 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
       primitive.frame,
       `${path}.frame`,
       inspection,
+      'curvedSheetPrimitive',
     )
     return
   }
@@ -1011,11 +1112,13 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
       primitive.boundary0,
       `${path}.boundary0`,
       inspection,
+      'curvedSheetPrimitive',
     )
     collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
       primitive.boundary1,
       `${path}.boundary1`,
       inspection,
+      'curvedSheetPrimitive',
     )
     return
   }
@@ -1025,21 +1128,25 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
       primitive.bottom,
       `${path}.bottom`,
       inspection,
+      'curvedSheetPrimitive',
     )
     collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
       primitive.right,
       `${path}.right`,
       inspection,
+      'curvedSheetPrimitive',
     )
     collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
       primitive.top,
       `${path}.top`,
       inspection,
+      'curvedSheetPrimitive',
     )
     collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
       primitive.left,
       `${path}.left`,
       inspection,
+      'curvedSheetPrimitive',
     )
   }
 }
@@ -1048,6 +1155,7 @@ function collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
   snapshot: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind = 'pathCoordinate',
 ): void {
   if (!isRecord(snapshot)) {
     return
@@ -1058,6 +1166,7 @@ function collectBoundaryPathSnapshotSupportedSymbolicExpressionSources(
     3,
     `${path}.segments`,
     inspection,
+    coordinateRefLocation,
   )
 }
 
@@ -1065,12 +1174,14 @@ function collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
   snapshot: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind = 'pathCoordinate',
 ): void {
   if (isConstantCoonsBoundarySnapshotLike(snapshot)) {
     collectVec3SupportedSymbolicExpressionSources(
       snapshot.point,
       `${path}.point`,
       inspection,
+      coordinateRefLocation,
     )
     return
   }
@@ -1079,6 +1190,7 @@ function collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
     snapshot,
     path,
     inspection,
+    coordinateRefLocation,
   )
 }
 
@@ -1086,6 +1198,7 @@ function collectWorkPlaneFrameSupportedSymbolicExpressionSources(
   frame: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind = 'workPlaneFrameField',
 ): void {
   if (!isRecord(frame)) {
     return
@@ -1095,21 +1208,25 @@ function collectWorkPlaneFrameSupportedSymbolicExpressionSources(
     frame.origin,
     `${path}.origin`,
     inspection,
+    coordinateRefLocation,
   )
   collectVec3SupportedSymbolicExpressionSources(
     frame.u,
     `${path}.u`,
     inspection,
+    coordinateRefLocation,
   )
   collectVec3SupportedSymbolicExpressionSources(
     frame.v,
     `${path}.v`,
     inspection,
+    coordinateRefLocation,
   )
   collectVec3SupportedSymbolicExpressionSources(
     frame.normal,
     `${path}.normal`,
     inspection,
+    coordinateRefLocation,
   )
 }
 
@@ -1117,6 +1234,7 @@ function collectVec3SupportedSymbolicExpressionSources(
   point: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind = 'pathCoordinate',
 ): void {
   if (!isRecord(point) || point.symbolic === undefined) {
     return
@@ -1142,10 +1260,11 @@ function collectVec3SupportedSymbolicExpressionSources(
   })
 
   if (symbolic.source !== undefined) {
-    collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+    collectCoordinateSourceSupportedSymbolicExpressionSources(
       symbolic.source,
       `${path}.symbolic.source`,
       inspection,
+      coordinateRefLocation,
     )
   }
 }
@@ -1181,13 +1300,21 @@ function collectCoordinateComponentSupportedSymbolicExpressionSources(
   )
 }
 
-function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
+function collectCoordinateSourceSupportedSymbolicExpressionSources(
   source: unknown,
   path: string,
   inspection: SupportedSymbolicCoordinateInspection,
+  coordinateRefLocation: CoordinateRefLocationKind,
 ): void {
   if (!isRecord(source)) {
     pushError(inspection.errors, path, 'Coordinate source must be an object.')
+    return
+  }
+
+  if (source.kind === 'coordinateRef') {
+    if (isCoordinateRefSupportedAtLocation(coordinateRefLocation)) {
+      markSupportedSymbolicObject(source, inspection)
+    }
     return
   }
 
@@ -1195,7 +1322,7 @@ function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
     pushError(
       inspection.errors,
       `${path}.kind`,
-      'Coordinate source kind must be workPlaneLocal.',
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
     )
     return
   }
@@ -1227,6 +1354,7 @@ function collectWorkPlaneLocalSourceSupportedSymbolicExpressionSources(
     source.frame,
     `${path}.frame`,
     inspection,
+    'workPlaneFrameField',
   )
 }
 
@@ -1328,6 +1456,15 @@ function findUnsupportedSymbolicCoordinateSources(
     return
   }
 
+  if (!isSupported && value.kind === 'coordinateRef') {
+    pushError(
+      errors,
+      path,
+      `Unsupported coordinate reference source; coordinateRef is not supported at ${stripSymbolicSourcePath(path)}.`,
+    )
+    return
+  }
+
   if (!isSupported && value.kind === 'symbolic') {
     pushError(errors, path, 'Unsupported symbolic coordinate source.')
     return
@@ -1342,6 +1479,12 @@ function findUnsupportedSymbolicCoordinateSources(
       errors,
     )
   })
+}
+
+function stripSymbolicSourcePath(path: string): string {
+  return path.endsWith('.symbolic.source')
+    ? path.slice(0, -'.symbolic.source'.length)
+    : path
 }
 
 function validateCoordinateAnchorSymbolicMetadata(
@@ -1868,11 +2011,38 @@ function validateSymbolicVec3Metadata(
   })
 
   if (symbolic.source !== undefined) {
-    validateWorkPlaneLocalCoordinateSource(
-      symbolic.source,
-      `${path}.symbolic.source`,
-      undefined,
-    ).forEach((issue) => pushError(errors, issue.path, issue.message))
+    if (!isRecord(symbolic.source)) {
+      pushError(
+        errors,
+        `${path}.symbolic.source`,
+        'Coordinate source must be an object.',
+      )
+      return
+    }
+
+    if (symbolic.source.kind === 'coordinateRef') {
+      validateCoordinateReferenceSourceShape(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        errors,
+      )
+      return
+    }
+
+    if (symbolic.source.kind === 'workPlaneLocal') {
+      validateWorkPlaneLocalCoordinateSource(
+        symbolic.source,
+        `${path}.symbolic.source`,
+        undefined,
+      ).forEach((issue) => pushError(errors, issue.path, issue.message))
+      return
+    }
+
+    pushError(
+      errors,
+      `${path}.symbolic.source.kind`,
+      'Coordinate source kind must be workPlaneLocal or coordinateRef.',
+    )
   }
 }
 
@@ -3048,6 +3218,25 @@ function refreshVec3SymbolicPreview(
     return normalizePreviewPoint(point, ambientDimension)
   }
 
+  if (point.symbolic.source?.kind === 'coordinateRef') {
+    const normalizedPoint = normalizePreviewPoint(point, ambientDimension)
+    const source = cloneCoordinateSource(point.symbolic.source)
+
+    if (source.kind === 'coordinateRef') {
+      source.preview = normalizePreviewPoint(source.preview, ambientDimension)
+    }
+
+    return {
+      ...normalizedPoint,
+      symbolic: {
+        x: numericCoordinateComponent(normalizedPoint.x),
+        y: numericCoordinateComponent(normalizedPoint.y),
+        z: numericCoordinateComponent(normalizedPoint.z),
+        source,
+      },
+    }
+  }
+
   if (point.symbolic.source !== undefined) {
     const refreshedSource = refreshWorkPlaneLocalCoordinateSource(
       point.symbolic.source,
@@ -3255,7 +3444,7 @@ function normalizeSymbolicVec3ForAmbientDimension(
     z: numericCoordinateComponent(0),
     ...(components.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(components.source) }),
+      : { source: cloneCoordinateSource(components.source) }),
   }
 }
 
@@ -3299,7 +3488,7 @@ function readGlobalCoordinateAnchorValue(
     pushError(
       errors,
       `${path}.source`,
-      'Global coordinate anchors must not store work-plane-local source metadata.',
+      'Global coordinate anchors must not store coordinate source metadata.',
     )
   }
 
@@ -3347,12 +3536,20 @@ function coordinateComponentFromUnknown(
 
 function coordinateSourceFromUnknown(
   source: unknown,
-): WorkPlaneLocalCoordinateSource | null {
-  if (!isRecord(source) || source.kind !== 'workPlaneLocal') {
+): CoordinateSource | null {
+  if (!isRecord(source)) {
     return null
   }
 
-  return source as unknown as WorkPlaneLocalCoordinateSource
+  if (source.kind === 'workPlaneLocal') {
+    return source as unknown as WorkPlaneLocalCoordinateSource
+  }
+
+  if (isCoordinateReferenceSource(source)) {
+    return source
+  }
+
+  return null
 }
 
 function symbolicVec3HasMetadata(symbolic: SymbolicVec3): boolean {
@@ -3369,7 +3566,7 @@ function cloneSymbolicVec3(symbolic: SymbolicVec3): SymbolicVec3 {
     z: cloneCoordinateComponent(symbolic.z),
     ...(symbolic.source === undefined
       ? {}
-      : { source: cloneWorkPlaneLocalCoordinateSource(symbolic.source) }),
+      : { source: cloneCoordinateSource(symbolic.source) }),
   }
 }
 

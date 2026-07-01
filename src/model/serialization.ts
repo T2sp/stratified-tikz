@@ -1176,7 +1176,7 @@ function normalizeLoadedGlobalCoordinateAnchorValue(
 
   if (savedValue.source !== undefined) {
     errors.push(
-      `${path}.source Global coordinate anchors must not store work-plane-local source metadata.`,
+      `${path}.source Global coordinate anchors must not store coordinate source metadata.`,
     )
   }
 

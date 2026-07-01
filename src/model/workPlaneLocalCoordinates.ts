@@ -18,6 +18,7 @@ import type {
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinateSource,
 } from './types.ts'
+import { cloneCoordinateSource } from './coordinateReferences.ts'
 
 export type WorkPlaneLocalCoordinateExpressionContext = {
   variableNames: readonly string[]
@@ -1073,9 +1074,7 @@ function cloneVec3(point: Vec3): Vec3 {
             ...(point.symbolic.source === undefined
               ? {}
               : {
-                  source: cloneWorkPlaneLocalCoordinateSource(
-                    point.symbolic.source,
-                  ),
+                  source: cloneCoordinateSource(point.symbolic.source),
                 }),
           },
         }),
