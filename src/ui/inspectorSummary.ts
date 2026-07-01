@@ -2,6 +2,7 @@ import type {
   AmbientDimension,
   ClosedPathBoundary,
   CoordinateAnchor,
+  CoordinateComponent,
   CurveStratum,
   Diagram,
   LabelStyle,
@@ -14,6 +15,7 @@ import type {
   TextLabel,
   Vec3,
 } from '../model/types'
+import type { ScalarInputValue } from '../model/scalarExpressions.ts'
 import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
 import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import { isClosedPathBoundary } from '../model/filledBoundaries.ts'
@@ -45,7 +47,7 @@ export type InspectorSection = {
 
 export type InspectorCompactSummary = {
   title: string
-  layer: string
+  layer: string | null
   detail: string | null
 }
 
@@ -106,7 +108,7 @@ export function createInspectorCompactSummary(
 
     return {
       title: `Coordinate: ${anchor.name} (${anchor.tikzName}) [${anchor.id}]`,
-      layer: 'global',
+      layer: null,
       detail: `position ${formatCoordinateAnchorPosition(
         anchor,
         diagram.ambientDimension,
@@ -263,19 +265,12 @@ function createCoordinateSections(
 ): InspectorSection[] {
   return [
     {
-      title: 'Selection',
+      title: 'Coordinate',
       fields: [
-        { label: 'Type', value: 'coordinate anchor' },
-        { label: 'ID', value: anchor.id },
         { label: 'Name', value: anchor.name },
         { label: 'TikZ name', value: anchor.tikzName },
-        { label: 'Layer', value: 'none (global)' },
-      ],
-    },
-    {
-      title: 'Position',
-      fields: [
         { label: 'Source', value: coordinateAnchorSourceLabel(anchor) },
+        ...coordinateAnchorPositionFields(anchor, ambientDimension),
         {
           label: 'Preview',
           value: formatCoordinateAnchorPosition(anchor, ambientDimension),
@@ -653,8 +648,44 @@ function pluralGeometricKindLabel(
 
 function coordinateAnchorSourceLabel(anchor: CoordinateAnchor): string {
   return anchor.position.kind === 'workPlaneLocal'
-    ? 'active work-plane local'
-    : 'global xyz'
+    ? 'Work-plane local'
+    : 'Global xyz'
+}
+
+function coordinateAnchorPositionFields(
+  anchor: CoordinateAnchor,
+  ambientDimension: AmbientDimension,
+): InspectorField[] {
+  if (anchor.position.kind === 'workPlaneLocal') {
+    return [
+      { label: 'Plane x / a', value: formatScalarInput(anchor.position.local.a) },
+      { label: 'Plane y / b', value: formatScalarInput(anchor.position.local.b) },
+    ]
+  }
+
+  const position = anchor.position
+
+  const axes =
+    ambientDimension === 2
+      ? (['x', 'y'] as const)
+      : (['x', 'y', 'z'] as const)
+
+  return axes.map((axis) => ({
+      label: axis,
+      value: formatCoordinateComponent(position.value[axis]),
+    }))
+}
+
+function formatCoordinateComponent(component: CoordinateComponent): string {
+  return component.kind === 'symbolic'
+    ? `${component.expression} (${formatNumber(component.previewValue)})`
+    : formatNumber(component.value)
+}
+
+function formatScalarInput(value: ScalarInputValue): string {
+  return value.kind === 'symbolic'
+    ? `${value.expression} (${formatNumber(value.previewValue)})`
+    : formatNumber(value.value)
 }
 
 function formatCoordinateAnchorPosition(

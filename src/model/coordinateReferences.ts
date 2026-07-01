@@ -151,6 +151,13 @@ export function isCoordinateReferenceSource(
   )
 }
 
+export function coordinateAnchorReferenceCount(
+  diagram: Diagram,
+  coordinateId: string,
+): number {
+  return countCoordinateReferenceSources(diagram, coordinateId, new WeakSet())
+}
+
 export function cloneCoordinateSource(source: CoordinateSource): CoordinateSource {
   switch (source.kind) {
     case 'workPlaneLocal':
@@ -174,6 +181,44 @@ export function cloneCoordinateSource(source: CoordinateSource): CoordinateSourc
         preview: cloneVec3(source.preview),
       }
   }
+}
+
+function countCoordinateReferenceSources(
+  value: unknown,
+  coordinateId: string,
+  seen: WeakSet<object>,
+): number {
+  if (!isRecord(value)) {
+    if (Array.isArray(value)) {
+      return value.reduce(
+        (count, item) =>
+          count + countCoordinateReferenceSources(item, coordinateId, seen),
+        0,
+      )
+    }
+
+    return 0
+  }
+
+  if (seen.has(value)) {
+    return 0
+  }
+
+  seen.add(value)
+
+  const ownCount =
+    isCoordinateReferenceSource(value) && value.coordinateId === coordinateId
+      ? 1
+      : 0
+
+  return (
+    ownCount +
+    Object.values(value as Record<string, unknown>).reduce<number>(
+      (count, item) =>
+        count + countCoordinateReferenceSources(item, coordinateId, seen),
+      0,
+    )
+  )
 }
 
 export function detachCoordinateAnchorReferences(

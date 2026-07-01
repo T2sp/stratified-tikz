@@ -33,6 +33,7 @@ export type CoordinateEditorProps = {
   ambientDimension: AmbientDimension
   variables?: readonly SymbolicVariable[]
   allowSymbolic?: boolean
+  showWorkPlaneLocalSummary?: boolean
   onCoordinateChange: (axis: CoordinateAxis, value: CoordinateComponent) => void
   onWorkPlaneLocalCoordinateChange?: (
     axis: WorkPlaneLocalCoordinateAxis,
@@ -46,6 +47,7 @@ export function CoordinateEditor({
   ambientDimension,
   variables,
   allowSymbolic = false,
+  showWorkPlaneLocalSummary = true,
   onCoordinateChange,
   onWorkPlaneLocalCoordinateChange,
 }: CoordinateEditorProps) {
@@ -60,6 +62,7 @@ export function CoordinateEditor({
       <WorkPlaneLocalCoordinateEditor
         label={label}
         view={localView}
+        showSummary={showWorkPlaneLocalSummary}
         expressionContext={expressionContext}
         onWorkPlaneLocalCoordinateChange={onWorkPlaneLocalCoordinateChange}
       />
@@ -88,11 +91,13 @@ export function CoordinateEditor({
 function WorkPlaneLocalCoordinateEditor({
   label,
   view,
+  showSummary,
   expressionContext,
   onWorkPlaneLocalCoordinateChange,
 }: {
   label: string
   view: NonNullable<ReturnType<typeof workPlaneLocalCoordinateInspectorView>>
+  showSummary: boolean
   expressionContext: CoordinateExpressionContext
   onWorkPlaneLocalCoordinateChange:
     | ((axis: WorkPlaneLocalCoordinateAxis, value: ScalarInputValue) => void)
@@ -101,20 +106,22 @@ function WorkPlaneLocalCoordinateEditor({
   return (
     <fieldset className="coordinate-group">
       <legend>{label}</legend>
-      <dl className="work-plane-local-coordinate-summary">
-        <div>
-          <dt>Source</dt>
-          <dd>{view.coordinateSource}</dd>
-        </div>
-        <div>
-          <dt>Preview</dt>
-          <dd>{formatEditorVec3(view.globalPreview)}</dd>
-        </div>
-        <div>
-          <dt>Stored frame</dt>
-          <dd>{view.frameSummary}</dd>
-        </div>
-      </dl>
+      {showSummary && (
+        <dl className="work-plane-local-coordinate-summary">
+          <div>
+            <dt>Source</dt>
+            <dd>{view.coordinateSource}</dd>
+          </div>
+          <div>
+            <dt>Preview</dt>
+            <dd>{formatEditorVec3(view.globalPreview)}</dd>
+          </div>
+          <div>
+            <dt>Stored frame</dt>
+            <dd>{view.frameSummary}</dd>
+          </div>
+        </dl>
+      )}
       <div className="coordinate-grid">
         {(['a', 'b'] as const).map((axis) => (
           <WorkPlaneLocalAxisInput

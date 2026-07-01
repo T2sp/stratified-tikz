@@ -1,6 +1,15 @@
+import { useEffect, useState } from 'react'
 import type { CoordinateAnchor, Diagram } from '../../model/types.ts'
-import { coordinateAnchorPositionPreview } from '../../model/coordinateAnchors.ts'
+import { coordinateAnchorPositionToVec3 } from '../../model/coordinateAnchors.ts'
 import type { TranslationVector } from '../../model/translation.ts'
+import {
+  createCoordinateAnchorInspectorModel,
+  deleteUnusedCoordinateAnchor,
+  updateCoordinateAnchorGlobalCoordinate,
+  updateCoordinateAnchorName,
+  updateCoordinateAnchorTikzName,
+  updateCoordinateAnchorWorkPlaneLocalCoordinate,
+} from '../coordinateAnchorEditing.ts'
 import { createBulkStyleEditorModel } from '../bulkEditing.ts'
 import { createInspectorCompactSummary } from '../inspectorSummary.ts'
 import {
@@ -9,7 +18,11 @@ import {
   type SelectedElement,
 } from '../selection.ts'
 import { BulkSelectionInspector } from './BulkSelectionInspector.tsx'
-import { ReadOnlyField } from './InspectorField.tsx'
+import { CoordinateEditor } from './CoordinateEditor.tsx'
+import {
+  EditableTextField,
+  ReadOnlyField,
+} from './InspectorField.tsx'
 import { StratumInspector } from './StratumInspector.tsx'
 import { TextLabelInspector } from './TextLabelInspector.tsx'
 import type { DiagramChangeHandler } from './types.ts'
@@ -65,7 +78,7 @@ export function EditableInspector({
           <div className="inspector-summary-copy">
             <span className="inspector-summary-title">{summary.title}</span>
             <span className="inspector-summary-meta">
-              <span>Layer: {summary.layer}</span>
+              {summary.layer !== null && <span>Layer: {summary.layer}</span>}
               {summary.detail !== null && <span>{summary.detail}</span>}
             </span>
           </div>
@@ -118,7 +131,11 @@ export function EditableInspector({
         onDiagramChange={onDiagramChange}
       />
     ) : selected.kind === 'coordinate' ? (
-      <CoordinateAnchorInspector diagram={diagram} anchor={selected.element} />
+      <CoordinateAnchorInspector
+        diagram={diagram}
+        anchor={selected.element}
+        onDiagramChange={onDiagramChange}
+      />
     ) : (
       <TextLabelInspector
         diagram={diagram}
@@ -134,7 +151,7 @@ export function EditableInspector({
           <div className="inspector-summary-copy">
             <span className="inspector-summary-title">{summary.title}</span>
             <span className="inspector-summary-meta">
-              <span>Layer: {summary.layer}</span>
+              {summary.layer !== null && <span>Layer: {summary.layer}</span>}
               {summary.detail !== null && <span>{summary.detail}</span>}
             </span>
           </div>
@@ -162,54 +179,154 @@ export function EditableInspector({
 function CoordinateAnchorInspector({
   diagram,
   anchor,
+  onDiagramChange,
 }: {
   diagram: Diagram
   anchor: CoordinateAnchor
+  onDiagramChange: DiagramChangeHandler
 }) {
+  const model = createCoordinateAnchorInspectorModel(diagram, anchor)
+  const positionPoint = coordinateAnchorPointForInspector(diagram, anchor)
+  const [tikzDraft, setTikzDraft] = useState(anchor.tikzName)
+  const [tikzError, setTikzError] = useState('')
+  const [deleteStatus, setDeleteStatus] = useState('')
+
+  useEffect(() => {
+    setTikzDraft(anchor.tikzName)
+    setTikzError('')
+    setDeleteStatus('')
+  }, [anchor.id, anchor.tikzName])
+
   return (
     <div className="inspector-content editable-inspector">
       <section className="inspector-section">
         <h3>Coordinate</h3>
         <div className="inspector-form">
-          <ReadOnlyField label="Type" value="coordinate anchor" />
-          <ReadOnlyField label="ID" value={anchor.id} />
-          <ReadOnlyField label="Name" value={anchor.name} />
-          <ReadOnlyField label="TikZ name" value={anchor.tikzName} />
-          <ReadOnlyField label="Layer" value="none (global)" />
-          <ReadOnlyField
-            label="Source"
-            value={
-              anchor.position.kind === 'workPlaneLocal'
-                ? 'active work-plane local'
-                : 'global xyz'
+          <EditableTextField
+            label="Name"
+            value={anchor.name}
+            onChange={(name) =>
+              onDiagramChange((currentDiagram) =>
+                updateCoordinateAnchorName(currentDiagram, anchor.id, name),
+              )
             }
           />
+          <label className="inspector-field inspector-field-with-note">
+            <span className="inspector-field-label">TikZ name</span>
+            <input
+              className="inspector-input"
+              type="text"
+              value={tikzDraft}
+              spellCheck={false}
+              aria-invalid={tikzError !== ''}
+              onChange={(event) => {
+                const nextDraft = event.currentTarget.value
+                const result = updateCoordinateAnchorTikzName(
+                  diagram,
+                  anchor.id,
+                  nextDraft,
+                )
+
+                setTikzDraft(nextDraft)
+
+                if (!result.ok) {
+                  setTikzError(result.error)
+                  return
+                }
+
+                setTikzError('')
+                onDiagramChange(result.diagram)
+              }}
+            />
+            {tikzError !== '' && (
+              <span className="inspector-field-error" role="status">
+                {tikzError}
+              </span>
+            )}
+          </label>
           <ReadOnlyField
-            label="Preview"
-            value={coordinateAnchorPreviewLabel(diagram, anchor)}
+            label="Source"
+            value={model.sourceLabel}
           />
+          {positionPoint === null ? (
+            <ReadOnlyField label="Position" value="unavailable" />
+          ) : (
+            <CoordinateEditor
+              label="Position"
+              point={positionPoint}
+              ambientDimension={diagram.ambientDimension}
+              variables={diagram.variables}
+              allowSymbolic
+              showWorkPlaneLocalSummary={false}
+              onCoordinateChange={(axis, value) =>
+                onDiagramChange((currentDiagram) =>
+                  updateCoordinateAnchorGlobalCoordinate(
+                    currentDiagram,
+                    anchor.id,
+                    axis,
+                    value,
+                  ),
+                )
+              }
+              onWorkPlaneLocalCoordinateChange={(axis, value) =>
+                onDiagramChange((currentDiagram) =>
+                  updateCoordinateAnchorWorkPlaneLocalCoordinate(
+                    currentDiagram,
+                    anchor.id,
+                    axis,
+                    value,
+                  ),
+                )
+              }
+            />
+          )}
+          <ReadOnlyField label="Preview" value={model.preview} />
+          <div className="inspector-field inspector-field-with-note">
+            <span className="inspector-field-label">Delete coordinate</span>
+            <button
+              type="button"
+              className="toolbar-button coordinate-delete-button"
+              disabled={model.deleteDisabled}
+              title={
+                model.deleteMessage ??
+                'Delete this unused coordinate anchor. This can be undone.'
+              }
+              onClick={() => {
+                const result = deleteUnusedCoordinateAnchor(diagram, anchor.id)
+
+                if (!result.ok) {
+                  setDeleteStatus(result.message)
+                  return
+                }
+
+                setDeleteStatus('')
+                onDiagramChange(result.diagram)
+              }}
+            >
+              Delete coordinate
+            </button>
+            {(model.deleteMessage !== null || deleteStatus !== '') && (
+              <span className="inspector-field-note" role="status">
+                {deleteStatus || model.deleteMessage}
+              </span>
+            )}
+          </div>
         </div>
       </section>
     </div>
   )
 }
 
-function coordinateAnchorPreviewLabel(
+function coordinateAnchorPointForInspector(
   diagram: Diagram,
   anchor: CoordinateAnchor,
-): string {
+): ReturnType<typeof coordinateAnchorPositionToVec3> | null {
   try {
-    const point = coordinateAnchorPositionPreview(
+    return coordinateAnchorPositionToVec3(
       anchor.position,
       diagram.ambientDimension,
     )
-    const values =
-      diagram.ambientDimension === 2
-        ? [point.x, point.y]
-        : [point.x, point.y, point.z]
-
-    return `(${values.join(', ')})`
   } catch {
-    return 'unavailable'
+    return null
   }
 }

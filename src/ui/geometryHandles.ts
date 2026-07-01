@@ -5,7 +5,8 @@ import {
 } from '../model/paths.ts'
 import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import { updateSheetVertex } from '../model/sheets.ts'
-import type { Diagram, SheetStratum, Vec3 } from '../model/types.ts'
+import type { Diagram, SheetStratum, Vec3, WorkPlane } from '../model/types.ts'
+import { moveCoordinateAnchorToPoint } from './coordinateAnchorEditing.ts'
 import { updateLabelById } from './diagramUpdates.ts'
 import {
   updateConcatenatedPathPoint,
@@ -13,6 +14,7 @@ import {
 } from './pathEditing.ts'
 
 export type GeometryHandleTarget =
+  | { kind: 'coordinateAnchor'; coordinateId: string }
   | { kind: 'pointPosition'; stratumId: string }
   | { kind: 'labelPosition'; labelId: string }
   | { kind: 'curvePoint'; stratumId: string; pointIndex: number }
@@ -31,6 +33,7 @@ export function updateDiagramGeometryHandle(
   diagram: Diagram,
   target: GeometryHandleTarget,
   position: Vec3,
+  workPlane?: WorkPlane,
 ): Diagram {
   const normalizedPosition = normalizePointForAmbientDimension(
     diagram.ambientDimension,
@@ -43,6 +46,13 @@ export function updateDiagramGeometryHandle(
 
   const nextDiagram = (() => {
     switch (target.kind) {
+      case 'coordinateAnchor':
+        return moveCoordinateAnchorToPoint(
+          diagram,
+          target.coordinateId,
+          normalizedPosition,
+          workPlane,
+        )
       case 'pointPosition':
         return updatePointPosition(diagram, target.stratumId, normalizedPosition)
       case 'labelPosition':
@@ -107,6 +117,7 @@ function targetChangesCurveGeometry(target: GeometryHandleTarget): boolean {
     case 'ellipseTemplateRadiusY':
       return true
     case 'pointPosition':
+    case 'coordinateAnchor':
     case 'labelPosition':
     case 'sheetVertex':
       return false

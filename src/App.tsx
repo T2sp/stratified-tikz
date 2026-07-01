@@ -3150,11 +3150,8 @@ function App() {
         }
       }
 
-      if (selected.kind === 'coordinate') {
-        return current
-      }
-
       if (
+        selected.kind !== 'coordinate' &&
         !isLayerSelectableByLayerFilter(
           current.editableDiagram,
           current.layerFilter,
@@ -3166,7 +3163,7 @@ function App() {
 
       let modelPoint: Vec3
       const handleWorkPlane =
-        selected.kind === 'label'
+        selected.kind === 'label' || selected.kind === 'coordinate'
           ? activeWorkPlane
           : geometryHandleWorkPlaneForTarget(target, selected.element) ??
             activeWorkPlane
@@ -3197,6 +3194,7 @@ function App() {
         current.editableDiagram,
         target,
         modelPoint,
+        handleWorkPlane,
       )
 
       if (nextDiagram === current.editableDiagram) {
@@ -8331,6 +8329,11 @@ function geometryHandleTargetsSelection(
       return (
         selectedElement.kind === 'stratum' &&
         selectedElement.id === target.stratumId
+      )
+    case 'coordinateAnchor':
+      return (
+        selectedElement.kind === 'coordinate' &&
+        selectedElement.id === target.coordinateId
       )
     case 'labelPosition':
       return (
