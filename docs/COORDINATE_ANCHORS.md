@@ -111,10 +111,13 @@ When coordinates are shown, each preview marker is a small dot surrounded by a
 small dotted circle. The marker is preview-only and is not emitted to TikZ.
 
 Coordinate markers are drawn above layer-bound geometry. Selection hit-testing
-checks coordinate markers before strata, labels, and geometry handles, and each
-marker has a larger transparent hit target than its visible dot. This gives
-coordinate anchors high hit-test priority while keeping them visually small.
-The marker tooltip names the coordinate anchor and its TikZ name.
+gives geometry handles the highest priority, then checks coordinate markers
+before ordinary layer-bound geometry such as strata, labels, curves, sheets,
+and regions. Each marker has a larger transparent hit target than its visible
+dot. This keeps editable handles easy to grab when they overlap a coordinate
+anchor, while coordinate anchors still outrank regular drawing hits and remain
+visually small. The marker tooltip names the coordinate anchor and its TikZ
+name.
 
 ## Deleting referenced coordinates
 
