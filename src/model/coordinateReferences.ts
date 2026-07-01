@@ -7,6 +7,7 @@ import type {
   CoordinateAnchor,
   CoordinateReferenceSource,
   CoordinateSource,
+  CubicBezierControlMode,
   CurvedSheetPrimitive,
   Diagram,
   DiagramValidationIssue,
@@ -14,12 +15,38 @@ import type {
   PathTemplate,
   Stratum,
   Vec3,
+  WorkPlaneFrameSnapshot,
 } from './types.ts'
 
-// Coordinate refs are resolved for author-entered point-like fields. Generated
-// sample data, grid/lattice frames, depth-sort faces, and occlusion split
-// segments remain numeric because they are derived geometry rather than user
-// coordinate inputs.
+export type CoordinateRefLocationKind =
+  | 'pathCoordinate'
+  | 'pathTemplateCenter'
+  | 'labelPosition'
+  | 'pointPosition'
+  | 'simpleSheetVertex'
+  | 'workPlaneFrameField'
+  | 'curvedSheetPrimitive'
+  | 'derivedCoordinate'
+
+const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
+  new Set([
+    'pathCoordinate',
+    'pathTemplateCenter',
+    'labelPosition',
+    'pointPosition',
+    'simpleSheetVertex',
+  ])
+
+const workPlaneFrameFields = ['origin', 'u', 'v', 'normal'] as const
+
+// CoordinateRef support is narrower than symbolic coordinate support because
+// TikZ export must preserve `(name)` references. Frame fields, derived previews,
+// and sampled curved sheets are rejected until reference-preserving export exists.
+export function isCoordinateRefSupportedAtLocation(
+  location: CoordinateRefLocationKind,
+): boolean {
+  return supportedCoordinateRefLocations.has(location)
+}
 
 export function coordinateReferenceSourceForPoint(
   point: Vec3,
@@ -131,6 +158,25 @@ export function validateDiagramCoordinateReferences(
       label.position,
       `labels[${index}].position`,
       errors,
+      'labelPosition',
+    )
+  })
+
+  diagram.coordinateAnchors?.forEach((anchor, index) => {
+    if (anchor.position.kind !== 'workPlaneLocal') {
+      return
+    }
+
+    validateWorkPlaneFrameCoordinateReferences(
+      anchor.position.frame,
+      `coordinateAnchors[${index}].position.frame`,
+      errors,
+    )
+    validateCoordinateReferencePointAtLocation(
+      anchor.position.preview,
+      `coordinateAnchors[${index}].position.preview`,
+      errors,
+      'derivedCoordinate',
     )
   })
 
@@ -177,13 +223,7 @@ function resolveStratumCoordinateRefs(
             ),
           }
         case 'curvedSheet':
-          return {
-            ...stratum,
-            primitive: resolveCurvedSheetPrimitiveCoordinateRefs(
-              diagram,
-              stratum.primitive,
-            ),
-          }
+          return stratum
       }
     case 'curve':
       switch (stratum.kind) {
@@ -218,44 +258,6 @@ function resolveStratumCoordinateRefs(
   }
 }
 
-function resolveCurvedSheetPrimitiveCoordinateRefs(
-  diagram: Diagram,
-  primitive: CurvedSheetPrimitive,
-): CurvedSheetPrimitive {
-  switch (primitive.kind) {
-    case 'hemisphere':
-      return {
-        ...primitive,
-        center: resolveCoordinateReferencePoint(diagram, primitive.center),
-      }
-    case 'saddle':
-      return primitive
-    case 'ruledSurface':
-      return {
-        ...primitive,
-        boundary0: resolveBoundarySnapshotCoordinateRefs(
-          diagram,
-          primitive.boundary0,
-        ),
-        boundary1: resolveBoundarySnapshotCoordinateRefs(
-          diagram,
-          primitive.boundary1,
-        ),
-      }
-    case 'coonsPatch':
-      return {
-        ...primitive,
-        bottom: resolveCoonsBoundarySnapshotCoordinateRefs(
-          diagram,
-          primitive.bottom,
-        ),
-        right: resolveCoonsBoundarySnapshotCoordinateRefs(diagram, primitive.right),
-        top: resolveCoonsBoundarySnapshotCoordinateRefs(diagram, primitive.top),
-        left: resolveCoonsBoundarySnapshotCoordinateRefs(diagram, primitive.left),
-      }
-  }
-}
-
 function resolvePathTemplateCoordinateRefs(
   diagram: Diagram,
   template: PathTemplate,
@@ -276,32 +278,6 @@ function resolveClosedPathBoundariesCoordinateRefs(
       resolvePathSegmentCoordinateRefs(diagram, segment),
     ),
   }))
-}
-
-function resolveBoundarySnapshotCoordinateRefs(
-  diagram: Diagram,
-  snapshot: BoundaryPathSnapshot,
-): BoundaryPathSnapshot {
-  return {
-    ...snapshot,
-    segments: snapshot.segments.map((segment) =>
-      resolvePathSegmentCoordinateRefs(diagram, segment),
-    ),
-  }
-}
-
-function resolveCoonsBoundarySnapshotCoordinateRefs(
-  diagram: Diagram,
-  snapshot: CoonsBoundarySnapshot,
-): CoonsBoundarySnapshot {
-  if ('kind' in snapshot) {
-    return {
-      ...snapshot,
-      point: resolveCoordinateReferencePoint(diagram, snapshot.point),
-    }
-  }
-
-  return resolveBoundarySnapshotCoordinateRefs(diagram, snapshot)
 }
 
 function resolvePathSegmentCoordinateRefs(
@@ -359,6 +335,7 @@ function validateStratumCoordinateReferences(
               corner,
               `${path}.corners[${index}]`,
               errors,
+              'simpleSheetVertex',
             ),
           )
           return
@@ -369,10 +346,16 @@ function validateStratumCoordinateReferences(
               vertex,
               `${path}.vertices[${index}]`,
               errors,
+              'simpleSheetVertex',
             ),
           )
           return
         case 'workPlaneFilledSheet':
+          validateWorkPlaneFrameCoordinateReferences(
+            stratum.planeFrame,
+            `${path}.planeFrame`,
+            errors,
+          )
           validateClosedPathBoundariesCoordinateReferences(
             diagram,
             stratum.boundaries,
@@ -381,8 +364,7 @@ function validateStratumCoordinateReferences(
           )
           return
         case 'curvedSheet':
-          validateCurvedSheetPrimitiveCoordinateReferences(
-            diagram,
+          validateUnsupportedCurvedSheetPrimitiveCoordinateReferences(
             stratum.primitive,
             `${path}.primitive`,
             errors,
@@ -399,6 +381,7 @@ function validateStratumCoordinateReferences(
               point,
               `${path}.points[${index}]`,
               errors,
+              'pathCoordinate',
             ),
           )
           return
@@ -416,9 +399,20 @@ function validateStratumCoordinateReferences(
             stratum.template.center,
             `${path}.template.center`,
             errors,
+            'pathTemplateCenter',
+          )
+          validatePathTemplateFrameCoordinateReferences(
+            stratum.template,
+            `${path}.template`,
+            errors,
           )
           return
         case 'grid':
+          validateWorkPlaneFrameCoordinateReferences(
+            stratum.frame.frame,
+            `${path}.frame.frame`,
+            errors,
+          )
           return
       }
     case 'point':
@@ -427,66 +421,78 @@ function validateStratumCoordinateReferences(
         stratum.position,
         `${path}.position`,
         errors,
+        'pointPosition',
       )
       return
   }
 }
 
-function validateCurvedSheetPrimitiveCoordinateReferences(
-  diagram: Diagram,
+function validateUnsupportedCurvedSheetPrimitiveCoordinateReferences(
   primitive: CurvedSheetPrimitive,
   path: string,
   errors: DiagramValidationIssue[],
 ): void {
   switch (primitive.kind) {
     case 'hemisphere':
-      validateCoordinateReferencePoint(
-        diagram,
+      validateCoordinateReferencePointAtLocation(
         primitive.center,
         `${path}.center`,
         errors,
+        'curvedSheetPrimitive',
+      )
+      validateWorkPlaneFrameCoordinateReferencesAtLocation(
+        primitive.frame,
+        `${path}.frame`,
+        errors,
+        'curvedSheetPrimitive',
       )
       return
     case 'saddle':
+      validateWorkPlaneFrameCoordinateReferencesAtLocation(
+        primitive.frame,
+        `${path}.frame`,
+        errors,
+        'curvedSheetPrimitive',
+      )
       return
     case 'ruledSurface':
-      validateBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.boundary0,
         `${path}.boundary0`,
         errors,
+        'curvedSheetPrimitive',
       )
-      validateBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.boundary1,
         `${path}.boundary1`,
         errors,
+        'curvedSheetPrimitive',
       )
       return
     case 'coonsPatch':
-      validateCoonsBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateCoonsBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.bottom,
         `${path}.bottom`,
         errors,
+        'curvedSheetPrimitive',
       )
-      validateCoonsBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateCoonsBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.right,
         `${path}.right`,
         errors,
+        'curvedSheetPrimitive',
       )
-      validateCoonsBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateCoonsBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.top,
         `${path}.top`,
         errors,
+        'curvedSheetPrimitive',
       )
-      validateCoonsBoundarySnapshotCoordinateReferences(
-        diagram,
+      validateCoonsBoundarySnapshotCoordinateReferencesAtLocation(
         primitive.left,
         `${path}.left`,
         errors,
+        'curvedSheetPrimitive',
       )
       return
   }
@@ -508,32 +514,42 @@ function validateClosedPathBoundariesCoordinateReferences(
   )
 }
 
-function validateBoundarySnapshotCoordinateReferences(
-  diagram: Diagram,
+function validateBoundarySnapshotCoordinateReferencesAtLocation(
   snapshot: BoundaryPathSnapshot,
   path: string,
   errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
 ): void {
-  validatePathSegmentsCoordinateReferences(
-    diagram,
+  validatePathSegmentsCoordinateReferencesAtLocation(
     snapshot.segments,
-    `${path}.segments`,
+    path,
     errors,
+    location,
   )
 }
 
-function validateCoonsBoundarySnapshotCoordinateReferences(
-  diagram: Diagram,
+function validateCoonsBoundarySnapshotCoordinateReferencesAtLocation(
   snapshot: CoonsBoundarySnapshot,
   path: string,
   errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
 ): void {
   if ('kind' in snapshot) {
-    validateCoordinateReferencePoint(diagram, snapshot.point, `${path}.point`, errors)
+    validateCoordinateReferencePointAtLocation(
+      snapshot.point,
+      `${path}.point`,
+      errors,
+      location,
+    )
     return
   }
 
-  validateBoundarySnapshotCoordinateReferences(diagram, snapshot, path, errors)
+  validateBoundarySnapshotCoordinateReferencesAtLocation(
+    snapshot,
+    path,
+    errors,
+    location,
+  )
 }
 
 function validatePathSegmentsCoordinateReferences(
@@ -552,6 +568,22 @@ function validatePathSegmentsCoordinateReferences(
   )
 }
 
+function validatePathSegmentsCoordinateReferencesAtLocation(
+  segments: readonly PathSegment[],
+  path: string,
+  errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
+): void {
+  segments.forEach((segment, index) =>
+    validatePathSegmentCoordinateReferencesAtLocation(
+      segment,
+      `${path}.segments[${index}]`,
+      errors,
+      location,
+    ),
+  )
+}
+
 function validatePathSegmentCoordinateReferences(
   diagram: Diagram,
   segment: PathSegment,
@@ -560,34 +592,169 @@ function validatePathSegmentCoordinateReferences(
 ): void {
   switch (segment.kind) {
     case 'line':
-      validateCoordinateReferencePoint(diagram, segment.start, `${path}.start`, errors)
-      validateCoordinateReferencePoint(diagram, segment.end, `${path}.end`, errors)
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.start,
+        `${path}.start`,
+        errors,
+        'pathCoordinate',
+      )
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.end,
+        `${path}.end`,
+        errors,
+        'pathCoordinate',
+      )
       return
     case 'cubicBezier':
-      validateCoordinateReferencePoint(diagram, segment.start, `${path}.start`, errors)
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.start,
+        `${path}.start`,
+        errors,
+        'pathCoordinate',
+      )
       validateCoordinateReferencePoint(
         diagram,
         segment.control1,
         `${path}.control1`,
         errors,
+        'pathCoordinate',
       )
       validateCoordinateReferencePoint(
         diagram,
         segment.control2,
         `${path}.control2`,
         errors,
+        'pathCoordinate',
       )
-      validateCoordinateReferencePoint(diagram, segment.end, `${path}.end`, errors)
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.end,
+        `${path}.end`,
+        errors,
+        'pathCoordinate',
+      )
+      validateCubicBezierControlModeCoordinateReferences(
+        segment.controlMode,
+        `${path}.controlMode`,
+        errors,
+      )
       return
     case 'arc':
-      validateCoordinateReferencePoint(diagram, segment.start, `${path}.start`, errors)
-      validateCoordinateReferencePoint(diagram, segment.end, `${path}.end`, errors)
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.start,
+        `${path}.start`,
+        errors,
+        'pathCoordinate',
+      )
+      validateCoordinateReferencePoint(
+        diagram,
+        segment.end,
+        `${path}.end`,
+        errors,
+        'pathCoordinate',
+      )
       validateCoordinateReferencePoint(
         diagram,
         segment.center,
         `${path}.center`,
         errors,
+        'pathCoordinate',
       )
+      if (segment.frame !== undefined) {
+        validateWorkPlaneFrameCoordinateReferences(
+          segment.frame,
+          `${path}.frame`,
+          errors,
+        )
+      }
+      return
+  }
+}
+
+function validatePathSegmentCoordinateReferencesAtLocation(
+  segment: PathSegment,
+  path: string,
+  errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
+): void {
+  switch (segment.kind) {
+    case 'line':
+      validateCoordinateReferencePointAtLocation(
+        segment.start,
+        `${path}.start`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.end,
+        `${path}.end`,
+        errors,
+        location,
+      )
+      return
+    case 'cubicBezier':
+      validateCoordinateReferencePointAtLocation(
+        segment.start,
+        `${path}.start`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.control1,
+        `${path}.control1`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.control2,
+        `${path}.control2`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.end,
+        `${path}.end`,
+        errors,
+        location,
+      )
+      validateCubicBezierControlModeCoordinateReferencesAtLocation(
+        segment.controlMode,
+        `${path}.controlMode`,
+        errors,
+        location,
+      )
+      return
+    case 'arc':
+      validateCoordinateReferencePointAtLocation(
+        segment.start,
+        `${path}.start`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.end,
+        `${path}.end`,
+        errors,
+        location,
+      )
+      validateCoordinateReferencePointAtLocation(
+        segment.center,
+        `${path}.center`,
+        errors,
+        location,
+      )
+      if (segment.frame !== undefined) {
+        validateWorkPlaneFrameCoordinateReferencesAtLocation(
+          segment.frame,
+          `${path}.frame`,
+          errors,
+          location,
+        )
+      }
       return
   }
 }
@@ -597,10 +764,21 @@ function validateCoordinateReferencePoint(
   point: Vec3,
   path: string,
   errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
 ): void {
   const source = point.symbolic?.source
 
   if (source?.kind !== 'coordinateRef') {
+    validateCoordinateReferencePointSourceFrame(point, path, errors)
+    return
+  }
+
+  if (!isCoordinateRefSupportedAtLocation(location)) {
+    pushError(
+      errors,
+      `${path}.symbolic.source`,
+      unsupportedCoordinateReferenceMessage(location, path),
+    )
     return
   }
 
@@ -629,6 +807,142 @@ function validateCoordinateReferencePoint(
     )
     return
   }
+}
+
+function validateCoordinateReferencePointAtLocation(
+  point: Vec3,
+  path: string,
+  errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
+): void {
+  const source = point.symbolic?.source
+
+  if (source?.kind === 'coordinateRef') {
+    pushError(
+      errors,
+      `${path}.symbolic.source`,
+      unsupportedCoordinateReferenceMessage(location, path),
+    )
+    return
+  }
+
+  validateCoordinateReferencePointSourceFrame(point, path, errors)
+}
+
+function validateCoordinateReferencePointSourceFrame(
+  point: Vec3,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  const source = point.symbolic?.source
+
+  if (source?.kind !== 'workPlaneLocal') {
+    return
+  }
+
+  validateWorkPlaneFrameCoordinateReferences(
+    source.frame,
+    `${path}.symbolic.source.frame`,
+    errors,
+  )
+}
+
+function validatePathTemplateFrameCoordinateReferences(
+  template: PathTemplate,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (template.frame === undefined) {
+    return
+  }
+
+  validateWorkPlaneFrameCoordinateReferences(
+    template.frame,
+    `${path}.frame`,
+    errors,
+  )
+}
+
+function validateCubicBezierControlModeCoordinateReferences(
+  controlMode: CubicBezierControlMode | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateCubicBezierControlModeCoordinateReferencesAtLocation(
+    controlMode,
+    path,
+    errors,
+    'workPlaneFrameField',
+  )
+}
+
+function validateCubicBezierControlModeCoordinateReferencesAtLocation(
+  controlMode: CubicBezierControlMode | undefined,
+  path: string,
+  errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
+): void {
+  if (
+    controlMode?.kind !== 'workPlaneRelativeCartesian' &&
+    controlMode?.kind !== 'workPlaneRelativePolar'
+  ) {
+    return
+  }
+
+  validateWorkPlaneFrameCoordinateReferencesAtLocation(
+    controlMode.frame,
+    `${path}.frame`,
+    errors,
+    location,
+  )
+}
+
+function validateWorkPlaneFrameCoordinateReferences(
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  validateWorkPlaneFrameCoordinateReferencesAtLocation(
+    frame,
+    path,
+    errors,
+    'workPlaneFrameField',
+  )
+}
+
+function validateWorkPlaneFrameCoordinateReferencesAtLocation(
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+  errors: DiagramValidationIssue[],
+  location: CoordinateRefLocationKind,
+): void {
+  workPlaneFrameFields.forEach((field) => {
+    validateCoordinateReferencePointAtLocation(
+      frame[field],
+      `${path}.${field}`,
+      errors,
+      location,
+    )
+  })
+}
+
+function unsupportedCoordinateReferenceMessage(
+  location: CoordinateRefLocationKind,
+  path: string,
+): string {
+  if (location === 'curvedSheetPrimitive') {
+    return 'Coordinate references are not currently supported inside curved sheet primitives because TikZ export samples them to numeric mesh coordinates.'
+  }
+
+  if (location === 'workPlaneFrameField') {
+    return `coordinateRef is not supported at ${path}; use a concrete coordinate value instead.`
+  }
+
+  if (location === 'derivedCoordinate') {
+    return `coordinateRef is not supported at ${path}; derived coordinates must use concrete preview values.`
+  }
+
+  return `coordinateRef is not supported at ${path}.`
 }
 
 function vec3FromCoordinateReference(

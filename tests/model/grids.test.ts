@@ -25,6 +25,7 @@ import type {
   GridParameterRange,
   GridStratum,
   LatticePattern,
+  Vec3,
   WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 
@@ -250,6 +251,63 @@ test('3D triangular and honeycomb previews lie in the stored work-plane frame', 
   }
 })
 
+test('grid frame origin rejects a missing coordinateRef as an unsupported location', () => {
+  const grid = valid3DGridWithFrameReference('origin', 'missing')
+  const validation = validateDiagram(diagramWithGrid(grid))
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatIssue).join('\n'),
+    /strata\[0\]\.frame\.frame\.origin\.symbolic\.source.*coordinateRef is not supported/,
+  )
+  assert.doesNotMatch(
+    validation.errors.map(formatIssue).join('\n'),
+    /must point to an existing coordinate anchor/,
+  )
+})
+
+test('grid frame origin rejects an existing coordinateRef as an unsupported location', () => {
+  const diagram = diagramWithGrid(valid3DGridWithFrameReference('origin'))
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a')]
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatIssue).join('\n'),
+    /strata\[0\]\.frame\.frame\.origin\.symbolic\.source.*coordinateRef is not supported/,
+  )
+})
+
+test('grid frame basis fields reject coordinateRefs', () => {
+  for (const field of ['u', 'v', 'normal'] as const) {
+    const diagram = diagramWithGrid(valid3DGridWithFrameReference(field))
+    diagram.coordinateAnchors = [coordinateAnchor('coord-a')]
+    const validation = validateDiagram(diagram)
+
+    assert.equal(validation.valid, false, `Expected ${field} to reject coordinateRef.`)
+    assert.match(
+      validation.errors.map(formatIssue).join('\n'),
+      new RegExp(`frame\\.frame\\.${field}\\.symbolic\\.source.*coordinateRef is not supported`),
+    )
+  }
+})
+
+test('saved grid frame coordinateRef is rejected cleanly without throwing', () => {
+  const diagram = diagramWithGrid(valid3DGridWithFrameReference('origin'))
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a')]
+  const loaded = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(loaded.ok, false)
+  if (loaded.ok) {
+    throw new Error('Expected saved grid frame coordinateRef to fail.')
+  }
+  assert.match(
+    loaded.error,
+    /strata\[0\]\.frame\.frame\.origin\.symbolic\.source.*coordinateRef is not supported at strata\[0\]\.frame\.frame\.origin/,
+  )
+})
+
 test('grid layer and style are preserved', () => {
   const style: CurveStyle = {
     kind: 'curveStyle',
@@ -352,6 +410,61 @@ function valid3DGrid(latticePattern: LatticePattern = 'rectangular'): GridStratu
     clip: clip(-1, 1, -1, 1),
     layer: 0,
   })
+}
+
+function valid3DGridWithFrameReference(
+  field: keyof WorkPlaneFrameSnapshot,
+  coordinateId = 'coord-a',
+): GridStratum {
+  const grid = valid3DGrid()
+
+  return {
+    ...grid,
+    frame: {
+      ...grid.frame,
+      frame: {
+        ...grid.frame.frame,
+        [field]: rawCoordinateReferencePoint(coordinateId, grid.frame.frame[field]),
+      },
+    },
+  }
+}
+
+function coordinateAnchor(
+  id: string,
+): NonNullable<Diagram['coordinateAnchors']>[number] {
+  return {
+    id,
+    name: 'A',
+    tikzName: 'A',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 0 },
+        y: { kind: 'numeric', value: 1 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  }
+}
+
+function rawCoordinateReferencePoint(
+  coordinateId: string,
+  preview: Vec3,
+): Vec3 {
+  return {
+    ...preview,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'coordinateRef',
+        coordinateId,
+        preview,
+      },
+    },
+  }
 }
 
 function diagramWithGrid(grid: GridStratum): Diagram {

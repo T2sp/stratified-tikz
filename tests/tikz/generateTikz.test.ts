@@ -37,6 +37,7 @@ import type {
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceVec3ForAnchorId,
+  isCoordinateRefSupportedAtLocation,
   resolveDiagramCoordinateRefs,
 } from '../../src/model/coordinateReferences.ts'
 import {
@@ -122,6 +123,15 @@ test('coordinate anchor names reserve the generated coordinate namespace', () =>
 
   assert.match(tikz, /\\coordinate \(curvePolyWire0p0\) at \(5,5\);/)
   assert.match(tikz, /\\coordinate \(curvePolyWire0p02\) at \(0,0\);/)
+})
+
+test('coordinateRef support boundary matches export-preserved locations', () => {
+  assert.equal(isCoordinateRefSupportedAtLocation('pathCoordinate'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('labelPosition'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('pointPosition'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('simpleSheetVertex'), true)
+  assert.equal(isCoordinateRefSupportedAtLocation('workPlaneFrameField'), false)
+  assert.equal(isCoordinateRefSupportedAtLocation('curvedSheetPrimitive'), false)
 })
 
 test('path endpoints can reference coordinate anchors in TikZ output', () => {
@@ -337,6 +347,92 @@ test('coordinate references round-trip through save and load', () => {
   }
   assert.equal(requireCoordinateReferenceSource(loadedCurve.points[0]).coordinateId, 'coord-a')
   assert.equal(requireCoordinateReferenceSource(loadedCurve.points[1]).coordinateId, 'coord-b')
+})
+
+test('hemisphere center coordinateRef is rejected because curved sheets sample meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'hemisphere',
+    center: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.center\.symbolic\.source.*curved sheet primitives.*samples them to numeric mesh coordinates/,
+  )
+})
+
+test('ruled surface boundary coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'ruledSurface',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.boundary0\.segments\[0\]\.start\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('Coons patch boundary coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'coonsPatch',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.bottom\.segments\[0\]\.start\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('saddle frame coordinateRef is rejected because export samples meshes', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'saddle',
+    frameOrigin: coordinateReferencePoint,
+  })
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.match(
+    validation.errors.map(formatValidationIssue).join('\n'),
+    /primitive\.frame\.origin\.symbolic\.source.*curved sheet primitives/,
+  )
+})
+
+test('curved sheet coordinateRef does not silently export as numeric sampled mesh', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'hemisphere',
+    center: coordinateReferencePoint,
+  })
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
+  assert.match(tikz, /omitted because coordinate references inside curved sheet primitives cannot be preserved/)
+  assert.doesNotMatch(tikz, /sampled mesh export/)
+  assert.doesNotMatch(tikz, /\\filldraw .*\(sheetCurved/)
+})
+
+test('saved curved sheet coordinateRef is rejected cleanly without throwing', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'ruledSurface',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected saved curved sheet coordinateRef to fail.')
+  }
+  assert.match(
+    parsed.error,
+    /primitive\.boundary0\.segments\[0\]\.start\.symbolic\.source.*coordinateRef is not supported/,
+  )
 })
 
 test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {
@@ -7690,6 +7786,122 @@ function testCoordinateAnchors(
   }
 
   return coordinateAnchors
+}
+
+type ReferencePointFactory = (diagram: Diagram, coordinateId: string) => Vec3
+
+type CurvedSheetReferenceSpec =
+  | {
+      kind: 'hemisphere'
+      center: ReferencePointFactory
+    }
+  | {
+      kind: 'saddle'
+      frameOrigin: ReferencePointFactory
+    }
+  | {
+      kind: 'ruledSurface'
+      boundaryStart: ReferencePointFactory
+    }
+  | {
+      kind: 'coonsPatch'
+      boundaryStart: ReferencePointFactory
+    }
+
+function createCurvedSheetReferenceDiagram(
+  spec: CurvedSheetReferenceSpec,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+  ])
+  const referencePoint = (factory: ReferencePointFactory) =>
+    factory(diagram, 'coord-a')
+  const primitive =
+    spec.kind === 'hemisphere'
+      ? {
+          kind: 'hemisphere' as const,
+          center: referencePoint(spec.center),
+          radius: 1,
+          frame: xyFrame3D(),
+          hemisphereSide: 'positive' as const,
+          sampling: { uSegments: 4, vSegments: 2 },
+        }
+      : spec.kind === 'saddle'
+        ? {
+            kind: 'saddle' as const,
+            frame: {
+              ...xyFrame3D(),
+              origin: referencePoint(spec.frameOrigin),
+            },
+            width: 2,
+            depth: 2,
+            height: 1,
+            sampling: { uSegments: 2, vSegments: 2 },
+          }
+        : spec.kind === 'ruledSurface'
+          ? {
+              kind: 'ruledSurface' as const,
+              boundary0: curvedSheetLineBoundary(
+                'ruled-ref-bottom',
+                referencePoint(spec.boundaryStart),
+                { x: 2, y: 0, z: 0 },
+              ),
+              boundary1: curvedSheetLineBoundary(
+                'ruled-ref-top',
+                { x: 0, y: 1, z: 1 },
+                { x: 2, y: 1, z: 1 },
+              ),
+              sampling: { segments: 2 },
+            }
+          : {
+              kind: 'coonsPatch' as const,
+              bottom: curvedSheetLineBoundary(
+                'coons-ref-bottom',
+                referencePoint(spec.boundaryStart),
+                { x: 2, y: 0, z: 0 },
+              ),
+              right: curvedSheetLineBoundary(
+                'coons-ref-right',
+                { x: 2, y: 0, z: 0 },
+                { x: 2, y: 1, z: 0 },
+              ),
+              top: curvedSheetLineBoundary(
+                'coons-ref-top',
+                { x: 0, y: 1, z: 0 },
+                { x: 2, y: 1, z: 0 },
+              ),
+              left: curvedSheetLineBoundary(
+                'coons-ref-left',
+                { x: 0, y: 0, z: 0 },
+                { x: 0, y: 1, z: 0 },
+              ),
+              sampling: { uSegments: 2, vSegments: 2 },
+            }
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    id: 'curved-coordinate-ref',
+    name: 'Curved Coordinate Ref',
+    style: sheetStyle(),
+    primitive,
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function curvedSheetLineBoundary(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): { id: string; segments: [{ kind: 'line'; start: Vec3; end: Vec3 }] } {
+  return {
+    id,
+    segments: [{ kind: 'line', start, end }],
+  }
 }
 
 function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {

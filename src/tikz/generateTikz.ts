@@ -1625,6 +1625,14 @@ function emitCurvedSheet(
   elementIndex: number,
   context: GenerateContext,
 ): string[] {
+  if (curvedSheetPrimitiveHasCoordinateReferenceSources(sheet.primitive)) {
+    return [
+      `% Curved sheet "${sheet.name}" [${sheet.id}] omitted because coordinate references inside curved sheet primitives cannot be preserved by sampled mesh TikZ export.`,
+      '% Use concrete coordinates for curved sheet primitives or use polygon/quad sheet vertices when coordinate anchors must be preserved.',
+      '',
+    ]
+  }
+
   let mesh: ReturnType<typeof sampleCurvedSheetPrimitive>
 
   try {
@@ -5109,6 +5117,14 @@ function curvedSheetPrimitiveHasWorkPlaneLocalSources(
 ): boolean {
   return curvedSheetPrimitivePoints(primitive).some(
     (point) => workPlaneLocalCoordinateSourceForPoint(point) !== null,
+  )
+}
+
+function curvedSheetPrimitiveHasCoordinateReferenceSources(
+  primitive: CurvedSheetPrimitive,
+): boolean {
+  return curvedSheetPrimitivePoints(primitive).some(
+    (point) => coordinateReferenceSourceForPoint(point) !== null,
   )
 }
 
