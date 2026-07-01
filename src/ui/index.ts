@@ -1,6 +1,7 @@
 export * from './diagramUpdates.ts'
 export * from './bulkEditing.ts'
 export * from './cameraControls.ts'
+export * from './coordinateAnchorEditing.ts'
 export * from './coordinateSources.ts'
 export * from './coordinateSourceHighlights.ts'
 export * from './directInputDrawer.ts'

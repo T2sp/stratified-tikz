@@ -2759,6 +2759,39 @@ function renderSelectedGeometryHandles(
     return null
   }
 
+  if (selectedElement.kind === 'coordinate') {
+    const anchor = (diagram.coordinateAnchors ?? []).find(
+      (candidate) => candidate.id === selectedElement.id,
+    )
+
+    if (anchor === undefined) {
+      return null
+    }
+
+    try {
+      const position = coordinateAnchorPositionPreview(
+        anchor.position,
+        diagram.ambientDimension,
+      )
+
+      return (
+        <g
+          key="selected-coordinate-handles"
+          aria-label="Selected coordinate drag handles"
+        >
+          {renderHandleCircle(
+            projectToSvgPoint(camera, position, viewportHeight),
+            { kind: 'coordinateAnchor', coordinateId: anchor.id },
+            anchor.name,
+            onPointerDown,
+          )}
+        </g>
+      )
+    } catch {
+      return null
+    }
+  }
+
   if (selectedElement.kind === 'label') {
     const label = diagram.labels.find(
       (candidate) => candidate.id === selectedElement.id,
@@ -2986,6 +3019,8 @@ function templatePathHandleDescriptions(
 
 function geometryHandleKey(target: GeometryHandleTarget): string {
   switch (target.kind) {
+    case 'coordinateAnchor':
+      return `coordinate-handle-${target.coordinateId}`
     case 'pointPosition':
       return `point-handle-${target.stratumId}`
     case 'labelPosition':
