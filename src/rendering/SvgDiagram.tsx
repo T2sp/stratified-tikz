@@ -128,7 +128,9 @@ import {
 } from '../geometry/pathIntersections.ts'
 import { pathCrossingKindForCandidate } from '../model/pathCrossings.ts'
 import {
-  svgCoordinateAnchorMarkers,
+  coordinateAnchorMarkerAppearance,
+  coordinateAnchorMarkerClassNames,
+  svgCoordinateAnchorMarkersForPreview,
   type SvgCoordinateAnchorMarker,
 } from './svgCoordinateAnchors.ts'
 
@@ -980,15 +982,12 @@ function renderCoordinateAnchors(
   selectedElement: SelectedElement,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): ReactElement | null {
-  if (!showCoordinateAnchors) {
-    return null
-  }
-
-  const markers = svgCoordinateAnchorMarkers(
+  const markers = svgCoordinateAnchorMarkersForPreview(
     diagram,
     camera,
     viewportHeight,
     selectedElement,
+    showCoordinateAnchors,
   )
 
   if (markers.length === 0) {
@@ -1013,11 +1012,19 @@ function renderCoordinateAnchor(
 ): ReactElement {
   const { anchor, center, hitRadius, selected } = marker
   const markerColor = '#0F766E'
+  const className = [
+    coordinateAnchorMarkerClassNames.marker,
+    'svg-coordinate-anchor',
+    'svg-selectable',
+    selected ? 'is-selected' : '',
+  ]
+    .filter((name) => name !== '')
+    .join(' ')
 
   return (
     <g
       key={anchor.id}
-      className="svg-coordinate-anchor svg-selectable"
+      className={className}
       role="button"
       aria-label={`Coordinate ${anchor.name}`}
       data-svg-coordinate-anchor="true"
@@ -1044,9 +1051,10 @@ function renderCoordinateAnchor(
       />
       {selected && (
         <circle
+          className={coordinateAnchorMarkerClassNames.selection}
           cx={center.x}
           cy={center.y}
-          r={10}
+          r={coordinateAnchorMarkerAppearance.selectedRadius}
           fill="none"
           stroke={highlightColor}
           strokeOpacity={0.92}
@@ -1055,40 +1063,28 @@ function renderCoordinateAnchor(
           pointerEvents="none"
         />
       )}
-      <path
-        d={`M ${center.x - 7},${center.y} L ${center.x + 7},${center.y} M ${
-          center.x
-        },${center.y - 7} L ${center.x},${center.y + 7}`}
-        fill="none"
-        stroke="#ffffff"
-        strokeOpacity={0.96}
-        strokeWidth={4}
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-        pointerEvents="none"
-      />
-      <path
-        d={`M ${center.x - 7},${center.y} L ${center.x + 7},${center.y} M ${
-          center.x
-        },${center.y - 7} L ${center.x},${center.y + 7}`}
+      <circle
+        className={coordinateAnchorMarkerClassNames.halo}
+        cx={center.x}
+        cy={center.y}
+        r={coordinateAnchorMarkerAppearance.haloRadius}
         fill="none"
         stroke={markerColor}
-        strokeOpacity={0.95}
-        strokeWidth={1.7}
-        strokeLinecap="round"
+        strokeOpacity={selected ? 1 : 0.88}
+        strokeWidth={selected ? 2 : 1.45}
+        strokeDasharray={coordinateAnchorMarkerAppearance.haloStrokeDasharray}
         vectorEffect="non-scaling-stroke"
         pointerEvents="none"
       />
-      <rect
-        x={center.x - 3.5}
-        y={center.y - 3.5}
-        width={7}
-        height={7}
-        transform={`rotate(45 ${center.x} ${center.y})`}
+      <circle
+        className={coordinateAnchorMarkerClassNames.dot}
+        cx={center.x}
+        cy={center.y}
+        r={coordinateAnchorMarkerAppearance.dotRadius}
         fill={markerColor}
-        fillOpacity={0.9}
+        fillOpacity={selected ? 1 : 0.92}
         stroke="#ffffff"
-        strokeWidth={1.1}
+        strokeWidth={1.15}
         vectorEffect="non-scaling-stroke"
         pointerEvents="none"
       />

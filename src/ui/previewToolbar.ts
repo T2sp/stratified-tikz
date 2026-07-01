@@ -116,6 +116,18 @@ export function togglePreviewToolbarState(
   return state === 'expanded' ? 'collapsed' : 'expanded'
 }
 
+export function toggleCoordinateAnchorVisibility(
+  showCoordinateAnchors: boolean,
+): boolean {
+  return !showCoordinateAnchors
+}
+
+export function coordinateAnchorVisibilityButtonLabel(
+  showCoordinateAnchors: boolean,
+): string {
+  return showCoordinateAnchors ? 'Coordinates: Hide' : 'Coordinates: Show'
+}
+
 export function toggleToolbarPalette(
   current: PreviewToolbarPalette,
   palette: PreviewToolbarPaletteId,
