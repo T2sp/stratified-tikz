@@ -274,6 +274,43 @@ test('created coordinate has unique TikZ name and is selected without changing l
   assert.match(generateTikz(committed.editableDiagram), /\\coordinate \(A2\) at \(1,1\);/)
 })
 
+test('New layer changes do not affect coordinate creation or export', () => {
+  const diagram: Diagram = {
+    ...emptyTwoDimensionalDiagram,
+    layers: [{ value: 12, name: 'New layer' }],
+  }
+  const initialState = createTestEditorState(diagram, {
+    kind: 'layer',
+    layer: 12,
+  })
+  const result = addCoordinateAnchorFromDirectInput(
+    initialState.editableDiagram,
+    { x: '3', y: '4', z: '0' },
+    { id: 'new-layer-coordinate', name: 'Layerless coordinate' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected coordinate creation to succeed.')
+  }
+
+  const committed = commitCoordinateCreationToTestState(initialState, result)
+  const anchor = findCoordinateAnchor(
+    committed.editableDiagram,
+    'new-layer-coordinate',
+  )
+  const tikz = generateTikz(committed.editableDiagram)
+
+  assert.equal('layer' in anchor, false)
+  assert.deepEqual(committed.layerFilter, initialState.layerFilter)
+  assert.deepEqual(committed.selectedElement, {
+    kind: 'coordinate',
+    id: 'new-layer-coordinate',
+  })
+  assert.match(tikz, /\\coordinate \(LayerlessCoordinate\) at \(3,4\);/)
+  assert.doesNotMatch(tikz, /stratifiedLayer12/)
+})
+
 test('global direct point coordinates accept scientific notation', () => {
   const cases = [
     ['1e-3', 0.001],

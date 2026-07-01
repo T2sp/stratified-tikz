@@ -155,6 +155,7 @@ export type SvgDiagramProps = {
   selectedPathIntersectionCandidateId?: string | null
   layerFilter?: LayerFilter
   visibilityOptions?: VisibilityOptions
+  showCoordinateAnchors?: boolean
   showGeometryHandles?: boolean
   onSelectionChange?: (
     selection: SelectedElement,
@@ -254,6 +255,7 @@ export function SvgDiagram({
   selectedPathIntersectionCandidateId = null,
   layerFilter = allLayersFilter,
   visibilityOptions: visibilityOptionsOverride,
+  showCoordinateAnchors = true,
   showGeometryHandles = false,
   onSelectionChange,
   onCurveStratumClick,
@@ -282,7 +284,7 @@ export function SvgDiagram({
     ...(cubicBezierDraft ?? []),
     ...(pathDraft === undefined ? [] : concatenatedPathDraftCoordinates(pathDraft)),
     ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
-    ...coordinateAnchorPreviewPoints(diagram),
+    ...(showCoordinateAnchors ? coordinateAnchorPreviewPoints(diagram) : []),
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
@@ -555,6 +557,7 @@ export function SvgDiagram({
         diagram,
         camera,
         height,
+        showCoordinateAnchors,
         selectedElement,
         onSelectionChange,
       )}
@@ -973,9 +976,14 @@ function renderCoordinateAnchors(
   diagram: Diagram,
   camera: Diagram['camera'],
   viewportHeight: number,
+  showCoordinateAnchors: boolean,
   selectedElement: SelectedElement,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): ReactElement | null {
+  if (!showCoordinateAnchors) {
+    return null
+  }
+
   const markers = svgCoordinateAnchorMarkers(
     diagram,
     camera,

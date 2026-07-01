@@ -698,6 +698,12 @@ replaces the current selection with that object instead of creating a mixed
 selection. This applies to `region`, `sheet`, `curve`, `point`, and free text
 `label` objects.
 
+Coordinate anchors use a stricter MVP policy: they are selectable, but
+single-selection only. Shift-clicking another coordinate anchor replaces the
+current coordinate selection with the clicked anchor rather than creating a
+coordinate multi-selection. Coordinate anchors are global references, not
+layer-bound objects, so they are excluded from layer-bound bulk operations.
+
 Background clicks clear the selection; modifier-background clicks preserve it.
 Hidden, locked, filtered, deleted, or missing objects are removed from selection
 state. The Inspector shows a compact multi-selection summary such as

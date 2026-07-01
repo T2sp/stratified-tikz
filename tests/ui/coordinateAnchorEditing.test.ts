@@ -7,6 +7,7 @@ import {
   coordinateReferenceVec3ForAnchorId,
 } from '../../src/model/coordinateReferences.ts'
 import { defaultCurveStyle } from '../../src/model/styles.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   CoordinateAnchor,
   CoordinateAnchorPosition,
@@ -18,6 +19,7 @@ import type {
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   createCoordinateAnchorInspectorModel,
+  deleteCoordinateAnchorWithDetach,
   deleteUnusedCoordinateAnchor,
   updateCoordinateAnchorGlobalCoordinate,
   updateCoordinateAnchorName,
@@ -205,6 +207,21 @@ test('moving a coordinate anchor updates referenced path preview', () => {
   assert.match(generateTikz(moved), /\\coordinate \(A\) at \(3,4\);/)
 })
 
+test('coordinate inspector model allows referenced coordinate deletion', () => {
+  const diagram = createReferencedPathDiagram()
+  const model = createCoordinateAnchorInspectorModel(
+    diagram,
+    findAnchor(diagram, 'coord-a'),
+  )
+
+  assert.equal(model.referenceCount, 1)
+  assert.equal(model.deleteDisabled, false)
+  assert.equal(
+    model.deleteMessage,
+    'Used by 1 coordinate reference. Deleting will detach it.',
+  )
+})
+
 test('delete unused coordinate removes it', () => {
   const diagram = createCoordinateDiagram(2)
   addAnchor(diagram, {
@@ -214,24 +231,48 @@ test('delete unused coordinate removes it', () => {
     position: globalAnchorPosition(0, 0, 0),
   })
 
-  const result = deleteUnusedCoordinateAnchor(diagram, 'coord-a')
+  const result = deleteCoordinateAnchorWithDetach(diagram, 'coord-a')
 
   assert.equal(result.ok, true)
   if (!result.ok) {
     throw new Error(result.message)
   }
+  assert.equal(result.detachedCount, 0)
+  assert.equal(result.message, 'Deleted coordinate "A".')
   assert.equal(result.diagram.coordinateAnchors?.length, 0)
 })
 
-test('delete referenced coordinate is blocked until detach-delete phase', () => {
+test('delete referenced coordinate detaches references and removes it', () => {
   const diagram = createReferencedPathDiagram()
-  const result = deleteUnusedCoordinateAnchor(diagram, 'coord-a')
+  const result = deleteCoordinateAnchorWithDetach(diagram, 'coord-a')
 
-  assert.equal(result.ok, false)
-  assert.equal(result.deleted, false)
-  assert.equal(result.reason, 'referenced')
-  assert.equal(result.referenceCount, 1)
-  assert.equal(findAnchor(result.diagram, 'coord-a').tikzName, 'A')
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const curve = findCurve(result.diagram, 'ref-path')
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(result.detachedCount, 1)
+  assert.equal(result.deletedCoordinateName, 'A')
+  assert.equal(
+    result.message,
+    'Deleted coordinate "A" and detached 1 coordinate reference.',
+  )
+  assert.equal(hasAnchor(result.diagram, 'coord-a'), false)
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0]), null)
+  assert.deepEqual(pointPreview(curve.points[0]), { x: 0, y: 0, z: 0 })
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.points[1])?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(JSON.stringify(result.diagram).includes('"coordinateId":"coord-a"'), false)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.doesNotMatch(tikz, /\\coordinate \(A\)/)
+  assert.doesNotMatch(tikz, /\(A\)/)
+  assert.match(tikz, /\\coordinate \(curvePolyReferencePath0p0\) at \(0,0\);/)
+  assert.match(tikz, /\(curvePolyReferencePath0p0\) -- \(B\);/)
 })
 
 test('undo and redo restore coordinate rename, move, and delete', () => {
@@ -269,7 +310,7 @@ test('undo and redo restore coordinate rename, move, and delete', () => {
   assert.equal(anchorPreview(findAnchor(moveRedone.editableDiagram, 'coord-a')).x, 9)
 
   const deleteInitial = createStateWithCoordinate()
-  const deleted = deleteUnusedCoordinateAnchor(
+  const deleted = deleteCoordinateAnchorWithDetach(
     deleteInitial.editableDiagram,
     'coord-a',
   )
@@ -290,6 +331,52 @@ test('undo and redo restore coordinate rename, move, and delete', () => {
   assert.equal(hasAnchor(deleteCommitted.editableDiagram, 'coord-a'), false)
   assert.equal(hasAnchor(deleteUndone.editableDiagram, 'coord-a'), true)
   assert.equal(hasAnchor(deleteRedone.editableDiagram, 'coord-a'), false)
+})
+
+test('undo and redo restore coordinate refs around inspector coordinate delete', () => {
+  const initial = createState(createReferencedPathDiagram(), {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const deleted = deleteCoordinateAnchorWithDetach(
+    initial.editableDiagram,
+    'coord-a',
+  )
+
+  assert.equal(deleted.ok, true)
+  if (!deleted.ok) {
+    throw new Error(deleted.message)
+  }
+
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: deleted.diagram,
+    selectedElement: null,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasAnchor(committed.editableDiagram, 'coord-a'), false)
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(committed.editableDiagram, 'ref-path').points[0],
+    ),
+    null,
+  )
+  assert.equal(hasAnchor(undone.editableDiagram, 'coord-a'), true)
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(undone.editableDiagram, 'ref-path').points[0],
+    )?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(hasAnchor(redone.editableDiagram, 'coord-a'), false)
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(redone.editableDiagram, 'ref-path').points[0],
+    ),
+    null,
+  )
 })
 
 test('selection is cleaned after unused coordinate delete', () => {

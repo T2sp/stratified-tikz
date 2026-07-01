@@ -506,8 +506,8 @@ under `diagram.layers`. Diagram-level view metadata may also be stored under
 `diagram.view`, but it is not geometry. UI/editor state such as the selected
 element or multi-selection, active creation tool, coordinate input mode, cursor
 snap settings, active work plane, draft geometry, current layer filter,
-expanded/collapsed panels, copy status, undo/redo history, and transient preview
-state is not saved.
+show/hide coordinate anchors, expanded/collapsed panels, copy status,
+undo/redo history, and transient preview state is not saved.
 
 Loading a file must check the `format` discriminator, supported `version`, and
 validate the contained `diagram` before replacing the current editable diagram.

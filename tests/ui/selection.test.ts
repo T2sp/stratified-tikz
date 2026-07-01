@@ -4,7 +4,10 @@ import {
   threeDimensionalExample,
   twoDimensionalExample,
 } from '../../src/examples/index.ts'
-import { serializeDiagram } from '../../src/model/serialization.ts'
+import {
+  parseSavedDiagramJson,
+  serializeDiagram,
+} from '../../src/model/serialization.ts'
 import { setLayerLock } from '../../src/model/layers.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
@@ -548,6 +551,53 @@ test('coordinate selection is not cleared by layer filter', () => {
   )
 })
 
+test('stale coordinate selection is cleaned after load normalization', () => {
+  const serialized = serializeDiagram(createCoordinateSelectionDiagram())
+  const parsed = parseSavedDiagramJson(serialized)
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  assert.equal(
+    clearSelectionIfMissing(parsed.diagram, {
+      kind: 'coordinate',
+      id: 'missing-coordinate',
+    }),
+    null,
+  )
+})
+
+test('coordinate anchors use single-selection MVP policy', () => {
+  const diagram = createCoordinateSelectionDiagram()
+  const secondAnchor = createCoordinateAnchor(diagram, {
+    id: 'coordB',
+    name: 'B',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 1 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  })
+  const twoCoordinateDiagram: Diagram = {
+    ...diagram,
+    coordinateAnchors: [...(diagram.coordinateAnchors ?? []), secondAnchor],
+  }
+  const selection = updateSelectionForClick(
+    twoCoordinateDiagram,
+    { kind: 'coordinate', id: 'coordA' },
+    { kind: 'coordinate', id: 'coordB' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'coordinate', id: 'coordB' })
+  assert.equal(selectedElements(selection).length, 1)
+})
+
 test('removeSelectedElement deletes an unused coordinate anchor', () => {
   const result = removeSelectedElement(createCoordinateSelectionDiagram(), {
     kind: 'coordinate',
@@ -842,6 +892,15 @@ test('TikZ output is unaffected by selection operations', () => {
 
   assert.equal(selectedElements(selection).length, 2)
   assert.equal(generateTikz(twoDimensionalExample), before)
+})
+
+test('TikZ output is unaffected by coordinate selection state', () => {
+  const diagram = createCoordinateSelectionDiagram()
+  const before = generateTikz(diagram)
+  const selection: SelectedElement = { kind: 'coordinate', id: 'coordA' }
+
+  assert.deepEqual(findSelectedElement(diagram, selection)?.kind, 'coordinate')
+  assert.equal(generateTikz(diagram), before)
 })
 
 test('formatVec3 formats 2D coordinates without z', () => {
@@ -1412,7 +1471,7 @@ test('generated TikZ no longer includes a removed selected element', () => {
   assert.equal(tikz.includes('$F^{(1)}L$'), false)
 })
 
-test('makeUniqueId avoids collisions across strata and labels', () => {
+test('makeUniqueId avoids collisions across top-level diagram ids', () => {
   const diagram = {
     ...twoDimensionalExample,
     strata: [
@@ -1429,9 +1488,20 @@ test('makeUniqueId avoids collisions across strata and labels', () => {
         id: 'point-2',
       },
     ],
+    coordinateAnchors: [
+      createCoordinateAnchor(twoDimensionalExample, {
+        id: 'point-3',
+        name: 'Reserved point id',
+        position: globalAnchorPosition({
+          x: { kind: 'numeric', value: 0 },
+          y: { kind: 'numeric', value: 0 },
+          z: { kind: 'numeric', value: 0 },
+        }),
+      }),
+    ],
   }
 
-  assert.equal(makeUniqueId(diagram, 'point'), 'point-3')
+  assert.equal(makeUniqueId(diagram, 'point'), 'point-4')
 })
 
 test('addPointStratum returns a new 2D diagram with codim 2 and z normalized', () => {

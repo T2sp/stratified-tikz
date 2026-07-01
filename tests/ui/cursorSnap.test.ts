@@ -239,6 +239,54 @@ test('drag handle update uses snap when fed cursor-drag coordinates', () => {
   })
 })
 
+test('coordinate drag handle update uses snapped cursor-drag coordinates', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const coordinateResult = addCoordinateAnchorFromCursorPoint(
+    diagram,
+    { x: 0, y: 0, z: 0 },
+    { id: 'drag-snap-coordinate' },
+  )
+  const snapped = requireSnappedPoint(
+    { x: 0.26, y: 0.74, z: 9 },
+    coordinateResult.diagram,
+    snapStep01,
+  )
+  const updated = updateDiagramGeometryHandle(
+    coordinateResult.diagram,
+    { kind: 'coordinateAnchor', coordinateId: coordinateResult.id },
+    snapped,
+  )
+  const anchor = updated.coordinateAnchors?.find(
+    (candidate) => candidate.id === coordinateResult.id,
+  )
+
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor position.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.x.kind === 'numeric'
+      ? anchor.position.value.x.value
+      : NaN,
+    0.3,
+  )
+  assert.equal(anchor.position.value.y.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.y.kind === 'numeric'
+      ? anchor.position.value.y.value
+      : NaN,
+    0.7,
+  )
+  assert.equal(anchor.position.value.z.kind, 'numeric')
+  assert.equal(
+    anchor.position.value.z.kind === 'numeric'
+      ? anchor.position.value.z.value
+      : NaN,
+    0,
+  )
+})
+
 test('direct input ignores cursor snap settings', () => {
   const snap: CursorSnapSettings = { enabled: true, step: 1 }
   const result = addPointStratumFromDirectInput(

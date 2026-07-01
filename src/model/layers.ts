@@ -10,6 +10,7 @@ import type {
   Vec3,
 } from './types.ts'
 import { cleanPathCrossingStates } from './pathCrossings.ts'
+import { collectTopLevelDiagramIds } from './diagramIds.ts'
 import { detachCoordinateReferencesInElements } from './coordinateReferences.ts'
 import {
   diagramTranslationContext,
@@ -351,7 +352,9 @@ export function duplicateLayer(
     )
   }
 
-  const topLevelIdAllocator = createUniqueIdAllocator(topLevelElementIds(diagram))
+  const topLevelIdAllocator = createUniqueIdAllocator(
+    collectTopLevelDiagramIds(diagram),
+  )
   const nestedIdAllocator = createUniqueIdAllocator(nestedObjectIds(diagram))
   const pathLabelAllocator = createPathLabelAllocator(diagram)
   const idChanges: DuplicateLayerIdChange[] = []
@@ -997,13 +1000,6 @@ function duplicatePathLabel<
   }
 }
 
-function topLevelElementIds(diagram: Diagram): string[] {
-  return [
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-  ]
-}
-
 function nestedObjectIds(diagram: Diagram): string[] {
   return diagram.strata.flatMap((stratum) => {
     if (stratum.geometricKind === 'curve') {
@@ -1025,7 +1021,7 @@ function nestedObjectIds(diagram: Diagram): string[] {
   })
 }
 
-function createUniqueIdAllocator(initialIds: string[]): UniqueIdAllocator {
+function createUniqueIdAllocator(initialIds: Iterable<string>): UniqueIdAllocator {
   const usedIds = new Set(initialIds)
 
   return {
