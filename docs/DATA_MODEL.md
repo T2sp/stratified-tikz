@@ -526,6 +526,8 @@ that omit export mode load with the standalone default.
 
 For the user-facing layer operation semantics, see
 [Layer Manager](./LAYER_MANAGER.md).
+For global TikZ coordinate anchors and coordinate references, see
+[Coordinate Anchors](./COORDINATE_ANCHORS.md).
 For Phase 24 editing semantics, see [Editing Fundamentals](./EDITING.md).
 
 ## Camera

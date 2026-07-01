@@ -28,6 +28,7 @@ git diff --check
 - [Specification](docs/SPEC.md)
 - [Data model](docs/DATA_MODEL.md)
 - [TikZ output](docs/TIKZ_OUTPUT.md)
+- [Coordinate anchors](docs/COORDINATE_ANCHORS.md)
 - [Ruled surfaces](docs/RULED_SURFACES.md)
 - [Symbolic input and grids](docs/SYMBOLIC_INPUT_AND_GRIDS.md)
 - [Editing fundamentals](docs/EDITING.md)

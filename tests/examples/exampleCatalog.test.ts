@@ -20,6 +20,7 @@ const expectedExampleNames = [
   '3D example',
   'braiding',
   '3D local symbolic',
+  'Coordinate anchors',
 ] as const
 
 test('main example catalog contains exactly the curated examples in order', () => {
@@ -27,7 +28,7 @@ test('main example catalog contains exactly the curated examples in order', () =
     exampleOptions.map((example) => example.name),
     expectedExampleNames,
   )
-  assert.equal(new Set(exampleOptions.map((example) => example.name)).size, 6)
+  assert.equal(new Set(exampleOptions.map((example) => example.name)).size, 7)
 })
 
 test('Empty 2D is the default and precedes Empty 3D', () => {
@@ -79,6 +80,21 @@ test('braiding example still loads and exports crossing overlays', () => {
     validation.errors.map((issue) => issue.message).join('\n'),
   )
   assert.match(generateTikz(diagram), /Braiding crossing:/)
+})
+
+test('coordinate anchor example exports reusable coordinate references', () => {
+  const diagram = getExampleOption('coordinateAnchors').diagram
+  const validation = validateDiagram(diagram)
+  const tikz = generateTikz(diagram)
+
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors.map((issue) => issue.message).join('\n'),
+  )
+  assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  assert.match(tikz, /\\node at \(LocalAnchor\) \{\$L\$\};/)
 })
 
 test('example bar CSS wraps instead of requiring horizontal scroll', () => {
