@@ -42,6 +42,14 @@ import type {
 } from './diagramUpdates.ts'
 import { formatVec3 } from './inspectorSummary.ts'
 
+export {
+  deleteCoordinateAnchorWithDetach,
+  deleteCoordinateAnchorsWithDetach,
+  type DeletedCoordinateAnchorSummary,
+  type DeleteCoordinateAnchorWithDetachResult,
+  type DeleteCoordinateAnchorsWithDetachResult,
+} from './coordinateAnchorDeletion.ts'
+
 export type CoordinateAnchorEditResult =
   | {
       ok: true
@@ -91,7 +99,6 @@ export function createCoordinateAnchorInspectorModel(
     anchor.position.kind === 'workPlaneLocal'
       ? ['Plane x / a', 'Plane y / b']
       : coordinateAxesForInspector(diagram.ambientDimension)
-  const deleteDisabled = referenceCount > 0
 
   return {
     title: 'Coordinate',
@@ -108,10 +115,13 @@ export function createCoordinateAnchorInspectorModel(
         ? 'Work-plane local'
         : 'Global xyz',
     preview: formatCoordinateAnchorPreview(anchor, diagram.ambientDimension),
-    deleteDisabled,
-    deleteMessage: deleteDisabled
-      ? 'Used by references. Detach-delete comes in a later phase.'
-      : null,
+    deleteDisabled: false,
+    deleteMessage:
+      referenceCount > 0
+        ? `Used by ${coordinateReferenceCountLabel(
+            referenceCount,
+          )}. Deleting will detach ${referenceCount === 1 ? 'it' : 'them'}.`
+        : null,
     referenceCount,
   }
 }
@@ -299,7 +309,7 @@ export function deleteUnusedCoordinateAnchor(
       deleted: false,
       reason: 'referenced',
       referenceCount,
-      message: 'Coordinate is used by references. Detach-delete comes later.',
+      message: 'Coordinate has references; delete with detach to remove it.',
     }
   }
 
@@ -383,6 +393,10 @@ function coordinateAxesForInspector(
   ambientDimension: AmbientDimension,
 ): CoordinateAxis[] {
   return ambientDimension === 2 ? ['x', 'y'] : ['x', 'y', 'z']
+}
+
+function coordinateReferenceCountLabel(count: number): string {
+  return `${count} coordinate ${count === 1 ? 'reference' : 'references'}`
 }
 
 function coordinateExpressionContextForDiagram(

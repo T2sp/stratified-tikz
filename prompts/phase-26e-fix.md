@@ -1,4 +1,4 @@
-# Phase 26E Fix Prompt: Make Coordinate Inspector deletion detach-aware
+# Phase 26E Fix Prompt: Reserve coordinate anchor IDs during layer and bulk duplication
 
 ## Environment
 
@@ -47,83 +47,84 @@ Review result:
 
 ## Medium issue
 
-Referenced coordinate deletion is inconsistent across UI paths.
+Duplicate operations do not reserve coordinate anchor IDs.
 
-Current behavior:
+Current problem:
 
-- Toolbar delete / Delete-key path uses detach-aware bulk delete.
-- Inspector still disables `Delete coordinate` when:
+- Coordinate anchor IDs are globally unique together with stratum IDs and label IDs.
+- Validation requires coordinate anchor IDs to be unique against strata and labels.
+- However, duplicate operations generate copied stratum/label IDs using only existing strata and labels.
+- They do not reserve `diagram.coordinateAnchors[*].id`.
+- This can generate a copied stratum/label ID that collides with an existing coordinate anchor ID.
 
-```ts
-referenceCount > 0
-```
-
-- Inspector still calls:
-
-```ts
-deleteUnusedCoordinateAnchor(...)
-```
-
-which rejects referenced coordinate anchors.
-- This contradicts the Phase 26 requirement:
+Review examples:
 
 ```text
-Deleting a referenced coordinate should detach references rather than block forever.
+src/model/layers.ts
+src/ui/bulkEditing.ts
 ```
 
-Review locations:
+Known affected paths:
+
+- `duplicateLayer`;
+- bulk duplicate / selected-element duplicate.
+
+Reproduced scenario:
 
 ```text
-src/ui/inspector/EditableInspector.tsx
-src/ui/coordinateAnchorEditing.ts
+Existing stratum id:
+  source-point
+
+Existing coordinate anchor id:
+  source-point-copy
+
+Duplicate source-point
 ```
 
-The old behavior was:
+Current duplicate logic may generate:
 
 ```text
-Referenced coordinate anchors cannot be deleted.
+source-point-copy
 ```
 
-The required behavior is now:
+for the copied stratum.
+
+Then validation fails:
 
 ```text
-Referenced coordinate anchors can be deleted.
-All references are detached first.
-Then the coordinate anchor is removed.
+coordinateAnchors[0].id: Id must be unique; already used at strata[1].id.
 ```
+
+This means duplicate operations can create invalid diagrams.
 
 ## Low-priority issue
 
-`Hide Coordinates` only hides marker rendering.
+The file:
 
-Hidden coordinate anchors still contribute to fit-to-view framing through unconditional:
-
-```ts
-coordinateAnchorPreviewPoints(diagram)
+```text
+src/ui/coordinateAnchorDeletion.ts
 ```
 
-in `SvgDiagram.tsx`.
+is currently untracked.
 
-A far-away hidden anchor can still shrink the visible diagram.
-
-This is low priority, but it is safe to fix if local to the same UI state.
+It must be included in the commit with the tracked changes if it is part of the Phase 26E implementation.
 
 ## Goal
 
-Fix the coordinate Inspector delete behavior so it uses the same detach-aware coordinate deletion path as toolbar/Delete-key deletion.
+Fix Phase 26E duplicate ID allocation so all top-level diagram IDs are reserved during duplication.
 
-Required:
+Specifically:
 
-1. Inspector must allow deleting referenced coordinate anchors.
-2. Inspector delete must detach all references before removing the coordinate.
-3. Inspector delete behavior must match toolbar/Delete-key behavior.
-4. Tests that still expect referenced coordinate deletion to be blocked must be updated.
-5. Existing toolbar/Delete-key detach-aware deletion must not regress.
-6. Undo/redo must work.
-7. No dangling `coordinateRef` metadata may remain.
-8. TikZ output after deletion must not contain the deleted coordinate definition or `(tikzName)` references.
-9. Former references should export concrete coordinates/sources.
-10. Optionally, hidden coordinate anchors should not affect fit-to-view framing.
+1. Layer duplication must reserve coordinate anchor IDs when generating copied stratum/label IDs.
+2. Bulk/selected duplicate must reserve coordinate anchor IDs when generating copied stratum/label IDs.
+3. Any other duplicate helper that creates new top-level IDs must also reserve coordinate anchor IDs.
+4. Generated IDs must be unique across:
+   - `diagram.strata[*].id`;
+   - `diagram.labels[*].id`;
+   - `diagram.coordinateAnchors[*].id`.
+5. Add regression tests for both duplicate paths where a coordinate anchor already owns the default `-copy` ID.
+6. Update duplicate invariants/tests to include coordinate anchors in top-level ID uniqueness checks.
+7. Ensure `src/ui/coordinateAnchorDeletion.ts` is tracked if it is required by the implementation.
 
 ## Scope
 
@@ -131,387 +132,319 @@ This is a targeted Phase 26E fix.
 
 Implement:
 
-- detach-aware coordinate deletion from the Inspector;
-- shared delete helper usage between Inspector and toolbar/Delete-key paths;
-- updated tests;
-- optional fit-to-view behavior correction for hidden coordinates.
+- shared top-level ID reservation helper or update existing ID generation helpers;
+- layer duplication ID collision fix;
+- bulk/selected duplication ID collision fix;
+- tests;
+- commit hygiene for untracked coordinate-anchor deletion file.
 
 Do not implement:
 
-- new coordinate anchor model features;
-- new coordinate reference fields;
-- new reference manager UI;
-- broad Inspector redesign;
+- new coordinate anchor model behavior;
+- duplicating coordinate anchors unless already intentionally supported;
 - new layer semantics;
-- new TikZ output mode;
+- new selection behavior;
+- new UI features;
+- broad duplicate/refactor beyond ID allocation correctness;
 - new dependencies.
 
 Do not change:
 
-- coordinate anchor global/non-layer-bound nature;
-- coordinateRef supported locations;
-- coordinateRef validation/export behavior when anchors exist;
-- toolbar/Delete-key delete semantics except shared helper cleanup;
-- layer translation detach behavior;
+- coordinate anchor global/non-layer-bound behavior;
+- coordinateRef validation/export behavior;
+- existing duplicate semantics except ID uniqueness;
+- layer duplicate geometry/style behavior;
+- bulk duplicate geometry/style behavior;
 - save/load format;
-- inline/standalone TikZ formatting;
-- SVG marker appearance except optional fit-to-view behavior.
+- TikZ generation semantics;
+- undo/redo semantics.
 
-## 1. Inspect current delete paths
+## 1. Inspect duplicate ID generation
 
 Inspect:
 
-- `src/ui/inspector/EditableInspector.tsx`;
-- `src/ui/coordinateAnchorEditing.ts`;
-- toolbar delete handler;
-- Delete-key handler;
-- bulk delete helper;
-- detach-aware coordinate deletion helper from Phase 26C/26I if already present;
-- tests that mention referenced coordinate deletion.
+- `src/model/layers.ts`;
+- `src/ui/bulkEditing.ts`;
+- any model-level duplicate helpers;
+- any helper that generates copy IDs, such as:
+  - `nextCopyId`;
+  - `makeUniqueId`;
+  - `disambiguateId`;
+  - `duplicateDiagramLayer`;
+  - `duplicateLayer`;
+  - `duplicateSelectedElements`;
+- validation logic for top-level IDs in `src/model/validation.ts`.
 
-Find the mismatch:
+Find every duplicate path that generates new IDs for:
 
-```text
-toolbar/Delete-key:
-  detach-aware bulk delete
+- copied strata;
+- copied labels;
+- copied generated coordinate names if applicable;
+- copied metadata references.
 
-Inspector:
-  disables Delete coordinate if referenceCount > 0
-  calls deleteUnusedCoordinateAnchor
-```
+The review points to several locations in `layers.ts` and `bulkEditing.ts` where only strata/labels are considered. These must include coordinate anchor IDs.
 
-The Inspector path must stop using the old unused-only deletion path for normal delete.
+## 2. Add or update a top-level ID collection helper
 
-## 2. Create or reuse a single detach-aware coordinate delete helper
+Preferred approach:
 
-Prefer one shared helper used by all UI paths.
-
-Suggested API:
+Create or reuse a helper that returns all top-level diagram IDs:
 
 ```ts
-deleteCoordinateAnchorWithDetach(
-  diagram: Diagram,
-  coordinateId: string
-): Result<{
-  diagram: Diagram;
-  detachedCount: number;
-  deletedCoordinateName: string;
-}, ValidationError>
+collectTopLevelDiagramIds(diagram): Set<string>
 ```
 
-or equivalent.
+It should include:
 
-If the existing bulk delete helper already supports coordinate detach correctly, either:
+```text
+strata ids
+label ids
+coordinate anchor ids
+```
 
-- call it from Inspector for a single coordinate; or
-- extract the coordinate detach/delete logic into a shared model/UI helper used by both.
+If other top-level ID-bearing entities exist, include them if validation requires uniqueness.
+
+Then use it anywhere a new stratum/label/coordinate-anchor ID is generated.
+
+Suggested helper:
+
+```ts
+function collectReservedDiagramIds(diagram: Diagram): Set<string> {
+  return new Set([
+    ...diagram.strata.map((s) => s.id),
+    ...diagram.labels.map((l) => l.id),
+    ...diagram.coordinateAnchors.map((c) => c.id),
+  ]);
+}
+```
+
+Exact shape depends on current model.
 
 Requirements:
 
-- detach all refs to the coordinate using current coordinate anchor position/source;
-- remove the coordinate anchor;
-- return detached reference count for status;
-- no dangling refs;
-- operation atomic;
-- no partial mutation if detach fails.
+- old diagrams with no `coordinateAnchors` handled safely;
+- helper is pure;
+- helper is tested;
+- helper is used by layer duplication and bulk duplication.
 
-## 3. Update Inspector UI behavior
+## 3. Fix layer duplication
 
-### Delete button state
+When duplicating a layer:
 
-Change the Inspector behavior:
+- copied strata must get IDs unique across strata, labels, and coordinate anchors;
+- copied labels must get IDs unique across strata, labels, and coordinate anchors;
+- if multiple objects are copied, update the reserved ID set as each new ID is allocated;
+- references between copied objects must be updated according to existing behavior;
+- coordinate anchors themselves should not be duplicated by layer duplication because they are global/non-layer-bound, unless existing semantics explicitly say otherwise.
 
-Old:
-
-```text
-Delete coordinate disabled when referenceCount > 0
-```
-
-New:
+Required regression case:
 
 ```text
-Delete coordinate enabled even when referenceCount > 0
+stratum id: source-point
+coordinate anchor id: source-point-copy
+duplicate layer containing source-point
 ```
 
-If referenced, the UI should communicate that refs will be detached.
+Expected:
 
-Suggested button text or helper text:
+- copied stratum id should not be `source-point-copy`;
+- it should be something like `source-point-copy-2` or whatever current unique-ID policy produces;
+- `validateDiagram` passes.
+
+## 4. Fix bulk / selected duplicate
+
+When duplicating selected objects:
+
+- copied strata/labels must reserve coordinate anchor IDs;
+- if coordinate anchors can be selected and duplicated, their copied IDs must also reserve strata/label IDs;
+- if coordinate anchors are not duplicated by bulk duplicate yet, ensure their IDs still reserve names for copied strata/labels;
+- update selection to newly copied ids according to existing behavior.
+
+Required regression case:
 
 ```text
-Delete coordinate
+selected stratum id: source-point
+existing coordinate anchor id: source-point-copy
+bulk duplicate selected stratum
 ```
 
-with small text:
+Expected:
 
-```text
-Used by 3 objects. Deleting will detach references.
-```
+- copied stratum id does not collide with coordinate anchor id;
+- `validateDiagram` passes.
 
-or:
+## 5. Update duplicate invariants
 
-```text
-Delete and detach references
-```
+Where duplicate tests check uniqueness, include coordinate anchors.
 
-If the existing UI pattern supports confirmation:
-
-```text
-Coordinate "A" is used by 3 objects. Detach references and delete?
-[Cancel] [Detach and delete]
-```
-
-MVP acceptable:
-
-- explicit delete button detaches automatically and shows status:
-
-```text
-Deleted coordinate "A" and detached 3 references.
-```
-
-Choose one policy and test/report it.
-
-### Inspector handler
-
-Update the Inspector delete action to call the detach-aware helper.
-
-Do not call:
+Add or update a helper test:
 
 ```ts
-deleteUnusedCoordinateAnchor(...)
+expectTopLevelIdsUnique(diagram)
 ```
 
-for normal coordinate delete.
+should check:
 
-If `deleteUnusedCoordinateAnchor` is still useful internally, rename or restrict it to avoid accidental use in the UI.
-
-## 4. Update coordinateAnchorEditing helpers
-
-Review `coordinateAnchorEditing.ts`.
-
-Likely changes:
-
-- keep a pure helper for unused-only delete if tests need it;
-- add a detach-aware delete helper;
-- update exported functions so Inspector uses the detach-aware one;
-- update names to reduce confusion.
-
-Suggested naming:
-
-```ts
-deleteCoordinateAnchorWithDetach(...)
-deleteUnusedCoordinateAnchor(...) // internal/legacy, not Inspector default
+```text
+strata ids
+label ids
+coordinate anchor ids
 ```
 
-or:
+not only strata/labels.
 
-```ts
-removeCoordinateAnchor(...)
-```
+If such helper already exists, update it.
 
-where the default behavior is detach-aware.
+## 6. Preserve coordinateRef behavior
 
-## 5. Update tests that expected deletion to be blocked
+If duplicated objects contain `coordinateRef` references:
 
-Find tests that assert referenced coordinate deletion is disabled/rejected.
+- they should continue to reference the same global coordinate anchor unless existing behavior intentionally detaches/copies refs.
+- Duplicating a layer should not duplicate global coordinate anchors.
+- Duplicating a selected path/point/label with a coordinateRef should preserve the coordinateRef to the existing anchor.
+- Ensure ID remapping does not accidentally remap coordinate anchor IDs unless coordinate anchors themselves are duplicated.
 
-Update them to the new requirement.
+Add tests if not already covered.
 
-New expected behavior:
+## 7. Tests
 
-- referenced coordinate delete succeeds;
-- references are detached;
-- coordinate is removed;
-- no dangling refs remain;
-- undo/redo restores state if applicable.
+Add focused regression tests.
 
-## 6. Required tests
+### ID helper tests
 
-Add or update focused tests.
+1. `collectReservedDiagramIds` or equivalent includes stratum IDs.
 
-### Inspector delete tests
+2. It includes label IDs.
 
-1. Inspector shows usage count for referenced coordinate.
+3. It includes coordinate anchor IDs.
 
-2. Inspector delete button is enabled for referenced coordinate.
+4. It handles diagrams with no coordinate anchors.
 
-3. Inspector delete action detaches references and removes coordinate.
+### Layer duplicate tests
 
-4. Inspector delete action returns/statuses detached count.
+5. Duplicate a layer containing stratum `source-point` when coordinate anchor `source-point-copy` already exists.
 
-5. Inspector delete action clears coordinate selection or updates selection safely.
+Expected:
 
-6. Inspector delete action uses same semantics as toolbar/Delete-key delete.
+- copied stratum id does not equal `source-point-copy`;
+- diagram validates.
 
-### Detach behavior tests
+6. Duplicate a layer containing label `source-label` when coordinate anchor `source-label-copy` already exists.
 
-7. Referenced path endpoint detaches to concrete coordinate.
+Expected:
 
-8. Referenced label position detaches.
+- copied label id does not equal `source-label-copy`;
+- diagram validates.
 
-9. Referenced point position detaches if supported.
+7. Duplicate a layer with multiple objects where generated IDs could collide with coordinate anchors.
 
-10. Referenced simple sheet vertex detaches if supported.
+Expected:
 
-11. Detached symbolic coordinate preserves symbolic expression where supported.
+- all copied IDs unique across strata/labels/coordinateAnchors.
 
-12. Detached work-plane-local coordinate preserves local source/frame where supported or uses documented fallback.
+8. Coordinate anchors are not duplicated by layer duplication unless explicitly supported.
 
-13. No dangling `coordinateRef` to deleted coordinate remains.
+9. CoordinateRefs inside duplicated layer objects still reference existing anchors.
 
-14. `validateDiagram(...)` passes after Inspector deletion.
+### Bulk duplicate tests
 
-### TikZ tests
+10. Bulk duplicate selected stratum `source-point` when coordinate anchor `source-point-copy` already exists.
 
-15. TikZ output no longer contains:
+Expected:
 
-```tex
-\coordinate (A)
-```
+- copied stratum id avoids collision;
+- diagram validates.
 
-for the deleted coordinate.
+11. Bulk duplicate selected label `source-label` when coordinate anchor `source-label-copy` already exists.
 
-16. TikZ output no longer contains:
+Expected:
 
-```tex
-(A)
-```
+- copied label id avoids collision;
+- diagram validates.
 
-references to the deleted coordinate.
+12. Bulk duplicate multiple selected objects with coordinate-anchor ID collisions.
 
-17. Former references export concrete coordinates/sources.
+13. If coordinate anchors are selectable and duplicable, duplicating a coordinate anchor must also avoid collisions with strata/labels.
 
-18. Inline output has no blank lines.
+If coordinate anchor duplication is intentionally unsupported, assert bulk duplicate skips/rejects coordinate anchors according to current policy.
 
-19. 4-space indentation preserved.
+14. Bulk duplicate selected object containing coordinateRef preserves reference to existing anchor.
 
-### Undo/redo tests
+### Validation/invariant tests
 
-20. Undo Inspector delete restores coordinate and refs.
+15. `validateDiagram` catches any duplicate id across coordinateAnchors and strata/labels.
 
-21. Redo Inspector delete detaches/removes again.
+16. Duplicate helpers always return diagrams passing `validateDiagram` for the regression fixtures.
 
 ### Regression tests
 
-22. Toolbar delete still detaches references.
+17. Existing layer duplicate behavior remains unchanged when no coordinate anchor ID collision exists.
 
-23. Delete-key delete still detaches references.
+18. Existing bulk duplicate behavior remains unchanged when no coordinate anchor ID collision exists.
 
-24. Bulk delete still detaches references.
+19. Undo/redo for layer duplicate still works.
 
-25. Deleting unused coordinate still works.
+20. Undo/redo for bulk duplicate still works.
 
-26. Existing coordinateRef validation/export tests still pass.
+21. TikZ output for duplicated objects remains valid.
 
-## 7. Optional Low-priority fix: hidden coordinates and fit-to-view
+## 8. Low-priority commit hygiene: include untracked file
 
-If straightforward, fix the low-priority issue too.
-
-Current issue:
+Review notes:
 
 ```text
-Hide Coordinates hides marker rendering, but hidden anchors still contribute to fit-to-view framing.
+src/ui/coordinateAnchorDeletion.ts is currently untracked.
 ```
 
-Required optional behavior:
+If this file is required for Phase 26E functionality:
 
-- if coordinate anchors are hidden, they should not contribute to automatic fit-to-view / preview bounding box calculations;
-- if coordinate anchors are shown, they may contribute to fit-to-view;
-- coordinate references still affect geometry, so referenced objects still contribute through their actual geometry.
+- make sure it is included in the final diff/commit;
+- ensure it is imported from tracked files;
+- ensure tests cover behavior that depends on it.
 
-Implementation idea:
+If it is obsolete:
 
-- pass coordinate visibility state into the preview-bounds calculation;
-- include `coordinateAnchorPreviewPoints(diagram)` only when coordinates are shown;
-- keep TikZ/export unaffected.
+- remove it;
+- ensure no imports reference it.
 
-Tests if implemented:
-
-27. Hidden far-away coordinate anchor does not affect fit-to-view bounds.
-
-28. Shown far-away coordinate anchor does affect bounds, if that is the chosen policy.
-
-29. Coordinate references still affect bounds via referencing geometry.
-
-This is Low-priority, so do not let it delay the Medium issue fix if it becomes invasive.
-
-## 8. Error and status messages
-
-Good status examples:
-
-```text
-Deleted coordinate "A".
-```
-
-```text
-Deleted coordinate "A" and detached 3 references.
-```
-
-Good error example:
-
-```text
-Could not delete coordinate "A": failed to detach reference in path "f".
-```
-
-Avoid:
-
-```text
-Coordinate is referenced and cannot be deleted.
-```
-
-except if a truly unsupported detach failure occurs.
+Do not leave a required implementation file untracked.
 
 ## 9. Manual verification checklist
 
 After implementation, run:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH npm run dev
+PATH=/opt/homebrew/bin:$PATH npm test
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check
+git status --short
 ```
 
-Manual Inspector test:
+Manual-style check if practical:
 
-1. Create coordinate anchor `A`.
-2. Create path endpoint referencing `A`.
-3. Select coordinate `A`.
-4. Confirm Inspector shows usage count.
-5. Confirm Delete coordinate is enabled.
-6. Click Delete coordinate.
-7. Confirm coordinate disappears.
-8. Confirm path remains visually in place.
-9. Confirm no dangling ref.
-10. Generate TikZ.
-11. Confirm `\coordinate (A)` is gone.
-12. Confirm `(A)` references are gone.
-13. Undo.
-14. Confirm coordinate and `(A)` references return.
-15. Redo.
-16. Confirm detach/delete happens again.
-
-Optional fit test:
-
-17. Create far-away coordinate.
-18. Hide coordinates.
-19. Fit view.
-20. Confirm far-away hidden coordinate does not shrink the visible diagram.
+1. Create point/stratum with id conceptually `source-point`.
+2. Create coordinate anchor with id `source-point-copy`.
+3. Duplicate layer containing the point.
+4. Confirm no validation error.
+5. Confirm copied point gets a disambiguated id.
+6. Repeat via selected/bulk duplicate.
+7. Confirm TikZ export still works.
 
 ## 10. Preserve existing behavior
 
 Do not regress:
 
-- toolbar delete;
-- Delete-key delete;
-- bulk delete;
-- coordinateRef validation;
-- coordinateRef export when anchor exists;
-- coordinate anchor definitions;
-- coordinate show/hide marker behavior;
-- layer translation detach;
-- save/load;
+- layer duplicate geometry/style behavior;
+- bulk duplicate geometry/style behavior;
+- coordinateRef preservation in duplicates;
+- coordinate anchor global/non-layer-bound behavior;
+- coordinate anchor deletion/detach behavior;
+- selection update after duplicate;
 - undo/redo;
+- save/load;
+- TikZ generation;
 - inline no-blank-lines;
-- 4-space indentation;
-- SVG preview;
-- TikZ generation.
+- 4-space indentation.
 
 ## 11. Verification
 
@@ -521,27 +454,22 @@ Run:
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
+git status --short
 ```
-
-Optional:
-
-```bash
-PATH=/opt/homebrew/bin:$PATH npm run lint
-```
-
-Only treat lint as required if the repository is already lint-clean.
 
 ## 12. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of inconsistent Inspector deletion;
-- shared detach-aware delete helper used/added;
-- Inspector delete UI behavior;
-- confirmation/status policy;
-- tests updated from old blocked-delete behavior;
-- optional fit-to-view hidden-coordinate behavior, if implemented;
+- root cause of duplicate ID collision;
+- shared reserved-ID helper behavior;
+- layer duplicate ID allocation fix;
+- bulk duplicate ID allocation fix;
+- coordinate anchor duplication policy if relevant;
+- coordinateRef behavior in duplicated objects;
+- whether `src/ui/coordinateAnchorDeletion.ts` is tracked or removed;
+- tests added/updated;
 - test results;
 - build results;
 - remaining limitations.

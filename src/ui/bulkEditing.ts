@@ -12,7 +12,6 @@ import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
 import {
-  detachCoordinateAnchorReferencesMany,
   detachCoordinateReferencesInElements,
 } from '../model/coordinateReferences.ts'
 import {
@@ -70,6 +69,7 @@ import {
   commitDiagramChange,
   type UndoableEditorState,
 } from './undo.ts'
+import { deleteCoordinateAnchorsWithDetach } from './coordinateAnchorDeletion.ts'
 
 export const bulkMixedValueLabel = 'Mixed'
 export const defaultFilledSurfaceLineWidth = 1.5
@@ -650,34 +650,32 @@ export function removeSelectedElements(
   let removedCurve = false
   let removedStrata = 0
   let removedLabels = 0
-  let removedCoordinates = 0
   const selectedCoordinateIds = (diagram.coordinateAnchors ?? [])
     .filter((anchor) =>
       selectedKeys.has(selectedElementKey({ kind: 'coordinate', id: anchor.id })),
     )
     .map((anchor) => anchor.id)
-  const detached =
+  const coordinateDelete =
     selectedCoordinateIds.length === 0
       ? {
           ok: true as const,
-          value: {
-            diagram,
-            detachedCount: 0,
-          },
+          diagram,
+          deletedCount: 0,
+          detachedCount: 0,
         }
-      : detachCoordinateAnchorReferencesMany(diagram, selectedCoordinateIds)
+      : deleteCoordinateAnchorsWithDetach(diagram, selectedCoordinateIds)
 
-  if (!detached.ok) {
+  if (!coordinateDelete.ok) {
     return {
       diagram,
       selectedElement: selection,
       removed: false,
       removedCount: 0,
-      error: `Could not delete selected coordinates: ${detached.error.message}`,
+      error: coordinateDelete.message,
     }
   }
 
-  const detachedDiagram = detached.value.diagram
+  const detachedDiagram = coordinateDelete.diagram
   const strata = detachedDiagram.strata.filter((stratum) => {
     const selected = selectedKeys.has(
       selectedElementKey({ kind: 'stratum', id: stratum.id }),
@@ -706,14 +704,10 @@ export function removeSelectedElements(
       selectedElementKey({ kind: 'coordinate', id: anchor.id }),
     )
 
-    if (!selected) {
-      return true
-    }
-
-    removedCoordinates += 1
-    return false
+    return !selected
   })
-  const removedCount = removedStrata + removedLabels + removedCoordinates
+  const removedCount =
+    removedStrata + removedLabels + coordinateDelete.deletedCount
 
   if (removedCount === 0) {
     return {
@@ -736,7 +730,7 @@ export function removeSelectedElements(
     selectedElement: null,
     removed: true,
     removedCount,
-    detachedCoordinateReferenceCount: detached.value.detachedCount,
+    detachedCoordinateReferenceCount: coordinateDelete.detachedCount,
   }
 }
 

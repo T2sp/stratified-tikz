@@ -35,9 +35,6 @@ import {
   type ScalarInputValue,
 } from '../model/scalarExpressions.ts'
 import {
-  detachCoordinateAnchorReferences,
-} from '../model/coordinateReferences.ts'
-import {
   cloneWorkPlaneLocalCoordinateSource,
   evaluateWorkPlaneLocalCoordinate,
 } from '../model/workPlaneLocalCoordinates.ts'
@@ -123,6 +120,7 @@ import {
   formatGridIssue,
   formatSymbolicInputError,
 } from './symbolicInputMessages.ts'
+import { deleteCoordinateAnchorWithDetach } from './coordinateAnchorDeletion.ts'
 
 export type CoordinateAxis = 'x' | 'y' | 'z'
 
@@ -232,48 +230,23 @@ export function removeSelectedElement(
   }
 
   if (selectedElement.kind === 'coordinate') {
-    const selectedAnchor = (diagram.coordinateAnchors ?? []).find(
-      (anchor) => anchor.id === selectedElement.id,
-    )
+    const deleted = deleteCoordinateAnchorWithDetach(diagram, selectedElement.id)
 
-    if (selectedAnchor === undefined) {
+    if (!deleted.ok) {
       return {
         diagram,
-        selectedElement: null,
+        selectedElement:
+          deleted.reason === 'missing' ? null : selectedElement,
         removed: false,
+        error: deleted.reason === 'missing' ? undefined : deleted.message,
       }
     }
-
-    const detached = detachCoordinateAnchorReferences(diagram, selectedElement.id)
-
-    if (!detached.ok) {
-      return {
-        diagram,
-        selectedElement,
-        removed: false,
-        error: `Could not delete coordinate "${selectedAnchor.name}": ${detached.error.message}`,
-      }
-    }
-
-    let removed = false
-    const coordinateAnchors = (detached.value.diagram.coordinateAnchors ?? []).filter(
-      (anchor) => {
-        if (!removed && anchor.id === selectedElement.id) {
-          removed = true
-          return false
-        }
-
-        return true
-      },
-    )
 
     return {
-      diagram: removed
-        ? { ...detached.value.diagram, coordinateAnchors }
-        : diagram,
+      diagram: deleted.diagram,
       selectedElement: null,
-      removed,
-      detachedCoordinateReferenceCount: detached.value.detachedCount,
+      removed: true,
+      detachedCoordinateReferenceCount: deleted.detachedCount,
     }
   }
 

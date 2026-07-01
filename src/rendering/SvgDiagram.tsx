@@ -284,7 +284,7 @@ export function SvgDiagram({
     ...(cubicBezierDraft ?? []),
     ...(pathDraft === undefined ? [] : concatenatedPathDraftCoordinates(pathDraft)),
     ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
-    ...coordinateAnchorPreviewPoints(diagram),
+    ...(showCoordinateAnchors ? coordinateAnchorPreviewPoints(diagram) : []),
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,

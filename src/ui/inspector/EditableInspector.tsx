@@ -4,7 +4,7 @@ import { coordinateAnchorPositionToVec3 } from '../../model/coordinateAnchors.ts
 import type { TranslationVector } from '../../model/translation.ts'
 import {
   createCoordinateAnchorInspectorModel,
-  deleteUnusedCoordinateAnchor,
+  deleteCoordinateAnchorWithDetach,
   updateCoordinateAnchorGlobalCoordinate,
   updateCoordinateAnchorName,
   updateCoordinateAnchorTikzName,
@@ -289,17 +289,17 @@ function CoordinateAnchorInspector({
               disabled={model.deleteDisabled}
               title={
                 model.deleteMessage ??
-                'Delete this unused coordinate anchor. This can be undone.'
+                'Delete this coordinate anchor. This can be undone.'
               }
               onClick={() => {
-                const result = deleteUnusedCoordinateAnchor(diagram, anchor.id)
+                const result = deleteCoordinateAnchorWithDetach(diagram, anchor.id)
 
                 if (!result.ok) {
                   setDeleteStatus(result.message)
                   return
                 }
 
-                setDeleteStatus('')
+                setDeleteStatus(result.message)
                 onDiagramChange(result.diagram)
               }}
             >
