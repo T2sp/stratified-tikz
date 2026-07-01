@@ -1177,6 +1177,90 @@ test('auto visibility preserves layer-aware TikZ output', () => {
   assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 
+test('surface depth sorting falls back per coordinate-ref sheet', () => {
+  const diagram = createCoordinateRefSurfaceDepthSortDiagram()
+  const normalTikz = generateTikz(diagram, {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      surfaceDepthSort: false,
+    },
+  })
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const inlineTikz = generateTikz(diagram, {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (0,0,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B) -- (C) -- cycle;')
+  const referenceLayer = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.match(normalTikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(normalTikz, /Surface depth sorting skipped/)
+  assert.match(
+    tikz,
+    /Surface depth sorting skipped for sheet "Reference Sorted Sheet" \[ref-sorted-sheet\]: coordinate references preserved by ordinary export\./,
+  )
+  assert.match(tikz, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /sheetPolyReferenceSortedSheet\d+Face0p0/)
+  assert.match(
+    tikz,
+    /Auto surface face depth sort: sheet "Numeric Sorted Sheet" \[numeric-sorted-sheet\]/,
+  )
+  assert.match(referenceLayer, /Surface depth sorting skipped/)
+  assert.match(referenceLayer, /\(A\) -- \(B\) -- \(C\) -- cycle;/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
+test('curve occlusion falls back per coordinate-ref path', () => {
+  const diagram = createCoordinateRefCurveOcclusionDiagram()
+  const normalTikz = generateTikz(diagram, {
+    visibility: {
+      ...enabledVisibilityOptions('layerThenDepth'),
+      curveOcclusion: false,
+    },
+  })
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const inlineTikz = generateTikz(diagram, {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (-2,-1,0);')
+  const referenceIndex = tikz.indexOf('(A) -- (B);')
+  const referenceLayer = extractLayerBlock(tikz, 'stratifiedLayer2')
+
+  assert.match(normalTikz, /\(A\) -- \(B\);/)
+  assert.doesNotMatch(normalTikz, /Curve occlusion skipped/)
+  assert.match(
+    tikz,
+    /Curve occlusion skipped for curve "Reference Curve" \[reference-curve\]: coordinate references preserved by ordinary export\./,
+  )
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  assert.ok(definitionIndex >= 0)
+  assert.ok(referenceIndex >= 0)
+  assert.ok(definitionIndex < referenceIndex)
+  assert.doesNotMatch(tikz, /curvePolyReferenceCurve\d+Occlusionp0/)
+  assert.match(tikz, /Auto curve occlusion: curve "Partly Hidden Curve"/)
+  assert.match(tikz, /Hidden sampled segment/)
+  assert.match(tikz, /densely dotted/)
+  assert.match(tikz, /\n\s+->,\n/)
+  assert.match(tikz, /mark=at position 0\.5/)
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(referenceLayer, /Curve occlusion skipped/)
+  assert.match(referenceLayer, /\(A\) -- \(B\);/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
 test('curve occlusion TikZ output applies hidden sampled segment style', () => {
   const diagram = createCurveOcclusionDiagram()
   const tikz = generateTikz(diagram, {
@@ -7043,6 +7127,52 @@ function createSurfaceDepthSortDiagram(): Diagram {
   return diagram
 }
 
+function createCoordinateRefSurfaceDepthSortDiagram(): Diagram {
+  const camera = {
+    ...createInitialCamera3D(),
+    thetaDeg: 70,
+    phiDeg: 110,
+  }
+  const viewDirection = cameraBasisFromTikz3dplotAngles(
+    camera.thetaDeg,
+    camera.phiDeg,
+  ).forward
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.camera = camera
+  diagram.view = { camera3d: camera }
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 1, y: 0, z: 0 },
+    { id: 'coord-c', name: 'C', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push(
+    surfaceDepthSortSheet(
+      'numeric-sorted-sheet',
+      'Numeric Sorted Sheet',
+      '#00AA00',
+      viewDirection,
+      0.6,
+    ),
+    {
+      codim: 1,
+      geometricKind: 'sheet',
+      kind: 'polygonSheet',
+      id: 'ref-sorted-sheet',
+      name: 'Reference Sorted Sheet',
+      style: sheetStyle(),
+      vertices: [
+        coordinateReferencePoint(diagram, 'coord-a'),
+        coordinateReferencePoint(diagram, 'coord-b'),
+        coordinateReferencePoint(diagram, 'coord-c'),
+      ],
+      layer: 2,
+    },
+  )
+
+  return diagram
+}
+
 function createCurveOcclusionDiagram(): Diagram {
   const camera = {
     ...createInitialCamera3D(),
@@ -7084,6 +7214,35 @@ function createCurveOcclusionDiagram(): Diagram {
       layer: 0,
     },
   )
+
+  return diagram
+}
+
+function createCoordinateRefCurveOcclusionDiagram(): Diagram {
+  const diagram = createCurveOcclusionDiagram()
+
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: -2, y: -1, z: 0 },
+    { id: 'coord-b', name: 'B', x: 2, y: -1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'reference-curve',
+    name: 'Reference Curve',
+    style: curveStyle({ strokeColor: '#AA00AA' }),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    arrows: arrowOptions({
+      endpoint: 'forward',
+      mid: { enabled: true, head: 'stealth' },
+    }),
+    layer: 2,
+  })
 
   return diagram
 }

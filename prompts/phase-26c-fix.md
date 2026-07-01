@@ -1,4 +1,4 @@
-# Phase 26C Fix Prompt: Preserve coordinateRef TikZ output under 3D auto-visibility export
+# Phase 26C Fix Prompt: Generate sampled-sheet fallback commands lazily in depth-sorted surface export
 
 ## Environment
 
@@ -29,13 +29,9 @@ git diff --check
 
 You are working on the StratifiedTikZ project.
 
-Phase 26C introduced coordinate-anchor references (`coordinateRef`) so paths, points, labels, and simple sheets can reference global TikZ coordinate anchors and export readable TikZ such as:
+Phase 26C introduced coordinate-anchor references (`coordinateRef`) and added safeguards so coordinate refs are preserved in normal TikZ output rather than silently degrading to numeric helper coordinates.
 
-```tex
-\coordinate (A) at (...);
-\draw (A) -- (B);
-\node at (A) {...};
-```
+A recent Phase 26C fix added fallback behavior for coordinateRef geometry under 3D auto-visibility export.
 
 Review result:
 
@@ -46,458 +42,328 @@ Review result:
 
 ## Medium issue
 
-Coordinate refs are silently degraded to numeric helper coordinates when 3D auto-visibility sampling is enabled.
+`emitDepthSortedSurfaceFaces` eagerly builds ordinary sampled-sheet fallback commands even when the fallback is never used.
 
-Normal export preserves `(A)` references. However, when auto-visibility export paths are enabled:
+Review details:
 
-### Surface depth sorting branch
-
-For polygon/quad sheets, normal export can preserve coordinate references such as:
-
-```tex
-\filldraw ... (A) -- (B) -- (C) -- cycle;
-```
-
-But the depth-sorted surface branch emits sampled face vertices from:
+- In `src/tikz/generateTikz.ts`, `sampledSheetCommands` is built eagerly.
+- That eager build calls `emitSheet(...)`.
+- `emitSheet(...)` mutates the shared TikZ coordinate context, especially:
 
 ```ts
-face.vertices3D
+context.coordinates
 ```
 
-through generated helper coordinates, producing names like:
+- Even when depth-sorted surface output succeeds and the ordinary fallback is not returned, the eager fallback generation has already registered ordinary sampled sheet vertex coordinates.
+- Result:
+  - numeric depth-sorted sheets emit unused ordinary vertex coordinate definitions;
+  - then they also emit depth-sorted face coordinate definitions.
 
-```tex
-(sheetPoly...Face0p0)
-```
-
-instead of preserving:
-
-```tex
-(A) -- (B) -- (C)
-```
-
-Relevant review locations:
+Observed output example for one numeric 3D sheet:
 
 ```text
-src/tikz/generateTikz.ts around depth-sorted sheet face emission
-src/tikz/generateTikz.ts around context.coordinates.define(...)
+sheetPolyNumericSheet0p0
+sheetPolyNumericSheet0Face0p0
 ```
 
-### Curve occlusion branch
+Only the `Face` coordinates are referenced.
 
-For paths, normal export preserves coordinate references.
-
-But the curve-occlusion branch samples referenced paths and emits generated helper coordinates such as:
-
-```tex
-(curvePoly...OcclusionpN)
-```
-
-instead of anchor references like:
-
-```tex
-(A) -- (B)
-```
-
-Relevant review locations:
+This regresses existing numeric depth-sorted TikZ readability and violates the checklist item:
 
 ```text
-src/tikz/generateTikz.ts around curve occlusion sampled coordinate emission
-```
-
-This occurs only when visibility options are enabled, but it violates Phase 26C’s requirement:
-
-```text
-coordinateRef sources should preserve (tikzName) in TikZ rather than silently becoming numeric output.
+existing direct/numeric fields unaffected
 ```
 
 ## Goal
 
-Fix Phase 26C coordinate-ref preservation in 3D auto-visibility TikZ export.
+Fix `emitDepthSortedSurfaceFaces` so ordinary sampled-sheet fallback commands are generated lazily only when the fallback is actually returned.
 
-When surface depth sorting or curve occlusion would sample a path/sheet containing `coordinateRef` sources:
+Specifically:
 
-1. Do not silently degrade coordinate refs to numeric helper coordinates.
-2. Either:
-   - fall back to ordinary coordinate-reference-preserving export with a clear comment; or
-   - preserve endpoint/vertex refs in emitted paths where possible.
-3. Add regression tests for:
-   - polygon/quad sheets with `surfaceDepthSort` enabled;
-   - paths with `curveOcclusion` enabled.
-4. Preserve normal non-ref auto-visibility behavior.
-
-Preferred MVP policy:
-
-```text
-If a path/sheet contains coordinateRef sources, disable sampled auto-visibility export for that object and fall back to ordinary reference-preserving TikZ export with an explicit comment.
-```
-
-This is safer than trying to partially preserve refs inside sampled visibility output.
+1. Do not call `emitSheet(...)` for non-coordinateRef sheets during successful depth sorting.
+2. Do not mutate the shared TikZ coordinate context while merely preparing a fallback that will not be used.
+3. Preserve coordinateRef fallback behavior.
+4. Preserve successful depth-sorted numeric surface output.
+5. Remove unused ordinary sampled-sheet coordinate definitions from successful depth-sorted output.
+6. Add regression tests.
 
 ## Scope
 
-This is a targeted Phase 26C fix.
+This is a targeted Phase 26C export fix.
 
 Implement:
 
-- detection of coordinateRef sources before sampled auto-visibility export;
-- reference-preserving fallback for those objects;
-- explicit fallback comments;
-- tests for surface depth sorting and curve occlusion.
+- lazy fallback generation for sampled-sheet commands;
+- no shared context mutation unless fallback is actually emitted;
+- tests for numeric depth-sorted surface output;
+- tests preserving coordinateRef fallback output.
 
 Do not implement:
 
-- exact coordinate-ref-preserving depth sorting;
-- exact coordinate-ref-preserving curve occlusion splitting;
-- new visibility algorithms;
-- new coordinateRef model fields;
-- new UI features;
+- new coordinateRef model behavior;
+- new visibility algorithm;
+- new surface geometry;
+- new TikZ output mode;
 - broad TikZ generator rewrite;
 - new dependencies.
 
 Do not change:
 
-- normal coordinateRef export when visibility is disabled;
-- normal auto-visibility export for objects without coordinateRef;
+- normal non-depth-sorted sheet export;
+- coordinateRef ordinary sheet/path/point/label export;
 - coordinate anchor definitions;
-- coordinateRef validation;
-- SVG preview behavior;
+- depth sorting order;
 - layer-aware output semantics;
 - inline/standalone formatting;
 - 4-space indentation;
-- inline no-blank-lines invariant.
+- inline no-blank-lines invariant;
+- SVG preview behavior;
+- save/load behavior.
 
-## 1. Inspect sampled auto-visibility export paths
+## 1. Inspect current depth-sorted surface export path
 
 Inspect `src/tikz/generateTikz.ts`.
 
-Find all export paths that sample geometry and emit generated helper coordinates:
+Focus on:
 
-### Surface depth sorting
+- `emitDepthSortedSurfaceFaces`;
+- `sampledSheetCommands`;
+- calls to `emitSheet(...)`;
+- coordinateRef fallback logic;
+- ordinary depth-sorted face emission;
+- `context.coordinates.define(...)`;
+- layer-aware wrapping.
 
-Look for code that:
+Find where fallback commands are currently built eagerly.
 
-- handles `surfaceDepthSort`;
-- emits sorted faces from `ProjectedSurfaceFace`;
-- uses `face.vertices3D`;
-- calls `context.coordinates.define(...)` for face vertices;
-- emits generated face coordinate names.
-
-### Curve occlusion
-
-Look for code that:
-
-- handles `curveOcclusion`;
-- emits visible/hidden sampled curve segments;
-- creates generated coordinate names for sampled segment points;
-- emits hidden-style draw commands.
-
-The fix should guard these paths when the source object contains coordinateRef sources.
-
-## 2. Add coordinateRef detection helper for export
-
-Add or reuse a helper such as:
+The problematic pattern is conceptually:
 
 ```ts
-geometryContainsCoordinateRef(source): boolean
+const sampledSheetCommands = emitSheet(...); // mutates context.coordinates
+
+if (shouldFallback) {
+  return sampledSheetCommands;
+}
+
+return depthSortedFaceCommands;
 ```
 
-or more specific helpers:
+This must become lazy.
+
+## 2. Generate fallback commands only when needed
+
+Preferred approach:
+
+Use a thunk / callback:
 
 ```ts
-pathContainsCoordinateRef(path): boolean
-sheetContainsCoordinateRef(sheet): boolean
-stratumContainsTikzPreservedCoordinateRef(stratum): boolean
+const emitSampledSheetFallback = () => emitSheet(...);
+```
+
+Then only call it in fallback branches:
+
+```ts
+if (shouldFallback) {
+  return emitSampledSheetFallback();
+}
+
+return emitDepthSortedFaces(...);
 ```
 
 Requirements:
 
-- detect coordinateRef in supported path fields:
-  - endpoints;
-  - polyline vertices;
-  - line segment start/end;
-  - cubic controls;
-  - arc start/end/center only if coordinateRef is supported there;
-  - concatenated path segments.
-- detect coordinateRef in simple sheet fields:
-  - polygon/quad vertices;
-  - filled simple boundaries if supported and export-preserving.
-- do not flag unsupported coordinateRef locations that validation already rejects, except defensively.
-- no false negatives for ordinary path endpoint refs or polygon sheet vertex refs.
+- if depth sorting succeeds, fallback thunk is never called;
+- shared `context.coordinates` is not mutated by fallback code;
+- ordinary fallback commands are not generated;
+- ordinary fallback coordinate definitions are not registered.
 
-## 3. Fallback policy for surface depth sorting
+## 3. Avoid context mutation during fallback probing
 
-When `surfaceDepthSort` is enabled and a simple sheet/polygon/quad contains coordinateRef sources:
+Do not use a pattern that still calls `emitSheet(...)` into the real context just to inspect output.
 
-### Preferred behavior
+If any fallback decision currently depends on `sampledSheetCommands`, refactor the decision so it uses non-mutating predicates instead.
 
-Do not emit sampled sorted faces for that object.
+Examples of predicates:
 
-Instead emit:
-
-1. A concise comment:
-
-```tex
-% Auto surface depth sorting skipped for <name/id>: coordinate references are preserved by ordinary export.
+```ts
+sheetContainsCoordinateRef(sheet)
+surfaceDepthSortUnsupportedForSheet(sheet)
+shouldUseCoordinateRefPreservingFallback(sheet)
 ```
 
-2. The ordinary sheet export that preserves coordinate refs:
+These should inspect the source object, not generate TikZ.
 
-```tex
-\filldraw ... (A) -- (B) -- (C) -- cycle;
-```
+If a fallback really needs generated commands, generate them after the decision is made.
 
-Requirements:
+## 4. CoordinateRef fallback behavior must remain
 
-- coordinate refs appear as `(tikzName)`;
-- coordinate anchor definitions remain before use;
-- sheet remains in the correct layer;
-- style/fill opacity preserved;
-- no generated numeric face coordinates for that object;
-- other surfaces without coordinateRef may still be depth sorted.
-
-### Alternative behavior
-
-If preserving refs inside sampled face output is implemented, tests must prove `(A)`, `(B)`, etc. appear where appropriate and no silent numeric-only degradation occurs.
-
-MVP fallback is strongly preferred.
-
-## 4. Fallback policy for curve occlusion
-
-When `curveOcclusion` is enabled and a path/curve contains coordinateRef sources:
-
-### Preferred behavior
-
-Do not emit sampled visible/hidden occlusion segments for that object.
-
-Instead emit:
-
-1. A concise comment:
-
-```tex
-% Curve occlusion skipped for <name/id>: coordinate references are preserved by ordinary export.
-```
-
-2. The ordinary path export that preserves coordinate refs:
-
-```tex
-\draw ... (A) -- (B);
-```
-
-Requirements:
-
-- coordinate refs appear as `(tikzName)`;
-- endpoint/mid arrows and path styles preserved through ordinary export;
-- hidden/dotted occlusion is skipped only for that object;
-- other curves without coordinateRef may still use occlusion;
-- no generated numeric occlusion helper coordinates for that object.
-
-### Important
-
-This is a deliberate tradeoff:
+The previous Phase 26C fix likely introduced fallback behavior:
 
 ```text
-preserve maintainable TikZ coordinate references over auto-visibility sampling for coordinate-ref paths.
+If a sheet contains coordinateRef sources and surface depth sorting would sample it numerically, skip sampled depth sorting for that sheet and emit ordinary reference-preserving export with a comment.
 ```
 
-Document this in code/comment.
-
-## 5. Preserve auto-visibility for non-ref objects
-
-Do not disable all visibility features globally.
-
-Only fall back per object when that object contains coordinateRef sources that would be degraded by sampling.
+Preserve that behavior.
 
 Required:
 
-- sheet without coordinateRef still depth-sorts as before;
-- path without coordinateRef still occlusion-splits as before;
-- mixed diagram can contain:
-  - normal sorted surfaces;
-  - fallback ref-preserving sheet;
-  - normal occluded curves;
-  - fallback ref-preserving path.
+- coordinateRef sheet with surfaceDepthSort enabled still exports `(A)`, `(B)`, etc.;
+- fallback comment remains;
+- ordinary fallback commands are emitted only for that coordinateRef sheet;
+- coordinate anchor definitions appear before references.
 
-## 6. Fallback comments
+## 5. Numeric depth-sorted sheets must not leak ordinary fallback coordinates
 
-Comments should be explicit but concise.
+For a numeric sheet with surfaceDepthSort enabled and successful depth sorting:
 
-Good examples:
+Required:
 
-```tex
-% Surface depth sorting skipped for sheetName: coordinate references preserved by ordinary export.
+- output includes depth-sorted face coordinate definitions if that is existing behavior;
+- output does **not** include ordinary sampled sheet coordinate definitions created only by unused fallback;
+- no `sheetPoly...p0` ordinary fallback coordinates unless actually referenced by successful output;
+- only the intended `Face...` helper coordinates appear, if that is the current depth-sorted naming policy.
+
+The key test should fail before the fix and pass after.
+
+## 6. Consider temporary context only if necessary
+
+If there is an unavoidable need to generate fallback commands for analysis, do not use the real shared context.
+
+Use a temporary isolated context or dry-run mode.
+
+However, preferred solution is simpler:
+
+```text
+do not generate fallback until returning fallback
 ```
 
-```tex
-% Curve occlusion skipped for pathName: coordinate references preserved by ordinary export.
-```
+If a temporary context is used, ensure:
 
-Inline mode requirement:
+- no coordinate definitions leak into real output;
+- no library requirements or style metadata leak accidentally;
+- tests cover no unused coordinates.
 
-- comments must not introduce blank lines;
-- 4-space indentation preserved.
+## 7. Layer-aware output
 
-If the project has an existing fallback-comment style, reuse it.
-
-## 7. Coordinate definitions
-
-Ensure coordinate anchor definitions are still emitted before fallback ordinary exports.
-
-Example expected output:
-
-```tex
-\coordinate (A) at (...);
-\coordinate (B) at (...);
-% Curve occlusion skipped for f: coordinate references preserved by ordinary export.
-\draw ... (A) -- (B);
-```
-
-Do not emit `(A)` before defining `A`.
-
-## 8. Layer-aware output
-
-Fallback ordinary export must remain inside the correct layer context.
+Preserve current layer-aware behavior.
 
 Requirements:
 
-- if original path/sheet is on layer 2, fallback output appears in layer 2 block;
-- layer ordering unchanged;
-- `pgfonlayer` indentation preserved.
+- depth-sorted numeric faces remain in the correct layer block;
+- coordinateRef fallback sheet remains in the correct layer block;
+- no duplicate layer wrapping;
+- indentation remains 4 spaces;
+- inline output has no blank lines.
 
-## 9. Arrows, braiding, and style interaction
-
-For path fallback:
-
-- preserve arrow options;
-- preserve path styles;
-- preserve segment style runs if ordinary export supports them;
-- preserve braiding/crossing output behavior as ordinary export currently does.
-
-If curve occlusion is skipped for a coordinateRef path, do not accidentally remove arrows or coordinate refs.
-
-## 10. Tests
+## 8. Tests
 
 Add focused tests.
 
-### Surface depth sorting with coordinateRef
+### Numeric depth-sorted sheet regression tests
 
-1. Polygon/quad sheet with vertices referencing coordinate anchors exports `(A)`, `(B)`, `(C)` when `surfaceDepthSort` is disabled.
+1. A simple numeric 3D polygon/quad sheet with `surfaceDepthSort` enabled exports depth-sorted face coordinates.
 
-2. Same sheet with `surfaceDepthSort` enabled still exports `(A)`, `(B)`, `(C)`.
+2. The same output does **not** include unused ordinary fallback coordinate definitions.
 
-3. Same sheet with `surfaceDepthSort` enabled emits a fallback comment explaining depth sorting was skipped to preserve coordinate refs.
+Example assertion concept:
 
-4. Same sheet does **not** emit generated numeric face helper coordinates for that object, such as `Face0p0`.
-
-5. Other sheet without coordinateRef still uses depth-sorted sampled export when visibility option is enabled.
-
-6. Layer-aware output preserved for the fallback sheet.
-
-### Curve occlusion with coordinateRef
-
-7. Path with endpoints referencing coordinate anchors exports `(A) -- (B)` when `curveOcclusion` is disabled.
-
-8. Same path with `curveOcclusion` enabled still exports `(A) -- (B)`.
-
-9. Same path with `curveOcclusion` enabled emits a fallback comment explaining occlusion was skipped to preserve coordinate refs.
-
-10. Same path does **not** emit generated numeric occlusion helper coordinates for that object, such as `Occlusionp0`.
-
-11. Path without coordinateRef still uses occlusion segmented output when enabled.
-
-12. Hidden style output for non-ref paths remains unchanged.
-
-13. Endpoint/mid arrows on coordinateRef path are preserved through fallback ordinary export.
-
-### Formatting tests
-
-14. Standalone output with fallback comments is valid-looking and includes coordinate definitions before references.
-
-15. Inline output with fallback comments has no blank lines.
-
-16. 4-space indentation preserved.
-
-17. No NaN/Infinity in fallback output.
-
-### Regression tests
-
-18. Normal coordinateRef path/point/label/simple sheet export still passes.
-
-19. Unsupported coordinateRef fields remain rejected.
-
-20. Numeric/non-ref auto-visibility tests still pass.
-
-21. Braiding/arrow tests still pass.
-
-## 11. Defensive validation/export guard
-
-Even if validation should reject unsupported refs, add defensive checks in sampled exporters:
-
-- if source object contains coordinateRef in a location that would be sampled numerically, use fallback or emit a clear policy comment.
-- do not silently sample to numeric helper coordinates.
-
-This prevents future fields from reintroducing silent degradation.
-
-## 12. Documentation/comments
-
-Add a code comment near the fallback decision:
-
-```text
-Sampled auto-visibility export would replace coordinateRef sources with generated numeric helper coordinates. For coordinate-ref geometry we prefer ordinary reference-preserving export with an explicit comment.
+```ts
+expect(output).toContain("Face0p0");
+expect(output).not.toContain("NumericSheet0p0");
 ```
 
-Update user docs only if there is a Phase 26 coordinateRef limitations section.
+Use actual stable naming patterns from the project.
 
-Suggested doc note:
+3. No unreferenced ordinary sheet helper coordinates are emitted.
 
-```text
-When 3D auto-visibility is enabled, paths/sheets that use coordinate anchors are exported without sampled visibility splitting so that TikZ coordinate references remain readable.
+If exact naming is brittle, assert that every generated coordinate definition without `Face` is referenced, or use a helper if available.
+
+4. The depth-sorted output remains deterministic.
+
+### CoordinateRef fallback preservation tests
+
+5. A polygon/quad sheet with coordinateRef vertices and `surfaceDepthSort` enabled still emits ordinary reference-preserving fallback.
+
+6. Output contains `(A)` / `(B)` references.
+
+7. Output contains fallback comment.
+
+8. Output does not emit sampled numeric face helper coordinates for that coordinateRef sheet.
+
+9. Coordinate anchor definitions appear before use.
+
+### Mixed diagram tests
+
+10. Diagram with one numeric sheet and one coordinateRef sheet:
+    - numeric sheet uses depth-sorted face output;
+    - coordinateRef sheet uses fallback ordinary output;
+    - numeric sheet does not leak ordinary fallback coordinates;
+    - coordinateRef sheet preserves refs.
+
+### Formatting/regression tests
+
+11. Inline output has no blank lines.
+
+12. 4-space indentation preserved.
+
+13. Layer-aware output preserved.
+
+14. Non-depth-sorted ordinary sheet export unchanged.
+
+15. Existing auto-visibility tests for non-ref surfaces still pass.
+
+16. Existing coordinateRef path/point/label/simple sheet tests still pass.
+
+## 9. Defensive checks
+
+Search for similar eager fallback generation patterns in TikZ export:
+
+```bash
+rg "fallback|emitSheet|sampledSheetCommands|emitDepthSortedSurfaceFaces" src/tikz/generateTikz.ts
 ```
 
-## 13. Preserve existing behavior
+If other branches eagerly generate fallback output into shared context and discard it, consider fixing them if they are clearly the same bug.
 
-Do not regress:
+Keep the fix focused.
 
-- coordinateRef model;
-- supported coordinateRef validation;
-- coordinate anchor definitions;
-- normal path/point/label/simple sheet ref export;
-- unsupported coordinateRef rejection;
-- auto-visibility for non-ref geometry;
-- hidden curve style export;
-- surface depth sorting for non-ref sheets;
-- layer-aware output;
-- arrows;
-- braiding;
-- inline no-blank-lines;
-- 4-space indentation;
-- save/load;
-- undo/redo.
-
-## 14. Manual verification checklist
+## 10. Manual verification checklist
 
 After implementation, run:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH npm run dev
+PATH=/opt/homebrew/bin:$PATH npm test
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check
 ```
 
-Manual checks:
+Manual-style checks if practical:
 
-1. Create coordinate anchors `A`, `B`, `C`.
-2. Create a path using `A` and `B`.
-3. Enable curve occlusion / auto visibility.
-4. Generate TikZ.
-5. Confirm output uses `(A)` and `(B)`, not generated numeric occlusion coordinates.
-6. Confirm fallback comment appears.
-7. Create a polygon sheet using `A`, `B`, `C`.
-8. Enable surface depth sorting.
-9. Generate TikZ.
-10. Confirm sheet uses `(A)`, `(B)`, `(C)` and fallback comment appears.
-11. Create a similar path/sheet without coordinate refs.
-12. Confirm auto-visibility still uses sampled output.
+1. Create a 3D numeric polygon sheet.
+2. Enable surface depth sorting.
+3. Generate TikZ.
+4. Confirm only depth-sorted face helper coordinates appear.
+5. Confirm no unused ordinary `sheetPoly...p0` coordinates appear.
+6. Create a sheet with coordinateRef vertices.
+7. Enable surface depth sorting.
+8. Confirm fallback comment appears and `(A)` references are preserved.
 
-## 15. Verification
+## 11. Preserve existing behavior
+
+Do not regress:
+
+- ordinary sheet export;
+- coordinateRef sheet fallback;
+- surface depth sorting for non-ref sheets;
+- coordinate anchor definitions;
+- layer-aware output;
+- inline no-blank-lines;
+- 4-space indentation;
+- SVG preview;
+- save/load;
+- undo/redo;
+- existing coordinateRef validation/export behavior.
+
+## 12. Verification
 
 Run:
 
@@ -507,16 +373,15 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-## 16. Report after implementation
+## 13. Report after implementation
 
 Please report:
 
 - files modified;
-- root cause of coordinateRef degradation in auto-visibility export;
-- coordinateRef detection helper;
-- surface depth sorting fallback behavior;
-- curve occlusion fallback behavior;
-- fallback comment wording;
+- root cause of unused ordinary coordinates leaking;
+- how fallback generation is now lazy;
+- whether a thunk, predicate, or temporary context was used;
+- how coordinateRef fallback remains preserved;
 - tests added/updated;
 - test results;
 - build results;

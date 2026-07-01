@@ -1428,6 +1428,49 @@ function emitDepthSortedSurfaceFaces(
       },
     ]),
   )
+  const coordinateRefSheetIds = new Set(
+    sheets
+      .filter(({ item }) => sheetContainsCoordinateRef(item))
+      .map(({ item }) => item.id),
+  )
+  const coordinateRefSheetCommands = sheets.flatMap(
+    ({ item }, index): LayeredTikzCommand[] =>
+      coordinateRefSheetIds.has(item.id)
+        ? [
+            {
+              layer: normalizeLayer(item.layer),
+              sectionTitle,
+              lines: emitSurfaceDepthSortCoordinateRefFallback(
+                item,
+                index,
+                context,
+              ),
+            },
+          ]
+        : [],
+  )
+  const sampledSheetCommands = sheets.flatMap(
+    ({ item }, index): LayeredTikzCommand[] =>
+      coordinateRefSheetIds.has(item.id)
+        ? []
+        : [
+            {
+              layer: normalizeLayer(item.layer),
+              sectionTitle,
+              lines: emitSheet(item, index, context),
+            },
+          ],
+  )
+  const sampledSheetIds = new Set(
+    sheets
+      .map(({ item }) => item.id)
+      .filter((sheetId) => !coordinateRefSheetIds.has(sheetId)),
+  )
+
+  if (sampledSheetIds.size === 0) {
+    return coordinateRefSheetCommands
+  }
+
   const maxSortedSurfaceFaces = normalizeVisibilityMaxSurfaceFacesForSorting(
     context.visibility.maxSurfaceFacesForSorting,
   )
@@ -1437,26 +1480,30 @@ function emitDepthSortedSurfaceFaces(
     const collectedFaces = collectProjectedSurfaceFacesForSorting(diagram, {
       camera: context.camera3d,
       maxSurfaceFacesForSorting: maxSortedSurfaceFaces,
-      sourceIds: new Set(sheetSources.keys()),
+      sourceIds: sampledSheetIds,
     })
 
     if (collectedFaces.kind === 'capExceeded') {
-      return emitDepthSortFaceCapFallback(
-        sectionTitle,
-        sheets.map(({ item }) => item),
-        collectedFaces.observedCount,
-        collectedFaces.cap,
-        context,
-      )
+      return [
+        ...coordinateRefSheetCommands,
+        ...emitDepthSortFaceCapFallback(
+          sectionTitle,
+          sheets
+            .map(({ item }) => item)
+            .filter((sheet) => sampledSheetIds.has(sheet.id)),
+          collectedFaces.observedCount,
+          collectedFaces.cap,
+          context,
+        ),
+      ]
     }
 
     faces = collectedFaces.faces
   } catch {
-    return emitLayeredItems(
-      sectionTitle,
-      sheets.map(({ item }) => item),
-      (sheet, index) => emitSheet(sheet, index, context),
-    )
+    return [
+      ...coordinateRefSheetCommands,
+      ...sampledSheetCommands,
+    ]
   }
 
   const oversizedSheetIds = sheetIdsWithTooManySortedFaces(
@@ -1490,6 +1537,7 @@ function emitDepthSortedSurfaceFaces(
   const optionsBySheetId = new Map<string, string[]>()
 
   return [
+    ...coordinateRefSheetCommands,
     ...oversizedSheetCommands,
     ...sortedFaces.flatMap((face): LayeredTikzCommand[] => {
       const source = sheetSources.get(face.sourceId)
@@ -1514,6 +1562,20 @@ function emitDepthSortedSurfaceFaces(
             },
           ]
     }),
+  ]
+}
+
+function emitSurfaceDepthSortCoordinateRefFallback(
+  sheet: SheetStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  return [
+    `% Surface depth sorting skipped for sheet "${sheet.name}" [${sheet.id}]: coordinate references preserved by ordinary export.`,
+    // Sampled auto-visibility export would replace coordinateRef sources with
+    // generated numeric helper coordinates. For coordinate-ref geometry we
+    // prefer ordinary reference-preserving export with an explicit comment.
+    ...emitSheet(sheet, elementIndex, context),
   ]
 }
 
@@ -2157,7 +2219,9 @@ function emitOcclusionSegmentedCurves(
     return curves.map(({ item }, index) => ({
       layer: normalizeLayer(item.layer),
       sectionTitle,
-      lines: emitCurve(item, index, context),
+      lines: curveContainsCoordinateRef(item)
+        ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+        : emitCurve(item, index, context),
     }))
   }
 
@@ -2168,7 +2232,9 @@ function emitOcclusionSegmentedCurves(
       layer: normalizeLayer(item.layer),
       sectionTitle,
       lines:
-        occlusion === undefined
+        curveContainsCoordinateRef(item)
+          ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+          : occlusion === undefined
           ? emitCurve(item, index, context)
           : occlusion.capped
             ? emitCurveOcclusionCapFallback(item, index, occlusion, context)
@@ -2177,6 +2243,20 @@ function emitOcclusionSegmentedCurves(
               : emitOcclusionSegmentedCurve(item, index, occlusion, context),
     }
   })
+}
+
+function emitCurveOcclusionCoordinateRefFallback(
+  curve: CurveStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  return [
+    `% Curve occlusion skipped for curve "${curve.name}" [${curve.id}]: coordinate references preserved by ordinary export.`,
+    // Sampled auto-visibility export would replace coordinateRef sources with
+    // generated numeric helper coordinates. For coordinate-ref geometry we
+    // prefer ordinary reference-preserving export with an explicit comment.
+    ...emitCurve(curve, elementIndex, context),
+  ]
 }
 
 function createTikzPointOcclusionMap(
@@ -5110,6 +5190,54 @@ function pathSegmentPoints(segment: PathSegment): Vec3[] {
     case 'arc':
       return [segment.start, segment.end, segment.center]
   }
+}
+
+function pointContainsCoordinateRef(point: Vec3): boolean {
+  return coordinateReferenceSourceForPoint(point) !== null
+}
+
+function sheetContainsCoordinateRef(sheet: SheetStratum): boolean {
+  switch (sheet.kind) {
+    case 'quadSheet':
+    case 'polygonSheet':
+      return sheetVertices(sheet).some(pointContainsCoordinateRef)
+    case 'workPlaneFilledSheet':
+      return closedBoundariesContainCoordinateRef(sheet.boundaries)
+    case 'curvedSheet':
+      return curvedSheetPrimitiveHasCoordinateReferenceSources(sheet.primitive)
+  }
+}
+
+function curveContainsCoordinateRef(curve: CurveStratum): boolean {
+  switch (curve.kind) {
+    case 'polyline':
+    case 'cubicBezier':
+      return curve.points.some(pointContainsCoordinateRef)
+    case 'concatenatedPath':
+      return pathSegmentsContainCoordinateRef(curve.segments)
+    case 'templatePath':
+      return pointContainsCoordinateRef(curve.template.center)
+    case 'grid':
+      return false
+  }
+}
+
+function closedBoundariesContainCoordinateRef(
+  boundaries: readonly ClosedPathBoundary[],
+): boolean {
+  return boundaries.some((boundary) =>
+    pathSegmentsContainCoordinateRef(boundary.segments),
+  )
+}
+
+function pathSegmentsContainCoordinateRef(
+  segments: readonly PathSegment[],
+): boolean {
+  return segments.some(pathSegmentContainsCoordinateRef)
+}
+
+function pathSegmentContainsCoordinateRef(segment: PathSegment): boolean {
+  return pathSegmentPoints(segment).some(pointContainsCoordinateRef)
 }
 
 function curvedSheetPrimitiveHasWorkPlaneLocalSources(
