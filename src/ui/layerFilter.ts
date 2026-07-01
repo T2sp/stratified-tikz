@@ -113,6 +113,10 @@ export function isSelectionCompatibleWithLayerFilter(
       return false
     }
 
+    if (selected.kind === 'coordinate') {
+      return true
+    }
+
     return selected.kind === 'stratum'
       ? isStratumSelectableInEditor(diagram, selected.element, filter)
       : isTextLabelSelectableInEditor(diagram, selected.element, filter)
@@ -136,6 +140,10 @@ export function clearSelectionForLayerFilter(
 
         if (selected === null) {
           return false
+        }
+
+        if (selected.kind === 'coordinate') {
+          return true
         }
 
         return selected.kind === 'stratum'

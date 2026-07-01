@@ -20,6 +20,8 @@ import type {
   WorkPlane,
 } from '../../src/model/types.ts'
 import {
+  addCoordinateAnchorFromCursorPoint,
+  addCoordinateAnchorFromDirectInput,
   addPointStratumFromDirectInput,
   addPointStratumWithResult,
 } from '../../src/ui/diagramUpdates.ts'
@@ -126,6 +128,47 @@ test('cursor-created point uses snap before committing geometry', () => {
   assert.deepEqual(point.position, { x: 0.3, y: 0.7, z: 0 })
 })
 
+test('cursor-created coordinate creates an anchor, not a point stratum', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const snapped = requireSnappedPoint(
+    { x: 0.26, y: 0.74, z: 8 },
+    diagram,
+    snapStep01,
+  )
+  const result = addCoordinateAnchorFromCursorPoint(diagram, snapped, {
+    id: 'snapped-cursor-coordinate',
+    name: 'Cursor coordinate',
+  })
+
+  assert.equal(result.diagram.strata.length, 0)
+  assert.equal(result.diagram.coordinateAnchors?.length, 1)
+  assert.equal(result.diagram.coordinateAnchors?.[0]?.id, result.id)
+})
+
+test('2D cursor-created coordinate keeps z at 0 and applies snap', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const snapped = requireSnappedPoint(
+    { x: 0.26, y: 0.74, z: 8 },
+    diagram,
+    snapStep01,
+  )
+  const result = addCoordinateAnchorFromCursorPoint(diagram, snapped, {
+    id: 'snapped-z-zero-coordinate',
+  })
+  const anchor = result.diagram.coordinateAnchors?.[0]
+
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor position.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(anchor.position.value.x.kind === 'numeric' ? anchor.position.value.x.value : NaN, 0.3)
+  assert.equal(anchor.position.value.y.kind, 'numeric')
+  assert.equal(anchor.position.value.y.kind === 'numeric' ? anchor.position.value.y.value : NaN, 0.7)
+  assert.equal(anchor.position.value.z.kind, 'numeric')
+  assert.equal(anchor.position.value.z.kind === 'numeric' ? anchor.position.value.z.value : NaN, 0)
+})
+
 test('cursor-created path vertex uses snap before draft append', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   const workPlane: WorkPlane = { kind: 'xy', z: 0 }
@@ -214,6 +257,33 @@ test('direct input ignores cursor snap settings', () => {
     y: 0.74,
     z: 0,
   })
+})
+
+test('direct coordinate input ignores cursor snap settings', () => {
+  const snap: CursorSnapSettings = { enabled: true, step: 1 }
+  const result = addCoordinateAnchorFromDirectInput(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    { x: '0.26', y: '0.74', z: '8' },
+    { id: 'direct-unsnapped-coordinate' },
+  )
+
+  assert.equal(snap.enabled, true)
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct coordinate creation to succeed.')
+  }
+
+  const anchor = result.diagram.coordinateAnchors?.[0]
+  assert.equal(anchor?.position.kind, 'global')
+  if (anchor?.position.kind !== 'global') {
+    throw new Error('Expected global coordinate anchor position.')
+  }
+  assert.equal(anchor.position.value.x.kind, 'numeric')
+  assert.equal(anchor.position.value.x.kind === 'numeric' ? anchor.position.value.x.value : NaN, 0.26)
+  assert.equal(anchor.position.value.y.kind, 'numeric')
+  assert.equal(anchor.position.value.y.kind === 'numeric' ? anchor.position.value.y.value : NaN, 0.74)
+  assert.equal(anchor.position.value.z.kind, 'numeric')
+  assert.equal(anchor.position.value.z.kind === 'numeric' ? anchor.position.value.z.value : NaN, 0)
 })
 
 test('symbolic input ignores cursor snap settings', () => {

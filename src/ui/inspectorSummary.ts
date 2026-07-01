@@ -1,6 +1,7 @@
 import type {
   AmbientDimension,
   ClosedPathBoundary,
+  CoordinateAnchor,
   CurveStratum,
   Diagram,
   LabelStyle,
@@ -14,6 +15,7 @@ import type {
   Vec3,
 } from '../model/types'
 import { cubicBezierControlModeLabel } from '../geometry/bezierControls.ts'
+import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import { isClosedPathBoundary } from '../model/filledBoundaries.ts'
 import {
   gridLatticePattern,
@@ -66,8 +68,12 @@ export function createInspectorSections(
     return []
   }
 
-  return selected.kind === 'stratum'
-    ? createStratumSections(selected.element, diagram.ambientDimension)
+  if (selected.kind === 'stratum') {
+    return createStratumSections(selected.element, diagram.ambientDimension)
+  }
+
+  return selected.kind === 'coordinate'
+    ? createCoordinateSections(selected.element, diagram.ambientDimension)
     : createLabelSections(selected.element, diagram.ambientDimension)
 }
 
@@ -95,6 +101,19 @@ export function createInspectorCompactSummary(
     }
   }
 
+  if (selected.kind === 'coordinate') {
+    const anchor = selected.element
+
+    return {
+      title: `Coordinate: ${anchor.name} (${anchor.tikzName}) [${anchor.id}]`,
+      layer: 'global',
+      detail: `position ${formatCoordinateAnchorPosition(
+        anchor,
+        diagram.ambientDimension,
+      )}`,
+    }
+  }
+
   const label = selected.element
   const titleText =
     label.text.trim().length === 0 ? label.name : compactSummaryText(label.text)
@@ -116,10 +135,13 @@ function createMultiSelectionCompactSummary(
     return null
   }
 
-  const geometricKind = selected[0]?.element.geometricKind ?? null
+  const geometricKind =
+    selected[0] === undefined ? null : selectedElementKindLabel(selected[0])
   const sameKind =
     geometricKind !== null &&
-    selected.every((candidate) => candidate.element.geometricKind === geometricKind)
+    selected.every(
+      (candidate) => selectedElementKindLabel(candidate) === geometricKind,
+    )
   const kindLabel =
     sameKind && geometricKind !== null
       ? pluralGeometricKindLabel(geometricKind, selected.length)
@@ -132,6 +154,14 @@ function createMultiSelectionCompactSummary(
     layer: 'multiple',
     detail: 'Bulk style, layer, delete, and duplicate available.',
   }
+}
+
+function selectedElementKindLabel(
+  selected: NonNullable<ReturnType<typeof findSelectedElement>>,
+): SelectableGeometricKind {
+  return selected.kind === 'coordinate'
+    ? 'coordinate'
+    : selected.element.geometricKind
 }
 
 export function formatVec3(
@@ -221,6 +251,34 @@ function createStratumSections(
         {
           label: stratum.style.kind,
           value: formatStratumStyleSummary(stratum.style),
+        },
+      ],
+    },
+  ]
+}
+
+function createCoordinateSections(
+  anchor: CoordinateAnchor,
+  ambientDimension: AmbientDimension,
+): InspectorSection[] {
+  return [
+    {
+      title: 'Selection',
+      fields: [
+        { label: 'Type', value: 'coordinate anchor' },
+        { label: 'ID', value: anchor.id },
+        { label: 'Name', value: anchor.name },
+        { label: 'TikZ name', value: anchor.tikzName },
+        { label: 'Layer', value: 'none (global)' },
+      ],
+    },
+    {
+      title: 'Position',
+      fields: [
+        { label: 'Source', value: coordinateAnchorSourceLabel(anchor) },
+        {
+          label: 'Preview',
+          value: formatCoordinateAnchorPosition(anchor, ambientDimension),
         },
       ],
     },
@@ -588,6 +646,28 @@ function pluralGeometricKindLabel(
       return 'regions'
     case 'sheet':
       return 'sheets'
+    case 'coordinate':
+      return 'coordinates'
+  }
+}
+
+function coordinateAnchorSourceLabel(anchor: CoordinateAnchor): string {
+  return anchor.position.kind === 'workPlaneLocal'
+    ? 'active work-plane local'
+    : 'global xyz'
+}
+
+function formatCoordinateAnchorPosition(
+  anchor: CoordinateAnchor,
+  ambientDimension: AmbientDimension,
+): string {
+  try {
+    return formatVec3(
+      coordinateAnchorPositionPreview(anchor.position, ambientDimension),
+      ambientDimension,
+    )
+  } catch {
+    return 'unavailable'
   }
 }
 

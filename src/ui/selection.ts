@@ -1,8 +1,9 @@
-import type { Diagram, Stratum, TextLabel } from '../model/types'
+import type { CoordinateAnchor, Diagram, Stratum, TextLabel } from '../model/types'
 
 export type SingleSelectedElement =
   | { kind: 'stratum'; id: string }
   | { kind: 'label'; id: string }
+  | { kind: 'coordinate'; id: string }
 
 export type MultiSelectedElement = {
   kind: 'multi'
@@ -23,10 +24,12 @@ export type Selection =
 export type SelectedDiagramElement =
   | { kind: 'stratum'; element: Stratum }
   | { kind: 'label'; element: TextLabel }
+  | { kind: 'coordinate'; element: CoordinateAnchor }
 
 export type SelectableGeometricKind =
   | Stratum['geometricKind']
   | TextLabel['geometricKind']
+  | 'coordinate'
 
 export type SelectionClickMode = 'replace' | 'toggle'
 
@@ -41,6 +44,14 @@ export function findSelectedElement(
   if (selection.kind === 'stratum') {
     const stratum = diagram.strata.find((candidate) => candidate.id === selection.id)
     return stratum === undefined ? null : { kind: 'stratum', element: stratum }
+  }
+
+  if (selection.kind === 'coordinate') {
+    const anchor = (diagram.coordinateAnchors ?? []).find(
+      (candidate) => candidate.id === selection.id,
+    )
+
+    return anchor === undefined ? null : { kind: 'coordinate', element: anchor }
   }
 
   const label = diagram.labels.find((candidate) => candidate.id === selection.id)
@@ -182,7 +193,9 @@ export function isSingleSelectedElement(
 ): selection is SingleSelectedElement {
   return (
     selection !== null &&
-    (selection.kind === 'stratum' || selection.kind === 'label')
+    (selection.kind === 'stratum' ||
+      selection.kind === 'label' ||
+      selection.kind === 'coordinate')
   )
 }
 
@@ -207,7 +220,9 @@ export function selectedElementGeometricKind(
 ): SelectableGeometricKind | null {
   const selected = findSelectedElement(diagram, selection)
 
-  return selected?.element.geometricKind ?? null
+  return selected?.kind === 'coordinate'
+    ? 'coordinate'
+    : selected?.element.geometricKind ?? null
 }
 
 export function selectionGeometricKind(

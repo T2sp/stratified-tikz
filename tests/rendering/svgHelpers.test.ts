@@ -22,6 +22,7 @@ import {
   createPointStratum,
   createTextLabel,
 } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   applyUserStylePresetToStratum,
   createUserStylePresetFromStyle,
@@ -75,6 +76,7 @@ import {
   type SvgArrowheadPreview,
 } from '../../src/rendering/svgArrows.ts'
 import { svgPathCrossingOverlayPrimitives } from '../../src/rendering/svgPathCrossings.ts'
+import { svgCoordinateAnchorMarkers } from '../../src/rendering/svgCoordinateAnchors.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -193,6 +195,38 @@ test('SVG arrow preview coordinates are finite for a 2D path', () => {
 
   assert.equal(arrowheads.length, 3)
   assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
+})
+
+test('SVG preview renders coordinate anchor marker', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const anchor = createCoordinateAnchor(diagram, {
+    id: 'svg-coordinate-anchor',
+    name: 'Preview coordinate',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 0 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  })
+  const markers = svgCoordinateAnchorMarkers(
+    {
+      ...diagram,
+      coordinateAnchors: [anchor],
+    },
+    diagram.camera,
+    360,
+    { kind: 'coordinate', id: anchor.id },
+  )
+
+  assert.equal(markers.length, 1)
+  assert.equal(markers[0]?.anchor.id, 'svg-coordinate-anchor')
+  assert.equal(markers[0]?.selected, true)
+  assert.equal(markers[0]?.hitRadius, 11)
+  assert.equal(Number.isFinite(markers[0]?.center.x), true)
+  assert.equal(Number.isFinite(markers[0]?.center.y), true)
 })
 
 test('SVG arrow preview coordinates are finite for a projected 3D path', () => {

@@ -20,6 +20,7 @@ import type { Camera3D, Diagram, Vec3, WorkPlane } from '../../src/model/types.t
 import type { ConcatenatedPathDraft } from '../../src/ui/pathDraft.ts'
 import { createCameraPresetCamera } from '../../src/ui/cameraControls.ts'
 import {
+  addCoordinateAnchorFromCursorPoint,
   addCurvedSheetStratumWithResult,
   addPointStratumWithResult,
   addPolylineCurveStratumWithResult,
@@ -207,6 +208,29 @@ test('creation undo removes point and redo restores it', () => {
   assert.equal(hasStratum(undone.editableDiagram, result.id), false)
   assert.equal(undone.selectedElement, null)
   assert.equal(hasStratum(redone.editableDiagram, result.id), true)
+})
+
+test('creation undo removes coordinate anchor and redo restores it', () => {
+  const initial = createUndoState(createEmptyDiagram({ ambientDimension: 2 }))
+  const result = addCoordinateAnchorFromCursorPoint(
+    initial.editableDiagram,
+    { x: 1, y: 2, z: 9 },
+    { id: 'created-coordinate', name: 'Undo coordinate' },
+  )
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: { kind: 'coordinate', id: result.id },
+  })
+
+  assert.equal(hasCoordinateAnchor(committed.editableDiagram, result.id), true)
+
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasCoordinateAnchor(undone.editableDiagram, result.id), false)
+  assert.equal(undone.selectedElement, null)
+  assert.equal(hasCoordinateAnchor(redone.editableDiagram, result.id), true)
 })
 
 test('creation undo removes curved sheet and redo restores primitive data', () => {
@@ -587,4 +611,8 @@ function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
 
 function hasStratum(diagram: Diagram, id: string): boolean {
   return diagram.strata.some((stratum) => stratum.id === id)
+}
+
+function hasCoordinateAnchor(diagram: Diagram, id: string): boolean {
+  return (diagram.coordinateAnchors ?? []).some((anchor) => anchor.id === id)
 }

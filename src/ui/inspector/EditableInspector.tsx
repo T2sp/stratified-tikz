@@ -1,4 +1,5 @@
-import type { Diagram } from '../../model/types.ts'
+import type { CoordinateAnchor, Diagram } from '../../model/types.ts'
+import { coordinateAnchorPositionPreview } from '../../model/coordinateAnchors.ts'
 import type { TranslationVector } from '../../model/translation.ts'
 import { createBulkStyleEditorModel } from '../bulkEditing.ts'
 import { createInspectorCompactSummary } from '../inspectorSummary.ts'
@@ -8,6 +9,7 @@ import {
   type SelectedElement,
 } from '../selection.ts'
 import { BulkSelectionInspector } from './BulkSelectionInspector.tsx'
+import { ReadOnlyField } from './InspectorField.tsx'
 import { StratumInspector } from './StratumInspector.tsx'
 import { TextLabelInspector } from './TextLabelInspector.tsx'
 import type { DiagramChangeHandler } from './types.ts'
@@ -115,6 +117,8 @@ export function EditableInspector({
         stratum={selected.element}
         onDiagramChange={onDiagramChange}
       />
+    ) : selected.kind === 'coordinate' ? (
+      <CoordinateAnchorInspector diagram={diagram} anchor={selected.element} />
     ) : (
       <TextLabelInspector
         diagram={diagram}
@@ -153,4 +157,59 @@ export function EditableInspector({
       )}
     </div>
   )
+}
+
+function CoordinateAnchorInspector({
+  diagram,
+  anchor,
+}: {
+  diagram: Diagram
+  anchor: CoordinateAnchor
+}) {
+  return (
+    <div className="inspector-content editable-inspector">
+      <section className="inspector-section">
+        <h3>Coordinate</h3>
+        <div className="inspector-form">
+          <ReadOnlyField label="Type" value="coordinate anchor" />
+          <ReadOnlyField label="ID" value={anchor.id} />
+          <ReadOnlyField label="Name" value={anchor.name} />
+          <ReadOnlyField label="TikZ name" value={anchor.tikzName} />
+          <ReadOnlyField label="Layer" value="none (global)" />
+          <ReadOnlyField
+            label="Source"
+            value={
+              anchor.position.kind === 'workPlaneLocal'
+                ? 'active work-plane local'
+                : 'global xyz'
+            }
+          />
+          <ReadOnlyField
+            label="Preview"
+            value={coordinateAnchorPreviewLabel(diagram, anchor)}
+          />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function coordinateAnchorPreviewLabel(
+  diagram: Diagram,
+  anchor: CoordinateAnchor,
+): string {
+  try {
+    const point = coordinateAnchorPositionPreview(
+      anchor.position,
+      diagram.ambientDimension,
+    )
+    const values =
+      diagram.ambientDimension === 2
+        ? [point.x, point.y]
+        : [point.x, point.y, point.z]
+
+    return `(${values.join(', ')})`
+  } catch {
+    return 'unavailable'
+  }
 }

@@ -164,6 +164,7 @@ test('fill paths are visible only for Select and Add path family tools', () => {
     'createCubicBezier',
   ]
   const hiddenTools: WorkPlanePreviewTool[] = [
+    'createCoordinate',
     'createPoint',
     'createLabel',
     'createSheet',
@@ -313,6 +314,7 @@ test('direct input is exposed through add-mode menus instead of a global mode', 
   const tools = previewToolbarTopTools(3)
   const toolMenus = new Map(tools.map((tool) => [tool.id, tool.menu]))
 
+  assert.equal(toolMenus.get('createCoordinate'), 'direct')
   assert.equal(toolMenus.get('createPoint'), 'direct')
   assert.equal(toolMenus.get('createLabel'), 'direct')
   assert.equal(toolMenus.get('createGrid'), 'direct')
@@ -336,6 +338,19 @@ test('selecting Direct for Add point opens the direct input drawer', () => {
   assert.equal(state, 'open')
   assert.equal(shouldShowDirectInputDrawer('createPoint', 'direct', state), true)
   assert.equal(directInputDrawerFormKind('createPoint', 'direct'), 'point')
+})
+
+test('selecting Direct for Add coordinate opens the coordinate direct input drawer', () => {
+  const state = directInputDrawerStateForInputMode('direct')
+
+  assert.equal(
+    shouldShowDirectInputDrawer('createCoordinate', 'direct', state),
+    true,
+  )
+  assert.equal(
+    directInputDrawerFormKind('createCoordinate', 'direct'),
+    'coordinate',
+  )
 })
 
 test('selecting Direct for Add path opens the path direct input form', () => {
@@ -471,6 +486,7 @@ test('preview canvas creation clicks are disabled for Add grid direct input', ()
 
 test('preview canvas creation clicks require cursor-capable tools in cursor mode', () => {
   const cursorTools: WorkPlanePreviewTool[] = [
+    'createCoordinate',
     'createPoint',
     'createLabel',
     'createPolyline',

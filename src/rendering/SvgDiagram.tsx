@@ -15,6 +15,7 @@ import type {
   Vec3,
   VisibilityOptions,
 } from '../model/types'
+import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import {
   curveOcclusionEnabled,
   defaultHiddenCurveStyle,
@@ -125,6 +126,10 @@ import {
   type PathIntersectionDetectionStatus,
 } from '../geometry/pathIntersections.ts'
 import { pathCrossingKindForCandidate } from '../model/pathCrossings.ts'
+import {
+  svgCoordinateAnchorMarkers,
+  type SvgCoordinateAnchorMarker,
+} from './svgCoordinateAnchors.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -272,6 +277,7 @@ export function SvgDiagram({
     ...(cubicBezierDraft ?? []),
     ...(pathDraft === undefined ? [] : concatenatedPathDraftCoordinates(pathDraft)),
     ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
+    ...coordinateAnchorPreviewPoints(diagram),
   ]
   const camera = resolveSvgCamera(diagram, width, height, {
     fitToView,
@@ -540,6 +546,13 @@ export function SvgDiagram({
         selectedPathIntersectionCandidateId,
         onPathIntersectionCandidateClick,
       )}
+      {renderCoordinateAnchors(
+        diagram,
+        camera,
+        height,
+        selectedElement,
+        onSelectionChange,
+      )}
       {shouldRenderSvgGeometryHandles(
         showGeometryHandles,
         onGeometryHandleDrag !== undefined,
@@ -763,6 +776,18 @@ function visibleSvgSheetIds(diagram: Diagram): ReadonlySet<string> {
   )
 }
 
+function coordinateAnchorPreviewPoints(diagram: Diagram): Vec3[] {
+  return (diagram.coordinateAnchors ?? []).flatMap((anchor) => {
+    try {
+      return [
+        coordinateAnchorPositionPreview(anchor.position, diagram.ambientDimension),
+      ]
+    } catch {
+      return []
+    }
+  })
+}
+
 function renderSortedSurfaceFace(
   diagram: Diagram,
   sheet: SheetStratum,
@@ -935,6 +960,125 @@ function renderCoordinateSourceHighlight(
           {highlight.label}
         </text>
       )}
+    </g>
+  )
+}
+
+function renderCoordinateAnchors(
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  selectedElement: SelectedElement,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): ReactElement | null {
+  const markers = svgCoordinateAnchorMarkers(
+    diagram,
+    camera,
+    viewportHeight,
+    selectedElement,
+  )
+
+  if (markers.length === 0) {
+    return null
+  }
+
+  return (
+    <g
+      key="coordinate-anchors"
+      className="svg-coordinate-anchors"
+      aria-label="Coordinate anchors"
+      data-svg-coordinate-anchors="true"
+    >
+      {markers.map((marker) => renderCoordinateAnchor(marker, onSelectionChange))}
+    </g>
+  )
+}
+
+function renderCoordinateAnchor(
+  marker: SvgCoordinateAnchorMarker,
+  onSelectionChange: SvgDiagramProps['onSelectionChange'],
+): ReactElement {
+  const { anchor, center, hitRadius, selected } = marker
+  const markerColor = '#0F766E'
+
+  return (
+    <g
+      key={anchor.id}
+      className="svg-coordinate-anchor svg-selectable"
+      role="button"
+      aria-label={`Coordinate ${anchor.name}`}
+      data-svg-coordinate-anchor="true"
+      data-coordinate-anchor-id={anchor.id}
+      data-coordinate-anchor-name={anchor.name}
+      data-coordinate-anchor-tikz-name={anchor.tikzName}
+      onClick={(event) =>
+        selectElement(
+          event,
+          { kind: 'coordinate', id: anchor.id },
+          onSelectionChange,
+        )
+      }
+    >
+      <title>{`${anchor.name} (${anchor.tikzName})`}</title>
+      <circle
+        cx={center.x}
+        cy={center.y}
+        r={hitRadius}
+        fill="#ffffff"
+        fillOpacity={0.001}
+        stroke="none"
+        data-svg-coordinate-anchor-hit-target="true"
+      />
+      {selected && (
+        <circle
+          cx={center.x}
+          cy={center.y}
+          r={10}
+          fill="none"
+          stroke={highlightColor}
+          strokeOpacity={0.92}
+          strokeWidth={2.4}
+          vectorEffect="non-scaling-stroke"
+          pointerEvents="none"
+        />
+      )}
+      <path
+        d={`M ${center.x - 7},${center.y} L ${center.x + 7},${center.y} M ${
+          center.x
+        },${center.y - 7} L ${center.x},${center.y + 7}`}
+        fill="none"
+        stroke="#ffffff"
+        strokeOpacity={0.96}
+        strokeWidth={4}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
+      <path
+        d={`M ${center.x - 7},${center.y} L ${center.x + 7},${center.y} M ${
+          center.x
+        },${center.y - 7} L ${center.x},${center.y + 7}`}
+        fill="none"
+        stroke={markerColor}
+        strokeOpacity={0.95}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
+      <rect
+        x={center.x - 3.5}
+        y={center.y - 3.5}
+        width={7}
+        height={7}
+        transform={`rotate(45 ${center.x} ${center.y})`}
+        fill={markerColor}
+        fillOpacity={0.9}
+        stroke="#ffffff"
+        strokeWidth={1.1}
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="none"
+      />
     </g>
   )
 }

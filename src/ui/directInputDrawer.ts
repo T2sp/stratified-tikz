@@ -5,6 +5,7 @@ import type { WorkPlanePreviewTool } from './workPlanePreview.ts'
 export type DirectInputDrawerState = 'open' | 'closed'
 
 export type DirectInputDrawerFormKind =
+  | 'coordinate'
   | 'point'
   | 'label'
   | 'path'
@@ -36,6 +37,8 @@ export function directInputDrawerFormKind(
   }
 
   switch (tool) {
+    case 'createCoordinate':
+      return 'coordinate'
     case 'createPoint':
       return 'point'
     case 'createLabel':
