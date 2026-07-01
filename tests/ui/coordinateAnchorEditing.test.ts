@@ -5,8 +5,9 @@ import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceSourceForPoint,
   coordinateReferenceVec3ForAnchorId,
+  findCoordinateAnchorReferences,
 } from '../../src/model/coordinateReferences.ts'
-import { defaultCurveStyle } from '../../src/model/styles.ts'
+import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   CoordinateAnchor,
@@ -15,6 +16,7 @@ import type {
   CurveStratum,
   Diagram,
   Vec3,
+  WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -275,6 +277,128 @@ test('delete referenced coordinate detaches references and removes it', () => {
   assert.match(tikz, /\(curvePolyReferencePath0p0\) -- \(B\);/)
 })
 
+test('delete coordinate detaches nested work-plane-local source frame references', () => {
+  const initial = createState(createNestedWorkPlaneLocalReferenceDiagram(), {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const result = deleteCoordinateAnchorWithDetach(
+    initial.editableDiagram,
+    'coord-a',
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const point = result.diagram.strata[0]
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(result.detachedCount, 1)
+  assert.equal(hasAnchor(result.diagram, 'coord-a'), false)
+  assert.equal(point?.geometricKind, 'point')
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected a point stratum.')
+  }
+  assert.equal(point.position.symbolic?.source?.kind, 'workPlaneLocal')
+  if (point.position.symbolic?.source?.kind !== 'workPlaneLocal') {
+    throw new Error('Expected a work-plane-local source.')
+  }
+  assert.deepEqual(point.position.symbolic.source.frame.origin, {
+    x: 5,
+    y: 5,
+    z: 0,
+  })
+  assert.deepEqual(pointPreview(point.position), { x: 7, y: 8, z: 0 })
+  assert.equal(
+    coordinateReferenceSourceForPoint(point.position.symbolic.source.frame.origin),
+    null,
+  )
+  assert.equal(JSON.stringify(result.diagram).includes('"coordinateId":"coord-a"'), false)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.doesNotMatch(tikz, /\\coordinate \(A\)/)
+  assert.doesNotMatch(tikz, /\(A\)/)
+
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: result.diagram,
+    selectedElement: null,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasAnchor(undone.editableDiagram, 'coord-a'), true)
+  assert.equal(hasAnchor(redone.editableDiagram, 'coord-a'), false)
+  assert.equal(
+    JSON.stringify(redone.editableDiagram).includes('"coordinateId":"coord-a"'),
+    false,
+  )
+})
+
+test('delete coordinate sanitizes self-referential replacement source frame refs', () => {
+  const diagram = createCoordinateDiagram(3)
+
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(10, 20, 30),
+  })
+  const selfOrigin = coordinateReferenceVec3ForAnchorId(diagram, 'coord-a')
+
+  if (selfOrigin === null) {
+    throw new Error('Expected coordinate reference point.')
+  }
+
+  const sourceFrame = {
+    origin: selfOrigin,
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: localAnchorPositionWithFrame(sourceFrame, 2, 3),
+        }
+      : anchor,
+  )
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'self-ref-point',
+    name: 'Self reference point',
+    style: { ...defaultPointStyle },
+    position: requiredCoordinateReference(diagram, 'coord-a'),
+    layer: 0,
+  })
+  const originalJson = JSON.stringify(diagram)
+  const result = deleteCoordinateAnchorWithDetach(diagram, 'coord-a')
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const point = result.diagram.strata[0]
+
+  assert.equal(result.detachedCount, 3)
+  assert.equal(hasAnchor(result.diagram, 'coord-a'), false)
+  assert.equal(point?.geometricKind, 'point')
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected a point stratum.')
+  }
+  assert.equal(point.position.symbolic, undefined)
+  assert.deepEqual(pointPreview(point.position), { x: 12, y: 23, z: 30 })
+  assert.equal(findCoordinateAnchorReferences(result.diagram, 'coord-a').length, 0)
+  assert.equal(JSON.stringify(result.diagram).includes('"coordinateId":"coord-a"'), false)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
 test('undo and redo restore coordinate rename, move, and delete', () => {
   const renameInitial = createStateWithCoordinate()
   const renamed = commitCoordinateChange(
@@ -421,6 +545,19 @@ function addAnchor(
   return anchor
 }
 
+function requiredCoordinateReference(
+  diagram: Diagram,
+  coordinateId: string,
+): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate reference ${coordinateId}.`)
+  }
+
+  return point
+}
+
 function createReferencedPathDiagram(): Diagram {
   const diagram = createCoordinateDiagram(2)
   addAnchor(diagram, {
@@ -451,6 +588,46 @@ function createReferencedPathDiagram(): Diagram {
     style: { ...defaultCurveStyle },
     styleSegments: [],
     points: [start, end],
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createNestedWorkPlaneLocalReferenceDiagram(): Diagram {
+  const diagram = createCoordinateDiagram(3)
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(1, 1, 0),
+  })
+  const origin = coordinateReferenceVec3ForAnchorId(diagram, 'coord-a')
+
+  if (origin === null) {
+    throw new Error('Expected coordinate reference point.')
+  }
+
+  diagram.coordinateAnchors = (diagram.coordinateAnchors ?? []).map((anchor) =>
+    anchor.id === 'coord-a'
+      ? {
+          ...anchor,
+          position: globalAnchorPosition(5, 5, 0),
+        }
+      : anchor,
+  )
+  diagram.strata.push({
+    codim: 3,
+    geometricKind: 'point',
+    id: 'nested-local-point',
+    name: 'Nested local point',
+    style: { ...defaultPointStyle },
+    position: workPlaneLocalPoint({
+      origin,
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    }),
     layer: 0,
   })
 
@@ -524,6 +701,55 @@ function localAnchorPosition(a: number, b: number): CoordinateAnchorPosition {
       b: { kind: 'numeric', value: b },
     },
     preview: { x: 10 + a, y: 20, z: 30 + b },
+  }
+}
+
+function localAnchorPositionWithFrame(
+  frame: WorkPlaneFrameSnapshot,
+  a: number,
+  b: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'workPlaneLocal',
+    frame,
+    local: {
+      a: { kind: 'numeric', value: a },
+      b: { kind: 'numeric', value: b },
+    },
+    preview: {
+      x: frame.origin.x + a * frame.u.x + b * frame.v.x,
+      y: frame.origin.y + a * frame.u.y + b * frame.v.y,
+      z: frame.origin.z + a * frame.u.z + b * frame.v.z,
+    },
+  }
+}
+
+function workPlaneLocalPoint(
+  frame: WorkPlaneFrameSnapshot,
+  a = 2,
+  b = 3,
+): Vec3 {
+  const preview = {
+    x: frame.origin.x + a * frame.u.x + b * frame.v.x,
+    y: frame.origin.y + a * frame.u.y + b * frame.v.y,
+    z: frame.origin.z + a * frame.u.z + b * frame.v.z,
+  }
+
+  return {
+    ...preview,
+    symbolic: {
+      x: { kind: 'numeric', value: preview.x },
+      y: { kind: 'numeric', value: preview.y },
+      z: { kind: 'numeric', value: preview.z },
+      source: {
+        kind: 'workPlaneLocal',
+        frame,
+        local: {
+          a: { kind: 'numeric', value: a },
+          b: { kind: 'numeric', value: b },
+        },
+      },
+    },
   }
 }
 

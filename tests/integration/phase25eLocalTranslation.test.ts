@@ -5,6 +5,11 @@ import {
   createEmptyDiagram,
   createPointStratum,
 } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
 import { translateLayer } from '../../src/model/layers.ts'
 import type { ScalarInputValue } from '../../src/model/scalarExpressions.ts'
 import {
@@ -134,6 +139,22 @@ test('layer translation uses the same local frame-origin policy', () => {
     unmoved.frame.origin,
     requireLocalSource(findPoint(diagram, 'local-b').position).frame.origin,
   )
+})
+
+test('layer translation sanitizes coordinateRef replacement work-plane-local frame refs', () => {
+  const diagram = diagramWithNestedCoordinateReplacement()
+  const translated = translateLayer(diagram, 0, translation)
+  const point = findPoint(translated, 'layer-coordinate-ref-point')
+  const source = requireLocalSource(point.position)
+
+  assert.equal(coordinateReferenceSourceForPoint(point.position), null)
+  assert.equal(coordinateReferenceSourceForPoint(source.frame.origin), null)
+  assert.deepEqual(source.frame.origin, { x: 11, y: 18, z: 33 })
+  assert.deepEqual(source.local, {
+    a: { kind: 'numeric', value: 2 },
+    b: { kind: 'numeric', value: 3 },
+  })
+  assertVec3Close(point.position, { x: 13, y: 21, z: 33 })
 })
 
 test('undo and redo restore local frame origins after translation', () => {
@@ -310,6 +331,54 @@ function diagramWithLocalPoints(): Diagram {
   return diagram
 }
 
+function diagramWithNestedCoordinateReplacement(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      tikzName: 'B',
+      position: {
+        kind: 'global',
+        value: {
+          x: { kind: 'numeric', value: 10 },
+          y: { kind: 'numeric', value: 20 },
+          z: { kind: 'numeric', value: 30 },
+        },
+      },
+    }),
+  ]
+  diagram.coordinateAnchors = [
+    ...(diagram.coordinateAnchors ?? []),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: {
+        kind: 'workPlaneLocal',
+        frame: xyFrame(requiredCoordinateReference(diagram, 'coord-b')),
+        local: {
+          a: { kind: 'numeric', value: 2 },
+          b: { kind: 'numeric', value: 3 },
+        },
+        preview: { x: 12, y: 23, z: 30 },
+      },
+    }),
+  ]
+  diagram.strata.push(
+    createPointStratum({
+      ambientDimension: 3,
+      id: 'layer-coordinate-ref-point',
+      name: 'Layer coordinate ref point',
+      position: requiredCoordinateReference(diagram, 'coord-a'),
+      layer: 0,
+    }),
+  )
+
+  return diagram
+}
+
 function diagramWithLocalPaths(mixedFrames: boolean): Diagram {
   const diagram = symbolicDiagram()
   const firstFrame = xyFrame()
@@ -475,6 +544,19 @@ function requireLocalSource(point: Vec3): WorkPlaneLocalCoordinateSource {
   }
 
   return source
+}
+
+function requiredCoordinateReference(
+  diagram: Diagram,
+  coordinateId: string,
+): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate reference ${coordinateId}.`)
+  }
+
+  return point
 }
 
 function findPoint(diagram: Diagram, id: string): PointStratum {
