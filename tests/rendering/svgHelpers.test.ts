@@ -40,6 +40,7 @@ import type {
   CurvedSheetStratum,
   CubicBezierControlMode,
   Diagram,
+  PathInlineNode,
   PathSegment,
   RegionStyle,
   SheetStyle,
@@ -77,7 +78,10 @@ import {
   curveArrowheadsForSvgPreview,
   type SvgArrowheadPreview,
 } from '../../src/rendering/svgArrows.ts'
-import { pathInlineNodesForSvgPreview } from '../../src/rendering/svgPathInlineNodes.ts'
+import {
+  maxSvgPathInlineNodePreviews,
+  pathInlineNodesForSvgPreview,
+} from '../../src/rendering/svgPathInlineNodes.ts'
 import { svgPathCrossingOverlayPrimitives } from '../../src/rendering/svgPathCrossings.ts'
 import {
   coordinateAnchorMarkerAppearance,
@@ -89,6 +93,8 @@ import {
 import {
   collectSvgPreviewSelectionCandidates,
   createSvgSelectionCandidateVisibility,
+  maxSvgPreviewSelectionCandidateProjections,
+  maxSvgPreviewSelectionInlineNodePreviews,
   nextSvgPreviewSelectionCycle,
   pickSvgPreviewHitTestCandidate,
   svgPreviewHitTestPriorityRank,
@@ -421,6 +427,226 @@ test('SVG preview selection candidates include overlapping selectable objects', 
   assert.ok(keys.includes('curve:path-overlap'))
   assert.ok(keys.includes('sheetOrRegion:region-overlap'))
   assert.ok(candidates.length >= 5)
+})
+
+test('SVG preview selection candidate collection bounds coordinate-anchor work before sorting', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const origin = { x: 0, y: 0, z: 0 }
+  const maxCandidates = 8
+
+  diagram.coordinateAnchors = Array.from({ length: maxCandidates + 12 }, (_, index) =>
+    createCoordinateAnchor(diagram, {
+      id: `coord-bound-${index}`,
+      name: `C${index}`,
+      position: coordinateAnchorPositionAt(origin),
+    }),
+  )
+
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: projectToSvgPoint(
+      diagram.camera,
+      origin,
+      overlappingCandidateViewportHeight,
+    ),
+    maxCandidates,
+    maxProjectedPoints: maxSvgPreviewSelectionCandidateProjections,
+    includeDiagnostics: true,
+  })
+
+  assert.equal(result.candidates.length, maxCandidates)
+  assert.equal(result.diagnostics.candidatesCreated, maxCandidates)
+  assert.equal(result.diagnostics.projectedPoints, maxCandidates)
+  assert.equal(result.diagnostics.candidateBudgetExhausted, true)
+  assert.equal(result.diagnostics.truncated, true)
+  assert.deepEqual(
+    candidateStableIds(result.candidates),
+    Array.from(
+      { length: maxCandidates },
+      (_, index) => `coordinateAnchor:coord-bound-${index}`,
+    ),
+  )
+})
+
+test('SVG preview selection candidate collection bounds label projection work', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const origin = { x: 0, y: 0, z: 0 }
+  const maxProjectedPoints = 5
+
+  diagram.labels = Array.from({ length: maxProjectedPoints + 20 }, (_, index) =>
+    createTextLabel({
+      ambientDimension: 2,
+      id: `bounded-label-${index}`,
+      name: `L${index}`,
+      text: '$L$',
+      position: origin,
+    }),
+  )
+
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: projectToSvgPoint(
+      diagram.camera,
+      origin,
+      overlappingCandidateViewportHeight,
+    ),
+    maxCandidates: maxProjectedPoints + 10,
+    maxProjectedPoints,
+    includeDiagnostics: true,
+  })
+
+  assert.equal(result.candidates.length, maxProjectedPoints)
+  assert.equal(result.diagnostics.projectedPoints, maxProjectedPoints)
+  assert.equal(result.diagnostics.projectionBudgetExhausted, true)
+  assert.equal(result.diagnostics.truncated, true)
+})
+
+test('SVG preview selection candidate collection applies a global inline-node preview budget', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const inlineBudget = 32
+
+  diagram.strata = Array.from(
+    { length: maxSvgPreviewSelectionInlineNodePreviews + 50 },
+    (_, index) =>
+      createCurveStratum({
+        ambientDimension: 2,
+        id: `inline-budget-path-${index}`,
+        name: `Path ${index}`,
+        points: [
+          { x: -1, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        inlineNodes: [pathInlineNodeForTest(`inline-budget-node-${index}`)],
+      }),
+  )
+
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: projectToSvgPoint(
+      diagram.camera,
+      { x: 0, y: 0, z: 0 },
+      overlappingCandidateViewportHeight,
+    ),
+    maxCandidates: inlineBudget + 8,
+    maxInlineNodePreviews: inlineBudget,
+    includeDiagnostics: true,
+  })
+
+  assert.equal(result.diagnostics.inlineNodePreviews, inlineBudget)
+  assert.equal(result.diagnostics.inlineNodePreviewBudgetExhausted, true)
+  assert.equal(result.diagnostics.truncated, true)
+  assert.ok(result.diagnostics.inlineNodePreviews < diagram.strata.length)
+  assert.equal(
+    result.candidates.filter((candidate) => candidate.kind === 'pathInlineNode')
+      .length,
+    inlineBudget,
+  )
+})
+
+test('SVG preview selection candidate collection preserves the per-curve inline-node cap', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata = [
+    createCurveStratum({
+      ambientDimension: 2,
+      id: 'per-curve-inline-budget-path',
+      points: [
+        { x: -1, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+      ],
+      inlineNodes: Array.from(
+        { length: maxSvgPathInlineNodePreviews + 12 },
+        (_, index) => pathInlineNodeForTest(`per-curve-inline-node-${index}`),
+      ),
+    }),
+  ]
+
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: projectToSvgPoint(
+      diagram.camera,
+      { x: 0, y: 0, z: 0 },
+      overlappingCandidateViewportHeight,
+    ),
+    maxCandidates: maxSvgPathInlineNodePreviews + 20,
+    maxInlineNodePreviews: maxSvgPathInlineNodePreviews + 20,
+    maxProjectedPoints: maxSvgPathInlineNodePreviews + 20,
+    includeDiagnostics: true,
+  })
+
+  assert.equal(result.diagnostics.inlineNodePreviews, maxSvgPathInlineNodePreviews)
+  assert.equal(result.diagnostics.inlineNodePreviewBudgetExhausted, false)
+  assert.equal(
+    result.candidates.filter((candidate) => candidate.kind === 'pathInlineNode')
+      .length,
+    maxSvgPathInlineNodePreviews,
+  )
+})
+
+test('hidden coordinate anchors do not consume cycling candidate work when anchors are hidden', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const origin = { x: 0, y: 0, z: 0 }
+
+  diagram.coordinateAnchors = Array.from({ length: 200 }, (_, index) =>
+    createCoordinateAnchor(diagram, {
+      id: `hidden-coordinate-${index}`,
+      name: `H${index}`,
+      position: coordinateAnchorPositionAt(origin),
+    }),
+  )
+  diagram.strata = [
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'visible-point-after-hidden-coordinates',
+      position: origin,
+    }),
+  ]
+
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: projectToSvgPoint(
+      diagram.camera,
+      origin,
+      overlappingCandidateViewportHeight,
+    ),
+    showCoordinateAnchors: false,
+    maxCandidates: 1,
+    includeDiagnostics: true,
+  })
+
+  assert.deepEqual(candidateStableIds(result.candidates), [
+    'point:visible-point-after-hidden-coordinates',
+  ])
+  assert.equal(result.diagnostics.projectedPoints, 1)
+  assert.equal(result.diagnostics.candidatesCreated, 1)
+})
+
+test('auto-hidden 3D point and label candidates are skipped before projection work', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const result = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: threeDimensionalCandidateViewportHeight,
+    point: threeDimensionalCandidateClickPoint(diagram),
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+      labelOcclusions: [['label-overlap-3d', 'hidden']],
+    }),
+    includeDiagnostics: true,
+  })
+
+  assert.deepEqual(candidateStableIds(result.candidates), ['curve:path-overlap-3d'])
+  assert.equal(result.diagnostics.projectedPoints, 2)
 })
 
 test('normal SVG preview hit ordering selects the top-priority overlap candidate', () => {
@@ -2185,6 +2411,30 @@ function candidateStableIds(
   }[],
 ): string[] {
   return candidates.map((candidate) => candidate.stableId)
+}
+
+function coordinateAnchorPositionAt(point: Vec3) {
+  return {
+    kind: 'global' as const,
+    value: {
+      x: { kind: 'numeric' as const, value: point.x },
+      y: { kind: 'numeric' as const, value: point.y },
+      z: { kind: 'numeric' as const, value: point.z },
+    },
+  }
+}
+
+function pathInlineNodeForTest(id: string): PathInlineNode {
+  return {
+    id,
+    position: {
+      kind: 'segment',
+      segmentIndex: 0,
+      value: 0.5,
+    },
+    text: '$n$',
+    options: { placement: 'above' },
+  }
 }
 
 function regionStyle(overrides: Partial<RegionStyle> = {}): RegionStyle {
