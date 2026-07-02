@@ -14,7 +14,9 @@ import { createBulkStyleEditorModel } from '../bulkEditing.ts'
 import { createInspectorCompactSummary } from '../inspectorSummary.ts'
 import {
   findSelectedElement,
+  isCoordinateAnchorSelection,
   isMultiSelectedElement,
+  selectedElementCount,
   type SelectedElement,
 } from '../selection.ts'
 import { BulkSelectionInspector } from './BulkSelectionInspector.tsx'
@@ -94,17 +96,23 @@ export function EditableInspector({
         </div>
         {expanded && (
           <div id="inspector-details" className="inspector-details-scroll">
-            <BulkSelectionInspector
-              diagram={diagram}
-              selection={selectedElement}
-              model={bulkStyleModel}
-              onDiagramChange={onDiagramChange}
-              onBulkLayerChange={onBulkLayerChange}
-              onBulkDelete={onBulkDelete}
-              onBulkDuplicate={onBulkDuplicate}
-              onBulkTranslate={onBulkTranslate}
-              onBulkConcatenatePaths={onBulkConcatenatePaths}
-            />
+            {isCoordinateAnchorSelection(selectedElement) ? (
+              <CoordinateAnchorMultiSelectionInspector
+                count={selectedElementCount(selectedElement)}
+              />
+            ) : (
+              <BulkSelectionInspector
+                diagram={diagram}
+                selection={selectedElement}
+                model={bulkStyleModel}
+                onDiagramChange={onDiagramChange}
+                onBulkLayerChange={onBulkLayerChange}
+                onBulkDelete={onBulkDelete}
+                onBulkDuplicate={onBulkDuplicate}
+                onBulkTranslate={onBulkTranslate}
+                onBulkConcatenatePaths={onBulkConcatenatePaths}
+              />
+            )}
           </div>
         )}
       </div>
@@ -172,6 +180,31 @@ export function EditableInspector({
           {details}
         </div>
       )}
+    </div>
+  )
+}
+
+function CoordinateAnchorMultiSelectionInspector({
+  count,
+}: {
+  count: number
+}) {
+  return (
+    <div className="inspector-content editable-inspector">
+      <section className="inspector-section">
+        <h3>Coordinates</h3>
+        <div className="inspector-form">
+          <ReadOnlyField label="Count" value={String(count)} />
+          <ReadOnlyField
+            label="Selection"
+            value={`${count} ${count === 1 ? 'coordinate' : 'coordinates'} selected`}
+          />
+          <ReadOnlyField
+            label="Translate selected coordinates"
+            value="Available in the coordinate translation phase."
+          />
+        </div>
+      </section>
     </div>
   )
 }
