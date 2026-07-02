@@ -19,6 +19,7 @@ import type {
   CubicBezierPathSegment,
   HexColor,
   LineStyle,
+  PathInlineNode,
   PathSegment,
   PathSegmentStyleOverride,
   Vec3,
@@ -371,14 +372,52 @@ export function appendCubicSegmentToConcatenatedPath(
 export function removeLastSegmentFromConcatenatedPath(
   path: ConcatenatedPathStratum,
 ): ConcatenatedPathStratum {
+  return removeSegmentFromConcatenatedPath(path, path.segments.length - 1)
+}
+
+export function removeSegmentFromConcatenatedPath(
+  path: ConcatenatedPathStratum,
+  segmentIndex: number,
+): ConcatenatedPathStratum {
   if (path.segments.length <= 1) {
     return path
   }
 
-  return {
-    ...path,
-    segments: path.segments.slice(0, -1),
+  if (
+    !Number.isInteger(segmentIndex) ||
+    segmentIndex < 0 ||
+    segmentIndex >= path.segments.length
+  ) {
+    return path
   }
+
+  const segments = pathSegmentsAfterSegmentRemoval(path, segmentIndex)
+
+  if (segments === null) {
+    return path
+  }
+
+  const nextPath: ConcatenatedPathStratum = {
+    ...path,
+    segments,
+  }
+
+  const inlineNodes = inlineNodesAfterSegmentRemoval(
+    path.inlineNodes,
+    segmentIndex,
+  )
+
+  if (path.inlineNodes === undefined) {
+    return nextPath
+  }
+
+  if (inlineNodes === undefined) {
+    delete nextPath.inlineNodes
+  } else {
+    nextPath.inlineNodes = inlineNodes
+  }
+
+  return nextPath
 }
 
 export function bezierControlModeOptions(
@@ -460,6 +499,93 @@ function pointForRole(
     case 'control2':
       return segment.kind === 'cubicBezier' ? segment.control2 : null
   }
+}
+
+function inlineNodesAfterSegmentRemoval(
+  inlineNodes: readonly PathInlineNode[] | undefined,
+  removedSegmentIndex: number,
+): PathInlineNode[] | undefined {
+  if (inlineNodes === undefined) {
+    return undefined
+  }
+
+  const nextNodes = inlineNodes.flatMap((node): PathInlineNode[] => {
+    const segmentIndex = node.position.segmentIndex
+
+    if (segmentIndex === removedSegmentIndex) {
+      return []
+    }
+
+    return [
+      {
+        ...node,
+        position: {
+          ...node.position,
+          segmentIndex:
+            segmentIndex > removedSegmentIndex
+              ? segmentIndex - 1
+              : segmentIndex,
+        },
+      },
+    ]
+  })
+
+  return nextNodes.length === 0 ? undefined : nextNodes
+}
+
+function pathSegmentsAfterSegmentRemoval(
+  path: ConcatenatedPathStratum,
+  removedSegmentIndex: number,
+): PathSegment[] | null {
+  const segments = path.segments.filter(
+    (_, index) => index !== removedSegmentIndex,
+  )
+
+  if (
+    removedSegmentIndex === 0 ||
+    removedSegmentIndex >= path.segments.length - 1
+  ) {
+    return segments
+  }
+
+  const previousSegment = path.segments[removedSegmentIndex - 1]
+  const nextSegment = segments[removedSegmentIndex]
+
+  if (previousSegment === undefined || nextSegment === undefined) {
+    return null
+  }
+
+  const reconnectedSegment = reconnectSegmentStartAfterRemoval(
+    nextSegment,
+    ambientDimensionForPath(path),
+    pathSegmentEnd(previousSegment),
+  )
+
+  if (reconnectedSegment === null) {
+    return null
+  }
+
+  return segments.map((segment, index) =>
+    index === removedSegmentIndex ? reconnectedSegment : segment,
+  )
+}
+
+function reconnectSegmentStartAfterRemoval(
+  segment: PathSegment,
+  ambientDimension: AmbientDimension,
+  start: Vec3,
+): PathSegment | null {
+  switch (segment.kind) {
+    case 'line':
+    case 'cubicBezier':
+      return updateSegmentEndpoint(segment, ambientDimension, 'start', start)
+    case 'arc':
+      return null
+  }
+}
+
+function ambientDimensionForPath(path: ConcatenatedPathStratum): AmbientDimension {
+  return path.codim === 1 ? 2 : 3
 }
 
 function updatePathSegmentsPoint(

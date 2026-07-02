@@ -31,6 +31,7 @@ import {
   clearConcatenatedPathSegmentStyleOverride,
   describeConcatenatedPathSegments,
   removeLastSegmentFromConcatenatedPath,
+  removeSegmentFromConcatenatedPath,
   updateConcatenatedPathCoordinate,
   updateConcatenatedPathPoint,
   updateConcatenatedPathSegmentStyleOverrideField,
@@ -168,6 +169,88 @@ test('segment operations append line, append cubic, and remove last segment', ()
   assert.equal(removeLastSegmentFromConcatenatedPath(createSingleSegmentPath()).segments.length, 1)
 })
 
+test('removing a concatenated path segment shifts later inline node segment indices', () => {
+  const path = createThreeSegmentPath([
+    {
+      id: 'first-node',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.4 },
+      text: '$f$',
+      options: { placement: 'above' },
+    },
+    {
+      id: 'last-node',
+      position: { kind: 'segment', segmentIndex: 2, value: 0.6 },
+      text: '$l$',
+      options: { placement: 'below' },
+    },
+  ])
+  const removed = removeSegmentFromConcatenatedPath(path, 1)
+
+  assert.equal(removed.segments.length, 2)
+  assert.deepEqual(
+    removed.inlineNodes?.map((node) => ({
+      id: node.id,
+      segmentIndex: node.position.segmentIndex,
+    })),
+    [
+      { id: 'first-node', segmentIndex: 0 },
+      { id: 'last-node', segmentIndex: 1 },
+    ],
+  )
+  assert.deepEqual(removed.segments[1].start, removed.segments[0].end)
+  assert.equal(hasStaleInlineNodeSegmentIndex(removed), false)
+  assert.equal(validatePath(removed).valid, true, validationMessage(removed))
+})
+
+test('removing a concatenated path segment prunes inline nodes on that segment', () => {
+  const path = createThreeSegmentPath([
+    {
+      id: 'removed-node',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+      text: '$x$',
+      options: { placement: 'above' },
+    },
+    {
+      id: 'kept-node',
+      position: { kind: 'segment', segmentIndex: 1, value: 0.5 },
+      text: '$y$',
+      options: { placement: 'below' },
+    },
+  ])
+  const removed = removeSegmentFromConcatenatedPath(path, 0)
+
+  assert.deepEqual(removed.inlineNodes?.map((node) => node.id), ['kept-node'])
+  assert.equal(removed.inlineNodes?.[0]?.position.segmentIndex, 0)
+  assert.equal(hasStaleInlineNodeSegmentIndex(removed), false)
+  assert.equal(validatePath(removed).valid, true, validationMessage(removed))
+})
+
+test('removing last concatenated path segment prunes inline nodes on removed segment', () => {
+  const path = createThreeSegmentPath([
+    {
+      id: 'kept-node',
+      position: { kind: 'segment', segmentIndex: 1, value: 0.5 },
+      text: '$k$',
+      options: { placement: 'above' },
+    },
+    {
+      id: 'dropped-node',
+      position: { kind: 'segment', segmentIndex: 2, value: 0.5 },
+      text: '$d$',
+      options: { placement: 'below' },
+    },
+  ])
+  const removed = removeLastSegmentFromConcatenatedPath(path)
+  const tikz = generateTikz(diagramWithPath(removed))
+
+  assert.equal(removed.segments.length, 2)
+  assert.deepEqual(removed.inlineNodes?.map((node) => node.id), ['kept-node'])
+  assert.equal(hasStaleInlineNodeSegmentIndex(removed), false)
+  assert.equal(validatePath(removed).valid, true, validationMessage(removed))
+  assert.match(tikz, /node\[pos=0\.5, above\] \{\$k\$\}/)
+  assert.doesNotMatch(tikz, /\$d\$/)
+})
+
 test('clearing concatenated path segment style override restores inheritance', () => {
   const path = createTestPath()
   const overridden = updateConcatenatedPathSegmentStyleOverrideField(
@@ -262,12 +345,95 @@ test('undo and redo restore concatenated path edits as one diagram change', () =
   })
 })
 
+test('undo and redo restore concatenated path segment removal inline-node cleanup', () => {
+  const initialDiagram = diagramWithPath(
+    createThreeSegmentPath([
+      {
+        id: 'undo-kept-node',
+        position: { kind: 'segment', segmentIndex: 1, value: 0.5 },
+        text: '$u$',
+        options: { placement: 'above' },
+      },
+      {
+        id: 'undo-dropped-node',
+        position: { kind: 'segment', segmentIndex: 2, value: 0.5 },
+        text: '$v$',
+        options: { placement: 'below' },
+      },
+    ]),
+  )
+  const initial = createTestEditorState(initialDiagram)
+  const editedDiagram = updateStratumById(
+    initial.editableDiagram,
+    'editable-path',
+    (stratum) => {
+      if (
+        stratum.geometricKind !== 'curve' ||
+        stratum.kind !== 'concatenatedPath'
+      ) {
+        return stratum
+      }
+
+      return removeLastSegmentFromConcatenatedPath(stratum)
+    },
+  )
+  const committed = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: editedDiagram,
+  })
+  const undone = undoLastDiagramChange(committed)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.deepEqual(
+    findPath(committed.editableDiagram).inlineNodes?.map((node) => node.id),
+    ['undo-kept-node'],
+  )
+  assert.deepEqual(
+    findPath(undone.editableDiagram).inlineNodes?.map((node) => node.id),
+    ['undo-kept-node', 'undo-dropped-node'],
+  )
+  assert.equal(findPath(undone.editableDiagram).inlineNodes?.[1]?.position.segmentIndex, 2)
+  assert.deepEqual(
+    findPath(redone.editableDiagram).inlineNodes?.map((node) => node.id),
+    ['undo-kept-node'],
+  )
+  assert.equal(hasStaleInlineNodeSegmentIndex(findPath(redone.editableDiagram)), false)
+})
+
 function createTestPath(): ConcatenatedPathStratum {
   return createConcatenatedPathStratum({
     ambientDimension: 2,
     id: 'editable-path',
     name: 'Editable Path',
     segments: createTestSegments(),
+  })
+}
+
+function createThreeSegmentPath(
+  inlineNodes?: ConcatenatedPathStratum['inlineNodes'],
+): ConcatenatedPathStratum {
+  return createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'editable-path',
+    name: 'Editable Path',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 2, y: 0, z: 0 },
+        end: { x: 3, y: 0, z: 0 },
+      },
+    ],
+    inlineNodes,
   })
 }
 
@@ -306,6 +472,18 @@ function diagramWithPath(path: ConcatenatedPathStratum): Diagram {
 
 function validatePath(path: ConcatenatedPathStratum) {
   return validateDiagram(diagramWithPath(path))
+}
+
+function validationMessage(path: ConcatenatedPathStratum): string {
+  return validatePath(path).errors.map((issue) => issue.message).join('\n')
+}
+
+function hasStaleInlineNodeSegmentIndex(path: ConcatenatedPathStratum): boolean {
+  return (
+    path.inlineNodes?.some(
+      (node) => node.position.segmentIndex >= path.segments.length,
+    ) ?? false
+  )
 }
 
 function pathSegmentToSvgSegment(segment: PathSegment): SvgPathSegment {

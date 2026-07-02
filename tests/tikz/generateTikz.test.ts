@@ -4806,6 +4806,80 @@ test('template paths export using native 2D TikZ circle and ellipse syntax', () 
   assert.doesNotMatch(tikz, /\.\. controls/)
 })
 
+test('template path inline nodes export on 2D circle and ellipse commands', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'templatePath',
+      id: 'circle-template-inline',
+      name: 'Circle Template Inline',
+      style: curveStyle(),
+      styleSegments: [],
+      inlineNodes: [
+        {
+          id: 'circle-template-late',
+          position: { kind: 'segment', segmentIndex: 0, value: 0.75 },
+          text: '$d$',
+          options: { placement: 'below' },
+        },
+        {
+          id: 'circle-template-early',
+          position: { kind: 'segment', segmentIndex: 0, value: 0.25 },
+          text: '$c$',
+          options: { placement: 'above' },
+        },
+      ],
+      layer: 0,
+      template: {
+        kind: 'circleTemplate',
+        center: { x: 0, y: 0, z: 0 },
+        radius: 1,
+      },
+    },
+    {
+      codim: 1,
+      geometricKind: 'curve',
+      kind: 'templatePath',
+      id: 'ellipse-template-inline',
+      name: 'Ellipse Template Inline',
+      style: curveStyle(),
+      styleSegments: [],
+      inlineNodes: [
+        {
+          id: 'ellipse-template-node',
+          position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+          text: '$e$',
+          options: { placement: 'right' },
+        },
+      ],
+      layer: 0,
+      template: {
+        kind: 'ellipseTemplate',
+        center: { x: 3, y: 0, z: 0 },
+        radiusX: 2,
+        radiusY: 0.5,
+      },
+    },
+  )
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+  assert.match(
+    tikz,
+    /circle\[radius=1\] node\[pos=0\.25, above\] \{\$c\$\} node\[pos=0\.75, below\] \{\$d\$\};/,
+  )
+  assert.match(
+    tikz,
+    /ellipse\[x radius=2, y radius=0\.5\] node\[pos=0\.5, right\] \{\$e\$\};/,
+  )
+  assert.doesNotMatch(tikz, /circle\[radius=1\];/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
 test('3D template paths export in a TikZ canvas-is-plane scope', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.strata.push({
@@ -4835,6 +4909,48 @@ test('3D template paths export in a TikZ canvas-is-plane scope', () => {
   assert.match(tikz, /\\usetikzlibrary\{3d\}/)
   assert.match(tikz, /canvas is plane/)
   assert.match(tikz, /\(0,0\) circle\[radius=2\]/)
+})
+
+test('3D template path inline nodes export inside the local plane scope', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'templatePath',
+    id: 'circle-template-inline-3d',
+    name: 'Circle Template Inline 3D',
+    style: curveStyle(),
+    styleSegments: [],
+    inlineNodes: [
+      {
+        id: 'circle-template-3d-node',
+        position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+        text: '$z$',
+        options: { placement: 'right' },
+      },
+    ],
+    layer: 0,
+    template: {
+      kind: 'circleTemplate',
+      center: { x: 1, y: 2, z: 3 },
+      radius: 2,
+      frame: {
+        origin: { x: 1, y: 2, z: 3 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+    },
+  })
+
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+  assert.match(tikz, /\\usetikzlibrary\{3d\}/)
+  assert.match(tikz, /canvas is plane/)
+  assert.match(tikz, /\(0,0\) circle\[radius=2\] node\[pos=0\.5, right\] \{\$z\$\};/)
+  expectNoBlankLines(inlineTikz)
+  expectNoTwoSpaceCommandIndent(inlineTikz)
 })
 
 test('2D grid exports foreach loops', () => {

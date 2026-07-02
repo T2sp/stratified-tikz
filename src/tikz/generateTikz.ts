@@ -3808,6 +3808,7 @@ function emitTemplatePath(
   const drawCommand = formatTemplatePathCommand(
     curve.template,
     `(${center})`,
+    formatPathInlineNodesForSegment(curve.inlineNodes, 0),
   )
 
   if (drawCommand === null) {
@@ -3876,6 +3877,7 @@ function emitTemplatePath3D(
   const drawCommand = formatTemplatePathCommand(
     curve.template,
     centerCoordinate,
+    formatPathInlineNodesForSegment(curve.inlineNodes, 0),
   )
 
   if (drawCommand === null) {
@@ -3941,11 +3943,14 @@ function emitTemplatePath3D(
 function formatTemplatePathCommand(
   template: PathTemplate,
   center: string,
+  inlineNodes = '',
 ): string | null {
+  const inlineNodeText = inlineNodes.length === 0 ? '' : ` ${inlineNodes}`
+
   switch (template.kind) {
     case 'circleTemplate':
       return Number.isFinite(template.radius) && template.radius > 0
-        ? `${center} circle[radius=${formatNumber(template.radius)}]`
+        ? `${center} circle[radius=${formatNumber(template.radius)}]${inlineNodeText}`
         : null
     case 'ellipseTemplate':
       return Number.isFinite(template.radiusX) &&
@@ -3954,7 +3959,7 @@ function formatTemplatePathCommand(
         template.radiusY > 0
         ? `${center} ellipse[x radius=${formatNumber(
             template.radiusX,
-          )}, y radius=${formatNumber(template.radiusY)}]`
+          )}, y radius=${formatNumber(template.radiusY)}]${inlineNodeText}`
         : null
   }
 }
