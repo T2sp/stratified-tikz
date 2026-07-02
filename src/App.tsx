@@ -99,6 +99,7 @@ import {
 } from './model/visibility.ts'
 import {
   SvgDiagram,
+  pathSplitTargetFromSvgPoint,
   svgPointToModelOnWorkPlane,
   type BoundaryPathHighlight,
   type SvgCanvasClickTarget,
@@ -131,6 +132,7 @@ import {
   applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
   applyDirectCreationCommitToEditorState,
+  applySplitSelectedPathToEditorState,
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
   applyMergeLayersToEditorState,
@@ -340,6 +342,7 @@ import {
   type InspectorDisclosureState,
   type InspectorDrawerState,
   type LayerFilter,
+  type PathSplitTarget,
   type PreviewPathInputMode,
   type PreviewPathMenuItem,
   type PreviewSheetCreationKind,
@@ -375,6 +378,10 @@ type DirectCreationTool =
   | 'createSheet'
   | 'createGrid'
 type DirectCoordinateAxis = 'x' | 'y' | 'z'
+type PathSplitPickState = {
+  pathId: string
+  keepOriginal: boolean
+}
 type SheetCreationKind =
   | PreviewSheetCreationKind
   | Extract<CurvedSheetCreationKind, 'saddle'>
@@ -762,6 +769,8 @@ function App() {
   const [workPlanePointPickingState, setWorkPlanePointPickingState] =
     useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
+  const [pathSplitPickState, setPathSplitPickState] =
+    useState<PathSplitPickState | null>(null)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const [cameraControl, setCameraControl] = useState<OrthographicCamera3D>(() =>
     createInitialCameraControlState(),
@@ -1301,6 +1310,7 @@ function App() {
       }),
     )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setPathSplitPickState(null)
     setWorkPlaneStatus('')
     const nextCamera = cameraControlStateFromDiagramView(nextDiagram)
 
@@ -1937,6 +1947,63 @@ function App() {
     setCopyStatus('idle')
 
     return nextState.layerOperationStatus
+  }
+
+  function splitCurrentPath(
+    target: PathSplitTarget,
+    keepOriginal: boolean,
+  ): string {
+    const nextState = applySplitSelectedPathToEditorState(editorState, target, {
+      keepOriginal,
+    })
+
+    setEditorState(nextState)
+    setPathSplitPickState(null)
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return nextState.layerOperationStatus
+  }
+
+  function startPathSplitPick(keepOriginal: boolean): string {
+    const selected = findSelectedElement(editableDiagram, selectedElement)
+    const message =
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      selected.element.geometricKind !== 'curve'
+        ? 'Select exactly one path to split.'
+        : 'Click the selected path in the preview at the split point.'
+
+    if (
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      selected.element.geometricKind !== 'curve'
+    ) {
+      setPathSplitPickState(null)
+      setLayerOperationStatus(message)
+      setPathStatus(message)
+      return message
+    }
+
+    setPathSplitPickState({
+      pathId: selected.element.id,
+      keepOriginal,
+    })
+    setLayerOperationStatus(message)
+    setPathStatus(message)
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return message
   }
 
   const removeCurrentSelection = useCallback(function removeCurrentSelection(): void {
@@ -2739,6 +2806,104 @@ function App() {
     }
 
     return sheetCreationStatusPrompt(sheetCreationKind)
+  }
+
+  function handlePreviewCanvasClick(
+    svgPoint: Vec2,
+    viewportHeight: number,
+    previewCamera: Camera,
+    target: SvgCanvasClickTarget,
+  ): void {
+    if (
+      pathSplitPickState !== null &&
+      handlePathSplitPickClick(svgPoint, viewportHeight, previewCamera, target)
+    ) {
+      return
+    }
+
+    handlePreviewCreationClick(svgPoint, viewportHeight, previewCamera, target)
+  }
+
+  function handlePathSplitPickClick(
+    svgPoint: Vec2,
+    viewportHeight: number,
+    previewCamera: Camera,
+    target: SvgCanvasClickTarget,
+  ): boolean {
+    if (pathSplitPickState === null) {
+      return false
+    }
+
+    if (target.kind !== 'curve' || target.curveId !== pathSplitPickState.pathId) {
+      const message = 'Click the selected path to choose a split point.'
+
+      setPathStatus(message)
+      setLayerOperationStatus(message)
+      return true
+    }
+
+    const selected = findSelectedElement(editableDiagram, {
+      kind: 'stratum',
+      id: pathSplitPickState.pathId,
+    })
+
+    if (
+      selected === null ||
+      selected.kind !== 'stratum' ||
+      selected.element.geometricKind !== 'curve'
+    ) {
+      const message = 'The selected path is no longer available.'
+
+      setPathSplitPickState(null)
+      setPathStatus(message)
+      setLayerOperationStatus(message)
+      return true
+    }
+
+    const splitTarget = pathSplitTargetFromSvgPoint(
+      selected.element,
+      editableDiagram.ambientDimension,
+      previewCamera,
+      viewportHeight,
+      svgPoint,
+    )
+
+    if (splitTarget === null) {
+      const message = 'Choose an interior point on a supported path segment.'
+
+      setPathStatus(message)
+      setLayerOperationStatus(message)
+      return true
+    }
+
+    const targetForSplit: PathSplitTarget = {
+      segmentIndex: splitTarget.segmentIndex,
+      t: splitTarget.t,
+    }
+    const nextState = applySplitSelectedPathToEditorState(
+      editorState,
+      targetForSplit,
+      {
+        keepOriginal: pathSplitPickState.keepOriginal,
+      },
+    )
+    const changedDiagram = nextState.editableDiagram !== editorState.editableDiagram
+
+    setEditorState(nextState)
+    setPathStatus(nextState.layerOperationStatus)
+    setLayerOperationStatus(nextState.layerOperationStatus)
+
+    if (changedDiagram) {
+      setPathSplitPickState(null)
+      setPolylineStatus('')
+      setCubicBezierStatus('')
+      setPathCrossingStatus('')
+      setSelectedPathIntersectionCandidateId(null)
+      setSheetStatus('')
+      setCopyStatus('idle')
+    }
+
+    return true
   }
 
   function handlePreviewCreationClick(
@@ -5759,6 +5924,8 @@ function App() {
             onBulkTranslate={translateCurrentSelection}
             onCoordinateTranslate={translateCurrentCoordinateSelection}
             onBulkConcatenatePaths={concatenateCurrentSelection}
+            onSplitPath={splitCurrentPath}
+            onStartPathSplitPick={startPathSplitPick}
           />
         </div>
       </aside>
@@ -7981,10 +8148,12 @@ function App() {
                     : undefined
                 }
                 onCanvasClick={
-                  !previewCursorCreationClicksEnabled ||
                   workPlanePointPickingState.active
                     ? undefined
-                    : handlePreviewCreationClick
+                    : pathSplitPickState !== null ||
+                        previewCursorCreationClicksEnabled
+                      ? handlePreviewCanvasClick
+                      : undefined
                 }
                 onPointStratumClick={
                   workPlanePointPickingState.active

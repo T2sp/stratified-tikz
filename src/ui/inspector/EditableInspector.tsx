@@ -38,6 +38,7 @@ import {
 import { StratumInspector } from './StratumInspector.tsx'
 import { TextLabelInspector } from './TextLabelInspector.tsx'
 import type { DiagramChangeHandler } from './types.ts'
+import type { PathSplitTarget } from '../pathSplitting.ts'
 
 export type EditableInspectorProps = {
   diagram: Diagram
@@ -54,6 +55,8 @@ export type EditableInspectorProps = {
     keepOriginals: boolean,
     directionReversed?: readonly boolean[],
   ) => string
+  onSplitPath: (target: PathSplitTarget, keepOriginal: boolean) => string
+  onStartPathSplitPick: (keepOriginal: boolean) => string
 }
 
 export function EditableInspector({
@@ -68,6 +71,8 @@ export function EditableInspector({
   onBulkTranslate,
   onCoordinateTranslate,
   onBulkConcatenatePaths,
+  onSplitPath,
+  onStartPathSplitPick,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
     const summary = createInspectorCompactSummary(diagram, selectedElement)
@@ -152,6 +157,8 @@ export function EditableInspector({
         diagram={diagram}
         stratum={selected.element}
         onDiagramChange={onDiagramChange}
+        onSplitPath={onSplitPath}
+        onStartPathSplitPick={onStartPathSplitPick}
       />
     ) : selected.kind === 'coordinate' ? (
       <CoordinateAnchorInspector

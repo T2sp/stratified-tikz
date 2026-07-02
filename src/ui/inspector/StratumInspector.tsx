@@ -18,21 +18,27 @@ import {
 import { FilledBoundaryGeometryEditor } from './FilledBoundaryGeometryEditor.tsx'
 import { PathArrowEditor } from './PathArrowEditor.tsx'
 import { PathInlineNodeEditor } from './PathInlineNodeEditor.tsx'
+import { PathSplitEditor } from './PathSplitEditor.tsx'
 import { PointGeometryEditor } from './PointGeometryEditor.tsx'
 import { SheetGeometryEditor } from './SheetGeometryEditor.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
+import type { PathSplitTarget } from '../pathSplitting.ts'
 
 export type StratumInspectorProps = {
   diagram: Diagram
   stratum: Stratum
   onDiagramChange: DiagramChangeHandler
+  onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
+  onStartPathSplitPick?: (keepOriginal: boolean) => string
 }
 
 export function StratumInspector({
   diagram,
   stratum,
   onDiagramChange,
+  onSplitPath,
+  onStartPathSplitPick,
 }: StratumInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -88,6 +94,16 @@ export function StratumInspector({
           onDiagramChange={onDiagramChange}
         />
       )}
+
+      {stratum.geometricKind === 'curve' &&
+        onSplitPath !== undefined &&
+        onStartPathSplitPick !== undefined && (
+          <PathSplitEditor
+            curve={stratum}
+            onSplitPath={onSplitPath}
+            onStartPathSplitPick={onStartPathSplitPick}
+          />
+        )}
 
       <StyleEditor
         diagram={diagram}

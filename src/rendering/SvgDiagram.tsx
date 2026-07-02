@@ -157,6 +157,10 @@ export type SvgCanvasClickTarget =
       kind: 'canvas'
     }
   | {
+      kind: 'curve'
+      curveId: string
+    }
+  | {
       kind: 'coordinateAnchor'
       coordinateId: string
     }
@@ -399,6 +403,7 @@ export function SvgDiagram({
             diagram,
             stratum,
             camera,
+            width,
             height,
             selectedElement,
             layerFilter,
@@ -409,6 +414,7 @@ export function SvgDiagram({
             onSelectionChange,
             onCurveStratumClick,
             onPointStratumClick,
+            onCanvasClick,
           ),
           stratum.geometricKind,
         ),
@@ -1591,6 +1597,7 @@ function renderStratum(
   diagram: Diagram,
   stratum: Stratum,
   camera: Diagram['camera'],
+  viewportWidth: number,
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
@@ -1601,6 +1608,7 @@ function renderStratum(
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
+  onCanvasClick: SvgDiagramProps['onCanvasClick'],
 ): RenderItemElement {
   switch (stratum.geometricKind) {
     case 'region':
@@ -1628,6 +1636,7 @@ function renderStratum(
         diagram,
         stratum,
         camera,
+        viewportWidth,
         viewportHeight,
         selectedElement,
         layerFilter,
@@ -1636,6 +1645,7 @@ function renderStratum(
         visibilityOptions,
         onSelectionChange,
         onCurveStratumClick,
+        onCanvasClick,
       )
     case 'point':
       return renderPoint(
@@ -1961,6 +1971,7 @@ function renderCurve(
   diagram: Diagram,
   curve: CurveStratum,
   camera: Diagram['camera'],
+  viewportWidth: number,
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
@@ -1969,6 +1980,7 @@ function renderCurve(
   visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
+  onCanvasClick: SvgDiagramProps['onCanvasClick'],
 ): RenderItemElement {
   const occlusion = curveOcclusionById.get(curve.id)
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
@@ -2013,8 +2025,12 @@ function renderCurve(
           selectCurveElement(
             event,
             curve.id,
+            viewportWidth,
+            viewportHeight,
+            camera,
             onSelectionChange,
             onCurveStratumClick,
+            onCanvasClick,
           )
         }
       >
@@ -3445,12 +3461,33 @@ function selectElement(
 function selectCurveElement(
   event: MouseEvent<SVGGElement>,
   curveId: string,
+  viewportWidth: number,
+  viewportHeight: number,
+  camera: Diagram['camera'],
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
+  onCanvasClick: SvgDiagramProps['onCanvasClick'],
 ): void {
   if (onCurveStratumClick !== undefined) {
     event.stopPropagation()
     onCurveStratumClick(curveId)
+    return
+  }
+
+  if (onCanvasClick !== undefined) {
+    const svgPoint = svgPointFromNestedMouseEvent(
+      event,
+      viewportWidth,
+      viewportHeight,
+    )
+
+    event.stopPropagation()
+    if (svgPoint !== null) {
+      onCanvasClick(svgPoint, viewportHeight, camera, {
+        kind: 'curve',
+        curveId,
+      })
+    }
     return
   }
 

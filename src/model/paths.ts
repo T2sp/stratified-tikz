@@ -48,6 +48,23 @@ export type PathSegmentStyleRun = {
   style: CurveStyle
 }
 
+export type SplitPathSegmentError =
+  | 'invalidParameter'
+  | 'unsupportedArc'
+  | 'nonFiniteSplitPoint'
+
+export type SplitPathSegmentResult =
+  | {
+      ok: true
+      first: PathSegment
+      second: PathSegment
+      point: Vec3
+    }
+  | {
+      ok: false
+      error: SplitPathSegmentError
+    }
+
 export type ReversibleCurveStratum = Extract<
   CurveStratum,
   { kind: 'polyline' | 'cubicBezier' | 'concatenatedPath' }
@@ -405,6 +422,85 @@ export function pathPointAt(
     localParameter,
     ambientDimension,
   )
+}
+
+export function splitPathSegmentAt(
+  segment: PathSegment,
+  parameter: number,
+  ambientDimension: AmbientDimension,
+): SplitPathSegmentResult {
+  const t = normalizedInteriorUnitParameter(parameter)
+
+  if (t === null) {
+    return {
+      ok: false,
+      error: 'invalidParameter',
+    }
+  }
+
+  const point = pathSegmentPointAt(segment, t, ambientDimension)
+
+  if (point === null || !isFiniteVec3(point)) {
+    return {
+      ok: false,
+      error: 'nonFiniteSplitPoint',
+    }
+  }
+
+  const splitPoint = normalizePointForAmbientDimension(ambientDimension, point)
+  const styleOverride = clonePathSegmentStyleOverride(segment.styleOverride)
+
+  switch (segment.kind) {
+    case 'line':
+      return {
+        ok: true,
+        first: {
+          kind: 'line',
+          start: cloneVec3(segment.start),
+          end: cloneVec3(splitPoint),
+          ...(styleOverride === undefined ? {} : { styleOverride }),
+        },
+        second: {
+          kind: 'line',
+          start: cloneVec3(splitPoint),
+          end: cloneVec3(segment.end),
+          ...(styleOverride === undefined ? {} : { styleOverride }),
+        },
+        point: splitPoint,
+      }
+    case 'cubicBezier': {
+      const p01 = lerpVec3(segment.start, segment.control1, t)
+      const p12 = lerpVec3(segment.control1, segment.control2, t)
+      const p23 = lerpVec3(segment.control2, segment.end, t)
+      const p012 = lerpVec3(p01, p12, t)
+      const p123 = lerpVec3(p12, p23, t)
+
+      return {
+        ok: true,
+        first: {
+          kind: 'cubicBezier',
+          start: cloneVec3(segment.start),
+          control1: normalizePointForAmbientDimension(ambientDimension, p01),
+          control2: normalizePointForAmbientDimension(ambientDimension, p012),
+          end: cloneVec3(splitPoint),
+          controlMode: { kind: 'absolute' },
+          ...(styleOverride === undefined ? {} : { styleOverride }),
+        },
+        second: {
+          kind: 'cubicBezier',
+          start: cloneVec3(splitPoint),
+          control1: normalizePointForAmbientDimension(ambientDimension, p123),
+          control2: normalizePointForAmbientDimension(ambientDimension, p23),
+          end: cloneVec3(segment.end),
+          controlMode: { kind: 'absolute' },
+          ...(styleOverride === undefined ? {} : { styleOverride }),
+        },
+        point: splitPoint,
+      }
+    }
+    case 'arc':
+      return splitArcPathSegmentAt(segment, t, ambientDimension, splitPoint)
+  }
 }
 
 export function pathSegmentCoordinates(segment: PathSegment): Vec3[] {
@@ -944,6 +1040,12 @@ function normalizedUnitParameter(parameter: number): number | null {
   return Object.is(parameter, -0) ? 0 : parameter
 }
 
+function normalizedInteriorUnitParameter(parameter: number): number | null {
+  const t = normalizedUnitParameter(parameter)
+
+  return t !== null && t > 0 && t < 1 ? t : null
+}
+
 function circularArcCubicSegment(
   segment: ArcPathSegment,
   startAngleDeg: number,
@@ -1155,6 +1257,75 @@ function cloneArcScalarInputValue(value: ArcScalarInputValue): ArcScalarInputVal
         expression: value.expression,
         previewValue: value.previewValue,
       }
+}
+
+function splitArcPathSegmentAt(
+  segment: ArcPathSegment,
+  parameter: number,
+  ambientDimension: AmbientDimension,
+  splitPoint: Vec3,
+): SplitPathSegmentResult {
+  if (
+    hasSymbolicArcScalarInputValue(segment.startAngleDeg) ||
+    hasSymbolicArcScalarInputValue(segment.endAngleDeg)
+  ) {
+    return {
+      ok: false,
+      error: 'unsupportedArc',
+    }
+  }
+
+  const sweepDegrees = arcSweepDegrees(segment)
+  const startAngleDeg = arcScalarPreviewValue(segment.startAngleDeg)
+  const radius = arcScalarPreviewValue(segment.radius)
+
+  if (
+    sweepDegrees === null ||
+    !Number.isFinite(startAngleDeg) ||
+    !Number.isFinite(radius) ||
+    radius <= 0
+  ) {
+    return {
+      ok: false,
+      error: 'unsupportedArc',
+    }
+  }
+
+  const splitAngleDeg = startAngleDeg + sweepDegrees * parameter
+  const styleOverride = clonePathSegmentStyleOverride(segment.styleOverride)
+  const frame =
+    segment.frame === undefined
+      ? undefined
+      : normalizeFrameForAmbientDimension(segment.frame, ambientDimension)
+
+  return {
+    ok: true,
+    first: {
+      kind: 'arc',
+      start: cloneVec3(segment.start),
+      end: cloneVec3(splitPoint),
+      center: normalizePointForAmbientDimension(ambientDimension, segment.center),
+      radius: cloneArcScalarInputValue(segment.radius),
+      startAngleDeg: cloneArcScalarInputValue(segment.startAngleDeg),
+      endAngleDeg: splitAngleDeg,
+      direction: segment.direction,
+      ...(frame === undefined ? {} : { frame }),
+      ...(styleOverride === undefined ? {} : { styleOverride }),
+    },
+    second: {
+      kind: 'arc',
+      start: cloneVec3(splitPoint),
+      end: cloneVec3(segment.end),
+      center: normalizePointForAmbientDimension(ambientDimension, segment.center),
+      radius: cloneArcScalarInputValue(segment.radius),
+      startAngleDeg: splitAngleDeg,
+      endAngleDeg: cloneArcScalarInputValue(segment.endAngleDeg),
+      direction: segment.direction,
+      ...(frame === undefined ? {} : { frame }),
+      ...(styleOverride === undefined ? {} : { styleOverride }),
+    },
+    point: splitPoint,
+  }
 }
 
 function reverseArcDirection(direction: ArcDirection): ArcDirection {
