@@ -46,6 +46,7 @@ export type PreviewPathMenuItem = {
     | 'arcPath'
     | 'directPathInput'
   label: string
+  helpText?: string
   icon: string
   group: PreviewPathMenuGroup
   tool: WorkPlanePreviewTool
@@ -219,7 +220,8 @@ export function addPathMenuItems(): PreviewPathMenuItem[] {
   return [
     {
       id: 'manualPath',
-      label: 'Line/manual path',
+      label: 'Arbitrary path',
+      helpText: 'Create a path with line, arc, and Bézier segments.',
       icon: '─',
       group: 'cursorCreation',
       tool: 'createPath',

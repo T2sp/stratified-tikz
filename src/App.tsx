@@ -7034,6 +7034,7 @@ function App() {
                         data-path-action={item.id}
                         aria-label={item.label}
                         aria-pressed={isSelected}
+                        title={item.helpText}
                         onClick={(event) => {
                           stopPreviewOverlayEvent(event)
                           activatePathMenuItem(item)

@@ -15,11 +15,12 @@ import {
 import { CoordinateEditor } from './CoordinateEditor.tsx'
 import {
   EditableNumberField,
+  EditableParsedNumberField,
   EditablePositiveNumberField,
   EditableSelectField,
   ReadOnlyField,
-  formatNumberInput,
 } from './InspectorField.tsx'
+import { type InspectorNumberParser } from './numericInput.ts'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type CurvedSheetGeometryEditorProps = {
@@ -362,29 +363,25 @@ function SamplingField({
   onChange: (value: number) => void
 }) {
   return (
-    <label className="inspector-field">
-      <span className="inspector-field-label">{label}</span>
-      <input
-        className="inspector-input"
-        type="number"
-        min="1"
-        max={maxCurvedSheetSamplingSegments}
-        step="1"
-        value={formatNumberInput(value)}
-        onChange={(event) => {
-          const nextValue = Number(event.currentTarget.value)
-
-          if (
-            Number.isInteger(nextValue) &&
-            nextValue > 0 &&
-            nextValue <= maxCurvedSheetSamplingSegments
-          ) {
-            onChange(nextValue)
-          }
-        }}
-      />
-    </label>
+    <EditableParsedNumberField
+      label={label}
+      value={value}
+      parse={parseSamplingSegmentsInput}
+      invalidMessage={`${label} must be an integer from 1 to ${maxCurvedSheetSamplingSegments}.`}
+      inputMode="numeric"
+      onChange={onChange}
+    />
   )
+}
+
+const parseSamplingSegmentsInput: InspectorNumberParser = (rawValue) => {
+  const nextValue = Number(rawValue)
+
+  return Number.isInteger(nextValue) &&
+    nextValue > 0 &&
+    nextValue <= maxCurvedSheetSamplingSegments
+    ? nextValue
+    : null
 }
 
 function formatVec3(point: Vec3): string {

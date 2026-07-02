@@ -85,6 +85,29 @@ test('layer palette CSS scrolls the layer list between fixed header and footer',
   assert.match(footerRule, /flex-wrap:\s*wrap;/)
 })
 
+test('layer actions panel is styled as a translucent overlay', () => {
+  const panelRule = cssRule('.layer-palette-action-panel')
+  const overlayRule = cssRule('.layer-palette-action-overlay')
+
+  assert.match(
+    layerManagerSource,
+    /className="layer-palette-action-panel layer-palette-action-overlay"/,
+  )
+  assert.match(panelRule, /background:\s*color-mix\(in srgb, #ffffff 78%, transparent\);/)
+  assert.match(panelRule, /box-shadow:\s*rgba\(30, 34, 44, 0\.18\) 0 10px 28px;/)
+  assert.match(panelRule, /backdrop-filter:\s*blur\(8px\);/)
+  assert.match(overlayRule, /isolation:\s*isolate;/)
+})
+
+test('layer actions toggle exposes active state while keeping action handlers wired', () => {
+  assert.match(layerManagerSource, /actionsExpanded \? 'is-selected' : ''/)
+  assert.match(layerManagerSource, /aria-pressed=\{actionsExpanded\}/)
+  assert.match(layerManagerSource, /onRenameLayer\(layerValue, draftName\)/)
+  assert.match(layerManagerSource, /onDuplicateLayer\(layerValue, targetLayer\.targetLayerValue\)/)
+  assert.match(layerManagerSource, /onTranslateLayer\(layerValue, parsed\.translation\)/)
+  assert.match(layerManagerSource, /onClick=\{\(\) => onDeleteLayer\(layer\.value\)\}/)
+})
+
 function cssRule(selector: string): string {
   const start = appCss.indexOf(`${selector} {`)
 

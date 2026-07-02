@@ -1,9 +1,17 @@
+import { useEffect, useId, useState } from 'react'
 import {
   parseFiniteNumber,
   parseOpacity,
   parsePositiveFiniteNumber,
 } from '../diagramUpdates.ts'
 import { normalizeColorInputValue } from '../colorInput.ts'
+import {
+  finiteNumberDraftWarning,
+  opacityDraftWarning,
+  positiveNumberDraftWarning,
+  updateInspectorNumericDraft,
+  type InspectorNumberParser,
+} from './numericInput.ts'
 
 export function ReadOnlyField({
   label,
@@ -77,22 +85,13 @@ export function EditableNumberField({
   onChange: (value: number) => void
 }) {
   return (
-    <label className="inspector-field">
-      <span className="inspector-field-label">{label}</span>
-      <input
-        className="inspector-input"
-        type="number"
-        step="any"
-        value={formatNumberInput(value)}
-        onChange={(event) => {
-          const parsedValue = parseFiniteNumber(event.currentTarget.value)
-
-          if (parsedValue !== null) {
-            onChange(parsedValue)
-          }
-        }}
-      />
-    </label>
+    <EditableParsedNumberField
+      label={label}
+      value={value}
+      parse={parseFiniteNumber}
+      invalidMessage={finiteNumberDraftWarning(label)}
+      onChange={onChange}
+    />
   )
 }
 
@@ -106,24 +105,13 @@ export function EditableOpacityField({
   onChange: (value: number) => void
 }) {
   return (
-    <label className="inspector-field">
-      <span className="inspector-field-label">{label}</span>
-      <input
-        className="inspector-input"
-        type="number"
-        min="0"
-        max="1"
-        step="0.05"
-        value={formatNumberInput(value)}
-        onChange={(event) => {
-          const parsedValue = parseOpacity(event.currentTarget.value)
-
-          if (parsedValue !== null) {
-            onChange(parsedValue)
-          }
-        }}
-      />
-    </label>
+    <EditableParsedNumberField
+      label={label}
+      value={value}
+      parse={parseOpacity}
+      invalidMessage={opacityDraftWarning(label)}
+      onChange={onChange}
+    />
   )
 }
 
@@ -137,22 +125,99 @@ export function EditablePositiveNumberField({
   onChange: (value: number) => void
 }) {
   return (
+    <EditableParsedNumberField
+      label={label}
+      value={value}
+      parse={parsePositiveFiniteNumber}
+      invalidMessage={positiveNumberDraftWarning(label)}
+      onChange={onChange}
+    />
+  )
+}
+
+export function EditableParsedNumberField({
+  label,
+  value,
+  placeholder,
+  parse,
+  invalidMessage,
+  inputMode = 'decimal',
+  onChange,
+}: {
+  label: string
+  value: number | null
+  placeholder?: string
+  parse: InspectorNumberParser
+  invalidMessage: string
+  inputMode?: 'decimal' | 'numeric'
+  onChange: (value: number) => void
+}) {
+  const committedValue = value === null ? '' : formatNumberInput(value)
+  const [draft, setDraft] = useState(committedValue)
+  const [hasEditedDraft, setHasEditedDraft] = useState(false)
+  const warningId = useId()
+  const draftUpdate = updateInspectorNumericDraft(
+    draft,
+    parse,
+    invalidMessage,
+  )
+  const showWarning = hasEditedDraft && draftUpdate.warning !== null
+
+  useEffect(() => {
+    setDraft(committedValue)
+    setHasEditedDraft(false)
+  }, [committedValue])
+
+  function commitDraftIfValid(nextDraft: string, canonicalize: boolean): void {
+    const nextUpdate = updateInspectorNumericDraft(
+      nextDraft,
+      parse,
+      invalidMessage,
+    )
+
+    if (nextUpdate.commitValue === null) {
+      return
+    }
+
+    onChange(nextUpdate.commitValue)
+
+    if (canonicalize) {
+      setDraft(formatNumberInput(nextUpdate.commitValue))
+      setHasEditedDraft(false)
+    }
+  }
+
+  return (
     <label className="inspector-field">
       <span className="inspector-field-label">{label}</span>
       <input
         className="inspector-input"
-        type="number"
-        min="0"
-        step="any"
-        value={formatNumberInput(value)}
+        type="text"
+        inputMode={inputMode}
+        spellCheck={false}
+        value={draft}
+        placeholder={placeholder}
+        aria-invalid={showWarning}
+        aria-describedby={showWarning ? warningId : undefined}
         onChange={(event) => {
-          const parsedValue = parsePositiveFiniteNumber(event.currentTarget.value)
+          const nextDraft = event.currentTarget.value
 
-          if (parsedValue !== null) {
-            onChange(parsedValue)
+          setDraft(nextDraft)
+          setHasEditedDraft(true)
+          commitDraftIfValid(nextDraft, false)
+        }}
+        onBlur={() => commitDraftIfValid(draft, true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commitDraftIfValid(draft, true)
           }
         }}
       />
+      {showWarning && (
+        <span id={warningId} className="inspector-field-error" role="status">
+          {draftUpdate.warning}
+        </span>
+      )}
     </label>
   )
 }

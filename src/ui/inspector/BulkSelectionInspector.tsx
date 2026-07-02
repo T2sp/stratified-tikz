@@ -18,7 +18,11 @@ import {
   type TranslationVector,
 } from '../../model/translation.ts'
 import { normalizeColorInputValue } from '../colorInput.ts'
-import { parseFiniteNumber, parseOpacity, parsePositiveFiniteNumber } from '../diagramUpdates.ts'
+import {
+  parseFiniteNumber,
+  parseOpacity,
+  parsePositiveFiniteNumber,
+} from '../diagramUpdates.ts'
 import {
   createPathConcatenationDirectionDraft,
   orientPathsForConcatenation,
@@ -27,7 +31,16 @@ import {
   type PathLikeSnapshot,
 } from '../pathConcatenation.ts'
 import type { MultiSelectedElement } from '../selection.ts'
-import { formatNumberInput, ReadOnlyField } from './InspectorField.tsx'
+import {
+  EditableParsedNumberField,
+  ReadOnlyField,
+} from './InspectorField.tsx'
+import {
+  finiteNumberDraftWarning,
+  opacityDraftWarning,
+  positiveNumberDraftWarning,
+  type InspectorNumberParser,
+} from './numericInput.ts'
 import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
@@ -670,9 +683,6 @@ function BulkStyleFieldEditor({
           value={field.value}
           onChange={onChange}
           parse={parseOpacity}
-          min={0}
-          max={1}
-          step="0.05"
         />
       )
     case 'positiveNumber':
@@ -682,7 +692,6 @@ function BulkStyleFieldEditor({
           value={field.value}
           onChange={onChange}
           parse={parsePositiveFiniteNumber}
-          min={0}
         />
       )
     case 'select':
@@ -733,43 +742,41 @@ function BulkNumberField({
   value,
   onChange,
   parse = parseFiniteNumber,
-  min,
-  max,
-  step = 'any',
 }: {
   label: string
   value: BulkFieldValue
   onChange: (value: number) => void
-  parse?: (rawValue: string) => number | null
-  min?: number
-  max?: number
-  step?: string
+  parse?: InspectorNumberParser
 }) {
   return (
-    <label className="inspector-field">
-      <span className="inspector-field-label">{label}</span>
-      <input
-        className="inspector-input"
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={
-          value.kind === 'value' && typeof value.value === 'number'
-            ? formatNumberInput(value.value)
-            : ''
-        }
-        placeholder={value.kind === 'mixed' ? bulkMixedValueLabel : undefined}
-        onChange={(event) => {
-          const parsedValue = parse(event.currentTarget.value)
-
-          if (parsedValue !== null) {
-            onChange(parsedValue)
-          }
-        }}
-      />
-    </label>
+    <EditableParsedNumberField
+      label={label}
+      value={
+        value.kind === 'value' && typeof value.value === 'number'
+          ? value.value
+          : null
+      }
+      placeholder={value.kind === 'mixed' ? bulkMixedValueLabel : undefined}
+      parse={parse}
+      invalidMessage={bulkNumberDraftWarning(label, parse)}
+      onChange={onChange}
+    />
   )
+}
+
+function bulkNumberDraftWarning(
+  label: string,
+  parse: InspectorNumberParser,
+): string {
+  if (parse === parseOpacity) {
+    return opacityDraftWarning(label)
+  }
+
+  if (parse === parsePositiveFiniteNumber) {
+    return positiveNumberDraftWarning(label)
+  }
+
+  return finiteNumberDraftWarning(label)
 }
 
 function BulkSelectField({

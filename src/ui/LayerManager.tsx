@@ -333,10 +333,22 @@ export function LayerManager({
             </form>
             <button
               type="button"
-              className="preview-overlay-button layer-palette-actions-toggle"
+              className={[
+                'preview-overlay-button',
+                'layer-palette-actions-toggle',
+                actionsExpanded ? 'is-selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               aria-controls={actionPanelId}
               aria-expanded={actionsExpanded}
+              aria-pressed={actionsExpanded}
               aria-label={
+                actionsExpanded
+                  ? 'Hide selected layer actions'
+                  : 'Show selected layer actions'
+              }
+              title={
                 actionsExpanded
                   ? 'Hide selected layer actions'
                   : 'Show selected layer actions'
@@ -718,7 +730,7 @@ function SelectedLayerActionForms({
   return (
     <div
       id={id}
-      className="layer-palette-action-panel"
+      className="layer-palette-action-panel layer-palette-action-overlay"
       aria-label={`Actions for layer ${layerKey}`}
     >
       <div className="layer-palette-action-heading">
