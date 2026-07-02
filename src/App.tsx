@@ -126,6 +126,7 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
+  applyCoordinateAnchorDragToEditorState,
   applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
   applyDirectCreationCommitToEditorState,
@@ -305,6 +306,8 @@ import {
   togglePreviewToolbarState,
   updateSelectionForCoordinateAnchorVisibility,
   updateSelectionForBackgroundClick,
+  startCoordinateAnchorDragSession,
+  type CoordinateAnchorDragSession,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectConcatenatedPathManualSegmentInput,
@@ -737,6 +740,8 @@ function App() {
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
+  const coordinateAnchorDragSessionRef =
+    useRef<CoordinateAnchorDragSession | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
     kind: 'xy',
     z: 0,
@@ -1466,6 +1471,7 @@ function App() {
       exampleIdForAmbientDimension(previousDiagram.ambientDimension),
     )
     geometryDragUndoDiagramRef.current = null
+    coordinateAnchorDragSessionRef.current = null
     setEditorState((current) => undoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setCopyStatus('idle')
@@ -1496,6 +1502,7 @@ function App() {
 
     setSelectedExampleId(exampleIdForAmbientDimension(nextDiagram.ambientDimension))
     geometryDragUndoDiagramRef.current = null
+    coordinateAnchorDragSessionRef.current = null
     setEditorState((current) => redoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setCopyStatus('idle')
@@ -2601,6 +2608,9 @@ function App() {
     const nextShowCoordinateAnchors =
       toggleCoordinateAnchorVisibility(showCoordinateAnchors)
 
+    if (!nextShowCoordinateAnchors) {
+      coordinateAnchorDragSessionRef.current = null
+    }
     setShowCoordinateAnchors(nextShowCoordinateAnchors)
 
     setEditorState((current) => {
@@ -3275,6 +3285,72 @@ function App() {
       )
     })
     setCopyStatus('idle')
+  }
+
+  function handleCoordinateAnchorDragStart(coordinateId: string): void {
+    if (creationTool !== 'select' || workPlanePointPickingState.active) {
+      coordinateAnchorDragSessionRef.current = null
+      return
+    }
+
+    const result = startCoordinateAnchorDragSession(
+      editableDiagram,
+      selectedElement,
+      coordinateId,
+      { showCoordinateAnchors },
+    )
+
+    coordinateAnchorDragSessionRef.current = result.ok ? result.session : null
+  }
+
+  function handleCoordinateAnchorDrag(
+    coordinateId: string,
+    svgPoint: Vec2,
+    viewportHeight: number,
+    previewCamera: Camera,
+  ): void {
+    if (creationTool !== 'select' || workPlanePointPickingState.active) {
+      return
+    }
+
+    const session = coordinateAnchorDragSessionRef.current
+
+    if (session === null || session.coordinateId !== coordinateId) {
+      return
+    }
+
+    let modelPoint: Vec3
+
+    try {
+      const projectedPoint = svgPointToModelOnWorkPlane(
+        previewCamera,
+        svgPoint,
+        viewportHeight,
+        activeWorkPlane,
+      )
+      const snappedPoint = snapCursorPoint(projectedPoint, {
+        ambientDimension: session.startDiagram.ambientDimension,
+        snap: cursorSnapSettings,
+        workPlane: activeWorkPlane,
+      })
+
+      if (snappedPoint === null) {
+        return
+      }
+
+      modelPoint = snappedPoint
+    } catch {
+      return
+    }
+
+    setEditorState((current) =>
+      applyCoordinateAnchorDragToEditorState(current, session, modelPoint),
+    )
+    setCopyStatus('idle')
+  }
+
+  function handleCoordinateAnchorDragEnd(): void {
+    coordinateAnchorDragSessionRef.current = null
   }
 
   function handleGeometryHandleDragStart(): void {
@@ -7868,6 +7944,27 @@ function App() {
                 onGeometryHandleDragEnd={
                   creationTool === 'select' && !workPlanePointPickingState.active
                     ? handleGeometryHandleDragEnd
+                    : undefined
+                }
+                onCoordinateAnchorDrag={
+                  creationTool === 'select' &&
+                  !workPlanePointPickingState.active &&
+                  showCoordinateAnchors
+                    ? handleCoordinateAnchorDrag
+                    : undefined
+                }
+                onCoordinateAnchorDragStart={
+                  creationTool === 'select' &&
+                  !workPlanePointPickingState.active &&
+                  showCoordinateAnchors
+                    ? handleCoordinateAnchorDragStart
+                    : undefined
+                }
+                onCoordinateAnchorDragEnd={
+                  creationTool === 'select' &&
+                  !workPlanePointPickingState.active &&
+                  showCoordinateAnchors
+                    ? handleCoordinateAnchorDragEnd
                     : undefined
                 }
                 onCameraDrag={
