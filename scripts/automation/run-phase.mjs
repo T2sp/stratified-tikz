@@ -155,6 +155,12 @@ const phaseSlugs = {
   "26N": "coordinate-translation-inspector",
   "26O": "coordinate-drag-translation",
   "26P": "coordinate-translation-polish",
+  "27A": "selection-cycling",
+  "27B": "path-inline-nodes",
+  "27C": "path-splitting",
+  "27D": "style-eyedropper",
+  "27E": "ui-polish-actions-numeric-arbitrary-path",
+  "27F": "interaction-polish-hardening",
 };
 
 function makePhaseSpec(phase) {

@@ -952,6 +952,46 @@ Coordinate anchors are global, not layer-bound, exported before drawing commands
 - Combined tests.
 - Save/load/TikZ/undo/redo hardening.
 
+## Phase 27: Interaction and editing polish
+
+Phase 27 prioritizes usability and final editing polish after the core editing features are complete.
+
+### Phase 27A: Selection cycling for overlapping preview objects
+
+- Alt/Option-click cycles through overlapping selectable candidates.
+- Coordinate anchors, points, labels, paths, sheets, crossing markers, and handles are considered according to priority.
+- Cycling state is UI-only.
+
+### Phase 27B: Path inline nodes/vertices exported as `node[pos=..., ...]`
+
+- Add path-attached inline nodes/vertices.
+- Export using TikZ `node[pos=...]`.
+- This does not split path geometry.
+
+### Phase 27C: Path splitting at an interior point
+
+- Split selected path into two paths.
+- Support line/polyline and cubic Bézier at minimum.
+- Handle styles/arrows/inline nodes/crossings with documented policy.
+
+### Phase 27D: Style eyedropper for same geometric kind
+
+- Copy/paste style between objects with the same `geometricKind`.
+- Works with multi-selection targets.
+- Does not copy geometry/layer/id.
+
+### Phase 27E: UI polish — Layer Actions translucency, lenient Inspector numeric inputs, and Add path naming
+
+- Make Layer Actions popover semi-transparent.
+- Inspector numeric inputs allow temporary invalid strings and show warnings.
+- Rename `Line/manual path` to `Arbitrary path`.
+
+### Phase 27F: Docs, combined tests, and interaction hardening
+
+- Documentation and combined workflow tests.
+- Performance and save/load/TikZ hardening.
+
+
 ## Later phases
 
 - Advanced TikZ export settings.
