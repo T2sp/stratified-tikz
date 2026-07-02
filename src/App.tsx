@@ -136,6 +136,7 @@ import {
   applyDeleteLayerToEditorState,
   applyDuplicateLayerToEditorState,
   applyMergeLayersToEditorState,
+  applyStyleClipboardToEditorState,
   applySwapLayersToEditorState,
   applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
@@ -167,6 +168,7 @@ import {
   createInitialCameraControlState,
   createExistingCoordinateSourceOptions,
   createSerializeDiagramOptionsForUi,
+  copyStyleFromSelection,
   boundarySurfaceBoundaryPathSourceErrorMessage,
   boundarySurfaceDraftPickErrorMessage,
   boundarySurfacePathClickWorkflow,
@@ -271,6 +273,7 @@ import {
   selectedElementCount,
   shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneDetails,
+  styleClipboardSummary,
   startWorkPlanePointPicking,
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
@@ -354,6 +357,7 @@ import {
   type SelectedElement,
   type RuledSurfaceBoundaryDraft,
   type SheetPolygonDraft,
+  type StyleClipboard,
   type WorkPlanePointPickingState,
   type WorkPlaneSelectValue,
   type WorkPlanePreviewTool,
@@ -725,6 +729,10 @@ function App() {
   const [styleImportReport, setStyleImportReport] = useState<StyleImportReport>(
     emptyStyleImportReport,
   )
+  const [styleClipboard, setStyleClipboard] = useState<StyleClipboard | null>(
+    null,
+  )
+  const [styleClipboardStatus, setStyleClipboardStatus] = useState<string>('')
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
     defaultJsonDownloadFilename,
   )
@@ -1886,6 +1894,35 @@ function App() {
 
   function duplicateCurrentSelection(): void {
     setEditorState((current) => applyBulkDuplicateToEditorState(current))
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+  }
+
+  function copyCurrentSelectionStyle(): void {
+    const result = copyStyleFromSelection(editableDiagram, selectedElement)
+
+    if (result.ok) {
+      setStyleClipboard(result.clipboard)
+    }
+
+    setStyleClipboardStatus(result.message)
+    setLayerOperationStatus(result.message)
+    setCopyStatus('idle')
+  }
+
+  function pasteCurrentSelectionStyle(): void {
+    const nextState = applyStyleClipboardToEditorState(
+      editorState,
+      styleClipboard,
+    )
+
+    setEditorState(nextState)
+    setStyleClipboardStatus(nextState.layerOperationStatus)
     setPolylineStatus('')
     setCubicBezierStatus('')
     setPathStatus('')
@@ -5921,6 +5958,11 @@ function App() {
             onBulkLayerChange={changeCurrentSelectionLayer}
             onBulkDelete={removeCurrentSelection}
             onBulkDuplicate={duplicateCurrentSelection}
+            styleClipboardSummary={styleClipboardSummary(styleClipboard)}
+            styleClipboardStatus={styleClipboardStatus}
+            pasteStyleDisabled={styleClipboard === null}
+            onCopyStyle={copyCurrentSelectionStyle}
+            onPasteStyle={pasteCurrentSelectionStyle}
             onBulkTranslate={translateCurrentSelection}
             onCoordinateTranslate={translateCurrentCoordinateSelection}
             onBulkConcatenatePaths={concatenateCurrentSelection}

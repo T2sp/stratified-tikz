@@ -14,18 +14,29 @@ import {
   ReadOnlyField,
 } from './InspectorField.tsx'
 import { LabelStyleEditor } from './LabelStyleEditor.tsx'
+import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type TextLabelInspectorProps = {
   diagram: Diagram
   label: TextLabel
   onDiagramChange: DiagramChangeHandler
+  styleClipboardSummary: string
+  styleClipboardStatus: string
+  onCopyStyle: () => void
+  onPasteStyle: () => void
+  pasteStyleDisabled?: boolean
 }
 
 export function TextLabelInspector({
   diagram,
   label,
   onDiagramChange,
+  styleClipboardSummary,
+  styleClipboardStatus,
+  onCopyStyle,
+  onPasteStyle,
+  pasteStyleDisabled = false,
 }: TextLabelInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -106,6 +117,14 @@ export function TextLabelInspector({
           />
         </div>
       </section>
+
+      <StyleClipboardControls
+        clipboardSummary={styleClipboardSummary}
+        status={styleClipboardStatus}
+        pasteDisabled={pasteStyleDisabled}
+        onCopyStyle={onCopyStyle}
+        onPasteStyle={onPasteStyle}
+      />
 
       <LabelStyleEditor
         diagram={diagram}

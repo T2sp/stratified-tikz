@@ -21,6 +21,7 @@ import { PathInlineNodeEditor } from './PathInlineNodeEditor.tsx'
 import { PathSplitEditor } from './PathSplitEditor.tsx'
 import { PointGeometryEditor } from './PointGeometryEditor.tsx'
 import { SheetGeometryEditor } from './SheetGeometryEditor.tsx'
+import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 import type { PathSplitTarget } from '../pathSplitting.ts'
@@ -29,6 +30,11 @@ export type StratumInspectorProps = {
   diagram: Diagram
   stratum: Stratum
   onDiagramChange: DiagramChangeHandler
+  styleClipboardSummary: string
+  styleClipboardStatus: string
+  onCopyStyle: () => void
+  onPasteStyle: () => void
+  pasteStyleDisabled?: boolean
   onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick?: (keepOriginal: boolean) => string
 }
@@ -37,6 +43,11 @@ export function StratumInspector({
   diagram,
   stratum,
   onDiagramChange,
+  styleClipboardSummary,
+  styleClipboardStatus,
+  onCopyStyle,
+  onPasteStyle,
+  pasteStyleDisabled = false,
   onSplitPath,
   onStartPathSplitPick,
 }: StratumInspectorProps) {
@@ -105,6 +116,14 @@ export function StratumInspector({
           />
         )}
 
+      <StyleClipboardControls
+        clipboardSummary={styleClipboardSummary}
+        status={styleClipboardStatus}
+        pasteDisabled={pasteStyleDisabled}
+        onCopyStyle={onCopyStyle}
+        onPasteStyle={onPasteStyle}
+      />
+
       <StyleEditor
         diagram={diagram}
         stratum={stratum}
@@ -171,7 +190,7 @@ function StratumGeometrySection({
   diagram,
   stratum,
   onDiagramChange,
-}: StratumInspectorProps) {
+}: Pick<StratumInspectorProps, 'diagram' | 'stratum' | 'onDiagramChange'>) {
   switch (stratum.geometricKind) {
     case 'region':
       if (stratum.kind === 'filledRegion') {
