@@ -59,6 +59,12 @@ import {
   isMidArrowDirection,
   isValidMidArrowPosition,
 } from './pathArrows.ts'
+import {
+  curveInlineNodeSegmentCount,
+  isPathInlineNodeMarker,
+  isPathInlineNodePlacement,
+  isValidPathInlineNodePositionValue,
+} from './pathInlineNodes.ts'
 import { sheetVertices } from './sheets.ts'
 import {
   hiddenCurveLineStyles,
@@ -121,6 +127,9 @@ import type {
   MidArrowDecoration,
   PartialCurveStyle,
   PathArrowOptions,
+  PathInlineNode,
+  PathInlineNodeOptions,
+  PathInlineNodePosition,
   PathCrossingState,
   PathIntersectionCandidate,
   PathSegment,
@@ -1458,6 +1467,7 @@ function validateCurveStratum(
   validateOptionalPathLabel(stratum.pathLabel, `${path}.pathLabel`, errors)
   validateCurveStyleSegments(stratum.styleSegments, `${path}.styleSegments`, errors)
   validatePathArrowOptions(stratum.arrows, `${path}.arrows`, errors)
+  validatePathInlineNodes(stratum, `${path}.inlineNodes`, errors)
 
   switch (stratum.kind) {
     case 'polyline':
@@ -3034,6 +3044,162 @@ function validateMidArrowDecoration(
 
   if (!isArrowHeadKind(decoration.head)) {
     pushError(errors, `${path}.head`, 'Arrow head kind is not supported.')
+  }
+}
+
+function validatePathInlineNodes(
+  curve: CurveStratum,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  const inlineNodes = curve.inlineNodes
+
+  if (inlineNodes === undefined) {
+    return
+  }
+
+  if (!Array.isArray(inlineNodes)) {
+    pushError(errors, path, 'Path inline nodes must be an array.')
+    return
+  }
+
+  const segmentCount = curveInlineNodeSegmentCount(curve)
+
+  if (segmentCount === 0 && inlineNodes.length > 0) {
+    pushError(errors, path, 'Path inline nodes require a path segment.')
+  }
+
+  const seenIds = new Map<string, string>()
+
+  inlineNodes.forEach((node, index) => {
+    if (isRecord(node) && typeof node.id === 'string') {
+      addUniqueId(node.id, `${path}[${index}].id`, seenIds, errors)
+    }
+
+    validatePathInlineNode(
+      node,
+      segmentCount,
+      `${path}[${index}]`,
+      errors,
+    )
+  })
+}
+
+function validatePathInlineNode(
+  node: PathInlineNode,
+  segmentCount: number,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(node)) {
+    pushError(errors, path, 'Path inline node must be an object.')
+    return
+  }
+
+  validateStringId(node.id, `${path}.id`, errors)
+  validatePathInlineNodePosition(
+    node.position,
+    segmentCount,
+    `${path}.position`,
+    errors,
+  )
+
+  if (typeof node.text !== 'string') {
+    pushError(errors, `${path}.text`, 'Path inline node text must be a string.')
+  }
+
+  validatePathInlineNodeOptions(node.options, `${path}.options`, errors)
+}
+
+function validatePathInlineNodePosition(
+  position: PathInlineNodePosition,
+  segmentCount: number,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(position)) {
+    pushError(errors, path, 'Path inline node position must be an object.')
+    return
+  }
+
+  if (position.kind !== 'segment') {
+    pushError(errors, `${path}.kind`, 'Path inline node position kind must be segment.')
+  }
+
+  if (
+    typeof position.segmentIndex !== 'number' ||
+    !Number.isInteger(position.segmentIndex) ||
+    position.segmentIndex < 0 ||
+    position.segmentIndex >= segmentCount
+  ) {
+    pushError(
+      errors,
+      `${path}.segmentIndex`,
+      'Path inline node segment index must reference an existing path segment.',
+    )
+  }
+
+  if (!isValidPathInlineNodePositionValue(position.value)) {
+    pushError(
+      errors,
+      `${path}.value`,
+      'Path inline node position value must be finite and satisfy 0 < value < 1.',
+    )
+  }
+}
+
+function validatePathInlineNodeOptions(
+  options: PathInlineNodeOptions,
+  path: string,
+  errors: DiagramValidationIssue[],
+): void {
+  if (!isRecord(options)) {
+    pushError(errors, path, 'Path inline node options must be an object.')
+    return
+  }
+
+  if (
+    options.placement !== undefined &&
+    !isPathInlineNodePlacement(options.placement)
+  ) {
+    pushError(
+      errors,
+      `${path}.placement`,
+      'Path inline node placement must be above, below, left, right, or center.',
+    )
+  }
+
+  if (options.sloped !== undefined && typeof options.sloped !== 'boolean') {
+    pushError(errors, `${path}.sloped`, 'Path inline node sloped flag must be boolean.')
+  }
+
+  if (
+    options.allowUpsideDown !== undefined &&
+    typeof options.allowUpsideDown !== 'boolean'
+  ) {
+    pushError(
+      errors,
+      `${path}.allowUpsideDown`,
+      'Path inline node allow-upside-down flag must be boolean.',
+    )
+  }
+
+  if (options.anchor !== undefined) {
+    if (typeof options.anchor !== 'string' || hasTikzOptionLineBreak(options.anchor)) {
+      pushError(
+        errors,
+        `${path}.anchor`,
+        'Path inline node anchor must be a single-line TikZ anchor value.',
+      )
+    }
+  }
+
+  if (options.marker !== undefined && !isPathInlineNodeMarker(options.marker)) {
+    pushError(
+      errors,
+      `${path}.marker`,
+      'Path inline node marker must be none or dot.',
+    )
   }
 }
 

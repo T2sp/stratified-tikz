@@ -278,6 +278,8 @@ test('bulk duplicate preserves geometry, style, and symbolic expressions', () =>
   assert.deepEqual(copied.points, source.points)
   assert.deepEqual(copied.style, source.style)
   assert.deepEqual(copied.styleSegments[0]?.style, source.styleSegments[0]?.style)
+  assert.equal(copied.inlineNodes?.[0]?.id, 'curve-a-inline-node-copy')
+  assert.deepEqual(copied.inlineNodes?.[0]?.position, source.inlineNodes?.[0]?.position)
   assert.equal(copied.pathLabel, 'alpha path copy')
   assert.notEqual(copied.points, source.points)
   assert.notEqual(copied.style, source.style)
@@ -895,6 +897,14 @@ function curveA(): CurveStratum {
         from: 0.2,
         to: 0.4,
         style: { lineStyle: 'dashed' },
+      },
+    ],
+    inlineNodes: [
+      {
+        id: 'curve-a-inline-node',
+        position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+        text: '$f$',
+        options: { placement: 'above' },
       },
     ],
     points: [symbolicPoint(), { x: 1, y: 1, z: 0 }],

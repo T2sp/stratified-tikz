@@ -18,6 +18,7 @@ import type {
   PathTemplate,
   PathSegment,
   PathSegmentStyleOverride,
+  PathInlineNode,
   Vec3,
   WorkPlaneFrameSnapshot,
 } from './types.ts'
@@ -217,6 +218,10 @@ export function reverseCurvePathDirection(
         ...curve,
         points: [...curve.points].reverse().map(cloneVec3),
         styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+        inlineNodes: reversePathInlineNodes(
+          curve.inlineNodes,
+          Math.max(0, curve.points.length - 1),
+        ),
       }
     case 'cubicBezier':
       if (curve.points.length !== 4) {
@@ -235,17 +240,41 @@ export function reverseCurvePathDirection(
           ? {}
           : { bezierControls: { kind: 'absolute' } as CubicBezierControlMode }),
         styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+        inlineNodes: reversePathInlineNodes(curve.inlineNodes, 1),
       }
     case 'concatenatedPath':
       return {
         ...curve,
         segments: [...curve.segments].reverse().map(reversePathSegment),
         styleSegments: reverseCurveStyleSegments(curve.styleSegments),
+        inlineNodes: reversePathInlineNodes(
+          curve.inlineNodes,
+          curve.segments.length,
+        ),
       }
     case 'templatePath':
     case 'grid':
       return null
   }
+}
+
+function reversePathInlineNodes(
+  inlineNodes: readonly PathInlineNode[] | undefined,
+  segmentCount: number,
+): PathInlineNode[] | undefined {
+  if (inlineNodes === undefined) {
+    return undefined
+  }
+
+  return inlineNodes.map((node) => ({
+    ...node,
+    position: {
+      kind: 'segment',
+      segmentIndex: segmentCount - 1 - node.position.segmentIndex,
+      value: 1 - node.position.value,
+    },
+    options: { ...node.options },
+  }))
 }
 
 export function pathEndpoints(

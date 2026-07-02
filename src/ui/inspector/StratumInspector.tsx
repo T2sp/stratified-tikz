@@ -17,6 +17,7 @@ import {
 } from './InspectorField.tsx'
 import { FilledBoundaryGeometryEditor } from './FilledBoundaryGeometryEditor.tsx'
 import { PathArrowEditor } from './PathArrowEditor.tsx'
+import { PathInlineNodeEditor } from './PathInlineNodeEditor.tsx'
 import { PointGeometryEditor } from './PointGeometryEditor.tsx'
 import { SheetGeometryEditor } from './SheetGeometryEditor.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
@@ -79,6 +80,13 @@ export function StratumInspector({
 
       {stratum.geometricKind === 'curve' && (
         <PathArrowEditor curve={stratum} onDiagramChange={onDiagramChange} />
+      )}
+
+      {stratum.geometricKind === 'curve' && (
+        <PathInlineNodeEditor
+          curve={stratum}
+          onDiagramChange={onDiagramChange}
+        />
       )}
 
       <StyleEditor

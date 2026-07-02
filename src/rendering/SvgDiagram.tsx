@@ -76,6 +76,10 @@ import {
 } from './svgPath'
 import { curveArrowheadsForSvgPreview } from './svgArrows.ts'
 import {
+  pathInlineNodesForSvgPreview,
+  type SvgPathInlineNodePreview,
+} from './svgPathInlineNodes.ts'
+import {
   svgPathCrossingOverlayPrimitives,
   type SvgPathCrossingOverlayPrimitive,
 } from './svgPathCrossings.ts'
@@ -1980,6 +1984,11 @@ function renderCurve(
     diagram.ambientDimension,
     (point) => projectToSvgPoint(camera, point, viewportHeight),
   )
+  const inlineNodes = pathInlineNodesForSvgPreview(
+    curve,
+    diagram.ambientDimension,
+    (point) => projectToSvgPoint(camera, point, viewportHeight),
+  )
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, curve.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -2066,8 +2075,90 @@ function renderCurve(
             data-svg-arrow-head={arrowhead.head}
           />
         ))}
+        {inlineNodes.map((node) =>
+          renderPathInlineNodePreview(node, curve, isSelected),
+        )}
       </g>
     ),
+  }
+}
+
+function renderPathInlineNodePreview(
+  node: SvgPathInlineNodePreview,
+  curve: CurveStratum,
+  isSelected: boolean,
+): ReactElement {
+  const markerRadius = node.marker === 'dot' ? 4.2 : 3.4
+  const stroke = isSelected ? highlightColor : curve.style.strokeColor
+  const fill = node.marker === 'dot' ? curve.style.strokeColor : '#ffffff'
+  const labelX = node.center.x + node.labelOffset.x
+  const labelY = node.center.y + node.labelOffset.y
+
+  return (
+    <g
+      key={`${curve.id}-inline-node-${node.id}`}
+      pointerEvents="none"
+      data-path-inline-node-id={node.id}
+      data-path-inline-node-path-id={node.pathId}
+    >
+      <circle
+        cx={node.center.x}
+        cy={node.center.y}
+        r={isSelected ? markerRadius + 1.4 : markerRadius}
+        fill={fill}
+        fillOpacity={node.marker === 'dot' ? 0.95 : 0.82}
+        stroke={stroke}
+        strokeOpacity={isSelected ? 0.95 : 0.72}
+        strokeWidth={isSelected ? 2 : 1.4}
+        vectorEffect="non-scaling-stroke"
+      />
+      {node.text.trim().length > 0 && (
+        <text
+          x={labelX}
+          y={labelY}
+          fill="#111827"
+          fontSize={12}
+          textAnchor={svgInlineNodeTextAnchor(node.placement)}
+          dominantBaseline={svgInlineNodeDominantBaseline(node.placement)}
+          paintOrder="stroke"
+          stroke="#ffffff"
+          strokeWidth={3}
+          strokeLinejoin="round"
+        >
+          {node.text}
+        </text>
+      )}
+    </g>
+  )
+}
+
+function svgInlineNodeTextAnchor(
+  placement: SvgPathInlineNodePreview['placement'],
+): 'start' | 'middle' | 'end' {
+  switch (placement) {
+    case 'left':
+      return 'end'
+    case 'right':
+      return 'start'
+    case 'above':
+    case 'below':
+    case 'center':
+      return 'middle'
+  }
+}
+
+function svgInlineNodeDominantBaseline(
+  placement: SvgPathInlineNodePreview['placement'],
+): 'auto' | 'central' | 'hanging' {
+  switch (placement) {
+    case 'above':
+      return 'auto'
+    case 'below':
+      return 'hanging'
+    case 'left':
+    case 'right':
+    case 'center':
+      return 'central'
   }
 }
 

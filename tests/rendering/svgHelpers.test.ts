@@ -77,6 +77,7 @@ import {
   curveArrowheadsForSvgPreview,
   type SvgArrowheadPreview,
 } from '../../src/rendering/svgArrows.ts'
+import { pathInlineNodesForSvgPreview } from '../../src/rendering/svgPathInlineNodes.ts'
 import { svgPathCrossingOverlayPrimitives } from '../../src/rendering/svgPathCrossings.ts'
 import {
   coordinateAnchorMarkerAppearance,
@@ -212,6 +213,37 @@ test('SVG arrow preview coordinates are finite for a 2D path', () => {
 
   assert.equal(arrowheads.length, 3)
   assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
+})
+
+test('SVG path inline node preview position is finite', () => {
+  const curve = createConcatenatedPathStratum({
+    ambientDimension: 2,
+    id: 'svg-inline-node-path',
+    name: 'SVG inline node path',
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+    ],
+    inlineNodes: [
+      {
+        id: 'svg-inline-node',
+        position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+        text: '$f$',
+        options: { placement: 'above' },
+      },
+    ],
+  })
+  const previews = pathInlineNodesForSvgPreview(curve, 2, (point) => ({
+    x: point.x,
+    y: point.y,
+  }))
+
+  assert.equal(previews.length, 1)
+  assert.equal(Number.isFinite(previews[0]?.center.x), true)
+  assert.equal(Number.isFinite(previews[0]?.center.y), true)
 })
 
 test('SVG preview renders coordinate anchor marker', () => {

@@ -505,6 +505,12 @@ test('duplicating a layer deep-clones curve/path geometry and disambiguates path
   assert.equal(sourcePath.segments[0].start.x, 0)
   assert.equal(sourceTemplate.template.center.x, 1.5)
   assert.equal(copiedPolyline.styleSegments[0]?.id, 'source-run-copy')
+  assert.equal(copiedPolyline.inlineNodes?.[0]?.id, 'source-inline-node-copy')
+  assert.deepEqual(copiedPolyline.inlineNodes?.[0]?.position, {
+    kind: 'segment',
+    segmentIndex: 0,
+    value: 0.5,
+  })
 })
 
 test('duplicating a layer copies sheets, filled objects, and curved sheet primitives', () => {
@@ -1685,6 +1691,14 @@ function createLayerOperationDiagram(): Diagram {
             from: 0,
             to: 1,
             style: { lineStyle: 'dashed' },
+          },
+        ],
+        inlineNodes: [
+          {
+            id: 'source-inline-node',
+            position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+            text: '$f$',
+            options: { placement: 'above' },
           },
         ],
         layer: sourceLayer,
