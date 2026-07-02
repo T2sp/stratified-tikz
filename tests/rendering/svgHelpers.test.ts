@@ -45,6 +45,7 @@ import type {
   SheetStyle,
   SurfaceFrame,
   Vec3,
+  VisibilityOptions,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
@@ -86,11 +87,13 @@ import {
 } from '../../src/rendering/svgCoordinateAnchors.ts'
 import {
   collectSvgPreviewSelectionCandidates,
+  createSvgSelectionCandidateVisibility,
   nextSvgPreviewSelectionCycle,
   pickSvgPreviewHitTestCandidate,
   svgPreviewHitTestPriorityRank,
 } from '../../src/rendering/svgHitTesting.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
+import { defaultVisibilityOptions } from '../../src/model/visibility.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -476,6 +479,202 @@ test('layer-filter-hidden objects are not SVG preview selection candidates', () 
     candidates.some((candidate) => candidate.stableId === 'point:point-overlap'),
     true,
   )
+})
+
+test('visible 3D points remain SVG preview selection candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'visible']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('point:point-overlap-3d'), true)
+})
+
+test('3D points hidden by hideHidden are not SVG preview selection candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('point:point-overlap-3d'), false)
+  assert.equal(candidateStableIds(candidates).includes('curve:path-overlap-3d'), true)
+})
+
+test('hidden 3D point occlusion does not exclude candidates unless hideHidden is enabled', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      visibilityOptions: {
+        ...autoHiddenSelectionVisibilityOptions,
+        pointVisibility: 'dimHidden',
+      },
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('point:point-overlap-3d'), true)
+})
+
+test('visible 3D labels remain SVG preview selection candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      labelOcclusions: [['label-overlap-3d', 'visible']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('label:label-overlap-3d'), true)
+})
+
+test('3D labels hidden by autoHide are not SVG preview selection candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      labelOcclusions: [['label-overlap-3d', 'hidden']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('label:label-overlap-3d'), false)
+  assert.equal(candidateStableIds(candidates).includes('point:point-overlap-3d'), true)
+})
+
+test('hidden 3D label occlusion does not exclude candidates unless autoHide is enabled', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      visibilityOptions: {
+        ...autoHiddenSelectionVisibilityOptions,
+        labelVisibility: 'autoDim',
+      },
+      labelOcclusions: [['label-overlap-3d', 'hidden']],
+    }),
+  })
+
+  assert.equal(candidateStableIds(candidates).includes('label:label-overlap-3d'), true)
+})
+
+test('2D point and label candidates are unchanged when 3D visibility maps are absent', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+    visibility: createAutoHiddenSelectionVisibility(),
+  })
+  const keys = candidateStableIds(candidates)
+
+  assert.equal(keys.includes('point:point-overlap'), true)
+  assert.equal(keys.includes('label:label-overlap'), true)
+})
+
+test('coordinate anchor visibility still excludes anchor cycling candidates', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+    visibility: createAutoHiddenSelectionVisibility(),
+    showCoordinateAnchors: false,
+  })
+
+  assert.equal(
+    candidates.some((candidate) => candidate.kind === 'coordinateAnchor'),
+    false,
+  )
+})
+
+test('layer filtering still excludes hidden-layer cycling candidates with preview visibility', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+    layerFilter: { kind: 'layer', layer: 1 },
+    visibility: createAutoHiddenSelectionVisibility(),
+  })
+  const keys = candidateStableIds(candidates)
+
+  assert.equal(keys.includes('curve:path-overlap'), false)
+  assert.equal(keys.includes('point:point-overlap'), true)
+})
+
+test('Alt-click cycling skips auto-hidden 3D point candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram({
+    includeLabel: false,
+  })
+  const point = threeDimensionalCandidateClickPoint(diagram)
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+    }),
+  })
+  const first = nextSvgPreviewSelectionCycle(null, point, candidates)
+  const second = nextSvgPreviewSelectionCycle(first.state, point, candidates)
+
+  assert.deepEqual(candidateStableIds(candidates), ['curve:path-overlap-3d'])
+  assert.equal(first.candidate?.stableId, 'curve:path-overlap-3d')
+  assert.equal(second.candidate?.stableId, 'curve:path-overlap-3d')
+})
+
+test('cycling order among remaining visible candidates is deterministic after auto-hide', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram()
+  const point = threeDimensionalCandidateClickPoint(diagram)
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+    }),
+  })
+  const first = nextSvgPreviewSelectionCycle(null, point, candidates)
+  const second = nextSvgPreviewSelectionCycle(first.state, point, candidates)
+
+  assert.deepEqual(candidateStableIds(candidates), [
+    'label:label-overlap-3d',
+    'curve:path-overlap-3d',
+  ])
+  assert.equal(first.candidate?.stableId, 'curve:path-overlap-3d')
+  assert.equal(second.candidate?.stableId, 'label:label-overlap-3d')
+})
+
+test('Alt-click cycling skips auto-hidden 3D label candidates', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram({
+    includePoint: false,
+  })
+  const point = threeDimensionalCandidateClickPoint(diagram)
+  const candidates = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      labelOcclusions: [['label-overlap-3d', 'hidden']],
+    }),
+  })
+  const first = nextSvgPreviewSelectionCycle(null, point, candidates)
+  const second = nextSvgPreviewSelectionCycle(first.state, point, candidates)
+
+  assert.deepEqual(candidateStableIds(candidates), ['curve:path-overlap-3d'])
+  assert.equal(first.candidate?.stableId, 'curve:path-overlap-3d')
+  assert.equal(second.candidate?.stableId, 'curve:path-overlap-3d')
+})
+
+test('normal hit ordering selects the top visible candidate when a point is auto-hidden', () => {
+  const diagram = createThreeDimensionalSelectionCandidateDiagram({
+    includeLabel: false,
+  })
+  const [topCandidate] = collectThreeDimensionalSelectionCandidates(diagram, {
+    visibility: createAutoHiddenSelectionVisibility({
+      pointOcclusions: [['point-overlap-3d', 'hidden']],
+    }),
+  })
+
+  assert.equal(topCandidate?.stableId, 'curve:path-overlap-3d')
+  assert.deepEqual(topCandidate?.selection, {
+    kind: 'stratum',
+    id: 'path-overlap-3d',
+  })
 })
 
 test('coordinate anchors outrank paths in collected SVG preview candidates', () => {
@@ -1736,6 +1935,13 @@ function createSvgBraidingCrossingDiagram(
 }
 
 const overlappingCandidateViewportHeight = 300
+const threeDimensionalCandidateViewportHeight = 300
+const autoHiddenSelectionVisibilityOptions: VisibilityOptions = {
+  ...defaultVisibilityOptions,
+  enabled: true,
+  pointVisibility: 'hideHidden',
+  labelVisibility: 'autoHide',
+}
 
 function createOverlappingSelectionCandidateDiagram(): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
@@ -1821,6 +2027,132 @@ function overlappingCandidateClickPoint(diagram: Diagram) {
     { x: 0, y: 0, z: 0 },
     overlappingCandidateViewportHeight,
   )
+}
+
+type ThreeDimensionalSelectionCandidateDiagramOptions = {
+  includePoint?: boolean
+  includeLabel?: boolean
+}
+
+function createThreeDimensionalSelectionCandidateDiagram({
+  includePoint = true,
+  includeLabel = true,
+}: ThreeDimensionalSelectionCandidateDiagramOptions = {}): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const camera: Camera3D = {
+    mode: '3d',
+    kind: 'orthographic',
+    thetaDeg: 70,
+    phiDeg: 110,
+    zoom: 30,
+    pan: { x: 120, y: 140 },
+  }
+  const origin = { x: 0, y: 0, z: 0 }
+
+  return {
+    ...diagram,
+    camera,
+    view: { ...diagram.view, camera3d: camera },
+    strata: [
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'path-overlap-3d',
+        name: 'f',
+        points: [
+          { x: -1, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        layer: 0,
+      }),
+      ...(includePoint
+        ? [
+            createPointStratum({
+              ambientDimension: 3,
+              id: 'point-overlap-3d',
+              name: 'p',
+              position: origin,
+              layer: 0,
+            }),
+          ]
+        : []),
+    ],
+    labels: includeLabel
+      ? [
+          createTextLabel({
+            ambientDimension: 3,
+            id: 'label-overlap-3d',
+            name: 'L',
+            text: '$L$',
+            position: origin,
+            layer: 0,
+          }),
+        ]
+      : [],
+  }
+}
+
+type AnchorVisibilityForTest = 'visible' | 'hidden'
+
+type AutoHiddenSelectionVisibilityOptions = {
+  visibilityOptions?: VisibilityOptions
+  pointOcclusions?: readonly (readonly [string, AnchorVisibilityForTest])[]
+  labelOcclusions?: readonly (readonly [string, AnchorVisibilityForTest])[]
+}
+
+function createAutoHiddenSelectionVisibility({
+  visibilityOptions = autoHiddenSelectionVisibilityOptions,
+  pointOcclusions = [],
+  labelOcclusions = [],
+}: AutoHiddenSelectionVisibilityOptions = {}) {
+  return createSvgSelectionCandidateVisibility({
+    visibilityOptions,
+    pointOcclusionById: occlusionMapForTest(pointOcclusions),
+    labelOcclusionById: occlusionMapForTest(labelOcclusions),
+  })
+}
+
+function occlusionMapForTest(
+  entries: readonly (readonly [string, AnchorVisibilityForTest])[],
+) {
+  return new Map(
+    entries.map(([id, visibility]) => [
+      id,
+      {
+        visibility,
+      },
+    ]),
+  )
+}
+
+function collectThreeDimensionalSelectionCandidates(
+  diagram: Diagram,
+  options: {
+    visibility?: ReturnType<typeof createSvgSelectionCandidateVisibility>
+  } = {},
+) {
+  return collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: threeDimensionalCandidateViewportHeight,
+    point: threeDimensionalCandidateClickPoint(diagram),
+    visibility: options.visibility,
+  })
+}
+
+function threeDimensionalCandidateClickPoint(diagram: Diagram) {
+  return projectToSvgPoint(
+    diagram.camera,
+    { x: 0, y: 0, z: 0 },
+    threeDimensionalCandidateViewportHeight,
+  )
+}
+
+function candidateStableIds(
+  candidates: readonly {
+    stableId: string
+  }[],
+): string[] {
+  return candidates.map((candidate) => candidate.stableId)
 }
 
 function regionStyle(overrides: Partial<RegionStyle> = {}): RegionStyle {

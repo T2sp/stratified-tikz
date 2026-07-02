@@ -19,6 +19,7 @@ import type {
   TextLabel,
   Vec2,
   Vec3,
+  VisibilityOptions,
 } from '../model/types.ts'
 import {
   allLayersFilter,
@@ -68,15 +69,31 @@ export type SvgPreviewSelectionCandidate = {
   selection?: SingleSelectedElement
 }
 
+export type SvgSelectionCandidateVisibility = {
+  hiddenPointIds?: ReadonlySet<string>
+  hiddenLabelIds?: ReadonlySet<string>
+}
+
+type SvgSelectionCandidateOcclusion = {
+  visibility: 'visible' | 'hidden'
+}
+
 export type CollectSvgPreviewSelectionCandidatesOptions = {
   diagram: Diagram
   camera: Diagram['camera']
   viewportHeight: number
   point: Vec2
   layerFilter?: LayerFilter
+  visibility?: SvgSelectionCandidateVisibility
   showCoordinateAnchors?: boolean
   pathIntersectionCandidates?: readonly PathIntersectionCandidate[]
   tolerance?: number
+}
+
+export type CreateSvgSelectionCandidateVisibilityOptions = {
+  visibilityOptions: Pick<VisibilityOptions, 'pointVisibility' | 'labelVisibility'>
+  pointOcclusionById?: ReadonlyMap<string, SvgSelectionCandidateOcclusion>
+  labelOcclusionById?: ReadonlyMap<string, SvgSelectionCandidateOcclusion>
 }
 
 export type SvgPreviewSelectionCyclingState = {
@@ -155,6 +172,7 @@ export function collectSvgPreviewSelectionCandidates({
   viewportHeight,
   point,
   layerFilter = allLayersFilter,
+  visibility,
   showCoordinateAnchors = true,
   pathIntersectionCandidates,
   tolerance = defaultHitTolerance,
@@ -177,6 +195,7 @@ export function collectSvgPreviewSelectionCandidates({
       viewportHeight,
       point,
       layerFilter,
+      visibility,
       tolerance,
     ),
     ...collectStratumCandidates(
@@ -185,11 +204,29 @@ export function collectSvgPreviewSelectionCandidates({
       viewportHeight,
       point,
       layerFilter,
+      visibility,
       tolerance,
     ),
   ]
 
   return candidates.sort(compareSvgPreviewSelectionCandidates)
+}
+
+export function createSvgSelectionCandidateVisibility({
+  visibilityOptions,
+  pointOcclusionById,
+  labelOcclusionById,
+}: CreateSvgSelectionCandidateVisibilityOptions): SvgSelectionCandidateVisibility {
+  return {
+    hiddenPointIds:
+      visibilityOptions.pointVisibility === 'hideHidden'
+        ? hiddenOcclusionIds(pointOcclusionById)
+        : undefined,
+    hiddenLabelIds:
+      visibilityOptions.labelVisibility === 'autoHide'
+        ? hiddenOcclusionIds(labelOcclusionById)
+        : undefined,
+  }
 }
 
 export function compareSvgPreviewSelectionCandidates(
@@ -350,10 +387,12 @@ function collectLabelCandidates(
   viewportHeight: number,
   point: Vec2,
   layerFilter: LayerFilter,
+  visibility: SvgSelectionCandidateVisibility | undefined,
   tolerance: number,
 ): SvgPreviewSelectionCandidate[] {
   return diagram.labels.flatMap((label) => {
     if (
+      visibility?.hiddenLabelIds?.has(label.id) === true ||
       !shouldRenderTextLabelInSvgPreview(diagram, label) ||
       !isLayerSelectableByLayerFilter(diagram, layerFilter, label.layer)
     ) {
@@ -386,6 +425,7 @@ function collectStratumCandidates(
   viewportHeight: number,
   point: Vec2,
   layerFilter: LayerFilter,
+  visibility: SvgSelectionCandidateVisibility | undefined,
   tolerance: number,
 ): SvgPreviewSelectionCandidate[] {
   return diagram.strata.flatMap((stratum) => {
@@ -423,9 +463,31 @@ function collectStratumCandidates(
           tolerance,
         )
       case 'point':
+        if (visibility?.hiddenPointIds?.has(stratum.id) === true) {
+          return []
+        }
+
         return collectPointCandidate(stratum, camera, viewportHeight, point)
     }
   })
+}
+
+function hiddenOcclusionIds(
+  occlusionById: ReadonlyMap<string, SvgSelectionCandidateOcclusion> | undefined,
+): ReadonlySet<string> | undefined {
+  if (occlusionById === undefined || occlusionById.size === 0) {
+    return undefined
+  }
+
+  const hiddenIds = new Set<string>()
+
+  occlusionById.forEach((occlusion, id) => {
+    if (occlusion.visibility === 'hidden') {
+      hiddenIds.add(id)
+    }
+  })
+
+  return hiddenIds.size === 0 ? undefined : hiddenIds
 }
 
 function collectSurfaceCandidate(

@@ -137,6 +137,7 @@ import {
 } from './svgCoordinateAnchors.ts'
 import {
   collectSvgPreviewSelectionCandidates,
+  createSvgSelectionCandidateVisibility,
   formatSvgPreviewSelectionCycleStatus,
   nextSvgPreviewSelectionCycle,
   type SvgPreviewSelectionCyclingState,
@@ -359,6 +360,13 @@ export function SvgDiagram({
     camera,
     visibilityOptions,
   )
+  // Selection cycling is geometric hit testing, so pass the renderer's resolved
+  // preview-hidden ids to keep candidates aligned with actually rendered items.
+  const selectionCandidateVisibility = createSvgSelectionCandidateVisibility({
+    visibilityOptions,
+    pointOcclusionById,
+    labelOcclusionById,
+  })
   const sortedSurfaceItems = renderSortedSurfaceFaces(
     diagram,
     camera,
@@ -557,6 +565,7 @@ export function SvgDiagram({
           viewportHeight: height,
           point: svgPoint,
           layerFilter,
+          visibility: selectionCandidateVisibility,
           showCoordinateAnchors,
           pathIntersectionCandidates,
         })
