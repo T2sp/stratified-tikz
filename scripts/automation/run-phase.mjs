@@ -150,6 +150,11 @@ const phaseSlugs = {
   "26I": "coordinate-delete-detach-usage",
   "26J": "layer-translation-detach-coordinate-refs",
   "26K": "coordinate-detach-polish",
+  "26L": "coordinate-multi-selection",
+  "26M": "coordinate-translation-helper",
+  "26N": "coordinate-translation-inspector",
+  "26O": "coordinate-drag-translation",
+  "26P": "coordinate-translation-polish",
 };
 
 function makePhaseSpec(phase) {
