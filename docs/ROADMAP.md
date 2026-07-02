@@ -984,7 +984,7 @@ Phase 27 prioritizes usability and final editing polish after the core editing f
 
 - Make Layer Actions popover semi-transparent.
 - Inspector numeric inputs allow temporary invalid strings and show warnings.
-- Rename `Line/manual path` to `Arbitrary path`.
+- Rename Add path cursor creation to `Arbitrary path`.
 
 ### Phase 27F: Docs, combined tests, and interaction hardening
 

@@ -27,7 +27,7 @@ transform scope.
 
 Path-related creation tools are consolidated under Add path:
 
-- line/manual path;
+- arbitrary path;
 - polyline;
 - cubic Bezier;
 - arc segment path;

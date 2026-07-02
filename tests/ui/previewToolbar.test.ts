@@ -212,9 +212,26 @@ test('Add path menu exposes polyline and cubic Bézier options', () => {
 
   assert.ok(labels.includes('Polyline'))
   assert.ok(labels.includes('Cubic Bézier'))
-  assert.ok(labels.includes('Line/manual path'))
+  assert.ok(labels.includes('Arbitrary path'))
+  assert.equal(labels.includes('Line/manual path'), false)
   assert.ok(labels.includes('Arc segment path'))
   assert.ok(labels.includes('Direct input...'))
+})
+
+test('Add path Arbitrary path keeps the manual creation action and help text', () => {
+  const arbitraryPathItem = addPathMenuItems().find(
+    (item) => item.id === 'manualPath',
+  )
+
+  assert.notEqual(arbitraryPathItem, undefined)
+  assert.equal(arbitraryPathItem?.label, 'Arbitrary path')
+  assert.equal(
+    arbitraryPathItem?.helpText,
+    'Create a path with line, arc, and Bézier segments.',
+  )
+  assert.equal(arbitraryPathItem?.tool, 'createPath')
+  assert.equal(arbitraryPathItem?.inputMode, 'cursor')
+  assert.equal(arbitraryPathItem?.segmentKind, 'line')
 })
 
 test('Add path Cubic Bézier menu item uses the curve icon sentinel', () => {
