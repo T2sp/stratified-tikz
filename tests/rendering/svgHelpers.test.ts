@@ -239,6 +239,31 @@ test('SVG preview renders coordinate anchor marker', () => {
   assert.equal(Number.isFinite(markers[0]?.center.y), true)
 })
 
+test('SVG preview marks multiple selected coordinate anchors', () => {
+  const diagram = coordinateAnchorMultiPreviewDiagram()
+  const markers = svgCoordinateAnchorMarkers(
+    diagram,
+    diagram.camera,
+    360,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'preview-coordinate-a' },
+        { kind: 'coordinate', id: 'preview-coordinate-c' },
+      ],
+    },
+  )
+  const selectedMarkers = markers
+    .filter((marker) => marker.selected)
+    .map((marker) => marker.anchor.id)
+
+  assert.equal(markers.length, 3)
+  assert.deepEqual(selectedMarkers, [
+    'preview-coordinate-a',
+    'preview-coordinate-c',
+  ])
+})
+
 test('SVG coordinate anchor marker design uses a dot and dotted halo', () => {
   assert.equal(
     coordinateAnchorMarkerClassNames.marker,
@@ -1370,6 +1395,52 @@ function coordinateAnchorPreviewDiagram(): Diagram {
   return {
     ...diagram,
     coordinateAnchors: [anchor],
+  }
+}
+
+function coordinateAnchorMultiPreviewDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  return {
+    ...diagram,
+    coordinateAnchors: [
+      createCoordinateAnchor(diagram, {
+        id: 'preview-coordinate-a',
+        name: 'A',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 0 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+      createCoordinateAnchor(diagram, {
+        id: 'preview-coordinate-b',
+        name: 'B',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 1 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+      createCoordinateAnchor(diagram, {
+        id: 'preview-coordinate-c',
+        name: 'C',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 2 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+    ],
   }
 }
 

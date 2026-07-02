@@ -302,6 +302,7 @@ import {
   toggleCoordinateAnchorVisibility,
   toggleToolbarPalette,
   togglePreviewToolbarState,
+  updateSelectionForCoordinateAnchorVisibility,
   updateSelectionForBackgroundClick,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
@@ -2581,18 +2582,19 @@ function App() {
 
     setShowCoordinateAnchors(nextShowCoordinateAnchors)
 
-    if (nextShowCoordinateAnchors) {
-      return
-    }
+    setEditorState((current) => {
+      const nextSelection = updateSelectionForCoordinateAnchorVisibility(
+        current.selectedElement,
+        nextShowCoordinateAnchors,
+      )
 
-    setEditorState((current) =>
-      selectionIncludesCoordinateAnchor(current.selectedElement)
-        ? {
+      return nextSelection === current.selectedElement
+        ? current
+        : {
             ...current,
-            selectedElement: null,
+            selectedElement: nextSelection,
           }
-        : current,
-    )
+    })
   }
 
   function togglePreviewToolbarPalette(palette: PreviewToolbarPaletteId): void {
@@ -8391,21 +8393,6 @@ function geometryHandleTargetsSelection(
         selectedElement.id === target.labelId
       )
   }
-}
-
-function selectionIncludesCoordinateAnchor(selection: SelectedElement): boolean {
-  if (selection === null) {
-    return false
-  }
-
-  if (selection.kind === 'coordinate') {
-    return true
-  }
-
-  return (
-    selection.kind === 'multi' &&
-    selection.elements.some((element) => element.kind === 'coordinate')
-  )
 }
 
 function geometryHandleWorkPlaneForTarget(

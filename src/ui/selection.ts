@@ -145,6 +145,8 @@ export function updateSelectionForClick(
     currentElements[0] ?? null,
   )
 
+  // Coordinate anchors are their own selection family. Modifier-clicking across
+  // coordinate and layer-bound families replaces the selection instead of mixing.
   if (clickedKind === null || currentKind === null || clickedKind !== currentKind) {
     return clickedElement
   }
@@ -186,6 +188,34 @@ export function selectedElementIds(selection: SelectedElement): string[] {
 
 export function selectedElementCount(selection: SelectedElement): number {
   return selectedElements(selection).length
+}
+
+export function isCoordinateAnchorSelection(
+  selection: SelectedElement,
+): boolean {
+  const elements = selectedElements(selection)
+
+  return (
+    elements.length > 0 &&
+    elements.every((element) => element.kind === 'coordinate')
+  )
+}
+
+export function selectionIncludesCoordinateAnchor(
+  selection: SelectedElement,
+): boolean {
+  return selectedElements(selection).some(
+    (element) => element.kind === 'coordinate',
+  )
+}
+
+export function updateSelectionForCoordinateAnchorVisibility(
+  selection: SelectedElement,
+  showCoordinateAnchors: boolean,
+): SelectedElement {
+  return !showCoordinateAnchors && selectionIncludesCoordinateAnchor(selection)
+    ? null
+    : selection
 }
 
 export function isSingleSelectedElement(
@@ -241,12 +271,16 @@ export function selectedElementFromElements(
     (element) => element.kind === 'coordinate',
   )
 
-  // Coordinate anchors are global reference handles. For the MVP, keep their
-  // selection single-only so layer-bound bulk operations never receive them.
   if (coordinateSelection.length > 0) {
-    return coordinateSelection[coordinateSelection.length - 1] ?? null
+    return selectionFromHomogeneousElements(coordinateSelection)
   }
 
+  return selectionFromHomogeneousElements(elements)
+}
+
+function selectionFromHomogeneousElements(
+  elements: readonly SingleSelectedElement[],
+): SelectedElement {
   if (elements.length === 0) {
     return null
   }

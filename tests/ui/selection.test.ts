@@ -90,6 +90,7 @@ import {
   type SelectedElement,
   updateSelectionForBackgroundClick,
   updateSelectionForClick,
+  updateSelectionForCoordinateAnchorVisibility,
 } from '../../src/ui/selection.ts'
 import {
   clearSelectionForLayerFilter,
@@ -213,6 +214,52 @@ function createCoordinateSelectionDiagram(): Diagram {
           kind: 'global',
           value: {
             x: { kind: 'numeric', value: 0 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+    ],
+  }
+}
+
+function createCoordinateMultiSelectionDiagram(): Diagram {
+  const diagram = createEmptyDiagramForTest(2)
+
+  return {
+    ...diagram,
+    coordinateAnchors: [
+      createCoordinateAnchor(diagram, {
+        id: 'coordA',
+        name: 'A',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 0 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+      createCoordinateAnchor(diagram, {
+        id: 'coordB',
+        name: 'B',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 1 },
+            y: { kind: 'numeric', value: 0 },
+            z: { kind: 'numeric', value: 0 },
+          },
+        },
+      }),
+      createCoordinateAnchor(diagram, {
+        id: 'coordC',
+        name: 'C',
+        position: {
+          kind: 'global',
+          value: {
+            x: { kind: 'numeric', value: 2 },
             y: { kind: 'numeric', value: 0 },
             z: { kind: 'numeric', value: 0 },
           },
@@ -569,33 +616,150 @@ test('stale coordinate selection is cleaned after load normalization', () => {
   )
 })
 
-test('coordinate anchors use single-selection MVP policy', () => {
-  const diagram = createCoordinateSelectionDiagram()
-  const secondAnchor = createCoordinateAnchor(diagram, {
+test('stale coordinate ids are removed from coordinate multi-selection', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
+  const removed = removeSelectedElement(diagram, {
+    kind: 'coordinate',
     id: 'coordB',
-    name: 'B',
-    position: {
-      kind: 'global',
-      value: {
-        x: { kind: 'numeric', value: 1 },
-        y: { kind: 'numeric', value: 0 },
-        z: { kind: 'numeric', value: 0 },
-      },
-    },
   })
-  const twoCoordinateDiagram: Diagram = {
-    ...diagram,
-    coordinateAnchors: [...(diagram.coordinateAnchors ?? []), secondAnchor],
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+      { kind: 'coordinate', id: 'coordC' },
+    ],
   }
+
+  assert.equal(removed.removed, true)
+  assert.deepEqual(clearSelectionIfMissing(removed.diagram, selection), {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordC' },
+    ],
+  })
+})
+
+test('click coordinate selects single coordinate anchor', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
   const selection = updateSelectionForClick(
-    twoCoordinateDiagram,
+    diagram,
+    null,
+    { kind: 'coordinate', id: 'coordA' },
+    'replace',
+  )
+
+  assert.deepEqual(selection, { kind: 'coordinate', id: 'coordA' })
+})
+
+test('Shift-click second coordinate creates coordinate multi-selection', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
+  const selection = updateSelectionForClick(
+    diagram,
     { kind: 'coordinate', id: 'coordA' },
     { kind: 'coordinate', id: 'coordB' },
     'toggle',
   )
 
-  assert.deepEqual(selection, { kind: 'coordinate', id: 'coordB' })
-  assert.equal(selectedElements(selection).length, 1)
+  assert.deepEqual(selection, {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+    ],
+  })
+})
+
+test('Shift-click selected coordinate removes it from coordinate multi-selection', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
+  const selection = updateSelectionForClick(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coordA' },
+        { kind: 'coordinate', id: 'coordB' },
+      ],
+    },
+    { kind: 'coordinate', id: 'coordB' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'coordinate', id: 'coordA' })
+})
+
+test('background click clears coordinate multi-selection', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+    ],
+  }
+
+  assert.equal(updateSelectionForBackgroundClick(selection, 'replace'), null)
+})
+
+test('hiding coordinates clears coordinate selection', () => {
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+    ],
+  }
+
+  assert.equal(
+    updateSelectionForCoordinateAnchorVisibility(selection, false),
+    null,
+  )
+  assert.equal(
+    updateSelectionForCoordinateAnchorVisibility(selection, true),
+    selection,
+  )
+})
+
+test('coordinate multi-selection cannot include layer-bound objects in MVP', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    coordinateAnchors: createCoordinateMultiSelectionDiagram().coordinateAnchors,
+  }
+  const selection = updateSelectionForClick(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coordA' },
+        { kind: 'coordinate', id: 'coordB' },
+      ],
+    },
+    { kind: 'stratum', id: 'visibleWire' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'stratum', id: 'visibleWire' })
+})
+
+test('Shift-click coordinate while layer-bound selection exists starts coordinate selection', () => {
+  const diagram = {
+    ...twoDimensionalExample,
+    coordinateAnchors: createCoordinateMultiSelectionDiagram().coordinateAnchors,
+  }
+  const selection = updateSelectionForClick(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'visibleWire' },
+        { kind: 'stratum', id: 'dashedMorphism' },
+      ],
+    },
+    { kind: 'coordinate', id: 'coordA' },
+    'toggle',
+  )
+
+  assert.deepEqual(selection, { kind: 'coordinate', id: 'coordA' })
 })
 
 test('removeSelectedElement deletes an unused coordinate anchor', () => {
@@ -839,6 +1003,26 @@ test('inspector summary displays multi-selection count and kind', () => {
   )
 })
 
+test('inspector summary displays coordinate multi-selection count', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
+  const summary = createInspectorCompactSummary(diagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+      { kind: 'coordinate', id: 'coordC' },
+    ],
+  })
+
+  assert.notEqual(summary, null)
+  assert.equal(summary?.title, '3 coordinates selected')
+  assert.equal(summary?.layer, null)
+  assert.equal(
+    summary?.detail,
+    'Translate selected coordinates will be available later.',
+  )
+})
+
 test('selected highlighting helper includes all multi-selected ids', () => {
   const selection: SelectedElement = {
     kind: 'multi',
@@ -881,6 +1065,26 @@ test('selection state is not saved to diagram JSON', () => {
   assert.equal('selection' in parsed, false)
 })
 
+test('coordinate multi-selection state is not saved to diagram JSON', () => {
+  const diagram = createCoordinateMultiSelectionDiagram()
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+    ],
+  }
+  const serialized = serializeDiagram(diagram)
+  const parsed = JSON.parse(serialized) as Record<string, unknown>
+
+  assert.deepEqual(selectionToSerializableModel(selection), {
+    kind: 'multi',
+    ids: ['coordA', 'coordB'],
+  })
+  assert.equal('selectedElement' in parsed, false)
+  assert.equal('selection' in parsed, false)
+})
+
 test('TikZ output is unaffected by selection operations', () => {
   const before = generateTikz(twoDimensionalExample)
   const selection = updateSelectionForClick(
@@ -895,11 +1099,17 @@ test('TikZ output is unaffected by selection operations', () => {
 })
 
 test('TikZ output is unaffected by coordinate selection state', () => {
-  const diagram = createCoordinateSelectionDiagram()
+  const diagram = createCoordinateMultiSelectionDiagram()
   const before = generateTikz(diagram)
-  const selection: SelectedElement = { kind: 'coordinate', id: 'coordA' }
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coordA' },
+      { kind: 'coordinate', id: 'coordB' },
+    ],
+  }
 
-  assert.deepEqual(findSelectedElement(diagram, selection)?.kind, 'coordinate')
+  assert.equal(selectedElements(selection).length, 2)
   assert.equal(generateTikz(diagram), before)
 })
 

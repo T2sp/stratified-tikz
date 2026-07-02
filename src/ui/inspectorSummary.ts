@@ -30,6 +30,7 @@ import type { FilledBoundaryStratum } from './filledStratumEditing.ts'
 import {
   findSelectedElement,
   findSelectedElements,
+  isCoordinateAnchorSelection,
   isMultiSelectedElement,
   type SelectableGeometricKind,
   type SelectedElement,
@@ -135,6 +136,17 @@ function createMultiSelectionCompactSummary(
 
   if (selected.length === 0) {
     return null
+  }
+
+  if (isCoordinateAnchorSelection(selection)) {
+    return {
+      title: `${selected.length} ${pluralGeometricKindLabel(
+        'coordinate',
+        selected.length,
+      )} selected`,
+      layer: null,
+      detail: 'Translate selected coordinates will be available later.',
+    }
   }
 
   const geometricKind =
