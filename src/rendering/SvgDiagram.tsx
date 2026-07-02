@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import type {
   ConcatenatedPathStratum,
@@ -135,6 +135,12 @@ import {
   svgCoordinateAnchorMarkersForPreview,
   type SvgCoordinateAnchorMarker,
 } from './svgCoordinateAnchors.ts'
+import {
+  collectSvgPreviewSelectionCandidates,
+  formatSvgPreviewSelectionCycleStatus,
+  nextSvgPreviewSelectionCycle,
+  type SvgPreviewSelectionCyclingState,
+} from './svgHitTesting.ts'
 
 export type BoundaryPathHighlight = {
   id: string
@@ -256,6 +262,11 @@ type ActiveCoordinateAnchorDrag = {
   moved: boolean
 }
 
+type SelectionCycleFeedback = {
+  point: Vec2
+  message: string
+}
+
 const defaultWidth = 520
 const defaultHeight = 360
 const pointRadiusScale = 1.8
@@ -302,6 +313,10 @@ export function SvgDiagram({
   const activeCoordinateAnchorDragRef =
     useRef<ActiveCoordinateAnchorDrag | null>(null)
   const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
+  const selectionCycleStateRef =
+    useRef<SvgPreviewSelectionCyclingState | null>(null)
+  const [selectionCycleFeedback, setSelectionCycleFeedback] =
+    useState<SelectionCycleFeedback | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
   const suppressCoordinateAnchorClickRef = useRef(false)
   const diagram = useMemo(
@@ -491,6 +506,28 @@ export function SvgDiagram({
     pathIntersectionDetection.status,
   ])
 
+  useEffect(() => {
+    function clearCycleOnEscape(event: KeyboardEvent): void {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      selectionCycleStateRef.current = null
+      setSelectionCycleFeedback(null)
+    }
+
+    window.addEventListener('keydown', clearCycleOnEscape)
+
+    return () => {
+      window.removeEventListener('keydown', clearCycleOnEscape)
+    }
+  }, [])
+
+  function clearSelectionCycling(): void {
+    selectionCycleStateRef.current = null
+    setSelectionCycleFeedback(null)
+  }
+
   return (
     <svg
       className="svg-diagram"
@@ -498,6 +535,58 @@ export function SvgDiagram({
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
+      onClickCapture={(event) => {
+        if (!event.altKey) {
+          if (
+            selectionCycleStateRef.current !== null ||
+            selectionCycleFeedback !== null
+          ) {
+            clearSelectionCycling()
+          }
+          return
+        }
+
+        if (onSelectionChange === undefined || onCanvasClick !== undefined) {
+          return
+        }
+
+        const svgPoint = svgPointFromMouseEvent(event, width, height)
+        const candidates = collectSvgPreviewSelectionCandidates({
+          diagram,
+          camera,
+          viewportHeight: height,
+          point: svgPoint,
+          layerFilter,
+          showCoordinateAnchors,
+          pathIntersectionCandidates,
+        })
+        const result = nextSvgPreviewSelectionCycle(
+          selectionCycleStateRef.current,
+          svgPoint,
+          candidates,
+        )
+
+        if (result.candidate === null) {
+          clearSelectionCycling()
+          return
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+        selectionCycleStateRef.current = result.state
+        setSelectionCycleFeedback({
+          point: svgPoint,
+          message: formatSvgPreviewSelectionCycleStatus(
+            result.candidate,
+            result.index,
+            result.count,
+          ),
+        })
+
+        if (result.candidate.selection !== undefined) {
+          onSelectionChange(result.candidate.selection, { mode: 'replace' })
+        }
+      }}
       onPointerDown={(event) => {
         if (
           activeDragTargetRef.current !== null ||
@@ -645,6 +734,7 @@ export function SvgDiagram({
         }
 
         if (onCanvasClick !== undefined) {
+          clearSelectionCycling()
           onCanvasClick(svgPointFromMouseEvent(event, width, height), height, camera, {
             kind: 'canvas',
           })
@@ -654,6 +744,7 @@ export function SvgDiagram({
         onSelectionChange?.(null, {
           mode: selectionClickModeFromMouseEvent(event),
         })
+        clearSelectionCycling()
       }}
     >
       <rect
@@ -727,6 +818,7 @@ export function SvgDiagram({
             },
           )
         : null}
+      {renderSelectionCycleFeedback(selectionCycleFeedback, width, height)}
     </svg>
   )
 }
@@ -3092,6 +3184,61 @@ function renderHandleCircle(
   )
 }
 
+function renderSelectionCycleFeedback(
+  feedback: SelectionCycleFeedback | null,
+  viewportWidth: number,
+  viewportHeight: number,
+): ReactElement | null {
+  if (feedback === null) {
+    return null
+  }
+
+  const rectWidth = Math.min(
+    Math.max(feedback.message.length * 6.4 + 18, 132),
+    Math.max(viewportWidth - 8, 132),
+  )
+  const rectHeight = 22
+  const x = clamp(feedback.point.x + 12, 4, viewportWidth - rectWidth - 4)
+  const y = clamp(
+    feedback.point.y - rectHeight - 10,
+    4,
+    viewportHeight - rectHeight - 4,
+  )
+
+  return (
+    <g
+      key="selection-cycle-feedback"
+      className="svg-selection-cycle-feedback"
+      pointerEvents="none"
+      role="status"
+      aria-live="polite"
+    >
+      <rect
+        x={x}
+        y={y}
+        width={rectWidth}
+        height={rectHeight}
+        rx={5}
+        fill="#111827"
+        fillOpacity={0.88}
+        stroke="#ffffff"
+        strokeOpacity={0.72}
+        strokeWidth={1}
+      />
+      <text
+        x={x + 9}
+        y={y + rectHeight / 2}
+        fill="#ffffff"
+        fontSize={11}
+        fontWeight={650}
+        dominantBaseline="middle"
+      >
+        {feedback.message}
+      </text>
+    </g>
+  )
+}
+
 type ConcatenatedPathHandleDescription = {
   target: ConcatenatedPathPointTarget
   point: Vec3
@@ -3310,4 +3457,12 @@ function svgPreviewElementClassName(
   }
 
   return isSelectable ? 'svg-selectable' : 'svg-locked-layer'
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (max < min) {
+    return min
+  }
+
+  return Math.max(min, Math.min(max, value))
 }

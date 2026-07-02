@@ -18,6 +18,7 @@ import { createInitialCamera3D } from '../../src/model/camera.ts'
 import { pathCrossingStateFromCandidate } from '../../src/model/pathCrossings.ts'
 import {
   createConcatenatedPathStratum,
+  createCurveStratum,
   createEmptyDiagram,
   createPointStratum,
   createTextLabel,
@@ -84,9 +85,12 @@ import {
   svgCoordinateAnchorMarkersForPreview,
 } from '../../src/rendering/svgCoordinateAnchors.ts'
 import {
+  collectSvgPreviewSelectionCandidates,
+  nextSvgPreviewSelectionCycle,
   pickSvgPreviewHitTestCandidate,
   svgPreviewHitTestPriorityRank,
 } from '../../src/rendering/svgHitTesting.ts'
+import { generateTikz } from '../../src/tikz/generateTikz.ts'
 
 test('polylineToSvgPath emits a readable move and line path', () => {
   assert.equal(
@@ -369,6 +373,160 @@ test('shown coordinate anchors have hit-test priority over paths and sheets', ()
     svgPreviewHitTestPriorityRank('coordinateAnchor') <
       svgPreviewHitTestPriorityRank('sheetOrRegion'),
   )
+})
+
+test('SVG preview selection candidates include overlapping selectable objects', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+  const keys = candidates.map((candidate) => candidate.stableId)
+
+  assert.ok(keys.includes('coordinateAnchor:coord-overlap'))
+  assert.ok(keys.includes('label:label-overlap'))
+  assert.ok(keys.includes('point:point-overlap'))
+  assert.ok(keys.includes('curve:path-overlap'))
+  assert.ok(keys.includes('sheetOrRegion:region-overlap'))
+  assert.ok(candidates.length >= 5)
+})
+
+test('normal SVG preview hit ordering selects the top-priority overlap candidate', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const [topCandidate] = collectOverlappingSelectionCandidates(diagram)
+
+  assert.deepEqual(topCandidate?.selection, {
+    kind: 'coordinate',
+    id: 'coord-overlap',
+  })
+})
+
+test('Alt-click cycling selects the second overlapping preview candidate', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const point = overlappingCandidateClickPoint(diagram)
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+  const result = nextSvgPreviewSelectionCycle(null, point, candidates)
+
+  assert.equal(result.index, 1)
+  assert.equal(result.count, candidates.length)
+  assert.deepEqual(result.candidate, candidates[1])
+})
+
+test('repeated SVG preview selection cycling wraps around candidates', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const point = overlappingCandidateClickPoint(diagram)
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+  const first = nextSvgPreviewSelectionCycle(null, point, candidates)
+  const visited = [first.index]
+  let state = first.state
+
+  for (let index = 1; index < candidates.length; index += 1) {
+    const next = nextSvgPreviewSelectionCycle(state, point, candidates)
+
+    visited.push(next.index)
+    state = next.state
+  }
+
+  assert.deepEqual(visited, [1, 2, 3, 4, 0])
+})
+
+test('SVG preview selection cycling resets when cursor location changes significantly', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const point = overlappingCandidateClickPoint(diagram)
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+  const first = nextSvgPreviewSelectionCycle(null, point, candidates)
+  const moved = nextSvgPreviewSelectionCycle(
+    first.state,
+    { x: point.x + 40, y: point.y },
+    candidates,
+  )
+
+  assert.equal(moved.reset, true)
+  assert.equal(moved.index, 1)
+})
+
+test('hidden coordinate anchors are not SVG preview selection candidates', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+    showCoordinateAnchors: false,
+  })
+
+  assert.equal(
+    candidates.some((candidate) => candidate.kind === 'coordinateAnchor'),
+    false,
+  )
+})
+
+test('layer-filter-hidden objects are not SVG preview selection candidates', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+    layerFilter: { kind: 'layer', layer: 1 },
+  })
+
+  assert.equal(
+    candidates.some((candidate) => candidate.stableId === 'curve:path-overlap'),
+    false,
+  )
+  assert.equal(
+    candidates.some((candidate) => candidate.stableId === 'point:point-overlap'),
+    true,
+  )
+})
+
+test('coordinate anchors outrank paths in collected SVG preview candidates', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+
+  assert.equal(candidates[0]?.kind, 'coordinateAnchor')
+  assert.equal(
+    svgPreviewHitTestPriorityRank('coordinateAnchor') <
+      svgPreviewHitTestPriorityRank('curve'),
+    true,
+  )
+})
+
+test('SVG preview selection cycling does not mutate the diagram model', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const before = JSON.stringify(diagram)
+  const point = overlappingCandidateClickPoint(diagram)
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+
+  nextSvgPreviewSelectionCycle(null, point, candidates)
+
+  assert.equal(JSON.stringify(diagram), before)
+})
+
+test('SVG preview selection cycling does not affect TikZ output', () => {
+  const diagram = createOverlappingSelectionCandidateDiagram()
+  const before = generateTikz(diagram)
+  const point = overlappingCandidateClickPoint(diagram)
+  const candidates = collectOverlappingSelectionCandidates(diagram)
+
+  nextSvgPreviewSelectionCycle(null, point, candidates)
+
+  assert.equal(generateTikz(diagram), before)
+})
+
+test('braiding marker hit-test priority is preserved for non-cycling clicks', () => {
+  const picked = pickSvgPreviewHitTestCandidate([
+    { kind: 'curve', id: 'path-under-crossing', hit: true },
+    {
+      kind: 'pathIntersectionCandidate',
+      id: 'crossing-over-path',
+      hit: true,
+    },
+  ])
+
+  assert.deepEqual(picked, {
+    kind: 'pathIntersectionCandidate',
+    id: 'crossing-over-path',
+    hit: true,
+  })
 })
 
 test('SVG coordinate anchor markers are independent of layer visibility', () => {
@@ -1575,6 +1733,105 @@ function createSvgBraidingCrossingDiagram(
   ]
 
   return diagram
+}
+
+const overlappingCandidateViewportHeight = 300
+
+function createOverlappingSelectionCandidateDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  const origin = { x: 0, y: 0, z: 0 }
+  const anchor = createCoordinateAnchor(diagram, {
+    id: 'coord-overlap',
+    name: 'A',
+    tikzName: 'A',
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: 0 },
+        y: { kind: 'numeric', value: 0 },
+        z: { kind: 'numeric', value: 0 },
+      },
+    },
+  })
+
+  return {
+    ...diagram,
+    camera: {
+      mode: '2d',
+      scale: 30,
+      origin: { x: 120, y: 140 },
+    },
+    coordinateAnchors: [anchor],
+    strata: [
+      {
+        id: 'region-overlap',
+        codim: 0,
+        geometricKind: 'region',
+        kind: 'filledRegion',
+        name: 'R',
+        visible: true,
+        style: regionStyle(),
+        boundaries: [squareBoundary2D('overlap-region-boundary', -1, -1, 2)],
+        fillRule: 'nonzero',
+        layer: 0,
+      },
+      createCurveStratum({
+        ambientDimension: 2,
+        id: 'path-overlap',
+        name: 'f',
+        points: [
+          { x: -1, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+        ],
+        layer: 0,
+      }),
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'point-overlap',
+        name: 'p',
+        position: origin,
+        layer: 1,
+      }),
+    ],
+    labels: [
+      createTextLabel({
+        ambientDimension: 2,
+        id: 'label-overlap',
+        name: 'L',
+        text: '$L$',
+        position: origin,
+        layer: 0,
+      }),
+    ],
+  }
+}
+
+function collectOverlappingSelectionCandidates(diagram: Diagram) {
+  return collectSvgPreviewSelectionCandidates({
+    diagram,
+    camera: diagram.camera,
+    viewportHeight: overlappingCandidateViewportHeight,
+    point: overlappingCandidateClickPoint(diagram),
+  })
+}
+
+function overlappingCandidateClickPoint(diagram: Diagram) {
+  return projectToSvgPoint(
+    diagram.camera,
+    { x: 0, y: 0, z: 0 },
+    overlappingCandidateViewportHeight,
+  )
+}
+
+function regionStyle(overrides: Partial<RegionStyle> = {}): RegionStyle {
+  return {
+    kind: 'regionStyle',
+    fillColor: '#4D9DE0',
+    fillOpacity: 0.35,
+    strokeColor: '#4D9DE0',
+    strokeOpacity: 1,
+    ...overrides,
+  }
 }
 
 function curveStyle(overrides: Partial<CurveStyle> = {}): CurveStyle {
