@@ -734,8 +734,11 @@ function SelectedLayerActionForms({
       aria-label={`Actions for layer ${layerKey}`}
     >
       <div className="layer-palette-action-heading">
-        <h3>L{layerKey}</h3>
-        <span>{layer.name}</span>
+        <h3>Layer L{layerKey}</h3>
+        <span>
+          {layer.name} - {elementCount}{' '}
+          {elementCount === 1 ? 'element' : 'elements'}
+        </span>
       </div>
 
       <div className="layer-manager-action-group">

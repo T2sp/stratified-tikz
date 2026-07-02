@@ -89,6 +89,7 @@ export type CollectSvgPreviewSelectionCandidatesOptions = {
   showCoordinateAnchors?: boolean
   pathIntersectionCandidates?: readonly PathIntersectionCandidate[]
   tolerance?: number
+  maxCandidates?: number
 }
 
 export type CreateSvgSelectionCandidateVisibilityOptions = {
@@ -120,6 +121,7 @@ const templatePathHitSamples = 96
 const pathIntersectionCandidateHitRadius = 9
 
 export const svgPreviewSelectionCycleResetDistance = 12
+export const maxSvgPreviewSelectionCandidates = 64
 
 export const svgPreviewHitTestPriority: readonly SvgPreviewHitTestTargetKind[] = [
   'geometryHandle',
@@ -177,6 +179,7 @@ export function collectSvgPreviewSelectionCandidates({
   showCoordinateAnchors = true,
   pathIntersectionCandidates,
   tolerance = defaultHitTolerance,
+  maxCandidates = maxSvgPreviewSelectionCandidates,
 }: CollectSvgPreviewSelectionCandidatesOptions): SvgPreviewSelectionCandidate[] {
   const candidates: SvgPreviewSelectionCandidate[] = [
     ...(showCoordinateAnchors
@@ -210,7 +213,10 @@ export function collectSvgPreviewSelectionCandidates({
     ),
   ]
 
-  return candidates.sort(compareSvgPreviewSelectionCandidates)
+  return limitSvgPreviewSelectionCandidates(
+    candidates.sort(compareSvgPreviewSelectionCandidates),
+    maxCandidates,
+  )
 }
 
 export function createSvgSelectionCandidateVisibility({
@@ -250,7 +256,9 @@ export function nextSvgPreviewSelectionCycle(
   candidates: readonly SvgPreviewSelectionCandidate[],
   resetDistance = svgPreviewSelectionCycleResetDistance,
 ): SvgPreviewSelectionCycleResult {
-  if (candidates.length === 0) {
+  const cycleCandidates = limitSvgPreviewSelectionCandidates(candidates)
+
+  if (cycleCandidates.length === 0) {
     return {
       state: null,
       candidate: null,
@@ -260,14 +268,14 @@ export function nextSvgPreviewSelectionCycle(
     }
   }
 
-  const candidateKeys = candidates.map((candidate) => candidate.stableId)
+  const candidateKeys = cycleCandidates.map((candidate) => candidate.stableId)
   const canContinue =
     currentState !== null &&
     squaredDistance(currentState.point, point) <= resetDistance * resetDistance &&
     sameStringArray(currentState.candidateKeys, candidateKeys)
   const selectedIndex = canContinue
-    ? (currentState.selectedIndex + 1) % candidates.length
-    : initialCycleIndex(candidates.length)
+    ? (currentState.selectedIndex + 1) % cycleCandidates.length
+    : initialCycleIndex(cycleCandidates.length)
   const state = {
     point: { ...point },
     candidateKeys,
@@ -276,9 +284,9 @@ export function nextSvgPreviewSelectionCycle(
 
   return {
     state,
-    candidate: candidates[selectedIndex] ?? null,
+    candidate: cycleCandidates[selectedIndex] ?? null,
     index: selectedIndex,
-    count: candidates.length,
+    count: cycleCandidates.length,
     reset: !canContinue,
   }
 }
@@ -971,6 +979,18 @@ function parseSvgPointList(points: string): Vec2[] {
 
 function initialCycleIndex(candidateCount: number): number {
   return candidateCount > 1 ? 1 : 0
+}
+
+function limitSvgPreviewSelectionCandidates(
+  candidates: readonly SvgPreviewSelectionCandidate[],
+  maxCandidates = maxSvgPreviewSelectionCandidates,
+): SvgPreviewSelectionCandidate[] {
+  const limit =
+    Number.isFinite(maxCandidates) && maxCandidates > 0
+      ? Math.floor(maxCandidates)
+      : maxSvgPreviewSelectionCandidates
+
+  return candidates.slice(0, limit)
 }
 
 function sameStringArray(left: readonly string[], right: readonly string[]): boolean {

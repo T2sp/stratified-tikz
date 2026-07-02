@@ -88,14 +88,19 @@ test('layer palette CSS scrolls the layer list between fixed header and footer',
 test('layer actions panel is styled as a translucent overlay', () => {
   const panelRule = cssRule('.layer-palette-action-panel')
   const overlayRule = cssRule('.layer-palette-action-overlay')
+  const backgroundOpacity = panelRule.match(
+    /background:\s*color-mix\(in srgb, #ffffff (\d+)%, transparent\);/,
+  )?.[1]
 
   assert.match(
     layerManagerSource,
     /className="layer-palette-action-panel layer-palette-action-overlay"/,
   )
-  assert.match(panelRule, /background:\s*color-mix\(in srgb, #ffffff 78%, transparent\);/)
+  assert.notEqual(backgroundOpacity, undefined)
+  assert.ok(Number(backgroundOpacity) >= 60)
+  assert.ok(Number(backgroundOpacity) <= 75)
   assert.match(panelRule, /box-shadow:\s*rgba\(30, 34, 44, 0\.18\) 0 10px 28px;/)
-  assert.match(panelRule, /backdrop-filter:\s*blur\(8px\);/)
+  assert.match(panelRule, /backdrop-filter:\s*blur\(12px\) saturate\(115%\);/)
   assert.match(overlayRule, /isolation:\s*isolate;/)
 })
 

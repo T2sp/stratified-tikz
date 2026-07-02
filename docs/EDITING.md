@@ -1,8 +1,8 @@
 # Editing Fundamentals
 
-Phase 24 adds editing primitives that are deliberately smaller than a CAD
-transform stack. They operate on existing `Diagram` geometry and keep transient
-UI state outside saved JSON.
+The editor keeps geometry-changing behavior in `Diagram` data and keeps
+transient interaction state outside saved JSON. Selection state, cycling state,
+inspector disclosure, draft geometry, and layer filters are UI/editor state.
 
 ## Cursor Snap
 
@@ -33,6 +33,13 @@ Modifier-click toggles objects in the selection. The MVP policy allows bulk
 selection only for objects with the same `geometricKind`; clicking a different
 kind replaces the selection. This keeps bulk style and arrow controls
 predictable.
+
+Alt-click, or Option-click on macOS, cycles through overlapping selectable
+objects under the cursor. Cycling is UI-only state: the saved diagram does not
+store the cycle index or the last cursor position. The cycle can include
+coordinate anchors, labels, strata, path crossing markers, path inline nodes,
+curves, sheets, and regions. Path inline nodes select their owning path because
+the node is persisted as path data rather than as a standalone diagram element.
 
 Coordinate anchors have their own coordinate-only multi-selection family.
 Modifier-clicking coordinates can build a coordinate selection, but coordinates
@@ -141,3 +148,61 @@ helpers:
 Bulk operations build ID lookup maps before scanning selected objects so large
 multi-selections stay linear in diagram size. Visibility and projected sorting
 still use their existing sample-count caps.
+
+## Style Eyedropper
+
+The Inspector style controls include copy/paste style commands. Copy reads the
+explicit saved style from one selected stratum or free text label. Paste applies
+that style only to selected targets with the same `geometricKind`; mixed-kind
+target selections fail without partial mutation.
+
+For curves, the copied style includes path arrow options. Pasting a curve style
+to multiple selected curves updates their style and arrows but leaves geometry,
+layer membership, inline nodes, labels, and path crossing state unchanged. Style
+copy state is UI-only; only successful paste results are diagram edits and are
+therefore undoable, redoable, saved, and exported.
+
+## Inspector Numeric Editing
+
+Inspector numeric fields are lenient while the user is typing. Temporary drafts
+such as `.`, `-`, or `1e` remain visible in the field and show a warning instead
+of immediately overwriting the saved value. Valid drafts, including leading
+decimals such as `.5`, commit normally.
+
+TikZ export always uses the last committed diagram value. Invalid temporary
+Inspector text is not stored in `Diagram`, is not saved, and cannot affect
+generated TikZ.
+
+## Path Inline Nodes
+
+Path inline nodes are segment-local annotations persisted on curve strata and
+exported as TikZ `node[pos=...]` attachments. They do not split path geometry.
+The text is raw user text; the editor does not add `$...$`.
+
+For a path segment from `A` to `B`, an inline node with position `0.5` and
+placement `above` exports as:
+
+```tex
+(A) -- node[pos=0.5, above] {$f$} (B)
+```
+
+Inline nodes are shown in the preview and can participate in selection cycling,
+but selecting one selects the owning path for editing.
+
+## Path Splitting
+
+The path split control is available for splittable curve paths. A split target
+uses a one-based segment number in the UI and a position satisfying
+`0 < pos < 1`. The edit creates two path strata, adjusts endpoint arrows, drops
+whole-path mid-arrow decorations, redistributes inline nodes away from the split
+point, and cleans stale crossing states when the original path is removed.
+
+Splitting is atomic. Unsupported path kinds, invalid segment numbers, invalid
+positions, non-finite preview coordinates, and unsupported segment geometry fail
+without changing the diagram. Successful splits are one undoable diagram edit.
+
+## Arbitrary Path Naming
+
+The Add path cursor tool named `Arbitrary path` creates a path from line, arc,
+and cubic Bezier segments. Direct path input still exposes specific template
+modes such as circle, ellipse, and arc.

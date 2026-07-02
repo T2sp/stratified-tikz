@@ -21,39 +21,42 @@ export type SvgPathInlineNodePreview = {
 }
 
 const labelOffsetDistance = 14
+export const maxSvgPathInlineNodePreviews = 128
 
 export function pathInlineNodesForSvgPreview(
   curve: CurveStratum,
   ambientDimension: AmbientDimension,
   project: (point: Vec3) => Vec2,
 ): SvgPathInlineNodePreview[] {
-  return (curve.inlineNodes ?? []).flatMap((node) => {
-    const modelPoint = pathInlineNodePoint(curve, node, ambientDimension)
+  return (curve.inlineNodes ?? [])
+    .slice(0, maxSvgPathInlineNodePreviews)
+    .flatMap((node) => {
+      const modelPoint = pathInlineNodePoint(curve, node, ambientDimension)
 
-    if (modelPoint === null) {
-      return []
-    }
+      if (modelPoint === null) {
+        return []
+      }
 
-    const center = project(modelPoint)
+      const center = project(modelPoint)
 
-    if (!isFiniteVec2(center)) {
-      return []
-    }
+      if (!isFiniteVec2(center)) {
+        return []
+      }
 
-    const placement = node.options.placement ?? 'above'
+      const placement = node.options.placement ?? 'above'
 
-    return [
-      {
-        id: node.id,
-        pathId: curve.id,
-        center,
-        text: node.text,
-        placement,
-        marker: node.options.marker ?? 'none',
-        labelOffset: placementOffset(placement),
-      },
-    ]
-  })
+      return [
+        {
+          id: node.id,
+          pathId: curve.id,
+          center,
+          text: node.text,
+          placement,
+          marker: node.options.marker ?? 'none',
+          labelOffset: placementOffset(placement),
+        },
+      ]
+    })
 }
 
 export function placementOffset(placement: PathInlineNodePlacement): Vec2 {

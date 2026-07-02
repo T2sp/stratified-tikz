@@ -16,6 +16,10 @@ Layer rows show:
 The current layer filter and current new-element layer are editor UI state. They
 are not saved as layer metadata.
 
+In the preview Layer window, the Actions panel targets the highlighted layer
+row. The panel is semi-transparent over the preview and groups layer operations
+by name, state, move, duplicate, merge, and delete controls.
+
 ## Operations
 
 Rename changes only `diagram.layers[].name`. It does not move elements and does
