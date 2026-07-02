@@ -118,7 +118,23 @@ export const cameraControlSliderFields: readonly CameraControlSliderSpec[] = [
 export function shouldShowCameraControls(
   ambientDimension: AmbientDimension,
 ): boolean {
+  return ambientDimension === 2 || ambientDimension === 3
+}
+
+export function shouldShowCameraOrientationControls(
+  ambientDimension: AmbientDimension,
+): boolean {
   return ambientDimension === 3
+}
+
+export function cameraControlSliderFieldsForAmbientDimension(
+  ambientDimension: AmbientDimension,
+): readonly CameraControlSliderSpec[] {
+  return cameraControlSliderFields.filter(
+    (field) =>
+      field.group === 'view' ||
+      shouldShowCameraOrientationControls(ambientDimension),
+  )
 }
 
 export function createInitialCameraControlState(): OrthographicCamera3D {

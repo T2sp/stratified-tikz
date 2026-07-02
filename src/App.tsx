@@ -155,7 +155,7 @@ import {
   commitDirectCreationResult,
   cameraControlStateFromDiagramView,
   cameraControlSliderBounds,
-  cameraControlSliderFields,
+  cameraControlSliderFieldsForAmbientDimension,
   cameraControlSliderValue,
   cameraControlFieldValue,
   cameraFieldDraftsFromCamera,
@@ -246,6 +246,7 @@ import {
   ruledSurfaceBoundaryPathIdsFromDraft,
   sheetDraftBlocksWorkPlaneChange,
   shouldShowCameraControls,
+  shouldShowCameraOrientationControls,
   shouldShowWorkPlaneControls,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
@@ -330,6 +331,7 @@ import {
   type ExistingCoordinateSource,
   type ExistingCoordinateSourceOption,
   type CameraControlField,
+  type CameraControlSliderSpec,
   type CameraDragMode,
   type CameraPresetId,
   type ConcatenatedPathDraftCoordinateRefRejectionReason,
@@ -1023,11 +1025,17 @@ function App() {
   const showCameraControls = shouldShowCameraControls(
     editableDiagram.ambientDimension,
   )
+  const showCameraOrientationPanel = shouldShowCameraOrientationControls(
+    editableDiagram.ambientDimension,
+  )
   const showCameraDetails = showCameraControls && isCameraDetailsExpanded
-  const activeCameraPresetId = cameraPresetIdForCamera(cameraControl)
+  const activeCameraPresetId = showCameraOrientationPanel
+    ? cameraPresetIdForCamera(cameraControl)
+    : null
   const canResetCameraToSaved =
-    showCameraControls && !areCamera3DEqual(cameraControl, savedCameraControl)
-  const previewCameraOverride = showCameraControls
+    showCameraOrientationPanel &&
+    !areCamera3DEqual(cameraControl, savedCameraControl)
+  const previewCameraOverride = showCameraOrientationPanel
     ? cameraOrientationForPreview(cameraControl)
     : undefined
   const previewCameraAdjustment = showCameraControls
@@ -1224,7 +1232,11 @@ function App() {
 
   function resetCameraViewToInitial(): void {
     setCameraControl(resetCameraControlState())
-    setCameraStatus('Camera reset to initial.')
+    setCameraStatus(
+      showCameraOrientationPanel
+        ? 'Camera reset to initial.'
+        : 'Preview view reset.',
+    )
     setCopyStatus('idle')
   }
 
@@ -1236,7 +1248,11 @@ function App() {
 
   function fitCameraView(): void {
     setCameraControl((current) => fitCameraControlState(current))
-    setCameraStatus('Camera fit to view.')
+    setCameraStatus(
+      showCameraOrientationPanel
+        ? 'Camera fit to view.'
+        : 'Preview view fit to view.',
+    )
     setCopyStatus('idle')
   }
 
@@ -1252,7 +1268,7 @@ function App() {
 
   function handleCameraDrag(delta: Vec2, mode: CameraDragMode): void {
     setCameraControl((current) =>
-      mode === 'pan'
+      editableDiagram.ambientDimension === 2 || mode === 'pan'
         ? applyCameraPanDrag(current, delta)
         : applyCameraOrbitDrag(current, delta),
     )
@@ -1326,7 +1342,9 @@ function App() {
     setCameraControl(nextCamera)
     setSavedCameraControl(nextCamera)
     setCameraFieldDrafts(cameraFieldDraftsFromCamera(nextCamera))
-    setIsCameraDetailsExpanded(nextDiagram.ambientDimension === 3)
+    setIsCameraDetailsExpanded(
+      shouldShowCameraControls(nextDiagram.ambientDimension),
+    )
     setCameraStatus('')
   }
 
@@ -1553,7 +1571,7 @@ function App() {
         createSerializeDiagramOptionsForUi(editableDiagram, {
           exportMode: tikzExportMode,
           includeCoordinateAxesInTikz,
-          camera3d: showCameraControls ? cameraControl : undefined,
+          camera3d: showCameraOrientationPanel ? cameraControl : undefined,
           visibility: visibilityOptions,
         }),
       )
@@ -1566,7 +1584,7 @@ function App() {
         throw new Error('Download failed.')
       }
 
-      if (showCameraControls) {
+      if (showCameraOrientationPanel) {
         setSavedCameraControl(cameraControl)
       }
       setSaveLoadStatus('saved')
@@ -1702,7 +1720,9 @@ function App() {
     setCameraControl(loadedCamera)
     setSavedCameraControl(loadedCamera)
     setCameraFieldDrafts(cameraFieldDraftsFromCamera(loadedCamera))
-    setIsCameraDetailsExpanded(diagram.ambientDimension === 3)
+    setIsCameraDetailsExpanded(
+      shouldShowCameraControls(diagram.ambientDimension),
+    )
     setCameraStatus('')
     setIncludeCoordinateAxesInTikz(
       diagram.ambientDimension === 3
@@ -6015,10 +6035,32 @@ function App() {
       return null
     }
 
-    const orientationFields = cameraControlSliderFields.filter(
+    const panelTitle = showCameraOrientationPanel ? 'Camera' : 'Preview view'
+    const summaryText = showCameraOrientationPanel
+      ? cameraSummaryLabel(cameraControl)
+      : `zoom ${cameraControlFieldValue(
+          cameraControl,
+          'zoom',
+        )}, pan x ${cameraControlFieldValue(
+          cameraControl,
+          'panX',
+        )}, pan y ${cameraControlFieldValue(cameraControl, 'panY')}`
+    const resetLabel = showCameraOrientationPanel
+      ? 'Reset camera to initial view'
+      : 'Reset preview view'
+    const fitLabel = showCameraOrientationPanel
+      ? 'Fit camera view'
+      : 'Fit preview view'
+    const helpText = showCameraOrientationPanel
+      ? 'Drag background to orbit. Shift-drag or middle-drag to pan. Zoom is manual.'
+      : 'Drag background to pan. Zoom is manual.'
+    const sliderFields = cameraControlSliderFieldsForAmbientDimension(
+      editableDiagram.ambientDimension,
+    )
+    const orientationFields = sliderFields.filter(
       (field) => field.group === 'orientation',
     )
-    const viewFields = cameraControlSliderFields.filter(
+    const viewFields = sliderFields.filter(
       (field) => field.group === 'view',
     )
 
@@ -6047,33 +6089,35 @@ function App() {
               {showCameraDetails ? 'v' : '>'}
             </span>
             <span id="camera-heading" className="control-label">
-              Camera
+              {panelTitle}
             </span>
             <span className="camera-summary">
-              {cameraSummaryLabel(cameraControl)}
+              {summaryText}
             </span>
           </button>
           <button
             type="button"
             className="toolbar-button"
-            aria-label="Reset camera to initial view"
+            aria-label={resetLabel}
             onClick={resetCameraViewToInitial}
           >
             Reset
           </button>
+          {showCameraOrientationPanel && (
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={!canResetCameraToSaved}
+              aria-label="Reset camera to saved JSON view"
+              onClick={resetCameraViewToSaved}
+            >
+              Saved
+            </button>
+          )}
           <button
             type="button"
             className="toolbar-button"
-            disabled={!canResetCameraToSaved}
-            aria-label="Reset camera to saved JSON view"
-            onClick={resetCameraViewToSaved}
-          >
-            Saved
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            aria-label="Fit camera view"
+            aria-label={fitLabel}
             onClick={fitCameraView}
           >
             Fit
@@ -6082,40 +6126,45 @@ function App() {
 
         {showCameraDetails && (
           <div id="camera-details" className="camera-details">
-            <div className="camera-orientation-panel">
-              <div className="camera-field-grid camera-angle-field-grid">
-                {orientationFields.map((field) => renderCameraSliderField(field))}
+            {showCameraOrientationPanel && (
+              <div className="camera-orientation-panel">
+                <div className="camera-field-grid camera-angle-field-grid">
+                  {orientationFields.map((field) =>
+                    renderCameraSliderField(field),
+                  )}
+                </div>
+                {renderCameraReferenceGraphic()}
               </div>
-              {renderCameraReferenceGraphic()}
-            </div>
+            )}
             <div className="camera-field-grid camera-view-field-grid">
               {viewFields.map((field) => renderCameraSliderField(field))}
             </div>
-            <label className="camera-preset-field">
-              <span>Preset</span>
-              <select
-                className="toolbar-select"
-                value={activeCameraPresetId ?? 'custom'}
-                onChange={(event) =>
-                  updateCameraPreset(
-                    event.currentTarget.value as CameraPresetId | 'custom',
-                  )
-                }
-              >
-                <option value="custom">custom</option>
-                {cameraPresetOptions.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {showCameraOrientationPanel && (
+              <label className="camera-preset-field">
+                <span>Preset</span>
+                <select
+                  className="toolbar-select"
+                  value={activeCameraPresetId ?? 'custom'}
+                  onChange={(event) =>
+                    updateCameraPreset(
+                      event.currentTarget.value as CameraPresetId | 'custom',
+                    )
+                  }
+                >
+                  <option value="custom">custom</option>
+                  {cameraPresetOptions.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
 
         <p className="camera-help">
-          Drag background to orbit. Shift-drag or middle-drag to pan. Zoom is
-          manual.
+          {helpText}
         </p>
         {cameraStatus !== '' && (
           <span className="toolbar-status camera-status" role="status">
@@ -6127,7 +6176,7 @@ function App() {
   }
 
   function renderCameraSliderField(
-    field: (typeof cameraControlSliderFields)[number],
+    field: CameraControlSliderSpec,
   ) {
     const bounds = cameraControlSliderBounds(cameraControl, field.field)
     const value = cameraControlSliderValue(cameraControl, field.field)

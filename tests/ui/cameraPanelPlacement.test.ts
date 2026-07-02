@@ -45,12 +45,14 @@ test('preview stage does not duplicate camera panel controls', () => {
   assert.equal(appCss.includes('.camera-control'), false)
 })
 
-test('camera panel is hidden by the existing 3D-only camera policy', () => {
+test('camera panel keeps the shared visibility guard', () => {
   const panelStart = appSource.indexOf('function renderCameraPanel()')
   const fieldsStart = appSource.indexOf('function renderCameraSliderField', panelStart)
   const renderCameraPanelSource = appSource.slice(panelStart, fieldsStart)
 
   assert.match(renderCameraPanelSource, /if \(!showCameraControls\) {\n {6}return null\n {4}}/)
+  assert.match(renderCameraPanelSource, /Preview view/)
+  assert.match(renderCameraPanelSource, /cameraControlSliderFieldsForAmbientDimension/)
 })
 
 test('camera panel collapse state is not serialized as diagram data', () => {
@@ -58,7 +60,10 @@ test('camera panel collapse state is not serialized as diagram data', () => {
   const saveEnd = appSource.indexOf('function openLoadJsonPicker()', saveStart)
   const saveSource = appSource.slice(saveStart, saveEnd)
 
-  assert.match(saveSource, /camera3d: showCameraControls \? cameraControl : undefined/)
+  assert.match(
+    saveSource,
+    /camera3d: showCameraOrientationPanel \? cameraControl : undefined/,
+  )
   assert.equal(saveSource.includes('isCameraDetailsExpanded'), false)
   assert.equal(saveSource.includes('cameraFieldDrafts'), false)
   assert.equal(saveSource.includes('cameraStatus'), false)

@@ -13,6 +13,7 @@ import {
   cameraPresetIdForCamera,
   cameraPresetIds,
   cameraPresetOptions,
+  cameraControlSliderFieldsForAmbientDimension,
   cameraControlSliderBounds,
   cameraControlSliderFields,
   cameraControlSliderValue,
@@ -23,10 +24,19 @@ import {
   fitCameraControlState,
   resetCameraControlState,
   shouldShowCameraControls,
+  shouldShowCameraOrientationControls,
   type CameraControlField,
 } from '../../src/ui/cameraControls.ts'
-import type { Camera3D, PerspectiveCamera3D } from '../../src/model/types.ts'
-import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import type {
+  Camera3D,
+  Diagram,
+  PerspectiveCamera3D,
+} from '../../src/model/types.ts'
+import {
+  createEmptyDiagram,
+  createPointStratum,
+} from '../../src/model/constructors.ts'
+import { generateTikz } from '../../src/tikz/generateTikz.ts'
 
 test('camera control input updates camera values', () => {
   let camera = createInitialCameraControlState()
@@ -210,9 +220,58 @@ test('camera control state disables unsupported perspective camera metadata', ()
   assert.equal(camera.kind, 'orthographic')
 })
 
-test('2D mode hides camera controls and 3D mode shows them', () => {
-  assert.equal(shouldShowCameraControls(2), false)
+test('2D and 3D modes both show preview camera controls', () => {
+  assert.equal(shouldShowCameraControls(2), true)
   assert.equal(shouldShowCameraControls(3), true)
+  assert.equal(shouldShowCameraOrientationControls(2), false)
+  assert.equal(shouldShowCameraOrientationControls(3), true)
+})
+
+test('2D camera panel exposes only view controls', () => {
+  assert.deepEqual(
+    cameraControlSliderFieldsForAmbientDimension(2).map((field) => field.field),
+    ['zoom', 'panX', 'panY'],
+  )
+  assert.deepEqual(
+    cameraControlSliderFieldsForAmbientDimension(3).map((field) => field.field),
+    ['thetaDeg', 'phiDeg', 'zoom', 'panX', 'panY'],
+  )
+})
+
+test('2D preview pan and zoom state is finite and resettable', () => {
+  const changedCamera = expectCameraInputOk(
+    expectCameraInputOk(
+      expectCameraInputOk(createInitialCameraControlState(), 'zoom', '1.75'),
+      'panX',
+      '42',
+    ),
+    'panY',
+    '-18',
+  )
+  const adjustment = cameraViewAdjustmentFromControls(changedCamera)
+  const fitted = fitCameraControlState(changedCamera)
+
+  assert.deepEqual(adjustment, { zoom: 1.75, pan: { x: 42, y: -18 } })
+  assert.equal(Number.isFinite(adjustment.zoom), true)
+  assert.equal(Number.isFinite(adjustment.pan.x), true)
+  assert.equal(Number.isFinite(adjustment.pan.y), true)
+  assert.equal(fitted.zoom, 1)
+  assert.deepEqual(fitted.pan, { x: 0, y: 0 })
+})
+
+test('2D preview pan state does not affect TikZ output', () => {
+  const diagram = createTwoDimensionalPointDiagram()
+  const before = generateTikz(diagram)
+  const pannedView = expectCameraInputOk(
+    expectCameraInputOk(createInitialCameraControlState(), 'panX', '64'),
+    'panY',
+    '-32',
+  )
+  const adjustment = cameraViewAdjustmentFromControls(pannedView)
+  const after = generateTikz(diagram)
+
+  assert.deepEqual(adjustment, { zoom: 1, pan: { x: 64, y: -32 } })
+  assert.equal(after, before)
 })
 
 test('camera control field values use theta and phi camera state', () => {
@@ -402,4 +461,19 @@ function expectCameraInputOk(
   }
 
   return result.camera
+}
+
+function createTwoDimensionalPointDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  return {
+    ...diagram,
+    strata: [
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'point-for-2d-view-pan',
+        position: { x: 1, y: 2, z: 0 },
+      }),
+    ],
+  }
 }

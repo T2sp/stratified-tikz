@@ -1686,6 +1686,39 @@ test('resolveSvgCamera returns a safe fitted camera for empty diagrams', () => {
   assert.deepEqual(origin, { x: 100, y: 60 })
 })
 
+test('resolveSvgCamera applies 2D pan and preserves inverse cursor mapping', () => {
+  const diagram = createCameraTestDiagram()
+  const baseCamera = resolveSvgCamera(diagram, 200, 120, { fitToView: true })
+  const pannedCamera = resolveSvgCamera(diagram, 200, 120, {
+    fitToView: true,
+    viewAdjustment: {
+      zoom: 1.5,
+      pan: { x: 18, y: -12 },
+    },
+  })
+  const modelPoint = { x: 2, y: 3, z: 0 }
+  const svgPoint = projectToSvgPoint(pannedCamera, modelPoint, 120)
+  const roundTripped = svgPointToModelOnWorkPlane(
+    pannedCamera,
+    svgPoint,
+    120,
+    { kind: 'xy', z: 0 },
+  )
+
+  assert.equal(baseCamera.mode, '2d')
+  assert.equal(pannedCamera.mode, '2d')
+  if (baseCamera.mode !== '2d' || pannedCamera.mode !== '2d') {
+    throw new Error('Expected 2D SVG cameras.')
+  }
+  assertAlmostEqual(pannedCamera.scale, baseCamera.scale * 1.5)
+  assert.deepEqual(pannedCamera.origin, {
+    x: baseCamera.origin.x + 18,
+    y: baseCamera.origin.y - 12,
+  })
+  assertVec3AlmostEqual(roundTripped, modelPoint)
+  assert.deepEqual(diagram, createCameraTestDiagram())
+})
+
 test('3D coordinate axes guide data is available for preview rendering', () => {
   const guide = createCoordinateAxesGuide(3)
 
