@@ -1607,6 +1607,10 @@ function duplicateCurveNestedData(
         stratum.styleSegments,
         nestedIdAllocator,
       ),
+      inlineNodes: duplicatePathInlineNodes(
+        stratum.inlineNodes,
+        nestedIdAllocator,
+      ),
     },
     pathLabelAllocator,
     pathLabelChanges,
@@ -1630,6 +1634,18 @@ function duplicateCurveStyleSegments(
   return segments.map((segment) => ({
     ...segment,
     id: nestedIdAllocator.allocate(segment.id),
+  }))
+}
+
+function duplicatePathInlineNodes(
+  inlineNodes: CurveStratum['inlineNodes'],
+  nestedIdAllocator: UniqueIdAllocator,
+): CurveStratum['inlineNodes'] {
+  return inlineNodes?.map((node) => ({
+    ...node,
+    id: nestedIdAllocator.allocate(node.id),
+    position: { ...node.position },
+    options: { ...node.options },
   }))
 }
 
@@ -1657,7 +1673,10 @@ function duplicatePathLabel<T extends CurveStratum | PolygonSheetStratum>(
 function nestedObjectIds(diagram: Diagram): string[] {
   return diagram.strata.flatMap((stratum) => {
     if (stratum.geometricKind === 'curve') {
-      return stratum.styleSegments.map((segment) => segment.id)
+      return [
+        ...stratum.styleSegments.map((segment) => segment.id),
+        ...(stratum.inlineNodes ?? []).map((node) => node.id),
+      ]
     }
 
     if (stratum.geometricKind === 'region' && stratum.kind === 'filledRegion') {

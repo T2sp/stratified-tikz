@@ -22,6 +22,7 @@ import {
   createPathArrowOptions,
   type PathArrowOptionsInput,
 } from './pathArrows.ts'
+import { clonePathInlineNodes } from './pathInlineNodes.ts'
 import {
   cloneGridFrame,
   cloneGridParameterRange,
@@ -57,6 +58,7 @@ import type {
   PointCurveKind,
   PolylineCurveStratum,
   PathSegment,
+  PathInlineNode,
   PathTemplate,
   QuadSheetStratum,
   RegionStratum,
@@ -157,6 +159,7 @@ export type CreateCurveStratumInput = {
   bezierControls?: CubicBezierControlMode
   styleSegments?: CurveStyleSegment[]
   arrows?: PathArrowOptionsInput
+  inlineNodes?: PathInlineNode[]
   layer?: number
 }
 
@@ -171,6 +174,7 @@ export type CreateConcatenatedPathStratumInput = {
   segments: PathSegment[]
   styleSegments?: CurveStyleSegment[]
   arrows?: PathArrowOptionsInput
+  inlineNodes?: PathInlineNode[]
   layer?: number
 }
 
@@ -185,6 +189,7 @@ export type CreateTemplatePathStratumInput = {
   template: PathTemplate
   styleSegments?: CurveStyleSegment[]
   arrows?: PathArrowOptionsInput
+  inlineNodes?: PathInlineNode[]
   layer?: number
 }
 
@@ -203,6 +208,7 @@ export type CreateGridStratumInput = {
   clip: GridRectangleClip
   styleSegments?: CurveStyleSegment[]
   arrows?: PathArrowOptionsInput
+  inlineNodes?: PathInlineNode[]
   layer?: number
 }
 
@@ -438,6 +444,7 @@ export function createCurveStratum({
   bezierControls,
   styleSegments = [],
   arrows,
+  inlineNodes,
   layer = 0,
 }: CreateCurveStratumInput): CurveStratum {
   if (kind === 'cubicBezier') {
@@ -456,6 +463,9 @@ export function createCurveStratum({
       ),
       styleSegments: styleSegments.map(cloneCurveStyleSegment),
       arrows: createPathArrowOptions(arrows),
+      ...(inlineNodes === undefined
+        ? {}
+        : { inlineNodes: clonePathInlineNodes(inlineNodes) }),
       layer,
     }
 
@@ -485,6 +495,9 @@ export function createCurveStratum({
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
     arrows: createPathArrowOptions(arrows),
+    ...(inlineNodes === undefined
+      ? {}
+      : { inlineNodes: clonePathInlineNodes(inlineNodes) }),
     layer,
   }
 
@@ -506,6 +519,7 @@ export function createConcatenatedPathStratum({
   segments,
   styleSegments = [],
   arrows,
+  inlineNodes,
   layer = 0,
 }: CreateConcatenatedPathStratumInput): ConcatenatedPathStratum {
   const path: Omit<ConcatenatedPathStratum, 'label'> = {
@@ -524,6 +538,9 @@ export function createConcatenatedPathStratum({
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
     arrows: createPathArrowOptions(arrows),
+    ...(inlineNodes === undefined
+      ? {}
+      : { inlineNodes: clonePathInlineNodes(inlineNodes) }),
     layer,
   }
 
@@ -545,6 +562,7 @@ export function createTemplatePathStratum({
   template,
   styleSegments = [],
   arrows,
+  inlineNodes,
   layer = 0,
 }: CreateTemplatePathStratumInput): TemplatePathStratum {
   const path: Omit<TemplatePathStratum, 'label'> = {
@@ -563,6 +581,9 @@ export function createTemplatePathStratum({
     ),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
     arrows: createPathArrowOptions(arrows),
+    ...(inlineNodes === undefined
+      ? {}
+      : { inlineNodes: clonePathInlineNodes(inlineNodes) }),
     layer,
   }
 
@@ -588,6 +609,7 @@ export function createGridStratum({
   clip,
   styleSegments = [],
   arrows,
+  inlineNodes,
   layer = 0,
 }: CreateGridStratumInput): GridStratum {
   const grid: Omit<GridStratum, 'label'> = {
@@ -607,6 +629,9 @@ export function createGridStratum({
     clip: cloneGridRectangleClip(clip),
     styleSegments: styleSegments.map(cloneCurveStyleSegment),
     arrows: createPathArrowOptions(arrows),
+    ...(inlineNodes === undefined
+      ? {}
+      : { inlineNodes: clonePathInlineNodes(inlineNodes) }),
     layer,
   }
 

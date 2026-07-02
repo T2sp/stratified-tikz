@@ -225,6 +225,41 @@ export type PathArrowOptions = {
   mid: MidArrowDecoration
 }
 
+export const pathInlineNodePlacements = [
+  'above',
+  'below',
+  'left',
+  'right',
+  'center',
+] as const
+export type PathInlineNodePlacement = (typeof pathInlineNodePlacements)[number]
+
+export const pathInlineNodeMarkers = ['none', 'dot'] as const
+export type PathInlineNodeMarker = (typeof pathInlineNodeMarkers)[number]
+
+export type SegmentPathInlineNodePosition = {
+  kind: 'segment'
+  segmentIndex: number
+  value: number
+}
+
+export type PathInlineNodePosition = SegmentPathInlineNodePosition
+
+export type PathInlineNodeOptions = {
+  placement?: PathInlineNodePlacement
+  sloped?: boolean
+  allowUpsideDown?: boolean
+  anchor?: string
+  marker?: PathInlineNodeMarker
+}
+
+export type PathInlineNode = {
+  id: string
+  position: PathInlineNodePosition
+  text: string
+  options: PathInlineNodeOptions
+}
+
 export const pointShapes = ['circle', 'square', 'triangle', 'star'] as const
 export type PointShape = (typeof pointShapes)[number]
 
@@ -679,6 +714,7 @@ type CurveStratumBase = {
   style: CurveStyle
   styleSegments: CurveStyleSegment[]
   arrows?: PathArrowOptions
+  inlineNodes?: PathInlineNode[]
   layer: number
 }
 

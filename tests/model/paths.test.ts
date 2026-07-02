@@ -25,6 +25,7 @@ import {
 } from '../../src/model/serialization.ts'
 import { ensureLayerMetadata } from '../../src/model/layers.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import { removeSelectedElement } from '../../src/ui/diagramUpdates.ts'
 import type {
   BoundaryPathSnapshot,
   CurveStratum,
@@ -38,6 +39,127 @@ test('valid 2D concatenated path with line and cubic segment validates', () => {
   const validation = validateDiagram(diagram)
 
   assert.equal(validation.valid, true, validation.errors.map((issue) => issue.message).join('\n'))
+})
+
+test('path inline node validates with pos 0.5', () => {
+  const diagram = createTwoDimensionalPathDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  curve.inlineNodes = [
+    {
+      id: 'inline-node-valid',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+      text: '$f$',
+      options: { placement: 'above' },
+    },
+  ]
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, true, joinValidationMessages(validation.errors))
+})
+
+test('path inline node rejects invalid boundary positions', () => {
+  const invalidValues = [0, 1]
+
+  invalidValues.forEach((value) => {
+    const diagram = createTwoDimensionalPathDiagram()
+    const curve = diagram.strata[0]
+
+    if (curve?.geometricKind !== 'curve') {
+      throw new Error('Expected curve.')
+    }
+
+    curve.inlineNodes = [
+      {
+        id: `inline-node-${value}`,
+        position: { kind: 'segment', segmentIndex: 0, value },
+        text: '',
+        options: {},
+      },
+    ]
+
+    const validation = validateDiagram(diagram)
+
+    assert.equal(validation.valid, false)
+    assert.match(joinValidationMessages(validation.errors), /0 < value < 1/)
+  })
+})
+
+test('path inline nodes round trip through save and load', () => {
+  const diagram = createTwoDimensionalPathDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  curve.inlineNodes = [
+    {
+      id: 'inline-node-roundtrip',
+      position: { kind: 'segment', segmentIndex: 1, value: 0.25 },
+      text: '$g$',
+      options: {
+        placement: 'below',
+        sloped: true,
+        allowUpsideDown: true,
+      },
+    },
+  ]
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const loadedCurve = parsed.diagram.strata[0]
+
+  assert.equal(loadedCurve?.geometricKind, 'curve')
+  if (loadedCurve?.geometricKind !== 'curve') {
+    throw new Error('Expected loaded curve.')
+  }
+  assert.deepEqual(loadedCurve.inlineNodes, curve.inlineNodes)
+})
+
+test('deleting a path removes its attached inline nodes with the path', () => {
+  const diagram = createTwoDimensionalPathDiagram()
+  const curve = diagram.strata[0]
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  curve.inlineNodes = [
+    {
+      id: 'inline-node-delete',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+      text: '',
+      options: { marker: 'dot' },
+    },
+  ]
+
+  const result = removeSelectedElement(diagram, {
+    kind: 'stratum',
+    id: curve.id,
+  })
+
+  assert.equal(result.removed, true)
+  assert.equal(
+    result.diagram.strata.some(
+      (stratum) =>
+        stratum.geometricKind === 'curve' &&
+        stratum.inlineNodes?.some((node) => node.id === 'inline-node-delete') ===
+          true,
+    ),
+    false,
+  )
+  assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
 test('valid 3D concatenated path validates', () => {

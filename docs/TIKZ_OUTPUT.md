@@ -136,6 +136,36 @@ decorations. The preview follows the projected path tangent in both 2D and 3D,
 but it does not attempt to reproduce the exact TikZ `Stealth`, `Latex`, or
 harpoon glyphs.
 
+## Path inline nodes
+
+Curve strata can store path-attached inline nodes. These are TikZ
+`node[pos=...]` attachments on an existing path segment; they do not split the
+path and do not change path geometry.
+
+For example:
+
+```tex
+\draw
+    (A) -- node[pos=0.5, above] {$f$} (B);
+```
+
+Inline nodes are segment-local in the saved model. A multi-segment path inserts
+the node immediately after the selected segment operation:
+
+```tex
+\draw
+    (A) -- (B) -- node[pos=0.25, below] {$g$} (C);
+```
+
+The Inspector exposes the segment number, `pos`, text, placement, sloped,
+allow-upside-down, anchor, and marker options. Text is stored and exported raw;
+the app does not wrap it in math delimiters. Empty text is allowed, and a dot
+marker can be used for vertex-style annotations.
+
+When 3D curve auto-occlusion would sample a path into numeric fragments, paths
+with inline nodes fall back to ordinary path export with an explicit comment so
+`node[pos=...]` attachments are not silently dropped.
+
 ## 2D braiding crossings without knot package
 
 2D path crossings can be marked as no braiding, braiding, or anti-braiding.

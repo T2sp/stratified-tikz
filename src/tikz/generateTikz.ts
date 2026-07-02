@@ -23,6 +23,8 @@ import type {
   LineStyle,
   MidArrowDecoration,
   PathArrowOptions,
+  PathInlineNode,
+  PathInlineNodeOptions,
   PointShape,
   PointStratum,
   PointStyle,
@@ -2004,7 +2006,7 @@ function emitCurve(
       '\\draw[',
       ...formatTikzOptions(continuousOptions),
       ']',
-      indentLine(`${formatConcatenatedPath(coordinates)};`),
+      indentLine(`${formatConcatenatedPath(coordinates, curve.inlineNodes)};`),
       '',
     ]
   }
@@ -2228,6 +2230,8 @@ function emitOcclusionSegmentedCurves(
       sectionTitle,
       lines: curveContainsCoordinateRef(item)
         ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+        : curveHasInlineNodes(item)
+          ? emitCurveOcclusionInlineNodeFallback(item, index, context)
         : emitCurve(item, index, context),
     }))
   }
@@ -2241,6 +2245,8 @@ function emitOcclusionSegmentedCurves(
       lines:
         curveContainsCoordinateRef(item)
           ? emitCurveOcclusionCoordinateRefFallback(item, index, context)
+          : curveHasInlineNodes(item)
+            ? emitCurveOcclusionInlineNodeFallback(item, index, context)
           : occlusion === undefined
           ? emitCurve(item, index, context)
           : occlusion.capped
@@ -2262,6 +2268,19 @@ function emitCurveOcclusionCoordinateRefFallback(
     // Sampled auto-visibility export would replace coordinateRef sources with
     // generated numeric helper coordinates. For coordinate-ref geometry we
     // prefer ordinary reference-preserving export with an explicit comment.
+    ...emitCurve(curve, elementIndex, context),
+  ]
+}
+
+function emitCurveOcclusionInlineNodeFallback(
+  curve: CurveStratum,
+  elementIndex: number,
+  context: GenerateContext,
+): string[] {
+  return [
+    `% Curve occlusion skipped for curve "${curve.name}" [${curve.id}]: path inline nodes preserved by ordinary export.`,
+    // Sampled auto-visibility export would split the path into numeric draw
+    // fragments and drop TikZ node[pos=...] attachments.
     ...emitCurve(curve, elementIndex, context),
   ]
 }
@@ -3992,7 +4011,13 @@ function emitConcatenatedPathStyleRun(
     '\\draw[',
     ...formatTikzOptions([...options, ...arrowOptions]),
     ']',
-    indentLine(`${formatConcatenatedPath(runCoordinates)};`),
+    indentLine(
+      `${formatConcatenatedPath(
+        runCoordinates,
+        curve.inlineNodes,
+        run.startIndex,
+      )};`,
+    ),
     '',
   ]
 }
@@ -4255,7 +4280,7 @@ function emitContinuousConcatenatedPathBody(
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
-    indentLine(`${formatConcatenatedPath(coordinates)};`),
+    indentLine(`${formatConcatenatedPath(coordinates, curve.inlineNodes)};`),
   ]
 }
 
@@ -5234,6 +5259,10 @@ function curveContainsCoordinateRef(curve: CurveStratum): boolean {
     case 'grid':
       return false
   }
+}
+
+function curveHasInlineNodes(curve: CurveStratum): boolean {
+  return (curve.inlineNodes ?? []).length > 0
 }
 
 function closedBoundariesContainCoordinateRef(
@@ -6970,19 +6999,43 @@ function formatCurvePath(
     const controlPath = formatRelativeBezierControls(curve.bezierControls, mode)
 
     if (controlPath !== null) {
-      return `(${coordinates[0]}) ${controlPath} (${coordinates[1]})`
+      const inlineNodes = formatPathInlineNodesForSegment(curve.inlineNodes, 0)
+      const inlineNodeText = inlineNodes.length === 0 ? '' : ` ${inlineNodes}`
+
+      return `(${coordinates[0]}) ${controlPath}${inlineNodeText} (${coordinates[1]})`
     }
   }
 
   if (curve.kind === 'cubicBezier' && coordinates.length === 4) {
-    return `(${coordinates[0]}) .. controls (${coordinates[1]}) and (${coordinates[2]}) .. (${coordinates[3]})`
+    const inlineNodes = formatPathInlineNodesForSegment(curve.inlineNodes, 0)
+    const inlineNodeText = inlineNodes.length === 0 ? '' : ` ${inlineNodes}`
+
+    return `(${coordinates[0]}) .. controls (${coordinates[1]}) and (${coordinates[2]}) ..${inlineNodeText} (${coordinates[3]})`
   }
 
-  return coordinates.map((name) => `(${name})`).join(' -- ')
+  if (coordinates.length === 0) {
+    return ''
+  }
+
+  const [firstCoordinate, ...restCoordinates] = coordinates
+  const commands = [`(${firstCoordinate})`]
+
+  restCoordinates.forEach((name, index) => {
+    const inlineNodes = formatPathInlineNodesForSegment(curve.inlineNodes, index)
+    commands.push(
+      inlineNodes.length === 0
+        ? `-- (${name})`
+        : `-- ${inlineNodes} (${name})`,
+    )
+  })
+
+  return commands.join(' ')
 }
 
 function formatConcatenatedPath(
   coordinates: readonly PathSegmentCoordinateNames[],
+  inlineNodes: readonly PathInlineNode[] | undefined = undefined,
+  segmentOffset = 0,
 ): string {
   if (coordinates.length === 0) {
     return ''
@@ -6992,8 +7045,19 @@ function formatConcatenatedPath(
 
   return [
     `(${firstSegment.start})`,
-    formatPathSegmentCommand(firstSegment),
-    ...restSegments.map(formatPathSegmentCommand),
+    formatPathSegmentCommand(
+      firstSegment,
+      formatPathInlineNodesForSegment(inlineNodes, segmentOffset),
+    ),
+    ...restSegments.map((segment, index) =>
+      formatPathSegmentCommand(
+        segment,
+        formatPathInlineNodesForSegment(
+          inlineNodes,
+          segmentOffset + index + 1,
+        ),
+      ),
+    ),
   ].join(' ')
 }
 
@@ -7094,23 +7158,77 @@ function formatArcScalarWithOffset(
   return formatNumber(scalar.value + offset)
 }
 
-function formatPathSegmentCommand(segment: PathSegmentCoordinateNames): string {
+function formatPathSegmentCommand(
+  segment: PathSegmentCoordinateNames,
+  inlineNodes = '',
+): string {
+  const inlineNodeText = inlineNodes.length === 0 ? '' : ` ${inlineNodes}`
+
   switch (segment.kind) {
     case 'line':
-      return `-- (${segment.end})`
+      return `--${inlineNodeText} (${segment.end})`
     case 'cubicBezier':
-      return `.. controls (${segment.control1}) and (${segment.control2}) .. (${segment.end})`
+      return `.. controls (${segment.control1}) and (${segment.control2}) ..${inlineNodeText} (${segment.end})`
     case 'arc':
       return `arc[start angle=${segment.startAngleDeg.tikz}, end angle=${arcEndAngleForDirection(
         segment,
-      )}, radius=${segment.radius.tikz}]`
+      )}, radius=${segment.radius.tikz}]${inlineNodeText}`
     case 'arcCubicApproximation':
-      return segment.cubics
+      return `${segment.cubics
         .map(
           (cubic) =>
             `.. controls (${cubic.control1}) and (${cubic.control2}) .. (${cubic.end})`,
         )
-        .join(' ')
+        .join(' ')}${inlineNodeText}`
+  }
+}
+
+function formatPathInlineNodesForSegment(
+  inlineNodes: readonly PathInlineNode[] | undefined,
+  segmentIndex: number,
+): string {
+  return (inlineNodes ?? [])
+    .filter((node) => node.position.segmentIndex === segmentIndex)
+    .sort((left, right) => left.position.value - right.position.value)
+    .map(formatPathInlineNode)
+    .join(' ')
+}
+
+function formatPathInlineNode(node: PathInlineNode): string {
+  return `node[${formatPathInlineNodeOptions(node)}] {${node.text}}`
+}
+
+function formatPathInlineNodeOptions(node: PathInlineNode): string {
+  const options = [
+    `pos=${formatNumber(node.position.value)}`,
+    ...pathInlineNodePlacementOptions(node.options),
+    ...(node.options.sloped === true ? ['sloped'] : []),
+    ...(node.options.allowUpsideDown === true ? ['allow upside down'] : []),
+    ...(node.options.anchor === undefined ||
+    node.options.anchor.trim().length === 0
+      ? []
+      : [`anchor=${node.options.anchor.trim()}`]),
+    ...(node.options.marker === 'dot'
+      ? ['circle', 'fill', 'inner sep=1.2pt']
+      : []),
+  ]
+
+  return options.join(', ')
+}
+
+function pathInlineNodePlacementOptions(
+  options: PathInlineNodeOptions,
+): string[] {
+  switch (options.placement) {
+    case 'above':
+    case 'below':
+    case 'left':
+    case 'right':
+      return [options.placement]
+    case 'center':
+      return options.anchor === undefined ? ['anchor=center'] : []
+    case undefined:
+      return []
   }
 }
 
@@ -7275,10 +7393,12 @@ function formatScopedWorkPlaneRelativeBezierPath(
           controlMode.firstControl,
           controlMode.secondControl,
         )
+  const inlineNodes = formatPathInlineNodesForSegment(curve.inlineNodes, 0)
+  const inlineNodeText = inlineNodes.length === 0 ? '' : ` ${inlineNodes}`
 
   return {
     frame: controlMode.frame,
-    path: `${start} ${controls} ${end}`,
+    path: `${start} ${controls}${inlineNodeText} ${end}`,
   }
 }
 

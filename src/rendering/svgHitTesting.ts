@@ -35,6 +35,7 @@ import {
   shouldRenderTextLabelInSvgPreview,
 } from './svgPreviewPolicy.ts'
 import { svgLabelAnchorPlacement } from './svgStyle.ts'
+import { pathInlineNodesForSvgPreview } from './svgPathInlineNodes.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -454,14 +455,23 @@ function collectStratumCandidates(
           'sheet',
         )
       case 'curve':
-        return collectCurveCandidate(
-          stratum,
-          diagram,
-          camera,
-          viewportHeight,
-          point,
-          tolerance,
-        )
+        return [
+          ...collectPathInlineNodeCandidates(
+            stratum,
+            diagram,
+            camera,
+            viewportHeight,
+            point,
+          ),
+          ...collectCurveCandidate(
+            stratum,
+            diagram,
+            camera,
+            viewportHeight,
+            point,
+            tolerance,
+          ),
+        ]
       case 'point':
         if (visibility?.hiddenPointIds?.has(stratum.id) === true) {
           return []
@@ -469,6 +479,38 @@ function collectStratumCandidates(
 
         return collectPointCandidate(stratum, camera, viewportHeight, point)
     }
+  })
+}
+
+function collectPathInlineNodeCandidates(
+  curve: CurveStratum,
+  diagram: Diagram,
+  camera: Diagram['camera'],
+  viewportHeight: number,
+  point: Vec2,
+): SvgPreviewSelectionCandidate[] {
+  return pathInlineNodesForSvgPreview(
+    curve,
+    diagram.ambientDimension,
+    (modelPoint) => projectToSvgPoint(camera, modelPoint, viewportHeight),
+  ).flatMap((node) => {
+    const distance = distanceVec2(node.center, point)
+
+    if (distance > 10) {
+      return []
+    }
+
+    return [
+      {
+        kind: 'pathInlineNode',
+        id: node.id,
+        hit: true,
+        distance,
+        stableId: `pathInlineNode:${curve.id}:${node.id}`,
+        description: `path node "${node.text.trim() || node.id}" on "${curve.name}"`,
+        selection: { kind: 'stratum', id: curve.id },
+      },
+    ]
   })
 }
 

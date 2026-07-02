@@ -170,6 +170,107 @@ test('path endpoints can reference coordinate anchors in TikZ output', () => {
   expectNoBlankLines(inlineTikz)
 })
 
+test('path inline node exports as TikZ node pos attachment', () => {
+  const diagram = createInlineNodePolylineDiagram()
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /-- node\[pos=0\.5, above\] \{\$f\$\} \(/)
+})
+
+test('segment-local path inline node appears on the selected segment', () => {
+  const diagram = createInlineNodeConcatenatedPathDiagram()
+  const tikz = generateTikz(diagram)
+
+  assert.match(
+    tikz,
+    /\(curvePathInlineSegment0p0\) -- \(curvePathInlineSegment0p1\) -- node\[pos=0\.25, below\] \{\$g\$\} \(curvePathInlineSegment0p2\);/,
+  )
+})
+
+test('coordinateRef path with inline node preserves references and node syntax', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 2, y: 0, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'ref-inline-path',
+    name: 'Reference inline path',
+    style: curveStyle(),
+    points: [
+      coordinateReferencePoint(diagram, 'coord-a'),
+      coordinateReferencePoint(diagram, 'coord-b'),
+    ],
+    styleSegments: [],
+    inlineNodes: [
+      {
+        id: 'ref-inline-node',
+        position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+        text: '$h$',
+        options: { placement: 'above' },
+      },
+    ],
+    layer: 0,
+  })
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\(A\) -- node\[pos=0\.5, above\] \{\$h\$\} \(B\);/)
+})
+
+test('path arrows and inline node are both preserved', () => {
+  const diagram = createArrowPathDiagram(
+    arrowOptions({
+      endpoint: 'forward',
+      mid: {
+        enabled: true,
+        position: 0.4,
+        head: 'stealth',
+      },
+    }),
+  )
+  const curve = diagram.strata[0]
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected curve.')
+  }
+
+  curve.inlineNodes = [
+    {
+      id: 'arrow-inline-node',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+      text: '$a$',
+      options: { placement: 'above' },
+    },
+  ]
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /\n\s+->,/)
+  assert.match(tikz, /mark=at position 0\.4/)
+  assert.match(tikz, /\\arrow\{Stealth\}/)
+  assert.match(tikz, /node\[pos=0\.5, above\] \{\$a\$\}/)
+})
+
+test('inline node inline math output has no blank lines', () => {
+  const tikz = generateTikz(createInlineNodePolylineDiagram(), {
+    exportMode: 'inlineMath',
+  })
+
+  assert.match(tikz, /node\[pos=0\.5, above\]/)
+  expectNoBlankLines(tikz)
+})
+
+test('old paths without inline nodes keep ordinary path syntax', () => {
+  const tikz = generateTikz(createArrowPathDiagram())
+
+  assert.match(tikz, /\(curvePolyArrowTestPath0p0\) -- \(curvePolyArrowTestPath0p1\);/)
+  assert.doesNotMatch(tikz, /node\[pos=/)
+})
+
 test('label positions can reference coordinate anchors in TikZ output', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
@@ -1407,6 +1508,42 @@ test('curve occlusion falls back per coordinate-ref path', () => {
   assert.doesNotMatch(tikz, /NaN|Infinity/)
   expectNoBlankLines(inlineTikz)
   expectNoTwoSpaceCommandIndent(inlineTikz)
+})
+
+test('curve occlusion falls back for paths with inline nodes', () => {
+  const diagram = createStraightCurveOcclusionDiagram('polyline')
+  const curve = diagram.strata.find(
+    (stratum) => stratum.geometricKind === 'curve',
+  )
+
+  if (curve?.geometricKind !== 'curve') {
+    throw new Error('Expected occlusion curve.')
+  }
+
+  curve.inlineNodes = [
+    {
+      id: 'occlusion-inline-node',
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+      text: '$v$',
+      options: { placement: 'above' },
+    },
+  ]
+
+  const tikz = generateTikz(diagram, {
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+  const inlineTikz = generateTikz(diagram, {
+    exportMode: 'inlineMath',
+    visibility: enabledVisibilityOptions('layerThenDepth'),
+  })
+
+  assert.match(
+    tikz,
+    /Curve occlusion skipped for curve "Straight Occlusion Polyline" \[straight-occlusion-polyline\]: path inline nodes preserved by ordinary export\./,
+  )
+  assert.match(tikz, /node\[pos=0\.5, above\] \{\$v\$\}/)
+  assert.doesNotMatch(tikz, /curvePolyStraightOcclusionPolyline\d+Occlusionp0/)
+  expectNoBlankLines(inlineTikz)
 })
 
 test('curve occlusion TikZ output applies hidden sampled segment style', () => {
@@ -7190,6 +7327,72 @@ function xyFrame3D(origin: Vec3 = { x: 0, y: 0, z: 0 }): WorkPlaneFrameSnapshot 
     v: { x: 0, y: 1, z: 0 },
     normal: { x: 0, y: 0, z: 1 },
   }
+}
+
+function createInlineNodePolylineDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'polyline',
+    id: 'inline-node-path',
+    name: 'Inline Node Path',
+    style: curveStyle(),
+    points: [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 0 },
+    ],
+    styleSegments: [],
+    inlineNodes: [
+      {
+        id: 'inline-node-mid',
+        position: { kind: 'segment', segmentIndex: 0, value: 0.5 },
+        text: '$f$',
+        options: { placement: 'above' },
+      },
+    ],
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createInlineNodeConcatenatedPathDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'inline-segment-path',
+    name: 'Inline Segment',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'line',
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 1, y: 0, z: 0 },
+      },
+      {
+        kind: 'line',
+        start: { x: 1, y: 0, z: 0 },
+        end: { x: 2, y: 0, z: 0 },
+      },
+    ],
+    styleSegments: [],
+    inlineNodes: [
+      {
+        id: 'inline-node-second-segment',
+        position: { kind: 'segment', segmentIndex: 1, value: 0.25 },
+        text: '$g$',
+        options: { placement: 'below' },
+      },
+    ],
+    layer: 0,
+  })
+
+  return diagram
 }
 
 function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
