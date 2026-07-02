@@ -47,6 +47,7 @@ import type {
   CoordinateAxis,
   WorkPlaneLocalCoordinateAxis,
 } from './diagramUpdates.ts'
+import { cloneDiagram } from './diagramUpdates.ts'
 import { formatVec3 } from './inspectorSummary.ts'
 import {
   clearSelectionForLayerFilter,
@@ -112,6 +113,29 @@ export type CoordinateAnchorTranslateSelectedResult =
 export type CoordinateAnchorTranslationEditorState = UndoableEditorState & {
   layerOperationStatus: string
 }
+
+export type CoordinateAnchorDragSession = {
+  coordinateId: string
+  coordinateIds: string[]
+  startPoint: Vec3
+  startDiagram: Diagram
+}
+
+export type StartCoordinateAnchorDragSessionResult =
+  | {
+      ok: true
+      session: CoordinateAnchorDragSession
+    }
+  | {
+      ok: false
+      reason:
+        | 'hidden'
+        | 'notMultiCoordinateSelection'
+        | 'notSelected'
+        | 'missing'
+        | 'invalidPosition'
+      message: string
+    }
 
 export type CoordinateAnchorInspectorField = {
   label: string
@@ -401,6 +425,167 @@ export function applyCoordinateAnchorTranslateToEditorState<
     sheetPolygonDraft: null,
     layerOperationStatus: result.message,
   })
+}
+
+export function startCoordinateAnchorDragSession(
+  diagram: Diagram,
+  selection: SelectedElement,
+  coordinateId: string,
+  options: { showCoordinateAnchors: boolean },
+): StartCoordinateAnchorDragSessionResult {
+  if (!options.showCoordinateAnchors) {
+    return {
+      ok: false,
+      reason: 'hidden',
+      message: 'Coordinate markers are hidden.',
+    }
+  }
+
+  const elements = selectedElements(selection)
+
+  if (
+    elements.length < 2 ||
+    !elements.every((element) => element.kind === 'coordinate')
+  ) {
+    return {
+      ok: false,
+      reason: 'notMultiCoordinateSelection',
+      message:
+        'Coordinate drag translation requires a coordinate-only multi-selection.',
+    }
+  }
+
+  if (
+    !elements.some(
+      (element) => element.kind === 'coordinate' && element.id === coordinateId,
+    )
+  ) {
+    return {
+      ok: false,
+      reason: 'notSelected',
+      message: 'Only selected coordinate markers can start a coordinate drag.',
+    }
+  }
+
+  const anchor = (diagram.coordinateAnchors ?? []).find(
+    (candidate) => candidate.id === coordinateId,
+  )
+
+  if (anchor === undefined) {
+    return {
+      ok: false,
+      reason: 'missing',
+      message: 'Coordinate anchor does not exist.',
+    }
+  }
+
+  let startPoint: Vec3
+
+  try {
+    startPoint = normalizePointForAmbientDimension(
+      diagram.ambientDimension,
+      coordinateAnchorPositionPreview(anchor.position, diagram.ambientDimension),
+    )
+  } catch {
+    return {
+      ok: false,
+      reason: 'invalidPosition',
+      message: 'Coordinate anchor position is not available for dragging.',
+    }
+  }
+
+  if (!isFiniteVec3(startPoint)) {
+    return {
+      ok: false,
+      reason: 'invalidPosition',
+      message: 'Coordinate anchor position must be finite for dragging.',
+    }
+  }
+
+  return {
+    ok: true,
+    session: {
+      coordinateId,
+      coordinateIds: [...new Set(elements.map((element) => element.id))],
+      startPoint,
+      startDiagram: cloneDiagram(diagram),
+    },
+  }
+}
+
+export function coordinateAnchorDragDelta(
+  session: CoordinateAnchorDragSession,
+  targetPoint: Vec3,
+): Vec3 {
+  const normalizedTarget = normalizePointForAmbientDimension(
+    session.startDiagram.ambientDimension,
+    targetPoint,
+  )
+
+  return {
+    x: normalizedTarget.x - session.startPoint.x,
+    y: normalizedTarget.y - session.startPoint.y,
+    z: normalizedTarget.z - session.startPoint.z,
+  }
+}
+
+export function applyCoordinateAnchorDragToEditorState<
+  T extends CoordinateAnchorTranslationEditorState,
+>(
+  current: T,
+  session: CoordinateAnchorDragSession,
+  targetPoint: Vec3,
+): T {
+  const result = translateCoordinateAnchors(
+    session.startDiagram,
+    session.coordinateIds,
+    coordinateAnchorDragDelta(session, targetPoint),
+  )
+
+  if (!result.ok) {
+    return {
+      ...current,
+      layerOperationStatus: `Drag selected coordinates failed: ${result.error.message}`,
+    }
+  }
+
+  const nextDiagram =
+    result.value.translatedCount === 0
+      ? session.startDiagram
+      : resolveDiagramCoordinateRefs(result.value.diagram)
+  const nextLayerFilter = normalizeLayerFilterForDiagram(
+    nextDiagram,
+    current.layerFilter,
+  )
+  const nextSelection = clearSelectionForLayerFilter(
+    nextDiagram,
+    current.selectedElement,
+    nextLayerFilter,
+  )
+  const translatedCount = result.value.translatedCount
+
+  return commitDiagramChange(
+    current,
+    {
+      ...current,
+      editableDiagram: nextDiagram,
+      selectedElement: nextSelection,
+      layerFilter: nextLayerFilter,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      pathDraft: null,
+      sheetPolygonDraft: null,
+      layerOperationStatus:
+        translatedCount === 0
+          ? 'No selected coordinates translated.'
+          : `Translated ${translatedCount} ${
+              translatedCount === 1 ? 'coordinate' : 'coordinates'
+            }.`,
+    },
+    {
+      undoSourceDiagram: session.startDiagram,
+    },
+  )
 }
 
 export function moveCoordinateAnchorToPoint(

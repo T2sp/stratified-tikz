@@ -37,8 +37,10 @@ import { sheetVertices } from '../model/sheets.ts'
 import { gridPreviewSegments } from '../model/grids.ts'
 import type { GeometryHandleTarget } from '../ui/geometryHandles'
 import {
+  isCoordinateAnchorSelection,
   isSelectedElement,
   isSingleSelectedElement,
+  selectedElementCount,
   type SelectedElement,
   type SelectionClickMode,
   type SingleSelectedElement,
@@ -184,6 +186,14 @@ export type SvgDiagramProps = {
   ) => void
   onGeometryHandleDragStart?: (target: GeometryHandleTarget) => void
   onGeometryHandleDragEnd?: () => void
+  onCoordinateAnchorDrag?: (
+    coordinateId: string,
+    svgPoint: Vec2,
+    viewportHeight: number,
+    camera: Diagram['camera'],
+  ) => void
+  onCoordinateAnchorDragStart?: (coordinateId: string) => void
+  onCoordinateAnchorDragEnd?: () => void
   onCameraDrag?: (delta: Vec2, mode: CameraDragMode) => void
 }
 
@@ -231,6 +241,11 @@ type ActiveCameraDrag = {
   moved: boolean
 }
 
+type ActiveCoordinateAnchorDrag = {
+  coordinateId: string
+  moved: boolean
+}
+
 const defaultWidth = 520
 const defaultHeight = 360
 const pointRadiusScale = 1.8
@@ -268,11 +283,17 @@ export function SvgDiagram({
   onGeometryHandleDrag,
   onGeometryHandleDragStart,
   onGeometryHandleDragEnd,
+  onCoordinateAnchorDrag,
+  onCoordinateAnchorDragStart,
+  onCoordinateAnchorDragEnd,
   onCameraDrag,
 }: SvgDiagramProps): ReactElement {
   const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
+  const activeCoordinateAnchorDragRef =
+    useRef<ActiveCoordinateAnchorDrag | null>(null)
   const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
+  const suppressCoordinateAnchorClickRef = useRef(false)
   const diagram = useMemo(
     () => resolveDiagramCoordinateRefs(sourceDiagram),
     [sourceDiagram],
@@ -397,6 +418,47 @@ export function SvgDiagram({
         layerFilterIncludesLayer(layerFilter, curve.layer),
     },
   )
+  const coordinateAnchorDragEnabled =
+    onCoordinateAnchorDrag !== undefined &&
+    onCoordinateAnchorDragStart !== undefined &&
+    isCoordinateAnchorSelection(selectedElement) &&
+    selectedElementCount(selectedElement) > 1
+  const handleCoordinateAnchorPointerDown = coordinateAnchorDragEnabled
+    ? (event: PointerEvent<SVGGElement>, marker: SvgCoordinateAnchorMarker) => {
+        event.preventDefault()
+        event.stopPropagation()
+        activeCoordinateAnchorDragRef.current = {
+          coordinateId: marker.anchor.id,
+          moved: false,
+        }
+        suppressNextCanvasClickRef.current = true
+        onCoordinateAnchorDragStart?.(marker.anchor.id)
+        event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
+      }
+    : undefined
+  const handleCoordinateAnchorClick = (
+    event: MouseEvent<SVGGElement>,
+    marker: SvgCoordinateAnchorMarker,
+  ) => {
+    if (suppressCoordinateAnchorClickRef.current) {
+      event.stopPropagation()
+      suppressCoordinateAnchorClickRef.current = false
+      return
+    }
+
+    selectElement(
+      event,
+      { kind: 'coordinate', id: marker.anchor.id },
+      onSelectionChange,
+    )
+  }
+  const coordinateAnchorMarkers = svgCoordinateAnchorMarkersForPreview(
+    diagram,
+    camera,
+    height,
+    selectedElement,
+    showCoordinateAnchors,
+  )
 
   useEffect(() => {
     onPathIntersectionDetectionStatusChange?.(pathIntersectionDetection.status)
@@ -414,7 +476,11 @@ export function SvgDiagram({
       role="img"
       aria-label={`${diagram.ambientDimension}D StratifiedTikZ example`}
       onPointerDown={(event) => {
-        if (activeDragTargetRef.current !== null || onCameraDrag === undefined) {
+        if (
+          activeDragTargetRef.current !== null ||
+          activeCoordinateAnchorDragRef.current !== null ||
+          onCameraDrag === undefined
+        ) {
           return
         }
 
@@ -438,6 +504,24 @@ export function SvgDiagram({
         event.currentTarget.setPointerCapture(event.pointerId)
       }}
       onPointerMove={(event) => {
+        const coordinateDrag = activeCoordinateAnchorDragRef.current
+
+        if (coordinateDrag !== null && onCoordinateAnchorDrag !== undefined) {
+          event.preventDefault()
+          activeCoordinateAnchorDragRef.current = {
+            ...coordinateDrag,
+            moved: true,
+          }
+          suppressNextCanvasClickRef.current = true
+          onCoordinateAnchorDrag(
+            coordinateDrag.coordinateId,
+            svgPointFromPointerEvent(event, width, height),
+            height,
+            camera,
+          )
+          return
+        }
+
         const target = activeDragTargetRef.current
 
         if (target !== null && onGeometryHandleDrag !== undefined) {
@@ -474,6 +558,26 @@ export function SvgDiagram({
         }
       }}
       onPointerUp={(event) => {
+        const coordinateDrag = activeCoordinateAnchorDragRef.current
+
+        if (coordinateDrag !== null) {
+          event.preventDefault()
+          activeCoordinateAnchorDragRef.current = null
+          onCoordinateAnchorDragEnd?.()
+          if (coordinateDrag.moved) {
+            suppressCoordinateAnchorClickRef.current = true
+            suppressNextCanvasClickRef.current = true
+            window.setTimeout(() => {
+              suppressCoordinateAnchorClickRef.current = false
+              suppressNextCanvasClickRef.current = false
+            }, 0)
+          } else {
+            suppressNextCanvasClickRef.current = false
+          }
+          releasePointerCaptureIfHeld(event)
+          return
+        }
+
         if (activeDragTargetRef.current !== null) {
           event.preventDefault()
           activeDragTargetRef.current = null
@@ -499,9 +603,15 @@ export function SvgDiagram({
         }
       }}
       onPointerCancel={(event) => {
+        const coordinateDrag = activeCoordinateAnchorDragRef.current
         activeDragTargetRef.current = null
         activeCameraDragRef.current = null
+        activeCoordinateAnchorDragRef.current = null
         suppressNextCanvasClickRef.current = false
+        suppressCoordinateAnchorClickRef.current = false
+        if (coordinateDrag !== null) {
+          onCoordinateAnchorDragEnd?.()
+        }
         onGeometryHandleDragEnd?.()
         releasePointerCaptureIfHeld(event)
       }}
@@ -555,13 +665,22 @@ export function SvgDiagram({
         selectedPathIntersectionCandidateId,
         onPathIntersectionCandidateClick,
       )}
-      {renderCoordinateAnchors(
-        diagram,
-        camera,
-        height,
-        showCoordinateAnchors,
-        selectedElement,
-        onSelectionChange,
+      {coordinateAnchorMarkers.length === 0 ? null : (
+        <g
+          key="coordinate-anchors"
+          className="svg-coordinate-anchors"
+          aria-label="Coordinate anchors"
+          data-svg-coordinate-anchors="true"
+        >
+          {coordinateAnchorMarkers.map((marker) => (
+            <CoordinateAnchorMarkerElement
+              key={marker.anchor.id}
+              marker={marker}
+              onCoordinateAnchorClick={handleCoordinateAnchorClick}
+              onCoordinateAnchorPointerDown={handleCoordinateAnchorPointerDown}
+            />
+          ))}
+        </g>
       )}
       {shouldRenderSvgGeometryHandles(
         showGeometryHandles,
@@ -974,71 +1093,65 @@ function renderCoordinateSourceHighlight(
   )
 }
 
-function renderCoordinateAnchors(
-  diagram: Diagram,
-  camera: Diagram['camera'],
-  viewportHeight: number,
-  showCoordinateAnchors: boolean,
-  selectedElement: SelectedElement,
-  onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): ReactElement | null {
-  const markers = svgCoordinateAnchorMarkersForPreview(
-    diagram,
-    camera,
-    viewportHeight,
-    selectedElement,
-    showCoordinateAnchors,
-  )
+type CoordinateAnchorMarkerElementProps = {
+  marker: SvgCoordinateAnchorMarker
+  onCoordinateAnchorClick: (
+    event: MouseEvent<SVGGElement>,
+    marker: SvgCoordinateAnchorMarker,
+  ) => void
+  onCoordinateAnchorPointerDown:
+    | ((
+        event: PointerEvent<SVGGElement>,
+        marker: SvgCoordinateAnchorMarker,
+      ) => void)
+    | undefined
+}
 
-  if (markers.length === 0) {
-    return null
-  }
-
+function CoordinateAnchorMarkerElement({
+  marker,
+  onCoordinateAnchorClick,
+  onCoordinateAnchorPointerDown,
+}: CoordinateAnchorMarkerElementProps): ReactElement {
   return (
     <g
-      key="coordinate-anchors"
-      className="svg-coordinate-anchors"
-      aria-label="Coordinate anchors"
-      data-svg-coordinate-anchors="true"
+      className={coordinateAnchorMarkerClassName(marker)}
+      role="button"
+      aria-label={`Coordinate anchor ${marker.anchor.name}, TikZ name ${marker.anchor.tikzName}`}
+      data-svg-coordinate-anchor="true"
+      data-coordinate-anchor-id={marker.anchor.id}
+      data-coordinate-anchor-name={marker.anchor.name}
+      data-coordinate-anchor-tikz-name={marker.anchor.tikzName}
+      onPointerDown={
+        marker.selected && onCoordinateAnchorPointerDown !== undefined
+          ? (event) => onCoordinateAnchorPointerDown(event, marker)
+          : undefined
+      }
+      onClick={(event) => onCoordinateAnchorClick(event, marker)}
     >
-      {markers.map((marker) => renderCoordinateAnchor(marker, onSelectionChange))}
+      {renderCoordinateAnchorMarkerContent(marker)}
     </g>
   )
 }
 
-function renderCoordinateAnchor(
-  marker: SvgCoordinateAnchorMarker,
-  onSelectionChange: SvgDiagramProps['onSelectionChange'],
-): ReactElement {
-  const { anchor, center, hitRadius, selected } = marker
-  const markerColor = '#0F766E'
-  const className = [
+function coordinateAnchorMarkerClassName(marker: SvgCoordinateAnchorMarker): string {
+  return [
     coordinateAnchorMarkerClassNames.marker,
     'svg-coordinate-anchor',
     'svg-selectable',
-    selected ? 'is-selected' : '',
+    marker.selected ? 'is-selected' : '',
   ]
     .filter((name) => name !== '')
     .join(' ')
+}
+
+function renderCoordinateAnchorMarkerContent(
+  marker: SvgCoordinateAnchorMarker,
+): ReactElement {
+  const { anchor, center, hitRadius, selected } = marker
+  const markerColor = '#0F766E'
 
   return (
-    <g
-      key={anchor.id}
-      className={className}
-      role="button"
-      aria-label={`Coordinate anchor ${anchor.name}, TikZ name ${anchor.tikzName}`}
-      data-svg-coordinate-anchor="true"
-      data-coordinate-anchor-id={anchor.id}
-      data-coordinate-anchor-name={anchor.name}
-      data-coordinate-anchor-tikz-name={anchor.tikzName}
-      onClick={(event) =>
-        selectElement(
-          event,
-          { kind: 'coordinate', id: anchor.id },
-          onSelectionChange,
-        )
-      }
-    >
+    <>
       <title>{`Coordinate anchor ${anchor.name}; TikZ name ${anchor.tikzName}`}</title>
       <circle
         cx={center.x}
@@ -1088,7 +1201,7 @@ function renderCoordinateAnchor(
         vectorEffect="non-scaling-stroke"
         pointerEvents="none"
       />
-    </g>
+    </>
   )
 }
 

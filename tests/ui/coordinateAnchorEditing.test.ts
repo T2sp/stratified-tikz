@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import { snapCursorPoint } from '../../src/geometry/cursorSnap.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceSourceForPoint,
@@ -26,14 +27,17 @@ import type {
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   createCoordinateAnchorInspectorModel,
+  applyCoordinateAnchorDragToEditorState,
   deleteCoordinateAnchorWithDetach,
   deleteUnusedCoordinateAnchor,
+  startCoordinateAnchorDragSession,
   applyCoordinateAnchorTranslateToEditorState,
   translateSelectedCoordinateAnchors,
   updateCoordinateAnchorGlobalCoordinate,
   updateCoordinateAnchorName,
   updateCoordinateAnchorTikzName,
   updateCoordinateAnchorWorkPlaneLocalCoordinate,
+  type CoordinateAnchorDragSession,
 } from '../../src/ui/coordinateAnchorEditing.ts'
 import { updateDiagramGeometryHandle } from '../../src/ui/geometryHandles.ts'
 import { createInspectorSections } from '../../src/ui/inspectorSummary.ts'
@@ -851,6 +855,257 @@ test('coordinate multi-translation preserves coordinate multi-selection after su
   assert.deepEqual(translated.selectedElement, coordinateMultiSelection())
 })
 
+test('coordinate drag moves all selected coordinates from the dragged marker delta', () => {
+  const diagram = createThreeCoordinateDiagram(2)
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, coordinateMultiSelection()),
+    session,
+    { x: 1, y: -2, z: 99 },
+  )
+
+  assert.deepEqual(anchorPreview(findAnchor(dragged.editableDiagram, 'coord-a')), {
+    x: 1,
+    y: -2,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(dragged.editableDiagram, 'coord-b')), {
+    x: 3,
+    y: -1,
+    z: 0,
+  })
+})
+
+test('coordinate drag leaves non-selected coordinates unchanged', () => {
+  const diagram = createThreeCoordinateDiagram(2)
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, coordinateMultiSelection()),
+    session,
+    { x: 1, y: -2, z: 0 },
+  )
+
+  assert.deepEqual(anchorPreview(findAnchor(dragged.editableDiagram, 'coord-c')), {
+    x: 5,
+    y: 5,
+    z: 0,
+  })
+})
+
+test('coordinate drag keeps referenced path previews live and refs intact', () => {
+  const diagram = createReferencedPathDiagram()
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, coordinateMultiSelection()),
+    session,
+    { x: 1, y: 2, z: 0 },
+  )
+  const curve = findCurve(dragged.editableDiagram, 'ref-path')
+
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.points[0])?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.points[1])?.coordinateId,
+    'coord-b',
+  )
+  assert.deepEqual(pointPreview(curve.points[0]), { x: 1, y: 2, z: 0 })
+  assert.deepEqual(pointPreview(curve.points[1]), { x: 2, y: 2, z: 0 })
+})
+
+test('coordinate drag with snap enabled lands dragged coordinate on snapped target', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const snappedTarget = snapCursorPoint(
+    { x: 0.76, y: 1.24, z: 9 },
+    {
+      ambientDimension: diagram.ambientDimension,
+      snap: { enabled: true, step: 1 },
+    },
+  )
+
+  assert.notEqual(snappedTarget, null)
+  if (snappedTarget === null) {
+    throw new Error('Expected snapped drag target.')
+  }
+
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, coordinateMultiSelection()),
+    session,
+    snappedTarget,
+  )
+
+  assert.deepEqual(anchorPreview(findAnchor(dragged.editableDiagram, 'coord-a')), {
+    x: 1,
+    y: 1,
+    z: 0,
+  })
+})
+
+test('coordinate drag with snap disabled preserves raw target delta', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const rawTarget = snapCursorPoint(
+    { x: 0.76, y: 1.24, z: 9 },
+    {
+      ambientDimension: diagram.ambientDimension,
+      snap: { enabled: false, step: 1 },
+    },
+  )
+
+  assert.notEqual(rawTarget, null)
+  if (rawTarget === null) {
+    throw new Error('Expected raw drag target.')
+  }
+
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, coordinateMultiSelection()),
+    session,
+    rawTarget,
+  )
+
+  assert.deepEqual(anchorPreview(findAnchor(dragged.editableDiagram, 'coord-a')), {
+    x: 0.76,
+    y: 1.24,
+    z: 0,
+  })
+})
+
+test('coordinate drag group translation is undoable and redoable as one entry', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const initial = createState(diagram, coordinateMultiSelection())
+  const session = startDragSession(diagram, coordinateMultiSelection(), 'coord-a')
+  const firstMove = applyCoordinateAnchorDragToEditorState(
+    initial,
+    session,
+    { x: 1, y: 0, z: 0 },
+  )
+  const secondMove = applyCoordinateAnchorDragToEditorState(
+    firstMove,
+    session,
+    { x: 2, y: 0, z: 0 },
+  )
+  const undone = undoLastDiagramChange(secondMove)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(secondMove.history.past.length, 1)
+  assert.deepEqual(anchorPreview(findAnchor(secondMove.editableDiagram, 'coord-a')), {
+    x: 2,
+    y: 0,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(secondMove.editableDiagram, 'coord-b')), {
+    x: 4,
+    y: 1,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(undone.editableDiagram, 'coord-a')), {
+    x: 0,
+    y: 0,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(redone.editableDiagram, 'coord-a')), {
+    x: 2,
+    y: 0,
+    z: 0,
+  })
+})
+
+test('coordinate drag of work-plane-local coordinate moves frame origin', () => {
+  const diagram = createCoordinateDiagram(3)
+
+  addAnchor(diagram, {
+    id: 'coord-local',
+    name: 'Local',
+    tikzName: 'Local',
+    position: localAnchorPosition(2, 3),
+  })
+  addAnchor(diagram, {
+    id: 'coord-b',
+    name: 'B',
+    tikzName: 'B',
+    position: globalAnchorPosition(0, 0, 0),
+  })
+
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-local' },
+      { kind: 'coordinate', id: 'coord-b' },
+    ],
+  }
+  const session = startDragSession(diagram, selection, 'coord-local')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, selection),
+    session,
+    { x: 14, y: 22, z: 36 },
+  )
+  const position = findAnchor(dragged.editableDiagram, 'coord-local').position
+
+  assert.equal(position.kind, 'workPlaneLocal')
+  if (position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate.')
+  }
+  assert.deepEqual(position.frame.origin, { x: 12, y: 22, z: 33 })
+  assert.deepEqual(position.local, localAnchorPosition(2, 3).local)
+  assert.deepEqual(position.preview, { x: 14, y: 22, z: 36 })
+})
+
+test('coordinate drag detaches selected coordinate internal coordinateRef before translation', () => {
+  const diagram = createCoordinateDiagram(3)
+
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(2, 3, 4),
+  })
+  addAnchor(diagram, {
+    id: 'coord-b',
+    name: 'B',
+    tikzName: 'B',
+    position: globalAnchorPositionReferencing(diagram, 'coord-a'),
+  })
+  addAnchor(diagram, {
+    id: 'coord-c',
+    name: 'C',
+    tikzName: 'C',
+    position: globalAnchorPosition(0, 0, 0),
+  })
+
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-b' },
+      { kind: 'coordinate', id: 'coord-c' },
+    ],
+  }
+  const session = startDragSession(diagram, selection, 'coord-b')
+  const dragged = applyCoordinateAnchorDragToEditorState(
+    createState(diagram, selection),
+    session,
+    { x: 3, y: 4, z: 5 },
+  )
+  const b = findAnchor(dragged.editableDiagram, 'coord-b')
+
+  assert.deepEqual(anchorPreview(b), { x: 3, y: 4, z: 5 })
+  assert.equal(positionContainsCoordinateRef(b.position), false)
+})
+
+test('hidden coordinate markers cannot start coordinate drag sessions', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const result = startCoordinateAnchorDragSession(
+    diagram,
+    coordinateMultiSelection(),
+    'coord-a',
+    { showCoordinateAnchors: false },
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.ok ? '' : result.reason, 'hidden')
+})
+
 function createCoordinateDiagram(ambientDimension: 2 | 3): Diagram {
   return createEmptyDiagram({ ambientDimension })
 }
@@ -874,6 +1129,19 @@ function createTwoCoordinateDiagram(ambientDimension: 2 | 3): Diagram {
   return diagram
 }
 
+function createThreeCoordinateDiagram(ambientDimension: 2 | 3): Diagram {
+  const diagram = createTwoCoordinateDiagram(ambientDimension)
+
+  addAnchor(diagram, {
+    id: 'coord-c',
+    name: 'C',
+    tikzName: 'C',
+    position: globalAnchorPosition(5, 5, ambientDimension === 2 ? 0 : 5),
+  })
+
+  return diagram
+}
+
 function coordinateMultiSelection(): SelectedElement {
   return {
     kind: 'multi',
@@ -882,6 +1150,26 @@ function coordinateMultiSelection(): SelectedElement {
       { kind: 'coordinate', id: 'coord-b' },
     ],
   }
+}
+
+function startDragSession(
+  diagram: Diagram,
+  selection: SelectedElement,
+  coordinateId: string,
+): CoordinateAnchorDragSession {
+  const result = startCoordinateAnchorDragSession(
+    diagram,
+    selection,
+    coordinateId,
+    { showCoordinateAnchors: true },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  return result.session
 }
 
 function addAnchor(
@@ -1042,6 +1330,22 @@ function globalAnchorPosition(
   }
 }
 
+function globalAnchorPositionReferencing(
+  diagram: Diagram,
+  coordinateId: string,
+): CoordinateAnchorPosition {
+  const reference = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (reference?.symbolic === undefined) {
+    throw new Error(`Expected coordinate reference ${coordinateId}.`)
+  }
+
+  return {
+    kind: 'global',
+    value: reference.symbolic,
+  }
+}
+
 function localAnchorPosition(a: number, b: number): CoordinateAnchorPosition {
   return {
     kind: 'workPlaneLocal',
@@ -1157,6 +1461,39 @@ function pointPreview(point: Vec3): Vec3 {
 
 function previewValue(component: CoordinateComponent): number {
   return component.kind === 'numeric' ? component.value : component.previewValue
+}
+
+function positionContainsCoordinateRef(position: CoordinateAnchorPosition): boolean {
+  if (position.kind === 'global') {
+    return position.value.source?.kind === 'coordinateRef'
+  }
+
+  return (
+    pointContainsCoordinateRef(position.preview) ||
+    pointContainsCoordinateRef(position.frame.origin) ||
+    pointContainsCoordinateRef(position.frame.u) ||
+    pointContainsCoordinateRef(position.frame.v) ||
+    pointContainsCoordinateRef(position.frame.normal)
+  )
+}
+
+function pointContainsCoordinateRef(point: Vec3): boolean {
+  const source = point.symbolic?.source
+
+  if (source?.kind === 'coordinateRef') {
+    return true
+  }
+
+  if (source?.kind !== 'workPlaneLocal') {
+    return false
+  }
+
+  return (
+    pointContainsCoordinateRef(source.frame.origin) ||
+    pointContainsCoordinateRef(source.frame.u) ||
+    pointContainsCoordinateRef(source.frame.v) ||
+    pointContainsCoordinateRef(source.frame.normal)
+  )
 }
 
 function parseTranslation(
