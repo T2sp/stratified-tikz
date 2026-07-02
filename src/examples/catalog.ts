@@ -69,7 +69,7 @@ export const exampleOptions: readonly ExampleOption[] = [
   {
     id: 'coordinateAnchors',
     name: 'Coordinate anchors',
-    summary: 'global anchors referenced by a path and local symbolic label',
+    summary: 'multi-selectable global anchors with live references',
     diagram: coordinateAnchorExample,
   },
 ]

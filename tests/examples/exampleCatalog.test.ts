@@ -94,6 +94,7 @@ test('coordinate anchor example exports reusable coordinate references', () => {
   )
   assert.match(tikz, /\\coordinate \(A\) at \(0,0,0\);/)
   assert.match(tikz, /\(A\) -- \(B\);/)
+  assert.match(tikz, /\(B\) -- \(C\);/)
   assert.match(tikz, /\\node at \(LocalAnchor\) \{\$L\$\};/)
 })
 

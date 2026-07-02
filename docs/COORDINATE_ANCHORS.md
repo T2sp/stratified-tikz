@@ -72,6 +72,40 @@ Coordinate references are rejected in locations where current TikZ export would
 need to sample or rewrite geometry numerically, such as curved sheet primitives,
 arc centers, path template centers, and work-plane frame fields.
 
+## Multi-selection and coordinate translation
+
+Coordinate anchors support coordinate-only multi-selection. Modifier-clicking
+another coordinate anchor toggles it into or out of the current coordinate
+selection. Mixed coordinate plus layer-bound selections are not part of the MVP:
+coordinate anchors are global live references, while strata and free text labels
+are layer-bound objects with layer filters, locking, styles, and layer
+translation detach rules. Combining those families in one translation would make it
+ambiguous whether references should stay live or be detached.
+
+The Inspector for a coordinate-only multi-selection exposes direct translation
+inputs `dx`, `dy`, and, in 3D, `dz`. In 2D, `dz` is disabled and kept at `0`.
+Applying a non-zero translation is atomic and undoable, and the status message
+reports the selected count, for example `Translated 3 coordinates.` Direct
+Inspector translation uses the entered numeric or symbolic delta exactly; it
+does not use cursor snap.
+
+When coordinate markers are visible, dragging any marker in a coordinate-only
+multi-selection translates the whole selected coordinate group. Drag translation
+uses the same cursor pipeline as other cursor edits, so cursor snap applies to
+the dragged target point when snap is enabled. The resulting snapped delta is
+then applied to every selected coordinate anchor.
+
+Coordinate translation moves the coordinate anchors themselves. Layer-bound
+paths, sheet vertices, point strata, and free text labels that reference those
+anchors keep their `coordinateRef` sources and therefore follow the moved
+anchors. If a selected coordinate anchor's own stored position contains an
+internal `coordinateRef`, that internal reference is detached before the anchor
+is translated so the selected anchor receives its own independent position.
+Global positions add the delta to coordinate components, preserving symbolic
+addition expressions when possible. Work-plane-local positions move their
+stored frame origin; local `a,b` expressions and frame basis vectors are left
+unchanged.
+
 ## TikZ export
 
 Coordinate anchors export in the `% Coordinates` section before generated helper
@@ -94,10 +128,10 @@ inside the picture body.
 ## Example
 
 The reference example catalog includes `coordinateAnchorExample`, which exports
-global anchors `A` and `B`, a work-plane-local anchor, a path using `(A) -- (B)`,
-a visible point stratum placed at `B`, and a free text label placed at the local
-anchor. The preview marker for each coordinate anchor remains separate from the
-visible point stratum.
+global anchors `A`, `B`, and `C`, a work-plane-local anchor, live referenced
+paths using `(A) -- (B)` and `(B) -- (C)`, a visible point stratum placed at
+`B`, and a free text label placed at the local anchor. The preview marker for
+each coordinate anchor remains separate from the visible point stratum.
 
 ## Layers and preview state
 
@@ -156,6 +190,12 @@ a global anchor that did not move with the layer. The layer operation status
 reports detached coordinate-reference counts when any detach happened, and
 undo/redo restores both the detach state and the translated coordinates.
 
+This is intentionally different from coordinate translation. Coordinate
+translation moves selected global anchors and leaves layer-bound references
+live. Layer translation moves layer-bound objects and detaches their coordinate
+references before moving them, because the referenced global anchors do not move
+with the layer.
+
 ## Limitations
 
 Coordinate references are currently preserved in TikZ only for path
@@ -172,3 +212,7 @@ would otherwise need to silently resample or rewrite geometry numerically:
 Coordinate anchors are global reference handles, not styled point strata. They
 do not currently have layer membership, style presets, partial visibility
 policies, or TikZ output beyond their `\coordinate` definitions.
+
+Mixed coordinate plus layer-bound multi-selection translation, affine
+coordinate transforms, and additional coordinate-reference locations are not
+implemented in the MVP.

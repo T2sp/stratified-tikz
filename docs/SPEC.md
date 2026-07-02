@@ -698,18 +698,28 @@ replaces the current selection with that object instead of creating a mixed
 selection. This applies to `region`, `sheet`, `curve`, `point`, and free text
 `label` objects.
 
-Coordinate anchors use a stricter MVP policy: they are selectable, but
-single-selection only. Shift-clicking another coordinate anchor replaces the
-current coordinate selection with the clicked anchor rather than creating a
-coordinate multi-selection. Coordinate anchors are global references, not
-layer-bound objects, so they are excluded from layer-bound bulk operations.
+Coordinate anchors use a coordinate-only MVP policy. Shift-clicking another
+coordinate anchor toggles it into a coordinate multi-selection, and
+Shift-clicking a selected coordinate removes it. Coordinate anchors are global
+references, not layer-bound objects, so they are excluded from layer-bound bulk
+operations. Shift-clicking across coordinate anchors and layer-bound objects
+replaces the selection instead of creating a mixed selection.
+
+Coordinate-only multi-selection supports Inspector translation by `dx`, `dy`,
+and, in 3D, `dz`. In 2D, `dz` remains disabled and locked to `0`. It also
+supports drag translation from a selected coordinate marker when coordinate
+markers are visible; drag uses cursor snap, while numeric Inspector translation
+does not. Successful coordinate translation reports a clear status such as
+`Translated 3 coordinates.` Mixed coordinate plus layer-bound translation is
+rejected with a coordinate-only selection error.
 
 Background clicks clear the selection; modifier-background clicks preserve it.
-Hidden, locked, filtered, deleted, or missing objects are removed from selection
-state. The Inspector shows a compact multi-selection summary such as
-`3 curves selected`; detailed bulk editing controls are reserved for later Phase
-24 subphases. SVG preview highlighting is applied to every selected id, while
-geometry drag handles remain single-selection only.
+Hidden, locked, filtered, deleted, or missing layer-bound objects are removed
+from selection state. Coordinate selections are not affected by layer filters,
+but hiding coordinate markers clears coordinate selections. The Inspector shows
+a compact multi-selection summary such as `3 curves selected` or
+`3 coordinates selected`. SVG preview highlighting is applied to every selected
+id, while geometry drag handles remain single-selection only.
 
 ## Style editing UI
 

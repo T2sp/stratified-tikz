@@ -844,6 +844,31 @@ test('failed coordinate multi-translation reports error without mutation', () =>
   assert.equal(translated.history.past.length, 0)
 })
 
+test('mixed coordinate and layer-bound translation rejection is clear', () => {
+  const diagram = createReferencedPathDiagram()
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coord-a' },
+        { kind: 'stratum', id: 'ref-path' },
+      ],
+    },
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, false)
+  if (result.ok) {
+    throw new Error('Expected mixed selection translation to fail.')
+  }
+  assert.equal(
+    result.error,
+    'Cannot translate mixed selections. Select only coordinate anchors, or use bulk translation for layer-bound objects.',
+  )
+  assert.equal(result.diagram, diagram)
+})
+
 test('coordinate multi-translation preserves coordinate multi-selection after success', () => {
   const diagram = createTwoCoordinateDiagram(2)
   const initial = createState(diagram, coordinateMultiSelection())

@@ -351,7 +351,7 @@ export function translateSelectedCoordinateAnchors(
       ok: false,
       diagram,
       error:
-        'Translate selected coordinates failed: coordinate translation supports coordinate-only selections.',
+        'Cannot translate mixed selections. Select only coordinate anchors, or use bulk translation for layer-bound objects.',
     }
   }
 
