@@ -295,6 +295,15 @@ export function concatenatedPathDraftNextPointLabel(
   }
 }
 
+export function concatenatedPathDraftNextPointSupportsCoordinateRef(
+  draft: ConcatenatedPathDraft | null,
+  segmentKind: ConcatenatedPathSegmentKind,
+): boolean {
+  const nextSegmentKind = draft?.currentSegmentKind ?? segmentKind
+
+  return nextSegmentKind === 'line' || nextSegmentKind === 'cubicBezier'
+}
+
 function validatePathDraftPoint(
   point: Vec3,
   workPlane: WorkPlane,

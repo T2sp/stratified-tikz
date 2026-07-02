@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import type { Diagram, Vec3, WorkPlane } from '../../src/model/types.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  resolveDiagramCoordinateRefs,
+} from '../../src/model/coordinateReferences.ts'
+import type {
+  CoordinateAnchorPosition,
+  Diagram,
+  Vec3,
+  WorkPlane,
+} from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addConcatenatedPathStratumWithResult,
+  addPointStratumWithResult,
   commitDirectCreationResult,
   applyDirectCreationCommitToEditorState,
 } from '../../src/ui/diagramUpdates.ts'
@@ -13,11 +24,17 @@ import {
   cancelConcatenatedPathDraft,
   concatenatedPathDraftBlocksWorkPlaneChange,
   concatenatedPathDraftCanFinish,
+  concatenatedPathDraftNextPointSupportsCoordinateRef,
   createConcatenatedPathDraft,
   setConcatenatedPathDraftSegmentKind,
   type ConcatenatedPathDraft,
+  type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
 } from '../../src/ui/pathDraft.ts'
+import {
+  resolveCoordinateAnchorReferenceForCursorCreation,
+  resolvePointStratumCoordinateForCursorCreation,
+} from '../../src/ui/coordinateSources.ts'
 import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
@@ -184,6 +201,213 @@ test('work-plane switching during cross-work-plane path creation keeps one draft
   assert.equal(concatenatedPathDraftCanFinish(draft), true)
 })
 
+test('coordinate anchor cursor clicks create referenced line path endpoints', () => {
+  const diagram = createCoordinateAnchorCursorDiagram()
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'line',
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    2,
+  )
+
+  const segment = draft.segments[0]
+
+  assert.equal(segment?.kind, 'line')
+  if (segment?.kind !== 'line') {
+    throw new Error('Expected cursor-created line segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.end)?.coordinateId,
+    'coord-b',
+  )
+
+  const result = addConcatenatedPathStratumWithResult(
+    diagram,
+    draft.segments,
+    { id: 'cursor-ref-path', name: 'Cursor Ref Path' },
+  )
+  const tikz = generateTikz(result.diagram)
+  const inlineTikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+  const definitionIndex = tikz.indexOf('\\coordinate (A) at (0,0);')
+  const pathIndex = tikz.indexOf('(A) -- (B);')
+
+  assert.ok(definitionIndex >= 0)
+  assert.ok(pathIndex >= 0)
+  assert.ok(definitionIndex < pathIndex)
+  assert.doesNotMatch(tikz, /\\coordinate \(curvePathCursorRefPath0p0\)/)
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
+})
+
+test('coordinate anchor cursor-created path refs stay live after anchor movement', () => {
+  const diagram = createCoordinateAnchorCursorDiagram()
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'line',
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    2,
+  )
+  const result = addConcatenatedPathStratumWithResult(
+    diagram,
+    draft.segments,
+    { id: 'cursor-live-ref-path', name: 'Cursor Live Ref Path' },
+  )
+  const moved = {
+    ...result.diagram,
+    coordinateAnchors: result.diagram.coordinateAnchors?.map((anchor) =>
+      anchor.id === 'coord-a'
+        ? {
+            ...anchor,
+            position: globalCoordinateAnchorPosition(4, 2, 0),
+          }
+        : anchor,
+    ),
+  }
+  const resolved = resolveDiagramCoordinateRefs(moved)
+  const curve = resolved.strata.find(
+    (stratum) => stratum.id === 'cursor-live-ref-path',
+  )
+  const tikz = generateTikz(moved)
+
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(curve?.kind, 'concatenatedPath')
+  if (curve?.geometricKind !== 'curve' || curve.kind !== 'concatenatedPath') {
+    throw new Error('Expected resolved cursor-created path.')
+  }
+  assert.equal(curve.segments[0]?.kind, 'line')
+  if (curve.segments[0]?.kind !== 'line') {
+    throw new Error('Expected resolved cursor-created line segment.')
+  }
+  assert.deepEqual(curve.segments[0].start, {
+    x: 4,
+    y: 2,
+    z: 0,
+    symbolic: curve.segments[0].start.symbolic,
+  })
+  assert.equal(
+    coordinateReferenceSourceForPoint(curve.segments[0].start)?.coordinateId,
+    'coord-a',
+  )
+  assert.match(tikz, /\\coordinate \(A\) at \(4,2\);/)
+  assert.match(tikz, /\(A\) -- \(B\);/)
+})
+
+test('coordinate anchor cursor clicks create cubic path control references', () => {
+  const diagram = createCoordinateAnchorCursorDiagram()
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'cubicBezier',
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-c'),
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-d'),
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    2,
+  )
+
+  const segment = draft.segments[0]
+
+  assert.equal(segment?.kind, 'cubicBezier')
+  if (segment?.kind !== 'cubicBezier') {
+    throw new Error('Expected cursor-created cubic segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.control1)?.coordinateId,
+    'coord-c',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.control2)?.coordinateId,
+    'coord-d',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.end)?.coordinateId,
+    'coord-b',
+  )
+})
+
+test('background cursor-created path points remain numeric', () => {
+  let draft = mustCreateDraft({ x: 0, y: 0, z: 0 }, xyPlane, 'line', 2)
+  draft = mustAppendPoint(draft, { x: 1, y: 0, z: 0 }, 2)
+
+  const segment = draft.segments[0]
+
+  assert.equal(segment?.kind, 'line')
+  if (segment?.kind !== 'line') {
+    throw new Error('Expected numeric line segment.')
+  }
+  assert.equal(coordinateReferenceSourceForPoint(segment.start), null)
+  assert.equal(coordinateReferenceSourceForPoint(segment.end), null)
+})
+
+test('ordinary point stratum cursor source still copies numeric coordinates', () => {
+  const pointResult = addPointStratumWithResult(
+    createEmptyDiagram({ ambientDimension: 2 }),
+    { x: 2, y: 3, z: 0 },
+    { id: 'source-point' },
+  )
+  const source = resolvePointStratumCoordinateForCursorCreation(
+    pointResult.diagram,
+    'source-point',
+    { workPlane: xyPlane },
+  )
+
+  assert.equal(source.ok, true)
+  if (!source.ok) {
+    throw new Error('Expected point source resolution to succeed.')
+  }
+  assert.deepEqual(source.point, { x: 2, y: 3, z: 0 })
+  assert.equal(coordinateReferenceSourceForPoint(source.point), null)
+})
+
+test('arc cursor parameters reject coordinate anchors instead of numeric fallback', () => {
+  const lineDraft = mustCreateDraft({ x: 0, y: 0, z: 0 }, xyPlane, 'line', 2)
+  const arcDraftResult = setConcatenatedPathDraftSegmentKind(lineDraft, 'arc')
+
+  assert.equal(
+    concatenatedPathDraftNextPointSupportsCoordinateRef(null, 'arc'),
+    false,
+  )
+  assert.equal(arcDraftResult.ok, true)
+  if (!arcDraftResult.ok) {
+    throw new Error('Expected arc segment kind update to succeed.')
+  }
+  assert.equal(
+    concatenatedPathDraftNextPointSupportsCoordinateRef(
+      arcDraftResult.draft,
+      'line',
+    ),
+    false,
+  )
+})
+
 test('finishing a path draft commits one selected concatenated path', () => {
   const initial = createTestEditorState(createEmptyDiagram({ ambientDimension: 2 }))
   const draft = createLineThenCubicDraft2D()
@@ -321,7 +545,7 @@ function createLineThenCubicDraft2D(): ConcatenatedPathDraft {
 function mustCreateDraft(
   point: Vec3,
   workPlane: WorkPlane,
-  segmentKind: 'line' | 'cubicBezier',
+  segmentKind: ConcatenatedPathSegmentKind,
   ambientDimension: 2 | 3,
   workPlaneMode: ConcatenatedPathWorkPlaneMode = 'sameWorkPlane',
 ): ConcatenatedPathDraft {
@@ -360,7 +584,7 @@ function mustAppendPoint(
 
 function mustSetSegmentKind(
   draft: ConcatenatedPathDraft,
-  segmentKind: 'line' | 'cubicBezier',
+  segmentKind: ConcatenatedPathSegmentKind,
 ): ConcatenatedPathDraft {
   const result = setConcatenatedPathDraftSegmentKind(draft, segmentKind)
 
@@ -377,6 +601,73 @@ function segmentPoints(segment: ConcatenatedPathDraft['segments'][number]): Vec3
       return [segment.start, segment.end]
     case 'cubicBezier':
       return [segment.start, segment.control1, segment.control2, segment.end]
+    case 'arc':
+      return [segment.start, segment.center, segment.end]
+  }
+}
+
+function createCoordinateAnchorCursorDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: globalCoordinateAnchorPosition(0, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      tikzName: 'B',
+      position: globalCoordinateAnchorPosition(2, 1, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-c',
+      name: 'C',
+      tikzName: 'C',
+      position: globalCoordinateAnchorPosition(0.5, 1, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-d',
+      name: 'D',
+      tikzName: 'D',
+      position: globalCoordinateAnchorPosition(1.5, 1, 0),
+    }),
+  ]
+
+  return diagram
+}
+
+function mustResolveCoordinateAnchorReference(
+  diagram: Diagram,
+  coordinateId: string,
+): Vec3 {
+  const result = resolveCoordinateAnchorReferenceForCursorCreation(
+    diagram,
+    coordinateId,
+    { workPlane: xyPlane },
+  )
+
+  if (!result.ok) {
+    throw new Error(result.reason)
+  }
+
+  return result.point
+}
+
+function globalCoordinateAnchorPosition(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
   }
 }
 

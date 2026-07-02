@@ -101,6 +101,7 @@ import {
   SvgDiagram,
   svgPointToModelOnWorkPlane,
   type BoundaryPathHighlight,
+  type SvgCanvasClickTarget,
 } from './rendering'
 import {
   addCoordinateAnchorFromCursorPoint,
@@ -254,6 +255,7 @@ import {
   concatenatedPathDraftBlocksWorkPlaneChange,
   concatenatedPathDraftCanFinish,
   concatenatedPathDraftNextPointLabel,
+  concatenatedPathDraftNextPointSupportsCoordinateRef,
   inactiveWorkPlanePointPickingState,
   closeInspectorDrawerState,
   defaultInspectorDrawerState,
@@ -262,6 +264,7 @@ import {
   openInspectorDrawerState,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
+  resolveCoordinateAnchorReferenceForCursorCreation,
   resolvePointStratumCoordinateForCursorCreation,
   selectedElementCount,
   shouldBlockCreationForWorkPlanePointPicking,
@@ -2742,6 +2745,7 @@ function App() {
     svgPoint: Vec2,
     viewportHeight: number,
     previewCamera: Camera,
+    target: SvgCanvasClickTarget,
   ): void {
     if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
       return
@@ -2776,6 +2780,17 @@ function App() {
         : creationTool === 'createSheet' && sheetPolygonDraft !== null
           ? sheetPolygonDraft.workPlane
           : activeWorkPlane
+
+    if (
+      target.kind === 'coordinateAnchor' &&
+      handleCoordinateAnchorSourceCreationClick(
+        target.coordinateId,
+        placementWorkPlane,
+      )
+    ) {
+      return
+    }
+
     let modelPoint: Vec3
 
     try {
@@ -2803,6 +2818,63 @@ function App() {
     }
 
     applyCursorCreationPoint(modelPoint, placementWorkPlane)
+  }
+
+  function handleCoordinateAnchorSourceCreationClick(
+    coordinateId: string,
+    placementWorkPlane: WorkPlane,
+  ): boolean {
+    const isPathCreationTool =
+      creationTool === 'createPath' ||
+      creationTool === 'createPolyline' ||
+      creationTool === 'createCubicBezier'
+
+    if (!isPathCreationTool) {
+      return false
+    }
+
+    if (
+      creationTool === 'createPath' &&
+      !concatenatedPathDraftNextPointSupportsCoordinateRef(
+        pathDraft,
+        pathSegmentKind,
+      )
+    ) {
+      setPathStatus('Coordinate anchors cannot be used for this path parameter.')
+      return true
+    }
+
+    const sourceResult = resolveCoordinateAnchorReferenceForCursorCreation(
+      editableDiagram,
+      coordinateId,
+      {
+        workPlane: placementWorkPlane,
+        requireWorkPlaneMembership:
+          creationTool === 'createPath' &&
+          (pathDraft?.workPlaneMode ?? pathWorkPlaneMode) === 'crossWorkPlane'
+            ? false
+            : true,
+      },
+    )
+
+    if (!sourceResult.ok) {
+      setCursorCreationSourceStatus(
+        sourceResult.reason === 'missingSource'
+          ? 'Coordinate anchor source is unavailable.'
+          : 'Coordinate anchor source is off the active work plane.',
+      )
+      return true
+    }
+
+    applyCursorCreationPoint(sourceResult.point, placementWorkPlane)
+    setCursorCreationSourceStatus(
+      `Referenced ${formatExistingCoordinateSourceLabel(
+        editableDiagram,
+        sourceResult.source,
+        editableDiagram.ambientDimension,
+      )}.`,
+    )
+    return true
   }
 
   function handleExistingPointSourceCreationClick(pointId: string): void {

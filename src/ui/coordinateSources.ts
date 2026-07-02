@@ -235,6 +235,61 @@ export function resolvePointStratumCoordinateForCursorCreation(
   }
 }
 
+export function resolveCoordinateAnchorReferenceForCursorCreation(
+  diagram: Diagram,
+  coordinateId: string,
+  options: {
+    workPlane: WorkPlane
+    epsilon?: number
+    requireWorkPlaneMembership?: boolean
+  },
+): CursorPointCoordinateSourceResult {
+  const source: ExistingCoordinateSource = {
+    kind: 'coordinateAnchor',
+    coordinateId,
+  }
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    return {
+      ok: false,
+      reason: 'missingSource',
+      source,
+    }
+  }
+
+  const normalizedPoint = normalizePointForAmbientDimension(
+    diagram.ambientDimension,
+    point,
+  )
+
+  if (!isFiniteVec3(normalizedPoint)) {
+    return {
+      ok: false,
+      reason: 'offPlaneOrInvalid',
+      source,
+    }
+  }
+
+  if (
+    diagram.ambientDimension === 3 &&
+    options.requireWorkPlaneMembership !== false &&
+    !isPointOnWorkPlane(normalizedPoint, options.workPlane, options.epsilon)
+  ) {
+    return {
+      ok: false,
+      reason: 'offPlaneOrInvalid',
+      source,
+    }
+  }
+
+  return {
+    ok: true,
+    point: normalizedPoint,
+    source,
+  }
+}
+
 export function createExistingCoordinateSourceOptions(
   diagram: Diagram,
 ): ExistingCoordinateSourceOption[] {

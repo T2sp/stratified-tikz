@@ -141,6 +141,15 @@ export type BoundaryPathHighlight = {
   label: string
 }
 
+export type SvgCanvasClickTarget =
+  | {
+      kind: 'canvas'
+    }
+  | {
+      kind: 'coordinateAnchor'
+      coordinateId: string
+    }
+
 export type SvgDiagramProps = {
   diagram: Diagram
   width?: number
@@ -177,6 +186,7 @@ export type SvgDiagramProps = {
     svgPoint: Vec2,
     viewportHeight: number,
     camera: Diagram['camera'],
+    target: SvgCanvasClickTarget,
   ) => void
   onGeometryHandleDrag?: (
     target: GeometryHandleTarget,
@@ -446,6 +456,19 @@ export function SvgDiagram({
       return
     }
 
+    if (onCanvasClick !== undefined) {
+      const svgPoint = svgPointFromNestedMouseEvent(event, width, height)
+
+      event.stopPropagation()
+      if (svgPoint !== null) {
+        onCanvasClick(svgPoint, height, camera, {
+          kind: 'coordinateAnchor',
+          coordinateId: marker.anchor.id,
+        })
+      }
+      return
+    }
+
     selectElement(
       event,
       { kind: 'coordinate', id: marker.anchor.id },
@@ -622,7 +645,9 @@ export function SvgDiagram({
         }
 
         if (onCanvasClick !== undefined) {
-          onCanvasClick(svgPointFromMouseEvent(event, width, height), height, camera)
+          onCanvasClick(svgPointFromMouseEvent(event, width, height), height, camera, {
+            kind: 'canvas',
+          })
           return
         }
 
@@ -3210,6 +3235,24 @@ function svgPointFromMouseEvent(
   return mapClientPointToViewBox(
     { x: event.clientX, y: event.clientY },
     bounds,
+    { width: viewportWidth, height: viewportHeight },
+  )
+}
+
+function svgPointFromNestedMouseEvent(
+  event: MouseEvent<SVGGElement>,
+  viewportWidth: number,
+  viewportHeight: number,
+): Vec2 | null {
+  const svgElement = event.currentTarget.ownerSVGElement
+
+  if (svgElement === null) {
+    return null
+  }
+
+  return mapClientPointToViewBox(
+    { x: event.clientX, y: event.clientY },
+    svgElement.getBoundingClientRect(),
     { width: viewportWidth, height: viewportHeight },
   )
 }
