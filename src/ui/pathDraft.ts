@@ -298,10 +298,40 @@ export function concatenatedPathDraftNextPointLabel(
 export function concatenatedPathDraftNextPointSupportsCoordinateRef(
   draft: ConcatenatedPathDraft | null,
   segmentKind: ConcatenatedPathSegmentKind,
+  ambientDimension: AmbientDimension,
 ): boolean {
+  return (
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(
+      draft,
+      segmentKind,
+      ambientDimension,
+    ) === null
+  )
+}
+
+export type ConcatenatedPathDraftCoordinateRefRejectionReason =
+  | 'arcEndpoint'
+  | 'arcCenter'
+  | 'arc3d'
+
+export function concatenatedPathDraftNextPointCoordinateRefRejectionReason(
+  draft: ConcatenatedPathDraft | null,
+  segmentKind: ConcatenatedPathSegmentKind,
+  ambientDimension: AmbientDimension,
+): ConcatenatedPathDraftCoordinateRefRejectionReason | null {
   const nextSegmentKind = draft?.currentSegmentKind ?? segmentKind
 
-  return nextSegmentKind === 'line' || nextSegmentKind === 'cubicBezier'
+  if (nextSegmentKind === 'line' || nextSegmentKind === 'cubicBezier') {
+    return null
+  }
+
+  if (ambientDimension === 3) {
+    return 'arc3d'
+  }
+
+  return draft !== null && draft.pendingPoints.length === 0
+    ? 'arcCenter'
+    : 'arcEndpoint'
 }
 
 function validatePathDraftPoint(

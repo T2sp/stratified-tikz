@@ -258,8 +258,8 @@ import {
   cancelWorkPlanePointPicking,
   concatenatedPathDraftBlocksWorkPlaneChange,
   concatenatedPathDraftCanFinish,
+  concatenatedPathDraftNextPointCoordinateRefRejectionReason,
   concatenatedPathDraftNextPointLabel,
-  concatenatedPathDraftNextPointSupportsCoordinateRef,
   inactiveWorkPlanePointPickingState,
   closeInspectorDrawerState,
   defaultInspectorDrawerState,
@@ -332,6 +332,7 @@ import {
   type CameraControlField,
   type CameraDragMode,
   type CameraPresetId,
+  type ConcatenatedPathDraftCoordinateRefRejectionReason,
   type ConcatenatedPathDraft,
   type ConcatenatedPathSegmentKind,
   type ConcatenatedPathWorkPlaneMode,
@@ -3026,36 +3027,47 @@ function App() {
     coordinateId: string,
     placementWorkPlane: WorkPlane,
   ): boolean {
-    const isPathCreationTool =
+    const isCoordinateAnchorCursorCreationTool =
       creationTool === 'createPath' ||
       creationTool === 'createPolyline' ||
-      creationTool === 'createCubicBezier'
+      creationTool === 'createCubicBezier' ||
+      creationTool === 'createPoint' ||
+      creationTool === 'createLabel'
 
-    if (!isPathCreationTool) {
+    if (!isCoordinateAnchorCursorCreationTool) {
       return false
     }
 
-    if (
-      creationTool === 'createPath' &&
-      !concatenatedPathDraftNextPointSupportsCoordinateRef(
-        pathDraft,
-        pathSegmentKind,
-      )
-    ) {
-      setPathStatus('Coordinate anchors cannot be used for this path parameter.')
-      return true
+    if (creationTool === 'createPath') {
+      const rejectionReason =
+        concatenatedPathDraftNextPointCoordinateRefRejectionReason(
+          pathDraft,
+          pathSegmentKind,
+          editableDiagram.ambientDimension,
+        )
+
+      if (rejectionReason !== null) {
+        setPathStatus(
+          coordinateAnchorPathCursorRejectionMessage(rejectionReason),
+        )
+        return true
+      }
     }
+
+    const requireWorkPlaneMembership =
+      creationTool === 'createPoint' || creationTool === 'createLabel'
+        ? false
+        : creationTool === 'createPath' &&
+            (pathDraft?.workPlaneMode ?? pathWorkPlaneMode) === 'crossWorkPlane'
+          ? false
+          : true
 
     const sourceResult = resolveCoordinateAnchorReferenceForCursorCreation(
       editableDiagram,
       coordinateId,
       {
         workPlane: placementWorkPlane,
-        requireWorkPlaneMembership:
-          creationTool === 'createPath' &&
-          (pathDraft?.workPlaneMode ?? pathWorkPlaneMode) === 'crossWorkPlane'
-            ? false
-            : true,
+        requireWorkPlaneMembership,
       },
     )
 
@@ -9300,6 +9312,19 @@ function concatenatedPathDraftPointErrorMessage(
       return 'Path points must be finite numbers.'
     case 'pointOffWorkPlane':
       return 'Path points must stay on the draft work plane.'
+  }
+}
+
+function coordinateAnchorPathCursorRejectionMessage(
+  reason: ConcatenatedPathDraftCoordinateRefRejectionReason,
+): string {
+  switch (reason) {
+    case 'arcEndpoint':
+      return 'Coordinate anchors are not supported for arc endpoints because arc geometry is derived from center, radius, and angles.'
+    case 'arcCenter':
+      return 'Coordinate anchors are not supported for arc centers because TikZ export cannot preserve the reference.'
+    case 'arc3d':
+      return 'Coordinate anchors are not supported for 3D arc cursor input because TikZ export approximates arcs numerically.'
   }
 }
 

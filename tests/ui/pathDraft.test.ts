@@ -16,6 +16,7 @@ import { generateTikz } from '../../src/tikz/index.ts'
 import {
   addConcatenatedPathStratumWithResult,
   addPointStratumWithResult,
+  addTextLabelWithResult,
   commitDirectCreationResult,
   applyDirectCreationCommitToEditorState,
 } from '../../src/ui/diagramUpdates.ts'
@@ -24,6 +25,7 @@ import {
   cancelConcatenatedPathDraft,
   concatenatedPathDraftBlocksWorkPlaneChange,
   concatenatedPathDraftCanFinish,
+  concatenatedPathDraftNextPointCoordinateRefRejectionReason,
   concatenatedPathDraftNextPointSupportsCoordinateRef,
   createConcatenatedPathDraft,
   setConcatenatedPathDraftSegmentKind,
@@ -305,6 +307,99 @@ test('coordinate anchor cursor-created path refs stay live after anchor movement
   assert.match(tikz, /\(A\) -- \(B\);/)
 })
 
+test('coordinate anchor cursor click creates referenced point without snap replacement', () => {
+  const diagram = createOffGridCoordinateAnchorCursorDiagram()
+  const point = mustResolveCoordinateAnchorReference(diagram, 'coord-a')
+  const result = addPointStratumWithResult(diagram, point, {
+    id: 'cursor-anchor-point',
+    name: 'Cursor Anchor Point',
+  })
+  const created = result.diagram.strata.find(
+    (stratum) => stratum.id === 'cursor-anchor-point',
+  )
+
+  assert.equal(created?.geometricKind, 'point')
+  if (created?.geometricKind !== 'point') {
+    throw new Error('Expected cursor-created point stratum.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(created.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(created.position.x, 0.26)
+  assert.equal(created.position.y, 0.74)
+
+  const moved = moveCoordinateAnchor(result.diagram, 'coord-a', 1.5, 2.5, 0)
+  const resolved = resolveDiagramCoordinateRefs(moved)
+  const resolvedPoint = resolved.strata.find(
+    (stratum) => stratum.id === 'cursor-anchor-point',
+  )
+  const tikz = generateTikz(result.diagram)
+  const coordinateIndex = tikz.indexOf('\\coordinate (A) at (0.26,0.74);')
+  const pointIndex = tikz.indexOf('] at (A) {};')
+
+  assert.equal(resolvedPoint?.geometricKind, 'point')
+  if (resolvedPoint?.geometricKind !== 'point') {
+    throw new Error('Expected resolved cursor-created point stratum.')
+  }
+  assert.equal(resolvedPoint.position.x, 1.5)
+  assert.equal(resolvedPoint.position.y, 2.5)
+  assert.equal(
+    coordinateReferenceSourceForPoint(resolvedPoint.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.ok(coordinateIndex >= 0)
+  assert.ok(pointIndex >= 0)
+  assert.ok(coordinateIndex < pointIndex)
+})
+
+test('coordinate anchor cursor click creates referenced label without snap replacement', () => {
+  const diagram = createOffGridCoordinateAnchorCursorDiagram()
+  const point = mustResolveCoordinateAnchorReference(diagram, 'coord-a')
+  const result = addTextLabelWithResult(diagram, point, {
+    id: 'cursor-anchor-label',
+    name: 'Cursor Anchor Label',
+    text: '$F$',
+  })
+  const created = result.diagram.labels.find(
+    (label) => label.id === 'cursor-anchor-label',
+  )
+
+  assert.notEqual(created, undefined)
+  if (created === undefined) {
+    throw new Error('Expected cursor-created label.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(created.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(created.position.x, 0.26)
+  assert.equal(created.position.y, 0.74)
+
+  const moved = moveCoordinateAnchor(result.diagram, 'coord-a', 1.5, 2.5, 0)
+  const resolved = resolveDiagramCoordinateRefs(moved)
+  const resolvedLabel = resolved.labels.find(
+    (label) => label.id === 'cursor-anchor-label',
+  )
+  const tikz = generateTikz(result.diagram)
+  const coordinateIndex = tikz.indexOf('\\coordinate (A) at (0.26,0.74);')
+  const labelIndex = tikz.indexOf('\\node at (A) {$F$};')
+
+  assert.notEqual(resolvedLabel, undefined)
+  if (resolvedLabel === undefined) {
+    throw new Error('Expected resolved cursor-created label.')
+  }
+  assert.equal(resolvedLabel.position.x, 1.5)
+  assert.equal(resolvedLabel.position.y, 2.5)
+  assert.equal(
+    coordinateReferenceSourceForPoint(resolvedLabel.position)?.coordinateId,
+    'coord-a',
+  )
+  assert.ok(coordinateIndex >= 0)
+  assert.ok(labelIndex >= 0)
+  assert.ok(coordinateIndex < labelIndex)
+})
+
 test('coordinate anchor cursor clicks create cubic path control references', () => {
   const diagram = createCoordinateAnchorCursorDiagram()
   let draft = mustCreateDraft(
@@ -387,24 +482,48 @@ test('ordinary point stratum cursor source still copies numeric coordinates', ()
   assert.equal(coordinateReferenceSourceForPoint(source.point), null)
 })
 
-test('arc cursor parameters reject coordinate anchors instead of numeric fallback', () => {
+test('arc cursor coordinate anchor support is explicitly rejected', () => {
   const lineDraft = mustCreateDraft({ x: 0, y: 0, z: 0 }, xyPlane, 'line', 2)
   const arcDraftResult = setConcatenatedPathDraftSegmentKind(lineDraft, 'arc')
 
   assert.equal(
-    concatenatedPathDraftNextPointSupportsCoordinateRef(null, 'arc'),
+    concatenatedPathDraftNextPointSupportsCoordinateRef(null, 'arc', 2),
     false,
+  )
+  assert.equal(
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 2),
+    'arcEndpoint',
+  )
+  assert.equal(
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 3),
+    'arc3d',
   )
   assert.equal(arcDraftResult.ok, true)
   if (!arcDraftResult.ok) {
     throw new Error('Expected arc segment kind update to succeed.')
   }
   assert.equal(
-    concatenatedPathDraftNextPointSupportsCoordinateRef(
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(
       arcDraftResult.draft,
       'line',
+      2,
     ),
-    false,
+    'arcCenter',
+  )
+
+  const afterCenter = mustAppendPoint(
+    arcDraftResult.draft,
+    { x: 0, y: 0, z: 0 },
+    2,
+  )
+
+  assert.equal(
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(
+      afterCenter,
+      'line',
+      2,
+    ),
+    'arcEndpoint',
   )
 })
 
@@ -637,6 +756,41 @@ function createCoordinateAnchorCursorDiagram(): Diagram {
   ]
 
   return diagram
+}
+
+function createOffGridCoordinateAnchorCursorDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: globalCoordinateAnchorPosition(0.26, 0.74, 0),
+    }),
+  ]
+
+  return diagram
+}
+
+function moveCoordinateAnchor(
+  diagram: Diagram,
+  coordinateId: string,
+  x: number,
+  y: number,
+  z: number,
+): Diagram {
+  return {
+    ...diagram,
+    coordinateAnchors: diagram.coordinateAnchors?.map((anchor) =>
+      anchor.id === coordinateId
+        ? {
+            ...anchor,
+            position: globalCoordinateAnchorPosition(x, y, z),
+          }
+        : anchor,
+    ),
+  }
 }
 
 function mustResolveCoordinateAnchorReference(
