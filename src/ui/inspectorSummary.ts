@@ -145,7 +145,7 @@ function createMultiSelectionCompactSummary(
         selected.length,
       )} selected`,
       layer: null,
-      detail: 'Translate selected coordinates will be available later.',
+      detail: 'Translate selected coordinates.',
     }
   }
 

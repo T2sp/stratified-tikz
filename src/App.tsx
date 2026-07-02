@@ -126,6 +126,7 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
+  applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
   applyDirectCreationCommitToEditorState,
   applyDeleteLayerToEditorState,
@@ -1885,6 +1886,26 @@ function App() {
     setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setCopyStatus('idle')
+  }
+
+  function translateCurrentCoordinateSelection(
+    translation: TranslationVector,
+  ): string {
+    const nextState = applyCoordinateAnchorTranslateToEditorState(
+      editorState,
+      translation,
+    )
+
+    setEditorState(nextState)
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return nextState.layerOperationStatus
   }
 
   function concatenateCurrentSelection(
@@ -5588,6 +5609,7 @@ function App() {
             onBulkDelete={removeCurrentSelection}
             onBulkDuplicate={duplicateCurrentSelection}
             onBulkTranslate={translateCurrentSelection}
+            onCoordinateTranslate={translateCurrentCoordinateSelection}
             onBulkConcatenatePaths={concatenateCurrentSelection}
           />
         </div>

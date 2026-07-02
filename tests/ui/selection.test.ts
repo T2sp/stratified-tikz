@@ -1019,7 +1019,7 @@ test('inspector summary displays coordinate multi-selection count', () => {
   assert.equal(summary?.layer, null)
   assert.equal(
     summary?.detail,
-    'Translate selected coordinates will be available later.',
+    'Translate selected coordinates.',
   )
 })
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
@@ -8,6 +9,10 @@ import {
   findCoordinateAnchorReferences,
 } from '../../src/model/coordinateReferences.ts'
 import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
+import {
+  parseTranslationVectorFromInputs,
+  type TranslationVector,
+} from '../../src/model/translation.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   CoordinateAnchor,
@@ -23,6 +28,8 @@ import {
   createCoordinateAnchorInspectorModel,
   deleteCoordinateAnchorWithDetach,
   deleteUnusedCoordinateAnchor,
+  applyCoordinateAnchorTranslateToEditorState,
+  translateSelectedCoordinateAnchors,
   updateCoordinateAnchorGlobalCoordinate,
   updateCoordinateAnchorName,
   updateCoordinateAnchorTikzName,
@@ -48,7 +55,13 @@ type TestEditorState = UndoableEditorState & {
   cubicBezierDraft: null
   pathDraft: null
   sheetPolygonDraft: null
+  layerOperationStatus: string
 }
+
+const editableInspectorSource = readFileSync(
+  new URL('../../src/ui/inspector/EditableInspector.tsx', import.meta.url),
+  'utf8',
+)
 
 test('coordinate inspector model shows coordinate fields without layer or style fields', () => {
   const diagram = createCoordinateDiagram(3)
@@ -84,6 +97,26 @@ test('coordinate inspector model shows coordinate fields without layer or style 
   assert.equal(labels.includes('Codimension'), false)
   assert.equal(labels.some((label) => label.toLowerCase().includes('style')), false)
   assert.equal(sectionLabels.includes('Layer'), false)
+})
+
+test('coordinate multi-selection inspector exposes direct translation controls', () => {
+  const inspectorStart = editableInspectorSource.indexOf(
+    'function CoordinateAnchorMultiSelectionInspector',
+  )
+  const inputStart = editableInspectorSource.indexOf(
+    'function CoordinateTranslationInput',
+    inspectorStart,
+  )
+  const inspectorSource = editableInspectorSource.slice(inspectorStart, inputStart)
+
+  assert.ok(inspectorStart >= 0)
+  assert.ok(inputStart > inspectorStart)
+  assert.match(inspectorSource, /Translate selected coordinates/)
+  assert.match(inspectorSource, /label="dx"/)
+  assert.match(inspectorSource, /label="dy"/)
+  assert.match(inspectorSource, /label="dz"/)
+  assert.match(inspectorSource, /2D coordinates keep z = 0\./)
+  assert.match(inspectorSource, /Apply/)
 })
 
 test('coordinate rename updates the anchor name', () => {
@@ -581,8 +614,274 @@ test('selection is cleaned after unused coordinate delete', () => {
   )
 })
 
+test('coordinate multi-translation applies dx and dy to all selected coordinates', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    coordinateMultiSelection(),
+    parseTranslation(diagram, '1', '-2', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(result.message, 'Translated 2 coordinates.')
+  assert.deepEqual(anchorPreview(findAnchor(result.diagram, 'coord-a')), {
+    x: 1,
+    y: -2,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(result.diagram, 'coord-b')), {
+    x: 3,
+    y: -1,
+    z: 0,
+  })
+})
+
+test('coordinate multi-translation in 2D keeps z locked to zero', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    coordinateMultiSelection(),
+    parseTranslation(diagram, '1', '1', 'Len'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  assert.equal(anchorPreview(findAnchor(result.diagram, 'coord-a')).z, 0)
+  assert.equal(anchorPreview(findAnchor(result.diagram, 'coord-b')).z, 0)
+})
+
+test('coordinate multi-translation moves work-plane-local anchors by frame origin', () => {
+  const diagram = createCoordinateDiagram(3)
+
+  addAnchor(diagram, {
+    id: 'coord-local-a',
+    name: 'Local A',
+    tikzName: 'A',
+    position: localAnchorPosition(2, 3),
+  })
+  addAnchor(diagram, {
+    id: 'coord-local-b',
+    name: 'Local B',
+    tikzName: 'B',
+    position: localAnchorPosition(4, 5),
+  })
+
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'coordinate', id: 'coord-local-a' },
+        { kind: 'coordinate', id: 'coord-local-b' },
+      ],
+    },
+    parseTranslation(diagram, '1', '-2', '3'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const position = findAnchor(result.diagram, 'coord-local-a').position
+
+  assert.equal(position.kind, 'workPlaneLocal')
+  if (position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate.')
+  }
+  assert.deepEqual(position.frame.origin, { x: 11, y: 18, z: 33 })
+  assert.deepEqual(position.local, localAnchorPosition(2, 3).local)
+  assert.deepEqual(position.preview, { x: 13, y: 18, z: 36 })
+})
+
+test('coordinate multi-translation preserves symbolic coordinate expressions', () => {
+  const diagram = createTwoCoordinateDiagram(3)
+
+  diagram.variables = [
+    {
+      id: 'var-Len',
+      name: 'Len',
+      macroName: 'Len',
+      expression: '4',
+      previewValue: 4,
+    },
+  ]
+  findAnchor(diagram, 'coord-a').position = {
+    kind: 'global',
+    value: {
+      x: { kind: 'symbolic', expression: 'Len', previewValue: 4 },
+      y: { kind: 'numeric', value: 0 },
+      z: { kind: 'numeric', value: 0 },
+    },
+  }
+
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    { kind: 'coordinate', id: 'coord-a' },
+    parseTranslation(diagram, 'Len/2', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const position = findAnchor(result.diagram, 'coord-a').position
+
+  assert.equal(position.kind, 'global')
+  if (position.kind !== 'global') {
+    throw new Error('Expected global coordinate.')
+  }
+  assert.equal(position.value.x.kind, 'symbolic')
+  assert.equal(
+    position.value.x.kind === 'symbolic' ? position.value.x.expression : '',
+    '(Len) + (Len/2)',
+  )
+  assert.equal(anchorPreview(findAnchor(result.diagram, 'coord-a')).x, 6)
+})
+
+test('coordinate multi-translation keeps layer-bound path refs live and updates preview', () => {
+  const diagram = createReferencedPathDiagram()
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    coordinateMultiSelection(),
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const curve = findCurve(result.diagram, 'ref-path')
+
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[0])?.coordinateId, 'coord-a')
+  assert.equal(coordinateReferenceSourceForPoint(curve.points[1])?.coordinateId, 'coord-b')
+  assert.deepEqual(pointPreview(curve.points[0]), { x: 1, y: 0, z: 0 })
+  assert.deepEqual(pointPreview(curve.points[1]), { x: 2, y: 0, z: 0 })
+})
+
+test('coordinate multi-translation updates TikZ coordinate definitions but not draw refs', () => {
+  const diagram = createReferencedPathDiagram()
+  const result = translateSelectedCoordinateAnchors(
+    diagram,
+    coordinateMultiSelection(),
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const tikz = generateTikz(result.diagram)
+
+  assert.match(tikz, /\\coordinate \(A\) at \(1,0\);/)
+  assert.match(tikz, /\\coordinate \(B\) at \(2,0\);/)
+  assert.match(tikz, /\(A\) -- \(B\);/)
+  assert.doesNotMatch(tikz, /\(1,0\) -- \(2,0\);/)
+})
+
+test('coordinate multi-translation is undoable and redoable', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const initial = createState(diagram, coordinateMultiSelection())
+  const translated = applyCoordinateAnchorTranslateToEditorState(
+    initial,
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+  const undone = undoLastDiagramChange(translated)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(translated.layerOperationStatus, 'Translated 2 coordinates.')
+  assert.deepEqual(anchorPreview(findAnchor(translated.editableDiagram, 'coord-a')), {
+    x: 1,
+    y: 0,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(undone.editableDiagram, 'coord-a')), {
+    x: 0,
+    y: 0,
+    z: 0,
+  })
+  assert.deepEqual(anchorPreview(findAnchor(redone.editableDiagram, 'coord-a')), {
+    x: 1,
+    y: 0,
+    z: 0,
+  })
+  assert.equal(translated.history.past.length, 1)
+})
+
+test('failed coordinate multi-translation reports error without mutation', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const initial = createState(diagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'coordinate', id: 'missing-coordinate' },
+    ],
+  })
+  const originalJson = JSON.stringify(diagram)
+  const translated = applyCoordinateAnchorTranslateToEditorState(
+    initial,
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.match(translated.layerOperationStatus, /does not exist/)
+  assert.equal(translated.editableDiagram, initial.editableDiagram)
+  assert.equal(JSON.stringify(diagram), originalJson)
+  assert.deepEqual(translated.selectedElement, initial.selectedElement)
+  assert.equal(translated.history.past.length, 0)
+})
+
+test('coordinate multi-translation preserves coordinate multi-selection after success', () => {
+  const diagram = createTwoCoordinateDiagram(2)
+  const initial = createState(diagram, coordinateMultiSelection())
+  const translated = applyCoordinateAnchorTranslateToEditorState(
+    initial,
+    parseTranslation(diagram, '1', '0', '0'),
+  )
+
+  assert.deepEqual(translated.selectedElement, coordinateMultiSelection())
+})
+
 function createCoordinateDiagram(ambientDimension: 2 | 3): Diagram {
   return createEmptyDiagram({ ambientDimension })
+}
+
+function createTwoCoordinateDiagram(ambientDimension: 2 | 3): Diagram {
+  const diagram = createCoordinateDiagram(ambientDimension)
+
+  addAnchor(diagram, {
+    id: 'coord-a',
+    name: 'A',
+    tikzName: 'A',
+    position: globalAnchorPosition(0, 0, 0),
+  })
+  addAnchor(diagram, {
+    id: 'coord-b',
+    name: 'B',
+    tikzName: 'B',
+    position: globalAnchorPosition(2, 1, ambientDimension === 2 ? 0 : 3),
+  })
+
+  return diagram
+}
+
+function coordinateMultiSelection(): SelectedElement {
+  return {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'coordinate', id: 'coord-b' },
+    ],
+  }
 }
 
 function addAnchor(
@@ -713,6 +1012,7 @@ function createState(
     cubicBezierDraft: null,
     pathDraft: null,
     sheetPolygonDraft: null,
+    layerOperationStatus: '',
     history: createDiagramHistory(diagram),
   }
 }
@@ -857,4 +1157,20 @@ function pointPreview(point: Vec3): Vec3 {
 
 function previewValue(component: CoordinateComponent): number {
   return component.kind === 'numeric' ? component.value : component.previewValue
+}
+
+function parseTranslation(
+  diagram: Diagram,
+  dx: string,
+  dy: string,
+  dz: string,
+): TranslationVector {
+  const parsed = parseTranslationVectorFromInputs(diagram, { dx, dy, dz })
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  return parsed.translation
 }
