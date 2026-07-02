@@ -49,6 +49,11 @@ export type EditableInspectorProps = {
   onBulkLayerChange: (layer: number) => void
   onBulkDelete: () => void
   onBulkDuplicate: () => void
+  styleClipboardSummary: string
+  styleClipboardStatus: string
+  pasteStyleDisabled?: boolean
+  onCopyStyle: () => void
+  onPasteStyle: () => void
   onBulkTranslate: (translation: TranslationVector) => void
   onCoordinateTranslate: (translation: TranslationVector) => string
   onBulkConcatenatePaths: (
@@ -68,6 +73,11 @@ export function EditableInspector({
   onBulkLayerChange,
   onBulkDelete,
   onBulkDuplicate,
+  styleClipboardSummary,
+  styleClipboardStatus,
+  pasteStyleDisabled = false,
+  onCopyStyle,
+  onPasteStyle,
   onBulkTranslate,
   onCoordinateTranslate,
   onBulkConcatenatePaths,
@@ -129,6 +139,11 @@ export function EditableInspector({
                 onBulkLayerChange={onBulkLayerChange}
                 onBulkDelete={onBulkDelete}
                 onBulkDuplicate={onBulkDuplicate}
+                styleClipboardSummary={styleClipboardSummary}
+                styleClipboardStatus={styleClipboardStatus}
+                pasteStyleDisabled={pasteStyleDisabled}
+                onCopyStyle={onCopyStyle}
+                onPasteStyle={onPasteStyle}
                 onBulkTranslate={onBulkTranslate}
                 onBulkConcatenatePaths={onBulkConcatenatePaths}
               />
@@ -157,6 +172,11 @@ export function EditableInspector({
         diagram={diagram}
         stratum={selected.element}
         onDiagramChange={onDiagramChange}
+        styleClipboardSummary={styleClipboardSummary}
+        styleClipboardStatus={styleClipboardStatus}
+        pasteStyleDisabled={pasteStyleDisabled}
+        onCopyStyle={onCopyStyle}
+        onPasteStyle={onPasteStyle}
         onSplitPath={onSplitPath}
         onStartPathSplitPick={onStartPathSplitPick}
       />
@@ -171,6 +191,11 @@ export function EditableInspector({
         diagram={diagram}
         label={selected.element}
         onDiagramChange={onDiagramChange}
+        styleClipboardSummary={styleClipboardSummary}
+        styleClipboardStatus={styleClipboardStatus}
+        pasteStyleDisabled={pasteStyleDisabled}
+        onCopyStyle={onCopyStyle}
+        onPasteStyle={onPasteStyle}
       />
     )
 

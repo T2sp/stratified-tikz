@@ -28,6 +28,7 @@ import {
 } from '../pathConcatenation.ts'
 import type { MultiSelectedElement } from '../selection.ts'
 import { formatNumberInput, ReadOnlyField } from './InspectorField.tsx'
+import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type BulkSelectionInspectorProps = {
@@ -38,6 +39,11 @@ export type BulkSelectionInspectorProps = {
   onBulkLayerChange: (layer: number) => void
   onBulkDelete: () => void
   onBulkDuplicate: () => void
+  styleClipboardSummary: string
+  styleClipboardStatus: string
+  pasteStyleDisabled?: boolean
+  onCopyStyle: () => void
+  onPasteStyle: () => void
   onBulkTranslate: (translation: TranslationVector) => void
   onBulkConcatenatePaths: (
     keepOriginals: boolean,
@@ -53,6 +59,11 @@ export function BulkSelectionInspector({
   onBulkLayerChange,
   onBulkDelete,
   onBulkDuplicate,
+  styleClipboardSummary,
+  styleClipboardStatus,
+  pasteStyleDisabled = false,
+  onCopyStyle,
+  onPasteStyle,
   onBulkTranslate,
   onBulkConcatenatePaths,
 }: BulkSelectionInspectorProps) {
@@ -104,6 +115,15 @@ export function BulkSelectionInspector({
           onDiagramChange={onDiagramChange}
         />
       )}
+
+      <StyleClipboardControls
+        clipboardSummary={styleClipboardSummary}
+        status={styleClipboardStatus}
+        copyDisabled
+        pasteDisabled={pasteStyleDisabled}
+        onCopyStyle={onCopyStyle}
+        onPasteStyle={onPasteStyle}
+      />
 
       <BulkTranslationSection
         diagram={diagram}
