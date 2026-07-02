@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react'
 import type { CoordinateAnchor, Diagram } from '../../model/types.ts'
 import { coordinateAnchorPositionToVec3 } from '../../model/coordinateAnchors.ts'
-import type { TranslationVector } from '../../model/translation.ts'
+import {
+  parseTranslationVectorFromInputs,
+  type TranslationVector,
+} from '../../model/translation.ts'
 import {
   createCoordinateAnchorInspectorModel,
   deleteCoordinateAnchorWithDetach,
@@ -17,7 +25,9 @@ import {
   isCoordinateAnchorSelection,
   isMultiSelectedElement,
   selectedElementCount,
+  selectedElements,
   type SelectedElement,
+  type MultiSelectedElement,
 } from '../selection.ts'
 import { BulkSelectionInspector } from './BulkSelectionInspector.tsx'
 import { CoordinateEditor } from './CoordinateEditor.tsx'
@@ -39,6 +49,7 @@ export type EditableInspectorProps = {
   onBulkDelete: () => void
   onBulkDuplicate: () => void
   onBulkTranslate: (translation: TranslationVector) => void
+  onCoordinateTranslate: (translation: TranslationVector) => string
   onBulkConcatenatePaths: (
     keepOriginals: boolean,
     directionReversed?: readonly boolean[],
@@ -55,6 +66,7 @@ export function EditableInspector({
   onBulkDelete,
   onBulkDuplicate,
   onBulkTranslate,
+  onCoordinateTranslate,
   onBulkConcatenatePaths,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
@@ -98,7 +110,10 @@ export function EditableInspector({
           <div id="inspector-details" className="inspector-details-scroll">
             {isCoordinateAnchorSelection(selectedElement) ? (
               <CoordinateAnchorMultiSelectionInspector
+                diagram={diagram}
+                selection={selectedElement}
                 count={selectedElementCount(selectedElement)}
+                onCoordinateTranslate={onCoordinateTranslate}
               />
             ) : (
               <BulkSelectionInspector
@@ -185,10 +200,74 @@ export function EditableInspector({
 }
 
 function CoordinateAnchorMultiSelectionInspector({
+  diagram,
+  selection,
   count,
+  onCoordinateTranslate,
 }: {
+  diagram: Diagram
+  selection: MultiSelectedElement
   count: number
+  onCoordinateTranslate: (translation: TranslationVector) => string
 }) {
+  const [dxInput, setDxInput] = useState('0')
+  const [dyInput, setDyInput] = useState('0')
+  const [dzInput, setDzInput] = useState('0')
+  const [statusState, setStatusState] = useState({
+    selectionKey: '',
+    message: '',
+  })
+  const selectionKey = selectedElements(selection)
+    .map((element) => `${element.kind}:${element.id}`)
+    .join('|')
+  const status =
+    statusState.selectionKey === selectionKey ? statusState.message : ''
+  const parsed = useMemo(
+    () =>
+      parseTranslationVectorFromInputs(diagram, {
+        dx: dxInput,
+        dy: dyInput,
+        dz: dzInput,
+      }),
+    [diagram, dxInput, dyInput, dzInput],
+  )
+  const isZero =
+    parsed.ok &&
+    parsed.preview.x === 0 &&
+    parsed.preview.y === 0 &&
+    parsed.preview.z === 0
+  const canSubmit = parsed.ok && !isZero
+  const errorMessage = parsed.ok
+    ? isZero
+      ? 'Enter a non-zero translation.'
+      : ''
+    : parsed.error
+
+  function submitTranslation(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault()
+
+    if (!parsed.ok) {
+      setStatusState({
+        selectionKey,
+        message: parsed.error,
+      })
+      return
+    }
+
+    if (isZero) {
+      setStatusState({
+        selectionKey,
+        message: 'Enter a non-zero translation.',
+      })
+      return
+    }
+
+    setStatusState({
+      selectionKey,
+      message: onCoordinateTranslate(parsed.translation),
+    })
+  }
+
   return (
     <div className="inspector-content editable-inspector">
       <section className="inspector-section">
@@ -199,13 +278,91 @@ function CoordinateAnchorMultiSelectionInspector({
             label="Selection"
             value={`${count} ${count === 1 ? 'coordinate' : 'coordinates'} selected`}
           />
-          <ReadOnlyField
-            label="Translate selected coordinates"
-            value="Available in the coordinate translation phase."
-          />
         </div>
       </section>
+      <section className="inspector-section">
+        <h3>Translate selected coordinates</h3>
+        <form className="inspector-form" onSubmit={submitTranslation}>
+          <CoordinateTranslationInput
+            label="dx"
+            value={dxInput}
+            invalid={!parsed.ok && parsed.error.startsWith('dx:')}
+            onChange={setDxInput}
+          />
+          <CoordinateTranslationInput
+            label="dy"
+            value={dyInput}
+            invalid={!parsed.ok && parsed.error.startsWith('dy:')}
+            onChange={setDyInput}
+          />
+          {diagram.ambientDimension === 3 ? (
+            <CoordinateTranslationInput
+              label="dz"
+              value={dzInput}
+              invalid={!parsed.ok && parsed.error.startsWith('dz:')}
+              onChange={setDzInput}
+            />
+          ) : (
+            <CoordinateTranslationInput
+              label="dz"
+              value="0"
+              invalid={false}
+              disabled={true}
+              onChange={() => undefined}
+            />
+          )}
+          <div className="inspector-field">
+            <span className="inspector-field-label">Apply</span>
+            <button
+              type="submit"
+              className="toolbar-button"
+              disabled={!canSubmit}
+              title={errorMessage}
+            >
+              Apply
+            </button>
+          </div>
+          {diagram.ambientDimension === 2 && (
+            <p className="inspector-status">2D coordinates keep z = 0.</p>
+          )}
+          {(status !== '' || errorMessage !== '') && (
+            <p className="inspector-status" role="status" aria-live="polite">
+              {status || errorMessage}
+            </p>
+          )}
+        </form>
+      </section>
     </div>
+  )
+}
+
+function CoordinateTranslationInput({
+  label,
+  value,
+  invalid,
+  disabled = false,
+  onChange,
+}: {
+  label: 'dx' | 'dy' | 'dz'
+  value: string
+  invalid: boolean
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="inspector-field">
+      <span className="inspector-field-label">{label}</span>
+      <input
+        className="inspector-input"
+        type="text"
+        inputMode="decimal"
+        aria-label={label}
+        aria-invalid={invalid}
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    </label>
   )
 }
 

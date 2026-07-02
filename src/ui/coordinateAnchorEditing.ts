@@ -20,12 +20,17 @@ import {
   resolveDiagramCoordinateRefs,
   type CoordinateReferenceLocation,
 } from '../model/coordinateReferences.ts'
+import { translateCoordinateAnchors } from '../model/coordinateAnchorTranslation.ts'
 import type { ScalarInputValue } from '../model/scalarExpressions.ts'
 import {
   coordinateComponentPreviewValue,
   updateVec3CoordinateComponent,
   type CoordinateExpressionContext,
 } from '../model/symbolicCoordinates.ts'
+import {
+  isZeroTranslationVector,
+  type TranslationVector,
+} from '../model/translation.ts'
 import { resolveSymbolicVariables } from '../model/variables.ts'
 import { evaluateWorkPlaneLocalCoordinate } from '../model/workPlaneLocalCoordinates.ts'
 import type {
@@ -43,6 +48,18 @@ import type {
   WorkPlaneLocalCoordinateAxis,
 } from './diagramUpdates.ts'
 import { formatVec3 } from './inspectorSummary.ts'
+import {
+  clearSelectionForLayerFilter,
+  normalizeLayerFilterForDiagram,
+} from './layerFilter.ts'
+import {
+  selectedElements,
+  type SelectedElement,
+} from './selection.ts'
+import {
+  commitDiagramChange,
+  type UndoableEditorState,
+} from './undo.ts'
 
 export {
   deleteCoordinateAnchorWithDetach,
@@ -77,6 +94,24 @@ export type DeleteUnusedCoordinateAnchorResult =
       referenceCount: number
       message: string
     }
+
+export type CoordinateAnchorTranslateSelectedResult =
+  | {
+      ok: true
+      diagram: Diagram
+      translated: boolean
+      translatedCount: number
+      message: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: string
+    }
+
+export type CoordinateAnchorTranslationEditorState = UndoableEditorState & {
+  layerOperationStatus: string
+}
 
 export type CoordinateAnchorInspectorField = {
   label: string
@@ -267,6 +302,104 @@ export function updateCoordinateAnchorWorkPlaneLocalCoordinate(
         preview,
       },
     }
+  })
+}
+
+export function translateSelectedCoordinateAnchors(
+  diagram: Diagram,
+  selection: SelectedElement,
+  translation: TranslationVector,
+): CoordinateAnchorTranslateSelectedResult {
+  const elements = selectedElements(selection)
+
+  if (elements.length === 0 || isZeroTranslationVector(translation)) {
+    return {
+      ok: true,
+      diagram,
+      translated: false,
+      translatedCount: 0,
+      message: 'No selected coordinates translated.',
+    }
+  }
+
+  if (!elements.every((element) => element.kind === 'coordinate')) {
+    return {
+      ok: false,
+      diagram,
+      error:
+        'Translate selected coordinates failed: coordinate translation supports coordinate-only selections.',
+    }
+  }
+
+  const result = translateCoordinateAnchors(
+    diagram,
+    elements.map((element) => element.id),
+    translation,
+  )
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: `Translate selected coordinates failed: ${result.error.message}`,
+    }
+  }
+
+  const translatedCount = result.value.translatedCount
+
+  return {
+    ok: true,
+    diagram:
+      translatedCount === 0
+        ? diagram
+        : resolveDiagramCoordinateRefs(result.value.diagram),
+    translated: translatedCount > 0,
+    translatedCount,
+    message:
+      translatedCount === 0
+        ? 'No selected coordinates translated.'
+        : `Translated ${translatedCount} ${
+            translatedCount === 1 ? 'coordinate' : 'coordinates'
+          }.`,
+  }
+}
+
+export function applyCoordinateAnchorTranslateToEditorState<
+  T extends CoordinateAnchorTranslationEditorState,
+>(current: T, translation: TranslationVector): T {
+  const result = translateSelectedCoordinateAnchors(
+    current.editableDiagram,
+    current.selectedElement,
+    translation,
+  )
+
+  if (!result.ok) {
+    return {
+      ...current,
+      layerOperationStatus: result.error,
+    }
+  }
+
+  const nextLayerFilter = normalizeLayerFilterForDiagram(
+    result.diagram,
+    current.layerFilter,
+  )
+  const nextSelection = clearSelectionForLayerFilter(
+    result.diagram,
+    current.selectedElement,
+    nextLayerFilter,
+  )
+
+  return commitDiagramChange(current, {
+    ...current,
+    editableDiagram: result.diagram,
+    selectedElement: nextSelection,
+    layerFilter: nextLayerFilter,
+    polylineDraft: null,
+    cubicBezierDraft: null,
+    pathDraft: null,
+    sheetPolygonDraft: null,
+    layerOperationStatus: result.message,
   })
 }
 
