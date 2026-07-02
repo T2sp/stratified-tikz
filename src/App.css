@@ -2140,9 +2140,9 @@
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, #ffffff 78%, transparent);
+  background: color-mix(in srgb, #ffffff 70%, transparent);
   box-shadow: rgba(30, 34, 44, 0.18) 0 10px 28px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px) saturate(115%);
 }
 
 .layer-palette-action-overlay {
@@ -2178,6 +2178,11 @@
 .layer-palette-action-panel .layer-manager-translate-form,
 .layer-palette-action-panel .layer-manager-state-controls {
   flex-wrap: wrap;
+}
+
+.layer-palette-action-panel .layer-manager-action-group {
+  padding-left: 8px;
+  border-left: 3px solid color-mix(in srgb, var(--focus) 36%, transparent);
 }
 
 .layer-manager {

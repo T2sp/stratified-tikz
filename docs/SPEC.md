@@ -452,11 +452,13 @@ Segment 2: Cubic Bezier
   End
 ```
 
-Inspector coordinate fields reject invalid numeric input. In 2D mode the `z`
-coordinate is hidden and edited points stay on `z = 0`; in 3D mode all three
-coordinates are editable. When an endpoint is shared between adjacent segments,
-editing either copy updates both stored endpoints. The editor must never commit
-a concatenated path whose adjacent endpoints disagree.
+Inspector coordinate fields allow temporarily invalid numeric text and show a
+warning while preserving the last committed diagram value. Leading decimals such
+as `.5` commit normally. In 2D mode the `z` coordinate is hidden and edited
+points stay on `z = 0`; in 3D mode all three coordinates are editable. When an
+endpoint is shared between adjacent segments, editing either copy updates both
+stored endpoints. The editor must never commit a concatenated path whose
+adjacent endpoints disagree.
 
 Selected concatenated paths show SVG drag handles for path vertices and cubic
 Bézier control points. Shared joins are rendered as one draggable vertex handle;
@@ -720,6 +722,12 @@ but hiding coordinate markers clears coordinate selections. The Inspector shows
 a compact multi-selection summary such as `3 curves selected` or
 `3 coordinates selected`. SVG preview highlighting is applied to every selected
 id, while geometry drag handles remain single-selection only.
+
+Alt-click, or Option-click on macOS, cycles through overlapping selectable
+preview candidates near the cursor. Candidate order is deterministic and uses
+the same priority family as ordinary hit testing, but cycling state is UI-only
+and is not stored in `Diagram`. Path inline-node candidates select their owning
+path.
 
 ## Style editing UI
 
