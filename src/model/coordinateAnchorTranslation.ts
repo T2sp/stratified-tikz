@@ -47,6 +47,11 @@ type DetachContext = {
   translationContext: DiagramTranslationContext
 }
 
+type CoordinateAnchorIndexEntry = {
+  anchor: CoordinateAnchor
+  index: number
+}
+
 type DetachPositionResult =
   | {
       ok: true
@@ -120,19 +125,20 @@ export function translateCoordinateAnchors(
 ): TranslateCoordinateAnchorsResult {
   const uniqueIds = [...new Set(coordinateIds)]
   const anchors = diagram.coordinateAnchors ?? []
-  const selectedAnchorIndexes = new Map<string, number>()
+  const anchorIndexById = coordinateAnchorIndexById(anchors)
+  const selectedAnchorIds = new Set<string>()
 
   for (const id of uniqueIds) {
-    const index = anchors.findIndex((anchor) => anchor.id === id)
+    const entry = anchorIndexById.get(id)
 
-    if (index < 0) {
+    if (entry === undefined) {
       return failure(
         'coordinateAnchors',
         `Coordinate anchor "${id}" does not exist.`,
       )
     }
 
-    selectedAnchorIndexes.set(id, index)
+    selectedAnchorIds.add(id)
   }
 
   const translation = normalizeCoordinateAnchorTranslation(diagram, delta)
@@ -164,7 +170,7 @@ export function translateCoordinateAnchors(
 
   const detachContext: DetachContext = {
     previewResolver: new CoordinateAnchorPreviewResolver(
-      diagram,
+      anchorIndexById,
       translationContext,
     ),
     translationContext,
@@ -173,7 +179,7 @@ export function translateCoordinateAnchors(
   const translatedAnchors: CoordinateAnchor[] = []
 
   for (const [index, anchor] of anchors.entries()) {
-    if (!selectedAnchorIndexes.has(anchor.id)) {
+    if (!selectedAnchorIds.has(anchor.id)) {
       translatedAnchors.push(anchor)
       continue
     }
@@ -264,17 +270,31 @@ function normalizeCoordinateAnchorTranslation(
   }
 }
 
+function coordinateAnchorIndexById(
+  anchors: readonly CoordinateAnchor[],
+): ReadonlyMap<string, CoordinateAnchorIndexEntry> {
+  const anchorIndexById = new Map<string, CoordinateAnchorIndexEntry>()
+
+  anchors.forEach((anchor, index) => {
+    if (!anchorIndexById.has(anchor.id)) {
+      anchorIndexById.set(anchor.id, { anchor, index })
+    }
+  })
+
+  return anchorIndexById
+}
+
 class CoordinateAnchorPreviewResolver {
-  private readonly diagram: Diagram
+  private readonly anchorIndexById: ReadonlyMap<string, CoordinateAnchorIndexEntry>
   private readonly context: DiagramTranslationContext
   private readonly previewById = new Map<string, Vec3>()
   private readonly resolvingIds = new Set<string>()
 
   constructor(
-    diagram: Diagram,
+    anchorIndexById: ReadonlyMap<string, CoordinateAnchorIndexEntry>,
     context: DiagramTranslationContext,
   ) {
-    this.diagram = diagram
+    this.anchorIndexById = anchorIndexById
     this.context = context
   }
 
@@ -298,20 +318,9 @@ class CoordinateAnchorPreviewResolver {
       )
     }
 
-    const anchorIndex = (this.diagram.coordinateAnchors ?? []).findIndex(
-      (anchor) => anchor.id === coordinateId,
-    )
+    const entry = this.anchorIndexById.get(coordinateId)
 
-    if (anchorIndex < 0) {
-      return failure(
-        path,
-        `Could not detach coordinate reference "${coordinateId}" because its coordinate anchor does not exist.`,
-      )
-    }
-
-    const anchor = this.diagram.coordinateAnchors?.[anchorIndex]
-
-    if (anchor === undefined) {
+    if (entry === undefined) {
       return failure(
         path,
         `Could not detach coordinate reference "${coordinateId}" because its coordinate anchor does not exist.`,
@@ -320,8 +329,8 @@ class CoordinateAnchorPreviewResolver {
 
     this.resolvingIds.add(coordinateId)
     const preview = this.previewForAnchor(
-      anchor,
-      `coordinateAnchors[${anchorIndex}].position`,
+      entry.anchor,
+      `coordinateAnchors[${entry.index}].position`,
     )
     this.resolvingIds.delete(coordinateId)
 

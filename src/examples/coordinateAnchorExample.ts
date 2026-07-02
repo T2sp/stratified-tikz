@@ -46,6 +46,14 @@ function createCoordinateAnchorExample(): Diagram {
   }
 
   anchors.push(
+    createAnchor(diagram, 'coord-c', 'Anchor C', 'C', globalAnchorPosition(3, 1, 1)),
+  )
+  diagram = {
+    ...diagram,
+    coordinateAnchors: anchors,
+  }
+
+  anchors.push(
     createAnchor(
       diagram,
       'coord-local',
@@ -61,6 +69,7 @@ function createCoordinateAnchorExample(): Diagram {
 
   const start = requiredCoordinateReference(diagram, 'coord-a')
   const end = requiredCoordinateReference(diagram, 'coord-b')
+  const groupEnd = requiredCoordinateReference(diagram, 'coord-c')
   const labelPosition = requiredCoordinateReference(diagram, 'coord-local')
   const visiblePointPosition = requiredCoordinateReference(diagram, 'coord-b')
 
@@ -70,6 +79,13 @@ function createCoordinateAnchorExample(): Diagram {
       id: 'coordinate-anchor-reference-path',
       name: 'Referenced anchor path',
       points: [start, end],
+      layer: 0,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'coordinate-anchor-group-reference-path',
+      name: 'Group reference path',
+      points: [end, groupEnd],
       layer: 0,
     }),
     createPointStratum({

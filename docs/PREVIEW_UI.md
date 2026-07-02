@@ -91,6 +91,14 @@ geometry, styles, symbolic coordinate metadata, and layer values while assigning
 new object ids; copied path labels are disambiguated using the same copy naming
 policy as layer duplication. Crossing states are not duplicated by the MVP.
 
+Coordinate-anchor multi-selection is separate from layer-bound bulk editing.
+When every selected item is a coordinate anchor, the Inspector shows a concise
+selected-count summary and direct translation controls. In 2D, `dz` is disabled
+and kept at `0`; in 3D, all three delta fields are available. Direct coordinate
+translation does not use cursor snap. Dragging one selected coordinate marker
+translates the selected coordinate group and does use cursor snap. Mixed
+coordinate plus layer-bound multi-selection translation is rejected for the MVP.
+
 ## Layer Window
 
 The Layer button opens a floating bottom-right layer window. The window controls

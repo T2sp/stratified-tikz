@@ -273,10 +273,9 @@ function CoordinateAnchorMultiSelectionInspector({
       <section className="inspector-section">
         <h3>Coordinates</h3>
         <div className="inspector-form">
-          <ReadOnlyField label="Count" value={String(count)} />
           <ReadOnlyField
-            label="Selection"
-            value={`${count} ${count === 1 ? 'coordinate' : 'coordinates'} selected`}
+            label="Selected"
+            value={`${count} ${count === 1 ? 'coordinate' : 'coordinates'}`}
           />
         </div>
       </section>

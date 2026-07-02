@@ -366,6 +366,18 @@ anchor through `Vec3.symbolic.source.kind === "coordinateRef"`. Deleting a
 referenced anchor or translating a layer detaches references first so saved
 diagrams do not contain dangling coordinate IDs.
 
+Coordinate-anchor selection is editor state and is not stored in `Diagram`.
+Coordinate anchors can still be selected as a coordinate-only multi-selection
+in the editor. Translating that selection is an ordinary undoable diagram edit:
+the selected anchors move, layer-bound `coordinateRef` sources remain live and
+follow the moved anchors, and no layer membership is introduced. If a selected
+anchor's own position contains an internal `coordinateRef`, that internal
+reference is detached before the selected anchor is translated. Global anchor
+positions preserve symbolic addition expressions when possible; work-plane-local
+anchor positions translate their stored frame origin while preserving local
+`a,b` expressions and frame basis vectors. Mixed coordinate plus layer-bound
+selection translation is intentionally not persisted or modeled for the MVP.
+
 `userStylePresets` is optional for backward compatibility. It stores
 user-created structured style presets that affect export. Built-in presets are
 not stored in the diagram.
@@ -503,6 +515,11 @@ absolute path coordinates are translated. Coordinates with `workPlaneLocal`
 source metadata follow the Phase 25 policy above: their own stored frame
 origins move, while local `a,b` expressions remain unchanged. In 2D, only `dx`
 and `dy` are accepted and all translated coordinates remain on `z = 0`.
+
+Layer translation is intentionally different from coordinate-anchor translation.
+Before layer-bound objects move, supported `coordinateRef` sources on those
+objects are detached to ordinary coordinates, because global coordinate anchors
+do not belong to the layer and do not move with it.
 
 ## Saved diagram file
 

@@ -34,6 +34,12 @@ selection only for objects with the same `geometricKind`; clicking a different
 kind replaces the selection. This keeps bulk style and arrow controls
 predictable.
 
+Coordinate anchors have their own coordinate-only multi-selection family.
+Modifier-clicking coordinates can build a coordinate selection, but coordinates
+and layer-bound objects are not mixed for MVP translation. Coordinate anchors
+are global live TikZ references, while layer-bound objects carry layer, locking,
+filter, style, and detach-on-layer-translation semantics.
+
 Selection, selection highlights, inspector disclosure state, draft geometry,
 and layer filter state are UI/editor state. They are not fields of `Diagram`
 and are not saved.
@@ -73,6 +79,15 @@ is never mutated by translation; each saved coordinate/frame snapshot is copied
 and moved as diagram data. This keeps local symbolic expressions available for
 TikZ plane-scope export after translation.
 
+Coordinate-anchor translation uses the same symbolic addition rules for global
+positions. It moves the selected coordinate anchors themselves, so existing
+`coordinateRef` sources in paths, sheets, points, and free text labels remain
+live and follow the moved anchors. If a selected anchor's own stored position
+contains an internal `coordinateRef`, that internal reference is detached before
+translation. Direct Inspector coordinate translation does not use cursor snap;
+dragging a selected coordinate marker translates the selected coordinate group
+through cursor input, so snap applies to the dragged target point.
+
 ## Path Concatenation
 
 Path concatenation joins selected path-like curves in selection order. The next
@@ -103,6 +118,10 @@ selection translation. It moves every absolute coordinate on the layer,
 including paths, labels, filled boundaries, grids, ruled surfaces, Coons patch
 snapshots, and frame origins.
 
+Before layer translation, supported coordinate references on layer-bound
+objects are detached. This differs from coordinate-anchor translation, where the
+anchors move and references intentionally remain live.
+
 ## Regression Guardrails
 
 Phase 24 regression tests cover combined workflows rather than only isolated
@@ -114,6 +133,8 @@ helpers:
 - symbolic translation plus save/load;
 - path concatenation plus arrows and braiding cleanup;
 - layer merge plus layer translation plus TikZ export;
+- coordinate multi-selection translation plus save/load, snap drag, undo/redo,
+  and TikZ export;
 - inline math export with no blank lines after edits;
 - selection/editor state excluded from saved JSON.
 
