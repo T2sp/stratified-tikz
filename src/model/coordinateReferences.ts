@@ -1387,31 +1387,63 @@ function refreshResolvedArcCoordinateReferences(
   resolvedSegment: Extract<PathSegment, { kind: 'arc' }>,
 ): Extract<PathSegment, { kind: 'arc' }> {
   if (
-    diagram.ambientDimension !== 2 ||
     !arcSegmentHasCoordinateReference(originalSegment)
   ) {
     return resolvedSegment
   }
 
-  const radius = distance2d(resolvedSegment.start, resolvedSegment.center)
-  const startAngleDeg = angleDegrees2d(
+  if (diagram.ambientDimension === 2) {
+    const radius = distance2d(resolvedSegment.start, resolvedSegment.center)
+    const startAngleDeg = angleDegrees2d(
+      resolvedSegment.start,
+      resolvedSegment.center,
+    )
+    const endAngleDeg = angleDegrees2d(
+      resolvedSegment.end,
+      resolvedSegment.center,
+    )
+
+    return Number.isFinite(radius) &&
+      radius > 0 &&
+      Number.isFinite(startAngleDeg) &&
+      Number.isFinite(endAngleDeg)
+      ? {
+          ...resolvedSegment,
+          radius,
+          startAngleDeg,
+          endAngleDeg,
+        }
+      : resolvedSegment
+  }
+
+  if (resolvedSegment.frame === undefined) {
+    return resolvedSegment
+  }
+
+  const frame = {
+    ...resolvedSegment.frame,
+    origin: concreteVec3(resolvedSegment.center),
+  }
+  const startPolar = localPolarCoordinateForFrame(
     resolvedSegment.start,
     resolvedSegment.center,
+    frame,
   )
-  const endAngleDeg = angleDegrees2d(
+  const endPolar = localPolarCoordinateForFrame(
     resolvedSegment.end,
     resolvedSegment.center,
+    frame,
   )
 
-  return Number.isFinite(radius) &&
-    radius > 0 &&
-    Number.isFinite(startAngleDeg) &&
-    Number.isFinite(endAngleDeg)
+  return startPolar !== null &&
+    endPolar !== null &&
+    startPolar.radius > 0
     ? {
         ...resolvedSegment,
-        radius,
-        startAngleDeg,
-        endAngleDeg,
+        radius: startPolar.radius,
+        startAngleDeg: startPolar.angleDeg,
+        endAngleDeg: endPolar.angleDeg,
+        frame,
       }
     : resolvedSegment
 }
@@ -1435,6 +1467,30 @@ function angleDegrees2d(point: Vec3, center: Vec3): number {
     (Math.atan2(point.y - center.y, point.x - center.x) * 180) /
     Math.PI
   )
+}
+
+function localPolarCoordinateForFrame(
+  point: Vec3,
+  center: Vec3,
+  frame: WorkPlaneFrameSnapshot,
+): { radius: number; angleDeg: number } | null {
+  const delta = {
+    x: point.x - center.x,
+    y: point.y - center.y,
+    z: point.z - center.z,
+  }
+  const localX = dotVec3(delta, frame.u)
+  const localY = dotVec3(delta, frame.v)
+  const radius = Math.hypot(localX, localY)
+  const angleDeg = (Math.atan2(localY, localX) * 180) / Math.PI
+
+  return Number.isFinite(radius) && Number.isFinite(angleDeg)
+    ? { radius, angleDeg }
+    : null
+}
+
+function dotVec3(first: Vec3, second: Vec3): number {
+  return first.x * second.x + first.y * second.y + first.z * second.z
 }
 
 function detachedCoordinatePointForAnchor(
@@ -3142,18 +3198,6 @@ function validatePathSegmentCoordinateReferences(
       )
       return
     case 'arc':
-      if (
-        diagram.ambientDimension === 3 &&
-        arcSegmentHasCoordinateReference(segment)
-      ) {
-        pushError(
-          errors,
-          path,
-          'coordinateRef is not supported for 3D arc segments because arc export approximates 3D arcs numerically.',
-        )
-        return
-      }
-
       validateCoordinateReferencePoint(
         diagram,
         segment.start,

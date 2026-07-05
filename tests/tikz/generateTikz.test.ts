@@ -659,7 +659,7 @@ test('2D arc start center end coordinateRefs export with calc references', () =>
   assert.doesNotMatch(inlineTikz, /\n\s*\n/)
 })
 
-test('3D arc coordinateRefs are rejected before numeric arc approximation export', () => {
+test('3D arc coordinateRefs export with explicit cubic approximation fallback', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
     { id: 'coord-a', name: 'A', x: 1, y: 0, z: 0 },
@@ -697,17 +697,27 @@ test('3D arc coordinateRefs are rejected before numeric arc approximation export
 
   const validation = validateDiagram(diagram)
   const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+  const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
 
-  assert.equal(validation.valid, false)
+  assert.equal(validation.valid, true)
+  assert.equal(parsed.ok, true)
   assert.match(
-    validation.errors.map(formatValidationIssue).join('\n'),
-    /3D arc segments.*approximates 3D arcs numerically/,
+    tikz,
+    /3D coordinate-reference arc export uses cubic Bezier approximation/,
   )
-  assert.equal(parsed.ok, false)
-  if (parsed.ok) {
-    throw new Error('Expected saved 3D arc coordinateRef to fail.')
-  }
-  assert.match(parsed.error, /3D arc segments.*approximates 3D arcs numerically/)
+  assert.match(
+    tikz,
+    /Arc references remain live in the model; control points are emitted from the current resolved preview\./,
+  )
+  assert.match(tikz, /\\coordinate \(A\) at \(1,0,0\);/)
+  assert.match(tikz, /\\coordinate \(O\) at \(0,0,0\);/)
+  assert.match(tikz, /\\coordinate \(B\) at \(0,1,0\);/)
+  assert.match(tikz, /\(A\) \.\. controls/)
+  assert.match(tikz, /\.\. \(B\);/)
+  assert.doesNotMatch(tikz, /omitted because coordinate references for 3D arc centers/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
 })
 
 test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {

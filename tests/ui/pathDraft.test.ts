@@ -501,7 +501,7 @@ test('arc cursor coordinate anchor refs are supported for 2D start center end pi
   )
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 3),
-    'arc3d',
+    null,
   )
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(
@@ -553,6 +553,64 @@ test('arc cursor coordinate anchor refs are supported for 2D start center end pi
   )
 })
 
+test('arc cursor coordinate anchor refs are supported for 3D start center end picks', () => {
+  const diagram = createArcCoordinateAnchorCursorDiagram(3)
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'arc',
+    3,
+  )
+
+  assert.equal(
+    concatenatedPathDraftNextPointSupportsCoordinateRef(null, 'arc', 3),
+    true,
+  )
+  assert.equal(
+    concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 3),
+    null,
+  )
+
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-o'),
+    3,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    3,
+  )
+
+  const segment = draft.segments[0]
+
+  assert.equal(segment?.kind, 'arc')
+  if (segment?.kind !== 'arc') {
+    throw new Error('Expected cursor-created 3D arc segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.center)?.coordinateId,
+    'coord-o',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.end)?.coordinateId,
+    'coord-b',
+  )
+  assert.equal(segment.frame?.origin.x, 0)
+  assert.equal(segment.frame?.origin.y, 0)
+  assert.equal(segment.frame?.origin.z, 0)
+  assert.equal(
+    segment.frame === undefined
+      ? null
+      : coordinateReferenceSourceForPoint(segment.frame.origin),
+    null,
+  )
+})
+
 test('coordinate anchor arc refs refresh derived radius and angles after anchor movement', () => {
   const diagram = createArcCoordinateAnchorCursorDiagram()
   let draft = mustCreateDraft(
@@ -596,6 +654,57 @@ test('coordinate anchor arc refs refresh derived radius and angles after anchor 
   )
   assert.equal(segment.center.x, 0.5)
   assert.equal(segment.center.y, 0.5)
+  assert.ok(Math.abs(Number(segment.radius) - Math.SQRT1_2) < 1e-9)
+  assert.ok(Math.abs(Number(segment.startAngleDeg) - -45) < 1e-9)
+  assert.ok(Math.abs(Number(segment.endAngleDeg) - 135) < 1e-9)
+})
+
+test('3D coordinate anchor arc refs refresh derived frame values after anchor movement', () => {
+  const diagram = createArcCoordinateAnchorCursorDiagram(3)
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'arc',
+    3,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-o'),
+    3,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    3,
+  )
+  const result = addConcatenatedPathStratumWithResult(diagram, draft.segments, {
+    id: 'cursor-ref-arc-3d',
+  })
+  const moved = moveCoordinateAnchor(result.diagram, 'coord-o', 0.5, 0.5, 0)
+  const resolved = resolveDiagramCoordinateRefs(moved)
+  const curve = resolved.strata.find((stratum) => stratum.id === 'cursor-ref-arc-3d')
+
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(curve?.kind, 'concatenatedPath')
+  if (curve?.geometricKind !== 'curve' || curve.kind !== 'concatenatedPath') {
+    throw new Error('Expected resolved 3D arc path.')
+  }
+
+  const segment = curve.segments[0]
+
+  assert.equal(segment?.kind, 'arc')
+  if (segment?.kind !== 'arc') {
+    throw new Error('Expected resolved 3D arc segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.center)?.coordinateId,
+    'coord-o',
+  )
+  assert.equal(segment.center.x, 0.5)
+  assert.equal(segment.center.y, 0.5)
+  assert.equal(segment.frame?.origin.x, 0.5)
+  assert.equal(segment.frame?.origin.y, 0.5)
+  assert.equal(segment.frame?.origin.z, 0)
   assert.ok(Math.abs(Number(segment.radius) - Math.SQRT1_2) < 1e-9)
   assert.ok(Math.abs(Number(segment.startAngleDeg) - -45) < 1e-9)
   assert.ok(Math.abs(Number(segment.endAngleDeg) - 135) < 1e-9)
@@ -832,8 +941,10 @@ function createCoordinateAnchorCursorDiagram(): Diagram {
   return diagram
 }
 
-function createArcCoordinateAnchorCursorDiagram(): Diagram {
-  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+function createArcCoordinateAnchorCursorDiagram(
+  ambientDimension: 2 | 3 = 2,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension })
 
   diagram.coordinateAnchors = [
     createCoordinateAnchor(diagram, {

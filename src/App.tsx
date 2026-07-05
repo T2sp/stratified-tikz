@@ -9413,8 +9413,6 @@ function coordinateAnchorPathCursorRejectionMessage(
       return 'Coordinate anchors are not supported for this arc endpoint in the current mode.'
     case 'arcCenter':
       return 'Coordinate anchors are not supported for this arc center in the current mode.'
-    case 'arc3d':
-      return 'Coordinate anchors are not supported for 3D arc cursor input because TikZ export approximates arcs numerically.'
   }
 }
 

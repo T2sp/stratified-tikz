@@ -313,21 +313,16 @@ export function concatenatedPathDraftNextPointSupportsCoordinateRef(
 export type ConcatenatedPathDraftCoordinateRefRejectionReason =
   | 'arcEndpoint'
   | 'arcCenter'
-  | 'arc3d'
 
 export function concatenatedPathDraftNextPointCoordinateRefRejectionReason(
   draft: ConcatenatedPathDraft | null,
   segmentKind: ConcatenatedPathSegmentKind,
-  ambientDimension: AmbientDimension,
+  _ambientDimension: AmbientDimension,
 ): ConcatenatedPathDraftCoordinateRefRejectionReason | null {
   const nextSegmentKind = draft?.currentSegmentKind ?? segmentKind
 
   if (nextSegmentKind === 'line' || nextSegmentKind === 'cubicBezier') {
     return null
-  }
-
-  if (ambientDimension === 3) {
-    return 'arc3d'
   }
 
   return null
@@ -400,7 +395,7 @@ function createArcDraftSegment(
     return null
   }
 
-  if (ambientDimension !== 2 || !arcDraftSegmentUsesCoordinateRef(start, center, endpointHint)) {
+  if (!arcDraftSegmentUsesCoordinateRef(start, center, endpointHint)) {
     return arc
   }
 
@@ -419,6 +414,14 @@ function createArcDraftSegment(
       coordinateRefSourceForPoint(endpointHint) === null
         ? arc.end
         : normalizePointForAmbientDimension(ambientDimension, endpointHint),
+    ...(ambientDimension === 3 && arc.frame !== undefined
+      ? {
+          frame: {
+            ...arc.frame,
+            origin: concreteVec3(center),
+          },
+        }
+      : {}),
   }
 }
 
@@ -429,7 +432,7 @@ function workPlaneFrameFromWorkPlane(
   const basis = workPlaneToBasis(workPlane)
 
   return {
-    origin: center,
+    origin: concreteVec3(center),
     u: basis.u,
     v: basis.v,
     normal: basis.normal,
@@ -467,6 +470,14 @@ function localPolarCoordinateForPoint(
 
 function dotVec3(first: Vec3, second: Vec3): number {
   return first.x * second.x + first.y * second.y + first.z * second.z
+}
+
+function concreteVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+  }
 }
 
 function arcDraftSegmentUsesCoordinateRef(

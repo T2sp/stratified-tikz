@@ -204,6 +204,7 @@ type PathSegmentCoordinateNames =
       kind: 'arcCubicApproximation'
       start: string
       end: string
+      coordinateCount: number
       cubics: Array<{
         control1: string
         control2: string
@@ -1967,16 +1968,6 @@ function emitCurve(
   }
 
   if (curve.kind === 'concatenatedPath') {
-    if (
-      context.mode === '3d' &&
-      pathSegmentsContainArcCenterCoordinateRef(curve.segments)
-    ) {
-      return [
-        `% Curve "${curve.name}" [${curve.id}] omitted because coordinate references for 3D arc centers cannot be preserved by arc export.`,
-        '',
-      ]
-    }
-
     const scopedLocalPath = emitScopedWorkPlaneLocalConcatenatedPath(
       curve,
       context,
@@ -2019,6 +2010,7 @@ function emitCurve(
 
     return [
       ...(scopedLocalPath.kind === 'fallback' ? scopedLocalPath.lines : []),
+      ...threeDimensionalArcCoordinateRefFallbackLines(curve, context),
       '\\draw[',
       ...formatTikzOptions(continuousOptions),
       ']',
@@ -3781,6 +3773,7 @@ function emitMixedStyleConcatenatedPath(
   )
 
   return [
+    ...threeDimensionalArcCoordinateRefFallbackLines(curve, context),
     ...savedPath,
     '% Segment style overrides split this concatenated path by resolved style.',
     ...drawCommands,
@@ -4298,6 +4291,7 @@ function emitContinuousConcatenatedPathBody(
   ]
 
   return [
+    ...threeDimensionalArcCoordinateRefFallbackLines(curve, context),
     '\\draw[',
     ...formatTikzOptions(options),
     ']',
@@ -5300,12 +5294,29 @@ function pathSegmentsContainCoordinateRef(
   return segments.some(pathSegmentContainsCoordinateRef)
 }
 
-function pathSegmentsContainArcCenterCoordinateRef(
+function pathSegmentsContain3dArcCoordinateRefFallback(
   segments: readonly PathSegment[],
 ): boolean {
   return segments.some(
-    (segment) => segment.kind === 'arc' && pointContainsCoordinateRef(segment.center),
+    (segment) => segment.kind === 'arc' && pathSegmentContainsCoordinateRef(segment),
   )
+}
+
+function threeDimensionalArcCoordinateRefFallbackLines(
+  curve: ConcatenatedPathStratum,
+  context: GenerateContext,
+): string[] {
+  if (
+    context.mode !== '3d' ||
+    !pathSegmentsContain3dArcCoordinateRefFallback(curve.segments)
+  ) {
+    return []
+  }
+
+  return [
+    '% 3D coordinate-reference arc export uses cubic Bezier approximation.',
+    '% Arc references remain live in the model; control points are emitted from the current resolved preview.',
+  ]
 }
 
 function pathSegmentContainsCoordinateRef(segment: PathSegment): boolean {
@@ -6869,8 +6880,10 @@ function defineArcCubicApproximationCoordinateNames(
   context: GenerateContext,
 ): PathSegmentCoordinateNames {
   const cubicSegments = arcSegmentToCubicBezierSegments(segment, 3) ?? []
+  const referencedEnd = coordinateReferenceTikzName(segment.end, context)
   let nextPointIndex = pointIndex
-  const cubics = cubicSegments.map((cubic) => {
+  const cubics = cubicSegments.map((cubic, index) => {
+    const isLast = index === cubicSegments.length - 1
     const names = {
       control1: context.coordinates.define(
         baseName,
@@ -6882,9 +6895,12 @@ function defineArcCubicApproximationCoordinateNames(
         nextPointIndex + 1,
         cubic.control2,
       ),
-      end: context.coordinates.define(baseName, nextPointIndex + 2, cubic.end),
+      end:
+        isLast && referencedEnd !== null
+          ? referencedEnd
+          : context.coordinates.define(baseName, nextPointIndex + 2, cubic.end),
     }
-    nextPointIndex += 3
+    nextPointIndex += isLast && referencedEnd !== null ? 2 : 3
     return names
   })
 
@@ -6892,6 +6908,7 @@ function defineArcCubicApproximationCoordinateNames(
     kind: 'arcCubicApproximation',
     start,
     end: cubics[cubics.length - 1]?.end ?? start,
+    coordinateCount: nextPointIndex - pointIndex,
     cubics,
   }
 }
@@ -6908,7 +6925,7 @@ function pathSegmentCoordinateNameCount(
     case 'cubicBezier':
       return 3
     case 'arcCubicApproximation':
-      return segment.cubics.length * 3
+      return segment.coordinateCount
   }
 }
 
