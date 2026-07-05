@@ -8,6 +8,7 @@ import {
   inactiveWorkPlanePointPickingState,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
+  pickWorkPlaneCoordinateAnchor,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   shouldBlockCreationForWorkPlanePointPicking,
@@ -15,12 +16,13 @@ import {
   shouldShowWorkPlaneControls,
   startWorkPlanePointPicking,
   validateWorkPlanePointPickingState,
+  workPlanePointPickingCount,
   workPlaneDisplayName,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
 } from '../../src/ui/workPlaneControls.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
-import type { Diagram, WorkPlane } from '../../src/model/types.ts'
+import type { CoordinateAnchor, Diagram, WorkPlane } from '../../src/model/types.ts'
 
 test('valid origin and normal input applies a custom work plane in 3D', () => {
   const previous: WorkPlane = { kind: 'xy', z: 5 }
@@ -317,6 +319,121 @@ test('picking three distinct point strata creates a custom work plane', () => {
   assert.deepEqual(result.workPlane.u, { x: 1, y: 0, z: 0 })
 })
 
+test('picking three coordinate anchors creates a snapshot custom work plane', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-a', 'A', 0, 0, 0),
+    coordinateAnchor('coord-b', 'B', 1, 0, 0),
+    coordinateAnchor('coord-c', 'C', 0, 1, 0),
+  ]
+  const first = pickWorkPlaneCoordinateAnchor(
+    diagram,
+    startWorkPlanePointPicking(3).state,
+    'coord-a',
+  )
+  const second = pickWorkPlaneCoordinateAnchor(diagram, first.state, 'coord-b')
+  const third = pickWorkPlaneCoordinateAnchor(diagram, second.state, 'coord-c')
+  const result = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 5 },
+    3,
+    diagram,
+    third.state,
+  )
+
+  assert.equal(workPlanePointPickingCount(third.state), 3)
+  assert.deepEqual(third.state.pickedPointIds, [])
+  assert.equal(result.ok, true)
+  assert.equal(result.status, 'Custom plane applied from picked points and coordinates.')
+  assert.equal(result.workPlane.kind, 'custom')
+
+  if (result.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assert.equal(result.workPlane.source.kind, 'threePoints')
+  assert.deepEqual(result.workPlane.origin, { x: 0, y: 0, z: 0 })
+  assert.deepEqual(result.workPlane.u, { x: 1, y: 0, z: 0 })
+})
+
+test('picked work-plane targets can mix point strata and coordinate anchors', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-b', 'B', 1, 0, 0),
+    coordinateAnchor('coord-c', 'C', 0, 1, 0),
+  ]
+  const first = pickWorkPlanePointStratum(startWorkPlanePointPicking(3).state, 'p0')
+  const second = pickWorkPlaneCoordinateAnchor(diagram, first.state, 'coord-b')
+  const third = pickWorkPlaneCoordinateAnchor(diagram, second.state, 'coord-c')
+  const result = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 5 },
+    3,
+    diagram,
+    third.state,
+  )
+
+  assert.equal(result.ok, true)
+  assert.equal(result.workPlane.kind, 'custom')
+
+  if (result.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assert.equal(result.workPlane.source.kind, 'threePoints')
+  assert.deepEqual(result.workPlane.origin, { x: 0, y: 0, z: 0 })
+})
+
+test('work-plane-local coordinate anchors can be picked from finite previews', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    workPlaneLocalCoordinateAnchor('coord-a', 'A', 0, 0, 0),
+    workPlaneLocalCoordinateAnchor('coord-b', 'B', 1, 0, 0),
+    workPlaneLocalCoordinateAnchor('coord-c', 'C', 0, 1, 0),
+  ]
+  const first = pickWorkPlaneCoordinateAnchor(
+    diagram,
+    startWorkPlanePointPicking(3).state,
+    'coord-a',
+  )
+  const second = pickWorkPlaneCoordinateAnchor(diagram, first.state, 'coord-b')
+  const third = pickWorkPlaneCoordinateAnchor(diagram, second.state, 'coord-c')
+  const result = applyPickedPointWorkPlane(
+    { kind: 'xy', z: 5 },
+    3,
+    diagram,
+    third.state,
+  )
+
+  assert.equal(result.ok, true)
+  assert.equal(result.workPlane.kind, 'custom')
+})
+
+test('work-plane coordinate picks snapshot anchor positions', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-a', 'A', 0, 0, 0),
+    coordinateAnchor('coord-b', 'B', 1, 0, 0),
+    coordinateAnchor('coord-c', 'C', 0, 1, 0),
+  ]
+  let state = startWorkPlanePointPicking(3).state
+  state = pickWorkPlaneCoordinateAnchor(diagram, state, 'coord-a').state
+  state = pickWorkPlaneCoordinateAnchor(diagram, state, 'coord-b').state
+  state = pickWorkPlaneCoordinateAnchor(diagram, state, 'coord-c').state
+  const result = applyPickedPointWorkPlane({ kind: 'xy', z: 5 }, 3, diagram, state)
+
+  assert.equal(result.ok, true)
+  if (result.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-a', 'A', 10, 10, 10),
+    coordinateAnchor('coord-b', 'B', 11, 10, 10),
+    coordinateAnchor('coord-c', 'C', 10, 11, 10),
+  ]
+
+  assert.deepEqual(result.workPlane.origin, { x: 0, y: 0, z: 0 })
+})
+
 test('duplicate point picks are rejected', () => {
   const started = startWorkPlanePointPicking(3)
   const first = pickWorkPlanePointStratum(started.state, 'p0')
@@ -324,6 +441,20 @@ test('duplicate point picks are rejected', () => {
 
   assert.equal(duplicate.status, 'Point already picked.')
   assert.deepEqual(duplicate.state.pickedPointIds, ['p0'])
+})
+
+test('duplicate coordinate anchor picks are rejected', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a', 'A', 0, 0, 0)]
+  const first = pickWorkPlaneCoordinateAnchor(
+    diagram,
+    startWorkPlanePointPicking(3).state,
+    'coord-a',
+  )
+  const duplicate = pickWorkPlaneCoordinateAnchor(diagram, first.state, 'coord-a')
+
+  assert.equal(duplicate.status, 'Coordinate anchor already picked.')
+  assert.equal(workPlanePointPickingCount(duplicate.state), 1)
 })
 
 test('collinear picked point positions are rejected without changing active plane', () => {
@@ -380,6 +511,51 @@ test('stale picked point ids are cleared when point strata disappear', () => {
   assert.deepEqual(validation.state.pickedPointIds, ['p0', 'p2'])
 })
 
+test('stale picked coordinate ids are cleared when anchors disappear', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-a', 'A', 0, 0, 0),
+    coordinateAnchor('coord-b', 'B', 1, 0, 0),
+  ]
+  const validation = validateWorkPlanePointPickingState(
+    { ...diagram, coordinateAnchors: [coordinateAnchor('coord-a', 'A', 0, 0, 0)] },
+    {
+      active: true,
+      pickedPointIds: [],
+      pickedTargets: [
+        { kind: 'coordinateAnchor', id: 'coord-a' },
+        { kind: 'coordinateAnchor', id: 'coord-b' },
+      ],
+    },
+  )
+
+  assert.deepEqual(validation.removedStaleCoordinateIds, ['coord-b'])
+  assert.equal(workPlanePointPickingCount(validation.state), 1)
+})
+
+test('collinear coordinate anchor picks are rejected without changing active plane', () => {
+  const previous: WorkPlane = { kind: 'yz', x: 4 }
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [
+    coordinateAnchor('coord-a', 'A', 0, 0, 0),
+    coordinateAnchor('coord-b', 'B', 1, 1, 1),
+    coordinateAnchor('coord-c', 'C', 2, 2, 2),
+  ]
+  const result = applyPickedPointWorkPlane(previous, 3, diagram, {
+    active: true,
+    pickedPointIds: [],
+    pickedTargets: [
+      { kind: 'coordinateAnchor', id: 'coord-a' },
+      { kind: 'coordinateAnchor', id: 'coord-b' },
+      { kind: 'coordinateAnchor', id: 'coord-c' },
+    ],
+  })
+
+  assert.equal(result.ok, false)
+  assert.equal(result.status, 'Plane points must not be collinear.')
+  assert.strictEqual(result.workPlane, previous)
+})
+
 function createPointPickingDiagram(
   points: Array<{ id: string; position: { x: number; y: number; z: number } }> = [
     { id: 'p0', position: { x: 0, y: 0, z: 0 } },
@@ -398,5 +574,55 @@ function createPointPickingDiagram(
         position: point.position,
       }),
     ),
+  }
+}
+
+function coordinateAnchor(
+  id: string,
+  name: string,
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchor {
+  return {
+    id,
+    name,
+    tikzName: name,
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: x },
+        y: { kind: 'numeric', value: y },
+        z: { kind: 'numeric', value: z },
+      },
+    },
+  }
+}
+
+function workPlaneLocalCoordinateAnchor(
+  id: string,
+  name: string,
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchor {
+  return {
+    id,
+    name,
+    tikzName: name,
+    position: {
+      kind: 'workPlaneLocal',
+      frame: {
+        origin: { x: 0, y: 0, z: 0 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+      local: {
+        a: { kind: 'numeric', value: x },
+        b: { kind: 'numeric', value: y },
+      },
+      preview: { x, y, z },
+    },
   }
 }

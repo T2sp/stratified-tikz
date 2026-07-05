@@ -128,7 +128,7 @@ test('coordinate anchor names reserve the generated coordinate namespace', () =>
 test('coordinateRef support boundary matches export-preserved locations', () => {
   assert.equal(isCoordinateRefSupportedAtLocation('pathCoordinate'), true)
   assert.equal(isCoordinateRefSupportedAtLocation('pathTemplateCenter'), false)
-  assert.equal(isCoordinateRefSupportedAtLocation('arcCenter'), false)
+  assert.equal(isCoordinateRefSupportedAtLocation('arcCenter'), true)
   assert.equal(isCoordinateRefSupportedAtLocation('labelPosition'), true)
   assert.equal(isCoordinateRefSupportedAtLocation('pointPosition'), true)
   assert.equal(isCoordinateRefSupportedAtLocation('simpleSheetVertex'), true)
@@ -610,24 +610,26 @@ test('path template center coordinateRef is rejected because template export can
   assert.match(tikz, /path template centers cannot be preserved/)
 })
 
-test('arc center coordinateRef is rejected because arc export cannot preserve it', () => {
+test('2D arc start center end coordinateRefs export with calc references', () => {
   const diagram = createEmptyDiagram({ ambientDimension: 2 })
   diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
-    { id: 'coord-a', name: 'A', x: 0, y: 0, z: 0 },
+    { id: 'coord-a', name: 'A', x: 1, y: 0, z: 0 },
+    { id: 'coord-o', name: 'O', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 0, y: 1, z: 0 },
   ])
   diagram.strata.push({
     codim: 1,
     geometricKind: 'curve',
     kind: 'concatenatedPath',
-    id: 'arc-center-ref',
-    name: 'Arc Center Ref',
+    id: 'arc-ref',
+    name: 'Arc Ref',
     style: curveStyle(),
     segments: [
       {
         kind: 'arc',
-        start: { x: 1, y: 0, z: 0 },
-        end: { x: 0, y: 1, z: 0 },
-        center: coordinateReferencePoint(diagram, 'coord-a'),
+        start: coordinateReferencePoint(diagram, 'coord-a'),
+        end: coordinateReferencePoint(diagram, 'coord-b'),
+        center: coordinateReferencePoint(diagram, 'coord-o'),
         radius: 1,
         startAngleDeg: 0,
         endAngleDeg: 90,
@@ -641,18 +643,71 @@ test('arc center coordinateRef is rejected because arc export cannot preserve it
   const validation = validateDiagram(diagram)
   const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
   const tikz = generateTikz(diagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+  assert.equal(validation.valid, true)
+  assert.equal(parsed.ok, true)
+  assert.match(tikz, /\\usetikzlibrary\{calc\}/)
+  assert.match(tikz, /\\coordinate \(A\) at \(1,0\);/)
+  assert.match(tikz, /\\coordinate \(O\) at \(0,0\);/)
+  assert.match(tikz, /\\coordinate \(B\) at \(0,1\);/)
+  assert.match(tikz, /\(A\) let \\p1 = \(\$\(A\)-\(O\)\$\)/)
+  assert.match(tikz, /\\p2 = \(\$\(B\)-\(O\)\$\)/)
+  assert.match(tikz, /arc\[start angle=\\n2, end angle=\\n4, radius=\\n1\]/)
+  assert.doesNotMatch(tikz, /arc centers cannot be preserved/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
+})
+
+test('3D arc coordinateRefs are rejected before numeric arc approximation export', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 0, z: 0 },
+    { id: 'coord-o', name: 'O', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 2,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'arc-ref-3d',
+    name: 'Arc Ref 3D',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: coordinateReferencePoint(diagram, 'coord-a'),
+        end: coordinateReferencePoint(diagram, 'coord-b'),
+        center: coordinateReferencePoint(diagram, 'coord-o'),
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+        frame: {
+          origin: { x: 0, y: 0, z: 0 },
+          u: { x: 1, y: 0, z: 0 },
+          v: { x: 0, y: 1, z: 0 },
+          normal: { x: 0, y: 0, z: 1 },
+        },
+      },
+    ],
+    styleSegments: [],
+    layer: 0,
+  })
+
+  const validation = validateDiagram(diagram)
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
 
   assert.equal(validation.valid, false)
   assert.match(
     validation.errors.map(formatValidationIssue).join('\n'),
-    /segments\[0\]\.center\.symbolic\.source.*arc centers.*does not preserve center references/,
+    /3D arc segments.*approximates 3D arcs numerically/,
   )
   assert.equal(parsed.ok, false)
   if (parsed.ok) {
-    throw new Error('Expected saved arc center coordinateRef to fail.')
+    throw new Error('Expected saved 3D arc coordinateRef to fail.')
   }
-  assert.match(parsed.error, /segments\[0\]\.center\.symbolic\.source.*coordinateRef is not supported/)
-  assert.match(tikz, /arc centers cannot be preserved/)
+  assert.match(parsed.error, /3D arc segments.*approximates 3D arcs numerically/)
 })
 
 test('work-plane-local coordinate anchors use local plane scopes when exportable', () => {

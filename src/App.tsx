@@ -267,6 +267,7 @@ import {
   isInspectorDrawerOpen,
   nextInspectorDisclosureStateForSelection,
   openInspectorDrawerState,
+  pickWorkPlaneCoordinateAnchor,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   resolveCoordinateAnchorReferenceForCursorCreation,
@@ -289,6 +290,7 @@ import {
   validateCoonsPatchBoundaryPathSource,
   validateCoonsPatchBoundaryPointSource,
   validateRuledSurfaceBoundaryPathSource,
+  workPlanePointPickingCount,
   workPlanePointPickingStatus,
   workPlaneDisplayName,
   workPlaneSelectValue,
@@ -2448,9 +2450,15 @@ function App() {
         current,
       )
 
-      if (validation.removedStalePointIds.length > 0) {
+      if (
+        validation.removedStalePointIds.length > 0 ||
+        validation.removedStaleCoordinateIds.length > 0
+      ) {
         setWorkPlaneStatus(
-          `${workPlanePointPickingStatus(validation.state)} Removed unavailable points.`,
+          `${workPlanePointPickingStatus(
+            validation.state,
+            editableDiagram,
+          )} Removed unavailable points or coordinates.`,
         )
       }
 
@@ -5860,6 +5868,33 @@ function App() {
     })
   }
 
+  function handleWorkPlanePointPickingCanvasClick(
+    _svgPoint: Vec2,
+    _viewportHeight: number,
+    _previewCamera: Camera,
+    target: SvgCanvasClickTarget,
+  ): void {
+    if (!workPlanePointPickingState.active) {
+      return
+    }
+
+    if (target.kind !== 'coordinateAnchor') {
+      setWorkPlaneStatus('Pick point strata or shown coordinate anchors.')
+      return
+    }
+
+    setWorkPlanePointPickingState((current) => {
+      const result = pickWorkPlaneCoordinateAnchor(
+        editableDiagram,
+        current,
+        target.coordinateId,
+      )
+
+      setWorkPlaneStatus(result.status)
+      return result.state
+    })
+  }
+
   function resetExistingPointWorkPlanePicking(): void {
     const result = resetWorkPlanePointPicking()
 
@@ -8073,12 +8108,15 @@ function App() {
                 <div
                   className="work-plane-panel work-plane-point-picker"
                   role="group"
-                  aria-label="Custom plane from existing point strata"
+                  aria-label="Custom plane from existing point strata or coordinates"
                 >
                   <div className="work-plane-section-heading">
-                    <h3>Pick 3 existing points</h3>
+                    <h3>Pick 3 existing points or coordinates</h3>
                     <span className="work-plane-picked-count" role="status">
-                      {workPlanePointPickingStatus(workPlanePointPickingState)}
+                      {workPlanePointPickingStatus(
+                        workPlanePointPickingState,
+                        editableDiagram,
+                      )}
                     </span>
                   </div>
                   <div className="work-plane-action-row">
@@ -8111,7 +8149,8 @@ function App() {
                       className="toolbar-button"
                       disabled={
                         !workPlanePointPickingState.active ||
-                        workPlanePointPickingState.pickedPointIds.length !== 3
+                        workPlanePointPickingCount(workPlanePointPickingState) !==
+                          3
                       }
                       onClick={applyExistingPointWorkPlane}
                     >
@@ -8253,7 +8292,7 @@ function App() {
                 }
                 onCanvasClick={
                   workPlanePointPickingState.active
-                    ? undefined
+                    ? handleWorkPlanePointPickingCanvasClick
                     : pathSplitPickState !== null ||
                         previewCursorCreationClicksEnabled
                       ? handlePreviewCanvasClick
@@ -9354,11 +9393,13 @@ function concatenatedPathDraftStatusMessage(
 }
 
 function concatenatedPathDraftPointErrorMessage(
-  reason: 'nonFinitePoint' | 'pointOffWorkPlane',
+  reason: 'nonFinitePoint' | 'invalidArcPoint' | 'pointOffWorkPlane',
 ): string {
   switch (reason) {
     case 'nonFinitePoint':
       return 'Path points must be finite numbers.'
+    case 'invalidArcPoint':
+      return 'Arc points must define a finite nondegenerate circle; coordinate anchor endpoints must stay on the selected radius.'
     case 'pointOffWorkPlane':
       return 'Path points must stay on the draft work plane.'
   }
@@ -9369,9 +9410,9 @@ function coordinateAnchorPathCursorRejectionMessage(
 ): string {
   switch (reason) {
     case 'arcEndpoint':
-      return 'Coordinate anchors are not supported for arc endpoints because arc geometry is derived from center, radius, and angles.'
+      return 'Coordinate anchors are not supported for this arc endpoint in the current mode.'
     case 'arcCenter':
-      return 'Coordinate anchors are not supported for arc centers because TikZ export cannot preserve the reference.'
+      return 'Coordinate anchors are not supported for this arc center in the current mode.'
     case 'arc3d':
       return 'Coordinate anchors are not supported for 3D arc cursor input because TikZ export approximates arcs numerically.'
   }

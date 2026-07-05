@@ -194,6 +194,13 @@ type PathSegmentCoordinateNames =
       direction: 'counterclockwise' | 'clockwise'
     }
   | {
+      kind: 'arcCoordinateRef'
+      start: string
+      end: string
+      center: string
+      direction: 'counterclockwise' | 'clockwise'
+    }
+  | {
       kind: 'arcCubicApproximation'
       start: string
       end: string
@@ -386,6 +393,7 @@ type GenerateContext = {
   externalTikzStyleUsage: ExternalTikzStyleUsageRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
+  requiresCalcLibrary: boolean
   requiresDecorationsMarkingsLibrary: boolean
   requiresArrowsMetaLibrary: boolean
   includeCoordinateAxes: boolean
@@ -684,6 +692,7 @@ function createContext(
     externalTikzStyleUsage: new ExternalTikzStyleUsageRegistry(),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
+    requiresCalcLibrary: false,
     requiresDecorationsMarkingsLibrary: false,
     requiresArrowsMetaLibrary: false,
     includeCoordinateAxes:
@@ -964,6 +973,10 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
 
   if (context.requiresTikz3dLibrary) {
     lines.push('\\usetikzlibrary{3d}', '')
+  }
+
+  if (context.requiresCalcLibrary) {
+    lines.push('\\usetikzlibrary{calc}', '')
   }
 
   return context.exportMode === 'inlineMath' && lines.length > 0
@@ -1954,9 +1967,12 @@ function emitCurve(
   }
 
   if (curve.kind === 'concatenatedPath') {
-    if (pathSegmentsContainArcCenterCoordinateRef(curve.segments)) {
+    if (
+      context.mode === '3d' &&
+      pathSegmentsContainArcCenterCoordinateRef(curve.segments)
+    ) {
       return [
-        `% Curve "${curve.name}" [${curve.id}] omitted because coordinate references for arc centers cannot be preserved by arc export.`,
+        `% Curve "${curve.name}" [${curve.id}] omitted because coordinate references for 3D arc centers cannot be preserved by arc export.`,
         '',
       ]
     }
@@ -6808,6 +6824,22 @@ function definePathSegmentCoordinateNames(
       }
     case 'arc':
       if (context.mode === '2d') {
+        if (arcSegmentUsesReferencePreservingExport(segment)) {
+          context.requiresCalcLibrary = true
+          return {
+            kind: 'arcCoordinateRef',
+            start,
+            end: coordinateNameForPoint(segment.end, baseName, pointIndex, context),
+            center: coordinateNameForPoint(
+              segment.center,
+              baseName,
+              pointIndex + 1,
+              context,
+            ),
+            direction: segment.direction,
+          }
+        }
+
         return {
           kind: 'arc',
           start,
@@ -6871,11 +6903,23 @@ function pathSegmentCoordinateNameCount(
     case 'line':
     case 'arc':
       return 1
+    case 'arcCoordinateRef':
+      return 2
     case 'cubicBezier':
       return 3
     case 'arcCubicApproximation':
       return segment.cubics.length * 3
   }
+}
+
+function arcSegmentUsesReferencePreservingExport(
+  segment: Extract<PathSegment, { kind: 'arc' }>,
+): boolean {
+  return (
+    pointContainsCoordinateRef(segment.start) ||
+    pointContainsCoordinateRef(segment.center) ||
+    pointContainsCoordinateRef(segment.end)
+  )
 }
 
 function closedBoundariesHaveFiniteCoordinates(
@@ -7178,6 +7222,8 @@ function formatPathSegmentCommand(
       return `arc[start angle=${segment.startAngleDeg.tikz}, end angle=${arcEndAngleForDirection(
         segment,
       )}, radius=${segment.radius.tikz}]${inlineNodeText}`
+    case 'arcCoordinateRef':
+      return `${formatReferencePreservingArcLet(segment)}${inlineNodeText}`
     case 'arcCubicApproximation':
       return `${segment.cubics
         .map(
@@ -7186,6 +7232,27 @@ function formatPathSegmentCommand(
         )
         .join(' ')}${inlineNodeText}`
   }
+}
+
+function formatReferencePreservingArcLet(
+  segment: Extract<PathSegmentCoordinateNames, { kind: 'arcCoordinateRef' }>,
+): string {
+  const endAngle =
+    segment.direction === 'counterclockwise'
+      ? '\\n4'
+      : '\\n5'
+
+  return [
+    'let',
+    `\\p1 = ($(${segment.start})-(${segment.center})$),`,
+    `\\p2 = ($(${segment.end})-(${segment.center})$),`,
+    '\\n1 = {veclen(\\x1,\\y1)},',
+    '\\n2 = {atan2(\\y1,\\x1)},',
+    '\\n3 = {atan2(\\y2,\\x2)},',
+    '\\n4 = {ifthenelse(\\n3 <= \\n2, \\n3 + 360, \\n3)},',
+    '\\n5 = {ifthenelse(\\n3 >= \\n2, \\n3 - 360, \\n3)}',
+    `in arc[start angle=\\n2, end angle=${endAngle}, radius=\\n1]`,
+  ].join(' ')
 }
 
 function formatPathInlineNodesForSegment(

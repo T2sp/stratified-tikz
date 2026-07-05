@@ -4,7 +4,7 @@ import {
   emptyThreeDimensionalDiagram,
   emptyTwoDimensionalDiagram,
 } from '../../src/examples/index.ts'
-import type { Diagram } from '../../src/model/types.ts'
+import type { CoordinateAnchor, Diagram } from '../../src/model/types.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -185,6 +185,48 @@ test('picked work-plane points produce numbered highlight data', () => {
   )
 })
 
+test('picked work-plane coordinate anchors produce numbered highlight data', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a', 'A', 2, 3, 0)]
+  const highlights = createWorkPlanePointPickingHighlights(diagram, {
+    active: true,
+    pickedPointIds: [],
+    pickedTargets: [{ kind: 'coordinateAnchor', id: 'coord-a' }],
+  })
+
+  assert.deepEqual(
+    highlights.map((highlight) =>
+      highlight.kind === 'workPlanePick'
+        ? {
+            coordinateId: highlight.coordinateId,
+            pickedIndex: highlight.pickedIndex,
+            label: highlight.label,
+            position: highlight.position,
+          }
+        : null,
+    ),
+    [
+      {
+        coordinateId: 'coord-a',
+        pickedIndex: 1,
+        label: '1',
+        position: { x: 2, y: 3, z: 0 },
+      },
+    ],
+  )
+})
+
+test('missing work-plane coordinate anchor picks produce no highlights', () => {
+  assert.deepEqual(
+    createWorkPlanePointPickingHighlights(emptyThreeDimensionalDiagram, {
+      active: true,
+      pickedPointIds: [],
+      pickedTargets: [{ kind: 'coordinateAnchor', id: 'deleted-coordinate' }],
+    }),
+    [],
+  )
+})
+
 test('missing coordinate sources produce no highlights and no crash', () => {
   assert.deepEqual(
     createDirectCoordinateSourceHighlights(emptyTwoDimensionalDiagram, [
@@ -257,4 +299,26 @@ function createPointPickingDiagram(): Diagram {
   )
 
   return p2.diagram
+}
+
+function coordinateAnchor(
+  id: string,
+  name: string,
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchor {
+  return {
+    id,
+    name,
+    tikzName: name,
+    position: {
+      kind: 'global',
+      value: {
+        x: { kind: 'numeric', value: x },
+        y: { kind: 'numeric', value: y },
+        z: { kind: 'numeric', value: z },
+      },
+    },
+  }
 }

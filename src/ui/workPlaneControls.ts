@@ -3,10 +3,12 @@ import {
   constructWorkPlaneFromThreePoints,
   constructWorkPlaneFromOriginNormal,
   cross,
+  isFiniteVec3,
   norm,
   subtractVec3,
   validateWorkPlane,
 } from '../geometry/workPlane.ts'
+import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import type {
   AmbientDimension,
   AxisAlignedWorkPlaneName,
@@ -47,9 +49,20 @@ export type CustomWorkPlaneApplyResult =
 
 export type WorkPlaneSelectValue = AxisAlignedWorkPlaneName | 'custom'
 
+export type WorkPlanePickTarget =
+  | {
+      kind: 'pointStratum'
+      id: string
+    }
+  | {
+      kind: 'coordinateAnchor'
+      id: string
+    }
+
 export type WorkPlanePointPickingState = {
   active: boolean
   pickedPointIds: string[]
+  pickedTargets?: WorkPlanePickTarget[]
 }
 
 export type WorkPlanePointPickResult = {
@@ -60,11 +73,13 @@ export type WorkPlanePointPickResult = {
 export type WorkPlanePointPickingValidationResult = {
   state: WorkPlanePointPickingState
   removedStalePointIds: string[]
+  removedStaleCoordinateIds: string[]
 }
 
 export const inactiveWorkPlanePointPickingState: WorkPlanePointPickingState = {
   active: false,
   pickedPointIds: [],
+  pickedTargets: [],
 }
 
 export const defaultCustomOriginNormalWorkPlaneInput: CustomOriginNormalWorkPlaneInput =
@@ -212,7 +227,7 @@ export function startWorkPlanePointPicking(
     }
   }
 
-  const state = { active: true, pickedPointIds: [] }
+  const state = workPlanePointPickingStateFromTargets([])
 
   return {
     state,
@@ -228,7 +243,7 @@ export function cancelWorkPlanePointPicking(): WorkPlanePointPickResult {
 }
 
 export function resetWorkPlanePointPicking(): WorkPlanePointPickResult {
-  const state = { active: true, pickedPointIds: [] }
+  const state = workPlanePointPickingStateFromTargets([])
 
   return {
     state,
@@ -240,6 +255,38 @@ export function pickWorkPlanePointStratum(
   state: WorkPlanePointPickingState,
   pointId: string,
 ): WorkPlanePointPickResult {
+  return pickWorkPlaneTarget(state, { kind: 'pointStratum', id: pointId })
+}
+
+export function pickWorkPlaneCoordinateAnchor(
+  diagram: Diagram,
+  state: WorkPlanePointPickingState,
+  coordinateId: string,
+): WorkPlanePointPickResult {
+  const resolved = resolveWorkPlanePickTargetPosition(diagram, {
+    kind: 'coordinateAnchor',
+    id: coordinateId,
+  })
+
+  if (resolved === null) {
+    return {
+      state,
+      status: 'Coordinate anchor is unavailable or has no finite preview position.',
+    }
+  }
+
+  return pickWorkPlaneTarget(
+    state,
+    { kind: 'coordinateAnchor', id: coordinateId },
+    diagram,
+  )
+}
+
+export function pickWorkPlaneTarget(
+  state: WorkPlanePointPickingState,
+  target: WorkPlanePickTarget,
+  diagram?: Diagram,
+): WorkPlanePointPickResult {
   if (!state.active) {
     return {
       state,
@@ -247,28 +294,37 @@ export function pickWorkPlanePointStratum(
     }
   }
 
-  if (state.pickedPointIds.includes(pointId)) {
+  const pickedTargets = workPlanePointPickingTargets(state)
+
+  if (
+    pickedTargets.some((pickedTarget) =>
+      workPlanePickTargetsEqual(pickedTarget, target),
+    )
+  ) {
     return {
       state,
-      status: 'Point already picked.',
+      status:
+        target.kind === 'pointStratum'
+          ? 'Point already picked.'
+          : 'Coordinate anchor already picked.',
     }
   }
 
-  if (state.pickedPointIds.length >= 3) {
+  if (pickedTargets.length >= 3) {
     return {
       state,
       status: 'Already picked 3/3 points.',
     }
   }
 
-  const nextState = {
-    active: true,
-    pickedPointIds: [...state.pickedPointIds, pointId],
-  }
+  const nextState = workPlanePointPickingStateFromTargets([
+    ...pickedTargets,
+    target,
+  ])
 
   return {
     state: nextState,
-    status: workPlanePointPickingStatus(nextState),
+    status: workPlanePointPickingStatus(nextState, diagram),
   }
 }
 
@@ -276,10 +332,13 @@ export function validateWorkPlanePointPickingState(
   diagram: Diagram,
   state: WorkPlanePointPickingState,
 ): WorkPlanePointPickingValidationResult {
-  if (!state.active || state.pickedPointIds.length === 0) {
+  const pickedTargets = workPlanePointPickingTargets(state)
+
+  if (!state.active || pickedTargets.length === 0) {
     return {
       state,
       removedStalePointIds: [],
+      removedStaleCoordinateIds: [],
     }
   }
 
@@ -288,19 +347,36 @@ export function validateWorkPlanePointPickingState(
       .filter((stratum): stratum is PointStratum => stratum.geometricKind === 'point')
       .map((point) => point.id),
   )
-  const pickedPointIds = state.pickedPointIds.filter((id) =>
-    availablePointIds.has(id),
+  const availableCoordinateIds = new Set(
+    (diagram.coordinateAnchors ?? [])
+      .filter((anchor) =>
+        isFiniteCoordinateAnchorPreview(diagram, anchor.id),
+      )
+      .map((anchor) => anchor.id),
   )
-  const removedStalePointIds = state.pickedPointIds.filter(
-    (id) => !availablePointIds.has(id),
+  const targets = pickedTargets.filter((target) =>
+    target.kind === 'pointStratum'
+      ? availablePointIds.has(target.id)
+      : availableCoordinateIds.has(target.id),
+  )
+  const removedStalePointIds = pickedTargets.flatMap((target) =>
+    target.kind === 'pointStratum' && !availablePointIds.has(target.id)
+      ? [target.id]
+      : [],
+  )
+  const removedStaleCoordinateIds = pickedTargets.flatMap((target) =>
+    target.kind === 'coordinateAnchor' && !availableCoordinateIds.has(target.id)
+      ? [target.id]
+      : [],
   )
 
   return {
     state:
-      removedStalePointIds.length === 0
+      removedStalePointIds.length === 0 && removedStaleCoordinateIds.length === 0
         ? state
-        : { ...state, pickedPointIds },
+        : workPlanePointPickingStateFromTargets(targets),
     removedStalePointIds,
+    removedStaleCoordinateIds,
   }
 }
 
@@ -329,7 +405,10 @@ export function applyPickedPointWorkPlane(
     }
   }
 
-  if (new Set(state.pickedPointIds).size !== state.pickedPointIds.length) {
+  const pickedTargets = workPlanePointPickingTargets(state)
+  const targetKeys = pickedTargets.map(workPlanePickTargetKey)
+
+  if (new Set(targetKeys).size !== targetKeys.length) {
     return {
       ok: false,
       workPlane: currentWorkPlane,
@@ -337,7 +416,7 @@ export function applyPickedPointWorkPlane(
     }
   }
 
-  if (state.pickedPointIds.length !== 3) {
+  if (pickedTargets.length !== 3) {
     return {
       ok: false,
       workPlane: currentWorkPlane,
@@ -345,14 +424,11 @@ export function applyPickedPointWorkPlane(
     }
   }
 
-  const points = state.pickedPointIds.map((id) =>
-    diagram.strata.find(
-      (stratum): stratum is PointStratum =>
-        stratum.id === id && stratum.geometricKind === 'point',
-    ),
+  const resolvedTargets = pickedTargets.map((target) =>
+    resolveWorkPlanePickTargetPosition(diagram, target),
   )
 
-  if (points.some((point) => point === undefined)) {
+  if (resolvedTargets.some((target) => target === null)) {
     return {
       ok: false,
       workPlane: currentWorkPlane,
@@ -360,7 +436,11 @@ export function applyPickedPointWorkPlane(
     }
   }
 
-  const [p0, p1, p2] = points as [PointStratum, PointStratum, PointStratum]
+  const [p0, p1, p2] = resolvedTargets as [
+    ResolvedWorkPlanePickTarget,
+    ResolvedWorkPlanePickTarget,
+    ResolvedWorkPlanePickTarget,
+  ]
   const firstEdge = subtractVec3(p1.position, p0.position)
   const secondEdge = subtractVec3(p2.position, p0.position)
 
@@ -382,17 +462,24 @@ export function applyPickedPointWorkPlane(
         name: 'Custom plane',
       },
     )
+    const allPointTargets = pickedTargets.every(
+      (target) => target.kind === 'pointStratum',
+    )
 
     return {
       ok: true,
-      workPlane: {
-        ...workPlane,
-        source: {
-          kind: 'existingPointStrata',
-          pointIds: [p0.id, p1.id, p2.id],
-        },
-      },
-      status: 'Custom plane applied from picked points.',
+      workPlane: allPointTargets
+        ? {
+            ...workPlane,
+            source: {
+              kind: 'existingPointStrata',
+              pointIds: [p0.id, p1.id, p2.id],
+            },
+          }
+        : workPlane,
+      status: allPointTargets
+        ? 'Custom plane applied from picked points.'
+        : 'Custom plane applied from picked points and coordinates.',
     }
   } catch {
     return {
@@ -407,6 +494,21 @@ export function shouldBlockCreationForWorkPlanePointPicking(
   state: WorkPlanePointPickingState,
 ): boolean {
   return state.active
+}
+
+export function workPlanePointPickingCount(
+  state: WorkPlanePointPickingState,
+): number {
+  return workPlanePointPickingTargets(state).length
+}
+
+export function workPlanePointPickingTargets(
+  state: WorkPlanePointPickingState,
+): WorkPlanePickTarget[] {
+  return state.pickedTargets ?? state.pickedPointIds.map((id) => ({
+    kind: 'pointStratum',
+    id,
+  }))
 }
 
 export function normalizeActiveWorkPlaneForAmbientDimension(
@@ -509,8 +611,119 @@ export function workPlaneDisplayName(workPlane: WorkPlane): string {
 
 export function workPlanePointPickingStatus(
   state: WorkPlanePointPickingState,
+  diagram?: Diagram,
 ): string {
-  return `Picked ${state.pickedPointIds.length}/3 points.`
+  const targets = workPlanePointPickingTargets(state)
+  const summary =
+    diagram === undefined || targets.length === 0
+      ? ''
+      : `: ${targets
+          .map((target) => workPlanePickTargetStatusLabel(diagram, target))
+          .join(', ')}`
+
+  return `Picked ${targets.length}/3 points${summary}.`
+}
+
+type ResolvedWorkPlanePickTarget = WorkPlanePickTarget & {
+  position: Vec3
+}
+
+function workPlanePointPickingStateFromTargets(
+  pickedTargets: WorkPlanePickTarget[],
+): WorkPlanePointPickingState {
+  return {
+    active: true,
+    pickedTargets,
+    pickedPointIds: pickedTargets.flatMap((target) =>
+      target.kind === 'pointStratum' ? [target.id] : [],
+    ),
+  }
+}
+
+function resolveWorkPlanePickTargetPosition(
+  diagram: Diagram,
+  target: WorkPlanePickTarget,
+): ResolvedWorkPlanePickTarget | null {
+  switch (target.kind) {
+    case 'pointStratum': {
+      const point = diagram.strata.find(
+        (stratum): stratum is PointStratum =>
+          stratum.id === target.id && stratum.geometricKind === 'point',
+      )
+
+      return point !== undefined && isFiniteVec3(point.position)
+        ? { ...target, position: { ...point.position } }
+        : null
+    }
+    case 'coordinateAnchor': {
+      const anchor = (diagram.coordinateAnchors ?? []).find(
+        (candidate) => candidate.id === target.id,
+      )
+
+      if (anchor === undefined) {
+        return null
+      }
+
+      try {
+        const position = coordinateAnchorPositionPreview(
+          anchor.position,
+          diagram.ambientDimension,
+        )
+
+        return isFiniteVec3(position)
+          ? { ...target, position: { ...position } }
+          : null
+      } catch {
+        return null
+      }
+    }
+  }
+}
+
+function isFiniteCoordinateAnchorPreview(
+  diagram: Diagram,
+  coordinateId: string,
+): boolean {
+  return resolveWorkPlanePickTargetPosition(diagram, {
+    kind: 'coordinateAnchor',
+    id: coordinateId,
+  }) !== null
+}
+
+function workPlanePickTargetsEqual(
+  left: WorkPlanePickTarget,
+  right: WorkPlanePickTarget,
+): boolean {
+  return left.kind === right.kind && left.id === right.id
+}
+
+function workPlanePickTargetKey(target: WorkPlanePickTarget): string {
+  return `${target.kind}:${target.id}`
+}
+
+function workPlanePickTargetStatusLabel(
+  diagram: Diagram,
+  target: WorkPlanePickTarget,
+): string {
+  switch (target.kind) {
+    case 'pointStratum': {
+      const point = diagram.strata.find(
+        (stratum): stratum is PointStratum =>
+          stratum.id === target.id && stratum.geometricKind === 'point',
+      )
+      return `point ${point?.name.trim() || target.id}`
+    }
+    case 'coordinateAnchor': {
+      const anchor = (diagram.coordinateAnchors ?? []).find(
+        (candidate) => candidate.id === target.id,
+      )
+      const label =
+        anchor === undefined
+          ? target.id
+          : `${anchor.name.trim() || anchor.id} (${anchor.tikzName})`
+      return `coordinate ${label}`
+    }
+  }
 }
 
 function workPlaneFixedCoordinate(plane: AxisAlignedWorkPlaneName): 'x' | 'y' | 'z' {

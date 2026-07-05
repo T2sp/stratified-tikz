@@ -34,6 +34,7 @@ export type ConcatenatedPathDraft = {
 
 export type ConcatenatedPathDraftPointError =
   | 'nonFinitePoint'
+  | 'invalidArcPoint'
   | 'pointOffWorkPlane'
 
 export type ConcatenatedPathDraftSegmentKindError = 'segmentInProgress'
@@ -175,7 +176,7 @@ export function appendConcatenatedPathDraftPoint(
       return {
         ok: false,
         draft,
-        reason: 'nonFinitePoint',
+        reason: 'invalidArcPoint',
       }
     }
 
@@ -329,9 +330,7 @@ export function concatenatedPathDraftNextPointCoordinateRefRejectionReason(
     return 'arc3d'
   }
 
-  return draft !== null && draft.pendingPoints.length === 0
-    ? 'arcCenter'
-    : 'arcEndpoint'
+  return null
 }
 
 function validatePathDraftPoint(
@@ -387,7 +386,7 @@ function createArcDraftSegment(
     return null
   }
 
-  return createArcPathSegmentFromAngles({
+  const arc = createArcPathSegmentFromAngles({
     center,
     radius: startPolar.radius,
     startAngleDeg: startPolar.angleDeg,
@@ -396,6 +395,31 @@ function createArcDraftSegment(
     ...(ambientDimension === 3 ? { frame } : {}),
     ambientDimension,
   })
+
+  if (arc === null) {
+    return null
+  }
+
+  if (ambientDimension !== 2 || !arcDraftSegmentUsesCoordinateRef(start, center, endpointHint)) {
+    return arc
+  }
+
+  if (
+    coordinateRefSourceForPoint(endpointHint) !== null &&
+    Math.abs(endPolar.radius - startPolar.radius) > pathEndpointEpsilon
+  ) {
+    return null
+  }
+
+  return {
+    ...arc,
+    start: normalizePointForAmbientDimension(ambientDimension, start),
+    center: normalizePointForAmbientDimension(ambientDimension, center),
+    end:
+      coordinateRefSourceForPoint(endpointHint) === null
+        ? arc.end
+        : normalizePointForAmbientDimension(ambientDimension, endpointHint),
+  }
 }
 
 function workPlaneFrameFromWorkPlane(
@@ -443,4 +467,22 @@ function localPolarCoordinateForPoint(
 
 function dotVec3(first: Vec3, second: Vec3): number {
   return first.x * second.x + first.y * second.y + first.z * second.z
+}
+
+function arcDraftSegmentUsesCoordinateRef(
+  start: Vec3,
+  center: Vec3,
+  end: Vec3,
+): boolean {
+  return (
+    coordinateRefSourceForPoint(start) !== null ||
+    coordinateRefSourceForPoint(center) !== null ||
+    coordinateRefSourceForPoint(end) !== null
+  )
+}
+
+function coordinateRefSourceForPoint(point: Vec3): unknown | null {
+  return point.symbolic?.source?.kind === 'coordinateRef'
+    ? point.symbolic.source
+    : null
 }

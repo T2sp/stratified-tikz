@@ -4,7 +4,10 @@ import {
   resolveExistingCoordinateSource,
   type ExistingCoordinateSource,
 } from './coordinateSources.ts'
-import type { WorkPlanePointPickingState } from './workPlaneControls.ts'
+import {
+  workPlanePointPickingTargets,
+  type WorkPlanePointPickingState,
+} from './workPlaneControls.ts'
 
 export type DirectCoordinateSourceHighlightInput = {
   source: ExistingCoordinateSource | null | undefined
@@ -23,7 +26,8 @@ export type CoordinateSourceHighlight =
       kind: 'workPlanePick'
       id: string
       position: Vec3
-      pointId: string
+      pointId?: string
+      coordinateId?: string
       pickedIndex: number
       label: string
     }
@@ -77,11 +81,17 @@ export function createWorkPlanePointPickingHighlights(
     return []
   }
 
-  return state.pickedPointIds.flatMap((pointId, index) => {
-    const source: ExistingCoordinateSource = {
-      kind: 'pointStratum',
-      stratumId: pointId,
-    }
+  return workPlanePointPickingTargets(state).flatMap((target, index) => {
+    const source: ExistingCoordinateSource =
+      target.kind === 'pointStratum'
+        ? {
+            kind: 'pointStratum',
+            stratumId: target.id,
+          }
+        : {
+            kind: 'coordinateAnchor',
+            coordinateId: target.id,
+          }
     const position = resolveExistingCoordinateSource(diagram, source)
 
     if (position === null) {
@@ -93,9 +103,11 @@ export function createWorkPlanePointPickingHighlights(
     return [
       {
         kind: 'workPlanePick',
-        id: `work-plane-pick:${pointId}:${pickedIndex}`,
+        id: `work-plane-pick:${existingCoordinateSourceKey(source)}:${pickedIndex}`,
         position,
-        pointId,
+        ...(target.kind === 'pointStratum'
+          ? { pointId: target.id }
+          : { coordinateId: target.id }),
         pickedIndex,
         label: String(pickedIndex),
       },

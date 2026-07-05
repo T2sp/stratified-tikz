@@ -62,6 +62,7 @@ export type CoordinateReferenceLocation = {
 const supportedCoordinateRefLocations: ReadonlySet<CoordinateRefLocationKind> =
   new Set([
     'pathCoordinate',
+    'arcCenter',
     'labelPosition',
     'pointPosition',
     'simpleSheetVertex',
@@ -1371,13 +1372,69 @@ function resolvePathSegmentCoordinateRefs(
         end: resolveCoordinateReferencePoint(diagram, segment.end),
       }
     case 'arc':
-      return {
+      return refreshResolvedArcCoordinateReferences(diagram, segment, {
         ...segment,
         start: resolveCoordinateReferencePoint(diagram, segment.start),
         end: resolveCoordinateReferencePoint(diagram, segment.end),
         center: resolveCoordinateReferencePoint(diagram, segment.center),
-      }
+      })
   }
+}
+
+function refreshResolvedArcCoordinateReferences(
+  diagram: Diagram,
+  originalSegment: Extract<PathSegment, { kind: 'arc' }>,
+  resolvedSegment: Extract<PathSegment, { kind: 'arc' }>,
+): Extract<PathSegment, { kind: 'arc' }> {
+  if (
+    diagram.ambientDimension !== 2 ||
+    !arcSegmentHasCoordinateReference(originalSegment)
+  ) {
+    return resolvedSegment
+  }
+
+  const radius = distance2d(resolvedSegment.start, resolvedSegment.center)
+  const startAngleDeg = angleDegrees2d(
+    resolvedSegment.start,
+    resolvedSegment.center,
+  )
+  const endAngleDeg = angleDegrees2d(
+    resolvedSegment.end,
+    resolvedSegment.center,
+  )
+
+  return Number.isFinite(radius) &&
+    radius > 0 &&
+    Number.isFinite(startAngleDeg) &&
+    Number.isFinite(endAngleDeg)
+    ? {
+        ...resolvedSegment,
+        radius,
+        startAngleDeg,
+        endAngleDeg,
+      }
+    : resolvedSegment
+}
+
+function arcSegmentHasCoordinateReference(
+  segment: Extract<PathSegment, { kind: 'arc' }>,
+): boolean {
+  return (
+    coordinateReferenceSourceForPoint(segment.start) !== null ||
+    coordinateReferenceSourceForPoint(segment.center) !== null ||
+    coordinateReferenceSourceForPoint(segment.end) !== null
+  )
+}
+
+function distance2d(first: Vec3, second: Vec3): number {
+  return Math.hypot(first.x - second.x, first.y - second.y)
+}
+
+function angleDegrees2d(point: Vec3, center: Vec3): number {
+  return (
+    (Math.atan2(point.y - center.y, point.x - center.x) * 180) /
+    Math.PI
+  )
 }
 
 function detachedCoordinatePointForAnchor(
@@ -3085,6 +3142,18 @@ function validatePathSegmentCoordinateReferences(
       )
       return
     case 'arc':
+      if (
+        diagram.ambientDimension === 3 &&
+        arcSegmentHasCoordinateReference(segment)
+      ) {
+        pushError(
+          errors,
+          path,
+          'coordinateRef is not supported for 3D arc segments because arc export approximates 3D arcs numerically.',
+        )
+        return
+      }
+
       validateCoordinateReferencePoint(
         diagram,
         segment.start,

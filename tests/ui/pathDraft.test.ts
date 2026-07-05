@@ -482,49 +482,123 @@ test('ordinary point stratum cursor source still copies numeric coordinates', ()
   assert.equal(coordinateReferenceSourceForPoint(source.point), null)
 })
 
-test('arc cursor coordinate anchor support is explicitly rejected', () => {
-  const lineDraft = mustCreateDraft({ x: 0, y: 0, z: 0 }, xyPlane, 'line', 2)
-  const arcDraftResult = setConcatenatedPathDraftSegmentKind(lineDraft, 'arc')
+test('arc cursor coordinate anchor refs are supported for 2D start center end picks', () => {
+  const diagram = createArcCoordinateAnchorCursorDiagram()
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'arc',
+    2,
+  )
 
   assert.equal(
     concatenatedPathDraftNextPointSupportsCoordinateRef(null, 'arc', 2),
-    false,
+    true,
   )
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 2),
-    'arcEndpoint',
+    null,
   )
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(null, 'arc', 3),
     'arc3d',
   )
-  assert.equal(arcDraftResult.ok, true)
-  if (!arcDraftResult.ok) {
-    throw new Error('Expected arc segment kind update to succeed.')
-  }
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(
-      arcDraftResult.draft,
+      draft,
       'line',
       2,
     ),
-    'arcCenter',
+    null,
   )
 
-  const afterCenter = mustAppendPoint(
-    arcDraftResult.draft,
-    { x: 0, y: 0, z: 0 },
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-o'),
     2,
   )
 
   assert.equal(
     concatenatedPathDraftNextPointCoordinateRefRejectionReason(
-      afterCenter,
+      draft,
       'line',
       2,
     ),
-    'arcEndpoint',
+    null,
   )
+
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    2,
+  )
+
+  const segment = draft.segments[0]
+
+  assert.equal(segment?.kind, 'arc')
+  if (segment?.kind !== 'arc') {
+    throw new Error('Expected cursor-created arc segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.center)?.coordinateId,
+    'coord-o',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.end)?.coordinateId,
+    'coord-b',
+  )
+})
+
+test('coordinate anchor arc refs refresh derived radius and angles after anchor movement', () => {
+  const diagram = createArcCoordinateAnchorCursorDiagram()
+  let draft = mustCreateDraft(
+    mustResolveCoordinateAnchorReference(diagram, 'coord-a'),
+    xyPlane,
+    'arc',
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-o'),
+    2,
+  )
+  draft = mustAppendPoint(
+    draft,
+    mustResolveCoordinateAnchorReference(diagram, 'coord-b'),
+    2,
+  )
+  const result = addConcatenatedPathStratumWithResult(diagram, draft.segments, {
+    id: 'cursor-ref-arc',
+  })
+  const moved = moveCoordinateAnchor(result.diagram, 'coord-o', 0.5, 0.5, 0)
+  const resolved = resolveDiagramCoordinateRefs(moved)
+  const curve = resolved.strata.find((stratum) => stratum.id === 'cursor-ref-arc')
+
+  assert.equal(curve?.geometricKind, 'curve')
+  assert.equal(curve?.kind, 'concatenatedPath')
+  if (curve?.geometricKind !== 'curve' || curve.kind !== 'concatenatedPath') {
+    throw new Error('Expected resolved arc path.')
+  }
+
+  const segment = curve.segments[0]
+
+  assert.equal(segment?.kind, 'arc')
+  if (segment?.kind !== 'arc') {
+    throw new Error('Expected resolved arc segment.')
+  }
+  assert.equal(
+    coordinateReferenceSourceForPoint(segment.center)?.coordinateId,
+    'coord-o',
+  )
+  assert.equal(segment.center.x, 0.5)
+  assert.equal(segment.center.y, 0.5)
+  assert.ok(Math.abs(Number(segment.radius) - Math.SQRT1_2) < 1e-9)
+  assert.ok(Math.abs(Number(segment.startAngleDeg) - -45) < 1e-9)
+  assert.ok(Math.abs(Number(segment.endAngleDeg) - 135) < 1e-9)
 })
 
 test('finishing a path draft commits one selected concatenated path', () => {
@@ -752,6 +826,33 @@ function createCoordinateAnchorCursorDiagram(): Diagram {
       name: 'D',
       tikzName: 'D',
       position: globalCoordinateAnchorPosition(1.5, 1, 0),
+    }),
+  ]
+
+  return diagram
+}
+
+function createArcCoordinateAnchorCursorDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      tikzName: 'A',
+      position: globalCoordinateAnchorPosition(1, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-o',
+      name: 'O',
+      tikzName: 'O',
+      position: globalCoordinateAnchorPosition(0, 0, 0),
+    }),
+    createCoordinateAnchor(diagram, {
+      id: 'coord-b',
+      name: 'B',
+      tikzName: 'B',
+      position: globalCoordinateAnchorPosition(0, 1, 0),
     }),
   ]
 
