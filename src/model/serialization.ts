@@ -43,6 +43,9 @@ import {
   uniqueCoordinateAnchorTikzName,
 } from './coordinateAnchors.ts'
 import {
+  detachSampledCurvedSheetCoordinateReferences,
+} from './coordinateReferences.ts'
+import {
   cleanPathCrossingStates,
   normalizeLoadedPathCrossingStates,
 } from './pathCrossings.ts'
@@ -976,9 +979,25 @@ function normalizeLoadedDiagram(
       ? {}
       : { pathCrossings: pathCrossingNormalization.pathCrossings }),
   }
-  const symbolicMetadataErrors = validateDiagramSymbolicCoordinateMetadata(diagram)
+  const sampledCurvedSheetDetach =
+    detachSampledCurvedSheetCoordinateReferences(diagram)
+
+  if (!sampledCurvedSheetDetach.ok) {
+    return {
+      diagram,
+      warnings,
+      errors: [
+        ...layerNormalization.errors,
+        `${sampledCurvedSheetDetach.error.path} ${sampledCurvedSheetDetach.error.message}`,
+      ],
+    }
+  }
+
+  const normalizedDiagram = sampledCurvedSheetDetach.value.diagram
+  const symbolicMetadataErrors =
+    validateDiagramSymbolicCoordinateMetadata(normalizedDiagram)
   const unsupportedSymbolicSourceErrors =
-    validateNoUnsupportedSymbolicCoordinateSources(diagram)
+    validateNoUnsupportedSymbolicCoordinateSources(normalizedDiagram)
   const symbolicCoordinateErrors = [
     ...symbolicMetadataErrors,
     ...unsupportedSymbolicSourceErrors,
@@ -986,7 +1005,7 @@ function normalizeLoadedDiagram(
 
   if (symbolicCoordinateErrors.length > 0) {
     return {
-      diagram,
+      diagram: normalizedDiagram,
       warnings,
       errors: [
         ...layerNormalization.errors,
@@ -999,13 +1018,15 @@ function normalizeLoadedDiagram(
 
   if (!shouldRefreshSymbolicPreviews) {
     return {
-      diagram,
+      diagram: normalizedDiagram,
       warnings,
       errors: layerNormalization.errors,
     }
   }
 
-  const coordinateRefresh = refreshLoadedSymbolicCoordinatePreviews(diagram)
+  const coordinateRefresh = refreshLoadedSymbolicCoordinatePreviews(
+    normalizedDiagram,
+  )
   warnings.push(...coordinateRefresh.warnings)
 
   return {

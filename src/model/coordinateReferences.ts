@@ -88,6 +88,19 @@ export type DetachCoordinateAnchorReferencesResult =
       error: DiagramValidationIssue
     }
 
+export type DetachSampledCurvedSheetPrimitiveCoordinateReferencesResult =
+  | {
+      ok: true
+      value: {
+        primitive: CurvedSheetPrimitive
+        detachedCount: number
+      }
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
 type DetachCoordinateReferenceContext = {
   anchorsById: ReadonlyMap<string, CoordinateAnchor>
   replacementAnchorsById: ReadonlyMap<string, CoordinateAnchor>
@@ -1156,6 +1169,111 @@ export function detachCoordinateReferencesInElements(
         strata,
         labels,
       },
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
+export function detachSampledCurvedSheetPrimitiveCoordinateReferences(
+  diagram: Diagram,
+  primitive: CurvedSheetPrimitive,
+  path: string,
+): DetachSampledCurvedSheetPrimitiveCoordinateReferencesResult {
+  const replacements = coordinateReferenceAnchorMapForExistingAnchors(diagram)
+
+  if (!replacements.ok) {
+    return replacements
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
+    requireReplacement: true,
+    detachedCount: 0,
+  }
+  const detached = detachSampledCurvedSheetPrimitiveBoundaryCoordinateReferences(
+    primitive,
+    context,
+    path,
+  )
+
+  if (!detached.ok) {
+    return detached
+  }
+
+  return {
+    ok: true,
+    value: {
+      primitive: detached.primitive,
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
+export function detachSampledCurvedSheetCoordinateReferences(
+  diagram: Diagram,
+): DetachCoordinateAnchorReferencesResult {
+  const replacements = coordinateReferenceAnchorMapForExistingAnchors(diagram)
+
+  if (!replacements.ok) {
+    return replacements
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
+    requireReplacement: true,
+    detachedCount: 0,
+  }
+  const strata: Stratum[] = []
+
+  for (const [index, stratum] of diagram.strata.entries()) {
+    if (stratum.geometricKind !== 'sheet' || stratum.kind !== 'curvedSheet') {
+      strata.push(stratum)
+      continue
+    }
+
+    const beforeDetachedCount = context.detachedCount
+    let detached: DetachCurvedSheetPrimitiveResult
+
+    try {
+      detached = detachSampledCurvedSheetPrimitiveBoundaryCoordinateReferences(
+        stratum.primitive,
+        context,
+        `strata[${index}].primitive`,
+      )
+    } catch {
+      context.detachedCount = beforeDetachedCount
+      strata.push(stratum)
+      continue
+    }
+
+    if (!detached.ok) {
+      return detached
+    }
+
+    strata.push(
+      context.detachedCount === beforeDetachedCount
+        ? stratum
+        : {
+            ...stratum,
+            primitive: detached.primitive,
+          },
+    )
+  }
+
+  return {
+    ok: true,
+    value: {
+      diagram:
+        context.detachedCount === 0
+          ? diagram
+          : {
+              ...diagram,
+              strata,
+            },
       detachedCount: context.detachedCount,
     },
   }
@@ -2764,6 +2882,105 @@ function detachCurvedSheetPrimitiveCoordinateReferences(
         },
       }
     }
+  }
+}
+
+function detachSampledCurvedSheetPrimitiveBoundaryCoordinateReferences(
+  primitive: CurvedSheetPrimitive,
+  context: DetachCoordinateReferenceContext,
+  path: string,
+): DetachCurvedSheetPrimitiveResult {
+  switch (primitive.kind) {
+    case 'ruledSurface': {
+      const boundary0 = detachBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary0,
+        context,
+        `${path}.boundary0`,
+        'curvedSheetPrimitive',
+      )
+      const boundary1 = detachBoundaryPathSnapshotCoordinateReferences(
+        primitive.boundary1,
+        context,
+        `${path}.boundary1`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!boundary0.ok) {
+        return boundary0
+      }
+
+      if (!boundary1.ok) {
+        return boundary1
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          boundary0: boundary0.snapshot,
+          boundary1: boundary1.snapshot,
+        },
+      }
+    }
+    case 'coonsPatch': {
+      const bottom = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.bottom,
+        context,
+        `${path}.bottom`,
+        'curvedSheetPrimitive',
+      )
+      const right = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.right,
+        context,
+        `${path}.right`,
+        'curvedSheetPrimitive',
+      )
+      const top = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.top,
+        context,
+        `${path}.top`,
+        'curvedSheetPrimitive',
+      )
+      const left = detachCoonsBoundarySnapshotCoordinateReferences(
+        primitive.left,
+        context,
+        `${path}.left`,
+        'curvedSheetPrimitive',
+      )
+
+      if (!bottom.ok) {
+        return bottom
+      }
+
+      if (!right.ok) {
+        return right
+      }
+
+      if (!top.ok) {
+        return top
+      }
+
+      if (!left.ok) {
+        return left
+      }
+
+      return {
+        ok: true,
+        primitive: {
+          ...primitive,
+          bottom: bottom.snapshot,
+          right: right.snapshot,
+          top: top.snapshot,
+          left: left.snapshot,
+        },
+      }
+    }
+    case 'hemisphere':
+    case 'saddle':
+      return {
+        ok: true,
+        primitive,
+      }
   }
 }
 

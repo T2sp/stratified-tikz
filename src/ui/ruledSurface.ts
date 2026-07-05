@@ -11,6 +11,9 @@ import {
 import { isFiniteVec3 } from '../geometry/workPlane.ts'
 import { createCurvedSheetStratum } from '../model/constructors.ts'
 import {
+  detachSampledCurvedSheetPrimitiveCoordinateReferences,
+} from '../model/coordinateReferences.ts'
+import {
   cloneBoundaryPathSnapshot,
   normalizePathSegmentsForAmbientDimension,
   pathEndpointEpsilon,
@@ -123,6 +126,7 @@ export type CreateRuledSurfaceFromBoundaryPathsError =
   | 'sourceWrongCodimension'
   | 'sourceNonFinite'
   | 'invalidSampling'
+  | 'coordinateReferenceDetachFailed'
   | 'invalidBoundary'
 
 export type CreateRuledSurfaceFromBoundaryPathsOptions = {
@@ -158,6 +162,7 @@ export type CreateCoonsPatchFromBoundaryPathsError =
   | 'sourceNonFinite'
   | 'sourceClosedPath'
   | 'invalidSampling'
+  | 'coordinateReferenceDetachFailed'
   | 'invalidBoundary'
 
 export type CreateCoonsPatchFromBoundaryPathsOptions = {
@@ -335,8 +340,22 @@ export function createRuledSurfaceFromBoundaryPaths(
     boundary1: boundaries[1],
     sampling: { segments: samplingSegments },
   }
+  const detachedPrimitive =
+    detachSampledCurvedSheetPrimitiveCoordinateReferences(
+      diagram,
+      primitive,
+      'primitive',
+    )
 
-  if (!validateCurvedSheetPrimitive(primitive).valid) {
+  if (!detachedPrimitive.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: 'coordinateReferenceDetachFailed',
+    }
+  }
+
+  if (!validateCurvedSheetPrimitive(detachedPrimitive.value.primitive).valid) {
     return {
       ok: false,
       diagram,
@@ -349,7 +368,7 @@ export function createRuledSurfaceFromBoundaryPaths(
     id: safeBoundarySurfaceId(diagram, options.id),
     name: options.name ?? 'Ruled surface',
     style: options.style ?? defaultSheetStyle,
-    primitive,
+    primitive: detachedPrimitive.value.primitive,
     layer,
   })
 
@@ -409,8 +428,22 @@ export function createCoonsPatchFromBoundaryPaths(
     left: boundaryResult.boundaries.left,
     sampling: { ...sampling },
   }
+  const detachedPrimitive =
+    detachSampledCurvedSheetPrimitiveCoordinateReferences(
+      diagram,
+      primitive,
+      'primitive',
+    )
 
-  if (!validateCurvedSheetPrimitive(primitive).valid) {
+  if (!detachedPrimitive.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: 'coordinateReferenceDetachFailed',
+    }
+  }
+
+  if (!validateCurvedSheetPrimitive(detachedPrimitive.value.primitive).valid) {
     return {
       ok: false,
       diagram,
@@ -423,7 +456,7 @@ export function createCoonsPatchFromBoundaryPaths(
     id: safeBoundarySurfaceId(diagram, options.id),
     name: options.name ?? 'Coons patch',
     style: options.style ?? defaultSheetStyle,
-    primitive,
+    primitive: detachedPrimitive.value.primitive,
     layer,
   })
 
@@ -711,6 +744,8 @@ export function createRuledSurfaceFromBoundaryPathsErrorMessage(
       return 'Picked boundary paths must have finite coordinates.'
     case 'invalidSampling':
       return `Sampling segments must be a positive integer at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
+    case 'coordinateReferenceDetachFailed':
+      return 'Could not snapshot coordinate anchors into the ruled surface boundary.'
     case 'invalidBoundary':
       return 'Boundary paths must be valid composable paths with matching closure status.'
   }
@@ -745,6 +780,8 @@ export function createCoonsPatchFromBoundaryPathsErrorMessage(
         : `Coons patch ${role} boundary must be an open path.`
     case 'invalidSampling':
       return `Coons patch u and v sampling must be positive integers at most ${MAX_BOUNDARY_SURFACE_SAMPLING_SEGMENTS}.`
+    case 'coordinateReferenceDetachFailed':
+      return 'Could not snapshot coordinate anchors into the Coons patch boundary.'
     case 'invalidBoundary':
       return 'Coons corners do not match with the current boundary directions. Check the failed corner equation, then use Reverse controls or choose a point/path with matching endpoints.'
   }

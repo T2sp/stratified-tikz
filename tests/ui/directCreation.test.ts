@@ -27,6 +27,10 @@ import {
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
+import {
+  coordinateReferenceVec3ForAnchorId,
+  resolveDiagramCoordinateRefs,
+} from '../../src/model/coordinateReferences.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -1599,6 +1603,77 @@ test('ruled surface creation copies two valid boundary paths and leaves sources 
   assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
 })
 
+test('ruled surface creation detaches coordinateRefs in copied boundary snapshots', () => {
+  const diagram = createAnchoredRuledSurfaceSourceDiagram()
+  const result = createRuledSurfaceFromBoundaryPaths(
+    diagram,
+    ['anchored-ruled-boundary-0', 'anchored-ruled-boundary-1'],
+    { id: 'anchored-ruled-surface', samplingSegments: 3 },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createRuledSurfaceFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  const source = findConcatenatedPath(result.diagram, 'anchored-ruled-boundary-0')
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(pathSegmentsContainCoordinateRef(source.segments), true)
+  assert.equal(sheet.primitive.kind, 'ruledSurface')
+  if (sheet.primitive.kind !== 'ruledSurface') {
+    throw new Error('Expected ruled surface primitive.')
+  }
+  assert.equal(
+    boundaryContainsCoordinateRef(sheet.primitive.boundary0),
+    false,
+  )
+  assert.equal(
+    boundaryContainsCoordinateRef(sheet.primitive.boundary1),
+    false,
+  )
+  assert.deepEqual(
+    globalPreview(
+      sheet.primitive.boundary0.segments[0]?.start ?? {
+        x: 0,
+        y: 0,
+        z: 0,
+      },
+    ),
+    {
+      x: 0,
+      y: 0,
+      z: 0,
+    },
+  )
+
+  const movedSourceDiagram = moveCoordinateAnchor(
+    result.diagram,
+    'coord-r0-start',
+    { x: 8, y: 8, z: 8 },
+  )
+  const resolvedMovedSourceDiagram =
+    resolveDiagramCoordinateRefs(movedSourceDiagram)
+  const movedSource = findConcatenatedPath(
+    resolvedMovedSourceDiagram,
+    'anchored-ruled-boundary-0',
+  )
+  const movedSheet = findCurvedSheet(resolvedMovedSourceDiagram, result.id)
+
+  assert.equal(movedSource.segments[0]?.start.x, 8)
+  assert.deepEqual(movedSheet.primitive, sheet.primitive)
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(parsed.ok, true)
+  assert.match(tikz, /Primitive: ruledSurface; sampling: u=3, v=1; faces=3/)
+  assert.doesNotMatch(
+    tikz,
+    /omitted because coordinate references inside curved sheet primitives/,
+  )
+})
+
 test('ruled surface creation rejects invalid boundary selections safely', () => {
   const diagram = createRuledSurfaceSourceDiagram()
 
@@ -1851,6 +1926,78 @@ test('Coons patch creation copies four compatible boundary paths and preserves s
     throw new Error(parsed.error)
   }
   assert.deepEqual(findCurvedSheet(parsed.diagram, result.id), sheet)
+})
+
+test('Coons patch creation detaches coordinateRefs in copied boundary snapshots', () => {
+  const diagram = createAnchoredCoonsPatchSourceDiagram()
+  const result = createCoonsPatchFromBoundaryPaths(
+    diagram,
+    {
+      bottom: 'anchored-coons-bottom',
+      right: 'anchored-coons-right',
+      top: 'anchored-coons-top',
+      left: 'anchored-coons-left',
+    },
+    { id: 'anchored-coons-patch', sampling: { uSegments: 3, vSegments: 2 } },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(createCoonsPatchFromBoundaryPathsErrorMessage(result.error))
+  }
+
+  const source = findConcatenatedPath(result.diagram, 'anchored-coons-bottom')
+  const sheet = findCurvedSheet(result.diagram, result.id)
+
+  assert.equal(pathSegmentsContainCoordinateRef(source.segments), true)
+  assert.equal(sheet.primitive.kind, 'coonsPatch')
+  if (sheet.primitive.kind !== 'coonsPatch') {
+    throw new Error('Expected Coons patch primitive.')
+  }
+  assert.equal(coonsBoundaryContainsCoordinateRef(sheet.primitive.bottom), false)
+  assert.equal(coonsBoundaryContainsCoordinateRef(sheet.primitive.right), false)
+  assert.equal(coonsBoundaryContainsCoordinateRef(sheet.primitive.top), false)
+  assert.equal(coonsBoundaryContainsCoordinateRef(sheet.primitive.left), false)
+  assert.deepEqual(
+    globalPreview(
+      coonsPathBoundary(sheet.primitive.bottom).segments[0]?.start ?? {
+        x: 0,
+        y: 0,
+        z: 0,
+      },
+    ),
+    {
+      x: 0,
+      y: 0,
+      z: 0,
+    },
+  )
+
+  const movedSourceDiagram = moveCoordinateAnchor(
+    result.diagram,
+    'coord-c-bottom-start',
+    { x: 9, y: 9, z: 9 },
+  )
+  const resolvedMovedSourceDiagram =
+    resolveDiagramCoordinateRefs(movedSourceDiagram)
+  const movedSource = findConcatenatedPath(
+    resolvedMovedSourceDiagram,
+    'anchored-coons-bottom',
+  )
+  const movedSheet = findCurvedSheet(resolvedMovedSourceDiagram, result.id)
+
+  assert.equal(movedSource.segments[0]?.start.x, 9)
+  assert.deepEqual(movedSheet.primitive, sheet.primitive)
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+  const tikz = generateTikz(result.diagram)
+
+  assert.equal(parsed.ok, true)
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=3, v=2; faces=6/)
+  assert.doesNotMatch(
+    tikz,
+    /omitted because coordinate references inside curved sheet primitives/,
+  )
 })
 
 test('Coons patch creation succeeds with explicit reversed cyclic boundaries', () => {
@@ -3609,6 +3756,29 @@ function createRuledSurfaceSourceDiagram(): Diagram {
   return secondPath.diagram
 }
 
+function createAnchoredRuledSurfaceSourceDiagram(): Diagram {
+  let diagram = addCoordinateAnchors(emptyThreeDimensionalDiagram, [
+    { id: 'coord-r0-start', name: 'R0 start', point: { x: 0, y: 0, z: 0 } },
+    { id: 'coord-r0-end', name: 'R0 end', point: { x: 2, y: 0, z: 0 } },
+    { id: 'coord-r1-start', name: 'R1 start', point: { x: 0, y: 1, z: 1 } },
+    { id: 'coord-r1-end', name: 'R1 end', point: { x: 2, y: 1, z: 1 } },
+  ])
+  diagram = addReferencedBoundaryPath(
+    diagram,
+    'anchored-ruled-boundary-0',
+    'Anchored ruled boundary 0',
+    'coord-r0-start',
+    'coord-r0-end',
+  )
+  return addReferencedBoundaryPath(
+    diagram,
+    'anchored-ruled-boundary-1',
+    'Anchored ruled boundary 1',
+    'coord-r1-start',
+    'coord-r1-end',
+  )
+}
+
 function createRuledSurfaceSourceDiagramWithPoint(): Diagram {
   return addPointStratumWithResult(
     createRuledSurfaceSourceDiagram(),
@@ -3646,6 +3816,47 @@ function createCoonsPatchSourceDiagram(): Diagram {
     'Coons left',
     { x: 0, y: 0, z: 0 },
     { x: 0, y: 1, z: 0.5 },
+  )
+}
+
+function createAnchoredCoonsPatchSourceDiagram(): Diagram {
+  let diagram = addCoordinateAnchors(emptyThreeDimensionalDiagram, [
+    { id: 'coord-c-bottom-start', name: 'Bottom start', point: { x: 0, y: 0, z: 0 } },
+    { id: 'coord-c-bottom-c1', name: 'Bottom control 1', point: { x: 0.5, y: 0.2, z: 0 } },
+    { id: 'coord-c-bottom-c2', name: 'Bottom control 2', point: { x: 1.5, y: 0.2, z: 0 } },
+    { id: 'coord-c-bottom-end', name: 'Bottom end', point: { x: 2, y: 0, z: 0 } },
+    { id: 'coord-c-right-end', name: 'Right end', point: { x: 2, y: 1, z: 1 } },
+    { id: 'coord-c-top-start', name: 'Top start', point: { x: 0, y: 1, z: 0.5 } },
+  ])
+  diagram = addReferencedCubicBoundaryPath(
+    diagram,
+    'anchored-coons-bottom',
+    'Anchored Coons bottom',
+    'coord-c-bottom-start',
+    'coord-c-bottom-c1',
+    'coord-c-bottom-c2',
+    'coord-c-bottom-end',
+  )
+  diagram = addReferencedBoundaryPath(
+    diagram,
+    'anchored-coons-right',
+    'Anchored Coons right',
+    'coord-c-bottom-end',
+    'coord-c-right-end',
+  )
+  diagram = addReferencedBoundaryPath(
+    diagram,
+    'anchored-coons-top',
+    'Anchored Coons top',
+    'coord-c-top-start',
+    'coord-c-right-end',
+  )
+  return addReferencedBoundaryPath(
+    diagram,
+    'anchored-coons-left',
+    'Anchored Coons left',
+    'coord-c-bottom-start',
+    'coord-c-top-start',
   )
 }
 
@@ -3769,6 +3980,109 @@ function addCoonsBoundaryPath(
   return result.diagram
 }
 
+function addCoordinateAnchors(
+  diagram: Diagram,
+  anchors: readonly { id: string; name: string; point: Vec3 }[],
+): Diagram {
+  let nextDiagram = diagram
+
+  for (const anchor of anchors) {
+    const result = addCoordinateAnchorFromDirectInput(
+      nextDiagram,
+      directVec3(anchor.point),
+      {
+        id: anchor.id,
+        name: anchor.name,
+      },
+    )
+
+    assert.equal(result.ok, true)
+    if (!result.ok) {
+      throw new Error(`Expected coordinate anchor ${anchor.id} to be created.`)
+    }
+
+    nextDiagram = result.diagram
+  }
+
+  return nextDiagram
+}
+
+function addReferencedBoundaryPath(
+  diagram: Diagram,
+  id: string,
+  name: string,
+  startCoordinateId: string,
+  endCoordinateId: string,
+): Diagram {
+  const result = addConcatenatedPathFromDirectInput(
+    diagram,
+    {
+      start: directVec3FromCoordinateReference(diagram, startCoordinateId),
+      segments: [
+        {
+          kind: 'line',
+          end: directVec3FromCoordinateReference(diagram, endCoordinateId),
+        },
+      ],
+    },
+    {
+      id,
+      name,
+      layer: 0,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(`Expected ${name} source path to be created.`)
+  }
+
+  return result.diagram
+}
+
+function addReferencedCubicBoundaryPath(
+  diagram: Diagram,
+  id: string,
+  name: string,
+  startCoordinateId: string,
+  control1CoordinateId: string,
+  control2CoordinateId: string,
+  endCoordinateId: string,
+): Diagram {
+  const result = addConcatenatedPathFromDirectInput(
+    diagram,
+    {
+      start: directVec3FromCoordinateReference(diagram, startCoordinateId),
+      segments: [
+        {
+          kind: 'cubicBezier',
+          control1: directVec3FromCoordinateReference(
+            diagram,
+            control1CoordinateId,
+          ),
+          control2: directVec3FromCoordinateReference(
+            diagram,
+            control2CoordinateId,
+          ),
+          end: directVec3FromCoordinateReference(diagram, endCoordinateId),
+        },
+      ],
+    },
+    {
+      id,
+      name,
+      layer: 0,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(`Expected ${name} source path to be created.`)
+  }
+
+  return result.diagram
+}
+
 function closedCoonsBoundarySegments(
   start: Vec3,
 ): ConcatenatedPathStratum['segments'] {
@@ -3810,6 +4124,93 @@ function directVec3(point: Vec3): DirectCoordinateInput {
     y: String(point.y),
     z: String(point.z),
   }
+}
+
+function directVec3FromCoordinateReference(
+  diagram: Diagram,
+  coordinateId: string,
+): DirectCoordinateInput & { source: ExistingCoordinateSource } {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return {
+    ...directVec3(point),
+    source: {
+      kind: 'coordinateAnchor',
+      coordinateId,
+    },
+  }
+}
+
+function moveCoordinateAnchor(
+  diagram: Diagram,
+  coordinateId: string,
+  point: Vec3,
+): Diagram {
+  return {
+    ...diagram,
+    coordinateAnchors: diagram.coordinateAnchors?.map((anchor) =>
+      anchor.id === coordinateId
+        ? {
+            ...anchor,
+            position: {
+              kind: 'global',
+              value: {
+                x: { kind: 'numeric', value: point.x },
+                y: { kind: 'numeric', value: point.y },
+                z: { kind: 'numeric', value: point.z },
+              },
+            },
+          }
+        : anchor,
+    ),
+  }
+}
+
+function coonsBoundaryContainsCoordinateRef(
+  boundary: CoonsBoundarySnapshot,
+): boolean {
+  return 'kind' in boundary
+    ? pointContainsCoordinateRef(boundary.point)
+    : boundaryContainsCoordinateRef(boundary)
+}
+
+function boundaryContainsCoordinateRef(boundary: BoundaryPathSnapshot): boolean {
+  return pathSegmentsContainCoordinateRef(boundary.segments)
+}
+
+function pathSegmentsContainCoordinateRef(
+  segments: readonly ConcatenatedPathStratum['segments'][number][],
+): boolean {
+  return segments.some((segment) => {
+    switch (segment.kind) {
+      case 'line':
+        return (
+          pointContainsCoordinateRef(segment.start) ||
+          pointContainsCoordinateRef(segment.end)
+        )
+      case 'cubicBezier':
+        return (
+          pointContainsCoordinateRef(segment.start) ||
+          pointContainsCoordinateRef(segment.control1) ||
+          pointContainsCoordinateRef(segment.control2) ||
+          pointContainsCoordinateRef(segment.end)
+        )
+      case 'arc':
+        return (
+          pointContainsCoordinateRef(segment.start) ||
+          pointContainsCoordinateRef(segment.center) ||
+          pointContainsCoordinateRef(segment.end)
+        )
+    }
+  })
+}
+
+function pointContainsCoordinateRef(point: Vec3): boolean {
+  return point.symbolic?.source?.kind === 'coordinateRef'
 }
 
 function createUndoTestEditorState(diagram: Diagram): UndoTestEditorState {

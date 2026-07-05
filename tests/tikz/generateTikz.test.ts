@@ -549,10 +549,10 @@ test('curved sheet coordinateRef does not silently export as numeric sampled mes
   assert.doesNotMatch(tikz, /\\filldraw .*\(sheetCurved/)
 })
 
-test('saved curved sheet coordinateRef is rejected cleanly without throwing', () => {
+test('saved non-boundary curved sheet coordinateRef is rejected cleanly without throwing', () => {
   const diagram = createCurvedSheetReferenceDiagram({
-    kind: 'ruledSurface',
-    boundaryStart: coordinateReferencePoint,
+    kind: 'hemisphere',
+    center: coordinateReferencePoint,
   })
   const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
 
@@ -562,7 +562,112 @@ test('saved curved sheet coordinateRef is rejected cleanly without throwing', ()
   }
   assert.match(
     parsed.error,
-    /primitive\.boundary0\.segments\[0\]\.start\.symbolic\.source.*coordinateRef is not supported/,
+    /primitive\.center\.symbolic\.source.*coordinateRef is not supported/,
+  )
+})
+
+test('legacy ruled surface boundary coordinateRefs load as detached snapshots', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'ruledSurface',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const sheet = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'curved-coordinate-ref',
+  )
+
+  assert.equal(sheet?.geometricKind, 'sheet')
+  assert.equal(sheet?.kind, 'curvedSheet')
+  if (sheet?.geometricKind !== 'sheet' || sheet.kind !== 'curvedSheet') {
+    throw new Error('Expected loaded ruled surface.')
+  }
+  assert.equal(sheet.primitive.kind, 'ruledSurface')
+  if (sheet.primitive.kind !== 'ruledSurface') {
+    throw new Error('Expected loaded ruled surface primitive.')
+  }
+  assert.doesNotMatch(JSON.stringify(sheet.primitive), /"kind":"coordinateRef"/)
+  assert.deepEqual(sheet.primitive.boundary0.segments[0]?.start, {
+    x: 0,
+    y: 0,
+    z: 0,
+  })
+
+  const tikz = generateTikz(parsed.diagram)
+
+  assert.match(tikz, /Primitive: ruledSurface; sampling: u=2, v=1; faces=2/)
+  assert.doesNotMatch(
+    tikz,
+    /omitted because coordinate references inside curved sheet primitives/,
+  )
+})
+
+test('legacy Coons patch boundary coordinateRefs load as detached snapshots', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'coonsPatch',
+    boundaryStart: coordinateReferencePoint,
+  })
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const sheet = parsed.diagram.strata.find(
+    (stratum) => stratum.id === 'curved-coordinate-ref',
+  )
+
+  assert.equal(sheet?.geometricKind, 'sheet')
+  assert.equal(sheet?.kind, 'curvedSheet')
+  if (sheet?.geometricKind !== 'sheet' || sheet.kind !== 'curvedSheet') {
+    throw new Error('Expected loaded Coons patch.')
+  }
+  assert.equal(sheet.primitive.kind, 'coonsPatch')
+  if (sheet.primitive.kind !== 'coonsPatch') {
+    throw new Error('Expected loaded Coons patch primitive.')
+  }
+  assert.doesNotMatch(JSON.stringify(sheet.primitive), /"kind":"coordinateRef"/)
+  assert.deepEqual(sheet.primitive.bottom.segments[0]?.start, {
+    x: 0,
+    y: 0,
+    z: 0,
+  })
+
+  const validation = validateDiagram(parsed.diagram)
+  const tikz = generateTikz(parsed.diagram)
+  const inlineTikz = generateTikz(parsed.diagram, { exportMode: 'inlineMath' })
+
+  assert.equal(validation.valid, true)
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=2, v=2; faces=4/)
+  assert.doesNotMatch(
+    tikz,
+    /omitted because coordinate references inside curved sheet primitives/,
+  )
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
+})
+
+test('legacy Coons patch boundary coordinateRefs fail load when anchors are missing', () => {
+  const diagram = createCurvedSheetReferenceDiagram({
+    kind: 'coonsPatch',
+    boundaryStart: coordinateReferencePoint,
+  })
+  diagram.coordinateAnchors = []
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected missing legacy coordinate anchor to fail.')
+  }
+  assert.match(
+    parsed.error,
+    /strata\[0\]\.primitive\.bottom\.segments\[0\]\.start.*coordinate anchor does not exist/,
   )
 })
 
