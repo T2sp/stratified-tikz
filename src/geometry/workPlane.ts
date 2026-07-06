@@ -162,7 +162,7 @@ export function constructWorkPlaneFromThreePoints(
 
   return createCustomWorkPlane(
     {
-      origin: p0,
+      origin: concreteVec3(p0),
       u,
       v,
       normal,
@@ -173,6 +173,14 @@ export function constructWorkPlaneFromThreePoints(
       source: { kind: 'threePoints' },
     },
   )
+}
+
+function concreteVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+  }
 }
 
 export function validateWorkPlane(

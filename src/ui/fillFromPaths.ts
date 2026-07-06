@@ -10,6 +10,9 @@ import {
   createFilledRegion2DStratum,
   createWorkPlaneFilledSheet3DStratum,
 } from '../model/constructors.ts'
+import {
+  detachWorkPlaneFrameCoordinateReferencesForStorage,
+} from '../model/coordinateReferences.ts'
 import { defaultSheetStyle } from '../model/styles.ts'
 import {
   closedPathBoundaryCoordinates,
@@ -47,6 +50,7 @@ export type CreateFillFromClosedPathsError =
   | 'sourceOpenPath'
   | 'sourceNotCoplanar'
   | 'sourcePlaneUnreliable'
+  | 'coordinateReferenceDetachFailed'
 
 export type CreateFillFromClosedPathsOptions = {
   id?: string
@@ -202,10 +206,26 @@ export function createFillFromClosedPaths(
     }
   }
 
+  // Work-plane frames are stored snapshots. Coordinate refs from boundary
+  // points must be detached before storing planeFrame.
+  const storageFrame = detachWorkPlaneFrameCoordinateReferencesForStorage(
+    diagram,
+    planeResult.frame,
+    'planeFrame',
+  )
+
+  if (!storageFrame.ok) {
+    return {
+      ok: false,
+      diagram,
+      error: 'coordinateReferenceDetachFailed',
+    }
+  }
+
   const sheet = createWorkPlaneFilledSheet3DStratum({
     id: safeFillId(diagram, options.id, 'filled-sheet'),
     name: options.name ?? 'Filled sheet',
-    planeFrame: planeResult.frame,
+    planeFrame: storageFrame.value.frame,
     boundaries,
     fillRule,
     layer,
@@ -248,6 +268,8 @@ export function createFillFromClosedPathsErrorMessage(
       return 'Picked 3D paths must lie on one common plane.'
     case 'sourcePlaneUnreliable':
       return 'Could not determine a reliable plane for the picked 3D paths.'
+    case 'coordinateReferenceDetachFailed':
+      return 'Could not detach coordinate references while storing the filled sheet frame.'
   }
 }
 

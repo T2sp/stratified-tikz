@@ -4,8 +4,15 @@ import {
   createConcatenatedPathStratum,
   createEmptyDiagram,
 } from '../../src/model/constructors.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
+import {
+  coordinateReferenceSourceForPoint,
+  coordinateReferenceVec3ForAnchorId,
+} from '../../src/model/coordinateReferences.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   ConcatenatedPathStratum,
+  CoordinateAnchorPosition,
   Diagram,
   FilledRegion2DStratum,
   LinePathSegment,
@@ -13,6 +20,7 @@ import type {
   Vec3,
   WorkPlaneFilledSheet3DStratum,
 } from '../../src/model/types.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import {
   createFillFromClosedPaths,
   type CreateFillFromClosedPathsResult,
@@ -136,6 +144,79 @@ test('creates a 3D work-plane filled sheet from one closed path on the active pl
     sheet.boundaries.map((boundary) => boundary.id),
     ['outer'],
   )
+})
+
+test('3D fill creation detaches coordinateRefs from stored planeFrame', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a',
+      name: 'A',
+      position: globalAnchorPosition(0, 0, 2),
+    }),
+  ]
+  const anchoredStart = coordinateReferencePoint(diagram, 'coord-a')
+  const sourcePath = createConcatenatedPathStratum({
+    ambientDimension: 3,
+    id: 'anchored-square',
+    name: 'Anchored square',
+    segments: squareSegments([
+      anchoredStart,
+      { x: 2, y: 0, z: 2 },
+      { x: 2, y: 2, z: 2 },
+      { x: 0, y: 2, z: 2 },
+    ]),
+  })
+  diagram.strata = [sourcePath]
+  const result = createFillFromClosedPaths(diagram, ['anchored-square'], {
+    id: 'anchored-filled-sheet',
+  })
+
+  assertFillOk(result)
+  const sheet = mustFindWorkPlaneFilledSheet(
+    result.diagram,
+    'anchored-filled-sheet',
+  )
+  const source = findPath(result.diagram, 'anchored-square')
+  const frameSnapshot = structuredClone(sheet.planeFrame)
+
+  assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame.origin), null)
+  assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame.u), null)
+  assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame.v), null)
+  assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame.normal), null)
+  assert.deepEqual(sheet.planeFrame.origin, { x: 0, y: 0, z: 2 })
+  assert.equal(
+    coordinateReferenceSourceForPoint(source.segments[0].start)?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      sheet.boundaries[0].segments[0].start,
+    )?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(validateDiagram(result.diagram).valid, true)
+
+  const movedDiagram: Diagram = {
+    ...result.diagram,
+    coordinateAnchors: [
+      createCoordinateAnchor(result.diagram, {
+        id: 'coord-a',
+        name: 'A',
+        position: globalAnchorPosition(9, 9, 9),
+      }),
+    ],
+  }
+  const movedSheet = mustFindWorkPlaneFilledSheet(
+    movedDiagram,
+    'anchored-filled-sheet',
+  )
+  const tikz = generateTikz(result.diagram)
+
+  assert.deepEqual(movedSheet.planeFrame, frameSnapshot)
+  assert.match(tikz, /Work-plane filled sheet "Filled sheet"/)
+  assert.match(tikz, /\\filldraw\[/)
+  assert.doesNotMatch(tikz, /omitted/)
 })
 
 test('creates a 3D work-plane filled sheet from two coplanar paths with even-odd fill', () => {
@@ -385,6 +466,31 @@ function addVec3(point: Vec3, offset: Vec3): Vec3 {
     y: point.y + offset.y,
     z: point.z + offset.z,
   }
+}
+
+function globalAnchorPosition(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
+  }
+}
+
+function coordinateReferencePoint(diagram: Diagram, coordinateId: string): Vec3 {
+  const point = coordinateReferenceVec3ForAnchorId(diagram, coordinateId)
+
+  if (point === null) {
+    throw new Error(`Expected coordinate anchor ${coordinateId}.`)
+  }
+
+  return point
 }
 
 function assertFillOk(

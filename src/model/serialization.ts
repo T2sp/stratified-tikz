@@ -43,6 +43,7 @@ import {
   uniqueCoordinateAnchorTikzName,
 } from './coordinateAnchors.ts'
 import {
+  detachWorkPlaneFilledSheetFrameCoordinateReferences,
   detachSampledCurvedSheetCoordinateReferences,
 } from './coordinateReferences.ts'
 import {
@@ -993,7 +994,23 @@ function normalizeLoadedDiagram(
     }
   }
 
-  const normalizedDiagram = sampledCurvedSheetDetach.value.diagram
+  const filledSheetFrameDetach =
+    detachWorkPlaneFilledSheetFrameCoordinateReferences(
+      sampledCurvedSheetDetach.value.diagram,
+    )
+
+  if (!filledSheetFrameDetach.ok) {
+    return {
+      diagram: sampledCurvedSheetDetach.value.diagram,
+      warnings,
+      errors: [
+        ...layerNormalization.errors,
+        `${filledSheetFrameDetach.error.path} ${filledSheetFrameDetach.error.message}`,
+      ],
+    }
+  }
+
+  const normalizedDiagram = filledSheetFrameDetach.value.diagram
   const symbolicMetadataErrors =
     validateDiagramSymbolicCoordinateMetadata(normalizedDiagram)
   const unsupportedSymbolicSourceErrors =

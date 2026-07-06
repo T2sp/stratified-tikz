@@ -15,11 +15,13 @@ import {
   createCurveStratum,
   createCurvedSheetStratum,
   createEmptyDiagram,
+  createWorkPlaneFilledSheet3DStratum,
 } from '../../src/model/constructors.ts'
 import {
   applyUserStylePresetToStratum,
   addSymbolicVariableToDiagram,
   createCoordinateAnchor,
+  coordinateReferenceSourceForPoint,
   createUserStylePresetFromStyle,
   coordinateReferenceVec3ForAnchorId,
   clonePathArrowOptions,
@@ -38,6 +40,7 @@ import { generateTikz } from '../../src/tikz/index.ts'
 import type {
   Camera3D,
   BoundaryPathSnapshot,
+  ClosedPathBoundary,
   CoonsPatchPrimitive,
   CoordinateAnchorPosition,
   CrossingKind,
@@ -466,6 +469,99 @@ test('parseSavedDiagramJson rejects dangling coordinate refs after anchor remova
   assert.match(
     parsed.error,
     /Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
+test('parseSavedDiagramJson migrates work-plane filled-sheet frame coordinateRefs', () => {
+  const diagram = legacyFilledSheetFrameReferenceDiagram('origin')
+  const saved = JSON.stringify({
+    format: savedDiagramFormat,
+    version: savedDiagramVersion,
+    diagram,
+  })
+  const parsed = parseSavedDiagramJson(saved)
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const sheet = requireWorkPlaneFilledSheet(parsed.diagram)
+  const tikz = generateTikz(parsed.diagram)
+
+  assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame.origin), null)
+  assert.deepEqual(sheet.planeFrame.origin, { x: 1, y: 2, z: 3 })
+  assert.equal(validateDiagram(parsed.diagram).valid, true)
+  assert.match(tikz, /Work-plane filled sheet "Legacy Filled Sheet"/)
+  assert.match(tikz, /\\filldraw\[/)
+  assert.doesNotMatch(tikz, /coordinateRef is not supported/)
+})
+
+test('parseSavedDiagramJson migrates work-plane filled-sheet basis coordinateRefs', () => {
+  const cases: Array<{
+    field: keyof WorkPlaneFrameSnapshot
+    expected: Vec3
+  }> = [
+    { field: 'u', expected: { x: 1, y: 0, z: 0 } },
+    { field: 'v', expected: { x: 0, y: 1, z: 0 } },
+    { field: 'normal', expected: { x: 0, y: 0, z: 1 } },
+  ]
+
+  cases.forEach(({ field, expected }) => {
+    const diagram = legacyFilledSheetFrameReferenceDiagram(field)
+    const parsed = parseSavedDiagramJson(
+      JSON.stringify({
+        format: savedDiagramFormat,
+        version: savedDiagramVersion,
+        diagram,
+      }),
+    )
+
+    assert.equal(parsed.ok, true, field)
+    if (!parsed.ok) {
+      throw new Error(parsed.error)
+    }
+
+    const sheet = requireWorkPlaneFilledSheet(parsed.diagram)
+
+    assert.equal(coordinateReferenceSourceForPoint(sheet.planeFrame[field]), null)
+    assert.deepEqual(sheet.planeFrame[field], expected)
+    assert.equal(validateDiagram(parsed.diagram).valid, true)
+  })
+})
+
+test('parseSavedDiagramJson rejects missing frame coordinateRef anchors with a path', () => {
+  const diagram = legacyFilledSheetFrameReferenceDiagram('origin')
+  diagram.coordinateAnchors = []
+  const parsed = parseSavedDiagramJson(
+    JSON.stringify({
+      format: savedDiagramFormat,
+      version: savedDiagramVersion,
+      diagram,
+    }),
+  )
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected missing frame coordinateRef anchor to fail.')
+  }
+  assert.match(parsed.error, /strata\[0\]\.planeFrame\.origin/)
+  assert.match(parsed.error, /coordinate anchor does not exist/)
+})
+
+test('validateDiagram still rejects work-plane filled-sheet frame coordinateRefs', () => {
+  const diagram = legacyFilledSheetFrameReferenceDiagram('origin')
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, false)
+  assert.ok(
+    validation.errors.some(
+      (issue) =>
+        issue.path === 'strata[0].planeFrame.origin.symbolic.source' &&
+        /coordinateRef is not supported at strata\[0\]\.planeFrame\.origin/.test(
+          issue.message,
+        ),
+    ),
   )
 })
 
@@ -2422,6 +2518,101 @@ function symbolicBoundaryFrame(): WorkPlaneFrameSnapshot {
     v: { x: 0, y: 1, z: 0 },
     normal: { x: 0, y: 0, z: 1 },
   }
+}
+
+function legacyFilledSheetFrameReferenceDiagram(
+  field: keyof WorkPlaneFrameSnapshot,
+): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const anchorPoint = frameFieldReferencePoint(field)
+
+  diagram.coordinateAnchors = [
+    createCoordinateAnchor(diagram, {
+      id: 'coord-frame',
+      name: 'Frame coordinate',
+      position: globalAnchorPosition(
+        anchorPoint.x,
+        anchorPoint.y,
+        anchorPoint.z,
+      ),
+    }),
+  ]
+
+  const reference = coordinateReferenceVec3ForAnchorId(diagram, 'coord-frame')
+
+  if (reference === null) {
+    throw new Error('Expected frame coordinate reference.')
+  }
+
+  const frame = legacyFilledSheetFrame()
+  frame[field] = reference
+
+  diagram.strata.push(
+    createWorkPlaneFilledSheet3DStratum({
+      id: 'legacy-filled-sheet',
+      name: 'Legacy Filled Sheet',
+      planeFrame: frame,
+      boundaries: [squareFilledSheetBoundary(frame.origin)],
+    }),
+  )
+
+  return diagram
+}
+
+function legacyFilledSheetFrame(): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 1, y: 2, z: 3 },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
+  }
+}
+
+function frameFieldReferencePoint(field: keyof WorkPlaneFrameSnapshot): Vec3 {
+  switch (field) {
+    case 'origin':
+      return { x: 1, y: 2, z: 3 }
+    case 'u':
+      return { x: 1, y: 0, z: 0 }
+    case 'v':
+      return { x: 0, y: 1, z: 0 }
+    case 'normal':
+      return { x: 0, y: 0, z: 1 }
+  }
+}
+
+function squareFilledSheetBoundary(origin: Vec3): ClosedPathBoundary {
+  const points: [Vec3, Vec3, Vec3, Vec3] = [
+    origin,
+    { x: origin.x + 1, y: origin.y, z: origin.z },
+    { x: origin.x + 1, y: origin.y + 1, z: origin.z },
+    { x: origin.x, y: origin.y + 1, z: origin.z },
+  ]
+
+  return {
+    id: 'legacy-filled-boundary',
+    name: 'Legacy filled boundary',
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
+  }
+}
+
+function requireWorkPlaneFilledSheet(diagram: Diagram) {
+  const sheet = diagram.strata[0]
+
+  if (
+    sheet === undefined ||
+    sheet.geometricKind !== 'sheet' ||
+    sheet.kind !== 'workPlaneFilledSheet'
+  ) {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+
+  return sheet
 }
 
 function pendingImportForDiagram(diagram: Diagram): PendingSymbolicDiagramImport {

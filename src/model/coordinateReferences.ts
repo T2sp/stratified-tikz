@@ -2,6 +2,7 @@ import {
   coordinateAnchorPositionPreview,
   coordinateAnchorPositionToVec3,
 } from './coordinateAnchors.ts'
+import { isValidWorkPlaneFrameSnapshot } from '../geometry/bezierControls.ts'
 import { evaluateWorkPlaneLocalCoordinate } from './workPlaneLocalCoordinates.ts'
 import type {
   AmbientDimension,
@@ -93,6 +94,19 @@ export type DetachSampledCurvedSheetPrimitiveCoordinateReferencesResult =
       ok: true
       value: {
         primitive: CurvedSheetPrimitive
+        detachedCount: number
+      }
+    }
+  | {
+      ok: false
+      error: DiagramValidationIssue
+    }
+
+export type DetachWorkPlaneFrameCoordinateReferencesResult =
+  | {
+      ok: true
+      value: {
+        frame: WorkPlaneFrameSnapshot
         detachedCount: number
       }
     }
@@ -1260,6 +1274,136 @@ export function detachSampledCurvedSheetCoordinateReferences(
         : {
             ...stratum,
             primitive: detached.primitive,
+          },
+    )
+  }
+
+  return {
+    ok: true,
+    value: {
+      diagram:
+        context.detachedCount === 0
+          ? diagram
+          : {
+              ...diagram,
+              strata,
+            },
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
+export function detachWorkPlaneFrameCoordinateReferencesForStorage(
+  diagram: Diagram,
+  frame: WorkPlaneFrameSnapshot,
+  path: string,
+): DetachWorkPlaneFrameCoordinateReferencesResult {
+  const replacements = coordinateReferenceAnchorMapForExistingAnchors(diagram)
+
+  if (!replacements.ok) {
+    return replacements
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
+    requireReplacement: true,
+    detachedCount: 0,
+  }
+  const detached = detachWorkPlaneFrameCoordinateReferences(
+    frame,
+    context,
+    path,
+    'workPlaneFrameField',
+  )
+
+  if (!detached.ok) {
+    return detached
+  }
+
+  if (
+    context.detachedCount > 0 &&
+    !isValidWorkPlaneFrameSnapshot(detached.frame)
+  ) {
+    return {
+      ok: false,
+      error: {
+        path,
+        message:
+          'Could not detach coordinate references in work-plane frame because the resulting frame is invalid.',
+      },
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      frame: detached.frame,
+      detachedCount: context.detachedCount,
+    },
+  }
+}
+
+export function detachWorkPlaneFilledSheetFrameCoordinateReferences(
+  diagram: Diagram,
+): DetachCoordinateAnchorReferencesResult {
+  const replacements = coordinateReferenceAnchorMapForExistingAnchors(diagram)
+
+  if (!replacements.ok) {
+    return replacements
+  }
+
+  const context: DetachCoordinateReferenceContext = {
+    anchorsById: replacements.anchorsById,
+    replacementAnchorsById: replacements.anchorsById,
+    ambientDimension: diagram.ambientDimension,
+    requireReplacement: true,
+    detachedCount: 0,
+  }
+  const strata: Stratum[] = []
+
+  for (const [index, stratum] of diagram.strata.entries()) {
+    if (
+      stratum.geometricKind !== 'sheet' ||
+      stratum.kind !== 'workPlaneFilledSheet'
+    ) {
+      strata.push(stratum)
+      continue
+    }
+
+    const beforeDetachedCount = context.detachedCount
+    const frame = detachWorkPlaneFrameCoordinateReferences(
+      stratum.planeFrame,
+      context,
+      `strata[${index}].planeFrame`,
+      'workPlaneFrameField',
+    )
+
+    if (!frame.ok) {
+      return frame
+    }
+
+    if (
+      context.detachedCount > beforeDetachedCount &&
+      !isValidWorkPlaneFrameSnapshot(frame.frame)
+    ) {
+      return {
+        ok: false,
+        error: {
+          path: `strata[${index}].planeFrame`,
+          message:
+            'Could not detach coordinate references in work-plane filled-sheet frame because the resulting frame is invalid.',
+        },
+      }
+    }
+
+    strata.push(
+      context.detachedCount === beforeDetachedCount
+        ? stratum
+        : {
+            ...stratum,
+            planeFrame: frame.frame,
           },
     )
   }
