@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from 'react'
 import './App.css'
+import cameraReferenceGraphicUrl from './assets/camera-3d-coords.svg'
 import {
   defaultExampleId,
   exampleIdForAmbientDimension,
@@ -6252,58 +6253,11 @@ function App() {
 
   function renderCameraReferenceGraphic() {
     return (
-      <svg
+      <img
         className="camera-reference-graphic"
-        viewBox="0 0 150 110"
-        role="img"
-        aria-label="3D theta and phi reference"
-      >
-        <defs>
-          <marker
-            id="camera-reference-arrow"
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="5"
-            markerHeight="5"
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" />
-          </marker>
-        </defs>
-        <line
-          className="camera-reference-axis"
-          x1="58"
-          y1="72"
-          x2="124"
-          y2="72"
-          markerEnd="url(#camera-reference-arrow)"
-        />
-        <line
-          className="camera-reference-axis"
-          x1="58"
-          y1="72"
-          x2="31"
-          y2="91"
-          markerEnd="url(#camera-reference-arrow)"
-        />
-        <line
-          className="camera-reference-axis"
-          x1="58"
-          y1="72"
-          x2="58"
-          y2="22"
-          markerEnd="url(#camera-reference-arrow)"
-        />
-        <path className="camera-reference-arc" d="M 78 72 A 20 14 0 0 1 62 55" />
-        <path className="camera-reference-arc" d="M 78 82 A 28 13 0 0 0 37 84" />
-        <circle className="camera-reference-origin" cx="58" cy="72" r="3" />
-        <text x="128" y="75">x</text>
-        <text x="18" y="99">y</text>
-        <text x="53" y="16">z</text>
-        <text x="80" y="56">theta</text>
-        <text x="43" y="101">phi</text>
-      </svg>
+        src={cameraReferenceGraphicUrl}
+        alt="3D theta and phi reference"
+      />
     )
   }
 
