@@ -242,6 +242,10 @@
   min-width: 0;
 }
 
+.camera-view-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+}
+
 .camera-field,
 .camera-preset-field {
   display: inline-grid;
