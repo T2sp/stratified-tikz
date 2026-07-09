@@ -161,6 +161,16 @@ const phaseSlugs = {
   "27D": "style-eyedropper",
   "27E": "ui-polish-actions-numeric-arbitrary-path",
   "27F": "interaction-polish-hardening",
+  "28A": "preview-first-layout",
+  "28B": "svg-export-edge-actions",
+  "28C": "translucent-toolbar-zindex",
+  "28D": "context-style-shortcuts",
+  "28E": "toolbar-eyedropper-imported-style",
+  "28F": "workplane-overlay-polar-input",
+  "28G": "workplane-setup-ux",
+  "28H": "coons-direction-lifecycle",
+  "28I": "tikz-faithful-arrow-preview",
+  "28J": "phase-28-polish-hardening",
 };
 
 function makePhaseSpec(phase) {
