@@ -9218,6 +9218,7 @@ const WorkPlaneOverlayPanel = memo(function WorkPlaneOverlayPanel({
             <span>Plane</span>
             <select
               value={workPlaneSelectValue(activeWorkPlane)}
+              aria-label="Work-plane preset"
               onChange={(event) => {
                 const value = event.currentTarget.value as WorkPlaneSelectValue
 
@@ -9243,6 +9244,7 @@ const WorkPlaneOverlayPanel = memo(function WorkPlaneOverlayPanel({
                 type="number"
                 step="any"
                 value={String(workPlaneFixedValue(activeWorkPlane))}
+                aria-label={`Fixed ${workPlaneFixedAxis(activeWorkPlane)} coordinate`}
                 onChange={(event) =>
                   updateWorkPlaneFixedValue(event.currentTarget.value)
                 }
@@ -9253,6 +9255,7 @@ const WorkPlaneOverlayPanel = memo(function WorkPlaneOverlayPanel({
             <button
               type="button"
               className="preview-overlay-button"
+              aria-label="Reset work plane"
               onClick={resetActiveWorkPlane}
             >
               Reset
@@ -9556,6 +9559,7 @@ const OriginNormalWorkPlaneSetup = memo(function OriginNormalWorkPlaneSetup({
                 type="text"
                 inputMode="decimal"
                 value={originNormalInput.origin[axis]}
+                aria-label={`Origin ${axis}`}
                 onChange={(event) =>
                   updateOriginInput(axis, event.currentTarget.value)
                 }
@@ -9573,6 +9577,7 @@ const OriginNormalWorkPlaneSetup = memo(function OriginNormalWorkPlaneSetup({
             <button
               type="button"
               className="preview-overlay-button"
+              aria-label="Pick work-plane origin"
               onClick={startOriginWorkPlanePicking}
             >
               Pick origin
@@ -9631,6 +9636,7 @@ const OriginNormalWorkPlaneSetup = memo(function OriginNormalWorkPlaneSetup({
         <button
           type="submit"
           className="preview-overlay-button"
+          aria-label="Apply origin and normal work plane"
           disabled={
             !canApplyCustomOriginNormalThetaPhiWorkPlaneInput(originNormalInput)
           }
@@ -9851,6 +9857,7 @@ const CustomThreePointWorkPlaneSetup = memo(
                     type="text"
                     inputMode="decimal"
                     value={customThreePointWorkPlaneInput[point][axis]}
+                    aria-label={`${point.toUpperCase()} ${axis}`}
                     onChange={(event) =>
                       updateCustomThreePointWorkPlaneVectorInput(
                         point,
@@ -9865,7 +9872,11 @@ const CustomThreePointWorkPlaneSetup = memo(
           ))}
         </div>
         <div className="preview-work-plane-actions">
-          <button type="submit" className="preview-overlay-button">
+          <button
+            type="submit"
+            className="preview-overlay-button"
+            aria-label="Apply custom three-point work plane"
+          >
             Apply
           </button>
         </div>
