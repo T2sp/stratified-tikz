@@ -4314,7 +4314,7 @@ test('duplicate external source comments are de-duplicated', () => {
   assert.equal(countMatches(tikz, /%   \\input\{mygeometry\.sty\}/g), 1)
 })
 
-test('imported style reference from a matching user preset exports after the local preset option', () => {
+test('imported style reference from a matching user preset exports compactly', () => {
   const diagram = withImportedTikzStyleReference(
     createTwoDimensionalDiagram(),
     'external-draw',
@@ -4342,14 +4342,10 @@ test('imported style reference from a matching user preset exports after the loc
   const tikz = generateTikz(withPreset)
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
 
-  assert.match(
-    tikz,
-    /stratifiedStyleImportedPresetCurve\/\.style=\{draw=stzStyleusercurveimportedpresetcurveStroke, draw opacity=1, line width=1\.2pt\}/,
-  )
-  assert.ok(
-    layerBlock.indexOf('stratifiedStyleImportedPresetCurve') <
-      layerBlock.indexOf('3cat/phys/1strata/color/x'),
-  )
+  assert.match(layerBlock, /3cat\/phys\/1strata\/color\/x/)
+  assert.doesNotMatch(tikz, /stratifiedStyleImportedPresetCurve\/\.style=/)
+  assert.doesNotMatch(layerBlock, /stratifiedStyleImportedPresetCurve/)
+  assert.doesNotMatch(layerBlock, /line width=1\.2pt/)
 })
 
 test('TikZ layer names are deterministic and TikZ-safe', () => {

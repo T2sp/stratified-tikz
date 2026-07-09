@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   createCurveStratum,
@@ -11,6 +12,7 @@ import {
   createCoordinateAnchor,
   symbolicVec3FromVec3,
 } from '../../src/model/coordinateAnchors.ts'
+import { importTikzStyleFile } from '../../src/model/importedTikzStyles.ts'
 import {
   defaultCurveStyle,
   defaultPointStyle,
@@ -23,12 +25,16 @@ import type {
   PointStratum,
   RegionStratum,
   SheetStratum,
+  UserStylePreset,
   Vec3,
 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
+  applyContextQuickStylePreset,
   applyContextQuickStyleField,
   createContextQuickStyleBarModel,
+  createContextQuickStylePresetModel,
+  filterContextQuickStylePresetOptions,
   updateContextQuickStyleNumericDraft,
   type ContextQuickStyleField,
 } from '../../src/ui/contextQuickStyleBar.ts'
@@ -37,9 +43,16 @@ import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   commitDiagramChange,
   createDiagramHistory,
+  redoLastDiagramChange,
   undoLastDiagramChange,
   type UndoableEditorState,
 } from '../../src/ui/undo.ts'
+
+const quickBarSource = readFileSync(
+  new URL('../../src/ui/ContextQuickStyleBar.tsx', import.meta.url),
+  'utf8',
+)
+const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
 
 type TestEditorState = UndoableEditorState & {
   polylineDraft: null
@@ -56,6 +69,23 @@ test('context quick style bar appears for a selected curve', () => {
     model?.fields.map((field) => field.label),
     ['Stroke', 'Width', 'Arrow'],
   )
+})
+
+test('context quick style bar source exposes style transfer controls', () => {
+  assert.match(quickBarSource, /aria-label="Copy style"/)
+  assert.match(quickBarSource, /Paste style; clipboard/)
+  assert.match(quickBarSource, /aria-label="Style eyedropper"/)
+  assert.match(appSource, /onCopyStyle=\{copyCurrentSelectionStyle\}/)
+  assert.match(appSource, /onPasteStyle=\{pasteCurrentSelectionStyle\}/)
+  assert.match(appSource, /onStartStyleEyedropper=\{startStyleEyedropper\}/)
+})
+
+test('context quick style bar source exposes searchable TikZ style controls', () => {
+  assert.match(quickBarSource, /aria-label="TikZ style selector"/)
+  assert.match(quickBarSource, /aria-label="Search TikZ styles"/)
+  assert.match(quickBarSource, /aria-label="Clear TikZ style"/)
+  assert.match(appSource, /onApplyStylePreset=/)
+  assert.match(appSource, /onClearStylePreset=/)
 })
 
 test('stroke width slider uses step 0.1', () => {
@@ -212,6 +242,270 @@ test('coordinate anchor selection does not show style shortcuts', () => {
   )
 })
 
+test('imported TikZ style model lists compatible curve presets and filters search', () => {
+  const diagram = importedCurveStyleDiagram()
+  const model = createContextQuickStylePresetModel(diagram, curveASelection())
+
+  assert.notEqual(model, null)
+  if (model === null) {
+    throw new Error('Expected imported style model.')
+  }
+
+  const importedOption = model.options.find(
+    (option) => option.importedKey === importedCurveKey,
+  )
+
+  assert.equal(model.geometricKind, 'curve')
+  assert.equal(model.current.kind, 'none')
+  assert.equal(importedOption?.origin, 'imported')
+  assert.equal(importedOption?.sourceName, '3cat.sty')
+  assert.deepEqual(
+    filterContextQuickStylePresetOptions(model.options, 'phys/1strata').map(
+      (option) => option.importedKey,
+    ),
+    [importedCurveKey],
+  )
+  assert.equal(filterContextQuickStylePresetOptions(model.options, 'missing').length, 0)
+})
+
+test('quick style TikZ style model is empty without saved presets', () => {
+  const model = createContextQuickStylePresetModel(
+    curveDiagram(),
+    curveASelection(),
+  )
+
+  assert.notEqual(model, null)
+  assert.deepEqual(model?.options, [])
+})
+
+test('mixed incompatible selection does not expose quick style controls', () => {
+  const diagram = curvePointDiagram()
+  const selection: SelectedElement = {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'curve-a' },
+      { kind: 'stratum', id: 'point-a' },
+    ],
+  }
+
+  assert.equal(createContextQuickStyleBarModel(diagram, selection), null)
+  assert.equal(createContextQuickStylePresetModel(diagram, selection), null)
+})
+
+test('applying imported TikZ style from quick bar sets references compactly', () => {
+  const diagram = importedCurveStyleDiagram()
+  const preset = importedCurvePreset(diagram)
+  const result = applyContextQuickStylePreset(
+    diagram,
+    curveASelection(),
+    preset.id,
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const curve = findCurve(result.diagram, 'curve-a')
+  const tikz = generateTikz({
+    ...result.diagram,
+    strata: [curve],
+  })
+
+  assert.equal(curve.stylePresetId, preset.id)
+  assert.equal(
+    curve.importedTikzStyleReferenceId,
+    preset.importedTikzStyleReferenceId,
+  )
+  assert.match(tikz, new RegExp(escapeRegExp(importedCurveKey)))
+  assert.doesNotMatch(tikz, /stratifiedStyle3catPhys1strataColorX/)
+  assert.doesNotMatch(tikz, /draw=stz/)
+  assert.doesNotMatch(tikz, /line width=/)
+})
+
+test('applying imported TikZ style to same-kind multi-selection is atomic', () => {
+  const diagram = importedCurveStyleDiagram()
+  const preset = importedCurvePreset(diagram)
+  const result = applyContextQuickStylePreset(
+    diagram,
+    curveABSelection(),
+    preset.id,
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  assert.equal(findCurve(result.diagram, 'curve-a').stylePresetId, preset.id)
+  assert.equal(findCurve(result.diagram, 'curve-b').stylePresetId, preset.id)
+})
+
+test('applying imported TikZ style rejects incompatible mixed selection atomically', () => {
+  const diagram = importedCurvePointStyleDiagram()
+  const original = structuredClone(diagram) as Diagram
+  const preset = importedCurvePreset(diagram)
+  const result = applyContextQuickStylePreset(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'curve-a' },
+        { kind: 'stratum', id: 'point-a' },
+      ],
+    },
+    preset.id,
+  )
+
+  assert.equal(result.ok, false)
+  assert.deepEqual(result.diagram, original)
+})
+
+test('quick style TikZ style model reports current and mixed preset state', () => {
+  const firstImport = importedCurveStyleDiagram()
+  const secondImport = importTikzStyleFile(
+    firstImport,
+    'other.sty',
+    String.raw`\tikzset{otherCurve/.style={draw=blue,dashed}}`,
+  ).diagram
+  const firstPreset = importedCurvePreset(secondImport)
+  const secondPreset = importedCurvePreset(secondImport, 'otherCurve')
+  const bothApplied = applyContextQuickStylePreset(
+    secondImport,
+    curveABSelection(),
+    firstPreset.id,
+  )
+
+  assert.equal(bothApplied.ok, true)
+  if (!bothApplied.ok) {
+    throw new Error(bothApplied.message)
+  }
+
+  const currentModel = createContextQuickStylePresetModel(
+    bothApplied.diagram,
+    curveABSelection(),
+  )
+
+  assert.equal(currentModel?.current.kind, 'preset')
+  assert.equal(
+    currentModel?.current.kind === 'preset'
+      ? currentModel.current.presetId
+      : undefined,
+    firstPreset.id,
+  )
+
+  const mixedApplied = applyContextQuickStylePreset(
+    bothApplied.diagram,
+    { kind: 'stratum', id: 'curve-b' },
+    secondPreset.id,
+  )
+
+  assert.equal(mixedApplied.ok, true)
+  if (!mixedApplied.ok) {
+    throw new Error(mixedApplied.message)
+  }
+
+  assert.equal(
+    createContextQuickStylePresetModel(
+      mixedApplied.diagram,
+      curveABSelection(),
+    )?.current.kind,
+    'mixed',
+  )
+})
+
+test('clearing quick style TikZ style preserves explicit style and removes references', () => {
+  const diagram = importedCurveStyleDiagram()
+  const preset = importedCurvePreset(diagram)
+  const applied = applyContextQuickStylePreset(
+    diagram,
+    curveASelection(),
+    preset.id,
+  )
+
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+
+  const cleared = applyContextQuickStylePreset(
+    applied.diagram,
+    curveASelection(),
+    null,
+  )
+
+  assert.equal(cleared.ok, true)
+  if (!cleared.ok) {
+    throw new Error(cleared.message)
+  }
+
+  const curve = findCurve(cleared.diagram, 'curve-a')
+
+  assert.equal(curve.stylePresetId, undefined)
+  assert.equal(curve.importedTikzStyleReferenceId, undefined)
+  assert.deepEqual(curve.style, preset.style)
+})
+
+test('quick bar imported TikZ style application is undoable and redoable', () => {
+  const diagram = importedCurveStyleDiagram()
+  const preset = importedCurvePreset(diagram)
+  const initial = editorState(diagram, curveASelection())
+  const applied = applyContextQuickStylePreset(
+    initial.editableDiagram,
+    initial.selectedElement,
+    preset.id,
+  )
+
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+
+  const state = commitDiagramChange(initial, {
+    ...initial,
+    editableDiagram: applied.diagram,
+  })
+  const undone = undoLastDiagramChange(state)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(state.history.past.length, 1)
+  assert.equal(findCurve(state.editableDiagram, 'curve-a').stylePresetId, preset.id)
+  assert.equal(findCurve(undone.editableDiagram, 'curve-a').stylePresetId, undefined)
+  assert.equal(findCurve(redone.editableDiagram, 'curve-a').stylePresetId, preset.id)
+})
+
+test('quick scalar override after imported style clears references by current policy', () => {
+  const diagram = importedCurveStyleDiagram()
+  const preset = importedCurvePreset(diagram)
+  const applied = applyContextQuickStylePreset(
+    diagram,
+    curveASelection(),
+    preset.id,
+  )
+
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+
+  const overridden = applyContextQuickStyleField(
+    applied.diagram,
+    curveASelection(),
+    'curve.lineWidth',
+    0.8,
+  )
+  const curve = findCurve(overridden, 'curve-a')
+  const tikz = generateTikz({
+    ...overridden,
+    strata: [curve],
+  })
+
+  assert.equal(curve.stylePresetId, undefined)
+  assert.equal(curve.importedTikzStyleReferenceId, undefined)
+  assert.doesNotMatch(tikz, new RegExp(escapeRegExp(importedCurveKey)))
+  assert.match(tikz, /line width=0\.8pt/)
+})
+
 test('TikZ output reflects style shortcut changes', () => {
   const diagram = applyContextQuickStyleField(
     curveDiagram(),
@@ -263,6 +557,70 @@ function curveDiagram(
           lineWidth: options.curveBWidth ?? 1.2,
         },
         points: [point(0, 1), point(1, 1)],
+      }),
+    ],
+  }
+}
+
+const importedCurveKey = '3cat/phys/1strata/color/x'
+
+function importedCurveStyleDiagram(): Diagram {
+  return importTikzStyleFile(
+    curveDiagram(),
+    '3cat.sty',
+    String.raw`\tikzset{3cat/.cd, phys/1strata/color/x/.style={red!60,decorate,decoration={snake}}}`,
+  ).diagram
+}
+
+function importedCurvePointStyleDiagram(): Diagram {
+  const diagram = importedCurveStyleDiagram()
+
+  return {
+    ...diagram,
+    strata: [
+      ...diagram.strata,
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'point-a',
+        style: defaultPointStyle,
+        position: point(2, 2),
+      }),
+    ],
+  }
+}
+
+function importedCurvePreset(
+  diagram: Diagram,
+  key = importedCurveKey,
+): UserStylePreset {
+  const reference = diagram.importedTikzStyleReferences?.find(
+    (candidate) => candidate.key === key,
+  )
+  const preset = diagram.userStylePresets?.find(
+    (candidate) =>
+      candidate.kind === 'curve' &&
+      candidate.importedTikzStyleReferenceId === reference?.id,
+  )
+
+  if (preset === undefined) {
+    throw new Error(`Expected imported curve preset for ${key}.`)
+  }
+
+  return preset
+}
+
+function curvePointDiagram(): Diagram {
+  const diagram = curveDiagram()
+
+  return {
+    ...diagram,
+    strata: [
+      ...diagram.strata,
+      createPointStratum({
+        ambientDimension: 2,
+        id: 'point-a',
+        style: defaultPointStyle,
+        position: point(2, 2),
       }),
     ],
   }
@@ -444,4 +802,8 @@ function findRegion(diagram: Diagram, id: string): RegionStratum {
 
 function point(x: number, y: number, z = 0): Vec3 {
   return { x, y, z }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

@@ -172,6 +172,7 @@ import {
   createExistingCoordinateSourceOptions,
   createSerializeDiagramOptionsForUi,
   copyStyleFromSelection,
+  pasteStyleClipboardToSelection,
   boundarySurfaceBoundaryPathSourceErrorMessage,
   boundarySurfaceDraftPickErrorMessage,
   boundarySurfacePathClickWorkflow,
@@ -199,6 +200,8 @@ import {
   createCustomWorkPlanePreview,
   createConcatenatedPathDraft,
   applyContextQuickStyleField,
+  applyContextQuickStylePreset,
+  createContextQuickStyleBarModel,
   createDiagramHistory,
   createSheetPolygonDraft,
   collapseExampleBarForEditing,
@@ -758,6 +761,8 @@ function App() {
     null,
   )
   const [styleClipboardStatus, setStyleClipboardStatus] = useState<string>('')
+  const [styleEyedropperTargetSelection, setStyleEyedropperTargetSelection] =
+    useState<SelectedElement>(null)
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
     defaultJsonDownloadFilename,
   )
@@ -1486,6 +1491,7 @@ function App() {
         undoSourceDiagram === undefined ? {} : { undoSourceDiagram },
       )
     })
+    setStyleEyedropperTargetSelection(null)
     setCopyStatus('idle')
   }
 
@@ -1955,6 +1961,11 @@ function App() {
     selection: SelectedElement,
     options?: { mode: SelectionClickMode },
   ): void {
+    if (styleEyedropperTargetSelection !== null) {
+      applyStyleEyedropperSourceSelection(selection)
+      return
+    }
+
     setEditorState((current) => {
       if (selection === null) {
         return {
@@ -1983,6 +1994,68 @@ function App() {
           current.layerFilter,
         ),
       }
+    })
+  }
+
+  function applyStyleEyedropperSourceSelection(
+    sourceSelection: SelectedElement,
+  ): void {
+    const targetSelection = styleEyedropperTargetSelection
+
+    setStyleEyedropperTargetSelection(null)
+
+    if (targetSelection === null) {
+      return
+    }
+
+    if (sourceSelection === null) {
+      const message = 'Style eyedropper canceled.'
+      setStyleClipboardStatus(message)
+      setLayerOperationStatus(message)
+      return
+    }
+
+    const copyResult = copyStyleFromSelection(editableDiagram, sourceSelection)
+
+    if (!copyResult.ok) {
+      setStyleClipboardStatus(copyResult.message)
+      setLayerOperationStatus(copyResult.message)
+      return
+    }
+
+    const pasteResult = pasteStyleClipboardToSelection(
+      editableDiagram,
+      targetSelection,
+      copyResult.clipboard,
+    )
+
+    setStyleClipboard(copyResult.clipboard)
+    setStyleClipboardStatus(pasteResult.message)
+    setCopyStatus('idle')
+
+    if (!pasteResult.ok) {
+      setLayerOperationStatus(pasteResult.message)
+      return
+    }
+
+    setEditorState((current) => {
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        pasteResult.diagram,
+        current.layerFilter,
+      )
+      const nextSelection = clearSelectionForLayerFilter(
+        pasteResult.diagram,
+        targetSelection,
+        nextLayerFilter,
+      )
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: pasteResult.diagram,
+        selectedElement: nextSelection,
+        layerFilter: nextLayerFilter,
+        layerOperationStatus: pasteResult.message,
+      })
     })
   }
 
@@ -2045,6 +2118,29 @@ function App() {
     setCopyStatus('idle')
   }
 
+  function startStyleEyedropper(): void {
+    const model = createContextQuickStyleBarModel(editableDiagram, selectedElement)
+
+    if (model === null) {
+      const message = 'Select styled object(s) before using the style eyedropper.'
+      setStyleEyedropperTargetSelection(null)
+      setStyleClipboardStatus(message)
+      setLayerOperationStatus(message)
+      return
+    }
+
+    setCreationTool('select')
+    setOpenToolbarPalette(null)
+    setStyleEyedropperTargetSelection(selectedElement)
+    setStyleClipboardStatus(
+      `Style eyedropper: click a ${model.geometricKind} source object.`,
+    )
+    setLayerOperationStatus(
+      `Style eyedropper: click a ${model.geometricKind} source object.`,
+    )
+    setCopyStatus('idle')
+  }
+
   function copyCurrentSelectionStyle(): void {
     const result = copyStyleFromSelection(editableDiagram, selectedElement)
 
@@ -2052,6 +2148,7 @@ function App() {
       setStyleClipboard(result.clipboard)
     }
 
+    setStyleEyedropperTargetSelection(null)
     setStyleClipboardStatus(result.message)
     setLayerOperationStatus(result.message)
     setCopyStatus('idle')
@@ -2064,6 +2161,7 @@ function App() {
     )
 
     setEditorState(nextState)
+    setStyleEyedropperTargetSelection(null)
     setStyleClipboardStatus(nextState.layerOperationStatus)
     setPolylineStatus('')
     setCubicBezierStatus('')
@@ -2071,6 +2169,50 @@ function App() {
     setPathCrossingStatus('')
     setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
+    setCopyStatus('idle')
+  }
+
+  function applyContextQuickStylePresetFromBar(presetId: string | null): void {
+    const statusResult = applyContextQuickStylePreset(
+      editableDiagram,
+      selectedElement,
+      presetId,
+    )
+
+    setStyleClipboardStatus(statusResult.message)
+    setEditorState((current) => {
+      const result = applyContextQuickStylePreset(
+        current.editableDiagram,
+        current.selectedElement,
+        presetId,
+      )
+
+      if (!result.ok) {
+        return {
+          ...current,
+          layerOperationStatus: result.message,
+        }
+      }
+
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        result.diagram,
+        current.layerFilter,
+      )
+      const nextSelection = clearSelectionForLayerFilter(
+        result.diagram,
+        current.selectedElement,
+        nextLayerFilter,
+      )
+
+      return commitDiagramChange(current, {
+        ...current,
+        editableDiagram: result.diagram,
+        selectedElement: nextSelection,
+        layerFilter: nextLayerFilter,
+        layerOperationStatus: result.message,
+      })
+    })
+    setStyleEyedropperTargetSelection(null)
     setCopyStatus('idle')
   }
 
@@ -6932,6 +7074,14 @@ function App() {
     const isCollapsed = previewToolbarState === 'collapsed'
     const coordinateVisibilityLabel =
       coordinateAnchorVisibilityButtonLabel(showCoordinateAnchors)
+    const quickStyleModel = createContextQuickStyleBarModel(
+      editableDiagram,
+      selectedElement,
+    )
+    const canPasteQuickStyle =
+      styleClipboard !== null &&
+      quickStyleModel !== null &&
+      quickStyleModel.geometricKind === styleClipboard.geometricKind
 
     return (
       <div
@@ -7037,6 +7187,16 @@ function App() {
             onChange={updateContextQuickStyleField}
             onSliderInteractionStart={beginQuickStyleSliderInteraction}
             onSliderInteractionEnd={endQuickStyleSliderInteraction}
+            styleClipboardSummary={styleClipboardSummary(styleClipboard)}
+            canPasteStyle={canPasteQuickStyle}
+            styleEyedropperActive={styleEyedropperTargetSelection !== null}
+            onCopyStyle={copyCurrentSelectionStyle}
+            onPasteStyle={pasteCurrentSelectionStyle}
+            onStartStyleEyedropper={startStyleEyedropper}
+            onApplyStylePreset={(presetId) =>
+              applyContextQuickStylePresetFromBar(presetId)
+            }
+            onClearStylePreset={() => applyContextQuickStylePresetFromBar(null)}
           />
         )}
 

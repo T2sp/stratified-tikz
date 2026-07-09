@@ -9,10 +9,14 @@ import { normalizeColorInputValue } from './colorInput.ts'
 import {
   contextQuickStyleMixedValueLabel,
   createContextQuickStyleBarModel,
+  createContextQuickStylePresetModel,
+  filterContextQuickStylePresetOptions,
   snapContextQuickStyleSliderValue,
   updateContextQuickStyleNumericDraft,
   type ContextQuickStyleChangeOptions,
   type ContextQuickStyleField,
+  type ContextQuickStylePresetModel,
+  type ContextQuickStylePresetOption,
 } from './contextQuickStyleBar.ts'
 import { formatNumberInput } from './inspector/InspectorField.tsx'
 import type { BulkFieldScalarValue, BulkStyleFieldId } from './bulkEditing.ts'
@@ -34,6 +38,14 @@ export type ContextQuickStyleBarProps = {
   ) => void
   onSliderInteractionStart: () => void
   onSliderInteractionEnd: () => void
+  styleClipboardSummary: string
+  canPasteStyle: boolean
+  styleEyedropperActive: boolean
+  onCopyStyle: () => void
+  onPasteStyle: () => void
+  onStartStyleEyedropper: () => void
+  onApplyStylePreset: (presetId: string) => void
+  onClearStylePreset: () => void
 }
 
 export function ContextQuickStyleBar({
@@ -42,8 +54,17 @@ export function ContextQuickStyleBar({
   onChange,
   onSliderInteractionStart,
   onSliderInteractionEnd,
+  styleClipboardSummary,
+  canPasteStyle,
+  styleEyedropperActive,
+  onCopyStyle,
+  onPasteStyle,
+  onStartStyleEyedropper,
+  onApplyStylePreset,
+  onClearStylePreset,
 }: ContextQuickStyleBarProps) {
   const model = createContextQuickStyleBarModel(diagram, selection)
+  const presetModel = createContextQuickStylePresetModel(diagram, selection)
 
   if (model === null || model.fields.length === 0) {
     return null
@@ -68,8 +89,155 @@ export function ContextQuickStyleBar({
           />
         ))}
       </div>
+      <div className="context-quick-style-actions" aria-label="Style actions">
+        <button
+          type="button"
+          className="context-quick-style-action-button"
+          aria-label="Copy style"
+          title="Copy style"
+          onClick={onCopyStyle}
+        >
+          Copy
+        </button>
+        <button
+          type="button"
+          className="context-quick-style-action-button"
+          aria-label={`Paste style; clipboard ${styleClipboardSummary}`}
+          title={`Paste style; clipboard ${styleClipboardSummary}`}
+          disabled={!canPasteStyle}
+          onClick={onPasteStyle}
+        >
+          Paste
+        </button>
+        <button
+          type="button"
+          className="context-quick-style-action-button"
+          aria-label="Style eyedropper"
+          title={
+            styleEyedropperActive
+              ? 'Click a source object to apply its style'
+              : 'Pick a source style from the preview'
+          }
+          aria-pressed={styleEyedropperActive}
+          onClick={onStartStyleEyedropper}
+        >
+          Pick
+        </button>
+        {presetModel !== null && presetModel.options.length > 0 && (
+          <QuickTikzStyleMenu
+            model={presetModel}
+            onApplyStylePreset={onApplyStylePreset}
+            onClearStylePreset={onClearStylePreset}
+          />
+        )}
+      </div>
     </section>
   )
+}
+
+function QuickTikzStyleMenu({
+  model,
+  onApplyStylePreset,
+  onClearStylePreset,
+}: {
+  model: ContextQuickStylePresetModel
+  onApplyStylePreset: (presetId: string) => void
+  onClearStylePreset: () => void
+}) {
+  const [filter, setFilter] = useState('')
+  const options = filterContextQuickStylePresetOptions(model.options, filter)
+  const summary = quickTikzStyleSummary(model)
+
+  return (
+    <details className="context-quick-style-preset-menu">
+      <summary aria-label="TikZ style selector" title="Apply a saved TikZ style">
+        TikZ: {summary}
+      </summary>
+      <div className="context-quick-style-preset-popover">
+        <input
+          className="context-quick-style-preset-search"
+          type="search"
+          value={filter}
+          aria-label="Search TikZ styles"
+          placeholder="Search TikZ styles"
+          onChange={(event) => setFilter(event.currentTarget.value)}
+        />
+        <button
+          type="button"
+          className="context-quick-style-preset-option"
+          aria-label="Clear TikZ style"
+          disabled={model.current.kind === 'none'}
+          onClick={onClearStylePreset}
+        >
+          None
+        </button>
+        {options.length === 0 ? (
+          <span className="context-quick-style-preset-empty">
+            No matching styles
+          </span>
+        ) : (
+          options.map((option) => (
+            <QuickTikzStyleOptionButton
+              key={option.presetId}
+              option={option}
+              selected={
+                model.current.kind === 'preset' &&
+                model.current.presetId === option.presetId
+              }
+              onApplyStylePreset={onApplyStylePreset}
+            />
+          ))
+        )}
+      </div>
+    </details>
+  )
+}
+
+function QuickTikzStyleOptionButton({
+  option,
+  selected,
+  onApplyStylePreset,
+}: {
+  option: ContextQuickStylePresetOption
+  selected: boolean
+  onApplyStylePreset: (presetId: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`context-quick-style-preset-option${
+        selected ? ' is-selected' : ''
+      }`}
+      aria-pressed={selected}
+      onClick={() => onApplyStylePreset(option.presetId)}
+    >
+      <span>{option.name}</span>
+      <span className="context-quick-style-preset-meta">
+        {quickTikzStyleOptionMeta(option)}
+      </span>
+    </button>
+  )
+}
+
+function quickTikzStyleSummary(model: ContextQuickStylePresetModel): string {
+  switch (model.current.kind) {
+    case 'none':
+      return 'None'
+    case 'mixed':
+      return contextQuickStyleMixedValueLabel
+    case 'preset':
+      return model.current.label
+  }
+}
+
+function quickTikzStyleOptionMeta(option: ContextQuickStylePresetOption): string {
+  if (option.origin === 'imported') {
+    return option.importedKey === undefined
+      ? 'imported'
+      : `imported: ${option.importedKey}`
+  }
+
+  return option.tikzStyleName
 }
 
 function ContextQuickStyleFieldEditor({
