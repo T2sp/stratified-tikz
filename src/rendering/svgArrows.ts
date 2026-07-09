@@ -16,15 +16,23 @@ import type {
   Vec2,
   Vec3,
 } from '../model/types.ts'
+import { svgPoint } from './svgPath.ts'
 
 export type SvgArrowheadPreview = {
   kind: 'endpoint' | 'mid'
   tip: Vec2
   left: Vec2
   right: Vec2
+  points: Vec2[]
+  pathData: string
   color: string
   opacity: number
   head: ArrowHeadKind | 'endpoint'
+  shape: ArrowHeadKind
+  className: string
+  angleRadians: number
+  length: number
+  strokeWidth: number
 }
 
 type MeasuredPolyline = {
@@ -33,10 +41,20 @@ type MeasuredPolyline = {
   totalLength: number
 }
 
+type ArrowheadShapeGeometry = {
+  points: Vec2[]
+  pathData: string
+  left: Vec2
+  right: Vec2
+  length: number
+  strokeWidth: number
+}
+
 const cubicSampleCount = 24
 const arcSampleCount = 32
 const templateSampleCount = 72
 const minArrowProbeLength = 1e-6
+const defaultArrowLineWidth = 1.2
 
 export function curveArrowheadsForSvgPreview(
   curve: CurveStratum,
@@ -301,14 +319,16 @@ function arrowheadAtDistance({
   kind: SvgArrowheadPreview['kind']
   head: SvgArrowheadPreview['head']
 }): SvgArrowheadPreview | null {
+  const shape = arrowheadShape(head)
+  const probeLength = tangentProbeLength(measured, lineWidth, shape)
   const tip = pointAtDistance(measured, distance)
   const before = pointAtDistance(
     measured,
-    Math.max(0, distance - tangentProbeLength(measured, lineWidth)),
+    Math.max(0, distance - probeLength),
   )
   const after = pointAtDistance(
     measured,
-    Math.min(measured.totalLength, distance + tangentProbeLength(measured, lineWidth)),
+    Math.min(measured.totalLength, distance + probeLength),
   )
 
   if (tip === null || before === null || after === null) {
@@ -331,49 +351,237 @@ function arrowheadAtDistance({
     return null
   }
 
-  const length = arrowheadLength(lineWidth)
-  const width = length * 0.62
-  const perpendicular = { x: -unit.y, y: unit.x }
-  const base = {
-    x: tip.x - unit.x * length,
-    y: tip.y - unit.y * length,
-  }
-  const left = {
-    x: base.x + perpendicular.x * width * 0.5,
-    y: base.y + perpendicular.y * width * 0.5,
-  }
-  const right = {
-    x: base.x - perpendicular.x * width * 0.5,
-    y: base.y - perpendicular.y * width * 0.5,
-  }
+  const geometry = arrowheadShapeGeometry(tip, unit, lineWidth, shape)
 
-  if (![tip, left, right].every(isFiniteVec2)) {
+  if (!geometry.points.every(isFiniteVec2)) {
     return null
   }
 
   return {
     kind,
     tip,
-    left,
-    right,
+    left: geometry.left,
+    right: geometry.right,
+    points: geometry.points,
+    pathData: geometry.pathData,
     color,
     opacity,
     head,
+    shape,
+    className: `svg-arrowhead-preview svg-arrowhead-preview--${shape}`,
+    angleRadians: Math.atan2(unit.y, unit.x),
+    length: geometry.length,
+    strokeWidth: geometry.strokeWidth,
   }
 }
 
 function tangentProbeLength(
   measured: MeasuredPolyline,
   lineWidth: number,
+  shape: ArrowHeadKind,
 ): number {
   return Math.max(
     minArrowProbeLength,
-    Math.min(measured.totalLength / 3, arrowheadLength(lineWidth)),
+    Math.min(measured.totalLength / 3, arrowheadLength(lineWidth, shape)),
   )
 }
 
-function arrowheadLength(lineWidth: number): number {
-  return Math.max(7, Math.min(18, 7 + lineWidth * 2.2))
+function arrowheadShape(head: SvgArrowheadPreview['head']): ArrowHeadKind {
+  return head === 'endpoint' ? 'standard' : head
+}
+
+function arrowheadShapeGeometry(
+  tip: Vec2,
+  unit: Vec2,
+  lineWidth: number,
+  shape: ArrowHeadKind,
+): ArrowheadShapeGeometry {
+  const length = arrowheadLength(lineWidth, shape)
+  const width = arrowheadWidth(length, shape)
+  const perpendicular = { x: -unit.y, y: unit.x }
+  const strokeWidth = arrowheadStrokeWidth(lineWidth)
+
+  switch (shape) {
+    case 'standard': {
+      const left = pointBehind(tip, unit, perpendicular, length, width * 0.5)
+      const right = pointBehind(tip, unit, perpendicular, length, -width * 0.5)
+      const points = [tip, left, right]
+
+      return {
+        points,
+        pathData: closedPath(points),
+        left,
+        right,
+        length,
+        strokeWidth,
+      }
+    }
+    case 'stealth': {
+      const left = pointBehind(tip, unit, perpendicular, length, width * 0.5)
+      const notch = pointBehind(tip, unit, perpendicular, length * 0.68, 0)
+      const right = pointBehind(tip, unit, perpendicular, length, -width * 0.5)
+      const points = [tip, left, notch, right]
+
+      return {
+        points,
+        pathData: closedPath(points),
+        left,
+        right,
+        length,
+        strokeWidth,
+      }
+    }
+    case 'latex': {
+      const shoulderBack = length * 0.74
+      const left = pointBehind(
+        tip,
+        unit,
+        perpendicular,
+        shoulderBack,
+        width * 0.5,
+      )
+      const tail = pointBehind(tip, unit, perpendicular, length, 0)
+      const right = pointBehind(
+        tip,
+        unit,
+        perpendicular,
+        shoulderBack,
+        -width * 0.5,
+      )
+      const points = [tip, left, tail, right]
+
+      return {
+        points,
+        pathData: closedPath(points),
+        left,
+        right,
+        length,
+        strokeWidth,
+      }
+    }
+    case 'stealthHarpoon': {
+      return harpoonShapeGeometry(
+        tip,
+        unit,
+        perpendicular,
+        length,
+        width,
+        1,
+        strokeWidth,
+      )
+    }
+    case 'stealthHarpoonSwap': {
+      return harpoonShapeGeometry(
+        tip,
+        unit,
+        perpendicular,
+        length,
+        width,
+        -1,
+        strokeWidth,
+      )
+    }
+  }
+}
+
+function harpoonShapeGeometry(
+  tip: Vec2,
+  unit: Vec2,
+  perpendicular: Vec2,
+  length: number,
+  width: number,
+  side: 1 | -1,
+  strokeWidth: number,
+): ArrowheadShapeGeometry {
+  const sidePoint = pointBehind(
+    tip,
+    unit,
+    perpendicular,
+    length,
+    side * width * 0.5,
+  )
+  const notch = pointBehind(tip, unit, perpendicular, length * 0.68, 0)
+  const tail = pointBehind(tip, unit, perpendicular, length, 0)
+  const points =
+    side === 1
+      ? [tip, sidePoint, notch, tail]
+      : [tip, tail, notch, sidePoint]
+  const left = side === 1 ? sidePoint : tail
+  const right = side === 1 ? tail : sidePoint
+
+  return {
+    points,
+    pathData: closedPath(points),
+    left,
+    right,
+    length,
+    strokeWidth,
+  }
+}
+
+function arrowheadLength(lineWidth: number, shape: ArrowHeadKind): number {
+  const base = Math.max(7, Math.min(18, 7 + safeLineWidth(lineWidth) * 2.2))
+
+  switch (shape) {
+    case 'standard':
+      return base
+    case 'stealth':
+      return base * 1.12
+    case 'latex':
+      return base * 1.18
+    case 'stealthHarpoon':
+    case 'stealthHarpoonSwap':
+      return base * 1.12
+  }
+}
+
+function arrowheadWidth(length: number, shape: ArrowHeadKind): number {
+  switch (shape) {
+    case 'standard':
+      return length * 0.5
+    case 'stealth':
+      return length * 0.78
+    case 'latex':
+      return length * 0.46
+    case 'stealthHarpoon':
+    case 'stealthHarpoonSwap':
+      return length * 0.78
+  }
+}
+
+function arrowheadStrokeWidth(lineWidth: number): number {
+  return Math.max(0.7, Math.min(1.8, safeLineWidth(lineWidth) * 0.35))
+}
+
+function safeLineWidth(lineWidth: number): number {
+  return Number.isFinite(lineWidth) && lineWidth > 0
+    ? lineWidth
+    : defaultArrowLineWidth
+}
+
+function pointBehind(
+  tip: Vec2,
+  unit: Vec2,
+  perpendicular: Vec2,
+  distance: number,
+  offset: number,
+): Vec2 {
+  return {
+    x: tip.x - unit.x * distance + perpendicular.x * offset,
+    y: tip.y - unit.y * distance + perpendicular.y * offset,
+  }
+}
+
+function closedPath(points: readonly Vec2[]): string {
+  const [firstPoint, ...restPoints] = points
+
+  return firstPoint === undefined
+    ? ''
+    : [
+        `M ${svgPoint(firstPoint)}`,
+        ...restPoints.map((point) => `L ${svgPoint(point)}`),
+        'Z',
+      ].join(' ')
 }
 
 function pointAtDistance(
