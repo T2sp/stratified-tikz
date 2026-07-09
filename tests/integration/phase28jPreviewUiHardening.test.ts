@@ -66,6 +66,62 @@ const quickBarSource = readFileSync(
   new URL('../../src/ui/ContextQuickStyleBar.tsx', import.meta.url),
   'utf8',
 )
+const editingDocs = readFileSync(
+  new URL('../../docs/EDITING.md', import.meta.url),
+  'utf8',
+)
+const previewUiDocs = readFileSync(
+  new URL('../../docs/PREVIEW_UI.md', import.meta.url),
+  'utf8',
+)
+const tikzOutputDocs = readFileSync(
+  new URL('../../docs/TIKZ_OUTPUT.md', import.meta.url),
+  'utf8',
+)
+
+test('Phase 28 style-reference docs distinguish local and imported references', () => {
+  assert.doesNotMatch(editingDocs, /style preset\/import references/)
+  assert.match(editingDocs, /`stylePresetId`/)
+  assert.match(editingDocs, /`importedTikzStyleReferenceId`/)
+  assert.match(
+    editingDocs,
+    /Imported TikZ style references are preserved when possible/,
+  )
+  assert.match(editingDocs, /explicit override/)
+  assert.match(
+    previewUiDocs,
+    /keeps the imported TikZ style reference where possible/,
+  )
+  assert.match(previewUiDocs, /avoiding duplicated options/)
+})
+
+test('Phase 28 arrow-preview docs describe differentiated SVG arrowheads', () => {
+  assert.match(
+    tikzOutputDocs,
+    /SVG preview draws approximate arrowhead families/,
+  )
+
+  for (const arrowHead of [
+    '`>`',
+    '`Stealth`',
+    '`Latex`',
+    '`Stealth[harpoon]`',
+    '`Stealth[harpoon,swap]`',
+  ]) {
+    assert.equal(tikzOutputDocs.includes(arrowHead), true)
+  }
+
+  assert.doesNotMatch(tikzOutputDocs, /approximate\s+triangular\s+arrowheads/)
+  assert.equal(
+    /does\s+not\s+attempt[\s\S]{0,80}(Stealth|Latex|harpoon)/.test(
+      tikzOutputDocs,
+    ),
+    false,
+  )
+  assert.match(tikzOutputDocs, /source of truth/)
+  assert.match(previewUiDocs, /SVG Preview draws path arrowheads/)
+  assert.match(previewUiDocs, /harpoon side/)
+})
 
 test('large Preview, Export SVG, and Layer edge actions share a robust layout', () => {
   const previewStageRule = cssRule('.preview-stage')

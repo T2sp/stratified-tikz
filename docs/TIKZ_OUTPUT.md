@@ -131,10 +131,14 @@ The arrow controls are intentionally compact:
 - the Reverse path direction command gives button feedback through its disabled
   state and tooltip when a path kind cannot be reversed.
 
-SVG preview draws approximate triangular arrowheads for endpoint and mid-arrow
-decorations. The preview follows the projected path tangent in both 2D and 3D,
-but it does not attempt to reproduce the exact TikZ `Stealth`, `Latex`, or
-harpoon glyphs.
+SVG preview draws approximate arrowhead families for the configured path arrow
+options. Endpoint arrows use the standard `>`-style head. Mid-arrow previews
+distinguish `>`, `Stealth`, `Latex`, `Stealth[harpoon]`, and
+`Stealth[harpoon,swap]`, including the harpoon side for `swap`.
+
+The preview still approximates TikZ `arrows.meta` rendering. Generated TikZ and
+its PDF output remain the source of truth, especially for exact glyph metrics,
+line joins, and edge cases involving decoration, occlusion, or 3D projection.
 
 ## Path inline nodes
 
