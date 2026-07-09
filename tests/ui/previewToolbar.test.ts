@@ -31,6 +31,8 @@ import {
   defaultPreviewCoordinateInputMode,
   previewToolbarTopTools,
   runPreviewOverlayAction,
+  shouldCloseCoonsPatchDirectionPanelForSheetMenuItem,
+  shouldCloseCoonsPatchDirectionPanelForWorkflow,
   shouldHandlePreviewCanvasCreationClick,
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
@@ -512,6 +514,120 @@ test('Add sheet menu uses the same grouped palette structure as Add path', () =>
   )
 })
 
+test('Coons direction panel stays open during Coons direction editing workflow', () => {
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForWorkflow({
+      ambientDimension: 3,
+      tool: 'createSheet',
+      sheetCreationKind: 'coonsPatch',
+    }),
+    false,
+  )
+})
+
+test('selecting Polygon closes the Coons direction panel', () => {
+  const polygonItem = addSheetMenuItems().find(
+    (item) => item.id === 'polygonSheet',
+  )
+
+  assert.notEqual(polygonItem, undefined)
+  if (polygonItem === undefined) {
+    return
+  }
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(polygonItem),
+    true,
+  )
+})
+
+test('selecting Ruled closes the Coons direction panel', () => {
+  const ruledItem = addSheetMenuItems().find(
+    (item) => item.id === 'ruledSurface',
+  )
+
+  assert.notEqual(ruledItem, undefined)
+  if (ruledItem === undefined) {
+    return
+  }
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(ruledItem),
+    true,
+  )
+})
+
+test('selecting Hemisphere closes the Coons direction panel', () => {
+  const hemisphereItem = addSheetMenuItems().find(
+    (item) => item.id === 'hemisphere',
+  )
+
+  assert.notEqual(hemisphereItem, undefined)
+  if (hemisphereItem === undefined) {
+    return
+  }
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(hemisphereItem),
+    true,
+  )
+})
+
+test('selecting Add path closes the Coons direction panel', () => {
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForWorkflow({
+      ambientDimension: 3,
+      tool: 'createPath',
+      sheetCreationKind: 'coonsPatch',
+    }),
+    true,
+  )
+})
+
+test('selecting Add sheet Direct input closes the Coons direction panel', () => {
+  const directItem = addSheetMenuItems().find(
+    (item) => item.id === 'directSheetInput',
+  )
+
+  assert.notEqual(directItem, undefined)
+  if (directItem === undefined) {
+    return
+  }
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(directItem),
+    true,
+  )
+})
+
+test('selecting non-sheet top tools closes the Coons direction panel', () => {
+  const tools: WorkPlanePreviewTool[] = [
+    'select',
+    'createPoint',
+    'createLabel',
+    'createGrid',
+  ]
+
+  for (const tool of tools) {
+    assert.equal(
+      shouldCloseCoonsPatchDirectionPanelForWorkflow({
+        ambientDimension: 3,
+        tool,
+        sheetCreationKind: 'coonsPatch',
+      }),
+      true,
+      tool,
+    )
+  }
+})
+
+test('ambient dimension changes out of 3D close the Coons direction panel', () => {
+  assert.equal(
+    shouldCloseCoonsPatchDirectionPanelForWorkflow({
+      ambientDimension: 2,
+      tool: 'createSheet',
+      sheetCreationKind: 'coonsPatch',
+    }),
+    true,
+  )
+})
+
 test('Add path direct drawer still exposes direct path creation choices', () => {
   const directModes = directPathInputModeItems().map((item) => item.id)
 
@@ -679,6 +795,67 @@ test('direct input drawer state is UI-only and does not change diagram serializa
   assert.equal(serializeDiagram(emptyTwoDimensionalDiagram), before)
 })
 
+test('Coons direction panel state is UI-only and controls both direction details', () => {
+  const serialized = serializeDiagram(emptyTwoDimensionalDiagram)
+  const openBindingCount =
+    appSource.match(/open={coonsPatchDirectionPanelOpen}/g)?.length ?? 0
+  const toggleBindingCount =
+    appSource.match(
+      /setCoonsPatchDirectionPanelOpen\(event\.currentTarget\.open\)/g,
+    )?.length ?? 0
+
+  assert.equal(openBindingCount, 2)
+  assert.equal(toggleBindingCount, 2)
+  assert.doesNotMatch(serialized, /coonsPatchDirectionPanelOpen/)
+})
+
+test('Coons workflow finish and cancel close the direction panel', () => {
+  const createSource = sourceSlice(
+    'function createCoonsPatchFromPickedPaths',
+    'useEffect(() =>',
+  )
+  const cancelSource = sourceSlice(
+    'function cancelCoonsPatchBoundaryPicking',
+    'function undoCoonsPatchBoundaryPicking',
+  )
+
+  assert.match(createSource, /closeCoonsPatchDirectionPanel\(\)/)
+  assert.match(cancelSource, /closeCoonsPatchDirectionPanel\(\)/)
+})
+
+test('diagram load and example switch close the Coons direction panel', () => {
+  const exampleSource = sourceSlice(
+    'function selectExample',
+    'function updateEditableDiagram',
+  )
+  const loadSource = sourceSlice(
+    'function commitLoadedJsonDiagram',
+    'async function loadJsonFile',
+  )
+
+  assert.match(exampleSource, /closeCoonsPatchDirectionPanel\(\)/)
+  assert.match(loadSource, /closeCoonsPatchDirectionPanel\(\)/)
+})
+
+test('Coons picking and direction edits do not close the direction panel', () => {
+  const pathPickSource = sourceSlice(
+    'function pickCoonsPatchBoundaryPath',
+    'function pickCoonsPatchBoundaryPoint',
+  )
+  const pointPickSource = sourceSlice(
+    'function pickCoonsPatchBoundaryPoint',
+    'function resetCoonsPatchBoundaryPicking',
+  )
+  const reverseSource = sourceSlice(
+    'function toggleCoonsPatchBoundaryDirection',
+    'function handleBoundarySurfaceCurveClick',
+  )
+
+  assert.doesNotMatch(pathPickSource, /closeCoonsPatchDirectionPanel\(\)/)
+  assert.doesNotMatch(pointPickSource, /closeCoonsPatchDirectionPanel\(\)/)
+  assert.doesNotMatch(reverseSource, /closeCoonsPatchDirectionPanel\(\)/)
+})
+
 test('direct input drawer open and closed states do not affect TikZ before creation', () => {
   const before = generateTikz(emptyTwoDimensionalDiagram)
   const openState = directInputDrawerStateForInputMode('direct')
@@ -783,6 +960,18 @@ test('overlay action helper stops propagation and calls history or trash handler
   assert.equal(stopped, true)
   assert.equal(calls, 1)
 })
+
+function sourceSlice(startMarker: string, endMarker: string): string {
+  const start = appSource.indexOf(startMarker)
+
+  assert.notEqual(start, -1, `Missing source marker: ${startMarker}`)
+
+  const end = appSource.indexOf(endMarker, start)
+
+  assert.notEqual(end, -1, `Missing source marker: ${endMarker}`)
+
+  return appSource.slice(start, end)
+}
 
 function cssRule(selector: string): string {
   const start = appCss.indexOf(`${selector} {`)

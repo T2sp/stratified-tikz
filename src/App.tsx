@@ -343,6 +343,8 @@ import {
   shouldHandlePreviewCanvasCreationClick,
   shouldShowDirectInputDrawer,
   shouldShowFillPathsForTool,
+  shouldCloseCoonsPatchDirectionPanelForSheetMenuItem,
+  shouldCloseCoonsPatchDirectionPanelForWorkflow,
   shouldShowWorkPlaneLocalInputModeControl,
   stopPreviewOverlayEvent,
   toolbarPaletteAfterCommandSelection,
@@ -686,6 +688,11 @@ function App() {
     useState<string>(String(defaultCoonsPatchSampling.vSegments))
   const [coonsPatchBoundaryDraft, setCoonsPatchBoundaryDraft] =
     useState<CoonsPatchBoundaryDraft>(createCoonsPatchBoundaryDraft)
+  const [coonsPatchDirectionPanelOpen, setCoonsPatchDirectionPanelOpen] =
+    useState<boolean>(false)
+  const closeCoonsPatchDirectionPanel = useCallback((): void => {
+    setCoonsPatchDirectionPanelOpen(false)
+  }, [])
   const [directCreationStatus, setDirectCreationStatus] = useState<string>('')
   const [fillBoundaryPathIds, setFillBoundaryPathIds] = useState<string[]>([])
   const [fillRule, setFillRule] = useState<FillRule>('nonzero')
@@ -1394,6 +1401,7 @@ function App() {
       setExampleBarState(collapseExampleBarForEditing())
     }
     setIsExampleDropdownOpen(false)
+    closeCoonsPatchDirectionPanel()
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setVisibilityOptions(
       cloneVisibilityOptions(nextDiagram.view?.visibility ?? defaultVisibilityOptions),
@@ -1682,6 +1690,7 @@ function App() {
     )
     geometryDragUndoDiagramRef.current = null
     coordinateAnchorDragSessionRef.current = null
+    closeCoonsPatchDirectionPanel()
     setEditorState((current) => undoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
@@ -1715,6 +1724,7 @@ function App() {
     setSelectedExampleId(exampleIdForAmbientDimension(nextDiagram.ambientDimension))
     geometryDragUndoDiagramRef.current = null
     coordinateAnchorDragSessionRef.current = null
+    closeCoonsPatchDirectionPanel()
     setEditorState((current) => redoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
@@ -1852,6 +1862,7 @@ function App() {
     setExampleBarState(collapseExampleBarForEditing())
     setIsExampleDropdownOpen(false)
     setSelectedExampleId(exampleIdForAmbientDimension(diagram.ambientDimension))
+    closeCoonsPatchDirectionPanel()
     setCreationTool('select')
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setEditorState((current) =>
@@ -2179,6 +2190,7 @@ function App() {
     }
 
     setCreationTool('select')
+    closeCoonsPatchDirectionPanel()
     setOpenToolbarPalette(null)
     setStyleEyedropperTargetSelection(selectedElement)
     setStyleClipboardStatus(
@@ -2476,6 +2488,7 @@ function App() {
     )
     setFillBoundaryPathIds([])
     setCreationTool('select')
+    closeCoonsPatchDirectionPanel()
     setFillStatus(
       `${result.kind === 'filledRegion' ? 'Filled region' : 'Filled sheet'} created.`,
     )
@@ -2631,6 +2644,13 @@ function App() {
     )
   }
 
+  function cancelCoonsPatchBoundaryPicking(): void {
+    setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    closeCoonsPatchDirectionPanel()
+    setSheetStatus('Coons patch canceled.')
+    setDirectCreationStatus('Coons patch canceled.')
+  }
+
   function undoCoonsPatchBoundaryPicking(): void {
     const draft = undoCoonsPatchBoundaryDraftPick(coonsPatchBoundaryDraft)
 
@@ -2726,6 +2746,7 @@ function App() {
       creationLayer,
     )
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    closeCoonsPatchDirectionPanel()
     setSheetStatus('Coons patch created.')
     setDirectCreationStatus('Coons patch created.')
     setCopyStatus('idle')
@@ -2967,6 +2988,7 @@ function App() {
   }
 
   function closeDirectInputDrawer(): void {
+    closeCoonsPatchDirectionPanel()
     updatePreviewCoordinateInputMode(closeDirectInputDrawerInputMode())
     setDirectCreationStatus('')
   }
@@ -2977,6 +2999,16 @@ function App() {
       editorState.editableDiagram.ambientDimension !== 3
     ) {
       return
+    }
+
+    if (
+      shouldCloseCoonsPatchDirectionPanelForWorkflow({
+        ambientDimension: editorState.editableDiagram.ambientDimension,
+        tool,
+        sheetCreationKind,
+      })
+    ) {
+      closeCoonsPatchDirectionPanel()
     }
 
     setCreationTool(tool)
@@ -3083,6 +3115,10 @@ function App() {
   }
 
   function activateSheetMenuItem(item: PreviewSheetMenuItem): void {
+    if (shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(item)) {
+      closeCoonsPatchDirectionPanel()
+    }
+
     if (item.sheetCreationKind !== undefined) {
       activateSheetCreationKind(item.sheetCreationKind)
       return
@@ -3190,6 +3226,16 @@ function App() {
   }
 
   function updateSheetCreationKind(kind: SheetCreationKind): void {
+    if (
+      shouldCloseCoonsPatchDirectionPanelForWorkflow({
+        ambientDimension: editableDiagram.ambientDimension,
+        tool: creationTool,
+        sheetCreationKind: kind,
+      })
+    ) {
+      closeCoonsPatchDirectionPanel()
+    }
+
     if (kind === sheetCreationKind) {
       setDirectCreationStatus('')
       setSheetStatus(currentBoundarySurfaceDraftStatus())
@@ -7770,8 +7816,21 @@ function App() {
             >
               Reset
             </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={cancelCoonsPatchBoundaryPicking}
+            >
+              Cancel
+            </button>
           </div>
-          <details className="direct-boundary-directions">
+          <details
+            className="direct-boundary-directions"
+            open={coonsPatchDirectionPanelOpen}
+            onToggle={(event) =>
+              setCoonsPatchDirectionPanelOpen(event.currentTarget.open)
+            }
+          >
             <summary>Boundary directions</summary>
             <div className="direct-boundary-direction-list">
               {coonsPatchBoundaryRoles.map((role) => {
@@ -8562,6 +8621,9 @@ function App() {
             >
               Reset
             </button>
+            <button type="button" onClick={cancelCoonsPatchBoundaryPicking}>
+              Cancel
+            </button>
             <button
               type="button"
               disabled={
@@ -8580,7 +8642,13 @@ function App() {
             >
               Create
             </button>
-            <details className="preview-toolbar-menu preview-toolbar-inline-menu">
+            <details
+              className="preview-toolbar-menu preview-toolbar-inline-menu"
+              open={coonsPatchDirectionPanelOpen}
+              onToggle={(event) =>
+                setCoonsPatchDirectionPanelOpen(event.currentTarget.open)
+              }
+            >
               <summary>Directions</summary>
               <div className="preview-toolbar-menu-popover preview-toolbar-wide-popover">
                 {coonsPatchBoundaryRoles.map((role) => {
