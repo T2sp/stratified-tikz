@@ -198,6 +198,7 @@ import {
   createConcatenatedPathDraft,
   createDiagramHistory,
   createSheetPolygonDraft,
+  collapseExampleBarForEditing,
   defaultCoonsPatchSampling,
   closeDirectInputDrawerInputMode,
   defaultHemisphereCreationParameters,
@@ -206,6 +207,7 @@ import {
   directInputDrawerStateForInputMode,
   defaultCustomOriginNormalWorkPlaneInput,
   defaultCustomThreePointWorkPlaneInput,
+  defaultExampleBarState,
   defaultJsonDownloadFilename,
   defaultTikzExportMode,
   directCoordinateModesForAmbientDimension,
@@ -275,6 +277,7 @@ import {
   resolvePointStratumCoordinateForCursorCreation,
   selectedElementCount,
   shouldBlockCreationForWorkPlanePointPicking,
+  shouldCollapseExampleBarForDiagramChange,
   shouldShowWorkPlaneDetails,
   styleClipboardSummary,
   startWorkPlanePointPicking,
@@ -313,6 +316,7 @@ import {
   shouldShowFillPathsForTool,
   stopPreviewOverlayEvent,
   toolbarPaletteAfterCommandSelection,
+  toggleExampleDropdown,
   toggleCoordinateAnchorVisibility,
   toggleToolbarPalette,
   togglePreviewToolbarState,
@@ -326,6 +330,7 @@ import {
   type DirectCoordinateInput,
   type DirectCoordinateMode,
   type DirectCubicBezierControlMode,
+  type ExampleBarState,
   type DirectGridCreationError,
   type DirectGridInput,
   type DirectInputDrawerState,
@@ -570,6 +575,10 @@ function labelVisibilityPolicyFromSelectValue(
 function App() {
   const [selectedExampleId, setSelectedExampleId] =
     useState<ExampleId>(defaultExampleId)
+  const [exampleBarState, setExampleBarState] =
+    useState<ExampleBarState>(() => defaultExampleBarState())
+  const [isExampleDropdownOpen, setIsExampleDropdownOpen] =
+    useState<boolean>(false)
   const [coordinateInputMode, setCoordinateInputMode] =
     useState<CoordinateInputMode>(defaultPreviewCoordinateInputMode)
   const [directInputDrawerState, setDirectInputDrawerState] =
@@ -884,6 +893,21 @@ function App() {
           coonsPatchBoundaryDraft,
         )))
   const selectedExample = getExampleOption(selectedExampleId)
+  const selectedExampleDiagramSignature = useMemo(
+    () => serializeDiagram(selectedExample.diagram),
+    [selectedExample],
+  )
+  const editableDiagramSignature = useMemo(
+    () => serializeDiagram(editableDiagram),
+    [editableDiagram],
+  )
+  const diagramMatchesSelectedExample =
+    editableDiagramSignature === selectedExampleDiagramSignature
+  const effectiveExampleBarState = shouldCollapseExampleBarForDiagramChange(
+    diagramMatchesSelectedExample,
+  )
+    ? collapseExampleBarForEditing()
+    : exampleBarState
   const tikzSource = useMemo(
     () =>
       generateTikzForUi(editableDiagram, {
@@ -1284,6 +1308,10 @@ function App() {
     const nextDiagram = cloneDiagram(nextExample.diagram)
 
     setSelectedExampleId(exampleId)
+    if (effectiveExampleBarState === 'compact') {
+      setExampleBarState(collapseExampleBarForEditing())
+    }
+    setIsExampleDropdownOpen(false)
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setVisibilityOptions(
       cloneVisibilityOptions(nextDiagram.view?.visibility ?? defaultVisibilityOptions),
@@ -1678,6 +1706,8 @@ function App() {
     setPendingSymbolicImport(null)
     setSymbolicImportDrafts([])
     setSymbolicImportStatus('')
+    setExampleBarState(collapseExampleBarForEditing())
+    setIsExampleDropdownOpen(false)
     setSelectedExampleId(exampleIdForAmbientDimension(diagram.ambientDimension))
     setCreationTool('select')
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
@@ -1776,6 +1806,8 @@ function App() {
     }
 
     if (result.kind === 'needsVariableResolution') {
+      setExampleBarState(collapseExampleBarForEditing())
+      setIsExampleDropdownOpen(false)
       setPendingSymbolicImport(result.pendingImport)
       setSymbolicImportDrafts(
         result.pendingImport.variables.map((variable) => ({
@@ -7763,28 +7795,75 @@ function App() {
         </header>
 
         <section className="toolbar" aria-label="Diagram controls">
-        <div className="control-stack example-control-stack">
-          <div className="control-group example-control-group">
-            <span className="control-label">Example</span>
-            <div className="segmented-control example-segmented-control">
-              {exampleOptions.map((example) => (
-                <button
-                  key={example.id}
-                  type="button"
-                  className={
-                    selectedExampleId === example.id ? 'is-selected' : undefined
-                  }
-                  aria-pressed={selectedExampleId === example.id}
-                  onClick={() => selectExample(example.id)}
+        <div
+          className={`control-stack example-control-stack example-control-stack-${effectiveExampleBarState}`}
+        >
+          {effectiveExampleBarState === 'expanded' ? (
+            <>
+              <div className="control-group example-control-group">
+                <span className="control-label">Example</span>
+                <div className="segmented-control example-segmented-control">
+                  {exampleOptions.map((example) => (
+                    <button
+                      key={example.id}
+                      type="button"
+                      className={
+                        selectedExampleId === example.id ? 'is-selected' : undefined
+                      }
+                      aria-pressed={selectedExampleId === example.id}
+                      onClick={() => selectExample(example.id)}
+                    >
+                      {example.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="toolbar-note">
+                Edits are temporary in this phase and reset when switching examples.
+              </p>
+            </>
+          ) : (
+            <div className="example-dropdown-control">
+              <button
+                type="button"
+                className="toolbar-button example-dropdown-toggle"
+                aria-haspopup="menu"
+                aria-expanded={isExampleDropdownOpen}
+                aria-controls="example-dropdown-menu"
+                aria-label="Open example diagram menu"
+                onClick={() =>
+                  setIsExampleDropdownOpen((current) =>
+                    toggleExampleDropdown(current),
+                  )
+                }
+              >
+                Examples {isExampleDropdownOpen ? '▴' : '▾'}
+              </button>
+              {isExampleDropdownOpen && (
+                <div
+                  id="example-dropdown-menu"
+                  className="example-dropdown-menu"
+                  role="menu"
+                  aria-label="Example diagrams"
                 >
-                  {example.name}
-                </button>
-              ))}
+                  {exampleOptions.map((example) => (
+                    <button
+                      key={example.id}
+                      type="button"
+                      role="menuitemradio"
+                      className={
+                        selectedExampleId === example.id ? 'is-selected' : undefined
+                      }
+                      aria-checked={selectedExampleId === example.id}
+                      onClick={() => selectExample(example.id)}
+                    >
+                      {example.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <p className="toolbar-note">
-            Edits are temporary in this phase and reset when switching examples.
-          </p>
+          )}
         </div>
 
         <VariableManager
