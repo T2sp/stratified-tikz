@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useMemo,
   useEffect,
@@ -272,7 +273,6 @@ import {
   workPlaneOriginReferenceText,
   workPlaneOverlayButtonLabel,
   VariableManager,
-  applyCustomOriginNormalThetaPhiWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
   applyPickedPointWorkPlane,
   canApplyCustomOriginNormalThetaPhiWorkPlaneInput,
@@ -296,8 +296,10 @@ import {
   pickWorkPlaneOriginPointStratum,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
+  commitCustomOriginNormalThetaPhiWorkPlaneInput,
   resolveCoordinateAnchorReferenceForCursorCreation,
   resolvePointStratumCoordinateForCursorCreation,
+  selectWorkPlaneSetupMethodPanel,
   selectedElementCount,
   shouldCollapseExampleBarForDiagramChange,
   styleClipboardSummary,
@@ -320,8 +322,9 @@ import {
   workPlanePointPickingStatus,
   workPlanePointPickingTargetLabels,
   toggleWorkPlaneOverlayPanel,
+  updateCustomOriginNormalThetaPhiWorkPlaneInputDraft,
   workPlaneDisplayName,
-  workPlaneNormalVectorPreviewGeometryFromInput,
+  workPlaneNormalVectorPreviewGeometryFromAngles,
   workPlaneSelectValue,
   workPlaneSetupMethodOptions,
   workPlaneSummaryLabel,
@@ -436,6 +439,10 @@ type DirectCoordinateAxis = 'x' | 'y' | 'z'
 type PathSplitPickState = {
   pathId: string
   keepOriginal: boolean
+}
+type WorkPlaneOriginDraftPick = {
+  id: number
+  origin: WorkPlaneVectorInput
 }
 type SheetCreationKind =
   | PreviewSheetCreationKind
@@ -842,18 +849,10 @@ function App() {
     kind: 'xy',
     z: 0,
   })
-  const [isWorkPlaneOverlayExpanded, setIsWorkPlaneOverlayExpanded] =
-    useState<boolean>(false)
-  const [workPlaneSetupMethod, setWorkPlaneSetupMethod] =
-    useState<WorkPlaneSetupMethod>(defaultWorkPlaneSetupMethod)
-  const [customOriginNormalWorkPlaneInput, setCustomOriginNormalWorkPlaneInput] =
-    useState<CustomOriginNormalThetaPhiWorkPlaneInput>(
-      defaultCustomOriginNormalThetaPhiWorkPlaneInput,
-    )
-  const [customThreePointWorkPlaneInput, setCustomThreePointWorkPlaneInput] =
-    useState<CustomThreePointWorkPlaneInput>(
-      defaultCustomThreePointWorkPlaneInput,
-    )
+  const [workPlaneOverlayOpenRequest, setWorkPlaneOverlayOpenRequest] =
+    useState<number>(0)
+  const [pendingWorkPlaneOriginPick, setPendingWorkPlaneOriginPick] =
+    useState<WorkPlaneOriginDraftPick | null>(null)
   const [workPlanePointPickingState, setWorkPlanePointPickingState] =
     useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
   const [workPlaneOriginPickingState, setWorkPlaneOriginPickingState] =
@@ -1113,10 +1112,6 @@ function App() {
       ...workPlaneCoordinateSourceHighlights,
     ],
     [directCoordinateSourceHighlights, workPlaneCoordinateSourceHighlights],
-  )
-  const showWorkPlaneOverlayPanel = shouldShowWorkPlaneOverlayPanel(
-    editableDiagram.ambientDimension,
-    isWorkPlaneOverlayExpanded,
   )
   const showCameraControls = shouldShowCameraControls(
     editableDiagram.ambientDimension,
@@ -1458,7 +1453,7 @@ function App() {
     )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+    setPendingWorkPlaneOriginPick(null)
     setPathSplitPickState(null)
     setWorkPlaneStatus('')
     const nextCamera = cameraControlStateFromDiagramView(nextDiagram)
@@ -1694,7 +1689,7 @@ function App() {
     setEditorState((current) => undoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+    setPendingWorkPlaneOriginPick(null)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
@@ -1728,7 +1723,7 @@ function App() {
     setEditorState((current) => redoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+    setPendingWorkPlaneOriginPick(null)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
     setSaveLoadMessage('')
@@ -1903,7 +1898,7 @@ function App() {
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+    setPendingWorkPlaneOriginPick(null)
     setWorkPlaneStatus('')
     const loadedCamera = cameraControlStateFromDiagramView(diagram)
 
@@ -2773,8 +2768,7 @@ function App() {
     if (editableDiagram.ambientDimension === 2) {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
       setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-      setIsWorkPlaneOverlayExpanded(false)
-      setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+      setPendingWorkPlaneOriginPick(null)
       setWorkPlaneLocalInputMode('cartesian')
       setWorkPlaneStatus('')
       setIsCameraDetailsExpanded(false)
@@ -6150,158 +6144,6 @@ function App() {
     return false
   }
 
-  function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    setWorkPlaneStatus('')
-    setActiveWorkPlane((current) => {
-      const fixedValue = workPlaneFixedValue(current)
-
-      switch (kind) {
-        case 'xy':
-          return { kind, z: fixedValue }
-        case 'xz':
-          return { kind, y: fixedValue }
-        case 'yz':
-          return { kind, x: fixedValue }
-      }
-    })
-  }
-
-  function updateWorkPlaneFixedValue(rawValue: string): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    const fixedValue = Number(rawValue)
-
-    if (!Number.isFinite(fixedValue)) {
-      setWorkPlaneStatus('Fixed coordinate must be finite.')
-      return
-    }
-
-    setWorkPlaneStatus('')
-    setActiveWorkPlane((current) => {
-      switch (current.kind) {
-        case 'xy':
-          return { ...current, z: fixedValue }
-        case 'xz':
-          return { ...current, y: fixedValue }
-        case 'yz':
-          return { ...current, x: fixedValue }
-        case 'axisAligned':
-          return { ...current, offset: fixedValue }
-        case 'custom':
-          return current
-      }
-    })
-  }
-
-  function updateWorkPlaneSetupMethod(method: WorkPlaneSetupMethod): void {
-    setWorkPlaneSetupMethod(method)
-    setWorkPlaneStatus('')
-
-    if (method !== 'pickThreeExistingPoints') {
-      setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
-    }
-    if (method !== 'originNormalVector') {
-      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    }
-  }
-
-  function updateCustomOriginNormalOriginInput(
-    axis: keyof CustomOriginNormalThetaPhiWorkPlaneInput['origin'],
-    value: string,
-  ): void {
-    setCustomOriginNormalWorkPlaneInput((current) => ({
-      ...current,
-      origin: {
-        ...current.origin,
-        [axis]: value,
-      },
-    }))
-    setWorkPlaneStatus('')
-  }
-
-  function updateCustomOriginNormalAngleInput(
-    field: 'normalThetaDeg' | 'normalPhiDeg',
-    value: string,
-  ): void {
-    setCustomOriginNormalWorkPlaneInput((current) => ({
-      ...current,
-      [field]: value,
-    }))
-    setWorkPlaneStatus('')
-  }
-
-  function updateCustomThreePointWorkPlaneVectorInput(
-    point: keyof CustomThreePointWorkPlaneInput,
-    axis: keyof CustomThreePointWorkPlaneInput['p0'],
-    value: string,
-  ): void {
-    setCustomThreePointWorkPlaneInput((current) => ({
-      ...current,
-      [point]: {
-        ...current[point],
-        [axis]: value,
-      },
-    }))
-    setWorkPlaneStatus('')
-  }
-
-  function applyCustomOriginNormalWorkPlane(): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    const result = applyCustomOriginNormalThetaPhiWorkPlaneInput(
-      activeWorkPlane,
-      editableDiagram.ambientDimension,
-      customOriginNormalWorkPlaneInput,
-    )
-
-    setWorkPlaneStatus(result.status)
-
-    if (result.ok) {
-      setActiveWorkPlane(result.workPlane)
-      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    }
-  }
-
-  function applyCustomThreePointWorkPlane(): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    const result = applyCustomThreePointWorkPlaneInput(
-      activeWorkPlane,
-      editableDiagram.ambientDimension,
-      customThreePointWorkPlaneInput,
-    )
-
-    setWorkPlaneStatus(result.status)
-
-    if (result.ok) {
-      setActiveWorkPlane(result.workPlane)
-      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    }
-  }
-
-  function startExistingPointWorkPlanePicking(): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    const result = startWorkPlanePointPicking(editableDiagram.ambientDimension)
-
-    setWorkPlaneSetupMethod('pickThreeExistingPoints')
-    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlanePointPickingState(result.state)
-    setWorkPlaneStatus(result.status)
-  }
-
   function pickExistingPointForWorkPlane(pointId: string): void {
     setWorkPlanePointPickingState((current) => {
       const result = pickWorkPlanePointStratum(current, pointId)
@@ -6311,52 +6153,31 @@ function App() {
     })
   }
 
-  function startOriginWorkPlanePicking(): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    const result = startWorkPlaneOriginPicking(editableDiagram.ambientDimension)
-
-    setWorkPlaneSetupMethod('originNormalVector')
-    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
-    setWorkPlaneOriginPickingState(result.state)
-    setWorkPlaneStatus(result.status)
-  }
-
-  function cancelOriginWorkPlanePicking(): void {
-    const result = cancelWorkPlaneOriginPicking(customOriginNormalWorkPlaneInput)
-
-    setWorkPlaneOriginPickingState(result.state)
-    setCustomOriginNormalWorkPlaneInput(result.input)
-    setWorkPlaneStatus(result.status)
-  }
-
   function pickOriginPointForWorkPlane(pointId: string): void {
     const result = pickWorkPlaneOriginPointStratum(
       editableDiagram,
       workPlaneOriginPickingState,
-      customOriginNormalWorkPlaneInput,
+      defaultCustomOriginNormalThetaPhiWorkPlaneInput,
       pointId,
     )
 
     setWorkPlaneOriginPickingState(result.state)
-    setCustomOriginNormalWorkPlaneInput(result.input)
     setWorkPlaneStatus(result.status)
+    queuePendingWorkPlaneOriginPick(result)
   }
 
   function pickOriginCoordinateForWorkPlane(coordinateId: string): void {
     const result = pickWorkPlaneOriginCoordinateAnchor(
       editableDiagram,
       workPlaneOriginPickingState,
-      customOriginNormalWorkPlaneInput,
+      defaultCustomOriginNormalThetaPhiWorkPlaneInput,
       coordinateId,
       { showCoordinateAnchors },
     )
 
     setWorkPlaneOriginPickingState(result.state)
-    setCustomOriginNormalWorkPlaneInput(result.input)
     setWorkPlaneStatus(result.status)
+    queuePendingWorkPlaneOriginPick(result)
   }
 
   function handleWorkPlanePickingCanvasClick(
@@ -6392,50 +6213,47 @@ function App() {
     })
   }
 
-  function resetExistingPointWorkPlanePicking(): void {
-    const result = resetWorkPlanePointPicking()
-
-    setWorkPlanePointPickingState(result.state)
-    setWorkPlaneStatus(result.status)
-  }
-
-  function cancelExistingPointWorkPlanePicking(): void {
-    const result = cancelWorkPlanePointPicking()
-
-    setWorkPlanePointPickingState(result.state)
-    setWorkPlaneStatus(result.status)
-  }
-
-  function applyExistingPointWorkPlane(): void {
-    if (blockWorkPlaneChangeForDraft()) {
+  function queuePendingWorkPlaneOriginPick(
+    result: ReturnType<typeof pickWorkPlaneOriginPointStratum>,
+  ): void {
+    if (!result.status.startsWith('Origin picked from ')) {
       return
     }
 
-    const result = applyPickedPointWorkPlane(
-      activeWorkPlane,
-      editableDiagram.ambientDimension,
-      editableDiagram,
-      workPlanePointPickingState,
+    setPendingWorkPlaneOriginPick((current) => ({
+      id: (current?.id ?? 0) + 1,
+      origin: result.input.origin,
+    }))
+  }
+
+  function requestWorkPlaneOverlayOpen(): void {
+    setWorkPlaneOverlayOpenRequest((request) => request + 1)
+  }
+
+  function clearPendingWorkPlaneOriginPick(): void {
+    setPendingWorkPlaneOriginPick(null)
+  }
+
+  function renderWorkPlaneOverlay() {
+    return (
+      <WorkPlaneOverlay
+        ambientDimension={editableDiagram.ambientDimension}
+        diagram={editableDiagram}
+        activeWorkPlane={activeWorkPlane}
+        workPlanePointPickingState={workPlanePointPickingState}
+        workPlaneOriginPickingState={workPlaneOriginPickingState}
+        workPlaneStatus={workPlaneStatus}
+        showCoordinateAnchors={showCoordinateAnchors}
+        openRequest={workPlaneOverlayOpenRequest}
+        pendingOriginPick={pendingWorkPlaneOriginPick}
+        onBeforeWorkPlaneChange={blockWorkPlaneChangeForDraft}
+        onActiveWorkPlaneChange={setActiveWorkPlane}
+        onWorkPlanePointPickingStateChange={setWorkPlanePointPickingState}
+        onWorkPlaneOriginPickingStateChange={setWorkPlaneOriginPickingState}
+        onWorkPlaneStatusChange={setWorkPlaneStatus}
+        onPendingOriginPickConsumed={clearPendingWorkPlaneOriginPick}
+      />
     )
-
-    setWorkPlaneStatus(result.status)
-
-    if (result.ok) {
-      setActiveWorkPlane(result.workPlane)
-      setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
-      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    }
-  }
-
-  function resetActiveWorkPlane(): void {
-    if (blockWorkPlaneChangeForDraft()) {
-      return
-    }
-
-    setActiveWorkPlane({ kind: 'xy', z: 0 })
-    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
-    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
-    setWorkPlaneStatus('Work plane reset.')
   }
 
   function renderDirectInputDrawer() {
@@ -6582,528 +6400,6 @@ function App() {
           </button>
         }
       />
-    )
-  }
-
-  function renderWorkPlaneOverlay() {
-    if (!shouldShowWorkPlaneOverlay(editableDiagram.ambientDimension)) {
-      return null
-    }
-
-    const frameDisplay = workPlaneFrameDisplay(activeWorkPlane)
-
-    return (
-      <aside
-        className="preview-work-plane-control"
-        aria-label="Preview work-plane editor"
-        onClick={stopPreviewOverlayEvent}
-        onPointerDown={stopPreviewOverlayEvent}
-      >
-        <button
-          type="button"
-          className="preview-overlay-button preview-work-plane-toggle-button"
-          aria-expanded={showWorkPlaneOverlayPanel}
-          aria-controls="preview-work-plane-panel"
-          onClick={(event) =>
-            runPreviewOverlayAction(event, () =>
-              setIsWorkPlaneOverlayExpanded((expanded) =>
-                toggleWorkPlaneOverlayPanel(expanded),
-              ),
-            )
-          }
-        >
-          {workPlaneOverlayButtonLabel(activeWorkPlane)}
-        </button>
-        {showWorkPlaneOverlayPanel && (
-          <section
-            id="preview-work-plane-panel"
-            className="preview-work-plane-panel"
-            aria-labelledby="preview-work-plane-heading"
-          >
-            <div className="preview-work-plane-heading-row">
-              <h3 id="preview-work-plane-heading">Work plane</h3>
-              <button
-                type="button"
-                className="preview-overlay-button preview-work-plane-close"
-                aria-label="Close work-plane panel"
-                aria-controls="preview-work-plane-panel"
-                onClick={(event) =>
-                  runPreviewOverlayAction(event, () =>
-                    setIsWorkPlaneOverlayExpanded(false),
-                  )
-                }
-              >
-                Close
-              </button>
-            </div>
-            <dl className="preview-work-plane-frame">
-              <div>
-                <dt>current origin</dt>
-                <dd>{frameDisplay?.originText ?? 'unavailable'}</dd>
-              </div>
-              <div>
-                <dt>current plane x</dt>
-                <dd>{frameDisplay?.planeXText ?? 'unavailable'}</dd>
-              </div>
-              <div>
-                <dt>current plane y</dt>
-                <dd>{frameDisplay?.planeYText ?? 'unavailable'}</dd>
-              </div>
-            </dl>
-            <div
-              className="preview-work-plane-setup"
-              role="group"
-              aria-label="Work-plane setup"
-            >
-              <div
-                className="preview-work-plane-preset-panel"
-                role="group"
-                aria-label="Preset or fixed work plane"
-              >
-                <label className="preview-toolbar-field preview-work-plane-preset-field">
-                  <span>Plane</span>
-                  <select
-                    value={workPlaneSelectValue(activeWorkPlane)}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value as WorkPlaneSelectValue
-
-                      if (value !== 'custom') {
-                        updateWorkPlaneKind(value)
-                      }
-                    }}
-                  >
-                    {activeWorkPlane.kind === 'custom' && (
-                      <option value="custom">{activeWorkPlane.name}</option>
-                    )}
-                    {workPlaneKinds.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {workPlaneLabel(kind)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {activeWorkPlane.kind !== 'custom' && (
-                  <label className="preview-toolbar-field preview-work-plane-fixed-field">
-                    <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={String(workPlaneFixedValue(activeWorkPlane))}
-                      onChange={(event) =>
-                        updateWorkPlaneFixedValue(event.currentTarget.value)
-                      }
-                    />
-                  </label>
-                )}
-                <div className="preview-work-plane-actions">
-                  <button
-                    type="button"
-                    className="preview-overlay-button"
-                    onClick={resetActiveWorkPlane}
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
-              <div
-                className="preview-work-plane-method-list"
-                role="radiogroup"
-                aria-label="Work-plane setup method"
-              >
-                {workPlaneSetupMethodOptions.map((method) => (
-                  <button
-                    key={method.id}
-                    type="button"
-                    role="radio"
-                    className={
-                      workPlaneSetupMethod === method.id ? 'is-selected' : undefined
-                    }
-                    aria-checked={workPlaneSetupMethod === method.id}
-                    onClick={() => updateWorkPlaneSetupMethod(method.id)}
-                  >
-                    {method.label}
-                  </button>
-                ))}
-              </div>
-              {renderSelectedWorkPlaneSetupMethod()}
-              {workPlaneStatus !== '' && (
-                <span className="preview-work-plane-status" role="status">
-                  {workPlaneStatus}
-                </span>
-              )}
-            </div>
-          </section>
-        )}
-      </aside>
-    )
-  }
-
-  function renderSelectedWorkPlaneSetupMethod() {
-    switch (workPlaneSetupMethod) {
-      case 'pickThreeExistingPoints':
-        return renderPickExistingPointWorkPlaneSetup()
-      case 'originNormalVector':
-        return renderOriginNormalWorkPlaneSetup()
-      case 'customThreePoints':
-        return renderCustomThreePointWorkPlaneSetup()
-    }
-  }
-
-  function renderPickExistingPointWorkPlaneSetup() {
-    const pickedCount = workPlanePointPickingCount(workPlanePointPickingState)
-    const pickedLabels = workPlanePointPickingTargetLabels(
-      editableDiagram,
-      workPlanePointPickingState,
-    )
-
-    return (
-      <div
-        className="preview-work-plane-method-panel"
-        role="group"
-        aria-label="Pick 3 existing points"
-      >
-        <div className="preview-work-plane-method-heading">
-          <span className="preview-work-plane-method-title">
-            Pick 3 existing points
-          </span>
-          <span className="work-plane-picked-count" role="status">
-            {pickedCount} / 3 selected
-          </span>
-        </div>
-        {pickedLabels.length > 0 && (
-          <ol className="preview-work-plane-picked-list">
-            {pickedLabels.map((label) => (
-              <li key={label}>{label}</li>
-            ))}
-          </ol>
-        )}
-        <span className="preview-work-plane-status">
-          {workPlanePointPickingStatus(workPlanePointPickingState, editableDiagram)}
-        </span>
-        <div className="preview-work-plane-actions">
-          <button
-            type="button"
-            className="preview-overlay-button"
-            onClick={startExistingPointWorkPlanePicking}
-          >
-            {workPlanePointPickingState.active ? 'Restart picking' : 'Start picking'}
-          </button>
-          <button
-            type="button"
-            className="preview-overlay-button"
-            disabled={!workPlanePointPickingState.active || pickedCount === 0}
-            onClick={resetExistingPointWorkPlanePicking}
-          >
-            Clear picks
-          </button>
-          <button
-            type="button"
-            className="preview-overlay-button"
-            disabled={!workPlanePointPickingState.active}
-            onClick={cancelExistingPointWorkPlanePicking}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="preview-overlay-button"
-            disabled={!canApplyPickedPointWorkPlane(workPlanePointPickingState)}
-            onClick={applyExistingPointWorkPlane}
-          >
-            Apply
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  function renderOriginNormalWorkPlaneSetup() {
-    const normal = normalVectorFromThetaPhiInput(customOriginNormalWorkPlaneInput)
-
-    return (
-      <form
-        className="preview-work-plane-method-panel custom-work-plane-form"
-        aria-label="Origin + normal vector"
-        onSubmit={(event) => {
-          event.preventDefault()
-          applyCustomOriginNormalWorkPlane()
-        }}
-      >
-        <div className="preview-work-plane-method-heading">
-          <span className="preview-work-plane-method-title">
-            Origin + normal vector
-          </span>
-        </div>
-        <p
-          id="preview-work-plane-normal-angle-convention"
-          className="preview-work-plane-angle-convention"
-        >
-          {normalAngleConventionText}
-        </p>
-        <div className="work-plane-vector-stack">
-          <div
-            className="work-plane-vector-row"
-            role="group"
-            aria-label="Origin"
-          >
-            <span className="work-plane-vector-label">Origin</span>
-            {workPlaneVectorAxes.map((axis) => (
-              <label key={axis} className="custom-work-plane-field">
-                <span>{axis}</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={customOriginNormalWorkPlaneInput.origin[axis]}
-                  onChange={(event) =>
-                    updateCustomOriginNormalOriginInput(
-                      axis,
-                      event.currentTarget.value,
-                    )
-                  }
-                />
-              </label>
-            ))}
-          </div>
-          <div className="preview-work-plane-origin-pick-row">
-            <span className="preview-work-plane-status">
-              {workPlaneOriginPickingState.active
-                ? 'Click a point or shown coordinate marker for the origin.'
-                : 'Use direct xyz or pick an existing point/coordinate.'}
-            </span>
-            <div className="preview-work-plane-actions">
-              <button
-                type="button"
-                className="preview-overlay-button"
-                onClick={startOriginWorkPlanePicking}
-              >
-                Pick origin
-              </button>
-              <button
-                type="button"
-                className="preview-overlay-button"
-                disabled={!workPlaneOriginPickingState.active}
-                onClick={cancelOriginWorkPlanePicking}
-              >
-                Cancel pick
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="preview-work-plane-normal-editor">
-          <div
-            className="preview-work-plane-angle-stack"
-            role="group"
-            aria-label="Normal angle input"
-          >
-            {renderNormalAngleField(
-              'normalThetaDeg',
-              'Normal θ',
-              0,
-              180,
-              0,
-              'preview-work-plane-normal-theta-help',
-              normalThetaConventionText,
-            )}
-            {renderNormalAngleField(
-              'normalPhiDeg',
-              'Normal φ',
-              -180,
-              180,
-              0,
-              'preview-work-plane-normal-phi-help',
-              normalPhiConventionText,
-            )}
-            <span className="preview-work-plane-normal-readout">
-              {normal === null
-                ? 'Normal vector unavailable'
-                : `Normal ${formatCompactVec3(normal)}`}
-            </span>
-          </div>
-          {renderWorkPlaneNormalVectorPreview()}
-        </div>
-        <div className="preview-work-plane-actions">
-          <button
-            type="submit"
-            className="preview-overlay-button"
-            disabled={
-              !canApplyCustomOriginNormalThetaPhiWorkPlaneInput(
-                customOriginNormalWorkPlaneInput,
-              )
-            }
-          >
-            Apply
-          </button>
-        </div>
-      </form>
-    )
-  }
-
-  function renderNormalAngleField(
-    field: 'normalThetaDeg' | 'normalPhiDeg',
-    label: string,
-    min: number,
-    max: number,
-    fallback: number,
-    descriptionId: string,
-    description: string,
-  ) {
-    const value = customOriginNormalWorkPlaneInput[field]
-    const describedBy = `preview-work-plane-normal-angle-convention ${descriptionId}`
-
-    return (
-      <label className="preview-work-plane-angle-field">
-        <span className="preview-work-plane-angle-label" title={description}>
-          {label}
-        </span>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step="1"
-          value={rangeValueFromDraft(value, min, max, fallback)}
-          aria-label={`${label} slider`}
-          aria-describedby={describedBy}
-          title={description}
-          onChange={(event) =>
-            updateCustomOriginNormalAngleInput(
-              field,
-              event.currentTarget.value,
-            )
-          }
-        />
-        <input
-          type="text"
-          inputMode="decimal"
-          value={value}
-          aria-label={`${label} degrees`}
-          aria-describedby={describedBy}
-          title={description}
-          onChange={(event) =>
-            updateCustomOriginNormalAngleInput(
-              field,
-              event.currentTarget.value,
-            )
-          }
-        />
-        <span id={descriptionId} className="preview-work-plane-angle-help">
-          {description}
-        </span>
-      </label>
-    )
-  }
-
-  function renderWorkPlaneNormalVectorPreview() {
-    const preview = workPlaneNormalVectorPreviewGeometryFromInput(
-      customOriginNormalWorkPlaneInput,
-    )
-
-    if (preview === null) {
-      return (
-        <div className="preview-work-plane-normal-preview is-invalid">
-          Invalid normal
-        </div>
-      )
-    }
-
-    return (
-      <svg
-        className="preview-work-plane-normal-preview"
-        role="img"
-        aria-label="Normal-vector preview"
-        viewBox={preview.viewBox}
-      >
-        <defs>
-          <marker
-            id="preview-work-plane-normal-arrow"
-            markerWidth="6"
-            markerHeight="6"
-            refX="5"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M0,0 L6,3 L0,6 Z" />
-          </marker>
-        </defs>
-        {preview.axes.map((axis) => (
-          <g key={axis.id} className={`normal-preview-axis normal-preview-${axis.id}`}>
-            <line
-              x1={axis.from.x}
-              y1={axis.from.y}
-              x2={axis.to.x}
-              y2={axis.to.y}
-            />
-            <text x={axis.to.x} y={axis.to.y}>
-              {axis.label}
-            </text>
-          </g>
-        ))}
-        <g className="normal-preview-vector">
-          <line
-            x1={preview.normal.from.x}
-            y1={preview.normal.from.y}
-            x2={preview.normal.to.x}
-            y2={preview.normal.to.y}
-            markerEnd="url(#preview-work-plane-normal-arrow)"
-          />
-          <text x={preview.normal.to.x} y={preview.normal.to.y}>
-            {preview.normal.label}
-          </text>
-        </g>
-      </svg>
-    )
-  }
-
-  function renderCustomThreePointWorkPlaneSetup() {
-    return (
-      <form
-        className="preview-work-plane-method-panel custom-work-plane-form"
-        aria-label="Custom 3 points"
-        onSubmit={(event) => {
-          event.preventDefault()
-          applyCustomThreePointWorkPlane()
-        }}
-      >
-        <div className="preview-work-plane-method-heading">
-          <span className="preview-work-plane-method-title">Custom 3 points</span>
-        </div>
-        <div className="work-plane-vector-stack">
-          {(['p0', 'p1', 'p2'] as const).map((point) => (
-            <div
-              key={point}
-              className="work-plane-vector-row"
-              role="group"
-              aria-label={point.toUpperCase()}
-            >
-              <span className="work-plane-vector-label">
-                {point.toUpperCase()}
-              </span>
-              {workPlaneVectorAxes.map((axis) => (
-                <label key={axis} className="custom-work-plane-field">
-                  <span>{axis}</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={customThreePointWorkPlaneInput[point][axis]}
-                    onChange={(event) =>
-                      updateCustomThreePointWorkPlaneVectorInput(
-                        point,
-                        axis,
-                        event.currentTarget.value,
-                      )
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="preview-work-plane-actions">
-          <button type="submit" className="preview-overlay-button">
-            Apply
-          </button>
-        </div>
-      </form>
     )
   }
 
@@ -9126,7 +8422,7 @@ function App() {
                 type="button"
                 className="toolbar-button work-plane-preview-route-button"
                 aria-controls="preview-work-plane-panel"
-                onClick={() => setIsWorkPlaneOverlayExpanded(true)}
+                onClick={requestWorkPlaneOverlayOpen}
               >
                 Edit in preview
               </button>
@@ -9648,6 +8944,935 @@ function App() {
     </main>
   )
 }
+
+type WorkPlaneOverlayProps = {
+  ambientDimension: AmbientDimension
+  diagram: Diagram
+  activeWorkPlane: WorkPlane
+  workPlanePointPickingState: WorkPlanePointPickingState
+  workPlaneOriginPickingState: typeof inactiveWorkPlaneOriginPickingState
+  workPlaneStatus: string
+  showCoordinateAnchors: boolean
+  openRequest: number
+  pendingOriginPick: WorkPlaneOriginDraftPick | null
+  onBeforeWorkPlaneChange: () => boolean
+  onActiveWorkPlaneChange: (update: SetStateAction<WorkPlane>) => void
+  onWorkPlanePointPickingStateChange: (
+    update: SetStateAction<WorkPlanePointPickingState>,
+  ) => void
+  onWorkPlaneOriginPickingStateChange: (
+    state: typeof inactiveWorkPlaneOriginPickingState,
+  ) => void
+  onWorkPlaneStatusChange: (message: string) => void
+  onPendingOriginPickConsumed: () => void
+}
+
+type WorkPlaneSetupPanelProps = Omit<
+  WorkPlaneOverlayProps,
+  'workPlaneStatus' | 'openRequest'
+>
+
+const WorkPlaneOverlay = memo(function WorkPlaneOverlay({
+  ambientDimension,
+  diagram,
+  activeWorkPlane,
+  workPlanePointPickingState,
+  workPlaneOriginPickingState,
+  workPlaneStatus,
+  showCoordinateAnchors,
+  openRequest,
+  pendingOriginPick,
+  onBeforeWorkPlaneChange,
+  onActiveWorkPlaneChange,
+  onWorkPlanePointPickingStateChange,
+  onWorkPlaneOriginPickingStateChange,
+  onWorkPlaneStatusChange,
+  onPendingOriginPickConsumed,
+}: WorkPlaneOverlayProps) {
+  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false)
+  const [workPlaneSetupMethod, setWorkPlaneSetupMethod] =
+    useState<WorkPlaneSetupMethod>(defaultWorkPlaneSetupMethod)
+
+  useEffect(() => {
+    if (openRequest > 0 && shouldShowWorkPlaneOverlay(ambientDimension)) {
+      setIsPanelOpen(true)
+    }
+  }, [ambientDimension, openRequest])
+
+  useEffect(() => {
+    if (!shouldShowWorkPlaneOverlay(ambientDimension)) {
+      setIsPanelOpen(false)
+      setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
+    }
+  }, [ambientDimension])
+
+  if (!shouldShowWorkPlaneOverlay(ambientDimension)) {
+    return null
+  }
+
+  const showPanel = shouldShowWorkPlaneOverlayPanel(ambientDimension, isPanelOpen)
+
+  function updateWorkPlaneSetupMethod(method: WorkPlaneSetupMethod): void {
+    setWorkPlaneSetupMethod(method)
+    onWorkPlaneStatusChange('')
+
+    if (method !== 'pickThreeExistingPoints') {
+      onWorkPlanePointPickingStateChange(inactiveWorkPlanePointPickingState)
+    }
+    if (method !== 'originNormalVector') {
+      onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+    }
+  }
+
+  return (
+    <aside
+      className="preview-work-plane-control"
+      aria-label="Preview work-plane editor"
+      onClick={stopPreviewOverlayEvent}
+      onPointerDown={stopPreviewOverlayEvent}
+    >
+      <button
+        type="button"
+        className="preview-overlay-button preview-work-plane-toggle-button"
+        aria-expanded={showPanel}
+        aria-controls="preview-work-plane-panel"
+        onClick={(event) =>
+          runPreviewOverlayAction(event, () =>
+            setIsPanelOpen((expanded) => toggleWorkPlaneOverlayPanel(expanded)),
+          )
+        }
+      >
+        {workPlaneOverlayButtonLabel(activeWorkPlane)}
+      </button>
+      {showPanel && (
+        <WorkPlaneOverlayPanel
+          ambientDimension={ambientDimension}
+          diagram={diagram}
+          activeWorkPlane={activeWorkPlane}
+          workPlanePointPickingState={workPlanePointPickingState}
+          workPlaneOriginPickingState={workPlaneOriginPickingState}
+          workPlaneStatus={workPlaneStatus}
+          showCoordinateAnchors={showCoordinateAnchors}
+          workPlaneSetupMethod={workPlaneSetupMethod}
+          pendingOriginPick={pendingOriginPick}
+          onClose={() => setIsPanelOpen(false)}
+          onSetupMethodChange={updateWorkPlaneSetupMethod}
+          onBeforeWorkPlaneChange={onBeforeWorkPlaneChange}
+          onActiveWorkPlaneChange={onActiveWorkPlaneChange}
+          onWorkPlanePointPickingStateChange={onWorkPlanePointPickingStateChange}
+          onWorkPlaneOriginPickingStateChange={onWorkPlaneOriginPickingStateChange}
+          onWorkPlaneStatusChange={onWorkPlaneStatusChange}
+          onPendingOriginPickConsumed={onPendingOriginPickConsumed}
+        />
+      )}
+    </aside>
+  )
+})
+
+type WorkPlaneOverlayPanelProps = WorkPlaneSetupPanelProps & {
+  workPlaneStatus: string
+  workPlaneSetupMethod: WorkPlaneSetupMethod
+  onClose: () => void
+  onSetupMethodChange: (method: WorkPlaneSetupMethod) => void
+}
+
+const WorkPlaneOverlayPanel = memo(function WorkPlaneOverlayPanel({
+  ambientDimension,
+  diagram,
+  activeWorkPlane,
+  workPlanePointPickingState,
+  workPlaneOriginPickingState,
+  workPlaneStatus,
+  showCoordinateAnchors,
+  workPlaneSetupMethod,
+  pendingOriginPick,
+  onClose,
+  onSetupMethodChange,
+  onBeforeWorkPlaneChange,
+  onActiveWorkPlaneChange,
+  onWorkPlanePointPickingStateChange,
+  onWorkPlaneOriginPickingStateChange,
+  onWorkPlaneStatusChange,
+  onPendingOriginPickConsumed,
+}: WorkPlaneOverlayPanelProps) {
+  const frameDisplay = workPlaneFrameDisplay(activeWorkPlane)
+  const setupPanelProps = {
+    ambientDimension,
+    diagram,
+    activeWorkPlane,
+    workPlanePointPickingState,
+    workPlaneOriginPickingState,
+    showCoordinateAnchors,
+    pendingOriginPick,
+    onBeforeWorkPlaneChange,
+    onActiveWorkPlaneChange,
+    onWorkPlanePointPickingStateChange,
+    onWorkPlaneOriginPickingStateChange,
+    onWorkPlaneStatusChange,
+    onPendingOriginPickConsumed,
+  }
+
+  function updateWorkPlaneKind(kind: AxisAlignedWorkPlaneName): void {
+    if (onBeforeWorkPlaneChange()) {
+      return
+    }
+
+    onWorkPlaneStatusChange('')
+    onActiveWorkPlaneChange((current) => {
+      const fixedValue = workPlaneFixedValue(current)
+
+      switch (kind) {
+        case 'xy':
+          return { kind, z: fixedValue }
+        case 'xz':
+          return { kind, y: fixedValue }
+        case 'yz':
+          return { kind, x: fixedValue }
+      }
+    })
+  }
+
+  function updateWorkPlaneFixedValue(rawValue: string): void {
+    if (onBeforeWorkPlaneChange()) {
+      return
+    }
+
+    const fixedValue = Number(rawValue)
+
+    if (!Number.isFinite(fixedValue)) {
+      onWorkPlaneStatusChange('Fixed coordinate must be finite.')
+      return
+    }
+
+    onWorkPlaneStatusChange('')
+    onActiveWorkPlaneChange((current) => {
+      switch (current.kind) {
+        case 'xy':
+          return { ...current, z: fixedValue }
+        case 'xz':
+          return { ...current, y: fixedValue }
+        case 'yz':
+          return { ...current, x: fixedValue }
+        case 'axisAligned':
+          return { ...current, offset: fixedValue }
+        case 'custom':
+          return current
+      }
+    })
+  }
+
+  function resetActiveWorkPlane(): void {
+    if (onBeforeWorkPlaneChange()) {
+      return
+    }
+
+    onActiveWorkPlaneChange({ kind: 'xy', z: 0 })
+    onWorkPlanePointPickingStateChange(inactiveWorkPlanePointPickingState)
+    onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+    onWorkPlaneStatusChange('Work plane reset.')
+  }
+
+  return (
+    <section
+      id="preview-work-plane-panel"
+      className="preview-work-plane-panel"
+      aria-labelledby="preview-work-plane-heading"
+    >
+      <div className="preview-work-plane-heading-row">
+        <h3 id="preview-work-plane-heading">Work plane</h3>
+        <button
+          type="button"
+          className="preview-overlay-button preview-work-plane-close"
+          aria-label="Close work-plane panel"
+          aria-controls="preview-work-plane-panel"
+          onClick={(event) => runPreviewOverlayAction(event, onClose)}
+        >
+          Close
+        </button>
+      </div>
+      <dl className="preview-work-plane-frame">
+        <div>
+          <dt>current origin</dt>
+          <dd>{frameDisplay?.originText ?? 'unavailable'}</dd>
+        </div>
+        <div>
+          <dt>current plane x</dt>
+          <dd>{frameDisplay?.planeXText ?? 'unavailable'}</dd>
+        </div>
+        <div>
+          <dt>current plane y</dt>
+          <dd>{frameDisplay?.planeYText ?? 'unavailable'}</dd>
+        </div>
+      </dl>
+      <div
+        className="preview-work-plane-setup"
+        role="group"
+        aria-label="Work-plane setup"
+      >
+        <div
+          className="preview-work-plane-preset-panel"
+          role="group"
+          aria-label="Preset or fixed work plane"
+        >
+          <label className="preview-toolbar-field preview-work-plane-preset-field">
+            <span>Plane</span>
+            <select
+              value={workPlaneSelectValue(activeWorkPlane)}
+              onChange={(event) => {
+                const value = event.currentTarget.value as WorkPlaneSelectValue
+
+                if (value !== 'custom') {
+                  updateWorkPlaneKind(value)
+                }
+              }}
+            >
+              {activeWorkPlane.kind === 'custom' && (
+                <option value="custom">{activeWorkPlane.name}</option>
+              )}
+              {workPlaneKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {workPlaneLabel(kind)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {activeWorkPlane.kind !== 'custom' && (
+            <label className="preview-toolbar-field preview-work-plane-fixed-field">
+              <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
+              <input
+                type="number"
+                step="any"
+                value={String(workPlaneFixedValue(activeWorkPlane))}
+                onChange={(event) =>
+                  updateWorkPlaneFixedValue(event.currentTarget.value)
+                }
+              />
+            </label>
+          )}
+          <div className="preview-work-plane-actions">
+            <button
+              type="button"
+              className="preview-overlay-button"
+              onClick={resetActiveWorkPlane}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+        <div
+          className="preview-work-plane-method-list"
+          role="radiogroup"
+          aria-label="Work-plane setup method"
+        >
+          {workPlaneSetupMethodOptions.map((method) => (
+            <button
+              key={method.id}
+              type="button"
+              role="radio"
+              className={
+                workPlaneSetupMethod === method.id ? 'is-selected' : undefined
+              }
+              aria-checked={workPlaneSetupMethod === method.id}
+              onClick={() => onSetupMethodChange(method.id)}
+            >
+              {method.label}
+            </button>
+          ))}
+        </div>
+        {selectWorkPlaneSetupMethodPanel(workPlaneSetupMethod, {
+          pickThreeExistingPoints: () => (
+            <PickExistingPointWorkPlaneSetup {...setupPanelProps} />
+          ),
+          originNormalVector: () => (
+            <OriginNormalWorkPlaneSetup {...setupPanelProps} />
+          ),
+          customThreePoints: () => (
+            <CustomThreePointWorkPlaneSetup {...setupPanelProps} />
+          ),
+        })}
+        {workPlaneStatus !== '' && (
+          <span className="preview-work-plane-status" role="status">
+            {workPlaneStatus}
+          </span>
+        )}
+      </div>
+    </section>
+  )
+})
+
+const PickExistingPointWorkPlaneSetup = memo(
+  function PickExistingPointWorkPlaneSetup({
+    ambientDimension,
+    diagram,
+    activeWorkPlane,
+    workPlanePointPickingState,
+    onBeforeWorkPlaneChange,
+    onActiveWorkPlaneChange,
+    onWorkPlanePointPickingStateChange,
+    onWorkPlaneOriginPickingStateChange,
+    onWorkPlaneStatusChange,
+  }: WorkPlaneSetupPanelProps) {
+    const pickedCount = workPlanePointPickingCount(workPlanePointPickingState)
+    const pickedLabels = useMemo(
+      () => workPlanePointPickingTargetLabels(diagram, workPlanePointPickingState),
+      [diagram, workPlanePointPickingState],
+    )
+
+    function startExistingPointWorkPlanePicking(): void {
+      if (onBeforeWorkPlaneChange()) {
+        return
+      }
+
+      const result = startWorkPlanePointPicking(ambientDimension)
+
+      onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+      onWorkPlanePointPickingStateChange(result.state)
+      onWorkPlaneStatusChange(result.status)
+    }
+
+    function resetExistingPointWorkPlanePicking(): void {
+      const result = resetWorkPlanePointPicking()
+
+      onWorkPlanePointPickingStateChange(result.state)
+      onWorkPlaneStatusChange(result.status)
+    }
+
+    function cancelExistingPointWorkPlanePicking(): void {
+      const result = cancelWorkPlanePointPicking()
+
+      onWorkPlanePointPickingStateChange(result.state)
+      onWorkPlaneStatusChange(result.status)
+    }
+
+    function applyExistingPointWorkPlane(): void {
+      if (onBeforeWorkPlaneChange()) {
+        return
+      }
+
+      const result = applyPickedPointWorkPlane(
+        activeWorkPlane,
+        ambientDimension,
+        diagram,
+        workPlanePointPickingState,
+      )
+
+      onWorkPlaneStatusChange(result.status)
+
+      if (result.ok) {
+        onActiveWorkPlaneChange(result.workPlane)
+        onWorkPlanePointPickingStateChange(inactiveWorkPlanePointPickingState)
+        onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+      }
+    }
+
+    return (
+      <div
+        className="preview-work-plane-method-panel"
+        role="group"
+        aria-label="Pick 3 existing points"
+      >
+        <div className="preview-work-plane-method-heading">
+          <span className="preview-work-plane-method-title">
+            Pick 3 existing points
+          </span>
+          <span className="work-plane-picked-count" role="status">
+            {pickedCount} / 3 selected
+          </span>
+        </div>
+        {pickedLabels.length > 0 && (
+          <ol className="preview-work-plane-picked-list">
+            {pickedLabels.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ol>
+        )}
+        <span className="preview-work-plane-status">
+          {workPlanePointPickingStatus(workPlanePointPickingState, diagram)}
+        </span>
+        <div className="preview-work-plane-actions">
+          <button
+            type="button"
+            className="preview-overlay-button"
+            onClick={startExistingPointWorkPlanePicking}
+          >
+            {workPlanePointPickingState.active ? 'Restart picking' : 'Start picking'}
+          </button>
+          <button
+            type="button"
+            className="preview-overlay-button"
+            disabled={!workPlanePointPickingState.active || pickedCount === 0}
+            onClick={resetExistingPointWorkPlanePicking}
+          >
+            Clear picks
+          </button>
+          <button
+            type="button"
+            className="preview-overlay-button"
+            disabled={!workPlanePointPickingState.active}
+            onClick={cancelExistingPointWorkPlanePicking}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="preview-overlay-button"
+            disabled={!canApplyPickedPointWorkPlane(workPlanePointPickingState)}
+            onClick={applyExistingPointWorkPlane}
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    )
+  },
+)
+
+const OriginNormalWorkPlaneSetup = memo(function OriginNormalWorkPlaneSetup({
+  ambientDimension,
+  activeWorkPlane,
+  workPlaneOriginPickingState,
+  pendingOriginPick,
+  onBeforeWorkPlaneChange,
+  onActiveWorkPlaneChange,
+  onWorkPlanePointPickingStateChange,
+  onWorkPlaneOriginPickingStateChange,
+  onWorkPlaneStatusChange,
+  onPendingOriginPickConsumed,
+}: WorkPlaneSetupPanelProps) {
+  const [originNormalInput, setOriginNormalInput] =
+    useState<CustomOriginNormalThetaPhiWorkPlaneInput>(
+      defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    )
+  const normal = normalVectorFromThetaPhiInput(originNormalInput)
+
+  useEffect(() => {
+    if (pendingOriginPick === null) {
+      return
+    }
+
+    setOriginNormalInput((current) => ({
+      ...current,
+      origin: pendingOriginPick.origin,
+    }))
+    onPendingOriginPickConsumed()
+  }, [pendingOriginPick, onPendingOriginPickConsumed])
+
+  function updateOriginInput(
+    axis: keyof CustomOriginNormalThetaPhiWorkPlaneInput['origin'],
+    value: string,
+  ): void {
+    setOriginNormalInput((current) =>
+      updateCustomOriginNormalThetaPhiWorkPlaneInputDraft(current, {
+        kind: 'origin',
+        axis,
+        value,
+      }),
+    )
+  }
+
+  function updateNormalAngleInput(
+    field: 'normalThetaDeg' | 'normalPhiDeg',
+    value: string,
+  ): void {
+    setOriginNormalInput((current) =>
+      updateCustomOriginNormalThetaPhiWorkPlaneInputDraft(current, {
+        kind: 'angle',
+        field,
+        value,
+      }),
+    )
+  }
+
+  function startOriginWorkPlanePicking(): void {
+    if (onBeforeWorkPlaneChange()) {
+      return
+    }
+
+    const result = startWorkPlaneOriginPicking(ambientDimension)
+
+    onWorkPlanePointPickingStateChange(inactiveWorkPlanePointPickingState)
+    onWorkPlaneOriginPickingStateChange(result.state)
+    onWorkPlaneStatusChange(result.status)
+  }
+
+  function cancelOriginWorkPlanePicking(): void {
+    const result = cancelWorkPlaneOriginPicking(originNormalInput)
+
+    onWorkPlaneOriginPickingStateChange(result.state)
+    setOriginNormalInput(result.input)
+    onWorkPlaneStatusChange(result.status)
+  }
+
+  function applyCustomOriginNormalWorkPlane(): void {
+    if (onBeforeWorkPlaneChange()) {
+      return
+    }
+
+    const result = commitCustomOriginNormalThetaPhiWorkPlaneInput(
+      activeWorkPlane,
+      ambientDimension,
+      originNormalInput,
+      (workPlane) => onActiveWorkPlaneChange(workPlane),
+    )
+
+    onWorkPlaneStatusChange(result.status)
+
+    if (result.ok) {
+      onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+    }
+  }
+
+  return (
+    <form
+      className="preview-work-plane-method-panel custom-work-plane-form"
+      aria-label="Origin + normal vector"
+      onSubmit={(event) => {
+        event.preventDefault()
+        applyCustomOriginNormalWorkPlane()
+      }}
+    >
+      <div className="preview-work-plane-method-heading">
+        <span className="preview-work-plane-method-title">
+          Origin + normal vector
+        </span>
+      </div>
+      <p
+        id="preview-work-plane-normal-angle-convention"
+        className="preview-work-plane-angle-convention"
+      >
+        {normalAngleConventionText}
+      </p>
+      <div className="work-plane-vector-stack">
+        <div
+          className="work-plane-vector-row"
+          role="group"
+          aria-label="Origin"
+        >
+          <span className="work-plane-vector-label">Origin</span>
+          {workPlaneVectorAxes.map((axis) => (
+            <label key={axis} className="custom-work-plane-field">
+              <span>{axis}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={originNormalInput.origin[axis]}
+                onChange={(event) =>
+                  updateOriginInput(axis, event.currentTarget.value)
+                }
+              />
+            </label>
+          ))}
+        </div>
+        <div className="preview-work-plane-origin-pick-row">
+          <span className="preview-work-plane-status">
+            {workPlaneOriginPickingState.active
+              ? 'Click a point or shown coordinate marker for the origin.'
+              : 'Use direct xyz or pick an existing point/coordinate.'}
+          </span>
+          <div className="preview-work-plane-actions">
+            <button
+              type="button"
+              className="preview-overlay-button"
+              onClick={startOriginWorkPlanePicking}
+            >
+              Pick origin
+            </button>
+            <button
+              type="button"
+              className="preview-overlay-button"
+              disabled={!workPlaneOriginPickingState.active}
+              onClick={cancelOriginWorkPlanePicking}
+            >
+              Cancel pick
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="preview-work-plane-normal-editor">
+        <div
+          className="preview-work-plane-angle-stack"
+          role="group"
+          aria-label="Normal angle input"
+        >
+          <NormalAngleField
+            field="normalThetaDeg"
+            label="Normal θ"
+            min={0}
+            max={180}
+            fallback={0}
+            value={originNormalInput.normalThetaDeg}
+            descriptionId="preview-work-plane-normal-theta-help"
+            description={normalThetaConventionText}
+            onChange={updateNormalAngleInput}
+          />
+          <NormalAngleField
+            field="normalPhiDeg"
+            label="Normal φ"
+            min={-180}
+            max={180}
+            fallback={0}
+            value={originNormalInput.normalPhiDeg}
+            descriptionId="preview-work-plane-normal-phi-help"
+            description={normalPhiConventionText}
+            onChange={updateNormalAngleInput}
+          />
+          <span className="preview-work-plane-normal-readout">
+            {normal === null
+              ? 'Normal vector unavailable'
+              : `Normal ${formatCompactVec3(normal)}`}
+          </span>
+        </div>
+        <NormalVectorPreview
+          thetaDeg={originNormalInput.normalThetaDeg}
+          phiDeg={originNormalInput.normalPhiDeg}
+        />
+      </div>
+      <div className="preview-work-plane-actions">
+        <button
+          type="submit"
+          className="preview-overlay-button"
+          disabled={
+            !canApplyCustomOriginNormalThetaPhiWorkPlaneInput(originNormalInput)
+          }
+        >
+          Apply
+        </button>
+      </div>
+    </form>
+  )
+})
+
+type NormalAngleFieldProps = {
+  field: 'normalThetaDeg' | 'normalPhiDeg'
+  label: string
+  min: number
+  max: number
+  fallback: number
+  value: string
+  descriptionId: string
+  description: string
+  onChange: (field: 'normalThetaDeg' | 'normalPhiDeg', value: string) => void
+}
+
+const NormalAngleField = memo(function NormalAngleField({
+  field,
+  label,
+  min,
+  max,
+  fallback,
+  value,
+  descriptionId,
+  description,
+  onChange,
+}: NormalAngleFieldProps) {
+  const describedBy = `preview-work-plane-normal-angle-convention ${descriptionId}`
+
+  return (
+    <label className="preview-work-plane-angle-field">
+      <span className="preview-work-plane-angle-label" title={description}>
+        {label}
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step="1"
+        value={rangeValueFromDraft(value, min, max, fallback)}
+        aria-label={`${label} slider`}
+        aria-describedby={describedBy}
+        title={description}
+        onChange={(event) => onChange(field, event.currentTarget.value)}
+      />
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        aria-label={`${label} degrees`}
+        aria-describedby={describedBy}
+        title={description}
+        onChange={(event) => onChange(field, event.currentTarget.value)}
+      />
+      <span id={descriptionId} className="preview-work-plane-angle-help">
+        {description}
+      </span>
+    </label>
+  )
+})
+
+type NormalVectorPreviewProps = {
+  thetaDeg: string
+  phiDeg: string
+}
+
+const NormalVectorPreview = memo(function NormalVectorPreview({
+  thetaDeg,
+  phiDeg,
+}: NormalVectorPreviewProps) {
+  const preview = useMemo(
+    () =>
+      workPlaneNormalVectorPreviewGeometryFromAngles({
+        normalThetaDeg: thetaDeg,
+        normalPhiDeg: phiDeg,
+      }),
+    [thetaDeg, phiDeg],
+  )
+
+  if (preview === null) {
+    return (
+      <div className="preview-work-plane-normal-preview is-invalid">
+        Invalid normal
+      </div>
+    )
+  }
+
+  return (
+    <svg
+      className="preview-work-plane-normal-preview"
+      role="img"
+      aria-label="Normal-vector preview"
+      viewBox={preview.viewBox}
+    >
+      <defs>
+        <marker
+          id="preview-work-plane-normal-arrow"
+          markerWidth="6"
+          markerHeight="6"
+          refX="5"
+          refY="3"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path d="M0,0 L6,3 L0,6 Z" />
+        </marker>
+      </defs>
+      {preview.axes.map((axis) => (
+        <g key={axis.id} className={`normal-preview-axis normal-preview-${axis.id}`}>
+          <line
+            x1={axis.from.x}
+            y1={axis.from.y}
+            x2={axis.to.x}
+            y2={axis.to.y}
+          />
+          <text x={axis.to.x} y={axis.to.y}>
+            {axis.label}
+          </text>
+        </g>
+      ))}
+      <g className="normal-preview-vector">
+        <line
+          x1={preview.normal.from.x}
+          y1={preview.normal.from.y}
+          x2={preview.normal.to.x}
+          y2={preview.normal.to.y}
+          markerEnd="url(#preview-work-plane-normal-arrow)"
+        />
+        <text x={preview.normal.to.x} y={preview.normal.to.y}>
+          {preview.normal.label}
+        </text>
+      </g>
+    </svg>
+  )
+})
+
+const CustomThreePointWorkPlaneSetup = memo(
+  function CustomThreePointWorkPlaneSetup({
+    ambientDimension,
+    activeWorkPlane,
+    onBeforeWorkPlaneChange,
+    onActiveWorkPlaneChange,
+    onWorkPlaneOriginPickingStateChange,
+    onWorkPlaneStatusChange,
+  }: WorkPlaneSetupPanelProps) {
+    const [customThreePointWorkPlaneInput, setCustomThreePointWorkPlaneInput] =
+      useState<CustomThreePointWorkPlaneInput>(
+        defaultCustomThreePointWorkPlaneInput,
+      )
+
+    function updateCustomThreePointWorkPlaneVectorInput(
+      point: keyof CustomThreePointWorkPlaneInput,
+      axis: keyof CustomThreePointWorkPlaneInput['p0'],
+      value: string,
+    ): void {
+      setCustomThreePointWorkPlaneInput((current) => ({
+        ...current,
+        [point]: {
+          ...current[point],
+          [axis]: value,
+        },
+      }))
+    }
+
+    function applyCustomThreePointWorkPlane(): void {
+      if (onBeforeWorkPlaneChange()) {
+        return
+      }
+
+      const result = applyCustomThreePointWorkPlaneInput(
+        activeWorkPlane,
+        ambientDimension,
+        customThreePointWorkPlaneInput,
+      )
+
+      onWorkPlaneStatusChange(result.status)
+
+      if (result.ok) {
+        onActiveWorkPlaneChange(result.workPlane)
+        onWorkPlaneOriginPickingStateChange(inactiveWorkPlaneOriginPickingState)
+      }
+    }
+
+    return (
+      <form
+        className="preview-work-plane-method-panel custom-work-plane-form"
+        aria-label="Custom 3 points"
+        onSubmit={(event) => {
+          event.preventDefault()
+          applyCustomThreePointWorkPlane()
+        }}
+      >
+        <div className="preview-work-plane-method-heading">
+          <span className="preview-work-plane-method-title">Custom 3 points</span>
+        </div>
+        <div className="work-plane-vector-stack">
+          {(['p0', 'p1', 'p2'] as const).map((point) => (
+            <div
+              key={point}
+              className="work-plane-vector-row"
+              role="group"
+              aria-label={point.toUpperCase()}
+            >
+              <span className="work-plane-vector-label">
+                {point.toUpperCase()}
+              </span>
+              {workPlaneVectorAxes.map((axis) => (
+                <label key={axis} className="custom-work-plane-field">
+                  <span>{axis}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={customThreePointWorkPlaneInput[point][axis]}
+                    onChange={(event) =>
+                      updateCustomThreePointWorkPlaneVectorInput(
+                        point,
+                        axis,
+                        event.currentTarget.value,
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="preview-work-plane-actions">
+          <button type="submit" className="preview-overlay-button">
+            Apply
+          </button>
+        </div>
+      </form>
+    )
+  },
+)
 
 function modalFocusableElements(dialog: HTMLElement): HTMLElement[] {
   return Array.from(

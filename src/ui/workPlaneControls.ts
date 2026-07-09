@@ -47,6 +47,23 @@ export type CustomOriginNormalThetaPhiWorkPlaneInput = {
   normalPhiDeg: string
 }
 
+export type CustomOriginNormalThetaPhiWorkPlaneDraftUpdate =
+  | {
+      kind: 'origin'
+      axis: keyof WorkPlaneVectorInput
+      value: string
+    }
+  | {
+      kind: 'angle'
+      field: 'normalThetaDeg' | 'normalPhiDeg'
+      value: string
+    }
+
+export type WorkPlaneNormalVectorPreviewAngles = {
+  normalThetaDeg: string
+  normalPhiDeg: string
+}
+
 export type CustomThreePointWorkPlaneInput = {
   p0: WorkPlaneVectorInput
   p1: WorkPlaneVectorInput
@@ -187,6 +204,27 @@ export const defaultCustomThreePointWorkPlaneInput: CustomThreePointWorkPlaneInp
     p2: { x: '0', y: '1', z: '0' },
   }
 
+export function updateCustomOriginNormalThetaPhiWorkPlaneInputDraft(
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+  update: CustomOriginNormalThetaPhiWorkPlaneDraftUpdate,
+): CustomOriginNormalThetaPhiWorkPlaneInput {
+  switch (update.kind) {
+    case 'origin':
+      return {
+        ...input,
+        origin: {
+          ...input.origin,
+          [update.axis]: update.value,
+        },
+      }
+    case 'angle':
+      return {
+        ...input,
+        [update.field]: update.value,
+      }
+  }
+}
+
 export function applyCustomOriginNormalThetaPhiWorkPlaneInput(
   currentWorkPlane: WorkPlane,
   ambientDimension: AmbientDimension,
@@ -238,6 +276,25 @@ export function applyCustomOriginNormalThetaPhiWorkPlaneInput(
       status: 'Custom plane inputs are invalid.',
     }
   }
+}
+
+export function commitCustomOriginNormalThetaPhiWorkPlaneInput(
+  currentWorkPlane: WorkPlane,
+  ambientDimension: AmbientDimension,
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+  commitWorkPlane: (workPlane: WorkPlane) => void,
+): CustomWorkPlaneApplyResult {
+  const result = applyCustomOriginNormalThetaPhiWorkPlaneInput(
+    currentWorkPlane,
+    ambientDimension,
+    input,
+  )
+
+  if (result.ok) {
+    commitWorkPlane(result.workPlane)
+  }
+
+  return result
 }
 
 export function canApplyCustomOriginNormalThetaPhiWorkPlaneInput(
@@ -341,6 +398,27 @@ export function workPlaneNormalVectorPreviewGeometryFromInput(
   const normal = normalVectorFromThetaPhiInput(input)
 
   return normal === null ? null : workPlaneNormalVectorPreviewGeometry(normal)
+}
+
+export function workPlaneNormalVectorPreviewGeometryFromAngles(
+  input: WorkPlaneNormalVectorPreviewAngles,
+): WorkPlaneNormalVectorPreviewGeometry | null {
+  return workPlaneNormalVectorPreviewGeometryFromInput({
+    origin: defaultCustomOriginNormalThetaPhiWorkPlaneInput.origin,
+    normalThetaDeg: input.normalThetaDeg,
+    normalPhiDeg: input.normalPhiDeg,
+  })
+}
+
+export type WorkPlaneSetupMethodPanelRenderers<T> = {
+  [method in WorkPlaneSetupMethod]: () => T
+}
+
+export function selectWorkPlaneSetupMethodPanel<T>(
+  method: WorkPlaneSetupMethod,
+  renderers: WorkPlaneSetupMethodPanelRenderers<T>,
+): T {
+  return renderers[method]()
 }
 
 export function applyCustomOriginNormalWorkPlaneInput(

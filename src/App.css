@@ -2202,7 +2202,6 @@
   border-radius: 7px;
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   box-shadow: rgba(30, 34, 44, 0.22) 0 14px 34px;
-  backdrop-filter: blur(10px);
 }
 
 .preview-work-plane-heading-row {

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { threeDimensionalExample } from '../../src/examples/index.ts'
+import { serializeDiagram } from '../../src/model/serialization.ts'
+import { generateTikz } from '../../src/tikz/index.ts'
 import {
   applyCustomOriginNormalThetaPhiWorkPlaneInput,
   applyPickedPointWorkPlane,
@@ -10,6 +13,7 @@ import {
   canApplyPickedPointWorkPlane,
   cancelWorkPlaneOriginPicking,
   cancelWorkPlanePointPicking,
+  commitCustomOriginNormalThetaPhiWorkPlaneInput,
   defaultCustomOriginNormalThetaPhiWorkPlaneInput,
   inactiveWorkPlaneOriginPickingState,
   inactiveWorkPlanePointPickingState,
@@ -24,6 +28,7 @@ import {
   pickWorkPlaneCoordinateAnchor,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
+  selectWorkPlaneSetupMethodPanel,
   shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneDetails,
   shouldShowWorkPlaneControls,
@@ -32,8 +37,10 @@ import {
   startWorkPlaneOriginPicking,
   startWorkPlanePointPicking,
   toggleWorkPlaneOverlayPanel,
+  updateCustomOriginNormalThetaPhiWorkPlaneInputDraft,
   validateWorkPlanePointPickingState,
   workPlaneFrameDisplay,
+  workPlaneNormalVectorPreviewGeometryFromAngles,
   workPlaneNormalVectorPreviewGeometryFromInput,
   workPlaneOriginReferenceText,
   workPlanePointPickingCount,
@@ -288,6 +295,156 @@ test('normal-vector preview geometry renders and changes with theta and phi', ()
   assert.notDeepEqual(zPreview.normal.to, xPreview.normal.to)
 })
 
+test('theta and phi draft changes do not mutate diagram, active work plane, or TikZ output', () => {
+  const activeWorkPlane: WorkPlane = { kind: 'xy', z: 0 }
+  const beforeDiagram = serializeDiagram(threeDimensionalExample)
+  const beforeTikz = generateTikz(threeDimensionalExample)
+  const draft = updateCustomOriginNormalThetaPhiWorkPlaneInputDraft(
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    {
+      kind: 'angle',
+      field: 'normalThetaDeg',
+      value: '90',
+    },
+  )
+  const nextDraft = updateCustomOriginNormalThetaPhiWorkPlaneInputDraft(draft, {
+    kind: 'angle',
+    field: 'normalPhiDeg',
+    value: '45',
+  })
+
+  assert.deepEqual(activeWorkPlane, { kind: 'xy', z: 0 })
+  assert.equal(serializeDiagram(threeDimensionalExample), beforeDiagram)
+  assert.equal(generateTikz(threeDimensionalExample), beforeTikz)
+  assert.deepEqual(defaultCustomOriginNormalThetaPhiWorkPlaneInput, {
+    origin: { x: '0', y: '0', z: '0' },
+    normalThetaDeg: '0',
+    normalPhiDeg: '0',
+  })
+  assert.equal(nextDraft.normalThetaDeg, '90')
+  assert.equal(nextDraft.normalPhiDeg, '45')
+})
+
+test('origin-normal Apply commits a valid draft exactly once', () => {
+  let commitCount = 0
+  let committedWorkPlane: WorkPlane | null = null
+  const result = commitCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    {
+      origin: { x: '1', y: '2', z: '3' },
+      normalThetaDeg: '90',
+      normalPhiDeg: '0',
+    },
+    (workPlane) => {
+      commitCount += 1
+      committedWorkPlane = workPlane
+    },
+  )
+  const invalidResult = commitCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    {
+      origin: { x: '1', y: '2', z: '3' },
+      normalThetaDeg: '',
+      normalPhiDeg: '0',
+    },
+    () => {
+      commitCount += 1
+    },
+  )
+
+  assert.equal(result.ok, true)
+  assert.equal(commitCount, 1)
+  assert.equal(committedWorkPlane?.kind, 'custom')
+  assert.equal(invalidResult.ok, false)
+  assert.equal(commitCount, 1)
+})
+
+test('work-plane setup panel selector invokes only the active method renderer', () => {
+  const calls = {
+    pickThreeExistingPoints: 0,
+    originNormalVector: 0,
+    customThreePoints: 0,
+  }
+  const selected = selectWorkPlaneSetupMethodPanel('originNormalVector', {
+    pickThreeExistingPoints: () => {
+      calls.pickThreeExistingPoints += 1
+      return 'pick'
+    },
+    originNormalVector: () => {
+      calls.originNormalVector += 1
+      return 'origin-normal'
+    },
+    customThreePoints: () => {
+      calls.customThreePoints += 1
+      return 'three-point'
+    },
+  })
+
+  assert.equal(selected, 'origin-normal')
+  assert.deepEqual(calls, {
+    pickThreeExistingPoints: 0,
+    originNormalVector: 1,
+    customThreePoints: 0,
+  })
+})
+
+test('normal-vector preview geometry is derived from theta and phi without origin input', () => {
+  const preview = workPlaneNormalVectorPreviewGeometryFromAngles({
+    normalThetaDeg: '90',
+    normalPhiDeg: '0',
+  })
+
+  assert.notEqual(preview, null)
+
+  if (preview === null) {
+    throw new Error('Expected preview geometry.')
+  }
+
+  assert.equal(preview.axes.length, 3)
+  assert.deepEqual(preview.normal.from, { x: 45, y: 44 })
+})
+
+test('work-plane overlay keeps origin-normal drafts local to memoized child components', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+  const appFunctionSource = source.slice(
+    source.indexOf('function App()'),
+    source.indexOf('type WorkPlaneOverlayProps'),
+  )
+  const originPanelSource = source.slice(
+    source.indexOf('const OriginNormalWorkPlaneSetup'),
+    source.indexOf('type NormalAngleFieldProps'),
+  )
+  const updateAngleSource = originPanelSource.slice(
+    originPanelSource.indexOf('function updateNormalAngleInput'),
+    originPanelSource.indexOf('function startOriginWorkPlanePicking'),
+  )
+
+  assert.doesNotMatch(appFunctionSource, /useState<CustomOriginNormalThetaPhiWorkPlaneInput>/)
+  assert.doesNotMatch(appFunctionSource, /normalThetaDeg|normalPhiDeg/)
+  assert.match(originPanelSource, /useState<CustomOriginNormalThetaPhiWorkPlaneInput>/)
+  assert.match(updateAngleSource, /setOriginNormalInput/)
+  assert.doesNotMatch(updateAngleSource, /onActiveWorkPlaneChange/)
+  assert.doesNotMatch(updateAngleSource, /onWorkPlaneStatusChange/)
+  assert.doesNotMatch(updateAngleSource, /SvgDiagram|generateTikzForUi/)
+})
+
+test('normal-vector preview component is memoized and depends only on theta and phi', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+  const previewSource = source.slice(
+    source.indexOf('const NormalVectorPreview = memo'),
+    source.indexOf('const CustomThreePointWorkPlaneSetup'),
+  )
+
+  assert.match(previewSource, /memo\(function NormalVectorPreview/)
+  assert.match(previewSource, /thetaDeg/)
+  assert.match(previewSource, /phiDeg/)
+  assert.match(previewSource, /workPlaneNormalVectorPreviewGeometryFromAngles/)
+  assert.doesNotMatch(previewSource, /diagram|activeWorkPlane|originNormalInput/)
+  assert.doesNotMatch(previewSource, /SvgDiagram|generateTikzForUi|workPlanePreview/)
+})
+
 test('zero normal input is rejected without changing the active work plane', () => {
   const previous: WorkPlane = { kind: 'xz', y: -2 }
   const result = applyCustomOriginNormalWorkPlaneInput(previous, 3, {
@@ -453,6 +610,25 @@ test('preview work-plane overlay panel opens and closes only when available', ()
   assert.equal(shouldShowWorkPlaneOverlayPanel(3, true), true)
   assert.equal(shouldShowWorkPlaneOverlayPanel(3, false), false)
   assert.equal(shouldShowWorkPlaneOverlayPanel(2, true), false)
+})
+
+test('preview work-plane overlay unmounts panel contents while closed', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+  const overlaySource = source.slice(
+    source.indexOf('const WorkPlaneOverlay = memo'),
+    source.indexOf('type WorkPlaneOverlayPanelProps'),
+  )
+
+  assert.match(overlaySource, /const showPanel = shouldShowWorkPlaneOverlayPanel/)
+  assert.match(overlaySource, /\{showPanel && \(\s*<WorkPlaneOverlayPanel/)
+  assert.doesNotMatch(overlaySource, /workPlaneFrameDisplay/)
+})
+
+test('large preview work-plane panel does not use backdrop filter', () => {
+  const css = readFileSync(new URL('../../src/App.css', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(cssRule(css, '.preview-work-plane-panel'), /backdrop-filter/)
+  assert.match(cssRule(css, '.preview-work-plane-toggle-button'), /backdrop-filter/)
 })
 
 test('work-plane frame display renders current origin and plane vectors', () => {
@@ -978,6 +1154,22 @@ function nonNullVec3(value: ReturnType<typeof normalVectorFromThetaPhiDegrees>) 
   }
 
   return value
+}
+
+function cssRule(css: string, selector: string): string {
+  const start = css.indexOf(`${selector} {`)
+
+  if (start === -1) {
+    throw new Error(`Missing CSS rule for ${selector}.`)
+  }
+
+  const end = css.indexOf('\n}', start)
+
+  if (end === -1) {
+    throw new Error(`Unterminated CSS rule for ${selector}.`)
+  }
+
+  return css.slice(start, end)
 }
 
 function assertVec3Approx(
