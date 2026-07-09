@@ -16,6 +16,9 @@ import {
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
   normalVectorFromThetaPhiDegrees,
+  normalAngleConventionText,
+  normalPhiConventionText,
+  normalThetaConventionText,
   pickWorkPlaneOriginCoordinateAnchor,
   pickWorkPlaneOriginPointStratum,
   pickWorkPlaneCoordinateAnchor,
@@ -67,6 +70,37 @@ test('work-plane editor is routed to the preview overlay instead of stale toolba
   assert.match(source, /Custom 3 points/)
   assert.doesNotMatch(source, /Custom by origin \+ normal/)
   assert.doesNotMatch(source, /customWorkPlaneInput\[vector\]\[axis\]/)
+})
+
+test('preview origin-normal work-plane panel explains the theta and phi convention', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /normalAngleConventionText/)
+  assert.match(source, /normalThetaConventionText/)
+  assert.match(source, /normalPhiConventionText/)
+  assert.match(source, /preview-work-plane-angle-convention/)
+  assert.match(normalAngleConventionText, /θ is measured from \+z/)
+  assert.match(
+    normalAngleConventionText,
+    /φ is measured in the xy-plane from \+x toward \+y/,
+  )
+  assert.match(normalAngleConventionText, /Angles are in degrees/)
+})
+
+test('normal theta and phi controls expose accessible angle descriptions', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+  const describedByCount = source.match(/aria-describedby={describedBy}/g)?.length ?? 0
+
+  assert.match(source, /preview-work-plane-normal-angle-convention/)
+  assert.match(source, /preview-work-plane-normal-theta-help/)
+  assert.match(source, /preview-work-plane-normal-phi-help/)
+  assert.match(source, /className="preview-work-plane-angle-help"/)
+  assert.equal(describedByCount, 2)
+  assert.match(normalThetaConventionText, /\+z/)
+  assert.match(normalThetaConventionText, /degrees/)
+  assert.match(normalPhiConventionText, /\+x/)
+  assert.match(normalPhiConventionText, /\+y/)
+  assert.match(normalPhiConventionText, /degrees/)
 })
 
 test('valid origin and normal input applies a custom work plane in 3D', () => {

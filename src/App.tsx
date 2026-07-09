@@ -233,6 +233,9 @@ import {
   normalizeJsonDownloadFilename,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
+  normalAngleConventionText,
+  normalPhiConventionText,
+  normalThetaConventionText,
   normalVectorFromThetaPhiInput,
   parseDirectCoordinateInput,
   parseDirectCoordinateInputWithCoordinateSource,
@@ -6785,6 +6788,12 @@ function App() {
             Origin + normal vector
           </span>
         </div>
+        <p
+          id="preview-work-plane-normal-angle-convention"
+          className="preview-work-plane-angle-convention"
+        >
+          {normalAngleConventionText}
+        </p>
         <div className="work-plane-vector-stack">
           <div
             className="work-plane-vector-row"
@@ -6846,6 +6855,8 @@ function App() {
               0,
               180,
               0,
+              'preview-work-plane-normal-theta-help',
+              normalThetaConventionText,
             )}
             {renderNormalAngleField(
               'normalPhiDeg',
@@ -6853,6 +6864,8 @@ function App() {
               -180,
               180,
               0,
+              'preview-work-plane-normal-phi-help',
+              normalPhiConventionText,
             )}
             <span className="preview-work-plane-normal-readout">
               {normal === null
@@ -6885,12 +6898,17 @@ function App() {
     min: number,
     max: number,
     fallback: number,
+    descriptionId: string,
+    description: string,
   ) {
     const value = customOriginNormalWorkPlaneInput[field]
+    const describedBy = `preview-work-plane-normal-angle-convention ${descriptionId}`
 
     return (
       <label className="preview-work-plane-angle-field">
-        <span>{label}</span>
+        <span className="preview-work-plane-angle-label" title={description}>
+          {label}
+        </span>
         <input
           type="range"
           min={min}
@@ -6898,6 +6916,8 @@ function App() {
           step="1"
           value={rangeValueFromDraft(value, min, max, fallback)}
           aria-label={`${label} slider`}
+          aria-describedby={describedBy}
+          title={description}
           onChange={(event) =>
             updateCustomOriginNormalAngleInput(
               field,
@@ -6910,6 +6930,8 @@ function App() {
           inputMode="decimal"
           value={value}
           aria-label={`${label} degrees`}
+          aria-describedby={describedBy}
+          title={description}
           onChange={(event) =>
             updateCustomOriginNormalAngleInput(
               field,
@@ -6917,6 +6939,9 @@ function App() {
             )
           }
         />
+        <span id={descriptionId} className="preview-work-plane-angle-help">
+          {description}
+        </span>
       </label>
     )
   }

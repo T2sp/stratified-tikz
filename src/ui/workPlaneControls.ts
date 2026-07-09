@@ -148,6 +148,15 @@ export const workPlaneSetupMethodOptions: WorkPlaneSetupMethodOption[] = [
   },
 ]
 
+export const normalAngleConventionText =
+  'Angle convention: θ is measured from +z; φ is measured in the xy-plane from +x toward +y. Angles are in degrees.'
+
+export const normalThetaConventionText =
+  'Normal θ: polar angle from +z, in degrees.'
+
+export const normalPhiConventionText =
+  'Normal φ: azimuth in the xy-plane from +x toward +y, in degrees.'
+
 export const inactiveWorkPlanePointPickingState: WorkPlanePointPickingState = {
   active: false,
   pickedPointIds: [],
