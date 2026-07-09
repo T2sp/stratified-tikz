@@ -55,9 +55,27 @@ and are not saved.
 
 Bulk style edits apply to the selected objects of the same geometric kind.
 Common values are shown directly; mixed values are shown as `Mixed`. Editing a
-mixed field applies the new explicit value to every selected object and clears
-style preset/import references on those edited objects so export remains driven
-by the saved structured style.
+mixed field applies the new explicit value to every selected object. Explicit
+style edits from the Inspector, bulk editor, or Preview quick style bar are
+treated as user overrides. They clear local `stylePresetId` values, because the
+object is no longer exactly following that local preset.
+
+Imported TikZ style references are preserved when possible. If an object uses an
+imported TikZ style and the user changes an explicit field such as stroke width,
+the saved object keeps its `importedTikzStyleReferenceId`; generated TikZ keeps
+the imported style reference and emits the explicit override after it, for
+example:
+
+```tex
+\draw[myImportedStyle, line width=0.8pt] ...
+```
+
+This keeps generated TikZ compact while making user overrides visible. The
+generator avoids duplicating options already provided by the imported style
+unless the user explicitly overrides those fields. The Preview quick style bar's
+explicit clear-style command intentionally clears both `stylePresetId` and
+`importedTikzStyleReferenceId`, because that command removes the selected style
+reference rather than editing one style field.
 
 Bulk layer changes, duplicate, delete, and translation are undoable diagram
 edits. Duplicate assigns fresh top-level IDs and fresh nested IDs where needed.
