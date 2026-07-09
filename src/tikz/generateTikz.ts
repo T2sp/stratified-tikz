@@ -5999,6 +5999,7 @@ function labelStyleOptions(
   )
   const presetStyleOption = userStylePresetTikzOption(
     'label',
+    'node',
     label.stylePresetId,
     label.style,
     context,
@@ -6006,6 +6007,18 @@ function labelStyleOptions(
 
   if (presetStyleOption !== null) {
     return [presetStyleOption, ...importedOptions]
+  }
+
+  if (
+    matchingImportedPresetReferenceApplies(
+      'label',
+      'node',
+      label.stylePresetId,
+      label.style,
+      context,
+    )
+  ) {
+    return importedOptions
   }
 
   if (isDefaultLabelStyle(label.style)) {
@@ -6080,10 +6093,24 @@ function curveStyleOptionsForElement(
   )
   const presetStyleOption = userStylePresetTikzOption(
     'curve',
+    'draw',
     stylePresetId,
     style,
     context,
   )
+
+  if (
+    presetStyleOption === null &&
+    matchingImportedPresetReferenceApplies(
+      'curve',
+      'draw',
+      stylePresetId,
+      style,
+      context,
+    )
+  ) {
+    return importedOptions
+  }
 
   return presetStyleOption === null
     ? [...importedOptions, ...curveStyleTikzOptions(style, colorBaseName, context)]
@@ -6483,10 +6510,24 @@ function filledSurfaceStyleOptionsForElement(
   )
   const presetStyleOption = userStylePresetTikzOption(
     kind,
+    'filldraw',
     stylePresetId,
     style,
     context,
   )
+
+  if (
+    presetStyleOption === null &&
+    matchingImportedPresetReferenceApplies(
+      kind,
+      'filldraw',
+      stylePresetId,
+      style,
+      context,
+    )
+  ) {
+    return importedOptions
+  }
 
   return presetStyleOption === null
     ? [
@@ -6529,10 +6570,24 @@ function pointStyleOptionsForElement(
   )
   const presetStyleOption = userStylePresetTikzOption(
     'point',
+    'node',
     stylePresetId,
     style,
     context,
   )
+
+  if (
+    presetStyleOption === null &&
+    matchingImportedPresetReferenceApplies(
+      'point',
+      'node',
+      stylePresetId,
+      style,
+      context,
+    )
+  ) {
+    return importedOptions
+  }
 
   return presetStyleOption === null
     ? [...importedOptions, ...pointStyleTikzOptions(style, colorBaseName, context)]
@@ -6541,6 +6596,7 @@ function pointStyleOptionsForElement(
 
 function userStylePresetTikzOption(
   kind: StylePresetKind,
+  commandTarget: TikzStyleTarget,
   stylePresetId: string | undefined,
   style: UserStylePreset['style'],
   context: GenerateContext,
@@ -6548,6 +6604,10 @@ function userStylePresetTikzOption(
   const preset = matchingUserStylePreset(kind, stylePresetId, style, context)
 
   if (preset === undefined) {
+    return null
+  }
+
+  if (compatibleImportedPresetReference(preset, kind, commandTarget, context)) {
     return null
   }
 
@@ -6600,6 +6660,41 @@ function styleReferenceAppliesToElement(
   return (
     reference.targets.includes(kind) ||
     reference.targets.includes(commandTarget)
+  )
+}
+
+function compatibleImportedPresetReference(
+  preset: UserStylePreset,
+  kind: StylePresetKind,
+  commandTarget: TikzStyleTarget,
+  context: GenerateContext,
+): boolean {
+  if (preset.importedTikzStyleReferenceId === undefined) {
+    return false
+  }
+
+  const reference = context.importedTikzStyleReferences.get(
+    preset.importedTikzStyleReferenceId,
+  )
+
+  return (
+    reference !== undefined &&
+    styleReferenceAppliesToElement(reference, kind, commandTarget)
+  )
+}
+
+function matchingImportedPresetReferenceApplies(
+  kind: StylePresetKind,
+  commandTarget: TikzStyleTarget,
+  stylePresetId: string | undefined,
+  style: UserStylePreset['style'],
+  context: GenerateContext,
+): boolean {
+  const preset = matchingUserStylePreset(kind, stylePresetId, style, context)
+
+  return (
+    preset !== undefined &&
+    compatibleImportedPresetReference(preset, kind, commandTarget, context)
   )
 }
 
