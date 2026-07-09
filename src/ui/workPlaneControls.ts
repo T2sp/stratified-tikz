@@ -97,6 +97,20 @@ export type WorkPlanePointPickResult = {
   status: string
 }
 
+export type WorkPlaneOriginPickingState = {
+  active: boolean
+}
+
+export type WorkPlaneOriginPickResult = {
+  state: WorkPlaneOriginPickingState
+  input: CustomOriginNormalThetaPhiWorkPlaneInput
+  status: string
+}
+
+export type WorkPlaneCoordinateAnchorPickOptions = {
+  showCoordinateAnchors?: boolean
+}
+
 export type WorkPlanePointPickingValidationResult = {
   state: WorkPlanePointPickingState
   removedStalePointIds: string[]
@@ -138,6 +152,10 @@ export const inactiveWorkPlanePointPickingState: WorkPlanePointPickingState = {
   active: false,
   pickedPointIds: [],
   pickedTargets: [],
+}
+
+export const inactiveWorkPlaneOriginPickingState: WorkPlaneOriginPickingState = {
+  active: false,
 }
 
 export const defaultCustomOriginNormalWorkPlaneInput: CustomOriginNormalWorkPlaneInput =
@@ -483,11 +501,19 @@ export function pickWorkPlaneCoordinateAnchor(
   diagram: Diagram,
   state: WorkPlanePointPickingState,
   coordinateId: string,
+  options: WorkPlaneCoordinateAnchorPickOptions = {},
 ): WorkPlanePointPickResult {
+  if (options.showCoordinateAnchors === false) {
+    return {
+      state,
+      status: 'Coordinate anchors are hidden.',
+    }
+  }
+
   const resolved = resolveWorkPlanePickTargetPosition(diagram, {
     kind: 'coordinateAnchor',
     id: coordinateId,
-  })
+  }, options)
 
   if (resolved === null) {
     return {
@@ -501,6 +527,112 @@ export function pickWorkPlaneCoordinateAnchor(
     { kind: 'coordinateAnchor', id: coordinateId },
     diagram,
   )
+}
+
+export function startWorkPlaneOriginPicking(
+  ambientDimension: AmbientDimension,
+): { state: WorkPlaneOriginPickingState; status: string } {
+  if (ambientDimension !== 3) {
+    return {
+      state: inactiveWorkPlaneOriginPickingState,
+      status: 'Origin picking for work planes is available only in 3D.',
+    }
+  }
+
+  return {
+    state: { active: true },
+    status: 'Pick an existing point or shown coordinate anchor for the origin.',
+  }
+}
+
+export function cancelWorkPlaneOriginPicking(
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+): WorkPlaneOriginPickResult {
+  return {
+    state: inactiveWorkPlaneOriginPickingState,
+    input,
+    status: 'Origin picking canceled.',
+  }
+}
+
+export function pickWorkPlaneOriginPointStratum(
+  diagram: Diagram,
+  state: WorkPlaneOriginPickingState,
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+  pointId: string,
+): WorkPlaneOriginPickResult {
+  return pickWorkPlaneOriginTarget(diagram, state, input, {
+    kind: 'pointStratum',
+    id: pointId,
+  })
+}
+
+export function pickWorkPlaneOriginCoordinateAnchor(
+  diagram: Diagram,
+  state: WorkPlaneOriginPickingState,
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+  coordinateId: string,
+  options: WorkPlaneCoordinateAnchorPickOptions = {},
+): WorkPlaneOriginPickResult {
+  if (options.showCoordinateAnchors === false) {
+    return {
+      state,
+      input,
+      status: 'Coordinate anchors are hidden.',
+    }
+  }
+
+  return pickWorkPlaneOriginTarget(
+    diagram,
+    state,
+    input,
+    {
+      kind: 'coordinateAnchor',
+      id: coordinateId,
+    },
+    options,
+  )
+}
+
+export function pickWorkPlaneOriginTarget(
+  diagram: Diagram,
+  state: WorkPlaneOriginPickingState,
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+  target: WorkPlanePickTarget,
+  options: WorkPlaneCoordinateAnchorPickOptions = {},
+): WorkPlaneOriginPickResult {
+  if (!state.active) {
+    return {
+      state,
+      input,
+      status: 'Origin picking is not active.',
+    }
+  }
+
+  const resolved = resolveWorkPlanePickTargetPosition(diagram, target, options)
+
+  if (resolved === null) {
+    return {
+      state,
+      input,
+      status:
+        target.kind === 'pointStratum'
+          ? 'Point is unavailable or has no finite position.'
+          : 'Coordinate anchor is unavailable or has no finite preview position.',
+    }
+  }
+
+  return {
+    state: inactiveWorkPlaneOriginPickingState,
+    input: {
+      ...input,
+      origin: workPlaneVectorInputFromVec3(resolved.position),
+    },
+    status: `Origin picked from ${workPlanePickTargetStatusLabel(
+      diagram,
+      target,
+    )}.`,
+  }
 }
 
 export function pickWorkPlaneTarget(
@@ -937,6 +1069,7 @@ function workPlanePointPickingStateFromTargets(
 function resolveWorkPlanePickTargetPosition(
   diagram: Diagram,
   target: WorkPlanePickTarget,
+  options: WorkPlaneCoordinateAnchorPickOptions = {},
 ): ResolvedWorkPlanePickTarget | null {
   switch (target.kind) {
     case 'pointStratum': {
@@ -950,6 +1083,10 @@ function resolveWorkPlanePickTargetPosition(
         : null
     }
     case 'coordinateAnchor': {
+      if (options.showCoordinateAnchors === false) {
+        return null
+      }
+
       const anchor = (diagram.coordinateAnchors ?? []).find(
         (candidate) => candidate.id === target.id,
       )
@@ -1041,6 +1178,18 @@ function parseWorkPlaneVectorInput(input: WorkPlaneVectorInput): Vec3 | null {
   }
 
   return { x, y, z }
+}
+
+function workPlaneVectorInputFromVec3(point: Vec3): WorkPlaneVectorInput {
+  return {
+    x: formatWorkPlaneVectorInputValue(point.x),
+    y: formatWorkPlaneVectorInputValue(point.y),
+    z: formatWorkPlaneVectorInputValue(point.z),
+  }
+}
+
+function formatWorkPlaneVectorInputValue(value: number): string {
+  return String(normalizeTinyWorkPlaneValue(value))
 }
 
 function parseFiniteNumberInput(value: string): number | null {

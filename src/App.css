@@ -2344,6 +2344,14 @@
   font-size: 12px;
 }
 
+.preview-work-plane-origin-pick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .preview-work-plane-picked-list {
   display: grid;
   gap: 3px;
