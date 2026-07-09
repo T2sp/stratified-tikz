@@ -4133,7 +4133,7 @@ test('stale user preset references fall back to inline structured style', () => 
   assert.match(tikz, /dashed/)
 })
 
-test('element imported draw style exports the raw key before structured draw fallback options', () => {
+test('element imported draw style exports the raw key without redundant fallback options', () => {
   const diagram = withImportedTikzStyleReference(
     createTwoDimensionalDiagram(),
     'external-draw',
@@ -4150,16 +4150,14 @@ test('element imported draw style exports the raw key before structured draw fal
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
 
   assert.match(layerBlock, /\\draw\[/)
+  assert.match(layerBlock, /3cat\/phys\/1strata\/color\/x/)
   assert.match(layerBlock, /draw=stzCurvewireStroke/)
   assert.ok(
     layerBlock.indexOf('3cat/phys/1strata/color/x') <
       layerBlock.indexOf('draw=stzCurvewireStroke'),
   )
-  assert.ok(
-    layerBlock.indexOf('3cat/phys/1strata/color/x') <
-      layerBlock.indexOf('line width=1.2pt'),
-  )
-  assert.match(layerBlock, /3cat\/phys\/1strata\/color\/x/)
+  assert.doesNotMatch(layerBlock, /draw opacity=1/)
+  assert.doesNotMatch(layerBlock, /line width=1\.2pt/)
 })
 
 test('element imported filldraw style exports the raw key in filldraw options', () => {
@@ -4201,6 +4199,9 @@ test('element imported node style exports the raw key in node options', () => {
 
   const tikz = generateTikz(diagram)
   const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer0')
+  const pointNodeStart = layerBlock.indexOf('\\node[')
+  const pointNodeEnd = layerBlock.indexOf('] at (pointVertex0p0)', pointNodeStart)
+  const pointNodeBlock = layerBlock.slice(pointNodeStart, pointNodeEnd)
 
   assert.match(layerBlock, /\\node\[/)
   assert.ok(
@@ -4209,8 +4210,10 @@ test('element imported node style exports the raw key in node options', () => {
   )
   assert.match(
     layerBlock,
-    /3cat\/phys\/3strata\/shape\/L[\s\S]*\] at \(pointVertex0p0\) \{\};/,
+    /3cat\/phys\/3strata\/shape\/L[\s\S]*fill=stzPointvertex[\s\S]*draw=stzPointvertex/,
   )
+  assert.doesNotMatch(pointNodeBlock, /inner sep=1\.5pt/)
+  assert.doesNotMatch(pointNodeBlock, /opacity=1/)
 })
 
 test('element imported label style exports the raw key in node options', () => {

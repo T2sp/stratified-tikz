@@ -99,6 +99,7 @@ export type ContextQuickStylePresetOption = {
   name: string
   tikzStyleName: string
   origin: 'user' | 'imported'
+  recent: boolean
   importedKey?: string
   sourceName?: string
 }
@@ -137,6 +138,8 @@ type ContextQuickStyleTarget = {
   id: string
   geometricKind: StylePresetKind
 }
+
+export const maxRecentContextQuickStylePresetIds = 6
 
 export const contextQuickStyleEndpointArrowLabels: Readonly<
   Record<EndpointArrowMode, string>
@@ -272,6 +275,7 @@ export function applyContextQuickStyleField(
 export function createContextQuickStylePresetModel(
   diagram: Diagram,
   selection: SelectedElement,
+  recentPresetIds: readonly string[] = [],
 ): ContextQuickStylePresetModel | null {
   const resolvedTargets = resolveContextQuickStyleTargets(diagram, selection)
 
@@ -298,6 +302,7 @@ export function createContextQuickStylePresetModel(
     importedReferencesById,
     externalSourcesById,
     currentPresetId.kind === 'preset' ? currentPresetId.presetId : undefined,
+    recentPresetIds,
   )
 
   return {
@@ -306,6 +311,16 @@ export function createContextQuickStylePresetModel(
     options,
     current: contextQuickStylePresetCurrentState(options, currentPresetId),
   }
+}
+
+export function updateRecentContextQuickStylePresetIds(
+  current: readonly string[],
+  presetId: string,
+): string[] {
+  return [
+    presetId,
+    ...current.filter((candidate) => candidate !== presetId),
+  ].slice(0, maxRecentContextQuickStylePresetIds)
 }
 
 export function filterContextQuickStylePresetOptions(
@@ -556,7 +571,12 @@ function contextQuickStylePresetOptions(
   importedReferencesById: ReadonlyMap<string, ImportedTikzStyleReference>,
   externalSourcesById: ReadonlyMap<string, ExternalTikzStyleSource>,
   currentPresetId: string | undefined,
+  recentPresetIds: readonly string[],
 ): ContextQuickStylePresetOption[] {
+  const recentPresetRank = new Map(
+    recentPresetIds.map((presetId, index) => [presetId, index] as const),
+  )
+
   return presets
     .filter((preset) => preset.kind === kind)
     .map((preset) =>
@@ -564,6 +584,7 @@ function contextQuickStylePresetOptions(
         preset,
         importedReferencesById,
         externalSourcesById,
+        recentPresetRank.has(preset.id),
       ),
     )
     .sort((a, b) => {
@@ -573,6 +594,21 @@ function contextQuickStylePresetOptions(
 
       if (b.presetId === currentPresetId && a.presetId !== currentPresetId) {
         return 1
+      }
+
+      const aRecentRank = recentPresetRank.get(a.presetId)
+      const bRecentRank = recentPresetRank.get(b.presetId)
+
+      if (aRecentRank !== undefined || bRecentRank !== undefined) {
+        if (aRecentRank === undefined) {
+          return 1
+        }
+
+        if (bRecentRank === undefined) {
+          return -1
+        }
+
+        return aRecentRank - bRecentRank
       }
 
       if (a.origin !== b.origin) {
@@ -587,6 +623,7 @@ function contextQuickStylePresetOption(
   preset: UserStylePreset,
   importedReferencesById: ReadonlyMap<string, ImportedTikzStyleReference>,
   externalSourcesById: ReadonlyMap<string, ExternalTikzStyleSource>,
+  recent: boolean,
 ): ContextQuickStylePresetOption {
   const reference =
     preset.importedTikzStyleReferenceId === undefined
@@ -600,6 +637,7 @@ function contextQuickStylePresetOption(
     name: preset.name,
     tikzStyleName: preset.tikzStyleName,
     origin: reference === undefined ? 'user' : 'imported',
+    recent,
     ...(reference === undefined ? {} : { importedKey: reference.key }),
     ...(source === undefined ? {} : { sourceName: source.name }),
   }

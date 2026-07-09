@@ -30,6 +30,7 @@ import { allLayersFilter, type LayerFilter } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import {
   applyStyleClipboardToEditorState,
+  applyStyleEyedropperSourceToSelection,
   copyStyleFromSelection,
   pasteStyleClipboardToSelection,
   type StyleClipboard,
@@ -75,9 +76,89 @@ test('copies curve style and arrows to a curve without changing geometry or laye
     target.importedTikzStyleReferenceId,
     source.importedTikzStyleReferenceId,
   )
+  assert.equal(target.id, beforeTarget.id)
+  assert.equal(target.name, beforeTarget.name)
   assert.equal(target.layer, beforeTarget.layer)
   assert.deepEqual(target.points, beforeTarget.points)
   assert.deepEqual(target.styleSegments, beforeTarget.styleSegments)
+})
+
+test('style eyedropper applies curve style to a curve target', () => {
+  const diagram = createStyleClipboardDiagram()
+  const result = applyStyleEyedropperSourceToSelection(
+    diagram,
+    { kind: 'stratum', id: 'curve-target' },
+    { kind: 'stratum', id: 'curve-source' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  assert.deepEqual(
+    findCurve(result.diagram, 'curve-target').style,
+    findCurve(diagram, 'curve-source').style,
+  )
+})
+
+test('style eyedropper rejects curve source for sheet target atomically', () => {
+  const diagram = createCurveSheetEyedropperDiagram()
+  const original = structuredClone(diagram) as Diagram
+  const result = applyStyleEyedropperSourceToSelection(
+    diagram,
+    { kind: 'stratum', id: 'sheet-target' },
+    { kind: 'stratum', id: 'curve-source' },
+  )
+
+  assert.equal(result.ok, false)
+  assert.match(result.message, /curve style can only be pasted to curve objects/)
+  assert.deepEqual(result.diagram, original)
+})
+
+test('style eyedropper applies curve style to same-kind multi-selection', () => {
+  const diagram = createStyleClipboardDiagram()
+  const result = applyStyleEyedropperSourceToSelection(
+    diagram,
+    {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'curve-target' },
+        { kind: 'stratum', id: 'curve-extra' },
+      ],
+    },
+    { kind: 'stratum', id: 'curve-source' },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+
+  const source = findCurve(diagram, 'curve-source')
+
+  assert.deepEqual(findCurve(result.diagram, 'curve-target').style, source.style)
+  assert.deepEqual(findCurve(result.diagram, 'curve-extra').style, source.style)
+  assert.equal(result.appliedCount, 2)
+})
+
+test('style eyedropper excludes coordinate anchors', () => {
+  const diagram = createStyleClipboardDiagram()
+  const sourceResult = applyStyleEyedropperSourceToSelection(
+    diagram,
+    { kind: 'stratum', id: 'curve-target' },
+    { kind: 'coordinate', id: 'coord-a' },
+  )
+  const targetResult = applyStyleEyedropperSourceToSelection(
+    diagram,
+    { kind: 'coordinate', id: 'coord-a' },
+    { kind: 'stratum', id: 'curve-source' },
+  )
+
+  assert.equal(sourceResult.ok, false)
+  assert.match(sourceResult.message, /Coordinate anchors do not have styles/)
+  assert.equal(targetResult.ok, false)
+  assert.match(targetResult.message, /Coordinate anchors do not have styles/)
 })
 
 test('copies sheet style to a sheet', () => {
@@ -522,6 +603,39 @@ function createSheetClipboardDiagram(): Diagram {
         point(0, 1, 0),
       ],
       layer: 6,
+    }),
+    createSheetStratum({
+      ambientDimension: 3,
+      id: 'sheet-target',
+      style: {
+        kind: 'sheetStyle',
+        fillColor: '#FFFFFF',
+        fillOpacity: 0.1,
+        strokeColor: '#000000',
+        strokeOpacity: 1,
+      },
+      corners: [
+        point(0, 0, 1),
+        point(1, 0, 1),
+        point(1, 1, 1),
+        point(0, 1, 1),
+      ],
+      layer: 1,
+    }),
+  ]
+
+  return diagram
+}
+
+function createCurveSheetEyedropperDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.strata = [
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'curve-source',
+      style: findCurveSourceStyle(),
+      points: [point(0, 0, 0), point(1, 0, 0)],
     }),
     createSheetStratum({
       ambientDimension: 3,

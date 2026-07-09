@@ -35,6 +35,7 @@ import {
   createContextQuickStyleBarModel,
   createContextQuickStylePresetModel,
   filterContextQuickStylePresetOptions,
+  updateRecentContextQuickStylePresetIds,
   updateContextQuickStyleNumericDraft,
   type ContextQuickStyleField,
 } from '../../src/ui/contextQuickStyleBar.ts'
@@ -84,8 +85,11 @@ test('context quick style bar source exposes searchable TikZ style controls', ()
   assert.match(quickBarSource, /aria-label="TikZ style selector"/)
   assert.match(quickBarSource, /aria-label="Search TikZ styles"/)
   assert.match(quickBarSource, /aria-label="Clear TikZ style"/)
+  assert.match(quickBarSource, /label="Recent"/)
+  assert.match(quickBarSource, /label="Imported"/)
   assert.match(appSource, /onApplyStylePreset=/)
   assert.match(appSource, /onClearStylePreset=/)
+  assert.match(appSource, /recentStylePresetIds=\{recentQuickTikzStylePresetIds\}/)
 })
 
 test('stroke width slider uses step 0.1', () => {
@@ -414,6 +418,42 @@ test('quick style TikZ style model reports current and mixed preset state', () =
   )
 })
 
+test('recent quick TikZ styles are shown first after applying a style', () => {
+  const firstImport = importedCurveStyleDiagram()
+  const diagram = importTikzStyleFile(
+    firstImport,
+    'other.sty',
+    String.raw`\tikzset{otherCurve/.style={draw=blue,dashed}}`,
+  ).diagram
+  const firstPreset = importedCurvePreset(diagram)
+  const secondPreset = importedCurvePreset(diagram, 'otherCurve')
+  const applied = applyContextQuickStylePreset(
+    diagram,
+    curveASelection(),
+    secondPreset.id,
+  )
+
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+
+  const recentPresetIds = updateRecentContextQuickStylePresetIds(
+    updateRecentContextQuickStylePresetIds([], firstPreset.id),
+    secondPreset.id,
+  )
+  const model = createContextQuickStylePresetModel(
+    applied.diagram,
+    curveASelection(),
+    recentPresetIds,
+  )
+
+  assert.equal(model?.options[0]?.presetId, secondPreset.id)
+  assert.equal(model?.options[0]?.recent, true)
+  assert.equal(model?.options[1]?.presetId, firstPreset.id)
+  assert.equal(model?.options[1]?.recent, true)
+})
+
 test('clearing quick style TikZ style preserves explicit style and removes references', () => {
   const diagram = importedCurveStyleDiagram()
   const preset = importedCurvePreset(diagram)
@@ -474,7 +514,7 @@ test('quick bar imported TikZ style application is undoable and redoable', () =>
   assert.equal(findCurve(redone.editableDiagram, 'curve-a').stylePresetId, preset.id)
 })
 
-test('quick scalar override after imported style clears references by current policy', () => {
+test('quick scalar override after imported style emits only explicit override', () => {
   const diagram = importedCurveStyleDiagram()
   const preset = importedCurvePreset(diagram)
   const applied = applyContextQuickStylePreset(
@@ -501,9 +541,14 @@ test('quick scalar override after imported style clears references by current po
   })
 
   assert.equal(curve.stylePresetId, undefined)
-  assert.equal(curve.importedTikzStyleReferenceId, undefined)
-  assert.doesNotMatch(tikz, new RegExp(escapeRegExp(importedCurveKey)))
+  assert.equal(
+    curve.importedTikzStyleReferenceId,
+    preset.importedTikzStyleReferenceId,
+  )
+  assert.match(tikz, new RegExp(escapeRegExp(importedCurveKey)))
   assert.match(tikz, /line width=0\.8pt/)
+  assert.doesNotMatch(tikz, /draw=stz/)
+  assert.doesNotMatch(tikz, /draw opacity=/)
 })
 
 test('TikZ output reflects style shortcut changes', () => {

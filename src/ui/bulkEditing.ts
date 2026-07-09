@@ -1439,7 +1439,6 @@ function clearStyleReferences<
   const nextValue = { ...value }
 
   delete nextValue.stylePresetId
-  delete nextValue.importedTikzStyleReferenceId
 
   return nextValue
 }

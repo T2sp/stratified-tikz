@@ -81,7 +81,10 @@ import {
   isOrthographicCamera3D,
 } from '../model/camera.ts'
 import { stylePresetStylesEqual } from '../model/stylePresets.ts'
-import { normalizeSingleLineCommentText } from '../model/importedTikzStyles.ts'
+import {
+  importedStylePresetStyle,
+  normalizeSingleLineCommentText,
+} from '../model/importedTikzStyles.ts'
 import {
   absoluteCubicBezierPointsFromControlMode,
   isFiniteVec3,
@@ -400,6 +403,11 @@ type GenerateContext = {
   includeCoordinateAxes: boolean
   exportMode: TikzExportMode
   visibility: VisibilityOptions
+}
+
+type ImportedStyleApplication = {
+  reference: ImportedTikzStyleReference
+  options: string[]
 }
 
 type LogicalPathRun = {
@@ -5989,7 +5997,7 @@ function labelStyleOptions(
   label: TextLabel,
   context: GenerateContext,
 ): string[] {
-  const importedOptions = importedStyleOptionsForElement(
+  const importedStyle = importedStyleApplicationForElement(
     'label',
     'node',
     label.importedTikzStyleReferenceId,
@@ -6006,27 +6014,26 @@ function labelStyleOptions(
   )
 
   if (presetStyleOption !== null) {
-    return [presetStyleOption, ...importedOptions]
+    return [presetStyleOption, ...(importedStyle?.options ?? [])]
   }
 
-  if (
-    matchingImportedPresetReferenceApplies(
-      'label',
-      'node',
-      label.stylePresetId,
-      label.style,
-      context,
-    )
-  ) {
-    return importedOptions
+  if (importedStyle !== null) {
+    return [
+      ...importedStyle.options,
+      ...labelImportedStyleOverrideOptions(
+        importedStyle.reference,
+        label.style,
+        `Label${label.id}`,
+        context,
+      ),
+    ]
   }
 
   if (isDefaultLabelStyle(label.style)) {
-    return importedOptions
+    return []
   }
 
   return [
-    ...importedOptions,
     ...labelStyleTikzOptions(label.style, `Label${label.id}`, context),
   ]
 }
@@ -6083,7 +6090,7 @@ function curveStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
-  const importedOptions = importedStyleOptionsForElement(
+  const importedStyle = importedStyleApplicationForElement(
     'curve',
     'draw',
     importedTikzStyleReferenceId,
@@ -6099,22 +6106,23 @@ function curveStyleOptionsForElement(
     context,
   )
 
-  if (
-    presetStyleOption === null &&
-    matchingImportedPresetReferenceApplies(
-      'curve',
-      'draw',
-      stylePresetId,
-      style,
-      context,
-    )
-  ) {
-    return importedOptions
+  if (presetStyleOption !== null) {
+    return [presetStyleOption, ...(importedStyle?.options ?? [])]
   }
 
-  return presetStyleOption === null
-    ? [...importedOptions, ...curveStyleTikzOptions(style, colorBaseName, context)]
-    : [presetStyleOption, ...importedOptions]
+  if (importedStyle !== null) {
+    return [
+      ...importedStyle.options,
+      ...curveImportedStyleOverrideOptions(
+        importedStyle.reference,
+        style,
+        colorBaseName,
+        context,
+      ),
+    ]
+  }
+
+  return curveStyleTikzOptions(style, colorBaseName, context)
 }
 
 function curveStyleAtPathParameter(
@@ -6500,7 +6508,7 @@ function filledSurfaceStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
-  const importedOptions = importedStyleOptionsForElement(
+  const importedStyle = importedStyleApplicationForElement(
     kind,
     'filldraw',
     importedTikzStyleReferenceId,
@@ -6516,25 +6524,24 @@ function filledSurfaceStyleOptionsForElement(
     context,
   )
 
-  if (
-    presetStyleOption === null &&
-    matchingImportedPresetReferenceApplies(
-      kind,
-      'filldraw',
-      stylePresetId,
-      style,
-      context,
-    )
-  ) {
-    return importedOptions
+  if (presetStyleOption !== null) {
+    return [presetStyleOption, ...(importedStyle?.options ?? [])]
   }
 
-  return presetStyleOption === null
-    ? [
-        ...importedOptions,
-        ...filledSurfaceStyleTikzOptions(style, colorBaseName, context),
-      ]
-    : [presetStyleOption, ...importedOptions]
+  if (importedStyle !== null) {
+    return [
+      ...importedStyle.options,
+      ...filledSurfaceImportedStyleOverrideOptions(
+        kind,
+        importedStyle.reference,
+        style,
+        colorBaseName,
+        context,
+      ),
+    ]
+  }
+
+  return filledSurfaceStyleTikzOptions(style, colorBaseName, context)
 }
 
 function pointStyleTikzOptions(
@@ -6560,7 +6567,7 @@ function pointStyleOptionsForElement(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
-  const importedOptions = importedStyleOptionsForElement(
+  const importedStyle = importedStyleApplicationForElement(
     'point',
     'node',
     importedTikzStyleReferenceId,
@@ -6576,22 +6583,23 @@ function pointStyleOptionsForElement(
     context,
   )
 
-  if (
-    presetStyleOption === null &&
-    matchingImportedPresetReferenceApplies(
-      'point',
-      'node',
-      stylePresetId,
-      style,
-      context,
-    )
-  ) {
-    return importedOptions
+  if (presetStyleOption !== null) {
+    return [presetStyleOption, ...(importedStyle?.options ?? [])]
   }
 
-  return presetStyleOption === null
-    ? [...importedOptions, ...pointStyleTikzOptions(style, colorBaseName, context)]
-    : [presetStyleOption, ...importedOptions]
+  if (importedStyle !== null) {
+    return [
+      ...importedStyle.options,
+      ...pointImportedStyleOverrideOptions(
+        importedStyle.reference,
+        style,
+        colorBaseName,
+        context,
+      ),
+    ]
+  }
+
+  return pointStyleTikzOptions(style, colorBaseName, context)
 }
 
 function userStylePresetTikzOption(
@@ -6616,31 +6624,31 @@ function userStylePresetTikzOption(
   )
 }
 
-function importedStyleOptionsForElement(
+function importedStyleApplicationForElement(
   kind: StylePresetKind,
   commandTarget: TikzStyleTarget,
   importedTikzStyleReferenceId: string | undefined,
   stylePresetId: string | undefined,
   style: UserStylePreset['style'],
   context: GenerateContext,
-): string[] {
+): ImportedStyleApplication | null {
   const referenceId =
     importedTikzStyleReferenceId ??
     matchingUserStylePreset(kind, stylePresetId, style, context)
       ?.importedTikzStyleReferenceId
 
   if (referenceId === undefined) {
-    return []
+    return null
   }
 
   const reference = context.importedTikzStyleReferences.get(referenceId)
 
   if (reference === undefined) {
-    return []
+    return null
   }
 
   if (!styleReferenceAppliesToElement(reference, kind, commandTarget)) {
-    return []
+    return null
   }
 
   const source = context.externalTikzStyleSources.get(reference.sourceId)
@@ -6649,7 +6657,10 @@ function importedStyleOptionsForElement(
     context.externalTikzStyleUsage.use(source)
   }
 
-  return [reference.key]
+  return {
+    reference,
+    options: [reference.key],
+  }
 }
 
 function styleReferenceAppliesToElement(
@@ -6683,19 +6694,180 @@ function compatibleImportedPresetReference(
   )
 }
 
-function matchingImportedPresetReferenceApplies(
-  kind: StylePresetKind,
-  commandTarget: TikzStyleTarget,
-  stylePresetId: string | undefined,
-  style: UserStylePreset['style'],
+function curveImportedStyleOverrideOptions(
+  reference: ImportedTikzStyleReference,
+  style: CurveStyle,
+  colorBaseName: string,
   context: GenerateContext,
-): boolean {
-  const preset = matchingUserStylePreset(kind, stylePresetId, style, context)
+): string[] {
+  const baseline = importedBaselineStyle('curve', reference, context)
 
-  return (
-    preset !== undefined &&
-    compatibleImportedPresetReference(preset, kind, commandTarget, context)
+  if (baseline.kind !== 'curveStyle') {
+    return curveStyleTikzOptions(style, colorBaseName, context)
+  }
+
+  const options: string[] = []
+
+  if (style.strokeColor !== baseline.strokeColor) {
+    options.push(
+      `draw=${context.colors.define(`${colorBaseName}Stroke`, style.strokeColor)}`,
+    )
+  }
+
+  if (style.strokeOpacity !== baseline.strokeOpacity) {
+    options.push(`draw opacity=${formatNumber(style.strokeOpacity)}`)
+  }
+
+  if (style.lineWidth !== baseline.lineWidth) {
+    options.push(`line width=${formatNumber(style.lineWidth)}pt`)
+  }
+
+  if (style.lineStyle !== baseline.lineStyle) {
+    options.push(lineStyleToTikzOption(style.lineStyle) ?? 'solid')
+  }
+
+  return options
+}
+
+function filledSurfaceImportedStyleOverrideOptions(
+  kind: 'region' | 'sheet',
+  reference: ImportedTikzStyleReference,
+  style: RegionStyle | SheetStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const baseline = importedBaselineStyle(kind, reference, context)
+
+  if (baseline.kind !== 'regionStyle' && baseline.kind !== 'sheetStyle') {
+    return filledSurfaceStyleTikzOptions(style, colorBaseName, context)
+  }
+
+  const options: string[] = []
+
+  if (style.fillColor !== baseline.fillColor) {
+    options.push(
+      `fill=${context.colors.define(`${colorBaseName}Fill`, style.fillColor)}`,
+    )
+  }
+
+  if (style.fillOpacity !== baseline.fillOpacity) {
+    options.push(`fill opacity=${formatNumber(style.fillOpacity)}`)
+  }
+
+  if (style.strokeColor !== baseline.strokeColor) {
+    options.push(
+      `draw=${context.colors.define(`${colorBaseName}Stroke`, style.strokeColor)}`,
+    )
+  }
+
+  if (style.strokeOpacity !== baseline.strokeOpacity) {
+    options.push(`draw opacity=${formatNumber(style.strokeOpacity)}`)
+  }
+
+  if (
+    style.lineWidth !== baseline.lineWidth &&
+    style.lineWidth !== undefined
+  ) {
+    options.push(`line width=${formatNumber(style.lineWidth)}pt`)
+  }
+
+  return options
+}
+
+function pointImportedStyleOverrideOptions(
+  reference: ImportedTikzStyleReference,
+  style: PointStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const baseline = importedBaselineStyle('point', reference, context)
+
+  if (baseline.kind !== 'pointStyle') {
+    return pointStyleTikzOptions(style, colorBaseName, context)
+  }
+
+  const options: string[] = []
+  let pointColor: string | null = null
+
+  function pointColorName(): string {
+    pointColor ??= context.colors.define(colorBaseName, style.color)
+    return pointColor
+  }
+
+  if (style.shape !== baseline.shape) {
+    options.push(...pointShapeOptions(style.shape, context))
+  }
+
+  if (style.fill !== baseline.fill || style.color !== baseline.color) {
+    options.push(`fill=${style.fill === 'filled' ? pointColorName() : 'white'}`)
+  }
+
+  if (style.color !== baseline.color || style.fill !== baseline.fill) {
+    options.push(`draw=${pointColorName()}`)
+  }
+
+  if (style.opacity !== baseline.opacity) {
+    options.push(`opacity=${formatNumber(style.opacity)}`)
+  }
+
+  if (style.size !== baseline.size) {
+    options.push(`inner sep=${formatNumber(style.size / 2)}pt`)
+  }
+
+  return options
+}
+
+function labelImportedStyleOverrideOptions(
+  reference: ImportedTikzStyleReference,
+  style: LabelStyle,
+  colorBaseName: string,
+  context: GenerateContext,
+): string[] {
+  const baseline = importedBaselineStyle('label', reference, context)
+
+  if (baseline.kind !== 'labelStyle') {
+    return labelStyleTikzOptions(style, colorBaseName, context)
+  }
+
+  const options: string[] = []
+
+  if (style.color !== baseline.color) {
+    options.push(
+      `text=${context.colors.define(colorBaseName, style.color)}`,
+    )
+  }
+
+  if (style.opacity !== baseline.opacity) {
+    options.push(`opacity=${formatNumber(style.opacity)}`)
+  }
+
+  if (style.fontSize !== baseline.fontSize) {
+    options.push(
+      `font=\\fontsize{${formatNumber(style.fontSize)}pt}{${formatNumber(
+        style.fontSize * 1.2,
+      )}pt}\\selectfont`,
+    )
+  }
+
+  if (style.anchor !== baseline.anchor) {
+    options.push(`anchor=${style.anchor}`)
+  }
+
+  return options
+}
+
+function importedBaselineStyle(
+  kind: StylePresetKind,
+  reference: ImportedTikzStyleReference,
+  context: GenerateContext,
+): UserStylePreset['style'] {
+  const preset = [...context.userStylePresets.values()].find(
+    (candidate) =>
+      candidate.kind === kind &&
+      candidate.importedTikzStyleReferenceId === reference.id,
   )
+
+  return preset?.style ?? importedStylePresetStyle(kind, reference.options)
 }
 
 function matchingUserStylePreset(
