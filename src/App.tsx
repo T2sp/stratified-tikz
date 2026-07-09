@@ -155,6 +155,7 @@ import {
   cloneDiagram,
   commitDiagramChange,
   commitDirectCreationResult,
+  ContextQuickStyleBar,
   cameraControlStateFromDiagramView,
   cameraControlSliderBounds,
   cameraControlSliderFieldsForAmbientDimension,
@@ -197,6 +198,7 @@ import {
   createWorkPlanePointPickingHighlights,
   createCustomWorkPlanePreview,
   createConcatenatedPathDraft,
+  applyContextQuickStyleField,
   createDiagramHistory,
   createSheetPolygonDraft,
   collapseExampleBarForEditing,
@@ -328,7 +330,10 @@ import {
   svgPreviewExportButtonLabel,
   svgPreviewExportMimeType,
   startCoordinateAnchorDragSession,
+  type BulkFieldScalarValue,
+  type BulkStyleFieldId,
   type CoordinateAnchorDragSession,
+  type ContextQuickStyleChangeOptions,
   type CustomOriginNormalWorkPlaneInput,
   type CustomThreePointWorkPlaneInput,
   type DirectConcatenatedPathManualSegmentInput,
@@ -780,6 +785,7 @@ function App() {
   const symbolicImportDialogRef = useRef<HTMLElement | null>(null)
   const symbolicImportFirstInputRef = useRef<HTMLInputElement | null>(null)
   const previewStageRef = useRef<HTMLDivElement | null>(null)
+  const quickStyleSliderUndoDiagramRef = useRef<Diagram | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const coordinateAnchorDragSessionRef =
     useRef<CoordinateAnchorDragSession | null>(null)
@@ -1427,6 +1433,58 @@ function App() {
         selectedElement: nextSelection,
         layerFilter: nextLayerFilter,
       })
+    })
+    setCopyStatus('idle')
+  }
+
+  function beginQuickStyleSliderInteraction(): void {
+    if (quickStyleSliderUndoDiagramRef.current !== null) {
+      return
+    }
+
+    quickStyleSliderUndoDiagramRef.current = cloneDiagram(editableDiagram)
+  }
+
+  function endQuickStyleSliderInteraction(): void {
+    quickStyleSliderUndoDiagramRef.current = null
+  }
+
+  function updateContextQuickStyleField(
+    fieldId: BulkStyleFieldId,
+    value: BulkFieldScalarValue,
+    options: ContextQuickStyleChangeOptions = {},
+  ): void {
+    setEditorState((current) => {
+      const nextDiagram = applyContextQuickStyleField(
+        current.editableDiagram,
+        current.selectedElement,
+        fieldId,
+        value,
+      )
+      const nextLayerFilter = normalizeLayerFilterForDiagram(
+        nextDiagram,
+        current.layerFilter,
+      )
+      const nextSelection = clearSelectionForLayerFilter(
+        nextDiagram,
+        current.selectedElement,
+        nextLayerFilter,
+      )
+      const undoSourceDiagram =
+        options.coalesceUndo === true
+          ? quickStyleSliderUndoDiagramRef.current ?? current.editableDiagram
+          : undefined
+
+      return commitDiagramChange(
+        current,
+        {
+          ...current,
+          editableDiagram: nextDiagram,
+          selectedElement: nextSelection,
+          layerFilter: nextLayerFilter,
+        },
+        undoSourceDiagram === undefined ? {} : { undoSourceDiagram },
+      )
     })
     setCopyStatus('idle')
   }
@@ -6970,6 +7028,16 @@ function App() {
               </svg>
             </button>
           </section>
+        )}
+
+        {!isCollapsed && (
+          <ContextQuickStyleBar
+            diagram={editableDiagram}
+            selection={selectedElement}
+            onChange={updateContextQuickStyleField}
+            onSliderInteractionStart={beginQuickStyleSliderInteraction}
+            onSliderInteractionEnd={endQuickStyleSliderInteraction}
+          />
         )}
 
         <div

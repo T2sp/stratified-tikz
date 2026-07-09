@@ -1552,6 +1552,122 @@
   pointer-events: auto;
 }
 
+.context-quick-style-bar {
+  z-index: var(--z-preview-context-bar);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  max-width: min(100%, 980px);
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 7px;
+  background: rgba(248, 246, 238, 0.4);
+  box-shadow: rgba(30, 34, 44, 0.13) 0 6px 20px;
+  backdrop-filter: blur(9px);
+  pointer-events: auto;
+}
+
+.context-quick-style-title {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.context-quick-style-fields {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.context-quick-style-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, max-content);
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.context-quick-style-slider-field {
+  grid-template-columns: auto minmax(148px, 208px);
+}
+
+.context-quick-style-color-control,
+.context-quick-style-slider-control,
+.context-quick-style-number-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.context-quick-style-color-control input[type='color'] {
+  width: 32px;
+  min-width: 32px;
+  height: 28px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px;
+  background: #ffffff;
+}
+
+.context-quick-style-range {
+  width: 92px;
+  min-width: 72px;
+  accent-color: #2a4f7f;
+}
+
+.context-quick-style-number,
+.context-quick-style-select {
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-h);
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.context-quick-style-number {
+  width: 46px;
+  padding: 3px 5px;
+  font-family: var(--mono);
+}
+
+.context-quick-style-select {
+  width: 88px;
+  padding: 3px 24px 3px 6px;
+  font-family: var(--sans);
+}
+
+.context-quick-style-number[aria-invalid='true'] {
+  border-color: #b3261e;
+}
+
+.context-quick-style-unit,
+.context-quick-style-mixed {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.context-quick-style-warning {
+  grid-column: 2;
+  color: #9f1239;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
 .preview-overlay-button,
 .preview-floating-toolbar button,
 .preview-toolbar-menu summary,

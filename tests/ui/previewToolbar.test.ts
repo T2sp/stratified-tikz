@@ -167,6 +167,7 @@ test('preview toolbar buttons are translucent while text remains opaque', () => 
 test('preview overlay z-index tokens keep modal above preview overlays', () => {
   const appShellRule = cssRule('.app-shell')
   const toolbarRule = cssRule('.preview-toolbar-overlay-stack')
+  const contextRule = cssRule('.context-quick-style-bar')
   const popoverRule = cssRule('.preview-toolbar-menu-popover')
   const edgeRule = cssRule('.preview-layer-control')
   const layerWindowRule = cssRule('.layer-palette-window')
@@ -187,6 +188,7 @@ test('preview overlay z-index tokens keep modal above preview overlays', () => {
   assert.equal(cssVariableNumber(appShellRule, '--z-modal-backdrop'), 90)
   assert.equal(cssVariableNumber(appShellRule, '--z-modal'), 100)
   assert.match(toolbarRule, /z-index:\s*var\(--z-preview-toolbar\);/)
+  assert.match(contextRule, /z-index:\s*var\(--z-preview-context-bar\);/)
   assert.match(popoverRule, /z-index:\s*var\(--z-popover\);/)
   assert.match(edgeRule, /z-index:\s*var\(--z-preview-edge-actions\);/)
   assert.match(layerWindowRule, /z-index:\s*var\(--z-layer-window\);/)
@@ -198,6 +200,19 @@ test('preview overlay z-index tokens keep modal above preview overlays', () => {
     cssVariableNumber(appShellRule, '--z-modal-backdrop') >
       cssVariableNumber(appShellRule, '--z-popover'),
   )
+})
+
+test('preview overlay renders context quick style bar near toolbar controls', () => {
+  const toolbarStart = appSource.indexOf('function renderPreviewToolbarOverlay')
+  const toolbarEnd = appSource.indexOf('function renderCursorSnapControls', toolbarStart)
+  const toolbarSource = appSource.slice(toolbarStart, toolbarEnd)
+
+  assert.ok(toolbarStart >= 0)
+  assert.ok(toolbarEnd > toolbarStart)
+  assert.match(toolbarSource, /<ContextQuickStyleBar/)
+  assert.match(toolbarSource, /onChange=\{updateContextQuickStyleField\}/)
+  assert.match(toolbarSource, /onSliderInteractionStart=\{beginQuickStyleSliderInteraction\}/)
+  assert.match(toolbarSource, /onSliderInteractionEnd=\{endQuickStyleSliderInteraction\}/)
 })
 
 test('symbolic variable import dialog is a topmost modal over toolbar overlays', () => {
