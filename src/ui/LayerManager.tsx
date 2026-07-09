@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
   type FormEvent,
+  type ReactNode,
 } from 'react'
 import {
   formatLayerValue,
@@ -59,6 +60,7 @@ export type LayerManagerProps = {
   onSetLayerLock: (layerValue: number, locked: boolean) => void
   onDeleteLayer: (layerValue: number) => void
   onStatusMessage: (message: string) => void
+  edgeActions?: ReactNode
 }
 
 export function LayerManager({
@@ -79,6 +81,7 @@ export function LayerManager({
   onSetLayerLock,
   onDeleteLayer,
   onStatusMessage,
+  edgeActions,
 }: LayerManagerProps) {
   const rows = useMemo(
     () => layerPaletteRows(diagram, layerFilter, creationLayerInput),
@@ -193,27 +196,30 @@ export function LayerManager({
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <button
-        type="button"
-        className="preview-overlay-button layer-palette-toggle-button"
-        aria-controls={detailsId}
-        aria-expanded={expanded}
-        aria-label={
-          expanded
-            ? 'Close layer window'
-            : `Open layer window. ${layerButtonTitle(
-                creationLayerInput,
-                layers,
-              )}`
-        }
-        title={layerButtonTitle(creationLayerInput, layers)}
-        onClick={() => changeExpanded(nextLayerPaletteOpenState(expanded))}
-      >
-        <span>Layer</span>
-        <span className="layer-palette-toggle-count">
-          {layerButtonLabel(creationLayerInput, layers.length)}
-        </span>
-      </button>
+      <div className="preview-edge-actions" aria-label="Preview edge actions">
+        {edgeActions}
+        <button
+          type="button"
+          className="preview-overlay-button layer-palette-toggle-button"
+          aria-controls={detailsId}
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? 'Close layer window'
+              : `Open layer window. ${layerButtonTitle(
+                  creationLayerInput,
+                  layers,
+                )}`
+          }
+          title={layerButtonTitle(creationLayerInput, layers)}
+          onClick={() => changeExpanded(nextLayerPaletteOpenState(expanded))}
+        >
+          <span>Layer</span>
+          <span className="layer-palette-toggle-count">
+            {layerButtonLabel(creationLayerInput, layers.length)}
+          </span>
+        </button>
+      </div>
 
       {expanded && (
         <section

@@ -1194,6 +1194,7 @@
 .preview-panel {
   height: 100%;
   min-height: 0;
+  padding-bottom: 30px;
 }
 
 .preview-stage {
@@ -1203,7 +1204,7 @@
   height: min(90svh, calc(100svh - var(--compact-header-height) - 12px));
   height: min(90dvh, calc(100dvh - var(--compact-header-height) - 12px));
   min-height: var(--preview-stage-min-height);
-  overflow: hidden;
+  overflow: visible;
   /*
    * Preview-local overlay order: SVG canvas; toolbar/history; layer controls;
    * direct input; inspector. Coordinate highlights and geometry handles live
@@ -1849,15 +1850,16 @@
 }
 
 .preview-layer-control {
-  position: absolute;
-  top: var(--preview-overlay-top-safe-area);
-  right: 12px;
+  position: sticky;
+  grid-area: 1 / 1;
+  align-self: stretch;
+  justify-self: stretch;
   bottom: 12px;
-  left: 12px;
   z-index: var(--z-preview-layer);
   display: grid;
   align-items: end;
   justify-items: end;
+  margin: var(--preview-overlay-top-safe-area) 12px 0;
   min-width: 0;
   min-height: 0;
   pointer-events: none;
@@ -1865,6 +1867,21 @@
 
 .preview-layer-control > * {
   pointer-events: auto;
+}
+
+.preview-edge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: min(100%, 520px);
+  transform: translateY(50%);
+}
+
+.preview-edge-action-button {
+  box-shadow: rgba(30, 34, 44, 0.14) 0 6px 18px;
+  backdrop-filter: blur(7px);
 }
 
 .layer-palette-toggle-button {
@@ -2902,6 +2919,7 @@
 }
 
 .svg-diagram {
+  grid-area: 1 / 1;
   display: block;
   width: 100%;
   height: 100%;

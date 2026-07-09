@@ -17,7 +17,7 @@ test('camera panel is rendered between preview and TikZ source', () => {
     workspace,
   )
   const previewStage = appSource.indexOf(
-    '<div className="preview-stage">',
+    'className="preview-stage"',
     previewRow,
   )
   const previewArticleEnd = appSource.indexOf('</article>', previewStage)
@@ -35,7 +35,7 @@ test('camera panel is rendered between preview and TikZ source', () => {
 })
 
 test('preview stage does not duplicate camera panel controls', () => {
-  const previewStage = appSource.indexOf('<div className="preview-stage">')
+  const previewStage = appSource.indexOf('className="preview-stage"')
   const previewArticleEnd = appSource.indexOf('</article>', previewStage)
   const previewMarkup = appSource.slice(previewStage, previewArticleEnd)
 

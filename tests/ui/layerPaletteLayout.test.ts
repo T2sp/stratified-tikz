@@ -54,9 +54,13 @@ test('layer palette CSS reserves an inspector-safe top area and bounds the windo
 
   assert.match(previewStageRule, /--preview-overlay-top-safe-area:\s*52px;/)
   assert.match(previewStageRule, /--preview-layer-toggle-offset:\s*42px;/)
-  assert.match(controlRule, /top:\s*var\(--preview-overlay-top-safe-area\);/)
-  assert.match(controlRule, /left:\s*12px;/)
+  assert.match(controlRule, /position:\s*sticky;/)
+  assert.match(controlRule, /grid-area:\s*1 \/ 1;/)
   assert.match(controlRule, /bottom:\s*12px;/)
+  assert.match(
+    controlRule,
+    /margin:\s*var\(--preview-overlay-top-safe-area\) 12px 0;/,
+  )
   assert.match(windowRule, /bottom:\s*var\(--preview-layer-toggle-offset\);/)
   assert.match(windowRule, /display:\s*flex;/)
   assert.match(windowRule, /flex-direction:\s*column;/)
