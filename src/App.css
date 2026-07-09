@@ -1766,6 +1766,20 @@
   text-align: left;
 }
 
+.context-quick-style-preset-group {
+  display: grid;
+  gap: 4px;
+}
+
+.context-quick-style-preset-group-label {
+  padding: 4px 2px 1px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .context-quick-style-preset-option.is-selected {
   border-color: #2a4f7f;
   background: #e4eef9;

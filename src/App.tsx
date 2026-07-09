@@ -139,6 +139,7 @@ import {
   applyDuplicateLayerToEditorState,
   applyMergeLayersToEditorState,
   applyStyleClipboardToEditorState,
+  applyStyleEyedropperSourceToSelection,
   applySwapLayersToEditorState,
   applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
@@ -172,7 +173,6 @@ import {
   createExistingCoordinateSourceOptions,
   createSerializeDiagramOptionsForUi,
   copyStyleFromSelection,
-  pasteStyleClipboardToSelection,
   boundarySurfaceBoundaryPathSourceErrorMessage,
   boundarySurfaceDraftPickErrorMessage,
   boundarySurfacePathClickWorkflow,
@@ -202,6 +202,7 @@ import {
   applyContextQuickStyleField,
   applyContextQuickStylePreset,
   createContextQuickStyleBarModel,
+  updateRecentContextQuickStylePresetIds,
   createDiagramHistory,
   createSheetPolygonDraft,
   collapseExampleBarForEditing,
@@ -763,6 +764,10 @@ function App() {
   const [styleClipboardStatus, setStyleClipboardStatus] = useState<string>('')
   const [styleEyedropperTargetSelection, setStyleEyedropperTargetSelection] =
     useState<SelectedElement>(null)
+  const [
+    recentQuickTikzStylePresetIds,
+    setRecentQuickTikzStylePresetIds,
+  ] = useState<string[]>([])
   const [jsonDownloadFilename, setJsonDownloadFilename] = useState<string>(
     defaultJsonDownloadFilename,
   )
@@ -2015,46 +2020,41 @@ function App() {
       return
     }
 
-    const copyResult = copyStyleFromSelection(editableDiagram, sourceSelection)
-
-    if (!copyResult.ok) {
-      setStyleClipboardStatus(copyResult.message)
-      setLayerOperationStatus(copyResult.message)
-      return
-    }
-
-    const pasteResult = pasteStyleClipboardToSelection(
+    const result = applyStyleEyedropperSourceToSelection(
       editableDiagram,
       targetSelection,
-      copyResult.clipboard,
+      sourceSelection,
     )
 
-    setStyleClipboard(copyResult.clipboard)
-    setStyleClipboardStatus(pasteResult.message)
+    if (result.clipboard !== undefined) {
+      setStyleClipboard(result.clipboard)
+    }
+
+    setStyleClipboardStatus(result.message)
     setCopyStatus('idle')
 
-    if (!pasteResult.ok) {
-      setLayerOperationStatus(pasteResult.message)
+    if (!result.ok) {
+      setLayerOperationStatus(result.message)
       return
     }
 
     setEditorState((current) => {
       const nextLayerFilter = normalizeLayerFilterForDiagram(
-        pasteResult.diagram,
+        result.diagram,
         current.layerFilter,
       )
       const nextSelection = clearSelectionForLayerFilter(
-        pasteResult.diagram,
+        result.diagram,
         targetSelection,
         nextLayerFilter,
       )
 
       return commitDiagramChange(current, {
         ...current,
-        editableDiagram: pasteResult.diagram,
+        editableDiagram: result.diagram,
         selectedElement: nextSelection,
         layerFilter: nextLayerFilter,
-        layerOperationStatus: pasteResult.message,
+        layerOperationStatus: result.message,
       })
     })
   }
@@ -2212,6 +2212,11 @@ function App() {
         layerOperationStatus: result.message,
       })
     })
+    if (statusResult.ok && presetId !== null) {
+      setRecentQuickTikzStylePresetIds((current) =>
+        updateRecentContextQuickStylePresetIds(current, presetId),
+      )
+    }
     setStyleEyedropperTargetSelection(null)
     setCopyStatus('idle')
   }
@@ -7193,6 +7198,7 @@ function App() {
             onCopyStyle={copyCurrentSelectionStyle}
             onPasteStyle={pasteCurrentSelectionStyle}
             onStartStyleEyedropper={startStyleEyedropper}
+            recentStylePresetIds={recentQuickTikzStylePresetIds}
             onApplyStylePreset={(presetId) =>
               applyContextQuickStylePresetFromBar(presetId)
             }

@@ -44,6 +44,7 @@ export type ContextQuickStyleBarProps = {
   onCopyStyle: () => void
   onPasteStyle: () => void
   onStartStyleEyedropper: () => void
+  recentStylePresetIds?: readonly string[]
   onApplyStylePreset: (presetId: string) => void
   onClearStylePreset: () => void
 }
@@ -60,11 +61,16 @@ export function ContextQuickStyleBar({
   onCopyStyle,
   onPasteStyle,
   onStartStyleEyedropper,
+  recentStylePresetIds = [],
   onApplyStylePreset,
   onClearStylePreset,
 }: ContextQuickStyleBarProps) {
   const model = createContextQuickStyleBarModel(diagram, selection)
-  const presetModel = createContextQuickStylePresetModel(diagram, selection)
+  const presetModel = createContextQuickStylePresetModel(
+    diagram,
+    selection,
+    recentStylePresetIds,
+  )
 
   if (model === null || model.fields.length === 0) {
     return null
@@ -146,12 +152,19 @@ function QuickTikzStyleMenu({
 }) {
   const [filter, setFilter] = useState('')
   const options = filterContextQuickStylePresetOptions(model.options, filter)
+  const recentOptions = options.filter((option) => option.recent)
+  const importedOptions = options.filter(
+    (option) => !option.recent && option.origin === 'imported',
+  )
+  const savedOptions = options.filter(
+    (option) => !option.recent && option.origin === 'user',
+  )
   const summary = quickTikzStyleSummary(model)
 
   return (
     <details className="context-quick-style-preset-menu">
       <summary aria-label="TikZ style selector" title="Apply a saved TikZ style">
-        TikZ: {summary}
+        TikZ style: {summary}
       </summary>
       <div className="context-quick-style-preset-popover">
         <input
@@ -176,20 +189,61 @@ function QuickTikzStyleMenu({
             No matching styles
           </span>
         ) : (
-          options.map((option) => (
-            <QuickTikzStyleOptionButton
-              key={option.presetId}
-              option={option}
-              selected={
-                model.current.kind === 'preset' &&
-                model.current.presetId === option.presetId
-              }
+          <>
+            <QuickTikzStyleOptionGroup
+              label="Recent"
+              options={recentOptions}
+              current={model.current}
               onApplyStylePreset={onApplyStylePreset}
             />
-          ))
+            <QuickTikzStyleOptionGroup
+              label="Imported"
+              options={importedOptions}
+              current={model.current}
+              onApplyStylePreset={onApplyStylePreset}
+            />
+            <QuickTikzStyleOptionGroup
+              label="Saved"
+              options={savedOptions}
+              current={model.current}
+              onApplyStylePreset={onApplyStylePreset}
+            />
+          </>
         )}
       </div>
     </details>
+  )
+}
+
+function QuickTikzStyleOptionGroup({
+  label,
+  options,
+  current,
+  onApplyStylePreset,
+}: {
+  label: string
+  options: readonly ContextQuickStylePresetOption[]
+  current: ContextQuickStylePresetModel['current']
+  onApplyStylePreset: (presetId: string) => void
+}) {
+  if (options.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="context-quick-style-preset-group">
+      <span className="context-quick-style-preset-group-label">{label}</span>
+      {options.map((option) => (
+        <QuickTikzStyleOptionButton
+          key={option.presetId}
+          option={option}
+          selected={
+            current.kind === 'preset' && current.presetId === option.presetId
+          }
+          onApplyStylePreset={onApplyStylePreset}
+        />
+      ))}
+    </div>
   )
 }
 

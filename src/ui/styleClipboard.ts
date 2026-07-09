@@ -100,6 +100,21 @@ export type PasteStyleResult =
       message: string
     }
 
+export type StyleEyedropperApplyResult =
+  | {
+      ok: true
+      diagram: Diagram
+      clipboard: StyleClipboard
+      appliedCount: number
+      message: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      message: string
+      clipboard?: StyleClipboard
+    }
+
 export type StyleClipboardEditorState = UndoableEditorState & {
   layerOperationStatus: string
 }
@@ -203,6 +218,53 @@ export function pasteStyleClipboardToSelection(
     message: `Pasted ${clipboard.geometricKind} style to ${styleObjectCountLabel(
       targets.targets.length,
     )}.`,
+  }
+}
+
+export function applyStyleEyedropperSourceToSelection(
+  diagram: Diagram,
+  targetSelection: SelectedElement,
+  sourceSelection: SelectedElement,
+): StyleEyedropperApplyResult {
+  if (sourceSelection === null) {
+    return {
+      ok: false,
+      diagram,
+      message: 'Style eyedropper canceled.',
+    }
+  }
+
+  const copyResult = copyStyleFromSelection(diagram, sourceSelection)
+
+  if (!copyResult.ok) {
+    return {
+      ok: false,
+      diagram,
+      message: copyResult.message,
+    }
+  }
+
+  const pasteResult = pasteStyleClipboardToSelection(
+    diagram,
+    targetSelection,
+    copyResult.clipboard,
+  )
+
+  if (!pasteResult.ok) {
+    return {
+      ok: false,
+      diagram,
+      clipboard: copyResult.clipboard,
+      message: pasteResult.message,
+    }
+  }
+
+  return {
+    ok: true,
+    diagram: pasteResult.diagram,
+    clipboard: copyResult.clipboard,
+    appliedCount: pasteResult.pastedCount,
+    message: pasteResult.message,
   }
 }
 
