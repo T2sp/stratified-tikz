@@ -329,6 +329,24 @@ export function shouldShowFillPathsForTool(tool: WorkPlanePreviewTool): boolean 
   return tool === 'select' || isAddPathTool(tool)
 }
 
+export function shouldCloseCoonsPatchDirectionPanelForWorkflow(options: {
+  ambientDimension: AmbientDimension
+  tool: WorkPlanePreviewTool
+  sheetCreationKind: PreviewSheetCreationKind | 'saddle'
+}): boolean {
+  return (
+    options.ambientDimension !== 3 ||
+    options.tool !== 'createSheet' ||
+    options.sheetCreationKind !== 'coonsPatch'
+  )
+}
+
+export function shouldCloseCoonsPatchDirectionPanelForSheetMenuItem(
+  item: PreviewSheetMenuItem,
+): boolean {
+  return item.inputMode === 'direct' || item.sheetCreationKind !== 'coonsPatch'
+}
+
 export function stopPreviewOverlayEvent(event: PreviewOverlayEvent): void {
   event.stopPropagation()
 }
