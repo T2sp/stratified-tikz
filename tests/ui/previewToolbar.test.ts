@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { emptyTwoDimensionalDiagram } from '../../src/examples/index.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
@@ -38,6 +39,12 @@ import {
   togglePreviewToolbarState,
 } from '../../src/ui/previewToolbar.ts'
 import type { WorkPlanePreviewTool } from '../../src/ui/workPlanePreview.ts'
+
+const appSource = readFileSync(
+  new URL('../../src/App.tsx', import.meta.url),
+  'utf8',
+)
+const appCss = readFileSync(new URL('../../src/App.css', import.meta.url), 'utf8')
 
 test('preview toolbar collapse state toggles between expanded and collapsed', () => {
   assert.equal(togglePreviewToolbarState('expanded'), 'collapsed')
@@ -94,6 +101,156 @@ test('preview overlay state is UI-only and not saved in diagram JSON', () => {
   assert.equal('layerWindowOpen' in parsed.diagram, false)
   assert.equal('cameraPanelOpen' in parsed.diagram, false)
   assert.equal('showCoordinateAnchors' in parsed.diagram, false)
+})
+
+test('preview toolbar chrome uses translucent backgrounds without parent opacity', () => {
+  const appShellRule = cssRule('.app-shell')
+  const toolbarRule = cssRule('.preview-floating-toolbar')
+  const historyRule = cssRule('.preview-history-overlay')
+
+  assert.match(
+    appShellRule,
+    /--preview-toolbar-bg:\s*rgba\(248, 246, 238, 0\.42\);/,
+  )
+  assert.match(toolbarRule, /background:\s*var\(--preview-toolbar-bg\);/)
+  assert.match(toolbarRule, /backdrop-filter:\s*blur\(10px\);/)
+  assert.match(historyRule, /background:\s*rgba\(248, 246, 238, 0\.36\);/)
+  assert.doesNotMatch(toolbarRule, /opacity:/)
+  assert.doesNotMatch(historyRule, /opacity:/)
+})
+
+test('preview toolbar buttons are translucent while text remains opaque', () => {
+  const appShellRule = cssRule('.app-shell')
+  const buttonRule = cssRuleStartingAt('.preview-overlay-button,')
+  const hoverRule = cssRuleStartingAt('.preview-overlay-button:hover,')
+  const disabledRule = cssRuleStartingAt('.preview-overlay-button:disabled,')
+  const activeRule = cssRuleStartingAt('.preview-floating-toolbar button.is-selected,')
+
+  assert.match(
+    appShellRule,
+    /--preview-toolbar-button-bg:\s*rgba\(255, 255, 255, 0\.36\);/,
+  )
+  assert.match(
+    appShellRule,
+    /--preview-toolbar-button-bg-hover:\s*rgba\(255, 255, 255, 0\.62\);/,
+  )
+  assert.match(
+    appShellRule,
+    /--preview-toolbar-button-bg-active:\s*rgba\(255, 255, 255, 0\.82\);/,
+  )
+  assert.match(
+    appShellRule,
+    /--preview-toolbar-button-text:\s*rgb\(20, 24, 32\);/,
+  )
+  assert.match(buttonRule, /background:\s*var\(--preview-toolbar-button-bg\);/)
+  assert.match(buttonRule, /color:\s*var\(--preview-toolbar-button-text\);/)
+  assert.match(
+    hoverRule,
+    /background:\s*var\(--preview-toolbar-button-bg-hover\);/,
+  )
+  assert.match(
+    activeRule,
+    /background:\s*var\(--preview-toolbar-button-bg-active\);/,
+  )
+  assert.match(
+    disabledRule,
+    /color:\s*var\(--preview-toolbar-button-text-disabled\);/,
+  )
+  assert.match(
+    disabledRule,
+    /background:\s*var\(--preview-toolbar-button-bg-disabled\);/,
+  )
+  assert.doesNotMatch(buttonRule, /opacity:/)
+  assert.doesNotMatch(disabledRule, /opacity:/)
+})
+
+test('preview overlay z-index tokens keep modal above preview overlays', () => {
+  const appShellRule = cssRule('.app-shell')
+  const toolbarRule = cssRule('.preview-toolbar-overlay-stack')
+  const popoverRule = cssRule('.preview-toolbar-menu-popover')
+  const edgeRule = cssRule('.preview-layer-control')
+  const layerWindowRule = cssRule('.layer-palette-window')
+  const directDrawerRule = cssRule('.direct-input-drawer')
+  const inspectorRule = cssRule('.inspector-drawer')
+  const backdropRule = cssRule('.modal-backdrop')
+  const dialogRule = cssRule('.modal-dialog')
+
+  assert.equal(cssVariableNumber(appShellRule, '--z-preview-canvas'), 0)
+  assert.equal(cssVariableNumber(appShellRule, '--z-preview-selection'), 5)
+  assert.equal(cssVariableNumber(appShellRule, '--z-preview-toolbar'), 20)
+  assert.equal(cssVariableNumber(appShellRule, '--z-preview-context-bar'), 21)
+  assert.equal(cssVariableNumber(appShellRule, '--z-preview-edge-actions'), 25)
+  assert.equal(cssVariableNumber(appShellRule, '--z-workplane-panel'), 30)
+  assert.equal(cssVariableNumber(appShellRule, '--z-layer-window'), 35)
+  assert.equal(cssVariableNumber(appShellRule, '--z-inspector-drawer'), 40)
+  assert.equal(cssVariableNumber(appShellRule, '--z-popover'), 60)
+  assert.equal(cssVariableNumber(appShellRule, '--z-modal-backdrop'), 90)
+  assert.equal(cssVariableNumber(appShellRule, '--z-modal'), 100)
+  assert.match(toolbarRule, /z-index:\s*var\(--z-preview-toolbar\);/)
+  assert.match(popoverRule, /z-index:\s*var\(--z-popover\);/)
+  assert.match(edgeRule, /z-index:\s*var\(--z-preview-edge-actions\);/)
+  assert.match(layerWindowRule, /z-index:\s*var\(--z-layer-window\);/)
+  assert.match(directDrawerRule, /z-index:\s*var\(--z-direct-input-drawer\);/)
+  assert.match(inspectorRule, /z-index:\s*var\(--z-inspector-drawer\);/)
+  assert.match(backdropRule, /z-index:\s*var\(--z-modal-backdrop\);/)
+  assert.match(dialogRule, /z-index:\s*var\(--z-modal\);/)
+  assert.ok(
+    cssVariableNumber(appShellRule, '--z-modal-backdrop') >
+      cssVariableNumber(appShellRule, '--z-popover'),
+  )
+})
+
+test('symbolic variable import dialog is a topmost modal over toolbar overlays', () => {
+  const backdropRule = cssRule('.modal-backdrop')
+  const dialogRule = cssRule('.modal-dialog')
+  const toolbarIndex = appSource.indexOf('<section className="toolbar"')
+  const modalIndex = appSource.indexOf(
+    'className="modal-backdrop symbolic-import-backdrop"',
+  )
+  const workspaceIndex = appSource.indexOf('className="workspace"')
+
+  assert.ok(toolbarIndex >= 0)
+  assert.ok(modalIndex > toolbarIndex)
+  assert.ok(workspaceIndex > modalIndex)
+  assert.match(appSource, /className="modal-dialog symbolic-import-dialog"/)
+  assert.match(appSource, /role="dialog"/)
+  assert.match(appSource, /aria-modal="true"/)
+  assert.match(backdropRule, /position:\s*fixed;/)
+  assert.match(backdropRule, /inset:\s*0;/)
+  assert.match(backdropRule, /pointer-events:\s*auto;/)
+  assert.match(dialogRule, /pointer-events:\s*auto;/)
+})
+
+test('symbolic variable import modal keeps focus and Escape inside modal flow', () => {
+  assert.match(appSource, /symbolicImportFirstInputRef\.current\?\.focus\(\)/)
+  assert.match(appSource, /autoFocus=\{index === 0\}/)
+  assert.match(appSource, /onKeyDown=\{handleSymbolicImportDialogKeyDown\}/)
+  assert.match(appSource, /modalFocusableElements\(dialog\)/)
+  assert.match(
+    appSource,
+    /window\.addEventListener\('keydown', handleSymbolicImportEscape, true\)/,
+  )
+  assert.match(appSource, /event\.stopPropagation\(\)/)
+  assert.match(appSource, /setSaveLoadMessage\('JSON load canceled\.'\)/)
+})
+
+test('preview toolbar command handlers remain wired after style changes', () => {
+  const toolbarStart = appSource.indexOf('function renderPreviewToolbarTool')
+  const toolbarEnd = appSource.indexOf('function isPathMenuItemSelected', toolbarStart)
+  const toolbarSource = appSource.slice(toolbarStart, toolbarEnd)
+  const historyStart = appSource.indexOf('className="preview-history-overlay"')
+  const historyEnd = appSource.indexOf('function renderCursorSnapControls', historyStart)
+  const historySource = appSource.slice(historyStart, historyEnd)
+
+  assert.ok(toolbarStart >= 0)
+  assert.ok(toolbarEnd > toolbarStart)
+  assert.match(toolbarSource, /activateCursorCreationTool\(directTool\)/)
+  assert.match(toolbarSource, /activateDirectCreationTool\(directTool\)/)
+  assert.match(toolbarSource, /activatePathMenuItem\(item\)/)
+  assert.match(toolbarSource, /activateSheetMenuItem\(item\)/)
+  assert.match(toolbarSource, /activateCursorCreationTool\(tool\.id\)/)
+  assert.match(historySource, /runPreviewOverlayAction\(event, undoLastChange\)/)
+  assert.match(historySource, /runPreviewOverlayAction\(event, redoLastChange\)/)
 })
 
 test('toolbar collapse state does not affect generated TikZ', () => {
@@ -579,3 +736,37 @@ test('overlay action helper stops propagation and calls history or trash handler
   assert.equal(stopped, true)
   assert.equal(calls, 1)
 })
+
+function cssRule(selector: string): string {
+  const start = appCss.indexOf(`${selector} {`)
+
+  assert.notEqual(start, -1, `Missing CSS rule for ${selector}.`)
+
+  const end = appCss.indexOf('\n}', start)
+
+  assert.notEqual(end, -1, `Missing CSS rule end for ${selector}.`)
+
+  return appCss.slice(start, end + 2)
+}
+
+function cssRuleStartingAt(selectorStart: string): string {
+  const start = appCss.indexOf(selectorStart)
+
+  assert.notEqual(start, -1, `Missing CSS rule starting at ${selectorStart}.`)
+
+  const openBrace = appCss.indexOf('{', start)
+  const end = appCss.indexOf('\n}', openBrace)
+
+  assert.notEqual(openBrace, -1, `Missing CSS rule open for ${selectorStart}.`)
+  assert.notEqual(end, -1, `Missing CSS rule end for ${selectorStart}.`)
+
+  return appCss.slice(start, end + 2)
+}
+
+function cssVariableNumber(rule: string, variableName: string): number {
+  const value = rule.match(new RegExp(`${variableName}:\\s*(\\d+);`))?.[1]
+
+  assert.notEqual(value, undefined, `Missing CSS variable ${variableName}.`)
+
+  return Number(value)
+}

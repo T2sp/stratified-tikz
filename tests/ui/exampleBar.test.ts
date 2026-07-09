@@ -75,7 +75,7 @@ test('example dropdown opens without reducing preview height', () => {
   assert.equal(toggleExampleDropdown(true), false)
   assert.match(stackRule, /position:\s*relative;/)
   assert.match(dropdownRule, /position:\s*absolute;/)
-  assert.match(dropdownRule, /z-index:\s*120;/)
+  assert.match(dropdownRule, /z-index:\s*var\(--z-popover\);/)
   assert.doesNotMatch(previewStageRule, /example/i)
 })
 
