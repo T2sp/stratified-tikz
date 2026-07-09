@@ -15,9 +15,20 @@ import type {
   AxisAlignedWorkPlaneName,
   Diagram,
   PointStratum,
+  Vec2,
   Vec3,
   WorkPlane,
 } from '../model/types.ts'
+
+export type WorkPlaneSetupMethod =
+  | 'pickThreeExistingPoints'
+  | 'originNormalVector'
+  | 'customThreePoints'
+
+export type WorkPlaneSetupMethodOption = {
+  id: WorkPlaneSetupMethod
+  label: string
+}
 
 export type WorkPlaneVectorInput = {
   x: string
@@ -28,6 +39,12 @@ export type WorkPlaneVectorInput = {
 export type CustomOriginNormalWorkPlaneInput = {
   origin: WorkPlaneVectorInput
   normal: WorkPlaneVectorInput
+}
+
+export type CustomOriginNormalThetaPhiWorkPlaneInput = {
+  origin: WorkPlaneVectorInput
+  normalThetaDeg: string
+  normalPhiDeg: string
 }
 
 export type CustomThreePointWorkPlaneInput = {
@@ -86,6 +103,37 @@ export type WorkPlanePointPickingValidationResult = {
   removedStaleCoordinateIds: string[]
 }
 
+export type WorkPlaneNormalVectorPreviewLine = {
+  id: 'x' | 'y' | 'z' | 'normal'
+  from: Vec2
+  to: Vec2
+  label: string
+}
+
+export type WorkPlaneNormalVectorPreviewGeometry = {
+  viewBox: string
+  axes: WorkPlaneNormalVectorPreviewLine[]
+  normal: WorkPlaneNormalVectorPreviewLine
+}
+
+export const defaultWorkPlaneSetupMethod: WorkPlaneSetupMethod =
+  'pickThreeExistingPoints'
+
+export const workPlaneSetupMethodOptions: WorkPlaneSetupMethodOption[] = [
+  {
+    id: 'pickThreeExistingPoints',
+    label: 'Pick 3 existing points',
+  },
+  {
+    id: 'originNormalVector',
+    label: 'Origin + normal vector',
+  },
+  {
+    id: 'customThreePoints',
+    label: 'Custom 3 points',
+  },
+]
+
 export const inactiveWorkPlanePointPickingState: WorkPlanePointPickingState = {
   active: false,
   pickedPointIds: [],
@@ -98,12 +146,175 @@ export const defaultCustomOriginNormalWorkPlaneInput: CustomOriginNormalWorkPlan
     normal: { x: '0', y: '0', z: '1' },
   }
 
+export const defaultCustomOriginNormalThetaPhiWorkPlaneInput: CustomOriginNormalThetaPhiWorkPlaneInput =
+  {
+    origin: { x: '0', y: '0', z: '0' },
+    normalThetaDeg: '0',
+    normalPhiDeg: '0',
+  }
+
 export const defaultCustomThreePointWorkPlaneInput: CustomThreePointWorkPlaneInput =
   {
     p0: { x: '0', y: '0', z: '0' },
     p1: { x: '1', y: '0', z: '0' },
     p2: { x: '0', y: '1', z: '0' },
   }
+
+export function applyCustomOriginNormalThetaPhiWorkPlaneInput(
+  currentWorkPlane: WorkPlane,
+  ambientDimension: AmbientDimension,
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+): CustomWorkPlaneApplyResult {
+  if (ambientDimension !== 3) {
+    return {
+      ok: false,
+      workPlane: normalizeActiveWorkPlaneForAmbientDimension(
+        ambientDimension,
+        currentWorkPlane,
+      ),
+      status: 'Custom work planes are available only in 3D.',
+    }
+  }
+
+  const origin = parseWorkPlaneVectorInput(input.origin)
+  const normal = normalVectorFromThetaPhiInput(input)
+
+  if (origin === null || normal === null) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Origin and normal angles must be finite numbers.',
+    }
+  }
+
+  if (isZeroVector(normal)) {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Normal vector must be nonzero.',
+    }
+  }
+
+  try {
+    return {
+      ok: true,
+      workPlane: constructWorkPlaneFromOriginNormal(origin, normal, {
+        id: 'custom-origin-normal-work-plane',
+        name: 'Custom plane',
+      }),
+      status: 'Custom plane applied.',
+    }
+  } catch {
+    return {
+      ok: false,
+      workPlane: currentWorkPlane,
+      status: 'Custom plane inputs are invalid.',
+    }
+  }
+}
+
+export function canApplyCustomOriginNormalThetaPhiWorkPlaneInput(
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+): boolean {
+  return (
+    parseWorkPlaneVectorInput(input.origin) !== null &&
+    normalVectorFromThetaPhiInput(input) !== null
+  )
+}
+
+export function normalVectorFromThetaPhiDegrees(
+  thetaDeg: number,
+  phiDeg: number,
+): Vec3 | null {
+  if (!Number.isFinite(thetaDeg) || !Number.isFinite(phiDeg)) {
+    return null
+  }
+
+  const theta = degreesToRadians(thetaDeg)
+  const phi = degreesToRadians(phiDeg)
+
+  if (!Number.isFinite(theta) || !Number.isFinite(phi)) {
+    return null
+  }
+
+  const sinTheta = Math.sin(theta)
+  const normal = {
+    x: normalizeTinyWorkPlaneValue(sinTheta * Math.cos(phi)),
+    y: normalizeTinyWorkPlaneValue(sinTheta * Math.sin(phi)),
+    z: normalizeTinyWorkPlaneValue(Math.cos(theta)),
+  }
+
+  return isFiniteVec3(normal) && !isZeroVector(normal) ? normal : null
+}
+
+export function normalVectorFromThetaPhiInput(
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+): Vec3 | null {
+  const thetaDeg = parseFiniteNumberInput(input.normalThetaDeg)
+  const phiDeg = parseFiniteNumberInput(input.normalPhiDeg)
+
+  return thetaDeg === null || phiDeg === null
+    ? null
+    : normalVectorFromThetaPhiDegrees(thetaDeg, phiDeg)
+}
+
+export function workPlaneNormalVectorPreviewGeometry(
+  normal: Vec3,
+): WorkPlaneNormalVectorPreviewGeometry | null {
+  if (!isFiniteVec3(normal) || isZeroVector(normal)) {
+    return null
+  }
+
+  const origin = { x: 45, y: 44 }
+  const axes: WorkPlaneNormalVectorPreviewLine[] = [
+    {
+      id: 'x',
+      from: origin,
+      to: projectNormalPreviewVector({ x: 1, y: 0, z: 0 }),
+      label: 'x',
+    },
+    {
+      id: 'y',
+      from: origin,
+      to: projectNormalPreviewVector({ x: 0, y: 1, z: 0 }),
+      label: 'y',
+    },
+    {
+      id: 'z',
+      from: origin,
+      to: projectNormalPreviewVector({ x: 0, y: 0, z: 1 }),
+      label: 'z',
+    },
+  ]
+  const normalLine = {
+    id: 'normal' as const,
+    from: origin,
+    to: projectNormalPreviewVector(normal),
+    label: 'n',
+  }
+
+  if (
+    [...axes, normalLine].some(
+      (line) => !isFiniteVec2(line.from) || !isFiniteVec2(line.to),
+    )
+  ) {
+    return null
+  }
+
+  return {
+    viewBox: '0 0 90 72',
+    axes,
+    normal: normalLine,
+  }
+}
+
+export function workPlaneNormalVectorPreviewGeometryFromInput(
+  input: CustomOriginNormalThetaPhiWorkPlaneInput,
+): WorkPlaneNormalVectorPreviewGeometry | null {
+  const normal = normalVectorFromThetaPhiInput(input)
+
+  return normal === null ? null : workPlaneNormalVectorPreviewGeometry(normal)
+}
 
 export function applyCustomOriginNormalWorkPlaneInput(
   currentWorkPlane: WorkPlane,
@@ -512,6 +723,12 @@ export function workPlanePointPickingCount(
   return workPlanePointPickingTargets(state).length
 }
 
+export function canApplyPickedPointWorkPlane(
+  state: WorkPlanePointPickingState,
+): boolean {
+  return state.active && workPlanePointPickingCount(state) === 3
+}
+
 export function workPlanePointPickingTargets(
   state: WorkPlanePointPickingState,
 ): WorkPlanePickTarget[] {
@@ -692,6 +909,15 @@ export function workPlanePointPickingStatus(
   return `Picked ${targets.length}/3 points${summary}.`
 }
 
+export function workPlanePointPickingTargetLabels(
+  diagram: Diagram,
+  state: WorkPlanePointPickingState,
+): string[] {
+  return workPlanePointPickingTargets(state).map((target) =>
+    workPlanePickTargetStatusLabel(diagram, target),
+  )
+}
+
 type ResolvedWorkPlanePickTarget = WorkPlanePickTarget & {
   position: Vec3
 }
@@ -825,6 +1051,27 @@ function parseFiniteNumberInput(value: string): number | null {
   const parsed = Number(value)
 
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function degreesToRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180
+}
+
+function normalizeTinyWorkPlaneValue(value: number): number {
+  return Math.abs(value) < 1e-12 ? 0 : value
+}
+
+function projectNormalPreviewVector(vector: Vec3): Vec2 {
+  const scale = 24
+
+  return {
+    x: 45 + scale * (vector.x - 0.55 * vector.y),
+    y: 44 + scale * (0.38 * vector.x + 0.38 * vector.y - vector.z),
+  }
+}
+
+function isFiniteVec2(point: Vec2): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y)
 }
 
 function formatCompactVec3ForWorkPlane(point: Vec3): string {
