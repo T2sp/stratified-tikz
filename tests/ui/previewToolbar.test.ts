@@ -9,6 +9,7 @@ import {
   directInputDrawerFormKind,
   directInputDrawerStateForInputMode,
   shouldShowDirectInputDrawer,
+  shouldShowWorkPlaneLocalInputModeControl,
 } from '../../src/ui/directInputDrawer.ts'
 import {
   closeInspectorDrawerState,
@@ -566,6 +567,37 @@ test('selecting Direct for Add coordinate opens the coordinate direct input draw
   assert.equal(
     directInputDrawerFormKind('createCoordinate', 'direct'),
     'coordinate',
+  )
+})
+
+test('work-plane local input mode control appears only for 3D point-like local creation', () => {
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(
+      3,
+      'createCoordinate',
+      'workPlaneLocal',
+    ),
+    true,
+  )
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(3, 'createPoint', 'workPlaneLocal'),
+    true,
+  )
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(3, 'createLabel', 'workPlaneLocal'),
+    false,
+  )
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(3, 'createPath', 'workPlaneLocal'),
+    false,
+  )
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(3, 'createPoint', 'global'),
+    false,
+  )
+  assert.equal(
+    shouldShowWorkPlaneLocalInputModeControl(2, 'createPoint', 'workPlaneLocal'),
+    false,
   )
 })
 

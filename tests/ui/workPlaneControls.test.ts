@@ -1,28 +1,67 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  applyCustomOriginNormalThetaPhiWorkPlaneInput,
   applyPickedPointWorkPlane,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
+  canApplyCustomOriginNormalThetaPhiWorkPlaneInput,
+  canApplyPickedPointWorkPlane,
   cancelWorkPlanePointPicking,
+  defaultCustomOriginNormalThetaPhiWorkPlaneInput,
   inactiveWorkPlanePointPickingState,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
+  normalVectorFromThetaPhiDegrees,
   pickWorkPlaneCoordinateAnchor,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneDetails,
   shouldShowWorkPlaneControls,
+  shouldShowWorkPlaneOverlay,
+  shouldShowWorkPlaneOverlayPanel,
   startWorkPlanePointPicking,
+  toggleWorkPlaneOverlayPanel,
   validateWorkPlanePointPickingState,
+  workPlaneFrameDisplay,
+  workPlaneNormalVectorPreviewGeometryFromInput,
+  workPlaneOriginReferenceText,
   workPlanePointPickingCount,
   workPlaneDisplayName,
+  workPlaneOverlayButtonLabel,
   workPlaneSelectValue,
+  workPlaneSetupMethodOptions,
   workPlaneSummaryLabel,
+  workPlaneVectorReferenceText,
 } from '../../src/ui/workPlaneControls.ts'
+import { validateWorkPlane } from '../../src/geometry/workPlane.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import type { CoordinateAnchor, Diagram, WorkPlane } from '../../src/model/types.ts'
+
+test('preview work-plane overlay setup methods use the required order', () => {
+  assert.deepEqual(
+    workPlaneSetupMethodOptions.map((method) => method.label),
+    [
+      'Pick 3 existing points',
+      'Origin + normal vector',
+      'Custom 3 points',
+    ],
+  )
+})
+
+test('work-plane editor is routed to the preview overlay instead of stale toolbar raw normal controls', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /Edit in preview/)
+  assert.match(source, /Origin \+ normal vector/)
+  assert.match(source, /Normal θ/)
+  assert.match(source, /Normal φ/)
+  assert.match(source, /Custom 3 points/)
+  assert.doesNotMatch(source, /Custom by origin \+ normal/)
+  assert.doesNotMatch(source, /customWorkPlaneInput\[vector\]\[axis\]/)
+})
 
 test('valid origin and normal input applies a custom work plane in 3D', () => {
   const previous: WorkPlane = { kind: 'xy', z: 5 }
@@ -44,6 +83,81 @@ test('valid origin and normal input applies a custom work plane in 3D', () => {
   assert.deepEqual(result.workPlane.normal, { x: 0, y: 0, z: 1 })
   assert.equal(workPlaneSelectValue(result.workPlane), 'custom')
   assert.equal(workPlaneDisplayName(result.workPlane), 'Custom plane')
+})
+
+test('theta and phi normal input follows polar-from-z spherical coordinates', () => {
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(0, 37)),
+    { x: 0, y: 0, z: 1 },
+  )
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(90, 0)),
+    { x: 1, y: 0, z: 0 },
+  )
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(90, 90)),
+    { x: 0, y: 1, z: 0 },
+  )
+})
+
+test('theta and phi origin-normal input applies a valid orthonormal frame', () => {
+  const result = applyCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    {
+      origin: { x: '1', y: '2', z: '3' },
+      normalThetaDeg: '90',
+      normalPhiDeg: '0',
+    },
+  )
+
+  assert.equal(result.ok, true)
+  assert.equal(result.workPlane.kind, 'custom')
+
+  if (result.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assertVec3Approx(result.workPlane.origin, { x: 1, y: 2, z: 3 })
+  assertVec3Approx(result.workPlane.normal, { x: 1, y: 0, z: 0 })
+  assertVec3Approx(result.workPlane.u, { x: 0, y: 1, z: 0 })
+  assert.equal(validateWorkPlane(result.workPlane).valid, true)
+})
+
+test('theta and phi origin-normal input rejects invalid drafts without mutating the active plane', () => {
+  const previous: WorkPlane = { kind: 'xz', y: -2 }
+  const input = {
+    ...defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    normalThetaDeg: '',
+  }
+  const result = applyCustomOriginNormalThetaPhiWorkPlaneInput(previous, 3, input)
+
+  assert.equal(canApplyCustomOriginNormalThetaPhiWorkPlaneInput(input), false)
+  assert.equal(result.ok, false)
+  assert.equal(result.status, 'Origin and normal angles must be finite numbers.')
+  assert.strictEqual(result.workPlane, previous)
+})
+
+test('normal-vector preview geometry renders and changes with theta and phi', () => {
+  const zPreview = workPlaneNormalVectorPreviewGeometryFromInput(
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+  )
+  const xPreview = workPlaneNormalVectorPreviewGeometryFromInput({
+    ...defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    normalThetaDeg: '90',
+    normalPhiDeg: '0',
+  })
+
+  assert.notEqual(zPreview, null)
+  assert.notEqual(xPreview, null)
+
+  if (zPreview === null || xPreview === null) {
+    throw new Error('Expected preview geometry.')
+  }
+
+  assert.equal(zPreview.axes.length, 3)
+  assert.equal(zPreview.normal.label, 'n')
+  assert.notDeepEqual(zPreview.normal.to, xPreview.normal.to)
 })
 
 test('zero normal input is rejected without changing the active work plane', () => {
@@ -196,6 +310,44 @@ test('work plane details expand only in 3D mode', () => {
   assert.equal(shouldShowWorkPlaneDetails(2, true), false)
 })
 
+test('preview work-plane overlay appears only in 3D mode', () => {
+  assert.equal(shouldShowWorkPlaneOverlay(3), true)
+  assert.equal(shouldShowWorkPlaneOverlay(2), false)
+  assert.equal(
+    workPlaneOverlayButtonLabel({ kind: 'xz', y: 2 }),
+    'Work plane: xz plane ▾',
+  )
+})
+
+test('preview work-plane overlay panel opens and closes only when available', () => {
+  assert.equal(toggleWorkPlaneOverlayPanel(false), true)
+  assert.equal(toggleWorkPlaneOverlayPanel(true), false)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(3, true), true)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(3, false), false)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(2, true), false)
+})
+
+test('work-plane frame display renders current origin and plane vectors', () => {
+  const workPlane: WorkPlane = {
+    kind: 'custom',
+    id: 'display-plane',
+    name: 'Display plane',
+    origin: { x: 1, y: 2, z: 3 },
+    u: { x: 0, y: 1, z: 0 },
+    v: { x: 0, y: 0, z: 1 },
+    normal: { x: 1, y: 0, z: 0 },
+    source: { kind: 'originNormal' },
+  }
+  const display = workPlaneFrameDisplay(workPlane)
+
+  assert.deepEqual(display?.origin, { x: 1, y: 2, z: 3 })
+  assert.equal(workPlaneOriginReferenceText(workPlane), 'Active work-plane origin: (1, 2, 3)')
+  assert.equal(
+    workPlaneVectorReferenceText(workPlane),
+    'Plane x (0, 1, 0); plane y (0, 0, 1)',
+  )
+})
+
 test('active work plane summary names the fixed coordinate in 3D', () => {
   assert.equal(workPlaneSummaryLabel({ kind: 'xy', z: 0 }), 'xy plane at z = 0')
   assert.equal(workPlaneSummaryLabel({ kind: 'xz', y: -2 }), 'xz plane at y = -2')
@@ -317,6 +469,25 @@ test('picking three distinct point strata creates a custom work plane', () => {
   assert.deepEqual(result.workPlane.source.pointIds, ['p0', 'p1', 'p2'])
   assert.deepEqual(result.workPlane.origin, { x: 0, y: 0, z: 0 })
   assert.deepEqual(result.workPlane.u, { x: 1, y: 0, z: 0 })
+})
+
+test('picked point work-plane Apply is enabled only with exactly three active picks', () => {
+  const started = startWorkPlanePointPicking(3)
+  const first = pickWorkPlanePointStratum(started.state, 'p0')
+  const second = pickWorkPlanePointStratum(first.state, 'p1')
+  const third = pickWorkPlanePointStratum(second.state, 'p2')
+
+  assert.equal(canApplyPickedPointWorkPlane(started.state), false)
+  assert.equal(canApplyPickedPointWorkPlane(first.state), false)
+  assert.equal(canApplyPickedPointWorkPlane(second.state), false)
+  assert.equal(canApplyPickedPointWorkPlane(third.state), true)
+  assert.equal(
+    canApplyPickedPointWorkPlane({
+      active: false,
+      pickedPointIds: ['p0', 'p1', 'p2'],
+    }),
+    false,
+  )
 })
 
 test('picking three coordinate anchors creates a snapshot custom work plane', () => {
@@ -625,4 +796,22 @@ function workPlaneLocalCoordinateAnchor(
       preview: { x, y, z },
     },
   }
+}
+
+function nonNullVec3(value: ReturnType<typeof normalVectorFromThetaPhiDegrees>) {
+  if (value === null) {
+    throw new Error('Expected a finite normal vector.')
+  }
+
+  return value
+}
+
+function assertVec3Approx(
+  actual: { x: number; y: number; z: number },
+  expected: { x: number; y: number; z: number },
+  epsilon = 1e-9,
+): void {
+  assert.ok(Math.abs(actual.x - expected.x) <= epsilon)
+  assert.ok(Math.abs(actual.y - expected.y) <= epsilon)
+  assert.ok(Math.abs(actual.z - expected.z) <= epsilon)
 }
