@@ -29,7 +29,7 @@ test('preview stage uses large viewport-oriented sizing', () => {
     /calc\(100dvh - var\(--compact-header-height\) - 12px\)/,
   )
   assert.match(previewStageRule, /min-height:\s*var\(--preview-stage-min-height\);/)
-  assert.match(previewStageRule, /overflow:\s*hidden;/)
+  assert.match(previewStageRule, /overflow:\s*visible;/)
 })
 
 test('example bar is expanded before editing by default', () => {
@@ -91,7 +91,7 @@ test('switching examples still selects fresh cloned diagram data', () => {
 })
 
 test('preview overlays still render inside preview stage', () => {
-  const previewStage = appSource.indexOf('<div className="preview-stage">')
+  const previewStage = appSource.indexOf('className="preview-stage"')
   const previewArticleEnd = appSource.indexOf('</article>', previewStage)
   const previewMarkup = appSource.slice(previewStage, previewArticleEnd)
 

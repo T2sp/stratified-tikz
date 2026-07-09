@@ -304,11 +304,13 @@ import {
   addSheetMenuGroups,
   addSheetMenuItems,
   defaultPreviewCoordinateInputMode,
+  defaultSvgPreviewExportFilename,
   directPathInputModeItems,
   generateTikzForUi,
   isAddPathTool,
   coordinateAnchorVisibilityAriaLabel,
   coordinateAnchorVisibilityButtonLabel,
+  createSvgPreviewExportText,
   previewToolbarTopTools,
   runPreviewOverlayAction,
   shouldHandlePreviewCanvasCreationClick,
@@ -322,6 +324,8 @@ import {
   togglePreviewToolbarState,
   updateSelectionForCoordinateAnchorVisibility,
   updateSelectionForBackgroundClick,
+  svgPreviewExportButtonLabel,
+  svgPreviewExportMimeType,
   startCoordinateAnchorDragSession,
   type CoordinateAnchorDragSession,
   type CustomOriginNormalWorkPlaneInput,
@@ -772,6 +776,7 @@ function App() {
   ] = useState<string>('')
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
+  const previewStageRef = useRef<HTMLDivElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const coordinateAnchorDragSessionRef =
     useRef<CoordinateAnchorDragSession | null>(null)
@@ -1094,6 +1099,26 @@ function App() {
     } else {
       setCopyStatus('failed')
     }
+  }
+
+  function exportSvgPreview(): void {
+    const previewSvg =
+      previewStageRef.current?.querySelector<SVGSVGElement>('svg.svg-diagram') ??
+      null
+    const svgText =
+      previewSvg === null ? null : createSvgPreviewExportText(previewSvg)
+
+    if (svgText === null) {
+      setCopyStatus('failed')
+      return
+    }
+
+    const downloaded = downloadTextFile(svgText, {
+      filename: defaultSvgPreviewExportFilename,
+      mimeType: svgPreviewExportMimeType,
+    })
+
+    setCopyStatus(downloaded ? 'downloaded' : 'failed')
   }
 
   function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
@@ -6094,6 +6119,17 @@ function App() {
         onSetLayerLock={setDiagramLayerLock}
         onDeleteLayer={deleteDiagramLayer}
         onStatusMessage={setLayerOperationStatus}
+        edgeActions={
+          <button
+            type="button"
+            className="preview-overlay-button preview-edge-action-button svg-export-button"
+            aria-label={svgPreviewExportButtonLabel}
+            title={svgPreviewExportButtonLabel}
+            onClick={exportSvgPreview}
+          >
+            Export SVG
+          </button>
+        }
       />
     )
   }
@@ -8285,7 +8321,7 @@ function App() {
                 <span>{selectedExample.summary}</span>
               </div>
             </div>
-            <div className="preview-stage">
+            <div className="preview-stage" ref={previewStageRef}>
               {renderPreviewToolbarOverlay()}
               {renderDirectInputDrawer()}
               {renderInspectorDrawer()}

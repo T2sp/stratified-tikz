@@ -806,6 +806,7 @@ export function SvgDiagram({
           className="svg-coordinate-anchors"
           aria-label="Coordinate anchors"
           data-svg-coordinate-anchors="true"
+          data-svg-export-exclude="true"
         >
           {coordinateAnchorMarkers.map((marker) => (
             <CoordinateAnchorMarkerElement
@@ -1105,6 +1106,7 @@ function renderSortedSurfaceFace(
             strokeWidth={5}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         <polygon
@@ -1132,6 +1134,7 @@ function renderCoordinateSourceHighlights(
       className="svg-coordinate-source-highlights"
       pointerEvents="none"
       aria-hidden="true"
+      data-svg-export-exclude="true"
     >
       {highlights.map((highlight) =>
         renderCoordinateSourceHighlight(highlight, camera, viewportHeight),
@@ -1361,6 +1364,7 @@ function renderPathIntersectionCandidates(
       key="path-intersection-candidates"
       className="svg-path-intersection-candidates"
       aria-label="Path intersection candidates"
+      data-svg-export-exclude="true"
     >
       {candidates.map((candidate) =>
         renderPathIntersectionCandidate(
@@ -1543,6 +1547,7 @@ function renderCoordinateAxesGuide(
       pointerEvents={guide.pointerEvents}
       aria-hidden="true"
       data-selectable={String(guide.selectable)}
+      data-svg-export-exclude="true"
     >
       {guide.axes.map((axis) =>
         renderCoordinateAxisGuide(axis, camera, viewportHeight),
@@ -1717,6 +1722,7 @@ function renderRegion(
             strokeWidth={5}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         {pathData !== '' && (
@@ -1798,6 +1804,7 @@ function renderSheet(
             strokeWidth={5}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         <polygon
@@ -1860,6 +1867,7 @@ function renderCurvedSheet(
                 fillOpacity={0.1}
                 stroke="none"
                 pointerEvents="none"
+                data-svg-export-exclude="true"
               />
             ))}
           {mesh.faces.map((face) => (
@@ -1883,6 +1891,7 @@ function renderCurvedSheet(
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="none"
+                data-svg-export-exclude="true"
               />
             ))}
         </g>
@@ -1952,6 +1961,7 @@ function renderWorkPlaneFilledSheet(
             strokeWidth={5}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         {pathData !== '' && (
@@ -2046,6 +2056,7 @@ function renderCurve(
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
             data-boundary-highlight-label={boundaryHighlight.label}
+            data-svg-export-exclude="true"
           />
         )}
         {isSelected && (
@@ -2059,6 +2070,7 @@ function renderCurve(
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         {pathRuns.map((run) => (
@@ -2546,6 +2558,7 @@ function renderLabel(
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
+            data-svg-export-exclude="true"
           />
         )}
         <text
@@ -2590,9 +2603,11 @@ function renderWorkPlanePreview(
   return (
     <g
       key="work-plane-preview"
+      className="svg-work-plane-preview"
       pointerEvents={preview.pointerEvents}
       aria-hidden="true"
       data-selectable={String(preview.selectable)}
+      data-svg-export-exclude="true"
     >
       <polygon
         points={svgPointList(corners)}
@@ -2718,7 +2733,12 @@ function renderSheetDraft(
   const boundaryData = polylineToSvgPath(points)
 
   return (
-    <g key="sheet-draft-preview" pointerEvents="none" aria-hidden="true">
+    <g
+      key="sheet-draft-preview"
+      pointerEvents="none"
+      aria-hidden="true"
+      data-svg-export-exclude="true"
+    >
       {points.length >= 3 && (
         <polygon
           points={svgPointList(points)}
@@ -2776,7 +2796,12 @@ function renderPolylineDraft(
   const pathData = polylineToSvgPath(points)
 
   return (
-    <g key="polyline-draft-preview" pointerEvents="none" aria-hidden="true">
+    <g
+      key="polyline-draft-preview"
+      pointerEvents="none"
+      aria-hidden="true"
+      data-svg-export-exclude="true"
+    >
       {points.length >= 2 && (
         <path
           d={pathData}
@@ -2823,7 +2848,12 @@ function renderCubicBezierDraft(
   const guideData = polylineToSvgPath(points)
 
   return (
-    <g key="cubic-bezier-draft-preview" pointerEvents="none" aria-hidden="true">
+    <g
+      key="cubic-bezier-draft-preview"
+      pointerEvents="none"
+      aria-hidden="true"
+      data-svg-export-exclude="true"
+    >
       {points.length >= 2 && (
         <path
           d={guideData}
@@ -2934,6 +2964,7 @@ function renderConcatenatedPathDraft(
       className="svg-path-draft"
       pointerEvents="none"
       aria-hidden="true"
+      data-svg-export-exclude="true"
     >
       {completedPathData !== '' && (
         <path
@@ -3035,6 +3066,7 @@ function renderPointHighlight(
       strokeWidth={3}
       vectorEffect="non-scaling-stroke"
       pointerEvents="none"
+      data-svg-export-exclude="true"
     />
   )
 }
