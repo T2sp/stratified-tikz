@@ -258,9 +258,14 @@ import {
   shouldShowCameraControls,
   shouldShowCameraOrientationControls,
   shouldShowWorkPlaneControls,
+  shouldShowWorkPlaneOverlay,
+  shouldShowWorkPlaneOverlayPanel,
   undoLastDiagramChange,
   updateDiagramGeometryHandle,
+  workPlaneFrameDisplay,
   workPlaneLocalCoordinateAxisLabel,
+  workPlaneOriginReferenceText,
+  workPlaneOverlayButtonLabel,
   VariableManager,
   applyCustomOriginNormalWorkPlaneInput,
   applyCustomThreePointWorkPlaneInput,
@@ -303,9 +308,11 @@ import {
   validateRuledSurfaceBoundaryPathSource,
   workPlanePointPickingCount,
   workPlanePointPickingStatus,
+  toggleWorkPlaneOverlayPanel,
   workPlaneDisplayName,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
+  workPlaneVectorReferenceText,
   addPathMenuGroups,
   addPathMenuItems,
   addSheetMenuGroups,
@@ -323,6 +330,7 @@ import {
   shouldHandlePreviewCanvasCreationClick,
   shouldShowDirectInputDrawer,
   shouldShowFillPathsForTool,
+  shouldShowWorkPlaneLocalInputModeControl,
   stopPreviewOverlayEvent,
   toolbarPaletteAfterCommandSelection,
   toggleExampleDropdown,
@@ -343,6 +351,7 @@ import {
   type DirectConcatenatedPathManualSegmentInput,
   type DirectCoordinateInput,
   type DirectCoordinateMode,
+  type WorkPlaneLocalInputMode,
   type DirectCubicBezierControlMode,
   type ExampleBarState,
   type DirectGridCreationError,
@@ -478,6 +487,13 @@ const defaultDirectCoordinates: DirectCoordinateInput = {
   y: '0',
   z: '0',
 }
+const workPlaneLocalInputModes: Array<{
+  id: WorkPlaneLocalInputMode
+  label: string
+}> = [
+  { id: 'cartesian', label: 'Cartesian' },
+  { id: 'polar', label: 'Polar' },
+]
 const defaultDirectGridInput: DirectGridInput = {
   uRange: {
     min: '-2',
@@ -667,6 +683,8 @@ function App() {
     useState<string>('Coordinate')
   const [directCoordinateMode, setDirectCoordinateMode] =
     useState<DirectCoordinateMode>('global')
+  const [workPlaneLocalInputMode, setWorkPlaneLocalInputMode] =
+    useState<WorkPlaneLocalInputMode>('cartesian')
   const [directLabelText, setDirectLabelText] = useState<string>('Label')
   const [newElementLayerInput, setNewElementLayerInput] = useState<string>('0')
   const [directPolylineRows, setDirectPolylineRows] = useState<string>(
@@ -804,6 +822,8 @@ function App() {
     z: 0,
   })
   const [isWorkPlaneDetailsExpanded, setIsWorkPlaneDetailsExpanded] =
+    useState<boolean>(false)
+  const [isWorkPlaneOverlayExpanded, setIsWorkPlaneOverlayExpanded] =
     useState<boolean>(false)
   const [customWorkPlaneInput, setCustomWorkPlaneInput] =
     useState<CustomOriginNormalWorkPlaneInput>(
@@ -1072,6 +1092,10 @@ function App() {
   const showWorkPlaneDetails = shouldShowWorkPlaneDetails(
     editableDiagram.ambientDimension,
     isWorkPlaneDetailsExpanded,
+  )
+  const showWorkPlaneOverlayPanel = shouldShowWorkPlaneOverlayPanel(
+    editableDiagram.ambientDimension,
+    isWorkPlaneOverlayExpanded,
   )
   const showCameraControls = shouldShowCameraControls(
     editableDiagram.ambientDimension,
@@ -1397,6 +1421,7 @@ function App() {
     setFillStatus('')
     setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
+    setWorkPlaneLocalInputMode('cartesian')
     setDirectPolylineRows(defaultDirectPolylineRows(nextDiagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(nextDiagram.ambientDimension))
@@ -1837,6 +1862,7 @@ function App() {
     setFillStatus('')
     setNewElementLayerInput('0')
     setDirectCoordinateMode('global')
+    setWorkPlaneLocalInputMode('cartesian')
     setDirectPolylineRows(defaultDirectPolylineRows(diagram.ambientDimension))
     setDirectCubicBezierControlMode('absolute')
     setDirectCubicBezierRows(defaultDirectCubicBezierRows(diagram.ambientDimension))
@@ -2703,6 +2729,8 @@ function App() {
     if (editableDiagram.ambientDimension === 2) {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
       setIsWorkPlaneDetailsExpanded(false)
+      setIsWorkPlaneOverlayExpanded(false)
+      setWorkPlaneLocalInputMode('cartesian')
       setWorkPlaneStatus('')
       setIsCameraDetailsExpanded(false)
       setCameraStatus('')
@@ -4287,6 +4315,9 @@ function App() {
         : 'absolute'
 
     setDirectCoordinateMode(nextMode)
+    if (nextMode !== 'workPlaneLocal') {
+      setWorkPlaneLocalInputMode('cartesian')
+    }
     setDirectCubicBezierControlMode(nextCubicBezierControlMode)
     setDirectPolylineRows(
       defaultDirectPolylineRows(editableDiagram.ambientDimension, nextMode),
@@ -4869,14 +4900,24 @@ function App() {
 
   function directCreationCoordinateOptions<T extends object>(options: T): T & {
     coordinateMode: DirectCoordinateMode
+    workPlaneLocalInputMode: WorkPlaneLocalInputMode
     workPlane: WorkPlane
   } {
+    const coordinateMode = effectiveDirectCoordinateMode(
+      editableDiagram.ambientDimension,
+      directCoordinateMode,
+    )
+
     return {
       ...options,
-      coordinateMode: effectiveDirectCoordinateMode(
+      coordinateMode,
+      workPlaneLocalInputMode: shouldShowWorkPlaneLocalInputModeControl(
         editableDiagram.ambientDimension,
-        directCoordinateMode,
-      ),
+        creationTool,
+        coordinateMode,
+      )
+        ? workPlaneLocalInputMode
+        : 'cartesian',
       workPlane: activeWorkPlane,
     }
   }
@@ -6235,6 +6276,16 @@ function App() {
     }
   }
 
+  function resetActiveWorkPlane(): void {
+    if (blockWorkPlaneChangeForDraft()) {
+      return
+    }
+
+    setActiveWorkPlane({ kind: 'xy', z: 0 })
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneStatus('Work plane reset.')
+  }
+
   function renderDirectInputDrawer() {
     if (!directInputDrawerVisible || !isDirectCreationTool(creationTool)) {
       return null
@@ -6379,6 +6430,151 @@ function App() {
           </button>
         }
       />
+    )
+  }
+
+  function renderWorkPlaneOverlay() {
+    if (!shouldShowWorkPlaneOverlay(editableDiagram.ambientDimension)) {
+      return null
+    }
+
+    const frameDisplay = workPlaneFrameDisplay(activeWorkPlane)
+
+    return (
+      <aside
+        className="preview-work-plane-control"
+        aria-label="Preview work-plane editor"
+        onClick={stopPreviewOverlayEvent}
+        onPointerDown={stopPreviewOverlayEvent}
+      >
+        <button
+          type="button"
+          className="preview-overlay-button preview-work-plane-toggle-button"
+          aria-expanded={showWorkPlaneOverlayPanel}
+          aria-controls="preview-work-plane-panel"
+          onClick={(event) =>
+            runPreviewOverlayAction(event, () =>
+              setIsWorkPlaneOverlayExpanded((expanded) =>
+                toggleWorkPlaneOverlayPanel(expanded),
+              ),
+            )
+          }
+        >
+          {workPlaneOverlayButtonLabel(activeWorkPlane)}
+        </button>
+        {showWorkPlaneOverlayPanel && (
+          <section
+            id="preview-work-plane-panel"
+            className="preview-work-plane-panel"
+            aria-labelledby="preview-work-plane-heading"
+          >
+            <div className="preview-work-plane-heading-row">
+              <h3 id="preview-work-plane-heading">Work plane</h3>
+              <button
+                type="button"
+                className="preview-overlay-button preview-work-plane-close"
+                aria-label="Close work-plane panel"
+                aria-controls="preview-work-plane-panel"
+                onClick={(event) =>
+                  runPreviewOverlayAction(event, () =>
+                    setIsWorkPlaneOverlayExpanded(false),
+                  )
+                }
+              >
+                Close
+              </button>
+            </div>
+            <dl className="preview-work-plane-frame">
+              <div>
+                <dt>current origin</dt>
+                <dd>{frameDisplay?.originText ?? 'unavailable'}</dd>
+              </div>
+              <div>
+                <dt>current plane x</dt>
+                <dd>{frameDisplay?.planeXText ?? 'unavailable'}</dd>
+              </div>
+              <div>
+                <dt>current plane y</dt>
+                <dd>{frameDisplay?.planeYText ?? 'unavailable'}</dd>
+              </div>
+            </dl>
+            <div className="preview-work-plane-setup" role="group" aria-label="Work-plane setup">
+              <label className="preview-toolbar-field preview-work-plane-preset-field">
+                <span>Plane</span>
+                <select
+                  value={workPlaneSelectValue(activeWorkPlane)}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value as WorkPlaneSelectValue
+
+                    if (value !== 'custom') {
+                      updateWorkPlaneKind(value)
+                    }
+                  }}
+                >
+                  {activeWorkPlane.kind === 'custom' && (
+                    <option value="custom">{activeWorkPlane.name}</option>
+                  )}
+                  {workPlaneKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {workPlaneLabel(kind)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {activeWorkPlane.kind !== 'custom' && (
+                <label className="preview-toolbar-field preview-work-plane-fixed-field">
+                  <span>{workPlaneFixedAxis(activeWorkPlane)}</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={String(workPlaneFixedValue(activeWorkPlane))}
+                    onChange={(event) =>
+                      updateWorkPlaneFixedValue(event.currentTarget.value)
+                    }
+                  />
+                </label>
+              )}
+              <div className="preview-work-plane-actions">
+                <button
+                  type="button"
+                  className="preview-overlay-button"
+                  onClick={resetActiveWorkPlane}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="preview-overlay-button"
+                  onClick={startExistingPointWorkPlanePicking}
+                >
+                  Pick 3 points
+                </button>
+                <button
+                  type="button"
+                  className="preview-overlay-button"
+                  disabled={!workPlanePointPickingState.active}
+                  onClick={applyExistingPointWorkPlane}
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  className="preview-overlay-button"
+                  disabled={!workPlanePointPickingState.active}
+                  onClick={cancelExistingPointWorkPlanePicking}
+                >
+                  Cancel
+                </button>
+              </div>
+              {workPlaneStatus !== '' && (
+                <span className="preview-work-plane-status" role="status">
+                  {workPlaneStatus}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
+      </aside>
     )
   }
 
@@ -6620,6 +6816,66 @@ function App() {
     )
   }
 
+  function renderWorkPlaneLocalInputModeControl() {
+    const coordinateMode = effectiveDirectCoordinateMode(
+      editableDiagram.ambientDimension,
+      directCoordinateMode,
+    )
+
+    if (
+      !shouldShowWorkPlaneLocalInputModeControl(
+        editableDiagram.ambientDimension,
+        creationTool,
+        coordinateMode,
+      )
+    ) {
+      return null
+    }
+
+    const vectorReference = workPlaneVectorReferenceText(activeWorkPlane)
+
+    return (
+      <div
+        className="direct-work-plane-local-input-panel"
+        aria-label="Active work-plane local input"
+      >
+        <div className="direct-local-input-mode-row">
+          <span className="control-label">Input mode</span>
+          <div
+            className="segmented-control direct-local-input-mode-control"
+            role="group"
+            aria-label="Work-plane local input mode"
+          >
+            {workPlaneLocalInputModes.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                className={
+                  workPlaneLocalInputMode === mode.id ? 'is-selected' : undefined
+                }
+                aria-pressed={workPlaneLocalInputMode === mode.id}
+                onClick={() => {
+                  setWorkPlaneLocalInputMode(mode.id)
+                  setDirectCreationStatus('')
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="direct-work-plane-reference">
+          {workPlaneOriginReferenceText(activeWorkPlane)}
+        </span>
+        {vectorReference !== null && (
+          <span className="direct-work-plane-reference direct-work-plane-vector-reference">
+            {vectorReference}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   function renderDirectCreationForm() {
     if (coordinateInputMode !== 'direct' || !isDirectCreationTool(creationTool)) {
       return null
@@ -6658,6 +6914,7 @@ function App() {
               </select>
             </label>
           )}
+        {renderWorkPlaneLocalInputModeControl()}
         {creationTool === 'createCoordinate' && (
           <label className="direct-create-field direct-create-text">
             <span>Name</span>
@@ -6704,6 +6961,7 @@ function App() {
                   axis,
                   editableDiagram.ambientDimension,
                   directCoordinateMode,
+                  workPlaneLocalInputMode,
                 )}{' '}
                 {creationTool === 'createSheet' &&
                   isAnchorCurvedSheetCreationKind(sheetCreationKind) &&
@@ -8641,6 +8899,7 @@ function App() {
               {renderPreviewToolbarOverlay()}
               {renderDirectInputDrawer()}
               {renderInspectorDrawer()}
+              {renderWorkPlaneOverlay()}
               {renderLayerManagerOverlay()}
               <SvgDiagram
                 diagram={editableDiagram}
@@ -10290,11 +10549,16 @@ function directCoordinateAxisLabel(
   axis: DirectCoordinateAxis,
   ambientDimension: AmbientDimension,
   coordinateMode: DirectCoordinateMode,
+  localInputMode: WorkPlaneLocalInputMode = 'cartesian',
 ): string {
   if (
     ambientDimension === 3 &&
     coordinateMode === 'workPlaneLocal'
   ) {
+    if (localInputMode === 'polar') {
+      return axis === 'x' ? 'r' : axis === 'y' ? 'theta (deg)' : axis
+    }
+
     return axis === 'x'
       ? workPlaneLocalCoordinateAxisLabel('a')
       : axis === 'y'

@@ -66,3 +66,15 @@ export function shouldShowDirectInputDrawer(
     directInputDrawerFormKind(tool, inputMode) !== null
   )
 }
+
+export function shouldShowWorkPlaneLocalInputModeControl(
+  ambientDimension: AmbientDimension,
+  tool: WorkPlanePreviewTool,
+  coordinateMode: DirectCoordinateMode,
+): boolean {
+  return (
+    ambientDimension === 3 &&
+    coordinateMode === 'workPlaneLocal' &&
+    (tool === 'createCoordinate' || tool === 'createPoint')
+  )
+}

@@ -494,10 +494,13 @@ export type DirectCoordinateInput = {
 
 export type DirectCoordinateMode = 'global' | 'workPlaneLocal'
 
+export type WorkPlaneLocalInputMode = 'cartesian' | 'polar'
+
 export type WorkPlaneLocalCoordinateAxis = 'a' | 'b'
 
 export type DirectCoordinateParseOptions = {
   coordinateMode?: DirectCoordinateMode
+  workPlaneLocalInputMode?: WorkPlaneLocalInputMode
   workPlane?: WorkPlane
   diagram?: Diagram
 }
@@ -3053,7 +3056,7 @@ export function parseDirectCoordinateInput(
     ambientDimension === 3 &&
     options.coordinateMode === 'workPlaneLocal'
   ) {
-    return parseWorkPlaneLocalCoordinateInput(coordinates, options.workPlane)
+    return parseWorkPlaneLocalCoordinateInput(coordinates, options)
   }
 
   const parsed = createVec3FromCoordinateInputs(
@@ -3136,7 +3139,7 @@ function parseNumericDirectCoordinateInput(
     ambientDimension === 3 &&
     options.coordinateMode === 'workPlaneLocal'
   ) {
-    return parseWorkPlaneLocalCoordinateInput(coordinates, options.workPlane)
+    return parseWorkPlaneLocalCoordinateInput(coordinates, options)
   }
 
   const x = parseFiniteNumber(coordinates.x)
@@ -3152,23 +3155,22 @@ function parseNumericDirectCoordinateInput(
 
 function parseWorkPlaneLocalCoordinateInput(
   coordinates: DirectCoordinateInput,
-  workPlane: WorkPlane | undefined,
+  options: DirectCoordinateParseOptions,
 ): Vec3 | null {
-  const a = parseFiniteNumber(coordinates.x)
-  const b = parseFiniteNumber(coordinates.y)
+  const local = parseNumericWorkPlaneLocalCoordinates(coordinates, options)
 
-  if (a === null || b === null || workPlane === undefined) {
+  if (local === null || options.workPlane === undefined) {
     return null
   }
 
-  const validation = validateWorkPlane(workPlane)
+  const validation = validateWorkPlane(options.workPlane)
 
   if (!validation.valid) {
     return null
   }
 
   try {
-    const point = pointOnWorkPlane(workPlane, a, b)
+    const point = pointOnWorkPlane(options.workPlane, local.a, local.b)
     return isFiniteVec3(point) ? point : null
   } catch {
     return null
@@ -3210,11 +3212,10 @@ function parseWorkPlaneLocalCoordinateInputWithSource(
   coordinates: DirectCoordinateInput,
   options: DirectCoordinateParseOptions,
 ): Vec3 | null {
-  const a = parseWorkPlaneLocalScalarInput(coordinates.x, options)
-  const b = parseWorkPlaneLocalScalarInput(coordinates.y, options)
+  const local = parseWorkPlaneLocalCoordinateScalarInputs(coordinates, options)
   const frame = workPlaneFrameSnapshotFromWorkPlane(options.workPlane)
 
-  if (!a.ok || !b.ok || frame === null) {
+  if (local === null || frame === null) {
     return null
   }
 
@@ -3222,14 +3223,126 @@ function parseWorkPlaneLocalCoordinateInputWithSource(
     {
       kind: 'workPlaneLocal',
       frame,
-      local: {
-        a: a.scalar,
-        b: b.scalar,
-      },
+      local,
     },
     3,
     coordinateExpressionContextForOptions(options),
   )
+}
+
+function parseNumericWorkPlaneLocalCoordinates(
+  coordinates: DirectCoordinateInput,
+  options: DirectCoordinateParseOptions,
+): WorkPlaneLocalCoordinate | null {
+  if (coordinates.source !== undefined) {
+    return null
+  }
+
+  const first = parseFiniteNumber(coordinates.x)
+  const second = parseFiniteNumber(coordinates.y)
+
+  if (first === null || second === null) {
+    return null
+  }
+
+  if (options.workPlaneLocalInputMode === 'polar') {
+    return localCoordinateFromPolar(first, second)
+  }
+
+  return { a: first, b: second }
+}
+
+function parseWorkPlaneLocalCoordinateScalarInputs(
+  coordinates: DirectCoordinateInput,
+  options: DirectCoordinateParseOptions,
+): WorkPlaneLocalCoordinateSource['local'] | null {
+  if (coordinates.source !== undefined) {
+    return null
+  }
+
+  const first = parseWorkPlaneLocalScalarInput(coordinates.x, options)
+  const second = parseWorkPlaneLocalScalarInput(coordinates.y, options)
+
+  if (!first.ok || !second.ok) {
+    return null
+  }
+
+  if (options.workPlaneLocalInputMode !== 'polar') {
+    return {
+      a: first.scalar,
+      b: second.scalar,
+    }
+  }
+
+  if (first.scalar.kind === 'numeric' && second.scalar.kind === 'numeric') {
+    const local = localCoordinateFromPolar(
+      first.scalar.value,
+      second.scalar.value,
+    )
+
+    return {
+      a: { kind: 'numeric', value: local.a },
+      b: { kind: 'numeric', value: local.b },
+    }
+  }
+
+  const a = parseWorkPlaneLocalScalarInput(
+    `${workPlaneLocalPolarRadiusExpressionFactor(
+      coordinates.x,
+    )}*cos(${coordinates.y.trim()})`,
+    options,
+  )
+  const b = parseWorkPlaneLocalScalarInput(
+    `${workPlaneLocalPolarRadiusExpressionFactor(
+      coordinates.x,
+    )}*sin(${coordinates.y.trim()})`,
+    options,
+  )
+
+  if (!a.ok || !b.ok) {
+    return null
+  }
+
+  return {
+    a: a.scalar,
+    b: b.scalar,
+  }
+}
+
+function localCoordinateFromPolar(
+  radius: number,
+  thetaDegrees: number,
+): WorkPlaneLocalCoordinate {
+  const thetaRadians = (thetaDegrees * Math.PI) / 180
+
+  return {
+    a: normalizeNearZero(radius * Math.cos(thetaRadians)),
+    b: normalizeNearZero(radius * Math.sin(thetaRadians)),
+  }
+}
+
+function workPlaneLocalPolarRadiusExpressionFactor(source: string): string {
+  const expression = source.trim()
+
+  return isSimpleScalarExpressionFactor(expression)
+    ? expression
+    : `(${expression})`
+}
+
+function isSimpleScalarExpressionFactor(expression: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/u.test(expression) || isFiniteNumericLiteral(expression)
+}
+
+function isFiniteNumericLiteral(expression: string): boolean {
+  if (expression.trim() === '') {
+    return false
+  }
+
+  return Number.isFinite(Number(expression))
+}
+
+function normalizeNearZero(value: number): number {
+  return Math.abs(value) < 1e-12 ? 0 : value
 }
 
 function effectiveCoordinateModeForAmbientDimension(

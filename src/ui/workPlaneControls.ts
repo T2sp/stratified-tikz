@@ -7,6 +7,7 @@ import {
   norm,
   subtractVec3,
   validateWorkPlane,
+  workPlaneToBasis,
 } from '../geometry/workPlane.ts'
 import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import type {
@@ -48,6 +49,15 @@ export type CustomWorkPlaneApplyResult =
     }
 
 export type WorkPlaneSelectValue = AxisAlignedWorkPlaneName | 'custom'
+
+export type WorkPlaneFrameDisplay = {
+  origin: Vec3
+  planeX: Vec3
+  planeY: Vec3
+  originText: string
+  planeXText: string
+  planeYText: string
+}
 
 export type WorkPlanePickTarget =
   | {
@@ -562,6 +572,23 @@ export function shouldShowWorkPlaneDetails(
   return shouldShowWorkPlaneControls(ambientDimension) && expanded
 }
 
+export function shouldShowWorkPlaneOverlay(
+  ambientDimension: AmbientDimension,
+): boolean {
+  return ambientDimension === 3
+}
+
+export function shouldShowWorkPlaneOverlayPanel(
+  ambientDimension: AmbientDimension,
+  expanded: boolean,
+): boolean {
+  return shouldShowWorkPlaneOverlay(ambientDimension) && expanded
+}
+
+export function toggleWorkPlaneOverlayPanel(expanded: boolean): boolean {
+  return !expanded
+}
+
 export function workPlaneSelectValue(
   workPlane: WorkPlane,
 ): WorkPlaneSelectValue {
@@ -607,6 +634,47 @@ export function workPlaneDisplayName(workPlane: WorkPlane): string {
     case 'custom':
       return workPlane.name
   }
+}
+
+export function workPlaneOverlayButtonLabel(workPlane: WorkPlane): string {
+  return `Work plane: ${workPlaneDisplayName(workPlane)} ▾`
+}
+
+export function workPlaneFrameDisplay(
+  workPlane: WorkPlane,
+): WorkPlaneFrameDisplay | null {
+  try {
+    const basis = workPlaneToBasis(workPlane)
+
+    return {
+      origin: basis.origin,
+      planeX: basis.u,
+      planeY: basis.v,
+      originText: formatCompactVec3ForWorkPlane(basis.origin),
+      planeXText: formatCompactVec3ForWorkPlane(basis.u),
+      planeYText: formatCompactVec3ForWorkPlane(basis.v),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function workPlaneOriginReferenceText(workPlane: WorkPlane): string {
+  const display = workPlaneFrameDisplay(workPlane)
+
+  return display === null
+    ? 'Active work-plane origin: unavailable'
+    : `Active work-plane origin: ${display.originText}`
+}
+
+export function workPlaneVectorReferenceText(
+  workPlane: WorkPlane,
+): string | null {
+  const display = workPlaneFrameDisplay(workPlane)
+
+  return display === null
+    ? null
+    : `Plane x ${display.planeXText}; plane y ${display.planeYText}`
 }
 
 export function workPlanePointPickingStatus(
@@ -757,6 +825,22 @@ function parseFiniteNumberInput(value: string): number | null {
   const parsed = Number(value)
 
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatCompactVec3ForWorkPlane(point: Vec3): string {
+  return `(${formatCompactNumberForWorkPlane(point.x)}, ${formatCompactNumberForWorkPlane(
+    point.y,
+  )}, ${formatCompactNumberForWorkPlane(point.z)})`
+}
+
+function formatCompactNumberForWorkPlane(value: number): string {
+  const normalized = Math.abs(value) < 1e-9 ? 0 : value
+
+  if (Number.isInteger(normalized)) {
+    return String(normalized)
+  }
+
+  return normalized.toFixed(3).replace(/\.?0+$/, '')
 }
 
 function isZeroVector(vector: Vec3): boolean {

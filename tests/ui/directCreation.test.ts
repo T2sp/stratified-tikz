@@ -236,6 +236,80 @@ test('direct work-plane-local coordinate creation stores frame snapshot and loca
   assert.deepEqual(globalPreview(anchor.position.preview), { x: 2, y: 3, z: 1.5 })
 })
 
+test('direct work-plane-local coordinate polar input stores numeric local a/b preview', () => {
+  const result = addCoordinateAnchorFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    { x: '2', y: '90', z: '0' },
+    {
+      id: 'coord-polar',
+      name: 'Polar coordinate',
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct local polar coordinate creation to succeed.')
+  }
+
+  const anchor = findCoordinateAnchor(result.diagram, result.id)
+
+  assert.equal(anchor.position.kind, 'workPlaneLocal')
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate anchor position.')
+  }
+  assert.deepEqual(anchor.position.local.a, { kind: 'numeric', value: 0 })
+  assert.deepEqual(anchor.position.local.b, { kind: 'numeric', value: 2 })
+  assert.deepEqual(globalPreview(anchor.position.preview), { x: 10, y: 20, z: 32 })
+})
+
+test('direct work-plane-local coordinate symbolic polar input stores local expressions', () => {
+  const result = addCoordinateAnchorFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R', y: 'q', z: '0' },
+    {
+      id: 'coord-symbolic-polar',
+      name: 'Symbolic polar coordinate',
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected direct local symbolic polar coordinate creation to succeed.')
+  }
+
+  const anchor = findCoordinateAnchor(result.diagram, result.id)
+
+  assert.equal(anchor.position.kind, 'workPlaneLocal')
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate anchor position.')
+  }
+  assert.equal(anchor.position.local.a.kind, 'symbolic')
+  assert.equal(
+    anchor.position.local.a.kind === 'symbolic'
+      ? anchor.position.local.a.expression
+      : '',
+    'R*cos(q)',
+  )
+  assert.equal(anchor.position.local.b.kind, 'symbolic')
+  assert.equal(
+    anchor.position.local.b.kind === 'symbolic'
+      ? anchor.position.local.b.expression
+      : '',
+    'R*sin(q)',
+  )
+  assertVec3ApproximatelyEqual(anchor.position.preview, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
 test('created coordinate has unique TikZ name and is selected without changing layer view', () => {
   const initialState = createTestEditorState(twoDimensionalExample, {
     kind: 'layer',
@@ -2531,6 +2605,68 @@ test('direct point creation stores symbolic active work-plane local coordinates'
   })
 })
 
+test('direct point creation accepts numeric active work-plane local polar input', () => {
+  const result = addPointStratumFromDirectInput(
+    emptyThreeDimensionalDiagram,
+    { x: '4', y: '180', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected numeric local polar point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id)
+  const source = point.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.deepEqual(source?.local.a, { kind: 'numeric', value: -4 })
+  assert.deepEqual(source?.local.b, { kind: 'numeric', value: 0 })
+  assertVec3ApproximatelyEqual(point.position, { x: 6, y: 20, z: 30 })
+})
+
+test('direct point creation stores symbolic active work-plane local polar expressions', () => {
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R', y: 'q', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected symbolic local polar point creation to succeed.')
+  }
+
+  const point = findPoint(result.diagram, result.id)
+  const source = point.position.symbolic?.source
+
+  assert.equal(source?.kind, 'workPlaneLocal')
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q)',
+  )
+  assert.equal(source?.local.b.kind, 'symbolic')
+  assert.equal(
+    source?.local.b.kind === 'symbolic' ? source.local.b.expression : '',
+    'R*sin(q)',
+  )
+  assertVec3ApproximatelyEqual(point.position, {
+    x: 10 + Math.sqrt(3),
+    y: 20,
+    z: 31,
+  })
+})
+
 test('direct label creation stores symbolic active work-plane local coordinates', () => {
   const diagram = createSymbolicThreeDimensionalDiagramWithRq()
   const result = addTextLabelFromDirectInput(
@@ -2750,6 +2886,38 @@ test('cursor snap does not alter direct local symbolic input', () => {
   assertVec3ApproximatelyEqual(point, { x: 12.26, y: 20, z: 30.74 })
 })
 
+test('cursor snap does not alter direct local symbolic polar input', () => {
+  const snap = { enabled: true, step: 1 }
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R + 0.26', y: 'q + 0.74', z: '0' },
+    {
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(snap.enabled, true)
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected local symbolic polar point creation to succeed.')
+  }
+
+  const source = findPoint(result.diagram, result.id).position.symbolic?.source
+
+  assert.equal(source?.local.a.kind, 'symbolic')
+  assert.equal(
+    source?.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    '(R + 0.26)*cos(q + 0.74)',
+  )
+  assert.equal(source?.local.b.kind, 'symbolic')
+  assert.equal(
+    source?.local.b.kind === 'symbolic' ? source.local.b.expression : '',
+    '(R + 0.26)*sin(q + 0.74)',
+  )
+})
+
 test('2D direct input does not expose work-plane-local coordinate mode', () => {
   assert.deepEqual(directCoordinateModesForAmbientDimension(2), ['global'])
   assert.deepEqual(directCoordinateModesForAmbientDimension(3), [
@@ -2808,6 +2976,97 @@ test('save and load preserves UI-created local coordinate source metadata', () =
     'R*cos(q)',
   )
   assert.deepEqual(source?.frame, expectedFrameSnapshot)
+})
+
+test('save and load preserves polar-created local coordinate source as local a/b', () => {
+  const result = addCoordinateAnchorFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R', y: 'q', z: '0' },
+    {
+      id: 'coord-polar-save-load',
+      name: 'Polar saved coordinate',
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected polar coordinate creation to succeed.')
+  }
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(result.diagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const source = findCoordinateAnchor(
+    parsed.diagram,
+    'coord-polar-save-load',
+  ).position
+
+  assert.equal(source.kind, 'workPlaneLocal')
+  if (source.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate anchor position.')
+  }
+  assert.equal(source.local.a.kind, 'symbolic')
+  assert.equal(
+    source.local.a.kind === 'symbolic' ? source.local.a.expression : '',
+    'R*cos(q)',
+  )
+  assert.equal(source.local.b.kind, 'symbolic')
+  assert.equal(
+    source.local.b.kind === 'symbolic' ? source.local.b.expression : '',
+    'R*sin(q)',
+  )
+})
+
+test('TikZ export preserves polar-created local symbolic expressions', () => {
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R', y: 'q', z: '0' },
+    {
+      id: 'point-polar-tikz',
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected polar point creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram)
+
+  assert.match(tikz, /\{\\R \* cos\(\\q\)\}/)
+  assert.match(tikz, /\{\\R \* sin\(\\q\)\}/)
+})
+
+test('inline TikZ for polar-created local symbolic input has no blank lines', () => {
+  const result = addPointStratumFromDirectInput(
+    createSymbolicThreeDimensionalDiagramWithRq(),
+    { x: 'R', y: 'q', z: '0' },
+    {
+      id: 'point-polar-inline',
+      coordinateMode: 'workPlaneLocal',
+      workPlaneLocalInputMode: 'polar',
+      workPlane: testCustomWorkPlane,
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error('Expected polar point creation to succeed.')
+  }
+
+  const tikz = generateTikz(result.diagram, { exportMode: 'inlineMath' })
+
+  assert.doesNotMatch(tikz, /\n[ \t]*\n/)
 })
 
 test('plane-local polyline direct creation converts every vertex', () => {

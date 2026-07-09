@@ -14,12 +14,19 @@ import {
   shouldBlockCreationForWorkPlanePointPicking,
   shouldShowWorkPlaneDetails,
   shouldShowWorkPlaneControls,
+  shouldShowWorkPlaneOverlay,
+  shouldShowWorkPlaneOverlayPanel,
   startWorkPlanePointPicking,
+  toggleWorkPlaneOverlayPanel,
   validateWorkPlanePointPickingState,
+  workPlaneFrameDisplay,
+  workPlaneOriginReferenceText,
   workPlanePointPickingCount,
   workPlaneDisplayName,
+  workPlaneOverlayButtonLabel,
   workPlaneSelectValue,
   workPlaneSummaryLabel,
+  workPlaneVectorReferenceText,
 } from '../../src/ui/workPlaneControls.ts'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import type { CoordinateAnchor, Diagram, WorkPlane } from '../../src/model/types.ts'
@@ -194,6 +201,44 @@ test('work plane details expand only in 3D mode', () => {
   assert.equal(shouldShowWorkPlaneDetails(3, true), true)
   assert.equal(shouldShowWorkPlaneDetails(3, false), false)
   assert.equal(shouldShowWorkPlaneDetails(2, true), false)
+})
+
+test('preview work-plane overlay appears only in 3D mode', () => {
+  assert.equal(shouldShowWorkPlaneOverlay(3), true)
+  assert.equal(shouldShowWorkPlaneOverlay(2), false)
+  assert.equal(
+    workPlaneOverlayButtonLabel({ kind: 'xz', y: 2 }),
+    'Work plane: xz plane ▾',
+  )
+})
+
+test('preview work-plane overlay panel opens and closes only when available', () => {
+  assert.equal(toggleWorkPlaneOverlayPanel(false), true)
+  assert.equal(toggleWorkPlaneOverlayPanel(true), false)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(3, true), true)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(3, false), false)
+  assert.equal(shouldShowWorkPlaneOverlayPanel(2, true), false)
+})
+
+test('work-plane frame display renders current origin and plane vectors', () => {
+  const workPlane: WorkPlane = {
+    kind: 'custom',
+    id: 'display-plane',
+    name: 'Display plane',
+    origin: { x: 1, y: 2, z: 3 },
+    u: { x: 0, y: 1, z: 0 },
+    v: { x: 0, y: 0, z: 1 },
+    normal: { x: 1, y: 0, z: 0 },
+    source: { kind: 'originNormal' },
+  }
+  const display = workPlaneFrameDisplay(workPlane)
+
+  assert.deepEqual(display?.origin, { x: 1, y: 2, z: 3 })
+  assert.equal(workPlaneOriginReferenceText(workPlane), 'Active work-plane origin: (1, 2, 3)')
+  assert.equal(
+    workPlaneVectorReferenceText(workPlane),
+    'Plane x (0, 1, 0); plane y (0, 0, 1)',
+  )
 })
 
 test('active work plane summary names the fixed coordinate in 3D', () => {
