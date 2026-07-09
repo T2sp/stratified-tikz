@@ -2088,19 +2088,21 @@ function renderCurve(
           />
         ))}
         {arrowheads.map((arrowhead, index) => (
-          <polygon
+          <path
             key={`${curve.id}-arrowhead-${index}`}
-            points={svgPointList([arrowhead.tip, arrowhead.left, arrowhead.right])}
+            className={arrowhead.className}
+            d={arrowhead.pathData}
             fill={arrowhead.color}
             fillOpacity={arrowhead.opacity}
             stroke={arrowhead.color}
             strokeOpacity={arrowhead.opacity}
-            strokeWidth={0.8}
+            strokeWidth={arrowhead.strokeWidth}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
             aria-hidden="true"
             data-svg-arrow-preview={arrowhead.kind}
             data-svg-arrow-head={arrowhead.head}
+            data-svg-arrow-shape={arrowhead.shape}
           />
         ))}
         {inlineNodes.map((node) =>

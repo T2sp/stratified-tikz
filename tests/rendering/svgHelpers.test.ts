@@ -34,17 +34,22 @@ import {
   resolvePathSegmentStyle,
 } from '../../src/model/paths.ts'
 import type {
+  ArrowHeadKind,
   Camera3D,
   ClosedPathBoundary,
+  CurveStratum,
   CurveStyle,
   CurvedSheetStratum,
   CubicBezierControlMode,
   Diagram,
+  EndpointArrowMode,
+  MidArrowDirection,
   PathInlineNode,
   PathSegment,
   RegionStyle,
   SheetStyle,
   SurfaceFrame,
+  Vec2,
   Vec3,
   VisibilityOptions,
 } from '../../src/model/types.ts'
@@ -219,6 +224,213 @@ test('SVG arrow preview coordinates are finite for a 2D path', () => {
 
   assert.equal(arrowheads.length, 3)
   assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
+})
+
+test('SVG arrow preview gives each supported arrow head a distinct shape', () => {
+  const heads: ArrowHeadKind[] = [
+    'standard',
+    'stealth',
+    'latex',
+    'stealthHarpoon',
+    'stealthHarpoonSwap',
+  ]
+  const arrowheads = heads.map((head) =>
+    onlyArrowhead(
+      arrowheadsForIdentityProjection(
+        createArrowPreviewCurve({
+          mid: { enabled: true, head },
+        }),
+      ),
+    ),
+  )
+
+  assert.deepEqual(
+    arrowheads.map((arrowhead) => arrowhead.shape),
+    heads,
+  )
+  assert.equal(
+    new Set(arrowheads.map((arrowhead) => arrowhead.pathData)).size,
+    heads.length,
+  )
+  assert.equal(
+    new Set(arrowheads.map((arrowhead) => arrowhead.className)).size,
+    heads.length,
+  )
+})
+
+test('SVG arrow preview makes Stealth and Latex visibly different', () => {
+  const stealth = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'stealth' },
+      }),
+    ),
+  )
+  const latex = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'latex' },
+      }),
+    ),
+  )
+
+  assert.notEqual(stealth.pathData, latex.pathData)
+  assert.notEqual(stealth.className, latex.className)
+})
+
+test('SVG arrow preview makes harpoon swap use the opposite half-head', () => {
+  const harpoon = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'stealthHarpoon' },
+      }),
+    ),
+  )
+  const swapped = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'stealthHarpoonSwap' },
+      }),
+    ),
+  )
+
+  assert.notEqual(harpoon.pathData, swapped.pathData)
+  assert.notEqual(harpoon.className, swapped.className)
+  assert.ok(harpoon.left.y > harpoon.tip.y)
+  assert.ok(swapped.right.y < swapped.tip.y)
+})
+
+test('SVG endpoint arrow preview orientation follows the path tangent', () => {
+  const arrowhead = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({ endpoint: 'forward' }),
+    ),
+  )
+
+  assert.equal(arrowhead.kind, 'endpoint')
+  assert.equal(arrowhead.head, 'endpoint')
+  assert.equal(arrowhead.shape, 'standard')
+  assertAlmostEqual(arrowhead.angleRadians, 0)
+})
+
+test('SVG mid-arrow preview position follows configured path position', () => {
+  const arrowhead = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, position: 0.25, head: 'stealth' },
+      }),
+    ),
+  )
+
+  assert.equal(arrowhead.kind, 'mid')
+  assertAlmostEqual(arrowhead.tip.x, 2.5)
+  assertAlmostEqual(arrowhead.tip.y, 0)
+})
+
+test('SVG arrow preview reverses direction when the path is reversed', () => {
+  const arrowhead = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        endpoint: 'forward',
+        start: { x: 10, y: 0, z: 0 },
+        end: { x: 0, y: 0, z: 0 },
+      }),
+    ),
+  )
+
+  assertAlmostEqual(Math.abs(arrowhead.angleRadians), Math.PI)
+})
+
+test('SVG arrow preview scales arrowhead size with line width', () => {
+  const thin = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'stealth' },
+        style: { lineWidth: 0.5 },
+      }),
+    ),
+  )
+  const thick = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'stealth' },
+        style: { lineWidth: 4 },
+      }),
+    ),
+  )
+
+  assert.ok(thick.length > thin.length)
+  assert.ok(thick.strokeWidth > thin.strokeWidth)
+})
+
+test('SVG arrow preview applies path stroke color and opacity', () => {
+  const arrowhead = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: { enabled: true, head: 'latex' },
+        style: {
+          strokeColor: '#AA00BB',
+          strokeOpacity: 0.42,
+        },
+      }),
+    ),
+  )
+
+  assert.equal(arrowhead.color, '#AA00BB')
+  assert.equal(arrowhead.opacity, 0.42)
+})
+
+test('SVG arrow preview changes direction for backward mid-arrows', () => {
+  const arrowhead = onlyArrowhead(
+    arrowheadsForIdentityProjection(
+      createArrowPreviewCurve({
+        mid: {
+          enabled: true,
+          direction: 'backward',
+          head: 'standard',
+        },
+      }),
+    ),
+  )
+
+  assertAlmostEqual(Math.abs(arrowhead.angleRadians), Math.PI)
+})
+
+test('SVG arrow preview leaves TikZ arrow export unchanged', () => {
+  const tikz = generateTikz(
+    createArrowPreviewDiagram(
+      createArrowPreviewCurve({
+        endpoint: 'both',
+        mid: {
+          enabled: true,
+          head: 'stealthHarpoon',
+          position: 0.4,
+        },
+      }),
+    ),
+  )
+
+  assert.match(tikz, /<->/)
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon\]\}/)
+  assert.match(tikz, /\\usetikzlibrary\{arrows\.meta\}/)
+})
+
+test('inline TikZ output with previewed arrowheads has no blank lines', () => {
+  const tikz = generateTikz(
+    createArrowPreviewDiagram(
+      createArrowPreviewCurve({
+        endpoint: 'forward',
+        mid: {
+          enabled: true,
+          head: 'stealthHarpoonSwap',
+        },
+      }),
+    ),
+    { exportMode: 'inlineMath' },
+  )
+
+  assert.doesNotMatch(tikz, /\n\s*\n/)
+  assert.match(tikz, /\\arrow\{Stealth\[harpoon,swap\]\}/)
 })
 
 test('SVG path inline node preview position is finite', () => {
@@ -1069,6 +1281,14 @@ test('SVG arrow preview coordinates are finite for a projected 3D path', () => {
 
   assert.equal(arrowheads.length, 2)
   assert.equal(arrowheads.every(isFiniteSvgArrowhead), true)
+  assert.equal(
+    arrowheads.every(
+      (arrowhead) =>
+        Number.isFinite(arrowhead.angleRadians) &&
+        Number.isFinite(arrowhead.length),
+    ),
+    true,
+  )
 })
 
 test('2D filled-region boundaries produce non-empty closed SVG path data', () => {
@@ -2570,10 +2790,103 @@ function squareBoundaryFromPoints(
   }
 }
 
-function isFiniteSvgArrowhead(arrowhead: SvgArrowheadPreview): boolean {
-  return [arrowhead.tip, arrowhead.left, arrowhead.right].every(
-    (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+type ArrowPreviewMidOptions = {
+  enabled?: boolean
+  position?: number
+  direction?: MidArrowDirection
+  head?: ArrowHeadKind
+}
+
+type ArrowPreviewCurveOptions = {
+  id?: string
+  ambientDimension?: 2 | 3
+  start?: Vec3
+  end?: Vec3
+  endpoint?: EndpointArrowMode
+  mid?: ArrowPreviewMidOptions
+  style?: Partial<CurveStyle>
+}
+
+function createArrowPreviewCurve({
+  id = 'svg-arrow-preview-path',
+  ambientDimension = 2,
+  start = { x: 0, y: 0, z: 0 },
+  end = { x: 10, y: 0, z: 0 },
+  endpoint,
+  mid,
+  style: styleOverride,
+}: ArrowPreviewCurveOptions = {}): CurveStratum {
+  const arrows =
+    endpoint === undefined && mid === undefined
+      ? undefined
+      : {
+          endpoint: endpoint ?? 'none',
+          mid,
+        }
+
+  return createConcatenatedPathStratum({
+    ambientDimension,
+    id,
+    name: 'SVG arrow preview path',
+    style: curveStyle(styleOverride),
+    arrows,
+    segments: [
+      {
+        kind: 'line',
+        start,
+        end,
+      },
+    ],
+  })
+}
+
+function createArrowPreviewDiagram(curve: CurveStratum): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: curve.codim === 1 ? 2 : 3 }),
+    strata: [curve],
+  }
+}
+
+function arrowheadsForIdentityProjection(
+  curve: CurveStratum,
+): SvgArrowheadPreview[] {
+  return curveArrowheadsForSvgPreview(
+    curve,
+    curve.codim === 1 ? 2 : 3,
+    (point) => ({
+      x: point.x,
+      y: point.y,
+    }),
   )
+}
+
+function onlyArrowhead(
+  arrowheads: readonly SvgArrowheadPreview[],
+): SvgArrowheadPreview {
+  assert.equal(arrowheads.length, 1)
+
+  const arrowhead = arrowheads[0]
+
+  if (arrowhead === undefined) {
+    throw new Error('Expected one SVG arrowhead preview.')
+  }
+
+  return arrowhead
+}
+
+function isFiniteSvgArrowhead(arrowhead: SvgArrowheadPreview): boolean {
+  return (
+    [arrowhead.tip, arrowhead.left, arrowhead.right, ...arrowhead.points].every(
+      isFiniteVec2,
+    ) &&
+    Number.isFinite(arrowhead.angleRadians) &&
+    Number.isFinite(arrowhead.length) &&
+    Number.isFinite(arrowhead.strokeWidth)
+  )
+}
+
+function isFiniteVec2(point: Vec2): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y)
 }
 
 function assertVec3AlmostEqual(actual: Vec3, expected: Vec3): void {
