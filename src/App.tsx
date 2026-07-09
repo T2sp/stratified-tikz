@@ -233,6 +233,9 @@ import {
   normalizeJsonDownloadFilename,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
+  normalAngleConventionText,
+  normalPhiConventionText,
+  normalThetaConventionText,
   normalVectorFromThetaPhiInput,
   parseDirectCoordinateInput,
   parseDirectCoordinateInputWithCoordinateSource,
@@ -275,27 +278,31 @@ import {
   canApplyCustomOriginNormalThetaPhiWorkPlaneInput,
   canApplyPickedPointWorkPlane,
   cancelConcatenatedPathDraft,
+  cancelWorkPlaneOriginPicking,
   cancelWorkPlanePointPicking,
   concatenatedPathDraftBlocksWorkPlaneChange,
   concatenatedPathDraftCanFinish,
   concatenatedPathDraftNextPointCoordinateRefRejectionReason,
   concatenatedPathDraftNextPointLabel,
   inactiveWorkPlanePointPickingState,
+  inactiveWorkPlaneOriginPickingState,
   closeInspectorDrawerState,
   defaultInspectorDrawerState,
   isInspectorDrawerOpen,
   nextInspectorDisclosureStateForSelection,
   openInspectorDrawerState,
   pickWorkPlaneCoordinateAnchor,
+  pickWorkPlaneOriginCoordinateAnchor,
+  pickWorkPlaneOriginPointStratum,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
   resolveCoordinateAnchorReferenceForCursorCreation,
   resolvePointStratumCoordinateForCursorCreation,
   selectedElementCount,
-  shouldBlockCreationForWorkPlanePointPicking,
   shouldCollapseExampleBarForDiagramChange,
   styleClipboardSummary,
   startWorkPlanePointPicking,
+  startWorkPlaneOriginPicking,
   selectedElementDisclosureKey,
   setInspectorDisclosureExpanded,
   inlineMathTikzExportHelp,
@@ -842,6 +849,8 @@ function App() {
     )
   const [workPlanePointPickingState, setWorkPlanePointPickingState] =
     useState<WorkPlanePointPickingState>(inactiveWorkPlanePointPickingState)
+  const [workPlaneOriginPickingState, setWorkPlaneOriginPickingState] =
+    useState(inactiveWorkPlaneOriginPickingState)
   const [workPlaneStatus, setWorkPlaneStatus] = useState<string>('')
   const [pathSplitPickState, setPathSplitPickState] =
     useState<PathSplitPickState | null>(null)
@@ -910,6 +919,8 @@ function App() {
   const canRedo = history.future.length > 0
   const previewCursorCreationClicksEnabled =
     shouldHandlePreviewCanvasCreationClick(creationTool, coordinateInputMode)
+  const workPlanePickingActive =
+    workPlanePointPickingState.active || workPlaneOriginPickingState.active
   const directInputDrawerVisible = shouldShowDirectInputDrawer(
     creationTool,
     coordinateInputMode,
@@ -926,7 +937,7 @@ function App() {
       sheetCreationKind === 'ruledSurface' || sheetCreationKind === 'coonsPatch'
         ? sheetCreationKind
         : 'other',
-    workPlanePointPickingActive: workPlanePointPickingState.active,
+    workPlanePointPickingActive: workPlanePickingActive,
   })
   const boundaryPathHighlights = createBoundaryPathHighlightsForSheetDraft(
     creationTool,
@@ -1438,6 +1449,7 @@ function App() {
       }),
     )
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
     setPathSplitPickState(null)
     setWorkPlaneStatus('')
@@ -1653,6 +1665,7 @@ function App() {
     resetDirectPathInput()
     resetDirectCoordinateSources()
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneStatus('')
     setCopyStatus('idle')
   }
@@ -1671,6 +1684,7 @@ function App() {
     coordinateAnchorDragSessionRef.current = null
     setEditorState((current) => undoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
@@ -1703,6 +1717,7 @@ function App() {
     coordinateAnchorDragSessionRef.current = null
     setEditorState((current) => redoLastDiagramChange(current))
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
     setCopyStatus('idle')
     setSaveLoadStatus('idle')
@@ -1876,6 +1891,7 @@ function App() {
     resetDirectCoordinateSources()
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
     setWorkPlaneStatus('')
     const loadedCamera = cameraControlStateFromDiagramView(diagram)
@@ -2427,8 +2443,8 @@ function App() {
   }
 
   function createFillFromPickedPaths(): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setFillStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setFillStatus('Finish or cancel work-plane picking first.')
       return
     }
 
@@ -2511,8 +2527,8 @@ function App() {
     creationLayer: number,
     setStatus: (message: string) => void,
   ): boolean {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setStatus('Finish or cancel work-plane picking first.')
       return false
     }
 
@@ -2659,8 +2675,8 @@ function App() {
     creationLayer: number,
     setStatus: (message: string) => void,
   ): boolean {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setStatus('Finish or cancel work-plane picking first.')
       return false
     }
 
@@ -2735,6 +2751,7 @@ function App() {
   useEffect(() => {
     if (editableDiagram.ambientDimension === 2) {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
       setIsWorkPlaneOverlayExpanded(false)
       setWorkPlaneSetupMethod(defaultWorkPlaneSetupMethod)
       setWorkPlaneLocalInputMode('cartesian')
@@ -3319,7 +3336,7 @@ function App() {
     previewCamera: Camera,
     target: SvgCanvasClickTarget,
   ): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+    if (workPlanePickingActive) {
       return
     }
 
@@ -3461,7 +3478,7 @@ function App() {
   }
 
   function handleExistingPointSourceCreationClick(pointId: string): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
+    if (workPlanePickingActive) {
       return
     }
 
@@ -3943,7 +3960,7 @@ function App() {
   }
 
   function handleCoordinateAnchorDragStart(coordinateId: string): void {
-    if (creationTool !== 'select' || workPlanePointPickingState.active) {
+    if (creationTool !== 'select' || workPlanePickingActive) {
       coordinateAnchorDragSessionRef.current = null
       return
     }
@@ -3964,7 +3981,7 @@ function App() {
     viewportHeight: number,
     previewCamera: Camera,
   ): void {
-    if (creationTool !== 'select' || workPlanePointPickingState.active) {
+    if (creationTool !== 'select' || workPlanePickingActive) {
       return
     }
 
@@ -4428,8 +4445,8 @@ function App() {
   }
 
   function createDirectElement(): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setDirectCreationStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setDirectCreationStatus('Finish or cancel work-plane picking first.')
       return
     }
 
@@ -5821,8 +5838,8 @@ function App() {
   }
 
   function finishPolylineDraft(): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setPolylineStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setPolylineStatus('Finish or cancel work-plane picking first.')
       return
     }
 
@@ -5933,8 +5950,8 @@ function App() {
   }
 
   function finishPathDraft(): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setPathStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setPathStatus('Finish or cancel work-plane picking first.')
       return
     }
 
@@ -5993,8 +6010,8 @@ function App() {
   }
 
   function finishSheetDraft(): void {
-    if (shouldBlockCreationForWorkPlanePointPicking(workPlanePointPickingState)) {
-      setSheetStatus('Finish or cancel point picking first.')
+    if (workPlanePickingActive) {
+      setSheetStatus('Finish or cancel work-plane picking first.')
       return
     }
 
@@ -6143,6 +6160,9 @@ function App() {
     if (method !== 'pickThreeExistingPoints') {
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
     }
+    if (method !== 'originNormalVector') {
+      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
+    }
   }
 
   function updateCustomOriginNormalOriginInput(
@@ -6200,6 +6220,7 @@ function App() {
 
     if (result.ok) {
       setActiveWorkPlane(result.workPlane)
+      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     }
   }
 
@@ -6218,6 +6239,7 @@ function App() {
 
     if (result.ok) {
       setActiveWorkPlane(result.workPlane)
+      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     }
   }
 
@@ -6229,6 +6251,7 @@ function App() {
     const result = startWorkPlanePointPicking(editableDiagram.ambientDimension)
 
     setWorkPlaneSetupMethod('pickThreeExistingPoints')
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlanePointPickingState(result.state)
     setWorkPlaneStatus(result.status)
   }
@@ -6242,13 +6265,61 @@ function App() {
     })
   }
 
-  function handleWorkPlanePointPickingCanvasClick(
+  function startOriginWorkPlanePicking(): void {
+    if (blockWorkPlaneChangeForDraft()) {
+      return
+    }
+
+    const result = startWorkPlaneOriginPicking(editableDiagram.ambientDimension)
+
+    setWorkPlaneSetupMethod('originNormalVector')
+    setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(result.state)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function cancelOriginWorkPlanePicking(): void {
+    const result = cancelWorkPlaneOriginPicking(customOriginNormalWorkPlaneInput)
+
+    setWorkPlaneOriginPickingState(result.state)
+    setCustomOriginNormalWorkPlaneInput(result.input)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function pickOriginPointForWorkPlane(pointId: string): void {
+    const result = pickWorkPlaneOriginPointStratum(
+      editableDiagram,
+      workPlaneOriginPickingState,
+      customOriginNormalWorkPlaneInput,
+      pointId,
+    )
+
+    setWorkPlaneOriginPickingState(result.state)
+    setCustomOriginNormalWorkPlaneInput(result.input)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function pickOriginCoordinateForWorkPlane(coordinateId: string): void {
+    const result = pickWorkPlaneOriginCoordinateAnchor(
+      editableDiagram,
+      workPlaneOriginPickingState,
+      customOriginNormalWorkPlaneInput,
+      coordinateId,
+      { showCoordinateAnchors },
+    )
+
+    setWorkPlaneOriginPickingState(result.state)
+    setCustomOriginNormalWorkPlaneInput(result.input)
+    setWorkPlaneStatus(result.status)
+  }
+
+  function handleWorkPlanePickingCanvasClick(
     _svgPoint: Vec2,
     _viewportHeight: number,
     _previewCamera: Camera,
     target: SvgCanvasClickTarget,
   ): void {
-    if (!workPlanePointPickingState.active) {
+    if (!workPlanePickingActive) {
       return
     }
 
@@ -6257,11 +6328,17 @@ function App() {
       return
     }
 
+    if (workPlaneOriginPickingState.active) {
+      pickOriginCoordinateForWorkPlane(target.coordinateId)
+      return
+    }
+
     setWorkPlanePointPickingState((current) => {
       const result = pickWorkPlaneCoordinateAnchor(
         editableDiagram,
         current,
         target.coordinateId,
+        { showCoordinateAnchors },
       )
 
       setWorkPlaneStatus(result.status)
@@ -6300,6 +6377,7 @@ function App() {
     if (result.ok) {
       setActiveWorkPlane(result.workPlane)
       setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+      setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     }
   }
 
@@ -6310,6 +6388,7 @@ function App() {
 
     setActiveWorkPlane({ kind: 'xy', z: 0 })
     setWorkPlanePointPickingState(inactiveWorkPlanePointPickingState)
+    setWorkPlaneOriginPickingState(inactiveWorkPlaneOriginPickingState)
     setWorkPlaneStatus('Work plane reset.')
   }
 
@@ -6709,6 +6788,12 @@ function App() {
             Origin + normal vector
           </span>
         </div>
+        <p
+          id="preview-work-plane-normal-angle-convention"
+          className="preview-work-plane-angle-convention"
+        >
+          {normalAngleConventionText}
+        </p>
         <div className="work-plane-vector-stack">
           <div
             className="work-plane-vector-row"
@@ -6733,6 +6818,30 @@ function App() {
               </label>
             ))}
           </div>
+          <div className="preview-work-plane-origin-pick-row">
+            <span className="preview-work-plane-status">
+              {workPlaneOriginPickingState.active
+                ? 'Click a point or shown coordinate marker for the origin.'
+                : 'Use direct xyz or pick an existing point/coordinate.'}
+            </span>
+            <div className="preview-work-plane-actions">
+              <button
+                type="button"
+                className="preview-overlay-button"
+                onClick={startOriginWorkPlanePicking}
+              >
+                Pick origin
+              </button>
+              <button
+                type="button"
+                className="preview-overlay-button"
+                disabled={!workPlaneOriginPickingState.active}
+                onClick={cancelOriginWorkPlanePicking}
+              >
+                Cancel pick
+              </button>
+            </div>
+          </div>
         </div>
         <div className="preview-work-plane-normal-editor">
           <div
@@ -6746,6 +6855,8 @@ function App() {
               0,
               180,
               0,
+              'preview-work-plane-normal-theta-help',
+              normalThetaConventionText,
             )}
             {renderNormalAngleField(
               'normalPhiDeg',
@@ -6753,6 +6864,8 @@ function App() {
               -180,
               180,
               0,
+              'preview-work-plane-normal-phi-help',
+              normalPhiConventionText,
             )}
             <span className="preview-work-plane-normal-readout">
               {normal === null
@@ -6785,12 +6898,17 @@ function App() {
     min: number,
     max: number,
     fallback: number,
+    descriptionId: string,
+    description: string,
   ) {
     const value = customOriginNormalWorkPlaneInput[field]
+    const describedBy = `preview-work-plane-normal-angle-convention ${descriptionId}`
 
     return (
       <label className="preview-work-plane-angle-field">
-        <span>{label}</span>
+        <span className="preview-work-plane-angle-label" title={description}>
+          {label}
+        </span>
         <input
           type="range"
           min={min}
@@ -6798,6 +6916,8 @@ function App() {
           step="1"
           value={rangeValueFromDraft(value, min, max, fallback)}
           aria-label={`${label} slider`}
+          aria-describedby={describedBy}
+          title={description}
           onChange={(event) =>
             updateCustomOriginNormalAngleInput(
               field,
@@ -6810,6 +6930,8 @@ function App() {
           inputMode="decimal"
           value={value}
           aria-label={`${label} degrees`}
+          aria-describedby={describedBy}
+          title={description}
           onChange={(event) =>
             updateCustomOriginNormalAngleInput(
               field,
@@ -6817,6 +6939,9 @@ function App() {
             )
           }
         />
+        <span id={descriptionId} className="preview-work-plane-angle-help">
+          {description}
+        </span>
       </label>
     )
   }
@@ -9067,7 +9192,7 @@ function App() {
                 visibilityOptions={visibilityOptions}
                 showCoordinateAnchors={showCoordinateAnchors}
                 showGeometryHandles={
-                  creationTool === 'select' && !workPlanePointPickingState.active
+                  creationTool === 'select' && !workPlanePickingActive
                 }
                 onSelectionChange={
                   boundaryPathClickWorkflow === 'select'
@@ -9081,8 +9206,8 @@ function App() {
                     : undefined
                 }
                 onCanvasClick={
-                  workPlanePointPickingState.active
-                    ? handleWorkPlanePointPickingCanvasClick
+                  workPlanePickingActive
+                    ? handleWorkPlanePickingCanvasClick
                     : pathSplitPickState !== null ||
                         previewCursorCreationClicksEnabled
                       ? handlePreviewCanvasClick
@@ -9091,6 +9216,8 @@ function App() {
                 onPointStratumClick={
                   workPlanePointPickingState.active
                     ? pickExistingPointForWorkPlane
+                    : workPlaneOriginPickingState.active
+                      ? pickOriginPointForWorkPlane
                     : !previewCursorCreationClicksEnabled
                       ? undefined
                       : handleExistingPointSourceCreationClick
@@ -9098,7 +9225,7 @@ function App() {
                 onPathIntersectionCandidateClick={
                   editableDiagram.ambientDimension === 2 &&
                   creationTool === 'select' &&
-                  !workPlanePointPickingState.active
+                  !workPlanePickingActive
                     ? handlePathIntersectionCandidateClick
                     : undefined
                 }
@@ -9106,37 +9233,37 @@ function App() {
                   handlePathIntersectionDetectionStatusChange
                 }
                 onGeometryHandleDrag={
-                  creationTool === 'select' && !workPlanePointPickingState.active
+                  creationTool === 'select' && !workPlanePickingActive
                     ? handleGeometryHandleDrag
                     : undefined
                 }
                 onGeometryHandleDragStart={
-                  creationTool === 'select' && !workPlanePointPickingState.active
+                  creationTool === 'select' && !workPlanePickingActive
                     ? handleGeometryHandleDragStart
                     : undefined
                 }
                 onGeometryHandleDragEnd={
-                  creationTool === 'select' && !workPlanePointPickingState.active
+                  creationTool === 'select' && !workPlanePickingActive
                     ? handleGeometryHandleDragEnd
                     : undefined
                 }
                 onCoordinateAnchorDrag={
                   creationTool === 'select' &&
-                  !workPlanePointPickingState.active &&
+                  !workPlanePickingActive &&
                   showCoordinateAnchors
                     ? handleCoordinateAnchorDrag
                     : undefined
                 }
                 onCoordinateAnchorDragStart={
                   creationTool === 'select' &&
-                  !workPlanePointPickingState.active &&
+                  !workPlanePickingActive &&
                   showCoordinateAnchors
                     ? handleCoordinateAnchorDragStart
                     : undefined
                 }
                 onCoordinateAnchorDragEnd={
                   creationTool === 'select' &&
-                  !workPlanePointPickingState.active &&
+                  !workPlanePickingActive &&
                   showCoordinateAnchors
                     ? handleCoordinateAnchorDragEnd
                     : undefined
@@ -9144,7 +9271,7 @@ function App() {
                 onCameraDrag={
                   showCameraControls &&
                   creationTool === 'select' &&
-                  !workPlanePointPickingState.active
+                  !workPlanePickingActive
                     ? handleCameraDrag
                     : undefined
                 }

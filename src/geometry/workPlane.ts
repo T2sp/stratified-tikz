@@ -116,7 +116,7 @@ export function constructWorkPlaneFromOriginNormal(
   assertFiniteVec3(normal, 'normal')
 
   const normalizedNormal = normalizeVector(normal, epsilon)
-  const auxiliaryAxis = chooseAuxiliaryAxis(normalizedNormal)
+  const auxiliaryAxis = chooseAuxiliaryAxis(normalizedNormal, epsilon)
   const u = normalizeVector(
     subtractVec3(
       auxiliaryAxis,
@@ -124,7 +124,9 @@ export function constructWorkPlaneFromOriginNormal(
     ),
     epsilon,
   )
-  // The basis is right-handed: cross(u, v) points in the normal direction.
+  // Deterministic MVP basis rule: project world +x onto the plane unless it is
+  // nearly parallel to the normal, then fall back to world +y. The basis is
+  // right-handed: cross(u, v) points in the normal direction.
   const v = normalizeVector(cross(normalizedNormal, u), epsilon)
 
   return createCustomWorkPlane(
@@ -359,18 +361,15 @@ function createCustomWorkPlane(
   }
 }
 
-function chooseAuxiliaryAxis(normal: Vec3): Vec3 {
-  const candidates: Vec3[] = [
-    { x: 1, y: 0, z: 0 },
-    { x: 0, y: 1, z: 0 },
-    { x: 0, y: 0, z: 1 },
-  ]
-
-  return candidates.reduce((best, candidate) =>
-    Math.abs(dot(candidate, normal)) < Math.abs(dot(best, normal))
-      ? candidate
-      : best,
+function chooseAuxiliaryAxis(normal: Vec3, epsilon: number): Vec3 {
+  const worldX: Vec3 = { x: 1, y: 0, z: 0 }
+  const worldY: Vec3 = { x: 0, y: 1, z: 0 }
+  const worldXProjection = subtractVec3(
+    worldX,
+    scaleVec3(normal, dot(worldX, normal)),
   )
+
+  return norm(worldXProjection) > epsilon ? worldX : worldY
 }
 
 function axisAlignedBasis(

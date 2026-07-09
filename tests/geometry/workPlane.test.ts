@@ -111,6 +111,33 @@ test('constructed custom work planes have an approximate orthonormal basis', () 
   assertVec3AlmostEqual(cross(plane.u, plane.v), plane.normal)
 })
 
+test('origin-normal basis projects world x and falls back to world y only near parallel normals', () => {
+  const zNormalPlane = constructWorkPlaneFromOriginNormal(
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 1 },
+  )
+  const xNormalPlane = constructWorkPlaneFromOriginNormal(
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+  )
+  const obliquePlane = constructWorkPlaneFromOriginNormal(
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 1, z: 0 },
+  )
+  const invSqrt2 = 1 / Math.sqrt(2)
+
+  assertVec3AlmostEqual(zNormalPlane.u, { x: 1, y: 0, z: 0 })
+  assertVec3AlmostEqual(zNormalPlane.v, { x: 0, y: 1, z: 0 })
+  assertVec3AlmostEqual(xNormalPlane.u, { x: 0, y: 1, z: 0 })
+  assertVec3AlmostEqual(xNormalPlane.v, { x: 0, y: 0, z: 1 })
+  assertVec3AlmostEqual(obliquePlane.u, {
+    x: invSqrt2,
+    y: -invSqrt2,
+    z: 0,
+  })
+  assertVec3AlmostEqual(cross(obliquePlane.u, obliquePlane.v), obliquePlane.normal)
+})
+
 test('normalizeVector rejects invalid epsilon values', () => {
   assertNormalizeRejectsInvalidEpsilon(Number.NaN)
   assertNormalizeRejectsInvalidEpsilon(Number.POSITIVE_INFINITY)

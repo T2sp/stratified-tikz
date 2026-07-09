@@ -8,12 +8,19 @@ import {
   applyCustomThreePointWorkPlaneInput,
   canApplyCustomOriginNormalThetaPhiWorkPlaneInput,
   canApplyPickedPointWorkPlane,
+  cancelWorkPlaneOriginPicking,
   cancelWorkPlanePointPicking,
   defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+  inactiveWorkPlaneOriginPickingState,
   inactiveWorkPlanePointPickingState,
   normalizeActiveWorkPlaneForDiagram,
   normalizeActiveWorkPlaneForAmbientDimension,
   normalVectorFromThetaPhiDegrees,
+  normalAngleConventionText,
+  normalPhiConventionText,
+  normalThetaConventionText,
+  pickWorkPlaneOriginCoordinateAnchor,
+  pickWorkPlaneOriginPointStratum,
   pickWorkPlaneCoordinateAnchor,
   pickWorkPlanePointStratum,
   resetWorkPlanePointPicking,
@@ -22,6 +29,7 @@ import {
   shouldShowWorkPlaneControls,
   shouldShowWorkPlaneOverlay,
   shouldShowWorkPlaneOverlayPanel,
+  startWorkPlaneOriginPicking,
   startWorkPlanePointPicking,
   toggleWorkPlaneOverlayPanel,
   validateWorkPlanePointPickingState,
@@ -56,11 +64,43 @@ test('work-plane editor is routed to the preview overlay instead of stale toolba
 
   assert.match(source, /Edit in preview/)
   assert.match(source, /Origin \+ normal vector/)
+  assert.match(source, /Pick origin/)
   assert.match(source, /Normal θ/)
   assert.match(source, /Normal φ/)
   assert.match(source, /Custom 3 points/)
   assert.doesNotMatch(source, /Custom by origin \+ normal/)
   assert.doesNotMatch(source, /customWorkPlaneInput\[vector\]\[axis\]/)
+})
+
+test('preview origin-normal work-plane panel explains the theta and phi convention', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /normalAngleConventionText/)
+  assert.match(source, /normalThetaConventionText/)
+  assert.match(source, /normalPhiConventionText/)
+  assert.match(source, /preview-work-plane-angle-convention/)
+  assert.match(normalAngleConventionText, /θ is measured from \+z/)
+  assert.match(
+    normalAngleConventionText,
+    /φ is measured in the xy-plane from \+x toward \+y/,
+  )
+  assert.match(normalAngleConventionText, /Angles are in degrees/)
+})
+
+test('normal theta and phi controls expose accessible angle descriptions', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+  const describedByCount = source.match(/aria-describedby={describedBy}/g)?.length ?? 0
+
+  assert.match(source, /preview-work-plane-normal-angle-convention/)
+  assert.match(source, /preview-work-plane-normal-theta-help/)
+  assert.match(source, /preview-work-plane-normal-phi-help/)
+  assert.match(source, /className="preview-work-plane-angle-help"/)
+  assert.equal(describedByCount, 2)
+  assert.match(normalThetaConventionText, /\+z/)
+  assert.match(normalThetaConventionText, /degrees/)
+  assert.match(normalPhiConventionText, /\+x/)
+  assert.match(normalPhiConventionText, /\+y/)
+  assert.match(normalPhiConventionText, /degrees/)
 })
 
 test('valid origin and normal input applies a custom work plane in 3D', () => {
@@ -96,6 +136,25 @@ test('theta and phi normal input follows polar-from-z spherical coordinates', ()
   )
   assertVec3Approx(
     nonNullVec3(normalVectorFromThetaPhiDegrees(90, 90)),
+    { x: 0, y: 1, z: 0 },
+  )
+})
+
+test('theta and phi normal input handles poles, negative azimuths, and wraps', () => {
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(180, 91)),
+    { x: 0, y: 0, z: -1 },
+  )
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(90, 180)),
+    { x: -1, y: 0, z: 0 },
+  )
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(90, -90)),
+    { x: 0, y: -1, z: 0 },
+  )
+  assertVec3Approx(
+    nonNullVec3(normalVectorFromThetaPhiDegrees(90, 450)),
     { x: 0, y: 1, z: 0 },
   )
 })
@@ -136,6 +195,75 @@ test('theta and phi origin-normal input rejects invalid drafts without mutating 
   assert.equal(result.ok, false)
   assert.equal(result.status, 'Origin and normal angles must be finite numbers.')
   assert.strictEqual(result.workPlane, previous)
+})
+
+test('origin-normal method picks origin from a point stratum', () => {
+  const diagram = createPointPickingDiagram()
+  const started = startWorkPlaneOriginPicking(3)
+  const picked = pickWorkPlaneOriginPointStratum(
+    diagram,
+    started.state,
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    'p1',
+  )
+  const applied = applyCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    picked.input,
+  )
+
+  assert.equal(started.state.active, true)
+  assert.equal(picked.state.active, false)
+  assert.deepEqual(picked.input.origin, { x: '1', y: '0', z: '0' })
+  assert.match(picked.status, /Origin picked from point/)
+  assert.equal(applied.ok, true)
+  assert.equal(applied.workPlane.kind, 'custom')
+
+  if (applied.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assert.deepEqual(applied.workPlane.origin, { x: 1, y: 0, z: 0 })
+})
+
+test('origin-normal method picks origin from a coordinate anchor', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a', 'A', 2.5, -3, 4)]
+  const picked = pickWorkPlaneOriginCoordinateAnchor(
+    diagram,
+    startWorkPlaneOriginPicking(3).state,
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    'coord-a',
+  )
+  const applied = applyCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    picked.input,
+  )
+
+  assert.equal(picked.state, inactiveWorkPlaneOriginPickingState)
+  assert.deepEqual(picked.input.origin, { x: '2.5', y: '-3', z: '4' })
+  assert.match(picked.status, /Origin picked from coordinate A/)
+  assert.equal(applied.ok, true)
+  assert.equal(applied.workPlane.kind, 'custom')
+
+  if (applied.workPlane.kind !== 'custom') {
+    throw new Error('Expected a custom work plane.')
+  }
+
+  assert.deepEqual(applied.workPlane.origin, { x: 2.5, y: -3, z: 4 })
+})
+
+test('origin picking can be canceled without changing the origin draft', () => {
+  const input = {
+    ...defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    origin: { x: '7', y: '8', z: '9' },
+  }
+  const result = cancelWorkPlaneOriginPicking(input)
+
+  assert.equal(result.state, inactiveWorkPlaneOriginPickingState)
+  assert.strictEqual(result.input, input)
+  assert.equal(result.status, 'Origin picking canceled.')
 })
 
 test('normal-vector preview geometry renders and changes with theta and phi', () => {
@@ -387,6 +515,25 @@ test('loading a diagram can reset active custom work-plane UI state', () => {
   )
 })
 
+test('loading a diagram does not reset snapshot origin-normal active work planes', () => {
+  const result = applyCustomOriginNormalThetaPhiWorkPlaneInput(
+    { kind: 'xy', z: 0 },
+    3,
+    {
+      origin: { x: '1', y: '2', z: '3' },
+      normalThetaDeg: '45',
+      normalPhiDeg: '30',
+    },
+  )
+  const loadedDiagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  assert.equal(result.ok, true)
+  assert.strictEqual(
+    normalizeActiveWorkPlaneForDiagram(loadedDiagram, result.workPlane),
+    result.workPlane,
+  )
+})
+
 test('active custom planes from existing points are valid only while source points exist', () => {
   const diagram = createPointPickingDiagram()
   const activeWorkPlane = applyPickedPointWorkPlane(
@@ -626,6 +773,33 @@ test('duplicate coordinate anchor picks are rejected', () => {
 
   assert.equal(duplicate.status, 'Coordinate anchor already picked.')
   assert.equal(workPlanePointPickingCount(duplicate.state), 1)
+})
+
+test('hidden coordinate anchors are not pickable for work-plane setup', () => {
+  const diagram = createPointPickingDiagram()
+  diagram.coordinateAnchors = [coordinateAnchor('coord-a', 'A', 0, 0, 0)]
+  const pointPick = pickWorkPlaneCoordinateAnchor(
+    diagram,
+    startWorkPlanePointPicking(3).state,
+    'coord-a',
+    { showCoordinateAnchors: false },
+  )
+  const originPick = pickWorkPlaneOriginCoordinateAnchor(
+    diagram,
+    startWorkPlaneOriginPicking(3).state,
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+    'coord-a',
+    { showCoordinateAnchors: false },
+  )
+
+  assert.equal(pointPick.status, 'Coordinate anchors are hidden.')
+  assert.equal(workPlanePointPickingCount(pointPick.state), 0)
+  assert.equal(originPick.status, 'Coordinate anchors are hidden.')
+  assert.equal(originPick.state.active, true)
+  assert.strictEqual(
+    originPick.input,
+    defaultCustomOriginNormalThetaPhiWorkPlaneInput,
+  )
 })
 
 test('collinear picked point positions are rejected without changing active plane', () => {

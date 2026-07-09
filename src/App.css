@@ -2329,6 +2329,14 @@
   overflow-wrap: anywhere;
 }
 
+.preview-work-plane-angle-convention {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .preview-work-plane-panel .work-plane-vector-row {
   grid-template-columns: minmax(46px, 58px) repeat(3, minmax(54px, 1fr));
   gap: 6px;
@@ -2342,6 +2350,14 @@
   min-height: 28px;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+.preview-work-plane-origin-pick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .preview-work-plane-picked-list {
@@ -2385,6 +2401,11 @@
   font-weight: 650;
 }
 
+.preview-work-plane-angle-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .preview-work-plane-angle-field input[type='range'] {
   width: 100%;
   min-width: 0;
@@ -2401,6 +2422,17 @@
   background: #ffffff;
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.preview-work-plane-angle-help {
+  grid-column: 1 / -1;
+  margin-top: -3px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .preview-work-plane-normal-readout {
