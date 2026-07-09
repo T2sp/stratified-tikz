@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type SetStateAction,
 } from 'react'
@@ -776,6 +777,8 @@ function App() {
   ] = useState<string>('')
   const loadFileInputRef = useRef<HTMLInputElement | null>(null)
   const styleImportFileInputRef = useRef<HTMLInputElement | null>(null)
+  const symbolicImportDialogRef = useRef<HTMLElement | null>(null)
+  const symbolicImportFirstInputRef = useRef<HTMLInputElement | null>(null)
   const previewStageRef = useRef<HTMLDivElement | null>(null)
   const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
   const coordinateAnchorDragSessionRef =
@@ -2619,6 +2622,46 @@ function App() {
       window.removeEventListener('keydown', handleToolbarPaletteEscape)
     }
   }, [openToolbarPalette])
+
+  useEffect(() => {
+    if (pendingSymbolicImport === null) {
+      return
+    }
+
+    function handleSymbolicImportEscape(event: KeyboardEvent): void {
+      if (event.defaultPrevented || event.key !== 'Escape') {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      setPendingSymbolicImport(null)
+      setSymbolicImportDrafts([])
+      setSymbolicImportStatus('')
+      setSaveLoadStatus('idle')
+      setSaveLoadMessage('JSON load canceled.')
+    }
+
+    window.addEventListener('keydown', handleSymbolicImportEscape, true)
+
+    return () => {
+      window.removeEventListener('keydown', handleSymbolicImportEscape, true)
+    }
+  }, [pendingSymbolicImport])
+
+  useEffect(() => {
+    if (pendingSymbolicImport === null) {
+      return
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      symbolicImportFirstInputRef.current?.focus()
+    })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId)
+    }
+  }, [pendingSymbolicImport])
 
   useEffect(() => {
     function handleSelectionEscape(event: KeyboardEvent): void {
@@ -7808,6 +7851,39 @@ function App() {
     )
   }
 
+  function handleSymbolicImportDialogKeyDown(
+    event: ReactKeyboardEvent<HTMLElement>,
+  ): void {
+    if (event.key !== 'Tab') {
+      return
+    }
+
+    const dialog = symbolicImportDialogRef.current
+
+    if (dialog === null) {
+      return
+    }
+
+    const focusableElements = modalFocusableElements(dialog)
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    if (firstElement === undefined || lastElement === undefined) {
+      return
+    }
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault()
+      lastElement.focus()
+      return
+    }
+
+    if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault()
+      firstElement.focus()
+    }
+  }
+
   const symbolicImportCanConfirm =
     pendingSymbolicImport !== null &&
     symbolicImportDrafts.every((draft) => draft.expression.trim().length > 0)
@@ -8235,12 +8311,14 @@ function App() {
       </div>
 
       {pendingSymbolicImport !== null && (
-        <div className="symbolic-import-backdrop">
+        <div className="modal-backdrop symbolic-import-backdrop">
           <section
-            className="symbolic-import-dialog"
+            ref={symbolicImportDialogRef}
+            className="modal-dialog symbolic-import-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="symbolic-import-heading"
+            onKeyDown={handleSymbolicImportDialogKeyDown}
           >
             <div className="symbolic-import-heading-row">
               <div>
@@ -8252,7 +8330,7 @@ function App() {
               </div>
             </div>
             <div className="symbolic-import-variable-list">
-              {pendingSymbolicImport.variables.map((variable) => {
+              {pendingSymbolicImport.variables.map((variable, index) => {
                 const draft =
                   symbolicImportDrafts.find(
                     (candidate) => candidate.name === variable.name,
@@ -8268,7 +8346,11 @@ function App() {
                   >
                     <span>{variable.name}</span>
                     <input
+                      ref={
+                        index === 0 ? symbolicImportFirstInputRef : undefined
+                      }
                       type="text"
+                      autoFocus={index === 0}
                       value={draft.expression}
                       spellCheck={false}
                       placeholder={variable.defined ? undefined : 'required'}
@@ -8731,6 +8813,20 @@ function App() {
       </section>
     </main>
   )
+}
+
+function modalFocusableElements(dialog: HTMLElement): HTMLElement[] {
+  return Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      [
+        'button:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(', '),
+    ),
+  ).filter((element) => element.tabIndex >= 0)
 }
 
 function renderPreviewMenuIcon(icon: string) {

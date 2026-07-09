@@ -1,6 +1,25 @@
 .app-shell {
   --compact-header-height: 96px;
   --preview-stage-min-height: 640px;
+  --preview-toolbar-bg: rgba(248, 246, 238, 0.42);
+  --preview-toolbar-button-bg: rgba(255, 255, 255, 0.36);
+  --preview-toolbar-button-bg-hover: rgba(255, 255, 255, 0.62);
+  --preview-toolbar-button-bg-active: rgba(255, 255, 255, 0.82);
+  --preview-toolbar-button-bg-disabled: rgba(255, 255, 255, 0.24);
+  --preview-toolbar-button-text: rgb(20, 24, 32);
+  --preview-toolbar-button-text-disabled: rgb(98, 105, 116);
+  --z-preview-canvas: 0;
+  --z-preview-selection: 5;
+  --z-preview-toolbar: 20;
+  --z-preview-context-bar: 21;
+  --z-preview-edge-actions: 25;
+  --z-workplane-panel: 30;
+  --z-layer-window: 35;
+  --z-direct-input-drawer: 38;
+  --z-inspector-drawer: 40;
+  --z-popover: 60;
+  --z-modal-backdrop: 90;
+  --z-modal: 100;
   display: grid;
   grid-template-rows: auto auto;
   gap: 12px;
@@ -12,7 +31,7 @@
 
 .top-control-area {
   position: relative;
-  z-index: 80;
+  z-index: var(--z-popover);
   display: grid;
   gap: 10px;
   width: min(100%, 1680px);
@@ -1045,7 +1064,6 @@
 .toolbar-button:disabled {
   color: var(--muted);
   cursor: not-allowed;
-  opacity: 0.65;
 }
 
 .segmented-control button:disabled:hover,
@@ -1088,7 +1106,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 120;
+  z-index: var(--z-popover);
   display: grid;
   gap: 4px;
   min-width: 220px;
@@ -1206,16 +1224,10 @@
   min-height: var(--preview-stage-min-height);
   overflow: visible;
   /*
-   * Preview-local overlay order: SVG canvas; toolbar/history; layer controls;
-   * direct input; inspector. Coordinate highlights and geometry handles live
-   * inside the SVG canvas and remain below the HTML overlays.
+   * Preview overlay order uses the app-shell z-index token hierarchy.
+   * Coordinate highlights and geometry handles live inside the SVG canvas and
+   * remain below the HTML overlays.
    */
-  --z-preview-toolbar: 30;
-  --z-preview-toolbar-popover: 34;
-  --z-preview-layer: 38;
-  --z-preview-direct: 46;
-  --z-preview-inspector-button: 50;
-  --z-preview-inspector: 60;
   --preview-overlay-top-safe-area: 52px;
   --preview-layer-toggle-offset: 42px;
 }
@@ -1225,7 +1237,7 @@
   top: 62px;
   right: 12px;
   bottom: 12px;
-  z-index: var(--z-preview-direct);
+  z-index: var(--z-direct-input-drawer);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -1244,7 +1256,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: var(--z-preview-inspector-button);
+  z-index: var(--z-inspector-drawer);
   pointer-events: auto;
 }
 
@@ -1253,7 +1265,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: var(--z-preview-inspector);
+  z-index: var(--z-inspector-drawer);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -1489,9 +1501,9 @@
   padding: 5px;
   border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  background: var(--preview-toolbar-bg);
   box-shadow: rgba(30, 34, 44, 0.16) 0 8px 24px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
   pointer-events: auto;
 }
 
@@ -1534,7 +1546,7 @@
   padding: 4px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  background: rgba(248, 246, 238, 0.36);
   box-shadow: rgba(30, 34, 44, 0.12) 0 5px 18px;
   backdrop-filter: blur(7px);
   pointer-events: auto;
@@ -1549,8 +1561,8 @@
   border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
   border-radius: 5px;
   padding: 5px 8px;
-  color: var(--text-h);
-  background: color-mix(in srgb, #ffffff 78%, transparent);
+  color: var(--preview-toolbar-button-text);
+  background: var(--preview-toolbar-button-bg);
   font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
@@ -1562,17 +1574,16 @@
 .preview-toolbar-menu summary:hover,
 .preview-toolbar-menu-popover button:hover,
 .preview-mini-segmented button:hover {
-  background: color-mix(in srgb, var(--button-hover) 86%, transparent);
+  background: var(--preview-toolbar-button-bg-hover);
 }
 
 .preview-overlay-button:disabled,
 .preview-floating-toolbar button:disabled,
 .preview-toolbar-menu-popover button:disabled,
 .preview-mini-segmented button:disabled {
-  color: var(--muted);
-  background: color-mix(in srgb, #ffffff 52%, transparent);
+  color: var(--preview-toolbar-button-text-disabled);
+  background: var(--preview-toolbar-button-bg-disabled);
   cursor: not-allowed;
-  opacity: 0.68;
 }
 
 .preview-overlay-button:focus-visible,
@@ -1589,8 +1600,8 @@
 .preview-toolbar-menu-popover button.is-selected,
 .preview-mini-segmented button.is-selected {
   border-color: color-mix(in srgb, var(--focus) 42%, var(--border));
-  color: var(--text-h);
-  background: color-mix(in srgb, #ffffff 92%, transparent);
+  color: var(--preview-toolbar-button-text);
+  background: var(--preview-toolbar-button-bg-active);
   box-shadow: rgba(30, 34, 44, 0.12) 0 1px 5px;
 }
 
@@ -1630,7 +1641,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: var(--z-preview-toolbar-popover);
+  z-index: var(--z-popover);
   display: grid;
   gap: 4px;
   min-width: 190px;
@@ -1855,7 +1866,7 @@
   align-self: stretch;
   justify-self: stretch;
   bottom: 12px;
-  z-index: var(--z-preview-layer);
+  z-index: var(--z-preview-edge-actions);
   display: grid;
   align-items: end;
   justify-items: end;
@@ -1903,6 +1914,7 @@
   position: absolute;
   right: 0;
   bottom: var(--preview-layer-toggle-offset);
+  z-index: var(--z-layer-window);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2817,14 +2829,25 @@
   cursor: pointer;
 }
 
-.symbolic-import-backdrop {
+.modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--z-modal-backdrop);
+  pointer-events: auto;
+}
+
+.modal-dialog {
+  position: relative;
+  z-index: var(--z-modal);
+  pointer-events: auto;
+}
+
+.symbolic-import-backdrop {
   display: grid;
   place-items: center;
   padding: 24px;
   background: rgb(15 23 42 / 45%);
+  isolation: isolate;
 }
 
 .symbolic-import-dialog {
@@ -2920,6 +2943,7 @@
 
 .svg-diagram {
   grid-area: 1 / 1;
+  z-index: var(--z-preview-canvas);
   display: block;
   width: 100%;
   height: 100%;
