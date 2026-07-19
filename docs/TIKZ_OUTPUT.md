@@ -433,13 +433,19 @@ opacity, line width, line style, local user presets, and compatible imported
 TikZ style references. Layer placement is unchanged: the whole grid scope is
 emitted inside the grid stratum's `pgfonlayer` block.
 
-Triangular lattices use `uRange.step` as the local spacing. The exporter clips
-to the numeric intersection of the saved range rectangle and rectangular clip,
-then emits three line-family loops: local u-direction lines, +60 degree lines,
-and -60 degree lines. Honeycomb lattices use `uRange.step` as the flat-top
-hexagon edge length. Their SVG preview de-duplicates shared edges; compact TikZ
-export uses nested `\foreach` loops over hexagon centers and draws a clipped
-hexagon path for each cell, so shared edges can be overdrawn in the MVP.
+Triangular lattices use `s = uRange.step` as the local spacing and
+`(uRange.min, vRange.min)` as the phase-preserving local origin. The Preview and
+exporter share the canonical basis `(s, 0), (s/2, sqrt(3)s/2)`. The exporter
+clips to the numeric intersection of the saved range rectangle and rectangular
+clip, then emits three compact line-family loops: local u-direction lines, +60
+degree lines, and -60 degree lines through the same lattice vertices. Clip
+minima never become a new lattice origin. The persisted `vRange.step` remains
+validated but does not control triangular geometry.
+
+Honeycomb lattices use `uRange.step` as the flat-top hexagon edge length. Their
+SVG preview de-duplicates shared edges; compact TikZ export uses nested
+`\foreach` loops over hexagon centers and draws a clipped hexagon path for each
+cell, so shared edges can be overdrawn in the MVP.
 
 In 3D, a grid stores the work-plane frame snapshot from creation/edit time. The
 generator does not consult transient active work-plane UI state. When the saved

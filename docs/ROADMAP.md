@@ -1054,4 +1054,11 @@ Recommended `phaseSlugs` entries:
 
 ### Phase 28L: Correct triangular lattice geometry for arbitrary spacing
 
+- Define triangular vertices by the local basis `(s, 0)` and
+  `(s/2, sqrt(3)s/2)`, where `s = uRange.step`.
+- Keep Preview and compact 2D/3D TikZ line-family phases aligned at the saved
+  local range origin for arbitrary positive finite spacing.
+- Cover unit, sub-unit, non-integral, and larger spacing with geometry-level
+  regression tests.
+
 ### Phase 28M: Keep every multiline TikZ library instruction commented

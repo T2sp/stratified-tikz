@@ -57,6 +57,11 @@ import {
   createUserStylePresetFromStyle,
 } from '../../src/model/stylePresets.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import {
+  gridPreviewSegments,
+  triangularLatticeLinePhases,
+  triangularLatticeMetrics,
+} from '../../src/model/grids.ts'
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -5153,6 +5158,102 @@ test('2D triangular lattice exports compact foreach loops and clip', () => {
   assert.doesNotMatch(layerBlock, /NaN|Infinity/)
 })
 
+test('triangular TikZ loops use canonical scaled offsets for every spacing', () => {
+  const origin = { u: 1.2, v: -0.7 }
+
+  for (const spacing of [0.25, 0.5, 1, 1.3, 2]) {
+    const metrics = triangularLatticeMetrics(spacing)
+    const phases = triangularLatticeLinePhases(origin, spacing)
+    const overrides = triangularGridRegressionOverrides(origin, spacing)
+    const tikz = generateTikz(
+      createTwoDimensionalGridDiagram(overrides),
+      { exportMode: 'inlineMath' },
+    )
+    const horizontal = extractGridForeachValues(tikz, '\\stzGridV')
+    const positive = extractGridForeachValues(tikz, '\\stzGridU')
+    const negative = extractGridForeachValues(tikz, '\\stzGridW')
+
+    assertApproximatelyEqual(
+      horizontal[1] - horizontal[0],
+      metrics.rowSeparation,
+      2e-6,
+    )
+    assertApproximatelyEqual(positive[1] - positive[0], spacing, 2e-6)
+    assertApproximatelyEqual(negative[1] - negative[0], spacing, 2e-6)
+
+    for (const value of horizontal) {
+      assertApproximatelyInteger(
+        (value - phases.horizontal) / metrics.rowSeparation,
+      )
+    }
+    for (const value of positive) {
+      assertApproximatelyInteger((value - phases.positiveDiagonal) / spacing)
+    }
+    for (const value of negative) {
+      assertApproximatelyInteger((value - phases.negativeDiagonal) / spacing)
+    }
+  }
+})
+
+test('sampled triangular TikZ line families agree with SVG Preview geometry', () => {
+  const origin = { u: 1.2, v: -0.7 }
+
+  for (const spacing of [0.5, 1, 1.3]) {
+    const diagram = createTwoDimensionalGridDiagram(
+      triangularGridRegressionOverrides(origin, spacing),
+    )
+    const grid = diagram.strata[0]
+
+    assert.equal(grid?.kind, 'grid')
+    if (grid?.kind !== 'grid') {
+      throw new Error('Expected triangular grid fixture.')
+    }
+
+    const preview = gridPreviewSegments(grid, 2)
+    assert.equal(preview.ok, true)
+    if (!preview.ok) {
+      throw new Error(preview.errors.map(formatValidationIssue).join('; '))
+    }
+
+    const metrics = triangularLatticeMetrics(spacing)
+    const previewValues = triangularPreviewLineValues(
+      preview.segments,
+      metrics.slope,
+    )
+    const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+    assertNumberArraysApproximatelyEqual(
+      extractGridForeachValues(tikz, '\\stzGridV'),
+      previewValues.horizontal,
+    )
+    assertNumberArraysApproximatelyEqual(
+      extractGridForeachValues(tikz, '\\stzGridU'),
+      previewValues.positiveDiagonal,
+    )
+    assertNumberArraysApproximatelyEqual(
+      extractGridForeachValues(tikz, '\\stzGridW'),
+      previewValues.negativeDiagonal,
+    )
+  }
+})
+
+test('2D and 3D triangular compact exports share the same local lattice convention', () => {
+  const overrides = triangularGridRegressionOverrides(
+    { u: -0.8, v: 0.35 },
+    1.3,
+  )
+  const tikz2D = generateTikz(createTwoDimensionalGridDiagram(overrides))
+  const tikz3D = generateTikz(createThreeDimensionalGridDiagram(overrides))
+
+  assert.match(tikz3D, /canvas is plane/)
+  for (const variable of ['\\stzGridV', '\\stzGridU', '\\stzGridW']) {
+    assertNumberArraysApproximatelyEqual(
+      extractGridForeachValues(tikz3D, variable),
+      extractGridForeachValues(tikz2D, variable),
+    )
+  }
+})
+
 test('2D honeycomb lattice exports compact foreach loops and clip', () => {
   const tikz = generateTikz(
     createTwoDimensionalGridDiagram({
@@ -7041,6 +7142,132 @@ function numericGridScalar(value: number): GridParameterRange['min'] {
     kind: 'numeric',
     value,
   }
+}
+
+function triangularGridRegressionOverrides(
+  origin: { u: number; v: number },
+  spacing: number,
+): Partial<GridStratum> {
+  const { rowSeparation } = triangularLatticeMetrics(spacing)
+
+  return {
+    latticePattern: 'triangular',
+    uRange: numericGridRange(origin.u, origin.u + 4 * spacing, spacing),
+    // vRange.step remains persisted and validated legacy data for triangular grids.
+    vRange: numericGridRange(origin.v, origin.v + 3 * rowSeparation, 9),
+    clip: numericGridClip(
+      origin.u + 0.1 * spacing,
+      origin.u + 3.9 * spacing,
+      origin.v + 0.1 * rowSeparation,
+      origin.v + 2.9 * rowSeparation,
+    ),
+  }
+}
+
+function extractGridForeachValues(tikz: string, variable: string): number[] {
+  const match = tikz.match(
+    new RegExp(`\\\\foreach ${escapeRegExp(variable)} in \\{([^}]+)\\}`),
+  )
+
+  assert.notEqual(match, null, `Expected a foreach loop for ${variable}.`)
+  const parts = match[1].split(',')
+
+  if (parts.length === 1) {
+    return [Number(parts[0])]
+  }
+
+  assert.equal(parts.length, 4)
+  assert.equal(parts[2], '...')
+  const first = Number(parts[0])
+  const next = Number(parts[1])
+  const last = Number(parts[3])
+  const step = next - first
+  const count = Math.round((last - first) / step) + 1
+
+  return Array.from({ length: count }, (_, index) => first + index * step)
+}
+
+function triangularPreviewLineValues(
+  segments: Array<{
+    start: Vec3
+    end: Vec3
+  }>,
+  slope: number,
+): {
+  horizontal: number[]
+  positiveDiagonal: number[]
+  negativeDiagonal: number[]
+} {
+  const values = {
+    horizontal: [] as number[],
+    positiveDiagonal: [] as number[],
+    negativeDiagonal: [] as number[],
+  }
+
+  for (const segment of segments) {
+    const dx = segment.end.x - segment.start.x
+    const dy = segment.end.y - segment.start.y
+
+    if (Math.abs(dy) <= 1e-9) {
+      values.horizontal.push(segment.start.y)
+    } else if (dx * dy > 0) {
+      values.positiveDiagonal.push(
+        segment.start.x - segment.start.y / slope,
+      )
+    } else {
+      values.negativeDiagonal.push(
+        segment.start.x + segment.start.y / slope,
+      )
+    }
+  }
+
+  return {
+    horizontal: uniqueSortedNumbers(values.horizontal),
+    positiveDiagonal: uniqueSortedNumbers(values.positiveDiagonal),
+    negativeDiagonal: uniqueSortedNumbers(values.negativeDiagonal),
+  }
+}
+
+function uniqueSortedNumbers(values: number[]): number[] {
+  const result: number[] = []
+
+  for (const value of [...values].sort((first, second) => first - second)) {
+    if (
+      result.length === 0 ||
+      Math.abs(value - (result[result.length - 1] ?? value)) > 1e-9
+    ) {
+      result.push(value)
+    }
+  }
+
+  return result
+}
+
+function assertNumberArraysApproximatelyEqual(
+  actual: number[],
+  expected: number[],
+  epsilon = 2e-5,
+): void {
+  assert.equal(actual.length, expected.length)
+  actual.forEach((value, index) => {
+    assertApproximatelyEqual(value, expected[index], epsilon)
+  })
+}
+
+function assertApproximatelyInteger(value: number, epsilon = 2e-5): void {
+  assertApproximatelyEqual(value, Math.round(value), epsilon)
+}
+
+function assertApproximatelyEqual(
+  actual: number,
+  expected: number | undefined,
+  epsilon: number,
+): void {
+  assert.notEqual(expected, undefined)
+  assert.ok(
+    Math.abs(actual - expected) <= epsilon,
+    `Expected ${actual} to be within ${epsilon} of ${expected}.`,
+  )
 }
 
 function symbolicGridScalar(

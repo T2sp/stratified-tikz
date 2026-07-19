@@ -270,9 +270,14 @@ with older saved diagrams.
 
 The SVG preview evaluates range and clip scalar fields through their finite
 preview values. Rectangular grids generate constant-u and constant-v line
-families. Triangular grids use `uRange.step` as the spacing and generate three
-families in local coordinates: horizontal, +60 degrees, and -60 degrees.
-Honeycomb grids use `uRange.step` as the hexagon edge length and generate a
+families. Triangular grids use `s = uRange.step` as the spacing and the local
+range origin `(uRange.min, vRange.min)`. Their canonical basis is
+`(s, 0), (s/2, sqrt(3)s/2)`, and they generate three line families through the
+same vertices: horizontal, +60 degrees, and -60 degrees. The range and clip
+bounds restrict visibility without changing that phase. `vRange.step` remains
+saved and positively validated for schema compatibility but is not used by
+triangular geometry. Honeycomb grids use `uRange.step` as the hexagon edge
+length and generate a
 flat-top hexagonal edge graph with de-duplicated preview edges. All patterns
 are generated in local `(u,v)` coordinates and embedded by `frame`. The preview
 rejects non-finite values, `step <= 0`, `max < min`, invalid frames, non-finite

@@ -56,7 +56,13 @@ import {
   coordinateReferenceSourceForPoint,
   resolveDiagramCoordinateRefs,
 } from '../model/coordinateReferences.ts'
-import { gridLatticePattern, isLatticePattern } from '../model/grids.ts'
+import {
+  gridGeometryEpsilon,
+  gridLatticePattern,
+  isLatticePattern,
+  triangularLatticeLinePhases,
+  triangularLatticeMetrics,
+} from '../model/grids.ts'
 import { sheetVertices } from '../model/sheets.ts'
 import {
   arcScalarPreviewValue,
@@ -428,7 +434,7 @@ const inlineMathBaselineTikzOption =
 const inlineMathCommentSeparatorLine = '%----------------------------------------'
 const TIKZ_INDENT = '    '
 export const maxCurvedSheetTikzFaces = 256
-const gridTikzEpsilon = 1e-9
+const gridTikzEpsilon = gridGeometryEpsilon
 const pathRunLengthEpsilon = 1e-9
 const pathRunLengthSampleCount = 32
 const workPlaneFrameComparisonEpsilon = 1e-6
@@ -2730,38 +2736,41 @@ function emitTriangularGridScopeBody(
     }
   }
 
-  const spacing = values.spacing
-  const verticalSpacing = (Math.sqrt(3) / 2) * spacing
+  const metrics = triangularLatticeMetrics(values.spacing)
+  const phases = triangularLatticeLinePhases(
+    { u: values.uBounds.min, v: values.vBounds.min },
+    metrics.spacing,
+  )
   const horizontalSequence = gridForeachSequenceFromBounds(
-    values.vBounds.min,
-    verticalSpacing,
+    phases.horizontal,
+    metrics.rowSeparation,
     domain.vMin.value,
     domain.vMax.value,
     'triangular horizontal family',
   )
   const positiveDiagonalSequence = gridForeachSequenceFromBounds(
-    values.uBounds.min,
-    spacing,
+    phases.positiveDiagonal,
+    metrics.spacing,
     minGridDomainCornerValue(
       domain,
-      (corner) => corner.u - corner.v / Math.sqrt(3),
+      (corner) => corner.u - corner.v / metrics.slope,
     ),
     maxGridDomainCornerValue(
       domain,
-      (corner) => corner.u - corner.v / Math.sqrt(3),
+      (corner) => corner.u - corner.v / metrics.slope,
     ),
     'triangular +60 family',
   )
   const negativeDiagonalSequence = gridForeachSequenceFromBounds(
-    values.uBounds.min,
-    spacing,
+    phases.negativeDiagonal,
+    metrics.spacing,
     minGridDomainCornerValue(
       domain,
-      (corner) => corner.u + corner.v / Math.sqrt(3),
+      (corner) => corner.u + corner.v / metrics.slope,
     ),
     maxGridDomainCornerValue(
       domain,
-      (corner) => corner.u + corner.v / Math.sqrt(3),
+      (corner) => corner.u + corner.v / metrics.slope,
     ),
     'triangular -60 family',
   )
@@ -2778,10 +2787,10 @@ function emitTriangularGridScopeBody(
     return negativeDiagonalSequence
   }
 
-  const padding = diagonalGridLinePadding(domain, spacing)
+  const padding = diagonalGridLinePadding(domain, metrics.spacing)
   const paddedUMin = normalizeGridTikzNumber(domain.uMin.value - padding)
   const paddedUMax = normalizeGridTikzNumber(domain.uMax.value + padding)
-  const slope = Math.sqrt(3)
+  const slope = metrics.slope
 
   return {
     ok: true,
