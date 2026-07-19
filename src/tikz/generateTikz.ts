@@ -411,6 +411,11 @@ type GenerateContext = {
   visibility: VisibilityOptions
 }
 
+type RequiredTikzLibraryInstruction = {
+  heading?: string
+  libraries: readonly string[]
+}
+
 type ImportedStyleApplication = {
   reference: ImportedTikzStyleReference
   options: string[]
@@ -962,41 +967,91 @@ function emitRequiredLibraryComment(context: GenerateContext): string[] {
     lines.push('% Requires \\usepackage{tikz-3dplot}', '')
   }
 
+  for (const instruction of collectRequiredTikzLibraryInstructions(context)) {
+    if (instruction.heading !== undefined) {
+      lines.push(`% ${instruction.heading}`)
+    }
+
+    lines.push(`\\usetikzlibrary{${instruction.libraries.join(',')}}`, '')
+  }
+
+  const commentedLines = commentEveryPhysicalLine(lines)
+
+  return context.exportMode === 'inlineMath' && commentedLines.length > 0
+    ? inlineMathCommentSection('Package requirements', commentedLines)
+    : commentedLines
+}
+
+function collectRequiredTikzLibraryInstructions(
+  context: GenerateContext,
+): RequiredTikzLibraryInstruction[] {
+  const instructions: RequiredTikzLibraryInstruction[] = []
+
   if (context.coordinates.hasNonCircularPointShape) {
-    lines.push(
-      '% Required TikZ libraries for non-circular point shapes:',
-      '% \\usetikzlibrary{shapes.geometric,shapes.symbols}',
-      '',
-    )
+    instructions.push({
+      heading: 'Required TikZ libraries for non-circular point shapes:',
+      libraries: ['shapes.geometric', 'shapes.symbols'],
+    })
   }
 
   if (context.hasSavedPaths) {
-    lines.push(
-      '% Required TikZ libraries for saved paths:',
-      '% \\usetikzlibrary{spath3}',
-      '',
-    )
+    instructions.push({
+      heading: 'Required TikZ libraries for saved paths:',
+      libraries: ['spath3'],
+    })
   }
 
   if (context.requiresDecorationsMarkingsLibrary) {
-    lines.push('\\usetikzlibrary{decorations.markings}', '')
+    instructions.push({ libraries: ['decorations.markings'] })
   }
 
   if (context.requiresArrowsMetaLibrary) {
-    lines.push('\\usetikzlibrary{arrows.meta}', '')
+    instructions.push({ libraries: ['arrows.meta'] })
   }
 
   if (context.requiresTikz3dLibrary) {
-    lines.push('\\usetikzlibrary{3d}', '')
+    instructions.push({ libraries: ['3d'] })
   }
 
   if (context.requiresCalcLibrary) {
-    lines.push('\\usetikzlibrary{calc}', '')
+    instructions.push({ libraries: ['calc'] })
   }
 
-  return context.exportMode === 'inlineMath' && lines.length > 0
-    ? inlineMathCommentSection('Package requirements', lines)
-    : lines
+  const seenLibraries = new Set<string>()
+
+  return instructions.flatMap((instruction) => {
+    const libraries = instruction.libraries.filter((library) => {
+      if (seenLibraries.has(library)) {
+        return false
+      }
+
+      seenLibraries.add(library)
+      return true
+    })
+
+    return libraries.length === 0 ? [] : [{ ...instruction, libraries }]
+  })
+}
+
+export function commentEveryPhysicalLine(
+  lines: readonly string[],
+): string[] {
+  return lines.flatMap((line) =>
+    line
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((physicalLine) => commentPhysicalLine(physicalLine)),
+  )
+}
+
+function commentPhysicalLine(line: string): string {
+  if (!isNonBlankLine(line) || line.trimStart().startsWith('%')) {
+    return line
+  }
+
+  const contentStart = line.search(/\S/)
+
+  return `${line.slice(0, contentStart)}% ${line.slice(contentStart)}`
 }
 
 function emitExternalTikzStyleLoadComment(context: GenerateContext): string[] {
