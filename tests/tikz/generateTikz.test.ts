@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  commentEveryPhysicalLine,
   generateTikz,
   frameCoordinateHasUnsupportedSymbolicSource,
   layerToTikzLayerName,
@@ -62,6 +63,42 @@ import {
   triangularLatticeLinePhases,
   triangularLatticeMetrics,
 } from '../../src/model/grids.ts'
+
+test('physical-line comment helper preserves one-line library instructions', () => {
+  assert.deepEqual(
+    commentEveryPhysicalLine(['\\usetikzlibrary{3d}']),
+    ['% \\usetikzlibrary{3d}'],
+  )
+})
+
+test('physical-line comment helper preserves and comments two library lines', () => {
+  assert.deepEqual(
+    commentEveryPhysicalLine([
+      '\\usetikzlibrary{arrows.meta,\n    decorations.markings}',
+    ]),
+    [
+      '% \\usetikzlibrary{arrows.meta,',
+      '    % decorations.markings}',
+    ],
+  )
+})
+
+test('physical-line comment helper comments every continuation without double comments', () => {
+  assert.deepEqual(
+    commentEveryPhysicalLine([
+      '% \\usetikzlibrary{calc,',
+      '    3d,\r\n    arrows.meta,\n    decorations.markings}',
+      '',
+    ]),
+    [
+      '% \\usetikzlibrary{calc,',
+      '    % 3d,',
+      '    % arrows.meta,',
+      '    % decorations.markings}',
+      '',
+    ],
+  )
+})
 
 test('2D TikZ output uses ordinary (x,y) coordinates', () => {
   const tikz = generateTikz(createTwoDimensionalDiagram())
@@ -721,34 +758,7 @@ test('path template center coordinateRef is rejected because template export can
 })
 
 test('2D arc start center end coordinateRefs export with calc references', () => {
-  const diagram = createEmptyDiagram({ ambientDimension: 2 })
-  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
-    { id: 'coord-a', name: 'A', x: 1, y: 0, z: 0 },
-    { id: 'coord-o', name: 'O', x: 0, y: 0, z: 0 },
-    { id: 'coord-b', name: 'B', x: 0, y: 1, z: 0 },
-  ])
-  diagram.strata.push({
-    codim: 1,
-    geometricKind: 'curve',
-    kind: 'concatenatedPath',
-    id: 'arc-ref',
-    name: 'Arc Ref',
-    style: curveStyle(),
-    segments: [
-      {
-        kind: 'arc',
-        start: coordinateReferencePoint(diagram, 'coord-a'),
-        end: coordinateReferencePoint(diagram, 'coord-b'),
-        center: coordinateReferencePoint(diagram, 'coord-o'),
-        radius: 1,
-        startAngleDeg: 0,
-        endAngleDeg: 90,
-        direction: 'counterclockwise',
-      },
-    ],
-    styleSegments: [],
-    layer: 0,
-  })
+  const diagram = createCoordinateReferenceArcDiagram()
 
   const validation = validateDiagram(diagram)
   const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
@@ -1383,6 +1393,126 @@ test('representative inline 3D export keeps camera and layer setup local', () =>
   assert.match(tikz, /\\coordinate \(curvePolyCameraLine0p0\) at \(0,0,0\);/)
   assert.match(tikz, /regular polygon sides=3/)
   expectNoBlankLines(tikz)
+})
+
+test('all generated TikZ library requirement variants remain commented', () => {
+  const savedPathDiagram = createArrowPathDiagram()
+  const savedPath = savedPathDiagram.strata[0]
+
+  if (savedPath?.geometricKind !== 'curve') {
+    throw new Error('Expected a curve for the saved-path requirement test.')
+  }
+
+  savedPath.pathLabel = 'saved path'
+
+  const arrowDiagram = createArrowPathDiagram(
+    arrowOptions({ mid: { enabled: true, head: 'stealth' } }),
+  )
+  const cases = [
+    {
+      library: '3d',
+      tikz: generateTikz(createWorkPlaneFilledSheetDiagram()),
+    },
+    {
+      library: 'spath3',
+      tikz: generateTikz(savedPathDiagram),
+    },
+    {
+      library: 'shapes.geometric',
+      tikz: generateTikz(createPointShapeDiagram('triangle')),
+    },
+    {
+      library: 'shapes.symbols',
+      tikz: generateTikz(createPointShapeDiagram('star')),
+    },
+    {
+      library: 'decorations.markings',
+      tikz: generateTikz(arrowDiagram),
+    },
+    {
+      library: 'arrows.meta',
+      tikz: generateTikz(arrowDiagram),
+    },
+    {
+      library: 'calc',
+      tikz: generateTikz(createCoordinateReferenceArcDiagram()),
+    },
+  ]
+
+  for (const { library, tikz } of cases) {
+    assert.ok(extractRequiredTikzLibraryNames(tikz).includes(library))
+    assertTikzLibraryInstructionsCommented(tikz)
+    assert.doesNotMatch(tikz, /^\s*\\usetikzlibrary/m)
+  }
+})
+
+test('combined library requirements are de-duplicated in deterministic order', () => {
+  const diagram = createThreeDimensionalExportModeRegressionDiagram()
+  const arrowCurve = diagram.strata.find(
+    (stratum) => stratum.id === 'camera-line',
+  )
+
+  if (arrowCurve?.geometricKind !== 'curve') {
+    throw new Error('Expected the representative 3D curve.')
+  }
+
+  arrowCurve.pathLabel = 'camera line'
+  arrowCurve.arrows = arrowOptions({
+    mid: { enabled: true, head: 'stealth' },
+  })
+  diagram.strata.push({
+    ...arrowCurve,
+    id: 'second-camera-line',
+    name: 'Second camera line',
+    pathLabel: 'second camera line',
+  })
+
+  const reversedDiagram: Diagram = {
+    ...diagram,
+    strata: [...diagram.strata].reverse(),
+  }
+  const standaloneTikz = generateTikz(diagram)
+  const reversedTikz = generateTikz(reversedDiagram)
+  const inlineTikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+  const expectedLibraries = [
+    'shapes.geometric',
+    'shapes.symbols',
+    'spath3',
+    'decorations.markings',
+    'arrows.meta',
+    '3d',
+  ]
+
+  assert.deepEqual(
+    extractRequiredTikzLibraryNames(standaloneTikz),
+    expectedLibraries,
+  )
+  assert.deepEqual(
+    extractRequiredTikzLibraryNames(reversedTikz),
+    expectedLibraries,
+  )
+  for (const library of expectedLibraries) {
+    assert.equal(
+      countMatches(
+        standaloneTikz,
+        new RegExp(
+          `\\\\usetikzlibrary\\{[^}]*${escapeRegExp(library)}`,
+          'g',
+        ),
+      ),
+      1,
+    )
+  }
+  assertTikzLibraryInstructionsCommented(standaloneTikz)
+  assertTikzLibraryInstructionsCommented(inlineTikz)
+  assert.match(
+    standaloneTikz,
+    /% \\usetikzlibrary\{spath3\}\n\n% \\usetikzlibrary\{decorations\.markings\}/,
+  )
+  assert.doesNotMatch(inlineTikz, /\n\s*\n/)
+  assert.doesNotMatch(inlineTikz, /^\s*%\s+% \\usetikzlibrary/m)
+  assert.match(inlineTikz, /^ {4}% \\usetikzlibrary/m)
+  assert.match(standaloneTikz, /^ {8}\\draw/m)
 })
 
 test('standalone output keeps blank-line section spacing', () => {
@@ -6971,6 +7101,53 @@ function assertIncludesSection(tikz: string, title: string): void {
   assert.match(tikz, new RegExp(`% ${escapeRegExp(title)}`))
 }
 
+function assertTikzLibraryInstructionsCommented(tikz: string): void {
+  const lines = tikz.split(/\r?\n/)
+  let insideInstruction = false
+  let braceDepth = 0
+  let instructionCount = 0
+
+  for (const line of lines) {
+    if (!insideInstruction && line.includes('\\usetikzlibrary')) {
+      insideInstruction = true
+      instructionCount += 1
+      braceDepth = 0
+    }
+
+    if (!insideInstruction) {
+      continue
+    }
+
+    if (line.trim() !== '') {
+      assert.equal(
+        line.trimStart().startsWith('%'),
+        true,
+        `Expected required-library line to be commented: ${line}`,
+      )
+    }
+
+    braceDepth += countMatches(line, /\{/g)
+    braceDepth -= countMatches(line, /\}/g)
+
+    if (braceDepth <= 0) {
+      insideInstruction = false
+    }
+  }
+
+  assert.ok(instructionCount > 0)
+  assert.equal(insideInstruction, false)
+}
+
+function extractRequiredTikzLibraryNames(tikz: string): string[] {
+  return [...tikz.matchAll(/\\usetikzlibrary\{([^}]+)\}/g)].flatMap(
+    (match) =>
+      (match[1] ?? '')
+        .split(',')
+        .map((library) => library.replace(/^\s*%?\s*/, '').trim())
+        .filter((library) => library.length > 0),
+  )
+}
+
 function expectNoBlankLines(output: string, message?: string): void {
   const blankLines = output
     .split('\n')
@@ -7923,6 +8100,39 @@ function createArrowPathDiagram(arrows?: PathArrowOptions): Diagram {
     ],
     styleSegments: [],
     ...(arrows === undefined ? {} : { arrows }),
+    layer: 0,
+  })
+
+  return diagram
+}
+
+function createCoordinateReferenceArcDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.coordinateAnchors = testCoordinateAnchors(diagram, [
+    { id: 'coord-a', name: 'A', x: 1, y: 0, z: 0 },
+    { id: 'coord-o', name: 'O', x: 0, y: 0, z: 0 },
+    { id: 'coord-b', name: 'B', x: 0, y: 1, z: 0 },
+  ])
+  diagram.strata.push({
+    codim: 1,
+    geometricKind: 'curve',
+    kind: 'concatenatedPath',
+    id: 'arc-ref',
+    name: 'Arc Ref',
+    style: curveStyle(),
+    segments: [
+      {
+        kind: 'arc',
+        start: coordinateReferencePoint(diagram, 'coord-a'),
+        end: coordinateReferencePoint(diagram, 'coord-b'),
+        center: coordinateReferencePoint(diagram, 'coord-o'),
+        radius: 1,
+        startAngleDeg: 0,
+        endAngleDeg: 90,
+        direction: 'counterclockwise',
+      },
+    ],
+    styleSegments: [],
     layer: 0,
   })
 

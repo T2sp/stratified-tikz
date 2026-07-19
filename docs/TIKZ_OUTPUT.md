@@ -105,17 +105,17 @@ heads are:
 Backward custom heads use TikZ's reversed marking command, for example
 `\arrowreversed{Stealth}`.
 
-Generated output requests the required libraries when needed:
+Generated output comments the required library instructions when needed:
 
 ```tex
-\usetikzlibrary{decorations.markings}
-\usetikzlibrary{arrows.meta}
+% \usetikzlibrary{decorations.markings}
+% \usetikzlibrary{arrows.meta}
 ```
 
 `decorations.markings` is needed for any mid-arrow decoration. `arrows.meta` is
 needed for `Stealth`, `Latex`, and harpoon arrow heads. Inline math output keeps
-these setup lines inside the `tikzpicture` setup section and still removes blank
-physical lines.
+this commented setup guidance inside the `tikzpicture` setup section and still
+removes blank physical lines.
 
 The Inspector shows arrow controls for path-like curve strata: polylines, cubic
 Bezier curves, concatenated paths, and path templates. Grids do not expose these
@@ -466,10 +466,10 @@ frame can be emitted safely, the grid uses the TikZ `3d` library plane scope:
 ```
 
 Inside that scope, grid paths are local 2D `(u,v)` coordinates. The plane scope
-is the only place the 3D frame is described. `\usetikzlibrary{3d}` is emitted
-when at least one work-plane-local grid, work-plane-filled sheet, local-symbolic
-point/label/path/sheet, 3D template path, or work-plane-local relative Bézier
-curve needs this scope form.
+is the only place the 3D frame is described. Commented
+`% \usetikzlibrary{3d}` guidance is emitted when at least one work-plane-local
+grid, work-plane-filled sheet, local-symbolic point/label/path/sheet, 3D template
+path, or work-plane-local relative Bézier curve needs this scope form.
 
 MVP symbolic policy: rectangular `\foreach` range triplets (`min`, `max`, and
 `step`) must be numeric so the generator can produce safe
@@ -1031,7 +1031,7 @@ When a 3D work-plane-local relative curve is consistent with its saved frame,
 the generator emits it inside a TikZ `3d` library canvas-plane scope:
 
 ```tex
-\usetikzlibrary{3d}
+% \usetikzlibrary{3d}
 
 \begin{scope}[
   plane origin={(10,20,30)},
@@ -1072,8 +1072,8 @@ points, the generator falls back to ordinary absolute 3D Bézier output:
 \draw (p0) .. controls (p1) and (p2) .. (p3);
 ```
 
-`\usetikzlibrary{3d}` is emitted when at least one scoped work-plane-local
-relative 3D Bézier path or work-plane-filled sheet is generated.
+Commented `% \usetikzlibrary{3d}` guidance is emitted when at least one scoped
+work-plane-local relative 3D Bézier path or work-plane-filled sheet is generated.
 
 ## Filled closed-boundary strata
 
@@ -1424,26 +1424,30 @@ Example:
 % \usetikzlibrary{shapes.geometric,shapes.symbols}
 ```
 
+These lines are preamble guidance, not active commands. Every non-empty
+physical line remains commented when an instruction wraps across multiple
+lines.
+
 For square and triangle point shapes, the output may require:
 
 ```tex
-\usetikzlibrary{shapes.geometric}
+% \usetikzlibrary{shapes.geometric}
 ```
 
 For star point shapes, the output may require:
 
 ```tex
-\usetikzlibrary{shapes.geometric,shapes.symbols}
+% \usetikzlibrary{shapes.geometric,shapes.symbols}
 ```
 
-For scoped 3D work-plane-local relative Bézier export, the generator emits the
-required TikZ `3d` library directly:
+For scoped 3D work-plane-local relative Bézier export, the generator emits
+commented guidance for the required TikZ `3d` library:
 
 ```tex
-\usetikzlibrary{3d}
+% \usetikzlibrary{3d}
 ```
 
-This line is conditional: it is omitted when no scoped 3D work-plane-local
+This guidance is conditional: it is omitted when no scoped 3D work-plane-local
 relative Bézier path appears in the generated output.
 
 The generated TikZ body should remain readable even when custom styles are used.
