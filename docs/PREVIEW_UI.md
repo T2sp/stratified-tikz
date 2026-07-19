@@ -60,14 +60,22 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 ## Export SVG
 
-The `Export SVG` button is a sticky preview edge action at the lower-right of
+The SVG export control is a sticky preview edge action at the lower-right of
 the preview frame, next to the Layer control area and protruding below the
-frame. It exports the current SVG Preview view, including visible diagram
+frame. Its background selector offers `Transparent background` (the default)
+and `White background` before using `Export SVG`. The Preview workspace may
+remain gray on screen; that editor-only background is not inherited by the
+download. White export instead adds an explicit white rectangle covering the
+exported viewBox behind the diagram.
+
+Export includes the current SVG Preview view, including visible diagram
 geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
 preview-only data attributes are removed from the exported SVG.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
-diagram model, undo history, TikZ source, or TikZ export mode.
+diagram model, undo history, TikZ source, or TikZ export mode. The most recently
+selected SVG background remains active for the current component lifetime, but
+is export-only and is not included in saved diagram JSON.
 
 ## Add Path
 

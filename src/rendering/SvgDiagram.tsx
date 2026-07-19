@@ -772,6 +772,7 @@ export function SvgDiagram({
         fill="currentColor"
         opacity="0.04"
         data-svg-background="true"
+        data-svg-export-exclude="true"
       />
       {renderCoordinateAxesGuide(coordinateAxesGuide, camera, height)}
       {renderWorkPlanePreview(workPlanePreview, camera, height)}

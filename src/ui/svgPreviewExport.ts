@@ -2,6 +2,36 @@ export const defaultSvgPreviewExportFilename = 'stratified-tikz-preview.svg'
 export const svgPreviewExportMimeType = 'image/svg+xml;charset=utf-8'
 export const svgPreviewExportButtonLabel =
   'Export current diagram view as SVG'
+export const svgPreviewExportBackgroundSelectLabel = 'SVG export background'
+
+export type SvgPreviewBackgroundMode = 'transparent' | 'white'
+
+export type SvgPreviewExportOptions = {
+  backgroundMode: SvgPreviewBackgroundMode
+}
+
+export const defaultSvgPreviewBackgroundMode: SvgPreviewBackgroundMode =
+  'transparent'
+
+export const svgPreviewBackgroundModeOptions: ReadonlyArray<{
+  value: SvgPreviewBackgroundMode
+  label: string
+}> = [
+  { value: 'transparent', label: 'Transparent background' },
+  { value: 'white', label: 'White background' },
+]
+
+export function svgPreviewBackgroundModeFromSelectValue(
+  value: string,
+): SvgPreviewBackgroundMode {
+  return value === 'white' ? 'white' : defaultSvgPreviewBackgroundMode
+}
+
+export function svgPreviewExportSuccessMessage(
+  mode: SvgPreviewBackgroundMode,
+): string {
+  return `SVG exported with ${mode} background.`
+}
 
 export type SvgPreviewExportAttributeLike = {
   readonly name: string
@@ -18,9 +48,18 @@ export type SvgPreviewExportElementLike = {
   remove: () => void
 }
 
+export type SvgPreviewExportCloneSourceLike = {
+  cloneNode: (deep?: boolean) => unknown
+}
+
 const svgXmlDeclaration = '<?xml version="1.0" encoding="UTF-8"?>'
-const standaloneSvgStyle =
-  'background:#ffffff;color:#94a3b8;font-family:Inter,Arial,sans-serif;'
+const svgNamespace = 'http://www.w3.org/2000/svg'
+const exportBackgroundMarkerAttribute =
+  'data-stratified-tikz-export-background'
+const standaloneSvgStyleDefaults = [
+  ['color', '#94a3b8'],
+  ['font-family', 'Inter,Arial,sans-serif'],
+] as const
 
 const exportExcludedClassNames = new Set([
   'svg-coordinate-anchors',
@@ -41,30 +80,65 @@ const metadataAttributeNames = new Set([
   'tabindex',
 ])
 
+const defaultSvgPreviewExportOptions: SvgPreviewExportOptions = {
+  backgroundMode: defaultSvgPreviewBackgroundMode,
+}
+
 export function createSvgPreviewExportText(
   svg: SVGSVGElement,
+  options: SvgPreviewExportOptions = defaultSvgPreviewExportOptions,
 ): string | null {
   if (typeof XMLSerializer === 'undefined') {
     return null
   }
 
+  try {
+    const clone = prepareSvgPreviewExportClone(svg, options)
+
+    if (clone === null) {
+      return null
+    }
+
+    return `${svgXmlDeclaration}\n${new XMLSerializer().serializeToString(
+      clone as unknown as Node,
+    )}\n`
+  } catch {
+    return null
+  }
+}
+
+export function prepareSvgPreviewExportClone(
+  svg: SvgPreviewExportCloneSourceLike,
+  options: SvgPreviewExportOptions = defaultSvgPreviewExportOptions,
+): SvgPreviewExportElementLike | null {
   const clone = svg.cloneNode(true)
 
   if (!isSvgPreviewExportElementLike(clone)) {
     return null
   }
 
-  sanitizeSvgPreviewExportTree(clone)
-
-  return `${svgXmlDeclaration}\n${new XMLSerializer().serializeToString(clone)}\n`
+  return sanitizeSvgPreviewExportTree(clone, options) ? clone : null
 }
 
 export function sanitizeSvgPreviewExportTree(
   root: SvgPreviewExportElementLike,
-): void {
+  options: SvgPreviewExportOptions = defaultSvgPreviewExportOptions,
+): boolean {
   removeExcludedSvgPreviewExportChildren(root)
   removeSvgPreviewExportMetadataAttributes(root)
   ensureStandaloneSvgRootAttributes(root)
+
+  if (options.backgroundMode === 'transparent') {
+    return true
+  }
+
+  const bounds = svgExportBackgroundBounds(root)
+
+  if (bounds === null) {
+    return false
+  }
+
+  return insertWhiteSvgExportBackground(root, bounds)
 }
 
 function removeExcludedSvgPreviewExportChildren(
@@ -84,7 +158,11 @@ function removeExcludedSvgPreviewExportChildren(
 function isExcludedSvgPreviewExportElement(
   element: SvgPreviewExportElementLike,
 ): boolean {
-  if (element.getAttribute('data-svg-export-exclude') === 'true') {
+  if (
+    element.getAttribute('data-svg-export-exclude') === 'true' ||
+    element.getAttribute('data-svg-background') === 'true' ||
+    element.getAttribute(exportBackgroundMarkerAttribute) !== null
+  ) {
     return true
   }
 
@@ -122,9 +200,14 @@ function ensureStandaloneSvgRootAttributes(
     return
   }
 
-  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  root.setAttribute('xmlns', svgNamespace)
   root.setAttribute('version', '1.1')
-  root.setAttribute('style', standaloneSvgStyle)
+  root.removeAttribute('background')
+  root.removeAttribute('background-color')
+  root.setAttribute(
+    'style',
+    standaloneSvgRootStyle(root.getAttribute('style')),
+  )
 
   const viewBox = parseSvgViewBox(root.getAttribute('viewBox'))
 
@@ -141,9 +224,126 @@ function ensureStandaloneSvgRootAttributes(
   }
 }
 
-function parseSvgViewBox(
-  viewBox: string | null,
-): { width: number; height: number } | null {
+function standaloneSvgRootStyle(style: string | null): string {
+  const declarations = (style ?? '')
+    .split(';')
+    .map((declaration) => declaration.trim())
+    .filter((declaration) => declaration.length > 0)
+    .filter((declaration) => {
+      const separatorIndex = declaration.indexOf(':')
+      const property = (
+        separatorIndex < 0 ? declaration : declaration.slice(0, separatorIndex)
+      )
+        .trim()
+        .toLowerCase()
+
+      return property !== 'background' && property !== 'background-color'
+    })
+
+  const properties = new Set(
+    declarations.map((declaration) =>
+      declaration.slice(0, declaration.indexOf(':')).trim().toLowerCase(),
+    ),
+  )
+
+  for (const [property, value] of standaloneSvgStyleDefaults) {
+    if (!properties.has(property)) {
+      declarations.push(`${property}:${value}`)
+    }
+  }
+
+  return `${declarations.join(';')};`
+}
+
+type SvgExportBounds = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function svgExportBackgroundBounds(
+  root: SvgPreviewExportElementLike,
+): SvgExportBounds | null {
+  const viewBox = parseSvgViewBox(root.getAttribute('viewBox'))
+
+  if (viewBox !== null) {
+    return viewBox
+  }
+
+  const width = parseSvgExportLength(root.getAttribute('width'))
+  const height = parseSvgExportLength(root.getAttribute('height'))
+
+  if (width === null || height === null) {
+    return null
+  }
+
+  return { x: 0, y: 0, width, height }
+}
+
+function insertWhiteSvgExportBackground(
+  root: SvgPreviewExportElementLike,
+  bounds: SvgExportBounds,
+): boolean {
+  const rectangle = createSvgExportElement(root, 'rect')
+
+  if (rectangle === null) {
+    return false
+  }
+
+  rectangle.setAttribute('x', formatSvgExportNumber(bounds.x))
+  rectangle.setAttribute('y', formatSvgExportNumber(bounds.y))
+  rectangle.setAttribute('width', formatSvgExportNumber(bounds.width))
+  rectangle.setAttribute('height', formatSvgExportNumber(bounds.height))
+  rectangle.setAttribute('fill', '#ffffff')
+  rectangle.setAttribute(exportBackgroundMarkerAttribute, 'white')
+
+  const insertBefore = methodFromUnknown(root, 'insertBefore')
+
+  if (insertBefore === null) {
+    return false
+  }
+
+  insertBefore.call(root, rectangle, root.children[0] ?? null)
+  return true
+}
+
+function createSvgExportElement(
+  root: SvgPreviewExportElementLike,
+  tagName: string,
+): SvgPreviewExportElementLike | null {
+  const ownerDocument = propertyFromUnknown(root, 'ownerDocument')
+  const createElement = methodFromUnknown(ownerDocument, 'createElementNS')
+
+  if (createElement === null) {
+    return null
+  }
+
+  const element = createElement.call(ownerDocument, svgNamespace, tagName)
+
+  return isSvgPreviewExportElementLike(element) ? element : null
+}
+
+function propertyFromUnknown(value: unknown, name: string): unknown {
+  if (typeof value !== 'object' || value === null || !(name in value)) {
+    return null
+  }
+
+  return value[name as keyof typeof value]
+}
+
+function methodFromUnknown(
+  value: unknown,
+  name: string,
+): ((...parameters: readonly unknown[]) => unknown) | null {
+  const property = propertyFromUnknown(value, name)
+
+  return typeof property === 'function'
+    ? (property as (...parameters: readonly unknown[]) => unknown)
+    : null
+}
+
+function parseSvgViewBox(viewBox: string | null): SvgExportBounds | null {
   if (viewBox === null) {
     return null
   }
@@ -160,9 +360,29 @@ function parseSvgViewBox(
   }
 
   return {
+    x: values[0],
+    y: values[1],
     width: values[2],
     height: values[3],
   }
+}
+
+function parseSvgExportLength(value: string | null): number | null {
+  if (value === null) {
+    return null
+  }
+
+  const match = value
+    .trim()
+    .match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(?:px)?$/i)
+
+  if (match === null) {
+    return null
+  }
+
+  const parsed = Number(match[1])
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function formatSvgExportNumber(value: number): string {
