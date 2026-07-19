@@ -275,12 +275,32 @@ Rectangular TikZ export uses two `\foreach` loops and `\clip`:
 \end{scope}
 ```
 
-Triangular lattices use `uRange.step` as spacing and export as three looped line
-families: horizontal, +60 degrees, and -60 degrees. Honeycomb lattices use
-`uRange.step` as the hexagon edge length and export as nested loops over
-flat-top hexagon centers inside the rectangular clip. SVG preview de-duplicates
-honeycomb shared edges; the compact TikZ MVP draws clipped hexagon paths per
-cell, so shared edges may be overdrawn.
+Triangular lattices use `s = uRange.step` as their spacing. Their local lattice
+origin is `(uRange.min, vRange.min)`, and their canonical basis is
+
+```text
+a = (s, 0)
+b = (s/2, sqrt(3)s/2)
+```
+
+Thus every vertex is `origin + i*a + j*b` for integers `i,j`. The horizontal,
++60 degree, and -60 degree line families all pass through those vertices. The
+saved range rectangle and rectangular clip only bound the visible domain; clip
+minima do not reset the phase. Changing `s` therefore scales the lattice about
+the same saved local origin. `vRange.step` remains persisted and must still be a
+positive finite value for compatibility with the common grid range schema, but
+triangular geometry does not use it; silently reinterpreting it would change
+saved JSON semantics.
+
+The implementation computes coordinates directly from normalized integer
+indices rather than repeatedly adding floating-point steps. A shared absolute
+epsilon of `1e-9` includes mathematically coincident lines on range and clip
+boundaries without accumulating drift.
+
+Honeycomb lattices use `uRange.step` as the hexagon edge length and export as
+nested loops over flat-top hexagon centers inside the rectangular clip. SVG
+preview de-duplicates honeycomb shared edges; the compact TikZ MVP draws clipped
+hexagon paths per cell, so shared edges may be overdrawn.
 
 For 3D work-plane grids, the loops run in a TikZ `3d` library plane scope:
 

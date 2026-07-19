@@ -215,7 +215,11 @@ emitted in the saved work-plane-local frame with `canvas is plane`. MVP
 rectangular `\foreach` range triplets must be numeric, while rectangular
 symbolic clip endpoints are allowed when they parse and evaluate safely.
 Triangular spacing and honeycomb edge length use `uRange.step`; their compact
-TikZ loops currently require numeric ranges and clip bounds.
+TikZ loops currently require numeric ranges and clip bounds. For a triangular
+spacing `s`, the saved local range origin and basis vectors
+`(s, 0), (s/2, sqrt(3)s/2)` define the phase independently of clip minima.
+`vRange.step` remains validated persisted data but does not affect triangular
+geometry.
 
 ### Cursor input mode
 

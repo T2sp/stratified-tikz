@@ -49,10 +49,30 @@ type ClipValues = {
   vMax: number
 }
 
-type LocalPoint = {
+export type GridLocalPoint = {
   u: number
   v: number
 }
+
+export type TriangularLatticeMetrics = {
+  spacing: number
+  halfRowOffset: number
+  rowSeparation: number
+  slope: number
+}
+
+export type TriangularLatticeBasis = {
+  a: GridLocalPoint
+  b: GridLocalPoint
+}
+
+export type TriangularLatticeLinePhases = {
+  horizontal: number
+  positiveDiagonal: number
+  negativeDiagonal: number
+}
+
+type LocalPoint = GridLocalPoint
 
 type LocalSegment = {
   start: LocalPoint
@@ -67,8 +87,72 @@ type ParameterSequence = {
 export const maxGridPreviewLines = 500
 export const defaultLatticePattern: LatticePattern = 'rectangular'
 
-const gridEpsilon = 1e-9
+// Absolute tolerance used when integer lattice indices meet floating-point
+// range and clip bounds. It prevents boundary lines from being lost without
+// accumulating coordinates, which are always computed directly from indices.
+export const gridGeometryEpsilon = 1e-9
+
+const gridEpsilon = gridGeometryEpsilon
 const sqrtThree = Math.sqrt(3)
+
+export function triangularLatticeMetrics(
+  spacing: number,
+): TriangularLatticeMetrics {
+  if (!Number.isFinite(spacing) || spacing <= 0) {
+    throw new RangeError(
+      'Triangular lattice spacing must be positive and finite.',
+    )
+  }
+
+  return {
+    spacing,
+    halfRowOffset: spacing / 2,
+    rowSeparation: (sqrtThree * spacing) / 2,
+    slope: sqrtThree,
+  }
+}
+
+export function triangularLatticeBasis(
+  spacing: number,
+): TriangularLatticeBasis {
+  const metrics = triangularLatticeMetrics(spacing)
+
+  return {
+    a: { u: metrics.spacing, v: 0 },
+    b: { u: metrics.halfRowOffset, v: metrics.rowSeparation },
+  }
+}
+
+export function triangularLatticeVertex(
+  origin: GridLocalPoint,
+  i: number,
+  j: number,
+  spacing: number,
+): GridLocalPoint {
+  if (!Number.isInteger(i) || !Number.isInteger(j)) {
+    throw new RangeError('Triangular lattice vertex indices must be integers.')
+  }
+
+  const basis = triangularLatticeBasis(spacing)
+
+  return {
+    u: origin.u + i * basis.a.u + j * basis.b.u,
+    v: origin.v + i * basis.a.v + j * basis.b.v,
+  }
+}
+
+export function triangularLatticeLinePhases(
+  origin: GridLocalPoint,
+  spacing: number,
+): TriangularLatticeLinePhases {
+  const { slope } = triangularLatticeMetrics(spacing)
+
+  return {
+    horizontal: origin.v,
+    positiveDiagonal: origin.u - origin.v / slope,
+    negativeDiagonal: origin.u + origin.v / slope,
+  }
+}
 
 export function createNumericScalarInputValue(value: number): ScalarInputValue {
   return {
@@ -571,25 +655,28 @@ function triangularGridPreviewLineCount(
     return 0
   }
 
-  const spacing = uRange.step
-  const verticalSpacing = (sqrtThree / 2) * spacing
+  const metrics = triangularLatticeMetrics(uRange.step)
+  const phases = triangularLatticeLinePhases(
+    { u: uRange.min, v: vRange.min },
+    metrics.spacing,
+  )
   const horizontalCount = parameterCountFromBounds(
-    vRange.min,
-    verticalSpacing,
+    phases.horizontal,
+    metrics.rowSeparation,
     domain.vMin,
     domain.vMax,
   )
   const positiveDiagonalCount = parameterCountFromBounds(
-    uRange.min,
-    spacing,
-    minCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
-    maxCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+    phases.positiveDiagonal,
+    metrics.spacing,
+    minCornerValue(domain, (corner) => corner.u - corner.v / metrics.slope),
+    maxCornerValue(domain, (corner) => corner.u - corner.v / metrics.slope),
   )
   const negativeDiagonalCount = parameterCountFromBounds(
-    uRange.min,
-    spacing,
-    minCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
-    maxCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+    phases.negativeDiagonal,
+    metrics.spacing,
+    minCornerValue(domain, (corner) => corner.u + corner.v / metrics.slope),
+    maxCornerValue(domain, (corner) => corner.u + corner.v / metrics.slope),
   )
 
   return horizontalCount + positiveDiagonalCount + negativeDiagonalCount
@@ -650,13 +737,23 @@ function triangularLocalSegments(
     return []
   }
 
-  const spacing = uRange.step
-  const verticalSpacing = (sqrtThree / 2) * spacing
-  const paddedUMin = domain.uMin - diagonalLinePadding(domain, spacing)
-  const paddedUMax = domain.uMax + diagonalLinePadding(domain, spacing)
+  const metrics = triangularLatticeMetrics(uRange.step)
+  const phases = triangularLatticeLinePhases(
+    { u: uRange.min, v: vRange.min },
+    metrics.spacing,
+  )
+  const paddedUMin =
+    domain.uMin - diagonalLinePadding(domain, metrics.spacing)
+  const paddedUMax =
+    domain.uMax + diagonalLinePadding(domain, metrics.spacing)
   const segments: LocalSegment[] = []
 
-  parameterValuesFromBounds(vRange.min, verticalSpacing, domain.vMin, domain.vMax)
+  parameterValuesFromBounds(
+    phases.horizontal,
+    metrics.rowSeparation,
+    domain.vMin,
+    domain.vMax,
+  )
     .map((v) => ({
       start: { u: domain.uMin, v },
       end: { u: domain.uMax, v },
@@ -664,37 +761,37 @@ function triangularLocalSegments(
     .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
 
   parameterValuesFromBounds(
-    uRange.min,
-    spacing,
-    minCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
-    maxCornerValue(domain, (corner) => corner.u - corner.v / sqrtThree),
+    phases.positiveDiagonal,
+    metrics.spacing,
+    minCornerValue(domain, (corner) => corner.u - corner.v / metrics.slope),
+    maxCornerValue(domain, (corner) => corner.u - corner.v / metrics.slope),
   )
     .map((intercept) => ({
       start: {
         u: paddedUMin,
-        v: sqrtThree * (paddedUMin - intercept),
+        v: metrics.slope * (paddedUMin - intercept),
       },
       end: {
         u: paddedUMax,
-        v: sqrtThree * (paddedUMax - intercept),
+        v: metrics.slope * (paddedUMax - intercept),
       },
     }))
     .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
 
   parameterValuesFromBounds(
-    uRange.min,
-    spacing,
-    minCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
-    maxCornerValue(domain, (corner) => corner.u + corner.v / sqrtThree),
+    phases.negativeDiagonal,
+    metrics.spacing,
+    minCornerValue(domain, (corner) => corner.u + corner.v / metrics.slope),
+    maxCornerValue(domain, (corner) => corner.u + corner.v / metrics.slope),
   )
     .map((intercept) => ({
       start: {
         u: paddedUMin,
-        v: -sqrtThree * (paddedUMin - intercept),
+        v: -metrics.slope * (paddedUMin - intercept),
       },
       end: {
         u: paddedUMax,
-        v: -sqrtThree * (paddedUMax - intercept),
+        v: -metrics.slope * (paddedUMax - intercept),
       },
     }))
     .forEach((segment) => pushClippedLocalSegment(segments, segment, domain))
