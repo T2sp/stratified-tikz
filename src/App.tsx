@@ -334,6 +334,7 @@ import {
   addSheetMenuGroups,
   addSheetMenuItems,
   defaultPreviewCoordinateInputMode,
+  defaultSvgPreviewBackgroundMode,
   defaultSvgPreviewExportFilename,
   directPathInputModeItems,
   generateTikzForUi,
@@ -358,7 +359,11 @@ import {
   updateSelectionForCoordinateAnchorVisibility,
   updateSelectionForBackgroundClick,
   svgPreviewExportButtonLabel,
+  svgPreviewExportBackgroundSelectLabel,
   svgPreviewExportMimeType,
+  svgPreviewBackgroundModeFromSelectValue,
+  svgPreviewBackgroundModeOptions,
+  svgPreviewExportSuccessMessage,
   startCoordinateAnchorDragSession,
   type BulkFieldScalarValue,
   type BulkStyleFieldId,
@@ -370,6 +375,7 @@ import {
   type DirectCoordinateInput,
   type DirectCoordinateMode,
   type WorkPlaneLocalInputMode,
+  type SvgPreviewBackgroundMode,
   type DirectCubicBezierControlMode,
   type ExampleBarState,
   type DirectGridCreationError,
@@ -819,6 +825,10 @@ function App() {
   )
   const [includeCoordinateAxesInTikz, setIncludeCoordinateAxesInTikz] =
     useState<boolean>(false)
+  const [svgPreviewBackgroundMode, setSvgPreviewBackgroundMode] =
+    useState<SvgPreviewBackgroundMode>(defaultSvgPreviewBackgroundMode)
+  const [svgPreviewExportStatus, setSvgPreviewExportStatus] =
+    useState<string>('')
   const [showCoordinateAnchors, setShowCoordinateAnchors] =
     useState<boolean>(true)
   const [tikzExportMode, setTikzExportMode] =
@@ -1165,10 +1175,19 @@ function App() {
       previewStageRef.current?.querySelector<SVGSVGElement>('svg.svg-diagram') ??
       null
     const svgText =
-      previewSvg === null ? null : createSvgPreviewExportText(previewSvg)
+      previewSvg === null
+        ? null
+        : createSvgPreviewExportText(previewSvg, {
+            backgroundMode: svgPreviewBackgroundMode,
+          })
 
     if (svgText === null) {
       setCopyStatus('failed')
+      setSvgPreviewExportStatus(
+        svgPreviewBackgroundMode === 'white'
+          ? 'SVG export failed. White background requires a valid viewBox or numeric width and height.'
+          : 'SVG export failed.',
+      )
       return
     }
 
@@ -1178,6 +1197,18 @@ function App() {
     })
 
     setCopyStatus(downloaded ? 'downloaded' : 'failed')
+    setSvgPreviewExportStatus(
+      downloaded
+        ? svgPreviewExportSuccessMessage(svgPreviewBackgroundMode)
+        : 'SVG export download failed.',
+    )
+  }
+
+  function updateSvgPreviewBackgroundMode(value: string): void {
+    setSvgPreviewBackgroundMode(
+      svgPreviewBackgroundModeFromSelectValue(value),
+    )
+    setSvgPreviewExportStatus('')
   }
 
   function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
@@ -6389,15 +6420,36 @@ function App() {
         onDeleteLayer={deleteDiagramLayer}
         onStatusMessage={setLayerOperationStatus}
         edgeActions={
-          <button
-            type="button"
-            className="preview-overlay-button preview-edge-action-button svg-export-button"
-            aria-label={svgPreviewExportButtonLabel}
-            title={svgPreviewExportButtonLabel}
-            onClick={exportSvgPreview}
-          >
-            Export SVG
-          </button>
+          <div className="svg-export-control">
+            <label className="svg-export-background-field">
+              <span>Background</span>
+              <select
+                aria-label={svgPreviewExportBackgroundSelectLabel}
+                value={svgPreviewBackgroundMode}
+                onChange={(event) =>
+                  updateSvgPreviewBackgroundMode(event.target.value)
+                }
+              >
+                {svgPreviewBackgroundModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="preview-overlay-button preview-edge-action-button svg-export-button"
+              aria-label={svgPreviewExportButtonLabel}
+              title={svgPreviewExportButtonLabel}
+              onClick={exportSvgPreview}
+            >
+              Export SVG
+            </button>
+            <span className="svg-export-status" role="status">
+              {svgPreviewExportStatus}
+            </span>
+          </div>
         }
       />
     )

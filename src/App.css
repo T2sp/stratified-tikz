@@ -2519,6 +2519,58 @@
   backdrop-filter: blur(7px);
 }
 
+.svg-export-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: min(100%, 390px);
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: rgba(30, 34, 44, 0.14) 0 6px 18px;
+  backdrop-filter: blur(7px);
+}
+
+.svg-export-background-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.svg-export-background-field select {
+  min-height: 30px;
+  max-width: 172px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 24px 4px 7px;
+  color: var(--text-h);
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.svg-export-control .svg-export-button {
+  box-shadow: none;
+}
+
+.svg-export-status {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.svg-export-status:empty {
+  display: none;
+}
+
 .layer-palette-toggle-button {
   display: inline-flex;
   align-items: center;
