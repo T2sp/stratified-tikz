@@ -171,6 +171,9 @@ const phaseSlugs = {
   "28H": "coons-direction-lifecycle",
   "28I": "tikz-faithful-arrow-preview",
   "28J": "phase-28-polish-hardening",
+  "28K": "svg-export-background-mode",
+  "28L": "triangular-lattice-spacing-fix",
+  "28M": "tikz-library-comment-continuations",
 };
 
 function makePhaseSpec(phase) {

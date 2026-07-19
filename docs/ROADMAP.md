@@ -1049,3 +1049,9 @@ Recommended `phaseSlugs` entries:
 - Docs/help.
 - Combined tests.
 - Accessibility and responsive hardening.
+
+### Phase 28K: Selectable transparent/white SVG export background
+
+### Phase 28L: Correct triangular lattice geometry for arbitrary spacing
+
+### Phase 28M: Keep every multiline TikZ library instruction commented
