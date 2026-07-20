@@ -967,6 +967,26 @@ export type BoundaryPathSnapshot = {
   segments: PathSegment[];
 };
 
+export type CoonsBoundarySnapshot =
+  | BoundaryPathSnapshot
+  | {
+      kind: "constantPoint";
+      sourceId?: string;
+      name?: string;
+      point: Vec3;
+    };
+
+export type CoonsPatchBoundaryRole = "bottom" | "right" | "top" | "left";
+
+export type CoonsPatchBoundarySource =
+  | { kind: "path"; sourcePathId: string; reversed: boolean }
+  | { kind: "point"; sourcePointId: string };
+
+export type CoonsPatchBoundarySources = Record<
+  CoonsPatchBoundaryRole,
+  CoonsPatchBoundarySource
+>;
+
 export type CurvedSheetPrimitive =
   | {
       kind: "hemisphere";
@@ -992,10 +1012,11 @@ export type CurvedSheetPrimitive =
     }
   | {
       kind: "coonsPatch";
-      bottom: BoundaryPathSnapshot;
-      right: BoundaryPathSnapshot;
-      top: BoundaryPathSnapshot;
-      left: BoundaryPathSnapshot;
+      bottom: CoonsBoundarySnapshot;
+      right: CoonsBoundarySnapshot;
+      top: CoonsBoundarySnapshot;
+      left: CoonsBoundarySnapshot;
+      boundarySources?: CoonsPatchBoundarySources;
       sampling: SurfaceSampling;
     };
 
@@ -1037,9 +1058,11 @@ hemisphere uses angular parameters: `u` runs around the equator from `0` to
 in `[-width/2, width/2]` and `v` in `[-depth/2, depth/2]`; its current sampler
 uses the hyperbolic patch `normalOffset = height * normalizedU * normalizedV`.
 
-Boundary-surface primitives store copied boundary path geometry. A
-`BoundaryPathSnapshot` is not a live reference to a curve stratum: later edits
-to the source curve do not mutate the surface. The boundary evaluator supports
+Boundary-surface primitives store materialized boundary geometry. A ruled
+surface's `BoundaryPathSnapshot` is not a live reference to a curve stratum, so
+later source edits do not mutate a ruled surface. A Coons patch may additionally
+store `boundarySources`; absence means the patch is static. The boundary
+evaluator supports
 copied concatenated `PathSegment[]` geometry made from line, cubic Bezier, 3D
 arc, and sampled path template segments. Circle and ellipse template paths are
 copied into ordinary path segments at creation time. Boundary snapshots must be
@@ -1086,6 +1109,22 @@ bottom end equals right start, top start equals left end, and top end equals
 right end. During Coons patch creation, the Add sheet draft can reverse the
 effective direction of each picked boundary before the copied snapshots are
 validated and saved. This draft reversal does not mutate the source paths.
+
+When `boundarySources` is present, it is persistent diagram data and records
+the path/point distinction plus the per-path `reversed` flag for every role.
+Committed diagram mutations compare resolved source-derived geometry before
+and after the edit. If it changed, all four sources are resolved from the same
+new diagram, oriented, detached from coordinate references, and validated as
+one candidate. A valid candidate atomically replaces all four snapshots. An
+invalid or missing source leaves the prior snapshots intact and produces a
+derived stale link status; no status or warning text is persisted. Sampling,
+rendering, and export remain snapshot-based.
+
+Linked patches round-trip without a format-version change. Legacy patches
+without `boundarySources` stay static even when snapshot `id` or `sourceId`
+fields resemble live sources. Layer or bulk duplication remaps source IDs only
+when the corresponding source is duplicated in the same operation; duplicating
+only a patch intentionally keeps links to the original sources.
 
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry

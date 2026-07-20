@@ -407,6 +407,89 @@ export type CoonsBoundarySnapshot =
   | BoundaryPathSnapshot
   | CoonsConstantPointBoundarySnapshot
 
+export const coonsPatchBoundaryRoles = [
+  'bottom',
+  'right',
+  'top',
+  'left',
+] as const
+
+export type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
+
+export type CoonsPatchBoundarySource =
+  | {
+      kind: 'path'
+      sourcePathId: string
+      reversed: boolean
+    }
+  | {
+      kind: 'point'
+      sourcePointId: string
+    }
+
+export type CoonsPatchBoundarySources = Record<
+  CoonsPatchBoundaryRole,
+  CoonsPatchBoundarySource
+>
+
+export type CoonsPatchCornerEndpoint = 'start' | 'end'
+
+export type CoonsPatchCornerEquationId =
+  | 'bottomStartEqualsLeftStart'
+  | 'bottomEndEqualsRightStart'
+  | 'topStartEqualsLeftEnd'
+  | 'topEndEqualsRightEnd'
+
+export type CoonsPatchCornerEquation = {
+  id: CoonsPatchCornerEquationId
+  leftRole: CoonsPatchBoundaryRole
+  leftEndpoint: CoonsPatchCornerEndpoint
+  rightRole: CoonsPatchBoundaryRole
+  rightEndpoint: CoonsPatchCornerEndpoint
+  label: string
+}
+
+export type CoonsPatchCornerEquationStatus = CoonsPatchCornerEquation & {
+  matches: boolean
+  leftPoint: Vec3
+  rightPoint: Vec3
+}
+
+export const coonsPatchRequiredCornerEquations = [
+  {
+    id: 'bottomStartEqualsLeftStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'start',
+    label: 'bottom start = left start',
+  },
+  {
+    id: 'bottomEndEqualsRightStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'start',
+    label: 'bottom end = right start',
+  },
+  {
+    id: 'topStartEqualsLeftEnd',
+    leftRole: 'top',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'end',
+    label: 'top start = left end',
+  },
+  {
+    id: 'topEndEqualsRightEnd',
+    leftRole: 'top',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'end',
+    label: 'top end = right end',
+  },
+] as const satisfies readonly CoonsPatchCornerEquation[]
+
 export type RuledSurfacePrimitive = {
   kind: 'ruledSurface'
   boundary0: BoundaryPathSnapshot
@@ -420,6 +503,8 @@ export type CoonsPatchPrimitive = {
   right: CoonsBoundarySnapshot
   top: CoonsBoundarySnapshot
   left: CoonsBoundarySnapshot
+  /** Missing means that the materialized boundary snapshots are static. */
+  boundarySources?: CoonsPatchBoundarySources
   sampling: SurfaceSampling
 }
 

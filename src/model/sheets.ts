@@ -2,6 +2,7 @@ import type {
   BoundaryPathSnapshot,
   CoonsBoundarySnapshot,
   CoonsConstantPointBoundarySnapshot,
+  CoonsPatchBoundarySources,
   CurvedSheetPrimitive,
   PathSegment,
   PolygonSheetStratum,
@@ -93,8 +94,26 @@ export function cloneCurvedSheetPrimitive(
         right: cloneCoonsBoundarySnapshot(primitive.right),
         top: cloneCoonsBoundarySnapshot(primitive.top),
         left: cloneCoonsBoundarySnapshot(primitive.left),
+        ...(primitive.boundarySources === undefined
+          ? {}
+          : {
+              boundarySources: cloneCoonsPatchBoundarySources(
+                primitive.boundarySources,
+              ),
+            }),
         sampling: cloneSurfaceSampling(primitive.sampling),
       }
+  }
+}
+
+function cloneCoonsPatchBoundarySources(
+  sources: CoonsPatchBoundarySources,
+): CoonsPatchBoundarySources {
+  return {
+    bottom: { ...sources.bottom },
+    right: { ...sources.right },
+    top: { ...sources.top },
+    left: { ...sources.left },
   }
 }
 

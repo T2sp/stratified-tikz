@@ -379,11 +379,11 @@ plane from non-collinear boundary points. Non-coplanar 3D picks are rejected.
 
 ### Boundary surface sheets
 
-The model supports two additional 3D codim 1 sheet primitives for Phase 20A:
-ruled surfaces and Coons patches. These are saved as `curvedSheet` primitives
-with copied boundary path snapshots, not live references to source curve
-strata. Editing, moving, or deleting an original source path after surface
-creation must not mutate the surface.
+The model supports two additional 3D codim 1 sheet primitives: ruled surfaces
+and Coons patches. Both are saved as `curvedSheet` primitives with materialized
+boundary snapshots. Ruled surfaces remain snapshot-only. A Coons patch may
+also store explicit path/point source metadata, including path reversal, so its
+snapshots can be refreshed after valid source edits.
 
 Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
 The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
@@ -420,14 +420,18 @@ S(u, v)
 The validator requires bottom start = left start, bottom end = right start, top
 start = left end, and top end = right end. During creation, each picked Coons
 boundary can be reversed in the Add sheet draft before validation; this changes
-only the copied boundary snapshot, not the source path. The sampler returns the existing finite
+only the oriented patch snapshot, not the source path. Linked patches preserve
+that reversal during later refreshes. Missing, invalid, or corner-incompatible
+sources leave the last valid snapshots visible and exportable until repaired.
+The sampler returns the existing finite
 quad mesh representation used by curved sheets: a deterministic flat vertex
 array plus quad index faces and boundary polylines for later rendering,
 depth-sorting, and TikZ export work. User-facing creation supports ruled
 surfaces from two boundary paths and Coons patches from explicit bottom, right,
 top, and left boundary roles. The workflow does not infer unordered roles
-automatically. Both workflows store copied boundary geometry, not live
-references.
+automatically. Coons link status is derived rather than saved, legacy patches
+without source metadata stay static, and users may detach links in the
+Inspector before maintaining geometry independently from the sources.
 
 ### Concatenated path editing
 

@@ -5,6 +5,7 @@ import {
   isOrthographicCamera3D,
 } from './camera.ts'
 import { createDefaultCamera2D } from './constructors.ts'
+import { synchronizeLinkedCoonsPatches } from './coonsPatchLinks.ts'
 import {
   isStylePresetKind,
   normalizeStylePresetName,
@@ -243,7 +244,11 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  const diagram = normalization.diagram
+  const diagram = synchronizeLinkedCoonsPatches(
+    null,
+    normalization.diagram,
+    { mode: 'full' },
+  ).diagram
   let validation: DiagramValidationResult
 
   try {
@@ -393,9 +398,12 @@ export function resolvePendingSymbolicDiagramImport(
   // Variable resolution can change path geometry and intersection parameters.
   // Clean/reconcile crossing states before validation so stale crossing IDs do
   // not reject otherwise valid imports.
-  const diagram = cleanPathCrossingStates(refreshed.diagram, {
+  const resolvedDiagram = cleanPathCrossingStates(refreshed.diagram, {
     reconcileStalePathPairs: true,
   })
+  const diagram = synchronizeLinkedCoonsPatches(null, resolvedDiagram, {
+    mode: 'full',
+  }).diagram
   const unsupportedSymbolicSources =
     validateNoUnsupportedSymbolicCoordinateSources(diagram)
 

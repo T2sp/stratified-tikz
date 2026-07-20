@@ -701,6 +701,8 @@ function App() {
     useState<string>(String(defaultCoonsPatchSampling.vSegments))
   const [coonsPatchBoundaryDraft, setCoonsPatchBoundaryDraft] =
     useState<CoonsPatchBoundaryDraft>(createCoonsPatchBoundaryDraft)
+  const [coonsPatchKeepLinked, setCoonsPatchKeepLinked] =
+    useState<boolean>(true)
   const [coonsPatchDirectionPanelOpen, setCoonsPatchDirectionPanelOpen] =
     useState<boolean>(false)
   const closeCoonsPatchDirectionPanel = useCallback((): void => {
@@ -1465,6 +1467,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     setFillRule('nonzero')
     setFillStatus('')
     setNewElementLayerInput('0')
@@ -1695,6 +1698,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     setFillStatus('')
     resetDirectPathInput()
     resetDirectCoordinateSources()
@@ -1736,6 +1740,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canUndo, history.past])
@@ -1770,6 +1775,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canRedo, history.future])
@@ -1916,6 +1922,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     setFillRule('nonzero')
     setFillStatus('')
     setNewElementLayerInput('0')
@@ -2672,6 +2679,7 @@ function App() {
 
   function cancelCoonsPatchBoundaryPicking(): void {
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     closeCoonsPatchDirectionPanel()
     setSheetStatus('Coons patch canceled.')
     setDirectCreationStatus('Coons patch canceled.')
@@ -2747,6 +2755,7 @@ function App() {
       {
         layer: creationLayer,
         sampling: { uSegments, vSegments },
+        keepLinkedToBoundarySources: coonsPatchKeepLinked,
       },
     )
 
@@ -2772,6 +2781,7 @@ function App() {
       creationLayer,
     )
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+    setCoonsPatchKeepLinked(true)
     closeCoonsPatchDirectionPanel()
     setSheetStatus('Coons patch created.')
     setDirectCreationStatus('Coons patch created.')
@@ -3069,6 +3079,7 @@ function App() {
       setSheetStatus('')
       setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
       setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+      setCoonsPatchKeepLinked(true)
       return
     }
 
@@ -3274,6 +3285,7 @@ function App() {
     }
     if (kind !== 'coonsPatch') {
       setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
+      setCoonsPatchKeepLinked(true)
     }
     if (kind !== 'polygon') {
       setDirectSheetSources([])
@@ -7141,6 +7153,16 @@ function App() {
               }}
             />
           </label>
+          <label className="direct-create-field">
+            <input
+              type="checkbox"
+              checked={coonsPatchKeepLinked}
+              onChange={(event) =>
+                setCoonsPatchKeepLinked(event.currentTarget.checked)
+              }
+            />
+            <span>Keep linked to boundary sources</span>
+          </label>
           <div className="direct-boundary-action-row">
             <button
               type="button"
@@ -7948,6 +7970,16 @@ function App() {
                   setDirectCreationStatus('')
                 }}
               />
+            </label>
+            <label className="preview-toolbar-field">
+              <input
+                type="checkbox"
+                checked={coonsPatchKeepLinked}
+                onChange={(event) =>
+                  setCoonsPatchKeepLinked(event.currentTarget.checked)
+                }
+              />
+              <span>Keep linked to boundary sources</span>
             </label>
             <button
               type="button"

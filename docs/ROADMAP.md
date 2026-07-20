@@ -1062,3 +1062,13 @@ Recommended `phaseSlugs` entries:
   regression tests.
 
 ### Phase 28M: Keep every multiline TikZ library instruction commented
+
+## Phase 29: Live-linked Coons patch boundary synchronization
+
+Recommended `phaseSlugs` entry: `"29": "live-linked-coons-boundaries"`.
+
+- Store optional source links alongside materialized Coons boundary snapshots.
+- Refresh valid linked patches after source path/point edits.
+- Preserve reverse direction and undo/redo atomicity.
+- Retain last valid snapshots when links are temporarily invalid.
+- Support static legacy patches and explicit detach.
