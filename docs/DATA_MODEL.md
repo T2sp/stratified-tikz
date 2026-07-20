@@ -2113,10 +2113,15 @@ boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
 stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
 local `(a,b)` coordinates. `curvedSheet` stores a hemisphere, saddle, ruled
 surface, or Coons patch primitive. Hemisphere and saddle primitives store an
-explicit finite orthonormal surface frame. Ruled surfaces and Coons patches
-store copied line/cubic/arc boundary path snapshots, not live references to
-source path strata. Ruled surfaces require two boundaries with matching closure
-status and use `S(u,v) = (1-v) C0(u) + v C1(u)`. Coons patches require
+explicit finite orthonormal surface frame. Ruled surfaces store copied
+line/cubic/arc boundary path snapshots and remain snapshot-only. Coons patches
+always retain materialized boundary snapshots used by sampling, Preview, SVG
+export, and TikZ export, but may additionally store optional `boundarySources`.
+Valid linked-source changes atomically refresh all four snapshots; missing or
+invalid sources leave the last valid snapshots in place. Static and legacy
+Coons patches without `boundarySources` do not follow source edits. Ruled
+surfaces require two boundaries with matching closure status and use
+`S(u,v) = (1-v) C0(u) + v C1(u)`. Coons patches require
 consistent bottom/right/top/left corners and use the standard Coons formula
 with the bilinear corner blend subtracted. All surface sampling counts are
 positive integers capped by `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`.

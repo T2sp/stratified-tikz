@@ -6,6 +6,7 @@ import {
   nextSymbolicVariableName,
   updateSymbolicVariableInDiagram,
 } from '../model/variables.ts'
+import { nextVariableId } from '../model/diagramIds.ts'
 import type { Diagram, SymbolicVariable } from '../model/types.ts'
 import {
   formatDiagramValidationIssue,
@@ -266,21 +267,6 @@ function variableDraftFromVariable(variable: SymbolicVariable): VariableDraft {
     expression: variable.expression,
     error: '',
   }
-}
-
-function nextVariableId(diagram: Diagram): string {
-  const usedIds = new Set([
-    ...(diagram.variables ?? []).map((variable) => variable.id),
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-  ])
-  let index = (diagram.variables ?? []).length + 1
-
-  while (usedIds.has(`variable-${index}`)) {
-    index += 1
-  }
-
-  return `variable-${index}`
 }
 
 function variableSummary(variables: readonly SymbolicVariable[]): string {

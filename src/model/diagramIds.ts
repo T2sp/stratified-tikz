@@ -44,3 +44,14 @@ export function collectTopLevelDiagramIds(diagram: Diagram): Set<string> {
 
   return ids
 }
+
+export function nextVariableId(diagram: Diagram): string {
+  const usedIds = collectTopLevelDiagramIds(diagram)
+  let index = (diagram.variables ?? []).length + 1
+
+  while (usedIds.has(`variable-${index}`)) {
+    index += 1
+  }
+
+  return `variable-${index}`
+}

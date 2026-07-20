@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { detachCoonsPatchBoundaryLinks } from '../../src/model/coonsPatchLinks.ts'
-import { collectTopLevelDiagramIds } from '../../src/model/diagramIds.ts'
+import {
+  collectTopLevelDiagramIds,
+  nextVariableId,
+} from '../../src/model/diagramIds.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   createEmptyDiagram,
@@ -82,6 +85,12 @@ test('collectTopLevelDiagramIds handles diagrams with no coordinateAnchors field
   }
 
   assert.deepEqual([...collectTopLevelDiagramIds(diagram)], [])
+})
+
+test('nextVariableId preserves ordinary deterministic allocation', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+
+  assert.equal(nextVariableId(diagram), 'variable-1')
 })
 
 test('collectTopLevelDiagramIds reserves dangling linked Coons path and point ids', () => {

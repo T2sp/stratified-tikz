@@ -10,6 +10,10 @@ import {
 } from '../../src/model/coonsPatchLinks.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { coordinateReferenceVec3ForAnchor } from '../../src/model/coordinateReferences.ts'
+import {
+  collectTopLevelDiagramIds,
+  nextVariableId,
+} from '../../src/model/diagramIds.ts'
 import { duplicateLayer, translateLayer } from '../../src/model/layers.ts'
 import { reverseCurvePathDirection } from '../../src/model/paths.ts'
 import {
@@ -20,7 +24,10 @@ import {
 } from '../../src/model/serialization.ts'
 import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
 import { symbolicVec3FromVec3 } from '../../src/model/coordinateAnchors.ts'
-import { updateSymbolicVariableInDiagram } from '../../src/model/variables.ts'
+import {
+  addSymbolicVariableToDiagram,
+  updateSymbolicVariableInDiagram,
+} from '../../src/model/variables.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   ConcatenatedPathStratum,
@@ -824,6 +831,58 @@ test('loaded dangling point source ids remain reserved for new elements', () => 
     coonsPatchBoundaryLinkStatus(created.diagram, 'point-patch').kind,
     'linkedStale',
   )
+})
+
+test('loaded dangling Coons source ids stay reserved for variable allocation', () => {
+  const linked = createConstantPointPatch(
+    createConstantPointSourceDiagram(false, 'variable-1'),
+    'variable-1',
+  )
+  const dangling = {
+    ...linked,
+    strata: linked.strata.filter((stratum) => stratum.id !== 'variable-1'),
+  }
+  const parsed = parseSavedDiagramJson(serializeDiagram(dangling))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const fallback = structuredClone(
+    findCoonsPatch(parsed.diagram, 'point-patch').primitive,
+  )
+  const reservedIds = collectTopLevelDiagramIds(parsed.diagram)
+  const variableId = nextVariableId(parsed.diagram)
+
+  assert.equal(reservedIds.has('variable-1'), true)
+  assert.notEqual(variableId, 'variable-1')
+  assert.equal(variableId, 'variable-2')
+
+  const added = addSymbolicVariableToDiagram(parsed.diagram, {
+    id: variableId,
+    name: 'R',
+    expression: '1',
+  })
+
+  assert.equal(added.ok, true)
+  if (!added.ok) {
+    throw new Error(added.error)
+  }
+
+  const patch = findCoonsPatch(added.diagram, 'point-patch')
+
+  assert.equal(added.diagram.variables?.[0]?.id, 'variable-2')
+  assert.deepEqual(patch.primitive.boundarySources?.bottom, {
+    kind: 'point',
+    sourcePointId: 'variable-1',
+  })
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(added.diagram, 'point-patch').kind,
+    'linkedStale',
+  )
+  assert.deepEqual(patch.primitive, fallback)
+  assert.equal(validateDiagram(added.diagram).valid, true)
 })
 
 test('source refresh and snapshots are one stable undo/redo transaction', () => {
