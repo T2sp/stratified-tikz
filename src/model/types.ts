@@ -432,6 +432,43 @@ export type CoonsPatchBoundarySources = Record<
   CoonsPatchBoundarySource
 >
 
+export function isCoonsPatchBoundarySource(
+  value: unknown,
+): value is CoonsPatchBoundarySource {
+  if (!isUnknownRecord(value)) {
+    return false
+  }
+
+  if (value.kind === 'path') {
+    return (
+      typeof value.sourcePathId === 'string' &&
+      value.sourcePathId.trim().length > 0 &&
+      typeof value.reversed === 'boolean'
+    )
+  }
+
+  return (
+    value.kind === 'point' &&
+    typeof value.sourcePointId === 'string' &&
+    value.sourcePointId.trim().length > 0
+  )
+}
+
+export function isCoonsPatchBoundarySources(
+  value: unknown,
+): value is CoonsPatchBoundarySources {
+  return (
+    isUnknownRecord(value) &&
+    coonsPatchBoundaryRoles.every((role) =>
+      isCoonsPatchBoundarySource(value[role]),
+    )
+  )
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export type CoonsPatchCornerEndpoint = 'start' | 'end'
 
 export type CoonsPatchCornerEquationId =

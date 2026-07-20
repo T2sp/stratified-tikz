@@ -1152,9 +1152,12 @@ Editor workflow:
   and leave the saved `Diagram` unchanged.
 
 Current limitations: inspector editing does not yet rotate or replace the saved
-surface frame. Boundary-surface creation for ruled surfaces and Coons patches
-stores copied boundary geometry only; it does not create live links back to
-source paths or infer unordered Coons roles automatically. The saved model also
+surface frame. Ruled surfaces remain snapshot-only. Coons patches created with
+`boundarySources` retain optional live links, while static and legacy patches
+without that field retain only their snapshots. Materialized snapshots remain
+the geometry used by sampling, rendering, and export: valid source edits refresh
+all four, while invalid or missing sources retain the last valid snapshots. The
+editor does not infer unordered Coons roles automatically. The saved model also
 does not support symbolic sampled surface boundaries, arbitrary symbolic
 parametric surfaces, boolean operations, or mesh sculpting.
 

@@ -18,6 +18,7 @@ import {
 import {
   coonsPatchBoundaryRoles,
   coonsPatchRequiredCornerEquations,
+  isCoonsPatchBoundarySources,
 } from '../model/types.ts'
 import type {
   ArcPathSegment,
@@ -749,6 +750,22 @@ function validateCoonsPatchBoundarySources(
 
   if (!isRecord(sources)) {
     pushError(errors, path, 'Coons patch boundary sources must be an object.')
+    return
+  }
+
+  if (isCoonsPatchBoundarySources(sources)) {
+    const pathSourceIds = coonsPatchBoundaryRoles.flatMap((role) => {
+      const source = sources[role]
+      return source.kind === 'path' ? [source.sourcePathId] : []
+    })
+
+    if (new Set(pathSourceIds).size !== pathSourceIds.length) {
+      pushError(
+        errors,
+        path,
+        'Linked Coons path sources must use distinct path ids.',
+      )
+    }
     return
   }
 

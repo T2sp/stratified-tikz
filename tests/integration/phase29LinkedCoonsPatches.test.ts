@@ -10,10 +10,12 @@ import {
 } from '../../src/model/coonsPatchLinks.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
 import { coordinateReferenceVec3ForAnchor } from '../../src/model/coordinateReferences.ts'
-import { duplicateLayer } from '../../src/model/layers.ts'
+import { duplicateLayer, translateLayer } from '../../src/model/layers.ts'
 import { reverseCurvePathDirection } from '../../src/model/paths.ts'
 import {
   parseSavedDiagramJson,
+  parseSavedDiagramJsonForImport,
+  resolvePendingSymbolicDiagramImport,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
 import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
@@ -332,6 +334,141 @@ test('corner-invalid updates are atomic, keep fallback snapshots, and recover', 
   })
 })
 
+test('partial layer translation preserves last-valid snapshots through repeated stale edits and recovery', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const splitAcrossLayers = {
+    ...linked,
+    strata: linked.strata.map((stratum) =>
+      stratum.id === 'right' || stratum.id === 'top' || stratum.id === 'left'
+        ? { ...stratum, layer: 1 }
+        : stratum,
+    ),
+  }
+  const initialState = createEditorState(splitAcrossLayers)
+  const initialPatch = structuredClone(
+    findCoonsPatch(splitAcrossLayers, 'patch'),
+  )
+  const initialMesh = sampleCoonsPatch(initialPatch.primitive)
+  const translatedDiagram = updateStratumById(
+    translateLayer(splitAcrossLayers, 0, point(1, 0, 0)),
+    'patch',
+    (stratum) => ({
+      ...stratum,
+      name: 'Patch after partial translation',
+      style:
+        stratum.geometricKind === 'sheet'
+          ? { ...stratum.style, fillOpacity: 0.6 }
+          : stratum.style,
+    }),
+  )
+  const translatedPatch = findCoonsPatch(translatedDiagram, 'patch')
+  const firstStale = commitDiagramChange(initialState, {
+    ...initialState,
+    editableDiagram: translatedDiagram,
+  })
+  const firstStalePatch = findCoonsPatch(firstStale.editableDiagram, 'patch')
+  const firstStatus = coonsPatchBoundaryLinkStatus(
+    firstStale.editableDiagram,
+    'patch',
+  )
+  const movedBottom = firstStale.editableDiagram.strata.find(
+    (stratum) => stratum.id === 'bottom',
+  )
+
+  assert.equal(movedBottom?.geometricKind, 'curve')
+  if (movedBottom?.geometricKind !== 'curve' || movedBottom.kind !== 'polyline') {
+    throw new Error('Expected the translated bottom polyline source.')
+  }
+  assert.equal(movedBottom.points[0]?.x, 1)
+  assert.equal(firstStatus.kind, 'linkedStale')
+  if (firstStatus.kind === 'linkedStale') {
+    assert.equal(
+      firstStatus.issues.some((issue) => issue.kind === 'cornerMismatch'),
+      true,
+    )
+  }
+
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(
+      firstStalePatch.primitive[role],
+      initialPatch.primitive[role],
+    )
+    assert.notDeepEqual(
+      firstStalePatch.primitive[role],
+      translatedPatch.primitive[role],
+    )
+  }
+  assert.deepEqual(sampleCoonsPatch(firstStalePatch.primitive), initialMesh)
+  assert.equal(firstStalePatch.name, translatedPatch.name)
+  assert.deepEqual(firstStalePatch.style, translatedPatch.style)
+  assert.deepEqual(
+    firstStalePatch.primitive.boundarySources,
+    translatedPatch.primitive.boundarySources,
+  )
+
+  const secondTranslatedDiagram = translateLayer(
+    firstStale.editableDiagram,
+    0,
+    point(1, 0, 0),
+  )
+  const secondStale = commitDiagramChange(firstStale, {
+    ...firstStale,
+    editableDiagram: secondTranslatedDiagram,
+  })
+  const secondStalePatch = findCoonsPatch(secondStale.editableDiagram, 'patch')
+
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(
+      secondStalePatch.primitive[role],
+      initialPatch.primitive[role],
+    )
+  }
+
+  const repairedDiagram = translateLayer(
+    secondStale.editableDiagram,
+    1,
+    point(2, 0, 0),
+  )
+  const repaired = commitDiagramChange(secondStale, {
+    ...secondStale,
+    editableDiagram: repairedDiagram,
+  })
+  const repairedPatch = findCoonsPatch(repaired.editableDiagram, 'patch')
+  const repairedMesh = sampleCoonsPatch(repairedPatch.primitive)
+
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(repaired.editableDiagram, 'patch'), {
+    kind: 'linkedUpToDate',
+  })
+  assert.equal(repairedMesh.vertices.length, initialMesh.vertices.length)
+  repairedMesh.vertices.forEach((vertex, index) => {
+    const initialVertex = initialMesh.vertices[index]
+
+    assert.notEqual(initialVertex, undefined)
+    if (initialVertex === undefined) {
+      return
+    }
+    assert.ok(Math.abs(vertex.x - (initialVertex.x + 2)) <= 1e-12)
+    assert.ok(Math.abs(vertex.y - initialVertex.y) <= 1e-12)
+    assert.ok(Math.abs(vertex.z - initialVertex.z) <= 1e-12)
+  })
+
+  const undoneRepair = undoLastDiagramChange(repaired)
+  const redoneRepair = redoLastDiagramChange(undoneRepair)
+
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(undoneRepair.editableDiagram, 'patch').kind,
+    'linkedStale',
+  )
+  assert.deepEqual(
+    findCoonsPatch(undoneRepair.editableDiagram, 'patch').primitive,
+    secondStalePatch.primitive,
+  )
+  assert.deepEqual(
+    findCoonsPatch(redoneRepair.editableDiagram, 'patch').primitive,
+    repairedPatch.primitive,
+  )
+})
+
 test('source deletion keeps fallback geometry and Undo restores an up-to-date link', () => {
   const linked = createLinkedPatch(createPathSourceDiagram())
   const initialState = createEditorState(linked)
@@ -551,6 +688,111 @@ test('linked JSON refreshes on load, legacy static JSON stays static, and dangli
     findCoonsPatch(parsedDangling.diagram, 'patch').primitive.bottom,
     findCoonsPatch(linked, 'patch').primitive.bottom,
   )
+})
+
+test('malformed linked JSON returns validation failures without throwing', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const validSources = findCoonsPatch(linked, 'patch').primitive.boundarySources
+
+  if (validSources === undefined) {
+    throw new Error('Expected linked boundary sources.')
+  }
+
+  const malformedSources: Array<{ name: string; value: unknown }> = [
+    { name: 'empty metadata', value: {} },
+    {
+      name: 'missing role',
+      value: {
+        bottom: validSources.bottom,
+        right: validSources.right,
+        top: validSources.top,
+      },
+    },
+    {
+      name: 'path without reversed',
+      value: {
+        ...validSources,
+        bottom: { kind: 'path', sourcePathId: 'bottom' },
+      },
+    },
+    {
+      name: 'null role',
+      value: { ...validSources, left: null },
+    },
+    {
+      name: 'unknown kind',
+      value: { ...validSources, right: { kind: 'curve', sourcePathId: 'right' } },
+    },
+  ]
+
+  for (const malformed of malformedSources) {
+    let parsed: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+    assert.doesNotThrow(() => {
+      parsed = parseSavedDiagramJson(
+        savedLinkedDiagramWithBoundarySources(linked, malformed.value),
+      )
+    }, malformed.name)
+    assert.equal(parsed?.ok, false, malformed.name)
+    if (parsed?.ok === false) {
+      assert.match(parsed.error, /invalid|malformed/i, malformed.name)
+    }
+  }
+})
+
+test('symbolic import rejects malformed linked metadata before pending resolution', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const symbolicLinked: Diagram = {
+    ...linked,
+    variables: [
+      {
+        id: 'variable-r',
+        name: 'R',
+        macroName: 'stzR',
+        expression: '1',
+        previewValue: 1,
+      },
+    ],
+  }
+  const malformedJson = savedLinkedDiagramWithBoundarySources(
+    symbolicLinked,
+    {},
+  )
+  let parsed: ReturnType<typeof parseSavedDiagramJsonForImport> | undefined
+
+  assert.doesNotThrow(() => {
+    parsed = parseSavedDiagramJsonForImport(malformedJson)
+  })
+  assert.equal(parsed?.ok, false)
+  if (parsed?.ok === false) {
+    assert.match(parsed.error, /invalid|malformed/i)
+  }
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(symbolicLinked))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected a pending symbolic linked import.')
+  }
+
+  ;(
+    findCoonsPatch(pending.pendingImport.diagram, 'patch')
+      .primitive as unknown as { boundarySources: unknown }
+  ).boundarySources = {}
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '1' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok === false) {
+    assert.match(resolved.error, /invalid|malformed|boundarySources/i)
+  }
 })
 
 test('layer duplication remaps copied sources while patch-only duplication keeps originals', () => {
@@ -788,6 +1030,28 @@ function commitSourceUpdate(
   )
 
   return commitDiagramChange(state, { ...state, editableDiagram: nextDiagram })
+}
+
+function savedLinkedDiagramWithBoundarySources(
+  diagram: Diagram,
+  boundarySources: unknown,
+): string {
+  const saved = JSON.parse(serializeDiagram(diagram)) as {
+    diagram: {
+      strata: Array<{
+        id?: unknown
+        primitive?: { boundarySources?: unknown }
+      }>
+    }
+  }
+  const patch = saved.diagram.strata.find((stratum) => stratum.id === 'patch')
+
+  if (patch?.primitive === undefined) {
+    throw new Error('Expected a saved Coons patch primitive.')
+  }
+
+  patch.primitive.boundarySources = boundarySources
+  return JSON.stringify(saved)
 }
 
 function findCoonsPatch(diagram: Diagram, id: string): CurvedSheetStratum & {

@@ -21,6 +21,7 @@ import {
 } from './paths.ts'
 import {
   coonsPatchBoundaryRoles,
+  isCoonsPatchBoundarySources,
   type AmbientDimension,
   type BoundaryPathSnapshot,
   type CoonsBoundarySnapshot,
@@ -139,17 +140,20 @@ export function synchronizeLinkedCoonsPatches(
     const previousPrimitive =
       previousStratum?.geometricKind === 'sheet' &&
       previousStratum.kind === 'curvedSheet' &&
-      previousStratum.primitive.kind === 'coonsPatch' &&
-      previousStratum.primitive.boundarySources !== undefined
+      previousStratum.primitive.kind === 'coonsPatch'
         ? previousStratum.primitive
         : null
+    const previousSources = previousPrimitive?.boundarySources
+    const nextSourcesValid = isCoonsPatchBoundarySources(nextSources)
+    const previousSourcesValid = isCoonsPatchBoundarySources(previousSources)
     const sourcesChanged =
       mode === 'full' ||
       previousDiagram === null ||
       previousPrimitive === null ||
-      previousPrimitive.boundarySources === undefined ||
+      !nextSourcesValid ||
+      !previousSourcesValid ||
       !coonsPatchBoundarySourcesEqual(
-        previousPrimitive.boundarySources,
+        previousSources,
         nextSources,
       ) ||
       inspectLinkedCoonsPatch(
@@ -173,6 +177,17 @@ export function synchronizeLinkedCoonsPatches(
       return {
         ...stratum,
         primitive: nextInspection.candidate,
+      }
+    }
+
+    if (sourcesChanged && nextInspection.candidate === null && previousPrimitive !== null) {
+      changed = true
+      return {
+        ...stratum,
+        primitive: restorePreviousCoonsPatchBoundaries(
+          stratum.primitive,
+          previousPrimitive,
+        ),
       }
     }
 
@@ -270,7 +285,11 @@ export function remapCoonsPatchBoundarySourceIds(
   primitive: CoonsPatchPrimitive,
   idMap: ReadonlyMap<string, string>,
 ): CoonsPatchPrimitive {
-  if (primitive.boundarySources === undefined || idMap.size === 0) {
+  if (
+    primitive.boundarySources === undefined ||
+    !isCoonsPatchBoundarySources(primitive.boundarySources) ||
+    idMap.size === 0
+  ) {
     return primitive
   }
 
@@ -420,6 +439,20 @@ function inspectLinkedCoonsPatch(
 
   if (sources === undefined) {
     return { sourceFingerprint: 'static', candidate: null, issues: [] }
+  }
+
+  if (!isCoonsPatchBoundarySources(sources)) {
+    return {
+      sourceFingerprint: 'malformed',
+      candidate: null,
+      issues: [
+        {
+          kind: 'invalidSource',
+          patchId,
+          message: 'Linked boundary source metadata is malformed.',
+        },
+      ],
+    }
   }
 
   const boundaries: Partial<Record<CoonsPatchBoundaryRole, CoonsBoundarySnapshot>> = {}
@@ -737,6 +770,19 @@ function coonsPatchMaterializedBoundariesEqual(
   )
 }
 
+function restorePreviousCoonsPatchBoundaries(
+  nextPrimitive: CoonsPatchPrimitive,
+  previousPrimitive: CoonsPatchPrimitive,
+): CoonsPatchPrimitive {
+  return {
+    ...nextPrimitive,
+    bottom: cloneCoonsBoundarySnapshot(previousPrimitive.bottom),
+    right: cloneCoonsBoundarySnapshot(previousPrimitive.right),
+    top: cloneCoonsBoundarySnapshot(previousPrimitive.top),
+    left: cloneCoonsBoundarySnapshot(previousPrimitive.left),
+  }
+}
+
 function coonsPatchBoundaryGeometryFingerprint(
   primitive: CoonsPatchPrimitive,
 ): string {
@@ -858,6 +904,14 @@ function cloneCoonsConstantPointBoundarySnapshot(
     ...(boundary.name === undefined ? {} : { name: boundary.name }),
     point: cloneVec3(boundary.point),
   }
+}
+
+function cloneCoonsBoundarySnapshot(
+  boundary: CoonsBoundarySnapshot,
+): CoonsBoundarySnapshot {
+  return isCoonsConstantPointBoundary(boundary)
+    ? cloneCoonsConstantPointBoundarySnapshot(boundary)
+    : cloneBoundaryPathSnapshot(boundary)
 }
 
 function cloneVec3(point: Vec3): Vec3 {
