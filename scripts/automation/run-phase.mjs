@@ -174,6 +174,7 @@ const phaseSlugs = {
   "28K": "svg-export-background-mode",
   "28L": "triangular-lattice-spacing-fix",
   "28M": "tikz-library-comment-continuations",
+  "29": "live-linked-coons-boundaries",
 };
 
 function makePhaseSpec(phase) {
