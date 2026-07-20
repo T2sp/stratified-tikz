@@ -6,6 +6,7 @@ import {
 } from './camera.ts'
 import { createDefaultCamera2D } from './constructors.ts'
 import { synchronizeLinkedCoonsPatches } from './coonsPatchLinks.ts'
+import { collectTopLevelDiagramIds } from './diagramIds.ts'
 import {
   isStylePresetKind,
   normalizeStylePresetName,
@@ -245,10 +246,22 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  let initialValidation: DiagramValidationResult
+  const malformedBoundarySources = validatePendingImportDiagramStructure(
+    normalization.diagram,
+  ).find((issue) => issue.path.endsWith('.primitive.boundarySources'))
+  if (malformedBoundarySources !== undefined) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${formatSymbolicImportIssue(malformedBoundarySources)}`,
+    }
+  }
+
+  let diagram: Diagram
 
   try {
-    initialValidation = validateDiagram(normalization.diagram)
+    diagram = synchronizeLinkedCoonsPatches(null, normalization.diagram, {
+      mode: 'full',
+    }).diagram
   } catch {
     return {
       ok: false,
@@ -256,23 +269,6 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  if (!initialValidation.valid) {
-    const firstIssue = initialValidation.errors[0]
-
-    return {
-      ok: false,
-      error:
-        firstIssue === undefined
-          ? 'Saved diagram is invalid.'
-          : `Saved diagram is invalid: ${firstIssue.path} ${firstIssue.message}`,
-    }
-  }
-
-  const diagram = synchronizeLinkedCoonsPatches(
-    null,
-    normalization.diagram,
-    { mode: 'full' },
-  ).diagram
   let finalValidation: DiagramValidationResult
 
   try {
@@ -635,11 +631,7 @@ function createPendingSymbolicDiagramImport(
 }
 
 function importVariableReservedIds(diagram: Diagram): Set<string> {
-  return new Set([
-    ...(diagram.variables ?? []).map((variable) => variable.id),
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-  ])
+  return collectTopLevelDiagramIds(diagram)
 }
 
 function nextImportVariableId(

@@ -24,6 +24,7 @@ import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
 } from './paths.ts'
+import { isCoonsPatchBoundarySources } from './types.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -2920,6 +2921,13 @@ function refreshCurvedSheetPrimitiveSymbolicPreviews(
         ),
       }
     case 'coonsPatch':
+      if (isCoonsPatchBoundarySources(primitive.boundarySources)) {
+        // Linked Coons boundaries are last-valid materialized snapshots. Their
+        // source strata are refreshed by the diagram traversal, and only the
+        // atomic linked-source synchronizer may replace these four snapshots.
+        return primitive
+      }
+
       return {
         ...primitive,
         bottom: refreshCoonsBoundarySnapshotSymbolicPreviews(

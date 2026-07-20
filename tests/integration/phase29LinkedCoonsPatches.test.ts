@@ -20,6 +20,8 @@ import {
 } from '../../src/model/serialization.ts'
 import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
 import { symbolicVec3FromVec3 } from '../../src/model/coordinateAnchors.ts'
+import { updateSymbolicVariableInDiagram } from '../../src/model/variables.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   ConcatenatedPathStratum,
   CoordinateAnchor,
@@ -36,7 +38,10 @@ import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { duplicateSelectedElements } from '../../src/ui/bulkEditing.ts'
 import { moveCoordinateAnchorToPoint } from '../../src/ui/coordinateAnchorEditing.ts'
-import { updateStratumById } from '../../src/ui/diagramUpdates.ts'
+import {
+  addPointStratumWithResult,
+  updateStratumById,
+} from '../../src/ui/diagramUpdates.ts'
 import { allLayersFilter } from '../../src/ui/layerFilter.ts'
 import {
   createCoonsPatchFromBoundaryPaths,
@@ -272,6 +277,239 @@ test('constant-point sources and coordinate-anchor changes refresh linked geomet
   )
 })
 
+test('symbolic stale snapshots survive save/load and recover from current sources', () => {
+  const linked = createSymbolicEndpointLinkedPatch()
+  const initialPatch = structuredClone(findCoonsPatch(linked, 'patch'))
+  const initialMesh = sampleCoonsPatch(initialPatch.primitive)
+  const initialSvg = curvedSheetToSvgMesh(
+    initialPatch,
+    createInitialCamera3D(),
+    240,
+  )
+  const variableUpdate = updateSymbolicVariableInDiagram(
+    linked,
+    'variable-r',
+    { expression: '2' },
+  )
+
+  assert.equal(variableUpdate.ok, true)
+  if (!variableUpdate.ok) {
+    throw new Error(variableUpdate.error)
+  }
+
+  const refreshedBottom = findPolyline(variableUpdate.diagram, 'bottom')
+  const refreshedPatch = findCoonsPatch(variableUpdate.diagram, 'patch')
+
+  assert.equal(refreshedBottom.points[2]?.x, 2)
+  assert.equal(refreshedBottom.points[2]?.symbolic?.x.previewValue, 2)
+  assert.equal(pathBoundary(refreshedPatch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.equal(
+    pathBoundary(refreshedPatch.primitive.bottom).segments[1]?.end.symbolic?.x
+      .previewValue,
+    1,
+  )
+
+  const stale = commitDiagramChange(createEditorState(linked), {
+    ...createEditorState(linked),
+    editableDiagram: variableUpdate.diagram,
+  })
+  const stalePatch = findCoonsPatch(stale.editableDiagram, 'patch')
+  const staleStatus = coonsPatchBoundaryLinkStatus(
+    stale.editableDiagram,
+    'patch',
+  )
+
+  assert.equal(staleStatus.kind, 'linkedStale')
+  assert.equal(pathBoundary(stalePatch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.deepEqual(sampleCoonsPatch(stalePatch.primitive), initialMesh)
+  assert.equal(validateDiagram(stale.editableDiagram).valid, true)
+
+  const serialized = serializeDiagram(stale.editableDiagram)
+  const parsed = parseSavedDiagramJson(serialized)
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const loadedBottom = findPolyline(parsed.diagram, 'bottom')
+  const loadedPatch = findCoonsPatch(parsed.diagram, 'patch')
+  const loadedStatus = coonsPatchBoundaryLinkStatus(parsed.diagram, 'patch')
+  const loadedSvg = curvedSheetToSvgMesh(
+    loadedPatch,
+    createInitialCamera3D(),
+    240,
+  )
+  const loadedTikz = generateTikz(parsed.diagram)
+
+  assert.equal(loadedBottom.points[2]?.x, 2)
+  assert.equal(loadedBottom.points[2]?.symbolic?.x.previewValue, 2)
+  assert.equal(pathBoundary(loadedPatch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.deepEqual(sampleCoonsPatch(loadedPatch.primitive), initialMesh)
+  assert.deepEqual(loadedSvg, initialSvg)
+  assert.equal(loadedStatus.kind, 'linkedStale')
+  assert.equal(validateDiagram(parsed.diagram).valid, true)
+  assert.match(loadedTikz, /Primitive: coonsPatch/)
+
+  const recovered = commitSourceUpdate(
+    createEditorState(parsed.diagram),
+    'right',
+    (source) => {
+      if (source.kind !== 'cubicBezier') {
+        return source
+      }
+
+      return {
+        ...source,
+        points: source.points.map((value, index) =>
+          index === 0 ? point(2, 0, 0) : value,
+        ),
+      }
+    },
+  )
+  const recoveredPatch = findCoonsPatch(recovered.editableDiagram, 'patch')
+
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(recovered.editableDiagram, 'patch'),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.equal(
+    pathBoundary(recoveredPatch.primitive.bottom).segments[1]?.end.x,
+    2,
+  )
+  assert.notDeepEqual(sampleCoonsPatch(recoveredPatch.primitive), initialMesh)
+})
+
+test('compatible symbolic source updates still refresh linked snapshots', () => {
+  const linked = createSymbolicInteriorLinkedPatch()
+  const variableUpdate = updateSymbolicVariableInDiagram(
+    linked,
+    'variable-r',
+    { expression: '0.6' },
+  )
+
+  assert.equal(variableUpdate.ok, true)
+  if (!variableUpdate.ok) {
+    throw new Error(variableUpdate.error)
+  }
+
+  const updated = commitDiagramChange(createEditorState(linked), {
+    ...createEditorState(linked),
+    editableDiagram: variableUpdate.diagram,
+  })
+  const updatedPatch = findCoonsPatch(updated.editableDiagram, 'patch')
+  const bottom = pathBoundary(updatedPatch.primitive.bottom)
+
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(updated.editableDiagram, 'patch'),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.equal(bottom.segments[0]?.end.z, 0.6)
+  assert.equal(bottom.segments[0]?.end.symbolic?.z.previewValue, 0.6)
+})
+
+test('symbolic linked import retains the saved fallback when inputs are incompatible', () => {
+  const linked = createSymbolicEndpointLinkedPatch()
+  const savedPatch = structuredClone(findCoonsPatch(linked, 'patch').primitive)
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(linked))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected a pending symbolic linked import.')
+  }
+
+  const resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+    { name: 'R', expression: '2' },
+  ])
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const source = findPolyline(resolved.diagram, 'bottom')
+  const patch = findCoonsPatch(resolved.diagram, 'patch')
+
+  assert.equal(source.points[2]?.x, 2)
+  assert.equal(pathBoundary(patch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.deepEqual(
+    sampleCoonsPatch(patch.primitive),
+    sampleCoonsPatch(savedPatch),
+  )
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(resolved.diagram, 'patch').kind,
+    'linkedStale',
+  )
+  assert.equal(validateDiagram(resolved.diagram).valid, true)
+})
+
+test('same-id replacement load keeps the incoming file fallback snapshots', () => {
+  const current = commitSourceUpdate(
+    createEditorState(createSymbolicEndpointLinkedPatch()),
+    'bottom',
+    (source) => {
+      if (source.kind !== 'polyline') {
+        return source
+      }
+
+      return {
+        ...source,
+        points: source.points.map((value, index) =>
+          index === 1 ? { ...value, z: 0.8 } : value,
+        ),
+      }
+    },
+  )
+  const incomingLinked = createSymbolicEndpointLinkedPatch()
+  const variableUpdate = updateSymbolicVariableInDiagram(
+    incomingLinked,
+    'variable-r',
+    { expression: '2' },
+  )
+
+  assert.equal(variableUpdate.ok, true)
+  if (!variableUpdate.ok) {
+    throw new Error(variableUpdate.error)
+  }
+
+  const incomingStale = commitDiagramChange(
+    createEditorState(incomingLinked),
+    {
+      ...createEditorState(incomingLinked),
+      editableDiagram: variableUpdate.diagram,
+    },
+  )
+  const parsed = parseSavedDiagramJson(
+    serializeDiagram(incomingStale.editableDiagram),
+  )
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const incomingFallback = structuredClone(
+    findCoonsPatch(parsed.diagram, 'patch').primitive,
+  )
+  const currentFallback = structuredClone(
+    findCoonsPatch(current.editableDiagram, 'patch').primitive,
+  )
+  const replaced = commitDiagramChange(
+    current,
+    { ...current, editableDiagram: parsed.diagram },
+    { replaceDiagram: true },
+  )
+  const replacedPatch = findCoonsPatch(replaced.editableDiagram, 'patch')
+
+  assert.deepEqual(replacedPatch.primitive, incomingFallback)
+  assert.notDeepEqual(replacedPatch.primitive, currentFallback)
+  assert.equal(findPolyline(replaced.editableDiagram, 'bottom').points[2]?.x, 2)
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(replaced.editableDiagram, 'patch').kind,
+    'linkedStale',
+  )
+})
+
 test('corner-invalid updates are atomic, keep fallback snapshots, and recover', () => {
   const linked = createLinkedPatch(createPathSourceDiagram())
   const before = findCoonsPatch(linked, 'patch').primitive
@@ -499,6 +737,93 @@ test('source deletion keeps fallback geometry and Undo restores an up-to-date li
   assert.deepEqual(coonsPatchBoundaryLinkStatus(undone.editableDiagram, 'patch'), {
     kind: 'linkedUpToDate',
   })
+})
+
+test('dangling point source ids stay reserved through creation and Undo recovery', () => {
+  const linked = createConstantPointPatch(
+    createConstantPointSourceDiagram(false, 'point-1'),
+    'point-1',
+  )
+  const initialState = createEditorState(linked)
+  const fallback = structuredClone(
+    findCoonsPatch(linked, 'point-patch').primitive,
+  )
+  const deleted = commitDiagramChange(initialState, {
+    ...initialState,
+    editableDiagram: {
+      ...linked,
+      strata: linked.strata.filter((stratum) => stratum.id !== 'point-1'),
+    },
+  })
+  const createdPoint = addPointStratumWithResult(
+    deleted.editableDiagram,
+    point(9, 9, 9),
+  )
+
+  assert.notEqual(createdPoint.id, 'point-1')
+
+  const created = commitDiagramChange(deleted, {
+    ...deleted,
+    editableDiagram: createdPoint.diagram,
+  })
+  const stalePatch = findCoonsPatch(created.editableDiagram, 'point-patch')
+
+  assert.deepEqual(stalePatch.primitive.boundarySources?.bottom, {
+    kind: 'point',
+    sourcePointId: 'point-1',
+  })
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(created.editableDiagram, 'point-patch').kind,
+    'linkedStale',
+  )
+  assert.deepEqual(stalePatch.primitive, fallback)
+
+  const withoutCreatedPoint = undoLastDiagramChange(created)
+  const restoredSource = undoLastDiagramChange(withoutCreatedPoint)
+
+  assert.notEqual(
+    restoredSource.editableDiagram.strata.find(
+      (stratum) => stratum.id === 'point-1',
+    ),
+    undefined,
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(
+      restoredSource.editableDiagram,
+      'point-patch',
+    ),
+    { kind: 'linkedUpToDate' },
+  )
+})
+
+test('loaded dangling point source ids remain reserved for new elements', () => {
+  const linked = createConstantPointPatch(
+    createConstantPointSourceDiagram(false, 'point-1'),
+    'point-1',
+  )
+  const dangling = {
+    ...linked,
+    strata: linked.strata.filter((stratum) => stratum.id !== 'point-1'),
+  }
+  const parsed = parseSavedDiagramJson(serializeDiagram(dangling))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const created = addPointStratumWithResult(parsed.diagram, point(4, 5, 6))
+
+  assert.notEqual(created.id, 'point-1')
+  assert.deepEqual(
+    findCoonsPatch(created.diagram, 'point-patch').primitive.boundarySources
+      ?.bottom,
+    { kind: 'point', sourcePointId: 'point-1' },
+  )
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(created.diagram, 'point-patch').kind,
+    'linkedStale',
+  )
 })
 
 test('source refresh and snapshots are one stable undo/redo transaction', () => {
@@ -950,7 +1275,78 @@ function createLinkedPatch(
   return result.diagram
 }
 
-function createConstantPointSourceDiagram(withAnchor: boolean): Diagram {
+function createSymbolicEndpointLinkedPatch(): Diagram {
+  const diagram = createPathSourceDiagram()
+  const bottom = findPolyline(diagram, 'bottom')
+
+  diagram.variables = [symbolicVariableR(1)]
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === bottom.id
+      ? {
+          ...bottom,
+          points: bottom.points.map((value, index) =>
+            index === 2
+              ? symbolicCoordinatePoint(value, 'x', 'R')
+              : value,
+          ),
+        }
+      : stratum,
+  )
+
+  return createLinkedPatch(diagram)
+}
+
+function createSymbolicInteriorLinkedPatch(): Diagram {
+  const diagram = createPathSourceDiagram()
+  const bottom = findPolyline(diagram, 'bottom')
+
+  diagram.variables = [symbolicVariableR(0.1)]
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === bottom.id
+      ? {
+          ...bottom,
+          points: bottom.points.map((value, index) =>
+            index === 1
+              ? symbolicCoordinatePoint(value, 'z', 'R')
+              : value,
+          ),
+        }
+      : stratum,
+  )
+
+  return createLinkedPatch(diagram)
+}
+
+function symbolicVariableR(value: number) {
+  return {
+    id: 'variable-r',
+    name: 'R',
+    macroName: 'stzR',
+    expression: `${value}`,
+    previewValue: value,
+  }
+}
+
+function symbolicCoordinatePoint(
+  value: Vec3,
+  axis: 'x' | 'y' | 'z',
+  expression: string,
+): Vec3 {
+  const symbolic = symbolicVec3FromVec3(value)
+
+  symbolic[axis] = {
+    kind: 'symbolic',
+    expression,
+    previewValue: value[axis],
+  }
+
+  return { ...value, symbolic }
+}
+
+function createConstantPointSourceDiagram(
+  withAnchor: boolean,
+  sourcePointId = 'constant-point',
+): Diagram {
   const diagram = createEmptyDiagram({ ambientDimension: 3 })
   let position = point(0, 0, 0)
   let coordinateAnchors: CoordinateAnchor[] = []
@@ -972,12 +1368,15 @@ function createConstantPointSourceDiagram(withAnchor: boolean): Diagram {
   return {
     ...diagram,
     coordinateAnchors,
-    strata: [pointStratum('constant-point', position, 3)],
+    strata: [pointStratum(sourcePointId, position, 3)],
   }
 }
 
-function createConstantPointPatch(diagram: Diagram): Diagram {
-  const pointSource = { kind: 'point' as const, sourcePointId: 'constant-point' }
+function createConstantPointPatch(
+  diagram: Diagram,
+  sourcePointId = 'constant-point',
+): Diagram {
+  const pointSource = { kind: 'point' as const, sourcePointId }
   const result = createCoonsPatchFromBoundaryPaths(
     diagram,
     {
@@ -1070,6 +1469,16 @@ function findCoonsPatch(diagram: Diagram, id: string): CurvedSheetStratum & {
   return stratum as CurvedSheetStratum & {
     primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
   }
+}
+
+function findPolyline(diagram: Diagram, id: string): PolylineCurveStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (stratum?.geometricKind !== 'curve' || stratum.kind !== 'polyline') {
+    throw new Error(`Expected polyline ${id}.`)
+  }
+
+  return stratum
 }
 
 function pathBoundary(

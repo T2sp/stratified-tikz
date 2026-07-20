@@ -28,6 +28,8 @@ export type UndoableEditorState = {
 
 export type CommitDiagramChangeOptions = {
   undoSourceDiagram?: Diagram
+  /** The next diagram owns its own linked-snapshot fallbacks. */
+  replaceDiagram?: boolean
 }
 
 export function createDiagramHistory(diagram: Diagram): DiagramHistory {
@@ -44,7 +46,7 @@ export function commitDiagramChange<T extends UndoableEditorState>(
   options: CommitDiagramChangeOptions = {},
 ): T {
   const synchronizedDiagram = synchronizeLinkedCoonsPatches(
-    current.editableDiagram,
+    options.replaceDiagram === true ? null : current.editableDiagram,
     next.editableDiagram,
   ).diagram
   const synchronizedNext =

@@ -30,6 +30,7 @@ import {
   type CoonsPatchBoundarySource,
   type CoonsPatchBoundarySources,
   type CoonsPatchPrimitive,
+  type CubicBezierControlMode,
   type CurveStratum,
   type Diagram,
   type PathSegment,
@@ -180,14 +181,22 @@ export function synchronizeLinkedCoonsPatches(
       }
     }
 
-    if (sourcesChanged && nextInspection.candidate === null && previousPrimitive !== null) {
+    if (sourcesChanged && nextInspection.candidate === null) {
+      const fallbackPrimitive =
+        previousPrimitive === null
+          ? stratum.primitive
+          : restorePreviousCoonsPatchBoundaries(
+              stratum.primitive,
+              previousPrimitive,
+            )
+
       changed = true
       return {
         ...stratum,
-        primitive: restorePreviousCoonsPatchBoundaries(
-          stratum.primitive,
-          previousPrimitive,
-        ),
+        // A stale linked fallback must be independent of current variable
+        // values. Freeze only these last-valid snapshots to their numeric
+        // previews; source strata and static Coons snapshots stay symbolic.
+        primitive: materializeLinkedCoonsPatchFallback(fallbackPrimitive),
       }
     }
 
@@ -781,6 +790,123 @@ function restorePreviousCoonsPatchBoundaries(
     top: cloneCoonsBoundarySnapshot(previousPrimitive.top),
     left: cloneCoonsBoundarySnapshot(previousPrimitive.left),
   }
+}
+
+function materializeLinkedCoonsPatchFallback(
+  primitive: CoonsPatchPrimitive,
+): CoonsPatchPrimitive {
+  return {
+    ...primitive,
+    bottom: materializeCoonsBoundarySnapshot(primitive.bottom),
+    right: materializeCoonsBoundarySnapshot(primitive.right),
+    top: materializeCoonsBoundarySnapshot(primitive.top),
+    left: materializeCoonsBoundarySnapshot(primitive.left),
+  }
+}
+
+function materializeCoonsBoundarySnapshot(
+  boundary: CoonsBoundarySnapshot,
+): CoonsBoundarySnapshot {
+  if (isCoonsConstantPointBoundary(boundary)) {
+    return {
+      kind: 'constantPoint',
+      ...(boundary.sourceId === undefined ? {} : { sourceId: boundary.sourceId }),
+      ...(boundary.name === undefined ? {} : { name: boundary.name }),
+      point: numericVec3(boundary.point),
+    }
+  }
+
+  return {
+    ...(boundary.id === undefined ? {} : { id: boundary.id }),
+    ...(boundary.name === undefined ? {} : { name: boundary.name }),
+    segments: boundary.segments.map(materializePathSegment),
+  }
+}
+
+function materializePathSegment(segment: PathSegment): PathSegment {
+  const styleOverride =
+    segment.styleOverride === undefined
+      ? {}
+      : { styleOverride: { ...segment.styleOverride } }
+
+  switch (segment.kind) {
+    case 'line':
+      return {
+        kind: 'line',
+        start: numericVec3(segment.start),
+        end: numericVec3(segment.end),
+        ...styleOverride,
+      }
+    case 'cubicBezier':
+      return {
+        kind: 'cubicBezier',
+        start: numericVec3(segment.start),
+        control1: numericVec3(segment.control1),
+        control2: numericVec3(segment.control2),
+        end: numericVec3(segment.end),
+        ...(segment.controlMode === undefined
+          ? {}
+          : {
+              controlMode: materializeCubicBezierControlMode(
+                segment.controlMode,
+              ),
+            }),
+        ...styleOverride,
+      }
+    case 'arc':
+      return {
+        kind: 'arc',
+        start: numericVec3(segment.start),
+        end: numericVec3(segment.end),
+        center: numericVec3(segment.center),
+        radius: arcScalarPreviewValue(segment.radius),
+        startAngleDeg: arcScalarPreviewValue(segment.startAngleDeg),
+        endAngleDeg: arcScalarPreviewValue(segment.endAngleDeg),
+        direction: segment.direction,
+        ...(segment.frame === undefined
+          ? {}
+          : { frame: materializeWorkPlaneFrame(segment.frame) }),
+        ...styleOverride,
+      }
+  }
+}
+
+function materializeCubicBezierControlMode(
+  controlMode: CubicBezierControlMode,
+): CubicBezierControlMode {
+  switch (controlMode.kind) {
+    case 'absolute':
+      return { kind: 'absolute' }
+    case 'relativeCartesian':
+      return {
+        ...controlMode,
+        firstControlOffset: numericVec3(controlMode.firstControlOffset),
+        secondControlOffset: numericVec3(controlMode.secondControlOffset),
+      }
+    case 'relativePolar':
+      return structuredClone(controlMode) as CubicBezierControlMode
+    case 'workPlaneRelativeCartesian':
+    case 'workPlaneRelativePolar':
+      return {
+        ...structuredClone(controlMode),
+        frame: materializeWorkPlaneFrame(controlMode.frame),
+      }
+  }
+}
+
+function materializeWorkPlaneFrame(
+  frame: WorkPlaneFrameSnapshot,
+): WorkPlaneFrameSnapshot {
+  return {
+    origin: numericVec3(frame.origin),
+    u: numericVec3(frame.u),
+    v: numericVec3(frame.v),
+    normal: numericVec3(frame.normal),
+  }
+}
+
+function numericVec3(point: Vec3): Vec3 {
+  return { x: point.x, y: point.y, z: point.z }
 }
 
 function coonsPatchBoundaryGeometryFingerprint(

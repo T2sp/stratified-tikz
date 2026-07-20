@@ -1898,16 +1898,20 @@ function App() {
     setCreationTool('select')
     updatePreviewCoordinateInputMode(defaultPreviewCoordinateInputMode())
     setEditorState((current) =>
-      commitDiagramChange(current, {
-        ...current,
-        editableDiagram: diagram,
-        selectedElement: null,
-        layerFilter: allLayersFilter,
-        polylineDraft: null,
-        cubicBezierDraft: null,
-        pathDraft: null,
-        sheetPolygonDraft: null,
-      }),
+      commitDiagramChange(
+        current,
+        {
+          ...current,
+          editableDiagram: diagram,
+          selectedElement: null,
+          layerFilter: allLayersFilter,
+          polylineDraft: null,
+          cubicBezierDraft: null,
+          pathDraft: null,
+          sheetPolygonDraft: null,
+        },
+        { replaceDiagram: true },
+      ),
     )
     setCopyStatus('idle')
     setPolylineStatus('')
