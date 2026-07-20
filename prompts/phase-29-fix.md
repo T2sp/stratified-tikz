@@ -1,4 +1,4 @@
-# Phase 29 Targeted Fix Prompt 3: Symbolic stale fallback persistence and dangling source-ID reservation
+# Phase 29 Targeted Fix Prompt 4: Variable ID allocation and linked-Coons documentation
 
 ## Environment
 
@@ -14,10 +14,11 @@ PATH=/opt/homebrew/bin:$PATH
 Required verification:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts
+PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts tests/model/diagramIds.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
+git diff --cached --check
 ```
 
 Run lint only if the repository is already established as repository-wide lint-clean:
@@ -30,410 +31,271 @@ Do not add dependencies.
 
 ## Project context
 
-You are fixing two verified Phase 29 correctness issues in StratifiedTikZ:
+You are applying one narrowly targeted Phase 29 correctness fix in StratifiedTikZ:
 
 ```text
 https://github.com/T2sp/stratified-tikz
 ```
 
-Review the actual current working tree and commit history before editing. Line numbers in the review may have moved.
+Review the actual current working tree before editing. Line numbers from the review may have moved.
 
 Read at least:
 
 - `AGENTS.md`;
 - `prompts/phase-29-implement.md`;
 - `prompts/phase-29-review.md`;
-- any earlier Phase 29 fix prompts present in the repository;
-- `src/model/coonsPatchLinks.ts`;
-- `src/model/serialization.ts`;
-- `src/model/symbolicCoordinates.ts`;
-- `src/model/variables.ts`;
-- `src/model/validation.ts`;
+- prior Phase 29 fix prompts present in the repository;
+- `src/ui/VariableManager.tsx`;
 - `src/model/diagramIds.ts`;
-- `src/ui/diagramUpdates.ts`;
-- `src/ui/undo.ts`;
-- the JSON-load path in `src/App.tsx`;
+- `src/model/variables.ts`;
+- the Coons boundary-source types in `src/model/types.ts`;
+- the JSON parsing/loading helpers;
+- `tests/model/diagramIds.test.ts`;
 - `tests/integration/phase29LinkedCoonsPatches.test.ts`;
-- existing symbolic-coordinate, serialization, ID-generation, and undo/redo tests.
+- any existing Variable Manager or symbolic-variable tests;
+- `docs/DATA_MODEL.md`.
 
-Search for all callers of:
+Search for all variable-ID allocation paths and all callers of:
 
-- `refreshDiagramSymbolicCoordinatePreviews`;
-- `synchronizeLinkedCoonsPatches`;
 - `collectTopLevelDiagramIds`;
-- `makeUniqueId`;
-- JSON parse/import helpers;
-- linked Coons boundary-source ID collectors.
+- `nextVariableId`;
+- `addSymbolicVariableToDiagram`;
+- `makeUniqueId`.
 
-## Review findings to fix
+## Verified review finding
 
-### Critical: symbolic stale fallback can become unloadable
+Phase 29 now reserves dangling Coons boundary-source IDs through the shared top-level diagram ID collector.
 
-Verified sequence:
+However, the in-app Variable Manager still has its own ID allocator. Its `nextVariableId()` builds a set from current variables, strata, and labels instead of using the shared reserved-ID collector.
 
-1. A linked Coons patch is valid while a source boundary uses symbolic variable `R`.
-2. Changing `R` changes the resolved source endpoint and temporarily breaks a Coons corner equation.
-3. Synchronization correctly reports `linkedStale` and retains the previous numeric materialized snapshots in memory.
-4. The diagram is serialized.
-5. During load, symbolic preview refresh reevaluates the saved fallback snapshot expressions using the current variable values.
-6. Initial diagram validation then rejects the Coons patch with a corner mismatch before linked synchronization can preserve or repair the fallback.
+Verified failure:
 
-The saved last-valid materialized geometry must remain loadable and usable even when the current symbolic source values make the link stale.
+1. A linked Coons patch retains a dangling boundary source ID `variable-1`.
+2. No symbolic variable currently uses `variable-1`.
+3. The user clicks `Add variable`.
+4. Variable Manager allocates `variable-1`.
+5. The variable insertion accepts that ID.
 
-### Medium: dangling source IDs can be reused
+This violates the Phase 29 identity-reservation rule. A source ID retained by `boundarySources` must remain reserved even while its source stratum is missing.
 
-Verified sequence:
-
-1. A linked point source has ID `point-1`.
-2. The source is deleted; the patch correctly becomes stale and keeps its last-valid snapshots.
-3. A new unrelated point is created.
-4. Auto-ID generation reuses `point-1`.
-5. The dangling link silently attaches to the unrelated point and the patch becomes incorrectly up to date.
-
-IDs retained by `boundarySources` must remain reserved while the link exists, even if the referenced source stratum is currently missing.
+There is also one contradictory sentence in `docs/DATA_MODEL.md` that still describes both ruled surfaces and Coons patches as non-live copied snapshots.
 
 ## Goal
 
-Fix only these Phase 29 issues.
+Fix only the remaining ID-allocation gap and documentation contradiction.
 
 After the fix:
 
-- a stale linked Coons patch with symbolic boundaries can be saved and loaded;
-- load preserves that file's own last-valid materialized snapshots;
-- Preview, SVG export, and TikZ export continue to use the last-valid snapshots while stale;
-- repairing the symbolic sources causes the patch to catch up automatically;
-- autogenerated IDs never reuse a path or point ID still referenced by a Coons `boundarySources` record;
-- deleting a source followed by creating unrelated elements cannot hijack the link;
-- static and legacy Coons patches keep their existing behavior;
-- ruled surfaces remain snapshot-only;
-- source edits and synchronization remain one undo/redo transaction.
+- Variable Manager uses the same shared reserved top-level ID set as other element-creation paths;
+- `Add variable` cannot reuse any dangling `sourcePathId` or `sourcePointId` retained by a linked Coons patch;
+- loaded diagrams receive the same protection before any new variable is added;
+- ordinary variable allocation remains deterministic;
+- existing linked-Coons synchronization, fallback, history, rendering, export, and serialization behavior is unchanged;
+- the data-model documentation accurately distinguishes ruled surfaces from optionally linked Coons patches.
 
-## Fix 1: preserve linked materialized snapshots during symbolic refresh
+## Required implementation
 
-### Required invariant
+### 1. Use the shared reserved ID collector
 
-For a linked Coons patch, the stored `bottom`, `right`, `top`, and `left` boundaries are materialized geometry.
-
-They must be replaced only by successful atomic linked-source synchronization.
-
-A general symbolic-preview refresh must not independently rewrite those four materialized boundaries and thereby destroy the last-valid fallback.
-
-This is especially important:
-
-- after a symbolic variable edit;
-- while a linked patch is stale;
-- during ordinary JSON load;
-- during pending symbolic import resolution;
-- before initial diagram validation.
-
-### Recommended implementation direction
-
-Update the symbolic preview refresh traversal so that materialized snapshots belonging to a Coons patch with structurally valid `boundarySources` are not directly reevaluated.
+Update Variable Manager’s variable-ID allocation to use the existing shared collector from `src/model/diagramIds.ts`.
 
 Conceptually:
 
 ```ts
-if (
-  primitive.kind === 'coonsPatch' &&
-  primitive.boundarySources !== undefined
-) {
-  // Preserve materialized bottom/right/top/left snapshots.
-  // Their linked source strata are refreshed elsewhere.
-  // synchronizeLinkedCoonsPatches is the only operation that may
-  // replace these snapshots after resolving and validating all four sources.
+import { collectTopLevelDiagramIds } from '../model/diagramIds.ts'
+
+function nextVariableId(diagram: Diagram): string {
+  const usedIds = collectTopLevelDiagramIds(diagram)
+
+  let index = (diagram.variables ?? []).length + 1
+  while (usedIds.has(`variable-${index}`)) {
+    index += 1
+  }
+
+  return `variable-${index}`
 }
 ```
 
-The exact helper and location should follow the current architecture.
+Adapt names and location to current repository conventions.
 
 Requirements:
 
-- continue refreshing symbolic previews in the linked source paths and points;
-- continue refreshing other diagram geometry normally;
-- continue the existing behavior for static Coons patches without `boundarySources`;
-- do not globally disable symbolic preview evaluation for curved sheets;
-- do not alter ruled-surface behavior;
-- do not strip symbolic metadata from unrelated geometry;
-- do not make rendering or export resolve source IDs at runtime.
+- do not maintain a second hand-written list of diagram entity IDs in `VariableManager.tsx`;
+- use the collector that already includes:
+  - ordinary top-level IDs;
+  - variables;
+  - coordinate anchors and other existing reserved top-level entities;
+  - dangling linked Coons `sourcePathId` values;
+  - dangling linked Coons `sourcePointId` values;
+- preserve the current deterministic `variable-N` naming policy unless a minimal helper extraction naturally improves it;
+- preserve global top-level ID uniqueness across entity kinds;
+- keep malformed-link handling defensive through the shared collector;
+- do not introduce a persistent tombstone registry;
+- do not detach, rewrite, or automatically relink Coons boundary sources;
+- do not alter `boundarySources` metadata.
 
-After source previews are refreshed, the existing central synchronization step must:
+If `nextVariableId` is difficult to test while private inside the React component, extract the allocation into a small pure helper in an appropriate existing utility/model module, or export a narrowly scoped helper.
 
-1. resolve all four linked sources from the refreshed diagram;
-2. build one complete candidate;
-3. detach/normalize according to the existing snapshot policy;
-4. validate all boundaries and corner equations;
-5. replace all four materialized snapshots only if the candidate is valid;
-6. otherwise leave all four previous/saved snapshots unchanged.
+Do not add a UI testing dependency solely for this fix.
 
-### Load ordering and validation
+### 2. Check for other variable allocator bypasses
 
-Ensure both normal JSON loading and symbolic import resolution follow safe semantics:
+Search the repository for any other code path that generates IDs for new symbolic variables.
 
-1. parse and structurally normalize the saved file;
-2. reject malformed `boundarySources` safely, without throwing;
-3. resolve variables and refresh source geometry;
-4. preserve linked Coons materialized fallback snapshots during that refresh;
-5. perform full linked Coons synchronization;
-6. if synchronization succeeds, use the refreshed candidate;
-7. if synchronization fails, retain the saved fallback snapshots and stale link metadata;
-8. run final full diagram validation;
-9. return a loadable diagram whose materialized Coons primitive is valid.
+All normal creation paths must use the shared reserved-ID semantics.
 
-Do not solve this by weakening `validateCurvedSheetPrimitive`, skipping final validation, or accepting an actually invalid materialized Coons primitive.
+Do not perform a broad ID-system refactor. Change only real bypasses found during the search.
 
-Do not use snapshots from a previously open document as load fallback. The fallback must come from the file being loaded.
+Do not change validation or synchronization code unless a focused test proves a necessary issue directly related to this allocator gap.
 
-Keep the existing replacement-diagram/load protections added by earlier Phase 29 fixes.
+### 3. Correct `docs/DATA_MODEL.md`
 
-### Symbolic fallback persistence
+Find the remaining paragraph that says ruled surfaces and Coons patches are both copied snapshots that are “not live references to source path strata.”
 
-For a stale linked patch:
+Replace it with wording that reflects the Phase 29 model accurately.
 
-- serialization must retain valid materialized fallback geometry;
-- parsing the serialized file must return `{ ok: true }`;
-- the loaded patch must remain `linkedStale`;
-- the loaded snapshots must geometrically equal the saved last-valid snapshots;
-- current symbolic source values must remain in the loaded source strata;
-- changing variables or boundaries back to a compatible state must make the patch `linkedUpToDate`;
-- recovery must replace the materialized snapshots with the current valid linked-source geometry.
+The revised text should clearly state:
 
-Prefer preserving the existing symbolic representation and export behavior where possible. Do not globally bake all symbolic coordinates to numeric literals merely to bypass the load lifecycle.
+- ruled surfaces remain snapshot-only;
+- every Coons patch retains materialized boundary snapshots used by sampling, Preview, SVG export, and TikZ export;
+- a Coons patch may additionally store optional `boundarySources`;
+- linked Coons snapshots are refreshed atomically after valid source changes;
+- static/legacy Coons patches without `boundarySources` do not follow source edits;
+- stale or missing linked sources retain the last valid materialized snapshots.
 
-If a narrowly scoped materialization helper is necessary, apply it only to linked Coons fallback snapshots and document why it does not alter static Coons or source-path symbolic semantics.
+A suitable wording is:
 
-### Symbolic import path
+```markdown
+Ruled surfaces remain snapshot-only and are not live references to source path
+strata. Coons patches also retain materialized boundary snapshots, but Phase 29
+allows them to store optional `boundarySources`. When those links are present,
+valid source changes atomically refresh the materialized snapshots; missing or
+invalid sources leave the last valid snapshots in place. Coons patches without
+`boundarySources` remain static.
+```
 
-Apply the same guarantees to:
-
-- `parseSavedDiagramJson`;
-- `parseSavedDiagramJsonForImport`;
-- `resolvePendingSymbolicDiagramImport`;
-
-where applicable.
-
-A pending symbolic import must not reevaluate and invalidate a linked patch's saved fallback before full synchronization has a chance to succeed or retain it.
-
-## Fix 2: reserve dangling Coons boundary-source IDs
-
-### Required invariant
-
-A non-empty source ID stored in a structurally valid linked Coons `boundarySources` record is reserved diagram identity until:
-
-- the link is detached;
-- the link is explicitly changed in a future feature; or
-- the patch is deleted.
-
-The ID remains reserved even when no current stratum has that ID.
-
-### ID collection
-
-Update the ID set used by autogenerated top-level element creation so it includes:
-
-- every linked path `sourcePathId`;
-- every linked point `sourcePointId`;
-- all four Coons boundary roles;
-- dangling IDs as well as currently resolved IDs.
-
-A suitable implementation may:
-
-- extend `collectTopLevelDiagramIds`; or
-- introduce a clearly named `collectReservedDiagramIds` helper and update all relevant auto-ID call sites.
-
-Choose the smallest coherent change.
-
-Requirements:
-
-- handle malformed metadata defensively;
-- ignore empty IDs rather than reserving `''`;
-- avoid introducing an import cycle between generic ID collection and Coons-link helpers;
-- do not add a separate persistent tombstone registry;
-- do not silently remove dangling links;
-- do not automatically retarget links by matching names or geometry;
-- preserve existing duplication/remapping behavior.
-
-Inspect every `makeUniqueId` or equivalent call site to confirm that newly created strata cannot reuse dangling linked source IDs.
-
-If top-level IDs are globally unique across entity kinds, preserve that global uniqueness policy.
-
-### Required behavior after source deletion
-
-Given a linked source `point-1`:
-
-1. delete `point-1`;
-2. verify the patch remains stale and retains `sourcePointId: 'point-1'`;
-3. create an unrelated point through the normal creation/update helper;
-4. verify its generated ID is not `point-1`;
-5. verify the patch remains stale;
-6. verify the fallback snapshots remain unchanged;
-7. Undo the source deletion and verify the original source restores the link coherently.
-
-Also cover path source IDs at the lower-level ID-collection/helper level, even if the full integration reproduction uses a point.
-
-A dangling linked ID loaded from JSON must also be reserved before the user creates a new element.
+Adjust the paragraph to fit the surrounding prose and avoid duplicating a nearby explanation.
 
 ## Regression tests
 
-Extend `tests/integration/phase29LinkedCoonsPatches.test.ts` and add focused lower-level tests where appropriate.
+Add focused coverage for the actual UI allocation path or its extracted pure helper.
 
-### 1. Symbolic stale save/load/recovery
+### Required regression: loaded dangling `variable-1`
 
-Create a valid linked Coons patch whose source boundary depends on symbolic variable `R`.
+Construct or load a valid diagram containing:
 
-Test the complete sequence:
+- a linked Coons patch;
+- structurally valid `boundarySources`;
+- a missing path or point source whose retained source ID is exactly `variable-1`;
+- no existing symbolic variable with ID `variable-1`;
+- valid last-known materialized Coons snapshots.
 
-1. Start with a variable value that gives valid matching corners.
-2. Change `R` so a source endpoint moves and a corner mismatch occurs.
-3. Confirm:
-   - the source preview reflects the new variable value;
-   - the link status is `linkedStale`;
-   - all four materialized patch snapshots retain the previous valid geometry.
-4. Serialize the diagram.
-5. Parse with `parseSavedDiagramJson`.
-6. Assert parsing succeeds.
-7. Confirm:
-   - the loaded source still reflects the current symbolic variable value;
-   - the loaded patch retains the saved last-valid snapshots;
-   - the loaded status is `linkedStale`;
-   - `validateDiagram` succeeds;
-   - sampling, SVG export, and TikZ export do not throw and use the fallback geometry.
-8. Repair the symbolic condition, either by restoring `R` or updating an adjacent source.
-9. Synchronize through the normal diagram-update path.
-10. Confirm the patch becomes `linkedUpToDate` and adopts the current source geometry.
+Then exercise the same allocator used by Variable Manager’s `Add variable`.
 
-Assert geometry, not only status strings.
+Assert:
 
-### 2. Successful symbolic update
+1. `collectTopLevelDiagramIds(diagram)` contains `variable-1`;
+2. the next generated variable ID is not `variable-1`;
+3. under the current deterministic policy, it is the expected next available `variable-N`;
+4. adding the variable succeeds;
+5. the linked Coons patch still retains its original dangling source ID;
+6. the patch remains stale rather than being considered linked to the new variable;
+7. the materialized fallback snapshots remain unchanged.
 
-Add or retain a case where a symbolic variable change keeps all four corners valid.
+The regression should include the load/parse path, not only a manually assembled in-memory diagram, because the review specifically requires protection for loaded linked metadata.
 
-Verify that linked synchronization still refreshes the patch successfully. This guards against an over-broad "never refresh linked symbolic snapshots" fix.
+### Ordinary allocation regression
 
-### 3. Static Coons symbolic behavior
+Verify that an ordinary diagram with no collision or reserved dangling ID still allocates the expected first available `variable-N`.
 
-Where the repository supports symbolic snapshots in a static Coons patch, verify that Phase 29's skip is limited to linked patches and does not unintentionally change static snapshot behavior.
+### Cross-kind reservation regression
 
-If static symbolic Coons snapshots are not a supported construct, document that fact in the test or implementation report rather than inventing new behavior.
+Where practical, verify that variable allocation respects a reserved Coons source ID even though the eventual new entity is a symbolic variable rather than a path or point.
 
-### 4. Symbolic import path
+This is intentional because top-level IDs are globally unique.
 
-Add a focused regression for the pending symbolic import path when practical:
+### Existing tests
 
-- load/import a linked Coons patch with symbolic source metadata;
-- resolve variables to a temporarily incompatible value;
-- ensure the API returns a normal result with last-valid fallback rather than a corner-validation error or exception.
+Keep all prior Phase 29 and ID tests passing, including:
 
-At minimum, directly test every production path changed to implement the fix.
-
-### 5. Dangling point-source ID reservation
-
-Use the real creation or ID-generation helper:
-
-1. Create a linked patch referring to point `point-1`.
-2. Delete `point-1`.
-3. Create an unrelated point.
-4. Assert the new point ID is not `point-1`.
-5. Assert the linked patch still references `point-1`.
-6. Assert status remains stale and geometry remains unchanged.
-
-Do not satisfy this test by manually assigning a non-conflicting ID.
-
-### 6. Dangling path-source ID reservation
-
-Add a focused ID-collection test proving a dangling path `sourcePathId` is included in the reserved/used ID set.
-
-### 7. Loaded dangling ID reservation
-
-Serialize and reload a diagram with a dangling linked source ID, then create a new element through the normal helper.
-
-Verify the loaded dangling ID is still not reused.
-
-### 8. Detach releases only the link reservation
-
-Where deterministic ID-generation semantics make this practical, verify that detaching removes the boundary-source reference from the reserved-ID set.
-
-Do not require the next generated ID to reuse the released value if the existing generator intentionally remains monotonic or other entities still reserve it.
-
-### 9. Existing regressions
-
-Keep all earlier Phase 29 regressions passing, especially:
-
-- malformed metadata returns `{ ok: false }` rather than throwing;
-- same-ID replacement document load preserves the loaded file's own snapshots;
-- partial layer translation retains previous last-valid snapshots;
-- repeated stale edits cannot drift fallback geometry;
-- numeric dangling-source JSON remains loadable;
-- source deletion and Undo recovery;
-- duplication and source-ID remapping;
+- dangling point/path source IDs collected by the shared helper;
+- source deletion followed by normal point creation;
+- loaded dangling IDs;
+- symbolic stale save/load/recovery;
+- malformed link metadata;
+- same-ID replacement-document load;
+- stale fallback protection during transforms;
+- detach;
+- duplication/remapping;
 - one-step Undo/Redo;
 - static and legacy Coons behavior.
+
+If there is an existing Variable Manager test file, place the focused allocator regression there. Otherwise, add the smallest appropriately named model/UI utility test without introducing new dependencies.
 
 ## Scope constraints
 
 Do not:
 
-- redesign Phase 29;
-- introduce a general dependency graph;
-- add persistent ID tombstones;
-- resolve linked sources during sampling, rendering, SVG export, or TikZ export;
-- weaken Coons validation;
-- drop symbolic expressions globally;
-- change the Coons formula or sampling;
-- change JSON format/version unless absolutely required;
-- auto-repair corner mismatches;
-- auto-relink missing sources;
-- change ruled-surface linking behavior;
-- perform unrelated UI or architecture cleanup.
+- change Coons synchronization;
+- change stale fallback behavior;
+- change rendering, SVG export, or TikZ export;
+- change undo/redo behavior;
+- change JSON schema or version;
+- change linked-Coons creation defaults;
+- change duplication/remapping;
+- change ruled surfaces;
+- add automatic source recovery or relinking;
+- redesign all ID generation;
+- add dependencies;
+- perform unrelated UI cleanup.
 
-Keep the diff targeted and explain any helper extraction.
+Keep the diff small and targeted.
 
 ## Verification
 
-Run exactly:
+Run:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts
+PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts tests/model/diagramIds.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
+git diff --cached --check
 ```
 
-Also run any focused symbolic-coordinate, serialization, diagram-ID, and undo tests affected by the implementation.
+Also run the focused Variable Manager or variable-ID test file added or modified by this fix.
 
-If a local dev server cannot start because the sandbox denies `listen`, report that limitation accurately. Do not claim browser verification was performed.
+If the local development server cannot start because the sandbox denies `listen`, report that limitation accurately. Do not claim browser verification was performed.
 
 ## Acceptance criteria
 
-This targeted fix is complete only when:
+This targeted Phase 29 fix is complete only when:
 
-- symbolic variable changes can make a linked patch stale without changing its last-valid materialized snapshots;
-- such a stale diagram serializes and loads successfully;
-- load keeps the file's own fallback snapshots and current symbolic source state;
-- stale status survives load and recovery works after source repair;
-- final loaded diagrams still pass normal full validation;
-- autogenerated IDs include dangling Coons boundary-source IDs in their reserved set;
-- deletion followed by unrelated element creation does not hijack a link;
-- loaded dangling links are also protected from ID reuse;
-- existing malformed-metadata, replacement-load, transform, duplication, undo/redo, SVG, and TikZ behavior remains correct;
-- focused tests, the full suite, build, and `git diff --check` pass.
+- Variable Manager no longer builds its own incomplete used-ID set;
+- its Add variable path uses the shared reserved diagram ID collector;
+- a loaded dangling Coons source ID `variable-1` cannot be reused by a newly added variable;
+- normal variable allocation remains deterministic;
+- linked Coons metadata and stale fallback geometry remain unchanged by variable creation;
+- `docs/DATA_MODEL.md` no longer implies that all Coons patches are permanently static;
+- synchronization, history, save/load, Preview, SVG, and TikZ behavior are unchanged;
+- focused tests, the full suite, build, `git diff --check`, and `git diff --cached --check` pass.
 
 ## Report after implementation
 
 Report:
 
 - files modified;
-- root cause of the symbolic stale load failure;
-- exact symbolic-refresh ownership rule adopted for linked Coons snapshots;
-- load/import ordering changes, if any;
-- how final validation remains strict;
-- root cause of dangling ID reuse;
-- ID-collection/generation changes;
-- how point and path source IDs are reserved;
+- root cause of the allocator bypass;
+- whether `nextVariableId` was updated in place or extracted;
+- how the shared reserved ID set is now used;
+- other variable-ID generation paths inspected;
 - regression tests added or updated;
-- focused Phase 29 test result;
-- additional focused test results;
+- documentation wording changed;
+- focused test results;
 - full `npm test` result;
 - `npm run build` result;
 - lint result, if run;
 - `git diff --check` result;
+- `git diff --cached --check` result;
 - manual verification performed or the exact reason it was unavailable;
 - remaining known limitations.
