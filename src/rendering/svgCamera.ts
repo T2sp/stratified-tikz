@@ -15,6 +15,7 @@ export type ResolveSvgCameraOptions = {
   fitToView?: boolean
   padding?: number
   extraPointsForFit?: readonly Vec3[]
+  curvedSheetVerticesById?: ReadonlyMap<string, readonly Vec3[]>
   cameraOverride?: Camera
   viewAdjustment?: CameraViewAdjustment
 }
@@ -38,6 +39,7 @@ export function resolveSvgCamera(
         height,
         options.padding ?? defaultPreviewPadding,
         options.extraPointsForFit ?? [],
+        options.curvedSheetVerticesById,
       )
     : baseDiagram.camera
 
@@ -86,8 +88,12 @@ export function fitCameraToDiagram(
   height: number,
   padding: number,
   extraPointsForFit: readonly Vec3[],
+  curvedSheetVerticesById?: ReadonlyMap<string, readonly Vec3[]>,
 ): Camera {
-  const modelPoints = [...collectDiagramPoints(diagram), ...extraPointsForFit]
+  const modelPoints = [
+    ...collectDiagramPoints(diagram, curvedSheetVerticesById),
+    ...extraPointsForFit,
+  ]
   const unitCamera = cameraWithUnitView(diagram.camera)
   const projectedPoints = modelPoints.map((point) => projectVec3(unitCamera, point))
   const bounds = getBounds(projectedPoints)
@@ -137,7 +143,13 @@ function cameraWithView(camera: Camera, scale: number, origin: Vec2): Camera {
   }
 }
 
-function collectDiagramPoints(diagram: Diagram): Vec3[] {
+function collectDiagramPoints(
+  diagram: Diagram,
+  curvedSheetVerticesById: ReadonlyMap<
+    string,
+    readonly Vec3[]
+  > | undefined,
+): Vec3[] {
   const stratumPoints = diagram.strata.flatMap((stratum) => {
     switch (stratum.geometricKind) {
       case 'region':
@@ -150,7 +162,10 @@ function collectDiagramPoints(diagram: Diagram): Vec3[] {
         }
 
         if (stratum.kind === 'curvedSheet') {
-          return sampleCurvedSheetPrimitive(stratum.primitive).vertices
+          return [
+            ...(curvedSheetVerticesById?.get(stratum.id) ??
+              sampleCurvedSheetPrimitive(stratum.primitive).vertices),
+          ]
         }
 
         return [...sheetVertices(stratum)]

@@ -553,6 +553,13 @@ export function surfaceBoundaryPolylines(
 ): Vec3[][] {
   const mesh = sampleCurvedSheetPrimitive(primitive)
 
+  return surfaceBoundaryPolylinesFromMesh(primitive, mesh)
+}
+
+export function surfaceBoundaryPolylinesFromMesh(
+  primitive: CurvedSheetPrimitive,
+  mesh: SurfaceSampleMesh,
+): Vec3[][] {
   switch (primitive.kind) {
     case 'hemisphere':
       return [meshRow(mesh, mesh.vSegments)]

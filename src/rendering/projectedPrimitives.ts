@@ -2,7 +2,10 @@ import {
   cameraBasisFromTikz3dplotAngles,
   projectVec3,
 } from '../geometry/projection.ts'
-import { sampleCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
+import {
+  sampleCurvedSheetPrimitive,
+  type SurfaceSampleMesh,
+} from '../geometry/curvedSheets.ts'
 import { gridPreviewSegments } from '../model/grids.ts'
 import {
   pathSegmentPointAt,
@@ -97,9 +100,18 @@ export type ProjectedSurfaceFaceCollectionResult =
       observedCount: number
     }
 
-type SurfaceFaceSample = {
+export type SurfaceFace3D = {
   vertices3D: Vec3[]
   faceIndex: number
+}
+
+export type SurfaceFaceSource = {
+  id: string
+  layer: number
+}
+
+export type SurfaceFacesForSheetOptions = {
+  sampledCurvedSheetMesh?: SurfaceSampleMesh
 }
 
 type CurveSegmentSample = {
@@ -183,7 +195,7 @@ export function extractProjectedRenderPrimitives(
         diagram.ambientDimension,
         curveSegmentSamples,
       )) {
-        const primitive = projectedSurfaceFace(
+        const primitive = projectSurfaceFace3D(
           camera,
           stratum,
           face,
@@ -271,7 +283,7 @@ export function collectProjectedSurfaceFacesForSorting(
       diagram.ambientDimension,
       curveSegmentSamples,
     )) {
-      const primitive = projectedSurfaceFace(
+      const primitive = projectSurfaceFace3D(
         camera,
         stratum,
         face,
@@ -324,11 +336,12 @@ function cameraViewDirection(camera: Camera3D): Vec3 {
   ).forward
 }
 
-function* surfaceFacesForSheet(
+export function* surfaceFacesForSheet(
   sheet: SheetStratum,
   ambientDimension: AmbientDimension,
   curveSegmentSamples: number,
-): Generator<SurfaceFaceSample> {
+  options: SurfaceFacesForSheetOptions = {},
+): Generator<SurfaceFace3D> {
   switch (sheet.kind) {
     case 'quadSheet':
     case 'polygonSheet':
@@ -360,7 +373,9 @@ function* surfaceFacesForSheet(
       }
       return
     case 'curvedSheet': {
-      const mesh = sampleCurvedSheetPrimitive(sheet.primitive)
+      const mesh =
+        options.sampledCurvedSheetMesh ??
+        sampleCurvedSheetPrimitive(sheet.primitive)
 
       for (let index = 0; index < mesh.faces.length; index += 1) {
         const face = mesh.faces[index]
@@ -380,10 +395,10 @@ function* surfaceFacesForSheet(
   }
 }
 
-function projectedSurfaceFace(
+export function projectSurfaceFace3D(
   camera: Camera3D,
-  sheet: SheetStratum,
-  face: SurfaceFaceSample,
+  source: SurfaceFaceSource,
+  face: SurfaceFace3D,
   originalIndex: number,
 ): ProjectedSurfaceFace | null {
   if (face.vertices3D.length < 3 || !face.vertices3D.every(isFiniteVec3)) {
@@ -400,8 +415,8 @@ function projectedSurfaceFace(
 
   return {
     kind: 'surfaceFace',
-    sourceId: sheet.id,
-    layer: sheet.layer,
+    sourceId: source.id,
+    layer: source.layer,
     projectedPolygon,
     vertices3D: face.vertices3D.map(cloneVec3),
     depth: projectedDepthStats(camera, face.vertices3D),

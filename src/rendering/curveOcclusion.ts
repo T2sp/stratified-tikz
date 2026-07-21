@@ -76,6 +76,7 @@ export type CurveOcclusionOptions = {
   maxCurveSegmentsPerCurve?: number
   occludingSurfaceIds?: ReadonlySet<string>
   curveIds?: ReadonlySet<string>
+  projectedSurfaceFaces?: readonly ProjectedSurfaceFace[]
 }
 
 type SurfaceFaceSample = {
@@ -144,13 +145,20 @@ export function classifyCurveOcclusion(
     normalizeVisibilityMaxSurfaceFacesForSorting(
       visibility.maxSurfaceFacesForSorting,
     )
-  const collectedFaces = projectedSurfaceFacesForDiagram(
-    diagram,
-    camera,
-    curveSegmentSamples,
-    options.occludingSurfaceIds,
-    maxSurfaceFacesForSorting,
-  )
+  const collectedFaces =
+    options.projectedSurfaceFaces === undefined
+      ? projectedSurfaceFacesForDiagram(
+          diagram,
+          camera,
+          curveSegmentSamples,
+          options.occludingSurfaceIds,
+          maxSurfaceFacesForSorting,
+        )
+      : collectPreparedProjectedSurfaceFaces(
+          options.projectedSurfaceFaces,
+          options.occludingSurfaceIds,
+          maxSurfaceFacesForSorting,
+        )
 
   if (collectedFaces.capExceeded) {
     return diagram.strata.flatMap((stratum): CurveOcclusionResult[] => {
@@ -175,7 +183,7 @@ export function classifyCurveOcclusion(
     })
   }
 
-  const faces = collectedFaces.faces
+  const faces = [...collectedFaces.faces]
 
   if (faces.length === 0) {
     return []
@@ -370,6 +378,37 @@ function projectedSurfaceFacesForDiagram(
             capExceeded: true,
           }
         }
+      }
+    }
+  }
+
+  return {
+    faces,
+    capExceeded: false,
+  }
+}
+
+function collectPreparedProjectedSurfaceFaces(
+  projectedSurfaceFaces: readonly ProjectedSurfaceFace[],
+  occludingSurfaceIds: ReadonlySet<string> | undefined,
+  maxSurfaceFacesForSorting: number,
+): ProjectedSurfaceFaceCollection {
+  const faces: ProjectedSurfaceFace[] = []
+
+  for (const face of projectedSurfaceFaces) {
+    if (
+      occludingSurfaceIds !== undefined &&
+      !occludingSurfaceIds.has(face.sourceId)
+    ) {
+      continue
+    }
+
+    faces.push(face)
+
+    if (faces.length > maxSurfaceFacesForSorting) {
+      return {
+        faces,
+        capExceeded: true,
       }
     }
   }
