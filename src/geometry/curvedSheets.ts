@@ -670,6 +670,11 @@ function validateCoonsPatchPrimitive(
     `${path}.boundarySources`,
     errors,
   )
+  validateCoonsPatchBoundarySnapshotState(
+    primitive.boundarySnapshotState,
+    `${path}.boundarySnapshotState`,
+    errors,
+  )
 
   if (
     isCoonsBoundarySnapshot(primitive.bottom) &&
@@ -697,6 +702,20 @@ function validateCoonsPatchPrimitive(
         errors,
       )
     }
+  }
+}
+
+function validateCoonsPatchBoundarySnapshotState(
+  state: unknown,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  if (state !== undefined && state !== 'frozen') {
+    pushError(
+      errors,
+      path,
+      'Coons patch boundary snapshot state must be frozen when present.',
+    )
   }
 }
 

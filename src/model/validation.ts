@@ -1203,32 +1203,41 @@ function validateCurvedSheetPrimitiveSymbolicCoordinatePolicy(
         coordinateExpressionContext,
       )
       return
-    case 'coonsPatch':
+    case 'coonsPatch': {
+      // Frozen fallbacks intentionally retain the symbolic expressions and
+      // preview values from the last valid source state. Validate those saved
+      // previews structurally rather than re-evaluating them with variables
+      // that may have since made the link stale.
+      const boundaryExpressionContext =
+        primitive.boundarySnapshotState === 'frozen'
+          ? undefined
+          : coordinateExpressionContext
       validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.bottom,
         `${path}.bottom`,
         errors,
-        coordinateExpressionContext,
+        boundaryExpressionContext,
       )
       validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.right,
         `${path}.right`,
         errors,
-        coordinateExpressionContext,
+        boundaryExpressionContext,
       )
       validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.top,
         `${path}.top`,
         errors,
-        coordinateExpressionContext,
+        boundaryExpressionContext,
       )
       validateCoonsBoundarySnapshotSymbolicCoordinatePolicy(
         primitive.left,
         `${path}.left`,
         errors,
-        coordinateExpressionContext,
+        boundaryExpressionContext,
       )
       return
+    }
   }
 }
 

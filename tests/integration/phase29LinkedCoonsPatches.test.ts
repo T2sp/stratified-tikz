@@ -76,6 +76,15 @@ type TestEditorState = {
   history: DiagramHistory
 }
 
+type CoonsPatchPrimitive = Extract<
+  CurvedSheetStratum['primitive'],
+  { kind: 'coonsPatch' }
+>
+
+type CoonsPatchStratum = CurvedSheetStratum & {
+  primitive: CoonsPatchPrimitive
+}
+
 test('linked creation stores normalized roles and static creation omits links', () => {
   const linked = createLinkedPatch(createPathSourceDiagram(), {
     top: { sourcePathId: 'top', reversed: false },
@@ -186,7 +195,13 @@ test('unsupported closed template replacement leaves the linked patch stale', ()
   const patch = findCoonsPatch(state.editableDiagram, 'patch')
   const status = coonsPatchBoundaryLinkStatus(state.editableDiagram, 'patch')
 
-  assert.deepEqual(patch.primitive, initialPrimitive)
+  assert.deepEqual(
+    coonsBoundarySnapshots(patch),
+    coonsPrimitiveBoundarySnapshots(initialPrimitive),
+  )
+  assert.deepEqual(patch.primitive.boundarySources, initialPrimitive.boundarySources)
+  assert.deepEqual(patch.primitive.sampling, initialPrimitive.sampling)
+  assert.equal(patch.primitive.boundarySnapshotState, 'frozen')
   assert.equal(status.kind, 'linkedStale')
   if (status.kind === 'linkedStale') {
     assert.match(status.issues[0]?.message ?? '', /closed/)
@@ -289,6 +304,7 @@ test('constant-point sources and coordinate-anchor changes refresh linked geomet
 test('symbolic stale snapshots survive save/load and recover from current sources', () => {
   const linked = createSymbolicEndpointLinkedPatch()
   const initialPatch = structuredClone(findCoonsPatch(linked, 'patch'))
+  const initialSnapshots = coonsBoundarySnapshots(initialPatch)
   const initialMesh = sampleCoonsPatch(initialPatch.primitive)
   const initialSvg = curvedSheetToSvgMesh(
     initialPatch,
@@ -329,7 +345,13 @@ test('symbolic stale snapshots survive save/load and recover from current source
   )
 
   assert.equal(staleStatus.kind, 'linkedStale')
+  assert.deepEqual(coonsBoundarySnapshots(stalePatch), initialSnapshots)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
   assert.equal(pathBoundary(stalePatch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.deepEqual(
+    pathBoundary(stalePatch.primitive.bottom).segments[1]?.end.symbolic?.x,
+    { kind: 'symbolic', expression: 'R', previewValue: 1 },
+  )
   assert.deepEqual(sampleCoonsPatch(stalePatch.primitive), initialMesh)
   assert.equal(validateDiagram(stale.editableDiagram).valid, true)
 
@@ -353,12 +375,56 @@ test('symbolic stale snapshots survive save/load and recover from current source
 
   assert.equal(loadedBottom.points[2]?.x, 2)
   assert.equal(loadedBottom.points[2]?.symbolic?.x.previewValue, 2)
+  assert.deepEqual(coonsBoundarySnapshots(loadedPatch), initialSnapshots)
+  assert.equal(loadedPatch.primitive.boundarySnapshotState, 'frozen')
   assert.equal(pathBoundary(loadedPatch.primitive.bottom).segments[1]?.end.x, 1)
+  assert.deepEqual(
+    pathBoundary(loadedPatch.primitive.bottom).segments[1]?.end.symbolic?.x,
+    { kind: 'symbolic', expression: 'R', previewValue: 1 },
+  )
   assert.deepEqual(sampleCoonsPatch(loadedPatch.primitive), initialMesh)
   assert.deepEqual(loadedSvg, initialSvg)
   assert.equal(loadedStatus.kind, 'linkedStale')
   assert.equal(validateDiagram(parsed.diagram).valid, true)
   assert.match(loadedTikz, /Primitive: coonsPatch/)
+
+  const detachedDivergentDiagram = detachCoonsPatchBoundaryLinks(
+    parsed.diagram,
+    'patch',
+  )
+  const detachedDivergentPatch = findCoonsPatch(
+    detachedDivergentDiagram,
+    'patch',
+  )
+
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(detachedDivergentDiagram, 'patch'),
+    { kind: 'static' },
+  )
+  assert.equal(
+    detachedDivergentPatch.primitive.boundarySnapshotState,
+    'frozen',
+  )
+  assert.deepEqual(
+    coonsBoundarySnapshots(detachedDivergentPatch),
+    initialSnapshots,
+  )
+  assert.equal(validateDiagram(detachedDivergentDiagram).valid, true)
+
+  const parsedDetachedDivergent = parseSavedDiagramJson(
+    serializeDiagram(detachedDivergentDiagram),
+  )
+
+  assert.equal(parsedDetachedDivergent.ok, true)
+  if (!parsedDetachedDivergent.ok) {
+    throw new Error(parsedDetachedDivergent.error)
+  }
+  assert.deepEqual(
+    coonsBoundarySnapshots(
+      findCoonsPatch(parsedDetachedDivergent.diagram, 'patch'),
+    ),
+    initialSnapshots,
+  )
 
   const recovered = commitSourceUpdate(
     createEditorState(parsed.diagram),
@@ -382,6 +448,7 @@ test('symbolic stale snapshots survive save/load and recover from current source
     coonsPatchBoundaryLinkStatus(recovered.editableDiagram, 'patch'),
     { kind: 'linkedUpToDate' },
   )
+  assert.equal(recoveredPatch.primitive.boundarySnapshotState, undefined)
   assert.equal(
     pathBoundary(recoveredPatch.primitive.bottom).segments[1]?.end.x,
     2,
@@ -771,8 +838,10 @@ test('same-id replacement load keeps the incoming file fallback snapshots', () =
 })
 
 test('corner-invalid updates are atomic, keep fallback snapshots, and recover', () => {
-  const linked = createLinkedPatch(createPathSourceDiagram())
-  const before = findCoonsPatch(linked, 'patch').primitive
+  const linked = createSymbolicInteriorLinkedPatch()
+  const beforePatch = findCoonsPatch(linked, 'patch')
+  const before = structuredClone(beforePatch.primitive)
+  const beforeSnapshots = coonsBoundarySnapshots(beforePatch)
   const invalidState = commitSourceUpdate(
     createEditorState(linked),
     'bottom',
@@ -798,7 +867,14 @@ test('corner-invalid updates are atomic, keep fallback snapshots, and recover', 
     'patch',
   )
 
-  assert.deepEqual(stalePatch.primitive, before)
+  assert.deepEqual(coonsBoundarySnapshots(stalePatch), beforeSnapshots)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(stalePatch.primitive.boundarySources, before.boundarySources)
+  assert.deepEqual(
+    pathBoundary(stalePatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+  assert.deepEqual(findCoonsPatch(linked, 'patch').primitive, before)
   assert.equal(staleStatus.kind, 'linkedStale')
   if (staleStatus.kind === 'linkedStale') {
     assert.equal(
@@ -827,6 +903,7 @@ test('corner-invalid updates are atomic, keep fallback snapshots, and recover', 
   const repairedPatch = findCoonsPatch(repairedState.editableDiagram, 'patch')
 
   assert.notDeepEqual(repairedPatch.primitive.bottom, before.bottom)
+  assert.equal(repairedPatch.primitive.boundarySnapshotState, undefined)
   assert.deepEqual(coonsPatchBoundaryLinkStatus(repairedState.editableDiagram, 'patch'), {
     kind: 'linkedUpToDate',
   })
@@ -981,7 +1058,14 @@ test('source deletion keeps fallback geometry and Undo restores an up-to-date li
   })
   const status = coonsPatchBoundaryLinkStatus(deleted.editableDiagram, 'patch')
 
-  assert.deepEqual(findCoonsPatch(deleted.editableDiagram, 'patch').primitive, fallback)
+  const stalePatch = findCoonsPatch(deleted.editableDiagram, 'patch')
+
+  assert.deepEqual(
+    coonsBoundarySnapshots(stalePatch),
+    coonsPrimitiveBoundarySnapshots(fallback),
+  )
+  assert.deepEqual(stalePatch.primitive.boundarySources, fallback.boundarySources)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
   assert.equal(status.kind, 'linkedStale')
   if (status.kind === 'linkedStale') {
     assert.equal(status.issues[0]?.role, 'right')
@@ -997,6 +1081,193 @@ test('source deletion keeps fallback geometry and Undo restores an up-to-date li
   assert.deepEqual(coonsPatchBoundaryLinkStatus(undone.editableDiagram, 'patch'), {
     kind: 'linkedUpToDate',
   })
+})
+
+test('missing symbolic source preserves exact snapshots through load, detach, and history', () => {
+  const linked = createSymbolicInteriorLinkedPatch()
+  const previousPatch = findCoonsPatch(linked, 'patch')
+  const previousSnapshots = coonsBoundarySnapshots(previousPatch)
+  const previousPrimitive = structuredClone(previousPatch.primitive)
+  const nextSampling = { uSegments: 5, vSegments: 6 }
+  const editedPatchDiagram = updateStratumById(linked, 'patch', (stratum) =>
+    stratum.geometricKind === 'sheet' &&
+    stratum.kind === 'curvedSheet' &&
+    stratum.primitive.kind === 'coonsPatch'
+      ? {
+          ...stratum,
+          primitive: { ...stratum.primitive, sampling: nextSampling },
+        }
+      : stratum,
+  )
+  const deletedDiagram = {
+    ...editedPatchDiagram,
+    strata: editedPatchDiagram.strata.filter(
+      (stratum) => stratum.id !== 'bottom',
+    ),
+  }
+  const deleted = commitDiagramChange(createEditorState(linked), {
+    ...createEditorState(linked),
+    editableDiagram: deletedDiagram,
+  })
+  const stalePatch = findCoonsPatch(deleted.editableDiagram, 'patch')
+
+  assert.equal(deleted.history.past.length, 1)
+  assert.equal(
+    deleted.editableDiagram.strata.some((stratum) => stratum.id === 'bottom'),
+    false,
+  )
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(deleted.editableDiagram, 'patch').kind,
+    'linkedStale',
+  )
+  assert.deepEqual(coonsBoundarySnapshots(stalePatch), previousSnapshots)
+  assert.deepEqual(
+    stalePatch.primitive.boundarySources,
+    previousPrimitive.boundarySources,
+  )
+  assert.deepEqual(stalePatch.primitive.sampling, nextSampling)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const previousBoundary = pathBoundary(previousPatch.primitive[role])
+    const staleBoundary = pathBoundary(stalePatch.primitive[role])
+
+    assert.notEqual(staleBoundary, previousBoundary)
+    assert.notEqual(staleBoundary.segments[0], previousBoundary.segments[0])
+  }
+  assert.deepEqual(
+    pathBoundary(stalePatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+  assert.doesNotThrow(() => sampleCoonsPatch(stalePatch.primitive))
+
+  // Synchronization must not mutate or replace the previous diagram's
+  // committed snapshots while cloning them into the stale next state.
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(
+      findCoonsPatch(linked, 'patch').primitive[role],
+      previousPatch.primitive[role],
+    )
+  }
+  assert.deepEqual(findCoonsPatch(linked, 'patch').primitive, previousPrimitive)
+
+  const undone = undoLastDiagramChange(deleted)
+  const redone = redoLastDiagramChange(undone)
+  const undoneAgain = undoLastDiagramChange(redone)
+  const redoneAgain = redoLastDiagramChange(undoneAgain)
+
+  assert.notEqual(
+    undone.editableDiagram.strata.find((stratum) => stratum.id === 'bottom'),
+    undefined,
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(undone.editableDiagram, 'patch'),
+    { kind: 'linkedUpToDate' },
+  )
+  for (const state of [redone, redoneAgain]) {
+    const patch = findCoonsPatch(state.editableDiagram, 'patch')
+
+    assert.equal(
+      coonsPatchBoundaryLinkStatus(state.editableDiagram, 'patch').kind,
+      'linkedStale',
+    )
+    assert.deepEqual(coonsBoundarySnapshots(patch), previousSnapshots)
+    assert.deepEqual(patch.primitive.sampling, nextSampling)
+    assert.deepEqual(
+      pathBoundary(patch.primitive.bottom).segments[0]?.end.symbolic?.z,
+      { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+    )
+  }
+
+  const parsed = parseSavedDiagramJson(serializeDiagram(redoneAgain.editableDiagram))
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const loadedPatch = findCoonsPatch(parsed.diagram, 'patch')
+  assert.deepEqual(coonsBoundarySnapshots(loadedPatch), previousSnapshots)
+  assert.deepEqual(loadedPatch.primitive.sampling, nextSampling)
+  assert.deepEqual(
+    pathBoundary(loadedPatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+  assert.equal(coonsPatchBoundaryLinkStatus(parsed.diagram, 'patch').kind, 'linkedStale')
+  assert.equal(validateDiagram(parsed.diagram).valid, true)
+  assert.doesNotThrow(() => sampleCoonsPatch(loadedPatch.primitive))
+  assert.doesNotThrow(() =>
+    curvedSheetToSvgMesh(loadedPatch, createInitialCamera3D(), 240),
+  )
+  assert.doesNotThrow(() => generateTikz(parsed.diagram))
+
+  const loadedState = createEditorState(parsed.diagram)
+  const detached = commitDiagramChange(loadedState, {
+    ...loadedState,
+    editableDiagram: detachCoonsPatchBoundaryLinks(parsed.diagram, 'patch'),
+  })
+  const detachedPatch = findCoonsPatch(detached.editableDiagram, 'patch')
+  const {
+    boundarySources: loadedBoundarySources,
+    ...loadedPrimitiveWithoutLinks
+  } = loadedPatch.primitive
+  const {
+    boundarySources: detachedBoundarySources,
+    ...detachedPrimitiveWithoutLinks
+  } = detachedPatch.primitive
+
+  assert.equal(detached.history.past.length, 1)
+  assert.notEqual(loadedBoundarySources, undefined)
+  assert.equal(detachedBoundarySources, undefined)
+  assert.deepEqual(detachedPrimitiveWithoutLinks, loadedPrimitiveWithoutLinks)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(detached.editableDiagram, 'patch'),
+    { kind: 'static' },
+  )
+  assert.equal(detachedPatch.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(coonsBoundarySnapshots(detachedPatch), previousSnapshots)
+  assert.deepEqual(
+    pathBoundary(detachedPatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+  assert.equal(validateDiagram(detached.editableDiagram).valid, true)
+
+  const parsedDetached = parseSavedDiagramJson(
+    serializeDiagram(detached.editableDiagram),
+  )
+
+  assert.equal(parsedDetached.ok, true)
+  if (!parsedDetached.ok) {
+    throw new Error(parsedDetached.error)
+  }
+  assert.deepEqual(
+    coonsBoundarySnapshots(findCoonsPatch(parsedDetached.diagram, 'patch')),
+    previousSnapshots,
+  )
+
+  const editedFormerSource = commitSourceUpdate(
+    detached,
+    'right',
+    (source) =>
+      source.geometricKind === 'curve' && source.kind === 'cubicBezier'
+        ? {
+            ...source,
+            points: source.points.map((value, index) =>
+              index === 1 ? { ...value, z: value.z + 1 } : value,
+            ),
+          }
+        : source,
+  )
+
+  assert.deepEqual(
+    coonsBoundarySnapshots(findCoonsPatch(editedFormerSource.editableDiagram, 'patch')),
+    previousSnapshots,
+  )
+
+  const restoredLinks = undoLastDiagramChange(detached)
+  const restoredPatch = findCoonsPatch(restoredLinks.editableDiagram, 'patch')
+
+  assert.deepEqual(restoredPatch.primitive.boundarySources, previousPrimitive.boundarySources)
+  assert.deepEqual(coonsBoundarySnapshots(restoredPatch), previousSnapshots)
 })
 
 test('dangling point source ids stay reserved through creation and Undo recovery', () => {
@@ -1036,7 +1307,12 @@ test('dangling point source ids stay reserved through creation and Undo recovery
     coonsPatchBoundaryLinkStatus(created.editableDiagram, 'point-patch').kind,
     'linkedStale',
   )
-  assert.deepEqual(stalePatch.primitive, fallback)
+  assert.deepEqual(
+    coonsBoundarySnapshots(stalePatch),
+    coonsPrimitiveBoundarySnapshots(fallback),
+  )
+  assert.deepEqual(stalePatch.primitive.boundarySources, fallback.boundarySources)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
 
   const withoutCreatedPoint = undoLastDiagramChange(created)
   const restoredSource = undoLastDiagramChange(withoutCreatedPoint)
@@ -1436,6 +1712,40 @@ test('malformed linked JSON returns validation failures without throwing', () =>
   }
 })
 
+test('malformed frozen snapshot state is rejected cleanly on load', () => {
+  const saved = JSON.parse(
+    serializeDiagram(createLinkedPatch(createPathSourceDiagram())),
+  ) as {
+    diagram: {
+      strata: Array<{
+        id?: unknown
+        primitive?: {
+          boundarySnapshotState?: unknown
+          boundarySources?: unknown
+        }
+      }>
+    }
+  }
+  const patch = saved.diagram.strata.find((stratum) => stratum.id === 'patch')
+
+  if (patch?.primitive === undefined) {
+    throw new Error('Expected a saved Coons patch primitive.')
+  }
+
+  delete patch.primitive.boundarySources
+  patch.primitive.boundarySnapshotState = 'thawed'
+
+  let parsed: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+  assert.doesNotThrow(() => {
+    parsed = parseSavedDiagramJson(JSON.stringify(saved))
+  })
+  assert.equal(parsed?.ok, false)
+  if (parsed?.ok === false) {
+    assert.match(parsed.error, /snapshot state|frozen|invalid/i)
+  }
+})
+
 test('symbolic import rejects malformed linked metadata before pending resolution', () => {
   const linked = createLinkedPatch(createPathSourceDiagram())
   const symbolicLinked: Diagram = {
@@ -1792,10 +2102,18 @@ test('source direction reversal is detected and keeps the last valid patch', () 
   )
 
   assert.equal(coonsPatchBoundaryLinkStatus(state.editableDiagram, 'patch').kind, 'linkedStale')
+  const stalePatch = findCoonsPatch(state.editableDiagram, 'patch')
+  const originalPatch = findCoonsPatch(linked, 'patch')
+
   assert.deepEqual(
-    findCoonsPatch(state.editableDiagram, 'patch').primitive,
-    findCoonsPatch(linked, 'patch').primitive,
+    coonsBoundarySnapshots(stalePatch),
+    coonsBoundarySnapshots(originalPatch),
   )
+  assert.deepEqual(
+    stalePatch.primitive.boundarySources,
+    originalPatch.primitive.boundarySources,
+  )
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
 })
 
 test('creation and Inspector expose linked controls and detach action', () => {
@@ -2188,9 +2506,20 @@ function savedLinkedDiagramWithBoundarySources(
   return JSON.stringify(saved)
 }
 
-function findCoonsPatch(diagram: Diagram, id: string): CurvedSheetStratum & {
-  primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
-} {
+function coonsBoundarySnapshots(patch: CoonsPatchStratum) {
+  return coonsPrimitiveBoundarySnapshots(patch.primitive)
+}
+
+function coonsPrimitiveBoundarySnapshots(primitive: CoonsPatchPrimitive) {
+  return structuredClone({
+    bottom: primitive.bottom,
+    right: primitive.right,
+    top: primitive.top,
+    left: primitive.left,
+  })
+}
+
+function findCoonsPatch(diagram: Diagram, id: string): CoonsPatchStratum {
   const stratum = diagram.strata.find((candidate) => candidate.id === id)
 
   if (
@@ -2201,9 +2530,7 @@ function findCoonsPatch(diagram: Diagram, id: string): CurvedSheetStratum & {
     throw new Error(`Expected Coons patch ${id}.`)
   }
 
-  return stratum as CurvedSheetStratum & {
-    primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
-  }
+  return stratum as CoonsPatchStratum
 }
 
 function findPolyline(diagram: Diagram, id: string): PolylineCurveStratum {

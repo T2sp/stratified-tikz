@@ -10,7 +10,6 @@ import {
   detachSampledCurvedSheetPrimitiveCoordinateReferences,
 } from './coordinateReferences.ts'
 import {
-  arcScalarPreviewValue,
   cloneBoundaryPathSnapshot,
   normalizePathSegmentsForAmbientDimension,
   pathCoordinates,
@@ -105,6 +104,11 @@ export type SynchronizeLinkedCoonsPatchesResult = {
   issues: CoonsPatchBoundaryLinkIssue[]
 }
 
+export type CoonsPatchBoundarySourceRemap = {
+  pathSourceIds: ReadonlyMap<string, string>
+  pointSourceIds: ReadonlyMap<string, string>
+}
+
 type LinkedPatchInspection = {
   sourceFingerprint: string
   candidate: CoonsPatchPrimitive | null
@@ -176,7 +180,9 @@ export function synchronizeLinkedCoonsPatches(
         coonsPatchMaterializedBoundariesEqual(
           stratum.primitive,
           nextInspection.candidate,
-        )
+        ) &&
+        stratum.primitive.boundarySnapshotState ===
+          nextInspection.candidate.boundarySnapshotState
       ) {
         return stratum
       }
@@ -197,14 +203,18 @@ export function synchronizeLinkedCoonsPatches(
               stratum.primitive,
               previousPrimitive,
             )
+      const stalePrimitive: CoonsPatchPrimitive = {
+        ...fallbackPrimitive,
+        // A stale linked fallback retains the complete last-valid snapshot
+        // model. Its saved previews, expressions, and provenance stay frozen
+        // until one complete source-derived candidate is valid.
+        boundarySnapshotState: 'frozen',
+      }
 
       changed = true
       return {
         ...stratum,
-        // A stale linked fallback must be independent of current variable
-        // values. Freeze only these last-valid snapshots to their numeric
-        // previews; source strata and static Coons snapshots stay symbolic.
-        primitive: materializeLinkedCoonsPatchFallback(fallbackPrimitive),
+        primitive: stalePrimitive,
       }
     }
 
@@ -290,6 +300,12 @@ export function detachCoonsPatchBoundaryLinks(
         right: stratum.primitive.right,
         top: stratum.primitive.top,
         left: stratum.primitive.left,
+        ...(stratum.primitive.boundarySnapshotState === undefined
+          ? {}
+          : {
+              boundarySnapshotState:
+                stratum.primitive.boundarySnapshotState,
+            }),
         sampling: stratum.primitive.sampling,
       },
     }
@@ -298,14 +314,41 @@ export function detachCoonsPatchBoundaryLinks(
   return changed ? { ...diagram, strata } : diagram
 }
 
-export function remapCoonsPatchBoundarySourceIds(
+export function coonsPatchBoundarySourceRemapForDuplicatedStrata(
+  duplicatedStrata: readonly Stratum[],
+  copiedIdBySourceId: ReadonlyMap<string, string>,
+): CoonsPatchBoundarySourceRemap {
+  const pathSourceIds = new Map<string, string>()
+  const pointSourceIds = new Map<string, string>()
+
+  for (const stratum of duplicatedStrata) {
+    const copiedId = copiedIdBySourceId.get(stratum.id)
+
+    if (copiedId === undefined) {
+      continue
+    }
+
+    if (isCoonsPatchBoundaryPathSourceStratum(stratum)) {
+      pathSourceIds.set(stratum.id, copiedId)
+      continue
+    }
+
+    if (isCoonsPatchBoundaryPointSourceStratum(stratum)) {
+      pointSourceIds.set(stratum.id, copiedId)
+    }
+  }
+
+  return { pathSourceIds, pointSourceIds }
+}
+
+export function remapCoonsPatchBoundarySources(
   primitive: CoonsPatchPrimitive,
-  idMap: ReadonlyMap<string, string>,
+  remap: CoonsPatchBoundarySourceRemap,
 ): CoonsPatchPrimitive {
   if (
     primitive.boundarySources === undefined ||
     !isCoonsPatchBoundarySources(primitive.boundarySources) ||
-    idMap.size === 0
+    (remap.pathSourceIds.size === 0 && remap.pointSourceIds.size === 0)
   ) {
     return primitive
   }
@@ -314,8 +357,10 @@ export function remapCoonsPatchBoundarySourceIds(
   const boundarySources = mapCoonsPatchBoundarySources(
     primitive.boundarySources,
     (source) => {
-      const sourceId = coonsPatchBoundarySourceId(source)
-      const remappedId = idMap.get(sourceId)
+      const remappedId =
+        source.kind === 'path'
+          ? remap.pathSourceIds.get(source.sourcePathId)
+          : remap.pointSourceIds.get(source.sourcePointId)
 
       if (remappedId === undefined) {
         return source
@@ -333,7 +378,7 @@ export function remapCoonsPatchBoundarySourceIds(
 
 export function remapLinkedCoonsPatchSourcesInStratum(
   stratum: Stratum,
-  idMap: ReadonlyMap<string, string>,
+  remap: CoonsPatchBoundarySourceRemap,
 ): Stratum {
   if (
     stratum.geometricKind !== 'sheet' ||
@@ -343,7 +388,7 @@ export function remapLinkedCoonsPatchSourcesInStratum(
     return stratum
   }
 
-  const primitive = remapCoonsPatchBoundarySourceIds(stratum.primitive, idMap)
+  const primitive = remapCoonsPatchBoundarySources(stratum.primitive, remap)
 
   return primitive === stratum.primitive ? stratum : { ...stratum, primitive }
 }
@@ -441,7 +486,7 @@ export function isBoundarySurfaceBoundaryPathStratum(
   ambientDimension: AmbientDimension,
 ): stratum is CurveStratum {
   return (
-    stratum.geometricKind === 'curve' &&
+    isCoonsPatchBoundaryPathSourceStratum(stratum) &&
     stratum.codim === expectedBoundaryPathCodim(ambientDimension) &&
     boundaryPathSnapshotFromCurveStratum(stratum, ambientDimension) !== null
   )
@@ -511,7 +556,7 @@ function inspectLinkedCoonsPatch(
   }
 
   const unresolvedCandidate: CoonsPatchPrimitive = {
-    ...primitive,
+    ...coonsPatchPrimitiveWithoutFrozenSnapshotState(primitive),
     bottom: boundaries.bottom,
     right: boundaries.right,
     top: boundaries.top,
@@ -665,7 +710,7 @@ function loadBoundaryPathSnapshot(
     return { ok: false, error: 'missingSourcePath' }
   }
 
-  if (source.geometricKind !== 'curve') {
+  if (!isCoonsPatchBoundaryPathSourceStratum(source)) {
     return { ok: false, error: 'sourceNotBoundaryPath' }
   }
 
@@ -703,16 +748,12 @@ function loadCoonsConstantPointBoundarySnapshot(
     return { ok: false, error: 'missingSourcePoint' }
   }
 
-  if (source.geometricKind !== 'point') {
+  if (!isCoonsPatchBoundaryPointSourceStratum(source)) {
     return { ok: false, error: 'sourceNotBoundaryPoint' }
   }
 
   if (source.codim !== expectedBoundaryPointCodim(diagram.ambientDimension)) {
     return { ok: false, error: 'sourceWrongCodimension' }
-  }
-
-  if (!isCoonsBoundaryPointStratum(source, diagram.ambientDimension)) {
-    return { ok: false, error: 'sourceNotBoundaryPoint' }
   }
 
   if (!isFiniteVec3(source.position)) {
@@ -792,121 +833,16 @@ function restorePreviousCoonsPatchBoundaries(
   }
 }
 
-function materializeLinkedCoonsPatchFallback(
+function coonsPatchPrimitiveWithoutFrozenSnapshotState(
   primitive: CoonsPatchPrimitive,
 ): CoonsPatchPrimitive {
-  return {
-    ...primitive,
-    bottom: materializeCoonsBoundarySnapshot(primitive.bottom),
-    right: materializeCoonsBoundarySnapshot(primitive.right),
-    top: materializeCoonsBoundarySnapshot(primitive.top),
-    left: materializeCoonsBoundarySnapshot(primitive.left),
-  }
-}
-
-function materializeCoonsBoundarySnapshot(
-  boundary: CoonsBoundarySnapshot,
-): CoonsBoundarySnapshot {
-  if (isCoonsConstantPointBoundary(boundary)) {
-    return {
-      kind: 'constantPoint',
-      ...(boundary.sourceId === undefined ? {} : { sourceId: boundary.sourceId }),
-      ...(boundary.name === undefined ? {} : { name: boundary.name }),
-      point: numericVec3(boundary.point),
-    }
+  if (primitive.boundarySnapshotState === undefined) {
+    return primitive
   }
 
-  return {
-    ...(boundary.id === undefined ? {} : { id: boundary.id }),
-    ...(boundary.name === undefined ? {} : { name: boundary.name }),
-    segments: boundary.segments.map(materializePathSegment),
-  }
-}
-
-function materializePathSegment(segment: PathSegment): PathSegment {
-  const styleOverride =
-    segment.styleOverride === undefined
-      ? {}
-      : { styleOverride: { ...segment.styleOverride } }
-
-  switch (segment.kind) {
-    case 'line':
-      return {
-        kind: 'line',
-        start: numericVec3(segment.start),
-        end: numericVec3(segment.end),
-        ...styleOverride,
-      }
-    case 'cubicBezier':
-      return {
-        kind: 'cubicBezier',
-        start: numericVec3(segment.start),
-        control1: numericVec3(segment.control1),
-        control2: numericVec3(segment.control2),
-        end: numericVec3(segment.end),
-        ...(segment.controlMode === undefined
-          ? {}
-          : {
-              controlMode: materializeCubicBezierControlMode(
-                segment.controlMode,
-              ),
-            }),
-        ...styleOverride,
-      }
-    case 'arc':
-      return {
-        kind: 'arc',
-        start: numericVec3(segment.start),
-        end: numericVec3(segment.end),
-        center: numericVec3(segment.center),
-        radius: arcScalarPreviewValue(segment.radius),
-        startAngleDeg: arcScalarPreviewValue(segment.startAngleDeg),
-        endAngleDeg: arcScalarPreviewValue(segment.endAngleDeg),
-        direction: segment.direction,
-        ...(segment.frame === undefined
-          ? {}
-          : { frame: materializeWorkPlaneFrame(segment.frame) }),
-        ...styleOverride,
-      }
-  }
-}
-
-function materializeCubicBezierControlMode(
-  controlMode: CubicBezierControlMode,
-): CubicBezierControlMode {
-  switch (controlMode.kind) {
-    case 'absolute':
-      return { kind: 'absolute' }
-    case 'relativeCartesian':
-      return {
-        ...controlMode,
-        firstControlOffset: numericVec3(controlMode.firstControlOffset),
-        secondControlOffset: numericVec3(controlMode.secondControlOffset),
-      }
-    case 'relativePolar':
-      return structuredClone(controlMode) as CubicBezierControlMode
-    case 'workPlaneRelativeCartesian':
-    case 'workPlaneRelativePolar':
-      return {
-        ...structuredClone(controlMode),
-        frame: materializeWorkPlaneFrame(controlMode.frame),
-      }
-  }
-}
-
-function materializeWorkPlaneFrame(
-  frame: WorkPlaneFrameSnapshot,
-): WorkPlaneFrameSnapshot {
-  return {
-    origin: numericVec3(frame.origin),
-    u: numericVec3(frame.u),
-    v: numericVec3(frame.v),
-    normal: numericVec3(frame.normal),
-  }
-}
-
-function numericVec3(point: Vec3): Vec3 {
-  return { x: point.x, y: point.y, z: point.z }
+  const candidate = { ...primitive }
+  delete candidate.boundarySnapshotState
+  return candidate
 }
 
 function linkedCoonsBoundarySourcesFingerprint(
@@ -1255,14 +1191,16 @@ function expectedBoundaryPointCodim(ambientDimension: AmbientDimension): 2 | 3 {
   return ambientDimension === 2 ? 2 : 3
 }
 
-function isCoonsBoundaryPointStratum(
+function isCoonsPatchBoundaryPathSourceStratum(
   stratum: Stratum,
-  ambientDimension: AmbientDimension,
+): stratum is CurveStratum {
+  return stratum.geometricKind === 'curve' && stratum.kind !== 'grid'
+}
+
+function isCoonsPatchBoundaryPointSourceStratum(
+  stratum: Stratum,
 ): stratum is PointStratum {
-  return (
-    stratum.geometricKind === 'point' &&
-    stratum.codim === expectedBoundaryPointCodim(ambientDimension)
-  )
+  return stratum.geometricKind === 'point'
 }
 
 function isCoonsConstantPointBoundary(

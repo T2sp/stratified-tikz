@@ -12,7 +12,10 @@ import type {
 import { cleanPathCrossingStates } from './pathCrossings.ts'
 import { collectTopLevelDiagramIds } from './diagramIds.ts'
 import { detachCoordinateReferencesInElements } from './coordinateReferences.ts'
-import { remapLinkedCoonsPatchSourcesInStratum } from './coonsPatchLinks.ts'
+import {
+  coonsPatchBoundarySourceRemapForDuplicatedStrata,
+  remapLinkedCoonsPatchSourcesInStratum,
+} from './coonsPatchLinks.ts'
 import {
   diagramTranslationContext,
   isZeroTranslationVector,
@@ -390,8 +393,13 @@ export function duplicateLayer(
   const copiedIdBySourceId = new Map(
     idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
   )
+  const boundarySourceRemap =
+    coonsPatchBoundarySourceRemapForDuplicatedStrata(
+      sourceStrata,
+      copiedIdBySourceId,
+    )
   const copiedStrata = copiedStrataBeforeSourceRemap.map((stratum) =>
-    remapLinkedCoonsPatchSourcesInStratum(stratum, copiedIdBySourceId),
+    remapLinkedCoonsPatchSourcesInStratum(stratum, boundarySourceRemap),
   )
   const nextDiagram = {
     ...diagram,

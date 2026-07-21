@@ -2921,10 +2921,14 @@ function refreshCurvedSheetPrimitiveSymbolicPreviews(
         ),
       }
     case 'coonsPatch':
-      if (isCoonsPatchBoundarySources(primitive.boundarySources)) {
+      if (
+        isCoonsPatchBoundarySources(primitive.boundarySources) ||
+        primitive.boundarySnapshotState === 'frozen'
+      ) {
         // Linked Coons boundaries are last-valid materialized snapshots. Their
         // source strata are refreshed by the diagram traversal, and only the
         // atomic linked-source synchronizer may replace these four snapshots.
+        // A detached stale fallback keeps the explicit frozen state.
         return primitive
       }
 

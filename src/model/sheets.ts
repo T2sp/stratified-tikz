@@ -94,6 +94,9 @@ export function cloneCurvedSheetPrimitive(
         right: cloneCoonsBoundarySnapshot(primitive.right),
         top: cloneCoonsBoundarySnapshot(primitive.top),
         left: cloneCoonsBoundarySnapshot(primitive.left),
+        ...(primitive.boundarySnapshotState === undefined
+          ? {}
+          : { boundarySnapshotState: primitive.boundarySnapshotState }),
         ...(primitive.boundarySources === undefined
           ? {}
           : {

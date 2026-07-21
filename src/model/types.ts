@@ -540,6 +540,11 @@ export type CoonsPatchPrimitive = {
   right: CoonsBoundarySnapshot
   top: CoonsBoundarySnapshot
   left: CoonsBoundarySnapshot
+  /**
+   * Present when the four snapshots are a frozen last-valid fallback whose
+   * saved preview values remain authoritative until a successful linked sync.
+   */
+  boundarySnapshotState?: 'frozen'
   /** Missing means that the materialized boundary snapshots are static. */
   boundarySources?: CoonsPatchBoundarySources
   sampling: SurfaceSampling

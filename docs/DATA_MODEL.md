@@ -1016,6 +1016,7 @@ export type CurvedSheetPrimitive =
       right: CoonsBoundarySnapshot;
       top: CoonsBoundarySnapshot;
       left: CoonsBoundarySnapshot;
+      boundarySnapshotState?: "frozen";
       boundarySources?: CoonsPatchBoundarySources;
       sampling: SurfaceSampling;
     };
@@ -1075,6 +1076,15 @@ the preview model values. JSON import refreshes symbolic previews before full
 diagram validation; TikZ mesh output may use the resolved numeric preview mesh
 while the saved boundary coordinate and frame expressions remain in the diagram
 model.
+
+When a linked refresh fails, `boundarySnapshotState: "frozen"` records that the
+four saved snapshots are the exact last-valid fallback. Their stored numeric
+previews, symbolic expressions, and coordinate provenance remain authoritative
+even if current diagram variables have diverged. Successful atomic linked
+synchronization clears this state. Detaching a stale patch preserves it so the
+same snapshots remain valid and serializable without the source links. The
+field is optional, so legacy and ordinary static Coons patches keep their
+existing symbolic-preview behavior.
 
 A ruled surface stores two boundary snapshots with a shared deterministic
 piecewise-uniform boundary parameter `u`. Its sampler uses:

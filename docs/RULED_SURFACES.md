@@ -113,8 +113,10 @@ surface primitive and sampling counts. When automatic visibility is enabled,
 the sampled mesh faces can participate in the same approximate painter-style
 depth sorting as other sheet faces, and curves can be sampled into visible and
 hidden runs behind the sheet. Export does not depend on `tikz-3dtools`.
-For symbolic boundary snapshots, this sampled mesh output uses the resolved
-numeric preview values from import or the current variable manager state.
+For symbolic boundary snapshots, this sampled mesh output uses their resolved
+numeric preview values. A stale linked patch keeps the complete last-valid
+snapshot model frozen, so its saved previews remain authoritative until the
+sources recover; detaching that stale patch preserves the same frozen fallback.
 
 ## Compatibility And Limitations
 
