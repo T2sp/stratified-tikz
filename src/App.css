@@ -1525,6 +1525,7 @@
 }
 
 .preview-floating-toolbar {
+  z-index: calc(var(--z-preview-context-bar) + 1);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
