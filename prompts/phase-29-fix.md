@@ -1,4 +1,4 @@
-# Phase 29 Targeted Fix Prompt 5: Symbolic provenance synchronization and regression hardening
+# Phase 29 Targeted Fix Prompt 6: Exact stale snapshots and source-aware duplication remapping
 
 ## Environment
 
@@ -14,6 +14,7 @@ PATH=/opt/homebrew/bin:$PATH
 Required verification:
 
 ```bash
+PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts
 PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts tests/model/diagramIds.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
@@ -32,412 +33,92 @@ Do not add dependencies.
 
 ## Project context
 
-You are applying one final, narrowly targeted Phase 29 correctness fix and strengthening two insufficient regressions in StratifiedTikZ:
+You are applying two narrowly targeted Phase 29 model-integrity fixes in StratifiedTikZ:
 
 ```text
 https://github.com/T2sp/stratified-tikz
 ```
 
-Review the actual current working tree and commit range before editing. The review covered `main@1faa43f` through `0416bda`, including unstaged Phase 29 fixes, but line numbers may have moved.
+The review covered `1faa43f..7fa9032` plus current unstaged changes. Inspect the actual working tree before editing because line numbers may have moved.
 
 Read at least:
 
 - `AGENTS.md`;
 - `prompts/phase-29-implement.md`;
 - `prompts/phase-29-review.md`;
-- all prior Phase 29 fix prompts present in the repository;
+- every prior Phase 29 fix prompt present in the repository;
 - `src/model/coonsPatchLinks.ts`;
 - `src/model/symbolicCoordinates.ts`;
-- `src/model/variables.ts`;
 - `src/model/serialization.ts`;
 - `src/model/validation.ts`;
 - `src/model/types.ts`;
 - `src/model/sheets.ts`;
-- `src/model/duplication.ts` and any layer/bulk duplication helpers;
-- `src/ui/undo.ts`;
-- the linked-Coons creation and update paths;
-- the TikZ generator and its curved-sheet/Coons helpers;
+- `src/model/layers.ts`;
+- `src/ui/bulkEditing.ts`;
+- all clone, layer-duplication, bulk-duplication, and ID-remapping helpers;
+- the detach-boundary-links implementation;
 - `tests/integration/phase29LinkedCoonsPatches.test.ts`;
-- existing symbolic-coordinate, serialization, duplication, undo/redo, and TikZ tests.
+- relevant symbolic-coordinate, serialization, duplication, and layer tests.
 
-Search for all helpers used to:
+Search for every caller of:
 
-- fingerprint or compare linked boundary sources;
-- compare materialized Coons boundary snapshots;
-- decide whether synchronization is required;
-- decide whether a synchronized candidate replaces the stored primitive;
-- derive `linkedUpToDate` versus `linkedStale`;
-- clone or remap `boundarySources`;
-- generate Coons TikZ output.
+- `materializeLinkedCoonsPatchFallback`;
+- `numericVec3`;
+- `synchronizeLinkedCoonsPatches`;
+- `remapCoonsPatchBoundarySources`;
+- layer and bulk ID-map builders;
+- Coons primitive clone/detach helpers.
 
 ## Verified review findings
 
-### Critical: equal-valued symbolic expression changes are missed
+### Medium 1: failed synchronization mutates the last-valid snapshots
 
-Verified sequence:
+When linked synchronization fails, the stale branch currently runs all four previous boundaries through a fallback materializer. That helper converts persisted symbolic coordinates to numeric `Vec3` values and strips symbolic expressions and other coordinate provenance.
 
-1. A linked source boundary and the corresponding materialized snapshot use symbolic expression `R`, with `R = 0.1`.
-2. The source expression is changed to `S`, with `S = 0.1`.
-3. The source correctly stores `S`.
-4. Because the resolved coordinates are unchanged, linked-source detection and snapshot equality treat the source and snapshot as equivalent.
-5. The materialized snapshot incorrectly retains expression `R`.
-6. Link status incorrectly reports `linkedUpToDate`.
-7. The now-unused variable `R` is changed to `0.7`.
-8. The snapshot still stores `R` with an obsolete preview value.
-9. `validateDiagram` fails, and serialized JSON cannot be loaded.
+Verified behavior:
 
-The observed load error is equivalent to:
+1. A valid linked Coons snapshot contains symbolic expression `R`.
+2. A linked source is deleted, or the four boundaries become temporarily invalid.
+3. Visible fallback geometry remains in place.
+4. The stored snapshot no longer contains expression `R`; it has been reduced to plain numeric coordinates.
+5. Saving or detaching therefore permanently loses valid snapshot model data.
 
-```text
-primitive.bottom...symbolic.z.previewValue
-Symbolic coordinate preview value must match the evaluated expression.
-```
+Phase 29 requires the previous four last-valid materialized snapshots to remain intact. “Last-valid geometry” means the complete persisted snapshot model, not only numerically equal preview coordinates.
 
-Ordinary symbolic refresh intentionally skips linked Coons snapshots so that stale last-valid fallback geometry is not destroyed. Therefore, linked synchronization itself must copy symbolic expression/provenance changes even when the evaluated coordinates remain equal.
+### Medium 2: duplication remaps links from unrelated ID-map entries
 
-### Medium: TikZ regression is not patch-specific
+Layer and bulk duplication currently pass broad old-ID-to-new-ID maps containing patches, labels, sheets, and unrelated strata. The Coons remapper applies a matching entry without proving that the old ID belongs to an actual duplicated source of the required path/point kind.
 
-The current TikZ refresh test compares the entire diagram before and after editing a visible source curve.
+Verified behavior:
 
-That output changes even when the Coons patch block remains stale, so the assertion does not prove that refreshed Coons geometry reached TikZ export.
+1. A valid loadable stale Coons patch has dangling point-source IDs equal to the patch’s own ID.
+2. Only the patch is duplicated.
+3. The broad duplication map contains `patch -> patch-copy`.
+4. The duplicate’s dangling `sourcePointId` is incorrectly rewritten from `patch` to `patch-copy`.
+5. The copied link now points at the copied sheet rather than retaining the original dangling identity.
 
-The tests also need focused coverage for:
-
-- stale last-valid Coons fallback coordinates in TikZ;
-- linked Coons inline-math formatting.
-
-### Medium: duplication regression omits one role and reversal
-
-The current duplication test does not assert the `top` source remap and does not verify preservation of a `reversed` flag.
-
-The generic implementation appears correct, but the current test would not catch a role-specific omission or lost reversal metadata.
+A link may be remapped only when its actual corresponding boundary source was duplicated.
 
 ## Goal
 
-Fix linked-Coons synchronization so that geometry-bearing symbolic expression/provenance changes are synchronized even when their resolved coordinates are numerically equal.
+Fix only these two verified issues.
 
 After the fix:
 
-- changing a linked source expression from `R` to equal-valued `S` updates the corresponding materialized snapshot from `R` to `S`;
-- the patch remains valid and reports `linkedUpToDate`;
-- later changes to unused `R` cannot invalidate the patch;
-- JSON round-trip remains valid;
-- Undo/Redo restores both source and snapshot expression metadata coherently;
-- unrelated edits do not cause unnecessary Coons rematerialization;
-- TikZ tests inspect the Coons patch block itself;
-- duplication tests verify all four roles and reversal metadata;
-- rendering, sampling, stale fallback, load behavior, and all previous Phase 29 fixes remain intact.
-
-## Required design principle
-
-Phase 29 needs two distinct notions of equality:
-
-1. **Resolved geometric equality**
-   - Used where only current numeric geometry matters.
-   - Equal coordinates may be geometrically equivalent.
-
-2. **Persisted linked-boundary semantic equality**
-   - Used to decide whether a linked source-derived snapshot is current.
-   - Must include geometry-bearing symbolic expression/provenance in addition to resolved geometry.
-
-Do not continue using resolved coordinates alone for every synchronization decision.
-
-Do not replace the comparison with a deep comparison of an entire source stratum, because cosmetic or unrelated changes such as style, name, selection, or layer metadata must not rematerialize the patch.
-
-## Fix 1: symbolic/provenance-sensitive source fingerprinting
-
-### Source-change detection
-
-Update linked-source change detection so it recognizes changes that can affect the persisted materialized boundary representation, even when preview coordinates are equal.
-
-The normalized source fingerprint/equality must include, where applicable:
-
-- boundary source kind: path or point;
-- source ID and boundary role;
-- path `reversed` state;
-- path primitive/segment structure relevant to the boundary;
-- every geometry-bearing coordinate;
-- resolved numeric preview values;
-- symbolic expression text or equivalent canonical expression representation;
-- symbolic-coordinate metadata required for valid serialization and later reevaluation;
-- coordinate-reference identity/provenance where it remains relevant before snapshot detachment;
-- template or concatenated-path parameters that determine the persisted boundary snapshot.
-
-It must exclude unrelated fields such as:
-
-- style;
-- layer number by itself;
-- display name, unless the existing snapshot format intentionally treats it as persisted boundary identity;
-- selection state;
-- Inspector/UI state;
-- unrelated diagram variables not referenced by the source;
-- unrelated strata.
-
-Prefer a small, pure, explicitly named helper, for example:
-
-```ts
-function linkedCoonsBoundarySourceFingerprint(
-  diagram: Diagram,
-  source: CoonsPatchBoundarySource,
-  role: CoonsPatchBoundaryRole,
-): LinkedCoonsBoundaryFingerprintResult
-```
-
-or:
-
-```ts
-function areLinkedBoundarySourceStatesEquivalent(
-  previous: ResolvedLinkedBoundaryState,
-  next: ResolvedLinkedBoundaryState,
-): boolean
-```
-
-Follow existing naming conventions.
-
-Do not use raw `JSON.stringify` over an entire stratum or the entire diagram.
-
-If the repository already has a structural equality or canonicalization helper for symbolic coordinates, reuse it.
-
-### Required equal-valued behavior
-
-This transition must count as a source change:
-
-```text
-previous expression: R
-previous preview:    0.1
-
-next expression:     S
-next preview:        0.1
-```
-
-This transition must not be ignored merely because both resolve to the same `Vec3`.
-
-Conversely, changing a wholly unrelated variable must not count as a linked source change when neither the source geometry nor its symbolic/provenance representation changes.
-
-## Fix 2: symbolic/provenance-sensitive candidate equality
-
-Even after source change is detected and a complete candidate is built, the replacement decision must not compare materialized boundaries by resolved geometry alone.
-
-Update the candidate-versus-current comparison so a candidate with expression `S` replaces a stored snapshot with expression `R`, even when both preview values are `0.1`.
-
-Compare normalized materialized boundary data after applying the same existing policies for:
-
-- boundary orientation;
-- coordinate-reference detachment;
-- symbolic snapshot materialization;
-- validation.
-
-Include all persisted geometry-bearing fields required for:
-
-- `validateDiagram`;
-- JSON serialization and parsing;
-- future symbolic reevaluation;
-- SVG and TikZ export.
-
-Exclude non-geometry patch metadata that is intentionally preserved from the next diagram, such as:
-
-- patch ID;
-- name;
-- layer;
-- style;
-- sampling settings;
-- selection/UI state.
-
-A successful candidate replacement must still update all four boundaries atomically.
-
-Do not partially update one role.
-
-Do not weaken the last-valid fallback rule for invalid or missing sources.
-
-## Fix 3: status correctness
-
-`inspectLinkedCoonsPatch` or its underlying comparison must use the same semantic notion of “current” as synchronization.
-
-A linked patch must not report `linkedUpToDate` when:
-
-- current linked source expression is `S`;
-- stored materialized snapshot expression is still `R`;
-- both happen to resolve to the same current coordinate.
-
-After successful synchronization, status should report `linkedUpToDate`.
-
-If a candidate cannot be validated, status should remain `linkedStale` while the previous last-valid snapshots remain authoritative.
-
-Avoid divergent equality logic between:
-
-- change detection;
-- candidate replacement;
-- status inspection.
-
-Prefer one normalized comparison/fingerprint helper reused by all three, or a small set of helpers with clearly documented responsibilities.
-
-## Preserve symbolic stale fallback semantics
-
-Do not undo the earlier Phase 29 fix that prevents ordinary symbolic refresh from rewriting linked Coons fallback snapshots.
-
-The ownership rule remains:
-
-- linked source paths/points receive normal symbolic preview refresh;
-- linked Coons materialized snapshots are replaced only by successful atomic linked synchronization;
-- failed synchronization preserves the previous last-valid snapshots;
-- saved stale linked diagrams remain loadable;
-- repaired sources recover automatically.
-
-The present fix is specifically about making successful synchronization copy equal-valued expression/provenance changes.
-
-Do not globally refresh linked snapshots through `refreshDiagramSymbolicCoordinatePreviews`.
-
-Do not globally bake all symbolic coordinates to numeric literals.
-
-## Undo/Redo requirements
-
-The expression edit and dependent snapshot update must remain one diagram history entry.
-
-For this sequence:
-
-```text
-R = 0.1
-S = 0.1
-source expression R -> S
-unused R value 0.1 -> 0.7
-```
-
-verify:
-
-- after `R -> S`, both source and linked snapshot store `S`;
-- one Undo restores both source and snapshot to `R`;
-- one Redo restores both to `S`;
-- changing unused `R` is a separate normal history entry;
-- Undo/Redo of the unused variable edit does not modify the linked snapshot;
-- every intermediate state passes validation;
-- repeated Undo/Redo does not drift expression metadata or preview values.
-
-Do not add a separate history entry for synchronization.
-
-## Regression tests: symbolic expression/provenance
-
-Extend `tests/integration/phase29LinkedCoonsPatches.test.ts`.
-
-### Required full reproduction
-
-Create a valid linked Coons patch with a symbolic source boundary.
-
-Use two variables:
-
-```text
-R = 0.1
-S = 0.1
-```
-
-Then:
-
-1. Confirm the source and its materialized linked snapshot initially store expression `R`.
-2. Change only the source expression from `R` to `S` through the normal editor/model update path.
-3. Confirm:
-   - resolved geometry remains numerically equal;
-   - source expression is `S`;
-   - the corresponding materialized Coons snapshot expression is also `S`;
-   - the complete patch remains valid;
-   - link status is `linkedUpToDate`;
-   - exactly one history entry represents the source edit plus synchronization.
-4. Change the now-unused variable `R` to `0.7`.
-5. Confirm:
-   - source remains based on `S`;
-   - snapshot remains based on `S`;
-   - snapshot preview values remain consistent;
-   - `validateDiagram` succeeds;
-   - link status remains `linkedUpToDate`;
-   - sampled patch geometry does not change merely because unused `R` changed.
-6. Serialize the diagram.
-7. Parse it with the normal saved-diagram JSON parser.
-8. Confirm:
-   - parsing succeeds;
-   - the loaded source and snapshot both store `S`;
-   - the loaded diagram validates;
-   - linked status is `linkedUpToDate`.
-9. Exercise Undo/Redo across both edits and assert source expression, snapshot expression, variable values, status, and validation at every step.
-
-Assert the actual symbolic expression/provenance fields, not only preview coordinates.
-
-### Unrelated edit/no-op regression
-
-Add a focused assertion that changing an unrelated style/name or an unrelated variable:
-
-- does not replace materialized Coons boundaries;
-- does not create an extra synchronization history entry;
-- leaves source and snapshot semantic fingerprints unchanged.
-
-Use value/deep equality or an existing stable primitive-equality helper; do not rely solely on object identity if the architecture clones diagrams.
-
-### Preserve value-changing symbolic coverage
-
-Keep the existing tests for:
-
-- valid symbolic value changes that refresh geometry;
-- symbolic changes that create a stale corner mismatch;
-- stale save/load fallback;
-- repair and recovery.
-
-The new equality logic must not regress those cases.
-
-## Regression tests: TikZ output
-
-Strengthen the existing TikZ tests so they prove the Coons patch geometry itself changed or remained stable.
-
-### Isolate the Coons block
-
-Use a uniquely named or uniquely identified Coons patch and extract only its TikZ block using the repository’s actual stable output structure.
-
-Prefer:
-
-- an existing helper that emits one stratum;
-- a stable comment/name marker already present in generated TikZ;
-- or a small test-only extraction helper bounded by known stratum markers.
-
-Do not pass by comparing the whole diagram output while visible source curves also change.
-
-Do not change production TikZ formatting merely to simplify the test.
-
-### Valid refresh assertion
-
-For a valid linked source edit:
-
-- capture the Coons patch block before;
-- perform the source edit and synchronization;
-- capture the Coons patch block after;
-- assert the block changed;
-- assert a coordinate or control value unique to the refreshed Coons snapshot appears;
-- assert the obsolete patch coordinate does not remain in the relevant location.
-
-The visible source curve’s own TikZ output must not be capable of satisfying this assertion.
-
-### Stale fallback assertion
-
-For an invalid linked source edit:
-
-- capture the last-valid Coons patch block;
-- make the linked patch stale;
-- assert the source’s own block changes where appropriate;
-- assert the isolated Coons patch block retains the last-valid fallback coordinates;
-- assert export does not use the invalid candidate.
-
-### Inline-math assertion
-
-Add focused linked-Coons coverage for inline-math TikZ mode.
-
-Assert on the isolated patch output that:
-
-- refreshed or fallback Coons coordinates are present as expected;
-- output remains valid inline-math form;
-- no blank lines are introduced;
-- existing 4-space indentation rules are preserved where applicable;
-- linked metadata itself does not leak into TikZ.
-
-Avoid brittle full-file snapshots unless that is already the repository convention.
-
-## Regression tests: duplication remapping
-
-Strengthen the duplication test to verify every boundary role explicitly:
+- failed linked synchronization preserves all four previous snapshots exactly, including symbolic expressions and persisted coordinate provenance;
+- the source edit and next patch’s non-boundary fields are still retained;
+- stale diagrams remain safe to save, load, render, export, detach, undo, redo, and recover;
+- layer and bulk duplication remap a boundary source ID only when a real source stratum of the matching source kind was duplicated;
+- patch-only, dangling, missing, or incompatible links retain their original IDs;
+- valid duplicated path and point sources still remap correctly;
+- all roles and path `reversed` flags remain unchanged;
+- sampling, Preview, SVG, TikZ, synchronization, and history architecture remain unchanged.
+
+## Fix 1: preserve the exact previous snapshots on synchronization failure
+
+### Required invariant
+
+For a linked Coons patch whose refresh candidate cannot be committed, the next patch must use an exact structural clone of the previous patch’s four last-valid snapshots:
 
 ```text
 bottom
@@ -446,23 +127,387 @@ top
 left
 ```
 
-Requirements:
+Preserve every persisted field, including where present:
 
-- duplicate the Coons patch and all source strata in the same operation;
-- assign distinguishable source IDs to all four roles;
-- set at least one path role to `reversed: true`;
-- preferably set another path role to `reversed: false`;
-- if a point role is used, verify its `kind: 'point'` and remapped `sourcePointId`;
-- assert each duplicated role points to the corresponding duplicated source;
-- explicitly assert the `top` role;
-- assert each path role preserves its original `reversed` value;
-- assert the original patch links remain unchanged;
-- assert materialized snapshots are independently cloned;
-- assert the duplicated patch remains valid and linked up to date.
+- numeric coordinates;
+- symbolic expression text;
+- symbolic preview values;
+- symbolic/provenance metadata;
+- path IDs and names stored in snapshots;
+- segment kinds and control points;
+- coordinate-reference provenance that is legitimately part of the already committed snapshot;
+- constant-point boundary metadata;
+- boundary ordering and orientation.
 
-Do not satisfy the test with only a generic loop that could silently omit a role from the fixture. It is acceptable to use a loop after first asserting the expected four-role key set exactly.
+Do not recreate these boundaries from numeric samples.
 
-Keep any existing patch-only duplication semantics unchanged.
+Do not pass them through `numericVec3`.
+
+Do not silently normalize away symbolic fields.
+
+Do not rebuild them from the invalid next sources.
+
+### Stale-branch behavior
+
+When source-derived synchronization fails:
+
+1. Accept the source edit in `nextDiagram`.
+2. Preserve the next diagram’s source state.
+3. Preserve the next patch’s non-boundary fields where the existing Phase 29 policy requires it, including:
+   - patch ID;
+   - name;
+   - layer;
+   - style;
+   - sampling settings;
+   - `boundarySources`;
+   - other unrelated patch metadata.
+4. Replace only `bottom`, `right`, `top`, and `left` with exact deep clones of the corresponding previous last-valid snapshots.
+5. Report the derived stale issue/status.
+6. Do not mutate either `previousDiagram` or its snapshot objects.
+7. Do not create a second undo entry.
+
+Conceptually:
+
+```ts
+const stalePrimitive: CoonsPatchPrimitive = {
+  ...nextPrimitive,
+  bottom: cloneCoonsBoundarySnapshot(previousPrimitive.bottom),
+  right: cloneCoonsBoundarySnapshot(previousPrimitive.right),
+  top: cloneCoonsBoundarySnapshot(previousPrimitive.top),
+  left: cloneCoonsBoundarySnapshot(previousPrimitive.left),
+}
+```
+
+Use the repository’s existing deep-clone helpers rather than introducing shallow aliases.
+
+The exact code must follow current types and conventions.
+
+### Remove or narrow numeric fallback materialization
+
+Do not call `materializeLinkedCoonsPatchFallback` from the ordinary failed-synchronization branch if it strips persisted fields.
+
+Then inspect whether that helper is still needed anywhere.
+
+Acceptable outcomes:
+
+- remove it if it has no valid remaining use; or
+- rename/narrow it to a clearly explicit migration/export-only operation if a real call site still requires numeric materialization.
+
+Do not leave dead or misleading fallback code.
+
+### Preserve earlier symbolic persistence fixes
+
+Earlier Phase 29 fixes addressed stale symbolic save/load and equal-valued symbolic-expression changes. Do not regress them.
+
+The ownership rule remains:
+
+- source paths and points receive normal symbolic refresh;
+- linked Coons snapshots are updated only by successful atomic linked synchronization;
+- failed synchronization preserves the previous snapshots;
+- equal-valued source expression/provenance changes still count as a successful refresh when the candidate is valid;
+- stale saved diagrams remain loadable;
+- repaired sources recover automatically.
+
+If exact snapshot preservation exposes a conflict with current symbolic validation or load normalization, fix that conflict narrowly. Do not solve it by stripping expressions again.
+
+Prefer existing “materialized/frozen snapshot” semantics if the model already has them.
+
+If the current model cannot represent an exact last-valid symbolic snapshot safely after current diagram variables diverge, introduce the smallest explicit, backward-compatible representation needed to distinguish frozen materialized snapshot values from live source evaluation. In that case:
+
+- preserve the original symbolic/provenance fields;
+- keep the saved numeric preview used by the last-valid geometry;
+- scope any validation exception to the explicit materialized/frozen snapshot representation;
+- do not weaken symbolic validation globally;
+- keep legacy JSON backward-compatible;
+- keep detach and JSON round-trip valid;
+- document the new optional field in model docs only if the persisted schema actually changes.
+
+Do not add such metadata unless inspection and focused tests prove it is necessary.
+
+### Detach semantics
+
+`Detach boundary links` must remove source links without changing any of the four materialized snapshots.
+
+For a stale patch containing symbolic/provenance fields:
+
+- before detach and after detach, the four snapshots must be structurally equal;
+- only `boundarySources` and derived link status may change;
+- detached geometry must remain valid, renderable, exportable, and serializable;
+- Undo of detach must restore the links without changing snapshots.
+
+Do not use detach as an opportunity to convert snapshots to numeric coordinates.
+
+### Save/load semantics
+
+For a stale linked patch:
+
+- serialization must retain the complete last-valid snapshots;
+- parsing must succeed;
+- loaded snapshots must be structurally equivalent to the saved snapshots after normal backward-compatible normalization;
+- missing or invalid sources must still produce stale status;
+- Preview, SVG, and TikZ must still use those saved snapshots;
+- repairing the sources must replace them through the normal successful atomic synchronization path.
+
+The loaded file’s own fallback remains authoritative. Do not use snapshots from a previously open document.
+
+## Fix 2: remap only actual duplicated boundary sources
+
+### Required invariant
+
+A Coons boundary-source link may be remapped from `oldId` to `newId` only if all of the following are true:
+
+1. the original diagram contains a stratum with `oldId`;
+2. that stratum is of the source kind required by the link:
+   - a path-like curve stratum for `kind: 'path'`;
+   - a point stratum for `kind: 'point'`;
+3. that exact source stratum participates in the current duplication operation;
+4. the duplication operation created `newId` for that source.
+
+Otherwise, preserve `oldId`.
+
+### Kind compatibility, not current geometric validity
+
+Use structural source-kind compatibility rather than full current Coons-boundary validity.
+
+Examples:
+
+- an existing path source that is temporarily closed or otherwise stale is still the actual path source and should remap when that path itself is duplicated;
+- a missing/dangling ID must not remap;
+- an ID belonging to a sheet, label, patch, or other incompatible stratum must not remap;
+- a valid source that was not duplicated must not remap;
+- duplicating only the patch must keep links to the original sources;
+- duplicating the patch and real sources together must remap those sources.
+
+Reuse the same path/point structural predicates used by Coons source resolution where possible, without requiring the source to be currently valid enough to refresh the patch.
+
+### Use typed source remap data
+
+Do not pass an unqualified global ID map directly into the boundary-source remapper.
+
+Prefer an API that makes eligibility explicit, for example:
+
+```ts
+type CoonsBoundarySourceRemap = {
+  pathSourceIds: ReadonlyMap<string, string>
+  pointSourceIds: ReadonlyMap<string, string>
+}
+
+function remapCoonsPatchBoundarySources(
+  sources: CoonsPatchBoundarySources,
+  remap: CoonsBoundarySourceRemap,
+): CoonsPatchBoundarySources
+```
+
+or an equivalent API that accepts:
+
+- the original diagram;
+- the exact duplicated source-ID set;
+- the operation’s old-to-new ID map.
+
+For a path role, consult only the path-source map.
+
+For a point role, consult only the point-source map.
+
+Do not infer eligibility merely because the broad ID map has a matching key.
+
+### Centralize eligibility
+
+Layer duplication and bulk duplication must use the same source-aware remapping rule.
+
+A suitable approach is:
+
+1. build the normal broad ID map for duplicated entities;
+2. inspect only original strata actually selected by the duplication operation;
+3. derive typed path/point source maps from those actual duplicated strata;
+4. pass the typed source maps into Coons link remapping.
+
+Avoid duplicating subtly different eligibility logic in `layers.ts` and `bulkEditing.ts`.
+
+A small pure helper in `coonsPatchLinks.ts` or an appropriate model duplication module is preferred.
+
+Avoid UI-to-model import cycles.
+
+### Preserve all other link fields
+
+When a source is remapped:
+
+- preserve its role;
+- preserve `kind`;
+- preserve `reversed`;
+- change only `sourcePathId` or `sourcePointId`.
+
+When a source is not eligible:
+
+- preserve the complete source record unchanged.
+
+Do not alter materialized boundary snapshots as part of metadata remapping except through the repository’s existing independent clone behavior.
+
+## Regression tests: exact stale snapshots
+
+Extend `tests/integration/phase29LinkedCoonsPatches.test.ts`.
+
+### 1. Missing symbolic source preserves complete snapshots
+
+Create a valid linked Coons patch whose stored boundary snapshot contains a symbolic expression such as `R`.
+
+Before deleting the source, deep-clone all four materialized snapshots.
+
+Delete the linked source through the normal diagram-update/history path.
+
+Assert:
+
+- the patch is `linkedStale`;
+- all four post-failure snapshots are deeply equal to the saved pre-failure snapshots;
+- the symbolic expression `R` still exists;
+- symbolic preview values and all other persisted coordinate metadata remain unchanged;
+- no boundary has been reduced to plain numeric coordinates;
+- source metadata is retained;
+- the source deletion itself is accepted;
+- the previous diagram object was not mutated.
+
+Do not assert only sampled/numeric geometry.
+
+### 2. Corner mismatch preserves complete snapshots
+
+Create a temporary corner mismatch while all sources still exist.
+
+Assert exact structural equality of all four snapshots before and after the failed synchronization, including symbolic/provenance fields.
+
+Then repair the corner and verify normal successful recovery updates the snapshots.
+
+### 3. Stale save/load preserves complete snapshots
+
+For a stale patch from source deletion or corner mismatch:
+
+1. serialize;
+2. parse through the normal saved-diagram API;
+3. assert parsing succeeds;
+4. assert the loaded snapshots preserve symbolic/provenance fields and are structurally equivalent to the serialized fallback;
+5. assert stale status and last-valid geometry;
+6. assert `validateDiagram`, sampling, SVG export, and TikZ export succeed.
+
+Keep the prior symbolic variable mismatch and equal-valued expression regressions passing.
+
+### 4. Detach preserves complete snapshots
+
+Detach the stale linked patch.
+
+Assert:
+
+- only link metadata is removed;
+- all four snapshots remain deeply equal;
+- symbolic/provenance fields remain;
+- save/load still succeeds;
+- later source changes no longer affect the detached patch;
+- Undo restores links without changing snapshots.
+
+### 5. Undo/Redo
+
+Verify one-step Undo/Redo for the source failure:
+
+- Undo restores the source and coherent up-to-date patch;
+- Redo restores the stale state with the exact last-valid snapshots;
+- repeated cycles do not strip fields or drift snapshots.
+
+## Regression tests: source-aware bulk duplication
+
+Add focused bulk-duplication coverage.
+
+### 1. Patch-only duplicate with dangling self-colliding link
+
+Construct a valid loadable stale linked patch whose point source ID equals the patch ID, for example:
+
+```text
+patch ID: patch
+sourcePointId: patch
+```
+
+There must be no actual point source with that ID.
+
+Duplicate only the patch through the normal bulk-duplication path.
+
+Assert:
+
+- the copied patch gets a new patch ID;
+- every dangling source ID remains exactly `patch`;
+- no source ID becomes the copied patch ID;
+- the copied patch remains stale;
+- `kind` and all `reversed` flags remain unchanged;
+- the original patch remains unchanged;
+- materialized snapshots are independent clones.
+
+### 2. Incompatible duplicated entity does not remap
+
+Create a stale path or point link whose source ID refers to an existing incompatible stratum kind where the loader/model permits it.
+
+Duplicate both the patch and that incompatible entity.
+
+Assert the copied link retains the original source ID rather than following the incompatible entity’s new ID.
+
+If the normal validator forbids constructing this case through JSON, test the pure source-remap helper directly with a structurally representative original diagram.
+
+### 3. Existing but nonduplicated source remains original
+
+Duplicate a patch without duplicating its actual valid source.
+
+Assert the copied patch still links to the original source ID.
+
+### 4. Actual duplicated path/point sources remap
+
+Keep or strengthen the positive case:
+
+- duplicate the patch and its actual sources together;
+- verify `bottom`, `right`, `top`, and `left` independently;
+- verify a real path source remaps;
+- verify a real point source remaps where supported;
+- verify at least one `reversed: true` flag is preserved;
+- verify the copied patch is linked to the copied sources.
+
+## Regression tests: source-aware layer duplication
+
+Add equivalent layer-duplication coverage.
+
+At minimum test:
+
+1. **Patch layer duplicated, actual source outside layer**
+   - copied patch keeps the original source ID.
+
+2. **Patch and actual source duplicated together**
+   - copied patch remaps to the copied source.
+
+3. **Patch-only stale/dangling self-collision**
+   - copied patch’s dangling source ID does not remap to the copied patch ID.
+
+4. **Temporarily invalid but existing path source duplicated**
+   - if the source stratum is structurally path-like and is duplicated, its link remaps even when the patch remains stale for a geometry reason.
+
+Assert role, source kind, source ID, and reversal explicitly.
+
+## Preserve existing behavior
+
+Do not regress:
+
+- successful atomic refresh;
+- equal-valued symbolic expression/provenance synchronization;
+- stale symbolic save/load;
+- last-valid numeric geometry;
+- automatic recovery;
+- replacement-document load isolation;
+- dangling source-ID reservation;
+- Variable Manager ID allocation;
+- malformed metadata handling;
+- linked/static creation;
+- role-specific reversal;
+- constant-point boundaries;
+- one-step Undo/Redo;
+- Inspector status;
+- detach;
+- valid duplication/remapping;
+- static and legacy Coons patches;
+- ruled surfaces;
+- SVG and TikZ export;
+- inline-math formatting;
+- 4-space TikZ indentation.
 
 ## Scope constraints
 
@@ -470,26 +515,30 @@ Do not:
 
 - redesign Phase 29;
 - introduce a general dependency graph;
-- change the Coons formula or sampling;
-- resolve source strata during rendering, SVG export, or TikZ export;
-- weaken validation;
-- change JSON schema/version unless absolutely required;
-- change creation defaults;
-- change stale fallback semantics;
-- remove symbolic expressions from linked snapshots;
-- globally deep-compare entire diagrams or strata;
-- rematerialize patches for style/name/selection-only edits;
-- alter ruled surfaces;
+- change the Coons formula or sampler;
+- resolve source strata at render/export time;
+- weaken model validation globally;
+- strip symbolic data to make tests pass;
+- add a general tombstone or identity registry;
+- auto-repair or auto-relink stale sources;
+- remap links by names or geometry;
+- change JSON version unless a narrowly required backward-compatible field is proven necessary;
 - perform unrelated UI or documentation cleanup;
 - add dependencies.
 
-Keep the production diff focused on equality/fingerprinting and any minimal helper extraction required for correctness. Test-only extraction helpers are acceptable.
+Keep production changes focused on:
+
+- stale fallback snapshot preservation;
+- any narrowly required symbolic snapshot persistence support;
+- source-aware duplication remapping;
+- targeted tests.
 
 ## Verification
 
 Run:
 
 ```bash
+PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts
 PATH=/opt/homebrew/bin:$PATH node --test tests/integration/phase29LinkedCoonsPatches.test.ts tests/model/diagramIds.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
@@ -498,21 +547,31 @@ git diff --cached --check
 git diff main --check
 ```
 
-Also run any focused symbolic-coordinate, serialization, duplication, undo, and TikZ test files modified by the fix.
+Also run any focused layer, bulk-editing, serialization, symbolic-coordinate, detach, or duplication test files modified by this fix.
 
-Perform a read-only reproduction of:
+Perform read-only probes for both verified failures and report the results:
+
+### Probe A: stale symbolic fallback
 
 ```text
-R=0.1 -> source expression S=0.1 -> unused R=0.7
+valid symbolic snapshots
+-> delete source or create corner mismatch
+-> inspect all four stored snapshots
+-> save/load
+-> detach
 ```
 
-and report:
+Report whether symbolic/provenance fields remain intact at every step.
 
-- source expression;
-- snapshot expression;
-- link status;
-- `validateDiagram` result;
-- serialized reload result.
+### Probe B: patch-only stale duplication
+
+```text
+patch ID = patch
+dangling sourcePointId = patch
+-> duplicate only patch
+```
+
+Report the copied patch ID and copied `sourcePointId`.
 
 If the local dev server cannot bind because the sandbox denies `listen`, report that limitation accurately. Do not claim browser verification was performed.
 
@@ -520,36 +579,37 @@ If the local dev server cannot bind because the sandbox denies `listen`, report 
 
 This targeted Phase 29 fix is complete only when:
 
-- equal-valued source expression changes trigger linked snapshot synchronization;
-- source and snapshot both store `S` after `R=0.1 -> S=0.1`;
-- changing unused `R` afterward cannot invalidate the diagram;
-- status does not incorrectly report up to date for semantically obsolete snapshots;
-- JSON round-trip succeeds;
-- Undo/Redo keeps source and snapshot expressions coherent in one transaction;
-- unrelated edits do not cause unnecessary rematerialization;
-- TikZ regressions isolate and verify the Coons patch block;
-- stale fallback TikZ coordinates are tested;
-- linked inline-math formatting is tested;
-- duplication tests cover bottom, right, top, left, and at least one preserved `reversed: true`;
-- all prior Phase 29 tests continue to pass;
-- focused tests, the full suite, build, and all diff checks pass.
+- failed synchronization preserves exact deep-cloned previous `bottom`, `right`, `top`, and `left` snapshots;
+- symbolic expressions and persisted coordinate provenance are not stripped;
+- stale save/load and recovery remain safe;
+- detach preserves the complete snapshots;
+- previous diagram objects are not mutated;
+- broad duplication maps can no longer remap links from patch, label, sheet, or unrelated entries;
+- dangling and incompatible source IDs retain their original values;
+- actual duplicated path/point sources remap correctly;
+- path roles retain `reversed`;
+- bulk and layer duplication use one coherent source-aware rule;
+- all targeted regressions pass;
+- the full suite, build, and all diff checks pass;
+- no Critical or Medium review issue remains.
 
 ## Report after implementation
 
 Report:
 
 - files modified;
-- root cause of the equal-valued symbolic-expression defect;
-- the distinction introduced between geometric equality and persisted semantic equality;
-- fields included and excluded from the new fingerprint/comparison;
-- synchronization call sites affected;
-- how status now determines up-to-date versus stale;
-- how unnecessary rematerialization is avoided;
-- Undo/Redo behavior verified;
-- JSON round-trip behavior verified;
-- TikZ block extraction/assertions added;
-- stale fallback and inline-math TikZ coverage added;
-- duplication role/reversal assertions added;
+- root cause of snapshot field loss;
+- stale-branch logic changed;
+- clone helper used for exact snapshot preservation;
+- whether fallback materialization was removed or narrowed;
+- how symbolic stale save/load remains valid without stripping provenance;
+- detach behavior verified;
+- root cause of incorrect duplication remapping;
+- source-kind eligibility rule;
+- shared remap helper/API introduced or changed;
+- bulk duplication behavior;
+- layer duplication behavior;
+- tests added or updated;
 - focused test results;
 - full `npm test` result;
 - `npm run build` result;
@@ -557,6 +617,6 @@ Report:
 - `git diff --check` result;
 - `git diff --cached --check` result;
 - `git diff main --check` result;
-- read-only reproduction result;
+- read-only probe results;
 - manual browser verification performed or the exact reason it was unavailable;
 - remaining known limitations.
