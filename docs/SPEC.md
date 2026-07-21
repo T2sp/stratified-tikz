@@ -199,11 +199,18 @@ coordinate editors and export paths are implemented.
 
 Persisted work-plane-local coordinate metadata is broader than the direct-input
 UI. JSON import and variable updates refresh local `a,b` previews, symbolic
-frame previews, and the derived global `Vec3` preview before validation. This
-refresh covers point and label positions, path vertices and cubic controls,
-arc centers and frames, polygon sheets, filled boundaries, work-plane-filled
-sheets, grid frame snapshots, and ruled or Coons boundary snapshots. Malformed
-or unsupported local-source placements are rejected during load/validation.
+frame previews, and derived global `Vec3` previews for active inputs before
+validation. This includes point and label positions, path vertices and cubic
+controls, arc centers and frames, polygon sheets, filled boundaries,
+work-plane-filled sheets, grid frame snapshots, ruled-surface snapshots, and
+static Coons snapshots. For a linked Coons patch, its source paths and points
+own the active symbolic dependencies; its materialized boundaries, including
+frozen last-valid fallbacks, are not independently refreshed. Successful
+linked synchronization atomically replaces all four materialized snapshots
+from the refreshed sources, while failed synchronization preserves the exact
+frozen snapshots. A symbolic expression referenced only by frozen snapshots
+does not create a UI import variable requirement under the Phase 29 rule.
+Malformed or unsupported active placements are rejected during load/validation.
 
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
@@ -389,11 +396,14 @@ Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
 The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
 template geometry. Circle and ellipse templates are copied into ordinary path
 segments at creation time. Boundaries must be non-empty, composable, finite, and
-sample to finite points. Boundary-surface coordinates and nested work-plane
-frame snapshot components may be symbolic when loading saved JSON, but they must
-resolve to finite numeric preview values before the diagram is committed. Frame
-previews must also pass geometric frame validation. Preview and sampled-mesh
-TikZ output use those preview coordinates while the saved model preserves
+sample to finite points. Active ruled-surface and static Coons snapshot
+coordinates, linked Coons source strata, and their nested work-plane frame
+components may be symbolic when loading saved JSON, but they must resolve to
+finite numeric preview values before the diagram is committed. Linked/frozen
+materialized Coons snapshots instead retain their saved finite previews until a
+successful synchronization atomically replaces them. Active frame previews
+must also pass geometric frame validation. Preview and sampled-mesh TikZ output
+use the materialized preview coordinates while the saved model preserves
 symbolic expressions where supported.
 
 A ruled surface from boundaries `C0` and `C1` uses:

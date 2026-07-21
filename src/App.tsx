@@ -145,6 +145,7 @@ import {
   applyTranslateLayerToEditorState,
   appendConcatenatedPathDraftPoint,
   appendSheetPolygonDraftPoint,
+  applyGeometryHandleDragToEditorState,
   areCamera3DEqual,
   areFinitePoints,
   arePointsOnWorkPlane,
@@ -192,7 +193,8 @@ import {
   createFillFromClosedPaths,
   createFillFromClosedPathsErrorMessage,
   createCoonsPatchBoundaryDraft,
-  createCoonsPatchFromBoundaryPaths,
+  createCoonsPatchCreationInteraction,
+  createCoonsPatchCreationOptionsDraft,
   createCoonsPatchFromBoundaryPathsErrorMessage,
   createRuledSurfaceBoundaryDraft,
   createRuledSurfaceFromBoundaryPaths,
@@ -221,6 +223,7 @@ import {
   defaultWorkPlaneSetupMethod,
   directCoordinateModesForAmbientDimension,
   downloadTextFile,
+  endGeometryHandleDragSession,
   EditableInspector,
   existingCoordinateSourceKey,
   findSelectedElement,
@@ -267,7 +270,6 @@ import {
   shouldShowWorkPlaneOverlay,
   shouldShowWorkPlaneOverlayPanel,
   undoLastDiagramChange,
-  updateDiagramGeometryHandle,
   workPlaneFrameDisplay,
   workPlaneLocalCoordinateAxisLabel,
   workPlaneOriginReferenceText,
@@ -365,6 +367,7 @@ import {
   svgPreviewBackgroundModeOptions,
   svgPreviewExportSuccessMessage,
   startCoordinateAnchorDragSession,
+  startGeometryHandleDragSession,
   type BulkFieldScalarValue,
   type BulkStyleFieldId,
   type CoordinateAnchorDragSession,
@@ -396,10 +399,12 @@ import {
   type CoonsPatchBoundaryDraft,
   type CoonsPatchBoundaryRole,
   type CoonsPatchCornerEquationStatus,
+  type CoonsPatchCreationOptionsDraft,
   type CoordinateSourceHighlight,
   type CurvedSheetCreationKind,
   type CurvedSheetCreationParameters,
   type GeometryHandleTarget,
+  type GeometryHandleDragSession,
   type InspectorDisclosureState,
   type InspectorDrawerState,
   type LayerFilter,
@@ -701,8 +706,16 @@ function App() {
     useState<string>(String(defaultCoonsPatchSampling.vSegments))
   const [coonsPatchBoundaryDraft, setCoonsPatchBoundaryDraft] =
     useState<CoonsPatchBoundaryDraft>(createCoonsPatchBoundaryDraft)
-  const [coonsPatchKeepLinked, setCoonsPatchKeepLinked] =
-    useState<boolean>(true)
+  const [coonsPatchCreationOptionsDraft, setCoonsPatchCreationOptionsDraft] =
+    useState<CoonsPatchCreationOptionsDraft>(
+      createCoonsPatchCreationOptionsDraft,
+    )
+  const coonsPatchCreationInteraction = createCoonsPatchCreationInteraction({
+    optionsDraft: coonsPatchCreationOptionsDraft,
+    updateOptionsDraft: (update) =>
+      setCoonsPatchCreationOptionsDraft(update),
+    updateBoundaryDraft: (update) => setCoonsPatchBoundaryDraft(update),
+  })
   const [coonsPatchDirectionPanelOpen, setCoonsPatchDirectionPanelOpen] =
     useState<boolean>(false)
   const closeCoonsPatchDirectionPanel = useCallback((): void => {
@@ -854,7 +867,8 @@ function App() {
   const symbolicImportFirstInputRef = useRef<HTMLInputElement | null>(null)
   const previewStageRef = useRef<HTMLDivElement | null>(null)
   const quickStyleSliderUndoDiagramRef = useRef<Diagram | null>(null)
-  const geometryDragUndoDiagramRef = useRef<Diagram | null>(null)
+  const geometryHandleDragSessionRef =
+    useRef<GeometryHandleDragSession | null>(null)
   const coordinateAnchorDragSessionRef =
     useRef<CoordinateAnchorDragSession | null>(null)
   const [activeWorkPlane, setActiveWorkPlane] = useState<WorkPlane>({
@@ -1467,7 +1481,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     setFillRule('nonzero')
     setFillStatus('')
     setNewElementLayerInput('0')
@@ -1698,7 +1712,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     setFillStatus('')
     resetDirectPathInput()
     resetDirectCoordinateSources()
@@ -1718,7 +1732,7 @@ function App() {
     setSelectedExampleId(
       exampleIdForAmbientDimension(previousDiagram.ambientDimension),
     )
-    geometryDragUndoDiagramRef.current = null
+    geometryHandleDragSessionRef.current = null
     coordinateAnchorDragSessionRef.current = null
     closeCoonsPatchDirectionPanel()
     setEditorState((current) => undoLastDiagramChange(current))
@@ -1740,7 +1754,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canUndo, history.past])
@@ -1753,7 +1767,7 @@ function App() {
     const nextDiagram = history.future[0]
 
     setSelectedExampleId(exampleIdForAmbientDimension(nextDiagram.ambientDimension))
-    geometryDragUndoDiagramRef.current = null
+    geometryHandleDragSessionRef.current = null
     coordinateAnchorDragSessionRef.current = null
     closeCoonsPatchDirectionPanel()
     setEditorState((current) => redoLastDiagramChange(current))
@@ -1775,7 +1789,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     setFillStatus('')
     setWorkPlaneStatus('')
   }, [canRedo, history.future])
@@ -1926,7 +1940,7 @@ function App() {
     setFillBoundaryPathIds([])
     setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
     setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     setFillRule('nonzero')
     setFillStatus('')
     setNewElementLayerInput('0')
@@ -2682,8 +2696,7 @@ function App() {
   }
 
   function cancelCoonsPatchBoundaryPicking(): void {
-    setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
+    coonsPatchCreationInteraction.cancel()
     closeCoonsPatchDirectionPanel()
     setSheetStatus('Coons patch canceled.')
     setDirectCreationStatus('Coons patch canceled.')
@@ -2753,13 +2766,19 @@ function App() {
       return false
     }
 
-    const result = createCoonsPatchFromBoundaryPaths(
+    const result = coonsPatchCreationInteraction.create(
       editableDiagram,
-      coonsPatchBoundarySelectionsFromDraft(coonsPatchBoundaryDraft),
+      coonsPatchBoundaryDraft,
       {
         layer: creationLayer,
         sampling: { uSegments, vSegments },
-        keepLinkedToBoundarySources: coonsPatchKeepLinked,
+      },
+      (created) => {
+        commitCreatedElement(
+          created.diagram,
+          { kind: 'stratum', id: created.id },
+          creationLayer,
+        )
       },
     )
 
@@ -2779,13 +2798,6 @@ function App() {
       return false
     }
 
-    commitCreatedElement(
-      result.diagram,
-      { kind: 'stratum', id: result.id },
-      creationLayer,
-    )
-    setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-    setCoonsPatchKeepLinked(true)
     closeCoonsPatchDirectionPanel()
     setSheetStatus('Coons patch created.')
     setDirectCreationStatus('Coons patch created.')
@@ -3083,7 +3095,7 @@ function App() {
       setSheetStatus('')
       setRuledSurfaceBoundaryDraft(resetRuledSurfaceBoundaryDraft())
       setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-      setCoonsPatchKeepLinked(true)
+      setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
       return
     }
 
@@ -3289,7 +3301,7 @@ function App() {
     }
     if (kind !== 'coonsPatch') {
       setCoonsPatchBoundaryDraft(resetCoonsPatchBoundaryDraft())
-      setCoonsPatchKeepLinked(true)
+      setCoonsPatchCreationOptionsDraft(createCoonsPatchCreationOptionsDraft())
     }
     if (kind !== 'polygon') {
       setDirectSheetSources([])
@@ -3950,6 +3962,12 @@ function App() {
       return
     }
 
+    const session = geometryHandleDragSessionRef.current
+
+    if (session === null) {
+      return
+    }
+
     setEditorState((current) => {
       if (!geometryHandleTargetsSelection(target, current.selectedElement)) {
         return current
@@ -4007,40 +4025,12 @@ function App() {
         return current
       }
 
-      const nextDiagram = updateDiagramGeometryHandle(
-        current.editableDiagram,
+      return applyGeometryHandleDragToEditorState(
+        current,
+        session,
         target,
         modelPoint,
         handleWorkPlane,
-      )
-
-      if (nextDiagram === current.editableDiagram) {
-        return current
-      }
-
-      return commitDiagramChange(
-        current,
-        {
-          ...current,
-          editableDiagram: nextDiagram,
-          selectedElement: clearSelectionForLayerFilter(
-            nextDiagram,
-            current.selectedElement,
-            current.layerFilter,
-          ),
-          layerFilter: normalizeLayerFilterForDiagram(
-            nextDiagram,
-            current.layerFilter,
-          ),
-          polylineDraft: null,
-          cubicBezierDraft: null,
-          pathDraft: null,
-          sheetPolygonDraft: null,
-        },
-        {
-          undoSourceDiagram:
-            geometryDragUndoDiagramRef.current ?? current.editableDiagram,
-        },
       )
     })
     setCopyStatus('idle')
@@ -4113,11 +4103,13 @@ function App() {
   }
 
   function handleGeometryHandleDragStart(): void {
-    geometryDragUndoDiagramRef.current = cloneDiagram(editableDiagram)
+    geometryHandleDragSessionRef.current = startGeometryHandleDragSession(
+      editableDiagram,
+    )
   }
 
   function handleGeometryHandleDragEnd(): void {
-    geometryDragUndoDiagramRef.current = null
+    geometryHandleDragSessionRef.current = endGeometryHandleDragSession()
   }
 
   function updateDirectCoordinate(axis: DirectCoordinateAxis, value: string): void {
@@ -7160,9 +7152,11 @@ function App() {
           <label className="direct-create-field">
             <input
               type="checkbox"
-              checked={coonsPatchKeepLinked}
+              checked={coonsPatchCreationInteraction.keepLinkedCheckbox.checked}
               onChange={(event) =>
-                setCoonsPatchKeepLinked(event.currentTarget.checked)
+                coonsPatchCreationInteraction.keepLinkedCheckbox.onCheckedChange(
+                  event.currentTarget.checked,
+                )
               }
             />
             <span>Keep linked to boundary sources</span>
@@ -7978,9 +7972,13 @@ function App() {
             <label className="preview-toolbar-field">
               <input
                 type="checkbox"
-                checked={coonsPatchKeepLinked}
+                checked={
+                  coonsPatchCreationInteraction.keepLinkedCheckbox.checked
+                }
                 onChange={(event) =>
-                  setCoonsPatchKeepLinked(event.currentTarget.checked)
+                  coonsPatchCreationInteraction.keepLinkedCheckbox.onCheckedChange(
+                    event.currentTarget.checked,
+                  )
                 }
               />
               <span>Keep linked to boundary sources</span>

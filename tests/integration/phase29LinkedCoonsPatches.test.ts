@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   sampleCoonsPatch,
   sampleCurvedSheetPrimitive,
+  validateCurvedSheetPrimitive,
 } from '../../src/geometry/curvedSheets.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import {
@@ -27,7 +28,11 @@ import {
   resolvePendingSymbolicDiagramImport,
   serializeDiagram,
 } from '../../src/model/serialization.ts'
-import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
+import {
+  defaultCurveStyle,
+  defaultPointStyle,
+  defaultSheetStyle,
+} from '../../src/model/styles.ts'
 import { symbolicVec3FromVec3 } from '../../src/model/coordinateAnchors.ts'
 import { createCoordinateComponentFromInput } from '../../src/model/symbolicCoordinates.ts'
 import {
@@ -49,9 +54,23 @@ import type {
   Vec3,
 } from '../../src/model/types.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
+import {
+  createSvgGeometryHandlePointerController,
+  type SvgPointerCaptureTarget,
+} from '../../src/rendering/svgGeometryHandles.ts'
+import {
+  createSvgSurfacePreparationCache,
+  prepareSvgSurfaceGeometry,
+  type CurvedSheetSampler,
+} from '../../src/rendering/svgSurfaceScene.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { duplicateSelectedElements } from '../../src/ui/bulkEditing.ts'
 import { moveCoordinateAnchorToPoint } from '../../src/ui/coordinateAnchorEditing.ts'
+import {
+  createCoonsPatchCreationInteraction,
+  createCoonsPatchCreationOptionsDraft,
+  createCoonsPatchFromCreationDraft,
+} from '../../src/ui/coonsPatchCreation.ts'
 import {
   addPointStratumWithResult,
   updateVec3Coordinate,
@@ -59,10 +78,23 @@ import {
 } from '../../src/ui/diagramUpdates.ts'
 import { allLayersFilter } from '../../src/ui/layerFilter.ts'
 import {
+  applyGeometryHandleDragToEditorState,
+  endGeometryHandleDragSession,
+  startGeometryHandleDragSession,
+  type GeometryHandleTarget,
+} from '../../src/ui/geometryHandles.ts'
+import {
   createCoonsPatchFromBoundaryPaths,
   type CoonsPatchBoundaryPathSelections,
 } from '../../src/ui/ruledSurface.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
+import {
+  createCoonsPatchBoundaryDraft,
+  pickCoonsPatchBoundaryDraftPath,
+  resetCoonsPatchBoundaryDraft,
+  toggleCoonsPatchBoundaryDraftReverse,
+  type CoonsPatchBoundaryDraft,
+} from '../../src/ui/sheetDraft.ts'
 import {
   commitDiagramChange,
   createDiagramHistory,
@@ -122,6 +154,456 @@ test('linked creation stores normalized roles and static creation omits links', 
     coonsPatchBoundaryLinkStatus(staticResult.diagram, 'static-patch'),
     { kind: 'static' },
   )
+})
+
+test('production Coons creation draft defaults linked and creates all four source roles', () => {
+  const sourceDiagram = createPathSourceDiagram({ reverseTopSource: true })
+  const sourceBefore = structuredClone(sourceDiagram)
+  let boundaryDraft = completeReversedTopCoonsBoundaryDraft()
+  let optionsDraft = createCoonsPatchCreationOptionsDraft()
+  const commits: Array<{ diagram: Diagram; id: string }> = []
+  const interaction = createCoonsPatchCreationInteraction({
+    optionsDraft,
+    updateOptionsDraft: (update) => {
+      optionsDraft = update(optionsDraft)
+    },
+    updateBoundaryDraft: (update) => {
+      boundaryDraft = update(boundaryDraft)
+    },
+  })
+
+  assert.equal(interaction.keepLinkedCheckbox.checked, true)
+  assert.equal(optionsDraft.keepLinkedToBoundarySources, true)
+
+  const result = interaction.create(
+    sourceDiagram,
+    boundaryDraft,
+    {
+      layer: 4,
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+    (created) => {
+      commits.push({ diagram: created.diagram, id: created.id })
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const patch = findCoonsPatch(result.diagram, result.id)
+  const topSource = findPolyline(result.diagram, 'top')
+
+  assert.equal(commits.length, 1)
+  assert.deepEqual(commits[0], { diagram: result.diagram, id: result.id })
+  assert.equal(result.id, 'sheet-1')
+  assert.equal(patch.id, 'sheet-1')
+  assert.equal(patch.name, 'Coons patch')
+  assert.equal(patch.layer, 4)
+  assert.deepEqual(patch.style, defaultSheetStyle)
+  assert.deepEqual(patch.primitive.sampling, { uSegments: 4, vSegments: 3 })
+  assert.deepEqual(patch.primitive.boundarySources, {
+    bottom: { kind: 'path', sourcePathId: 'bottom', reversed: false },
+    right: { kind: 'path', sourcePathId: 'right', reversed: false },
+    top: { kind: 'path', sourcePathId: 'top', reversed: true },
+    left: { kind: 'path', sourcePathId: 'left', reversed: false },
+  })
+  assert.equal(patch.primitive.boundarySnapshotState, undefined)
+  assert.equal(validateCurvedSheetPrimitive(patch.primitive).valid, true)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(result.diagram, result.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assertReversedTopSnapshotMatchesSource(patch, topSource)
+  assert.deepEqual(
+    result.diagram.strata.slice(0, sourceBefore.strata.length),
+    sourceBefore.strata,
+  )
+  assert.deepEqual(boundaryDraft, resetCoonsPatchBoundaryDraft())
+  assert.deepEqual(optionsDraft, createCoonsPatchCreationOptionsDraft())
+})
+
+test('production Coons checkbox transition creates a static snapshot', () => {
+  const sourceDiagram = createPathSourceDiagram({ reverseTopSource: true })
+  const sourceBefore = structuredClone(sourceDiagram)
+  let boundaryDraft = completeReversedTopCoonsBoundaryDraft()
+  let optionsDraft = createCoonsPatchCreationOptionsDraft()
+  const commits: Array<{ diagram: Diagram; id: string }> = []
+  const createInteraction = () =>
+    createCoonsPatchCreationInteraction({
+      optionsDraft,
+      updateOptionsDraft: (update) => {
+        optionsDraft = update(optionsDraft)
+      },
+      updateBoundaryDraft: (update) => {
+        boundaryDraft = update(boundaryDraft)
+      },
+    })
+  let interaction = createInteraction()
+
+  assert.equal(interaction.keepLinkedCheckbox.checked, true)
+  interaction.keepLinkedCheckbox.onCheckedChange(false)
+  interaction = createInteraction()
+  assert.equal(interaction.keepLinkedCheckbox.checked, false)
+  assert.equal(optionsDraft.keepLinkedToBoundarySources, false)
+
+  const result = interaction.create(
+    sourceDiagram,
+    boundaryDraft,
+    {
+      layer: 5,
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+    (created) => {
+      commits.push({ diagram: created.diagram, id: created.id })
+    },
+  )
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  const patch = findCoonsPatch(result.diagram, result.id)
+  const topSource = findPolyline(result.diagram, 'top')
+  const snapshotsBeforeSourceEdit = coonsBoundarySnapshots(patch)
+
+  assert.equal(commits.length, 1)
+  assert.deepEqual(commits[0], { diagram: result.diagram, id: result.id })
+  assert.equal(result.id, 'sheet-1')
+  assert.equal(patch.layer, 5)
+  assert.deepEqual(patch.style, defaultSheetStyle)
+  assert.deepEqual(patch.primitive.sampling, { uSegments: 4, vSegments: 3 })
+  assert.equal(patch.primitive.boundarySources, undefined)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, result.id), {
+    kind: 'static',
+  })
+  assert.equal(validateCurvedSheetPrimitive(patch.primitive).valid, true)
+  assertReversedTopSnapshotMatchesSource(patch, topSource)
+  assert.deepEqual(
+    result.diagram.strata.slice(0, sourceBefore.strata.length),
+    sourceBefore.strata,
+  )
+  assert.deepEqual(boundaryDraft, resetCoonsPatchBoundaryDraft())
+  assert.deepEqual(optionsDraft, createCoonsPatchCreationOptionsDraft())
+
+  const target: GeometryHandleTarget = {
+    kind: 'curvePoint',
+    stratumId: 'top',
+    pointIndex: 1,
+  }
+  const startState = createEditorState(result.diagram, {
+    kind: 'stratum',
+    id: 'top',
+  })
+  const session = startGeometryHandleDragSession(
+    startState.editableDiagram,
+  )
+  const movedPoint = point(0.45, 1, 0.55)
+  const movedState = applyGeometryHandleDragToEditorState(
+    startState,
+    session,
+    target,
+    movedPoint,
+    { kind: 'xz', y: 1 },
+  )
+
+  assert.deepEqual(findPolyline(movedState.editableDiagram, 'top').points[1], movedPoint)
+  assert.deepEqual(
+    coonsBoundarySnapshots(findCoonsPatch(movedState.editableDiagram, result.id)),
+    snapshotsBeforeSourceEdit,
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(movedState.editableDiagram, result.id),
+    { kind: 'static' },
+  )
+  assert.deepEqual(sourceDiagram, sourceBefore)
+
+  boundaryDraft = completeReversedTopCoonsBoundaryDraft()
+  interaction = createInteraction()
+  interaction.keepLinkedCheckbox.onCheckedChange(false)
+  interaction = createInteraction()
+  interaction.cancel()
+  assert.deepEqual(boundaryDraft, resetCoonsPatchBoundaryDraft())
+  assert.deepEqual(optionsDraft, createCoonsPatchCreationOptionsDraft())
+})
+
+test('production geometry-handle drag refreshes linked Preview state and coalesces history', () => {
+  const sourceDiagram = createPathSourceDiagram({ reverseTopSource: true })
+  const creationResult = createCoonsPatchFromCreationDraft(
+    sourceDiagram,
+    completeReversedTopCoonsBoundaryDraft(),
+    createCoonsPatchCreationOptionsDraft(),
+    {
+      layer: 2,
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+  )
+
+  assert.equal(creationResult.ok, true)
+  if (!creationResult.ok) {
+    throw new Error(creationResult.error)
+  }
+
+  const patchId = creationResult.id
+  const target: GeometryHandleTarget = {
+    kind: 'curvePoint',
+    stratumId: 'top',
+    pointIndex: 1,
+  }
+  const initialState = createEditorState(creationResult.diagram, {
+    kind: 'stratum',
+    id: 'top',
+  })
+  const initialSource = structuredClone(
+    findPolyline(initialState.editableDiagram, 'top'),
+  )
+  const initialPatch = findCoonsPatch(initialState.editableDiagram, patchId)
+  const initialPrimitive = structuredClone(initialPatch.primitive)
+  const initialSnapshots = coonsBoundarySnapshots(initialPatch)
+  const initialSources = structuredClone(initialPatch.primitive.boundarySources)
+  const previewCache = createSvgSurfacePreparationCache()
+  const sampledPrimitives: Parameters<CurvedSheetSampler>[0][] = []
+  const previewSampler: CurvedSheetSampler = (primitive) => {
+    sampledPrimitives.push(primitive)
+    return sampleCurvedSheetPrimitive(primitive)
+  }
+  const initialPreview = prepareSvgSurfaceGeometry(initialState.editableDiagram, {
+    cache: previewCache,
+    sampleCurvedSheet: previewSampler,
+  })
+  const initialPreviewMesh = preparedCoonsMesh(initialPreview, patchId)
+  let previousPreviewMesh = initialPreviewMesh
+  let lastPreview = initialPreview
+  let state = initialState
+  let activeSession: ReturnType<typeof startGeometryHandleDragSession> | null =
+    null
+  const pointerId = 29
+  const capturedPointerIds = new Set<number>()
+  const releasedPointerIds: number[] = []
+  const pointerCaptureTarget: SvgPointerCaptureTarget = {
+    setPointerCapture: (capturedPointerId) => {
+      capturedPointerIds.add(capturedPointerId)
+    },
+    hasPointerCapture: (capturedPointerId) =>
+      capturedPointerIds.has(capturedPointerId),
+    releasePointerCapture: (capturedPointerId) => {
+      capturedPointerIds.delete(capturedPointerId)
+      releasedPointerIds.push(capturedPointerId)
+    },
+  }
+  const pointerController = createSvgGeometryHandlePointerController()
+  let dragStartCalls = 0
+  let dragEndCalls = 0
+
+  pointerController.begin(target, pointerId, pointerCaptureTarget, () => {
+    dragStartCalls += 1
+    activeSession = startGeometryHandleDragSession(
+      initialState.editableDiagram,
+    )
+  })
+
+  assert.equal(sampledPrimitives.length, 1)
+  assert.deepEqual(pointerController.activeTarget(), target)
+  assert.equal(dragStartCalls, 1)
+  assert.equal(capturedPointerIds.has(pointerId), true)
+  assert.deepEqual(releasedPointerIds, [])
+  assert.notEqual(activeSession, null)
+  if (activeSession === null) {
+    throw new Error('Expected pointer-down to start the drag session.')
+  }
+  assert.notEqual(activeSession.startDiagram, initialState.editableDiagram)
+  assert.deepEqual(activeSession.startDiagram, initialState.editableDiagram)
+  assert.equal(initialState.history.past.length, 0)
+  assert.equal(initialState.history.future.length, 0)
+  assert.equal(findCoonsPatch(initialState.editableDiagram, patchId).id, patchId)
+  assert.deepEqual(
+    findCoonsPatch(initialState.editableDiagram, patchId).primitive.boundarySources,
+    initialSources,
+  )
+
+  const movePoints = [
+    point(0.4, 1, 0.25),
+    point(0.5, 1, 0.45),
+    point(0.6, 1, 0.65),
+  ]
+  let statusSamplingCalls = 0
+
+  movePoints.forEach((movePoint, moveIndex) => {
+    const session = activeSession
+
+    if (session === null) {
+      throw new Error('Expected an active geometry-handle drag session.')
+    }
+
+    const handled = pointerController.move((activeTarget) => {
+      state = applyGeometryHandleDragToEditorState(
+        state,
+        session,
+        activeTarget,
+        movePoint,
+        { kind: 'xz', y: 1 },
+      )
+    })
+
+    assert.equal(handled, true)
+    assert.deepEqual(pointerController.activeTarget(), target)
+    assert.equal(dragStartCalls, 1)
+    assert.equal(capturedPointerIds.has(pointerId), true)
+    assert.deepEqual(releasedPointerIds, [])
+
+    const source = findPolyline(state.editableDiagram, 'top')
+    const patch = findCoonsPatch(state.editableDiagram, patchId)
+    const top = pathBoundary(patch.primitive.top)
+
+    assert.deepEqual(source.points[1], movePoint)
+    assert.deepEqual(top.segments[0]?.start, source.points[2])
+    assert.deepEqual(top.segments[0]?.end, movePoint)
+    assert.deepEqual(top.segments[1]?.start, movePoint)
+    assert.deepEqual(top.segments[1]?.end, source.points[0])
+    assert.equal(patch.id, patchId)
+    assert.deepEqual(patch.primitive.boundarySources, initialSources)
+    assert.deepEqual(patch.primitive.boundarySources?.top, {
+      kind: 'path',
+      sourcePathId: 'top',
+      reversed: true,
+    })
+    assert.equal(validateCurvedSheetPrimitive(patch.primitive).valid, true)
+    assert.deepEqual(
+      coonsPatchBoundaryLinkStatus(state.editableDiagram, patchId, {
+        sampleCandidate: (primitive) => {
+          statusSamplingCalls += 1
+          return sampleCurvedSheetPrimitive(primitive)
+        },
+      }),
+      { kind: 'linkedUpToDate' },
+    )
+    assert.equal(statusSamplingCalls, 0)
+    assert.equal(state.history.past.length, 1)
+    assert.equal(state.history.future.length, 0)
+    assert.deepEqual(state.history.present, state.editableDiagram)
+
+    const preview = prepareSvgSurfaceGeometry(state.editableDiagram, {
+      cache: previewCache,
+      sampleCurvedSheet: previewSampler,
+    })
+    const previewMesh = preparedCoonsMesh(preview, patchId)
+    const topMidpointIndex =
+      patch.primitive.sampling.vSegments *
+        (patch.primitive.sampling.uSegments + 1) +
+      patch.primitive.sampling.uSegments / 2
+    const interiorMidpointIndex =
+      patch.primitive.sampling.uSegments +
+      1 +
+      patch.primitive.sampling.uSegments / 2
+
+    assert.equal(sampledPrimitives.length, moveIndex + 2)
+    assert.equal(sampledPrimitives.at(-1), patch.primitive)
+    assertVec3ApproximatelyEqual(
+      previewMesh.vertices[topMidpointIndex],
+      movePoint,
+    )
+    assert.notDeepEqual(
+      previewMesh.vertices[interiorMidpointIndex],
+      previousPreviewMesh.vertices[interiorMidpointIndex],
+    )
+    assert.notDeepEqual(previewMesh.vertices, previousPreviewMesh.vertices)
+
+    previousPreviewMesh = previewMesh
+    lastPreview = preview
+  })
+
+  const finalSource = structuredClone(findPolyline(state.editableDiagram, 'top'))
+  const finalPatch = findCoonsPatch(state.editableDiagram, patchId)
+  const finalPrimitive = structuredClone(finalPatch.primitive)
+  const finalSnapshots = coonsBoundarySnapshots(finalPatch)
+  const finalPreviewMesh = previousPreviewMesh
+  const historyLengthBeforePointerUp = state.history.past.length
+
+  const ended = pointerController.end(
+    pointerId,
+    pointerCaptureTarget,
+    () => {
+      dragEndCalls += 1
+      activeSession = endGeometryHandleDragSession()
+    },
+  )
+
+  assert.equal(ended, true)
+  assert.equal(dragEndCalls, 1)
+  assert.equal(activeSession, null)
+  assert.equal(pointerController.activeTarget(), null)
+  assert.equal(capturedPointerIds.has(pointerId), false)
+  assert.deepEqual(releasedPointerIds, [pointerId])
+  assert.equal(state.history.past.length, historyLengthBeforePointerUp)
+  assert.equal(state.history.past.length, 1)
+  assert.deepEqual(finalSource.points[1], movePoints.at(-1))
+  assert.deepEqual(
+    pathBoundary(finalPatch.primitive.top).segments[0]?.end,
+    movePoints.at(-1),
+  )
+
+  const committedPreview = prepareSvgSurfaceGeometry(state.editableDiagram, {
+    cache: previewCache,
+    sampleCurvedSheet: previewSampler,
+  })
+
+  assert.equal(committedPreview, lastPreview)
+  assert.equal(sampledPrimitives.length, movePoints.length + 1)
+  assert.deepEqual(preparedCoonsMesh(committedPreview, patchId), finalPreviewMesh)
+
+  const undone = undoLastDiagramChange(state)
+  const undonePatch = findCoonsPatch(undone.editableDiagram, patchId)
+  const undonePreview = prepareSvgSurfaceGeometry(undone.editableDiagram, {
+    cache: previewCache,
+    sampleCurvedSheet: previewSampler,
+  })
+
+  assert.deepEqual(findPolyline(undone.editableDiagram, 'top'), initialSource)
+  assert.deepEqual(undonePatch.primitive, initialPrimitive)
+  assert.deepEqual(coonsBoundarySnapshots(undonePatch), initialSnapshots)
+  assert.deepEqual(undonePatch.primitive.boundarySources, initialSources)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(undone.editableDiagram, patchId),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(preparedCoonsMesh(undonePreview, patchId), initialPreviewMesh)
+  assert.equal(undone.history.past.length, 0)
+  assert.equal(undone.history.future.length, 1)
+
+  const redone = redoLastDiagramChange(undone)
+  const redonePatch = findCoonsPatch(redone.editableDiagram, patchId)
+  const redonePreview = prepareSvgSurfaceGeometry(redone.editableDiagram, {
+    cache: previewCache,
+    sampleCurvedSheet: previewSampler,
+  })
+
+  assert.deepEqual(findPolyline(redone.editableDiagram, 'top'), finalSource)
+  assert.deepEqual(redonePatch.primitive, finalPrimitive)
+  assert.deepEqual(coonsBoundarySnapshots(redonePatch), finalSnapshots)
+  assert.deepEqual(redonePatch.primitive.boundarySources, initialSources)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(redone.editableDiagram, patchId),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(preparedCoonsMesh(redonePreview, patchId), finalPreviewMesh)
+  assert.equal(redone.history.past.length, 1)
+  assert.equal(redone.history.future.length, 0)
+
+  const undoneAgain = undoLastDiagramChange(redone)
+  const redoneAgain = redoLastDiagramChange(undoneAgain)
+
+  assert.deepEqual(undoneAgain.editableDiagram, undone.editableDiagram)
+  assert.deepEqual(redoneAgain.editableDiagram, redone.editableDiagram)
+  assert.deepEqual(
+    findCoonsPatch(redoneAgain.editableDiagram, patchId).primitive,
+    finalPrimitive,
+  )
+  assert.equal(undoneAgain.history.past.length, 0)
+  assert.equal(undoneAgain.history.future.length, 1)
+  assert.equal(redoneAgain.history.past.length, 1)
+  assert.equal(redoneAgain.history.future.length, 0)
 })
 
 test('polyline, cubic, and concatenated source edits refresh snapshots and mesh', () => {
@@ -2713,18 +3195,43 @@ test('source direction reversal is detected and keeps the last valid patch', () 
   assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
 })
 
-test('creation and Inspector expose linked controls and detach action', () => {
-  const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
-  const inspectorSource = readFileSync(
-    new URL('../../src/ui/inspector/CurvedSheetGeometryEditor.tsx', import.meta.url),
+test('Phase 29 docs distinguish Coons source roles and frozen symbolic snapshots', () => {
+  const ruledSurfaceDocs = readFileSync(
+    new URL('../../docs/RULED_SURFACES.md', import.meta.url),
+    'utf8',
+  )
+  const spec = readFileSync(
+    new URL('../../docs/SPEC.md', import.meta.url),
     'utf8',
   )
 
-  assert.match(appSource, /Keep linked to boundary sources/)
-  assert.match(appSource, /keepLinkedToBoundarySources: coonsPatchKeepLinked/)
-  assert.match(inspectorSource, /Linked — up to date/)
-  assert.match(inspectorSource, /The last valid patch geometry is being displayed\./)
-  assert.match(inspectorSource, /Detach boundary links/)
+  assert.doesNotMatch(ruledSurfaceDocs, /Coons patches use four boundary paths/)
+  assert.match(
+    ruledSurfaceDocs,
+    /four boundary roles—`bottom`, `right`, `top`, and `left`/,
+  )
+  assert.match(
+    ruledSurfaceDocs,
+    /point\s+stratum as a constant-point boundary/,
+  )
+  assert.match(ruledSurfaceDocs, /Constant-point boundaries do not need path reversal/)
+  assert.match(
+    ruledSurfaceDocs,
+    /stored\s+`reversed` flag is reapplied on every successful source refresh/,
+  )
+  assert.match(ruledSurfaceDocs, /last valid materialized geometry/)
+  assert.match(ruledSurfaceDocs, /Ruled surfaces remain snapshot-only/)
+
+  assert.doesNotMatch(spec, /ruled or Coons boundary snapshots/)
+  assert.match(spec, /ruled-surface snapshots, and\s+static Coons snapshots/)
+  assert.match(spec, /source paths and points\s+own the active symbolic dependencies/)
+  assert.match(spec, /frozen last-valid fallbacks, are not independently refreshed/)
+  assert.match(spec, /atomically replaces all four materialized snapshots/)
+  assert.match(spec, /failed synchronization preserves the exact\s+frozen snapshots/)
+  assert.match(
+    spec,
+    /referenced only by frozen snapshots\s+does not create a UI import variable requirement/,
+  )
 })
 
 function extractCoonsPatchTikzBlock(tikz: string, patchId: string): string {
@@ -3045,6 +3552,47 @@ function createConstantPointPatch(
   return result.diagram
 }
 
+function completeReversedTopCoonsBoundaryDraft(): CoonsPatchBoundaryDraft {
+  let draft = createCoonsPatchBoundaryDraft()
+
+  for (const sourcePathId of ['bottom', 'right', 'top', 'left']) {
+    const result = pickCoonsPatchBoundaryDraftPath(draft, sourcePathId)
+
+    if (!result.ok) {
+      throw new Error(`Could not pick Coons boundary ${sourcePathId}.`)
+    }
+
+    draft = result.draft
+  }
+
+  return toggleCoonsPatchBoundaryDraftReverse(draft, 'top')
+}
+
+function assertReversedTopSnapshotMatchesSource(
+  patch: CoonsPatchStratum,
+  source: PolylineCurveStratum,
+): void {
+  const top = pathBoundary(patch.primitive.top)
+
+  assert.deepEqual(top.segments[0]?.start, source.points[2])
+  assert.deepEqual(top.segments[0]?.end, source.points[1])
+  assert.deepEqual(top.segments[1]?.start, source.points[1])
+  assert.deepEqual(top.segments[1]?.end, source.points[0])
+}
+
+function preparedCoonsMesh(
+  geometry: ReturnType<typeof prepareSvgSurfaceGeometry>,
+  patchId: string,
+) {
+  const mesh = geometry.surfacesBySheetId.get(patchId)?.curvedMesh
+
+  if (mesh === undefined) {
+    throw new Error(`Expected prepared Preview mesh for ${patchId}.`)
+  }
+
+  return mesh
+}
+
 function defaultSelections(): CoonsPatchBoundaryPathSelections {
   return {
     bottom: 'bottom',
@@ -3054,10 +3602,13 @@ function defaultSelections(): CoonsPatchBoundaryPathSelections {
   }
 }
 
-function createEditorState(diagram: Diagram): TestEditorState {
+function createEditorState(
+  diagram: Diagram,
+  selectedElement: SelectedElement = null,
+): TestEditorState {
   return {
     editableDiagram: diagram,
-    selectedElement: null,
+    selectedElement,
     layerFilter: allLayersFilter,
     polylineDraft: null,
     cubicBezierDraft: null,
@@ -3221,6 +3772,21 @@ function pointStratum(id: string, position: Vec3, layer: number): PointStratum {
 
 function point(x: number, y: number, z: number): Vec3 {
   return { x, y, z }
+}
+
+function assertVec3ApproximatelyEqual(
+  actual: Vec3 | undefined,
+  expected: Vec3,
+  epsilon = 1e-12,
+): void {
+  assert.notEqual(actual, undefined)
+  if (actual === undefined) {
+    throw new Error('Expected a Preview mesh vertex.')
+  }
+
+  assert.ok(Math.abs(actual.x - expected.x) <= epsilon)
+  assert.ok(Math.abs(actual.y - expected.y) <= epsilon)
+  assert.ok(Math.abs(actual.z - expected.z) <= epsilon)
 }
 
 function standardFrame() {

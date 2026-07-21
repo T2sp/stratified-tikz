@@ -12,7 +12,8 @@ S(u, v) = (1 - v) C0(u) + v C1(u)
 
 where `C0` and `C1` are copied snapshots of the two chosen boundary paths.
 
-Coons patches use four boundary paths and are sampled as
+Coons patches use four boundary roles—`bottom`, `right`, `top`, and `left`—and
+are sampled as
 
 ```text
 S(u, v)
@@ -50,17 +51,19 @@ coordinate and frame expressions remain in the saved model where supported.
 
 In a 3D diagram:
 
-1. Create or select four boundary paths. Polylines, cubic Beziers,
-   concatenated paths, and path templates can be used. Grids cannot be used as
-   boundary paths.
+1. Create or select four compatible boundary sources, one for each role. A
+   role may use a supported open boundary path (polyline, cubic Bezier,
+   concatenated path, or supported open path template) or a supported point
+   stratum as a constant-point boundary. Grids and closed paths cannot be used.
 2. Choose `Add sheet`, then `Coons`.
-3. Click the boundary paths directly in this order: `bottom`, `right`, `top`,
-   then `left`. The picked paths remain in the current Add sheet draft, so
+3. Click the boundary sources directly in this order: `bottom`, `right`, `top`,
+   then `left`. The picked sources remain in the current Add sheet draft, so
    there is no need to switch back to Select mode between picks.
-4. Check the displayed direction for each picked boundary. Use the per-role
-   `Reverse` control to flip a boundary direction for this Coons patch draft.
-   Reversal affects only the copied boundary snapshot used by the new Coons
-   patch; it does not modify the source path.
+4. For each path boundary, check its direction and use the per-role `Reverse`
+   control when needed. Constant-point boundaries do not need path reversal.
+   Reversal never mutates the source path. For a static patch it determines the
+   initial copied snapshot orientation; for a linked patch the stored
+   `reversed` flag is reapplied on every successful source refresh.
 5. Leave `Keep linked to boundary sources` checked for a live-linked patch, or
    clear it for a static copied patch.
 6. Set `U segments` and `V segments`.
@@ -73,17 +76,18 @@ Boundary role order is part of the geometry:
 - top: left to right
 - left: bottom to top
 
-The required corner matches are:
+All four selected boundaries, including constant-point boundaries, must satisfy
+these corner equations:
 
 - bottom start = left start
 - bottom end = right start
 - top start = left end
 - top end = right end
 
-Inconsistent corners are rejected with a status message. If the four paths form
-a geometric loop but the corners do not match in the current directions, reverse
-the affected roles in the Coons draft and revalidate. The source paths are not
-modified.
+Inconsistent corners are rejected with a status message. If four path
+boundaries form a geometric loop but the corners do not match in the current
+directions, reverse the affected roles in the Coons draft and revalidate. The
+source paths are not modified.
 
 A linked Coons patch stores both the four source roles (including each path's
 `reversed` flag) and four materialized snapshots. Valid path, point, coordinate

@@ -94,7 +94,9 @@ import {
 } from './curvedSheetMesh.ts'
 import { mapClientPointToViewBox } from './svgViewBox'
 import {
+  createSvgGeometryHandlePointerController,
   curveHandleLabel,
+  releaseSvgPointerCaptureIfHeld,
   shouldRenderSvgGeometryHandles,
   vertexHandleLabel,
 } from './svgGeometryHandles'
@@ -325,7 +327,9 @@ export function SvgDiagram({
   onCoordinateAnchorDragEnd,
   onCameraDrag,
 }: SvgDiagramProps): ReactElement {
-  const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
+  const geometryHandlePointerControllerRef = useRef(
+    createSvgGeometryHandlePointerController(),
+  )
   const activeCoordinateAnchorDragRef =
     useRef<ActiveCoordinateAnchorDrag | null>(null)
   const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
@@ -699,7 +703,7 @@ export function SvgDiagram({
       }}
       onPointerDown={(event) => {
         if (
-          activeDragTargetRef.current !== null ||
+          geometryHandlePointerControllerRef.current.activeTarget() !== null ||
           activeCoordinateAnchorDragRef.current !== null ||
           onCameraDrag === undefined
         ) {
@@ -744,16 +748,22 @@ export function SvgDiagram({
           return
         }
 
-        const target = activeDragTargetRef.current
-
-        if (target !== null && onGeometryHandleDrag !== undefined) {
-          event.preventDefault()
-          onGeometryHandleDrag(
-            target,
-            svgPointFromPointerEvent(event, width, height),
-            height,
-            camera,
+        const handledGeometryDrag =
+          geometryHandlePointerControllerRef.current.move(
+            onGeometryHandleDrag === undefined
+              ? undefined
+              : (target) => {
+                  event.preventDefault()
+                  onGeometryHandleDrag(
+                    target,
+                    svgPointFromPointerEvent(event, width, height),
+                    height,
+                    camera,
+                  )
+                },
           )
+
+        if (handledGeometryDrag) {
           return
         }
 
@@ -800,11 +810,16 @@ export function SvgDiagram({
           return
         }
 
-        if (activeDragTargetRef.current !== null) {
-          event.preventDefault()
-          activeDragTargetRef.current = null
-          onGeometryHandleDragEnd?.()
-          releasePointerCaptureIfHeld(event)
+        if (
+          geometryHandlePointerControllerRef.current.end(
+            event.pointerId,
+            event.currentTarget,
+            () => {
+              event.preventDefault()
+              onGeometryHandleDragEnd?.()
+            },
+          )
+        ) {
           window.setTimeout(() => {
             suppressNextCanvasClickRef.current = false
           }, 0)
@@ -826,7 +841,7 @@ export function SvgDiagram({
       }}
       onPointerCancel={(event) => {
         const coordinateDrag = activeCoordinateAnchorDragRef.current
-        activeDragTargetRef.current = null
+        geometryHandlePointerControllerRef.current.cancel()
         activeCameraDragRef.current = null
         activeCoordinateAnchorDragRef.current = null
         suppressNextCanvasClickRef.current = false
@@ -923,10 +938,13 @@ export function SvgDiagram({
             (event, target) => {
               event.preventDefault()
               event.stopPropagation()
-              activeDragTargetRef.current = target
               suppressNextCanvasClickRef.current = true
-              onGeometryHandleDragStart?.(target)
-              event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
+              geometryHandlePointerControllerRef.current.begin(
+                target,
+                event.pointerId,
+                event.currentTarget.ownerSVGElement,
+                onGeometryHandleDragStart,
+              )
             },
           )
         : null}
@@ -3696,9 +3714,7 @@ function isSvgBackgroundTarget(target: EventTarget): boolean {
 }
 
 function releasePointerCaptureIfHeld(event: PointerEvent<SVGSVGElement>): void {
-  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-    event.currentTarget.releasePointerCapture(event.pointerId)
-  }
+  releaseSvgPointerCaptureIfHeld(event.currentTarget, event.pointerId)
 }
 
 function isSelectedStratum(
