@@ -22,6 +22,7 @@ import type { ScalarInputValue } from './scalarExpressions.ts'
 import {
   coonsPatchBoundaryRoles,
   isCoonsPatchBoundarySources,
+  isValidCoonsBoundarySnapshotState,
   type AmbientDimension,
   type BoundaryPathSnapshot,
   type CoonsBoundarySnapshot,
@@ -76,6 +77,7 @@ export type CoonsPatchBoundaryPointSourceValidationResult =
 export type CoonsPatchBoundaryLinkIssueKind =
   | 'missingSource'
   | 'invalidSource'
+  | 'invalidBoundarySnapshotState'
   | 'coordinateReferenceResolutionFailure'
   | 'cornerMismatch'
   | 'invalidPatch'
@@ -86,6 +88,7 @@ export type CoonsPatchBoundaryLinkIssue = {
   patchId: string
   role?: CoonsPatchBoundaryRole
   sourceId?: string
+  value?: unknown
   message: string
 }
 
@@ -142,6 +145,20 @@ export function synchronizeLinkedCoonsPatches(
       stratum.primitive.kind !== 'coonsPatch' ||
       stratum.primitive.boundarySources === undefined
     ) {
+      return stratum
+    }
+
+    const boundarySnapshotState: unknown =
+      stratum.primitive.boundarySnapshotState
+
+    if (!isValidCoonsBoundarySnapshotState(boundarySnapshotState)) {
+      issues.push({
+        kind: 'invalidBoundarySnapshotState',
+        patchId: stratum.id,
+        value: boundarySnapshotState,
+        message:
+          'Coons patch boundarySnapshotState must be absent or exactly "frozen".',
+      })
       return stratum
     }
 

@@ -1627,6 +1627,10 @@ test('linked JSON refreshes on load, legacy static JSON stays static, and dangli
     findCoonsPatch(parsed.diagram, 'patch').primitive.bottom,
     findCoonsPatch(linked, 'patch').primitive.bottom,
   )
+  assert.equal(
+    findCoonsPatch(parsed.diagram, 'patch').primitive.boundarySnapshotState,
+    undefined,
+  )
 
   const staticDiagram = createCoonsPatchFromBoundaryPaths(
     createPathSourceDiagram(),
@@ -1656,6 +1660,11 @@ test('linked JSON refreshes on load, legacy static JSON stays static, and dangli
     throw new Error(parsedDangling.error)
   }
   assert.equal(coonsPatchBoundaryLinkStatus(parsedDangling.diagram, 'patch').kind, 'linkedStale')
+  assert.equal(
+    findCoonsPatch(parsedDangling.diagram, 'patch').primitive
+      .boundarySnapshotState,
+    'frozen',
+  )
   assert.deepEqual(
     findCoonsPatch(parsedDangling.diagram, 'patch').primitive.bottom,
     findCoonsPatch(linked, 'patch').primitive.bottom,
@@ -1712,6 +1721,54 @@ test('malformed linked JSON returns validation failures without throwing', () =>
   }
 })
 
+test('linked JSON rejects thawed snapshot state before valid-source refresh', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  let parsed: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+  assert.doesNotThrow(() => {
+    parsed = parseSavedDiagramJson(
+      savedLinkedDiagramWithBoundarySnapshotState(linked, 'thawed'),
+    )
+  })
+  assert.equal(parsed?.ok, false)
+  if (parsed?.ok === false) {
+    assert.match(parsed.error, /boundarySnapshotState.*frozen/i)
+  }
+})
+
+test('linked JSON rejects thawed snapshot state before stale fallback', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const fallbackSnapshots = coonsBoundarySnapshots(
+    findCoonsPatch(linked, 'patch'),
+  )
+  const dangling: Diagram = {
+    ...linked,
+    strata: linked.strata.filter((stratum) => stratum.id !== 'left'),
+  }
+  const validStale = parseSavedDiagramJson(serializeDiagram(dangling))
+
+  assert.equal(validStale.ok, true)
+  if (!validStale.ok) {
+    throw new Error(validStale.error)
+  }
+  const validStalePatch = findCoonsPatch(validStale.diagram, 'patch')
+
+  assert.equal(validStalePatch.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(coonsBoundarySnapshots(validStalePatch), fallbackSnapshots)
+
+  let parsed: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+  assert.doesNotThrow(() => {
+    parsed = parseSavedDiagramJson(
+      savedLinkedDiagramWithBoundarySnapshotState(dangling, 'thawed'),
+    )
+  })
+  assert.equal(parsed?.ok, false)
+  if (parsed?.ok === false) {
+    assert.match(parsed.error, /boundarySnapshotState.*frozen/i)
+  }
+})
+
 test('malformed frozen snapshot state is rejected cleanly on load', () => {
   const saved = JSON.parse(
     serializeDiagram(createLinkedPatch(createPathSourceDiagram())),
@@ -1742,7 +1799,117 @@ test('malformed frozen snapshot state is rejected cleanly on load', () => {
   })
   assert.equal(parsed?.ok, false)
   if (parsed?.ok === false) {
-    assert.match(parsed.error, /snapshot state|frozen|invalid/i)
+    assert.match(parsed.error, /boundarySnapshotState.*frozen/i)
+  }
+})
+
+test('symbolic import rejects thawed snapshot state before pending resolution', () => {
+  const symbolicLinked = createSymbolicInteriorLinkedPatch()
+  let parsed: ReturnType<typeof parseSavedDiagramJsonForImport> | undefined
+
+  assert.doesNotThrow(() => {
+    parsed = parseSavedDiagramJsonForImport(
+      savedLinkedDiagramWithBoundarySnapshotState(symbolicLinked, 'thawed'),
+    )
+  })
+  assert.equal(parsed?.ok, false)
+  if (parsed?.ok === false) {
+    assert.match(parsed.error, /boundarySnapshotState.*frozen/i)
+  }
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(symbolicLinked))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected a pending symbolic linked import.')
+  }
+
+  const mutablePrimitive = findCoonsPatch(
+    pending.pendingImport.diagram,
+    'patch',
+  ).primitive as unknown as { boundarySnapshotState?: unknown }
+  mutablePrimitive.boundarySnapshotState = 'thawed'
+
+  let resolved:
+    | ReturnType<typeof resolvePendingSymbolicDiagramImport>
+    | undefined
+
+  assert.doesNotThrow(() => {
+    resolved = resolvePendingSymbolicDiagramImport(pending.pendingImport, [
+      { name: 'R', expression: '0.1' },
+    ])
+  })
+  assert.equal(resolved?.ok, false)
+  if (resolved?.ok === false) {
+    assert.match(resolved.error, /boundarySnapshotState.*frozen/i)
+  }
+  assert.equal(mutablePrimitive.boundarySnapshotState, 'thawed')
+})
+
+test('direct synchronization preserves thawed state and reports an issue', () => {
+  const linkedWithValidSources = createLinkedPatch(createPathSourceDiagram())
+  const linkedWithMissingSource = createLinkedPatch(createPathSourceDiagram())
+  const fixtures: Array<{ name: string; diagram: Diagram }> = [
+    { name: 'valid sources', diagram: linkedWithValidSources },
+    {
+      name: 'missing source',
+      diagram: {
+        ...linkedWithMissingSource,
+        strata: linkedWithMissingSource.strata.filter(
+          (stratum) => stratum.id !== 'left',
+        ),
+      },
+    },
+  ]
+
+  for (const fixture of fixtures) {
+    const patch = findCoonsPatch(fixture.diagram, 'patch')
+    const mutablePrimitive = patch.primitive as unknown as {
+      boundarySnapshotState?: unknown
+    }
+    mutablePrimitive.boundarySnapshotState = 'thawed'
+    const beforeSynchronization = structuredClone(patch)
+    const primitiveReference = patch.primitive
+    let synchronization:
+      | ReturnType<typeof synchronizeLinkedCoonsPatches>
+      | undefined
+
+    assert.doesNotThrow(() => {
+      synchronization = synchronizeLinkedCoonsPatches(
+        null,
+        fixture.diagram,
+        { mode: 'full' },
+      )
+    }, fixture.name)
+
+    if (synchronization === undefined) {
+      throw new Error(`Expected synchronization result for ${fixture.name}.`)
+    }
+
+    const synchronizedPatch = findCoonsPatch(
+      synchronization.diagram,
+      'patch',
+    )
+    const issue = synchronization.issues.find(
+      (candidate) => candidate.kind === 'invalidBoundarySnapshotState',
+    )
+
+    assert.equal(synchronization.diagram, fixture.diagram, fixture.name)
+    assert.deepEqual(synchronization.updatedPatchIds, [], fixture.name)
+    assert.equal(synchronizedPatch.primitive, primitiveReference, fixture.name)
+    assert.deepEqual(synchronizedPatch, beforeSynchronization, fixture.name)
+    assert.equal(issue?.patchId, 'patch', fixture.name)
+    assert.equal(issue?.value, 'thawed', fixture.name)
+    assert.match(issue?.message ?? '', /boundarySnapshotState.*frozen/i)
+    assert.equal(
+      (
+        synchronizedPatch.primitive as unknown as {
+          boundarySnapshotState?: unknown
+        }
+      ).boundarySnapshotState,
+      'thawed',
+      fixture.name,
+    )
   }
 })
 
@@ -2503,6 +2670,28 @@ function savedLinkedDiagramWithBoundarySources(
   }
 
   patch.primitive.boundarySources = boundarySources
+  return JSON.stringify(saved)
+}
+
+function savedLinkedDiagramWithBoundarySnapshotState(
+  diagram: Diagram,
+  boundarySnapshotState: unknown,
+): string {
+  const saved = JSON.parse(serializeDiagram(diagram)) as {
+    diagram: {
+      strata: Array<{
+        id?: unknown
+        primitive?: { boundarySnapshotState?: unknown }
+      }>
+    }
+  }
+  const patch = saved.diagram.strata.find((stratum) => stratum.id === 'patch')
+
+  if (patch?.primitive === undefined) {
+    throw new Error('Expected a saved Coons patch primitive.')
+  }
+
+  patch.primitive.boundarySnapshotState = boundarySnapshotState
   return JSON.stringify(saved)
 }
 

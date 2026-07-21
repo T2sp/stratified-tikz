@@ -1455,6 +1455,48 @@ test('parseSavedDiagramJson rejects malformed JSON', () => {
   assert.match(result.error, /valid JSON/)
 })
 
+test('parseSavedDiagramJson rejects invalid Coons boundary snapshot states', () => {
+  const invalidStates: Array<{ name: string; value: unknown }> = [
+    { name: 'null', value: null },
+    { name: 'false', value: false },
+    { name: 'zero', value: 0 },
+    { name: 'empty string', value: '' },
+    { name: 'uppercase string', value: 'THAWED' },
+    { name: 'array', value: [] },
+    { name: 'object', value: {} },
+  ]
+
+  for (const invalidState of invalidStates) {
+    const saved = JSON.parse(serializeDiagram(symbolicCoonsDiagram())) as {
+      diagram: {
+        strata: Array<{
+          primitive?: Record<string, unknown>
+        }>
+      }
+    }
+    const primitive = saved.diagram.strata[0]?.primitive
+
+    if (primitive === undefined) {
+      throw new Error('Expected a saved Coons patch primitive.')
+    }
+
+    primitive.boundarySnapshotState = invalidState.value
+    let result: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+    assert.doesNotThrow(() => {
+      result = parseSavedDiagramJson(JSON.stringify(saved))
+    }, invalidState.name)
+    assert.equal(result?.ok, false, invalidState.name)
+    if (result?.ok === false) {
+      assert.match(
+        result.error,
+        /boundarySnapshotState.*frozen/i,
+        invalidState.name,
+      )
+    }
+  }
+})
+
 test('parseSavedDiagramJson rejects the wrong format', () => {
   const result = parseSavedDiagramJson(
     JSON.stringify({

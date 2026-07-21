@@ -19,6 +19,7 @@ import {
   coonsPatchBoundaryRoles,
   coonsPatchRequiredCornerEquations,
   isCoonsPatchBoundarySources,
+  isValidCoonsBoundarySnapshotState,
 } from '../model/types.ts'
 import type {
   ArcPathSegment,
@@ -710,7 +711,7 @@ function validateCoonsPatchBoundarySnapshotState(
   path: string,
   errors: SurfaceValidationIssue[],
 ): void {
-  if (state !== undefined && state !== 'frozen') {
+  if (!isValidCoonsBoundarySnapshotState(state)) {
     pushError(
       errors,
       path,
