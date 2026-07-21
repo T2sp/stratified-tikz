@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { sampleCoonsPatch } from '../../src/geometry/curvedSheets.ts'
+import {
+  sampleCoonsPatch,
+  sampleCurvedSheetPrimitive,
+} from '../../src/geometry/curvedSheets.ts'
 import { createInitialCamera3D } from '../../src/model/camera.ts'
 import {
   coonsPatchBoundaryLinkStatus,
   detachCoonsPatchBoundaryLinks,
+  inspectLinkedCoonsSourceState,
+  resolveLinkedCoonsBoundarySource,
   synchronizeLinkedCoonsPatches,
 } from '../../src/model/coonsPatchLinks.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
@@ -27,6 +32,7 @@ import { symbolicVec3FromVec3 } from '../../src/model/coordinateAnchors.ts'
 import { createCoordinateComponentFromInput } from '../../src/model/symbolicCoordinates.ts'
 import {
   addSymbolicVariableToDiagram,
+  deleteSymbolicVariableFromDiagram,
   updateSymbolicVariableInDiagram,
 } from '../../src/model/variables.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
@@ -171,6 +177,261 @@ test('polyline, cubic, and concatenated source edits refresh snapshots and mesh'
   assert.deepEqual(coonsPatchBoundaryLinkStatus(state.editableDiagram, 'patch'), {
     kind: 'linkedUpToDate',
   })
+})
+
+test('source fingerprints avoid unchanged sampling and changed candidates sample once', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const patch = findCoonsPatch(linked, 'patch')
+  const unrelatedDiagram: Diagram = {
+    ...linked,
+    strata: [
+      ...linked.strata,
+      pointStratum('unrelated-fast-path', point(8, 9, 10), 0),
+    ],
+  }
+  const previousState = inspectLinkedCoonsSourceState(
+    linked,
+    patch.id,
+    patch.primitive,
+  )
+  const unrelatedState = inspectLinkedCoonsSourceState(
+    unrelatedDiagram,
+    patch.id,
+    patch.primitive,
+  )
+
+  assert.deepEqual(unrelatedState.fingerprints, previousState.fingerprints)
+
+  let unrelatedSamplingCalls = 0
+  const unrelatedResolutionCalls = new Map<string, number>()
+  const unrelatedSynchronization = synchronizeLinkedCoonsPatches(
+    linked,
+    unrelatedDiagram,
+    {
+      context: {
+        resolveBoundarySource: (diagram, source, role) => {
+          const side = diagram === linked ? 'previous' : 'next'
+          const key = `${side}:${role}`
+          unrelatedResolutionCalls.set(
+            key,
+            (unrelatedResolutionCalls.get(key) ?? 0) + 1,
+          )
+          return resolveLinkedCoonsBoundarySource(diagram, source, role)
+        },
+        sampleCandidate: (primitive) => {
+          unrelatedSamplingCalls += 1
+          return sampleCurvedSheetPrimitive(primitive)
+        },
+      },
+    },
+  )
+
+  assert.equal(unrelatedSamplingCalls, 0)
+  assert.equal(
+    findCoonsPatch(unrelatedSynchronization.diagram, 'patch').primitive,
+    patch.primitive,
+  )
+  assert.deepEqual(unrelatedSynchronization.updatedPatchIds, [])
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(unrelatedResolutionCalls.get(`previous:${role}`), 1)
+    assert.equal(unrelatedResolutionCalls.get(`next:${role}`), 1)
+  }
+
+  let clonedUnrelatedSamplingCalls = 0
+  const clonedUnrelatedSynchronization = synchronizeLinkedCoonsPatches(
+    linked,
+    structuredClone(unrelatedDiagram),
+    {
+      context: {
+        sampleCandidate: (primitive) => {
+          clonedUnrelatedSamplingCalls += 1
+          return sampleCurvedSheetPrimitive(primitive)
+        },
+      },
+    },
+  )
+  const clonedUnrelatedPatch = findCoonsPatch(
+    clonedUnrelatedSynchronization.diagram,
+    'patch',
+  ).primitive
+
+  assert.equal(clonedUnrelatedSamplingCalls, 0)
+  assert.equal(clonedUnrelatedPatch, patch.primitive)
+  assert.equal(clonedUnrelatedPatch.bottom, patch.primitive.bottom)
+  assert.equal(clonedUnrelatedPatch.right, patch.primitive.right)
+  assert.equal(clonedUnrelatedPatch.top, patch.primitive.top)
+  assert.equal(clonedUnrelatedPatch.left, patch.primitive.left)
+
+  const committedUnrelated = commitDiagramChange(createEditorState(linked), {
+    ...createEditorState(linked),
+    editableDiagram: unrelatedDiagram,
+  })
+
+  assert.equal(committedUnrelated.history.past.length, 1)
+  assert.equal(
+    findCoonsPatch(committedUnrelated.editableDiagram, 'patch').primitive,
+    patch.primitive,
+  )
+
+  const changedDiagram = updateStratumById(linked, 'bottom', (stratum) =>
+    stratum.geometricKind === 'curve' && stratum.kind === 'polyline'
+      ? {
+          ...stratum,
+          points: stratum.points.map((value, index) =>
+            index === 1 ? { ...value, z: 0.65 } : value,
+          ),
+        }
+      : stratum,
+  )
+  const changedPatch = findCoonsPatch(changedDiagram, 'patch')
+  const changedState = inspectLinkedCoonsSourceState(
+    changedDiagram,
+    changedPatch.id,
+    changedPatch.primitive,
+  )
+
+  assert.notEqual(
+    changedState.fingerprints.bottom,
+    previousState.fingerprints.bottom,
+  )
+
+  let changedSamplingCalls = 0
+  const changedResolutionCalls = new Map<string, number>()
+  const changedSynchronization = synchronizeLinkedCoonsPatches(
+    linked,
+    changedDiagram,
+    {
+      context: {
+        resolveBoundarySource: (diagram, source, role) => {
+          const side = diagram === linked ? 'previous' : 'next'
+          const key = `${side}:${role}`
+          changedResolutionCalls.set(
+            key,
+            (changedResolutionCalls.get(key) ?? 0) + 1,
+          )
+          return resolveLinkedCoonsBoundarySource(diagram, source, role)
+        },
+        sampleCandidate: (primitive) => {
+          changedSamplingCalls += 1
+          return sampleCurvedSheetPrimitive(primitive)
+        },
+      },
+    },
+  )
+
+  assert.equal(changedSamplingCalls, 1)
+  assert.deepEqual(changedSynchronization.updatedPatchIds, ['patch'])
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(changedResolutionCalls.get(`previous:${role}`), 1)
+    assert.equal(changedResolutionCalls.get(`next:${role}`), 1)
+  }
+  assert.notDeepEqual(
+    findCoonsPatch(changedSynchronization.diagram, 'patch').primitive.bottom,
+    patch.primitive.bottom,
+  )
+})
+
+test('link status is structural, non-sampling, and non-mutating', () => {
+  const linked = createLinkedPatch(createPathSourceDiagram())
+  const staticDiagram = detachCoonsPatchBoundaryLinks(linked, 'patch')
+  const missingSource: Diagram = {
+    ...linked,
+    strata: linked.strata.filter((stratum) => stratum.id !== 'right'),
+  }
+  const cornerMismatch = updateStratumById(linked, 'bottom', (stratum) =>
+    stratum.geometricKind === 'curve' && stratum.kind === 'polyline'
+      ? {
+          ...stratum,
+          points: stratum.points.map((value, index) =>
+            index === 2 ? { ...value, x: 1.25 } : value,
+          ),
+        }
+      : stratum,
+  )
+  const obsoleteSnapshot = updateStratumById(linked, 'patch', (stratum) => {
+    if (
+      stratum.geometricKind !== 'sheet' ||
+      stratum.kind !== 'curvedSheet' ||
+      stratum.primitive.kind !== 'coonsPatch'
+    ) {
+      return stratum
+    }
+
+    const bottom = pathBoundary(stratum.primitive.bottom)
+    const midpoint = point(0.5, 0, 0.45)
+
+    return {
+      ...stratum,
+      primitive: {
+        ...stratum.primitive,
+        bottom: {
+          ...bottom,
+          segments: [
+            { ...bottom.segments[0], end: midpoint },
+            { ...bottom.segments[1], start: midpoint },
+          ],
+        },
+      },
+    }
+  })
+  const malformedState = structuredClone(linked)
+  ;(
+    findCoonsPatch(malformedState, 'patch').primitive as unknown as {
+      boundarySnapshotState?: unknown
+    }
+  ).boundarySnapshotState = 'thawed'
+  const fixtures: Array<{
+    name: string
+    diagram: Diagram
+    expectedKind: ReturnType<typeof coonsPatchBoundaryLinkStatus>['kind']
+  }> = [
+    { name: 'up to date', diagram: linked, expectedKind: 'linkedUpToDate' },
+    { name: 'static', diagram: staticDiagram, expectedKind: 'static' },
+    { name: 'missing', diagram: missingSource, expectedKind: 'linkedStale' },
+    { name: 'corner', diagram: cornerMismatch, expectedKind: 'linkedStale' },
+    { name: 'obsolete', diagram: obsoleteSnapshot, expectedKind: 'linkedStale' },
+    { name: 'malformed state', diagram: malformedState, expectedKind: 'linkedStale' },
+  ]
+  let samplingCalls = 0
+
+  for (const fixture of fixtures) {
+    const before = structuredClone(fixture.diagram)
+
+    for (let call = 0; call < 3; call += 1) {
+      const status = coonsPatchBoundaryLinkStatus(
+        fixture.diagram,
+        'patch',
+        {
+          sampleCandidate: (primitive) => {
+            samplingCalls += 1
+            return sampleCurvedSheetPrimitive(primitive)
+          },
+        },
+      )
+
+      assert.equal(status.kind, fixture.expectedKind, fixture.name)
+    }
+
+    assert.deepEqual(fixture.diagram, before, fixture.name)
+  }
+
+  assert.equal(samplingCalls, 0)
+  const cornerStatus = coonsPatchBoundaryLinkStatus(cornerMismatch, 'patch')
+  assert.equal(cornerStatus.kind, 'linkedStale')
+  if (cornerStatus.kind === 'linkedStale') {
+    assert.equal(
+      cornerStatus.issues.some((issue) => issue.kind === 'cornerMismatch'),
+      true,
+    )
+  }
+  const obsoleteStatus = coonsPatchBoundaryLinkStatus(obsoleteSnapshot, 'patch')
+  assert.equal(obsoleteStatus.kind, 'linkedStale')
+  if (obsoleteStatus.kind === 'linkedStale') {
+    assert.equal(
+      obsoleteStatus.issues.some((issue) => issue.kind === 'snapshotOutOfDate'),
+      true,
+    )
+  }
 })
 
 test('unsupported closed template replacement leaves the linked patch stale', () => {
@@ -770,6 +1031,22 @@ test('symbolic linked import retains the saved fallback when inputs are incompat
   assert.equal(validateDiagram(resolved.diagram).valid, true)
 })
 
+test('active linked sources remain symbolic import dependencies', () => {
+  const linked = createSymbolicInteriorLinkedPatch()
+  delete linked.variables
+
+  const pending = parseSavedDiagramJsonForImport(serializeDiagram(linked))
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected the active linked source to require R.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => variable.name),
+    ['R'],
+  )
+})
+
 test('same-id replacement load keeps the incoming file fallback snapshots', () => {
   const current = commitSourceUpdate(
     createEditorState(createSymbolicEndpointLinkedPatch()),
@@ -920,8 +1197,9 @@ test('partial layer translation preserves last-valid snapshots through repeated 
     ),
   }
   const initialState = createEditorState(splitAcrossLayers)
+  const lastValidPatch = findCoonsPatch(splitAcrossLayers, 'patch')
   const initialPatch = structuredClone(
-    findCoonsPatch(splitAcrossLayers, 'patch'),
+    lastValidPatch,
   )
   const initialMesh = sampleCoonsPatch(initialPatch.primitive)
   const translatedDiagram = updateStratumById(
@@ -964,6 +1242,10 @@ test('partial layer translation preserves last-valid snapshots through repeated 
   }
 
   for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(
+      firstStalePatch.primitive[role],
+      lastValidPatch.primitive[role],
+    )
     assert.deepEqual(
       firstStalePatch.primitive[role],
       initialPatch.primitive[role],
@@ -993,19 +1275,57 @@ test('partial layer translation preserves last-valid snapshots through repeated 
   const secondStalePatch = findCoonsPatch(secondStale.editableDiagram, 'patch')
 
   for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(
+      secondStalePatch.primitive[role],
+      firstStalePatch.primitive[role],
+    )
     assert.deepEqual(
       secondStalePatch.primitive[role],
       initialPatch.primitive[role],
     )
   }
+  assert.equal(secondStalePatch.primitive, firstStalePatch.primitive)
 
-  const repairedDiagram = translateLayer(
-    secondStale.editableDiagram,
-    1,
-    point(2, 0, 0),
+  const thirdStale = commitSourceUpdate(
+    secondStale,
+    'bottom',
+    (source) =>
+      source.geometricKind === 'curve' && source.kind === 'polyline'
+        ? {
+            ...source,
+            points: source.points.map((value, index) =>
+              index === 2 ? { ...value, x: value.x + 0.25 } : value,
+            ),
+          }
+        : source,
   )
-  const repaired = commitDiagramChange(secondStale, {
-    ...secondStale,
+  const thirdStalePatch = findCoonsPatch(thirdStale.editableDiagram, 'patch')
+
+  assert.equal(thirdStalePatch.primitive, firstStalePatch.primitive)
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(thirdStale.editableDiagram, 'patch').kind,
+    'linkedStale',
+  )
+
+  const repairedDiagram = updateStratumById(
+    translateLayer(
+      thirdStale.editableDiagram,
+      1,
+      point(2, 0, 0),
+    ),
+    'bottom',
+    (stratum) =>
+      stratum.geometricKind === 'curve' && stratum.kind === 'polyline'
+        ? {
+            ...stratum,
+            points: stratum.points.map((value, index) =>
+              index === 2 ? { ...value, x: value.x - 0.25 } : value,
+            ),
+          }
+        : stratum,
+  )
+  const repaired = commitDiagramChange(thirdStale, {
+    ...thirdStale,
     editableDiagram: repairedDiagram,
   })
   const repairedPatch = findCoonsPatch(repaired.editableDiagram, 'patch')
@@ -1036,7 +1356,7 @@ test('partial layer translation preserves last-valid snapshots through repeated 
   )
   assert.deepEqual(
     findCoonsPatch(undoneRepair.editableDiagram, 'patch').primitive,
-    secondStalePatch.primitive,
+    thirdStalePatch.primitive,
   )
   assert.deepEqual(
     findCoonsPatch(redoneRepair.editableDiagram, 'patch').primitive,
@@ -1131,8 +1451,8 @@ test('missing symbolic source preserves exact snapshots through load, detach, an
     const previousBoundary = pathBoundary(previousPatch.primitive[role])
     const staleBoundary = pathBoundary(stalePatch.primitive[role])
 
-    assert.notEqual(staleBoundary, previousBoundary)
-    assert.notEqual(staleBoundary.segments[0], previousBoundary.segments[0])
+    assert.equal(staleBoundary, previousBoundary)
+    assert.equal(staleBoundary.segments[0], previousBoundary.segments[0])
   }
   assert.deepEqual(
     pathBoundary(stalePatch.primitive.bottom).segments[0]?.end.symbolic?.z,
@@ -1140,8 +1460,8 @@ test('missing symbolic source preserves exact snapshots through load, detach, an
   )
   assert.doesNotThrow(() => sampleCoonsPatch(stalePatch.primitive))
 
-  // Synchronization must not mutate or replace the previous diagram's
-  // committed snapshots while cloning them into the stale next state.
+  // Synchronization shares immutable last-valid snapshots with the stale next
+  // state without mutating or replacing the previous committed diagram.
   for (const role of ['bottom', 'right', 'top', 'left'] as const) {
     assert.equal(
       findCoonsPatch(linked, 'patch').primitive[role],
@@ -1268,6 +1588,116 @@ test('missing symbolic source preserves exact snapshots through load, detach, an
 
   assert.deepEqual(restoredPatch.primitive.boundarySources, previousPrimitive.boundarySources)
   assert.deepEqual(coonsBoundarySnapshots(restoredPatch), previousSnapshots)
+})
+
+test('frozen-only symbolic variables are omitted from the real UI import lifecycle', () => {
+  const linked = createSymbolicInteriorLinkedPatch()
+  linked.variables = [
+    ...(linked.variables ?? []),
+    {
+      id: 'variable-s',
+      name: 'S',
+      macroName: 'stzS',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  const fallbackSnapshots = coonsBoundarySnapshots(
+    findCoonsPatch(linked, 'patch'),
+  )
+  const stale = commitDiagramChange(createEditorState(linked), {
+    ...createEditorState(linked),
+    editableDiagram: {
+      ...linked,
+      strata: linked.strata.filter((stratum) => stratum.id !== 'bottom'),
+    },
+  })
+  const deletedVariable = deleteSymbolicVariableFromDiagram(
+    stale.editableDiagram,
+    'variable-r',
+  )
+
+  assert.equal(deletedVariable.ok, true)
+  if (!deletedVariable.ok) {
+    throw new Error(deletedVariable.error)
+  }
+  assert.equal(
+    deletedVariable.diagram.variables?.some(
+      (variable) => variable.name === 'R',
+    ),
+    false,
+  )
+  const stalePatch = findCoonsPatch(deletedVariable.diagram, 'patch')
+
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(coonsBoundarySnapshots(stalePatch), fallbackSnapshots)
+  assert.deepEqual(
+    pathBoundary(stalePatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+
+  const serialized = serializeDiagram(deletedVariable.diagram)
+  const direct = parseSavedDiagramJson(serialized)
+
+  assert.equal(direct.ok, true)
+  if (!direct.ok) {
+    throw new Error(direct.error)
+  }
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(direct.diagram, 'patch').kind,
+    'linkedStale',
+  )
+  assert.deepEqual(
+    coonsBoundarySnapshots(findCoonsPatch(direct.diagram, 'patch')),
+    fallbackSnapshots,
+  )
+
+  const pending = parseSavedDiagramJsonForImport(serialized)
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected only the remaining saved variable S.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => variable.name),
+    ['S'],
+  )
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pending.pendingImport,
+    [{ name: 'S', expression: '2' }],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const importedPatch = findCoonsPatch(resolved.diagram, 'patch')
+  const importedStatus = coonsPatchBoundaryLinkStatus(
+    resolved.diagram,
+    'patch',
+  )
+  const importedMesh = sampleCoonsPatch(importedPatch.primitive)
+  const importedSvg = curvedSheetToSvgMesh(
+    importedPatch,
+    createInitialCamera3D(),
+    240,
+  )
+  const importedTikz = generateTikz(resolved.diagram)
+
+  assert.equal(importedStatus.kind, 'linkedStale')
+  assert.equal(importedPatch.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(coonsBoundarySnapshots(importedPatch), fallbackSnapshots)
+  assert.deepEqual(
+    pathBoundary(importedPatch.primitive.bottom).segments[0]?.end.symbolic?.z,
+    { kind: 'symbolic', expression: 'R', previewValue: 0.1 },
+  )
+  assert.equal(validateDiagram(resolved.diagram).valid, true)
+  assert.ok(importedMesh.faces.length > 0)
+  assert.ok(importedSvg.faces.length > 0)
+  assert.match(importedTikz, /Primitive: coonsPatch/)
+  assert.doesNotMatch(importedTikz, /\\pgfmathsetmacro\{\\stzR\}/)
 })
 
 test('dangling point source ids stay reserved through creation and Undo recovery', () => {

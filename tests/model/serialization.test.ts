@@ -1937,7 +1937,7 @@ test('parseSavedDiagramJsonForImport detects symbolic Coons boundaries with save
   )
 })
 
-test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variables', () => {
+test('static Coons snapshots still require missing symbolic boundary variables', () => {
   const diagram = symbolicCoonsDiagram()
   delete diagram.variables
 
@@ -1958,6 +1958,27 @@ test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variable
       { name: 'Len', expression: '', defined: false },
       { name: 'R', expression: '', defined: false },
     ],
+  )
+})
+
+test('ruled-surface snapshots still require missing symbolic boundary variables', () => {
+  const diagram = symbolicRuledDiagram()
+  delete diagram.variables
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected ruled-surface import to need variable resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [{ name: 'Len', expression: '', defined: false }],
   )
 })
 

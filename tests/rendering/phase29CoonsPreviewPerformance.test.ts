@@ -8,7 +8,11 @@ import {
   createPointStratum,
   createTextLabel,
 } from '../../src/model/constructors.ts'
-import { detachCoonsPatchBoundaryLinks } from '../../src/model/coonsPatchLinks.ts'
+import {
+  coonsPatchBoundaryLinkStatus,
+  detachCoonsPatchBoundaryLinks,
+  synchronizeLinkedCoonsPatches,
+} from '../../src/model/coonsPatchLinks.ts'
 import { setLayerVisibility } from '../../src/model/layers.ts'
 import type {
   BoundaryPathSnapshot,
@@ -563,6 +567,193 @@ test('stale snapshots render without source lookup and recovery invalidates imme
   )
 })
 
+test('Coons link-state metadata churn reuses the same world-space mesh', () => {
+  const initialSheet = coonsSheet('patch', {
+    ...coonsPrimitive(),
+    boundarySources: linkedBoundarySources(),
+  })
+  let diagram = diagramWithSheets(
+    [initialSheet],
+    projectionCamera,
+    linkedSourceCurves(),
+  )
+  const counters = createPreparationCounters()
+  const cache = createSvgSurfacePreparationCache()
+  const initialGeometry = prepareSvgSurfaceGeometry(diagram, {
+    cache,
+    sampleCurvedSheet: counters.sample,
+  })
+
+  for (let edit = 0; edit < 3; edit += 1) {
+    const previousSheet = findCoonsSheet(diagram, 'patch')
+    const boundarySources = previousSheet.primitive.boundarySources
+
+    if (boundarySources === undefined) {
+      throw new Error('Expected linked Coons metadata.')
+    }
+
+    const nextSheet: CurvedSheetStratum = {
+      ...previousSheet,
+      primitive: {
+        ...previousSheet.primitive,
+        boundarySources: structuredClone(boundarySources),
+        ...(edit === 1 ? {} : { boundarySnapshotState: 'frozen' as const }),
+      },
+    }
+    diagram = {
+      ...diagram,
+      strata: diagram.strata.map((stratum) =>
+        stratum.id === nextSheet.id ? nextSheet : stratum,
+      ),
+    }
+    const geometry = prepareSvgSurfaceGeometry(diagram, {
+      cache,
+      sampleCurvedSheet: counters.sample,
+    })
+
+    assert.equal(geometry, initialGeometry)
+    assert.equal(counters.sampleCount(), 1)
+  }
+})
+
+test('repeated stale synchronization reuses fallback mesh until real recovery', () => {
+  const initialSheet = coonsSheet('patch', {
+    ...coonsPrimitive(),
+    boundarySources: linkedBoundarySources(),
+  })
+  let diagram = diagramWithSheets(
+    [initialSheet],
+    projectionCamera,
+    linkedSourceCurves(),
+  )
+  const initialPatch = findCoonsSheet(diagram, 'patch')
+  const initialBoundaries = {
+    bottom: initialPatch.primitive.bottom,
+    right: initialPatch.primitive.right,
+    top: initialPatch.primitive.top,
+    left: initialPatch.primitive.left,
+  }
+  const counters = createPreparationCounters()
+  const cache = createSvgSurfacePreparationCache()
+  const initialGeometry = prepareSvgSurfaceGeometry(diagram, {
+    cache,
+    sampleCurvedSheet: counters.sample,
+  })
+  let frozenPrimitive: CoonsPatchPrimitive | null = null
+
+  for (const endpointX of [1.1, 1.2, 1.3]) {
+    const edited = updateCubicSource(diagram, 'source-bottom', (points) =>
+      points.map((value, index) =>
+        index === 3 ? { ...value, x: endpointX } : value,
+      ),
+    )
+    diagram = synchronizeLinkedCoonsPatches(diagram, edited).diagram
+    const patch = findCoonsSheet(diagram, 'patch')
+
+    assert.equal(patch.primitive.boundarySnapshotState, 'frozen')
+    assert.equal(patch.primitive.bottom, initialBoundaries.bottom)
+    assert.equal(patch.primitive.right, initialBoundaries.right)
+    assert.equal(patch.primitive.top, initialBoundaries.top)
+    assert.equal(patch.primitive.left, initialBoundaries.left)
+    if (frozenPrimitive === null) {
+      frozenPrimitive = patch.primitive
+    } else {
+      assert.equal(patch.primitive, frozenPrimitive)
+    }
+
+    const staleGeometry = prepareSvgSurfaceGeometry(diagram, {
+      cache,
+      sampleCurvedSheet: counters.sample,
+    })
+
+    assert.equal(staleGeometry, initialGeometry)
+    assert.equal(counters.sampleCount(), 1)
+    assert.equal(coonsPatchBoundaryLinkStatus(diagram, 'patch').kind, 'linkedStale')
+  }
+
+  const repairedSource = updateCubicSource(
+    diagram,
+    'source-bottom',
+    (points) =>
+      points.map((value, index) =>
+        index === 1
+          ? { ...value, y: 0.4 }
+          : index === 3
+            ? { ...value, x: 1 }
+            : value,
+      ),
+  )
+  diagram = synchronizeLinkedCoonsPatches(diagram, repairedSource).diagram
+  const recoveredPatch = findCoonsSheet(diagram, 'patch')
+  const recoveredGeometry = prepareSvgSurfaceGeometry(diagram, {
+    cache,
+    sampleCurvedSheet: counters.sample,
+  })
+
+  assert.equal(coonsPatchBoundaryLinkStatus(diagram, 'patch').kind, 'linkedUpToDate')
+  assert.equal(recoveredPatch.primitive.boundarySnapshotState, undefined)
+  assert.notEqual(recoveredPatch.primitive.bottom, initialBoundaries.bottom)
+  assert.equal(counters.sampleCount(), 2)
+  assert.notDeepEqual(
+    recoveredGeometry.surfacesBySheetId.get('patch')?.curvedMesh?.vertices,
+    initialGeometry.surfacesBySheetId.get('patch')?.curvedMesh?.vertices,
+  )
+
+  const samplingChanged: Diagram = {
+    ...diagram,
+    strata: diagram.strata.map((stratum) =>
+      stratum.id === 'patch' &&
+      stratum.geometricKind === 'sheet' &&
+      stratum.kind === 'curvedSheet' &&
+      stratum.primitive.kind === 'coonsPatch'
+        ? {
+            ...stratum,
+            primitive: {
+              ...stratum.primitive,
+              sampling: { uSegments: 2, vSegments: 5 },
+            },
+          }
+        : stratum,
+    ),
+  }
+  diagram = synchronizeLinkedCoonsPatches(diagram, samplingChanged).diagram
+  const resampledGeometry = prepareSvgSurfaceGeometry(diagram, {
+    cache,
+    sampleCurvedSheet: counters.sample,
+  })
+
+  assert.equal(counters.sampleCount(), 3)
+  assert.equal(
+    resampledGeometry.surfacesBySheetId.get('patch')?.curvedMesh?.faces.length,
+    10,
+  )
+
+  const metadataOnlyPatch = findCoonsSheet(diagram, 'patch')
+  const metadataOnlyDiagram: Diagram = {
+    ...diagram,
+    strata: diagram.strata.map((stratum) =>
+      stratum.id === metadataOnlyPatch.id
+        ? {
+            ...metadataOnlyPatch,
+            primitive: {
+              ...metadataOnlyPatch.primitive,
+              boundarySources: structuredClone(
+                metadataOnlyPatch.primitive.boundarySources,
+              ),
+            },
+          }
+        : stratum,
+    ),
+  }
+  const metadataGeometry = prepareSvgSurfaceGeometry(metadataOnlyDiagram, {
+    cache,
+    sampleCurvedSheet: counters.sample,
+  })
+
+  assert.equal(metadataGeometry, resampledGeometry)
+  assert.equal(counters.sampleCount(), 3)
+})
+
 test('caps and surface filters preserve fallback rules without mutating shared faces', () => {
   const firstSheet = coonsSheet('visible-patch', coonsPrimitive())
   const hiddenSheet = {
@@ -851,6 +1042,22 @@ function linkedSourceCurves(): Stratum[] {
       throw new Error('Expected a boundary source segment.')
     }
 
+    if (segment.kind === 'cubicBezier') {
+      return createCurveStratum({
+        ambientDimension: 3,
+        id,
+        kind: 'cubicBezier',
+        name: id,
+        points: [
+          segment.start,
+          segment.control1,
+          segment.control2,
+          segment.end,
+        ],
+        layer: 0,
+      })
+    }
+
     return createCurveStratum({
       ambientDimension: 3,
       id,
@@ -859,6 +1066,40 @@ function linkedSourceCurves(): Stratum[] {
       layer: 0,
     })
   })
+}
+
+function findCoonsSheet(
+  diagram: Diagram,
+  id: string,
+): CurvedSheetStratum & { primitive: CoonsPatchPrimitive } {
+  const sheet = diagram.strata.find((stratum) => stratum.id === id)
+
+  if (
+    sheet?.geometricKind !== 'sheet' ||
+    sheet.kind !== 'curvedSheet' ||
+    sheet.primitive.kind !== 'coonsPatch'
+  ) {
+    throw new Error(`Expected Coons patch ${id}.`)
+  }
+
+  return sheet
+}
+
+function updateCubicSource(
+  diagram: Diagram,
+  id: string,
+  updatePoints: (points: readonly Vec3[]) => Vec3[],
+): Diagram {
+  return {
+    ...diagram,
+    strata: diagram.strata.map((stratum) =>
+      stratum.id === id &&
+      stratum.geometricKind === 'curve' &&
+      stratum.kind === 'cubicBezier'
+        ? { ...stratum, points: updatePoints(stratum.points) }
+        : stratum,
+    ),
+  }
 }
 
 function createThrowingBoundarySource(id: string): Stratum {

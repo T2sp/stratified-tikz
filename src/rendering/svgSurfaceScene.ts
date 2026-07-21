@@ -82,11 +82,33 @@ type CachedCurvedSheetGeometry = {
   boundaryPolylines3D: readonly (readonly Vec3[])[]
 }
 
+type CurvedSheetSamplingInput =
+  | {
+      kind: 'primitiveIdentity'
+      primitive: CurvedSheetPrimitive
+    }
+  | {
+      kind: 'coonsPatch'
+      bottom: Extract<CurvedSheetPrimitive, { kind: 'coonsPatch' }>['bottom']
+      right: Extract<CurvedSheetPrimitive, { kind: 'coonsPatch' }>['right']
+      top: Extract<CurvedSheetPrimitive, { kind: 'coonsPatch' }>['top']
+      left: Extract<CurvedSheetPrimitive, { kind: 'coonsPatch' }>['left']
+      uSegments: number
+      vSegments: number
+    }
+
 type SurfaceGeometryInput = {
   sheetId: string
   layer: number
   sheetKind: SheetStratum['kind']
-  geometryIdentity: object
+  geometryIdentity?: object
+  curvedSamplingInput?: CurvedSheetSamplingInput
+}
+
+type CachedCurvedSheetGeometryBySheet = {
+  sampler: CurvedSheetSampler
+  samplingInput: CurvedSheetSamplingInput
+  geometry: CachedCurvedSheetGeometry
 }
 
 type CachedSurfaceGeometryPreparation = {
@@ -110,6 +132,7 @@ export type SvgSurfacePreparationCache = {
     CurvedSheetPrimitive,
     CachedCurvedSheetGeometry
   >
+  curvedGeometryBySheetId: Map<string, CachedCurvedSheetGeometryBySheet>
   lastGeometryPreparation: CachedSurfaceGeometryPreparation | null
   lastProjection: CachedSurfaceProjection | null
 }
@@ -119,6 +142,7 @@ const defaultCurveSegmentSamples = 24
 export function createSvgSurfacePreparationCache(): SvgSurfacePreparationCache {
   return {
     curvedGeometryByPrimitive: new WeakMap(),
+    curvedGeometryBySheetId: new Map(),
     lastGeometryPreparation: null,
     lastProjection: null,
   }
@@ -169,6 +193,11 @@ export function prepareSvgSurfaceGeometry(
   const surfacesBySheetId = new Map(
     surfaces.map((surface) => [surface.sheetId, surface]),
   )
+
+  if (cache !== undefined) {
+    pruneCurvedSheetGeometryCache(cache, inputs)
+  }
+
   const curvedSheetVerticesById = new Map(
     surfaces.flatMap((surface): Array<[string, readonly Vec3[]]> =>
       surface.curvedMesh === undefined
@@ -317,13 +346,27 @@ function sampledSurfaceGeometry(
   }
 
   const cached = cache?.curvedGeometryByPrimitive.get(sheet.primitive)
+  const samplingInput = curvedSheetSamplingInput(sheet.primitive)
+  const cachedBySheet = cache?.curvedGeometryBySheetId.get(sheet.id)
   const curvedGeometry =
     cached !== undefined && cached.sampler === sampler
       ? cached
+      : cachedBySheet !== undefined &&
+          cachedBySheet.sampler === sampler &&
+          curvedSheetSamplingInputsEqual(
+            cachedBySheet.samplingInput,
+            samplingInput,
+          )
+        ? cachedBySheet.geometry
       : sampleCurvedSurfaceGeometry(sheet, diagram, curveSegmentSamples, sampler)
 
-  if (cache !== undefined && curvedGeometry !== cached) {
+  if (cache !== undefined) {
     cache.curvedGeometryByPrimitive.set(sheet.primitive, curvedGeometry)
+    cache.curvedGeometryBySheetId.set(sheet.id, {
+      sampler,
+      samplingInput,
+      geometry: curvedGeometry,
+    })
   }
 
   return {
@@ -368,22 +411,31 @@ function surfaceGeometryInputs(diagram: Diagram): SurfaceGeometryInput[] {
     return []
   }
 
-  // Editor geometry updates replace the affected coordinate arrays or curved
-  // primitive. Style, selection, and unrelated edits preserve these identities,
-  // so they are safe cache keys without serializing the complete diagram.
+  // Editor geometry updates replace the affected coordinate arrays. Coons
+  // link/frozen metadata may replace a primitive without changing its actual
+  // sampling inputs, so those inputs are captured separately below.
   return diagram.strata.flatMap((stratum): SurfaceGeometryInput[] => {
     if (stratum.geometricKind !== 'sheet' || stratum.codim !== 1) {
       return []
     }
 
-    return [
-      {
-        sheetId: stratum.id,
-        layer: stratum.layer,
-        sheetKind: stratum.kind,
-        geometryIdentity: sheetGeometryIdentity(stratum),
-      },
-    ]
+    return stratum.kind === 'curvedSheet'
+      ? [
+          {
+            sheetId: stratum.id,
+            layer: stratum.layer,
+            sheetKind: stratum.kind,
+            curvedSamplingInput: curvedSheetSamplingInput(stratum.primitive),
+          },
+        ]
+      : [
+          {
+            sheetId: stratum.id,
+            layer: stratum.layer,
+            sheetKind: stratum.kind,
+            geometryIdentity: sheetGeometryIdentity(stratum),
+          },
+        ]
   })
 }
 
@@ -414,10 +466,88 @@ function surfaceGeometryInputsEqual(
         input.sheetId === candidate.sheetId &&
         input.layer === candidate.layer &&
         input.sheetKind === candidate.sheetKind &&
-        input.geometryIdentity === candidate.geometryIdentity
+        surfaceGeometryInputGeometryEqual(input, candidate)
       )
     })
   )
+}
+
+function surfaceGeometryInputGeometryEqual(
+  left: SurfaceGeometryInput,
+  right: SurfaceGeometryInput,
+): boolean {
+  if (
+    left.curvedSamplingInput !== undefined ||
+    right.curvedSamplingInput !== undefined
+  ) {
+    return (
+      left.curvedSamplingInput !== undefined &&
+      right.curvedSamplingInput !== undefined &&
+      curvedSheetSamplingInputsEqual(
+        left.curvedSamplingInput,
+        right.curvedSamplingInput,
+      )
+    )
+  }
+
+  return left.geometryIdentity === right.geometryIdentity
+}
+
+function curvedSheetSamplingInput(
+  primitive: CurvedSheetPrimitive,
+): CurvedSheetSamplingInput {
+  if (primitive.kind !== 'coonsPatch') {
+    return { kind: 'primitiveIdentity', primitive }
+  }
+
+  return {
+    kind: 'coonsPatch',
+    bottom: primitive.bottom,
+    right: primitive.right,
+    top: primitive.top,
+    left: primitive.left,
+    uSegments: primitive.sampling.uSegments,
+    vSegments: primitive.sampling.vSegments,
+  }
+}
+
+function curvedSheetSamplingInputsEqual(
+  left: CurvedSheetSamplingInput,
+  right: CurvedSheetSamplingInput,
+): boolean {
+  if (left.kind === 'primitiveIdentity' || right.kind === 'primitiveIdentity') {
+    return (
+      left.kind === 'primitiveIdentity' &&
+      right.kind === 'primitiveIdentity' &&
+      left.primitive === right.primitive
+    )
+  }
+
+  return (
+    left.bottom === right.bottom &&
+    left.right === right.right &&
+    left.top === right.top &&
+    left.left === right.left &&
+    left.uSegments === right.uSegments &&
+    left.vSegments === right.vSegments
+  )
+}
+
+function pruneCurvedSheetGeometryCache(
+  cache: SvgSurfacePreparationCache,
+  inputs: readonly SurfaceGeometryInput[],
+): void {
+  const currentCurvedSheetIds = new Set(
+    inputs.flatMap((input) =>
+      input.curvedSamplingInput === undefined ? [] : [input.sheetId],
+    ),
+  )
+
+  for (const sheetId of cache.curvedGeometryBySheetId.keys()) {
+    if (!currentCurvedSheetIds.has(sheetId)) {
+      cache.curvedGeometryBySheetId.delete(sheetId)
+    }
+  }
 }
 
 function includedSourceIds(

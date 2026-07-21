@@ -71,6 +71,10 @@ export type SurfaceValidationResult = {
   errors: SurfaceValidationIssue[]
 }
 
+export type CurvedSheetValidationSampler = (
+  primitive: CurvedSheetPrimitive,
+) => SurfaceSampleMesh
+
 type MeshPointSampler = (uIndex: number, vIndex: number) => Vec3
 
 export function validateSurfaceFrame(
@@ -317,6 +321,25 @@ export function validateCurvedSheetPrimitive(
   primitive: unknown,
   path = 'primitive',
 ): SurfaceValidationResult {
+  const structuralValidation = validateCurvedSheetPrimitiveStructure(
+    primitive,
+    path,
+  )
+
+  if (!structuralValidation.valid) {
+    return structuralValidation
+  }
+
+  return validateCurvedSheetPrimitiveBySampling(
+    primitive as CurvedSheetPrimitive,
+    path,
+  )
+}
+
+export function validateCurvedSheetPrimitiveStructure(
+  primitive: unknown,
+  path = 'primitive',
+): SurfaceValidationResult {
   const errors: SurfaceValidationIssue[] = []
 
   if (!isRecord(primitive)) {
@@ -346,18 +369,26 @@ export function validateCurvedSheetPrimitive(
       break
   }
 
-  if (errors.length === 0) {
-    try {
-      sampleCurvedSheetPrimitive(primitive as CurvedSheetPrimitive)
-    } catch (error) {
-      pushError(
-        errors,
-        path,
-        error instanceof Error
-          ? error.message
-          : 'Curved sheet primitive sampling failed.',
-      )
-    }
+  return validationResult(errors)
+}
+
+export function validateCurvedSheetPrimitiveBySampling(
+  primitive: CurvedSheetPrimitive,
+  path = 'primitive',
+  sampler: CurvedSheetValidationSampler = sampleCurvedSheetPrimitive,
+): SurfaceValidationResult {
+  const errors: SurfaceValidationIssue[] = []
+
+  try {
+    sampler(primitive)
+  } catch (error) {
+    pushError(
+      errors,
+      path,
+      error instanceof Error
+        ? error.message
+        : 'Curved sheet primitive sampling failed.',
+    )
   }
 
   return validationResult(errors)
@@ -946,29 +977,6 @@ function assertValidPrimitive(primitive: CurvedSheetPrimitive): void {
       validation.errors.map((issue) => `${issue.path} ${issue.message}`).join('; '),
     )
   }
-}
-
-function validateCurvedSheetPrimitiveStructure(
-  primitive: CurvedSheetPrimitive,
-): SurfaceValidationResult {
-  const errors: SurfaceValidationIssue[] = []
-
-  switch (primitive.kind) {
-    case 'hemisphere':
-      validateHemispherePrimitive(primitive, 'primitive', errors)
-      break
-    case 'saddle':
-      validateSaddlePrimitive(primitive, 'primitive', errors)
-      break
-    case 'ruledSurface':
-      validateRuledSurfacePrimitive(primitive, 'primitive', errors)
-      break
-    case 'coonsPatch':
-      validateCoonsPatchPrimitive(primitive, 'primitive', errors)
-      break
-  }
-
-  return validationResult(errors)
 }
 
 function assertFiniteMesh(mesh: SurfaceSampleMesh): void {

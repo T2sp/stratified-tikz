@@ -103,6 +103,7 @@ type SupportedSymbolicCoordinateInspection = {
   sources: SymbolicExpressionSource[]
   errors: DiagramValidationIssue[]
   supportedSymbolicObjects: WeakSet<object>
+  collectionMode: 'allSupported' | 'activeDependencies'
 }
 
 export const emptyCoordinateExpressionContext: CoordinateExpressionContext = {
@@ -495,6 +496,27 @@ export function collectDiagramSupportedSymbolicExpressionSources(
   }
 }
 
+export function collectDiagramActiveSymbolicExpressionSources(
+  diagram: Diagram,
+): CollectSupportedSymbolicExpressionSourcesResult {
+  const inspection = inspectDiagramSupportedSymbolicCoordinateSources(
+    diagram,
+    'activeDependencies',
+  )
+
+  if (inspection.errors.length > 0) {
+    return {
+      ok: false,
+      errors: inspection.errors,
+    }
+  }
+
+  return {
+    ok: true,
+    sources: inspection.sources,
+  }
+}
+
 export function validateNoUnsupportedSymbolicCoordinateSources(
   diagram: Diagram,
 ): DiagramValidationIssue[] {
@@ -537,11 +559,14 @@ export function validateNoUnsupportedSymbolicCoordinateSources(
 
 function inspectDiagramSupportedSymbolicCoordinateSources(
   diagram: Diagram,
+  collectionMode: SupportedSymbolicCoordinateInspection['collectionMode'] =
+    'allSupported',
 ): SupportedSymbolicCoordinateInspection {
   const inspection: SupportedSymbolicCoordinateInspection = {
     sources: [],
     errors: [],
     supportedSymbolicObjects: new WeakSet<object>(),
+    collectionMode,
   }
 
   if (Array.isArray(diagram.strata)) {
@@ -1125,6 +1150,14 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
   }
 
   if (primitive.kind === 'coonsPatch') {
+    if (
+      inspection.collectionMode === 'activeDependencies' &&
+      (isCoonsPatchBoundarySources(primitive.boundarySources) ||
+        primitive.boundarySnapshotState === 'frozen')
+    ) {
+      return
+    }
+
     collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
       primitive.bottom,
       `${path}.bottom`,

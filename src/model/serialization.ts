@@ -24,7 +24,7 @@ import {
   resolveSymbolicVariables,
 } from './variables.ts'
 import {
-  collectDiagramSupportedSymbolicExpressionSources,
+  collectDiagramActiveSymbolicExpressionSources,
   refreshDiagramSymbolicCoordinatePreviews,
   validateDiagramSymbolicCoordinateMetadata,
   validateNoUnsupportedSymbolicCoordinateSources,
@@ -588,7 +588,7 @@ function createPendingSymbolicDiagramImport(
   }
 
   const collectedExpressions =
-    collectDiagramSupportedSymbolicExpressionSources(diagram)
+    collectDiagramActiveSymbolicExpressionSources(diagram)
 
   if (!collectedExpressions.ok) {
     return {

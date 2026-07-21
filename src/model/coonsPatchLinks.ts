@@ -3,7 +3,9 @@ import {
   isBoundaryPathClosed,
   validateBoundaryPathSnapshot,
   validateCoonsBoundarySnapshot,
-  validateCurvedSheetPrimitive,
+  validateCurvedSheetPrimitiveBySampling,
+  validateCurvedSheetPrimitiveStructure,
+  type CurvedSheetValidationSampler,
 } from '../geometry/curvedSheets.ts'
 import { isFiniteVec3 } from '../geometry/workPlane.ts'
 import {
@@ -31,10 +33,12 @@ import {
   type CoonsPatchBoundarySource,
   type CoonsPatchBoundarySources,
   type CoonsPatchPrimitive,
+  type CoordinateAnchor,
   type CoordinateComponent,
   type CoordinateSource,
   type CubicBezierControlMode,
   type CurveStratum,
+  type CurvedSheetStratum,
   type Diagram,
   type PathSegment,
   type PointStratum,
@@ -99,6 +103,7 @@ export type CoonsPatchBoundaryLinkStatus =
 
 export type SynchronizeLinkedCoonsPatchesOptions = {
   mode?: 'changedSources' | 'full'
+  context?: LinkedCoonsLookupContext
 }
 
 export type SynchronizeLinkedCoonsPatchesResult = {
@@ -112,10 +117,42 @@ export type CoonsPatchBoundarySourceRemap = {
   pointSourceIds: ReadonlyMap<string, string>
 }
 
-type LinkedPatchInspection = {
-  sourceFingerprint: string
+export type LinkedBoundarySourceFingerprint = string
+
+export type LinkedCoonsSourceState = {
+  fingerprints: Record<
+    CoonsPatchBoundaryRole,
+    LinkedBoundarySourceFingerprint
+  >
+  sourceIssues: CoonsPatchBoundaryLinkIssue[]
+  resolvedBoundaries: Partial<
+    Record<CoonsPatchBoundaryRole, CoonsBoundarySnapshot>
+  >
+}
+
+export type LinkedCoonsCandidateResult = {
   candidate: CoonsPatchPrimitive | null
   issues: CoonsPatchBoundaryLinkIssue[]
+}
+
+export type LinkedCoonsBoundarySourceResolutionResult =
+  | { ok: true; boundary: CoonsBoundarySnapshot }
+  | {
+      ok: false
+      error:
+        | CoonsPatchBoundaryPathSourceError
+        | CoonsPatchBoundaryPointSourceError
+    }
+
+export type LinkedCoonsBoundarySourceResolver = (
+  diagram: Diagram,
+  source: CoonsPatchBoundarySource,
+  role: CoonsPatchBoundaryRole,
+) => LinkedCoonsBoundarySourceResolutionResult
+
+export type LinkedCoonsLookupContext = {
+  resolveBoundarySource?: LinkedCoonsBoundarySourceResolver
+  sampleCandidate?: CurvedSheetValidationSampler
 }
 
 type LinkedBoundaryFingerprintValue =
@@ -125,12 +162,18 @@ type LinkedBoundaryFingerprintValue =
   | null
   | LinkedBoundaryFingerprintValue[]
 
+type LinkedBoundaryDependencyContext = {
+  diagram: Diagram
+  resolvingAnchorIds: ReadonlySet<string>
+}
+
 export function synchronizeLinkedCoonsPatches(
   previousDiagram: Diagram | null,
   nextDiagram: Diagram,
   options: SynchronizeLinkedCoonsPatchesOptions = {},
 ): SynchronizeLinkedCoonsPatchesResult {
   const mode = options.mode ?? (previousDiagram === null ? 'full' : 'changedSources')
+  const context = options.context
   const previousById = new Map(
     (previousDiagram?.strata ?? []).map((stratum) => [stratum.id, stratum]),
   )
@@ -162,13 +205,24 @@ export function synchronizeLinkedCoonsPatches(
       return stratum
     }
 
-    const nextInspection = inspectLinkedCoonsPatch(
+    const nextSources = stratum.primitive.boundarySources
+
+    if (!isCoonsPatchBoundarySources(nextSources)) {
+      issues.push({
+        kind: 'invalidSource',
+        patchId: stratum.id,
+        message: 'Linked boundary source metadata is malformed.',
+      })
+      return stratum
+    }
+
+    const nextSourceState = inspectLinkedCoonsSourceState(
       nextDiagram,
       stratum.id,
       stratum.primitive,
+      context,
     )
-    const nextSources = stratum.primitive.boundarySources
-    issues.push(...nextInspection.issues)
+    issues.push(...nextSourceState.sourceIssues)
 
     const previousStratum = previousById.get(stratum.id)
     const previousPrimitive =
@@ -178,57 +232,105 @@ export function synchronizeLinkedCoonsPatches(
         ? previousStratum.primitive
         : null
     const previousSources = previousPrimitive?.boundarySources
-    const nextSourcesValid = isCoonsPatchBoundarySources(nextSources)
     const previousSourcesValid = isCoonsPatchBoundarySources(previousSources)
+    const previousSnapshotStateValid = isValidCoonsBoundarySnapshotState(
+      previousPrimitive?.boundarySnapshotState,
+    )
+    const previousSourceState =
+      mode !== 'full' &&
+      previousDiagram !== null &&
+      previousPrimitive !== null &&
+      previousSourcesValid &&
+      previousSnapshotStateValid
+        ? inspectLinkedCoonsSourceState(
+            previousDiagram,
+            stratum.id,
+            previousPrimitive,
+            context,
+          )
+        : null
     const sourcesChanged =
       mode === 'full' ||
       previousDiagram === null ||
       previousPrimitive === null ||
-      !nextSourcesValid ||
       !previousSourcesValid ||
-      inspectLinkedCoonsPatch(
-        previousDiagram,
-        stratum.id,
-        previousPrimitive,
-      ).sourceFingerprint !== nextInspection.sourceFingerprint
+      !previousSnapshotStateValid ||
+      previousSourceState === null ||
+      !linkedCoonsSourceFingerprintsEqual(
+        previousSourceState.fingerprints,
+        nextSourceState.fingerprints,
+      )
 
-    if (sourcesChanged && nextInspection.candidate !== null) {
-      if (
-        coonsPatchMaterializedBoundariesEqual(
-          stratum.primitive,
-          nextInspection.candidate,
-        ) &&
-        stratum.primitive.boundarySnapshotState ===
-          nextInspection.candidate.boundarySnapshotState
-      ) {
+    if (!sourcesChanged) {
+      const unchangedPrimitive = preserveUnchangedLinkedCoonsPrimitive(
+        stratum.primitive,
+        previousPrimitive,
+      )
+
+      if (unchangedPrimitive === stratum.primitive) {
         return stratum
       }
 
       changed = true
-      updatedPatchIds.push(stratum.id)
       return {
         ...stratum,
-        primitive: nextInspection.candidate,
+        primitive: unchangedPrimitive,
       }
     }
 
-    if (sourcesChanged && nextInspection.candidate === null) {
-      const fallbackPrimitive =
-        previousPrimitive === null
-          ? stratum.primitive
-          : restorePreviousCoonsPatchBoundaries(
-              stratum.primitive,
-              previousPrimitive,
-            )
-      const stalePrimitive: CoonsPatchPrimitive = {
-        ...fallbackPrimitive,
-        // A stale linked fallback retains the complete last-valid snapshot
-        // model. Its saved previews, expressions, and provenance stay frozen
-        // until one complete source-derived candidate is valid.
-        boundarySnapshotState: 'frozen',
+    const candidateResult = resolveLinkedCoonsCandidate(
+      nextDiagram,
+      stratum.id,
+      stratum.primitive,
+      nextSourceState,
+    )
+    issues.push(...candidateResult.issues)
+
+    if (candidateResult.candidate !== null) {
+      const samplingValidation = validateCurvedSheetPrimitiveBySampling(
+        candidateResult.candidate,
+        'primitive',
+        context?.sampleCandidate,
+      )
+
+      if (samplingValidation.valid) {
+        const acceptedPrimitive = acceptedLinkedCoonsCandidatePrimitive(
+          stratum.primitive,
+          candidateResult.candidate,
+        )
+
+        if (acceptedPrimitive === stratum.primitive) {
+          return stratum
+        }
+
+        changed = true
+        updatedPatchIds.push(stratum.id)
+        return {
+          ...stratum,
+          primitive: acceptedPrimitive,
+        }
       }
 
+      issues.push(
+        ...samplingValidation.errors.map<CoonsPatchBoundaryLinkIssue>(
+          (error) => ({
+            kind: 'invalidPatch',
+            patchId: stratum.id,
+            role: roleFromPrimitivePath(error.path),
+            message: error.message,
+          }),
+        ),
+      )
+    }
+
+    const stalePrimitive = frozenCoonsPatchFallbackPrimitive(
+      stratum.primitive,
+      previousPrimitive,
+    )
+
+    if (stalePrimitive !== stratum.primitive) {
       changed = true
+
       return {
         ...stratum,
         primitive: stalePrimitive,
@@ -248,6 +350,7 @@ export function synchronizeLinkedCoonsPatches(
 export function coonsPatchBoundaryLinkStatus(
   diagram: Diagram,
   patchId: string,
+  context?: LinkedCoonsLookupContext,
 ): CoonsPatchBoundaryLinkStatus {
   const stratum = diagram.strata.find((candidate) => candidate.id === patchId)
 
@@ -260,20 +363,81 @@ export function coonsPatchBoundaryLinkStatus(
     return { kind: 'static' }
   }
 
-  const inspection = inspectLinkedCoonsPatch(
+  return inspectLinkedCoonsStatusWithoutSampling(
     diagram,
-    patchId,
-    stratum.primitive,
+    stratum,
+    context,
   )
+}
 
-  if (inspection.candidate === null) {
-    return { kind: 'linkedStale', issues: inspection.issues }
+export function inspectLinkedCoonsStatusWithoutSampling(
+  diagram: Diagram,
+  patch: CurvedSheetStratum,
+  context?: LinkedCoonsLookupContext,
+): CoonsPatchBoundaryLinkStatus {
+  if (
+    patch.primitive.kind !== 'coonsPatch' ||
+    patch.primitive.boundarySources === undefined
+  ) {
+    return { kind: 'static' }
+  }
+
+  const boundarySnapshotState: unknown =
+    patch.primitive.boundarySnapshotState
+
+  if (!isValidCoonsBoundarySnapshotState(boundarySnapshotState)) {
+    return {
+      kind: 'linkedStale',
+      issues: [
+        {
+          kind: 'invalidBoundarySnapshotState',
+          patchId: patch.id,
+          value: boundarySnapshotState,
+          message:
+            'Coons patch boundarySnapshotState must be absent or exactly "frozen".',
+        },
+      ],
+    }
+  }
+
+  if (!isCoonsPatchBoundarySources(patch.primitive.boundarySources)) {
+    return {
+      kind: 'linkedStale',
+      issues: [
+        {
+          kind: 'invalidSource',
+          patchId: patch.id,
+          message: 'Linked boundary source metadata is malformed.',
+        },
+      ],
+    }
+  }
+
+  const sourceState = inspectLinkedCoonsSourceState(
+    diagram,
+    patch.id,
+    patch.primitive,
+    context,
+  )
+  const candidateResult = resolveLinkedCoonsCandidate(
+    diagram,
+    patch.id,
+    patch.primitive,
+    sourceState,
+  )
+  const inspectionIssues = [
+    ...sourceState.sourceIssues,
+    ...candidateResult.issues,
+  ]
+
+  if (candidateResult.candidate === null) {
+    return { kind: 'linkedStale', issues: inspectionIssues }
   }
 
   if (
     coonsPatchMaterializedBoundariesEqual(
-      stratum.primitive,
-      inspection.candidate,
+      patch.primitive,
+      candidateResult.candidate,
     )
   ) {
     return { kind: 'linkedUpToDate' }
@@ -282,10 +446,10 @@ export function coonsPatchBoundaryLinkStatus(
   return {
     kind: 'linkedStale',
     issues: [
-      ...inspection.issues,
+      ...inspectionIssues,
       {
         kind: 'snapshotOutOfDate',
-        patchId,
+        patchId: patch.id,
         message: 'Linked boundary snapshots are out of date.',
       },
     ],
@@ -509,52 +673,79 @@ export function isBoundarySurfaceBoundaryPathStratum(
   )
 }
 
-function inspectLinkedCoonsPatch(
+export function inspectLinkedCoonsSourceState(
   diagram: Diagram,
   patchId: string,
   primitive: CoonsPatchPrimitive,
-): LinkedPatchInspection {
+  context?: LinkedCoonsLookupContext,
+): LinkedCoonsSourceState {
   const sources = primitive.boundarySources
 
   if (sources === undefined) {
-    return { sourceFingerprint: 'static', candidate: null, issues: [] }
+    return {
+      fingerprints: linkedCoonsRoleFingerprints('static'),
+      sourceIssues: [],
+      resolvedBoundaries: {},
+    }
   }
 
   if (!isCoonsPatchBoundarySources(sources)) {
     return {
-      sourceFingerprint: 'malformed',
-      candidate: null,
-      issues: [
+      fingerprints: linkedCoonsRoleFingerprints('malformed'),
+      sourceIssues: [
         {
           kind: 'invalidSource',
           patchId,
           message: 'Linked boundary source metadata is malformed.',
         },
       ],
+      resolvedBoundaries: {},
     }
   }
 
-  const boundaries: Partial<Record<CoonsPatchBoundaryRole, CoonsBoundarySnapshot>> = {}
-  const issues: CoonsPatchBoundaryLinkIssue[] = []
-  const sourceStates = coonsPatchBoundaryRoles.map((role) =>
-    linkedCoonsBoundarySourceState(diagram, sources[role], role),
-  )
+  const resolver =
+    context?.resolveBoundarySource ?? resolveLinkedCoonsBoundarySource
+  const fingerprints = {} as Record<
+    CoonsPatchBoundaryRole,
+    LinkedBoundarySourceFingerprint
+  >
+  const sourceIssues: CoonsPatchBoundaryLinkIssue[] = []
+  const resolvedBoundaries: Partial<
+    Record<CoonsPatchBoundaryRole, CoonsBoundarySnapshot>
+  > = {}
 
   for (const role of coonsPatchBoundaryRoles) {
     const source = sources[role]
     const sourceId = coonsPatchBoundarySourceId(source)
-    const result = resolveBoundarySource(diagram, source)
+    const result = resolver(diagram, source, role)
+    const sourceState = linkedCoonsBoundarySourceState(
+      diagram,
+      source,
+      role,
+    )
+
+    fingerprints[role] = JSON.stringify([
+      'linkedCoonsBoundarySource',
+      diagram.ambientDimension,
+      sourceState,
+      result.ok
+        ? [
+            'resolved',
+            coonsBoundaryPersistedSemanticState(result.boundary),
+          ]
+        : ['error', result.error],
+    ] satisfies LinkedBoundaryFingerprintValue)
 
     if (!result.ok) {
       const issue = sourceLinkIssue(patchId, role, source, result.error)
-      issues.push(issue)
+      sourceIssues.push(issue)
       continue
     }
 
-    boundaries[role] = result.boundary
+    resolvedBoundaries[role] = result.boundary
 
     if (sourceId.length === 0) {
-      issues.push({
+      sourceIssues.push({
         kind: 'invalidSource',
         patchId,
         role,
@@ -564,21 +755,32 @@ function inspectLinkedCoonsPatch(
     }
   }
 
-  if (!hasAllCoonsBoundaries(boundaries)) {
-    return {
-      sourceFingerprint: linkedCoonsBoundarySourcesFingerprint(sourceStates),
-      candidate: null,
-      issues,
-    }
+  return { fingerprints, sourceIssues, resolvedBoundaries }
+}
+
+export function resolveLinkedCoonsCandidate(
+  diagram: Diagram,
+  patchId: string,
+  primitive: CoonsPatchPrimitive,
+  sourceState: LinkedCoonsSourceState,
+): LinkedCoonsCandidateResult {
+  const sources = primitive.boundarySources
+
+  if (
+    !isCoonsPatchBoundarySources(sources) ||
+    sourceState.sourceIssues.length > 0 ||
+    !hasAllCoonsBoundaries(sourceState.resolvedBoundaries)
+  ) {
+    return { candidate: null, issues: [] }
   }
 
   const unresolvedCandidate: CoonsPatchPrimitive = {
     ...coonsPatchPrimitiveWithoutFrozenSnapshotState(primitive),
-    bottom: boundaries.bottom,
-    right: boundaries.right,
-    top: boundaries.top,
-    left: boundaries.left,
-    boundarySources: cloneCoonsPatchBoundarySources(sources),
+    bottom: sourceState.resolvedBoundaries.bottom,
+    right: sourceState.resolvedBoundaries.right,
+    top: sourceState.resolvedBoundaries.top,
+    left: sourceState.resolvedBoundaries.left,
+    boundarySources: sources,
   }
   const detached = detachSampledCurvedSheetPrimitiveCoordinateReferences(
     diagram,
@@ -592,10 +794,8 @@ function inspectLinkedCoonsPatch(
       : detached.error
 
     return {
-      sourceFingerprint: linkedCoonsBoundarySourcesFingerprint(sourceStates),
       candidate: null,
       issues: [
-        ...issues,
         {
           kind: 'coordinateReferenceResolutionFailure',
           patchId,
@@ -607,14 +807,10 @@ function inspectLinkedCoonsPatch(
   }
 
   const candidate = detached.value.primitive
-  const sourceFingerprint = linkedCoonsBoundarySourcesFingerprint(
-    sourceStates,
-    candidate,
-  )
-  const validation = validateCurvedSheetPrimitive(candidate)
+  const validation = validateCurvedSheetPrimitiveStructure(candidate)
 
   if (validation.valid) {
-    return { sourceFingerprint, candidate, issues }
+    return { candidate, issues: [] }
   }
 
   const cornerIssues = coonsPatchCornerEquationStatusesFromBoundaries({
@@ -641,21 +837,16 @@ function inspectLinkedCoonsPatch(
         }))
 
   return {
-    sourceFingerprint,
     candidate: null,
-    issues: [...issues, ...candidateIssues],
+    issues: candidateIssues,
   }
 }
 
-function resolveBoundarySource(
+export function resolveLinkedCoonsBoundarySource(
   diagram: Diagram,
   source: CoonsPatchBoundarySource,
-):
-  | { ok: true; boundary: CoonsBoundarySnapshot }
-  | {
-      ok: false
-      error: CoonsPatchBoundaryPathSourceError | CoonsPatchBoundaryPointSourceError
-    } {
+  _role: CoonsPatchBoundaryRole,
+): LinkedCoonsBoundarySourceResolutionResult {
   if (source.kind === 'point') {
     return validateCoonsPatchBoundaryPointSource(diagram, source.sourcePointId)
   }
@@ -837,16 +1028,127 @@ function coonsPatchMaterializedBoundariesEqual(
   )
 }
 
-function restorePreviousCoonsPatchBoundaries(
+function acceptedLinkedCoonsCandidatePrimitive(
+  currentPrimitive: CoonsPatchPrimitive,
+  candidate: CoonsPatchPrimitive,
+): CoonsPatchPrimitive {
+  if (!coonsPatchMaterializedBoundariesEqual(currentPrimitive, candidate)) {
+    return candidate
+  }
+
+  return coonsPatchPrimitiveWithoutFrozenSnapshotState(currentPrimitive)
+}
+
+function preserveUnchangedLinkedCoonsPrimitive(
   nextPrimitive: CoonsPatchPrimitive,
   previousPrimitive: CoonsPatchPrimitive,
 ): CoonsPatchPrimitive {
+  const boundarySources = coonsPatchBoundarySourcesEqual(
+    nextPrimitive.boundarySources,
+    previousPrimitive.boundarySources,
+  )
+    ? previousPrimitive.boundarySources
+    : nextPrimitive.boundarySources
+  const sampling = surfaceSamplingEqual(nextPrimitive, previousPrimitive)
+    ? previousPrimitive.sampling
+    : nextPrimitive.sampling
+  const snapshotState = previousPrimitive.boundarySnapshotState
+
+  if (
+    nextPrimitive.bottom === previousPrimitive.bottom &&
+    nextPrimitive.right === previousPrimitive.right &&
+    nextPrimitive.top === previousPrimitive.top &&
+    nextPrimitive.left === previousPrimitive.left &&
+    nextPrimitive.boundarySources === boundarySources &&
+    nextPrimitive.sampling === sampling &&
+    nextPrimitive.boundarySnapshotState === snapshotState
+  ) {
+    return nextPrimitive
+  }
+
+  if (
+    previousPrimitive.boundarySources === boundarySources &&
+    previousPrimitive.sampling === sampling &&
+    previousPrimitive.boundarySnapshotState === snapshotState
+  ) {
+    return previousPrimitive
+  }
+
+  const preserved: CoonsPatchPrimitive = {
+    ...nextPrimitive,
+    bottom: previousPrimitive.bottom,
+    right: previousPrimitive.right,
+    top: previousPrimitive.top,
+    left: previousPrimitive.left,
+    boundarySources,
+    sampling,
+  }
+
+  if (snapshotState === undefined) {
+    delete preserved.boundarySnapshotState
+  } else {
+    preserved.boundarySnapshotState = snapshotState
+  }
+
+  return preserved
+}
+
+function frozenCoonsPatchFallbackPrimitive(
+  nextPrimitive: CoonsPatchPrimitive,
+  previousPrimitive: CoonsPatchPrimitive | null,
+): CoonsPatchPrimitive {
+  const fallbackPrimitive = previousPrimitive ?? nextPrimitive
+  const boundarySources =
+    previousPrimitive !== null &&
+    coonsPatchBoundarySourcesEqual(
+      nextPrimitive.boundarySources,
+      previousPrimitive.boundarySources,
+    )
+      ? previousPrimitive.boundarySources
+      : nextPrimitive.boundarySources
+  const sampling =
+    previousPrimitive !== null &&
+    surfaceSamplingEqual(nextPrimitive, previousPrimitive)
+      ? previousPrimitive.sampling
+      : nextPrimitive.sampling
+
+  if (
+    nextPrimitive.bottom === fallbackPrimitive.bottom &&
+    nextPrimitive.right === fallbackPrimitive.right &&
+    nextPrimitive.top === fallbackPrimitive.top &&
+    nextPrimitive.left === fallbackPrimitive.left &&
+    nextPrimitive.boundarySources === boundarySources &&
+    nextPrimitive.sampling === sampling &&
+    nextPrimitive.boundarySnapshotState === 'frozen'
+  ) {
+    return nextPrimitive
+  }
+
+  if (
+    previousPrimitive !== null &&
+    previousPrimitive.bottom === fallbackPrimitive.bottom &&
+    previousPrimitive.right === fallbackPrimitive.right &&
+    previousPrimitive.top === fallbackPrimitive.top &&
+    previousPrimitive.left === fallbackPrimitive.left &&
+    previousPrimitive.boundarySources === boundarySources &&
+    previousPrimitive.sampling === sampling &&
+    previousPrimitive.boundarySnapshotState === 'frozen'
+  ) {
+    return previousPrimitive
+  }
+
   return {
     ...nextPrimitive,
-    bottom: cloneCoonsBoundarySnapshot(previousPrimitive.bottom),
-    right: cloneCoonsBoundarySnapshot(previousPrimitive.right),
-    top: cloneCoonsBoundarySnapshot(previousPrimitive.top),
-    left: cloneCoonsBoundarySnapshot(previousPrimitive.left),
+    bottom: fallbackPrimitive.bottom,
+    right: fallbackPrimitive.right,
+    top: fallbackPrimitive.top,
+    left: fallbackPrimitive.left,
+    // A stale linked fallback retains the complete last-valid snapshot model.
+    // Its saved previews, expressions, and provenance stay frozen until one
+    // complete source-derived candidate is valid.
+    boundarySnapshotState: 'frozen',
+    ...(boundarySources === undefined ? {} : { boundarySources }),
+    sampling,
   }
 }
 
@@ -862,17 +1164,53 @@ function coonsPatchPrimitiveWithoutFrozenSnapshotState(
   return candidate
 }
 
-function linkedCoonsBoundarySourcesFingerprint(
-  sourceStates: LinkedBoundaryFingerprintValue[],
-  candidate?: CoonsPatchPrimitive,
-): string {
-  return JSON.stringify([
-    'linkedCoonsBoundarySources',
-    sourceStates,
-    candidate === undefined
-      ? null
-      : coonsPatchPersistedBoundarySemanticState(candidate),
-  ])
+function linkedCoonsRoleFingerprints(
+  value: LinkedBoundarySourceFingerprint,
+): Record<CoonsPatchBoundaryRole, LinkedBoundarySourceFingerprint> {
+  return {
+    bottom: value,
+    right: value,
+    top: value,
+    left: value,
+  }
+}
+
+function linkedCoonsSourceFingerprintsEqual(
+  left: Record<CoonsPatchBoundaryRole, LinkedBoundarySourceFingerprint>,
+  right: Record<CoonsPatchBoundaryRole, LinkedBoundarySourceFingerprint>,
+): boolean {
+  return coonsPatchBoundaryRoles.every((role) => left[role] === right[role])
+}
+
+function coonsPatchBoundarySourcesEqual(
+  left: CoonsPatchBoundarySources | undefined,
+  right: CoonsPatchBoundarySources | undefined,
+): boolean {
+  if (left === undefined || right === undefined) {
+    return left === right
+  }
+
+  return coonsPatchBoundaryRoles.every((role) => {
+    const leftSource = left[role]
+    const rightSource = right[role]
+
+    return leftSource.kind === 'path' && rightSource.kind === 'path'
+      ? leftSource.sourcePathId === rightSource.sourcePathId &&
+          leftSource.reversed === rightSource.reversed
+      : leftSource.kind === 'point' && rightSource.kind === 'point'
+        ? leftSource.sourcePointId === rightSource.sourcePointId
+        : false
+  })
+}
+
+function surfaceSamplingEqual(
+  left: CoonsPatchPrimitive,
+  right: CoonsPatchPrimitive,
+): boolean {
+  return (
+    left.sampling.uSegments === right.sampling.uSegments &&
+    left.sampling.vSegments === right.sampling.vSegments
+  )
 }
 
 // This is deliberately narrower than a stratum comparison. It records only
@@ -883,6 +1221,10 @@ function linkedCoonsBoundarySourceState(
   source: CoonsPatchBoundarySource,
   role: CoonsPatchBoundaryRole,
 ): LinkedBoundaryFingerprintValue {
+  const dependencyContext: LinkedBoundaryDependencyContext = {
+    diagram,
+    resolvingAnchorIds: new Set(),
+  }
   const sourceId = coonsPatchBoundarySourceId(source)
   const stratum = diagram.strata.find((candidate) => candidate.id === sourceId)
   const descriptor: LinkedBoundaryFingerprintValue =
@@ -901,7 +1243,7 @@ function linkedCoonsBoundarySourceState(
           descriptor,
           'pointSource',
           stratum.codim,
-          vec3PersistedSemanticState(stratum.position),
+          vec3PersistedSemanticState(stratum.position, dependencyContext),
         ]
       : [role, descriptor, 'incompatibleSource', stratum.geometricKind, stratum.codim]
   }
@@ -912,33 +1254,46 @@ function linkedCoonsBoundarySourceState(
         descriptor,
         'pathSource',
         stratum.codim,
-        curveBoundarySourceSemanticState(stratum),
+        curveBoundarySourceSemanticState(stratum, dependencyContext),
       ]
     : [role, descriptor, 'incompatibleSource', stratum.geometricKind, stratum.codim]
 }
 
 function curveBoundarySourceSemanticState(
   curve: CurveStratum,
+  dependencyContext: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   switch (curve.kind) {
     case 'polyline':
       return [
         'polyline',
-        curve.points.map(vec3PersistedSemanticState),
+        curve.points.map((point) =>
+          vec3PersistedSemanticState(point, dependencyContext),
+        ),
       ]
     case 'cubicBezier':
       return [
         'cubicBezier',
-        curve.points.map(vec3PersistedSemanticState),
-        cubicBezierControlModeSemanticState(curve.bezierControls),
+        curve.points.map((point) =>
+          vec3PersistedSemanticState(point, dependencyContext),
+        ),
+        cubicBezierControlModeSemanticState(
+          curve.bezierControls,
+          dependencyContext,
+        ),
       ]
     case 'concatenatedPath':
       return [
         'concatenatedPath',
-        curve.segments.map(pathSegmentPersistedSemanticState),
+        curve.segments.map((segment) =>
+          pathSegmentPersistedSemanticState(segment, dependencyContext),
+        ),
       ]
     case 'templatePath':
-      return ['templatePath', pathTemplateSemanticState(curve.template)]
+      return [
+        'templatePath',
+        pathTemplateSemanticState(curve.template, dependencyContext),
+      ]
     case 'grid':
       return ['grid']
   }
@@ -946,37 +1301,26 @@ function curveBoundarySourceSemanticState(
 
 function pathTemplateSemanticState(
   template: PathTemplate,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   switch (template.kind) {
     case 'circleTemplate':
       return [
         'circleTemplate',
-        vec3PersistedSemanticState(template.center),
+        vec3PersistedSemanticState(template.center, dependencyContext),
         template.radius,
-        workPlaneFrameSemanticState(template.frame),
+        workPlaneFrameSemanticState(template.frame, dependencyContext),
       ]
     case 'ellipseTemplate':
       return [
         'ellipseTemplate',
-        vec3PersistedSemanticState(template.center),
+        vec3PersistedSemanticState(template.center, dependencyContext),
         template.radiusX,
         template.radiusY,
         template.rotationDeg ?? null,
-        workPlaneFrameSemanticState(template.frame),
+        workPlaneFrameSemanticState(template.frame, dependencyContext),
       ]
   }
-}
-
-function coonsPatchPersistedBoundarySemanticState(
-  primitive: CoonsPatchPrimitive,
-): LinkedBoundaryFingerprintValue {
-  return [
-    'coonsPatchBoundaries',
-    ...coonsPatchBoundaryRoles.map((role) => [
-      role,
-      coonsBoundaryPersistedSemanticState(primitive[role]),
-    ] satisfies LinkedBoundaryFingerprintValue),
-  ]
 }
 
 // Snapshot ids/names are display identity, not geometry. Duplication remaps
@@ -996,45 +1340,55 @@ function coonsBoundaryPersistedSemanticState(
     return ['point', vec3PersistedSemanticState(boundary.point)]
   }
 
-  return ['path', boundary.segments.map(pathSegmentPersistedSemanticState)]
+  return [
+    'path',
+    boundary.segments.map((segment) =>
+      pathSegmentPersistedSemanticState(segment),
+    ),
+  ]
 }
 
 function pathSegmentPersistedSemanticState(
   segment: PathSegment,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   switch (segment.kind) {
     case 'line':
       return [
         'line',
-        vec3PersistedSemanticState(segment.start),
-        vec3PersistedSemanticState(segment.end),
+        vec3PersistedSemanticState(segment.start, dependencyContext),
+        vec3PersistedSemanticState(segment.end, dependencyContext),
       ]
     case 'cubicBezier':
       return [
         'cubicBezier',
-        vec3PersistedSemanticState(segment.start),
-        vec3PersistedSemanticState(segment.control1),
-        vec3PersistedSemanticState(segment.control2),
-        vec3PersistedSemanticState(segment.end),
-        cubicBezierControlModeSemanticState(segment.controlMode),
+        vec3PersistedSemanticState(segment.start, dependencyContext),
+        vec3PersistedSemanticState(segment.control1, dependencyContext),
+        vec3PersistedSemanticState(segment.control2, dependencyContext),
+        vec3PersistedSemanticState(segment.end, dependencyContext),
+        cubicBezierControlModeSemanticState(
+          segment.controlMode,
+          dependencyContext,
+        ),
       ]
     case 'arc':
       return [
         'arc',
-        vec3PersistedSemanticState(segment.start),
-        vec3PersistedSemanticState(segment.end),
-        vec3PersistedSemanticState(segment.center),
+        vec3PersistedSemanticState(segment.start, dependencyContext),
+        vec3PersistedSemanticState(segment.end, dependencyContext),
+        vec3PersistedSemanticState(segment.center, dependencyContext),
         scalarInputSemanticState(segment.radius),
         scalarInputSemanticState(segment.startAngleDeg),
         scalarInputSemanticState(segment.endAngleDeg),
         segment.direction,
-        workPlaneFrameSemanticState(segment.frame),
+        workPlaneFrameSemanticState(segment.frame, dependencyContext),
       ]
   }
 }
 
 function cubicBezierControlModeSemanticState(
   controlMode: CubicBezierControlMode | undefined,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   if (controlMode === undefined) {
     return null
@@ -1046,8 +1400,14 @@ function cubicBezierControlModeSemanticState(
     case 'relativeCartesian':
       return [
         'relativeCartesian',
-        vec3PersistedSemanticState(controlMode.firstControlOffset),
-        vec3PersistedSemanticState(controlMode.secondControlOffset),
+        vec3PersistedSemanticState(
+          controlMode.firstControlOffset,
+          dependencyContext,
+        ),
+        vec3PersistedSemanticState(
+          controlMode.secondControlOffset,
+          dependencyContext,
+        ),
         controlMode.secondOffsetReference,
       ]
     case 'relativePolar':
@@ -1062,7 +1422,7 @@ function cubicBezierControlModeSemanticState(
     case 'workPlaneRelativeCartesian':
       return [
         'workPlaneRelativeCartesian',
-        workPlaneFrameSemanticState(controlMode.frame),
+        workPlaneFrameSemanticState(controlMode.frame, dependencyContext),
         controlMode.localStart.a,
         controlMode.localStart.b,
         controlMode.localEnd.a,
@@ -1076,7 +1436,7 @@ function cubicBezierControlModeSemanticState(
     case 'workPlaneRelativePolar':
       return [
         'workPlaneRelativePolar',
-        workPlaneFrameSemanticState(controlMode.frame),
+        workPlaneFrameSemanticState(controlMode.frame, dependencyContext),
         controlMode.localStart.a,
         controlMode.localStart.b,
         controlMode.localEnd.a,
@@ -1092,18 +1452,20 @@ function cubicBezierControlModeSemanticState(
 
 function vec3PersistedSemanticState(
   point: Vec3,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   return [
     'vec3',
     point.x,
     point.y,
     point.z,
-    symbolicVec3SemanticState(point.symbolic),
+    symbolicVec3SemanticState(point.symbolic, dependencyContext),
   ]
 }
 
 function symbolicVec3SemanticState(
   symbolic: SymbolicVec3 | undefined,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   return symbolic === undefined
     ? null
@@ -1112,7 +1474,7 @@ function symbolicVec3SemanticState(
         coordinateComponentSemanticState(symbolic.x),
         coordinateComponentSemanticState(symbolic.y),
         coordinateComponentSemanticState(symbolic.z),
-        coordinateSourceSemanticState(symbolic.source),
+        coordinateSourceSemanticState(symbolic.source, dependencyContext),
       ]
 }
 
@@ -1126,6 +1488,7 @@ function coordinateComponentSemanticState(
 
 function coordinateSourceSemanticState(
   source: CoordinateSource | undefined,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   if (source === undefined) {
     return null
@@ -1137,11 +1500,17 @@ function coordinateSourceSemanticState(
         'coordinateRef',
         source.coordinateId,
         vec3PersistedSemanticState(source.preview),
+        dependencyContext === undefined
+          ? null
+          : coordinateAnchorDependencySemanticState(
+              source.coordinateId,
+              dependencyContext,
+            ),
       ]
     case 'workPlaneLocal':
       return [
         'workPlaneLocal',
-        workPlaneFrameSemanticState(source.frame),
+        workPlaneFrameSemanticState(source.frame, dependencyContext),
         scalarInputSemanticState(source.local.a),
         scalarInputSemanticState(source.local.b),
       ]
@@ -1162,16 +1531,68 @@ function scalarInputSemanticState(
 
 function workPlaneFrameSemanticState(
   frame: WorkPlaneFrameSnapshot | undefined,
+  dependencyContext?: LinkedBoundaryDependencyContext,
 ): LinkedBoundaryFingerprintValue {
   return frame === undefined
     ? null
     : [
         'frame',
-        vec3PersistedSemanticState(frame.origin),
-        vec3PersistedSemanticState(frame.u),
-        vec3PersistedSemanticState(frame.v),
-        vec3PersistedSemanticState(frame.normal),
+        vec3PersistedSemanticState(frame.origin, dependencyContext),
+        vec3PersistedSemanticState(frame.u, dependencyContext),
+        vec3PersistedSemanticState(frame.v, dependencyContext),
+        vec3PersistedSemanticState(frame.normal, dependencyContext),
       ]
+}
+
+function coordinateAnchorDependencySemanticState(
+  coordinateId: string,
+  context: LinkedBoundaryDependencyContext,
+): LinkedBoundaryFingerprintValue {
+  if (context.resolvingAnchorIds.has(coordinateId)) {
+    return ['coordinateAnchorCycle', coordinateId]
+  }
+
+  const anchor = context.diagram.coordinateAnchors?.find(
+    (candidate) => candidate.id === coordinateId,
+  )
+
+  if (anchor === undefined) {
+    return ['missingCoordinateAnchor', coordinateId]
+  }
+
+  const resolvingAnchorIds = new Set(context.resolvingAnchorIds)
+  resolvingAnchorIds.add(coordinateId)
+
+  return [
+    'coordinateAnchor',
+    coordinateId,
+    coordinateAnchorPositionSemanticState(anchor, {
+      ...context,
+      resolvingAnchorIds,
+    }),
+  ]
+}
+
+function coordinateAnchorPositionSemanticState(
+  anchor: CoordinateAnchor,
+  context: LinkedBoundaryDependencyContext,
+): LinkedBoundaryFingerprintValue {
+  const position = anchor.position
+
+  if (position.kind === 'global') {
+    return [
+      'global',
+      symbolicVec3SemanticState(position.value, context),
+    ]
+  }
+
+  return [
+    'workPlaneLocal',
+    workPlaneFrameSemanticState(position.frame, context),
+    scalarInputSemanticState(position.local.a),
+    scalarInputSemanticState(position.local.b),
+    vec3PersistedSemanticState(position.preview, context),
+  ]
 }
 
 function hasAllCoonsBoundaries(
@@ -1235,14 +1656,6 @@ function cloneCoonsConstantPointBoundarySnapshot(
     ...(boundary.name === undefined ? {} : { name: boundary.name }),
     point: cloneVec3(boundary.point),
   }
-}
-
-function cloneCoonsBoundarySnapshot(
-  boundary: CoonsBoundarySnapshot,
-): CoonsBoundarySnapshot {
-  return isCoonsConstantPointBoundary(boundary)
-    ? cloneCoonsConstantPointBoundarySnapshot(boundary)
-    : cloneBoundaryPathSnapshot(boundary)
 }
 
 function cloneVec3(point: Vec3): Vec3 {
