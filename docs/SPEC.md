@@ -199,11 +199,18 @@ coordinate editors and export paths are implemented.
 
 Persisted work-plane-local coordinate metadata is broader than the direct-input
 UI. JSON import and variable updates refresh local `a,b` previews, symbolic
-frame previews, and the derived global `Vec3` preview before validation. This
-refresh covers point and label positions, path vertices and cubic controls,
-arc centers and frames, polygon sheets, filled boundaries, work-plane-filled
-sheets, grid frame snapshots, and ruled or Coons boundary snapshots. Malformed
-or unsupported local-source placements are rejected during load/validation.
+frame previews, and derived global `Vec3` previews for active inputs before
+validation. This includes point and label positions, path vertices and cubic
+controls, arc centers and frames, polygon sheets, filled boundaries,
+work-plane-filled sheets, grid frame snapshots, ruled-surface snapshots, and
+static Coons snapshots. For a linked Coons patch, its source paths and points
+own the active symbolic dependencies; its materialized boundaries, including
+frozen last-valid fallbacks, are not independently refreshed. Successful
+linked synchronization atomically replaces all four materialized snapshots
+from the refreshed sources, while failed synchronization preserves the exact
+frozen snapshots. A symbolic expression referenced only by frozen snapshots
+does not create a UI import variable requirement under the Phase 29 rule.
+Malformed or unsupported active placements are rejected during load/validation.
 
 Direct input also supports generated grid strata. A grid stores a lattice
 pattern, numeric or symbolic scalar fields for `uRange`, `vRange`, and a
@@ -379,21 +386,24 @@ plane from non-collinear boundary points. Non-coplanar 3D picks are rejected.
 
 ### Boundary surface sheets
 
-The model supports two additional 3D codim 1 sheet primitives for Phase 20A:
-ruled surfaces and Coons patches. These are saved as `curvedSheet` primitives
-with copied boundary path snapshots, not live references to source curve
-strata. Editing, moving, or deleting an original source path after surface
-creation must not mutate the surface.
+The model supports two additional 3D codim 1 sheet primitives: ruled surfaces
+and Coons patches. Both are saved as `curvedSheet` primitives with materialized
+boundary snapshots. Ruled surfaces remain snapshot-only. A Coons patch may
+also store explicit path/point source metadata, including path reversal, so its
+snapshots can be refreshed after valid source edits.
 
 Boundary snapshots are deterministic concatenated `PathSegment[]` geometry.
 The boundary evaluator supports line, cubic Bezier, 3D arc, and sampled path
 template geometry. Circle and ellipse templates are copied into ordinary path
 segments at creation time. Boundaries must be non-empty, composable, finite, and
-sample to finite points. Boundary-surface coordinates and nested work-plane
-frame snapshot components may be symbolic when loading saved JSON, but they must
-resolve to finite numeric preview values before the diagram is committed. Frame
-previews must also pass geometric frame validation. Preview and sampled-mesh
-TikZ output use those preview coordinates while the saved model preserves
+sample to finite points. Active ruled-surface and static Coons snapshot
+coordinates, linked Coons source strata, and their nested work-plane frame
+components may be symbolic when loading saved JSON, but they must resolve to
+finite numeric preview values before the diagram is committed. Linked/frozen
+materialized Coons snapshots instead retain their saved finite previews until a
+successful synchronization atomically replaces them. Active frame previews
+must also pass geometric frame validation. Preview and sampled-mesh TikZ output
+use the materialized preview coordinates while the saved model preserves
 symbolic expressions where supported.
 
 A ruled surface from boundaries `C0` and `C1` uses:
@@ -420,14 +430,18 @@ S(u, v)
 The validator requires bottom start = left start, bottom end = right start, top
 start = left end, and top end = right end. During creation, each picked Coons
 boundary can be reversed in the Add sheet draft before validation; this changes
-only the copied boundary snapshot, not the source path. The sampler returns the existing finite
+only the oriented patch snapshot, not the source path. Linked patches preserve
+that reversal during later refreshes. Missing, invalid, or corner-incompatible
+sources leave the last valid snapshots visible and exportable until repaired.
+The sampler returns the existing finite
 quad mesh representation used by curved sheets: a deterministic flat vertex
 array plus quad index faces and boundary polylines for later rendering,
 depth-sorting, and TikZ export work. User-facing creation supports ruled
 surfaces from two boundary paths and Coons patches from explicit bottom, right,
 top, and left boundary roles. The workflow does not infer unordered roles
-automatically. Both workflows store copied boundary geometry, not live
-references.
+automatically. Coons link status is derived rather than saved, legacy patches
+without source metadata stay static, and users may detach links in the
+Inspector before maintaining geometry independently from the sources.
 
 ### Concatenated path editing
 

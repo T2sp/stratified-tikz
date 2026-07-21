@@ -18,12 +18,9 @@ import type {
 import { coordinateAnchorPositionPreview } from '../model/coordinateAnchors.ts'
 import { resolveDiagramCoordinateRefs } from '../model/coordinateReferences.ts'
 import {
-  curveOcclusionEnabled,
   defaultHiddenCurveStyle,
   hiddenLabelStyleFromBase,
   hiddenPointStyleFromBase,
-  labelAutoVisibilityEnabled,
-  pointAutoVisibilityEnabled,
   resolveVisibilityOptions,
 } from '../model/visibility.ts'
 import {
@@ -91,10 +88,15 @@ import {
   svgPathCrossingMarkerStyle,
   svgLabelAnchorPlacement,
 } from './svgStyle'
-import { curvedSheetToSvgMesh } from './curvedSheetMesh.ts'
+import {
+  curvedSheetSvgMeshesFromPreparedScene,
+  type SvgCurvedSheetMesh,
+} from './curvedSheetMesh.ts'
 import { mapClientPointToViewBox } from './svgViewBox'
 import {
+  createSvgGeometryHandlePointerController,
   curveHandleLabel,
+  releaseSvgPointerCaptureIfHeld,
   shouldRenderSvgGeometryHandles,
   vertexHandleLabel,
 } from './svgGeometryHandles'
@@ -119,15 +121,22 @@ import {
   type SvgRenderItemKind,
 } from './svgRenderSort.ts'
 import type { ProjectedSurfaceFace } from './projectedPrimitives.ts'
-import { sortedSvgSurfaceFaces } from './svgSurfaceDepthSort.ts'
 import {
-  classifyCurveOcclusion,
-  type CurveOcclusionResult,
-} from './curveOcclusion.ts'
+  sortedPreparedSvgSurfaceFaces,
+  type SvgPreparedSortedSurfaceFace,
+} from './svgSurfaceDepthSort.ts'
+import type { CurveOcclusionResult } from './curveOcclusion.ts'
 import {
-  classifyAnchorOcclusion,
-  type AnchorOcclusionResult,
-} from './pointOcclusion.ts'
+  createSvgSurfacePreparationCache,
+  prepareSvgSurfaceGeometry,
+  projectSvgSurfaceScene,
+} from './svgSurfaceScene.ts'
+import {
+  prepareSvgVisibility,
+  visibleSvgSheetIds,
+  type SvgAnchorOcclusionById,
+  type SvgCurveOcclusionById,
+} from './svgVisibilityPreparation.ts'
 import {
   pathIntersectionDetectionForDiagram,
   type PathIntersectionDetectionStatus,
@@ -257,8 +266,8 @@ type SvgCurvePathRun = {
   strokeDasharray?: string
 }
 
-type CurveOcclusionById = ReadonlyMap<string, CurveOcclusionResult>
-type AnchorOcclusionById = ReadonlyMap<string, AnchorOcclusionResult>
+type CurveOcclusionById = SvgCurveOcclusionById
+type AnchorOcclusionById = SvgAnchorOcclusionById
 
 type ActiveCameraDrag = {
   mode: CameraDragMode
@@ -318,7 +327,9 @@ export function SvgDiagram({
   onCoordinateAnchorDragEnd,
   onCameraDrag,
 }: SvgDiagramProps): ReactElement {
-  const activeDragTargetRef = useRef<GeometryHandleTarget | null>(null)
+  const geometryHandlePointerControllerRef = useRef(
+    createSvgGeometryHandlePointerController(),
+  )
   const activeCoordinateAnchorDragRef =
     useRef<ActiveCoordinateAnchorDrag | null>(null)
   const activeCameraDragRef = useRef<ActiveCameraDrag | null>(null)
@@ -328,45 +339,130 @@ export function SvgDiagram({
     useState<SelectionCycleFeedback | null>(null)
   const suppressNextCanvasClickRef = useRef(false)
   const suppressCoordinateAnchorClickRef = useRef(false)
+  const surfacePreparationCache = useMemo(
+    () => createSvgSurfacePreparationCache(),
+    [],
+  )
   const diagram = useMemo(
     () => resolveDiagramCoordinateRefs(sourceDiagram),
     [sourceDiagram],
   )
-  const coordinateAxesGuide = createCoordinateAxesGuide(diagram.ambientDimension)
-  const extraPointsForFit = [
-    ...(coordinateAxesGuide?.fitPoints ?? []),
-    ...(workPlanePreview?.corners ?? []),
-    ...(sheetDraft ?? []),
-    ...(polylineDraft ?? []),
-    ...(cubicBezierDraft ?? []),
-    ...(pathDraft === undefined ? [] : concatenatedPathDraftCoordinates(pathDraft)),
-    ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ?? []),
-    ...(showCoordinateAnchors ? coordinateAnchorPreviewPoints(diagram) : []),
-  ]
-  const camera = resolveSvgCamera(diagram, width, height, {
-    fitToView,
-    cameraOverride,
-    viewAdjustment: cameraViewAdjustment,
-    extraPointsForFit,
-  })
-  const visibilityOptions = resolveVisibilityOptions(
-    diagram,
-    visibilityOptionsOverride,
+  const surfaceGeometry = useMemo(
+    () =>
+      prepareSvgSurfaceGeometry(diagram, {
+        cache: surfacePreparationCache,
+      }),
+    [diagram, surfacePreparationCache],
   )
-  const curveOcclusionById = createSvgCurveOcclusionMap(
-    diagram,
-    camera,
-    visibilityOptions,
+  const coordinateAxesGuide = useMemo(
+    () => createCoordinateAxesGuide(diagram.ambientDimension),
+    [diagram.ambientDimension],
   )
-  const pointOcclusionById = createSvgPointOcclusionMap(
-    diagram,
-    camera,
-    visibilityOptions,
+  const extraPointsForFit = useMemo(
+    () => [
+      ...(coordinateAxesGuide?.fitPoints ?? []),
+      ...(workPlanePreview?.corners ?? []),
+      ...(sheetDraft ?? []),
+      ...(polylineDraft ?? []),
+      ...(cubicBezierDraft ?? []),
+      ...(pathDraft === undefined
+        ? []
+        : concatenatedPathDraftCoordinates(pathDraft)),
+      ...(coordinateSourceHighlights?.map((highlight) => highlight.position) ??
+        []),
+      ...(showCoordinateAnchors ? coordinateAnchorPreviewPoints(diagram) : []),
+    ],
+    [
+      coordinateAxesGuide,
+      workPlanePreview,
+      sheetDraft,
+      polylineDraft,
+      cubicBezierDraft,
+      pathDraft,
+      coordinateSourceHighlights,
+      showCoordinateAnchors,
+      diagram,
+    ],
   )
-  const labelOcclusionById = createSvgLabelOcclusionMap(
-    diagram,
-    camera,
-    visibilityOptions,
+  const stableCameraOverride = useStableCamera(cameraOverride)
+  const stableCameraViewAdjustment = useStableCameraViewAdjustment(
+    cameraViewAdjustment,
+  )
+  const camera = useMemo(
+    () =>
+      resolveSvgCamera(diagram, width, height, {
+        fitToView,
+        cameraOverride: stableCameraOverride,
+        viewAdjustment: stableCameraViewAdjustment,
+        extraPointsForFit,
+        curvedSheetVerticesById: surfaceGeometry.curvedSheetVerticesById,
+      }),
+    [
+      diagram,
+      extraPointsForFit,
+      fitToView,
+      height,
+      stableCameraOverride,
+      stableCameraViewAdjustment,
+      surfaceGeometry,
+      width,
+    ],
+  )
+  const visibilityOptions = useMemo(
+    () => resolveVisibilityOptions(diagram, visibilityOptionsOverride),
+    [diagram, visibilityOptionsOverride],
+  )
+  const visibleSheetIds = useMemo(
+    () => visibleSvgSheetIds(diagram),
+    [diagram],
+  )
+  const projectedSurfaceScene = useMemo(
+    () =>
+      projectSvgSurfaceScene(surfaceGeometry, camera, {
+        cache: surfacePreparationCache,
+        sourceIds: visibleSheetIds,
+      }),
+    [camera, surfaceGeometry, surfacePreparationCache, visibleSheetIds],
+  )
+  const curvedSheetMeshesById = useMemo(
+    () =>
+      curvedSheetSvgMeshesFromPreparedScene(
+        projectedSurfaceScene,
+        height,
+      ),
+    [height, projectedSurfaceScene],
+  )
+  const visibilityPreparation = useMemo(
+    () =>
+      prepareSvgVisibility(
+        diagram,
+        camera,
+        visibilityOptions,
+        projectedSurfaceScene.projectedFaces,
+      ),
+    [diagram, camera, visibilityOptions, projectedSurfaceScene],
+  )
+  const {
+    curveOcclusionById,
+    pointOcclusionById,
+    labelOcclusionById,
+  } = visibilityPreparation
+  const sortedSurfaceFaces = useMemo(
+    () =>
+      diagram.ambientDimension === 3 && camera.mode === '3d'
+        ? sortedPreparedSvgSurfaceFaces(
+            projectedSurfaceScene.projectedFaces,
+            height,
+            visibilityOptions,
+          )
+        : null,
+    [
+      camera.mode,
+      diagram.ambientDimension,
+      height,
+      projectedSurfaceScene,
+      visibilityOptions,
+    ],
   )
   // Selection cycling is geometric hit testing, so pass the renderer's resolved
   // preview-hidden ids to keep candidates aligned with actually rendered items.
@@ -377,11 +473,9 @@ export function SvgDiagram({
   })
   const sortedSurfaceItems = renderSortedSurfaceFaces(
     diagram,
-    camera,
-    height,
+    sortedSurfaceFaces,
     selectedElement,
     layerFilter,
-    visibilityOptions,
     onSelectionChange,
   )
   const renderSurfacesAsSortedFaces = sortedSurfaceItems !== null
@@ -408,6 +502,7 @@ export function SvgDiagram({
             selectedElement,
             layerFilter,
             boundaryPathHighlights,
+            curvedSheetMeshesById,
             curveOcclusionById,
             pointOcclusionById,
             visibilityOptions,
@@ -608,7 +703,7 @@ export function SvgDiagram({
       }}
       onPointerDown={(event) => {
         if (
-          activeDragTargetRef.current !== null ||
+          geometryHandlePointerControllerRef.current.activeTarget() !== null ||
           activeCoordinateAnchorDragRef.current !== null ||
           onCameraDrag === undefined
         ) {
@@ -653,16 +748,22 @@ export function SvgDiagram({
           return
         }
 
-        const target = activeDragTargetRef.current
-
-        if (target !== null && onGeometryHandleDrag !== undefined) {
-          event.preventDefault()
-          onGeometryHandleDrag(
-            target,
-            svgPointFromPointerEvent(event, width, height),
-            height,
-            camera,
+        const handledGeometryDrag =
+          geometryHandlePointerControllerRef.current.move(
+            onGeometryHandleDrag === undefined
+              ? undefined
+              : (target) => {
+                  event.preventDefault()
+                  onGeometryHandleDrag(
+                    target,
+                    svgPointFromPointerEvent(event, width, height),
+                    height,
+                    camera,
+                  )
+                },
           )
+
+        if (handledGeometryDrag) {
           return
         }
 
@@ -709,11 +810,16 @@ export function SvgDiagram({
           return
         }
 
-        if (activeDragTargetRef.current !== null) {
-          event.preventDefault()
-          activeDragTargetRef.current = null
-          onGeometryHandleDragEnd?.()
-          releasePointerCaptureIfHeld(event)
+        if (
+          geometryHandlePointerControllerRef.current.end(
+            event.pointerId,
+            event.currentTarget,
+            () => {
+              event.preventDefault()
+              onGeometryHandleDragEnd?.()
+            },
+          )
+        ) {
           window.setTimeout(() => {
             suppressNextCanvasClickRef.current = false
           }, 0)
@@ -735,7 +841,7 @@ export function SvgDiagram({
       }}
       onPointerCancel={(event) => {
         const coordinateDrag = activeCoordinateAnchorDragRef.current
-        activeDragTargetRef.current = null
+        geometryHandlePointerControllerRef.current.cancel()
         activeCameraDragRef.current = null
         activeCoordinateAnchorDragRef.current = null
         suppressNextCanvasClickRef.current = false
@@ -832,15 +938,141 @@ export function SvgDiagram({
             (event, target) => {
               event.preventDefault()
               event.stopPropagation()
-              activeDragTargetRef.current = target
               suppressNextCanvasClickRef.current = true
-              onGeometryHandleDragStart?.(target)
-              event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId)
+              geometryHandlePointerControllerRef.current.begin(
+                target,
+                event.pointerId,
+                event.currentTarget.ownerSVGElement,
+                onGeometryHandleDragStart,
+              )
             },
           )
         : null}
       {renderSelectionCycleFeedback(selectionCycleFeedback, width, height)}
     </svg>
+  )
+}
+
+function useStableCamera(
+  camera: Diagram['camera'] | undefined,
+): Diagram['camera'] | undefined {
+  const mode = camera?.mode
+  const scale = camera?.mode === '2d' ? camera.scale : undefined
+  const originX = camera?.mode === '2d' ? camera.origin.x : undefined
+  const originY = camera?.mode === '2d' ? camera.origin.y : undefined
+  const kind = camera?.mode === '3d' ? camera.kind : undefined
+  const thetaDeg = camera?.mode === '3d' ? camera.thetaDeg : undefined
+  const phiDeg = camera?.mode === '3d' ? camera.phiDeg : undefined
+  const zoom = camera?.mode === '3d' ? camera.zoom : undefined
+  const panX = camera?.mode === '3d' ? camera.pan.x : undefined
+  const panY = camera?.mode === '3d' ? camera.pan.y : undefined
+  const targetX =
+    camera?.mode === '3d' && camera.kind === 'perspective'
+      ? camera.target.x
+      : undefined
+  const targetY =
+    camera?.mode === '3d' && camera.kind === 'perspective'
+      ? camera.target.y
+      : undefined
+  const targetZ =
+    camera?.mode === '3d' && camera.kind === 'perspective'
+      ? camera.target.z
+      : undefined
+  const distance =
+    camera?.mode === '3d' && camera.kind === 'perspective'
+      ? camera.distance
+      : undefined
+  const fieldOfViewDeg =
+    camera?.mode === '3d' && camera.kind === 'perspective'
+      ? camera.fieldOfViewDeg
+      : undefined
+
+  return useMemo(() => {
+    if (
+      mode === '2d' &&
+      scale !== undefined &&
+      originX !== undefined &&
+      originY !== undefined
+    ) {
+      return {
+        mode,
+        scale,
+        origin: { x: originX, y: originY },
+      }
+    }
+
+    if (
+      mode !== '3d' ||
+      kind === undefined ||
+      thetaDeg === undefined ||
+      phiDeg === undefined ||
+      zoom === undefined ||
+      panX === undefined ||
+      panY === undefined
+    ) {
+      return undefined
+    }
+
+    if (kind === 'orthographic') {
+      return {
+        mode,
+        kind,
+        thetaDeg,
+        phiDeg,
+        zoom,
+        pan: { x: panX, y: panY },
+      }
+    }
+
+    return targetX !== undefined &&
+      targetY !== undefined &&
+      targetZ !== undefined &&
+      distance !== undefined &&
+      fieldOfViewDeg !== undefined
+      ? {
+          mode,
+          kind,
+          thetaDeg,
+          phiDeg,
+          zoom,
+          pan: { x: panX, y: panY },
+          target: { x: targetX, y: targetY, z: targetZ },
+          distance,
+          fieldOfViewDeg,
+        }
+      : undefined
+  }, [
+    distance,
+    fieldOfViewDeg,
+    kind,
+    mode,
+    originX,
+    originY,
+    panX,
+    panY,
+    phiDeg,
+    scale,
+    targetX,
+    targetY,
+    targetZ,
+    thetaDeg,
+    zoom,
+  ])
+}
+
+function useStableCameraViewAdjustment(
+  adjustment: CameraViewAdjustment | undefined,
+): CameraViewAdjustment | undefined {
+  const zoom = adjustment?.zoom
+  const panX = adjustment?.pan.x
+  const panY = adjustment?.pan.y
+
+  return useMemo(
+    () =>
+      zoom === undefined || panX === undefined || panY === undefined
+        ? undefined
+        : { zoom, pan: { x: panX, y: panY } },
+    [panX, panY, zoom],
   )
 }
 
@@ -880,166 +1112,45 @@ function withStableRenderIndex(
 
 function renderSortedSurfaceFaces(
   diagram: Diagram,
-  camera: Diagram['camera'],
-  viewportHeight: number,
+  sortedFaces: readonly SvgPreparedSortedSurfaceFace[] | null,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
-  visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItemDraft[] | null {
-  const sortedFaces = sortedSvgSurfaceFaces(
-    diagram,
-    camera,
-    viewportHeight,
-    visibilityOptions,
-  )
-
   if (sortedFaces === null) {
     return null
   }
 
-  return sortedFaces.map(({ sheet, face, points }, surfaceSortIndex) =>
-    withRenderKind(
-      renderSortedSurfaceFace(
-        diagram,
-        sheet,
-        face,
-        points,
-        surfaceSortIndex,
-        selectedElement,
-        layerFilter,
-        onSelectionChange,
-      ),
-      'surfaceFace',
+  const sheetsById = new Map(
+    diagram.strata.flatMap((stratum): Array<[string, SheetStratum]> =>
+      stratum.geometricKind === 'sheet' && stratum.codim === 1
+        ? [[stratum.id, stratum]]
+        : [],
     ),
   )
-}
 
-function createSvgCurveOcclusionMap(
-  diagram: Diagram,
-  camera: Diagram['camera'],
-  visibilityOptions: VisibilityOptions,
-): CurveOcclusionById {
-  if (
-    diagram.ambientDimension !== 3 ||
-    camera.mode !== '3d' ||
-    !curveOcclusionEnabled(visibilityOptions)
-  ) {
-    return new Map()
-  }
+  return sortedFaces.flatMap(
+    ({ face, points }, surfaceSortIndex): RenderItemDraft[] => {
+      const sheet = sheetsById.get(face.sourceId)
 
-  const visibleSheetIds = new Set(
-    diagram.strata
-      .filter(
-        (stratum): stratum is SheetStratum =>
-          stratum.geometricKind === 'sheet' &&
-          stratum.codim === 1 &&
-          shouldRenderStratumInSvgPreview(diagram, stratum),
-      )
-      .map((sheet) => sheet.id),
-  )
-
-  try {
-    return new Map(
-      classifyCurveOcclusion(diagram, {
-        camera,
-        visibility: visibilityOptions,
-        occludingSurfaceIds: visibleSheetIds,
-      }).map((result) => [result.curveId, result]),
-    )
-  } catch {
-    return new Map()
-  }
-}
-
-function createSvgPointOcclusionMap(
-  diagram: Diagram,
-  camera: Diagram['camera'],
-  visibilityOptions: VisibilityOptions,
-): AnchorOcclusionById {
-  if (
-    diagram.ambientDimension !== 3 ||
-    camera.mode !== '3d' ||
-    !pointAutoVisibilityEnabled(visibilityOptions)
-  ) {
-    return new Map()
-  }
-
-  const visibleSheetIds = visibleSvgSheetIds(diagram)
-  const targets = diagram.strata.flatMap((stratum) =>
-    stratum.geometricKind === 'point' &&
-    stratum.codim === 3 &&
-    shouldRenderStratumInSvgPreview(diagram, stratum)
-      ? [
-          {
-            id: stratum.id,
-            layer: stratum.layer,
-            position: stratum.position,
-          },
-        ]
-      : [],
-  )
-
-  try {
-    return new Map(
-      classifyAnchorOcclusion(diagram, targets, {
-        camera,
-        visibility: visibilityOptions,
-        occludingSurfaceIds: visibleSheetIds,
-        kind: 'point',
-      }).map((result) => [result.id, result]),
-    )
-  } catch {
-    return new Map()
-  }
-}
-
-function createSvgLabelOcclusionMap(
-  diagram: Diagram,
-  camera: Diagram['camera'],
-  visibilityOptions: VisibilityOptions,
-): AnchorOcclusionById {
-  if (
-    diagram.ambientDimension !== 3 ||
-    camera.mode !== '3d' ||
-    !labelAutoVisibilityEnabled(visibilityOptions)
-  ) {
-    return new Map()
-  }
-
-  const visibleSheetIds = visibleSvgSheetIds(diagram)
-  const targets = diagram.labels
-    .filter((label) => shouldRenderTextLabelInSvgPreview(diagram, label))
-    .map((label) => ({
-      id: label.id,
-      layer: label.layer,
-      position: label.position,
-    }))
-
-  try {
-    return new Map(
-      classifyAnchorOcclusion(diagram, targets, {
-        camera,
-        visibility: visibilityOptions,
-        occludingSurfaceIds: visibleSheetIds,
-        kind: 'label',
-      }).map((result) => [result.id, result]),
-    )
-  } catch {
-    return new Map()
-  }
-}
-
-function visibleSvgSheetIds(diagram: Diagram): ReadonlySet<string> {
-  return new Set(
-    diagram.strata
-      .filter(
-        (stratum): stratum is SheetStratum =>
-          stratum.geometricKind === 'sheet' &&
-          stratum.codim === 1 &&
-          shouldRenderStratumInSvgPreview(diagram, stratum),
-      )
-      .map((sheet) => sheet.id),
+      return sheet === undefined
+        ? []
+        : [
+            withRenderKind(
+              renderSortedSurfaceFace(
+                diagram,
+                sheet,
+                face,
+                points,
+                surfaceSortIndex,
+                selectedElement,
+                layerFilter,
+                onSelectionChange,
+              ),
+              'surfaceFace',
+            ),
+          ]
+    },
   )
 }
 
@@ -1608,6 +1719,7 @@ function renderStratum(
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
   boundaryPathHighlights: BoundaryPathHighlight[] | undefined,
+  curvedSheetMeshesById: ReadonlyMap<string, SvgCurvedSheetMesh>,
   curveOcclusionById: CurveOcclusionById,
   pointOcclusionById: AnchorOcclusionById,
   visibilityOptions: VisibilityOptions,
@@ -1635,6 +1747,7 @@ function renderStratum(
         viewportHeight,
         selectedElement,
         layerFilter,
+        curvedSheetMeshesById,
         onSelectionChange,
       )
     case 'curve':
@@ -1746,6 +1859,7 @@ function renderSheet(
   viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  curvedSheetMeshesById: ReadonlyMap<string, SvgCurvedSheetMesh>,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItemElement {
   if (sheet.kind === 'workPlaneFilledSheet') {
@@ -1764,10 +1878,9 @@ function renderSheet(
     return renderCurvedSheet(
       diagram,
       sheet,
-      camera,
-      viewportHeight,
       selectedElement,
       layerFilter,
+      curvedSheetMeshesById,
       onSelectionChange,
     )
   }
@@ -1825,10 +1938,9 @@ function renderSheet(
 function renderCurvedSheet(
   diagram: Diagram,
   sheet: Extract<SheetStratum, { kind: 'curvedSheet' }>,
-  camera: Diagram['camera'],
-  viewportHeight: number,
   selectedElement: SelectedElement,
   layerFilter: LayerFilter,
+  curvedSheetMeshesById: ReadonlyMap<string, SvgCurvedSheetMesh>,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
 ): RenderItemElement {
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, sheet.layer)
@@ -1841,7 +1953,11 @@ function renderCurvedSheet(
   const surfaceAttributes = filledSurfaceStyleToSvgAttributes(sheet.style, 0.85)
 
   try {
-    const mesh = curvedSheetToSvgMesh(sheet, camera, viewportHeight)
+    const mesh = curvedSheetMeshesById.get(sheet.id)
+
+    if (mesh === undefined) {
+      throw new Error('Prepared curved-sheet mesh is unavailable.')
+    }
 
     return {
       id: sheet.id,
@@ -3598,9 +3714,7 @@ function isSvgBackgroundTarget(target: EventTarget): boolean {
 }
 
 function releasePointerCaptureIfHeld(event: PointerEvent<SVGSVGElement>): void {
-  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-    event.currentTarget.releasePointerCapture(event.pointerId)
-  }
+  releaseSvgPointerCaptureIfHeld(event.currentTarget, event.pointerId)
 }
 
 function isSelectedStratum(

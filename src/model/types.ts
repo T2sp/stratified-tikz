@@ -407,6 +407,132 @@ export type CoonsBoundarySnapshot =
   | BoundaryPathSnapshot
   | CoonsConstantPointBoundarySnapshot
 
+export const coonsPatchBoundaryRoles = [
+  'bottom',
+  'right',
+  'top',
+  'left',
+] as const
+
+export type CoonsPatchBoundaryRole = (typeof coonsPatchBoundaryRoles)[number]
+
+export type CoonsPatchBoundarySource =
+  | {
+      kind: 'path'
+      sourcePathId: string
+      reversed: boolean
+    }
+  | {
+      kind: 'point'
+      sourcePointId: string
+    }
+
+export type CoonsPatchBoundarySources = Record<
+  CoonsPatchBoundaryRole,
+  CoonsPatchBoundarySource
+>
+
+export function isCoonsPatchBoundarySource(
+  value: unknown,
+): value is CoonsPatchBoundarySource {
+  if (!isUnknownRecord(value)) {
+    return false
+  }
+
+  if (value.kind === 'path') {
+    return (
+      typeof value.sourcePathId === 'string' &&
+      value.sourcePathId.trim().length > 0 &&
+      typeof value.reversed === 'boolean'
+    )
+  }
+
+  return (
+    value.kind === 'point' &&
+    typeof value.sourcePointId === 'string' &&
+    value.sourcePointId.trim().length > 0
+  )
+}
+
+export function isCoonsPatchBoundarySources(
+  value: unknown,
+): value is CoonsPatchBoundarySources {
+  return (
+    isUnknownRecord(value) &&
+    coonsPatchBoundaryRoles.every((role) =>
+      isCoonsPatchBoundarySource(value[role]),
+    )
+  )
+}
+
+export function isValidCoonsBoundarySnapshotState(
+  value: unknown,
+): value is undefined | 'frozen' {
+  return value === undefined || value === 'frozen'
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export type CoonsPatchCornerEndpoint = 'start' | 'end'
+
+export type CoonsPatchCornerEquationId =
+  | 'bottomStartEqualsLeftStart'
+  | 'bottomEndEqualsRightStart'
+  | 'topStartEqualsLeftEnd'
+  | 'topEndEqualsRightEnd'
+
+export type CoonsPatchCornerEquation = {
+  id: CoonsPatchCornerEquationId
+  leftRole: CoonsPatchBoundaryRole
+  leftEndpoint: CoonsPatchCornerEndpoint
+  rightRole: CoonsPatchBoundaryRole
+  rightEndpoint: CoonsPatchCornerEndpoint
+  label: string
+}
+
+export type CoonsPatchCornerEquationStatus = CoonsPatchCornerEquation & {
+  matches: boolean
+  leftPoint: Vec3
+  rightPoint: Vec3
+}
+
+export const coonsPatchRequiredCornerEquations = [
+  {
+    id: 'bottomStartEqualsLeftStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'start',
+    label: 'bottom start = left start',
+  },
+  {
+    id: 'bottomEndEqualsRightStart',
+    leftRole: 'bottom',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'start',
+    label: 'bottom end = right start',
+  },
+  {
+    id: 'topStartEqualsLeftEnd',
+    leftRole: 'top',
+    leftEndpoint: 'start',
+    rightRole: 'left',
+    rightEndpoint: 'end',
+    label: 'top start = left end',
+  },
+  {
+    id: 'topEndEqualsRightEnd',
+    leftRole: 'top',
+    leftEndpoint: 'end',
+    rightRole: 'right',
+    rightEndpoint: 'end',
+    label: 'top end = right end',
+  },
+] as const satisfies readonly CoonsPatchCornerEquation[]
+
 export type RuledSurfacePrimitive = {
   kind: 'ruledSurface'
   boundary0: BoundaryPathSnapshot
@@ -420,6 +546,13 @@ export type CoonsPatchPrimitive = {
   right: CoonsBoundarySnapshot
   top: CoonsBoundarySnapshot
   left: CoonsBoundarySnapshot
+  /**
+   * Present when the four snapshots are a frozen last-valid fallback whose
+   * saved preview values remain authoritative until a successful linked sync.
+   */
+  boundarySnapshotState?: 'frozen'
+  /** Missing means that the materialized boundary snapshots are static. */
+  boundarySources?: CoonsPatchBoundarySources
   sampling: SurfaceSampling
 }
 

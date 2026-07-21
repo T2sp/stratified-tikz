@@ -1,4 +1,5 @@
 import type { Diagram } from '../model/types.ts'
+import { synchronizeLinkedCoonsPatches } from '../model/coonsPatchLinks.ts'
 import { cloneDiagram } from './diagramUpdates.ts'
 import {
   clearSelectionForLayerFilter,
@@ -27,6 +28,8 @@ export type UndoableEditorState = {
 
 export type CommitDiagramChangeOptions = {
   undoSourceDiagram?: Diagram
+  /** The next diagram owns its own linked-snapshot fallbacks. */
+  replaceDiagram?: boolean
 }
 
 export function createDiagramHistory(diagram: Diagram): DiagramHistory {
@@ -42,9 +45,18 @@ export function commitDiagramChange<T extends UndoableEditorState>(
   next: T,
   options: CommitDiagramChangeOptions = {},
 ): T {
-  if (areDiagramsEqual(current.editableDiagram, next.editableDiagram)) {
+  const synchronizedDiagram = synchronizeLinkedCoonsPatches(
+    options.replaceDiagram === true ? null : current.editableDiagram,
+    next.editableDiagram,
+  ).diagram
+  const synchronizedNext =
+    synchronizedDiagram === next.editableDiagram
+      ? next
+      : { ...next, editableDiagram: synchronizedDiagram }
+
+  if (areDiagramsEqual(current.editableDiagram, synchronizedDiagram)) {
     return {
-      ...next,
+      ...synchronizedNext,
       history: current.history,
     }
   }
@@ -63,10 +75,10 @@ export function commitDiagramChange<T extends UndoableEditorState>(
       : appendBoundedPast(current.history.past, undoSourceDiagram)
 
   return {
-    ...next,
+    ...synchronizedNext,
     history: {
       past,
-      present: cloneDiagram(next.editableDiagram),
+      present: cloneDiagram(synchronizedDiagram),
       future: [],
     },
   }

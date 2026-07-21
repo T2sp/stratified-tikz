@@ -49,6 +49,7 @@ export type AnchorOcclusionOptions = {
   occludingSurfaceIds?: ReadonlySet<string>
   targetIds?: ReadonlySet<string>
   kind?: 'point' | 'label'
+  projectedSurfaceFaces?: readonly ProjectedSurfaceFace[]
 }
 
 export function classifyAnchorOcclusion(
@@ -72,6 +73,7 @@ export function classifyAnchorOcclusion(
     camera,
     visibility,
     options.occludingSurfaceIds,
+    options.projectedSurfaceFaces,
   )
 
   if (faces.length === 0) {
@@ -131,14 +133,19 @@ function projectedSurfaceFacesForDiagram(
   camera: Camera3D,
   visibility: VisibilityOptions,
   occludingSurfaceIds: ReadonlySet<string> | undefined,
+  projectedSurfaceFaces: readonly ProjectedSurfaceFace[] | undefined,
 ): ProjectedSurfaceFace[] {
-  const faces = extractProjectedRenderPrimitives(diagram, { camera })
-    .filter(
+  const faces = (
+    projectedSurfaceFaces ??
+    extractProjectedRenderPrimitives(diagram, { camera }).filter(
       (primitive): primitive is ProjectedSurfaceFace =>
-        primitive.kind === 'surfaceFace' &&
-        (occludingSurfaceIds === undefined ||
-          occludingSurfaceIds.has(primitive.sourceId)),
+        primitive.kind === 'surfaceFace',
     )
+  ).filter(
+    (face) =>
+      occludingSurfaceIds === undefined ||
+      occludingSurfaceIds.has(face.sourceId),
+  )
 
   if (
     faces.length >
@@ -149,7 +156,7 @@ function projectedSurfaceFacesForDiagram(
     return []
   }
 
-  return faces
+  return [...faces]
     .sort((left, right) =>
       compareProjectedSurfaceFaces(left, right, visibility),
     )

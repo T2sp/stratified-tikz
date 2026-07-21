@@ -5,6 +5,8 @@ import {
   isOrthographicCamera3D,
 } from './camera.ts'
 import { createDefaultCamera2D } from './constructors.ts'
+import { synchronizeLinkedCoonsPatches } from './coonsPatchLinks.ts'
+import { collectTopLevelDiagramIds } from './diagramIds.ts'
 import {
   isStylePresetKind,
   normalizeStylePresetName,
@@ -22,7 +24,7 @@ import {
   resolveSymbolicVariables,
 } from './variables.ts'
 import {
-  collectDiagramSupportedSymbolicExpressionSources,
+  collectDiagramActiveSymbolicExpressionSources,
   refreshDiagramSymbolicCoordinatePreviews,
   validateDiagramSymbolicCoordinateMetadata,
   validateNoUnsupportedSymbolicCoordinateSources,
@@ -52,6 +54,8 @@ import {
 } from './pathCrossings.ts'
 import {
   hiddenCurveLineStyles,
+  isCoonsPatchBoundarySources,
+  isValidCoonsBoundarySnapshotState,
   labelVisibilityPolicies,
   pointVisibilityPolicies,
   tikzExportModes,
@@ -235,6 +239,16 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     return parsed
   }
 
+  const boundarySnapshotStateIssues =
+    validateCoonsBoundarySnapshotStatesBeforeSynchronization(parsed.diagram)
+
+  if (boundarySnapshotStateIssues.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${formatSymbolicImportIssue(boundarySnapshotStateIssues[0])}`,
+    }
+  }
+
   const normalization = normalizeLoadedDiagram(parsed.diagram)
   if (normalization.errors.length > 0) {
     return {
@@ -243,11 +257,22 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  const diagram = normalization.diagram
-  let validation: DiagramValidationResult
+  const malformedBoundarySources = validatePendingImportDiagramStructure(
+    normalization.diagram,
+  ).find((issue) => issue.path.endsWith('.primitive.boundarySources'))
+  if (malformedBoundarySources !== undefined) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${formatSymbolicImportIssue(malformedBoundarySources)}`,
+    }
+  }
+
+  let diagram: Diagram
 
   try {
-    validation = validateDiagram(diagram)
+    diagram = synchronizeLinkedCoonsPatches(null, normalization.diagram, {
+      mode: 'full',
+    }).diagram
   } catch {
     return {
       ok: false,
@@ -255,8 +280,19 @@ export function parseSavedDiagramJson(text: string): ParseSavedDiagramResult {
     }
   }
 
-  if (!validation.valid) {
-    const firstIssue = validation.errors[0]
+  let finalValidation: DiagramValidationResult
+
+  try {
+    finalValidation = validateDiagram(diagram)
+  } catch {
+    return {
+      ok: false,
+      error: 'Saved diagram is malformed.',
+    }
+  }
+
+  if (!finalValidation.valid) {
+    const firstIssue = finalValidation.errors[0]
 
     return {
       ok: false,
@@ -283,6 +319,16 @@ export function parseSavedDiagramJsonForImport(
     return parsed
   }
 
+  const boundarySnapshotStateIssues =
+    validateCoonsBoundarySnapshotStatesBeforeSynchronization(parsed.diagram)
+
+  if (boundarySnapshotStateIssues.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${formatSymbolicImportIssue(boundarySnapshotStateIssues[0])}`,
+    }
+  }
+
   const normalization = normalizeLoadedDiagram(parsed.diagram, {
     variables: 'structural',
     refreshSymbolicPreviews: false,
@@ -292,6 +338,17 @@ export function parseSavedDiagramJsonForImport(
     return {
       ok: false,
       error: `Saved diagram is invalid: ${normalization.errors[0]}`,
+    }
+  }
+
+  const structuralIssues = validatePendingImportDiagramStructure(
+    normalization.diagram,
+  )
+
+  if (structuralIssues.length > 0) {
+    return {
+      ok: false,
+      error: `Saved diagram is invalid: ${formatSymbolicImportIssue(structuralIssues[0])}`,
     }
   }
 
@@ -333,6 +390,23 @@ export function resolvePendingSymbolicDiagramImport(
   pendingImport: PendingSymbolicDiagramImport,
   variableInputs: readonly ResolveSymbolicImportVariableInput[],
 ): ResolvePendingSymbolicDiagramImportResult {
+  const boundarySnapshotStateIssues =
+    validateCoonsBoundarySnapshotStatesBeforeSynchronization(
+      pendingImport.diagram,
+    )
+
+  if (boundarySnapshotStateIssues.length > 0) {
+    return symbolicImportError(boundarySnapshotStateIssues)
+  }
+
+  const pendingStructuralIssues = validatePendingImportDiagramStructure(
+    pendingImport.diagram,
+  )
+
+  if (pendingStructuralIssues.length > 0) {
+    return symbolicImportError(pendingStructuralIssues)
+  }
+
   const inputByName = new Map(
     variableInputs.map((input) => [input.name, input.expression]),
   )
@@ -393,21 +467,25 @@ export function resolvePendingSymbolicDiagramImport(
   // Variable resolution can change path geometry and intersection parameters.
   // Clean/reconcile crossing states before validation so stale crossing IDs do
   // not reject otherwise valid imports.
-  const diagram = cleanPathCrossingStates(refreshed.diagram, {
+  const resolvedDiagram = cleanPathCrossingStates(refreshed.diagram, {
     reconcileStalePathPairs: true,
   })
   const unsupportedSymbolicSources =
-    validateNoUnsupportedSymbolicCoordinateSources(diagram)
+    validateNoUnsupportedSymbolicCoordinateSources(resolvedDiagram)
 
   if (unsupportedSymbolicSources.length > 0) {
     return symbolicImportError(unsupportedSymbolicSources)
   }
 
-  const structuralIssues = validatePendingImportDiagramStructure(diagram)
+  const structuralIssues = validatePendingImportDiagramStructure(resolvedDiagram)
 
   if (structuralIssues.length > 0) {
     return symbolicImportError(structuralIssues)
   }
+
+  const diagram = synchronizeLinkedCoonsPatches(null, resolvedDiagram, {
+    mode: 'full',
+  }).diagram
 
   let validation: DiagramValidationResult
 
@@ -510,7 +588,7 @@ function createPendingSymbolicDiagramImport(
   }
 
   const collectedExpressions =
-    collectDiagramSupportedSymbolicExpressionSources(diagram)
+    collectDiagramActiveSymbolicExpressionSources(diagram)
 
   if (!collectedExpressions.ok) {
     return {
@@ -583,11 +661,7 @@ function createPendingSymbolicDiagramImport(
 }
 
 function importVariableReservedIds(diagram: Diagram): Set<string> {
-  return new Set([
-    ...(diagram.variables ?? []).map((variable) => variable.id),
-    ...diagram.strata.map((stratum) => stratum.id),
-    ...diagram.labels.map((label) => label.id),
-  ])
+  return collectTopLevelDiagramIds(diagram)
 }
 
 function nextImportVariableId(
@@ -624,7 +698,9 @@ function symbolicImportError(
 function validatePendingImportDiagramStructure(
   diagram: Diagram,
 ): DiagramValidationIssue[] {
-  const errors: DiagramValidationIssue[] = []
+  const errors = validateCoonsBoundarySnapshotStatesBeforeSynchronization(
+    diagram,
+  )
 
   if (Array.isArray(diagram.strata)) {
     diagram.strata.forEach((stratum, index) => {
@@ -655,6 +731,24 @@ function validatePendingImportDiagramStructure(
         errors.push({
           path: `${path}.name`,
           message: 'Stratum name is missing or invalid.',
+        })
+      }
+
+      const primitive = (
+        stratum as unknown as Record<string, unknown>
+      ).primitive
+
+      if (
+        stratum.geometricKind === 'sheet' &&
+        stratum.kind === 'curvedSheet' &&
+        isRecord(primitive) &&
+        primitive.kind === 'coonsPatch' &&
+        primitive.boundarySources !== undefined &&
+        !isCoonsPatchBoundarySources(primitive.boundarySources)
+      ) {
+        errors.push({
+          path: `${path}.primitive.boundarySources`,
+          message: 'Coons patch boundary source metadata is malformed.',
         })
       }
     })
@@ -721,6 +815,37 @@ function validatePendingImportDiagramStructure(
       }
     })
   }
+
+  return errors
+}
+
+function validateCoonsBoundarySnapshotStatesBeforeSynchronization(
+  diagramLike: unknown,
+): DiagramValidationIssue[] {
+  const errors: DiagramValidationIssue[] = []
+
+  if (!isRecord(diagramLike) || !Array.isArray(diagramLike.strata)) {
+    return errors
+  }
+
+  diagramLike.strata.forEach((stratum, index) => {
+    if (!isRecord(stratum) || !isRecord(stratum.primitive)) {
+      return
+    }
+
+    const primitive = stratum.primitive
+
+    if (
+      primitive.kind === 'coonsPatch' &&
+      !isValidCoonsBoundarySnapshotState(primitive.boundarySnapshotState)
+    ) {
+      errors.push({
+        path: `strata[${index}].primitive.boundarySnapshotState`,
+        message:
+          'Coons patch boundarySnapshotState must be absent or exactly "frozen".',
+      })
+    }
+  })
 
   return errors
 }

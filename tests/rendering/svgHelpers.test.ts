@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { absoluteCubicBezierPointsFromControlMode } from '../../src/geometry/bezierControls.ts'
+import { sampleCurvedSheetPrimitive } from '../../src/geometry/curvedSheets.ts'
 import { threeDimensionalExample } from '../../src/examples/index.ts'
 import {
   closedBoundariesToSvgPathData,
@@ -1434,6 +1435,34 @@ test('saddle curved sheet projects to one SVG polygon per sampled face', () => {
   )
 })
 
+test('Coons curved sheet SVG conversion samples once for faces and boundary', () => {
+  const sheet = curvedCoonsPatchSheet()
+  let sampleCount = 0
+  const mesh = curvedSheetToSvgMesh(
+    sheet,
+    createInitialCamera3D(),
+    240,
+    {
+      samplePrimitive: (primitive) => {
+        sampleCount += 1
+        return sampleCurvedSheetPrimitive(primitive)
+      },
+    },
+  )
+
+  assert.equal(sampleCount, 1)
+  assert.equal(mesh.primitiveKind, 'coonsPatch')
+  assert.equal(mesh.faces.length, 12)
+  assert.equal(mesh.boundaryPathData.length, 1)
+  assert.doesNotMatch(
+    [
+      ...mesh.faces.map((face) => face.points),
+      ...mesh.boundaryPathData,
+    ].join('\n'),
+    /NaN|Infinity/,
+  )
+})
+
 test('filled surface SVG attributes preserve fill and stroke style values', () => {
   const regionStyle: RegionStyle = {
     kind: 'regionStyle',
@@ -2395,6 +2424,49 @@ function curvedSaddleSheet(): CurvedSheetStratum {
       sampling: { uSegments: 6, vSegments: 5 },
     },
     layer: 0,
+  }
+}
+
+function curvedCoonsPatchSheet(): CurvedSheetStratum {
+  return {
+    id: 'svg-coons-patch',
+    codim: 1,
+    geometricKind: 'sheet',
+    kind: 'curvedSheet',
+    name: 'SVG Coons patch',
+    style: sheetStyle(),
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: lineBoundarySnapshot(
+        'svg-coons-bottom',
+        { x: 0, y: 0, z: 0 },
+        { x: 2, y: 0, z: 0 },
+      ),
+      right: lineBoundarySnapshot(
+        'svg-coons-right',
+        { x: 2, y: 0, z: 0 },
+        { x: 2, y: 1, z: 0 },
+      ),
+      top: lineBoundarySnapshot(
+        'svg-coons-top',
+        { x: 0, y: 1, z: 0 },
+        { x: 2, y: 1, z: 0 },
+      ),
+      left: lineBoundarySnapshot(
+        'svg-coons-left',
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 1, z: 0 },
+      ),
+      sampling: { uSegments: 4, vSegments: 3 },
+    },
+    layer: 0,
+  }
+}
+
+function lineBoundarySnapshot(id: string, start: Vec3, end: Vec3) {
+  return {
+    id,
+    segments: [{ kind: 'line' as const, start, end }],
   }
 }
 

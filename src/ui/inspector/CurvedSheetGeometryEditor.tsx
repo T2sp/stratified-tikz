@@ -7,6 +7,12 @@ import type {
   SurfaceSampling,
   Vec3,
 } from '../../model/types.ts'
+import { coonsPatchBoundaryRoles } from '../../model/types.ts'
+import {
+  coonsPatchBoundaryLinkStatus,
+  coonsPatchBoundarySourceId,
+  detachCoonsPatchBoundaryLinks,
+} from '../../model/coonsPatchLinks.ts'
 import {
   maxCurvedSheetSamplingSegments,
   updateCurvedSheetPrimitiveById,
@@ -37,13 +43,100 @@ export function CurvedSheetGeometryEditor({
   const primitive = sheet.primitive
 
   return (
+    <>
+      <section className="inspector-section">
+        <h3>Geometry</h3>
+        <div className="inspector-form">
+          <ReadOnlyField label="Primitive" value={primitive.kind} />
+          {renderPrimitiveFields(diagram, sheet, onDiagramChange)}
+          {renderSamplingFields(sheet, onDiagramChange)}
+          {renderFrameFields(primitive)}
+        </div>
+      </section>
+      {primitive.kind === 'coonsPatch' && (
+        <CoonsPatchBoundarySourcesInspector
+          diagram={diagram}
+          sheet={sheet}
+          onDiagramChange={onDiagramChange}
+        />
+      )}
+    </>
+  )
+}
+
+function CoonsPatchBoundarySourcesInspector({
+  diagram,
+  sheet,
+  onDiagramChange,
+}: CurvedSheetGeometryEditorProps) {
+  if (sheet.primitive.kind !== 'coonsPatch') {
+    return null
+  }
+
+  const sources = sheet.primitive.boundarySources
+  const status = coonsPatchBoundaryLinkStatus(diagram, sheet.id)
+  const statusLabel =
+    status.kind === 'static'
+      ? 'Static'
+      : status.kind === 'linkedUpToDate'
+        ? 'Linked — up to date'
+        : 'Linked — stale'
+
+  return (
     <section className="inspector-section">
-      <h3>Geometry</h3>
+      <h3>Boundary sources</h3>
       <div className="inspector-form">
-        <ReadOnlyField label="Primitive" value={primitive.kind} />
-        {renderPrimitiveFields(diagram, sheet, onDiagramChange)}
-        {renderSamplingFields(sheet, onDiagramChange)}
-        {renderFrameFields(primitive)}
+        <ReadOnlyField label="Boundary sources" value={statusLabel} />
+        {sources !== undefined &&
+          coonsPatchBoundaryRoles.map((role) => {
+            const source = sources[role]
+            const sourceId = coonsPatchBoundarySourceId(source)
+            const sourceStratum = diagram.strata.find(
+              (stratum) => stratum.id === sourceId,
+            )
+            const sourceName =
+              sourceStratum?.name.trim().length === 0 || sourceStratum === undefined
+                ? sourceId
+                : sourceStratum.name
+            const suffix =
+              source.kind === 'path' && source.reversed ? ' — reversed' : ''
+
+            return (
+              <ReadOnlyField
+                key={role}
+                label={role}
+                value={`${sourceName}${suffix}`}
+              />
+            )
+          })}
+        {status.kind === 'linkedStale' && (
+          <>
+            <p className="toolbar-status">
+              The last valid patch geometry is being displayed.
+            </p>
+            {status.issues.slice(0, 4).map((issue, index) => (
+              <p
+                className="toolbar-status"
+                key={`${issue.kind}-${issue.role ?? 'patch'}-${index}`}
+              >
+                {issue.message}
+              </p>
+            ))}
+          </>
+        )}
+        {sources !== undefined && (
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() =>
+              onDiagramChange((currentDiagram) =>
+                detachCoonsPatchBoundaryLinks(currentDiagram, sheet.id),
+              )
+            }
+          >
+            Detach boundary links
+          </button>
+        )}
       </div>
     </section>
   )

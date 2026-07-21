@@ -39,6 +39,7 @@ import {
   createWorkPlaneFilledSheet3DStratum,
 } from '../../src/model/constructors.ts'
 import { createNumericScalarInputValue } from '../../src/model/grids.ts'
+import { coonsPatchBoundaryLinkStatus } from '../../src/model/coonsPatchLinks.ts'
 import {
   parseSavedDiagramJson,
   savedDiagramFormat,
@@ -48,14 +49,18 @@ import {
 import { defaultCurveStyle, defaultSheetStyle } from '../../src/model/styles.ts'
 import { polylineToSvgPath } from '../../src/rendering/svgPath.ts'
 import type {
+  BoundaryPathSnapshot,
   ClosedPathBoundary,
+  CoonsPatchBoundarySources,
   CoordinateAnchorPosition,
   CoordinateComponent,
+  CurvedSheetStratum,
   CurveStratum,
   Diagram,
   PointStratum,
   PolygonSheetStratum,
   TextLabel,
+  Vec3,
   WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
@@ -577,6 +582,123 @@ test('duplicating a layer copies sheets, filled objects, and curved sheet primit
   assert.equal(copiedRegion.layer, 3)
   assert.notEqual(copiedRegion.boundaries, sourceRegion.boundaries)
   assert.notEqual(copiedRegion.boundaries[0]?.id, 'region-boundary')
+})
+
+test('layer duplicate keeps Coons links to actual sources outside the layer', () => {
+  const diagram = createLayerLinkedCoonsDiagram({
+    patchLayer: 0,
+    sourceLayers: { bottom: 1, right: 1, top: 1, left: 1 },
+  })
+  const sourcePatch = findLayerCoonsPatch(diagram, 'patch')
+  const originalSources = structuredClone(sourcePatch.primitive.boundarySources)
+  const result = duplicateLayer(diagram, 0, { targetLayerValue: 2 })
+  const copiedPatch = findLayerCoonsPatch(result.diagram, 'patch-copy')
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources, originalSources)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id), {
+    kind: 'linkedUpToDate',
+  })
+  assertIndependentLayerCoonsSnapshots(sourcePatch, copiedPatch)
+})
+
+test('layer duplicate remaps only actual Coons sources duplicated with the patch', () => {
+  const diagram = createLayerLinkedCoonsDiagram({
+    patchLayer: 0,
+    sourceLayers: { bottom: 0, right: 1, top: 1, left: 1 },
+  })
+  const result = duplicateLayer(diagram, 0, { targetLayerValue: 2 })
+  const idMap = new Map(
+    result.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const copiedPatch = findLayerCoonsPatch(
+    result.diagram,
+    idMap.get('patch') ?? '',
+  )
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources, {
+    bottom: {
+      kind: 'path',
+      sourcePathId: idMap.get('bottom'),
+      reversed: false,
+    },
+    right: { kind: 'path', sourcePathId: 'right', reversed: false },
+    top: { kind: 'path', sourcePathId: 'top', reversed: true },
+    left: { kind: 'path', sourcePathId: 'left', reversed: false },
+  })
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id), {
+    kind: 'linkedUpToDate',
+  })
+})
+
+test('layer duplicate keeps dangling self-colliding Coons source ids', () => {
+  const diagram = createLayerLinkedCoonsDiagram({
+    patchLayer: 0,
+    sourceLayers: { bottom: 1, right: 1, top: 1, left: 1 },
+  })
+  const patch = findLayerCoonsPatch(diagram, 'patch')
+  const selfCollidingSources: CoonsPatchBoundarySources = {
+    bottom: { kind: 'point', sourcePointId: 'patch' },
+    right: {
+      kind: 'path',
+      sourcePathId: 'dangling-right',
+      reversed: false,
+    },
+    top: { kind: 'path', sourcePathId: 'dangling-top', reversed: true },
+    left: { kind: 'point', sourcePointId: 'patch' },
+  }
+
+  patch.primitive.boundarySources = structuredClone(selfCollidingSources)
+  assert.equal(validateDiagram(diagram).valid, true)
+  const result = duplicateLayer(diagram, 0, { targetLayerValue: 2 })
+  const copiedPatch = findLayerCoonsPatch(result.diagram, 'patch-copy')
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources, selfCollidingSources)
+  assert.deepEqual(patch.primitive.boundarySources, selfCollidingSources)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id).kind,
+    'linkedStale',
+  )
+  assertIndependentLayerCoonsSnapshots(patch, copiedPatch)
+})
+
+test('layer duplicate remaps a duplicated path source that is temporarily invalid', () => {
+  const diagram = createLayerLinkedCoonsDiagram({
+    patchLayer: 0,
+    sourceLayers: { bottom: 0, right: 1, top: 1, left: 1 },
+  })
+  const bottom = findCurve(diagram, 'bottom')
+
+  if (bottom.kind !== 'polyline') {
+    throw new Error('Expected a polyline bottom source.')
+  }
+  const closedEndpoint = bottom.points[0] ?? { x: 0, y: 0, z: 0 }
+  bottom.points = [{ ...closedEndpoint }, { ...closedEndpoint }]
+  assert.equal(coonsPatchBoundaryLinkStatus(diagram, 'patch').kind, 'linkedStale')
+
+  const result = duplicateLayer(diagram, 0, { targetLayerValue: 2 })
+  const idMap = new Map(
+    result.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const copiedPatch = findLayerCoonsPatch(
+    result.diagram,
+    idMap.get('patch') ?? '',
+  )
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources?.bottom, {
+    kind: 'path',
+    sourcePathId: idMap.get('bottom'),
+    reversed: false,
+  })
+  assert.deepEqual(copiedPatch.primitive.boundarySources?.top, {
+    kind: 'path',
+    sourcePathId: 'top',
+    reversed: true,
+  })
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id).kind,
+    'linkedStale',
+  )
 })
 
 test('duplicating a layer creates target metadata with the default unused layer policy', () => {
@@ -2229,6 +2351,121 @@ function createSymbolicTranslationDiagram(): Diagram {
       }),
     ],
     labels: [],
+  }
+}
+
+type LayerCoonsSourceLayers = Record<
+  'bottom' | 'right' | 'top' | 'left',
+  number
+>
+
+function createLayerLinkedCoonsDiagram(options: {
+  patchLayer: number
+  sourceLayers: LayerCoonsSourceLayers
+}): Diagram {
+  const bottomStart = { x: 0, y: 0, z: 0 }
+  const bottomEnd = { x: 1, y: 0, z: 0 }
+  const topStart = { x: 0, y: 1, z: 0 }
+  const topEnd = { x: 1, y: 1, z: 0 }
+  const sources = [
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'bottom',
+      name: 'bottom',
+      points: [bottomStart, bottomEnd],
+      layer: options.sourceLayers.bottom,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'right',
+      name: 'right',
+      points: [bottomEnd, topEnd],
+      layer: options.sourceLayers.right,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'top',
+      name: 'top',
+      points: [topEnd, topStart],
+      layer: options.sourceLayers.top,
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'left',
+      name: 'left',
+      points: [bottomStart, topStart],
+      layer: options.sourceLayers.left,
+    }),
+  ]
+  const patch = createCurvedSheetStratum({
+    id: 'patch',
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: layerCoonsBoundary('bottom', bottomStart, bottomEnd),
+      right: layerCoonsBoundary('right', bottomEnd, topEnd),
+      top: layerCoonsBoundary('top', topStart, topEnd),
+      left: layerCoonsBoundary('left', bottomStart, topStart),
+      boundarySources: {
+        bottom: { kind: 'path', sourcePathId: 'bottom', reversed: false },
+        right: { kind: 'path', sourcePathId: 'right', reversed: false },
+        top: { kind: 'path', sourcePathId: 'top', reversed: true },
+        left: { kind: 'path', sourcePathId: 'left', reversed: false },
+      },
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+    layer: options.patchLayer,
+  })
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [...sources, patch],
+    labels: [],
+  }
+}
+
+function layerCoonsBoundary(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    name: id,
+    segments: [{ kind: 'line', start, end }],
+  }
+}
+
+type LayerCoonsPatchStratum = CurvedSheetStratum & {
+  primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
+}
+
+function findLayerCoonsPatch(
+  diagram: Diagram,
+  id: string,
+): LayerCoonsPatchStratum {
+  const stratum = findCurvedSheet(diagram, id)
+
+  if (stratum.primitive.kind !== 'coonsPatch') {
+    throw new Error(`Expected Coons patch ${id}.`)
+  }
+
+  return stratum
+}
+
+function assertIndependentLayerCoonsSnapshots(
+  source: LayerCoonsPatchStratum,
+  copied: LayerCoonsPatchStratum,
+): void {
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const sourceBoundary = source.primitive[role]
+    const copiedBoundary = copied.primitive[role]
+
+    assert.notEqual(copiedBoundary, sourceBoundary)
+    assert.deepEqual(copiedBoundary, sourceBoundary)
+    if (!('kind' in sourceBoundary) && !('kind' in copiedBoundary)) {
+      assert.notEqual(copiedBoundary.segments, sourceBoundary.segments)
+      assert.notEqual(copiedBoundary.segments[0], sourceBoundary.segments[0])
+    }
   }
 }
 

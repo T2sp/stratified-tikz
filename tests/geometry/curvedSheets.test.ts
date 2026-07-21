@@ -14,6 +14,7 @@ import {
   sampleRuledSurface,
   sampleSaddle,
   surfaceBoundaryPolylines,
+  surfaceBoundaryPolylinesFromMesh,
   validateCoonsBoundarySnapshot,
   validateCurvedSheetPrimitive,
   validateSurfaceFrame,
@@ -673,6 +674,25 @@ test('Coons patch sampling produces finite mesh vertices and boundary', () => {
   assert.equal(mesh.vertices.every(isFiniteVec3), true)
   assert.equal(boundaries.length, 1)
   assert.equal(boundaries[0].every(isFiniteVec3), true)
+})
+
+test('curved sheet boundaries derived from a sampled mesh preserve boundary order', () => {
+  const primitives = [
+    validHemisphere(),
+    validSaddle(),
+    validRuledSurface(),
+    validCoonsPatch(),
+  ]
+
+  for (const primitive of primitives) {
+    const mesh = sampleCurvedSheetPrimitive(primitive)
+
+    assert.deepEqual(
+      surfaceBoundaryPolylinesFromMesh(primitive, mesh),
+      surfaceBoundaryPolylines(primitive),
+      primitive.kind,
+    )
+  }
 })
 
 test('boundary surface sampling validation enforces the segment cap', () => {

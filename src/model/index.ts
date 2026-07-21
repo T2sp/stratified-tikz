@@ -1,4 +1,5 @@
 export * from './camera.ts'
+export * from './coonsPatchLinks.ts'
 export * from './constructors.ts'
 export * from './coordinateAnchors.ts'
 export * from './coordinateAnchorTranslation.ts'

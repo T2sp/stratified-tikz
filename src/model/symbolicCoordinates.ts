@@ -24,6 +24,7 @@ import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
 } from './paths.ts'
+import { isCoonsPatchBoundarySources } from './types.ts'
 import type {
   AmbientDimension,
   BoundaryPathSnapshot,
@@ -102,6 +103,7 @@ type SupportedSymbolicCoordinateInspection = {
   sources: SymbolicExpressionSource[]
   errors: DiagramValidationIssue[]
   supportedSymbolicObjects: WeakSet<object>
+  collectionMode: 'allSupported' | 'activeDependencies'
 }
 
 export const emptyCoordinateExpressionContext: CoordinateExpressionContext = {
@@ -494,6 +496,27 @@ export function collectDiagramSupportedSymbolicExpressionSources(
   }
 }
 
+export function collectDiagramActiveSymbolicExpressionSources(
+  diagram: Diagram,
+): CollectSupportedSymbolicExpressionSourcesResult {
+  const inspection = inspectDiagramSupportedSymbolicCoordinateSources(
+    diagram,
+    'activeDependencies',
+  )
+
+  if (inspection.errors.length > 0) {
+    return {
+      ok: false,
+      errors: inspection.errors,
+    }
+  }
+
+  return {
+    ok: true,
+    sources: inspection.sources,
+  }
+}
+
 export function validateNoUnsupportedSymbolicCoordinateSources(
   diagram: Diagram,
 ): DiagramValidationIssue[] {
@@ -536,11 +559,14 @@ export function validateNoUnsupportedSymbolicCoordinateSources(
 
 function inspectDiagramSupportedSymbolicCoordinateSources(
   diagram: Diagram,
+  collectionMode: SupportedSymbolicCoordinateInspection['collectionMode'] =
+    'allSupported',
 ): SupportedSymbolicCoordinateInspection {
   const inspection: SupportedSymbolicCoordinateInspection = {
     sources: [],
     errors: [],
     supportedSymbolicObjects: new WeakSet<object>(),
+    collectionMode,
   }
 
   if (Array.isArray(diagram.strata)) {
@@ -1124,6 +1150,14 @@ function collectCurvedSheetPrimitiveSupportedSymbolicExpressionSources(
   }
 
   if (primitive.kind === 'coonsPatch') {
+    if (
+      inspection.collectionMode === 'activeDependencies' &&
+      (isCoonsPatchBoundarySources(primitive.boundarySources) ||
+        primitive.boundarySnapshotState === 'frozen')
+    ) {
+      return
+    }
+
     collectCoonsBoundarySnapshotSupportedSymbolicExpressionSources(
       primitive.bottom,
       `${path}.bottom`,
@@ -2920,6 +2954,17 @@ function refreshCurvedSheetPrimitiveSymbolicPreviews(
         ),
       }
     case 'coonsPatch':
+      if (
+        isCoonsPatchBoundarySources(primitive.boundarySources) ||
+        primitive.boundarySnapshotState === 'frozen'
+      ) {
+        // Linked Coons boundaries are last-valid materialized snapshots. Their
+        // source strata are refreshed by the diagram traversal, and only the
+        // atomic linked-source synchronizer may replace these four snapshots.
+        // A detached stale fallback keeps the explicit frozen state.
+        return primitive
+      }
+
       return {
         ...primitive,
         bottom: refreshCoonsBoundarySnapshotSymbolicPreviews(

@@ -7,11 +7,19 @@ import { cleanPathCrossingStates } from '../model/pathCrossings.ts'
 import { updateSheetVertex } from '../model/sheets.ts'
 import type { Diagram, SheetStratum, Vec3, WorkPlane } from '../model/types.ts'
 import { moveCoordinateAnchorToPoint } from './coordinateAnchorEditing.ts'
-import { updateLabelById } from './diagramUpdates.ts'
+import { cloneDiagram, updateLabelById } from './diagramUpdates.ts'
+import {
+  clearSelectionForLayerFilter,
+  normalizeLayerFilterForDiagram,
+} from './layerFilter.ts'
 import {
   updateConcatenatedPathPoint,
   type ConcatenatedPathPointRole,
 } from './pathEditing.ts'
+import {
+  commitDiagramChange,
+  type UndoableEditorState,
+} from './undo.ts'
 
 export type GeometryHandleTarget =
   | { kind: 'coordinateAnchor'; coordinateId: string }
@@ -28,6 +36,67 @@ export type GeometryHandleTarget =
   | { kind: 'ellipseTemplateRadiusX'; stratumId: string }
   | { kind: 'ellipseTemplateRadiusY'; stratumId: string }
   | { kind: 'sheetVertex'; stratumId: string; vertexIndex: number }
+
+export type GeometryHandleDragSession = {
+  startDiagram: Diagram
+}
+
+export function startGeometryHandleDragSession(
+  diagram: Diagram,
+): GeometryHandleDragSession {
+  return {
+    startDiagram: cloneDiagram(diagram),
+  }
+}
+
+export function endGeometryHandleDragSession(): null {
+  return null
+}
+
+export function applyGeometryHandleDragToEditorState<
+  T extends UndoableEditorState,
+>(
+  current: T,
+  session: GeometryHandleDragSession,
+  target: GeometryHandleTarget,
+  position: Vec3,
+  workPlane?: WorkPlane,
+): T {
+  const nextDiagram = updateDiagramGeometryHandle(
+    current.editableDiagram,
+    target,
+    position,
+    workPlane,
+  )
+
+  if (nextDiagram === current.editableDiagram) {
+    return current
+  }
+
+  const nextLayerFilter = normalizeLayerFilterForDiagram(
+    nextDiagram,
+    current.layerFilter,
+  )
+
+  return commitDiagramChange(
+    current,
+    {
+      ...current,
+      editableDiagram: nextDiagram,
+      selectedElement: clearSelectionForLayerFilter(
+        nextDiagram,
+        current.selectedElement,
+        current.layerFilter,
+      ),
+      layerFilter: nextLayerFilter,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      pathDraft: null,
+      sheetPolygonDraft: null,
+    },
+    { undoSourceDiagram: session.startDiagram },
+  )
+}
 
 export function updateDiagramGeometryHandle(
   diagram: Diagram,

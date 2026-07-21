@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createCurveStratum,
+  createCurvedSheetStratum,
   createEmptyDiagram,
   createPointStratum,
   createTextLabel,
 } from '../../src/model/constructors.ts'
+import { coonsPatchBoundaryLinkStatus } from '../../src/model/coonsPatchLinks.ts'
 import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import {
   coordinateReferenceSourceForPoint,
@@ -20,8 +22,11 @@ import {
   type TranslationVector,
 } from '../../src/model/translation.ts'
 import type {
+  BoundaryPathSnapshot,
+  CoonsPatchBoundarySources,
   CoordinateAnchorPosition,
   CoordinateComponent,
+  CurvedSheetStratum,
   CurveStratum,
   Diagram,
   PointStratum,
@@ -283,6 +288,181 @@ test('bulk duplicate preserves geometry, style, and symbolic expressions', () =>
   assert.equal(copied.pathLabel, 'alpha path copy')
   assert.notEqual(copied.points, source.points)
   assert.notEqual(copied.style, source.style)
+})
+
+test('bulk duplicate keeps dangling self-colliding Coons source ids', () => {
+  const diagram = createBulkLinkedCoonsDiagram()
+  const patch = findBulkCoonsPatch(diagram, 'patch')
+  const selfCollidingSources: CoonsPatchBoundarySources = {
+    bottom: { kind: 'point', sourcePointId: 'patch' },
+    right: {
+      kind: 'path',
+      sourcePathId: 'dangling-right',
+      reversed: false,
+    },
+    top: { kind: 'path', sourcePathId: 'dangling-top', reversed: true },
+    left: { kind: 'point', sourcePointId: 'patch' },
+  }
+
+  patch.primitive.boundarySources = structuredClone(selfCollidingSources)
+  assert.equal(validateDiagram(diagram).valid, true)
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'stratum',
+    id: 'patch',
+  })
+  const copiedId = result.idChanges.find(
+    ({ sourceId }) => sourceId === 'patch',
+  )?.copiedId
+
+  assert.equal(copiedId, 'patch-copy')
+  const copiedPatch = findBulkCoonsPatch(result.diagram, copiedId ?? '')
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources, selfCollidingSources)
+  assert.deepEqual(patch.primitive.boundarySources, selfCollidingSources)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id).kind,
+    'linkedStale',
+  )
+  assertIndependentBulkCoonsSnapshots(patch, copiedPatch)
+})
+
+test('bulk duplicate does not remap a Coons path link through a copied point', () => {
+  const diagram = createBulkLinkedCoonsDiagram()
+  const patch = findBulkCoonsPatch(diagram, 'patch')
+  const incompatiblePoint = createPointStratum({
+    ambientDimension: 3,
+    id: 'incompatible-point',
+    position: { x: 0, y: 0, z: 0 },
+  })
+
+  diagram.strata.push(incompatiblePoint)
+  if (patch.primitive.boundarySources === undefined) {
+    throw new Error('Expected linked Coons boundary sources.')
+  }
+  patch.primitive.boundarySources.top = {
+    kind: 'path',
+    sourcePathId: incompatiblePoint.id,
+    reversed: true,
+  }
+
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: incompatiblePoint.id },
+      { kind: 'stratum', id: patch.id },
+    ],
+  })
+  const idMap = new Map(
+    result.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const copiedPatch = findBulkCoonsPatch(
+    result.diagram,
+    idMap.get(patch.id) ?? '',
+  )
+
+  assert.equal(idMap.get(incompatiblePoint.id), 'incompatible-point-copy')
+  assert.deepEqual(copiedPatch.primitive.boundarySources?.top, {
+    kind: 'path',
+    sourcePathId: incompatiblePoint.id,
+    reversed: true,
+  })
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id).kind,
+    'linkedStale',
+  )
+})
+
+test('bulk duplicate keeps links to actual nonduplicated Coons sources', () => {
+  const diagram = createBulkLinkedCoonsDiagram()
+  const patch = findBulkCoonsPatch(diagram, 'patch')
+  const originalSources = structuredClone(patch.primitive.boundarySources)
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  const copiedId = result.idChanges.find(
+    ({ sourceId }) => sourceId === patch.id,
+  )?.copiedId
+  const copiedPatch = findBulkCoonsPatch(result.diagram, copiedId ?? '')
+
+  assert.deepEqual(copiedPatch.primitive.boundarySources, originalSources)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, copiedPatch.id), {
+    kind: 'linkedUpToDate',
+  })
+  assertIndependentBulkCoonsSnapshots(patch, copiedPatch)
+})
+
+test('bulk duplicate remaps actual Coons path and point sources by kind', () => {
+  const pathDiagram = createBulkLinkedCoonsDiagram()
+  const pathResult = duplicateSelectedElements(pathDiagram, {
+    kind: 'multi',
+    elements: ['bottom', 'right', 'top', 'left', 'patch'].map((id) => ({
+      kind: 'stratum' as const,
+      id,
+    })),
+  })
+  const pathIdMap = new Map(
+    pathResult.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const copiedPathPatch = findBulkCoonsPatch(
+    pathResult.diagram,
+    pathIdMap.get('patch') ?? '',
+  )
+
+  assert.deepEqual(copiedPathPatch.primitive.boundarySources, {
+    bottom: {
+      kind: 'path',
+      sourcePathId: pathIdMap.get('bottom'),
+      reversed: false,
+    },
+    right: {
+      kind: 'path',
+      sourcePathId: pathIdMap.get('right'),
+      reversed: false,
+    },
+    top: {
+      kind: 'path',
+      sourcePathId: pathIdMap.get('top'),
+      reversed: true,
+    },
+    left: {
+      kind: 'path',
+      sourcePathId: pathIdMap.get('left'),
+      reversed: false,
+    },
+  })
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(pathResult.diagram, copiedPathPatch.id),
+    { kind: 'linkedUpToDate' },
+  )
+
+  const pointDiagram = createBulkPointLinkedCoonsDiagram()
+  const pointResult = duplicateSelectedElements(pointDiagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'stratum', id: 'constant-point' },
+      { kind: 'stratum', id: 'point-patch' },
+    ],
+  })
+  const pointIdMap = new Map(
+    pointResult.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const copiedPointPatch = findBulkCoonsPatch(
+    pointResult.diagram,
+    pointIdMap.get('point-patch') ?? '',
+  )
+
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(copiedPointPatch.primitive.boundarySources?.[role], {
+      kind: 'point',
+      sourcePointId: pointIdMap.get('constant-point'),
+    })
+  }
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(pointResult.diagram, copiedPointPatch.id),
+    { kind: 'linkedUpToDate' },
+  )
 })
 
 test('bulk duplicate does not duplicate crossing states', () => {
@@ -639,6 +819,162 @@ function createBulkCurveDiagram(): Diagram {
     ],
     strata: [curveA(), curveB(), curveC()],
     labels: [labelA()],
+  }
+}
+
+function createBulkLinkedCoonsDiagram(): Diagram {
+  const bottomStart = { x: 0, y: 0, z: 0 }
+  const bottomEnd = { x: 1, y: 0, z: 0 }
+  const topStart = { x: 0, y: 1, z: 0 }
+  const topEnd = { x: 1, y: 1, z: 0 }
+  const sources = [
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'bottom',
+      name: 'bottom',
+      points: [bottomStart, bottomEnd],
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'right',
+      name: 'right',
+      points: [bottomEnd, topEnd],
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'top',
+      name: 'top',
+      points: [topEnd, topStart],
+    }),
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'left',
+      name: 'left',
+      points: [bottomStart, topStart],
+    }),
+  ]
+  const patch = createCurvedSheetStratum({
+    id: 'patch',
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: bulkCoonsBoundary('bottom', bottomStart, bottomEnd),
+      right: bulkCoonsBoundary('right', bottomEnd, topEnd),
+      top: bulkCoonsBoundary('top', topStart, topEnd),
+      left: bulkCoonsBoundary('left', bottomStart, topStart),
+      boundarySources: {
+        bottom: { kind: 'path', sourcePathId: 'bottom', reversed: false },
+        right: { kind: 'path', sourcePathId: 'right', reversed: false },
+        top: { kind: 'path', sourcePathId: 'top', reversed: true },
+        left: { kind: 'path', sourcePathId: 'left', reversed: false },
+      },
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+  })
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [...sources, patch],
+    labels: [],
+  }
+}
+
+function createBulkPointLinkedCoonsDiagram(): Diagram {
+  const position = { x: 0, y: 0, z: 0 }
+  const source = createPointStratum({
+    ambientDimension: 3,
+    id: 'constant-point',
+    name: 'constant-point',
+    position,
+  })
+  const boundary = {
+    kind: 'constantPoint' as const,
+    sourceId: source.id,
+    name: source.name,
+    point: position,
+  }
+  const pointSource = {
+    kind: 'point' as const,
+    sourcePointId: source.id,
+  }
+  const patch = createCurvedSheetStratum({
+    id: 'point-patch',
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: boundary,
+      right: boundary,
+      top: boundary,
+      left: boundary,
+      boundarySources: {
+        bottom: pointSource,
+        right: pointSource,
+        top: pointSource,
+        left: pointSource,
+      },
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+  })
+
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [source, patch],
+    labels: [],
+  }
+}
+
+function bulkCoonsBoundary(
+  id: string,
+  start: Vec3,
+  end: Vec3,
+): BoundaryPathSnapshot {
+  return {
+    id,
+    name: id,
+    segments: [{ kind: 'line', start, end }],
+  }
+}
+
+type BulkCoonsPatchStratum = CurvedSheetStratum & {
+  primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
+}
+
+function findBulkCoonsPatch(
+  diagram: Diagram,
+  id: string,
+): BulkCoonsPatchStratum {
+  const stratum = diagram.strata.find((candidate) => candidate.id === id)
+
+  if (
+    stratum?.geometricKind !== 'sheet' ||
+    stratum.kind !== 'curvedSheet' ||
+    stratum.primitive.kind !== 'coonsPatch'
+  ) {
+    throw new Error(`Expected ${id} to be a Coons patch.`)
+  }
+
+  return stratum
+}
+
+function assertIndependentBulkCoonsSnapshots(
+  source: BulkCoonsPatchStratum,
+  copied: BulkCoonsPatchStratum,
+): void {
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const sourceBoundary = source.primitive[role]
+    const copiedBoundary = copied.primitive[role]
+
+    assert.notEqual(copiedBoundary, sourceBoundary)
+    assert.deepEqual(copiedBoundary, sourceBoundary)
+    if (
+      'kind' in sourceBoundary &&
+      sourceBoundary.kind === 'constantPoint' &&
+      'kind' in copiedBoundary &&
+      copiedBoundary.kind === 'constantPoint'
+    ) {
+      assert.notEqual(copiedBoundary.point, sourceBoundary.point)
+    } else if (!('kind' in sourceBoundary) && !('kind' in copiedBoundary)) {
+      assert.notEqual(copiedBoundary.segments, sourceBoundary.segments)
+      assert.notEqual(copiedBoundary.segments[0], sourceBoundary.segments[0])
+    }
   }
 }
 

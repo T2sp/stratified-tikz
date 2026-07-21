@@ -15,12 +15,20 @@ import {
   pathPointAt,
   reverseBoundaryPathSnapshot,
 } from '../model/paths.ts'
+import {
+  coonsPatchBoundaryRoles,
+  coonsPatchRequiredCornerEquations,
+  isCoonsPatchBoundarySources,
+  isValidCoonsBoundarySnapshotState,
+} from '../model/types.ts'
 import type {
   ArcPathSegment,
   BoundaryPathSnapshot,
   CoonsBoundarySnapshot,
   CoonsConstantPointBoundarySnapshot,
   CoonsPatchPrimitive,
+  CoonsPatchBoundaryRole,
+  CoonsPatchCornerEquationStatus,
   CurvedSheetPrimitive,
   HemisphereCurvedSheetPrimitive,
   PathSegment,
@@ -62,6 +70,10 @@ export type SurfaceValidationResult = {
   valid: boolean
   errors: SurfaceValidationIssue[]
 }
+
+export type CurvedSheetValidationSampler = (
+  primitive: CurvedSheetPrimitive,
+) => SurfaceSampleMesh
 
 type MeshPointSampler = (uIndex: number, vIndex: number) => Vec3
 
@@ -279,7 +291,52 @@ export function reverseBoundary(
   return reverseBoundaryPathSnapshot(boundary)
 }
 
+export function coonsPatchCornerEquationStatusesFromBoundaries(
+  boundaries: Record<CoonsPatchBoundaryRole, CoonsBoundarySnapshot>,
+): CoonsPatchCornerEquationStatus[] {
+  return coonsPatchRequiredCornerEquations.map((equation) => {
+    const leftPoint = boundaryEndpoint(
+      boundaries[equation.leftRole],
+      equation.leftEndpoint,
+    )
+    const rightPoint = boundaryEndpoint(
+      boundaries[equation.rightRole],
+      equation.rightEndpoint,
+    )
+
+    return {
+      ...equation,
+      matches: vec3ApproximatelyEqual(
+        leftPoint,
+        rightPoint,
+        pathEndpointEpsilon,
+      ),
+      leftPoint,
+      rightPoint,
+    }
+  })
+}
+
 export function validateCurvedSheetPrimitive(
+  primitive: unknown,
+  path = 'primitive',
+): SurfaceValidationResult {
+  const structuralValidation = validateCurvedSheetPrimitiveStructure(
+    primitive,
+    path,
+  )
+
+  if (!structuralValidation.valid) {
+    return structuralValidation
+  }
+
+  return validateCurvedSheetPrimitiveBySampling(
+    primitive as CurvedSheetPrimitive,
+    path,
+  )
+}
+
+export function validateCurvedSheetPrimitiveStructure(
   primitive: unknown,
   path = 'primitive',
 ): SurfaceValidationResult {
@@ -312,18 +369,26 @@ export function validateCurvedSheetPrimitive(
       break
   }
 
-  if (errors.length === 0) {
-    try {
-      sampleCurvedSheetPrimitive(primitive as CurvedSheetPrimitive)
-    } catch (error) {
-      pushError(
-        errors,
-        path,
-        error instanceof Error
-          ? error.message
-          : 'Curved sheet primitive sampling failed.',
-      )
-    }
+  return validationResult(errors)
+}
+
+export function validateCurvedSheetPrimitiveBySampling(
+  primitive: CurvedSheetPrimitive,
+  path = 'primitive',
+  sampler: CurvedSheetValidationSampler = sampleCurvedSheetPrimitive,
+): SurfaceValidationResult {
+  const errors: SurfaceValidationIssue[] = []
+
+  try {
+    sampler(primitive)
+  } catch (error) {
+    pushError(
+      errors,
+      path,
+      error instanceof Error
+        ? error.message
+        : 'Curved sheet primitive sampling failed.',
+    )
   }
 
   return validationResult(errors)
@@ -519,6 +584,13 @@ export function surfaceBoundaryPolylines(
 ): Vec3[][] {
   const mesh = sampleCurvedSheetPrimitive(primitive)
 
+  return surfaceBoundaryPolylinesFromMesh(primitive, mesh)
+}
+
+export function surfaceBoundaryPolylinesFromMesh(
+  primitive: CurvedSheetPrimitive,
+  mesh: SurfaceSampleMesh,
+): Vec3[][] {
   switch (primitive.kind) {
     case 'hemisphere':
       return [meshRow(mesh, mesh.vSegments)]
@@ -632,6 +704,16 @@ function validateCoonsPatchPrimitive(
     errors,
     validateSurfaceSampling(primitive.sampling, `${path}.sampling`),
   )
+  validateCoonsPatchBoundarySources(
+    primitive.boundarySources,
+    `${path}.boundarySources`,
+    errors,
+  )
+  validateCoonsPatchBoundarySnapshotState(
+    primitive.boundarySnapshotState,
+    `${path}.boundarySnapshotState`,
+    errors,
+  )
 
   if (
     isCoonsBoundarySnapshot(primitive.bottom) &&
@@ -662,6 +744,20 @@ function validateCoonsPatchPrimitive(
   }
 }
 
+function validateCoonsPatchBoundarySnapshotState(
+  state: unknown,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  if (!isValidCoonsBoundarySnapshotState(state)) {
+    pushError(
+      errors,
+      path,
+      'Coons patch boundary snapshot state must be frozen when present.',
+    )
+  }
+}
+
 function validateRuledSurfaceSampling(
   sampling: unknown,
   path: string,
@@ -686,34 +782,114 @@ function validateCoonsPatchCorners(
   path: string,
   errors: SurfaceValidationIssue[],
 ): void {
-  validateCornerMatch(
-    boundaryStart(bottom),
-    boundaryStart(left),
-    `${path}.bottom`,
-    `${path}.left`,
-    errors,
+  const boundaries = { bottom, right, top, left }
+
+  coonsPatchCornerEquationStatusesFromBoundaries(boundaries).forEach(
+    (status) => {
+      if (!status.matches) {
+        pushError(
+          errors,
+          `${path}.${status.leftRole}`,
+          `Coons patch corner must match ${path}.${status.rightRole}.`,
+        )
+      }
+    },
   )
-  validateCornerMatch(
-    boundaryEnd(bottom),
-    boundaryStart(right),
-    `${path}.bottom`,
-    `${path}.right`,
-    errors,
-  )
-  validateCornerMatch(
-    boundaryStart(top),
-    boundaryEnd(left),
-    `${path}.top`,
-    `${path}.left`,
-    errors,
-  )
-  validateCornerMatch(
-    boundaryEnd(top),
-    boundaryEnd(right),
-    `${path}.top`,
-    `${path}.right`,
-    errors,
-  )
+}
+
+function validateCoonsPatchBoundarySources(
+  sources: unknown,
+  path: string,
+  errors: SurfaceValidationIssue[],
+): void {
+  if (sources === undefined) {
+    return
+  }
+
+  if (!isRecord(sources)) {
+    pushError(errors, path, 'Coons patch boundary sources must be an object.')
+    return
+  }
+
+  if (isCoonsPatchBoundarySources(sources)) {
+    const pathSourceIds = coonsPatchBoundaryRoles.flatMap((role) => {
+      const source = sources[role]
+      return source.kind === 'path' ? [source.sourcePathId] : []
+    })
+
+    if (new Set(pathSourceIds).size !== pathSourceIds.length) {
+      pushError(
+        errors,
+        path,
+        'Linked Coons path sources must use distinct path ids.',
+      )
+    }
+    return
+  }
+
+  const pathSourceIds: string[] = []
+
+  coonsPatchBoundaryRoles.forEach((role) => {
+    const source = sources[role]
+    const sourcePath = `${path}.${role}`
+
+    if (!isRecord(source)) {
+      pushError(errors, sourcePath, `Coons patch ${role} source is required.`)
+      return
+    }
+
+    if (source.kind === 'path') {
+      if (
+        typeof source.sourcePathId !== 'string' ||
+        source.sourcePathId.trim().length === 0
+      ) {
+        pushError(
+          errors,
+          `${sourcePath}.sourcePathId`,
+          'Linked Coons path source id must be non-empty.',
+        )
+      } else {
+        pathSourceIds.push(source.sourcePathId)
+      }
+
+      if (typeof source.reversed !== 'boolean') {
+        pushError(
+          errors,
+          `${sourcePath}.reversed`,
+          'Linked Coons path reverse flag must be boolean.',
+        )
+      }
+      return
+    }
+
+    if (source.kind === 'point') {
+      if (
+        typeof source.sourcePointId !== 'string' ||
+        source.sourcePointId.trim().length === 0
+      ) {
+        pushError(
+          errors,
+          `${sourcePath}.sourcePointId`,
+          'Linked Coons point source id must be non-empty.',
+        )
+      }
+      return
+    }
+
+    pushError(
+      errors,
+      `${sourcePath}.kind`,
+      'Linked Coons boundary source kind must be path or point.',
+    )
+  })
+
+  if (new Set(pathSourceIds).size !== pathSourceIds.length) {
+    pushError(
+      errors,
+      path,
+      'Linked Coons path sources must use distinct path ids.',
+    )
+  }
 }
 
 function validateCoonsPatchOpenBoundary(
@@ -732,22 +908,6 @@ function validateCoonsPatchOpenBoundary(
 
   pushError(errors, path, `Coons patch ${role} boundary must be an open path.`)
   return false
-}
-
-function validateCornerMatch(
-  first: Vec3,
-  second: Vec3,
-  firstPath: string,
-  secondPath: string,
-  errors: SurfaceValidationIssue[],
-): void {
-  if (!vec3ApproximatelyEqual(first, second, pathEndpointEpsilon)) {
-    pushError(
-      errors,
-      firstPath,
-      `Coons patch corner must match ${secondPath}.`,
-    )
-  }
 }
 
 function sampleMesh(
@@ -817,29 +977,6 @@ function assertValidPrimitive(primitive: CurvedSheetPrimitive): void {
       validation.errors.map((issue) => `${issue.path} ${issue.message}`).join('; '),
     )
   }
-}
-
-function validateCurvedSheetPrimitiveStructure(
-  primitive: CurvedSheetPrimitive,
-): SurfaceValidationResult {
-  const errors: SurfaceValidationIssue[] = []
-
-  switch (primitive.kind) {
-    case 'hemisphere':
-      validateHemispherePrimitive(primitive, 'primitive', errors)
-      break
-    case 'saddle':
-      validateSaddlePrimitive(primitive, 'primitive', errors)
-      break
-    case 'ruledSurface':
-      validateRuledSurfacePrimitive(primitive, 'primitive', errors)
-      break
-    case 'coonsPatch':
-      validateCoonsPatchPrimitive(primitive, 'primitive', errors)
-      break
-  }
-
-  return validationResult(errors)
 }
 
 function assertFiniteMesh(mesh: SurfaceSampleMesh): void {

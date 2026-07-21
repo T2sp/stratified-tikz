@@ -71,6 +71,10 @@ import {
   type UndoableEditorState,
 } from './undo.ts'
 import { deleteCoordinateAnchorsWithDetach } from './coordinateAnchorDeletion.ts'
+import {
+  coonsPatchBoundarySourceRemapForDuplicatedStrata,
+  remapLinkedCoonsPatchSourcesInStratum,
+} from '../model/coonsPatchLinks.ts'
 
 export const bulkMixedValueLabel = 'Mixed'
 export const defaultFilledSurfaceLineWidth = 1.5
@@ -811,10 +815,24 @@ export function duplicateSelectedElements(
     copiedSelection.push({ kind: 'label', id: copied.id })
   }
 
+  const copiedIdBySourceId = new Map(
+    idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
+  )
+  const boundarySourceRemap =
+    coonsPatchBoundarySourceRemapForDuplicatedStrata(
+      selected.flatMap((element) =>
+        element.kind === 'stratum' ? [element.element] : [],
+      ),
+      copiedIdBySourceId,
+    )
+  const remappedCopiedStrata = copiedStrata.map((stratum) =>
+    remapLinkedCoonsPatchSourcesInStratum(stratum, boundarySourceRemap),
+  )
+
   return {
     diagram: ensureLayerMetadata({
       ...diagram,
-      strata: [...diagram.strata, ...copiedStrata],
+      strata: [...diagram.strata, ...remappedCopiedStrata],
       labels: [...diagram.labels, ...copiedLabels],
     }),
     selectedElement: selectedElementFromElements(copiedSelection),

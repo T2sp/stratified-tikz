@@ -1455,6 +1455,48 @@ test('parseSavedDiagramJson rejects malformed JSON', () => {
   assert.match(result.error, /valid JSON/)
 })
 
+test('parseSavedDiagramJson rejects invalid Coons boundary snapshot states', () => {
+  const invalidStates: Array<{ name: string; value: unknown }> = [
+    { name: 'null', value: null },
+    { name: 'false', value: false },
+    { name: 'zero', value: 0 },
+    { name: 'empty string', value: '' },
+    { name: 'uppercase string', value: 'THAWED' },
+    { name: 'array', value: [] },
+    { name: 'object', value: {} },
+  ]
+
+  for (const invalidState of invalidStates) {
+    const saved = JSON.parse(serializeDiagram(symbolicCoonsDiagram())) as {
+      diagram: {
+        strata: Array<{
+          primitive?: Record<string, unknown>
+        }>
+      }
+    }
+    const primitive = saved.diagram.strata[0]?.primitive
+
+    if (primitive === undefined) {
+      throw new Error('Expected a saved Coons patch primitive.')
+    }
+
+    primitive.boundarySnapshotState = invalidState.value
+    let result: ReturnType<typeof parseSavedDiagramJson> | undefined
+
+    assert.doesNotThrow(() => {
+      result = parseSavedDiagramJson(JSON.stringify(saved))
+    }, invalidState.name)
+    assert.equal(result?.ok, false, invalidState.name)
+    if (result?.ok === false) {
+      assert.match(
+        result.error,
+        /boundarySnapshotState.*frozen/i,
+        invalidState.name,
+      )
+    }
+  }
+})
+
 test('parseSavedDiagramJson rejects the wrong format', () => {
   const result = parseSavedDiagramJson(
     JSON.stringify({
@@ -1895,7 +1937,7 @@ test('parseSavedDiagramJsonForImport detects symbolic Coons boundaries with save
   )
 })
 
-test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variables', () => {
+test('static Coons snapshots still require missing symbolic boundary variables', () => {
   const diagram = symbolicCoonsDiagram()
   delete diagram.variables
 
@@ -1916,6 +1958,27 @@ test('parseSavedDiagramJsonForImport asks for missing symbolic boundary variable
       { name: 'Len', expression: '', defined: false },
       { name: 'R', expression: '', defined: false },
     ],
+  )
+})
+
+test('ruled-surface snapshots still require missing symbolic boundary variables', () => {
+  const diagram = symbolicRuledDiagram()
+  delete diagram.variables
+
+  const result = parseSavedDiagramJsonForImport(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok || result.kind !== 'needsVariableResolution') {
+    throw new Error('Expected ruled-surface import to need variable resolution.')
+  }
+
+  assert.deepEqual(
+    result.pendingImport.variables.map((variable) => ({
+      name: variable.name,
+      expression: variable.expression,
+      defined: variable.defined,
+    })),
+    [{ name: 'Len', expression: '', defined: false }],
   )
 })
 

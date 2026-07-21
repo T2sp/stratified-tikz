@@ -967,6 +967,26 @@ export type BoundaryPathSnapshot = {
   segments: PathSegment[];
 };
 
+export type CoonsBoundarySnapshot =
+  | BoundaryPathSnapshot
+  | {
+      kind: "constantPoint";
+      sourceId?: string;
+      name?: string;
+      point: Vec3;
+    };
+
+export type CoonsPatchBoundaryRole = "bottom" | "right" | "top" | "left";
+
+export type CoonsPatchBoundarySource =
+  | { kind: "path"; sourcePathId: string; reversed: boolean }
+  | { kind: "point"; sourcePointId: string };
+
+export type CoonsPatchBoundarySources = Record<
+  CoonsPatchBoundaryRole,
+  CoonsPatchBoundarySource
+>;
+
 export type CurvedSheetPrimitive =
   | {
       kind: "hemisphere";
@@ -992,10 +1012,12 @@ export type CurvedSheetPrimitive =
     }
   | {
       kind: "coonsPatch";
-      bottom: BoundaryPathSnapshot;
-      right: BoundaryPathSnapshot;
-      top: BoundaryPathSnapshot;
-      left: BoundaryPathSnapshot;
+      bottom: CoonsBoundarySnapshot;
+      right: CoonsBoundarySnapshot;
+      top: CoonsBoundarySnapshot;
+      left: CoonsBoundarySnapshot;
+      boundarySnapshotState?: "frozen";
+      boundarySources?: CoonsPatchBoundarySources;
       sampling: SurfaceSampling;
     };
 
@@ -1037,9 +1059,11 @@ hemisphere uses angular parameters: `u` runs around the equator from `0` to
 in `[-width/2, width/2]` and `v` in `[-depth/2, depth/2]`; its current sampler
 uses the hyperbolic patch `normalOffset = height * normalizedU * normalizedV`.
 
-Boundary-surface primitives store copied boundary path geometry. A
-`BoundaryPathSnapshot` is not a live reference to a curve stratum: later edits
-to the source curve do not mutate the surface. The boundary evaluator supports
+Boundary-surface primitives store materialized boundary geometry. A ruled
+surface's `BoundaryPathSnapshot` is not a live reference to a curve stratum, so
+later source edits do not mutate a ruled surface. A Coons patch may additionally
+store `boundarySources`; absence means the patch is static. The boundary
+evaluator supports
 copied concatenated `PathSegment[]` geometry made from line, cubic Bezier, 3D
 arc, and sampled path template segments. Circle and ellipse template paths are
 copied into ordinary path segments at creation time. Boundary snapshots must be
@@ -1052,6 +1076,15 @@ the preview model values. JSON import refreshes symbolic previews before full
 diagram validation; TikZ mesh output may use the resolved numeric preview mesh
 while the saved boundary coordinate and frame expressions remain in the diagram
 model.
+
+When a linked refresh fails, `boundarySnapshotState: "frozen"` records that the
+four saved snapshots are the exact last-valid fallback. Their stored numeric
+previews, symbolic expressions, and coordinate provenance remain authoritative
+even if current diagram variables have diverged. Successful atomic linked
+synchronization clears this state. Detaching a stale patch preserves it so the
+same snapshots remain valid and serializable without the source links. The
+field is optional, so legacy and ordinary static Coons patches keep their
+existing symbolic-preview behavior.
 
 A ruled surface stores two boundary snapshots with a shared deterministic
 piecewise-uniform boundary parameter `u`. Its sampler uses:
@@ -1087,6 +1120,22 @@ right end. During Coons patch creation, the Add sheet draft can reverse the
 effective direction of each picked boundary before the copied snapshots are
 validated and saved. This draft reversal does not mutate the source paths.
 
+When `boundarySources` is present, it is persistent diagram data and records
+the path/point distinction plus the per-path `reversed` flag for every role.
+Committed diagram mutations compare resolved source-derived geometry before
+and after the edit. If it changed, all four sources are resolved from the same
+new diagram, oriented, detached from coordinate references, and validated as
+one candidate. A valid candidate atomically replaces all four snapshots. An
+invalid or missing source leaves the prior snapshots intact and produces a
+derived stale link status; no status or warning text is persisted. Sampling,
+rendering, and export remain snapshot-based.
+
+Linked patches round-trip without a format-version change. Legacy patches
+without `boundarySources` stay static even when snapshot `id` or `sourceId`
+fields resemble live sources. Layer or bulk duplication remaps source IDs only
+when the corresponding source is duplicated in the same operation; duplicating
+only a patch intentionally keeps links to the original sources.
+
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry
 helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. Ruled surfaces use the
@@ -1113,9 +1162,12 @@ Editor workflow:
   and leave the saved `Diagram` unchanged.
 
 Current limitations: inspector editing does not yet rotate or replace the saved
-surface frame. Boundary-surface creation for ruled surfaces and Coons patches
-stores copied boundary geometry only; it does not create live links back to
-source paths or infer unordered Coons roles automatically. The saved model also
+surface frame. Ruled surfaces remain snapshot-only. Coons patches created with
+`boundarySources` retain optional live links, while static and legacy patches
+without that field retain only their snapshots. Materialized snapshots remain
+the geometry used by sampling, rendering, and export: valid source edits refresh
+all four, while invalid or missing sources retain the last valid snapshots. The
+editor does not infer unordered Coons roles automatically. The saved model also
 does not support symbolic sampled surface boundaries, arbitrary symbolic
 parametric surfaces, boolean operations, or mesh sculpting.
 
@@ -2071,10 +2123,15 @@ boundaries on a finite orthonormal plane-frame snapshot. Rendering projects the
 stored model coordinates, and TikZ export prefers a `canvas is plane` scope with
 local `(a,b)` coordinates. `curvedSheet` stores a hemisphere, saddle, ruled
 surface, or Coons patch primitive. Hemisphere and saddle primitives store an
-explicit finite orthonormal surface frame. Ruled surfaces and Coons patches
-store copied line/cubic/arc boundary path snapshots, not live references to
-source path strata. Ruled surfaces require two boundaries with matching closure
-status and use `S(u,v) = (1-v) C0(u) + v C1(u)`. Coons patches require
+explicit finite orthonormal surface frame. Ruled surfaces store copied
+line/cubic/arc boundary path snapshots and remain snapshot-only. Coons patches
+always retain materialized boundary snapshots used by sampling, Preview, SVG
+export, and TikZ export, but may additionally store optional `boundarySources`.
+Valid linked-source changes atomically refresh all four snapshots; missing or
+invalid sources leave the last valid snapshots in place. Static and legacy
+Coons patches without `boundarySources` do not follow source edits. Ruled
+surfaces require two boundaries with matching closure status and use
+`S(u,v) = (1-v) C0(u) + v C1(u)`. Coons patches require
 consistent bottom/right/top/left corners and use the standard Coons formula
 with the bilinear corner blend subtracted. All surface sampling counts are
 positive integers capped by `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`.

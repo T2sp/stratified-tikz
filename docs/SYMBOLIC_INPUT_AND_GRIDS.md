@@ -89,10 +89,12 @@ value. In 2D diagrams, `z` remains hidden or locked to numeric `0`.
 Symbolic global coordinates are supported for point positions, free-label
 positions, ordinary curve vertices, absolute cubic controls, filled-boundary
 path coordinates, 2D template centers, sheet vertices, and copied boundary
-snapshots used by ruled surfaces and Coons patches. In 3D mode, direct input
-and inspector editing can also store symbolic work-plane-local coordinates
-`(a,b)` against a saved work-plane frame snapshot. SVG preview still uses the
-finite global `Vec3` obtained from that local source.
+snapshots used by ruled surfaces and Coons patches. A linked Coons patch also
+keeps the expressions and provenance in its materialized boundary snapshots,
+including while those snapshots are frozen as last-valid fallback data. In 3D
+mode, direct input and inspector editing can also store symbolic
+work-plane-local coordinates `(a,b)` against a saved work-plane frame snapshot.
+SVG preview still uses the finite global `Vec3` obtained from that local source.
 
 ## Work-Plane-Local Symbolic Coordinates
 
@@ -209,21 +211,32 @@ formulas.
 
 ## JSON Import With Symbolic Variables
 
-When a saved JSON diagram contains symbolic variables or symbolic coordinate
-expressions, loading pauses at a variable-resolution dialog. Saved variable
-definitions are prefilled, and referenced variables that are missing from the
-file are shown with empty inputs. Confirming the dialog validates the variable
-expressions with the same scalar-expression evaluator, rejects cycles,
-unknown variables, unsafe tokens, and non-finite preview values, then refreshes
-all symbolic preview coordinates before the diagram is committed.
+When a saved JSON diagram contains symbolic variables or active symbolic
+coordinate expressions, loading pauses at a variable-resolution dialog. Saved
+variable definitions are prefilled, and variables referenced by active model
+inputs but missing from the file are shown with empty inputs. Confirming the
+dialog validates the variable expressions with the same scalar-expression
+evaluator, rejects cycles, unknown variables, unsafe tokens, and non-finite
+preview values, then refreshes the applicable symbolic preview coordinates
+before the diagram is committed.
 
-Canceling the dialog leaves the current editor diagram unchanged. Boundary
-surface snapshots are included in this refresh, so symbolic Coons or ruled
-boundary coordinates such as `.5*Len`, `-.5*Len`, and `R` can load as long as
-the confirmed variables produce finite numeric preview values. Work-plane frame
-snapshots nested in those boundary segments are refreshed at the same time; a
-symbolic frame is accepted only when `origin`, `u`, `v`, and `normal` evaluate
-to finite preview vectors and the evaluated frame is geometrically valid.
+Canceling the dialog leaves the current editor diagram unchanged. Ruled-surface
+snapshots and static Coons snapshots remain active symbolic inputs: expressions
+such as `.5*Len`, `-.5*Len`, and `R` require variables and are refreshed during
+import. Work-plane frame snapshots nested in those active boundary segments are
+refreshed at the same time; a symbolic frame is accepted only when `origin`,
+`u`, `v`, and `normal` evaluate to finite preview vectors and the evaluated
+frame is geometrically valid.
+
+For a linked Coons patch, the linked source strata own the active symbolic
+dependencies. Its four materialized boundaries are saved snapshots, not a
+second set of active inputs. If the link is stale, the frozen snapshots remain
+the authoritative last-valid numeric preview geometry. A variable referenced
+only by those frozen snapshots is therefore not requested during UI import.
+The snapshot expressions and provenance are still preserved exactly for
+persistence, inspection, detaching, and recovery; they are not stripped or
+rewritten. Once every source is valid again, synchronization atomically replaces
+all four fallback boundaries with freshly resolved snapshots.
 
 Work-plane-local coordinate sources participate in the same import path. The
 loader detects variables in local `a` and `b` scalar expressions and in the
@@ -237,10 +250,12 @@ without replacing the current diagram.
 The refresh pass covers local sources stored on point and label positions, path
 segment vertices and cubic controls, arc centers and frames, polygon sheet
 vertices, filled boundary segments, work-plane-filled sheet frames and
-boundaries, grid frame snapshots, and ruled or Coons boundary snapshots,
-including constant-point Coons boundaries. Unsupported or malformed placements
-are rejected during load/validation rather than saved as partially refreshed
-data.
+boundaries, grid frame snapshots, ruled-surface snapshots, and static Coons
+boundary snapshots, including constant-point Coons boundaries. Linked Coons
+patches instead refresh their active source strata; their materialized snapshots
+remain unchanged until successful source synchronization. Unsupported or
+malformed placements are rejected during load/validation rather than saved as
+partially refreshed data.
 
 ## Grid Generation
 
