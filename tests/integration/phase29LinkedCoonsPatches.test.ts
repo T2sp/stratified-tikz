@@ -24,6 +24,7 @@ import {
 } from '../../src/model/serialization.ts'
 import { defaultCurveStyle, defaultPointStyle } from '../../src/model/styles.ts'
 import { symbolicVec3FromVec3 } from '../../src/model/coordinateAnchors.ts'
+import { createCoordinateComponentFromInput } from '../../src/model/symbolicCoordinates.ts'
 import {
   addSymbolicVariableToDiagram,
   updateSymbolicVariableInDiagram,
@@ -47,6 +48,7 @@ import { duplicateSelectedElements } from '../../src/ui/bulkEditing.ts'
 import { moveCoordinateAnchorToPoint } from '../../src/ui/coordinateAnchorEditing.ts'
 import {
   addPointStratumWithResult,
+  updateVec3Coordinate,
   updateStratumById,
 } from '../../src/ui/diagramUpdates.ts'
 import { allLayersFilter } from '../../src/ui/layerFilter.ts'
@@ -413,6 +415,257 @@ test('compatible symbolic source updates still refresh linked snapshots', () => 
   )
   assert.equal(bottom.segments[0]?.end.z, 0.6)
   assert.equal(bottom.segments[0]?.end.symbolic?.z.previewValue, 0.6)
+})
+
+test('equal-valued symbolic provenance synchronizes atomically and survives unused-variable edits', () => {
+  const linked = createEqualValuedSymbolicInteriorLinkedPatch()
+  const initialState = createEditorState(linked)
+  const initialMesh = sampleCoonsPatch(findCoonsPatch(linked, 'patch').primitive)
+  const initialSourcePoint = findPolyline(linked, 'bottom').points[1]
+
+  assertLinkedSymbolicInteriorState(linked, {
+    expression: 'R',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+
+  const sComponent = coordinateComponentForDiagram(linked, 'S')
+  const expressionDiagram = updateStratumById(linked, 'bottom', (stratum) => {
+    if (stratum.geometricKind !== 'curve' || stratum.kind !== 'polyline') {
+      return stratum
+    }
+
+    return {
+      ...stratum,
+      points: stratum.points.map((value, index) =>
+        index === 1
+          ? updateVec3Coordinate(value, 'z', sComponent, 3)
+          : value,
+      ),
+    }
+  })
+  const expressionSynchronization = synchronizeLinkedCoonsPatches(
+    linked,
+    expressionDiagram,
+  )
+
+  assert.deepEqual(expressionSynchronization.updatedPatchIds, ['patch'])
+
+  const edited = commitDiagramChange(initialState, {
+    ...initialState,
+    editableDiagram: expressionDiagram,
+  })
+  const editedSourcePoint = findPolyline(
+    edited.editableDiagram,
+    'bottom',
+  ).points[1]
+
+  assert.equal(editedSourcePoint?.z, initialSourcePoint?.z)
+  assert.equal(edited.history.past.length, 1)
+  assert.deepEqual(edited.history.present, edited.editableDiagram)
+  assertLinkedSymbolicInteriorState(edited.editableDiagram, {
+    expression: 'S',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+  assert.deepEqual(
+    sampleCoonsPatch(findCoonsPatch(edited.editableDiagram, 'patch').primitive),
+    initialMesh,
+  )
+
+  const semanticallyObsolete = updateStratumById(
+    edited.editableDiagram,
+    'patch',
+    (stratum) => {
+      if (
+        stratum.geometricKind !== 'sheet' ||
+        stratum.kind !== 'curvedSheet' ||
+        stratum.primitive.kind !== 'coonsPatch'
+      ) {
+        return stratum
+      }
+
+      const bottom = pathBoundary(stratum.primitive.bottom)
+      const first = bottom.segments[0]
+
+      if (first === undefined) {
+        return stratum
+      }
+
+      return {
+        ...stratum,
+        primitive: {
+          ...stratum.primitive,
+          bottom: {
+            ...bottom,
+            segments: [
+              {
+                ...first,
+                end: updateVec3Coordinate(
+                  first.end,
+                  'z',
+                  coordinateComponentForDiagram(edited.editableDiagram, 'R'),
+                  3,
+                ),
+              },
+              ...bottom.segments.slice(1),
+            ],
+          },
+        },
+      }
+    },
+  )
+
+  assert.equal(validateDiagram(semanticallyObsolete).valid, true)
+  const obsoleteSource = findPolyline(semanticallyObsolete, 'bottom').points[1]
+  const obsoleteSnapshot = pathBoundary(
+    findCoonsPatch(semanticallyObsolete, 'patch').primitive.bottom,
+  ).segments[0]?.end
+
+  assert.equal(obsoleteSource?.z, obsoleteSnapshot?.z)
+  assert.equal(obsoleteSource?.symbolic?.z.kind, 'symbolic')
+  assert.equal(obsoleteSnapshot?.symbolic?.z.kind, 'symbolic')
+  if (
+    obsoleteSource?.symbolic?.z.kind !== 'symbolic' ||
+    obsoleteSnapshot?.symbolic?.z.kind !== 'symbolic'
+  ) {
+    throw new Error('Expected the source and obsolete snapshot to stay symbolic.')
+  }
+  assert.equal(obsoleteSource.symbolic.z.expression, 'S')
+  assert.equal(obsoleteSnapshot.symbolic.z.expression, 'R')
+  assert.equal(obsoleteSource.symbolic.z.previewValue, 0.1)
+  assert.equal(obsoleteSnapshot.symbolic.z.previewValue, 0.1)
+
+  const obsoleteStatus = coonsPatchBoundaryLinkStatus(
+    semanticallyObsolete,
+    'patch',
+  )
+
+  assert.equal(obsoleteStatus.kind, 'linkedStale')
+  if (obsoleteStatus.kind === 'linkedStale') {
+    assert.equal(
+      obsoleteStatus.issues.some((issue) => issue.kind === 'snapshotOutOfDate'),
+      true,
+    )
+  }
+
+  const undoneExpression = undoLastDiagramChange(edited)
+  assertLinkedSymbolicInteriorState(undoneExpression.editableDiagram, {
+    expression: 'R',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+  const redoneExpression = redoLastDiagramChange(undoneExpression)
+  assertLinkedSymbolicInteriorState(redoneExpression.editableDiagram, {
+    expression: 'S',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+
+  const beforeUnusedVariableEdit = structuredClone(
+    findCoonsPatch(redoneExpression.editableDiagram, 'patch').primitive,
+  )
+  const unusedVariableUpdate = updateSymbolicVariableInDiagram(
+    redoneExpression.editableDiagram,
+    'variable-r',
+    { expression: '0.7' },
+  )
+
+  assert.equal(unusedVariableUpdate.ok, true)
+  if (!unusedVariableUpdate.ok) {
+    throw new Error(unusedVariableUpdate.error)
+  }
+
+  const unusedVariableSynchronization = synchronizeLinkedCoonsPatches(
+    redoneExpression.editableDiagram,
+    unusedVariableUpdate.diagram,
+  )
+
+  assert.equal(unusedVariableSynchronization.diagram, unusedVariableUpdate.diagram)
+  assert.deepEqual(unusedVariableSynchronization.updatedPatchIds, [])
+
+  const unusedVariableEdited = commitDiagramChange(redoneExpression, {
+    ...redoneExpression,
+    editableDiagram: unusedVariableUpdate.diagram,
+  })
+
+  assert.equal(unusedVariableEdited.history.past.length, 2)
+  assert.deepEqual(unusedVariableEdited.history.present, unusedVariableEdited.editableDiagram)
+  assert.deepEqual(
+    findCoonsPatch(unusedVariableEdited.editableDiagram, 'patch').primitive,
+    beforeUnusedVariableEdit,
+  )
+  assertLinkedSymbolicInteriorState(unusedVariableEdited.editableDiagram, {
+    expression: 'S',
+    rValue: 0.7,
+    sValue: 0.1,
+  })
+  assert.deepEqual(
+    sampleCoonsPatch(
+      findCoonsPatch(unusedVariableEdited.editableDiagram, 'patch').primitive,
+    ),
+    initialMesh,
+  )
+
+  const parsed = parseSavedDiagramJson(
+    serializeDiagram(unusedVariableEdited.editableDiagram),
+  )
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  assertLinkedSymbolicInteriorState(parsed.diagram, {
+    expression: 'S',
+    rValue: 0.7,
+    sValue: 0.1,
+  })
+
+  const undoneUnusedVariable = undoLastDiagramChange(unusedVariableEdited)
+  assertLinkedSymbolicInteriorState(undoneUnusedVariable.editableDiagram, {
+    expression: 'S',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+  assert.deepEqual(
+    findCoonsPatch(undoneUnusedVariable.editableDiagram, 'patch').primitive,
+    beforeUnusedVariableEdit,
+  )
+
+  const undoneBoth = undoLastDiagramChange(undoneUnusedVariable)
+  assertLinkedSymbolicInteriorState(undoneBoth.editableDiagram, {
+    expression: 'R',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+
+  const redoneSource = redoLastDiagramChange(undoneBoth)
+  assertLinkedSymbolicInteriorState(redoneSource.editableDiagram, {
+    expression: 'S',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+  const redoneBoth = redoLastDiagramChange(redoneSource)
+  assertLinkedSymbolicInteriorState(redoneBoth.editableDiagram, {
+    expression: 'S',
+    rValue: 0.7,
+    sValue: 0.1,
+  })
+
+  const repeatedUndo = undoLastDiagramChange(redoneBoth)
+  const repeatedRedo = redoLastDiagramChange(repeatedUndo)
+
+  assertLinkedSymbolicInteriorState(repeatedUndo.editableDiagram, {
+    expression: 'S',
+    rValue: 0.1,
+    sValue: 0.1,
+  })
+  assertLinkedSymbolicInteriorState(repeatedRedo.editableDiagram, {
+    expression: 'S',
+    rValue: 0.7,
+    sValue: 0.1,
+  })
+  assert.deepEqual(repeatedRedo.editableDiagram, redoneBoth.editableDiagram)
 })
 
 test('symbolic linked import retains the saved fallback when inputs are incompatible', () => {
@@ -921,6 +1174,12 @@ test('unrelated edits and patch sampling do not rematerialize boundaries', () =>
   const linked = createLinkedPatch(createPathSourceDiagram())
   const state = createEditorState(linked)
   const before = findCoonsPatch(linked, 'patch').primitive
+  const beforeBoundaries = structuredClone({
+    bottom: before.bottom,
+    right: before.right,
+    top: before.top,
+    left: before.left,
+  })
   const withUnrelated = {
     ...linked,
     strata: [...linked.strata, pointStratum('unrelated', point(9, 9, 9), 3)],
@@ -932,10 +1191,63 @@ test('unrelated edits and patch sampling do not rematerialize boundaries', () =>
   const afterUnrelated = findCoonsPatch(unrelated.editableDiagram, 'patch').primitive
 
   assert.equal(afterUnrelated, before)
+  assert.deepEqual(
+    {
+      bottom: afterUnrelated.bottom,
+      right: afterUnrelated.right,
+      top: afterUnrelated.top,
+      left: afterUnrelated.left,
+    },
+    beforeBoundaries,
+  )
   assert.equal(unrelated.history.past.length, 1)
 
-  const samplingDiagram = updateStratumById(
+  const cosmeticSourceDiagram = updateStratumById(
     unrelated.editableDiagram,
+    'bottom',
+    (stratum) =>
+      stratum.geometricKind === 'curve'
+        ? {
+            ...stratum,
+            name: 'Cosmetically renamed bottom source',
+            style: { ...stratum.style, strokeColor: '#c026d3' },
+          }
+        : stratum,
+  )
+  const cosmeticSynchronization = synchronizeLinkedCoonsPatches(
+    unrelated.editableDiagram,
+    cosmeticSourceDiagram,
+  )
+
+  assert.equal(cosmeticSynchronization.diagram, cosmeticSourceDiagram)
+  assert.deepEqual(cosmeticSynchronization.updatedPatchIds, [])
+
+  const cosmetic = commitDiagramChange(unrelated, {
+    ...unrelated,
+    editableDiagram: cosmeticSourceDiagram,
+  })
+  const afterCosmetic = findCoonsPatch(
+    cosmetic.editableDiagram,
+    'patch',
+  ).primitive
+
+  assert.equal(cosmetic.history.past.length, 2)
+  assert.deepEqual(
+    {
+      bottom: afterCosmetic.bottom,
+      right: afterCosmetic.right,
+      top: afterCosmetic.top,
+      left: afterCosmetic.left,
+    },
+    beforeBoundaries,
+  )
+  assert.equal(
+    pathBoundary(afterCosmetic.bottom).name,
+    pathBoundary(before.bottom).name,
+  )
+
+  const samplingDiagram = updateStratumById(
+    cosmetic.editableDiagram,
     'patch',
     (stratum) =>
       stratum.geometricKind === 'sheet' &&
@@ -950,15 +1262,15 @@ test('unrelated edits and patch sampling do not rematerialize boundaries', () =>
           }
         : stratum,
   )
-  const sampled = commitDiagramChange(unrelated, {
-    ...unrelated,
+  const sampled = commitDiagramChange(cosmetic, {
+    ...cosmetic,
     editableDiagram: samplingDiagram,
   })
   const afterSampling = findCoonsPatch(sampled.editableDiagram, 'patch').primitive
 
   assert.equal(afterSampling.bottom, afterUnrelated.bottom)
   assert.deepEqual(afterSampling.sampling, { uSegments: 3, vSegments: 4 })
-  assert.equal(sampled.history.past.length, 2)
+  assert.equal(sampled.history.past.length, 3)
 })
 
 test('detach is undoable and later source edits no longer affect snapshots', () => {
@@ -1180,7 +1492,16 @@ test('symbolic import rejects malformed linked metadata before pending resolutio
 })
 
 test('layer duplication remaps copied sources while patch-only duplication keeps originals', () => {
-  const linked = createLinkedPatch(createPathSourceDiagram())
+  const linked = createLinkedPatch(
+    createPathSourceDiagram({ reverseTopSource: true }),
+    { top: { sourcePathId: 'top', reversed: true } },
+  )
+  const originalPatch = findCoonsPatch(linked, 'patch')
+  const originalSources = structuredClone(originalPatch.primitive.boundarySources)
+
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(linked, 'patch'), {
+    kind: 'linkedUpToDate',
+  })
   const duplicatedLayer = duplicateLayer(linked, 0, { targetLayerValue: 1 })
   const idMap = new Map(
     duplicatedLayer.idChanges.map(({ sourceId, copiedId }) => [sourceId, copiedId]),
@@ -1192,8 +1513,61 @@ test('layer duplication remaps copied sources while patch-only duplication keeps
     duplicatedLayer.diagram,
     copiedPatchId ?? 'missing',
   )
-  assert.equal(copiedPatch.primitive.boundarySources?.bottom.sourcePathId, idMap.get('bottom'))
-  assert.equal(copiedPatch.primitive.boundarySources?.right.sourcePathId, idMap.get('right'))
+  const copiedSources = copiedPatch.primitive.boundarySources
+
+  assert.notEqual(copiedSources, undefined)
+  if (copiedSources === undefined) {
+    throw new Error('Expected copied linked boundary sources.')
+  }
+  assert.deepEqual(Object.keys(copiedSources).sort(), [
+    'bottom',
+    'left',
+    'right',
+    'top',
+  ])
+  assert.deepEqual(copiedSources.bottom, {
+    kind: 'path',
+    sourcePathId: idMap.get('bottom'),
+    reversed: false,
+  })
+  assert.deepEqual(copiedSources.right, {
+    kind: 'path',
+    sourcePathId: idMap.get('right'),
+    reversed: false,
+  })
+  assert.deepEqual(copiedSources.top, {
+    kind: 'path',
+    sourcePathId: idMap.get('top'),
+    reversed: true,
+  })
+  assert.deepEqual(copiedSources.left, {
+    kind: 'path',
+    sourcePathId: idMap.get('left'),
+    reversed: false,
+  })
+  assert.deepEqual(
+    findCoonsPatch(duplicatedLayer.diagram, 'patch').primitive.boundarySources,
+    originalSources,
+  )
+  assert.equal(validateDiagram(duplicatedLayer.diagram).valid, true)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(duplicatedLayer.diagram, copiedPatch.id),
+    { kind: 'linkedUpToDate' },
+  )
+
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const copiedBoundary = pathBoundary(copiedPatch.primitive[role])
+    const originalBoundary = pathBoundary(originalPatch.primitive[role])
+
+    assert.notEqual(copiedBoundary, originalBoundary)
+    assert.deepEqual(copiedBoundary, originalBoundary)
+    assert.notEqual(copiedBoundary.segments, originalBoundary.segments)
+    assert.notEqual(copiedBoundary.segments[0], originalBoundary.segments[0])
+    assert.notEqual(
+      copiedBoundary.segments[0]?.start,
+      originalBoundary.segments[0]?.start,
+    )
+  }
 
   const patchOnly = duplicateSelectedElements(linked, {
     kind: 'stratum',
@@ -1204,8 +1578,26 @@ test('layer duplication remaps copied sources while patch-only duplication keeps
   )?.copiedId
   const patchCopy = findCoonsPatch(patchOnly.diagram, patchCopyId ?? 'missing')
 
-  assert.equal(patchCopy.primitive.boundarySources?.bottom.sourcePathId, 'bottom')
-  assert.notEqual(patchCopy.primitive.bottom, findCoonsPatch(linked, 'patch').primitive.bottom)
+  assert.deepEqual(patchCopy.primitive.boundarySources, originalSources)
+  assert.deepEqual(
+    findCoonsPatch(patchOnly.diagram, 'patch').primitive.boundarySources,
+    originalSources,
+  )
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(patchOnly.diagram, patchCopy.id), {
+    kind: 'linkedUpToDate',
+  })
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const copiedBoundary = pathBoundary(patchCopy.primitive[role])
+    const originalBoundary = pathBoundary(originalPatch.primitive[role])
+
+    assert.notEqual(copiedBoundary, originalBoundary)
+    assert.deepEqual(copiedBoundary, originalBoundary)
+    assert.notEqual(copiedBoundary.segments[0], originalBoundary.segments[0])
+    assert.notEqual(
+      copiedBoundary.segments[0]?.start,
+      originalBoundary.segments[0]?.start,
+    )
+  }
 
   const bulkTogether = duplicateSelectedElements(linked, {
     kind: 'multi',
@@ -1221,22 +1613,75 @@ test('layer duplication remaps copied sources while patch-only duplication keeps
     bulkTogether.diagram,
     bulkIdMap.get('patch') ?? 'missing',
   )
+  const bulkSources = bulkPatch.primitive.boundarySources
 
-  assert.equal(
-    bulkPatch.primitive.boundarySources?.bottom.sourcePathId,
-    bulkIdMap.get('bottom'),
+  assert.notEqual(bulkSources, undefined)
+  if (bulkSources === undefined) {
+    throw new Error('Expected bulk-copied linked boundary sources.')
+  }
+  assert.deepEqual(Object.keys(bulkSources).sort(), [
+    'bottom',
+    'left',
+    'right',
+    'top',
+  ])
+  assert.deepEqual(bulkSources.bottom, {
+    kind: 'path',
+    sourcePathId: bulkIdMap.get('bottom'),
+    reversed: false,
+  })
+  assert.deepEqual(bulkSources.right, {
+    kind: 'path',
+    sourcePathId: bulkIdMap.get('right'),
+    reversed: false,
+  })
+  assert.deepEqual(bulkSources.top, {
+    kind: 'path',
+    sourcePathId: bulkIdMap.get('top'),
+    reversed: true,
+  })
+  assert.deepEqual(bulkSources.left, {
+    kind: 'path',
+    sourcePathId: bulkIdMap.get('left'),
+    reversed: false,
+  })
+  assert.deepEqual(
+    findCoonsPatch(bulkTogether.diagram, 'patch').primitive.boundarySources,
+    originalSources,
   )
-  assert.equal(
-    bulkPatch.primitive.boundarySources?.left.sourcePathId,
-    bulkIdMap.get('left'),
+  assert.equal(validateDiagram(bulkTogether.diagram).valid, true)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(bulkTogether.diagram, bulkPatch.id),
+    { kind: 'linkedUpToDate' },
   )
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    const copiedBoundary = pathBoundary(bulkPatch.primitive[role])
+    const originalBoundary = pathBoundary(originalPatch.primitive[role])
+
+    assert.notEqual(copiedBoundary, originalBoundary)
+    assert.deepEqual(copiedBoundary, originalBoundary)
+    assert.notEqual(copiedBoundary.segments, originalBoundary.segments)
+    assert.notEqual(copiedBoundary.segments[0], originalBoundary.segments[0])
+    assert.notEqual(
+      copiedBoundary.segments[0]?.start,
+      originalBoundary.segments[0]?.start,
+    )
+  }
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(bulkTogether.diagram, 'patch'), {
+    kind: 'linkedUpToDate',
+  })
 })
 
 test('SVG and TikZ consume refreshed snapshots and no-op synchronization preserves identity', () => {
-  const linked = createLinkedPatch(createPathSourceDiagram())
+  const linked = updateStratumById(
+    createLinkedPatch(createPathSourceDiagram()),
+    'patch',
+    (stratum) => ({ ...stratum, name: 'Unique linked Coons regression' }),
+  )
   const beforePatch = findCoonsPatch(linked, 'patch')
   const beforeSvg = curvedSheetToSvgMesh(beforePatch, createInitialCamera3D(), 240)
   const beforeTikz = generateTikz(linked)
+  const beforeCoonsBlock = extractCoonsPatchTikzBlock(beforeTikz, 'patch')
   const edited = commitSourceUpdate(createEditorState(linked), 'bottom', (source) => {
     if (source.kind !== 'polyline') {
       return source
@@ -1251,14 +1696,91 @@ test('SVG and TikZ consume refreshed snapshots and no-op synchronization preserv
   const afterPatch = findCoonsPatch(edited, 'patch')
   const afterSvg = curvedSheetToSvgMesh(afterPatch, createInitialCamera3D(), 240)
   const afterTikz = generateTikz(edited)
+  const afterCoonsBlock = extractCoonsPatchTikzBlock(afterTikz, 'patch')
 
   assert.notDeepEqual(afterSvg.faces, beforeSvg.faces)
-  assert.notEqual(afterTikz, beforeTikz)
-  assert.match(afterTikz, /Primitive: coonsPatch/)
+  assert.notEqual(afterCoonsBlock, beforeCoonsBlock)
+  assert.match(
+    beforeCoonsBlock,
+    /\\coordinate \([^)]*p2\) at \(0\.5,0,0\.1\);/,
+  )
+  assert.match(
+    afterCoonsBlock,
+    /\\coordinate \([^)]*p2\) at \(0\.5,0,0\.7\);/,
+  )
+  assert.doesNotMatch(
+    afterCoonsBlock,
+    /\\coordinate \([^)]*p2\) at \(0\.5,0,0\.1\);/,
+  )
 
   const noOp = synchronizeLinkedCoonsPatches(edited, edited)
   assert.equal(noOp.diagram, edited)
   assert.deepEqual(noOp.updatedPatchIds, [])
+
+  const stale = commitSourceUpdate(
+    createEditorState(edited),
+    'bottom',
+    (source) => {
+      if (source.kind !== 'polyline') {
+        return source
+      }
+
+      return {
+        ...source,
+        points: source.points.map((value, index) =>
+          index === 2 ? point(1.25, 0, 0) : value,
+        ),
+      }
+    },
+  ).editableDiagram
+  const staleTikz = generateTikz(stale)
+  const staleCoonsBlock = extractCoonsPatchTikzBlock(staleTikz, 'patch')
+
+  assert.equal(coonsPatchBoundaryLinkStatus(stale, 'patch').kind, 'linkedStale')
+  assert.match(
+    staleTikz,
+    /\\coordinate \(curvePolybottom0p2\) at \(1\.25,0,0\);/,
+  )
+  assert.doesNotMatch(
+    afterTikz,
+    /\\coordinate \(curvePolybottom0p2\) at \(1\.25,0,0\);/,
+  )
+  assert.equal(staleCoonsBlock, afterCoonsBlock)
+  assert.match(
+    staleCoonsBlock,
+    /\\coordinate \([^)]*p4\) at \(1,0,0\);/,
+  )
+  assert.doesNotMatch(staleCoonsBlock, /\(1\.25,0,0\)/)
+
+  const inlineTikz = generateTikz(stale, { exportMode: 'inlineMath' })
+  const inlineCoonsBlock = extractCoonsPatchTikzBlock(inlineTikz, 'patch')
+
+  assert.match(inlineTikz, /^\\begin\{tikzpicture\}\[baseline=/)
+  assert.match(inlineTikz, /\\end\{tikzpicture\}$/)
+  assert.doesNotMatch(inlineTikz, /\n[ \t]*\n/)
+  assert.match(
+    inlineCoonsBlock,
+    /\\coordinate \([^)]*p2\) at \(0\.5,0,0\.7\);/,
+  )
+  assert.match(
+    inlineCoonsBlock,
+    /\\coordinate \([^)]*p4\) at \(1,0,0\);/,
+  )
+  assert.doesNotMatch(inlineCoonsBlock, /\(1\.25,0,0\)/)
+  assert.doesNotMatch(
+    inlineCoonsBlock,
+    /boundarySources|sourcePathId|sourcePointId|reversed|linkedUpToDate|linkedStale/,
+  )
+  assert.match(inlineCoonsBlock, /^ {8}\\coordinate /m)
+  assert.match(inlineCoonsBlock, /^ {12}% Curved sheet /m)
+  assert.match(inlineCoonsBlock, /^ {12}\\begin\{scope\}\[/m)
+  assert.match(inlineCoonsBlock, /^ {16}\\filldraw /m)
+
+  for (const line of inlineCoonsBlock.split('\n')) {
+    const indentation = line.match(/^ */)?.[0].length ?? 0
+
+    assert.equal(indentation % 4, 0, `Unexpected TikZ indentation: ${line}`)
+  }
 })
 
 test('source direction reversal is detected and keeps the last valid patch', () => {
@@ -1289,6 +1811,61 @@ test('creation and Inspector expose linked controls and detach action', () => {
   assert.match(inspectorSource, /The last valid patch geometry is being displayed\./)
   assert.match(inspectorSource, /Detach boundary links/)
 })
+
+function extractCoonsPatchTikzBlock(tikz: string, patchId: string): string {
+  const marker = new RegExp(
+    `^[ \\t]*% Curved sheet "[^"\\r\\n]*" \\[${escapeRegExp(patchId)}\\] sampled mesh export\\.$`,
+    'm',
+  ).exec(tikz)
+
+  assert.notEqual(marker, null)
+  if (marker === null || marker.index === undefined) {
+    throw new Error(`Expected a TikZ marker for Coons patch ${patchId}.`)
+  }
+
+  const scopeStart = tikz.indexOf('\\begin{scope}[', marker.index)
+  const scopeEndToken = '\\end{scope}'
+  const scopeEnd = tikz.indexOf(scopeEndToken, scopeStart)
+
+  assert.notEqual(scopeStart, -1)
+  assert.notEqual(scopeEnd, -1)
+  if (scopeStart === -1 || scopeEnd === -1) {
+    throw new Error(`Expected a sampled TikZ scope for Coons patch ${patchId}.`)
+  }
+
+  const drawingBlock = tikz.slice(
+    marker.index,
+    scopeEnd + scopeEndToken.length,
+  )
+
+  assert.match(drawingBlock, /Primitive: coonsPatch/)
+
+  const allCoordinateDefinitions = [
+    ...tikz.matchAll(
+      /^[ \\t]*\\coordinate \(([^)]+)\) at [^\r\n]+;$/gm,
+    ),
+  ]
+  const definedCoordinateNames = new Set(
+    allCoordinateDefinitions.map((match) => match[1] ?? ''),
+  )
+  const referencedCoordinates = new Set(
+    [...drawingBlock.matchAll(/\(([A-Za-z][A-Za-z0-9]*)\)/g)]
+      .map((match) => match[1] ?? '')
+      .filter((name) => definedCoordinateNames.has(name)),
+  )
+  const coordinateDefinitions = allCoordinateDefinitions
+    .filter((match) => referencedCoordinates.has(match[1] ?? ''))
+    .map((match) => match[0])
+
+  assert.ok(referencedCoordinates.size > 0)
+  assert.equal(coordinateDefinitions.length, referencedCoordinates.size)
+
+  return [...coordinateDefinitions, drawingBlock].join('\n')
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 function createPathSourceDiagram(
   options: { reverseTopSource?: boolean } = {},
@@ -1376,6 +1953,36 @@ function createSymbolicInteriorLinkedPatch(): Diagram {
   return createLinkedPatch(diagram)
 }
 
+function createEqualValuedSymbolicInteriorLinkedPatch(): Diagram {
+  const diagram = createPathSourceDiagram()
+  const bottom = findPolyline(diagram, 'bottom')
+
+  diagram.variables = [
+    symbolicVariableR(0.1),
+    {
+      id: 'variable-s',
+      name: 'S',
+      macroName: 'stzS',
+      expression: '0.1',
+      previewValue: 0.1,
+    },
+  ]
+  diagram.strata = diagram.strata.map((stratum) =>
+    stratum.id === bottom.id
+      ? {
+          ...bottom,
+          points: bottom.points.map((value, index) =>
+            index === 1
+              ? symbolicCoordinatePoint(value, 'z', 'R')
+              : value,
+          ),
+        }
+      : stratum,
+  )
+
+  return createLinkedPatch(diagram)
+}
+
 function symbolicVariableR(value: number) {
   return {
     id: 'variable-r',
@@ -1400,6 +2007,75 @@ function symbolicCoordinatePoint(
   }
 
   return { ...value, symbolic }
+}
+
+function coordinateComponentForDiagram(diagram: Diagram, expression: string) {
+  const variables = diagram.variables ?? []
+  const result = createCoordinateComponentFromInput(expression, {
+    variableNames: variables.map((variable) => variable.name),
+    previewValues: new Map(
+      variables.map((variable) => [variable.name, variable.previewValue]),
+    ),
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+
+  return result.component
+}
+
+function assertLinkedSymbolicInteriorState(
+  diagram: Diagram,
+  expected: {
+    expression: 'R' | 'S'
+    rValue: number
+    sValue: number
+  },
+): void {
+  const sourcePoint = findPolyline(diagram, 'bottom').points[1]
+  const bottom = pathBoundary(findCoonsPatch(diagram, 'patch').primitive.bottom)
+  const firstSnapshotPoint = bottom.segments[0]?.end
+  const secondSnapshotPoint = bottom.segments[1]?.start
+
+  assert.notEqual(sourcePoint, undefined)
+  assert.notEqual(firstSnapshotPoint, undefined)
+  assert.notEqual(secondSnapshotPoint, undefined)
+  if (
+    sourcePoint === undefined ||
+    firstSnapshotPoint === undefined ||
+    secondSnapshotPoint === undefined
+  ) {
+    throw new Error('Expected the symbolic bottom midpoint in source and snapshot.')
+  }
+
+  for (const value of [sourcePoint, firstSnapshotPoint, secondSnapshotPoint]) {
+    const component = value.symbolic?.z
+
+    assert.equal(value.z, 0.1)
+    assert.equal(component?.kind, 'symbolic')
+    if (component?.kind !== 'symbolic') {
+      throw new Error('Expected a symbolic z component.')
+    }
+    assert.equal(component.expression, expected.expression)
+    assert.equal(component.previewValue, 0.1)
+  }
+
+  const r = diagram.variables?.find((variable) => variable.name === 'R')
+  const s = diagram.variables?.find((variable) => variable.name === 'S')
+
+  assert.equal(r?.expression, `${expected.rValue}`)
+  assert.equal(r?.previewValue, expected.rValue)
+  assert.equal(s?.expression, `${expected.sValue}`)
+  assert.equal(s?.previewValue, expected.sValue)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(diagram, 'patch'), {
+    kind: 'linkedUpToDate',
+  })
+
+  const validation = validateDiagram(diagram)
+
+  assert.equal(validation.valid, true, JSON.stringify(validation.errors))
 }
 
 function createConstantPointSourceDiagram(
