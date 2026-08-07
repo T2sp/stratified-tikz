@@ -129,6 +129,7 @@ export function EditableInspector({
                 selection={selectedElement}
                 count={selectedElementCount(selectedElement)}
                 onCoordinateTranslate={onCoordinateTranslate}
+                onBulkDuplicate={onBulkDuplicate}
               />
             ) : (
               <BulkSelectionInspector
@@ -185,6 +186,7 @@ export function EditableInspector({
         diagram={diagram}
         anchor={selected.element}
         onDiagramChange={onDiagramChange}
+        onBulkDuplicate={onBulkDuplicate}
       />
     ) : (
       <TextLabelInspector
@@ -236,11 +238,13 @@ function CoordinateAnchorMultiSelectionInspector({
   selection,
   count,
   onCoordinateTranslate,
+  onBulkDuplicate,
 }: {
   diagram: Diagram
   selection: MultiSelectedElement
   count: number
   onCoordinateTranslate: (translation: TranslationVector) => string
+  onBulkDuplicate: () => void
 }) {
   const [dxInput, setDxInput] = useState('0')
   const [dyInput, setDyInput] = useState('0')
@@ -363,6 +367,22 @@ function CoordinateAnchorMultiSelectionInspector({
           )}
         </form>
       </section>
+      <section className="inspector-section">
+        <h3>Actions</h3>
+        <div className="inspector-form">
+          <div className="inspector-field">
+            <span className="inspector-field-label">Duplicate coordinates</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              title={`Duplicate ${count} selected coordinates`}
+              onClick={onBulkDuplicate}
+            >
+              Duplicate
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
@@ -401,10 +421,12 @@ function CoordinateAnchorInspector({
   diagram,
   anchor,
   onDiagramChange,
+  onBulkDuplicate,
 }: {
   diagram: Diagram
   anchor: CoordinateAnchor
   onDiagramChange: DiagramChangeHandler
+  onBulkDuplicate: () => void
 }) {
   const model = createCoordinateAnchorInspectorModel(diagram, anchor)
   const positionPoint = coordinateAnchorPointForInspector(diagram, anchor)
@@ -503,6 +525,17 @@ function CoordinateAnchorInspector({
           )}
           <ReadOnlyField label="Preview" value={model.preview} />
           <ReadOnlyField label="Usage" value={model.usageMessage} />
+          <div className="inspector-field">
+            <span className="inspector-field-label">Duplicate coordinate</span>
+            <button
+              type="button"
+              className="toolbar-button"
+              title="Duplicate this coordinate and select the copy"
+              onClick={onBulkDuplicate}
+            >
+              Duplicate coordinate
+            </button>
+          </div>
           <div className="inspector-field inspector-field-with-note">
             <span className="inspector-field-label">Delete coordinate</span>
             <button

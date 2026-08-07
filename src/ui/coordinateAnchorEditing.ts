@@ -174,6 +174,7 @@ export function createCoordinateAnchorInspectorModel(
       ...coordinateLabels.map((label) => ({ label })),
       { label: 'Preview' },
       { label: 'Usage' },
+      { label: 'Duplicate coordinate' },
       { label: 'Delete coordinate' },
     ],
     sourceLabel:

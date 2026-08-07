@@ -12,6 +12,7 @@ import { collectTopLevelDiagramIds } from '../model/diagramIds.ts'
 import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
+import { createCoordinateAnchor } from '../model/coordinateAnchors.ts'
 import {
   detachCoordinateReferencesInElements,
 } from '../model/coordinateReferences.ts'
@@ -31,6 +32,7 @@ import {
 } from '../model/pathArrows.ts'
 import type {
   ClosedPathBoundary,
+  CoordinateAnchor,
   CurveStratum,
   CurveStyleSegment,
   Diagram,
@@ -766,6 +768,15 @@ export function duplicateSelectedElements(
   diagram: Diagram,
   selection: SelectedElement,
 ): BulkDuplicateSelectedElementsResult {
+  const selectedCoordinateAnchors = existingSelectedCoordinateAnchors(
+    diagram,
+    selection,
+  )
+
+  if (selectedCoordinateAnchors.length > 0) {
+    return duplicateSelectedCoordinateAnchors(diagram, selectedCoordinateAnchors)
+  }
+
   const selected = existingSelectedElements(diagram, selection)
 
   if (selected.length === 0) {
@@ -839,6 +850,47 @@ export function duplicateSelectedElements(
     duplicatedCount: copiedStrata.length + copiedLabels.length,
     idChanges,
     pathLabelChanges,
+  }
+}
+
+function duplicateSelectedCoordinateAnchors(
+  diagram: Diagram,
+  selectedCoordinateAnchors: readonly CoordinateAnchor[],
+): BulkDuplicateSelectedElementsResult {
+  const topLevelIdAllocator = createUniqueIdAllocator(
+    collectTopLevelDiagramIds(diagram),
+  )
+  const coordinateAnchors = [...(diagram.coordinateAnchors ?? [])]
+  const copiedSelection: SingleSelectedElement[] = []
+  const idChanges: BulkDuplicateIdChange[] = []
+
+  for (const anchor of selectedCoordinateAnchors) {
+    const copiedId = topLevelIdAllocator.allocate(anchor.id)
+    const copied = createCoordinateAnchor(
+      { ...diagram, coordinateAnchors },
+      {
+        id: copiedId,
+        name: anchor.name,
+        tikzName: anchor.tikzName,
+        position: anchor.position,
+        ...(anchor.locked === undefined ? {} : { locked: anchor.locked }),
+      },
+    )
+
+    coordinateAnchors.push(copied)
+    copiedSelection.push({ kind: 'coordinate', id: copied.id })
+    idChanges.push({ sourceId: anchor.id, copiedId: copied.id })
+  }
+
+  return {
+    diagram: {
+      ...diagram,
+      coordinateAnchors,
+    },
+    selectedElement: selectedElementFromElements(copiedSelection),
+    duplicatedCount: copiedSelection.length,
+    idChanges,
+    pathLabelChanges: [],
   }
 }
 
@@ -1504,6 +1556,32 @@ function existingSelectedElements(
   }
 
   return elements
+}
+
+function existingSelectedCoordinateAnchors(
+  diagram: Diagram,
+  selection: SelectedElement,
+): CoordinateAnchor[] {
+  const anchorsById = new Map(
+    (diagram.coordinateAnchors ?? []).map((anchor) => [anchor.id, anchor]),
+  )
+  const seen = new Set<string>()
+  const anchors: CoordinateAnchor[] = []
+
+  for (const selectedElement of selectedElements(selection)) {
+    if (selectedElement.kind !== 'coordinate' || seen.has(selectedElement.id)) {
+      continue
+    }
+
+    seen.add(selectedElement.id)
+    const anchor = anchorsById.get(selectedElement.id)
+
+    if (anchor !== undefined) {
+      anchors.push(anchor)
+    }
+  }
+
+  return anchors
 }
 
 function selectedElementKeySet(selection: SelectedElement): Set<string> {

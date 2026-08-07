@@ -24,6 +24,7 @@ import {
 import type {
   BoundaryPathSnapshot,
   CoonsPatchBoundarySources,
+  CoordinateAnchor,
   CoordinateAnchorPosition,
   CoordinateComponent,
   CurvedSheetStratum,
@@ -260,16 +261,144 @@ test('bulk duplicate reserves coordinate anchor ids for copied strata and labels
   assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
-test('bulk duplicate skips selected coordinate anchors', () => {
+test('bulk duplicate copies a selected coordinate anchor with unique identities', () => {
   const diagram = createBulkCoordinateReferenceDiagram()
+  const source = findCoordinateAnchor(diagram, 'coord-a')
+
+  source.locked = true
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const copied = findCoordinateAnchor(result.diagram, 'coord-a-copy')
+
+  assert.equal(result.duplicatedCount, 1)
+  assert.deepEqual(result.idChanges, [
+    { sourceId: 'coord-a', copiedId: 'coord-a-copy' },
+  ])
+  assert.deepEqual(result.selectedElement, {
+    kind: 'coordinate',
+    id: 'coord-a-copy',
+  })
+  assert.equal(copied.name, source.name)
+  assert.equal(copied.tikzName, 'A2')
+  assert.equal(copied.locked, true)
+  assert.deepEqual(copied.position, source.position)
+  assert.notEqual(copied.position, source.position)
+  assert.equal(
+    coordinateReferenceSourceForPoint(
+      findCurve(result.diagram, 'ref-path').points[0],
+    )?.coordinateId,
+    'coord-a',
+  )
+  assert.equal(result.diagram.layers, diagram.layers)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('bulk duplicate copies multiple selected coordinate anchors in selection order', () => {
+  const diagram = createBulkCoordinateReferenceDiagram()
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-b' },
+      { kind: 'coordinate', id: 'coord-a' },
+      { kind: 'coordinate', id: 'coord-b' },
+    ],
+  })
+
+  assert.equal(result.duplicatedCount, 2)
+  assert.deepEqual(result.idChanges, [
+    { sourceId: 'coord-b', copiedId: 'coord-b-copy' },
+    { sourceId: 'coord-a', copiedId: 'coord-a-copy' },
+  ])
+  assert.deepEqual(result.selectedElement, {
+    kind: 'multi',
+    elements: [
+      { kind: 'coordinate', id: 'coord-b-copy' },
+      { kind: 'coordinate', id: 'coord-a-copy' },
+    ],
+  })
+  assert.deepEqual(
+    [
+      findCoordinateAnchor(result.diagram, 'coord-b-copy').tikzName,
+      findCoordinateAnchor(result.diagram, 'coord-a-copy').tikzName,
+    ],
+    ['B2', 'A2'],
+  )
+  assert.deepEqual(
+    findCoordinateAnchor(result.diagram, 'coord-b-copy').position,
+    findCoordinateAnchor(diagram, 'coord-b').position,
+  )
+  assert.equal(result.diagram.coordinateAnchors?.length, 5)
+  assertTopLevelIdsUnique(result.diagram)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('coordinate duplicate preserves work-plane-local position data', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const source = createCoordinateAnchor(diagram, {
+    id: 'coord-local',
+    name: 'Local',
+    tikzName: 'Local',
+    position: workPlaneLocalAnchorPositionForBulkTest(),
+  })
+
+  diagram.coordinateAnchors = [source]
+  const result = duplicateSelectedElements(diagram, {
+    kind: 'coordinate',
+    id: source.id,
+  })
+  const copied = findCoordinateAnchor(result.diagram, 'coord-local-copy')
+
+  assert.deepEqual(copied.position, source.position)
+  assert.notEqual(copied.position, source.position)
+  assert.equal(copied.position.kind, 'workPlaneLocal')
+  if (
+    copied.position.kind !== 'workPlaneLocal' ||
+    source.position.kind !== 'workPlaneLocal'
+  ) {
+    throw new Error('Expected work-plane-local coordinate positions.')
+  }
+  assert.notEqual(copied.position.frame, source.position.frame)
+  assert.notEqual(copied.position.local, source.position.local)
+  assert.equal(validateDiagram(result.diagram).valid, true)
+})
+
+test('coordinate duplicate ids avoid stratum, label, and anchor collisions', () => {
+  const diagram = createBulkCoordinateReferenceDiagram()
+
+  diagram.strata.push(
+    createPointStratum({
+      ambientDimension: 2,
+      id: 'coord-a-copy',
+      position: { x: 0, y: 2, z: 0 },
+    }),
+  )
+  diagram.labels.push(
+    createTextLabel({
+      ambientDimension: 2,
+      id: 'coord-a-copy-1',
+      text: 'reserved',
+      position: { x: 0, y: 3, z: 0 },
+    }),
+  )
+  diagram.coordinateAnchors?.push(
+    createCoordinateAnchor(diagram, {
+      id: 'coord-a-copy-2',
+      name: 'Reserved coordinate ID',
+      tikzName: 'ReservedCoordinateId',
+      position: globalAnchorPositionForBulkTest(0, 4, 0),
+    }),
+  )
   const result = duplicateSelectedElements(diagram, {
     kind: 'coordinate',
     id: 'coord-a',
   })
 
-  assert.equal(result.duplicatedCount, 0)
-  assert.equal(result.selectedElement, null)
-  assert.deepEqual(result.diagram.coordinateAnchors, diagram.coordinateAnchors)
+  assert.deepEqual(result.idChanges, [
+    { sourceId: 'coord-a', copiedId: 'coord-a-copy-3' },
+  ])
+  assertTopLevelIdsUnique(result.diagram)
   assert.equal(validateDiagram(result.diagram).valid, true)
 })
 
@@ -779,6 +908,27 @@ test('undo and redo work for bulk duplicate', () => {
   assert.equal(hasStratum(redone.editableDiagram, 'curve-a-copy'), true)
 })
 
+test('undo and redo work for selected coordinate duplication', () => {
+  const diagram = createBulkCoordinateReferenceDiagram()
+  const initial = createBulkState(diagram, {
+    kind: 'coordinate',
+    id: 'coord-a',
+  })
+  const duplicated = applyBulkDuplicateToEditorState(initial)
+  const undone = undoLastDiagramChange(duplicated)
+  const redone = redoLastDiagramChange(undone)
+
+  assert.equal(hasCoordinateAnchor(duplicated.editableDiagram, 'coord-a-copy'), true)
+  assert.deepEqual(duplicated.selectedElement, {
+    kind: 'coordinate',
+    id: 'coord-a-copy',
+  })
+  assert.equal(duplicated.layerOperationStatus, 'Duplicated 1 selected object.')
+  assert.equal(hasCoordinateAnchor(undone.editableDiagram, 'coord-a-copy'), false)
+  assert.equal(hasCoordinateAnchor(redone.editableDiagram, 'coord-a-copy'), true)
+  assert.equal(duplicated.layerFilter, initial.layerFilter)
+})
+
 test('TikZ output reflects bulk style and layer edits', () => {
   const styled = applyBulkStyleField(
     createBulkCurveDiagram(),
@@ -1164,6 +1314,23 @@ function globalAnchorPositionForBulkTest(
   }
 }
 
+function workPlaneLocalAnchorPositionForBulkTest(): CoordinateAnchorPosition {
+  return {
+    kind: 'workPlaneLocal',
+    frame: {
+      origin: { x: 1, y: 2, z: 3 },
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    local: {
+      a: { kind: 'numeric', value: 2 },
+      b: { kind: 'numeric', value: -1 },
+    },
+    preview: { x: 3, y: 1, z: 3 },
+  }
+}
+
 function coordinateReferencePointForBulkTest(
   diagram: Diagram,
   coordinateId: string,
@@ -1507,6 +1674,25 @@ function findCurve(diagram: Diagram, id: string): CurveStratum {
   }
 
   return stratum
+}
+
+function findCoordinateAnchor(
+  diagram: Diagram,
+  id: string,
+): CoordinateAnchor {
+  const anchor = diagram.coordinateAnchors?.find(
+    (candidate) => candidate.id === id,
+  )
+
+  if (anchor === undefined) {
+    throw new Error(`Expected ${id} to be a coordinate anchor.`)
+  }
+
+  return anchor
+}
+
+function hasCoordinateAnchor(diagram: Diagram, id: string): boolean {
+  return diagram.coordinateAnchors?.some((anchor) => anchor.id === id) ?? false
 }
 
 function findPoint(diagram: Diagram, id: string): PointStratum {

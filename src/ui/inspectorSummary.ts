@@ -145,7 +145,7 @@ function createMultiSelectionCompactSummary(
         selected.length,
       )} selected`,
       layer: null,
-      detail: 'Translate coordinates.',
+      detail: 'Translate and duplicate coordinates.',
     }
   }
 

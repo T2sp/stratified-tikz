@@ -91,6 +91,7 @@ test('coordinate inspector model shows coordinate fields without layer or style 
     'z',
     'Preview',
     'Usage',
+    'Duplicate coordinate',
     'Delete coordinate',
   ])
   assert.equal(model.sourceLabel, 'Global xyz')
@@ -121,6 +122,27 @@ test('coordinate multi-selection inspector exposes direct translation controls',
   assert.match(inspectorSource, /label="dz"/)
   assert.match(inspectorSource, /2D coordinates keep z = 0\./)
   assert.match(inspectorSource, /Apply/)
+  assert.match(inspectorSource, /onClick=\{onBulkDuplicate\}/)
+  assert.match(inspectorSource, /Duplicate coordinates/)
+})
+
+test('single coordinate inspector exposes duplicate action', () => {
+  const inspectorStart = editableInspectorSource.indexOf(
+    'function CoordinateAnchorInspector',
+  )
+  const inspectorEnd = editableInspectorSource.indexOf(
+    'function coordinateAnchorPointForInspector',
+    inspectorStart,
+  )
+  const inspectorSource = editableInspectorSource.slice(
+    inspectorStart,
+    inspectorEnd,
+  )
+
+  assert.ok(inspectorStart >= 0)
+  assert.ok(inspectorEnd > inspectorStart)
+  assert.match(inspectorSource, /onClick=\{onBulkDuplicate\}/)
+  assert.match(inspectorSource, /Duplicate coordinate/)
 })
 
 test('coordinate rename updates the anchor name', () => {
