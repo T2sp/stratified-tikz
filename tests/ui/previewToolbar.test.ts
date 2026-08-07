@@ -23,6 +23,7 @@ import {
   addPathMenuItems,
   addSheetMenuGroups,
   addSheetMenuItems,
+  activeToolSupportsCoordinateAnchorCursorSource,
   activeToolSupportsCursorCreation,
   directPathInputModeItems,
   closeToolbarPalette,
@@ -67,6 +68,28 @@ test('coordinate anchor visibility control exposes show and hide labels', () => 
     coordinateAnchorVisibilityAriaLabel(false),
     'Show coordinate anchors in preview',
   )
+})
+
+test('polygon sheet cursor creation accepts coordinate anchor sources', () => {
+  assert.equal(
+    activeToolSupportsCoordinateAnchorCursorSource('createSheet', 'polygon'),
+    true,
+  )
+
+  for (const sheetCreationKind of [
+    'hemisphere',
+    'ruledSurface',
+    'coonsPatch',
+    'saddle',
+  ] as const) {
+    assert.equal(
+      activeToolSupportsCoordinateAnchorCursorSource(
+        'createSheet',
+        sheetCreationKind,
+      ),
+      false,
+    )
+  }
 })
 
 test('opening Add point palette sets the open toolbar palette', () => {

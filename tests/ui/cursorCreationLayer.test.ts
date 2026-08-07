@@ -12,9 +12,12 @@ import {
   constructWorkPlaneFromThreePoints,
   pointOnWorkPlane,
 } from '../../src/geometry/workPlane.ts'
+import { createCoordinateAnchor } from '../../src/model/coordinateAnchors.ts'
 import { createEmptyDiagram } from '../../src/model/constructors.ts'
+import { coordinateReferenceSourceForPoint } from '../../src/model/coordinateReferences.ts'
 import type {
   Camera3D,
+  CoordinateAnchorPosition,
   CurveStratum,
   Diagram,
   PolygonSheetStratum,
@@ -37,11 +40,18 @@ import {
   parseDirectLayerInput,
   updateStratumById,
 } from '../../src/ui/diagramUpdates.ts'
-import { resolvePointStratumCoordinateForCursorCreation } from '../../src/ui/coordinateSources.ts'
+import {
+  resolveCoordinateAnchorReferenceForCursorCreation,
+  resolvePointStratumCoordinateForCursorCreation,
+} from '../../src/ui/coordinateSources.ts'
 import type { LayerFilter } from '../../src/ui/layerFilter.ts'
 import { layerFilterIncludesLayer } from '../../src/ui/layerFilter.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
-import { isPointOnWorkPlane } from '../../src/ui/sheetDraft.ts'
+import {
+  appendSheetPolygonDraftPoint,
+  createSheetPolygonDraft,
+  isPointOnWorkPlane,
+} from '../../src/ui/sheetDraft.ts'
 
 type TestEditorState = {
   editableDiagram: Diagram
@@ -574,6 +584,90 @@ test('cursor polygon sheet creation can copy existing point strata on the active
   assert.deepEqual(findPolygonSheet(result.diagram, result.id).vertices, vertices)
 })
 
+test('3D polygon sheet cursor creation recognizes coordinate anchor vertices', () => {
+  const workPlane: WorkPlane = { kind: 'xy', z: 2 }
+  const sourceDiagram = createEmptyDiagram({ ambientDimension: 3 })
+  const coordinateAnchors = [
+    { id: 'coord-a', name: 'A', position: [0.26, 0.74, 2] },
+    { id: 'coord-b', name: 'B', position: [1.33, 0.27, 2] },
+    { id: 'coord-c', name: 'C', position: [0.61, 1.42, 2] },
+    { id: 'coord-off-plane', name: 'D', position: [4, 5, 3] },
+  ] as const
+  sourceDiagram.coordinateAnchors = coordinateAnchors.map(
+    ({ id, name, position: [x, y, z] }) =>
+      createCoordinateAnchor(sourceDiagram, {
+        id,
+        name,
+        tikzName: name,
+        position: globalCoordinateAnchorPosition(x, y, z),
+      }),
+  )
+
+  const vertices = ['coord-a', 'coord-b', 'coord-c'].map((coordinateId) => {
+    const result = resolveCoordinateAnchorReferenceForCursorCreation(
+      sourceDiagram,
+      coordinateId,
+      { workPlane },
+    )
+
+    if (!result.ok) {
+      throw new Error(`Expected ${coordinateId} to resolve as a cursor source.`)
+    }
+
+    return result.point
+  })
+  let draft = createSheetPolygonDraft(vertices[0], workPlane)
+  draft = appendSheetPolygonDraftPoint(draft, vertices[1])
+  draft = appendSheetPolygonDraftPoint(draft, vertices[2])
+  const result = addPolygonSheetStratumWithResult(
+    sourceDiagram,
+    draft.points,
+    { id: 'cursor-coordinate-sheet' },
+  )
+
+  assert.notEqual(result.id, null)
+  if (result.id === null) {
+    throw new Error('Expected polygon sheet creation to succeed.')
+  }
+
+  const sheet = findPolygonSheet(result.diagram, result.id)
+
+  assert.deepEqual(
+    sheet.vertices.map(
+      (vertex) => coordinateReferenceSourceForPoint(vertex)?.coordinateId,
+    ),
+    ['coord-a', 'coord-b', 'coord-c'],
+  )
+  assert.deepEqual(
+    sheet.vertices.map(({ x, y, z }) => ({ x, y, z })),
+    [
+      { x: 0.26, y: 0.74, z: 2 },
+      { x: 1.33, y: 0.27, z: 2 },
+      { x: 0.61, y: 1.42, z: 2 },
+    ],
+  )
+  assert.match(
+    generateTikz(result.diagram),
+    /\(A\) -- \(B\) -- \(C\) -- cycle;/,
+  )
+
+  assert.deepEqual(
+    resolveCoordinateAnchorReferenceForCursorCreation(
+      sourceDiagram,
+      'coord-off-plane',
+      { workPlane },
+    ),
+    {
+      ok: false,
+      reason: 'offPlaneOrInvalid',
+      source: {
+        kind: 'coordinateAnchor',
+        coordinateId: 'coord-off-plane',
+      },
+    },
+  )
+})
+
 test('cursor point source creation is copy-on-create after source points move', () => {
   const pointResult = addPointStratumWithResult(
     createEmptyDiagram({ ambientDimension: 3 }),
@@ -856,4 +950,19 @@ function findPolygonSheet(
   }
 
   return stratum
+}
+
+function globalCoordinateAnchorPosition(
+  x: number,
+  y: number,
+  z: number,
+): CoordinateAnchorPosition {
+  return {
+    kind: 'global',
+    value: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: { kind: 'numeric', value: z },
+    },
+  }
 }

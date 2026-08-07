@@ -104,6 +104,26 @@ export function activeToolSupportsCursorCreation(
   }
 }
 
+export function activeToolSupportsCoordinateAnchorCursorSource(
+  tool: WorkPlanePreviewTool,
+  sheetCreationKind: PreviewSheetCreationKind | 'saddle',
+): boolean {
+  switch (tool) {
+    case 'createPoint':
+    case 'createLabel':
+    case 'createPolyline':
+    case 'createCubicBezier':
+    case 'createPath':
+      return true
+    case 'createSheet':
+      return sheetCreationKind === 'polygon'
+    case 'select':
+    case 'createCoordinate':
+    case 'createGrid':
+      return false
+  }
+}
+
 export function shouldHandlePreviewCanvasCreationClick(
   tool: WorkPlanePreviewTool,
   inputMode: CoordinateInputMode,

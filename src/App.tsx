@@ -335,6 +335,7 @@ import {
   addPathMenuItems,
   addSheetMenuGroups,
   addSheetMenuItems,
+  activeToolSupportsCoordinateAnchorCursorSource,
   defaultPreviewCoordinateInputMode,
   defaultSvgPreviewBackgroundMode,
   defaultSvgPreviewExportFilename,
@@ -3513,11 +3514,10 @@ function App() {
     placementWorkPlane: WorkPlane,
   ): boolean {
     const isCoordinateAnchorCursorCreationTool =
-      creationTool === 'createPath' ||
-      creationTool === 'createPolyline' ||
-      creationTool === 'createCubicBezier' ||
-      creationTool === 'createPoint' ||
-      creationTool === 'createLabel'
+      activeToolSupportsCoordinateAnchorCursorSource(
+        creationTool,
+        sheetCreationKind,
+      )
 
     if (!isCoordinateAnchorCursorCreationTool) {
       return false
