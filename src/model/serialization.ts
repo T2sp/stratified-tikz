@@ -896,7 +896,7 @@ function toPersistentDiagram(
       ? undefined
       : cleanedDiagram.pathCrossings
 
-  return {
+  const persistentDiagram: PersistentDiagram = {
     version: cleanedDiagram.version,
     ambientDimension: cleanedDiagram.ambientDimension,
     ...(view === undefined ? {} : { view }),
@@ -914,6 +914,10 @@ function toPersistentDiagram(
     labels: cleanedDiagram.labels,
     ...(pathCrossings === undefined ? {} : { pathCrossings }),
   }
+
+  return normalizeDerivedCoordinatePreviewCaches(
+    persistentDiagram,
+  ).value as PersistentDiagram
 }
 
 function normalizePersistentLayers(diagram: Diagram): DiagramLayer[] | undefined {
@@ -987,33 +991,44 @@ function normalizeLoadedDiagram(
   options: LoadedDiagramNormalizationOptions = {},
 ): LoadedDiagramNormalization {
   const warnings: string[] = []
+  const previewNormalization = normalizeDerivedCoordinatePreviewCaches(
+    savedDiagram,
+  )
+  const normalizedSavedDiagram = previewNormalization.value as SavedDiagramInput
+
+  if (previewNormalization.normalizedCount > 0) {
+    warnings.push(
+      `${previewNormalization.normalizedCount} derived coordinate preview ${previewNormalization.normalizedCount === 1 ? 'cache was' : 'caches were'} normalized.`,
+    )
+  }
+
   const shouldRefreshSymbolicPreviews =
     options.refreshSymbolicPreviews !== false
-  const camera = normalizeLoadedCamera(savedDiagram, warnings)
-  const view = normalizeLoadedView(savedDiagram, camera, warnings)
+  const camera = normalizeLoadedCamera(normalizedSavedDiagram, warnings)
+  const view = normalizeLoadedView(normalizedSavedDiagram, camera, warnings)
   const sourceNormalization = normalizeLoadedExternalTikzStyleSources(
-    savedDiagram.externalTikzStyleSources,
+    normalizedSavedDiagram.externalTikzStyleSources,
   )
   warnings.push(...sourceNormalization.warnings)
   const referenceNormalization = normalizeLoadedImportedTikzStyleReferences(
-    savedDiagram.importedTikzStyleReferences,
+    normalizedSavedDiagram.importedTikzStyleReferences,
     sourceNormalization.externalTikzStyleSources,
   )
   warnings.push(...referenceNormalization.warnings)
   const presetNormalization = normalizeLoadedUserStylePresets(
-    savedDiagram.userStylePresets,
+    normalizedSavedDiagram.userStylePresets,
   )
   warnings.push(...presetNormalization.warnings)
   const variableNormalization =
     options.variables === 'structural'
-      ? normalizeLoadedVariablesStructurally(savedDiagram.variables)
-      : normalizeLoadedVariables(savedDiagram.variables)
+      ? normalizeLoadedVariablesStructurally(normalizedSavedDiagram.variables)
+      : normalizeLoadedVariables(normalizedSavedDiagram.variables)
   warnings.push(...variableNormalization.warnings)
   const coordinateAnchorNormalization = normalizeLoadedCoordinateAnchors(
-    savedDiagram.coordinateAnchors,
+    normalizedSavedDiagram.coordinateAnchors,
   )
   warnings.push(...coordinateAnchorNormalization.warnings)
-  const strata = normalizeLoadedStrata(savedDiagram.strata)
+  const strata = normalizeLoadedStrata(normalizedSavedDiagram.strata)
 
   const styleMetadataErrors = [
     ...sourceNormalization.errors,
@@ -1026,8 +1041,8 @@ function normalizeLoadedDiagram(
   if (styleMetadataErrors.length > 0) {
     return {
       diagram: {
-        version: savedDiagram.version,
-        ambientDimension: savedDiagram.ambientDimension,
+        version: normalizedSavedDiagram.version,
+        ambientDimension: normalizedSavedDiagram.ambientDimension,
         camera,
         ...(view === undefined ? {} : { view }),
         ...(sourceNormalization.externalTikzStyleSources === undefined
@@ -1047,7 +1062,7 @@ function normalizeLoadedDiagram(
           : { variables: variableNormalization.variables }),
         coordinateAnchors: coordinateAnchorNormalization.coordinateAnchors,
         strata,
-        labels: savedDiagram.labels as TextLabel[],
+        labels: normalizedSavedDiagram.labels as TextLabel[],
       },
       warnings,
       errors: styleMetadataErrors,
@@ -1055,8 +1070,8 @@ function normalizeLoadedDiagram(
   }
 
   const diagramWithoutLayers: Diagram = {
-    version: savedDiagram.version,
-    ambientDimension: savedDiagram.ambientDimension,
+    version: normalizedSavedDiagram.version,
+    ambientDimension: normalizedSavedDiagram.ambientDimension,
     camera,
     ...(view === undefined ? {} : { view }),
     ...(sourceNormalization.externalTikzStyleSources === undefined
@@ -1079,11 +1094,11 @@ function normalizeLoadedDiagram(
       : { variables: variableNormalization.variables }),
     coordinateAnchors: coordinateAnchorNormalization.coordinateAnchors,
     strata,
-    labels: savedDiagram.labels as TextLabel[],
+    labels: normalizedSavedDiagram.labels as TextLabel[],
   }
   const layerNormalization = normalizeLoadedLayers(
     diagramWithoutLayers,
-    savedDiagram.layers,
+    normalizedSavedDiagram.layers,
   )
   warnings.push(...layerNormalization.warnings)
 
@@ -1095,7 +1110,7 @@ function normalizeLoadedDiagram(
   }
   const pathCrossingNormalization = normalizeLoadedPathCrossingStates(
     diagramWithoutPathCrossings,
-    savedDiagram.pathCrossings,
+    normalizedSavedDiagram.pathCrossings,
   )
   warnings.push(...pathCrossingNormalization.warnings)
 
@@ -1176,6 +1191,75 @@ function normalizeLoadedDiagram(
     warnings,
     errors: [...layerNormalization.errors, ...coordinateRefresh.errors],
   }
+}
+
+type DerivedCoordinatePreviewNormalization = {
+  value: unknown
+  normalizedCount: number
+}
+
+function normalizeDerivedCoordinatePreviewCaches(
+  value: unknown,
+): DerivedCoordinatePreviewNormalization {
+  if (Array.isArray(value)) {
+    const normalizedItems = value.map(normalizeDerivedCoordinatePreviewCaches)
+
+    return {
+      value: normalizedItems.map((item) => item.value),
+      normalizedCount: normalizedItems.reduce(
+        (count, item) => count + item.normalizedCount,
+        0,
+      ),
+    }
+  }
+
+  if (!isRecord(value)) {
+    return { value, normalizedCount: 0 }
+  }
+
+  let normalizedCount = 0
+  const normalizedEntries = Object.entries(value).map(([key, child]) => {
+    const normalizedChild = normalizeDerivedCoordinatePreviewCaches(child)
+    normalizedCount += normalizedChild.normalizedCount
+    return [key, normalizedChild.value] as const
+  })
+  const normalizedRecord = Object.fromEntries(normalizedEntries) as Record<
+    string,
+    unknown
+  >
+  const preview = normalizedRecord.preview
+
+  if (
+    isDerivedCoordinatePreviewOwner(normalizedRecord) &&
+    isRecord(preview) &&
+    preview.symbolic !== undefined &&
+    typeof preview.x === 'number' &&
+    Number.isFinite(preview.x) &&
+    typeof preview.y === 'number' &&
+    Number.isFinite(preview.y) &&
+    typeof preview.z === 'number' &&
+    Number.isFinite(preview.z)
+  ) {
+    normalizedRecord.preview = {
+      x: preview.x,
+      y: preview.y,
+      z: preview.z,
+    }
+    normalizedCount += 1
+  }
+
+  return { value: normalizedRecord, normalizedCount }
+}
+
+function isDerivedCoordinatePreviewOwner(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    value.kind === 'coordinateRef' ||
+    (value.kind === 'workPlaneLocal' &&
+      isRecord(value.frame) &&
+      isRecord(value.local))
+  )
 }
 
 function normalizeLoadedStrata(savedStrata: unknown[]): Stratum[] {

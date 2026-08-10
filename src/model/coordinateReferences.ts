@@ -308,7 +308,7 @@ export function cloneCoordinateSource(source: CoordinateSource): CoordinateSourc
       return {
         kind: 'coordinateRef',
         coordinateId: source.coordinateId,
-        preview: cloneVec3(source.preview),
+        preview: concreteVec3(source.preview),
       }
   }
 }
@@ -3885,7 +3885,7 @@ function vec3FromCoordinateReference(
   coordinateId: string,
   preview: Vec3,
 ): Vec3 {
-  const normalizedPreview = cloneVec3(preview)
+  const normalizedPreview = concreteVec3(preview)
 
   return {
     ...normalizedPreview,
@@ -3896,7 +3896,7 @@ function vec3FromCoordinateReference(
       source: {
         kind: 'coordinateRef',
         coordinateId,
-        preview: cloneVec3(normalizedPreview),
+        preview: concreteVec3(normalizedPreview),
       },
     },
   }
@@ -3905,7 +3905,7 @@ function vec3FromCoordinateReference(
 function unresolvedCoordinateReferenceVec3(
   source: CoordinateReferenceSource,
 ): Vec3 {
-  const preview = cloneVec3(source.preview)
+  const preview = concreteVec3(source.preview)
 
   return {
     x: Number.NaN,

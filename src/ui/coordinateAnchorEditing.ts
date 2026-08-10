@@ -781,7 +781,7 @@ function workPlaneLocalCoordinateAnchorPositionFromPoint(
         a: numericScalarInputValue(local.a),
         b: numericScalarInputValue(local.b),
       },
-      preview: normalizePointForAmbientDimension(3, point),
+      preview: { x: point.x, y: point.y, z: point.z },
     }
   } catch {
     return null

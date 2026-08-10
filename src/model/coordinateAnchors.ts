@@ -108,7 +108,7 @@ export function cloneCoordinateAnchorPosition(
           a: cloneScalarInputValue(position.local.a),
           b: cloneScalarInputValue(position.local.b),
         },
-        preview: cloneVec3(position.preview),
+        preview: concreteVec3(position.preview),
       }
   }
 }
@@ -201,7 +201,7 @@ function normalizeAnchorPreviewPoint(
 ): Vec3 {
   return ambientDimension === 2
     ? { x: point.x, y: point.y, z: 0 }
-    : cloneVec3(point)
+    : concreteVec3(point)
 }
 
 function cloneSymbolicVec3(value: SymbolicVec3): SymbolicVec3 {
@@ -223,7 +223,7 @@ function cloneCoordinateSource(source: CoordinateSource): CoordinateSource {
       return {
         kind: 'coordinateRef',
         coordinateId: source.coordinateId,
-        preview: cloneVec3(source.preview),
+        preview: concreteVec3(source.preview),
       }
   }
 }
@@ -287,6 +287,14 @@ function cloneVec3(point: Vec3): Vec3 {
         z: point.z,
         symbolic: cloneSymbolicVec3(point.symbolic),
       }
+}
+
+function concreteVec3(point: Vec3): Vec3 {
+  return {
+    x: point.x,
+    y: point.y,
+    z: point.z,
+  }
 }
 
 function cloneScalarInputValue(value: ScalarInputValue): ScalarInputValue {

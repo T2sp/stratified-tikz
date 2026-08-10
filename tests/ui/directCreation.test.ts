@@ -31,6 +31,7 @@ import {
   coordinateReferenceVec3ForAnchorId,
   resolveDiagramCoordinateRefs,
 } from '../../src/model/coordinateReferences.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -3444,6 +3445,63 @@ test('existing coordinate anchor source creates direct coordinate references', (
   assert.equal(firstPoint.symbolic.source.coordinateId, 'coord-a')
   assert.match(generateTikz(pathResult.diagram), /\\coordinate \(A\) at \(4,5\);/)
   assert.match(generateTikz(pathResult.diagram), /\(A\) -- \(curvePoly[^)]*p1\);/)
+})
+
+test('direct work-plane-local coordinate references use plain preview caches', () => {
+  const diagram = createSymbolicThreeDimensionalDiagram()
+  const workPlane: WorkPlane = { kind: 'xz', y: 3 }
+  const anchorResult = addCoordinateAnchorFromDirectInput(
+    diagram,
+    { x: 'R - 8', y: '1', z: '0' },
+    {
+      id: 'coord-local-reference',
+      name: 'Local reference',
+      coordinateMode: 'workPlaneLocal',
+      workPlane,
+      diagram,
+    },
+  )
+
+  assert.equal(anchorResult.ok, true)
+  if (!anchorResult.ok) {
+    throw new Error(anchorResult.error)
+  }
+
+  const source: ExistingCoordinateSource = {
+    kind: 'coordinateAnchor',
+    coordinateId: anchorResult.id,
+  }
+  const pathResult = addPolylineCurveFromDirectInput(
+    anchorResult.diagram,
+    [
+      sourceInput(source),
+      { x: '4', y: '3', z: '1' },
+    ],
+    { id: 'local-reference-path' },
+  )
+
+  assert.equal(pathResult.ok, true)
+  if (!pathResult.ok) {
+    throw new Error(pathResult.error)
+  }
+
+  const anchor = findCoordinateAnchor(pathResult.diagram, anchorResult.id)
+
+  assert.equal(anchor.position.kind, 'workPlaneLocal')
+  if (anchor.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected work-plane-local coordinate anchor.')
+  }
+  assert.deepEqual(anchor.position.preview, { x: 2, y: 3, z: 1 })
+
+  const firstPoint = findCurve(pathResult.diagram, pathResult.id).points[0]
+  const reference = firstPoint?.symbolic?.source
+
+  assert.equal(reference?.kind, 'coordinateRef')
+  if (reference?.kind !== 'coordinateRef') {
+    throw new Error('Expected local coordinate reference.')
+  }
+  assert.deepEqual(reference.preview, { x: 2, y: 3, z: 1 })
+  assert.equal(validateDiagram(pathResult.diagram).valid, true)
 })
 
 test('existing coordinate source labels disambiguate duplicate point names', () => {

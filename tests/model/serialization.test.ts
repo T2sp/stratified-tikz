@@ -50,6 +50,7 @@ import type {
   Vec3,
   WorkPlane,
   WorkPlaneFrameSnapshot,
+  WorkPlaneLocalCoordinateSource,
 } from '../../src/model/types.ts'
 
 test('serializeDiagram includes format, version, and diagram data', () => {
@@ -469,6 +470,109 @@ test('parseSavedDiagramJson rejects dangling coordinate refs after anchor remova
   assert.match(
     parsed.error,
     /Coordinate reference must point to an existing coordinate anchor/,
+  )
+})
+
+test('parseSavedDiagramJson normalizes legacy nested coordinate-ref previews', () => {
+  const parsed = parseSavedDiagramJson(
+    legacyNestedCoordinateReferencePreviewJson(),
+  )
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+
+  const source = requiredLegacyCoordinateReferenceSource(parsed.diagram)
+
+  assert.equal(source.coordinateId, 'coord-local')
+  assert.deepEqual(source.preview, { x: 2, y: 1, z: 0 })
+  assert.deepEqual(parsed.warnings, [
+    '2 derived coordinate preview caches were normalized.',
+  ])
+  assert.equal(validateDiagram(parsed.diagram).valid, true)
+})
+
+test('parseSavedDiagramJsonForImport normalizes legacy nested coordinate-ref previews after variable resolution', () => {
+  const pending = parseSavedDiagramJsonForImport(
+    legacyNestedCoordinateReferencePreviewJson(),
+  )
+
+  assert.equal(pending.ok, true)
+  if (!pending.ok || pending.kind !== 'needsVariableResolution') {
+    throw new Error('Expected legacy coordinate reference import to need R.')
+  }
+  assert.deepEqual(
+    pending.pendingImport.variables.map((variable) => variable.name),
+    ['R'],
+  )
+  assert.deepEqual(pending.pendingImport.warnings, [
+    '2 derived coordinate preview caches were normalized.',
+  ])
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    pending.pendingImport,
+    [{ name: 'R', expression: '2' }],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const source = requiredLegacyCoordinateReferenceSource(resolved.diagram)
+
+  assert.equal(source.coordinateId, 'coord-local')
+  assert.deepEqual(source.preview, { x: 2, y: 1, z: 0 })
+  assert.deepEqual(resolved.warnings, [
+    '2 derived coordinate preview caches were normalized.',
+  ])
+  assert.equal(validateDiagram(resolved.diagram).valid, true)
+})
+
+test('serializeDiagram removes legacy derived preview metadata without mutating the diagram', () => {
+  const diagram = legacyNestedCoordinateReferencePreviewDiagram()
+  const originalJson = JSON.stringify(diagram)
+  const serialized = serializeDiagram(diagram)
+  const saved = JSON.parse(serialized) as { diagram: Diagram }
+  const anchor = saved.diagram.coordinateAnchors?.[0]
+
+  if (anchor?.position.kind !== 'workPlaneLocal') {
+    throw new Error('Expected saved work-plane-local coordinate anchor.')
+  }
+
+  assert.deepEqual(anchor.position.preview, { x: 2, y: 1, z: 0 })
+  assert.deepEqual(
+    requiredLegacyCoordinateReferenceSource(saved.diagram).preview,
+    { x: 2, y: 1, z: 0 },
+  )
+  assert.equal(JSON.stringify(diagram), originalJson)
+})
+
+test('legacy coordinate-ref preview normalization still rejects unsupported local sources elsewhere', () => {
+  const saved = JSON.parse(
+    legacyNestedCoordinateReferencePreviewJson(),
+  ) as {
+    diagram: {
+      strata: Array<Record<string, unknown>>
+    }
+  }
+  const firstStratum = saved.diagram.strata[0]
+
+  if (firstStratum === undefined) {
+    throw new Error('Expected legacy reference stratum.')
+  }
+  firstStratum.unsupportedLocal = legacyPreviewWorkPlaneLocalSource()
+
+  const parsed = parseSavedDiagramJsonForImport(JSON.stringify(saved))
+
+  assert.equal(parsed.ok, false)
+  if (parsed.ok) {
+    throw new Error('Expected unsupported local source rejection.')
+  }
+  assert.match(
+    parsed.error,
+    /strata\[0\]\.unsupportedLocal Unsupported work-plane-local coordinate source/,
   )
 })
 
@@ -2877,6 +2981,124 @@ function savedNumericCoordinateComponent(value: number): unknown {
     kind: 'numeric',
     value,
   }
+}
+
+function legacyNestedCoordinateReferencePreviewDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+  const source = legacyPreviewWorkPlaneLocalSource()
+
+  diagram.variables = [
+    {
+      id: 'var-R',
+      name: 'R',
+      macroName: 'R',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.coordinateAnchors = [
+    {
+      id: 'coord-local',
+      name: 'Local coordinate',
+      tikzName: 'LocalCoordinate',
+      position: {
+        ...source,
+        preview: legacyPreviewPoint(source),
+      },
+    },
+  ]
+  diagram.strata = [
+    createCurveStratum({
+      ambientDimension: 3,
+      id: 'legacy-reference-path',
+      points: [
+        {
+          x: 2,
+          y: 1,
+          z: 0,
+          symbolic: {
+            x: { kind: 'numeric', value: 2 },
+            y: { kind: 'numeric', value: 1 },
+            z: { kind: 'numeric', value: 0 },
+            source: {
+              kind: 'coordinateRef',
+              coordinateId: 'coord-local',
+              preview: legacyPreviewPoint(source),
+            },
+          },
+        },
+        { x: 3, y: 1, z: 0 },
+      ],
+    }),
+  ]
+
+  return diagram
+}
+
+function legacyNestedCoordinateReferencePreviewJson(): string {
+  return JSON.stringify({
+    format: savedDiagramFormat,
+    version: savedDiagramVersion,
+    diagram: legacyNestedCoordinateReferencePreviewDiagram(),
+  })
+}
+
+function legacyPreviewWorkPlaneLocalSource(): WorkPlaneLocalCoordinateSource {
+  return {
+    kind: 'workPlaneLocal',
+    frame: {
+      origin: { x: 0, y: 0, z: 0 },
+      u: { x: 1, y: 0, z: 0 },
+      v: { x: 0, y: 1, z: 0 },
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    local: {
+      a: { kind: 'symbolic', expression: 'R', previewValue: 2 },
+      b: { kind: 'numeric', value: 1 },
+    },
+  }
+}
+
+function legacyPreviewPoint(
+  source: WorkPlaneLocalCoordinateSource,
+): Vec3 {
+  return {
+    x: 2,
+    y: 1,
+    z: 0,
+    symbolic: {
+      x: { kind: 'numeric', value: 2 },
+      y: { kind: 'numeric', value: 1 },
+      z: { kind: 'numeric', value: 0 },
+      source,
+    },
+  }
+}
+
+function requiredLegacyCoordinateReferenceSource(
+  diagram: Diagram,
+): NonNullable<ReturnType<typeof coordinateReferenceSourceForPoint>> {
+  const stratum = diagram.strata.find(
+    (candidate) => candidate.id === 'legacy-reference-path',
+  )
+
+  if (stratum?.geometricKind !== 'curve' || stratum.kind !== 'polyline') {
+    throw new Error('Expected legacy reference polyline.')
+  }
+
+  const point = stratum.points[0]
+
+  if (point === undefined) {
+    throw new Error('Expected legacy reference point.')
+  }
+
+  const source = coordinateReferenceSourceForPoint(point)
+
+  if (source === null) {
+    throw new Error('Expected coordinate reference source.')
+  }
+
+  return source
 }
 
 function globalAnchorPosition(

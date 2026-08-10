@@ -3003,7 +3003,7 @@ export function parseDirectCoordinateAnchorPosition(
       kind: 'workPlaneLocal',
       frame: source.frame,
       local: source.local,
-      preview: normalizePointForAmbientDimension(3, point),
+      preview: { x: point.x, y: point.y, z: point.z },
     }
   }
 
@@ -3201,7 +3201,7 @@ function workPlaneLocalCoordinateAnchorPositionFromPoint(
         a: { kind: 'numeric', value: local.a },
         b: { kind: 'numeric', value: local.b },
       },
-      preview: normalizePointForAmbientDimension(3, point),
+      preview: { x: point.x, y: point.y, z: point.z },
     }
   } catch {
     return null
