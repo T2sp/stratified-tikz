@@ -11,6 +11,7 @@ import {
   sampleCoonsPatch,
   validateCurvedSheetPrimitive,
 } from '../../src/geometry/curvedSheets.ts'
+import { defaultVisibilityOptions } from '../../src/model/visibility.ts'
 import {
   coonsPatchBoundaryLinkStatus,
   synchronizeLinkedCoonsPatches,
@@ -44,17 +45,15 @@ import type {
   ConcatenatedPathStratum,
   CoordinateAnchor,
   CoonsBoundarySnapshot,
-  CoonsPatchPrimitive,
-  CurvedSheetStratum,
   Diagram,
-  PathSegment,
-  PointStratum,
   Stratum,
+  Vec2,
   Vec3,
   WorkPlaneFrameSnapshot,
   WorkPlaneLocalCoordinateSource,
 } from '../../src/model/types.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
 import { prepareSvgSurfaceGeometry } from '../../src/rendering/svgSurfaceScene.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { duplicateSelectedElements } from '../../src/ui/bulkEditing.ts'
@@ -63,7 +62,9 @@ import {
   duplicateAndTranslateCoonsPatch,
   isCoonsPatchStratum,
   submitCoonsPatchDuplicateTranslation,
+  type CoonsPatchDuplicateTranslationInput,
   type CoonsPatchStratum,
+  type DuplicateAndTranslateCoonsPatchActionResult,
 } from '../../src/ui/coonsPatchDuplicateTranslation.ts'
 import { allLayersFilter } from '../../src/ui/layerFilter.ts'
 import {
@@ -71,6 +72,12 @@ import {
   type CoonsPatchBoundaryPathSelections,
 } from '../../src/ui/ruledSurface.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
+import {
+  prepareSvgPreviewExportClone,
+  type SvgPreviewExportAttributeLike,
+  type SvgPreviewExportCloneSourceLike,
+  type SvgPreviewExportElementLike,
+} from '../../src/ui/svgPreviewExport.ts'
 import {
   createDiagramHistory,
   redoLastDiagramChange,
@@ -89,6 +96,40 @@ type TestEditorState = {
   layerOperationStatus: string
   history: DiagramHistory
 }
+
+type CoonsPatchDuplicateTranslateFormHarnessProps = {
+  diagram: Diagram
+  patch: CoonsPatchStratum
+  onDuplicateAndTranslate: (
+    patchId: string,
+    translation: TranslationVector,
+  ) => DuplicateAndTranslateCoonsPatchActionResult
+  input: CoonsPatchDuplicateTranslationInput
+  statusState: CoonsPatchDuplicateTranslateStatusState
+  onInputChange: (
+    field: keyof CoonsPatchDuplicateTranslationInput,
+    value: string,
+  ) => void
+  onStatusStateChange: (
+    status: CoonsPatchDuplicateTranslateStatusState,
+  ) => void
+}
+
+type CoonsPatchDuplicateTranslateStatusState = {
+  patchId: string
+  message: string
+}
+
+type CoonsPatchDuplicateTranslateFormHarnessComponent = (
+  props: CoonsPatchDuplicateTranslateFormHarnessProps,
+) => unknown
+
+type ProductionReactElement = {
+  type: unknown
+  props: Record<string, unknown>
+}
+
+type SvgCamera3D = Extract<Diagram['camera'], { mode: '3d' }>
 
 test('operation eligibility is exact and failures preserve the original diagram', () => {
   const diagram = createComplexPatchDiagram(false)
@@ -819,7 +860,7 @@ test('production state transition selects the copy and commits exactly one undoa
   assert.equal(locked.state.history.past.length, 0)
 })
 
-test('save/load, Preview, SVG data, and TikZ use both static translated meshes', () => {
+test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes', async () => {
   const sourceDiagram = createComplexPatchDiagram(false)
   const delta = point(2, -1, 0.5)
   const result = duplicateAndTranslateCoonsPatch(
@@ -853,6 +894,9 @@ test('save/load, Preview, SVG data, and TikZ use both static translated meshes',
   sourceVertices?.forEach((vertex, index) => {
     assertVec3Translated(vertex, copiedVertices?.[index], delta, 1e-9)
   })
+  const sourceMesh = sampleCoonsPatch(
+    findCoonsPatch(fullSync, 'patch').primitive,
+  )
 
   const standalone = generateTikz(fullSync)
   assert.match(standalone, /Curved sheet "Phase 30 patch" \[patch\]/)
@@ -861,13 +905,133 @@ test('save/load, Preview, SVG data, and TikZ use both static translated meshes',
     new RegExp(`Curved sheet "Phase 30 patch" \\[${loadedCopy.id}\\]`),
   )
   assert.equal((standalone.match(/Primitive: coonsPatch/g) ?? []).length, 2)
+  assertTikzCoonsPatchCoordinates(
+    standalone,
+    'patch',
+    loadedCopy.id,
+    sourceMesh,
+    delta,
+  )
+  assertTikzIndentation(standalone)
 
   const inline = generateTikz(fullSync, { exportMode: 'inlineMath' })
   assert.doesNotMatch(inline, /\n[ \t]*\n/)
   assert.equal((inline.match(/Primitive: coonsPatch/g) ?? []).length, 2)
-  for (const line of inline.split('\n')) {
-    const indentation = line.match(/^ */)?.[0].length ?? 0
-    assert.equal(indentation % 4, 0, `Unexpected TikZ indentation: ${line}`)
+  assertTikzCoonsPatchCoordinates(
+    inline,
+    'patch',
+    loadedCopy.id,
+    sourceMesh,
+    delta,
+  )
+  assertTikzIndentation(inline)
+
+  const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-svg-'))
+  const server = await createServer({
+    root: process.cwd(),
+    appType: 'custom',
+    cacheDir,
+    logLevel: 'silent',
+    server: { middlewareMode: true },
+  })
+
+  try {
+    const svgModule = (await server.ssrLoadModule(
+      '/src/rendering/SvgDiagram.tsx',
+    )) as { SvgDiagram: ComponentType<Record<string, unknown>> }
+    const width = 520
+    const height = 360
+    const camera: SvgCamera3D = {
+      mode: '3d',
+      kind: 'orthographic',
+      thetaDeg: 31,
+      phiDeg: -19,
+      zoom: 64,
+      pan: { x: 160, y: 140 },
+    }
+    const svgMarkup = renderToStaticMarkup(
+      createElement(svgModule.SvgDiagram, {
+        diagram: fullSync,
+        width,
+        height,
+        fitToView: false,
+        cameraOverride: camera,
+        selectedElement: null,
+        showCoordinateAnchors: false,
+        visibilityOptions: {
+          ...defaultVisibilityOptions,
+          enabled: true,
+          surfaceDepthSort: true,
+        },
+      }),
+    )
+    assert.match(svgMarkup, /^<svg /)
+    assert.equal(
+      (svgMarkup.match(/data-surface-source-id=/g) ?? []).length,
+      sourceMesh.faces.length * 2,
+    )
+    assert.equal(
+      (svgMarkup.match(/<polygon /g) ?? []).length,
+      sourceMesh.faces.length * 2,
+    )
+
+    const liveSvg = parseSsrSvgMarkup(svgMarkup)
+    const expectedCopyVertices = sourceMesh.vertices.map((vertex) => ({
+      x: vertex.x + delta.x,
+      y: vertex.y + delta.y,
+      z: vertex.z + delta.z,
+    }))
+    const sourceFacePoints = assertRenderedSvgMeshCoordinates(
+      liveSvg,
+      'patch',
+      sourceMesh.vertices,
+      sourceMesh.faces,
+      camera,
+      height,
+    )
+    const copyFacePoints = assertRenderedSvgMeshCoordinates(
+      liveSvg,
+      loadedCopy.id,
+      expectedCopyVertices,
+      sourceMesh.faces,
+      camera,
+      height,
+    )
+    assert.notDeepEqual(copyFacePoints, sourceFacePoints)
+    const sourceFacePointSet = new Set(sourceFacePoints)
+    for (const points of copyFacePoints) {
+      assert.equal(
+        sourceFacePointSet.has(points),
+        false,
+        `Translated copy face unexpectedly equals a source face: ${points}`,
+      )
+    }
+
+    const exportedSvg = prepareSvgPreviewExportClone(liveSvg, {
+      backgroundMode: 'transparent',
+    })
+    assert.notEqual(exportedSvg, null)
+    if (exportedSvg === null) {
+      throw new Error('Expected production SVG export preparation to succeed.')
+    }
+    const exportedPolygonPoints = svgDescendantElements(exportedSvg)
+      .filter((element) => element.tagName.toLowerCase() === 'polygon')
+      .map((element) => element.getAttribute('points'))
+      .filter((points): points is string => points !== null)
+      .sort()
+    assert.deepEqual(
+      exportedPolygonPoints,
+      [...sourceFacePoints, ...copyFacePoints].sort(),
+    )
+    assert.equal(
+      svgDescendantElements(exportedSvg).some(
+        (element) => element.getAttribute('data-surface-source-id') !== null,
+      ),
+      false,
+    )
+  } finally {
+    await server.close()
+    rmSync(cacheDir, { recursive: true, force: true })
   }
 })
 
@@ -911,7 +1075,7 @@ test('generic bulk duplicate keeps Phase 29 linked-copy semantics', () => {
   assert.ok(sources?.left.kind === 'path' && selectedIds.has(sources.left.sourcePathId))
 })
 
-test('production Inspector renders the compact section only for one Coons patch', async () => {
+test('production Inspector form submits through the editor transition and remains exactly gated', async () => {
   const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-'))
   const server = await createServer({
     root: process.cwd(),
@@ -924,10 +1088,14 @@ test('production Inspector renders the compact section only for one Coons patch'
   try {
     const loaded = (await server.ssrLoadModule(
       '/src/ui/inspector/EditableInspector.tsx',
-    )) as { EditableInspector: ComponentType<Record<string, unknown>> }
-    const svgModule = (await server.ssrLoadModule(
-      '/src/rendering/SvgDiagram.tsx',
-    )) as { SvgDiagram: ComponentType<Record<string, unknown>> }
+    )) as {
+      EditableInspector: ComponentType<Record<string, unknown>>
+    }
+    const formModule = (await server.ssrLoadModule(
+      '/src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx',
+    )) as {
+      CoonsPatchDuplicateTranslateForm: CoonsPatchDuplicateTranslateFormHarnessComponent
+    }
     const diagram = createComplexPatchDiagram(false)
     const coonsMarkup = renderInspector(
       loaded.EditableInspector,
@@ -940,6 +1108,11 @@ test('production Inspector renders the compact section only for one Coons patch'
     assert.match(coonsMarkup, /aria-label="Coons patch translation dz"/)
     assert.match(coonsMarkup, /type="text"/)
     assert.doesNotMatch(coonsMarkup, /snap/i)
+
+    assertProductionInspectorFormSubmissions(
+      formModule.CoonsPatchDuplicateTranslateForm,
+      diagram,
+    )
 
     const curveMarkup = renderInspector(
       loaded.EditableInspector,
@@ -980,35 +1153,603 @@ test('production Inspector renders the compact section only for one Coons patch'
         id,
       )
     }
-
-    const duplicated = duplicateAndTranslateCoonsPatch(
-      diagram,
-      'patch',
-      numericTranslation(diagram, point(1, 0, 2)),
-    )
-    assert.equal(duplicated.ok, true)
-    if (!duplicated.ok) {
-      throw new Error(duplicated.error)
-    }
-    const svgMarkup = renderToStaticMarkup(
-      createElement(svgModule.SvgDiagram, {
-        diagram: duplicated.diagram,
-        fitToView: true,
-        showCoordinateAnchors: false,
-      }),
-    )
-    assert.match(svgMarkup, /^<svg /)
-    assert.equal(
-      (svgMarkup.match(/data-curved-sheet-primitive="coonsPatch"/g) ?? [])
-        .length,
-      2,
-    )
-    assert.equal((svgMarkup.match(/<polygon /g) ?? []).length, 40)
   } finally {
     await server.close()
     rmSync(cacheDir, { recursive: true, force: true })
   }
 })
+
+function assertProductionInspectorFormSubmissions(
+  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
+  diagram: Diagram,
+): void {
+  const patch = findCoonsPatch(diagram, 'patch')
+  const initial = createEditorState(diagram, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  let current = initial
+  let callbackCount = 0
+  let receivedPatchId: string | null = null
+  let receivedTranslation: TranslationVector | null = null
+  const harness = createProductionCoonsPatchFormHarness(
+    Form,
+    diagram,
+    patch,
+    (patchId, translation) => {
+      callbackCount += 1
+      receivedPatchId = patchId
+      receivedTranslation = translation
+      const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
+        current,
+        patchId,
+        translation,
+      )
+
+      if (!applied.ok) {
+        return { ok: false, message: applied.message }
+      }
+
+      current = applied.state
+      return {
+        ok: true,
+        duplicatedPatchId: applied.duplicatedPatchId,
+        message: applied.message,
+      }
+    },
+  )
+
+  harness.change('dx', '1.25')
+  harness.change('dy', '-2.5')
+  harness.change('dz', '3.75')
+  assert.equal(harness.submit(), 1)
+  assert.equal(callbackCount, 1)
+  assert.equal(receivedPatchId, patch.id)
+  assert.deepEqual(receivedTranslation, {
+    x: { kind: 'numeric', value: 1.25 },
+    y: { kind: 'numeric', value: -2.5 },
+    z: { kind: 'numeric', value: 3.75 },
+  })
+  assert.equal(current.editableDiagram.strata.length, diagram.strata.length + 1)
+  const appended = current.editableDiagram.strata.filter(
+    (stratum) => !diagram.strata.some((source) => source.id === stratum.id),
+  )
+  assert.equal(appended.length, 1)
+  assert.deepEqual(current.selectedElement, {
+    kind: 'stratum',
+    id: appended[0]?.id,
+  })
+  assert.equal(current.history.past.length, 1)
+  assert.equal(current.history.future.length, 0)
+
+  assertProductionInspectorFormNoOp(
+    Form,
+    diagram,
+    { dx: '1e', dy: '-2.5', dz: '3.75' },
+    /^dx:/,
+  )
+  assertProductionInspectorFormNoOp(
+    Form,
+    diagram,
+    { dx: '0', dy: '-0', dz: '0.0' },
+    /^Enter a non-zero translation\.$/,
+  )
+}
+
+function assertProductionInspectorFormNoOp(
+  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
+  diagram: Diagram,
+  input: CoonsPatchDuplicateTranslationInput,
+  expectedMessage: RegExp,
+): void {
+  const patch = findCoonsPatch(diagram, 'patch')
+  const initial = createEditorState(diagram, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  let current = initial
+  let callbackCount = 0
+  const harness = createProductionCoonsPatchFormHarness(
+    Form,
+    diagram,
+    patch,
+    (patchId, translation) => {
+      callbackCount += 1
+      const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
+        current,
+        patchId,
+        translation,
+      )
+
+      if (!applied.ok) {
+        return { ok: false, message: applied.message }
+      }
+
+      current = applied.state
+      return {
+        ok: true,
+        duplicatedPatchId: applied.duplicatedPatchId,
+        message: applied.message,
+      }
+    },
+  )
+
+  harness.change('dx', input.dx)
+  harness.change('dy', input.dy)
+  harness.change('dz', input.dz)
+  assert.equal(harness.submit(), 1)
+  assert.equal(callbackCount, 0)
+  assert.equal(current, initial)
+  assert.equal(current.editableDiagram, diagram)
+  assert.deepEqual(current.selectedElement, initial.selectedElement)
+  assert.equal(current.history, initial.history)
+  assert.equal(current.history.past.length, 0)
+  assert.equal(current.history.future.length, 0)
+  assert.deepEqual(
+    current.editableDiagram.strata.map((stratum) => stratum.id),
+    diagram.strata.map((stratum) => stratum.id),
+  )
+  assert.equal(
+    current.editableDiagram.strata.some((stratum) =>
+      stratum.id.startsWith(`${patch.id}-copy`),
+    ),
+    false,
+  )
+  assert.match(harness.status().message, expectedMessage)
+}
+
+function createProductionCoonsPatchFormHarness(
+  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
+  diagram: Diagram,
+  patch: CoonsPatchStratum,
+  action: CoonsPatchDuplicateTranslateFormHarnessProps['onDuplicateAndTranslate'],
+) {
+  let input: CoonsPatchDuplicateTranslationInput = {
+    dx: '0',
+    dy: '0',
+    dz: '0',
+  }
+  let statusState: CoonsPatchDuplicateTranslateStatusState = {
+    patchId: '',
+    message: '',
+  }
+
+  function render(): unknown {
+    return Form({
+      diagram,
+      patch,
+      onDuplicateAndTranslate: action,
+      input,
+      statusState,
+      onInputChange: (field, value) => {
+        input = { ...input, [field]: value }
+        statusState = { patchId: '', message: '' }
+      },
+      onStatusStateChange: (status) => {
+        statusState = status
+      },
+    })
+  }
+
+  return {
+    change(
+      field: keyof CoonsPatchDuplicateTranslationInput,
+      value: string,
+    ): void {
+      const label = `Coons patch translation ${field}`
+      const inputs = productionNativeElements(render()).filter(
+        (element) =>
+          element.type === 'input' && element.props['aria-label'] === label,
+      )
+      assert.equal(inputs.length, 1, `Expected production input ${label}.`)
+      const onChange = inputs[0]?.props.onChange
+      assert.equal(typeof onChange, 'function')
+      if (typeof onChange !== 'function') {
+        throw new Error(`Expected an onChange handler for ${label}.`)
+      }
+      ;(onChange as (event: { currentTarget: { value: string } }) => void)({
+        currentTarget: { value },
+      })
+      assert.equal(input[field], value)
+    },
+    submit(): number {
+      const forms = productionNativeElements(render()).filter(
+        (element) => element.type === 'form',
+      )
+      assert.equal(forms.length, 1, 'Expected the production Coons patch form.')
+      const onSubmit = forms[0]?.props.onSubmit
+      assert.equal(typeof onSubmit, 'function')
+      if (typeof onSubmit !== 'function') {
+        throw new Error('Expected the production form onSubmit handler.')
+      }
+      let preventDefaultCount = 0
+      ;(onSubmit as (event: { preventDefault: () => void }) => void)({
+        preventDefault: () => {
+          preventDefaultCount += 1
+        },
+      })
+      return preventDefaultCount
+    },
+    status(): CoonsPatchDuplicateTranslateStatusState {
+      return statusState
+    },
+  }
+}
+
+function productionNativeElements(node: unknown): ProductionReactElement[] {
+  const elements: ProductionReactElement[] = []
+
+  function visit(value: unknown): void {
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+
+    if (!isProductionReactElement(value)) {
+      return
+    }
+
+    if (typeof value.type === 'function') {
+      const Component = value.type as (
+        props: Record<string, unknown>,
+      ) => unknown
+      visit(Component(value.props))
+      return
+    }
+
+    elements.push(value)
+    visit(value.props.children)
+  }
+
+  visit(node)
+  return elements
+}
+
+function isProductionReactElement(
+  value: unknown,
+): value is ProductionReactElement {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    'props' in value &&
+    typeof value.props === 'object' &&
+    value.props !== null
+  )
+}
+
+function assertTikzCoonsPatchCoordinates(
+  tikz: string,
+  sourcePatchId: string,
+  copiedPatchId: string,
+  sourceMesh: ReturnType<typeof sampleCoonsPatch>,
+  delta: Vec3,
+): void {
+  const definitions = parseTikzCoordinateDefinitions(tikz)
+  const sourceFaces = parseTikzCoonsPatchFaces(
+    tikz,
+    sourcePatchId,
+    definitions,
+  )
+  const copiedFaces = parseTikzCoonsPatchFaces(
+    tikz,
+    copiedPatchId,
+    definitions,
+  )
+  assert.equal(sourceFaces.length, sourceMesh.faces.length)
+  assert.equal(copiedFaces.length, sourceMesh.faces.length)
+
+  sourceMesh.faces.forEach((face, faceIndex) => {
+    const sourceFace = sourceFaces[faceIndex]
+    const copiedFace = copiedFaces[faceIndex]
+    assert.notEqual(sourceFace, undefined)
+    assert.notEqual(copiedFace, undefined)
+    if (sourceFace === undefined || copiedFace === undefined) {
+      throw new Error(`Expected TikZ face ${faceIndex}.`)
+    }
+    assert.equal(sourceFace.length, face.length)
+    assert.equal(copiedFace.length, face.length)
+
+    face.forEach((vertexIndex, faceVertexIndex) => {
+      const expectedSource = sourceMesh.vertices[vertexIndex]
+      const emittedSource = sourceFace[faceVertexIndex]
+      const emittedCopy = copiedFace[faceVertexIndex]
+      assert.notEqual(expectedSource, undefined)
+      assert.notEqual(emittedSource, undefined)
+      assert.notEqual(emittedCopy, undefined)
+      if (
+        expectedSource === undefined ||
+        emittedSource === undefined ||
+        emittedCopy === undefined
+      ) {
+        throw new Error(`Expected TikZ face ${faceIndex} vertex ${faceVertexIndex}.`)
+      }
+      assertVec3Close(emittedSource, expectedSource, 1e-6)
+      assertVec3Translated(emittedSource, emittedCopy, delta, 1e-6)
+    })
+  })
+}
+
+function parseTikzCoordinateDefinitions(tikz: string): ReadonlyMap<string, Vec3> {
+  const definitions = new Map<string, Vec3>()
+
+  for (const match of tikz.matchAll(
+    /^[ \t]*\\coordinate \(([^)]+)\) at \(([^,]+),([^,]+),([^)]+)\);$/gm,
+  )) {
+    const name = match[1]
+    const x = Number(match[2])
+    const y = Number(match[3])
+    const z = Number(match[4])
+    assert.notEqual(name, undefined)
+    assert.ok(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))
+    if (name !== undefined) {
+      definitions.set(name, { x, y, z })
+    }
+  }
+
+  assert.ok(definitions.size > 0)
+  return definitions
+}
+
+function parseTikzCoonsPatchFaces(
+  tikz: string,
+  patchId: string,
+  definitions: ReadonlyMap<string, Vec3>,
+): Vec3[][] {
+  const marker = new RegExp(
+    `^[ \\t]*% Curved sheet "[^"\\r\\n]*" \\[${escapeRegExp(patchId)}\\] sampled mesh export\\.$`,
+    'm',
+  ).exec(tikz)
+  assert.notEqual(marker, null)
+  if (marker === null || marker.index === undefined) {
+    throw new Error(`Expected a TikZ marker for Coons patch ${patchId}.`)
+  }
+
+  const scopeStart = tikz.indexOf('\\begin{scope}[', marker.index)
+  const scopeEnd = tikz.indexOf('\\end{scope}', scopeStart)
+  assert.notEqual(scopeStart, -1)
+  assert.notEqual(scopeEnd, -1)
+  if (scopeStart === -1 || scopeEnd === -1) {
+    throw new Error(`Expected a sampled TikZ scope for Coons patch ${patchId}.`)
+  }
+  const block = tikz.slice(marker.index, scopeEnd)
+  assert.match(block, /Primitive: coonsPatch/)
+
+  return [...block.matchAll(/^[ \t]*\\filldraw (.+) -- cycle;$/gm)].map(
+    (faceMatch, faceIndex) => {
+      const coordinateNames = [
+        ...(faceMatch[1] ?? '').matchAll(/\(([^)]+)\)/g),
+      ].map((coordinateMatch) => coordinateMatch[1] ?? '')
+      assert.ok(coordinateNames.length >= 3)
+
+      return coordinateNames.map((name) => {
+        const coordinate = definitions.get(name)
+        assert.notEqual(
+          coordinate,
+          undefined,
+          `Missing TikZ coordinate ${name} for ${patchId} face ${faceIndex}.`,
+        )
+        if (coordinate === undefined) {
+          throw new Error(`Expected TikZ coordinate ${name}.`)
+        }
+        return coordinate
+      })
+    },
+  )
+}
+
+function assertTikzIndentation(tikz: string): void {
+  for (const line of tikz.split('\n')) {
+    const indentation = line.match(/^ */)?.[0].length ?? 0
+    assert.equal(indentation % 4, 0, `Unexpected TikZ indentation: ${line}`)
+  }
+}
+
+function assertRenderedSvgMeshCoordinates(
+  root: SvgPreviewExportElementLike,
+  sheetId: string,
+  vertices: readonly Vec3[],
+  faces: readonly (readonly number[])[],
+  camera: SvgCamera3D,
+  viewportHeight: number,
+): string[] {
+  const groups = svgDescendantElements(root).filter(
+    (element) => element.getAttribute('data-surface-source-id') === sheetId,
+  )
+  assert.equal(groups.length, faces.length)
+  const groupsByFaceIndex = new Map<number, SvgPreviewExportElementLike>()
+  for (const group of groups) {
+    assert.equal(group.getAttribute('data-surface-depth-sorted'), 'true')
+    const faceIndex = Number(group.getAttribute('data-surface-face-index'))
+    assert.ok(Number.isInteger(faceIndex))
+    assert.equal(groupsByFaceIndex.has(faceIndex), false)
+    groupsByFaceIndex.set(faceIndex, group)
+  }
+
+  return faces.map((face, faceIndex) => {
+    const group = groupsByFaceIndex.get(faceIndex)
+    assert.notEqual(group, undefined)
+    if (group === undefined) {
+      throw new Error(`Expected rendered SVG face ${sheetId}:${faceIndex}.`)
+    }
+    const polygons = svgDescendantElements(group).filter(
+      (element) => element.tagName.toLowerCase() === 'polygon',
+    )
+    assert.equal(polygons.length, 1)
+    const pointsText = polygons[0]?.getAttribute('points')
+    assert.notEqual(pointsText, null)
+    assert.notEqual(pointsText, undefined)
+    if (pointsText === null || pointsText === undefined) {
+      throw new Error(`Expected SVG polygon points for ${sheetId}:${faceIndex}.`)
+    }
+    const emitted = parseSvgPointList(pointsText)
+    const expected = face.map((vertexIndex) => {
+      const vertex = vertices[vertexIndex]
+      assert.notEqual(vertex, undefined)
+      if (vertex === undefined) {
+        throw new Error(`Expected mesh vertex ${vertexIndex}.`)
+      }
+      return projectToSvgPoint(camera, vertex, viewportHeight)
+    })
+    assert.equal(emitted.length, expected.length)
+    emitted.forEach((point, vertexIndex) => {
+      const expectedPoint = expected[vertexIndex]
+      assert.notEqual(expectedPoint, undefined)
+      if (expectedPoint === undefined) {
+        throw new Error(`Expected projected vertex ${vertexIndex}.`)
+      }
+      assert.ok(Math.abs(point.x - expectedPoint.x) <= 0.000500001)
+      assert.ok(Math.abs(point.y - expectedPoint.y) <= 0.000500001)
+    })
+    return pointsText
+  })
+}
+
+function parseSvgPointList(points: string): Vec2[] {
+  return points.trim().split(/\s+/).map((token) => {
+    const components = token.split(',')
+    assert.equal(components.length, 2)
+    const x = Number(components[0])
+    const y = Number(components[1])
+    assert.ok(Number.isFinite(x) && Number.isFinite(y))
+    return { x, y }
+  })
+}
+
+function svgDescendantElements(
+  root: SvgPreviewExportElementLike,
+): SvgPreviewExportElementLike[] {
+  const descendants = [root]
+
+  for (const child of Array.from(root.children)) {
+    descendants.push(...svgDescendantElements(child))
+  }
+
+  return descendants
+}
+
+class TestSvgElement
+  implements SvgPreviewExportElementLike, SvgPreviewExportCloneSourceLike
+{
+  readonly tagName: string
+  private readonly attributeMap: Map<string, string>
+  private readonly childElements: TestSvgElement[] = []
+  private parent: TestSvgElement | null = null
+
+  constructor(tagName: string, attributes: ReadonlyMap<string, string>) {
+    this.tagName = tagName
+    this.attributeMap = new Map(attributes)
+  }
+
+  get attributes(): SvgPreviewExportAttributeLike[] {
+    return [...this.attributeMap].map(([name, value]) => ({ name, value }))
+  }
+
+  get children(): TestSvgElement[] {
+    return this.childElements
+  }
+
+  append(child: TestSvgElement): void {
+    child.parent = this
+    this.childElements.push(child)
+  }
+
+  cloneNode(deep = false): TestSvgElement {
+    const clone = new TestSvgElement(this.tagName, this.attributeMap)
+    if (deep) {
+      this.childElements.forEach((child) => clone.append(child.cloneNode(true)))
+    }
+    return clone
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributeMap.get(name) ?? null
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributeMap.set(name, value)
+  }
+
+  removeAttribute(name: string): void {
+    this.attributeMap.delete(name)
+  }
+
+  remove(): void {
+    if (this.parent === null) {
+      return
+    }
+    const index = this.parent.childElements.indexOf(this)
+    if (index >= 0) {
+      this.parent.childElements.splice(index, 1)
+    }
+    this.parent = null
+  }
+}
+
+function parseSsrSvgMarkup(markup: string): TestSvgElement {
+  const stack: TestSvgElement[] = []
+  let root: TestSvgElement | null = null
+
+  for (const match of markup.matchAll(
+    /<(\/)?([A-Za-z][A-Za-z0-9:.-]*)([^<>]*?)(\/?)>/g,
+  )) {
+    const closing = match[1] === '/'
+    const tagName = match[2]
+    if (tagName === undefined) {
+      continue
+    }
+
+    if (closing) {
+      const closed = stack.pop()
+      assert.equal(closed?.tagName, tagName)
+      continue
+    }
+
+    const attributes = new Map<string, string>()
+    for (const attribute of (match[3] ?? '').matchAll(
+      /([^\s=/>]+)="([^"]*)"/g,
+    )) {
+      const name = attribute[1]
+      const value = attribute[2]
+      if (name !== undefined && value !== undefined) {
+        attributes.set(name, decodeSsrAttribute(value))
+      }
+    }
+    const element = new TestSvgElement(tagName, attributes)
+    const parent = stack[stack.length - 1]
+    if (parent === undefined) {
+      assert.equal(root, null)
+      root = element
+    } else {
+      parent.append(element)
+    }
+
+    if (match[4] !== '/') {
+      stack.push(element)
+    }
+  }
+
+  assert.equal(stack.length, 0)
+  assert.notEqual(root, null)
+  assert.equal(root?.tagName.toLowerCase(), 'svg')
+  if (root === null) {
+    throw new Error('Expected SSR markup to contain an SVG root.')
+  }
+  return root
+}
+
+function decodeSsrAttribute(value: string): string {
+  return value
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#x27;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 function createComplexPatchDiagram(linked: boolean): Diagram {
   const base = createEmptyDiagram({ ambientDimension: 3 })
@@ -1511,6 +2252,16 @@ function assertVec3Translated(
   assert.ok(Math.abs(copy.x - (source.x + delta.x)) <= epsilon)
   assert.ok(Math.abs(copy.y - (source.y + delta.y)) <= epsilon)
   assert.ok(Math.abs(copy.z - (source.z + delta.z)) <= epsilon)
+}
+
+function assertVec3Close(
+  actual: Vec3,
+  expected: Vec3,
+  epsilon: number,
+): void {
+  assert.ok(Math.abs(actual.x - expected.x) <= epsilon)
+  assert.ok(Math.abs(actual.y - expected.y) <= epsilon)
+  assert.ok(Math.abs(actual.z - expected.z) <= epsilon)
 }
 
 function selectedStratumIds(selection: SelectedElement): Set<string> {

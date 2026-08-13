@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   isZeroTranslationVector,
   parseTranslationVectorFromInputs,
@@ -6,6 +6,7 @@ import {
 } from '../../model/translation.ts'
 import {
   submitCoonsPatchDuplicateTranslation,
+  type CoonsPatchDuplicateTranslationInput,
   type CoonsPatchStratum,
   type DuplicateAndTranslateCoonsPatchActionResult,
 } from '../coonsPatchDuplicateTranslation.ts'
@@ -21,27 +22,66 @@ export type CoonsPatchDuplicateTranslateEditorProps = {
   ) => DuplicateAndTranslateCoonsPatchActionResult
 }
 
+export type CoonsPatchDuplicateTranslateStatusState = {
+  patchId: string
+  message: string
+}
+
+export type CoonsPatchDuplicateTranslateFormProps =
+  CoonsPatchDuplicateTranslateEditorProps & {
+    input: CoonsPatchDuplicateTranslationInput
+    statusState: CoonsPatchDuplicateTranslateStatusState
+    onInputChange: (
+      field: keyof CoonsPatchDuplicateTranslationInput,
+      value: string,
+    ) => void
+    onStatusStateChange: (
+      status: CoonsPatchDuplicateTranslateStatusState,
+    ) => void
+  }
+
 export function CoonsPatchDuplicateTranslateEditor({
   diagram,
   patch,
   onDuplicateAndTranslate,
 }: CoonsPatchDuplicateTranslateEditorProps) {
-  const [dxInput, setDxInput] = useState('0')
-  const [dyInput, setDyInput] = useState('0')
-  const [dzInput, setDzInput] = useState('0')
-  const [statusState, setStatusState] = useState({
-    patchId: '',
-    message: '',
+  const [input, setInput] = useState<CoonsPatchDuplicateTranslationInput>({
+    dx: '0',
+    dy: '0',
+    dz: '0',
   })
-  const parsed = useMemo(
-    () =>
-      parseTranslationVectorFromInputs(diagram, {
-        dx: dxInput,
-        dy: dyInput,
-        dz: dzInput,
-      }),
-    [diagram, dxInput, dyInput, dzInput],
+  const [statusState, setStatusState] =
+    useState<CoonsPatchDuplicateTranslateStatusState>({
+      patchId: '',
+      message: '',
+    })
+
+  return (
+    <CoonsPatchDuplicateTranslateForm
+      diagram={diagram}
+      patch={patch}
+      onDuplicateAndTranslate={onDuplicateAndTranslate}
+      input={input}
+      statusState={statusState}
+      onInputChange={(field, value) => {
+        setInput((current) => ({ ...current, [field]: value }))
+        setStatusState({ patchId: '', message: '' })
+      }}
+      onStatusStateChange={setStatusState}
+    />
   )
+}
+
+export function CoonsPatchDuplicateTranslateForm({
+  diagram,
+  patch,
+  onDuplicateAndTranslate,
+  input,
+  statusState,
+  onInputChange,
+  onStatusStateChange,
+}: CoonsPatchDuplicateTranslateFormProps) {
+  const parsed = parseTranslationVectorFromInputs(diagram, input)
   const isZero = parsed.ok && isZeroTranslationVector(parsed.translation)
   const errorMessage = parsed.ok
     ? isZero
@@ -55,12 +95,12 @@ export function CoonsPatchDuplicateTranslateEditor({
     event.preventDefault()
 
     if (!parsed.ok) {
-      setStatusState({ patchId: patch.id, message: parsed.error })
+      onStatusStateChange({ patchId: patch.id, message: parsed.error })
       return
     }
 
     if (isZero) {
-      setStatusState({
+      onStatusStateChange({
         patchId: patch.id,
         message: 'Enter a non-zero translation.',
       })
@@ -70,11 +110,11 @@ export function CoonsPatchDuplicateTranslateEditor({
     const result = submitCoonsPatchDuplicateTranslation(
       diagram,
       patch.id,
-      { dx: dxInput, dy: dyInput, dz: dzInput },
+      input,
       onDuplicateAndTranslate,
     )
 
-    setStatusState({
+    onStatusStateChange({
       patchId: result.ok ? result.duplicatedPatchId : patch.id,
       message: result.message,
     })
@@ -86,30 +126,21 @@ export function CoonsPatchDuplicateTranslateEditor({
       <form className="inspector-form" onSubmit={submit}>
         <TranslationInput
           label="dx"
-          value={dxInput}
+          value={input.dx}
           invalid={!parsed.ok && parsed.error.startsWith('dx:')}
-          onChange={(value) => {
-            setDxInput(value)
-            setStatusState({ patchId: '', message: '' })
-          }}
+          onChange={(value) => onInputChange('dx', value)}
         />
         <TranslationInput
           label="dy"
-          value={dyInput}
+          value={input.dy}
           invalid={!parsed.ok && parsed.error.startsWith('dy:')}
-          onChange={(value) => {
-            setDyInput(value)
-            setStatusState({ patchId: '', message: '' })
-          }}
+          onChange={(value) => onInputChange('dy', value)}
         />
         <TranslationInput
           label="dz"
-          value={dzInput}
+          value={input.dz}
           invalid={!parsed.ok && parsed.error.startsWith('dz:')}
-          onChange={(value) => {
-            setDzInput(value)
-            setStatusState({ patchId: '', message: '' })
-          }}
+          onChange={(value) => onInputChange('dz', value)}
         />
         <div className="inspector-field">
           <span className="inspector-field-label">Create static copy</span>
