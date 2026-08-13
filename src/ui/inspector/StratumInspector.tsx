@@ -25,6 +25,14 @@ import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 import type { PathSplitTarget } from '../pathSplitting.ts'
+import {
+  isCoonsPatchStratum,
+} from '../coonsPatchDuplicateTranslation.ts'
+import {
+  CoonsPatchDuplicateTranslateEditor,
+  type DuplicateAndTranslateCoonsPatchActionResult,
+} from './CoonsPatchDuplicateTranslateEditor.tsx'
+import type { TranslationVector } from '../../model/translation.ts'
 
 export type StratumInspectorProps = {
   diagram: Diagram
@@ -37,6 +45,10 @@ export type StratumInspectorProps = {
   pasteStyleDisabled?: boolean
   onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick?: (keepOriginal: boolean) => string
+  onDuplicateAndTranslateCoonsPatch: (
+    patchId: string,
+    translation: TranslationVector,
+  ) => DuplicateAndTranslateCoonsPatchActionResult
 }
 
 export function StratumInspector({
@@ -50,6 +62,7 @@ export function StratumInspector({
   pasteStyleDisabled = false,
   onSplitPath,
   onStartPathSplitPick,
+  onDuplicateAndTranslateCoonsPatch,
 }: StratumInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -94,6 +107,14 @@ export function StratumInspector({
         stratum={stratum}
         onDiagramChange={onDiagramChange}
       />
+
+      {isCoonsPatchStratum(stratum) && (
+        <CoonsPatchDuplicateTranslateEditor
+          diagram={diagram}
+          patch={stratum}
+          onDuplicateAndTranslate={onDuplicateAndTranslateCoonsPatch}
+        />
+      )}
 
       {stratum.geometricKind === 'curve' && (
         <PathArrowEditor curve={stratum} onDiagramChange={onDiagramChange} />

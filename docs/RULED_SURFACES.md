@@ -104,6 +104,40 @@ links` removes only the source metadata and leaves the current snapshots,
 identity, style, layer, and sampling unchanged. Detach before intentionally
 maintaining patch geometry independently from its former sources.
 
+## Inspector Duplicate And Translate
+
+The detailed Inspector shows `Duplicate & translate` only when exactly one
+Coons patch is selected. Its `dx`, `dy`, and `dz` fields specify a global 3D
+translation vector using the editor's existing numeric and scalar-expression
+grammar. At least one component must be non-zero and every resolved preview
+must be finite. This direct-input operation does not use cursor snap.
+
+The operation creates one deep-cloned Coons patch, translates its four current
+materialized boundary snapshots by the same vector, and selects the copy. The
+copy keeps the original name, layer, style, sampling, boundary-role order, path
+orientation, and snapshot provenance, but it is always static. The original's
+active `boundarySources` are not copied, and the source paths, constant points,
+and coordinate anchors are neither duplicated nor moved. Consequently, later
+source edits and linked synchronization can update the linked original without
+moving or staling the translated copy.
+
+Preview, SVG export, and TikZ export consume the translated materialized
+snapshots of the static copy; they do not perform a boundary-source lookup.
+
+For a stale linked original, the operation copies the exact last-valid frozen
+snapshots and translates their stored numeric previews. It preserves their
+symbolic expressions, provenance, and `boundarySnapshotState: "frozen"`, so
+changed diagram variables and JSON import cannot independently reevaluate or
+drift that static fallback. The stale original and all of its links remain
+unchanged.
+
+Duplication, link detachment, translation, and append are committed as one
+undoable diagram edit. One Undo removes the complete copy; one Redo restores
+the same ID and geometry. Invalid, incomplete, non-finite, unknown-expression,
+and zero-vector drafts do not modify the diagram or history. Rotation, scaling,
+cursor placement, source duplication, and independent linked-patch transform
+offsets are not part of this operation.
+
 ## Preview And Export
 
 The SVG preview samples ruled surfaces and Coons patches into quadrilateral

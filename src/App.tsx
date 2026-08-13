@@ -131,6 +131,7 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
+  applyDuplicateAndTranslateCoonsPatchToEditorState,
   applyCoordinateAnchorDragToEditorState,
   applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
@@ -2228,6 +2229,44 @@ function App() {
     setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setCopyStatus('idle')
+  }
+
+  function duplicateAndTranslateCurrentCoonsPatch(
+    patchId: string,
+    translation: TranslationVector,
+  ) {
+    const result = applyDuplicateAndTranslateCoonsPatchToEditorState(
+      editorState,
+      patchId,
+      translation,
+    )
+
+    if (!result.ok) {
+      setLayerOperationStatus(result.message)
+      return result
+    }
+
+    setEditorState(result.state)
+    setInspectorDisclosure((current) =>
+      setInspectorDisclosureExpanded(
+        current,
+        { kind: 'stratum', id: result.duplicatedPatchId },
+        true,
+      ),
+    )
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return {
+      ok: true as const,
+      duplicatedPatchId: result.duplicatedPatchId,
+      message: result.message,
+    }
   }
 
   function startStyleEyedropper(): void {
@@ -6401,6 +6440,9 @@ function App() {
             onBulkConcatenatePaths={concatenateCurrentSelection}
             onSplitPath={splitCurrentPath}
             onStartPathSplitPick={startPathSplitPick}
+            onDuplicateAndTranslateCoonsPatch={
+              duplicateAndTranslateCurrentCoonsPatch
+            }
           />
         </div>
       </aside>

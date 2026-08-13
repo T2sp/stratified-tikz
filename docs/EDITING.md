@@ -113,6 +113,49 @@ translation. Direct Inspector coordinate translation does not use cursor snap;
 dragging a selected coordinate marker translates the selected coordinate group
 through cursor input, so snap applies to the dragged target point.
 
+## Coons Patch Duplicate And Translate
+
+When exactly one Coons patch is selected and editable under the current layer
+filter, its detailed Inspector includes `Duplicate & translate`. The three
+controlled `dx`, `dy`, and `dz` fields use the same numeric and scalar-expression
+grammar as the shared translation controls. They describe one global 3D vector;
+at least one finite preview component must be non-zero. This is direct Inspector
+input, so cursor snap does not apply. Incomplete drafts remain UI-only, show a
+warning, and do not change the diagram.
+
+One successful action deep-copies the patch, assigns a fresh globally unique
+top-level ID, translates all four materialized boundary snapshots, and selects
+the copy. The copy preserves the source patch's name, layer, style, sampling,
+boundary orientation, and attached label metadata. It is always an independent
+static Coons patch: active `boundarySources` are removed before the edit is
+committed, while the original patch and its source paths, points, and coordinate
+anchors are neither duplicated nor moved. Supported coordinate references in
+the copied sampled geometry are detached according to the existing curved-sheet
+translation policy.
+
+Every stored absolute boundary coordinate and frame origin moves once by the
+same vector. Frame basis vectors and work-plane-local `a` and `b` values remain
+unchanged. Symbolic coordinates preserve their intent by adding the translation
+expression with the shared typed expression model.
+
+A linked original remains linked. A stale linked original remains stale, and
+its copy is made from the exact last-valid frozen snapshots currently displayed.
+Frozen numeric previews are translated from their stored values rather than
+reevaluated against variables that may have changed; retained symbolic
+expressions and provenance remain part of the static snapshot. Later source
+edits, linked synchronization, and JSON reload therefore cannot reset or move
+the translated copy.
+
+Deep copy, link detachment, coordinate-reference detachment, translation, and
+append form one atomic diagram edit. One Undo removes the copy, and one Redo
+restores the same ID and geometry. Success selects the new patch, subject to the
+existing layer-filter and locked-layer selection policy. Invalid, non-finite,
+unknown-expression, zero-vector, malformed-geometry, hidden-layer, and
+locked-layer submissions add neither a copy nor a history entry.
+
+This action does not add rotation, scale, shear, source duplication, linked
+transform offsets, per-role relinking, or cursor-drag placement.
+
 ## Path Concatenation
 
 Path concatenation joins selected path-like curves in selection order. The next

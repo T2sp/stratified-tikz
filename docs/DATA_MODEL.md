@@ -1136,6 +1136,22 @@ fields resemble live sources. Layer or bulk duplication remaps source IDs only
 when the corresponding source is duplicated in the same operation; duplicating
 only a patch intentionally keeps links to the original sources.
 
+Inspector duplicate-and-translate has a deliberately different link policy.
+It deep-copies the selected Coons patch's current materialized snapshots,
+removes `boundarySources` from the copy, detaches supported coordinate
+references in the copied sampled geometry, applies one global 3D translation,
+and appends an ordinary static Coons patch. Snapshot `id`, `sourceId`, `name`,
+and other provenance may remain, but they are not interpreted as active links.
+The original patch and its boundary sources remain unchanged. A copied stale
+fallback retains `boundarySnapshotState: "frozen"`; its translated stored
+previews stay authoritative through JSON import even if current variable values
+differ from those used by the last valid linked refresh.
+
+Phase 30 adds no persistent translation-offset metadata, no independent linked
+transform model, and no save-file version change. Selection, Inspector drafts,
+validation status, and the ID returned for post-operation selection remain
+editor state rather than `Diagram` fields.
+
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry
 helper constant `MAX_CURVED_SHEET_SAMPLING_SEGMENTS`. Ruled surfaces use the

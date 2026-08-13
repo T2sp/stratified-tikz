@@ -4,6 +4,10 @@ import {
   type Diagram,
 } from './types.ts'
 
+export type UniqueDiagramIdAllocator = {
+  allocate: (sourceId: string) => string
+}
+
 export function collectTopLevelDiagramIds(diagram: Diagram): Set<string> {
   const ids = new Set<string>()
 
@@ -43,6 +47,28 @@ export function collectTopLevelDiagramIds(diagram: Diagram): Set<string> {
   }
 
   return ids
+}
+
+export function createCopyDiagramIdAllocator(
+  initialIds: Iterable<string>,
+): UniqueDiagramIdAllocator {
+  const usedIds = new Set(initialIds)
+
+  return {
+    allocate(sourceId: string): string {
+      const stem = sourceId.trim().length === 0 ? 'copy' : sourceId
+      let candidate = `${stem}-copy`
+      let suffix = 1
+
+      while (usedIds.has(candidate)) {
+        candidate = `${stem}-copy-${suffix}`
+        suffix += 1
+      }
+
+      usedIds.add(candidate)
+      return candidate
+    },
+  }
 }
 
 export function nextVariableId(diagram: Diagram): string {
