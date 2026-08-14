@@ -3,10 +3,6 @@ import {
   detachSampledCurvedSheetPrimitiveCoordinateReferences,
 } from '../model/coordinateReferences.ts'
 import {
-  collectTopLevelDiagramIds,
-  createCopyDiagramIdAllocator,
-} from '../model/diagramIds.ts'
-import {
   diagramTranslationContext,
   isZeroTranslationVector,
   normalizeTranslationVectorForDiagram,
@@ -21,6 +17,7 @@ import type {
   Stratum,
 } from '../model/types.ts'
 import { validateDiagram } from '../model/validation.ts'
+import { duplicateSelectedElements } from './bulkEditing.ts'
 import {
   clearSelectionForLayerFilter,
   isSelectionCompatibleWithLayerFilter,
@@ -36,7 +33,7 @@ export type CoonsPatchStratum = CurvedSheetStratum & {
   primitive: Extract<CurvedSheetStratum['primitive'], { kind: 'coonsPatch' }>
 }
 
-export type DuplicateAndTranslateCoonsPatchResult =
+export type DuplicateCoonsPatchResult =
   | {
       ok: true
       diagram: Diagram
@@ -49,13 +46,24 @@ export type DuplicateAndTranslateCoonsPatchResult =
       error: string
     }
 
-export type DuplicateAndTranslateCoonsPatchEditorState =
-  UndoableEditorState & {
-    layerOperationStatus: string
-  }
+export type TranslateCoonsPatchResult =
+  | {
+      ok: true
+      diagram: Diagram
+      patchId: string
+    }
+  | {
+      ok: false
+      diagram: Diagram
+      error: string
+    }
 
-export type ApplyDuplicateAndTranslateCoonsPatchResult<
-  T extends DuplicateAndTranslateCoonsPatchEditorState,
+export type CoonsPatchActionEditorState = UndoableEditorState & {
+  layerOperationStatus: string
+}
+
+export type ApplyDuplicateCoonsPatchResult<
+  T extends CoonsPatchActionEditorState,
 > =
   | {
       ok: true
@@ -69,7 +77,22 @@ export type ApplyDuplicateAndTranslateCoonsPatchResult<
       message: string
     }
 
-export type DuplicateAndTranslateCoonsPatchActionResult =
+export type ApplyTranslateCoonsPatchResult<
+  T extends CoonsPatchActionEditorState,
+> =
+  | {
+      ok: true
+      state: T
+      patchId: string
+      message: string
+    }
+  | {
+      ok: false
+      state: T
+      message: string
+    }
+
+export type DuplicateCoonsPatchActionResult =
   | {
       ok: true
       duplicatedPatchId: string
@@ -80,7 +103,18 @@ export type DuplicateAndTranslateCoonsPatchActionResult =
       message: string
     }
 
-export type CoonsPatchDuplicateTranslationInput = {
+export type TranslateCoonsPatchActionResult =
+  | {
+      ok: true
+      patchId: string
+      message: string
+    }
+  | {
+      ok: false
+      message: string
+    }
+
+export type CoonsPatchTranslationInput = {
   dx: string
   dy: string
   dz: string
@@ -99,20 +133,104 @@ export function isCoonsPatchStratum(
   )
 }
 
-export function duplicateAndTranslateCoonsPatch(
+/**
+ * Duplicate one Coons patch with the ordinary Phase 29 patch-only policy.
+ * The copy is untranslated and retains any active boundary links.
+ */
+export function duplicateCoonsPatch(
   diagram: Diagram,
   patchId: string,
-  translation: TranslationVector,
-): DuplicateAndTranslateCoonsPatchResult {
+): DuplicateCoonsPatchResult {
   try {
     const source = diagram.strata.find((stratum) => stratum.id === patchId)
 
     if (source === undefined) {
-      return operationFailure(diagram, `Coons patch "${patchId}" does not exist.`)
+      return duplicateFailure(diagram, `Coons patch "${patchId}" does not exist.`)
     }
 
     if (!isCoonsPatchStratum(source)) {
-      return operationFailure(
+      return duplicateFailure(
+        diagram,
+        `Stratum "${patchId}" is not a Coons patch.`,
+      )
+    }
+
+    const duplicated = duplicateSelectedElements(diagram, {
+      kind: 'stratum',
+      id: patchId,
+    })
+    const duplicatedPatchId =
+      duplicated.selectedElement?.kind === 'stratum'
+        ? duplicated.selectedElement.id
+        : null
+    const copy =
+      duplicatedPatchId === null
+        ? undefined
+        : duplicated.diagram.strata.find(
+            (stratum) => stratum.id === duplicatedPatchId,
+          )
+
+    if (
+      duplicated.duplicatedCount !== 1 ||
+      duplicatedPatchId === null ||
+      copy === undefined ||
+      !isCoonsPatchStratum(copy)
+    ) {
+      return duplicateFailure(
+        diagram,
+        'Duplicate Coons patch failed: patch-only duplication returned an unexpected result.',
+      )
+    }
+
+    const diagramValidation = validateDiagram(duplicated.diagram)
+
+    if (!diagramValidation.valid) {
+      return duplicateFailure(
+        diagram,
+        validationErrorMessage(
+          'Duplicated diagram is invalid',
+          diagramValidation.errors,
+        ),
+      )
+    }
+
+    return {
+      ok: true,
+      diagram: duplicated.diagram,
+      sourcePatchId: source.id,
+      duplicatedPatchId,
+    }
+  } catch (error) {
+    return duplicateFailure(
+      diagram,
+      error instanceof Error
+        ? `Duplicate Coons patch failed: ${error.message}`
+        : 'Duplicate Coons patch failed.',
+    )
+  }
+}
+
+/**
+ * Translate one Coons patch in place. Active boundary links are removed from
+ * the local candidate before it is returned to the central commit/synchronizer.
+ */
+export function translateCoonsPatch(
+  diagram: Diagram,
+  patchId: string,
+  translation: TranslationVector,
+): TranslateCoonsPatchResult {
+  try {
+    const sourceIndex = diagram.strata.findIndex(
+      (stratum) => stratum.id === patchId,
+    )
+    const source = diagram.strata[sourceIndex]
+
+    if (source === undefined) {
+      return translateFailure(diagram, `Coons patch "${patchId}" does not exist.`)
+    }
+
+    if (!isCoonsPatchStratum(source)) {
+      return translateFailure(
         diagram,
         `Stratum "${patchId}" is not a Coons patch.`,
       )
@@ -125,19 +243,16 @@ export function duplicateAndTranslateCoonsPatch(
     )
 
     if (isZeroTranslationVector(normalizedTranslation)) {
-      return operationFailure(diagram, 'Enter a non-zero translation.')
+      return translateFailure(diagram, 'Enter a non-zero translation.')
     }
 
-    const copied = structuredClone(source) as CoonsPatchStratum
-    copied.id = createCopyDiagramIdAllocator(
-      collectTopLevelDiagramIds(diagram),
-    ).allocate(source.id)
-    delete copied.primitive.boundarySources
+    const localCandidate = structuredClone(source) as CoonsPatchStratum
+    delete localCandidate.primitive.boundarySources
 
     const detached = detachSampledCurvedSheetPrimitiveCoordinateReferences(
       diagram,
-      copied.primitive,
-      'primitive',
+      localCandidate.primitive,
+      `strata[${sourceIndex}].primitive`,
     )
 
     if (!detached.ok || detached.value.primitive.kind !== 'coonsPatch') {
@@ -145,29 +260,29 @@ export function duplicateAndTranslateCoonsPatch(
         ? 'Detached curved-sheet primitive changed kind.'
         : detached.error.message
 
-      return operationFailure(
+      return translateFailure(
         diagram,
-        `Duplicate and translate failed: ${message}`,
+        `Translate Coons patch failed: ${message}`,
       )
     }
 
-    copied.primitive = detached.value.primitive
+    localCandidate.primitive = detached.value.primitive
     const context = diagramTranslationContext(
       diagram,
-      copied.primitive.boundarySnapshotState === 'frozen'
+      localCandidate.primitive.boundarySnapshotState === 'frozen'
         ? 'preserveStored'
         : 'evaluateExpressions',
     )
     const translated = translateStratum(
-      copied,
+      localCandidate,
       normalizedTranslation,
       context,
     )
 
     if (!isCoonsPatchStratum(translated)) {
-      return operationFailure(
+      return translateFailure(
         diagram,
-        'Duplicate and translate failed: translated primitive changed kind.',
+        'Translate Coons patch failed: translated primitive changed kind.',
       )
     }
 
@@ -176,7 +291,7 @@ export function duplicateAndTranslateCoonsPatch(
     )
 
     if (!primitiveValidation.valid) {
-      return operationFailure(
+      return translateFailure(
         diagram,
         validationErrorMessage(
           'Translated Coons patch is invalid',
@@ -185,14 +300,13 @@ export function duplicateAndTranslateCoonsPatch(
       )
     }
 
-    const candidate = {
-      ...diagram,
-      strata: [...diagram.strata, translated],
-    }
+    const strata = [...diagram.strata]
+    strata[sourceIndex] = translated
+    const candidate = { ...diagram, strata }
     const diagramValidation = validateDiagram(candidate)
 
     if (!diagramValidation.valid) {
-      return operationFailure(
+      return translateFailure(
         diagram,
         validationErrorMessage(
           'Translated diagram is invalid',
@@ -204,52 +318,34 @@ export function duplicateAndTranslateCoonsPatch(
     return {
       ok: true,
       diagram: candidate,
-      sourcePatchId: source.id,
-      duplicatedPatchId: translated.id,
+      patchId: translated.id,
     }
   } catch (error) {
-    return operationFailure(
+    return translateFailure(
       diagram,
       error instanceof Error
-        ? `Duplicate and translate failed: ${error.message}`
-        : 'Duplicate and translate failed.',
+        ? `Translate Coons patch failed: ${error.message}`
+        : 'Translate Coons patch failed.',
     )
   }
 }
 
-export function applyDuplicateAndTranslateCoonsPatchToEditorState<
-  T extends DuplicateAndTranslateCoonsPatchEditorState,
+export function applyDuplicateCoonsPatchToEditorState<
+  T extends CoonsPatchActionEditorState,
 >(
   current: T,
   patchId: string,
-  translation: TranslationVector,
-): ApplyDuplicateAndTranslateCoonsPatchResult<T> {
-  const selected = current.selectedElement
+): ApplyDuplicateCoonsPatchResult<T> {
+  const selectionError = coonsPatchSelectionError(current, patchId)
 
-  if (
-    selected === null ||
-    selected.kind !== 'stratum' ||
-    selected.id !== patchId ||
-    !isSelectionCompatibleWithLayerFilter(
-      current.editableDiagram,
-      selected,
-      current.layerFilter,
-    )
-  ) {
-    return editorFailure(
-      current,
-      'Selection is not editable in the current layer filter.',
-    )
+  if (selectionError !== null) {
+    return duplicateEditorFailure(current, selectionError)
   }
 
-  const result = duplicateAndTranslateCoonsPatch(
-    current.editableDiagram,
-    patchId,
-    translation,
-  )
+  const result = duplicateCoonsPatch(current.editableDiagram, patchId)
 
   if (!result.ok) {
-    return editorFailure(current, result.error)
+    return duplicateEditorFailure(current, result.error)
   }
 
   const nextLayerFilter = normalizeLayerFilterForDiagram(
@@ -261,8 +357,65 @@ export function applyDuplicateAndTranslateCoonsPatchToEditorState<
     { kind: 'stratum', id: result.duplicatedPatchId },
     nextLayerFilter,
   )
+  const message = 'Duplicated Coons patch.'
+  const state = commitDiagramChange(
+    current,
+    {
+      ...current,
+      editableDiagram: result.diagram,
+      selectedElement: nextSelection,
+      layerFilter: nextLayerFilter,
+      polylineDraft: null,
+      cubicBezierDraft: null,
+      pathDraft: null,
+      sheetPolygonDraft: null,
+      layerOperationStatus: message,
+    },
+    { preserveLinkedCoonsSnapshots: true },
+  )
+
+  return {
+    ok: true,
+    state,
+    duplicatedPatchId: result.duplicatedPatchId,
+    message,
+  }
+}
+
+export function applyTranslateCoonsPatchToEditorState<
+  T extends CoonsPatchActionEditorState,
+>(
+  current: T,
+  patchId: string,
+  translation: TranslationVector,
+): ApplyTranslateCoonsPatchResult<T> {
+  const selectionError = coonsPatchSelectionError(current, patchId)
+
+  if (selectionError !== null) {
+    return translateEditorFailure(current, selectionError)
+  }
+
+  const result = translateCoonsPatch(
+    current.editableDiagram,
+    patchId,
+    translation,
+  )
+
+  if (!result.ok) {
+    return translateEditorFailure(current, result.error)
+  }
+
+  const nextLayerFilter = normalizeLayerFilterForDiagram(
+    result.diagram,
+    current.layerFilter,
+  )
+  const nextSelection: SelectedElement = clearSelectionForLayerFilter(
+    result.diagram,
+    { kind: 'stratum', id: result.patchId },
+    nextLayerFilter,
+  )
   const preview = translationVectorPreview(translation)
-  const message = `Duplicated and translated Coons patch by (${preview.x}, ${preview.y}, ${preview.z}).`
+  const message = `Translated Coons patch by (${preview.x}, ${preview.y}, ${preview.z}).`
   const state = commitDiagramChange(current, {
     ...current,
     editableDiagram: result.diagram,
@@ -278,20 +431,20 @@ export function applyDuplicateAndTranslateCoonsPatchToEditorState<
   return {
     ok: true,
     state,
-    duplicatedPatchId: result.duplicatedPatchId,
+    patchId: result.patchId,
     message,
   }
 }
 
-export function submitCoonsPatchDuplicateTranslation(
+export function submitCoonsPatchTranslation(
   diagram: Diagram,
   patchId: string,
-  input: CoonsPatchDuplicateTranslationInput,
+  input: CoonsPatchTranslationInput,
   action: (
     patchId: string,
     translation: TranslationVector,
-  ) => DuplicateAndTranslateCoonsPatchActionResult,
-): DuplicateAndTranslateCoonsPatchActionResult {
+  ) => TranslateCoonsPatchActionResult,
+): TranslateCoonsPatchActionResult {
   const parsed = parseTranslationVectorFromInputs(diagram, input)
 
   if (!parsed.ok) {
@@ -313,17 +466,49 @@ function isCurvedSheetStratum(
   )
 }
 
-function operationFailure(
+function coonsPatchSelectionError(
+  current: CoonsPatchActionEditorState,
+  patchId: string,
+): string | null {
+  const selected = current.selectedElement
+
+  return selected === null ||
+    selected.kind !== 'stratum' ||
+    selected.id !== patchId ||
+    !isSelectionCompatibleWithLayerFilter(
+      current.editableDiagram,
+      selected,
+      current.layerFilter,
+    )
+    ? 'Selection is not editable in the current layer filter.'
+    : null
+}
+
+function duplicateFailure(
   diagram: Diagram,
   error: string,
-): DuplicateAndTranslateCoonsPatchResult {
+): DuplicateCoonsPatchResult {
   return { ok: false, diagram, error }
 }
 
-function editorFailure<T extends DuplicateAndTranslateCoonsPatchEditorState>(
+function translateFailure(
+  diagram: Diagram,
+  error: string,
+): TranslateCoonsPatchResult {
+  return { ok: false, diagram, error }
+}
+
+function duplicateEditorFailure<T extends CoonsPatchActionEditorState>(
   state: T,
   message: string,
-): ApplyDuplicateAndTranslateCoonsPatchResult<T> {
+): ApplyDuplicateCoonsPatchResult<T> {
+  return { ok: false, state, message }
+}
+
+function translateEditorFailure<T extends CoonsPatchActionEditorState>(
+  state: T,
+  message: string,
+): ApplyTranslateCoonsPatchResult<T> {
   return { ok: false, state, message }
 }
 

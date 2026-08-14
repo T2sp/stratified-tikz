@@ -1136,21 +1136,31 @@ fields resemble live sources. Layer or bulk duplication remaps source IDs only
 when the corresponding source is duplicated in the same operation; duplicating
 only a patch intentionally keeps links to the original sources.
 
-Inspector duplicate-and-translate has a deliberately different link policy.
-It deep-copies the selected Coons patch's current materialized snapshots,
-removes `boundarySources` from the copy, detaches supported coordinate
-references in the copied sampled geometry, applies one global 3D translation,
-and appends an ordinary static Coons patch. Snapshot `id`, `sourceId`, `name`,
-and other provenance may remain, but they are not interpreted as active links.
-The original patch and its boundary sources remain unchanged. A copied stale
-fallback retains `boundarySnapshotState: "frozen"`; its translated stored
-previews stay authoritative through JSON import even if current variable values
-differ from those used by the last valid linked refresh.
+The Inspector exposes separate duplication and translation operations.
+`Duplicate` follows the same patch-only link policy described above. It
+deep-copies the current materialized snapshots and other mutable patch data,
+allocates one new top-level patch ID, and appends the untranslated copy. Active
+`boundarySources` remain active on a healthy or stale linked copy and continue
+to identify the same source strata. A stale copy retains its exact cloned
+last-valid snapshots and `boundarySnapshotState: "frozen"`; duplication neither
+repairs nor partially refreshes them.
+
+`Translate` does not allocate or append a stratum. It clones the selected patch
+as a local candidate, removes active `boundarySources` before the candidate can
+reach linked-patch synchronization, applies the existing curved-sheet
+coordinate-reference detachment or rejection policy, translates the four
+materialized boundary snapshots, and replaces the stratum at the same array
+position and ID. Snapshot `id`, `sourceId`, `name`, and other provenance may
+remain, but they are not interpreted as active links after detachment. Source
+paths, source points, coordinate anchors, and other strata remain unchanged. If
+`boundarySnapshotState` is `"frozen"`, translation preserves it and adds the
+vector to stored previews instead of reevaluating old expressions against
+current variable values.
 
 Phase 30 adds no persistent translation-offset metadata, no independent linked
 transform model, and no save-file version change. Selection, Inspector drafts,
-validation status, and the ID returned for post-operation selection remain
-editor state rather than `Diagram` fields.
+validation status, and the copied ID returned for post-duplication selection
+remain editor state rather than `Diagram` fields.
 
 `SurfaceSampling` stores the mesh resolution used by preview/export helpers.
 Both segment counts must be positive integers and are capped by the geometry

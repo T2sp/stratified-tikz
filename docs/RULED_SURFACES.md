@@ -104,39 +104,51 @@ links` removes only the source metadata and leaves the current snapshots,
 identity, style, layer, and sampling unchanged. Detach before intentionally
 maintaining patch geometry independently from its former sources.
 
-## Inspector Duplicate And Translate
+## Inspector Duplicate And Translate Actions
 
-The detailed Inspector shows `Duplicate & translate` only when exactly one
-Coons patch is selected. Its `dx`, `dy`, and `dz` fields specify a global 3D
-translation vector using the editor's existing numeric and scalar-expression
-grammar. At least one component must be non-zero and every resolved preview
-must be finite. This direct-input operation does not use cursor snap.
+The detailed Inspector shows separate `Duplicate` and `Translate` actions only
+when exactly one editable Coons patch is selected. `Duplicate` takes no vector:
+it appends a deep-cloned, untranslated patch with a fresh globally unique ID and
+selects that copy. It preserves the patch's materialized snapshots, name, layer,
+style, sampling, boundary-role order, path orientation, provenance, and other
+metadata without sharing mutable nested data.
 
-The operation creates one deep-cloned Coons patch, translates its four current
-materialized boundary snapshots by the same vector, and selects the copy. The
-copy keeps the original name, layer, style, sampling, boundary-role order, path
-orientation, and snapshot provenance, but it is always static. The original's
-active `boundarySources` are not copied, and the source paths, constant points,
-and coordinate anchors are neither duplicated nor moved. Consequently, later
-source edits and linked synchronization can update the linked original without
-moving or staling the translated copy.
+Patch-only link semantics remain the same as ordinary duplication. A static
+patch produces a static copy. A healthy linked patch produces an independently
+materialized copy linked to the same source IDs. A stale linked patch keeps the
+same active `boundarySources`, exact frozen last-valid snapshots, and
+`boundarySnapshotState: "frozen"`. Duplication does not detach, repair, refresh,
+or translate the copy, and it does not duplicate or move source paths, constant
+points, or coordinate anchors.
 
-Preview, SVG export, and TikZ export consume the translated materialized
-snapshots of the static copy; they do not perform a boundary-source lookup.
+The `Translate` form's `dx`, `dy`, and `dz` fields specify a finite, non-zero
+global 3D vector using the editor's existing numeric and scalar-expression
+grammar. This direct-input action does not use cursor snap. It replaces the
+selected patch at the same ID and array position, translates all four
+materialized boundary snapshots once, and appends nothing.
 
-For a stale linked original, the operation copies the exact last-valid frozen
-snapshots and translates their stored numeric previews. It preserves their
-symbolic expressions, provenance, and `boundarySnapshotState: "frozen"`, so
-changed diagram variables and JSON import cannot independently reevaluate or
-drift that static fallback. The stale original and all of its links remain
-unchanged.
+Before translating a healthy or stale linked patch, the editor removes that
+patch's active `boundarySources` from the candidate that will be committed.
+This makes only the translated patch static and prevents synchronization from
+snapping it back. Its former sources and coordinate anchors remain unchanged.
+For stale input, translation starts from the exact stored frozen snapshots,
+adds the vector to their stored numeric previews without reevaluating them, and
+preserves symbolic expressions, provenance, and
+`boundarySnapshotState: "frozen"`.
 
-Duplication, link detachment, translation, and append are committed as one
-undoable diagram edit. One Undo removes the complete copy; one Redo restores
-the same ID and geometry. Invalid, incomplete, non-finite, unknown-expression,
-and zero-vector drafts do not modify the diagram or history. Rotation, scaling,
-cursor placement, source duplication, and independent linked-patch transform
-offsets are not part of this operation.
+Preview, SVG export, and TikZ export consume the resulting materialized
+snapshots; they do not resolve boundary sources while rendering or exporting.
+Later source edits, deletion, repair, synchronization, and JSON import cannot
+move or relink a translated static patch.
+
+Each action is one undoable diagram edit. `Duplicate` followed by `Translate`
+uses two Undo steps: the first restores the unshifted copy and its exact prior
+link state, and the second removes it. A failed translation leaves an earlier
+successful duplicate intact. Invalid, incomplete, non-finite,
+unknown-expression, and zero-vector translation drafts do not modify the
+diagram or history and do not disable `Duplicate`. Rotation, scaling, cursor
+placement, source-tree duplication, and independent linked-patch transform
+offsets are not part of these actions.
 
 ## Preview And Export
 

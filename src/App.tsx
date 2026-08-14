@@ -131,7 +131,8 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
-  applyDuplicateAndTranslateCoonsPatchToEditorState,
+  applyDuplicateCoonsPatchToEditorState,
+  applyTranslateCoonsPatchToEditorState,
   applyCoordinateAnchorDragToEditorState,
   applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
@@ -2231,15 +2232,8 @@ function App() {
     setCopyStatus('idle')
   }
 
-  function duplicateAndTranslateCurrentCoonsPatch(
-    patchId: string,
-    translation: TranslationVector,
-  ) {
-    const result = applyDuplicateAndTranslateCoonsPatchToEditorState(
-      editorState,
-      patchId,
-      translation,
-    )
+  function duplicateCurrentCoonsPatch(patchId: string) {
+    const result = applyDuplicateCoonsPatchToEditorState(editorState, patchId)
 
     if (!result.ok) {
       setLayerOperationStatus(result.message)
@@ -2265,6 +2259,44 @@ function App() {
     return {
       ok: true as const,
       duplicatedPatchId: result.duplicatedPatchId,
+      message: result.message,
+    }
+  }
+
+  function translateCurrentCoonsPatch(
+    patchId: string,
+    translation: TranslationVector,
+  ) {
+    const result = applyTranslateCoonsPatchToEditorState(
+      editorState,
+      patchId,
+      translation,
+    )
+
+    if (!result.ok) {
+      setLayerOperationStatus(result.message)
+      return result
+    }
+
+    setEditorState(result.state)
+    setInspectorDisclosure((current) =>
+      setInspectorDisclosureExpanded(
+        current,
+        { kind: 'stratum', id: result.patchId },
+        true,
+      ),
+    )
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return {
+      ok: true as const,
+      patchId: result.patchId,
       message: result.message,
     }
   }
@@ -6424,6 +6456,7 @@ function App() {
           <EditableInspector
             diagram={editableDiagram}
             selectedElement={selectedElement}
+            layerFilter={layerFilter}
             onDiagramChange={updateEditableDiagram}
             expanded={isInspectorExpanded}
             onExpandedChange={updateInspectorExpanded}
@@ -6440,9 +6473,8 @@ function App() {
             onBulkConcatenatePaths={concatenateCurrentSelection}
             onSplitPath={splitCurrentPath}
             onStartPathSplitPick={startPathSplitPick}
-            onDuplicateAndTranslateCoonsPatch={
-              duplicateAndTranslateCurrentCoonsPatch
-            }
+            onDuplicateCoonsPatch={duplicateCurrentCoonsPatch}
+            onTranslateCoonsPatch={translateCurrentCoonsPatch}
           />
         </div>
       </aside>

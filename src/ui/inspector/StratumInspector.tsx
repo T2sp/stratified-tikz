@@ -25,14 +25,17 @@ import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 import type { PathSplitTarget } from '../pathSplitting.ts'
+import { isCoonsPatchStratum } from '../coonsPatchDuplicateTranslation.ts'
 import {
-  isCoonsPatchStratum,
-} from '../coonsPatchDuplicateTranslation.ts'
-import {
-  CoonsPatchDuplicateTranslateEditor,
-  type DuplicateAndTranslateCoonsPatchActionResult,
+  CoonsPatchActionsEditor,
+  type DuplicateCoonsPatchActionResult,
+  type TranslateCoonsPatchActionResult,
 } from './CoonsPatchDuplicateTranslateEditor.tsx'
 import type { TranslationVector } from '../../model/translation.ts'
+import {
+  isStratumSelectableInEditor,
+  type LayerFilter,
+} from '../layerFilter.ts'
 
 export type StratumInspectorProps = {
   diagram: Diagram
@@ -45,10 +48,14 @@ export type StratumInspectorProps = {
   pasteStyleDisabled?: boolean
   onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick?: (keepOriginal: boolean) => string
-  onDuplicateAndTranslateCoonsPatch: (
+  layerFilter: LayerFilter
+  onDuplicateCoonsPatch: (
+    patchId: string,
+  ) => DuplicateCoonsPatchActionResult
+  onTranslateCoonsPatch: (
     patchId: string,
     translation: TranslationVector,
-  ) => DuplicateAndTranslateCoonsPatchActionResult
+  ) => TranslateCoonsPatchActionResult
 }
 
 export function StratumInspector({
@@ -62,7 +69,9 @@ export function StratumInspector({
   pasteStyleDisabled = false,
   onSplitPath,
   onStartPathSplitPick,
-  onDuplicateAndTranslateCoonsPatch,
+  layerFilter,
+  onDuplicateCoonsPatch,
+  onTranslateCoonsPatch,
 }: StratumInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -108,11 +117,13 @@ export function StratumInspector({
         onDiagramChange={onDiagramChange}
       />
 
-      {isCoonsPatchStratum(stratum) && (
-        <CoonsPatchDuplicateTranslateEditor
+      {isCoonsPatchStratum(stratum) &&
+        isStratumSelectableInEditor(diagram, stratum, layerFilter) && (
+        <CoonsPatchActionsEditor
           diagram={diagram}
           patch={stratum}
-          onDuplicateAndTranslate={onDuplicateAndTranslateCoonsPatch}
+          onDuplicate={onDuplicateCoonsPatch}
+          onTranslate={onTranslateCoonsPatch}
         />
       )}
 

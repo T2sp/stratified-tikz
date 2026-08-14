@@ -113,48 +113,64 @@ translation. Direct Inspector coordinate translation does not use cursor snap;
 dragging a selected coordinate marker translates the selected coordinate group
 through cursor input, so snap applies to the dragged target point.
 
-## Coons Patch Duplicate And Translate
+## Coons Patch Duplicate And Translate Actions
 
 When exactly one Coons patch is selected and editable under the current layer
-filter, its detailed Inspector includes `Duplicate & translate`. The three
-controlled `dx`, `dy`, and `dz` fields use the same numeric and scalar-expression
-grammar as the shared translation controls. They describe one global 3D vector;
-at least one finite preview component must be non-zero. This is direct Inspector
-input, so cursor snap does not apply. Incomplete drafts remain UI-only, show a
-warning, and do not change the diagram.
+filter, its detailed Inspector includes two independent actions: `Duplicate`
+and `Translate`. `Duplicate` is separate from the translation form. It neither
+reads nor validates the `dx`, `dy`, and `dz` drafts, so an incomplete, invalid,
+or zero translation does not prevent duplication.
 
-One successful action deep-copies the patch, assigns a fresh globally unique
-top-level ID, translates all four materialized boundary snapshots, and selects
-the copy. The copy preserves the source patch's name, layer, style, sampling,
-boundary orientation, and attached label metadata. It is always an independent
-static Coons patch: active `boundarySources` are removed before the edit is
-committed, while the original patch and its source paths, points, and coordinate
-anchors are neither duplicated nor moved. Supported coordinate references in
-the copied sampled geometry are detached according to the existing curved-sheet
-translation policy.
+`Duplicate` deep-copies the complete patch, assigns a fresh globally unique
+top-level ID, appends the untranslated copy, and selects it. The copy preserves
+the current materialized boundary snapshots, name, layer, style, sampling,
+boundary orientation, attached label metadata, and other patch metadata.
+Mutable nested data is independent from the original. Source paths, source
+points, and coordinate anchors are not duplicated or moved.
+
+Ordinary patch-only link semantics apply to `Duplicate`. A static patch produces
+a static copy. A healthy linked patch produces another patch linked to the same
+source IDs, with independent current snapshots; later source edits synchronize
+both patches. A stale linked patch produces a stale linked copy with the same
+active `boundarySources`, exact independently cloned last-valid snapshots, and
+`boundarySnapshotState: "frozen"`. Duplication does not repair or detach either
+linked state.
+
+The `Translate` form uses the same numeric and scalar-expression grammar as the
+shared translation controls. Its `dx`, `dy`, and `dz` fields describe one finite,
+non-zero global 3D vector. This is direct Inspector input, so cursor snap does
+not apply. Incomplete or invalid drafts remain UI-only and do not change the
+diagram.
+
+`Translate` moves the selected patch in place: it keeps the same ID and array
+position and does not append a copy. A static patch remains static. A healthy or
+stale linked patch has its active `boundarySources` removed before the translated
+candidate is committed, so link synchronization cannot restore the former
+source geometry. Only that patch is detached. Its former source paths, source
+points, and coordinate anchors are neither moved nor modified.
 
 Every stored absolute boundary coordinate and frame origin moves once by the
 same vector. Frame basis vectors and work-plane-local `a` and `b` values remain
-unchanged. Symbolic coordinates preserve their intent by adding the translation
-expression with the shared typed expression model.
+unchanged. Supported coordinate references are detached according to the
+existing curved-sheet translation policy. Symbolic coordinates preserve their
+intent by using the shared typed expression model. For a stale linked patch,
+translation starts from the exact stored last-valid snapshots, adds the vector
+to their stored previews without reevaluating them against current variables,
+and preserves `boundarySnapshotState: "frozen"`. Later source edits,
+synchronization, source deletion or repair, and JSON reload cannot move or
+relink the translated static patch.
 
-A linked original remains linked. A stale linked original remains stale, and
-its copy is made from the exact last-valid frozen snapshots currently displayed.
-Frozen numeric previews are translated from their stored values rather than
-reevaluated against variables that may have changed; retained symbolic
-expressions and provenance remain part of the static snapshot. Later source
-edits, linked synchronization, and JSON reload therefore cannot reset or move
-the translated copy.
+Each successful action is one atomic diagram edit. `Duplicate` followed by
+`Translate` therefore creates two history entries: the first Undo restores the
+untranslated copy and its exact pre-translation link state, and the second Undo
+removes the copy. Redo restores the same copy ID before restoring its translated
+geometry. A failed translation does not roll back an earlier successful
+duplication. Invalid, non-finite, unknown-expression, zero-vector,
+malformed-geometry, hidden-layer, and locked-layer actions do not change the
+diagram or history.
 
-Deep copy, link detachment, coordinate-reference detachment, translation, and
-append form one atomic diagram edit. One Undo removes the copy, and one Redo
-restores the same ID and geometry. Success selects the new patch, subject to the
-existing layer-filter and locked-layer selection policy. Invalid, non-finite,
-unknown-expression, zero-vector, malformed-geometry, hidden-layer, and
-locked-layer submissions add neither a copy nor a history entry.
-
-This action does not add rotation, scale, shear, source duplication, linked
-transform offsets, per-role relinking, or cursor-drag placement.
+These actions do not add rotation, scale, shear, source-tree duplication,
+linked transform offsets, per-role relinking, or cursor-drag placement.
 
 ## Path Concatenation
 

@@ -5,62 +5,65 @@ import {
   type TranslationVector,
 } from '../../model/translation.ts'
 import {
-  submitCoonsPatchDuplicateTranslation,
-  type CoonsPatchDuplicateTranslationInput,
+  submitCoonsPatchTranslation,
   type CoonsPatchStratum,
-  type DuplicateAndTranslateCoonsPatchActionResult,
+  type CoonsPatchTranslationInput,
+  type DuplicateCoonsPatchActionResult,
+  type TranslateCoonsPatchActionResult,
 } from '../coonsPatchDuplicateTranslation.ts'
 
-export type { DuplicateAndTranslateCoonsPatchActionResult } from '../coonsPatchDuplicateTranslation.ts'
+export type {
+  DuplicateCoonsPatchActionResult,
+  TranslateCoonsPatchActionResult,
+} from '../coonsPatchDuplicateTranslation.ts'
 
-export type CoonsPatchDuplicateTranslateEditorProps = {
+export type CoonsPatchActionsEditorProps = {
   diagram: Parameters<typeof parseTranslationVectorFromInputs>[0]
   patch: CoonsPatchStratum
-  onDuplicateAndTranslate: (
+  onDuplicate: (patchId: string) => DuplicateCoonsPatchActionResult
+  onTranslate: (
     patchId: string,
     translation: TranslationVector,
-  ) => DuplicateAndTranslateCoonsPatchActionResult
+  ) => TranslateCoonsPatchActionResult
 }
 
-export type CoonsPatchDuplicateTranslateStatusState = {
+export type CoonsPatchActionStatusState = {
   patchId: string
   message: string
 }
 
-export type CoonsPatchDuplicateTranslateFormProps =
-  CoonsPatchDuplicateTranslateEditorProps & {
-    input: CoonsPatchDuplicateTranslationInput
-    statusState: CoonsPatchDuplicateTranslateStatusState
-    onInputChange: (
-      field: keyof CoonsPatchDuplicateTranslationInput,
-      value: string,
-    ) => void
-    onStatusStateChange: (
-      status: CoonsPatchDuplicateTranslateStatusState,
-    ) => void
-  }
+export type CoonsPatchActionsControlsProps = CoonsPatchActionsEditorProps & {
+  input: CoonsPatchTranslationInput
+  statusState: CoonsPatchActionStatusState
+  onInputChange: (
+    field: keyof CoonsPatchTranslationInput,
+    value: string,
+  ) => void
+  onStatusStateChange: (status: CoonsPatchActionStatusState) => void
+}
 
-export function CoonsPatchDuplicateTranslateEditor({
+export function CoonsPatchActionsEditor({
   diagram,
   patch,
-  onDuplicateAndTranslate,
-}: CoonsPatchDuplicateTranslateEditorProps) {
-  const [input, setInput] = useState<CoonsPatchDuplicateTranslationInput>({
+  onDuplicate,
+  onTranslate,
+}: CoonsPatchActionsEditorProps) {
+  const [input, setInput] = useState<CoonsPatchTranslationInput>({
     dx: '0',
     dy: '0',
     dz: '0',
   })
-  const [statusState, setStatusState] =
-    useState<CoonsPatchDuplicateTranslateStatusState>({
-      patchId: '',
-      message: '',
-    })
+  const [statusState, setStatusState] = useState<CoonsPatchActionStatusState>({
+    patchId: '',
+    message: '',
+  })
 
   return (
-    <CoonsPatchDuplicateTranslateForm
+    <CoonsPatchActionsControls
       diagram={diagram}
       patch={patch}
-      onDuplicateAndTranslate={onDuplicateAndTranslate}
+      onDuplicate={onDuplicate}
+      onTranslate={onTranslate}
       input={input}
       statusState={statusState}
       onInputChange={(field, value) => {
@@ -72,15 +75,16 @@ export function CoonsPatchDuplicateTranslateEditor({
   )
 }
 
-export function CoonsPatchDuplicateTranslateForm({
+export function CoonsPatchActionsControls({
   diagram,
   patch,
-  onDuplicateAndTranslate,
+  onDuplicate,
+  onTranslate,
   input,
   statusState,
   onInputChange,
   onStatusStateChange,
-}: CoonsPatchDuplicateTranslateFormProps) {
+}: CoonsPatchActionsControlsProps) {
   const parsed = parseTranslationVectorFromInputs(diagram, input)
   const isZero = parsed.ok && isZeroTranslationVector(parsed.translation)
   const errorMessage = parsed.ok
@@ -88,42 +92,52 @@ export function CoonsPatchDuplicateTranslateForm({
       ? 'Enter a non-zero translation.'
       : ''
     : parsed.error
-  const status =
-    statusState.patchId === patch.id ? statusState.message : ''
+  const status = statusState.patchId === patch.id ? statusState.message : ''
 
-  function submit(event: FormEvent<HTMLFormElement>): void {
+  function duplicate(): void {
+    const result = onDuplicate(patch.id)
+
+    onStatusStateChange({
+      patchId: patch.id,
+      message: result.message,
+    })
+  }
+
+  function submitTranslation(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
 
-    if (!parsed.ok) {
-      onStatusStateChange({ patchId: patch.id, message: parsed.error })
-      return
-    }
-
-    if (isZero) {
-      onStatusStateChange({
-        patchId: patch.id,
-        message: 'Enter a non-zero translation.',
-      })
-      return
-    }
-
-    const result = submitCoonsPatchDuplicateTranslation(
+    const result = submitCoonsPatchTranslation(
       diagram,
       patch.id,
       input,
-      onDuplicateAndTranslate,
+      onTranslate,
     )
 
     onStatusStateChange({
-      patchId: result.ok ? result.duplicatedPatchId : patch.id,
+      patchId: patch.id,
       message: result.message,
     })
   }
 
   return (
     <section className="inspector-section">
-      <h3>Duplicate &amp; translate</h3>
-      <form className="inspector-form" onSubmit={submit}>
+      <h3>Coons patch actions</h3>
+      <div className="inspector-form">
+        <div className="inspector-field">
+          <span className="inspector-field-label">Duplicate</span>
+          <button
+            type="button"
+            className="toolbar-button"
+            aria-label="Duplicate selected Coons patch"
+            title="Create an untranslated Coons patch copy using the current patch-only link policy"
+            onClick={duplicate}
+          >
+            Duplicate
+          </button>
+        </div>
+      </div>
+      <form className="inspector-form" onSubmit={submitTranslation}>
+        <h4>Translate</h4>
         <TranslationInput
           label="dx"
           value={input.dx}
@@ -143,19 +157,24 @@ export function CoonsPatchDuplicateTranslateForm({
           onChange={(value) => onInputChange('dz', value)}
         />
         <div className="inspector-field">
-          <span className="inspector-field-label">Create static copy</span>
+          <span className="inspector-field-label">Move selected patch</span>
           <button
             type="submit"
             className="toolbar-button"
+            aria-label="Translate selected Coons patch"
             disabled={!parsed.ok || isZero}
             title={
               errorMessage ||
-              'Duplicate this Coons patch as an independent static copy and translate it globally'
+              'Translate this Coons patch globally; active boundary links are detached first'
             }
           >
-            Duplicate &amp; translate
+            Translate
           </button>
         </div>
+        <p className="inspector-help">
+          Translating a linked patch detaches only that patch and makes it
+          static. Its boundary sources are not moved.
+        </p>
         {(status !== '' || errorMessage !== '') && (
           <p className="inspector-status" role="status" aria-live="polite">
             {errorMessage || status}

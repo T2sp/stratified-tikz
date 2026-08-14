@@ -25,7 +25,10 @@ import {
 import {
   coordinateReferenceVec3ForAnchor,
 } from '../../src/model/coordinateReferences.ts'
-import { createArcPathSegmentFromAngles } from '../../src/model/paths.ts'
+import {
+  createArcPathSegmentFromAngles,
+  sampleTemplatePathPoints,
+} from '../../src/model/paths.ts'
 import {
   parseSavedDiagramJson,
   serializeDiagram,
@@ -58,13 +61,16 @@ import { prepareSvgSurfaceGeometry } from '../../src/rendering/svgSurfaceScene.t
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { duplicateSelectedElements } from '../../src/ui/bulkEditing.ts'
 import {
-  applyDuplicateAndTranslateCoonsPatchToEditorState,
-  duplicateAndTranslateCoonsPatch,
+  applyDuplicateCoonsPatchToEditorState,
+  applyTranslateCoonsPatchToEditorState,
+  duplicateCoonsPatch,
   isCoonsPatchStratum,
-  submitCoonsPatchDuplicateTranslation,
-  type CoonsPatchDuplicateTranslationInput,
+  submitCoonsPatchTranslation,
+  translateCoonsPatch,
+  type CoonsPatchTranslationInput,
   type CoonsPatchStratum,
-  type DuplicateAndTranslateCoonsPatchActionResult,
+  type DuplicateCoonsPatchActionResult,
+  type TranslateCoonsPatchActionResult,
 } from '../../src/ui/coonsPatchDuplicateTranslation.ts'
 import { allLayersFilter } from '../../src/ui/layerFilter.ts'
 import {
@@ -97,31 +103,32 @@ type TestEditorState = {
   history: DiagramHistory
 }
 
-type CoonsPatchDuplicateTranslateFormHarnessProps = {
+type CoonsPatchActionsControlsHarnessProps = {
   diagram: Diagram
   patch: CoonsPatchStratum
-  onDuplicateAndTranslate: (
+  onDuplicate: (patchId: string) => DuplicateCoonsPatchActionResult
+  onTranslate: (
     patchId: string,
     translation: TranslationVector,
-  ) => DuplicateAndTranslateCoonsPatchActionResult
-  input: CoonsPatchDuplicateTranslationInput
-  statusState: CoonsPatchDuplicateTranslateStatusState
+  ) => TranslateCoonsPatchActionResult
+  input: CoonsPatchTranslationInput
+  statusState: CoonsPatchActionStatusState
   onInputChange: (
-    field: keyof CoonsPatchDuplicateTranslationInput,
+    field: keyof CoonsPatchTranslationInput,
     value: string,
   ) => void
   onStatusStateChange: (
-    status: CoonsPatchDuplicateTranslateStatusState,
+    status: CoonsPatchActionStatusState,
   ) => void
 }
 
-type CoonsPatchDuplicateTranslateStatusState = {
+type CoonsPatchActionStatusState = {
   patchId: string
   message: string
 }
 
-type CoonsPatchDuplicateTranslateFormHarnessComponent = (
-  props: CoonsPatchDuplicateTranslateFormHarnessProps,
+type CoonsPatchActionsControlsHarnessComponent = (
+  props: CoonsPatchActionsControlsHarnessProps,
 ) => unknown
 
 type ProductionReactElement = {
@@ -131,49 +138,39 @@ type ProductionReactElement = {
 
 type SvgCamera3D = Extract<Diagram['camera'], { mode: '3d' }>
 
-test('operation eligibility is exact and failures preserve the original diagram', () => {
+test('separate model operations have exact eligibility and atomic failures', () => {
   const diagram = createComplexPatchDiagram(false)
   const patch = findCoonsPatch(diagram, 'patch')
-  const translation = numericTranslation(diagram, point(1, 2, 3))
+  const delta = numericTranslation(diagram, point(1, 2, 3))
 
   assert.equal(isCoonsPatchStratum(patch), true)
   for (const stratum of diagram.strata.filter((value) => value.id !== patch.id)) {
     assert.equal(isCoonsPatchStratum(stratum), false, stratum.id)
-    const rejected = duplicateAndTranslateCoonsPatch(
-      diagram,
-      stratum.id,
-      translation,
-    )
-
-    assert.equal(rejected.ok, false)
-    assert.equal(rejected.diagram, diagram)
+    const duplicate = duplicateCoonsPatch(diagram, stratum.id)
+    assert.equal(duplicate.ok, false)
+    assert.equal(duplicate.diagram, diagram)
+    const translate = translateCoonsPatch(diagram, stratum.id, delta)
+    assert.equal(translate.ok, false)
+    assert.equal(translate.diagram, diagram)
   }
 
-  const missing = duplicateAndTranslateCoonsPatch(
-    diagram,
-    'missing-patch',
-    translation,
-  )
-  assert.equal(missing.ok, false)
-  assert.equal(missing.diagram, diagram)
+  assert.equal(duplicateCoonsPatch(diagram, 'missing-patch').ok, false)
+  assert.equal(translateCoonsPatch(diagram, 'missing-patch', delta).ok, false)
 
-  const zero = duplicateAndTranslateCoonsPatch(
+  const zero = translateCoonsPatch(
     diagram,
     patch.id,
     numericTranslation(diagram, point(0, 0, 0)),
   )
   assert.equal(zero.ok, false)
   assert.equal(zero.diagram, diagram)
+  assert.equal(zero.error, 'Enter a non-zero translation.')
 
-  const nonFinite = duplicateAndTranslateCoonsPatch(
-    diagram,
-    patch.id,
-    {
-      x: { kind: 'numeric', value: Number.POSITIVE_INFINITY },
-      y: { kind: 'numeric', value: 0 },
-      z: { kind: 'numeric', value: 0 },
-    },
-  )
+  const nonFinite = translateCoonsPatch(diagram, patch.id, {
+    x: { kind: 'numeric', value: Number.POSITIVE_INFINITY },
+    y: { kind: 'numeric', value: 0 },
+    z: { kind: 'numeric', value: 0 },
+  })
   assert.equal(nonFinite.ok, false)
   assert.equal(nonFinite.diagram, diagram)
 
@@ -191,44 +188,40 @@ test('operation eligibility is exact and failures preserve the original diagram'
     strata: [...diagram.strata, malformedPatch],
   }
   assert.doesNotThrow(() =>
-    duplicateAndTranslateCoonsPatch(
-      malformedDiagram,
-      malformedPatch.id,
-      translation,
-    ),
+    duplicateCoonsPatch(malformedDiagram, malformedPatch.id),
   )
-  const malformed = duplicateAndTranslateCoonsPatch(
-    malformedDiagram,
-    malformedPatch.id,
-    translation,
+  assert.doesNotThrow(() =>
+    translateCoonsPatch(malformedDiagram, malformedPatch.id, delta),
   )
-  assert.equal(malformed.ok, false)
-  assert.equal(malformed.diagram, malformedDiagram)
+  assert.equal(
+    duplicateCoonsPatch(malformedDiagram, malformedPatch.id).ok,
+    false,
+  )
+  assert.equal(
+    translateCoonsPatch(malformedDiagram, malformedPatch.id, delta).ok,
+    false,
+  )
 })
 
-test('static duplication deeply clones metadata and translates every boundary form', () => {
+test('static Duplicate is untranslated and deeply independent; Translate replaces the same ID and covers all boundaries', () => {
   const diagram = createComplexPatchDiagram(false)
-  const before = structuredClone(diagram)
+  const diagramBefore = structuredClone(diagram)
   const source = findCoonsPatch(diagram, 'patch')
   const sourceMesh = sampleCoonsPatch(source.primitive)
-  const delta = point(1.25, -0.5, 2)
-  const result = duplicateAndTranslateCoonsPatch(
-    diagram,
-    source.id,
-    numericTranslation(diagram, delta),
-  )
+  const duplicated = duplicateCoonsPatch(diagram, source.id)
 
-  assert.equal(result.ok, true)
-  if (!result.ok) {
-    throw new Error(result.error)
+  assert.equal(duplicated.ok, true)
+  if (!duplicated.ok) {
+    throw new Error(duplicated.error)
   }
 
-  const copy = findCoonsPatch(result.diagram, result.duplicatedPatchId)
+  const copy = findCoonsPatch(duplicated.diagram, duplicated.duplicatedPatchId)
   assert.equal(copy.id, 'patch-copy')
   assert.equal(copy.name, source.name)
-  assert.equal(copy.codim, source.codim)
-  assert.equal(copy.geometricKind, source.geometricKind)
-  assert.equal(copy.kind, source.kind)
+  assert.equal(copy.codim, 1)
+  assert.equal(copy.geometricKind, 'sheet')
+  assert.equal(copy.kind, 'curvedSheet')
+  assert.equal(copy.primitive.kind, 'coonsPatch')
   assert.equal(copy.layer, source.layer)
   assert.equal(copy.label, source.label)
   assert.equal(
@@ -236,11 +229,11 @@ test('static duplication deeply clones metadata and translates every boundary fo
     source.importedTikzStyleReferenceId,
   )
   assert.deepEqual(copy.style, source.style)
-  assert.deepEqual(copy.primitive.sampling, source.primitive.sampling)
-  assert.equal(copy.primitive.boundarySources, undefined)
-  assert.equal(copy.primitive.boundarySnapshotState, undefined)
-  assert.deepEqual(diagram, before)
-  assert.equal(findCoonsPatch(diagram, source.id), source)
+  assert.deepEqual(copy.primitive, source.primitive)
+  assert.deepEqual(sampleCoonsPatch(copy.primitive), sourceMesh)
+  assert.deepEqual(diagram, diagramBefore)
+  assert.equal(duplicated.diagram.strata.length, diagram.strata.length + 1)
+  assert.equal(findCoonsPatch(duplicated.diagram, source.id), source)
 
   assert.notEqual(copy, source)
   assert.notEqual(copy.style, source.style)
@@ -251,208 +244,280 @@ test('static duplication deeply clones metadata and translates every boundary fo
   assertBoundaryDeepClone(source.primitive.top, copy.primitive.top)
   assertBoundaryDeepClone(source.primitive.left, copy.primitive.left)
 
-  assertBoundaryTranslated(source.primitive.bottom, copy.primitive.bottom, delta)
-  assertBoundaryTranslated(source.primitive.right, copy.primitive.right, delta)
-  assertBoundaryTranslated(source.primitive.top, copy.primitive.top, delta)
-  assertBoundaryTranslated(source.primitive.left, copy.primitive.left, delta)
+  const delta = point(1.25, -0.5, 2)
+  const beforeTranslate = structuredClone(duplicated.diagram)
+  const translated = translateCoonsPatch(
+    duplicated.diagram,
+    copy.id,
+    numericTranslation(duplicated.diagram, delta),
+  )
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
 
-  const sourceBottom = pathBoundary(source.primitive.bottom)
-  const copyBottom = pathBoundary(copy.primitive.bottom)
-  const sourceArc = sourceBottom.segments.find((segment) => segment.kind === 'arc')
-  const copyArc = copyBottom.segments.find((segment) => segment.kind === 'arc')
-  assert.notEqual(sourceArc, undefined)
-  assert.notEqual(copyArc, undefined)
-  if (sourceArc?.kind !== 'arc' || copyArc?.kind !== 'arc') {
+  assert.equal(translated.patchId, copy.id)
+  assert.equal(translated.diagram.strata.length, duplicated.diagram.strata.length)
+  assert.deepEqual(
+    translated.diagram.strata.map((stratum) => stratum.id),
+    duplicated.diagram.strata.map((stratum) => stratum.id),
+  )
+  assertOtherStrataAndAnchorsUnchanged(
+    duplicated.diagram,
+    translated.diagram,
+    copy.id,
+  )
+
+  const moved = findCoonsPatch(translated.diagram, copy.id)
+  assert.equal(moved.primitive.boundarySources, undefined)
+  assertBoundaryTranslated(copy.primitive.bottom, moved.primitive.bottom, delta)
+  assertBoundaryTranslated(copy.primitive.right, moved.primitive.right, delta)
+  assertBoundaryTranslated(copy.primitive.top, moved.primitive.top, delta)
+  assertBoundaryTranslated(copy.primitive.left, moved.primitive.left, delta)
+
+  const sourceBottom = pathBoundary(copy.primitive.bottom)
+  const movedBottom = pathBoundary(moved.primitive.bottom)
+  const sourceArc = sourceBottom.segments.find(
+    (segment) => segment.kind === 'arc',
+  )
+  const movedArc = movedBottom.segments.find(
+    (segment) => segment.kind === 'arc',
+  )
+  if (sourceArc?.kind !== 'arc' || movedArc?.kind !== 'arc') {
     throw new Error('Expected the representative arc segment.')
   }
-  assert.notEqual(copyArc.frame, sourceArc.frame)
-  assertVec3Translated(sourceArc.frame?.origin, copyArc.frame?.origin, delta)
-  assert.deepEqual(copyArc.frame?.u, sourceArc.frame?.u)
-  assert.deepEqual(copyArc.frame?.v, sourceArc.frame?.v)
-  assert.deepEqual(copyArc.frame?.normal, sourceArc.frame?.normal)
-  assert.notEqual(copyArc.frame?.u, sourceArc.frame?.u)
+  assertVec3Translated(sourceArc.frame?.origin, movedArc.frame?.origin, delta)
+  assert.deepEqual(movedArc.frame?.u, sourceArc.frame?.u)
+  assert.deepEqual(movedArc.frame?.v, sourceArc.frame?.v)
+  assert.deepEqual(movedArc.frame?.normal, sourceArc.frame?.normal)
+  assert.notEqual(movedArc.frame?.u, sourceArc.frame?.u)
 
   const cornerStatuses = coonsPatchCornerEquationStatusesFromBoundaries({
-    bottom: copy.primitive.bottom,
-    right: copy.primitive.right,
-    top: copy.primitive.top,
-    left: copy.primitive.left,
+    bottom: moved.primitive.bottom,
+    right: moved.primitive.right,
+    top: moved.primitive.top,
+    left: moved.primitive.left,
   })
   assert.equal(cornerStatuses.every((status) => status.matches), true)
-  assert.equal(validateCurvedSheetPrimitive(copy.primitive).valid, true)
+  assert.equal(validateCurvedSheetPrimitive(moved.primitive).valid, true)
 
-  const copyMesh = sampleCoonsPatch(copy.primitive)
-  assert.equal(copyMesh.uSegments, sourceMesh.uSegments)
-  assert.equal(copyMesh.vSegments, sourceMesh.vSegments)
-  assert.deepEqual(copyMesh.faces, sourceMesh.faces)
-  assert.equal(copyMesh.vertices.length, sourceMesh.vertices.length)
+  const movedMesh = sampleCoonsPatch(moved.primitive)
+  assert.equal(movedMesh.uSegments, sourceMesh.uSegments)
+  assert.equal(movedMesh.vSegments, sourceMesh.vSegments)
+  assert.deepEqual(movedMesh.faces, sourceMesh.faces)
   sourceMesh.vertices.forEach((vertex, index) => {
-    assertVec3Translated(vertex, copyMesh.vertices[index], delta, 1e-9)
+    assertVec3Translated(vertex, movedMesh.vertices[index], delta, 1e-9)
   })
 
-  const originalOpacity = source.style.fillOpacity
-  const originalStartX = pathBoundary(source.primitive.bottom).segments[0]?.start.x
-  copy.style.fillOpacity = 0.91
-  const copiedFirst = pathBoundary(copy.primitive.bottom).segments[0]
-  if (copiedFirst !== undefined) {
-    copiedFirst.start.x += 10
+  moved.style.fillOpacity = 0.91
+  const movedFirst = pathBoundary(moved.primitive.bottom).segments[0]
+  if (movedFirst !== undefined) {
+    movedFirst.start.x += 10
   }
-  assert.equal(source.style.fillOpacity, originalOpacity)
-  assert.equal(
-    pathBoundary(source.primitive.bottom).segments[0]?.start.x,
-    originalStartX,
-  )
+  assert.deepEqual(duplicated.diagram, beforeTranslate)
+  assert.equal(copy.style.fillOpacity, source.style.fillOpacity)
+  assert.deepEqual(copy.primitive, source.primitive)
 })
 
-test('linked duplication makes only the copy static and later source sync cannot move it', () => {
+test('healthy linked Duplicate retains links and Translate detaches only the same-ID target before synchronization', () => {
   const linked = createComplexPatchDiagram(true)
-  const sourceBefore = findCoonsPatch(linked, 'patch')
-  const linksBefore = structuredClone(sourceBefore.primitive.boundarySources)
-  const result = duplicateAndTranslateCoonsPatch(
-    linked,
-    sourceBefore.id,
-    numericTranslation(linked, point(0.5, 1, -0.25)),
-  )
+  const source = findCoonsPatch(linked, 'patch')
+  const linksBefore = structuredClone(source.primitive.boundarySources)
+  const duplicated = duplicateCoonsPatch(linked, source.id)
 
-  assert.equal(result.ok, true)
-  if (!result.ok) {
-    throw new Error(result.error)
+  assert.equal(duplicated.ok, true)
+  if (!duplicated.ok) {
+    throw new Error(duplicated.error)
   }
-  const original = findCoonsPatch(result.diagram, sourceBefore.id)
-  const copy = findCoonsPatch(result.diagram, result.duplicatedPatchId)
-  const frozenCopy = structuredClone(copy.primitive)
+  const original = findCoonsPatch(duplicated.diagram, source.id)
+  const copy = findCoonsPatch(duplicated.diagram, duplicated.duplicatedPatchId)
 
-  assert.equal(original, sourceBefore)
-  assert.deepEqual(original.primitive.boundarySources, linksBefore)
-  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, original.id), {
+  assert.deepEqual(original, source)
+  assert.deepEqual(copy.primitive, source.primitive)
+  assert.deepEqual(copy.primitive.boundarySources, linksBefore)
+  assert.notEqual(copy.primitive.boundarySources, source.primitive.boundarySources)
+  assertBoundaryDeepClone(source.primitive.bottom, copy.primitive.bottom)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(duplicated.diagram, original.id), {
     kind: 'linkedUpToDate',
   })
-  assert.deepEqual(coonsPatchBoundaryLinkStatus(result.diagram, copy.id), {
-    kind: 'static',
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(duplicated.diagram, copy.id), {
+    kind: 'linkedUpToDate',
   })
 
   const editedCandidate = {
-    ...result.diagram,
-    strata: result.diagram.strata.map((stratum) =>
+    ...duplicated.diagram,
+    strata: duplicated.diagram.strata.map((stratum) =>
       stratum.id === 'bottom'
         ? editBottomInteriorControl(stratum, 0.8)
         : stratum,
     ),
   }
   const synchronized = synchronizeLinkedCoonsPatches(
-    result.diagram,
+    duplicated.diagram,
     editedCandidate,
   ).diagram
-
   assert.notDeepEqual(
     findCoonsPatch(synchronized, original.id).primitive.bottom,
     original.primitive.bottom,
   )
-  assert.deepEqual(findCoonsPatch(synchronized, copy.id).primitive, frozenCopy)
-  assert.deepEqual(coonsPatchBoundaryLinkStatus(synchronized, copy.id), {
+  assert.deepEqual(
+    findCoonsPatch(synchronized, original.id).primitive.bottom,
+    findCoonsPatch(synchronized, copy.id).primitive.bottom,
+  )
+
+  const copyBefore = findCoonsPatch(synchronized, copy.id)
+  const delta = point(0.5, 1, -0.25)
+  const translated = translateCoonsPatch(
+    synchronized,
+    copy.id,
+    numericTranslation(synchronized, delta),
+  )
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  const moved = findCoonsPatch(translated.diagram, copy.id)
+  const staticPrimitive = structuredClone(moved.primitive)
+
+  assert.equal(moved.id, copy.id)
+  assert.equal(moved.primitive.boundarySources, undefined)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(translated.diagram, moved.id), {
     kind: 'static',
   })
+  assertBoundaryTranslated(
+    copyBefore.primitive.bottom,
+    moved.primitive.bottom,
+    delta,
+  )
+  assertOtherStrataAndAnchorsUnchanged(synchronized, translated.diagram, copy.id)
+
+  const changedSource = synchronizeLinkedCoonsPatches(translated.diagram, {
+    ...translated.diagram,
+    strata: translated.diagram.strata.map((stratum) =>
+      stratum.id === 'bottom'
+        ? editBottomInteriorControl(stratum, 1.4)
+        : stratum,
+    ),
+  }).diagram
+  assert.deepEqual(findCoonsPatch(changedSource, moved.id).primitive, staticPrimitive)
+
+  const bottomSource = findStratum(changedSource, 'bottom')
+  const deleted = synchronizeLinkedCoonsPatches(changedSource, {
+    ...changedSource,
+    strata: changedSource.strata.filter((stratum) => stratum.id !== 'bottom'),
+  }).diagram
+  assert.deepEqual(findCoonsPatch(deleted, moved.id).primitive, staticPrimitive)
+
+  const repaired = synchronizeLinkedCoonsPatches(deleted, {
+    ...deleted,
+    strata: [bottomSource, ...deleted.strata],
+  }).diagram
+  const fullSync = synchronizeLinkedCoonsPatches(null, repaired, {
+    mode: 'full',
+  }).diagram
+  assert.deepEqual(findCoonsPatch(fullSync, moved.id).primitive, staticPrimitive)
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(fullSync))
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+  assert.deepEqual(
+    findCoonsPatch(loaded.diagram, moved.id).primitive,
+    staticPrimitive,
+  )
 })
 
-test('stale linked duplication translates the exact frozen fallback and only the original recovers', () => {
+test('stale linked Duplicate preserves exact frozen links and Translate moves the frozen fallback', () => {
   const linked = createComplexPatchDiagram(true)
   const bottomSource = findStratum(linked, 'bottom')
   const sourceMesh = sampleCoonsPatch(findCoonsPatch(linked, 'patch').primitive)
-  const missingSourceCandidate = {
+  const stale = synchronizeLinkedCoonsPatches(linked, {
     ...linked,
     strata: linked.strata.filter((stratum) => stratum.id !== bottomSource.id),
-  }
-  const stale = synchronizeLinkedCoonsPatches(
-    linked,
-    missingSourceCandidate,
-  ).diagram
+  }).diagram
   const stalePatch = findCoonsPatch(stale, 'patch')
+  const frozenBefore = structuredClone(stalePatch.primitive)
 
   assert.equal(coonsPatchBoundaryLinkStatus(stale, stalePatch.id).kind, 'linkedStale')
   assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
   assert.deepEqual(sampleCoonsPatch(stalePatch.primitive), sourceMesh)
 
-  const delta = point(-1, 0.25, 0.75)
-  const duplicated = duplicateAndTranslateCoonsPatch(
-    stale,
-    stalePatch.id,
-    numericTranslation(stale, delta),
-  )
+  const duplicated = duplicateCoonsPatch(stale, stalePatch.id)
   assert.equal(duplicated.ok, true)
   if (!duplicated.ok) {
     throw new Error(duplicated.error)
   }
   const copy = findCoonsPatch(duplicated.diagram, duplicated.duplicatedPatchId)
-  const copyBeforeRepair = structuredClone(copy.primitive)
-
-  assert.equal(copy.primitive.boundarySources, undefined)
+  assert.deepEqual(findCoonsPatch(duplicated.diagram, stalePatch.id).primitive, frozenBefore)
+  assert.deepEqual(copy.primitive, frozenBefore)
+  assert.notEqual(copy.primitive, stalePatch.primitive)
+  assert.notEqual(copy.primitive.boundarySources, stalePatch.primitive.boundarySources)
   assert.equal(copy.primitive.boundarySnapshotState, 'frozen')
+  assert.equal(coonsPatchBoundaryLinkStatus(duplicated.diagram, copy.id).kind, 'linkedStale')
+
+  const delta = point(-1, 0.25, 0.75)
+  const translated = translateCoonsPatch(
+    duplicated.diagram,
+    copy.id,
+    numericTranslation(duplicated.diagram, delta),
+  )
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  const moved = findCoonsPatch(translated.diagram, copy.id)
+  const movedBeforeRepair = structuredClone(moved.primitive)
+
+  assert.equal(moved.primitive.boundarySources, undefined)
+  assert.equal(moved.primitive.boundarySnapshotState, 'frozen')
   sourceMesh.vertices.forEach((vertex, index) => {
     assertVec3Translated(
       vertex,
-      sampleCoonsPatch(copy.primitive).vertices[index],
+      sampleCoonsPatch(moved.primitive).vertices[index],
       delta,
       1e-9,
     )
   })
 
-  const repairedCandidate = {
-    ...duplicated.diagram,
-    strata: [bottomSource, ...duplicated.diagram.strata],
-  }
-  const repaired = synchronizeLinkedCoonsPatches(
-    duplicated.diagram,
-    repairedCandidate,
-  ).diagram
-
-  assert.deepEqual(coonsPatchBoundaryLinkStatus(repaired, 'patch'), {
+  const repaired = synchronizeLinkedCoonsPatches(translated.diagram, {
+    ...translated.diagram,
+    strata: [bottomSource, ...translated.diagram.strata],
+  }).diagram
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(repaired, stalePatch.id), {
     kind: 'linkedUpToDate',
   })
-  assert.equal(
-    findCoonsPatch(repaired, 'patch').primitive.boundarySnapshotState,
-    undefined,
-  )
-  assert.deepEqual(
-    findCoonsPatch(repaired, copy.id).primitive,
-    copyBeforeRepair,
-  )
+  assert.deepEqual(findCoonsPatch(repaired, moved.id).primitive, movedBeforeRepair)
 })
 
-test('frozen symbolic previews translate from stored values and survive save/load without drift', () => {
+test('frozen symbolic and work-plane-local Translate preserve stored previews and frame policy', () => {
   const linked = createComplexPatchDiagram(true)
   const symbolic = withFrozenSymbolicBottomControl(linked, 0.2, 9)
   const frozenPatch = findCoonsPatch(symbolic, 'patch')
   const sourceControl = bottomCubicControl1(frozenPatch)
-
   assert.equal(sourceControl.z, 0.2)
   assert.equal(sourceControl.symbolic?.z.kind, 'symbolic')
   assert.equal(symbolic.variables?.[0]?.previewValue, 9)
 
-  const parsedTranslation = parseTranslationVectorFromInputs(symbolic, {
+  const parsed = parseTranslationVectorFromInputs(symbolic, {
     dx: '0',
     dy: '0',
     dz: '1',
   })
-  assert.equal(parsedTranslation.ok, true)
-  if (!parsedTranslation.ok) {
-    throw new Error(parsedTranslation.error)
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
   }
-  const result = duplicateAndTranslateCoonsPatch(
-    symbolic,
-    frozenPatch.id,
-    parsedTranslation.translation,
-  )
-
-  assert.equal(result.ok, true)
-  if (!result.ok) {
-    throw new Error(result.error)
+  const translated = translateCoonsPatch(symbolic, frozenPatch.id, parsed.translation)
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
   }
-  const copy = findCoonsPatch(result.diagram, result.duplicatedPatchId)
-  const translatedControl = bottomCubicControl1(copy)
+  const moved = findCoonsPatch(translated.diagram, frozenPatch.id)
+  const translatedControl = bottomCubicControl1(moved)
   const translatedComponent = translatedControl.symbolic?.z
-
-  assert.equal(copy.primitive.boundarySources, undefined)
-  assert.equal(copy.primitive.boundarySnapshotState, 'frozen')
+  assert.equal(moved.primitive.boundarySources, undefined)
+  assert.equal(moved.primitive.boundarySnapshotState, 'frozen')
   assert.equal(translatedControl.z, 1.2)
   assert.equal(translatedComponent?.kind, 'symbolic')
   if (translatedComponent?.kind !== 'symbolic') {
@@ -461,25 +526,16 @@ test('frozen symbolic previews translate from stored values and survive save/loa
   assert.equal(translatedComponent.expression, '(R) + 1')
   assert.equal(translatedComponent.previewValue, 1.2)
 
-  const loaded = parseSavedDiagramJson(serializeDiagram(result.diagram))
+  const loaded = parseSavedDiagramJson(serializeDiagram(translated.diagram))
   assert.equal(loaded.ok, true)
   if (!loaded.ok) {
     throw new Error(loaded.error)
   }
-  const loadedCopy = findCoonsPatch(loaded.diagram, copy.id)
-  assert.equal(loadedCopy.primitive.boundarySources, undefined)
-  assert.equal(loadedCopy.primitive.boundarySnapshotState, 'frozen')
-  assert.deepEqual(bottomCubicControl1(loadedCopy), translatedControl)
+  assert.deepEqual(
+    bottomCubicControl1(findCoonsPatch(loaded.diagram, moved.id)),
+    translatedControl,
+  )
 
-  const fullySynchronized = synchronizeLinkedCoonsPatches(
-    null,
-    loaded.diagram,
-    { mode: 'full' },
-  ).diagram
-  assert.deepEqual(findCoonsPatch(fullySynchronized, copy.id), loadedCopy)
-})
-
-test('frozen work-plane-local snapshots move stored previews and frame origins without changing local data', () => {
   const frame = standardFrame()
   const symbolicOrigin = symbolicVec3FromVec3(point(10, 20, 30))
   symbolicOrigin.x = {
@@ -500,7 +556,7 @@ test('frozen work-plane-local snapshots move stored previews and frame origins w
     },
   }
   const storedPoint = workPlaneLocalPoint(point(12.26, 20, 30.74), source)
-  const patch = createCurvedSheetStratum({
+  const localPatch = createCurvedSheetStratum({
     id: 'frozen-local-patch',
     primitive: {
       kind: 'coonsPatch',
@@ -512,68 +568,142 @@ test('frozen work-plane-local snapshots move stored previews and frame origins w
       sampling: { uSegments: 2, vSegments: 2 },
     },
   })
-  const diagram: Diagram = {
+  const localDiagram: Diagram = {
     ...createEmptyDiagram({ ambientDimension: 3 }),
-    variables: [
-      {
-        id: 'variable-r',
-        name: 'R',
-        macroName: 'stzR',
-        expression: '99',
-        previewValue: 99,
-      },
-    ],
-    strata: [patch],
+    variables: [{
+      id: 'variable-r',
+      name: 'R',
+      macroName: 'stzR',
+      expression: '99',
+      previewValue: 99,
+    }],
+    strata: [localPatch],
   }
-  assert.equal(validateDiagram(diagram).valid, true)
   const delta = point(1, -2, 3)
-  const result = duplicateAndTranslateCoonsPatch(
-    diagram,
-    patch.id,
-    numericTranslation(diagram, delta),
+  const localTranslated = translateCoonsPatch(
+    localDiagram,
+    localPatch.id,
+    numericTranslation(localDiagram, delta),
   )
-  assert.equal(result.ok, true)
-  if (!result.ok) {
-    throw new Error(result.error)
+  assert.equal(localTranslated.ok, true)
+  if (!localTranslated.ok) {
+    throw new Error(localTranslated.error)
   }
-  const copy = findCoonsPatch(result.diagram, result.duplicatedPatchId)
-  const movedPoint = constantBoundary(copy.primitive.bottom).point
+  const movedPoint = constantBoundary(
+    findCoonsPatch(localTranslated.diagram, localPatch.id).primitive.bottom,
+  ).point
   const movedSource = requireWorkPlaneLocalSource(movedPoint)
-
   assertVec3Translated(storedPoint, movedPoint, delta)
   assertVec3Translated(source.frame.origin, movedSource.frame.origin, delta)
   assert.deepEqual(movedSource.local, source.local)
   assert.deepEqual(movedSource.frame.u, source.frame.u)
   assert.deepEqual(movedSource.frame.v, source.frame.v)
   assert.deepEqual(movedSource.frame.normal, source.frame.normal)
-  assert.equal(copy.primitive.boundarySnapshotState, 'frozen')
-
-  const loaded = parseSavedDiagramJson(serializeDiagram(result.diagram))
-  assert.equal(loaded.ok, true)
-  if (!loaded.ok) {
-    throw new Error(loaded.error)
-  }
-  assert.deepEqual(
-    constantBoundary(
-      findCoonsPatch(loaded.diagram, copy.id).primitive.bottom,
-    ).point,
-    movedPoint,
-  )
 })
 
-test('symbolic translation uses the shared grammar and invalid drafts fail atomically', () => {
+test('Translate moves materialized sampled-template snapshot segments once without changing topology', () => {
+  const sampledPoints = sampleTemplatePathPoints(
+    {
+      kind: 'ellipseTemplate',
+      center: point(0, 0, 0),
+      radiusX: 2,
+      radiusY: 1,
+      rotationDeg: 17,
+      frame: standardFrame(),
+    },
+    3,
+    8,
+  ).slice(0, 3)
+  const liftedPoints = sampledPoints.map((value) => ({
+    ...value,
+    z: value.z + 2,
+  }))
+  const sampledSegments = sampledPoints.slice(0, -1).map((start, index) => ({
+    kind: 'line' as const,
+    start,
+    end: sampledPoints[index + 1] ?? start,
+  }))
+  const liftedSegments = liftedPoints.slice(0, -1).map((start, index) => ({
+    kind: 'line' as const,
+    start,
+    end: liftedPoints[index + 1] ?? start,
+  }))
+  const patch = createCurvedSheetStratum({
+    id: 'sampled-template-patch',
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: {
+        id: 'materialized-ellipse-template',
+        name: 'Sampled ellipse template snapshot',
+        segments: sampledSegments,
+      },
+      right: {
+        segments: [{
+          kind: 'line',
+          start: sampledPoints[2] ?? point(0, 0, 0),
+          end: liftedPoints[2] ?? point(0, 0, 2),
+        }],
+      },
+      top: {
+        segments: liftedSegments,
+      },
+      left: {
+        segments: [{
+          kind: 'line',
+          start: sampledPoints[0] ?? point(0, 0, 0),
+          end: liftedPoints[0] ?? point(0, 0, 2),
+        }],
+      },
+      sampling: { uSegments: 6, vSegments: 5 },
+    },
+  })
+  const diagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [patch],
+  }
+  assert.equal(validateDiagram(diagram).valid, true)
+
+  const delta = point(-0.75, 1.5, 0.25)
+  const translated = translateCoonsPatch(
+    diagram,
+    patch.id,
+    numericTranslation(diagram, delta),
+  )
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  const moved = findCoonsPatch(translated.diagram, patch.id)
+  assert.deepEqual(moved.primitive.sampling, patch.primitive.sampling)
+  assert.deepEqual(
+    pathBoundary(moved.primitive.bottom).segments.map((segment) => segment.kind),
+    sampledSegments.map((segment) => segment.kind),
+  )
+  assertBoundaryTranslated(
+    patch.primitive.bottom,
+    moved.primitive.bottom,
+    delta,
+  )
+  assertBoundaryTranslated(
+    patch.primitive.right,
+    moved.primitive.right,
+    delta,
+  )
+  assertBoundaryTranslated(patch.primitive.top, moved.primitive.top, delta)
+  assertBoundaryTranslated(patch.primitive.left, moved.primitive.left, delta)
+})
+
+test('Translate uses the shared symbolic parser and invalid or zero drafts never invoke mutation', () => {
   const base = createComplexPatchDiagram(false)
   const diagram: Diagram = {
     ...base,
-    variables: [
-      {
-        id: 'variable-d',
-        name: 'D',
-        macroName: 'stzD',
-        expression: '1.5',
-        previewValue: 1.5,
-      },
-    ],
+    variables: [{
+      id: 'variable-d',
+      name: 'D',
+      macroName: 'stzD',
+      expression: '1.5',
+      previewValue: 1.5,
+    }],
   }
   const parsed = parseTranslationVectorFromInputs(diagram, {
     dx: 'D',
@@ -584,31 +714,28 @@ test('symbolic translation uses the shared grammar and invalid drafts fail atomi
   if (!parsed.ok) {
     throw new Error(parsed.error)
   }
-  const result = duplicateAndTranslateCoonsPatch(
-    diagram,
-    'patch',
-    parsed.translation,
-  )
+  const result = translateCoonsPatch(diagram, 'patch', parsed.translation)
   assert.equal(result.ok, true)
   if (!result.ok) {
     throw new Error(result.error)
   }
-  const copyStart = pathBoundary(
-    findCoonsPatch(result.diagram, result.duplicatedPatchId).primitive.bottom,
+  const movedStart = pathBoundary(
+    findCoonsPatch(result.diagram, 'patch').primitive.bottom,
   ).segments[0]?.start
-  assert.equal(copyStart?.x, 1.5)
-  assert.equal(copyStart?.symbolic?.x.kind, 'symbolic')
-  assert.equal(copyStart?.symbolic?.x.expression, 'D')
-  assert.equal(copyStart?.symbolic?.x.previewValue, 1.5)
+  assert.equal(movedStart?.x, 1.5)
+  assert.equal(movedStart?.symbolic?.x.kind, 'symbolic')
+  assert.equal(movedStart?.symbolic?.x.expression, 'D')
+  assert.equal(movedStart?.symbolic?.x.previewValue, 1.5)
 
   let actionCalls = 0
-  const fakeAction = () => {
+  const fakeAction = (
+    patchId: string,
+    translation: TranslationVector,
+  ): TranslateCoonsPatchActionResult => {
     actionCalls += 1
-    return {
-      ok: true as const,
-      duplicatedPatchId: 'copy',
-      message: 'ok',
-    }
+    assert.equal(patchId, 'patch')
+    assert.ok(translation.x !== undefined)
+    return { ok: true, patchId, message: 'ok' }
   }
 
   for (const input of [
@@ -620,20 +747,19 @@ test('symbolic translation uses the shared grammar and invalid drafts fail atomi
     { dx: '1 / 0', dy: '0', dz: '0' },
     { dx: 'NaN', dy: '0', dz: '0' },
     { dx: 'Infinity', dy: '0', dz: '0' },
-    { dx: '0', dy: '0', dz: '0' },
+    { dx: '0', dy: '-0', dz: '0.0' },
   ]) {
-    const submission = submitCoonsPatchDuplicateTranslation(
+    const submission = submitCoonsPatchTranslation(
       diagram,
       'patch',
       input,
       fakeAction,
     )
-
     assert.equal(submission.ok, false, JSON.stringify(input))
   }
   assert.equal(actionCalls, 0)
 
-  const decimalDraft = submitCoonsPatchDuplicateTranslation(
+  const decimalDraft = submitCoonsPatchTranslation(
     diagram,
     'patch',
     { dx: '.5', dy: '0', dz: '0' },
@@ -643,7 +769,7 @@ test('symbolic translation uses the shared grammar and invalid drafts fail atomi
   assert.equal(actionCalls, 1)
 })
 
-test('global ID reservation is deterministic across every top-level namespace', () => {
+test('Duplicate reserves global IDs and repeated Duplicate never translates prior copies', () => {
   const base = createComplexPatchDiagram(true)
   const source = findCoonsPatch(base, 'patch')
   const dangling = structuredClone(source)
@@ -683,28 +809,42 @@ test('global ID reservation is deterministic across every top-level namespace', 
     strata: [...base.strata, collisionStratum, dangling],
     labels: [...base.labels, collisionLabel],
   }
-  const translation = numericTranslation(diagram, point(1, 0, 0))
-  const first = duplicateAndTranslateCoonsPatch(diagram, 'patch', translation)
+
+  const first = duplicateCoonsPatch(diagram, 'patch')
   assert.equal(first.ok, true)
   if (!first.ok) {
     throw new Error(first.error)
   }
   assert.equal(first.duplicatedPatchId, 'patch-copy-4')
-
-  const second = duplicateAndTranslateCoonsPatch(
-    first.diagram,
-    'patch',
-    translation,
+  assert.deepEqual(
+    findCoonsPatch(first.diagram, first.duplicatedPatchId).primitive,
+    source.primitive,
   )
+
+  const firstCopyBefore = structuredClone(
+    findCoonsPatch(first.diagram, first.duplicatedPatchId),
+  )
+  const second = duplicateCoonsPatch(first.diagram, 'patch')
   assert.equal(second.ok, true)
   if (!second.ok) {
     throw new Error(second.error)
   }
   assert.equal(second.duplicatedPatchId, 'patch-copy-5')
-  assert.equal(new Set(second.diagram.strata.map((value) => value.id)).size, second.diagram.strata.length)
+  assert.deepEqual(
+    findCoonsPatch(second.diagram, first.duplicatedPatchId),
+    firstCopyBefore,
+  )
+  assert.deepEqual(
+    findCoonsPatch(second.diagram, second.duplicatedPatchId).primitive,
+    source.primitive,
+  )
+  assert.equal(
+    new Set(second.diagram.strata.map((value) => value.id)).size,
+    second.diagram.strata.length,
+  )
 })
 
-test('unsupported coordinate-reference snapshots fail without mutation', () => {
+test('Translate detaches resolvable coordinate references and rejects missing anchors atomically', () => {
   const anchor: CoordinateAnchor = {
     id: 'anchor',
     name: 'Anchor',
@@ -732,154 +872,1011 @@ test('unsupported coordinate-reference snapshots fail without mutation', () => {
     strata: [patch],
   }
   assert.equal(validateDiagram(diagram).valid, false)
-  const unsupported = duplicateAndTranslateCoonsPatch(
+
+  const duplicateFailure = duplicateCoonsPatch(diagram, patch.id)
+  assert.equal(duplicateFailure.ok, false)
+  assert.equal(duplicateFailure.diagram, diagram)
+
+  const translated = translateCoonsPatch(
     diagram,
     patch.id,
     numericTranslation(diagram, point(1, 2, 3)),
   )
-  assert.equal(unsupported.ok, false)
-  assert.equal(unsupported.diagram, diagram)
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  assert.deepEqual(diagram.coordinateAnchors, [anchor])
+  assert.equal(findCoonsPatch(diagram, patch.id), patch)
+  assert.deepEqual(translated.diagram.coordinateAnchors, [anchor])
+  const movedPoint = constantBoundary(
+    findCoonsPatch(translated.diagram, patch.id).primitive.bottom,
+  ).point
+  assert.equal(movedPoint.symbolic?.source, undefined)
+  assertVec3Translated(referencedPoint, movedPoint, point(1, 2, 3))
 
   const missingAnchorDiagram: Diagram = { ...diagram, coordinateAnchors: [] }
-  const failure = duplicateAndTranslateCoonsPatch(
+  const missingAnchor = translateCoonsPatch(
     missingAnchorDiagram,
     patch.id,
     numericTranslation(missingAnchorDiagram, point(1, 0, 0)),
   )
-  assert.equal(failure.ok, false)
-  assert.equal(failure.diagram, missingAnchorDiagram)
+  assert.equal(missingAnchor.ok, false)
+  assert.equal(missingAnchor.diagram, missingAnchorDiagram)
 })
 
-test('production state transition selects the copy and commits exactly one undoable edit', () => {
+test('editor actions create separate history entries with exact two-step Undo and Redo ordering', () => {
   const diagram = createComplexPatchDiagram(true)
-  const initial = createEditorState(diagram, { kind: 'stratum', id: 'patch' })
-  const parsed = parseTranslationVectorFromInputs(diagram, {
-    dx: '1',
-    dy: '0',
-    dz: '2',
-  })
-  assert.equal(parsed.ok, true)
-  if (!parsed.ok) {
-    throw new Error(parsed.error)
+  const h0 = createEditorState(diagram, { kind: 'stratum', id: 'patch' })
+  const duplicate = applyDuplicateCoonsPatchToEditorState(h0, 'patch')
+
+  assert.equal(duplicate.ok, true)
+  if (!duplicate.ok) {
+    throw new Error(duplicate.message)
   }
+  const copyId = duplicate.duplicatedPatchId
+  const h1 = duplicate.state
+  const unshiftedCopy = structuredClone(findCoonsPatch(h1.editableDiagram, copyId))
 
-  const submission = submitCoonsPatchDuplicateTranslation(
-    diagram,
-    'patch',
-    { dx: '1', dy: '0', dz: '2' },
-    (patchId, translation) => {
-      const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
-        initial,
-        patchId,
-        translation,
-      )
-
-      return applied.ok
-        ? {
-            ok: true,
-            duplicatedPatchId: applied.duplicatedPatchId,
-            message: applied.message,
-          }
-        : { ok: false, message: applied.message }
-    },
+  assert.deepEqual(h1.selectedElement, { kind: 'stratum', id: copyId })
+  assert.equal(h1.history.past.length, 1)
+  assert.equal(h1.history.future.length, 0)
+  assert.notEqual(unshiftedCopy.primitive.boundarySources, undefined)
+  assert.deepEqual(
+    unshiftedCopy.primitive,
+    findCoonsPatch(h1.editableDiagram, 'patch').primitive,
   )
-  assert.equal(submission.ok, true)
 
-  const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
-    initial,
-    'patch',
-    parsed.translation,
+  const delta = point(1, 0, 2)
+  const translate = applyTranslateCoonsPatchToEditorState(
+    h1,
+    copyId,
+    numericTranslation(h1.editableDiagram, delta),
   )
-  assert.equal(applied.ok, true)
-  if (!applied.ok) {
-    throw new Error(applied.message)
+  assert.equal(translate.ok, true)
+  if (!translate.ok) {
+    throw new Error(translate.message)
   }
-  assert.deepEqual(applied.state.selectedElement, {
+  const h2 = translate.state
+  const translatedCopy = structuredClone(findCoonsPatch(h2.editableDiagram, copyId))
+
+  assert.equal(translate.patchId, copyId)
+  assert.deepEqual(h2.selectedElement, { kind: 'stratum', id: copyId })
+  assert.equal(h2.editableDiagram.strata.length, h1.editableDiagram.strata.length)
+  assert.equal(h2.history.past.length, 2)
+  assert.equal(translatedCopy.primitive.boundarySources, undefined)
+  assertBoundaryTranslated(
+    unshiftedCopy.primitive.bottom,
+    translatedCopy.primitive.bottom,
+    delta,
+  )
+
+  const undoTranslate = undoLastDiagramChange(h2)
+  assert.deepEqual(
+    findCoonsPatch(undoTranslate.editableDiagram, copyId),
+    unshiftedCopy,
+  )
+  assert.deepEqual(undoTranslate.selectedElement, {
     kind: 'stratum',
-    id: applied.duplicatedPatchId,
+    id: copyId,
   })
-  assert.equal(applied.state.history.past.length, 1)
-  assert.equal(applied.state.history.future.length, 0)
-  assert.match(
-    applied.message,
-    /Duplicated and translated Coons patch by \(1, 0, 2\)\./,
-  )
-  assert.equal(
-    findCoonsPatch(applied.state.editableDiagram, applied.duplicatedPatchId)
-      .primitive.boundarySources,
-    undefined,
-  )
+  assert.equal(undoTranslate.history.past.length, 1)
+  assert.equal(undoTranslate.history.future.length, 1)
 
-  const geometry = structuredClone(
-    findCoonsPatch(applied.state.editableDiagram, applied.duplicatedPatchId),
-  )
-  const undone = undoLastDiagramChange(applied.state)
+  const undoDuplicate = undoLastDiagramChange(undoTranslate)
+  assert.deepEqual(undoDuplicate.editableDiagram, diagram)
   assert.equal(
-    undone.editableDiagram.strata.some(
-      (stratum) => stratum.id === applied.duplicatedPatchId,
+    undoDuplicate.editableDiagram.strata.some(
+      (stratum) => stratum.id === copyId,
     ),
     false,
   )
-  assert.equal(undone.selectedElement, null)
-  assert.equal(undone.history.future.length, 1)
+  assert.equal(undoDuplicate.selectedElement, null)
+  assert.equal(undoDuplicate.history.past.length, 0)
+  assert.equal(undoDuplicate.history.future.length, 2)
 
-  const redone = redoLastDiagramChange(undone)
+  const redoDuplicate = redoLastDiagramChange(undoDuplicate)
   assert.deepEqual(
-    findCoonsPatch(redone.editableDiagram, applied.duplicatedPatchId),
-    geometry,
+    findCoonsPatch(redoDuplicate.editableDiagram, copyId),
+    unshiftedCopy,
   )
-  assert.equal(redone.selectedElement, null)
-  const undoneAgain = undoLastDiagramChange(redone)
-  const redoneAgain = redoLastDiagramChange(undoneAgain)
+  assert.equal(redoDuplicate.selectedElement, null)
+
+  const redoTranslate = redoLastDiagramChange(redoDuplicate)
   assert.deepEqual(
-    findCoonsPatch(redoneAgain.editableDiagram, applied.duplicatedPatchId),
-    geometry,
+    findCoonsPatch(redoTranslate.editableDiagram, copyId),
+    translatedCopy,
   )
+  assert.equal(redoTranslate.selectedElement, null)
   assert.equal(
-    redoneAgain.editableDiagram.strata.filter(
-      (stratum) => stratum.id === applied.duplicatedPatchId,
+    redoTranslate.editableDiagram.strata.filter(
+      (stratum) => stratum.id === copyId,
     ).length,
     1,
   )
 
-  const lockedDiagram = {
-    ...diagram,
-    layers: [{ value: 3, name: 'Locked patch layer', locked: true }],
+  const redoTwiceAgain = redoLastDiagramChange(
+    redoLastDiagramChange(
+      undoLastDiagramChange(undoLastDiagramChange(redoTranslate)),
+    ),
+  )
+  assert.deepEqual(
+    findCoonsPatch(redoTwiceAgain.editableDiagram, copyId),
+    translatedCopy,
+  )
+})
+
+test('direct static, healthy-linked, and stale-linked Translate Undo restores the exact same-ID pre-state', () => {
+  const linked = createComplexPatchDiagram(true)
+  const stale = synchronizeLinkedCoonsPatches(linked, {
+    ...linked,
+    strata: linked.strata.filter((stratum) => stratum.id !== 'bottom'),
+  }).diagram
+
+  for (const [label, diagram] of [
+    ['static', createComplexPatchDiagram(false)],
+    ['healthy linked', linked],
+    ['stale linked', stale],
+  ] as const) {
+    const beforePatch = structuredClone(findCoonsPatch(diagram, 'patch'))
+    const initial = createEditorState(diagram, {
+      kind: 'stratum',
+      id: 'patch',
+    })
+    const applied = applyTranslateCoonsPatchToEditorState(
+      initial,
+      'patch',
+      numericTranslation(diagram, point(0.5, -0.25, 1.5)),
+    )
+
+    assert.equal(applied.ok, true, label)
+    if (!applied.ok) {
+      throw new Error(applied.message)
+    }
+    assert.equal(applied.patchId, 'patch')
+    assert.equal(applied.state.editableDiagram.strata.length, diagram.strata.length)
+    assert.deepEqual(applied.state.selectedElement, {
+      kind: 'stratum',
+      id: 'patch',
+    })
+    assert.equal(applied.state.history.past.length, 1)
+    assert.equal(
+      findCoonsPatch(applied.state.editableDiagram, 'patch').primitive
+        .boundarySources,
+      undefined,
+    )
+
+    const undone = undoLastDiagramChange(applied.state)
+    assert.deepEqual(findCoonsPatch(undone.editableDiagram, 'patch'), beforePatch)
+    assert.deepEqual(undone.selectedElement, {
+      kind: 'stratum',
+      id: 'patch',
+    })
+
+    const redone = redoLastDiagramChange(undone)
+    assert.deepEqual(
+      findCoonsPatch(redone.editableDiagram, 'patch'),
+      findCoonsPatch(applied.state.editableDiagram, 'patch'),
+    )
   }
-  const lockedState = createEditorState(lockedDiagram, {
+})
+
+test('resolvable-but-stale Duplicate remains frozen and linked through the production editor commit', () => {
+  const linked = createComplexPatchDiagram(true)
+  const stale = structuredClone(linked)
+  const stalePatch = findCoonsPatch(stale, 'patch')
+  const staleBottom = pathBoundary(stalePatch.primitive.bottom)
+  const cubic = staleBottom.segments.find(
+    (segment) => segment.kind === 'cubicBezier',
+  )
+  if (cubic?.kind !== 'cubicBezier') {
+    throw new Error('Expected the stale probe cubic boundary segment.')
+  }
+  cubic.control1.z = 7.25
+  stalePatch.primitive.boundarySnapshotState = 'frozen'
+
+  assert.equal(validateDiagram(stale).valid, true)
+  assert.equal(stalePatch.primitive.boundarySnapshotState, 'frozen')
+  assert.equal(coonsPatchBoundaryLinkStatus(stale, stalePatch.id).kind, 'linkedStale')
+
+  const initial = createEditorState(stale, {
+    kind: 'stratum',
+    id: stalePatch.id,
+  })
+  const applied = applyDuplicateCoonsPatchToEditorState(initial, stalePatch.id)
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+  const original = findCoonsPatch(applied.state.editableDiagram, stalePatch.id)
+  const copy = findCoonsPatch(
+    applied.state.editableDiagram,
+    applied.duplicatedPatchId,
+  )
+  assert.deepEqual(original.primitive, stalePatch.primitive)
+  assert.deepEqual(copy.primitive, stalePatch.primitive)
+  assert.notEqual(copy.primitive, stalePatch.primitive)
+  assert.notEqual(copy.primitive.boundarySources, stalePatch.primitive.boundarySources)
+  assert.equal(copy.primitive.boundarySnapshotState, 'frozen')
+  assert.notEqual(copy.primitive.boundarySources, undefined)
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(applied.state.editableDiagram, copy.id).kind,
+    'linkedStale',
+  )
+  assert.equal(applied.state.history.past.length, 1)
+})
+
+function assertOtherStrataAndAnchorsUnchanged(
+  before: Diagram,
+  after: Diagram,
+  excludedStratumId: string,
+): void {
+  assert.deepEqual(
+    after.strata.filter((stratum) => stratum.id !== excludedStratumId),
+    before.strata.filter((stratum) => stratum.id !== excludedStratumId),
+  )
+  assert.deepEqual(after.coordinateAnchors, before.coordinateAnchors)
+  assert.deepEqual(after.labels, before.labels)
+}
+
+test('repeated Duplicate allocates per click while repeated Translate keeps one ID and applies one delta', () => {
+  const diagram = createComplexPatchDiagram(false)
+  let duplicateState = createEditorState(diagram, {
     kind: 'stratum',
     id: 'patch',
   })
-  const locked = applyDuplicateAndTranslateCoonsPatchToEditorState(
-    lockedState,
-    'patch',
-    parsed.translation,
-  )
-  assert.equal(locked.ok, false)
-  assert.equal(locked.state, lockedState)
-  assert.equal(locked.state.history.past.length, 0)
-})
+  const copyIds: string[] = []
 
-test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes', async () => {
-  const sourceDiagram = createComplexPatchDiagram(false)
-  const delta = point(2, -1, 0.5)
-  const result = duplicateAndTranslateCoonsPatch(
-    sourceDiagram,
-    'patch',
-    numericTranslation(sourceDiagram, delta),
-  )
-  assert.equal(result.ok, true)
-  if (!result.ok) {
-    throw new Error(result.error)
+  for (let index = 0; index < 3; index += 1) {
+    const selectedId =
+      duplicateState.selectedElement?.kind === 'stratum'
+        ? duplicateState.selectedElement.id
+        : 'patch'
+    const applied = applyDuplicateCoonsPatchToEditorState(
+      duplicateState,
+      selectedId,
+    )
+    assert.equal(applied.ok, true)
+    if (!applied.ok) {
+      throw new Error(applied.message)
+    }
+    copyIds.push(applied.duplicatedPatchId)
+    duplicateState = applied.state
+  }
+  assert.equal(new Set(copyIds).size, 3)
+  assert.equal(duplicateState.history.past.length, 3)
+  assert.equal(duplicateState.editableDiagram.strata.length, diagram.strata.length + 3)
+  for (const copyId of copyIds) {
+    assert.deepEqual(
+      sampleCoonsPatch(findCoonsPatch(duplicateState.editableDiagram, copyId).primitive),
+      sampleCoonsPatch(findCoonsPatch(diagram, 'patch').primitive),
+    )
   }
 
-  const loaded = parseSavedDiagramJson(serializeDiagram(result.diagram))
+  let translateState = createEditorState(diagram, {
+    kind: 'stratum',
+    id: 'patch',
+  })
+  const initialMesh = sampleCoonsPatch(findCoonsPatch(diagram, 'patch').primitive)
+  const delta = point(0.25, -0.5, 0.75)
+
+  for (let index = 1; index <= 3; index += 1) {
+    const applied = applyTranslateCoonsPatchToEditorState(
+      translateState,
+      'patch',
+      numericTranslation(translateState.editableDiagram, delta),
+    )
+    assert.equal(applied.ok, true)
+    if (!applied.ok) {
+      throw new Error(applied.message)
+    }
+    translateState = applied.state
+    assert.equal(translateState.editableDiagram.strata.length, diagram.strata.length)
+    assert.deepEqual(translateState.selectedElement, {
+      kind: 'stratum',
+      id: 'patch',
+    })
+    const mesh = sampleCoonsPatch(
+      findCoonsPatch(translateState.editableDiagram, 'patch').primitive,
+    )
+    initialMesh.vertices.forEach((vertex, vertexIndex) => {
+      assertVec3Translated(
+        vertex,
+        mesh.vertices[vertexIndex],
+        point(delta.x * index, delta.y * index, delta.z * index),
+        1e-9,
+      )
+    })
+  }
+  assert.equal(translateState.history.past.length, 3)
+  assert.deepEqual(
+    translateState.editableDiagram.strata.map((stratum) => stratum.id),
+    diagram.strata.map((stratum) => stratum.id),
+  )
+})
+
+test('editor transitions reject stale, mismatched, multi, hidden, locked, and filtered selections atomically', () => {
+  const diagram = createComplexPatchDiagram(false)
+  const rejectionStates: TestEditorState[] = [
+    createEditorState(diagram, null),
+    createEditorState(diagram, { kind: 'stratum', id: 'missing' }),
+    createEditorState(diagram, { kind: 'stratum', id: 'bottom' }),
+    createEditorState(diagram, {
+      kind: 'multi',
+      elements: [
+        { kind: 'stratum', id: 'patch' },
+        { kind: 'stratum', id: 'bottom' },
+      ],
+    }),
+    {
+      ...createEditorState(diagram, { kind: 'stratum', id: 'patch' }),
+      layerFilter: { kind: 'layer', layer: 0 },
+    },
+  ]
+
+  const hiddenDiagram: Diagram = {
+    ...diagram,
+    layers: [{ value: 3, name: 'Hidden patch layer', visible: false }],
+  }
+  rejectionStates.push(
+    createEditorState(hiddenDiagram, { kind: 'stratum', id: 'patch' }),
+  )
+  const lockedDiagram: Diagram = {
+    ...diagram,
+    layers: [{ value: 3, name: 'Locked patch layer', locked: true }],
+  }
+  rejectionStates.push(
+    createEditorState(lockedDiagram, { kind: 'stratum', id: 'patch' }),
+  )
+
+  for (const state of rejectionStates) {
+    const delta = numericTranslation(state.editableDiagram, point(1, 0, 0))
+    const duplicate = applyDuplicateCoonsPatchToEditorState(state, 'patch')
+    assert.equal(duplicate.ok, false)
+    assert.equal(duplicate.state, state)
+    assert.equal(duplicate.state.history, state.history)
+
+    const translate = applyTranslateCoonsPatchToEditorState(
+      state,
+      'patch',
+      delta,
+    )
+    assert.equal(translate.ok, false)
+    assert.equal(translate.state, state)
+    assert.equal(translate.state.history, state.history)
+  }
+})
+
+test('generic Phase 29 patch-only and patch-plus-source duplication remain unchanged', () => {
+  const linked = createComplexPatchDiagram(true)
+  const patchOnly = duplicateSelectedElements(linked, {
+    kind: 'stratum',
+    id: 'patch',
+  })
+  const patchCopySelection = patchOnly.selectedElement
+  assert.equal(patchCopySelection?.kind, 'stratum')
+  if (patchCopySelection?.kind !== 'stratum') {
+    throw new Error('Expected one bulk-duplicated patch selection.')
+  }
+  assert.deepEqual(
+    findCoonsPatch(patchOnly.diagram, patchCopySelection.id).primitive
+      .boundarySources,
+    findCoonsPatch(linked, 'patch').primitive.boundarySources,
+  )
+
+  const withSources = duplicateSelectedElements(linked, {
+    kind: 'multi',
+    elements: ['bottom', 'right-corner', 'top', 'left', 'patch'].map((id) => ({
+      kind: 'stratum' as const,
+      id,
+    })),
+  })
+  const selectedIds = selectedStratumIds(withSources.selectedElement)
+  const copiedPatch = withSources.diagram.strata.find(
+    (stratum) => selectedIds.has(stratum.id) && isCoonsPatchStratum(stratum),
+  )
+  assert.notEqual(copiedPatch, undefined)
+  if (copiedPatch === undefined || !isCoonsPatchStratum(copiedPatch)) {
+    throw new Error('Expected copied patch with copied sources.')
+  }
+  const sources = copiedPatch.primitive.boundarySources
+  assert.notEqual(sources, undefined)
+  assert.ok(
+    sources?.bottom.kind === 'path' &&
+      selectedIds.has(sources.bottom.sourcePathId),
+  )
+  assert.ok(
+    sources?.right.kind === 'point' &&
+      selectedIds.has(sources.right.sourcePointId),
+  )
+  assert.ok(
+    sources?.top.kind === 'path' &&
+      selectedIds.has(sources.top.sourcePathId),
+  )
+  assert.ok(
+    sources?.left.kind === 'path' &&
+      selectedIds.has(sources.left.sourcePathId),
+  )
+})
+
+test('production controls invoke isolated Duplicate click and Translate submit paths with exact arguments', async () => {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-controls-'))
+  const server = await createServer({
+    root: process.cwd(),
+    appType: 'custom',
+    cacheDir,
+    logLevel: 'silent',
+    server: { middlewareMode: true },
+  })
+
+  try {
+    const controlsModule = (await server.ssrLoadModule(
+      '/src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx',
+    )) as {
+      CoonsPatchActionsControls: CoonsPatchActionsControlsHarnessComponent
+    }
+
+    for (const input of [
+      { dx: '1e', dy: '-2.5', dz: '3.75' },
+      { dx: '0', dy: '-0', dz: '0.0' },
+    ]) {
+      const diagram = createComplexPatchDiagram(true)
+      const patch = findCoonsPatch(diagram, 'patch')
+      let current = createEditorState(diagram, {
+        kind: 'stratum',
+        id: patch.id,
+      })
+      const duplicateArguments: unknown[][] = []
+      let translateCalls = 0
+      const harness = createProductionCoonsPatchActionsHarness(
+        controlsModule.CoonsPatchActionsControls,
+        diagram,
+        patch,
+        (...args: [string]) => {
+          duplicateArguments.push(args)
+          const applied = applyDuplicateCoonsPatchToEditorState(current, args[0])
+          if (!applied.ok) {
+            return { ok: false, message: applied.message }
+          }
+          current = applied.state
+          return {
+            ok: true,
+            duplicatedPatchId: applied.duplicatedPatchId,
+            message: applied.message,
+          }
+        },
+        () => {
+          translateCalls += 1
+          return { ok: false, message: 'Translate must not run.' }
+        },
+      )
+      harness.change('dx', input.dx)
+      harness.change('dy', input.dy)
+      harness.change('dz', input.dz)
+      assert.equal(harness.duplicateButtonProps().type, 'button')
+      assert.notEqual(harness.duplicateButtonProps().disabled, true)
+      harness.clickDuplicate()
+
+      assert.deepEqual(duplicateArguments, [[patch.id]])
+      assert.equal(translateCalls, 0)
+      assert.equal(current.history.past.length, 1)
+      assert.equal(current.editableDiagram.strata.length, diagram.strata.length + 1)
+      const selection = current.selectedElement
+      assert.equal(selection?.kind, 'stratum')
+      if (selection?.kind !== 'stratum') {
+        throw new Error('Expected the production Duplicate to select its copy.')
+      }
+      const copy = findCoonsPatch(current.editableDiagram, selection.id)
+      assert.deepEqual(copy.primitive, patch.primitive)
+      assert.deepEqual(sampleCoonsPatch(copy.primitive), sampleCoonsPatch(patch.primitive))
+      assert.deepEqual(harness.status(), {
+        patchId: patch.id,
+        message: 'Duplicated Coons patch.',
+      })
+      harness.setTarget(current.editableDiagram, copy)
+      assert.doesNotMatch(harness.visibleStatusText(), /Duplicated Coons patch/)
+
+      assert.equal(harness.submit(), 1)
+      assert.equal(translateCalls, 0)
+      assert.equal(current.history.past.length, 1)
+      assert.deepEqual(findCoonsPatch(current.editableDiagram, copy.id), copy)
+    }
+
+    const diagram = createComplexPatchDiagram(true)
+    const patch = findCoonsPatch(diagram, 'patch')
+    let current = createEditorState(diagram, {
+      kind: 'stratum',
+      id: patch.id,
+    })
+    let duplicateCalls = 0
+    const translateArguments: Array<[string, TranslationVector]> = []
+    const harness = createProductionCoonsPatchActionsHarness(
+      controlsModule.CoonsPatchActionsControls,
+      diagram,
+      patch,
+      () => {
+        duplicateCalls += 1
+        return { ok: false, message: 'Duplicate must not run.' }
+      },
+      (patchId, translation) => {
+        translateArguments.push([patchId, translation])
+        const candidate = translateCoonsPatch(
+          current.editableDiagram,
+          patchId,
+          translation,
+        )
+        assert.equal(candidate.ok, true)
+        if (!candidate.ok) {
+          return { ok: false, message: candidate.error }
+        }
+        assert.equal(
+          findCoonsPatch(candidate.diagram, patchId).primitive.boundarySources,
+          undefined,
+        )
+        const applied = applyTranslateCoonsPatchToEditorState(
+          current,
+          patchId,
+          translation,
+        )
+        if (!applied.ok) {
+          return { ok: false, message: applied.message }
+        }
+        current = applied.state
+        return {
+          ok: true,
+          patchId: applied.patchId,
+          message: applied.message,
+        }
+      },
+    )
+    harness.change('dx', '1.25')
+    harness.change('dy', '-2.5')
+    harness.change('dz', '3.75')
+    assert.equal(harness.submit(), 1)
+
+    assert.equal(duplicateCalls, 0)
+    assert.equal(translateArguments.length, 1)
+    assert.equal(translateArguments[0]?.[0], patch.id)
+    assert.deepEqual(translateArguments[0]?.[1], {
+      x: { kind: 'numeric', value: 1.25 },
+      y: { kind: 'numeric', value: -2.5 },
+      z: { kind: 'numeric', value: 3.75 },
+    })
+    assert.equal(current.editableDiagram.strata.length, diagram.strata.length)
+    assert.deepEqual(current.selectedElement, {
+      kind: 'stratum',
+      id: patch.id,
+    })
+    assert.equal(current.history.past.length, 1)
+    assert.equal(
+      findCoonsPatch(current.editableDiagram, patch.id).primitive.boundarySources,
+      undefined,
+    )
+
+    assertProductionTranslateFormNoOp(
+      controlsModule.CoonsPatchActionsControls,
+      { dx: '1e', dy: '-2.5', dz: '3.75' },
+      /^dx:/,
+    )
+    assertProductionTranslateFormNoOp(
+      controlsModule.CoonsPatchActionsControls,
+      { dx: '0', dy: '-0', dz: '0.0' },
+      /^Enter a non-zero translation\.$/,
+    )
+  } finally {
+    await server.close()
+    rmSync(cacheDir, { recursive: true, force: true })
+  }
+})
+
+function assertProductionTranslateFormNoOp(
+  Controls: CoonsPatchActionsControlsHarnessComponent,
+  input: CoonsPatchTranslationInput,
+  expectedMessage: RegExp,
+): void {
+  const diagram = createComplexPatchDiagram(true)
+  const patch = findCoonsPatch(diagram, 'patch')
+  const initial = createEditorState(diagram, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  let current = initial
+  let duplicateCalls = 0
+  let translateCalls = 0
+  const harness = createProductionCoonsPatchActionsHarness(
+    Controls,
+    diagram,
+    patch,
+    () => {
+      duplicateCalls += 1
+      return { ok: false, message: 'Duplicate must not run.' }
+    },
+    (patchId, translation) => {
+      translateCalls += 1
+      const applied = applyTranslateCoonsPatchToEditorState(
+        current,
+        patchId,
+        translation,
+      )
+      if (!applied.ok) {
+        return { ok: false, message: applied.message }
+      }
+      current = applied.state
+      return {
+        ok: true,
+        patchId: applied.patchId,
+        message: applied.message,
+      }
+    },
+  )
+
+  harness.change('dx', input.dx)
+  harness.change('dy', input.dy)
+  harness.change('dz', input.dz)
+  assert.equal(harness.submit(), 1)
+  assert.equal(duplicateCalls, 0)
+  assert.equal(translateCalls, 0)
+  assert.equal(current, initial)
+  assert.equal(current.editableDiagram, diagram)
+  assert.deepEqual(current.selectedElement, initial.selectedElement)
+  assert.equal(current.history, initial.history)
+  assert.equal(current.history.past.length, 0)
+  assert.equal(current.history.future.length, 0)
+  assert.notEqual(
+    findCoonsPatch(current.editableDiagram, patch.id).primitive.boundarySources,
+    undefined,
+  )
+  assert.match(harness.status().message, expectedMessage)
+}
+
+function createProductionCoonsPatchActionsHarness(
+  Controls: CoonsPatchActionsControlsHarnessComponent,
+  initialDiagram: Diagram,
+  initialPatch: CoonsPatchStratum,
+  duplicateAction: CoonsPatchActionsControlsHarnessProps['onDuplicate'],
+  translateAction: CoonsPatchActionsControlsHarnessProps['onTranslate'],
+) {
+  let diagram = initialDiagram
+  let patch = initialPatch
+  let input: CoonsPatchTranslationInput = {
+    dx: '0',
+    dy: '0',
+    dz: '0',
+  }
+  let statusState: CoonsPatchActionStatusState = {
+    patchId: '',
+    message: '',
+  }
+
+  function render(): unknown {
+    return Controls({
+      diagram,
+      patch,
+      onDuplicate: duplicateAction,
+      onTranslate: translateAction,
+      input,
+      statusState,
+      onInputChange: (field, value) => {
+        input = { ...input, [field]: value }
+        statusState = { patchId: '', message: '' }
+      },
+      onStatusStateChange: (status) => {
+        statusState = status
+      },
+    })
+  }
+
+  function findOne(
+    predicate: (element: ProductionReactElement) => boolean,
+    description: string,
+  ): ProductionReactElement {
+    const matching = productionNativeElements(render()).filter(predicate)
+    assert.equal(matching.length, 1, 'Expected one production ' + description + '.')
+    const element = matching[0]
+    if (element === undefined) {
+      throw new Error('Expected production ' + description + '.')
+    }
+    return element
+  }
+
+  return {
+    setTarget(nextDiagram: Diagram, nextPatch: CoonsPatchStratum): void {
+      diagram = nextDiagram
+      patch = nextPatch
+    },
+    change(field: keyof CoonsPatchTranslationInput, value: string): void {
+      const label = 'Coons patch translation ' + field
+      const element = findOne(
+        (candidate) =>
+          candidate.type === 'input' &&
+          candidate.props['aria-label'] === label,
+        'input ' + label,
+      )
+      const onChange = element.props.onChange
+      assert.equal(typeof onChange, 'function')
+      if (typeof onChange !== 'function') {
+        throw new Error('Expected an onChange handler for ' + label + '.')
+      }
+      ;(onChange as (event: { currentTarget: { value: string } }) => void)({
+        currentTarget: { value },
+      })
+      assert.equal(input[field], value)
+    },
+    duplicateButtonProps(): Record<string, unknown> {
+      return findOne(
+        (candidate) =>
+          candidate.type === 'button' &&
+          candidate.props['aria-label'] === 'Duplicate selected Coons patch',
+        'Duplicate button',
+      ).props
+    },
+    clickDuplicate(): void {
+      const onClick = this.duplicateButtonProps().onClick
+      assert.equal(typeof onClick, 'function')
+      if (typeof onClick !== 'function') {
+        throw new Error('Expected the production Duplicate onClick handler.')
+      }
+      ;(onClick as () => void)()
+    },
+    submit(): number {
+      const form = findOne(
+        (candidate) => candidate.type === 'form',
+        'Translate form',
+      )
+      const onSubmit = form.props.onSubmit
+      assert.equal(typeof onSubmit, 'function')
+      if (typeof onSubmit !== 'function') {
+        throw new Error('Expected the production Translate onSubmit handler.')
+      }
+      let preventDefaultCount = 0
+      ;(onSubmit as (event: { preventDefault: () => void }) => void)({
+        preventDefault: () => {
+          preventDefaultCount += 1
+        },
+      })
+      return preventDefaultCount
+    },
+    status(): CoonsPatchActionStatusState {
+      return statusState
+    },
+    visibleStatusText(): string {
+      const status = productionNativeElements(render()).find(
+        (element) => element.props.role === 'status',
+      )
+      return typeof status?.props.children === 'string'
+        ? status.props.children
+        : ''
+    },
+  }
+}
+
+function productionNativeElements(node: unknown): ProductionReactElement[] {
+  const elements: ProductionReactElement[] = []
+
+  function visit(value: unknown): void {
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+    if (!isProductionReactElement(value)) {
+      return
+    }
+    if (typeof value.type === 'function') {
+      const Component = value.type as (
+        props: Record<string, unknown>,
+      ) => unknown
+      visit(Component(value.props))
+      return
+    }
+    elements.push(value)
+    visit(value.props.children)
+  }
+
+  visit(node)
+  return elements
+}
+
+function isProductionReactElement(
+  value: unknown,
+): value is ProductionReactElement {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    'props' in value &&
+    typeof value.props === 'object' &&
+    value.props !== null
+  )
+}
+
+test('production Inspector exposes separate controls only for one editable selected Coons patch', async () => {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-inspector-'))
+  const server = await createServer({
+    root: process.cwd(),
+    appType: 'custom',
+    cacheDir,
+    logLevel: 'silent',
+    server: { middlewareMode: true },
+  })
+
+  try {
+    const loaded = (await server.ssrLoadModule(
+      '/src/ui/inspector/EditableInspector.tsx',
+    )) as {
+      EditableInspector: ComponentType<Record<string, unknown>>
+    }
+    const diagram = createComplexPatchDiagram(false)
+    const coonsMarkup = renderInspector(
+      loaded.EditableInspector,
+      diagram,
+      { kind: 'stratum', id: 'patch' },
+    )
+    assert.match(coonsMarkup, /Coons patch actions/)
+    assert.match(coonsMarkup, /aria-label="Duplicate selected Coons patch"/)
+    assert.match(coonsMarkup, /aria-label="Translate selected Coons patch"/)
+    assert.match(coonsMarkup, /aria-label="Coons patch translation dx"/)
+    assert.match(coonsMarkup, /aria-label="Coons patch translation dy"/)
+    assert.match(coonsMarkup, /aria-label="Coons patch translation dz"/)
+    assert.match(coonsMarkup, /Translating a linked patch detaches only that patch/)
+    assert.doesNotMatch(coonsMarkup, /Duplicate &amp; translate/i)
+    assert.doesNotMatch(coonsMarkup, /snap/i)
+
+    for (const selection of [
+      null,
+      { kind: 'stratum', id: 'missing' },
+      { kind: 'stratum', id: 'bottom' },
+      { kind: 'stratum', id: 'right-corner' },
+      {
+        kind: 'multi',
+        elements: [
+          { kind: 'stratum', id: 'patch' },
+          { kind: 'stratum', id: 'bottom' },
+        ],
+      },
+    ] satisfies SelectedElement[]) {
+      assertNoCoonsPatchActions(
+        renderInspector(loaded.EditableInspector, diagram, selection),
+      )
+    }
+
+    const label = createTextLabel({
+      ambientDimension: 3,
+      id: 'free-label',
+      text: '$L$',
+      position: point(1, 1, 1),
+    })
+    const anchor: CoordinateAnchor = {
+      id: 'coordinate-anchor',
+      name: 'Anchor',
+      tikzName: 'anchor',
+      position: {
+        kind: 'global',
+        value: symbolicVec3FromVec3(point(1, 1, 1)),
+      },
+    }
+    const withNonStrata: Diagram = {
+      ...diagram,
+      labels: [...diagram.labels, label],
+      coordinateAnchors: [...(diagram.coordinateAnchors ?? []), anchor],
+    }
+    assertNoCoonsPatchActions(
+      renderInspector(loaded.EditableInspector, withNonStrata, {
+        kind: 'label',
+        id: label.id,
+      }),
+    )
+    assertNoCoonsPatchActions(
+      renderInspector(loaded.EditableInspector, withNonStrata, {
+        kind: 'coordinate',
+        id: anchor.id,
+      }),
+    )
+
+    const otherKinds = diagramWithOtherSheetKinds(diagram)
+    for (const id of ['polygon', 'filled', 'ruled', 'hemisphere', 'saddle']) {
+      assertNoCoonsPatchActions(
+        renderInspector(
+          loaded.EditableInspector,
+          otherKinds,
+          { kind: 'stratum', id },
+        ),
+        id,
+      )
+    }
+
+    const hiddenDiagram: Diagram = {
+      ...diagram,
+      layers: [{ value: 3, name: 'Hidden', visible: false }],
+    }
+    assertNoCoonsPatchActions(
+      renderInspector(
+        loaded.EditableInspector,
+        hiddenDiagram,
+        { kind: 'stratum', id: 'patch' },
+      ),
+      'hidden',
+    )
+    const lockedDiagram: Diagram = {
+      ...diagram,
+      layers: [{ value: 3, name: 'Locked', locked: true }],
+    }
+    assertNoCoonsPatchActions(
+      renderInspector(
+        loaded.EditableInspector,
+        lockedDiagram,
+        { kind: 'stratum', id: 'patch' },
+      ),
+      'locked',
+    )
+    assertNoCoonsPatchActions(
+      renderInspector(
+        loaded.EditableInspector,
+        diagram,
+        { kind: 'stratum', id: 'patch' },
+        { kind: 'layer', layer: 0 },
+      ),
+      'filtered',
+    )
+  } finally {
+    await server.close()
+    rmSync(cacheDir, { recursive: true, force: true })
+  }
+})
+
+function assertNoCoonsPatchActions(markup: string, context = ''): void {
+  assert.doesNotMatch(markup, /Coons patch actions/, context)
+  assert.doesNotMatch(markup, /Duplicate selected Coons patch/, context)
+  assert.doesNotMatch(markup, /Translate selected Coons patch/, context)
+}
+
+test('save/load, Preview, rendered/exported SVG, and both TikZ modes distinguish Duplicate then Translate', async () => {
+  const sourceDiagram = createComplexPatchDiagram(false)
+  const duplicated = duplicateCoonsPatch(sourceDiagram, 'patch')
+  assert.equal(duplicated.ok, true)
+  if (!duplicated.ok) {
+    throw new Error(duplicated.error)
+  }
+  const copyBefore = findCoonsPatch(
+    duplicated.diagram,
+    duplicated.duplicatedPatchId,
+  )
+  const sourceMesh = sampleCoonsPatch(
+    findCoonsPatch(duplicated.diagram, 'patch').primitive,
+  )
+  assert.deepEqual(sampleCoonsPatch(copyBefore.primitive), sourceMesh)
+
+  const delta = point(2, -1, 0.5)
+  const translated = translateCoonsPatch(
+    duplicated.diagram,
+    copyBefore.id,
+    numericTranslation(duplicated.diagram, delta),
+  )
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  const translatedMesh = sampleCoonsPatch(
+    findCoonsPatch(translated.diagram, copyBefore.id).primitive,
+  )
+  sourceMesh.vertices.forEach((vertex, index) => {
+    assertVec3Translated(vertex, translatedMesh.vertices[index], delta, 1e-9)
+  })
+
+  const saved = serializeDiagram(translated.diagram)
+  assert.doesNotMatch(saved, /selectedElement|translationDraft|statusState/)
+  const loaded = parseSavedDiagramJson(saved)
   assert.equal(loaded.ok, true)
   if (!loaded.ok) {
     throw new Error(loaded.error)
   }
-  const loadedCopy = findCoonsPatch(loaded.diagram, result.duplicatedPatchId)
+  const loadedCopy = findCoonsPatch(loaded.diagram, copyBefore.id)
   assert.equal(loadedCopy.primitive.boundarySources, undefined)
+  assert.deepEqual(loadedCopy.style, findCoonsPatch(sourceDiagram, 'patch').style)
+  assert.deepEqual(
+    loadedCopy.primitive.sampling,
+    findCoonsPatch(sourceDiagram, 'patch').primitive.sampling,
+  )
+  assert.equal(loadedCopy.layer, 3)
 
   const fullSync = synchronizeLinkedCoonsPatches(null, loaded.diagram, {
     mode: 'full',
@@ -894,17 +1891,16 @@ test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes'
   sourceVertices?.forEach((vertex, index) => {
     assertVec3Translated(vertex, copiedVertices?.[index], delta, 1e-9)
   })
-  const sourceMesh = sampleCoonsPatch(
-    findCoonsPatch(fullSync, 'patch').primitive,
-  )
 
   const standalone = generateTikz(fullSync)
   assert.match(standalone, /Curved sheet "Phase 30 patch" \[patch\]/)
   assert.match(
     standalone,
-    new RegExp(`Curved sheet "Phase 30 patch" \\[${loadedCopy.id}\\]`),
+    new RegExp('Curved sheet "Phase 30 patch" \\[' + escapeRegExp(loadedCopy.id) + '\\]'),
   )
   assert.equal((standalone.match(/Primitive: coonsPatch/g) ?? []).length, 2)
+  assert.match(standalone, /fill opacity=0\.42/)
+  assert.match(standalone, /draw opacity=0\.73/)
   assertTikzCoonsPatchCoordinates(
     standalone,
     'patch',
@@ -970,10 +1966,6 @@ test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes'
       (svgMarkup.match(/data-surface-source-id=/g) ?? []).length,
       sourceMesh.faces.length * 2,
     )
-    assert.equal(
-      (svgMarkup.match(/<polygon /g) ?? []).length,
-      sourceMesh.faces.length * 2,
-    )
 
     const liveSvg = parseSsrSvgMarkup(svgMarkup)
     const expectedCopyVertices = sourceMesh.vertices.map((vertex) => ({
@@ -1003,7 +1995,7 @@ test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes'
       assert.equal(
         sourceFacePointSet.has(points),
         false,
-        `Translated copy face unexpectedly equals a source face: ${points}`,
+        'Translated copy face unexpectedly equals a source face: ' + points,
       )
     }
 
@@ -1034,389 +2026,6 @@ test('save/load, Preview, rendered/exported SVG, and TikZ use translated meshes'
     rmSync(cacheDir, { recursive: true, force: true })
   }
 })
-
-test('generic bulk duplicate keeps Phase 29 linked-copy semantics', () => {
-  const linked = createComplexPatchDiagram(true)
-  const patchOnly = duplicateSelectedElements(linked, {
-    kind: 'stratum',
-    id: 'patch',
-  })
-  const patchCopySelection = patchOnly.selectedElement
-  assert.equal(patchCopySelection?.kind, 'stratum')
-  if (patchCopySelection?.kind !== 'stratum') {
-    throw new Error('Expected one bulk-duplicated patch selection.')
-  }
-  assert.deepEqual(
-    findCoonsPatch(patchOnly.diagram, patchCopySelection.id).primitive
-      .boundarySources,
-    findCoonsPatch(linked, 'patch').primitive.boundarySources,
-  )
-
-  const withSources = duplicateSelectedElements(linked, {
-    kind: 'multi',
-    elements: ['bottom', 'right-corner', 'top', 'left', 'patch'].map((id) => ({
-      kind: 'stratum' as const,
-      id,
-    })),
-  })
-  const selectedIds = selectedStratumIds(withSources.selectedElement)
-  const copiedPatch = withSources.diagram.strata.find(
-    (stratum) => selectedIds.has(stratum.id) && isCoonsPatchStratum(stratum),
-  )
-  assert.notEqual(copiedPatch, undefined)
-  if (copiedPatch === undefined || !isCoonsPatchStratum(copiedPatch)) {
-    throw new Error('Expected copied patch with copied sources.')
-  }
-  const sources = copiedPatch.primitive.boundarySources
-  assert.notEqual(sources, undefined)
-  assert.ok(sources?.bottom.kind === 'path' && selectedIds.has(sources.bottom.sourcePathId))
-  assert.ok(sources?.right.kind === 'point' && selectedIds.has(sources.right.sourcePointId))
-  assert.ok(sources?.top.kind === 'path' && selectedIds.has(sources.top.sourcePathId))
-  assert.ok(sources?.left.kind === 'path' && selectedIds.has(sources.left.sourcePathId))
-})
-
-test('production Inspector form submits through the editor transition and remains exactly gated', async () => {
-  const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-'))
-  const server = await createServer({
-    root: process.cwd(),
-    appType: 'custom',
-    cacheDir,
-    logLevel: 'silent',
-    server: { middlewareMode: true },
-  })
-
-  try {
-    const loaded = (await server.ssrLoadModule(
-      '/src/ui/inspector/EditableInspector.tsx',
-    )) as {
-      EditableInspector: ComponentType<Record<string, unknown>>
-    }
-    const formModule = (await server.ssrLoadModule(
-      '/src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx',
-    )) as {
-      CoonsPatchDuplicateTranslateForm: CoonsPatchDuplicateTranslateFormHarnessComponent
-    }
-    const diagram = createComplexPatchDiagram(false)
-    const coonsMarkup = renderInspector(
-      loaded.EditableInspector,
-      diagram,
-      { kind: 'stratum', id: 'patch' },
-    )
-    assert.match(coonsMarkup, /Duplicate &amp; translate/)
-    assert.match(coonsMarkup, /aria-label="Coons patch translation dx"/)
-    assert.match(coonsMarkup, /aria-label="Coons patch translation dy"/)
-    assert.match(coonsMarkup, /aria-label="Coons patch translation dz"/)
-    assert.match(coonsMarkup, /type="text"/)
-    assert.doesNotMatch(coonsMarkup, /snap/i)
-
-    assertProductionInspectorFormSubmissions(
-      formModule.CoonsPatchDuplicateTranslateForm,
-      diagram,
-    )
-
-    const curveMarkup = renderInspector(
-      loaded.EditableInspector,
-      diagram,
-      { kind: 'stratum', id: 'bottom' },
-    )
-    assert.doesNotMatch(curveMarkup, /Duplicate &amp; translate/)
-
-    const pointMarkup = renderInspector(
-      loaded.EditableInspector,
-      diagram,
-      { kind: 'stratum', id: 'right-corner' },
-    )
-    assert.doesNotMatch(pointMarkup, /Duplicate &amp; translate/)
-
-    const multiMarkup = renderInspector(
-      loaded.EditableInspector,
-      diagram,
-      {
-        kind: 'multi',
-        elements: [
-          { kind: 'stratum', id: 'patch' },
-          { kind: 'stratum', id: 'bottom' },
-        ],
-      },
-    )
-    assert.doesNotMatch(multiMarkup, /Duplicate &amp; translate/)
-
-    const otherKinds = diagramWithOtherSheetKinds(diagram)
-    for (const id of ['polygon', 'filled', 'ruled', 'hemisphere', 'saddle']) {
-      assert.doesNotMatch(
-        renderInspector(
-          loaded.EditableInspector,
-          otherKinds,
-          { kind: 'stratum', id },
-        ),
-        /Duplicate &amp; translate/,
-        id,
-      )
-    }
-  } finally {
-    await server.close()
-    rmSync(cacheDir, { recursive: true, force: true })
-  }
-})
-
-function assertProductionInspectorFormSubmissions(
-  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
-  diagram: Diagram,
-): void {
-  const patch = findCoonsPatch(diagram, 'patch')
-  const initial = createEditorState(diagram, {
-    kind: 'stratum',
-    id: patch.id,
-  })
-  let current = initial
-  let callbackCount = 0
-  let receivedPatchId: string | null = null
-  let receivedTranslation: TranslationVector | null = null
-  const harness = createProductionCoonsPatchFormHarness(
-    Form,
-    diagram,
-    patch,
-    (patchId, translation) => {
-      callbackCount += 1
-      receivedPatchId = patchId
-      receivedTranslation = translation
-      const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
-        current,
-        patchId,
-        translation,
-      )
-
-      if (!applied.ok) {
-        return { ok: false, message: applied.message }
-      }
-
-      current = applied.state
-      return {
-        ok: true,
-        duplicatedPatchId: applied.duplicatedPatchId,
-        message: applied.message,
-      }
-    },
-  )
-
-  harness.change('dx', '1.25')
-  harness.change('dy', '-2.5')
-  harness.change('dz', '3.75')
-  assert.equal(harness.submit(), 1)
-  assert.equal(callbackCount, 1)
-  assert.equal(receivedPatchId, patch.id)
-  assert.deepEqual(receivedTranslation, {
-    x: { kind: 'numeric', value: 1.25 },
-    y: { kind: 'numeric', value: -2.5 },
-    z: { kind: 'numeric', value: 3.75 },
-  })
-  assert.equal(current.editableDiagram.strata.length, diagram.strata.length + 1)
-  const appended = current.editableDiagram.strata.filter(
-    (stratum) => !diagram.strata.some((source) => source.id === stratum.id),
-  )
-  assert.equal(appended.length, 1)
-  assert.deepEqual(current.selectedElement, {
-    kind: 'stratum',
-    id: appended[0]?.id,
-  })
-  assert.equal(current.history.past.length, 1)
-  assert.equal(current.history.future.length, 0)
-
-  assertProductionInspectorFormNoOp(
-    Form,
-    diagram,
-    { dx: '1e', dy: '-2.5', dz: '3.75' },
-    /^dx:/,
-  )
-  assertProductionInspectorFormNoOp(
-    Form,
-    diagram,
-    { dx: '0', dy: '-0', dz: '0.0' },
-    /^Enter a non-zero translation\.$/,
-  )
-}
-
-function assertProductionInspectorFormNoOp(
-  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
-  diagram: Diagram,
-  input: CoonsPatchDuplicateTranslationInput,
-  expectedMessage: RegExp,
-): void {
-  const patch = findCoonsPatch(diagram, 'patch')
-  const initial = createEditorState(diagram, {
-    kind: 'stratum',
-    id: patch.id,
-  })
-  let current = initial
-  let callbackCount = 0
-  const harness = createProductionCoonsPatchFormHarness(
-    Form,
-    diagram,
-    patch,
-    (patchId, translation) => {
-      callbackCount += 1
-      const applied = applyDuplicateAndTranslateCoonsPatchToEditorState(
-        current,
-        patchId,
-        translation,
-      )
-
-      if (!applied.ok) {
-        return { ok: false, message: applied.message }
-      }
-
-      current = applied.state
-      return {
-        ok: true,
-        duplicatedPatchId: applied.duplicatedPatchId,
-        message: applied.message,
-      }
-    },
-  )
-
-  harness.change('dx', input.dx)
-  harness.change('dy', input.dy)
-  harness.change('dz', input.dz)
-  assert.equal(harness.submit(), 1)
-  assert.equal(callbackCount, 0)
-  assert.equal(current, initial)
-  assert.equal(current.editableDiagram, diagram)
-  assert.deepEqual(current.selectedElement, initial.selectedElement)
-  assert.equal(current.history, initial.history)
-  assert.equal(current.history.past.length, 0)
-  assert.equal(current.history.future.length, 0)
-  assert.deepEqual(
-    current.editableDiagram.strata.map((stratum) => stratum.id),
-    diagram.strata.map((stratum) => stratum.id),
-  )
-  assert.equal(
-    current.editableDiagram.strata.some((stratum) =>
-      stratum.id.startsWith(`${patch.id}-copy`),
-    ),
-    false,
-  )
-  assert.match(harness.status().message, expectedMessage)
-}
-
-function createProductionCoonsPatchFormHarness(
-  Form: CoonsPatchDuplicateTranslateFormHarnessComponent,
-  diagram: Diagram,
-  patch: CoonsPatchStratum,
-  action: CoonsPatchDuplicateTranslateFormHarnessProps['onDuplicateAndTranslate'],
-) {
-  let input: CoonsPatchDuplicateTranslationInput = {
-    dx: '0',
-    dy: '0',
-    dz: '0',
-  }
-  let statusState: CoonsPatchDuplicateTranslateStatusState = {
-    patchId: '',
-    message: '',
-  }
-
-  function render(): unknown {
-    return Form({
-      diagram,
-      patch,
-      onDuplicateAndTranslate: action,
-      input,
-      statusState,
-      onInputChange: (field, value) => {
-        input = { ...input, [field]: value }
-        statusState = { patchId: '', message: '' }
-      },
-      onStatusStateChange: (status) => {
-        statusState = status
-      },
-    })
-  }
-
-  return {
-    change(
-      field: keyof CoonsPatchDuplicateTranslationInput,
-      value: string,
-    ): void {
-      const label = `Coons patch translation ${field}`
-      const inputs = productionNativeElements(render()).filter(
-        (element) =>
-          element.type === 'input' && element.props['aria-label'] === label,
-      )
-      assert.equal(inputs.length, 1, `Expected production input ${label}.`)
-      const onChange = inputs[0]?.props.onChange
-      assert.equal(typeof onChange, 'function')
-      if (typeof onChange !== 'function') {
-        throw new Error(`Expected an onChange handler for ${label}.`)
-      }
-      ;(onChange as (event: { currentTarget: { value: string } }) => void)({
-        currentTarget: { value },
-      })
-      assert.equal(input[field], value)
-    },
-    submit(): number {
-      const forms = productionNativeElements(render()).filter(
-        (element) => element.type === 'form',
-      )
-      assert.equal(forms.length, 1, 'Expected the production Coons patch form.')
-      const onSubmit = forms[0]?.props.onSubmit
-      assert.equal(typeof onSubmit, 'function')
-      if (typeof onSubmit !== 'function') {
-        throw new Error('Expected the production form onSubmit handler.')
-      }
-      let preventDefaultCount = 0
-      ;(onSubmit as (event: { preventDefault: () => void }) => void)({
-        preventDefault: () => {
-          preventDefaultCount += 1
-        },
-      })
-      return preventDefaultCount
-    },
-    status(): CoonsPatchDuplicateTranslateStatusState {
-      return statusState
-    },
-  }
-}
-
-function productionNativeElements(node: unknown): ProductionReactElement[] {
-  const elements: ProductionReactElement[] = []
-
-  function visit(value: unknown): void {
-    if (Array.isArray(value)) {
-      value.forEach(visit)
-      return
-    }
-
-    if (!isProductionReactElement(value)) {
-      return
-    }
-
-    if (typeof value.type === 'function') {
-      const Component = value.type as (
-        props: Record<string, unknown>,
-      ) => unknown
-      visit(Component(value.props))
-      return
-    }
-
-    elements.push(value)
-    visit(value.props.children)
-  }
-
-  visit(node)
-  return elements
-}
-
-function isProductionReactElement(
-  value: unknown,
-): value is ProductionReactElement {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    'props' in value &&
-    typeof value.props === 'object' &&
-    value.props !== null
-  )
-}
 
 function assertTikzCoonsPatchCoordinates(
   tikz: string,
@@ -2001,6 +2610,7 @@ function renderInspector(
   Inspector: ComponentType<Record<string, unknown>>,
   diagram: Diagram,
   selectedElement: SelectedElement,
+  layerFilter = allLayersFilter,
 ): string {
   const noOp = () => undefined
 
@@ -2008,6 +2618,7 @@ function renderInspector(
     createElement(Inspector, {
       diagram,
       selectedElement,
+      layerFilter,
       expanded: true,
       onExpandedChange: noOp,
       onDiagramChange: noOp,
@@ -2023,7 +2634,11 @@ function renderInspector(
       onBulkConcatenatePaths: () => '',
       onSplitPath: () => '',
       onStartPathSplitPick: () => '',
-      onDuplicateAndTranslateCoonsPatch: () => ({
+      onDuplicateCoonsPatch: () => ({
+        ok: false,
+        message: 'not invoked during SSR',
+      }),
+      onTranslateCoonsPatch: () => ({
         ok: false,
         message: 'not invoked during SSR',
       }),
