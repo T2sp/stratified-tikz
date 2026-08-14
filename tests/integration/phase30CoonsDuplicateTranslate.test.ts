@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { createElement, type ComponentType } from 'react'
+import * as React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import {
@@ -134,6 +134,28 @@ type CoonsPatchActionsControlsHarnessComponent = (
 type ProductionReactElement = {
   type: unknown
   props: Record<string, unknown>
+}
+
+type ProductionFunctionComponent = (
+  props: Record<string, unknown>,
+) => unknown
+
+type FullProductionCallbackChainModules = {
+  App: ProductionFunctionComponent
+  EditableInspector: ProductionFunctionComponent
+  StratumInspector: ProductionFunctionComponent
+  CoonsPatchActionsEditor: ProductionFunctionComponent
+  CoonsPatchActionsControls: ProductionFunctionComponent
+}
+
+type ProductionHookDispatcher = {
+  useState: <T>(
+    initialState: T | (() => T),
+  ) => [T, React.Dispatch<React.SetStateAction<T>>]
+  useMemo: <T>(create: () => T) => T
+  useCallback: <T>(callback: T) => T
+  useEffect: () => void
+  useRef: <T>(initialValue: T) => { current: T }
 }
 
 type SvgCamera3D = Extract<Diagram['camera'], { mode: '3d' }>
@@ -1689,6 +1711,687 @@ function isProductionReactElement(
   )
 }
 
+class ProductionHookRenderer {
+  private readonly stateSlots: unknown[] = []
+  private readonly initializedStateSlots: boolean[] = []
+  private readonly stateSetCounts: number[] = []
+  private readonly refSlots: Array<{ current: unknown }> = []
+  private readonly initializedRefSlots: boolean[] = []
+  private readonly initialEditorState: TestEditorState | null
+  private readonly dispatcher: ProductionHookDispatcher
+  private stateCursor = 0
+  private refCursor = 0
+  private editorStateSlotIndex: number | null = null
+
+  constructor(initialEditorState: TestEditorState | null = null) {
+    this.initialEditorState = initialEditorState
+    this.dispatcher = {
+      useState: <T,>(initialState: T | (() => T)) =>
+        this.useState(initialState),
+      useMemo: <T,>(create: () => T) => create(),
+      useCallback: <T,>(callback: T) => callback,
+      useEffect: () => undefined,
+      useRef: <T,>(initialValue: T) => this.useRef(initialValue),
+    }
+  }
+
+  render(
+    Component: ProductionFunctionComponent,
+    props: Record<string, unknown> = {},
+  ): unknown {
+    const internals = reactClientInternals()
+    const previousDispatcher = internals.H
+    this.stateCursor = 0
+    this.refCursor = 0
+    internals.H = this.dispatcher
+
+    try {
+      return Component(props)
+    } finally {
+      internals.H = previousDispatcher
+    }
+  }
+
+  appEditorState(): TestEditorState {
+    const index = this.editorStateSlotIndex
+    assert.notEqual(index, null, 'Expected the App editor-state hook slot.')
+    if (index === null) {
+      throw new Error('Expected the App editor-state hook slot.')
+    }
+    const value = this.stateSlots[index]
+    assert.equal(isTestEditorState(value), true)
+    if (!isTestEditorState(value)) {
+      throw new Error('Expected the current App editor state.')
+    }
+    return value
+  }
+
+  appEditorStateUpdateCount(): number {
+    const index = this.editorStateSlotIndex
+    assert.notEqual(index, null, 'Expected the App editor-state hook slot.')
+    if (index === null) {
+      throw new Error('Expected the App editor-state hook slot.')
+    }
+    return this.stateSetCounts[index] ?? 0
+  }
+
+  private useState<T>(
+    initialState: T | (() => T),
+  ): [T, React.Dispatch<React.SetStateAction<T>>] {
+    const index = this.stateCursor
+    this.stateCursor += 1
+
+    if (this.initializedStateSlots[index] !== true) {
+      const initialized =
+        typeof initialState === 'function'
+          ? (initialState as () => T)()
+          : initialState
+      const isEditorState = isTestEditorState(initialized)
+      this.stateSlots[index] =
+        isEditorState && this.initialEditorState !== null
+          ? this.initialEditorState
+          : initialized
+      this.initializedStateSlots[index] = true
+      this.stateSetCounts[index] = 0
+      if (isEditorState && this.initialEditorState !== null) {
+        assert.equal(
+          this.editorStateSlotIndex,
+          null,
+          'Expected exactly one App editor-state hook slot.',
+        )
+        this.editorStateSlotIndex = index
+      }
+    }
+
+    const setState: React.Dispatch<React.SetStateAction<T>> = (update) => {
+      const current = this.stateSlots[index] as T
+      this.stateSlots[index] =
+        typeof update === 'function'
+          ? (update as (value: T) => T)(current)
+          : update
+      this.stateSetCounts[index] = (this.stateSetCounts[index] ?? 0) + 1
+    }
+
+    return [this.stateSlots[index] as T, setState]
+  }
+
+  private useRef<T>(initialValue: T): { current: T } {
+    const index = this.refCursor
+    this.refCursor += 1
+
+    if (this.initializedRefSlots[index] !== true) {
+      this.refSlots[index] = { current: initialValue }
+      this.initializedRefSlots[index] = true
+    }
+
+    return this.refSlots[index] as { current: T }
+  }
+}
+
+function reactClientInternals(): { H: unknown } {
+  return (
+    React as unknown as {
+      __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
+        H: unknown
+      }
+    }
+  ).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE
+}
+
+function isTestEditorState(value: unknown): value is TestEditorState {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'editableDiagram' in value &&
+    'selectedElement' in value &&
+    'layerFilter' in value &&
+    'history' in value &&
+    'layerOperationStatus' in value
+  )
+}
+
+function productionReactElements(
+  node: unknown,
+): ProductionReactElement[] {
+  const elements: ProductionReactElement[] = []
+
+  function visit(value: unknown): void {
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+    if (!isProductionReactElement(value)) {
+      return
+    }
+    elements.push(value)
+    visit(value.props.children)
+  }
+
+  visit(node)
+  return elements
+}
+
+function findOneProductionElement(
+  node: unknown,
+  predicate: (element: ProductionReactElement) => boolean,
+  description: string,
+): ProductionReactElement {
+  const matches = productionReactElements(node).filter(predicate)
+  assert.equal(matches.length, 1, `Expected one production ${description}.`)
+  const match = matches[0]
+  if (match === undefined) {
+    throw new Error(`Expected production ${description}.`)
+  }
+  return match
+}
+
+function findOneRenderedNativeElement(
+  node: unknown,
+  predicate: (element: ProductionReactElement) => boolean,
+  description: string,
+): ProductionReactElement {
+  const matches = productionNativeElements(node).filter(predicate)
+  assert.equal(matches.length, 1, `Expected one production ${description}.`)
+  const match = matches[0]
+  if (match === undefined) {
+    throw new Error(`Expected production ${description}.`)
+  }
+  return match
+}
+
+function renderFullProductionCallbackChain(
+  modules: FullProductionCallbackChainModules,
+  appTree: unknown,
+) {
+  const editableInspector = findOneProductionElement(
+    appTree,
+    (element) => element.type === modules.EditableInspector,
+    'App-owned EditableInspector',
+  )
+  assert.equal(typeof editableInspector.props.onDuplicateCoonsPatch, 'function')
+  assert.equal(typeof editableInspector.props.onTranslateCoonsPatch, 'function')
+
+  const editableInspectorTree = modules.EditableInspector(
+    editableInspector.props,
+  )
+  const stratumInspector = findOneProductionElement(
+    editableInspectorTree,
+    (element) => element.type === modules.StratumInspector,
+    'StratumInspector child',
+  )
+  assert.equal(
+    stratumInspector.props.onDuplicateCoonsPatch,
+    editableInspector.props.onDuplicateCoonsPatch,
+  )
+  assert.equal(
+    stratumInspector.props.onTranslateCoonsPatch,
+    editableInspector.props.onTranslateCoonsPatch,
+  )
+
+  const stratumInspectorTree = modules.StratumInspector(
+    stratumInspector.props,
+  )
+  const actionsEditor = findOneProductionElement(
+    stratumInspectorTree,
+    (element) => element.type === modules.CoonsPatchActionsEditor,
+    'CoonsPatchActionsEditor child',
+  )
+  assert.equal(
+    actionsEditor.props.onDuplicate,
+    editableInspector.props.onDuplicateCoonsPatch,
+  )
+  assert.equal(
+    actionsEditor.props.onTranslate,
+    editableInspector.props.onTranslateCoonsPatch,
+  )
+
+  const actionsRenderer = new ProductionHookRenderer()
+  const controls = renderFullProductionActionsControls(
+    modules,
+    actionsRenderer,
+    actionsEditor,
+  )
+
+  return {
+    editableInspector,
+    stratumInspector,
+    actionsEditor,
+    actionsRenderer,
+    controls,
+  }
+}
+
+function renderFullProductionActionsControls(
+  modules: FullProductionCallbackChainModules,
+  renderer: ProductionHookRenderer,
+  actionsEditor: ProductionReactElement,
+): ProductionReactElement {
+  const controls = renderer.render(
+    modules.CoonsPatchActionsEditor,
+    actionsEditor.props,
+  )
+  assert.equal(isProductionReactElement(controls), true)
+  if (!isProductionReactElement(controls)) {
+    throw new Error('Expected production CoonsPatchActionsControls.')
+  }
+  assert.equal(controls.type, modules.CoonsPatchActionsControls)
+  assert.equal(controls.props.onDuplicate, actionsEditor.props.onDuplicate)
+  assert.equal(controls.props.onTranslate, actionsEditor.props.onTranslate)
+  return controls
+}
+
+test('actual App Inspector callback chain applies linked Duplicate then same-ID Translate with exact H0/H1/H2 history', async () => {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-app-chain-'))
+  const server = await createServer({
+    root: process.cwd(),
+    appType: 'custom',
+    cacheDir,
+    logLevel: 'silent',
+    server: { middlewareMode: true },
+  })
+
+  try {
+    const [appModule, editableModule, stratumModule, actionsModule] =
+      await Promise.all([
+        server.ssrLoadModule('/src/App.tsx'),
+        server.ssrLoadModule('/src/ui/inspector/EditableInspector.tsx'),
+        server.ssrLoadModule('/src/ui/inspector/StratumInspector.tsx'),
+        server.ssrLoadModule(
+          '/src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx',
+        ),
+      ])
+    const modules: FullProductionCallbackChainModules = {
+      App: appModule.default as ProductionFunctionComponent,
+      EditableInspector:
+        editableModule.EditableInspector as ProductionFunctionComponent,
+      StratumInspector:
+        stratumModule.StratumInspector as ProductionFunctionComponent,
+      CoonsPatchActionsEditor:
+        actionsModule.CoonsPatchActionsEditor as ProductionFunctionComponent,
+      CoonsPatchActionsControls:
+        actionsModule.CoonsPatchActionsControls as ProductionFunctionComponent,
+    }
+
+    const selectedPatchId = 'full-chain-source'
+    const base = createComplexPatchDiagram(true)
+    const basePatch = findCoonsPatch(base, 'patch')
+    const selectedPatch = structuredClone(basePatch)
+    selectedPatch.id = selectedPatchId
+    selectedPatch.name = 'Full production callback source'
+    const decoyPatch = structuredClone(basePatch)
+    decoyPatch.name = 'Callback ID decoy'
+    const diagram: Diagram = {
+      ...base,
+      strata: [
+        ...base.strata.filter((stratum) => stratum.id !== basePatch.id),
+        selectedPatch,
+        decoyPatch,
+      ],
+    }
+    assert.equal(validateDiagram(diagram).valid, true)
+    assert.equal(
+      coonsPatchBoundaryLinkStatus(diagram, selectedPatchId).kind,
+      'linkedUpToDate',
+    )
+
+    const h0 = createEditorState(diagram, {
+      kind: 'stratum',
+      id: selectedPatchId,
+    })
+    const abandonedRedo = structuredClone(diagram)
+    findCoonsPatch(abandonedRedo, selectedPatchId).name = 'Abandoned redo branch'
+    h0.history.future = [abandonedRedo]
+    const h0Diagram = structuredClone(h0.editableDiagram)
+    const h0Ids = h0Diagram.strata.map((stratum) => stratum.id)
+    const sourceBefore = structuredClone(
+      findCoonsPatch(h0Diagram, selectedPatchId),
+    )
+
+    const appRenderer = new ProductionHookRenderer(h0)
+    let appTree = appRenderer.render(modules.App)
+    const openInspectorButton = findOneProductionElement(
+      appTree,
+      (element) =>
+        element.type === 'button' &&
+        element.props['aria-label'] === 'Open inspector drawer',
+      'Open inspector drawer button',
+    )
+    const openInspector = openInspectorButton.props.onClick
+    assert.equal(typeof openInspector, 'function')
+    if (typeof openInspector !== 'function') {
+      throw new Error('Expected the App Inspector-open handler.')
+    }
+    let stopPropagationCount = 0
+    ;(openInspector as (event: { stopPropagation: () => void }) => void)({
+      stopPropagation: () => {
+        stopPropagationCount += 1
+      },
+    })
+    assert.equal(stopPropagationCount, 1)
+
+    appTree = appRenderer.render(modules.App)
+    const collapsedInspector = findOneProductionElement(
+      appTree,
+      (element) => element.type === modules.EditableInspector,
+      'collapsed App-owned EditableInspector',
+    )
+    assert.equal(collapsedInspector.props.expanded, false)
+    const collapsedInspectorTree = modules.EditableInspector(
+      collapsedInspector.props,
+    )
+    const expandButton = findOneProductionElement(
+      collapsedInspectorTree,
+      (element) =>
+        element.type === 'button' &&
+        element.props['aria-controls'] === 'inspector-details',
+      'Inspector Expand button',
+    )
+    const expandInspector = expandButton.props.onClick
+    assert.equal(typeof expandInspector, 'function')
+    if (typeof expandInspector !== 'function') {
+      throw new Error('Expected the App Inspector-expand handler.')
+    }
+    ;(expandInspector as () => void)()
+    assert.equal(appRenderer.appEditorStateUpdateCount(), 0)
+
+    appTree = appRenderer.render(modules.App)
+    const duplicateChain = renderFullProductionCallbackChain(modules, appTree)
+    assert.equal(duplicateChain.editableInspector.props.diagram, h0.editableDiagram)
+    assert.deepEqual(duplicateChain.editableInspector.props.selectedElement, {
+      kind: 'stratum',
+      id: selectedPatchId,
+    })
+    assert.equal(duplicateChain.editableInspector.props.expanded, true)
+    assert.equal(
+      (duplicateChain.stratumInspector.props.stratum as Stratum).id,
+      selectedPatchId,
+    )
+    assert.equal(
+      (duplicateChain.actionsEditor.props.patch as CoonsPatchStratum).id,
+      selectedPatchId,
+    )
+
+    const duplicateControlsTree = modules.CoonsPatchActionsControls(
+      duplicateChain.controls.props,
+    )
+    const duplicateButton = findOneRenderedNativeElement(
+      duplicateControlsTree,
+      (element) =>
+        element.type === 'button' &&
+        element.props['aria-label'] === 'Duplicate selected Coons patch',
+      'full-chain Duplicate button',
+    )
+    assert.equal(duplicateButton.props.type, 'button')
+    assert.notEqual(duplicateButton.props.disabled, true)
+    const duplicateClick = duplicateButton.props.onClick
+    assert.equal(typeof duplicateClick, 'function')
+    if (typeof duplicateClick !== 'function') {
+      throw new Error('Expected the full-chain Duplicate onClick handler.')
+    }
+    ;(duplicateClick as () => void)()
+
+    assert.equal(
+      appRenderer.appEditorStateUpdateCount(),
+      1,
+      'Duplicate must reach and apply the App editor-state handler exactly once.',
+    )
+    const duplicateStatusControls = renderFullProductionActionsControls(
+      modules,
+      duplicateChain.actionsRenderer,
+      duplicateChain.actionsEditor,
+    )
+    assert.deepEqual(duplicateStatusControls.props.statusState, {
+      patchId: selectedPatchId,
+      message: 'Duplicated Coons patch.',
+    })
+
+    const h1 = appRenderer.appEditorState()
+    const h1Diagram = structuredClone(h1.editableDiagram)
+    assert.equal(h1.selectedElement?.kind, 'stratum')
+    if (h1.selectedElement?.kind !== 'stratum') {
+      throw new Error('Expected Duplicate to select exactly one copied patch.')
+    }
+    const copyId = h1.selectedElement.id
+    assert.equal(copyId, `${selectedPatchId}-copy`)
+    assert.deepEqual(h1.editableDiagram.strata.map((stratum) => stratum.id), [
+      ...h0Ids,
+      copyId,
+    ])
+    assert.equal(h1.editableDiagram.strata.length, h0Diagram.strata.length + 1)
+    assert.deepEqual(
+      h1.editableDiagram.strata.slice(0, h0Diagram.strata.length),
+      h0Diagram.strata,
+    )
+    assert.deepEqual(
+      findCoonsPatch(h1.editableDiagram, selectedPatchId),
+      sourceBefore,
+    )
+    const unshiftedCopy = structuredClone(
+      findCoonsPatch(h1.editableDiagram, copyId),
+    )
+    assert.deepEqual(unshiftedCopy.primitive, sourceBefore.primitive)
+    assert.notEqual(unshiftedCopy.primitive, sourceBefore.primitive)
+    assert.notEqual(unshiftedCopy.primitive.boundarySources, undefined)
+    assert.deepEqual(
+      coonsPatchBoundaryLinkStatus(h1.editableDiagram, copyId),
+      { kind: 'linkedUpToDate' },
+    )
+    assert.deepEqual(
+      sampleCoonsPatch(unshiftedCopy.primitive),
+      sampleCoonsPatch(sourceBefore.primitive),
+    )
+    assert.deepEqual(h1.selectedElement, { kind: 'stratum', id: copyId })
+    assert.equal(h1.layerOperationStatus, 'Duplicated Coons patch.')
+    assert.equal(h1.history.past.length, 1)
+    assert.deepEqual(h1.history.past[0], h0Diagram)
+    assert.deepEqual(h1.history.present, h1.editableDiagram)
+    assert.equal(h1.history.future.length, 0)
+
+    appTree = appRenderer.render(modules.App)
+    const translateChain = renderFullProductionCallbackChain(modules, appTree)
+    assert.equal(translateChain.editableInspector.props.diagram, h1.editableDiagram)
+    assert.deepEqual(translateChain.editableInspector.props.selectedElement, {
+      kind: 'stratum',
+      id: copyId,
+    })
+    assert.equal(
+      (translateChain.actionsEditor.props.patch as CoonsPatchStratum).id,
+      copyId,
+    )
+    const initialTranslateControlsTree = modules.CoonsPatchActionsControls(
+      translateChain.controls.props,
+    )
+    const drafts: CoonsPatchTranslationInput = {
+      dx: '1.25',
+      dy: '-2.5',
+      dz: '3.75',
+    }
+    for (const field of ['dx', 'dy', 'dz'] as const) {
+      const input = findOneRenderedNativeElement(
+        initialTranslateControlsTree,
+        (element) =>
+          element.type === 'input' &&
+          element.props['aria-label'] === `Coons patch translation ${field}`,
+        `full-chain ${field} input`,
+      )
+      const onChange = input.props.onChange
+      assert.equal(typeof onChange, 'function')
+      if (typeof onChange !== 'function') {
+        throw new Error(`Expected the full-chain ${field} input handler.`)
+      }
+      ;(onChange as (event: { currentTarget: { value: string } }) => void)({
+        currentTarget: { value: drafts[field] },
+      })
+    }
+
+    const translateControls = renderFullProductionActionsControls(
+      modules,
+      translateChain.actionsRenderer,
+      translateChain.actionsEditor,
+    )
+    assert.deepEqual(translateControls.props.input, drafts)
+    const translateControlsTree = modules.CoonsPatchActionsControls(
+      translateControls.props,
+    )
+    const translateButton = findOneRenderedNativeElement(
+      translateControlsTree,
+      (element) =>
+        element.type === 'button' &&
+        element.props['aria-label'] === 'Translate selected Coons patch',
+      'full-chain Translate button',
+    )
+    assert.notEqual(translateButton.props.disabled, true)
+    const translateForm = findOneRenderedNativeElement(
+      translateControlsTree,
+      (element) => element.type === 'form',
+      'full-chain Translate form',
+    )
+    const submitTranslate = translateForm.props.onSubmit
+    assert.equal(typeof submitTranslate, 'function')
+    if (typeof submitTranslate !== 'function') {
+      throw new Error('Expected the full-chain Translate onSubmit handler.')
+    }
+    let preventDefaultCount = 0
+    ;(submitTranslate as (event: { preventDefault: () => void }) => void)({
+      preventDefault: () => {
+        preventDefaultCount += 1
+      },
+    })
+    assert.equal(preventDefaultCount, 1)
+    assert.equal(
+      appRenderer.appEditorStateUpdateCount(),
+      2,
+      'Translate must add exactly one App editor-state application and must not invoke Duplicate again.',
+    )
+    const translateStatusControls = renderFullProductionActionsControls(
+      modules,
+      translateChain.actionsRenderer,
+      translateChain.actionsEditor,
+    )
+    assert.deepEqual(translateStatusControls.props.statusState, {
+      patchId: copyId,
+      message: 'Translated Coons patch by (1.25, -2.5, 3.75).',
+    })
+
+    const h2 = appRenderer.appEditorState()
+    const h2Diagram = structuredClone(h2.editableDiagram)
+    const delta = point(1.25, -2.5, 3.75)
+    assert.equal(h2.editableDiagram.strata.length, h1.editableDiagram.strata.length)
+    assert.deepEqual(
+      h2.editableDiagram.strata.map((stratum) => stratum.id),
+      h1.editableDiagram.strata.map((stratum) => stratum.id),
+    )
+    assert.equal(
+      h2.editableDiagram.strata.findIndex((stratum) => stratum.id === copyId),
+      h1.editableDiagram.strata.findIndex((stratum) => stratum.id === copyId),
+    )
+    assertOtherStrataAndAnchorsUnchanged(
+      h1.editableDiagram,
+      h2.editableDiagram,
+      copyId,
+    )
+    const translatedCopy = structuredClone(
+      findCoonsPatch(h2.editableDiagram, copyId),
+    )
+    assert.equal(translatedCopy.id, copyId)
+    assert.equal(translatedCopy.primitive.boundarySources, undefined)
+    assert.deepEqual(
+      coonsPatchBoundaryLinkStatus(h2.editableDiagram, copyId),
+      { kind: 'static' },
+    )
+    assertBoundaryTranslated(
+      unshiftedCopy.primitive.bottom,
+      translatedCopy.primitive.bottom,
+      delta,
+    )
+    assertBoundaryTranslated(
+      unshiftedCopy.primitive.right,
+      translatedCopy.primitive.right,
+      delta,
+    )
+    assertBoundaryTranslated(
+      unshiftedCopy.primitive.top,
+      translatedCopy.primitive.top,
+      delta,
+    )
+    assertBoundaryTranslated(
+      unshiftedCopy.primitive.left,
+      translatedCopy.primitive.left,
+      delta,
+    )
+    const h1Mesh = sampleCoonsPatch(unshiftedCopy.primitive)
+    const h2Mesh = sampleCoonsPatch(translatedCopy.primitive)
+    assert.deepEqual(h2Mesh.faces, h1Mesh.faces)
+    h1Mesh.vertices.forEach((vertex, index) => {
+      assertVec3Translated(vertex, h2Mesh.vertices[index], delta, 1e-9)
+    })
+    assert.deepEqual(h2.selectedElement, { kind: 'stratum', id: copyId })
+    assert.equal(
+      h2.layerOperationStatus,
+      'Translated Coons patch by (1.25, -2.5, 3.75).',
+    )
+    assert.equal(h2.history.past.length, 2)
+    assert.deepEqual(h2.history.past[0], h0Diagram)
+    assert.deepEqual(h2.history.past[1], h1Diagram)
+    assert.deepEqual(h2.history.present, h2.editableDiagram)
+    assert.equal(h2.history.future.length, 0)
+
+    const undoTranslate = undoLastDiagramChange(h2)
+    assert.deepEqual(undoTranslate.editableDiagram, h1Diagram)
+    assert.deepEqual(
+      findCoonsPatch(undoTranslate.editableDiagram, copyId),
+      unshiftedCopy,
+    )
+    assert.deepEqual(undoTranslate.selectedElement, {
+      kind: 'stratum',
+      id: copyId,
+    })
+    assert.equal(undoTranslate.history.past.length, 1)
+    assert.deepEqual(undoTranslate.history.past[0], h0Diagram)
+    assert.deepEqual(undoTranslate.history.future, [h2Diagram])
+
+    const undoDuplicate = undoLastDiagramChange(undoTranslate)
+    assert.deepEqual(undoDuplicate.editableDiagram, h0Diagram)
+    assert.equal(
+      undoDuplicate.editableDiagram.strata.some(
+        (stratum) => stratum.id === copyId,
+      ),
+      false,
+    )
+    assert.equal(undoDuplicate.selectedElement, null)
+    assert.equal(undoDuplicate.history.past.length, 0)
+    assert.deepEqual(undoDuplicate.history.future, [h1Diagram, h2Diagram])
+
+    const redoDuplicate = redoLastDiagramChange(undoDuplicate)
+    assert.deepEqual(redoDuplicate.editableDiagram, h1Diagram)
+    assert.deepEqual(
+      findCoonsPatch(redoDuplicate.editableDiagram, copyId),
+      unshiftedCopy,
+    )
+    assert.equal(redoDuplicate.selectedElement, null)
+    assert.equal(redoDuplicate.history.future.length, 1)
+
+    const redoTranslate = redoLastDiagramChange(redoDuplicate)
+    assert.deepEqual(redoTranslate.editableDiagram, h2Diagram)
+    assert.deepEqual(
+      findCoonsPatch(redoTranslate.editableDiagram, copyId),
+      translatedCopy,
+    )
+    assert.deepEqual(
+      sampleCoonsPatch(
+        findCoonsPatch(redoTranslate.editableDiagram, copyId).primitive,
+      ),
+      h2Mesh,
+    )
+    assert.equal(redoTranslate.selectedElement, null)
+    assert.equal(redoTranslate.history.past.length, 2)
+    assert.equal(redoTranslate.history.future.length, 0)
+  } finally {
+    await server.close()
+    rmSync(cacheDir, { recursive: true, force: true })
+  }
+})
+
 test('production Inspector exposes separate controls only for one editable selected Coons patch', async () => {
   const cacheDir = mkdtempSync(join(tmpdir(), 'stratified-tikz-phase30-inspector-'))
   const server = await createServer({
@@ -1703,7 +2406,7 @@ test('production Inspector exposes separate controls only for one editable selec
     const loaded = (await server.ssrLoadModule(
       '/src/ui/inspector/EditableInspector.tsx',
     )) as {
-      EditableInspector: ComponentType<Record<string, unknown>>
+      EditableInspector: React.ComponentType<Record<string, unknown>>
     }
     const diagram = createComplexPatchDiagram(false)
     const coonsMarkup = renderInspector(
@@ -1934,7 +2637,7 @@ test('save/load, Preview, rendered/exported SVG, and both TikZ modes distinguish
   try {
     const svgModule = (await server.ssrLoadModule(
       '/src/rendering/SvgDiagram.tsx',
-    )) as { SvgDiagram: ComponentType<Record<string, unknown>> }
+    )) as { SvgDiagram: React.ComponentType<Record<string, unknown>> }
     const width = 520
     const height = 360
     const camera: SvgCamera3D = {
@@ -1946,7 +2649,7 @@ test('save/load, Preview, rendered/exported SVG, and both TikZ modes distinguish
       pan: { x: 160, y: 140 },
     }
     const svgMarkup = renderToStaticMarkup(
-      createElement(svgModule.SvgDiagram, {
+      React.createElement(svgModule.SvgDiagram, {
         diagram: fullSync,
         width,
         height,
@@ -2607,7 +3310,7 @@ function diagramWithOtherSheetKinds(diagram: Diagram): Diagram {
 }
 
 function renderInspector(
-  Inspector: ComponentType<Record<string, unknown>>,
+  Inspector: React.ComponentType<Record<string, unknown>>,
   diagram: Diagram,
   selectedElement: SelectedElement,
   layerFilter = allLayersFilter,
@@ -2615,7 +3318,7 @@ function renderInspector(
   const noOp = () => undefined
 
   return renderToStaticMarkup(
-    createElement(Inspector, {
+    React.createElement(Inspector, {
       diagram,
       selectedElement,
       layerFilter,
