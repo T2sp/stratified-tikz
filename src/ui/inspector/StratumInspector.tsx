@@ -25,6 +25,17 @@ import { StyleClipboardControls } from './StyleClipboardControls.tsx'
 import { StyleEditor } from './StyleEditor.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 import type { PathSplitTarget } from '../pathSplitting.ts'
+import { isCoonsPatchStratum } from '../coonsPatchDuplicateTranslation.ts'
+import {
+  CoonsPatchActionsEditor,
+  type DuplicateCoonsPatchActionResult,
+  type TranslateCoonsPatchActionResult,
+} from './CoonsPatchDuplicateTranslateEditor.tsx'
+import type { TranslationVector } from '../../model/translation.ts'
+import {
+  isStratumSelectableInEditor,
+  type LayerFilter,
+} from '../layerFilter.ts'
 
 export type StratumInspectorProps = {
   diagram: Diagram
@@ -37,6 +48,14 @@ export type StratumInspectorProps = {
   pasteStyleDisabled?: boolean
   onSplitPath?: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick?: (keepOriginal: boolean) => string
+  layerFilter: LayerFilter
+  onDuplicateCoonsPatch: (
+    patchId: string,
+  ) => DuplicateCoonsPatchActionResult
+  onTranslateCoonsPatch: (
+    patchId: string,
+    translation: TranslationVector,
+  ) => TranslateCoonsPatchActionResult
 }
 
 export function StratumInspector({
@@ -50,6 +69,9 @@ export function StratumInspector({
   pasteStyleDisabled = false,
   onSplitPath,
   onStartPathSplitPick,
+  layerFilter,
+  onDuplicateCoonsPatch,
+  onTranslateCoonsPatch,
 }: StratumInspectorProps) {
   return (
     <div className="inspector-content editable-inspector">
@@ -94,6 +116,16 @@ export function StratumInspector({
         stratum={stratum}
         onDiagramChange={onDiagramChange}
       />
+
+      {isCoonsPatchStratum(stratum) &&
+        isStratumSelectableInEditor(diagram, stratum, layerFilter) && (
+        <CoonsPatchActionsEditor
+          diagram={diagram}
+          patch={stratum}
+          onDuplicate={onDuplicateCoonsPatch}
+          onTranslate={onTranslateCoonsPatch}
+        />
+      )}
 
       {stratum.geometricKind === 'curve' && (
         <PathArrowEditor curve={stratum} onDiagramChange={onDiagramChange} />

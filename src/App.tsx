@@ -131,6 +131,8 @@ import {
   applyBulkDuplicateToEditorState,
   applyBulkLayerChangeToEditorState,
   applyBulkTranslateToEditorState,
+  applyDuplicateCoonsPatchToEditorState,
+  applyTranslateCoonsPatchToEditorState,
   applyCoordinateAnchorDragToEditorState,
   applyCoordinateAnchorTranslateToEditorState,
   applyConcatenateSelectedPathsToEditorState,
@@ -2228,6 +2230,75 @@ function App() {
     setSelectedPathIntersectionCandidateId(null)
     setSheetStatus('')
     setCopyStatus('idle')
+  }
+
+  function duplicateCurrentCoonsPatch(patchId: string) {
+    const result = applyDuplicateCoonsPatchToEditorState(editorState, patchId)
+
+    if (!result.ok) {
+      setLayerOperationStatus(result.message)
+      return result
+    }
+
+    setEditorState(result.state)
+    setInspectorDisclosure((current) =>
+      setInspectorDisclosureExpanded(
+        current,
+        { kind: 'stratum', id: result.duplicatedPatchId },
+        true,
+      ),
+    )
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return {
+      ok: true as const,
+      duplicatedPatchId: result.duplicatedPatchId,
+      message: result.message,
+    }
+  }
+
+  function translateCurrentCoonsPatch(
+    patchId: string,
+    translation: TranslationVector,
+  ) {
+    const result = applyTranslateCoonsPatchToEditorState(
+      editorState,
+      patchId,
+      translation,
+    )
+
+    if (!result.ok) {
+      setLayerOperationStatus(result.message)
+      return result
+    }
+
+    setEditorState(result.state)
+    setInspectorDisclosure((current) =>
+      setInspectorDisclosureExpanded(
+        current,
+        { kind: 'stratum', id: result.patchId },
+        true,
+      ),
+    )
+    setPolylineStatus('')
+    setCubicBezierStatus('')
+    setPathStatus('')
+    setPathCrossingStatus('')
+    setSelectedPathIntersectionCandidateId(null)
+    setSheetStatus('')
+    setCopyStatus('idle')
+
+    return {
+      ok: true as const,
+      patchId: result.patchId,
+      message: result.message,
+    }
   }
 
   function startStyleEyedropper(): void {
@@ -6385,6 +6456,7 @@ function App() {
           <EditableInspector
             diagram={editableDiagram}
             selectedElement={selectedElement}
+            layerFilter={layerFilter}
             onDiagramChange={updateEditableDiagram}
             expanded={isInspectorExpanded}
             onExpandedChange={updateInspectorExpanded}
@@ -6401,6 +6473,8 @@ function App() {
             onBulkConcatenatePaths={concatenateCurrentSelection}
             onSplitPath={splitCurrentPath}
             onStartPathSplitPick={startPathSplitPick}
+            onDuplicateCoonsPatch={duplicateCurrentCoonsPatch}
+            onTranslateCoonsPatch={translateCurrentCoonsPatch}
           />
         </div>
       </aside>

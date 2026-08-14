@@ -1,6 +1,8 @@
 import {
+  detectScalarExpressionVariables,
   evaluateScalarExpression,
   parseScalarExpression,
+  type ParsedScalarExpression,
 } from './scalarExpressions.ts'
 import {
   coordinateComponentPreviewValue,
@@ -41,7 +43,10 @@ export type TranslationVector = SymbolicVec3
 export type DiagramTranslationContext = {
   ambientDimension: AmbientDimension
   coordinateExpressionContext: CoordinateExpressionContext
+  previewPolicy: TranslationPreviewPolicy
 }
+
+export type TranslationPreviewPolicy = 'evaluateExpressions' | 'preserveStored'
 
 export type ParseTranslationVectorInput = {
   dx: string
@@ -68,6 +73,7 @@ const previewValueEpsilon = 1e-9
 
 export function diagramTranslationContext(
   diagram: Diagram,
+  previewPolicy: TranslationPreviewPolicy = 'evaluateExpressions',
 ): DiagramTranslationContext {
   const resolved = resolveSymbolicVariables(diagram.variables ?? [])
 
@@ -86,6 +92,7 @@ export function diagramTranslationContext(
       variableNames: resolved.variables.map((variable) => variable.name),
       previewValues: resolved.values,
     },
+    previewPolicy,
   }
 }
 
@@ -177,23 +184,43 @@ export function normalizeTranslationVectorForDiagram(
   translation: TranslationVector,
   options: NormalizeTranslationVectorOptions = {},
 ): TranslationVector {
-  assertFiniteTranslationPreview(translation)
+  const expressionContext = diagramTranslationContext(diagram)
+    .coordinateExpressionContext
+  const normalized = {
+    x: normalizeTranslationComponent(
+      translation.x,
+      expressionContext,
+      'dx',
+    ),
+    y: normalizeTranslationComponent(
+      translation.y,
+      expressionContext,
+      'dy',
+    ),
+    z: normalizeTranslationComponent(
+      translation.z,
+      expressionContext,
+      'dz',
+    ),
+  }
+
+  assertFiniteTranslationPreview(normalized)
 
   if (
     diagram.ambientDimension === 2 &&
     options.reject2DNonZeroZ === true &&
-    !numbersApproximatelyEqual(coordinateComponentPreviewValue(translation.z), 0)
+    !numbersApproximatelyEqual(coordinateComponentPreviewValue(normalized.z), 0)
   ) {
     throw new Error('2D layer translation does not allow dz.')
   }
 
   return diagram.ambientDimension === 2
     ? {
-        x: cloneCoordinateComponent(translation.x),
-        y: cloneCoordinateComponent(translation.y),
+        x: cloneCoordinateComponent(normalized.x),
+        y: cloneCoordinateComponent(normalized.y),
         z: numericCoordinateComponent(0),
       }
-    : cloneTranslationVector(translation)
+    : cloneTranslationVector(normalized)
 }
 
 export function translationVectorPreview(
@@ -264,6 +291,7 @@ export function translateVec3(
 
   if (point.symbolic?.source?.kind === 'workPlaneLocal') {
     return translateWorkPlaneLocalVec3(
+      point,
       point.symbolic.source,
       translation,
       context,
@@ -276,13 +304,13 @@ export function translateVec3(
           x: translateCoordinateComponent(
             coordinateComponentForPoint(point, 'x'),
             translation.x,
-            context.coordinateExpressionContext,
+            context,
             'x',
           ),
           y: translateCoordinateComponent(
             coordinateComponentForPoint(point, 'y'),
             translation.y,
-            context.coordinateExpressionContext,
+            context,
             'y',
           ),
           z: numericCoordinateComponent(0),
@@ -291,19 +319,19 @@ export function translateVec3(
           x: translateCoordinateComponent(
             coordinateComponentForPoint(point, 'x'),
             translation.x,
-            context.coordinateExpressionContext,
+            context,
             'x',
           ),
           y: translateCoordinateComponent(
             coordinateComponentForPoint(point, 'y'),
             translation.y,
-            context.coordinateExpressionContext,
+            context,
             'y',
           ),
           z: translateCoordinateComponent(
             coordinateComponentForPoint(point, 'z'),
             translation.z,
-            context.coordinateExpressionContext,
+            context,
             'z',
           ),
         }
@@ -441,6 +469,45 @@ function parseTranslationComponent(
             previewValue: evaluated.value,
           }
         : numericCoordinateComponent(evaluated.value),
+  }
+}
+
+function normalizeTranslationComponent(
+  component: CoordinateComponent,
+  context: CoordinateExpressionContext,
+  label: 'dx' | 'dy' | 'dz',
+): CoordinateComponent {
+  if (component.kind === 'numeric') {
+    if (!Number.isFinite(component.value)) {
+      throw new Error(`${label} must have a finite preview value.`)
+    }
+
+    return numericCoordinateComponent(component.value)
+  }
+
+  const parsed = parseScalarExpression(component.expression, {
+    variables: context.variableNames,
+  })
+
+  if (!parsed.ok) {
+    throw new Error(`${label}: ${parsed.error}`)
+  }
+
+  const evaluated = evaluateScalarExpression(
+    parsed.expression,
+    context.previewValues,
+  )
+
+  if (!evaluated.ok || !Number.isFinite(evaluated.value)) {
+    throw new Error(
+      `${label}: ${evaluated.ok ? 'expression must have a finite preview value.' : evaluated.error}`,
+    )
+  }
+
+  return {
+    kind: 'symbolic',
+    expression: component.expression,
+    previewValue: evaluated.value,
   }
 }
 
@@ -771,7 +838,7 @@ function snapshotIsCoonsConstantPointBoundary(
 function translateCoordinateComponent(
   component: CoordinateComponent,
   delta: CoordinateComponent,
-  context: CoordinateExpressionContext,
+  context: DiagramTranslationContext,
   axis: 'x' | 'y' | 'z',
 ): CoordinateComponent {
   if (component.kind === 'numeric' && delta.kind === 'numeric') {
@@ -785,31 +852,87 @@ function translateCoordinateComponent(
   }
 
   const expression = additionExpression(component, delta)
+  const preservedPreview =
+    coordinateComponentPreviewValue(component) +
+    coordinateComponentPreviewValue(delta)
+
+  if (
+    context.previewPolicy === 'preserveStored' &&
+    !Number.isFinite(preservedPreview)
+  ) {
+    throw new Error(`Translation would create a non-finite coordinate on ${axis}.`)
+  }
   const parsed = parseScalarExpression(expression, {
-    variables: context.variableNames,
+    variables:
+      context.previewPolicy === 'preserveStored'
+        ? frozenTranslationVariableNames(
+            component,
+            delta,
+            context.coordinateExpressionContext,
+          )
+        : context.coordinateExpressionContext.variableNames,
   })
 
   if (!parsed.ok) {
     throw new Error(`${axis} translation expression is invalid: ${parsed.error}`)
   }
 
-  const evaluated = evaluateScalarExpression(
-    parsed.expression,
-    context.previewValues,
-  )
+  const previewValue =
+    context.previewPolicy === 'preserveStored'
+      ? preservedPreview
+      : evaluatedTranslationExpressionPreview(
+          parsed.expression,
+          context.coordinateExpressionContext,
+          axis,
+        )
+
+  return {
+    kind: 'symbolic',
+    expression,
+    previewValue,
+  }
+}
+
+function evaluatedTranslationExpressionPreview(
+  expression: ParsedScalarExpression,
+  context: CoordinateExpressionContext,
+  axis: 'x' | 'y' | 'z',
+): number {
+  const evaluated = evaluateScalarExpression(expression, context.previewValues)
 
   if (!evaluated.ok) {
     throw new Error(`${axis} translation expression is invalid: ${evaluated.error}`)
   }
 
-  return {
-    kind: 'symbolic',
-    expression,
-    previewValue: evaluated.value,
+  return evaluated.value
+}
+
+function frozenTranslationVariableNames(
+  component: CoordinateComponent,
+  delta: CoordinateComponent,
+  context: CoordinateExpressionContext,
+): string[] {
+  const names = new Set(context.variableNames)
+
+  for (const candidate of [component, delta]) {
+    if (candidate.kind !== 'symbolic') {
+      continue
+    }
+
+    const detected = detectScalarExpressionVariables(candidate.expression)
+
+    if (!detected.ok) {
+      throw new Error(`Translation expression is invalid: ${detected.error}`)
+    }
+
+    detected.variables.forEach((name) => names.add(name))
   }
+
+  return [...names]
 }
 
 function translateWorkPlaneLocalVec3(
+  point: Vec3,
   source: WorkPlaneLocalCoordinateSource,
   translation: TranslationVector,
   context: DiagramTranslationContext,
@@ -819,6 +942,31 @@ function translateWorkPlaneLocalVec3(
     translation,
     context,
   )
+  if (context.previewPolicy === 'preserveStored') {
+    const translationPreview = translationVectorPreview(translation)
+    const preview = {
+      x: point.x + translationPreview.x,
+      y: point.y + translationPreview.y,
+      z: point.z + translationPreview.z,
+    }
+
+    if (!isFiniteVec3(preview)) {
+      throw new Error(
+        'Translation would create a non-finite work-plane-local coordinate.',
+      )
+    }
+
+    return {
+      ...preview,
+      symbolic: {
+        x: numericCoordinateComponent(preview.x),
+        y: numericCoordinateComponent(preview.y),
+        z: numericCoordinateComponent(preview.z),
+        source: translatedSource,
+      },
+    }
+  }
+
   const evaluated = evaluateWorkPlaneLocalCoordinate(
     translatedSource,
     context.coordinateExpressionContext,
@@ -863,11 +1011,11 @@ function additionExpression(
   component: CoordinateComponent,
   delta: CoordinateComponent,
 ): string {
-  if (delta.kind === 'numeric' && numbersApproximatelyEqual(delta.value, 0)) {
+  if (delta.kind === 'numeric' && delta.value === 0) {
     return coordinateComponentExpression(component)
   }
 
-  if (component.kind === 'numeric' && numbersApproximatelyEqual(component.value, 0)) {
+  if (component.kind === 'numeric' && component.value === 0) {
     return coordinateComponentExpression(delta)
   }
 

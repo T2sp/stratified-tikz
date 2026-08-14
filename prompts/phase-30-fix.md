@@ -1,4 +1,4 @@
-# Phase 30 Fix Prompt: Harden Coons duplicate-and-translate atomicity and independence
+# Phase 30 Targeted Fix Prompt: Reject rounded-away Coons translation and cover H1 serialization
 
 ## Environment
 
@@ -21,693 +21,679 @@ PATH=/opt/homebrew/bin:$PATH node --test \
 
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
+
+PATH=/opt/homebrew/bin:$PATH npx eslint \
+  src/model/translation.ts \
+  src/ui/coonsPatchDuplicateTranslation.ts \
+  src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx \
+  tests/integration/phase30CoonsDuplicateTranslate.test.ts
+
 git diff --check
 ```
 
-If the focused file has a different implemented name, use that exact file in
-the focused command and report it.
-
-Run lint only if the repository is already established as repository-wide
-lint-clean:
-
-```bash
-PATH=/opt/homebrew/bin:$PATH npm run lint
-```
+If another production file changes, include it in a targeted lint probe and
+report the exact command and result. Repository-wide pre-existing lint debt is
+not a Phase 30 gate. Do not perform broad lint cleanup.
 
 Do not add dependencies.
 
-## Project context
+## Latest review findings
 
-You are hardening Phase 30 of StratifiedTikZ:
+The latest Phase 30 review found no Critical issue and no Low-priority issue.
+It found exactly two Medium issues.
 
-```text
-https://github.com/T2sp/stratified-tikz
-```
+### Medium 1: a finite non-zero Translate can succeed without moving geometry
 
-Phase 30 adds one Inspector action for a singly selected Coons patch:
+`translateCoonsPatch` accepts a normalized finite non-zero vector and can
+return success even when IEEE-754 addition rounds every requested movement
+away. Numeric translation currently rejects non-finite results, but it does
+not reject a finite addition whose result is the same representable number as
+its input.
 
-```text
-Duplicate & translate
-```
-
-The intended operation is narrow:
-
-- deep-copy the selected patch's current materialized geometry;
-- remove active links from the copy;
-- translate all four copied boundaries by one global 3D vector;
-- append one static patch;
-- select that copy;
-- commit exactly one history transaction.
-
-This fix prompt is for auditing and correcting the initial Phase 30
-implementation. Verify each failure mode against production code and tests
-before changing behavior. Do not perform a broad rewrite when the existing code
-already satisfies a requirement.
-
-## Required reading before fixing
-
-Inspect at least:
-
-- `AGENTS.md`;
-- `prompts/phase-30-implement.md`;
-- `prompts/phase-29-implement.md`;
-- `prompts/phase-29-fix.md`;
-- the Phase 30 implementation diff;
-- any Phase 30 review findings available on the branch;
-- `src/model/types.ts`;
-- `src/model/coonsPatchLinks.ts`;
-- `src/model/translation.ts`;
-- `src/model/diagramIds.ts`;
-- `src/model/coordinateReferences.ts`;
-- `src/ui/bulkEditing.ts`;
-- the implemented Phase 30 operation helper;
-- `src/ui/undo.ts`;
-- the Inspector component containing the new form;
-- the App-level production callback used by that form;
-- Phase 24 duplicate/translation tests;
-- Phase 26 ID reservation tests;
-- Phase 27 sampled Coons coordinate-reference tests;
-- Phase 29 linked/stale/synchronization/duplication tests;
-- Phase 30 tests;
-- `package.json`.
-
-Search for:
-
-- every call to the Phase 30 operation helper;
-- every `boundarySources` mutation in the new path;
-- every diagram commit made by one button click;
-- every translation of `bottom`, `right`, `top`, and `left`;
-- `boundarySnapshotState` handling;
-- ID allocation and copy selection;
-- any UI test that only reads source code instead of exercising behavior.
-
-## Required Phase 30 contract
-
-The final behavior must be:
+The review reproduced the defect with a valid static constant-point Coons
+patch whose four boundary points all have `x = 1e16`:
 
 ```text
-original patch: unchanged
-original boundary sources: unchanged
-translated copy: deep-cloned, static, and independent
-history: one entry
+translation = (1, 0, 0)
+helper result = success
+editor action result = success
+materialized x coordinates = unchanged
+diagram JSON = unchanged
+success status = shown
+history entries added = 0
 ```
 
-For all original states:
+The history layer correctly suppresses a JSON-equal candidate. The defect is
+that the Coons Translate operation reports success even though it produced no
+representable geometric translation and therefore no required history entry.
 
-| Original patch | Original after action | Translated copy |
-| --- | --- | --- |
-| Static | Static, unchanged | Static |
-| Linked — up to date | Linked, unchanged | Static |
-| Linked — stale | Linked and stale, unchanged | Static frozen fallback |
+### Medium 2: actual H1 Duplicate states are not serialized
 
-The table above is normative.
+Focused tests cover the static, healthy-linked, and stale-linked Duplicate
+state matrix, but every existing Phase 30 save/load assertion serializes an H2
+state after Translate. There is no save/load test for the actual untranslated
+H1 state immediately after Duplicate.
 
-Do not preserve active `boundarySources` on the translated copy.
+No production persistence defect was observed. This is a verified high-risk
+coverage gap for Phase 29 link metadata and frozen fallback data at the Phase
+30 H1 boundary.
 
-Do not solve the link/translation conflict by:
+## What the review confirmed correct
 
-- duplicating source paths or points;
-- moving original sources;
-- adding a persistent offset;
-- teaching the synchronizer to apply transforms;
-- bypassing synchronization in rendering;
-- changing generic Phase 29 patch-only duplication semantics.
+Preserve the following behavior and coverage. Do not reimplement it unless a
+new regression exposes a concrete defect:
+
+- Inspector exposes independent `Duplicate` and `Translate` actions;
+- the Phase 30 review gate describes that split contract;
+- the focused regression traverses the real production callback chain from
+  the Inspector controls through `App`;
+- `Duplicate` reuses Phase 29 patch-only duplication, deep cloning,
+  deterministic global ID allocation, and linked/frozen snapshot semantics;
+- `Translate` replaces the selected patch at the same ID and index and removes
+  `boundarySources` before central synchronization;
+- stale symbolic translation uses stored frozen previews plus the delta and
+  does not re-evaluate changed variables;
+- source paths, source points, coordinate anchors, and unrelated strata remain
+  unchanged;
+- static, healthy-linked, and stale-linked operation matrices are covered;
+- eligibility, hidden/locked/filter behavior, selection, deterministic IDs,
+  atomic failure, and two-step Undo/Redo are covered;
+- H0 -> H1 -> H2 production behavior is covered;
+- save/load and synchronization remain snapshot-based;
+- generic Phase 29 duplication semantics remain unchanged;
+- Preview and rendered SVG assertions use actual translated coordinates;
+- standalone and inline-math TikZ assertions use actual translated
+  coordinates;
+- documentation, automation prompt resolution, and the Phase 30 slug are
+  correct;
+- no schema change or dependency was introduced;
+- the previously reported unused imports and callback-chain coverage gap are
+  resolved.
+
+All existing regressions must remain passing. They are preservation
+requirements, not invitations to broaden this fix.
 
 ## Goal
 
-Audit and fix Phase 30 so that:
+Make only these two targeted changes:
 
-1. The real Inspector action is correctly gated and wired.
-2. Linked and stale copies are static before the central synchronizer sees the
-   candidate diagram.
-3. All copied geometry is deep-cloned and translated exactly once.
-4. Frozen stale symbolic previews do not drift.
-5. IDs are globally unique.
-6. Invalid input is atomic.
-7. One click creates one history entry.
-8. Preview, JSON, SVG, and TikZ remain consistent.
-9. Regression coverage exercises production behavior rather than implementation
-   text.
+1. Make Coons Translate reject atomically when a requested non-zero movement
+   cannot be represented for required translated geometry, so `ok: true`
+   always corresponds to real geometric movement and one normal history
+   commit.
+2. Add genuine pre-Translate H1 save/load and post-load synchronization tests
+   for static, healthy-linked, and stale-linked Duplicate results.
 
-## 1. Verify production Inspector wiring
+Do not change the successful Duplicate/Translate product semantics described
+above.
 
-The new section must be shown only when the current selection resolves to one
-stratum with:
+## Required reading before fixing
 
-```ts
-geometricKind === 'sheet'
-kind === 'curvedSheet'
-primitive.kind === 'coonsPatch'
-```
+Read at least:
 
-Check that the section is absent for:
+- `AGENTS.md`;
+- this prompt in full;
+- `prompts/phase-30-implement.md` as historical context;
+- `prompts/phase-30-review.md`, whose reconciled split contract remains the
+  release gate;
+- the latest Phase 30 review report if it is available in the execution
+  context; otherwise use this prompt's `Latest review findings` section as the
+  authoritative summary;
+- `src/ui/coonsPatchDuplicateTranslation.ts`, especially
+  `translateCoonsPatch` and the editor-state action that commits its result;
+- `src/model/translation.ts`, especially numeric coordinate addition, Coons
+  boundary traversal, stored-preview handling, and frame translation;
+- `src/ui/undo.ts`, especially equality suppression in
+  `commitDiagramChange`;
+- the Coons validation, sampling, link-status, synchronization, and
+  serialization/parsing code used by Phase 29 and Phase 30;
+- `tests/integration/phase30CoonsDuplicateTranslate.test.ts`, including the
+  Duplicate state matrix, H0 -> H1 -> H2 callback-chain test, history tests,
+  save/load tests, synchronization tests, and SVG/TikZ coordinate assertions;
+- the relevant Phase 29 linked-Coons regression tests;
+- `package.json`, including the explicit `npm test` registration.
 
-- no selection;
-- multi-selection;
-- coordinate selections;
-- free text labels;
-- points and curves;
-- polygon/work-plane-filled sheets;
-- ruled surfaces;
-- hemispheres and saddles.
+Inspect the actual production code and assertions. Do not infer coverage from
+test names or passing counts.
 
-The form must call the production App/editor-state path. It is not enough for a
-button to render or for a source-text regex to find its label.
+## State terminology
 
-Verify:
+Use these names consistently in tests and the implementation report:
 
-- `dx`, `dy`, and `dz` draft state is local UI state;
-- the fields allow temporary incomplete strings;
-- changing selection does not show stale success/error text for the next patch;
-- the action respects existing hidden/locked/filter editability;
-- success selects the returned duplicate ID;
-- no Phase 30 draft or status is serialized.
+- **H0**: the selected original Coons patch before Duplicate;
+- **H1**: the untranslated duplicate immediately after Duplicate and before
+  any Translate call;
+- **H2**: the same selected duplicate after a successful Translate.
 
-If the callback currently updates only `Diagram` and cannot select the copy,
-introduce the smallest typed App/editor callback needed. Do not redesign all
-Inspector state.
+H1 is not interchangeable with an H2 patch translated by a zero vector or a
+detached H2 fixture. The new persistence tests must serialize real production
+H1 results.
 
-## 2. Fix linked-copy snap-back
+## 1. Reject representationally rounded-away translation
 
-Inspect the candidate diagram immediately before `commitDiagramChange`.
+### Success postcondition
 
-The duplicate must already omit:
+A finite normalized vector with at least one non-zero component is necessary,
+but it is not sufficient for Coons Translate success.
 
-```ts
-primitive.boundarySources
-```
+For every non-zero translation axis, every materialized spatial coordinate or
+stored spatial preview that the Coons translation contract requires to move
+must have a different representable value after applying that component. If a
+required addition is swallowed by IEEE-754 rounding, reject the complete
+operation.
 
-If links are removed only after the commit, the central Phase 29 synchronizer
-can rematerialize the copy from untranslated original sources. That ordering is
-incorrect.
-
-Correct ordering:
-
-```text
-clone
--> assign fresh ID
--> remove active boundarySources on clone
--> translate clone
--> validate
--> append
--> one commit
-```
-
-After the fix, test all of these events against the translated copy:
-
-- edit an original linked source;
-- delete an original linked source;
-- repair a stale original;
-- invoke changed-source synchronization;
-- invoke full synchronization;
-- save and reload JSON;
-- Undo and Redo.
-
-None may move the static copy or recreate its active links.
-
-Keep optional snapshot `id`, `sourceId`, and `name` provenance unless current
-validation requires a documented normalization. These are not active links.
-
-## 3. Fix stale/frozen copy semantics
-
-For a linked stale original, use the exact displayed last-valid snapshots.
-
-Do not:
-
-- require missing/broken sources to resolve before copying;
-- partially rebuild valid roles;
-- refresh frozen symbolic previews against current diagram variables;
-- clear `boundarySnapshotState: 'frozen'` merely because links were detached;
-- replace stale snapshots with invalid current source geometry.
-
-The static translated copy must preserve:
-
-```ts
-boundarySnapshotState: 'frozen'
-```
-
-and translate the stored authoritative preview geometry.
-
-### Frozen symbolic regression
-
-Create a linked patch whose last-valid snapshot contains a symbolic expression,
-then make the patch stale and change the variable so the expression's current
-evaluation differs from the frozen preview.
-
-For numeric delta `d`, require:
+For example:
 
 ```text
-translated frozen preview = stored frozen preview + d
+1e16 + 1 === 1e16
 ```
 
-not:
+Therefore a patch containing a required world-space coordinate at `1e16`
+cannot be translated successfully by `dx = 1`, even if another smaller
+coordinate in the same patch would change.
 
-```text
-translated frozen preview = reevaluate(expression, current variables) + d
-```
+Do not define success using only one of these weak checks:
 
-Preserve a valid symbolic addition expression and provenance where the shared
-model supports it. If the standard translation engine cannot distinguish frozen
-preview authority, add a narrow explicit translation policy and test it. Do not
-use raw unvalidated expression strings.
+- the input vector is finite and non-zero;
+- the whole primitive is structurally different;
+- the whole diagram JSON is different;
+- `boundarySources` or coordinate-reference metadata was removed;
+- a symbolic expression string changed;
+- at least one point or one axis changed;
+- the history helper happened to accept a candidate.
 
-## 4. Fix complete geometry translation
+Those checks can allow a partial, non-uniform, or metadata-only result to be
+reported as a successful translation.
 
-Audit the operation for partial or double translation.
+### Geometry that must be checked
 
-Every copy must translate exactly once:
+Apply the representability postcondition to the same world-space data that the
+existing Coons translation traversal is required to translate exactly once,
+including, as applicable:
 
-- all `bottom` geometry;
-- all `right` geometry;
-- all `top` geometry;
-- all `left` geometry;
-- constant-point boundary points;
+- `bottom`, `right`, `top`, and `left` materialized boundary snapshots;
+- constant-point boundary coordinates;
 - line endpoints;
 - cubic endpoints and control points;
-- arc/frame origins and absolute points;
-- concatenated/sampled-template snapshot segments;
-- work-plane-local stored frame origins.
+- arc and other absolute path points;
+- concatenated or sampled-template path geometry stored in snapshots;
+- numeric previews carried by symbolic coordinate components;
+- frozen stored previews when `preserveStored` is required;
+- translated frame origins;
+- the materialized/sampled Coons geometry used by Preview and export.
 
-Do not translate:
+Do not require intentionally invariant data to change:
 
-- frame `u`;
-- frame `v`;
-- frame `normal`;
-- local `a`/`b` values when translating their frame origin;
-- source paths, source points, or coordinate anchors;
-- the original patch.
+- frame basis vectors `u`, `v`, and `normal`;
+- work-plane-local `a` and `b` coordinates when translation is represented by
+  moving the frame origin;
+- topology, sampling counts, role ordering, orientation, reversal, style, or
+  other non-spatial metadata;
+- axes whose normalized delta component is zero.
 
-Use the shared translation engine. If the Phase 30 helper manually walks only
-some boundary kinds, replace that duplication with the existing typed helper or
-extract one shared helper.
+Use exact representable `Number` equality for the swallowed-addition check. A
+required movement is rounded away when its post-addition value is equal to its
+pre-addition value with `after === before`; treat `-0` and `0` as the same
+geometric value. Do not use an epsilon or an approximate model-comparison
+helper for this check, because that could reject a small but representable
+movement. Also do not require `(after - before) === delta`, because the
+subtraction itself may round.
 
-Validate the full candidate after translation:
+If sampling is derived rather than stored, establish with focused assertions
+or an equivalent invariant from the checked primitive that the resulting mesh
+moves. The production fix need not add a second broad sampling traversal when
+the materialized-coordinate check already proves the same postcondition.
+`ok: true` must not produce a Preview/export mesh that stayed fixed on a
+requested non-zero axis.
 
-- all coordinates finite;
-- all path snapshots valid/composable;
-- every Coons corner equation holds;
-- sampling remains valid;
-- sampled mesh finite;
-- candidate diagram valid.
+### Safe comparison boundary
 
-For numeric data, assert:
+For linked or coordinate-referenced patches, link removal and reference
+detachment are preparation steps, not geometric movement. Prefer this logical
+ordering on a cloned candidate:
 
-```text
-copyMesh[i] = originalMaterializedMesh[i] + delta
-```
+1. locate and validate the selected editable Coons patch;
+2. normalize and validate the requested vector;
+3. clone the selected patch/diagram candidate;
+4. remove only the candidate patch's active `boundarySources` as required by
+   the existing Translate contract;
+5. apply the existing coordinate-reference detachment policy;
+6. capture the candidate's materialized geometric baseline;
+7. translate through the shared symbolic/frozen-aware machinery;
+8. verify every required non-zero-axis movement against that baseline;
+9. validate the translated primitive and complete diagram;
+10. return success for one normal commit.
 
-for every sampled vertex within the existing tolerance.
+This ordering prevents link removal, reference detachment, or expression
+metadata from being mistaken for translation. It also keeps the original
+diagram and its links available for an atomic failure return.
 
-## 5. Fix shallow copies and metadata loss
+The exact internal helper shape may differ, but preserve the same observable
+ordering and atomicity.
 
-Check identity as well as deep equality.
+### Atomic failure behavior
 
-The original and copy must not share mutable nested objects for:
+When any required movement is not representable:
 
-- stratum;
-- style;
-- primitive;
-- sampling;
-- each boundary snapshot;
-- segment arrays;
-- segments;
-- endpoints and controls;
-- constant-point coordinates;
-- retained symbolic/source metadata.
+- return a typed failure, not `ok: true`;
+- return or retain the original diagram without committing the candidate;
+- do not append, replace, detach, or partially translate a stratum;
+- preserve stratum count, order, and every ID;
+- preserve the selected patch and selection ID;
+- preserve healthy or stale `boundarySources` and
+  `boundarySnapshotState` exactly;
+- preserve frozen snapshots and stored previews exactly;
+- preserve all source strata and coordinate anchors;
+- preserve `history.present`, `history.past`, and `history.future` exactly;
+- do not allocate an ID;
+- do not show the previous translation-success status;
+- return a useful precision/representability error in `result.message`.
 
-Preserve:
+Under the current helper convention,
+`applyTranslateCoonsPatchToEditorState` must return `ok: false` and its exact
+input `state` while carrying the precision error in `result.message`. The
+`App`/Inspector may display that message as transient UI status outside the
+failed editor-state transition, but it must never display the translated
+success message. Diagram, selection, link, and history state must not change.
 
-- name under the existing ordinary duplicate policy;
-- codimension 1;
-- `geometricKind: 'sheet'`;
-- `kind: 'curvedSheet'`;
-- layer;
-- style and opacity;
-- imported/local style metadata;
-- attached label metadata;
-- sampling;
-- role ordering and orientation;
-- frozen snapshot state where required.
-
-After creating the copy, mutate it through a normal editor operation and prove
-the original remains byte-for-byte or semantically unchanged.
-
-## 6. Fix global ID allocation
-
-Do not allocate by checking only `diagram.strata` or by always appending one
-literal suffix.
-
-Reuse the established global allocator and reserve all IDs covered by current
-policy, including:
-
-- strata;
-- labels;
-- coordinate anchors;
-- dangling linked-Coons path/point source IDs;
-- IDs allocated earlier in the same operation.
-
-Add collision tests such as:
-
-```text
-patch
-patch-copy       (label)
-patch-copy-1     (coordinate anchor)
-patch-copy-2     (dangling linked source ID)
-```
-
-and verify the next deterministic unused ID is chosen.
-
-Repeated clicks and Undo/Redo must never cause duplicate top-level IDs.
-
-Do not regenerate optional boundary snapshot provenance IDs as top-level IDs.
-
-## 7. Fix input validation and atomic failure
-
-Reuse the existing translation parser and scalar-expression rules.
-
-Required behavior:
-
-- incomplete drafts such as ``, `.`, `-`, and `1e` remain editable;
-- invalid drafts show warnings;
-- `NaN` and `Infinity` are rejected;
-- unknown variables are rejected;
-- non-finite evaluated expressions are rejected;
-- zero translation is rejected with `Enter a non-zero translation.`;
-- direct Inspector input does not use cursor snap;
-- invalid input never calls the diagram mutation path.
-
-For every failure, assert:
-
-- same diagram data;
-- no appended copy;
-- original untouched;
-- selection unchanged;
-- history lengths unchanged;
-- no success status.
-
-If translation fails after cloning, discard the local candidate and return the
-original diagram. Never expose a partially translated copy.
-
-## 8. Fix history and selection atomicity
-
-One button click must call the central commit path once with the complete final
-diagram.
-
-Disallowed sequences:
+An appropriate user-facing explanation is equivalent to:
 
 ```text
-commit duplicate
-commit detach
-commit translate
+Translation is too small to change this Coons patch at its current coordinate scale.
 ```
 
-or:
+Use existing typed result and status conventions; do not add a new persistence
+field for the error.
 
-```text
-commit duplicate
-React effect translates it later
-```
+### Forbidden workarounds
 
-Required history behavior:
+Do not fix this issue by:
 
-- successful action adds exactly one `past` entry;
-- one Undo removes the copy and preserves the original;
-- missing-copy selection is cleaned on Undo;
-- one Redo restores the exact same duplicate ID and geometry;
-- selection after Redo follows current history policy and is valid;
-- repeated Undo/Redo does not drift geometry, regenerate IDs, or append copies;
-- no separate linked-synchronization history entry exists.
+- forcing a history entry for a JSON-equal diagram;
+- weakening `commitDiagramChange` equality suppression;
+- returning success because links or metadata changed;
+- rounding, clamping, or silently changing the requested vector;
+- applying an arbitrary epsilon;
+- moving a coordinate to a neighboring float with `nextUp`/`nextDown` instead
+  of applying the requested delta;
+- introducing arbitrary-precision arithmetic or a new numeric model;
+- accepting partial movement when another required coordinate rounded away;
+- treating all large coordinates or all small deltas as invalid;
+- special-casing only the literal values `1e16` and `1`;
+- committing detachment first and translation in a second transaction.
 
-Do not broaden Phase 30 into general selection-history persistence.
+The operation must either represent the requested uniform translation under
+the existing numeric model or fail atomically.
 
-## 9. Fix rendering, export, and save/load regressions
+### Implementation locality
 
-Sampling, rendering, and export must continue consuming materialized snapshots.
+Prefer a small typed Coons-operation preflight or postcondition near
+`translateCoonsPatch`. Change shared `src/model/translation.ts` only if that is
+the smallest correct design and all affected translation consumers are
+regressed.
 
-Do not pass the whole `Diagram` into `sampleCoonsPatch` and do not add source
-lookup to:
+Do not turn this targeted fix into a repository-wide floating-point policy
+rewrite. Existing ordinary-scale, symbolic, frozen, 2D, work-plane, and all-role
+translation behavior must continue to pass.
 
-- SVG scene preparation;
-- curved-sheet mesh rendering;
-- SVG export;
-- TikZ generation.
+## 2. Add actual H1 serialization coverage
 
-Verify:
+Use the production Duplicate operation to create each H1 fixture. Serialize
+and parse that diagram immediately, before calling Translate.
 
-- original and copy are both present in Preview;
-- the copy's isolated world-space mesh is translated;
-- SVG export contains translated copy geometry;
-- TikZ uses translated snapshots;
-- layer/style/opacity/sampling remain unchanged;
-- JSON round-trip retains a static copy;
-- frozen static copy previews do not refresh or drift on load;
-- standalone TikZ remains readable;
-- inline-math output contains no blank lines;
-- TikZ indentation remains 4 spaces.
+For all three cases below, assert at least:
 
-Do not change the Coons formula, mesh topology, or visibility algorithm.
+- parsing succeeds through the production save/load path;
+- the loaded diagram validates;
+- ambient dimension and diagram-level data are preserved;
+- top-level stratum count, order, and IDs are exact;
+- the original patch remains present and unchanged;
+- the duplicate retains its exact new ID;
+- the duplicate is still untranslated;
+- all four materialized boundary snapshots are semantically exact;
+- style, opacity, name policy, layer, sampling, `codim`, `geometricKind`, and
+  Coons primitive kind are preserved;
+- no source stratum or coordinate anchor was duplicated or moved;
+- a normal full synchronization after load preserves the expected H1 state.
 
-## Behavioral regression strategy
+Diagram persistence does not include Inspector drafts, selection, or undo
+history. Do not add them to the schema or assert that they round-trip.
 
-Tests must exercise production behavior.
+### Static H1
 
-Preferred order:
+Create a static H0 patch and invoke Duplicate only.
 
-1. Use an existing component/interaction harness if available.
-2. Otherwise exercise the production App controller/editor-state helper used by
-   the real Inspector callback.
-3. If behavior is trapped inside React, extract the smallest pure typed helper
-   and make both production and tests call it.
+Before and after save/load, assert:
 
-Do not satisfy behavioral coverage by:
+- the original and duplicate are static;
+- the duplicate has no `boundarySources`;
+- the duplicate's snapshots equal the untranslated H0 materialized snapshots;
+- the duplicate's snapshots are independent model data, not aliased mutable
+  objects before serialization;
+- derived status is exactly `static`;
+- full synchronization leaves the loaded duplicate unchanged.
 
-- source-text matching alone;
-- calling only `translateStratum`;
-- calling only generic `duplicateSelectedElements`;
-- manually constructing the expected final diagram;
-- using a test-only fake operation;
-- asserting only that the button label exists.
+### Healthy-linked H1
 
-The behavioral regression should:
+Create a healthy linked H0 patch and invoke Duplicate only.
 
-1. select one real Coons patch;
-2. enter valid `dx`, `dy`, and `dz` values in the production form/state path;
-3. invoke the production action once;
-4. inspect the created diagram model and selection;
-5. Undo once;
-6. Redo once;
-7. edit an original source and synchronize;
-8. verify the static copy stays translated.
+Before and after save/load, assert:
 
-No new browser/testing dependency is allowed.
+- original and duplicate retain the exact active `boundarySources` role map
+  and source IDs;
+- both have derived status `linkedUpToDate`;
+- the duplicate retains the current untranslated materialized snapshots;
+- no source object was duplicated;
+- editing a real linked boundary source after load and running the normal
+  changed-source synchronization updates both original and duplicate;
+- both patches remain linked to the same expected sources after that update.
 
-## Required tests
+This is the existing Phase 29 patch-only Duplicate policy. Do not make a
+Duplicate-only linked H1 static merely to simplify the test.
 
-At minimum, add or correct tests for:
+### Stale-linked H1
 
-1. Real Inspector eligibility and production callback wiring.
-2. Static numeric duplicate and complete mesh translation.
-3. Linked original remains linked; copy is static before commit.
-4. Later changed-source and full synchronization cannot snap the copy back.
-5. Stale linked original produces a static frozen translated copy.
-6. Frozen symbolic preview uses stored preview plus delta.
-7. Constant-point and representative path/frame boundaries.
-8. Deep-clone identity at every important nesting level.
-9. Original patch and sources remain unchanged.
-10. Global ID collisions across strata, labels, anchors, and reserved source IDs.
-11. Repeated duplicate-and-translate actions allocate distinct IDs.
-12. Invalid, non-finite, unknown, incomplete, and zero input is atomic.
-13. Success selects the copy; failure preserves selection.
-14. Exactly one Undo entry, one-step Undo/Redo, and no drift.
-15. Save/load preserves the static translated copy.
-16. SVG/TikZ geometry and formatting invariants.
-17. Generic Phase 29 duplicate/link-remapping behavior remains unchanged.
-18. Ruled surfaces and other curved-sheet kinds are unaffected.
+Create a genuinely stale H0 patch by removing one referenced source after
+establishing last-valid snapshots, then invoke Duplicate only. Use this exact
+missing-source path so the expected derived status is unambiguously
+`linkedStale`.
 
-Inspect assertions, not only test counts. Ensure every new test file is included
-by `npm test`.
+Before and after save/load, assert:
 
-## Production changes
+- original and duplicate retain their exact dangling/missing-source
+  `boundarySources` metadata;
+- the duplicate retains `boundarySnapshotState: "frozen"`;
+- all four last-valid materialized snapshots and stored numeric previews are
+  exact;
+- the sampled frozen mesh remains exact;
+- both patches have derived status `linkedStale`;
+- missing-source/full synchronization does not clear, partially refresh, or
+  drift the frozen fallback;
+- reinserting the removed source after load and running the normal Phase 29
+  synchronization recovers original and duplicate consistently;
+- the recovered patches retain the expected links and return to derived status
+  `linkedUpToDate` under the existing Phase 29 recovery policy.
 
-Keep production changes focused on verified Phase 30 gaps.
+Do not rebuild the stale H1 from currently resolvable source geometry during
+parse or synchronization. The serialized frozen fallback is authoritative
+while the source problem remains.
 
-Acceptable changes include:
+### No H1 substitutes
 
-- a narrow pure operation helper;
-- reuse/extraction of a shared Coons snapshot translation helper;
-- a frozen-preview translation policy;
-- a typed Inspector/App callback needed for selection and one-step history;
-- compact validation/status fixes;
-- focused test seams used by production and tests.
+The following do not satisfy this coverage requirement:
 
-Do not:
+- serializing only H2 after Translate;
+- translating by zero and calling the result H1;
+- manually deleting `boundarySources` from an H2 fixture;
+- constructing a duplicate-shaped object without invoking production
+  Duplicate;
+- checking raw JSON text without parsing it;
+- asserting only object counts, statuses, or schema version;
+- testing only static H1;
+- omitting post-load source synchronization and stale recovery.
 
-- redesign all bulk editing;
-- redesign the history model;
-- add source-tree duplication;
-- add persistent transform metadata;
-- change generic linked-Coons semantics;
-- move source resolution into rendering;
-- change JSON version/schema;
-- add dependencies;
-- perform unrelated UI cleanup.
+No schema or version change is expected. If a production persistence defect is
+actually exposed, make the smallest compatible fix and report it explicitly.
 
-## Manual verification checklist
+## Required focused regressions
 
-Run:
+Add or extend behavioral tests in
+`tests/integration/phase30CoonsDuplicateTranslate.test.ts`.
 
-```bash
-PATH=/opt/homebrew/bin:$PATH npm run dev
-```
+### Rounded-away Translate matrix
 
-Verify:
+1. **All-role static failure**
 
-1. Select a static Coons patch.
-2. Enter a non-zero 3D translation and click once.
-3. Confirm exactly one selected copy appears at the translated position.
-4. Undo once and Redo once.
-5. Repeat with a healthy linked patch.
-6. Confirm the original remains linked and the copy reports `Static`.
-7. Move an original boundary source and confirm the copy stays fixed.
-8. Repeat with a stale/missing-source patch.
-9. Confirm its displayed last-valid geometry is copied and translated.
-10. Change a variable involved in the stale snapshots and confirm no copy drift.
-11. Save and reload JSON.
-12. Check SVG, standalone TikZ, and inline-math TikZ export.
-13. Try incomplete, invalid, non-finite, and zero inputs.
-14. Confirm non-Coons selections do not expose the action.
+   Use a valid static constant-point Coons patch whose `bottom`, `right`,
+   `top`, and `left` materialized points all have `x = 1e16`. Translate by
+   `(1, 0, 0)` and assert:
 
-If manual verification is unavailable, state that explicitly. Do not claim it
-was performed.
+   - `translateCoonsPatch` returns `ok: false`;
+   - the returned/input diagram is unchanged, preferably retaining the
+     original diagram reference under the existing result convention;
+   - every boundary and sampled coordinate remains exactly the original;
+   - no partial candidate escapes.
 
-## Documentation
+2. **Editor-state atomic failure**
 
-Ensure the implemented docs state:
+   Submit the same valid vector through the production-used editor-state
+   action and assert:
 
-- the action is for one selected Coons patch;
-- the vector is global `dx`, `dy`, `dz` and direct input is not snapped;
-- the result is always a static independent copy;
-- original sources are not duplicated or moved;
-- linked/stale originals remain unchanged;
-- stale copies use translated frozen last-valid snapshots;
-- Undo/Redo is one transaction;
-- no linked transform offset, rotation, scale, or source-tree duplication is
-  implemented.
+   - the action returns failure;
+   - seed the fixture with non-empty `history.past` and `history.future` so
+     accidental Undo/Redo-stack clearing cannot pass vacuously;
+   - diagram, selection, stratum order/IDs, and all persistent data are exact;
+   - `history.present`, `history.past`, and `history.future` are exact;
+   - no translation-success status is emitted;
+   - `result.message` explains numeric scale/representability;
+   - the returned `state` is the exact input state under the existing helper
+     convention.
 
-Fix contradictions only where they exist. Do not broadly rewrite documentation.
+3. **Mixed-scale partial-rounding failure**
+
+   Use a valid patch where at least one required coordinate would change by
+   `1`, while another required `x = 1e16` coordinate would not. Translate by
+   `(1, 0, 0)` and assert the entire operation fails atomically.
+
+   This regression is required so a whole-diagram inequality or
+   “at-least-one-point-moved” guard cannot pass.
+
+4. **Linked atomic failure**
+
+   Exercise a healthy-linked patch with a swallowed required movement and
+   assert failure preserves its exact `boundarySources`, linked status,
+   materialized snapshots, source strata, and history. Link detachment must not
+   be mistaken for movement.
+
+5. **Representable control success**
+
+   Use the same large coordinate scale with a representable delta, for example
+   `x = 1e16` and `dx = 2`, and assert:
+
+   - the helper and editor action succeed;
+   - actual geometry changes;
+   - all required points/mesh coordinates obey the normal translation
+     contract;
+   - stratum count, ID, and array position remain unchanged;
+   - a linked target, if used, is detached according to the existing contract;
+   - exactly one normal history entry is added.
+
+   Do not blanket-reject large coordinates or all deltas near their precision
+   limit.
+
+### H1 persistence matrix
+
+6. Round-trip the production static H1 and verify its unchanged static state
+   and full-sync stability.
+7. Round-trip the production healthy-linked H1 and verify exact links plus
+   post-load source-edit synchronization of original and duplicate.
+8. Round-trip the production stale-linked H1 and verify exact frozen fallback,
+   missing-source stability, and post-load repair/recovery.
+
+Keep the new tests deterministic. Use semantic model assertions and numeric
+coordinates, not source-text matching or comments as proof.
+
+## Scope
+
+### Implement
+
+- a typed, operation-local representability failure for Coons Translate;
+- atomic propagation of that failure through the existing editor-state path;
+- the rounded-away, mixed-scale, linked-atomicity, and representable-control
+  regressions;
+- actual static, healthy-linked, and stale-linked H1 save/load/sync tests;
+- a minimal persistence fix only if those new H1 tests reproduce a real defect.
+
+Expected implementation files are primarily:
+
+- `src/ui/coonsPatchDuplicateTranslation.ts`;
+- `tests/integration/phase30CoonsDuplicateTranslate.test.ts`.
+
+Touch `src/model/translation.ts` or shared serialization/link code only if
+necessary for the smallest correct fix, and explain why.
+
+### Do not implement
+
+- a return to the combined `Duplicate & translate` action;
+- changes to the reconciled split-action review contract without a newly
+  demonstrated inconsistency;
+- a generic numeric-precision framework;
+- arbitrary-precision coordinates;
+- epsilon-based or neighboring-float movement;
+- rotation, scaling, shear, affine transforms, or persistent patch offsets;
+- source-tree duplication or source movement during Translate;
+- a rewrite of generic Phase 29 Duplicate semantics;
+- a rewrite of global history equality behavior;
+- a new saved schema or version bump;
+- new dependencies;
+- broad Inspector, rendering, export, synchronization, or lint refactors;
+- unrelated documentation, roadmap, automation, or style cleanup.
 
 ## Preserve existing behavior
 
-Do not regress:
+The complete Phase 30 suite must continue to establish:
 
-- static and linked Coons creation;
-- live source synchronization;
-- stale fallback/recovery;
-- source deletion;
-- detach;
-- per-role reversal;
-- source-ID reservation;
-- generic patch-only duplication;
-- patch-plus-source ID remapping;
-- coordinate-reference detachment;
-- symbolic import and frozen snapshots;
-- bulk/layer duplicate and translation;
-- layer filtering, visibility, and locking;
-- selection and multi-selection;
-- Undo/Redo;
-- JSON save/load;
-- Preview performance and mesh caching;
-- SVG/TikZ export;
-- inline no-blank-lines;
-- 4-space indentation;
-- ruled surfaces and other curved sheets.
+- separate production `Duplicate` and `Translate` controls and callbacks;
+- real `EditableInspector` -> `StratumInspector` -> action editor -> `App`
+  callback wiring;
+- Duplicate creates one untranslated H1, selects its globally unique ID, and
+  adds exactly one history entry;
+- static Duplicate stays static;
+- healthy-linked Duplicate retains active links;
+- stale-linked Duplicate retains active links and exact frozen snapshots;
+- Translate keeps the selected ID and array position and appends no stratum;
+- successful linked Translate removes active links before central sync;
+- successful stale Translate uses stored frozen preview plus delta;
+- ordinary successful Translate adds exactly one history entry;
+- invalid, incomplete, non-finite, unknown, and zero vectors remain atomic
+  failures;
+- Undo/Redo restores H0, H1, and H2 in the existing two-step order without ID
+  regeneration or geometric drift;
+- full and changed-source synchronization never snap a translated static H2
+  back to old sources;
+- JSON H2 round trips remain static and snapshot-authoritative;
+- Preview, SVG, standalone TikZ, and inline-math TikZ retain their exact
+  coordinate and formatting regressions;
+- generic Phase 29 duplicate/remap behavior and unrelated strata are
+  unchanged;
+- TikZ remains readable, uses 4-space indentation, and adds no blank lines in
+  inline-math mode.
 
-## Scope constraints
+## Manual verification checklist
 
-This is a targeted Phase 30 fix.
+If a browser/dev server is available:
 
-Implement only fixes and coverage needed for:
+1. Select a static Coons patch at ordinary coordinates and confirm Translate
+   still succeeds, moves it, and Undo/Redo is one step.
+2. Select a healthy-linked patch and confirm a successful Translate detaches
+   only that patch and does not move its sources.
+3. Duplicate static, healthy-linked, and stale-linked patches; save and reload
+   each H1 before translating and inspect its status and geometry.
+4. After loading a healthy-linked H1, edit a source and confirm original and
+   duplicate both update.
+5. After loading a stale-linked H1, confirm its frozen shape remains visible;
+   repair the source and confirm normal recovery.
+6. If the UI can enter the scale directly, try `x = 1e16`, `dx = 1` and confirm
+   a precision error is shown with no movement or history entry.
+7. Try the representable control `x = 1e16`, `dx = 2` and confirm success.
 
-- Inspector behavior;
-- static-copy link policy;
-- frozen snapshot correctness;
-- complete/deep translation;
-- ID safety;
-- atomic validation/history;
-- rendering/export/save-load stability.
+If manual verification is unavailable, state that explicitly and do not claim
+it was performed. Automated coverage of both review findings remains required.
 
-Do not implement:
+## Documentation
 
-- translated live links;
-- duplicated source ecosystems;
-- persistent transforms;
-- general affine transforms;
-- drag placement;
-- work-plane-local Phase 30 UI;
-- general dependency graphs;
-- new sampling or rendering architecture;
-- unrelated features.
+No documentation, roadmap, slug, or automation change is expected for this
+targeted fix. Existing split-action documentation remains normative.
+
+If implementation reveals a direct user-visible contract inconsistency, make
+only the necessary correction and explain why it was required. Do not edit
+documentation merely to restate test details.
 
 ## Verification
 
-Run the focused Phase 30 test first, then the complete suite:
+Run the focused test first:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node --test \
   tests/integration/phase30CoonsDuplicateTranslate.test.ts
+```
 
+Then run all required gates:
+
+```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
+
+PATH=/opt/homebrew/bin:$PATH npx eslint \
+  src/model/translation.ts \
+  src/ui/coonsPatchDuplicateTranslation.ts \
+  src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx \
+  tests/integration/phase30CoonsDuplicateTranslate.test.ts
+
 git diff --check
 ```
 
-Run lint only if the repository is already lint-clean:
+Report exact commands, exit status, and pass/fail counts. If a listed lint file
+was not changed, it should still pass the targeted regression probe. If a
+different production file changed, lint it too.
 
-```bash
-PATH=/opt/homebrew/bin:$PATH npm run lint
-```
-
-Report exact commands and results. Do not hide pre-existing failures; distinguish
-them from Phase 30 regressions with evidence.
+Do not treat pre-existing repository-wide lint debt or Vite's non-failing
+large-chunk advisory as a Phase 30 failure. Do report them accurately if seen.
 
 ## Acceptance criteria
 
-The Phase 30 fix is complete when:
+Phase 30 is ready for review only when all of the following are true:
 
-- production Inspector behavior is exercised and correct;
-- original patch and sources never change;
-- every translated copy is deep-cloned and static before commit;
-- healthy linked copies cannot snap back;
-- stale copies preserve and translate exact frozen last-valid previews;
-- all four boundary roles and supported nested geometry move exactly once;
-- globally reserved IDs cannot collide;
-- invalid/zero input has no diagram, selection, or history effect;
-- one action is exactly one Undo/Redo transaction;
-- save/load, SVG, and TikZ preserve translated output;
-- existing Phase 29 duplication/synchronization behavior remains intact;
-- focused tests, full tests, build, and `git diff --check` pass.
+- a finite non-zero vector cannot return Coons Translate success when any
+  required movement on a non-zero axis is rounded back to its original
+  representable value;
+- the `x = 1e16`, `dx = 1` static reproduction returns typed failure and leaves
+  diagram, selection, IDs, links, sources, and history unchanged;
+- a mixed-scale partial-rounding candidate also fails atomically;
+- a failed linked translation retains its active links and frozen/healthy
+  state exactly;
+- a representable large-scale control such as `x = 1e16`, `dx = 2` moves real
+  geometry and creates exactly one history entry;
+- success is not manufactured by metadata changes, forced history, epsilon,
+  clamping, or an altered vector;
+- real production H1 diagrams for static, healthy-linked, and stale-linked
+  Duplicate results all round-trip;
+- loaded healthy H1 links continue to synchronize both original and duplicate;
+- loaded stale H1 frozen data remains stable while broken and recovers under
+  the existing Phase 29 source-repair behavior;
+- the previously corrected split review gate and full production callback
+  regression remain intact;
+- existing H0/H1/H2, Undo/Redo, save/load, synchronization, Preview, SVG, TikZ,
+  and generic Phase 29 regressions remain passing;
+- the focused test, full test suite, build, targeted lint, and
+  `git diff --check` all pass;
+- no schema change, dependency, or unrelated rewrite was introduced.
 
 ## Report after implementation
 
-Please report:
+Report:
 
-- files modified;
-- verified root causes or gaps;
-- Inspector production wiring;
-- helper and shared translation logic used;
-- linked/static/stale-copy policy;
-- frozen symbolic preview handling;
-- deep-clone evidence;
-- ID-allocation policy;
-- input validation and zero-vector behavior;
-- selection and one-step history behavior;
-- synchronization/save-load behavior;
-- SVG/TikZ verification;
-- focused tests added or corrected;
-- manual verification performed;
-- exact focused-test result;
-- exact `npm test` result;
-- exact `npm run build` result;
-- lint result, if run;
+- files changed;
+- the root cause of the rounded-away success;
+- the exact representability rule and where it is enforced;
+- which materialized coordinate/previews are checked and which intentionally
+  invariant frame/local fields are excluded;
+- how linked/reference preparation is kept distinct from actual movement;
+- the typed failure and user-visible status behavior;
+- evidence that failure preserves diagram, selection, active/frozen links,
+  sources, and complete history;
+- results for the all-role `1e16 + 1` failure, mixed-scale failure,
+  linked-atomicity failure, and `1e16 + 2` success control;
+- static, healthy-linked, and stale-linked H1 serialization assertions;
+- post-load healthy synchronization and stale recovery results;
+- whether shared translation or persistence code changed and why;
+- preservation results for the full callback chain, two-step Undo/Redo,
+  H0/H1/H2, SVG, standalone TikZ, and inline-math TikZ;
+- focused test command and exact result;
+- full `npm test` command and exact result;
+- build command and exact result;
+- targeted lint command and exact result;
 - `git diff --check` result;
-- remaining limitations.
+- manual verification performed, or an explicit statement that it was not
+  available;
+- any remaining limitations.

@@ -8,7 +8,11 @@ import {
   pointShapes,
 } from '../model/types.ts'
 import { ensureLayerMetadata, formatLayerValue, normalizeLayerValue } from '../model/layers.ts'
-import { collectTopLevelDiagramIds } from '../model/diagramIds.ts'
+import {
+  collectTopLevelDiagramIds,
+  createCopyDiagramIdAllocator,
+  type UniqueDiagramIdAllocator,
+} from '../model/diagramIds.ts'
 import {
   cleanPathCrossingStates,
 } from '../model/pathCrossings.ts'
@@ -789,7 +793,7 @@ export function duplicateSelectedElements(
     }
   }
 
-  const topLevelIdAllocator = createUniqueIdAllocator(
+  const topLevelIdAllocator = createCopyDiagramIdAllocator(
     collectTopLevelDiagramIds(diagram),
   )
   const nestedIdAllocator = createUniqueIdAllocator(nestedObjectIds(diagram))
@@ -857,7 +861,7 @@ function duplicateSelectedCoordinateAnchors(
   diagram: Diagram,
   selectedCoordinateAnchors: readonly CoordinateAnchor[],
 ): BulkDuplicateSelectedElementsResult {
-  const topLevelIdAllocator = createUniqueIdAllocator(
+  const topLevelIdAllocator = createCopyDiagramIdAllocator(
     collectTopLevelDiagramIds(diagram),
   )
   const coordinateAnchors = [...(diagram.coordinateAnchors ?? [])]
@@ -1602,7 +1606,7 @@ function bulkOperationErrorMessage(error: unknown, fallback: string): string {
 
 function duplicateSelectedStratum(
   stratum: Stratum,
-  topLevelIdAllocator: UniqueIdAllocator,
+  topLevelIdAllocator: UniqueDiagramIdAllocator,
   nestedIdAllocator: UniqueIdAllocator,
   pathLabelAllocator: PathLabelAllocator,
   idChanges: BulkDuplicateIdChange[],
@@ -1638,7 +1642,7 @@ function duplicateSelectedStratum(
 
 function duplicateSelectedTextLabel(
   label: TextLabel,
-  topLevelIdAllocator: UniqueIdAllocator,
+  topLevelIdAllocator: UniqueDiagramIdAllocator,
   idChanges: BulkDuplicateIdChange[],
 ): TextLabel {
   const copied = cloneDiagramValue(label)

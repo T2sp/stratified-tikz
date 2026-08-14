@@ -1073,13 +1073,15 @@ Recommended `phaseSlugs` entry: `"29": "live-linked-coons-boundaries"`.
 - Retain last valid snapshots when links are temporarily invalid.
 - Support static legacy patches and explicit detach.
 
-## Phase 30: Inspector duplicate-and-translate for Coons patches
+## Phase 30: Inspector duplicate and translate actions for Coons patches
 
 Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
-- Duplicate one selected Coons patch and translate its materialized geometry in
-  one Inspector action.
-- Create an independent static copy while preserving the original patch and its
-  source links.
-- Support last-valid stale snapshots, symbolic-aware translation, and one-step
-  Undo/Redo.
+- Duplicate one selected Coons patch as an untranslated copy using ordinary
+  patch-only link semantics, then select the copy.
+- Translate a selected Coons patch in place at the same ID, detaching only that
+  patch before moving it when active boundary links are present.
+- Preserve exact last-valid stale snapshots and symbolic-aware translation
+  without moving source strata or coordinate anchors.
+- Commit each action as one transaction, so Duplicate followed by Translate
+  has two-step Undo/Redo.

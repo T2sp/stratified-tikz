@@ -30,6 +30,12 @@ export type CommitDiagramChangeOptions = {
   undoSourceDiagram?: Diagram
   /** The next diagram owns its own linked-snapshot fallbacks. */
   replaceDiagram?: boolean
+  /**
+   * Use only for edits, such as patch-only duplication, that do not change any
+   * linked source geometry and must preserve the candidate's materialized
+   * snapshots exactly.
+   */
+  preserveLinkedCoonsSnapshots?: boolean
 }
 
 export function createDiagramHistory(diagram: Diagram): DiagramHistory {
@@ -45,8 +51,14 @@ export function commitDiagramChange<T extends UndoableEditorState>(
   next: T,
   options: CommitDiagramChangeOptions = {},
 ): T {
+  const synchronizationBaseline =
+    options.preserveLinkedCoonsSnapshots === true
+      ? next.editableDiagram
+      : options.replaceDiagram === true
+        ? null
+        : current.editableDiagram
   const synchronizedDiagram = synchronizeLinkedCoonsPatches(
-    options.replaceDiagram === true ? null : current.editableDiagram,
+    synchronizationBaseline,
     next.editableDiagram,
   ).diagram
   const synchronizedNext =

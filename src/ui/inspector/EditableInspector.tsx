@@ -39,6 +39,11 @@ import { StratumInspector } from './StratumInspector.tsx'
 import { TextLabelInspector } from './TextLabelInspector.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 import type { PathSplitTarget } from '../pathSplitting.ts'
+import type {
+  DuplicateCoonsPatchActionResult,
+  TranslateCoonsPatchActionResult,
+} from './CoonsPatchDuplicateTranslateEditor.tsx'
+import type { LayerFilter } from '../layerFilter.ts'
 
 export type EditableInspectorProps = {
   diagram: Diagram
@@ -62,6 +67,14 @@ export type EditableInspectorProps = {
   ) => string
   onSplitPath: (target: PathSplitTarget, keepOriginal: boolean) => string
   onStartPathSplitPick: (keepOriginal: boolean) => string
+  layerFilter: LayerFilter
+  onDuplicateCoonsPatch: (
+    patchId: string,
+  ) => DuplicateCoonsPatchActionResult
+  onTranslateCoonsPatch: (
+    patchId: string,
+    translation: TranslationVector,
+  ) => TranslateCoonsPatchActionResult
 }
 
 export function EditableInspector({
@@ -83,6 +96,9 @@ export function EditableInspector({
   onBulkConcatenatePaths,
   onSplitPath,
   onStartPathSplitPick,
+  layerFilter,
+  onDuplicateCoonsPatch,
+  onTranslateCoonsPatch,
 }: EditableInspectorProps) {
   if (isMultiSelectedElement(selectedElement)) {
     const summary = createInspectorCompactSummary(diagram, selectedElement)
@@ -180,6 +196,9 @@ export function EditableInspector({
         onPasteStyle={onPasteStyle}
         onSplitPath={onSplitPath}
         onStartPathSplitPick={onStartPathSplitPick}
+        layerFilter={layerFilter}
+        onDuplicateCoonsPatch={onDuplicateCoonsPatch}
+        onTranslateCoonsPatch={onTranslateCoonsPatch}
       />
     ) : selected.kind === 'coordinate' ? (
       <CoordinateAnchorInspector

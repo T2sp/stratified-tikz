@@ -10,7 +10,11 @@ import type {
   Vec3,
 } from './types.ts'
 import { cleanPathCrossingStates } from './pathCrossings.ts'
-import { collectTopLevelDiagramIds } from './diagramIds.ts'
+import {
+  collectTopLevelDiagramIds,
+  createCopyDiagramIdAllocator,
+  type UniqueDiagramIdAllocator,
+} from './diagramIds.ts'
 import { detachCoordinateReferencesInElements } from './coordinateReferences.ts'
 import {
   coonsPatchBoundarySourceRemapForDuplicatedStrata,
@@ -363,7 +367,7 @@ export function duplicateLayer(
     )
   }
 
-  const topLevelIdAllocator = createUniqueIdAllocator(
+  const topLevelIdAllocator = createCopyDiagramIdAllocator(
     collectTopLevelDiagramIds(diagram),
   )
   const nestedIdAllocator = createUniqueIdAllocator(nestedObjectIds(diagram))
@@ -890,7 +894,7 @@ function layerMetadataForDuplicate(
 function duplicateStratumForLayer(
   stratum: Stratum,
   targetLayer: number,
-  topLevelIdAllocator: UniqueIdAllocator,
+  topLevelIdAllocator: UniqueDiagramIdAllocator,
   nestedIdAllocator: UniqueIdAllocator,
   pathLabelAllocator: PathLabelAllocator,
   idChanges: DuplicateLayerIdChange[],
@@ -928,7 +932,7 @@ function duplicateStratumForLayer(
 function duplicateTextLabelForLayer(
   label: TextLabel,
   targetLayer: number,
-  topLevelIdAllocator: UniqueIdAllocator,
+  topLevelIdAllocator: UniqueDiagramIdAllocator,
   idChanges: DuplicateLayerIdChange[],
 ): TextLabel {
   const copied = cloneDiagramValue(label)

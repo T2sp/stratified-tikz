@@ -274,6 +274,8 @@ function runCodex(promptFile, logFile) {
     "workspace-write",
     "-c",
     "model_reasoning_effort=ultra",
+    "-c",
+    "features.fast_mode=true",
     prompt,
   ];
 
