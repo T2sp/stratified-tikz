@@ -1,4 +1,4 @@
-# Phase 30 Fix Prompt: Split Coons Inspector Duplicate and Translate actions
+# Phase 30 Targeted Fix Prompt: Reconcile the split-action review gate and test the full production callback chain
 
 ## Environment
 
@@ -30,33 +30,145 @@ PATH=/opt/homebrew/bin:$PATH npx eslint \
 git diff --check
 ```
 
-The production files may be renamed as part of splitting the feature. If so,
-run targeted ESLint on the actual changed Phase 30 files and update the focused
-test command or explicit `npm test` list only where necessary. Report the exact
-commands.
-
-Repository-wide lint currently has unrelated pre-existing debt. Do not use that
-debt as a Phase 30 failure and do not broaden this fix into repository-wide lint
-cleanup.
+If this fix changes another production file, include it in a targeted lint
+probe and report the result. `EditableInspector.tsx` currently has an unrelated
+pre-existing `react-hooks/set-state-in-effect` issue; do not turn that existing
+debt into a Phase 30 requirement or perform broad lint cleanup.
 
 Do not add dependencies.
 
-## Project context
+## Latest review findings
 
-You are changing Phase 30 of StratifiedTikZ:
+The latest Phase 30 review found no Critical issue and no Low-priority issue. It
+found exactly two Medium issues.
+
+### Medium 1: contradictory release contracts
+
+`prompts/phase-30-fix.md` superseded the original combined action with separate
+Inspector actions:
 
 ```text
-https://github.com/T2sp/stratified-tikz
+Duplicate
+Translate
 ```
 
-The initial Phase 30 implementation exposed one combined Inspector operation:
+Production and tests implement that split contract. However,
+`prompts/phase-30-review.md` still treats this as normative:
 
 ```text
 Duplicate & translate
 ```
 
-That product contract is superseded by this fix prompt. Replace it with two
-independent actions:
+and still requires one atomic operation that appends an already translated
+static copy. Under the current fix prompt the production implementation is
+correct; under the literal review gate the required feature is absent. A note
+that the fix prompt supersedes the review prompt is not sufficient: the review
+prompt itself is executed by automation and must be reconciled.
+
+### Medium 2: full production callback chain is not behaviorally tested
+
+The focused test behaviorally exercises the leaf
+`CoonsPatchActionsControls` component by manually injecting callbacks that call
+editor-state helpers. Separate SSR coverage checks full `EditableInspector`
+markup and eligibility, but does not invoke its callbacks.
+
+Consequently, the tests do not execute this complete production path:
+
+```text
+actual Duplicate button / actual Translate form
+-> CoonsPatchActionsEditor
+-> StratumInspector
+-> EditableInspector
+-> production App callback
+-> App-used editor-state transition
+```
+
+A dropped or swapped callback at any forwarding boundary could pass. The
+current forwarding appears correct by inspection; this is a verified coverage
+gap, not a reproduced runtime defect.
+
+## What the review confirmed correct
+
+The latest review confirmed the following behavior and coverage. Preserve it;
+do not reimplement it unless the new full-chain regression exposes a concrete
+defect:
+
+- the production Inspector exposes separate `Duplicate` and `Translate`
+  controls;
+- `Duplicate` reuses Phase 29 deep-clone, global-ID, and patch-only link
+  semantics;
+- `Translate` performs a same-ID replacement and removes active links before
+  translation and central synchronization;
+- stale/frozen previews use stored values plus the delta and do not drift after
+  variable changes;
+- original source paths, source points, coordinate anchors, and unrelated
+  strata remain unchanged;
+- static, healthy-linked, and stale-linked state matrices are correct;
+- eligibility, hidden/locked/filter behavior, selection, deterministic IDs,
+  two-step Undo/Redo, and atomic failure are covered;
+- save/load and synchronization remain snapshot-based;
+- generic Phase 29 duplication behavior remains unchanged;
+- rendered SVG tests assert actual translated coordinates;
+- standalone and inline-math TikZ tests assert actual translated coordinates;
+- the previously reported unused imports are resolved;
+- focused tests, the full suite, build, targeted Phase 30 lint, and
+  `git diff --check` pass.
+
+Passing these existing regressions remains required, but they are not new fix
+work.
+
+## Goal
+
+Make only these two targeted changes:
+
+1. Rewrite `prompts/phase-30-review.md` so the automated Phase 30 release gate
+   reviews the implemented split `Duplicate` and `Translate` contract.
+2. Add a behavioral regression that invokes both actions through the complete
+   production Inspector-to-App callback chain and verifies exact diagram,
+   selection, and history transitions.
+
+Do not change production Duplicate/Translate behavior unless the new regression
+demonstrates an actual production defect. If it does, make the smallest typed
+fix and add a root-cause assertion.
+
+## Required reading before fixing
+
+Read at least:
+
+- `AGENTS.md`;
+- this prompt in full;
+- `prompts/phase-30-implement.md` as historical context only;
+- all of `prompts/phase-30-review.md`;
+- the latest Phase 30 review report if it is available in the execution
+  context; otherwise use this prompt's `Latest review findings` section as the
+  authoritative summary;
+- `src/App.tsx`, including `duplicateCurrentCoonsPatch`,
+  `translateCurrentCoonsPatch`, and the `EditableInspector` props;
+- `src/ui/inspector/EditableInspector.tsx`;
+- `src/ui/inspector/StratumInspector.tsx`;
+- `src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx`;
+- `src/ui/coonsPatchDuplicateTranslation.ts`;
+- `tests/integration/phase30CoonsDuplicateTranslate.test.ts`, especially:
+  - the `CoonsPatchActionsControls` harness;
+  - the production controls interaction test;
+  - the full `EditableInspector` SSR/gating test;
+  - exact history and selection tests;
+- `scripts/automation/run-phase.mjs`, especially review prompt resolution and
+  `REVIEW_JSON` parsing;
+- `package.json`.
+
+Trace callback identity and arguments at every production forwarding boundary.
+Inspect assertions, not only test names or counts.
+
+## Normative split contract
+
+Use this concise contract when rewriting the review gate and when evaluating the
+new integration test.
+
+### Inspector
+
+For exactly one selected editable Coons patch, Inspector exposes two independent
+controls:
 
 ```text
 Duplicate
@@ -69,542 +181,211 @@ Translate
   [Translate]
 ```
 
-The ordinary workflow is:
+There is no combined production `Duplicate & translate` action.
 
-1. select one Coons patch;
-2. click `Duplicate`;
-3. the new copy becomes selected;
-4. optionally enter a vector and click `Translate` to move that selected copy.
+`Duplicate` is a button independent of the translation form. `Translate` is the
+only form submit action. Invalid or zero translation drafts do not affect
+Duplicate.
 
-The user may also invoke `Translate` directly on any eligible selected Coons
-patch without duplicating it first.
+### Duplicate
 
-These are separate production interactions, separate typed operations, and
-separate history transactions. Do not keep a combined production button or
-make either action secretly perform both operations.
+`Duplicate` takes only the selected patch ID. It appends one untranslated,
+deep-cloned copy with a globally safe ID, selects that copy, and commits one
+history entry.
 
-## Superseding prior Phase 30 wording
-
-Where this prompt conflicts with the combined-action wording in
-`phase-30-implement.md`, `phase-30-review.md`, the initial implementation, or
-the previous review, this split-action prompt is normative.
-
-In particular, replace these prior assumptions:
-
-- one button both duplicates and translates;
-- one vector submission appends a translated copy;
-- every duplicate made by Phase 30 is immediately static;
-- deep clone, detach, translate, append, and select happen in one transaction;
-- one Undo removes the translated copy;
-- invalid translation means no copy was created.
-
-with these contracts:
-
-- `Duplicate` alone appends an untranslated copy using existing Phase 29
-  patch-only duplication semantics;
-- `Translate` alone changes the selected patch at the same ID;
-- only `Translate` detaches a linked selected patch before moving it;
-- each successful action creates exactly one history entry;
-- `Duplicate` followed by `Translate` creates exactly two history entries;
-- a failed `Translate` does not undo an earlier successful `Duplicate`.
-
-Do not edit the Phase 30 prompt files as part of implementing this fix. This
-file is the override consumed by fix mode.
-
-## Review findings that must also be closed
-
-The previous review found no Critical runtime defect. It found two Medium
-coverage gaps and one Low lint issue:
-
-1. The production Inspector test server-rendered markup but did not invoke the
-   actual form callback. The state test called submission and editor-state
-   helpers directly, so incorrect production UI forwarding could pass.
-2. Preview vertices were checked, but rendered SVG used only element-count
-   assertions and TikZ used only comments/counts/formatting assertions. Final
-   translated coordinates were not tested.
-3. The focused test reported unused imports for `CoonsPatchPrimitive`,
-   `CurvedSheetStratum`, `PathSegment`, and `PointStratum`.
-
-Adapt those fixes to the two new action paths. Splitting the UI does not waive
-the production-interaction or final-output regression requirements.
-
-## Required reading before implementation
-
-Read at least:
-
-- `AGENTS.md`;
-- `prompts/phase-30-implement.md` for the original geometry requirements;
-- `prompts/phase-30-review.md` for the previous review methodology, while
-  applying this prompt's superseding behavior;
-- `prompts/phase-29-implement.md` and `prompts/phase-29-fix.md` for generic
-  Coons patch duplication and link synchronization;
-- the complete current Phase 30 diff;
-- `src/ui/coonsPatchDuplicateTranslation.ts`;
-- `src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx`;
-- `src/ui/inspector/EditableInspector.tsx`;
-- `src/ui/inspector/StratumInspector.tsx`;
-- the App callbacks for bulk duplicate, bulk translate, and the current combined
-  Coons operation;
-- `src/ui/bulkEditing.ts`, including patch-only duplication and translation;
-- `src/model/coonsPatchLinks.ts`;
-- `src/model/translation.ts`;
-- `src/model/diagramIds.ts`;
-- `src/model/coordinateReferences.ts`;
-- `src/ui/undo.ts`;
-- the rendering/SVG/TikZ paths used by Coons patches;
-- `tests/integration/phase29LinkedCoonsPatches.test.ts`;
-- `tests/integration/phase30CoonsDuplicateTranslate.test.ts`;
-- `package.json`;
-- `docs/EDITING.md`, `docs/RULED_SURFACES.md`, `docs/DATA_MODEL.md`, and
-  `docs/ROADMAP.md`.
-
-Inspect actual callbacks, handler references, commit boundaries, and test
-assertions. Search for every surviving `Duplicate & translate`, combined
-callback/helper name, and combined one-step history claim.
-
-## Goal
-
-Implement two independent Inspector actions for exactly one selected editable
-Coons patch:
-
-1. `Duplicate` creates an untranslated copy using generic patch-only link
-   semantics, selects the copy, and commits one edit.
-2. `Translate` moves the selected patch at the same ID. If it is linked, it is
-   atomically detached before translation so synchronization cannot snap it
-   back. It commits one edit.
-
-Also close the previous review gaps with real production interaction tests,
-actual SVG/TikZ coordinate assertions, and targeted lint cleanup.
-
-## 1. Inspector layout and eligibility
-
-Show the two controls only when selection resolves to exactly one editable
-stratum satisfying:
-
-```ts
-geometricKind === 'sheet'
-kind === 'curvedSheet'
-primitive.kind === 'coonsPatch'
-```
-
-Do not show or enable them for:
-
-- no selection;
-- stale/missing selection IDs;
-- multi-selection;
-- coordinate selections;
-- free text labels;
-- points or curves;
-- polygon or work-plane-filled sheets;
-- ruled surfaces;
-- hemispheres or saddles;
-- a selection excluded by the existing hidden/locked/layer-filter editability
-  policy.
-
-Use either two compact sections or one clearly separated `Coons patch actions`
-section. The controls must remain distinct:
-
-- `Duplicate` is a `type="button"` action and is not the submit control of the
-  translation form;
-- `Translate` is the only submit button in the `dx`/`dy`/`dz` form;
-- pressing Enter in a translation field must never trigger `Duplicate`;
-- clicking `Duplicate` must not submit or validate the translation draft.
-
-Use accessible, distinct labels and titles. The UI must explain concisely that
-translating a linked patch detaches that patch and makes it static. Do not imply
-that ordinary duplication always detaches links.
-
-Keep `dx`, `dy`, `dz`, and status strings in local UI state. Reset or re-key
-status when the selected patch changes so a message for the original does not
-bleed onto a copy or another patch. No action drafts or selection state belong
-in `Diagram` or saved JSON.
-
-## 2. Duplicate operation
-
-### Public behavior
-
-`Duplicate` targets the currently selected Coons patch and takes no translation
-vector.
-
-It must:
-
-1. verify the selected ID still resolves to an eligible editable Coons patch;
-2. use the established deterministic global ID allocator;
-3. deep-clone the complete patch and mutable nested data;
-4. preserve its current materialized snapshots exactly, without translation;
-5. apply the existing Phase 29 patch-only duplication policy to active links;
-6. preserve required metadata;
-7. validate the candidate diagram;
-8. append exactly one copy;
-9. select the new copy as a single stratum selection;
-10. commit exactly one history entry.
-
-Duplicate must never:
-
-- inspect, parse, or reject the `dx`/`dy`/`dz` drafts;
-- translate any point;
-- detach links merely because a later Translate might occur;
-- duplicate or move boundary source paths, source points, or coordinate
-  anchors;
-- allocate more than one top-level copy ID;
-- invoke the Translate callback;
-- modify the selected original.
-
-An invalid or zero translation draft must not disable or alter `Duplicate`.
-
-### Duplicate state matrix
-
-This table is normative:
-
-| Selected patch before Duplicate | Original after Duplicate | New selected copy |
+| Before Duplicate | Original after Duplicate | New selected copy |
 | --- | --- | --- |
-| Static | Static and unchanged | Static with equal untranslated snapshots |
-| Linked — up to date | Linked and unchanged | Linked to the same source IDs, with independent current snapshots |
-| Linked — stale | Linked and stale, unchanged | Linked and stale, with exact independently cloned frozen last-valid snapshots |
+| Static | Static and unchanged | Static, untranslated |
+| Linked — up to date | Linked and unchanged | Linked to the same sources, untranslated |
+| Linked — stale | Linked and stale, unchanged | Linked and stale with exact frozen snapshots |
 
-For a stale linked duplicate, preserve its active `boundarySources` and
-`boundarySnapshotState: 'frozen'`. Do not repair, partially refresh, or detach it
-during Duplicate.
+This is the existing Phase 29 patch-only duplicate policy. Duplicate does not
+move or duplicate boundary sources and does not detach links.
 
-For a healthy linked duplicate, a later source edit is expected to synchronize
-both original and duplicate until either is independently translated/detached.
-This is existing Phase 29 behavior, not snap-back.
+### Translate
 
-### Duplicate clone and metadata requirements
+`Translate` takes the selected patch ID and one finite non-zero global
+`TranslationVector`. It replaces that patch at the same ID and array position,
+keeps it selected, appends nothing, and commits one history entry.
 
-Do not share mutable nested references between original and copy, including:
-
-- stratum and style objects;
-- primitive and sampling objects;
-- all four boundary snapshots;
-- segment arrays and segment objects;
-- endpoints and controls;
-- constant-point coordinates;
-- work-plane frames;
-- symbolic/source provenance;
-- active `boundarySources` metadata when retained.
-
-Preserve:
-
-- name according to the existing ordinary duplicate policy;
-- `codim: 1`;
-- `geometricKind: 'sheet'`;
-- `kind: 'curvedSheet'`;
-- `primitive.kind: 'coonsPatch'`;
-- layer;
-- style, opacity, preset/import metadata, and attached label metadata;
-- sampling;
-- boundary role order and reversal/orientation;
-- frozen snapshot state where applicable.
-
-Reserve every top-level namespace already covered by the global policy:
-
-- strata;
-- labels;
-- coordinate anchors;
-- dangling linked-Coons path/point source IDs;
-- IDs allocated by repeated Duplicate actions.
-
-Do not reinterpret optional snapshot provenance IDs as top-level IDs.
-
-### Duplicate failure and repetition
-
-On failure, preserve diagram, selection, and history exactly. Do not leave a
-persistent ID reservation or partial copy.
-
-Repeated Duplicate clicks must create one fresh copy per click and select the
-newest copy. Each click adds one history entry. No Duplicate may move any prior
-copy.
-
-## 3. Translate operation
-
-### Public behavior
-
-`Translate` targets the Coons patch selected at submission time. It performs an
-immutable same-ID replacement; it does not append or allocate anything.
-
-It must:
-
-1. verify the selected ID still resolves to an eligible editable Coons patch;
-2. parse `dx`, `dy`, and `dz` through the shared translation parser;
-3. require one finite non-zero global 3D vector;
-4. clone the selected patch for a local candidate;
-5. if linked, remove the candidate's active `boundarySources` before the central
-   commit/synchronizer sees it;
-6. apply coordinate-reference detachment/rejection according to the existing
-   curved-sheet translation policy;
-7. translate all four materialized snapshots exactly once;
-8. validate the complete primitive and candidate diagram;
-9. replace the selected stratum at the same array position and same ID;
-10. retain the same selection;
-11. commit exactly one history entry.
-
-Translate must never:
-
-- create a copy;
-- allocate or change an ID;
-- change stratum count or order;
-- translate source paths, source points, or coordinate anchors;
-- translate any other selected or unselected object;
-- preserve active links on an independently moved patch;
-- implement translation as duplicate-then-delete;
-- invoke the Duplicate callback.
-
-Direct Inspector translation uses the global vector and never cursor snap.
-
-### Translate state matrix
-
-This table is normative:
-
-| Selected patch before Translate | Same-ID selected patch after Translate |
+| Before Translate | Same-ID selected patch after Translate |
 | --- | --- |
-| Static | Static with materialized snapshots translated by `d` |
-| Linked — up to date | Static, links removed before commit, current materialized snapshots translated by `d` |
-| Linked — stale | Static frozen fallback, links removed before commit, exact stored frozen previews translated by `d` |
+| Static | Static with all materialized snapshots translated once |
+| Linked — up to date | Static; links removed before commit; current snapshots translated once |
+| Linked — stale | Static frozen fallback; links removed before commit; stored frozen previews translated once |
 
-Only the selected patch changes. Its former boundary source strata and
-coordinate anchors remain byte-for-byte or semantically unchanged.
-
-For a linked patch, detach-before-translate is required. Do not leave
-`boundarySources` active and rely on a later effect to detach them: Phase 29
-synchronization may otherwise restore source geometry and cancel the move.
-
-Do not reuse generic bulk translation blindly if it preserves active Coons
-links until `commitDiagramChange`. Use or extract a narrow typed same-ID Coons
-translation operation that completes detach, translation, validation, and
-replacement before the one commit.
-
-### Frozen and symbolic translation
-
-For a stale linked patch, use its exact stored/displayed last-valid snapshots.
-Do not resolve broken sources, partially rebuild valid roles, or refresh against
-current diagram variables.
-
-Preserve:
-
-```ts
-boundarySnapshotState: 'frozen'
-```
-
-For an evaluated delta `d`, require:
+Translation never moves source strata or anchors. For stale symbolic data:
 
 ```text
-translated preview = stored frozen preview + d
+translated preview = stored frozen preview + delta
 ```
 
-and reject:
+not a re-evaluation against current variables.
+
+Invalid, incomplete, non-finite, unknown, or zero translation input changes no
+diagram, selection, link, ID, or history state.
+
+### History
+
+Each action is independently atomic:
 
 ```text
-translated preview = reevaluate(old expression, current variables) + d
+H0: original patch
+H1: after Duplicate, untranslated copy exists and is selected
+H2: after Translate, that same copy ID is translated and static
 ```
 
-Use existing typed symbolic addition/parser/formatter helpers. Do not build raw
-expression strings. Preserve valid provenance and finite stored previews.
+The first Undo restores H1, including the copy's exact pre-Translate link and
+frozen state. The second Undo removes the copy and restores H0. Redo restores H1
+and H2 without new IDs or geometry drift.
 
-### Complete translation coverage
+The two user actions intentionally create two history entries. Do not require a
+single combined transaction.
 
-Translate exactly once in all four roles:
+## 1. Reconcile `phase-30-review.md`
 
-- `bottom`;
-- `right`;
-- `top`;
-- `left`.
+Update the review prompt itself. Do not rely on another superseding note.
 
-Cover:
+### Required contract changes
 
-- constant-point boundaries;
-- line endpoints;
-- cubic endpoints and controls;
-- arc absolute points and stored frame origins;
-- concatenated path segments;
-- sampled-template segments;
-- global and symbolic coordinates;
-- work-plane-local stored frame origins.
+Rewrite every normative combined-action section, including:
 
-Do not translate:
+- title and Project context;
+- UI sketch and goal under review;
+- architecture/helper expectations;
+- Inspector eligibility and production wiring;
+- operation ordering;
+- static, healthy-linked, and stale-linked state matrices;
+- deep clone, metadata, and ID expectations;
+- translation and frozen-preview expectations;
+- validation and atomic failure;
+- selection and history;
+- save/load, synchronization, SVG, and TikZ;
+- required tests;
+- manual verification;
+- documentation checks;
+- final readiness criteria.
 
-- frame `u`, `v`, or `normal`;
-- local work-plane `a` or `b` when the frame origin moves;
-- sampling counts or mesh topology.
+The revised review prompt must assess Duplicate and Translate separately using
+the normative split contract above.
 
-All corner equations and validations must still hold. For every numeric sampled
-vertex within existing tolerance:
+Remove or rewrite requirements that say or imply:
+
+- one form submission duplicates and translates;
+- every Duplicate result is static;
+- translation allocates or appends a copy;
+- deep clone, detach, translate, append, and select form one transaction;
+- one Undo removes a translated copy;
+- invalid translation means no Duplicate occurred;
+- retaining links on an ordinary linked Duplicate is an error;
+- more than one Undo step for a Duplicate-then-Translate workflow is an error.
+
+The review prompt may mention the former combined action only as rejected
+historical context. It must not leave it as an acceptance condition, severity
+example, test requirement, or manual step.
+
+### Review production-wiring requirement
+
+The reconciled review gate must explicitly inspect the complete path:
 
 ```text
-meshAfter[i] = meshBefore[i] + d
+CoonsPatchActionsControls
+-> CoonsPatchActionsEditor
+-> StratumInspector
+-> EditableInspector
+-> App Duplicate/Translate handlers
+-> App-used editor-state transition
 ```
 
-The comparison is against the selected patch immediately before Translate, not
-necessarily against the original patch from an earlier Duplicate.
+It must treat missing behavioral coverage of a callback forwarding boundary as
+at least Medium. Leaf controls with manually supplied test callbacks plus SSR
+markup do not prove the full chain.
 
-### Translate validation and failure
+### Preserve review automation format
 
-Allow temporary draft states such as:
+Keep the existing human report sections and the exact machine-readable contract:
 
 ```text
-empty string
-.
-.5
--
-1e
+REVIEW_JSON_START
+{
+  "summary": "pass or needs_changes",
+  "critical_count": 0,
+  "medium_count": 0,
+  "low_count": 0,
+  "ready_to_commit": true,
+  "suggested_fix_prompt": ""
+}
+REVIEW_JSON_END
 ```
 
-Reject without invoking the mutation callback:
+Preserve these rules:
 
-- incomplete or invalid expressions;
-- unknown variables;
-- `NaN` or `Infinity`;
-- expressions with non-finite previews;
-- the zero vector.
+- counts are numeric;
+- `summary` is exactly `pass` or `needs_changes`;
+- any Critical or Medium finding makes `ready_to_commit` false;
+- only Low findings may leave it true;
+- a needed fix prompt is limited to verified findings;
+- focused tests, full tests, build, and `git diff --check` are required;
+- repository-wide pre-existing lint debt alone does not fail Phase 30.
 
-Use the status:
+Retain severity distinctions and update examples to the split semantics. In
+particular, wrong callback forwarding, wrong Duplicate link semantics, failure
+to detach before Translate, wrong same-ID/append behavior, or incorrect
+one-entry-per-action/two-step history is Medium unless it causes Critical data
+corruption.
 
-```text
-Enter a non-zero translation.
-```
+### Historical implement prompt
 
-On every Translate failure:
+Do not rewrite `phase-30-implement.md` in this targeted fix. The updated review
+prompt must state that this split fix contract supersedes the implement prompt's
+combined-action wording.
 
-- diagram data is unchanged;
-- active links are not detached;
-- stratum count and IDs are unchanged;
-- selection is unchanged;
-- history `past`, `present`, and `future` are unchanged;
-- no success status is shown.
+After editing, search `phase-30-review.md` for all combined-action and one-step
+phrases and inspect every match in context. Do not use a blind global replace.
 
-If a Duplicate succeeded earlier, a failed Translate leaves that untranslated
-copy intact. Do not roll back the independent Duplicate transaction.
+## 2. Add a full production callback-chain regression
 
-Repeated successful Translate submissions apply one delta per submission to the
-same ID and create one history entry each. They must not regenerate IDs, append
-copies, or introduce numerical/Undo drift beyond the defined repeated
-translation.
+### Required end-to-end path
 
-## 4. Typed production APIs and cleanup
+Add a focused behavioral regression that starts from the actual production
+Duplicate button or Translate form event and reaches the actual App-used
+editor-state transition through every production forwarding boundary.
 
-Expose distinct typed production paths, conceptually:
+The same test or tightly coupled tests must fail if any of these regressions is
+introduced:
 
-```ts
-onDuplicateCoonsPatch(patchId: string): DuplicateCoonsPatchActionResult
+- App fails to pass either callback to `EditableInspector`;
+- `EditableInspector` drops or swaps the callbacks when creating
+  `StratumInspector`;
+- `StratumInspector` drops or swaps them when creating
+  `CoonsPatchActionsEditor`;
+- `CoonsPatchActionsEditor` drops or swaps them when creating
+  `CoonsPatchActionsControls`;
+- the Duplicate event invokes Translate;
+- the Translate event invokes Duplicate;
+- the patch ID changes at any boundary;
+- `dx`, `dy`, or `dz` is omitted or swapped;
+- the App handler fails to apply the result to editor state.
 
-onTranslateCoonsPatch(
-  patchId: string,
-  translation: TranslationVector,
-): TranslateCoonsPatchActionResult
-```
+### Duplicate assertions
 
-Names may follow repository conventions, but the contracts and distinct
-callbacks are required.
+Through that full production chain, one actual Duplicate click must verify:
 
-Separate:
+- the App Duplicate handler is reached exactly once;
+- the exact selected source patch ID reaches it;
+- no translation vector is passed;
+- the Translate handler is not called;
+- one untranslated copy is appended;
+- the original remains unchanged;
+- the new copy ID becomes the single selection;
+- history `past` increases by exactly one;
+- history `future` follows the normal new-edit policy.
 
-- pure/model-level Duplicate logic;
-- Duplicate editor-state application;
-- pure/model-level same-ID Translate logic;
-- Translate editor-state application;
-- Inspector Duplicate click handling;
-- Inspector Translate form submission;
-- App callbacks passed through `EditableInspector` and `StratumInspector`.
+### Translate assertions
 
-Low-level clone, ID, translation, validation, and commit helpers may be reused.
-Do not duplicate geometry traversal merely to obtain separate buttons.
-
-Remove the combined production UI entry point and combined App/Inspector
-callback. Do not leave a dead `Duplicate & translate` button, hidden form, or
-public state-transition path that can accidentally be wired later. A private
-low-level helper may be retained only if it has a clear single responsibility
-and is actually reused by one of the separate operations; do not retain a
-public combined operation merely for backward compatibility.
-
-There is no saved schema/API compatibility requirement for UI callback names.
-Do not bump the diagram version.
-
-The existing source/test filenames may remain if renaming them would add noise,
-but exported type/function/component names and visible labels must accurately
-describe the separate behavior. If files are renamed, update imports and the
-explicit test script atomically.
-
-## 5. Selection and history semantics
-
-Each action is independently atomic.
-
-### Duplicate alone
-
-```text
-before: H0, original selected
-Duplicate: H1, new untranslated copy selected
-Undo: H0, copy removed; stale missing-copy selection cleaned
-Redo: H1, exact same copy ID and geometry restored
-```
-
-Redo selection follows the existing non-persistent selection policy; do not add
-selection to diagram history solely for this feature.
-
-### Translate alone
-
-```text
-before: H0, patch P selected
-Translate: H1, same ID P translated and selected
-Undo: H0, exact pre-translation geometry and link state restored
-Redo: H1, exact translated static state restored
-```
-
-Directly translating a linked original must be undoable back to the exact
-linked state, including source IDs, reversal flags, materialized snapshots, and
-frozen state.
-
-### Duplicate followed by Translate
-
-```text
-H0: original only
-H1: untranslated copy exists with its Duplicate-time static/linked/stale state
-H2: same copy ID is translated and static
-```
-
-Required Undo order:
-
-1. first Undo restores H1: the unshifted copy remains and its exact pre-Translate
-   link/static/frozen state is restored;
-2. second Undo restores H0: the copy is removed and missing selection is
-   cleaned.
-
-Required Redo order:
-
-1. first Redo restores the exact same unshifted copy ID;
-2. second Redo restores the exact same translated static geometry.
-
-Repeated cycles must not drift geometry, regenerate IDs, duplicate history
-entries, append extra patches, or alter source strata.
-
-Do not collapse the sequence into one history entry. Two user actions are
-intentionally two transactions.
-
-## 6. Production interaction regressions
-
-The previous review's UI coverage finding must be fixed for both actions.
-
-### Duplicate button regression
-
-Exercise the actual production `Duplicate` button handler, not only a helper or
-server-rendered label.
-
-The test must verify:
-
-- one click invokes the production Duplicate callback exactly once;
-- it forwards the exact selected patch ID and no translation vector;
-- it routes through the same editor-state transition used by the App;
-- exactly one untranslated copy is appended;
-- the returned copy ID becomes selected;
-- history gains exactly one entry;
-- invalid or zero translation drafts do not disable, alter, or get submitted by
-  Duplicate;
-- the Translate callback is not invoked.
-
-### Translate form regression
-
-Exercise the actual production Translate form handler.
-
-Use three distinct components, for example:
+After rebinding/rerendering the production chain to the state and selection
+created by Duplicate, submit the actual Translate form with distinct values,
+for example:
 
 ```text
 dx = 1.25
@@ -614,292 +395,145 @@ dz = 3.75
 
 Verify:
 
-- one submit invokes the production Translate callback exactly once;
-- it forwards the exact selected patch ID;
-- it forwards the parsed finite vector with no missing or swapped component;
-- the App/editor-state transition replaces the same ID and does not append;
-- linked input is static before central synchronization sees the candidate;
-- selection stays on that same ID;
-- history gains exactly one entry;
-- the Duplicate callback is not invoked.
+- the App Translate handler is reached exactly once;
+- the exact newly selected copy ID reaches it;
+- the parsed vector components arrive with no omission or swap;
+- the Duplicate handler is not called again;
+- stratum count and IDs do not change;
+- the same copy ID is replaced with translated static geometry;
+- that same ID remains selected;
+- history `past` increases by exactly one more entry;
+- the resulting history is exactly H0 -> H1 -> H2;
+- Undo once restores the untranslated copy and its pre-Translate link/static
+  state;
+- Undo twice removes the copy;
+- Redo twice restores the same ID and translated geometry without drift.
 
-Through that same form path, invalid and zero submissions must invoke the
-mutation callback zero times and preserve diagram, selection, and history.
+Use a linked input for at least one full-chain sequence so a dropped/swap error
+cannot be hidden by static-only behavior. Existing lower-level tests may retain
+broader static/stale matrices.
 
-### Interaction harness constraints
+### What is not sufficient
 
-Prefer an existing interaction/component harness. Do not add a React testing,
-DOM, browser, or other dependency for this fix.
+Do not close this finding with any combination of only:
 
-If hook state cannot be driven directly, extract the smallest hook-free typed
-production handler/controller seam. The real button/form and App path must use
-that seam. Do not build a parallel test-only implementation.
+- direct calls to `CoonsPatchActionsControls` with test-owned callbacks;
+- a test lambda that directly calls `applyDuplicateCoonsPatchToEditorState` or
+  `applyTranslateCoonsPatchToEditorState` from the leaf harness;
+- direct helper or editor-state-helper tests;
+- `EditableInspector` SSR markup/gating;
+- checking callback prop names or source text;
+- asserting callback identity at one layer without invoking the event;
+- separately testing an App controller and leaf component without connecting
+  them through the production forwarding chain;
+- a test-only parallel callback composition.
 
-These are insufficient by themselves:
+Keep the existing leaf interaction and SSR eligibility tests as useful
+supplemental coverage, but add the missing full-chain proof.
 
-- SSR markup;
-- source-text or regular-expression matching;
-- label or button counts;
-- calling only pure duplicate/translate helpers;
-- calling editor-state helpers directly without the actual production click or
-  form handler;
-- callbacks explicitly marked as not invoked;
-- test-only fake control flow.
+### Allowed test seam
 
-Keep SSR eligibility assertions only as supplemental coverage.
+Use an existing interaction harness if one can drive the complete path. Do not
+add a DOM, browser, React-testing, or other dependency.
 
-## 7. SVG and TikZ coordinate regressions
+If the current App-local closures or React hook state make the full chain
+inaccessible, extract the smallest typed production App action/controller seam
+needed for testing. This is acceptable only when all of the following are true:
 
-The final-output review finding remains required after the split.
+- `App` itself uses that exact seam for its real Duplicate and Translate
+  handlers;
+- the test obtains the callbacks supplied to `EditableInspector` from the
+  actual App-owned render/composition path;
+- if extraction is required, `App` renders a small production composition
+  component whose real callback props are exercised by the test;
+- the test starts from the actual leaf click/form handler;
+- the test traverses the actual production callback props through
+  `CoonsPatchActionsEditor`, `StratumInspector`, and `EditableInspector`;
+- the event reaches that App-used seam without a test-owned operation callback
+  replacing it;
+- the same test observes the resulting diagram, selection, and history;
+- deleting or swapping any production forwarding prop makes the test fail.
 
-Use an asymmetric patch, a fixed camera, and a non-zero vector that changes the
-projection. The regression may perform Duplicate and then Translate, but it
-must distinguish these states:
+Constructing `EditableInspector` directly in the test with callbacks imported
+from an App helper is insufficient. That arrangement would still pass if the
+real App JSX stopped supplying or swapped those props.
 
-```text
-after Duplicate: copy mesh equals source mesh
-after Translate: copy mesh equals pre-Translate copy mesh + d
-```
-
-### SVG
-
-Render through the production `SvgDiagram` path and the SVG export preparation
-path where available.
-
-The test must:
-
-1. identify the selected copy's emitted curved-sheet face geometry
-   deterministically;
-2. parse numeric polygon `points` or boundary `d` coordinates;
-3. derive expected projected coordinates from the translated mesh using the
-   production camera/projection convention;
-4. compare actual and expected values with the repository tolerance/formatting
-   policy;
-5. prove the asserted copy geometry differs from the source geometry.
-
-Prefer all copy-face coordinates when a stable helper already exposes their
-mapping. A smaller distinctive set is acceptable only if it unambiguously
-identifies the copy and would fail if the copy were rendered at source
-coordinates.
-
-Element counts, data attributes, or Preview/world-space vertices alone are not
-sufficient.
-
-### Standalone and inline-math TikZ
-
-For both:
-
-```ts
-generateTikz(diagram)
-generateTikz(diagram, { exportMode: 'inlineMath' })
-```
-
-the test must:
-
-1. isolate the translated patch/copy export block and coordinate definitions;
-2. associate its coordinate names with its sampled mesh vertices;
-3. compare emitted numeric coordinates with pre-Translate vertices plus `d`;
-4. prove the values are not the source/untranslated values;
-5. perform the coordinate assertion separately for both export modes.
-
-Use stable structural parsing around the unique ID/comment and coordinate
-definitions. A number occurring elsewhere in the document must not satisfy the
-assertion accidentally.
-
-Retain existing checks for:
-
-- readable standalone output;
-- 4-space indentation;
-- no blank lines in inline-math output;
-- style, opacity, layer visibility, and sampling preservation.
-
-Do not change SVG/TikZ production output merely to make assertions convenient.
-Add a narrow stable semantic hook only if no existing deterministic association
-is possible, and explain why.
-
-## 8. Required model and integration tests
-
-At minimum, add or update meaningful assertions for:
-
-1. separate visible `Duplicate` and `Translate` controls;
-2. absence of the combined `Duplicate & translate` action;
-3. exact eligibility and hidden/locked/filter behavior for both controls;
-4. production Duplicate button callback, patch ID, selection, and one history
-   entry;
-5. production Translate form callback, patch ID, distinct vector components,
-   same-ID selection, and one history entry;
-6. invalid/zero Translate callback count zero and atomic state;
-7. Duplicate works independently of invalid/zero translation drafts;
-8. static Duplicate produces an equal untranslated independent copy;
-9. healthy linked Duplicate preserves links to the same sources;
-10. stale linked Duplicate preserves links and exact frozen snapshots;
-11. a source edit synchronizes both healthy linked patches before either is
-    translated;
-12. static Translate changes the same ID and appends nothing;
-13. healthy linked Translate removes links before commit and becomes static;
-14. stale linked Translate uses stored frozen preview plus delta and preserves
-    frozen state;
-15. source edits, deletion, repair, changed-source sync, full sync, and JSON load
-    cannot move or relink a translated static patch;
-16. all four boundary roles, constant/line/cubic/arc/template geometry, and
-    frame-origin policy;
-17. Duplicate deep-clone identity and metadata preservation;
-18. Duplicate global ID collisions across strata, labels, anchors, and dangling
-    source IDs;
-19. repeated Duplicate uses distinct IDs and never translates;
-20. repeated Translate retains one ID, applies one delta per action, and never
-    appends;
-21. Duplicate-only Undo/Redo;
-22. direct Translate Undo restoring exact previous static/linked/stale state;
-23. two-step Duplicate-then-Translate Undo/Redo ordering;
-24. intermediate untranslated output and final translated Preview mesh;
-25. actual translated SVG coordinates;
-26. actual translated standalone TikZ coordinates;
-27. actual translated inline-math TikZ coordinates;
-28. generic Phase 29 patch-only and patch-plus-source duplication remain
-    unchanged outside these Inspector actions;
-29. ruled surfaces and other curved sheets remain unaffected;
-30. save/load contains no UI draft or selection state.
-
-Inspect assertions, not only test names/counts. Ensure the focused test remains
-part of `npm test` if the script enumerates files explicitly.
-
-Remove the four reported unused type imports from the focused test unless a new
-assertion genuinely uses the type:
-
-- `CoonsPatchPrimitive`;
-- `CurvedSheetStratum`;
-- `PathSegment`;
-- `PointStratum`.
-
-Targeted ESLint must finish with no Phase 30 error. Do not perform unrelated lint
-cleanup.
-
-## 9. Documentation
-
-Update implemented documentation to describe two independent actions:
-
-- `Duplicate` creates an untranslated copy and selects it;
-- ordinary linked/stale Duplicate retains Phase 29 patch-only link semantics;
-- `Translate` moves the selected same-ID patch;
-- translating a linked/stale patch detaches only that patch before moving it;
-- source paths, source points, and coordinate anchors are not moved;
-- stale Translate uses stored frozen last-valid previews;
-- each action is one transaction;
-- Duplicate followed by Translate is two Undo steps;
-- direct Inspector translation is global and unsnapped;
-- no rotation, scale, persistent offset, or source-tree duplication exists.
-
-At minimum, correct combined-action/one-step wording in:
-
-- `docs/EDITING.md`;
-- `docs/RULED_SURFACES.md`;
-- `docs/ROADMAP.md`.
-
-Update `docs/DATA_MODEL.md` only if its current Phase 30 wording becomes false.
-Do not add a schema or version field. The existing phase slug
-`coons-patch-duplicate-translate` may remain; no `run-phase.mjs` change is
-required solely because the controls are separated.
-
-Documentation must describe implemented behavior, not aspirational behavior.
-
-## Preserve existing behavior
-
-Do not regress:
-
-- static and linked Coons creation;
-- Phase 29 materialized-snapshot architecture;
-- link synchronization and per-role reversal;
-- stale fallback, recovery, detach, and source deletion;
-- generic patch-only duplicate link preservation;
-- patch-plus-source ID remapping;
-- deterministic global ID reservation;
-- coordinate-reference detachment/rejection policy;
-- symbolic and frozen-preview translation;
-- frame-origin versus basis/local-coordinate translation;
-- layer filters, visibility, locking, and selection cleanup;
-- generic bulk/layer duplicate and translation outside the new Coons controls;
-- Undo/Redo and save/load;
-- Preview performance and mesh caching;
-- SVG and TikZ rendering from materialized snapshots;
-- inline-math no-blank-lines and 4-space indentation;
-- ruled surfaces and other curved-sheet kinds.
-
-Do not resolve source strata from rendering or export. Do not introduce a
-persistent linked-patch offset.
+Do not export large App internals or redesign global editor state. Prefer a
+small hook-free adapter around the existing editor-state operations. Keep
+production semantics unchanged unless the test exposes a defect.
 
 ## Scope
 
 ### Implement
 
-- separate Coons Inspector `Duplicate` and `Translate` controls;
-- separate typed callbacks, production handlers, and editor-state operations;
-- Phase 29-compatible untranslated Duplicate semantics;
-- same-ID Translate with detach-before-translate for linked/stale patches;
-- independent selection, validation, and history behavior;
-- production interaction tests for both controls;
-- final SVG and both TikZ coordinate regressions;
-- documentation updates required by the split;
-- the reported focused-test lint cleanup.
+- reconcile `prompts/phase-30-review.md` with the split contract;
+- add full production callback-chain behavioral coverage for Duplicate and
+  Translate;
+- add the smallest shared App test seam only if required;
+- fix a production callback defect only if the new regression reproduces it.
 
 ### Do not implement
 
-- any combined production `Duplicate & translate` action;
+- another redesign of Duplicate or Translate semantics;
+- changes to the already-correct state matrices, geometry, frozen policy, ID
+  allocation, synchronization, save/load, SVG, or TikZ behavior;
+- new SVG/TikZ output formats or duplicate coordinate tests solely for count;
+- changes to `phase-30-implement.md`;
+- changes to `scripts/automation/run-phase.mjs` or the Phase 30 slug;
+- broad product-documentation rewrites;
 - a new dependency or test framework;
-- linked transformed patches or persistent offsets;
-- duplicated source ecosystems;
-- movement of source paths, points, or anchors;
-- rotation, scale, shear, drag placement, or general affine transforms;
-- work-plane-local Phase 30 UI;
-- a general dependency graph;
-- a rendering/sampling/TikZ architecture rewrite;
-- a history model rewrite or selection-history persistence;
-- a JSON schema/version change;
-- unrelated lint or UI cleanup.
+- unrelated source, test, lint, or formatting cleanup.
+
+Expected changes are primarily `prompts/phase-30-review.md` and the focused
+Phase 30 integration test. Production files should change only for a minimal
+shared test seam or a defect demonstrated by the new regression.
+
+## Tests and regression preservation
+
+Keep the existing focused assertions for:
+
+- split labels and eligibility;
+- leaf event parsing and invalid/zero no-op behavior;
+- static/healthy-linked/stale-linked Duplicate and Translate matrices;
+- frozen symbolic previews;
+- deep-clone and global-ID safety;
+- source immutability and synchronization;
+- exact two-step Undo/Redo;
+- save/load;
+- actual SVG coordinates;
+- actual standalone and inline-math TikZ coordinates;
+- generic Phase 29 duplication behavior.
+
+Do not weaken or replace these tests when adding the full-chain regression.
+Ensure the focused file remains in the explicit `npm test` command.
 
 ## Manual verification
 
-If the environment permits running the app, verify:
+If the environment permits running the app, verify through the real Inspector:
 
-1. select a static Coons patch;
-2. click `Duplicate` with zero or invalid translation drafts present;
-3. confirm one untranslated copy appears and becomes selected;
-4. enter distinct non-zero `dx`, `dy`, and `dz` values;
-5. click `Translate` and confirm the same selected copy moves without another
-   copy appearing;
-6. Undo once and confirm the unshifted copy remains;
-7. Undo again and confirm the copy is removed;
-8. Redo twice and confirm the exact same copy ID and translated geometry return;
-9. repeat Duplicate on a healthy linked patch and confirm the copy is initially
-   linked to the same sources;
-10. Translate the linked copy and confirm only that copy becomes static;
-11. edit a source and run synchronization; confirm the translated copy stays
-    fixed while still-linked patches update;
-12. repeat with a stale/missing-source patch and verify frozen last-valid
-    behavior;
-13. directly Translate a linked original, then Undo and confirm its links return;
-14. try invalid, non-finite, unknown, and zero Translate values;
-15. confirm non-Coons and non-editable selections expose neither action;
-16. save/reload JSON;
-17. inspect Preview, exported SVG, standalone TikZ, and inline-math TikZ.
+1. select a linked Coons patch;
+2. click `Duplicate` and confirm one untranslated linked copy becomes selected;
+3. enter distinct `dx`, `dy`, and `dz` values;
+4. click `Translate` and confirm the same copy ID moves and becomes static;
+5. Undo once and confirm the unshifted linked copy returns;
+6. Undo again and confirm the copy is removed;
+7. Redo twice and confirm the same translated copy returns.
 
-If the local server cannot run, report the exact limitation. Do not claim manual
-verification that was not performed.
+The previous review environment could not bind the development server and
+reported `listen EPERM`. If manual verification remains unavailable, report the
+exact limitation and do not claim it was performed. This does not waive the
+automated full-chain regression.
 
 ## Verification
 
-Run the focused Phase 30 test first:
+Run the focused suite first:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node --test \
   tests/integration/phase30CoonsDuplicateTranslate.test.ts
 ```
 
-If the file was renamed, use the actual focused filename and ensure `npm test`
-includes it.
-
-Run targeted lint on every Phase 30 file changed by the fix. For unchanged
-legacy filenames, at minimum:
+Run the established minimum targeted lint gate:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH npx eslint \
@@ -907,6 +541,10 @@ PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/ui/inspector/CoonsPatchDuplicateTranslateEditor.tsx \
   tests/integration/phase30CoonsDuplicateTranslate.test.ts
 ```
+
+If a new App/controller or Inspector file is changed, lint it separately and
+report any exact pre-existing rule failure instead of hiding it or broadening
+the fix.
 
 Then run:
 
@@ -916,65 +554,63 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 git diff --check
 ```
 
-Report exact commands, exit codes, test counts, and failures. If repository-wide
-lint is run, report unrelated pre-existing debt separately; it is not a required
-Phase 30 gate.
+Also inspect the reconciled review prompt with targeted searches such as:
+
+```bash
+rg -n 'Duplicate & translate|one atomic|one-step|translated copy|static copy' \
+  prompts/phase-30-review.md
+```
+
+Every match must be either removed, updated to split semantics, or clearly
+non-normative historical context.
+
+Report exact commands, exit codes, test counts, and failures. Do not hide
+pre-existing failures; distinguish them with evidence.
 
 ## Acceptance criteria
 
-The Phase 30 fix is complete when:
+This targeted fix is complete when:
 
-- the production Inspector visibly exposes separate `Duplicate` and `Translate`
-  actions and no combined action;
-- each control is behaviorally tested through its actual production handler;
-- Duplicate takes only the patch ID, ignores translation drafts, appends one
-  untranslated deep copy, and selects it;
-- Duplicate follows the static/healthy-linked/stale-linked state matrix;
-- Translate takes patch ID plus vector, appends nothing, preserves the ID and
-  selection, and translates every materialized boundary exactly once;
-- Translate detaches linked/stale input before central synchronization;
-- stale Translate uses exact stored frozen previews plus the delta;
-- boundary sources and anchors never move;
-- each action creates exactly one history entry;
-- Duplicate followed by Translate has the required two-step Undo/Redo order;
-- invalid/zero Translate is atomic and never rolls back a completed Duplicate;
-- repeated Duplicate and repeated Translate follow their distinct ID/geometry
-  policies;
-- rendered/exported SVG assertions fail if the translated target uses source
-  coordinates;
-- standalone and inline-math TikZ assertions fail if the translated target uses
-  source coordinates;
-- the reported unused-import errors are gone;
-- documentation describes the split accurately;
-- generic Phase 29 duplication and all listed preserved behavior remain intact;
-- the focused test, targeted lint, complete test suite, build, and
+- `phase-30-review.md` no longer requires the former combined atomic action;
+- its title, context, goal, checklists, severity examples, tests, manual steps,
+  and readiness rule consistently review separate Duplicate and Translate
+  actions;
+- its Duplicate/Translate state matrices and two-entry history semantics match
+  this prompt;
+- it preserves the human report and machine-readable `REVIEW_JSON` contract;
+- a behavioral test begins at the actual Duplicate and Translate UI events and
+  reaches the App-used editor-state transitions through every production
+  callback-forwarding boundary;
+- that test fails for a dropped or swapped callback at any layer;
+- the test verifies exact IDs/vector arguments and exact diagram, selection,
+  and H0/H1/H2 history transitions;
+- the full-chain linked sequence proves Duplicate preserves links and Translate
+  detaches before moving;
+- no production behavior changes unless the new test exposes and documents an
+  actual defect;
+- all previously correct Phase 30 regressions remain intact;
+- focused tests, minimum targeted lint, the full suite, build, and
   `git diff --check` pass.
 
 ## Report after implementation
 
 Please report:
 
-- files modified or renamed;
-- separate Duplicate and Translate UI locations and accessible labels;
-- old combined entry points removed;
-- Duplicate helper/callback/state-transition API;
-- Translate helper/callback/state-transition API;
-- Duplicate static/healthy-linked/stale-linked behavior;
-- Translate static/healthy-linked/stale-linked behavior;
-- detach-before-commit implementation;
-- frozen symbolic preview handling;
-- deep-clone and global ID evidence for Duplicate;
-- same-ID and no-append evidence for Translate;
-- distinct callback invocation and argument assertions;
-- invalid/zero Translate and invalid-draft-independent Duplicate assertions;
-- one-entry-per-action and two-step sequence Undo/Redo evidence;
-- actual SVG coordinate assertion method;
-- actual standalone and inline-math TikZ coordinate assertion method;
-- whether the new tests exposed any additional production defect;
-- unused imports removed or legitimately used;
-- documentation updated;
+- files modified;
+- every `phase-30-review.md` section reconciled;
+- how you confirmed no combined action remains normative in the review gate;
+- how the review's `REVIEW_JSON` automation contract was preserved;
+- the exact production callback path exercised by the new test;
+- evidence that it is not the existing leaf-only harness;
+- how each `CoonsPatchActionsEditor`, `StratumInspector`, `EditableInspector`,
+  and App boundary is covered;
+- exact Duplicate and Translate callback counts and arguments;
+- exact diagram, selection, and H0/H1/H2 history assertions;
+- whether the new regression exposed a production defect;
+- any production seam introduced and why it was necessary;
+- confirmation that existing SVG/TikZ numeric-coordinate regressions remain;
 - exact focused-test command/result;
-- exact targeted ESLint command/result;
+- exact targeted lint command/result;
 - exact `npm test` result;
 - exact `npm run build` result;
 - exact `git diff --check` result;
