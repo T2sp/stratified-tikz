@@ -56,6 +56,7 @@ import type {
   WorkPlaneLocalCoordinateSource,
 } from '../../src/model/types.ts'
 import { validateDiagram } from '../../src/model/validation.ts'
+import { updateSymbolicVariableInDiagram } from '../../src/model/variables.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
 import { prepareSvgSurfaceGeometry } from '../../src/rendering/svgSurfaceScene.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
@@ -222,6 +223,268 @@ test('separate model operations have exact eligibility and atomic failures', () 
   assert.equal(
     translateCoonsPatch(malformedDiagram, malformedPatch.id, delta).ok,
     false,
+  )
+})
+
+test('all-role static Translate rejects a non-zero delta swallowed at the current coordinate scale', () => {
+  const diagram = createLargeConstantPointPatchDiagram(false)
+  const before = structuredClone(diagram)
+  const patch = findCoonsPatch(diagram, 'precision-patch')
+  const beforeMesh = sampleCoonsPatch(patch.primitive)
+
+  assert.equal(validateDiagram(diagram).valid, true)
+  assert.equal(1e16 + 1, 1e16)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.equal(constantBoundary(patch.primitive[role]).point.x, 1e16)
+  }
+
+  const result = translateCoonsPatch(
+    diagram,
+    patch.id,
+    numericTranslation(diagram, point(1, 0, 0)),
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.diagram, diagram)
+  if (result.ok) {
+    throw new Error('Expected rounded-away translation to fail.')
+  }
+  assert.match(result.error, /too small.*current coordinate scale/i)
+  assert.deepEqual(diagram, before)
+  assert.deepEqual(sampleCoonsPatch(patch.primitive), beforeMesh)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(
+      constantBoundary(findCoonsPatch(result.diagram, patch.id).primitive[role]),
+      constantBoundary(patch.primitive[role]),
+    )
+  }
+})
+
+test('editor-state rounded-away Translate failure preserves selection, status, and non-empty Undo/Redo stacks', () => {
+  const diagram = createLargeConstantPointPatchDiagram(false)
+  const initial = createEditorStateWithSeededHistory(
+    diagram,
+    { kind: 'stratum', id: 'precision-patch' },
+  )
+  const before = structuredClone(initial)
+  const result = applyTranslateCoonsPatchToEditorState(
+    initial,
+    'precision-patch',
+    numericTranslation(diagram, point(1, 0, 0)),
+  )
+
+  assert.equal(initial.history.past.length, 1)
+  assert.equal(initial.history.future.length, 1)
+  assert.equal(result.ok, false)
+  assert.equal(result.state, initial)
+  assert.match(result.message, /too small.*current coordinate scale/i)
+  assert.doesNotMatch(result.message, /Translated Coons patch by/)
+  assert.deepEqual(result.state, before)
+  assert.deepEqual(result.state.editableDiagram, before.editableDiagram)
+  assert.deepEqual(result.state.selectedElement, before.selectedElement)
+  assert.deepEqual(result.state.history.present, before.history.present)
+  assert.deepEqual(result.state.history.past, before.history.past)
+  assert.deepEqual(result.state.history.future, before.history.future)
+  assert.equal(result.state.layerOperationStatus, 'Existing operation status')
+  assert.deepEqual(
+    result.state.editableDiagram.strata.map((stratum) => stratum.id),
+    before.editableDiagram.strata.map((stratum) => stratum.id),
+  )
+})
+
+test('mixed-scale Translate rejects atomically when only some required coordinates can move', () => {
+  const diagram = createMixedScalePatchDiagram()
+  const before = structuredClone(diagram)
+  const patch = findCoonsPatch(diagram, 'mixed-scale-patch')
+  const bottom = pathBoundary(patch.primitive.bottom)
+  const smallCoordinate = bottom.segments[0]?.start.x
+  const largeCoordinate = bottom.segments[0]?.end.x
+  const beforeMesh = sampleCoonsPatch(patch.primitive)
+
+  assert.equal(validateDiagram(diagram).valid, true)
+  assert.equal(smallCoordinate, 0)
+  assert.equal(largeCoordinate, 1e16)
+  assert.notEqual((smallCoordinate ?? 0) + 1, smallCoordinate)
+  assert.equal((largeCoordinate ?? 0) + 1, largeCoordinate)
+
+  const result = translateCoonsPatch(
+    diagram,
+    patch.id,
+    numericTranslation(diagram, point(1, 0, 0)),
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.diagram, diagram)
+  if (result.ok) {
+    throw new Error('Expected mixed-scale translation to fail.')
+  }
+  assert.match(result.error, /too small.*current coordinate scale/i)
+  assert.deepEqual(diagram, before)
+  assert.deepEqual(sampleCoonsPatch(patch.primitive), beforeMesh)
+})
+
+test('Translate rejects when representable boundary movement is lost in the derived sampled mesh', () => {
+  const diagram = structuredClone(createLargeConstantPointPatchDiagram(false))
+  const patch = findCoonsPatch(diagram, 'precision-patch')
+  const source = findStratum(diagram, 'precision-source')
+
+  if (source.geometricKind !== 'point') {
+    throw new Error('Expected the precision point source.')
+  }
+  source.position.x = 0
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    constantBoundary(patch.primitive[role]).point.x = 0
+  }
+  const before = structuredClone(diagram)
+  const beforeMesh = sampleCoonsPatch(patch.primitive)
+  const delta = Number.MIN_VALUE
+
+  assert.equal(validateDiagram(diagram).valid, true)
+  assert.notEqual(0 + delta, 0)
+
+  const result = translateCoonsPatch(
+    diagram,
+    patch.id,
+    numericTranslation(diagram, point(delta, 0, 0)),
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.diagram, diagram)
+  if (result.ok) {
+    throw new Error('Expected sampled-mesh representability failure.')
+  }
+  assert.match(result.error, /too small.*current coordinate scale/i)
+  assert.deepEqual(diagram, before)
+  assert.deepEqual(sampleCoonsPatch(patch.primitive), beforeMesh)
+})
+
+test('linked rounded-away Translate failure retains active links, snapshots, sources, and complete history', () => {
+  const diagram = createLargeConstantPointPatchDiagram(true)
+  const patch = findCoonsPatch(diagram, 'precision-patch')
+  const linksBefore = structuredClone(patch.primitive.boundarySources)
+  const snapshotsBefore = structuredClone(patch.primitive)
+  const sourcesBefore = structuredClone(
+    diagram.strata.filter((stratum) => stratum.id !== patch.id),
+  )
+  const initial = createEditorStateWithSeededHistory(
+    diagram,
+    { kind: 'stratum', id: patch.id },
+  )
+  const before = structuredClone(initial)
+
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(diagram, patch.id), {
+    kind: 'linkedUpToDate',
+  })
+
+  const result = applyTranslateCoonsPatchToEditorState(
+    initial,
+    patch.id,
+    numericTranslation(diagram, point(1, 0, 0)),
+  )
+
+  assert.equal(result.ok, false)
+  assert.equal(result.state, initial)
+  assert.match(result.message, /too small.*current coordinate scale/i)
+  assert.deepEqual(result.state, before)
+  assert.deepEqual(
+    findCoonsPatch(result.state.editableDiagram, patch.id).primitive,
+    snapshotsBefore,
+  )
+  assert.deepEqual(
+    findCoonsPatch(result.state.editableDiagram, patch.id).primitive
+      .boundarySources,
+    linksBefore,
+  )
+  assert.deepEqual(
+    result.state.editableDiagram.strata.filter(
+      (stratum) => stratum.id !== patch.id,
+    ),
+    sourcesBefore,
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(result.state.editableDiagram, patch.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(result.state.history, before.history)
+  assert.deepEqual(result.state.selectedElement, before.selectedElement)
+  assert.equal(result.state.layerOperationStatus, 'Existing operation status')
+})
+
+test('large-scale representable Translate control moves every required point and commits once', () => {
+  const diagram = createLargeConstantPointPatchDiagram(true)
+  const patch = findCoonsPatch(diagram, 'precision-patch')
+  const linksBefore = structuredClone(patch.primitive.boundarySources)
+  const sourceMesh = sampleCoonsPatch(patch.primitive)
+  const delta = point(2, 0, 0)
+
+  assert.notEqual(1e16 + delta.x, 1e16)
+  assert.notEqual(linksBefore, undefined)
+
+  const translated = translateCoonsPatch(
+    diagram,
+    patch.id,
+    numericTranslation(diagram, delta),
+  )
+
+  assert.equal(translated.ok, true)
+  if (!translated.ok) {
+    throw new Error(translated.error)
+  }
+  assert.equal(translated.patchId, patch.id)
+  assert.equal(translated.diagram.strata.length, diagram.strata.length)
+  assert.deepEqual(
+    translated.diagram.strata.map((stratum) => stratum.id),
+    diagram.strata.map((stratum) => stratum.id),
+  )
+  const moved = findCoonsPatch(translated.diagram, patch.id)
+  assert.equal(moved.primitive.boundarySources, undefined)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(translated.diagram, patch.id), {
+    kind: 'static',
+  })
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assertBoundaryTranslated(patch.primitive[role], moved.primitive[role], delta)
+    assert.notEqual(
+      constantBoundary(moved.primitive[role]).point.x,
+      constantBoundary(patch.primitive[role]).point.x,
+    )
+  }
+  const movedMesh = sampleCoonsPatch(moved.primitive)
+  sourceMesh.vertices.forEach((vertex, index) => {
+    const movedVertex = movedMesh.vertices[index]
+    assertVec3Translated(vertex, movedVertex, delta)
+    assert.notEqual(movedVertex?.x, vertex.x)
+  })
+  assertOtherStrataAndAnchorsUnchanged(diagram, translated.diagram, patch.id)
+
+  const initial = createEditorState(diagram, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  const applied = applyTranslateCoonsPatchToEditorState(
+    initial,
+    patch.id,
+    numericTranslation(diagram, delta),
+  )
+
+  assert.equal(applied.ok, true)
+  if (!applied.ok) {
+    throw new Error(applied.message)
+  }
+  assert.deepEqual(applied.state.editableDiagram, translated.diagram)
+  assert.deepEqual(applied.state.selectedElement, {
+    kind: 'stratum',
+    id: patch.id,
+  })
+  assert.equal(applied.state.history.past.length, 1)
+  assert.deepEqual(applied.state.history.past[0], diagram)
+  assert.deepEqual(
+    applied.state.history.present,
+    applied.state.editableDiagram,
+  )
+  assert.equal(applied.state.history.future.length, 0)
+  assert.equal(
+    applied.state.layerOperationStatus,
+    'Translated Coons patch by (2, 0, 0).',
   )
 })
 
@@ -2532,6 +2795,361 @@ function assertNoCoonsPatchActions(markup: string, context = ''): void {
   assert.doesNotMatch(markup, /Translate selected Coons patch/, context)
 }
 
+test('static production H1 round-trips before Translate and remains static under full synchronization', () => {
+  const h0Diagram = normalizeSavedDiagramFixture(
+    withH1PersistenceSentinels(createComplexPatchDiagram(false)),
+  )
+  const h0Patch = findCoonsPatch(h0Diagram, 'patch')
+  const duplicate = applyDuplicateCoonsPatchToEditorState(
+    createEditorState(h0Diagram, { kind: 'stratum', id: h0Patch.id }),
+    h0Patch.id,
+  )
+
+  assert.equal(duplicate.ok, true)
+  if (!duplicate.ok) {
+    throw new Error(duplicate.message)
+  }
+  const h1Diagram = duplicate.state.editableDiagram
+  const h1Copy = findCoonsPatch(h1Diagram, duplicate.duplicatedPatchId)
+
+  assert.deepEqual(duplicate.state.selectedElement, {
+    kind: 'stratum',
+    id: h1Copy.id,
+  })
+  assert.equal(duplicate.state.history.past.length, 1)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(h1Diagram, h0Patch.id), {
+    kind: 'static',
+  })
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(h1Diagram, h1Copy.id), {
+    kind: 'static',
+  })
+  assert.equal(h0Patch.primitive.boundarySources, undefined)
+  assert.equal(h1Copy.primitive.boundarySources, undefined)
+  assertH1DuplicateMetadataAndGeometry(h0Patch, h1Copy)
+  assert.notEqual(h1Copy, h0Patch)
+  assert.notEqual(h1Copy.style, h0Patch.style)
+  assert.notEqual(h1Copy.primitive, h0Patch.primitive)
+  assert.notEqual(h1Copy.primitive.sampling, h0Patch.primitive.sampling)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assertBoundaryDeepClone(h0Patch.primitive[role], h1Copy.primitive[role])
+  }
+  assert.deepEqual(
+    sampleCoonsPatch(h1Copy.primitive),
+    sampleCoonsPatch(h0Patch.primitive),
+  )
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(h1Diagram))
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+  assertActualH1RoundTrip(
+    h0Diagram,
+    h1Diagram,
+    loaded.diagram,
+    h0Patch.id,
+    h1Copy.id,
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(loaded.diagram, h0Patch.id),
+    { kind: 'static' },
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(loaded.diagram, h1Copy.id),
+    { kind: 'static' },
+  )
+
+  const fullSynchronization = synchronizeLinkedCoonsPatches(
+    null,
+    loaded.diagram,
+    { mode: 'full' },
+  )
+  assert.equal(fullSynchronization.diagram, loaded.diagram)
+  assert.deepEqual(
+    findCoonsPatch(fullSynchronization.diagram, h1Copy.id),
+    findCoonsPatch(loaded.diagram, h1Copy.id),
+  )
+})
+
+test('healthy-linked production H1 round-trips with exact links and synchronizes both patches after load', () => {
+  const h0Diagram = normalizeSavedDiagramFixture(
+    withH1PersistenceSentinels(createComplexPatchDiagram(true)),
+  )
+  const h0Patch = findCoonsPatch(h0Diagram, 'patch')
+  const expectedLinks = structuredClone(h0Patch.primitive.boundarySources)
+  const duplicate = applyDuplicateCoonsPatchToEditorState(
+    createEditorState(h0Diagram, { kind: 'stratum', id: h0Patch.id }),
+    h0Patch.id,
+  )
+
+  assert.equal(duplicate.ok, true)
+  if (!duplicate.ok) {
+    throw new Error(duplicate.message)
+  }
+  const h1Diagram = duplicate.state.editableDiagram
+  const h1Copy = findCoonsPatch(h1Diagram, duplicate.duplicatedPatchId)
+
+  assert.notEqual(expectedLinks, undefined)
+  assert.deepEqual(h1Copy.primitive.boundarySources, expectedLinks)
+  assert.notEqual(
+    h1Copy.primitive.boundarySources,
+    h0Patch.primitive.boundarySources,
+  )
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(h1Diagram, h0Patch.id), {
+    kind: 'linkedUpToDate',
+  })
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(h1Diagram, h1Copy.id), {
+    kind: 'linkedUpToDate',
+  })
+  assertH1DuplicateMetadataAndGeometry(h0Patch, h1Copy)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assertBoundaryDeepClone(h0Patch.primitive[role], h1Copy.primitive[role])
+  }
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(h1Diagram))
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+  assertActualH1RoundTrip(
+    h0Diagram,
+    h1Diagram,
+    loaded.diagram,
+    h0Patch.id,
+    h1Copy.id,
+  )
+  const loadedOriginal = findCoonsPatch(loaded.diagram, h0Patch.id)
+  const loadedCopy = findCoonsPatch(loaded.diagram, h1Copy.id)
+  assert.deepEqual(loadedOriginal.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(loadedCopy.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(loaded.diagram, h0Patch.id), {
+    kind: 'linkedUpToDate',
+  })
+  assert.deepEqual(coonsPatchBoundaryLinkStatus(loaded.diagram, h1Copy.id), {
+    kind: 'linkedUpToDate',
+  })
+
+  const fullSynchronization = synchronizeLinkedCoonsPatches(
+    null,
+    loaded.diagram,
+    { mode: 'full' },
+  ).diagram
+  assert.deepEqual(fullSynchronization, loaded.diagram)
+  const editedCandidate: Diagram = {
+    ...fullSynchronization,
+    strata: fullSynchronization.strata.map((stratum) =>
+      stratum.id === 'bottom'
+        ? editBottomInteriorControl(stratum, 0.86)
+        : stratum,
+    ),
+  }
+  const synchronized = synchronizeLinkedCoonsPatches(
+    fullSynchronization,
+    editedCandidate,
+  ).diagram
+  const synchronizedOriginal = findCoonsPatch(synchronized, h0Patch.id)
+  const synchronizedCopy = findCoonsPatch(synchronized, h1Copy.id)
+
+  assert.notDeepEqual(
+    synchronizedOriginal.primitive.bottom,
+    loadedOriginal.primitive.bottom,
+  )
+  assert.deepEqual(
+    synchronizedOriginal.primitive.bottom,
+    synchronizedCopy.primitive.bottom,
+  )
+  assert.deepEqual(synchronizedOriginal.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(synchronizedCopy.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(synchronized, synchronizedOriginal.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(synchronized, synchronizedCopy.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(
+    synchronized.coordinateAnchors,
+    h0Diagram.coordinateAnchors,
+  )
+})
+
+test('stale-linked production H1 round-trips frozen previews, stays stable while missing, and recovers both patches', () => {
+  const linked = normalizeSavedDiagramFixture(
+    withH1PersistenceSentinels(createComplexPatchDiagram(true)),
+  )
+  const staleFixture = createFrozenSymbolicMissingBottomFixture(
+    linked,
+    0.2,
+    9,
+  )
+  const h0Diagram = normalizeSavedDiagramFixture(staleFixture.stale)
+  const h0Patch = findCoonsPatch(h0Diagram, 'patch')
+  const expectedLinks = structuredClone(h0Patch.primitive.boundarySources)
+  const frozenPrimitive = structuredClone(h0Patch.primitive)
+  const frozenMesh = sampleCoonsPatch(h0Patch.primitive)
+  const frozenControl = bottomCubicControl1(h0Patch)
+
+  assert.equal(h0Patch.primitive.boundarySnapshotState, 'frozen')
+  assert.equal(coonsPatchBoundaryLinkStatus(h0Diagram, h0Patch.id).kind, 'linkedStale')
+  assert.equal(frozenControl.z, 0.2)
+  assert.deepEqual(frozenControl.symbolic?.z, {
+    kind: 'symbolic',
+    expression: 'R',
+    previewValue: 0.2,
+  })
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(
+      h0Patch.primitive[role],
+      staleFixture.lastValidPatch.primitive[role],
+    )
+  }
+
+  const duplicate = applyDuplicateCoonsPatchToEditorState(
+    createEditorState(h0Diagram, { kind: 'stratum', id: h0Patch.id }),
+    h0Patch.id,
+  )
+  assert.equal(duplicate.ok, true)
+  if (!duplicate.ok) {
+    throw new Error(duplicate.message)
+  }
+  const h1Diagram = duplicate.state.editableDiagram
+  const h1Copy = findCoonsPatch(h1Diagram, duplicate.duplicatedPatchId)
+
+  assert.deepEqual(findCoonsPatch(h1Diagram, h0Patch.id).primitive, frozenPrimitive)
+  assert.deepEqual(h1Copy.primitive, frozenPrimitive)
+  assert.notEqual(h1Copy.primitive, h0Patch.primitive)
+  assert.notEqual(
+    h1Copy.primitive.boundarySources,
+    h0Patch.primitive.boundarySources,
+  )
+  assert.equal(h1Copy.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(h1Copy.primitive.boundarySources, expectedLinks)
+  assert.equal(coonsPatchBoundaryLinkStatus(h1Diagram, h0Patch.id).kind, 'linkedStale')
+  assert.equal(coonsPatchBoundaryLinkStatus(h1Diagram, h1Copy.id).kind, 'linkedStale')
+  assert.deepEqual(sampleCoonsPatch(h1Copy.primitive), frozenMesh)
+  assert.deepEqual(bottomCubicControl1(h1Copy), frozenControl)
+  assertH1DuplicateMetadataAndGeometry(h0Patch, h1Copy)
+
+  const loaded = parseSavedDiagramJson(serializeDiagram(h1Diagram))
+  assert.equal(loaded.ok, true)
+  if (!loaded.ok) {
+    throw new Error(loaded.error)
+  }
+  assertActualH1RoundTrip(
+    h0Diagram,
+    h1Diagram,
+    loaded.diagram,
+    h0Patch.id,
+    h1Copy.id,
+  )
+  const loadedOriginal = findCoonsPatch(loaded.diagram, h0Patch.id)
+  const loadedCopy = findCoonsPatch(loaded.diagram, h1Copy.id)
+  assert.deepEqual(loadedOriginal.primitive, frozenPrimitive)
+  assert.deepEqual(loadedCopy.primitive, frozenPrimitive)
+  assert.deepEqual(loadedOriginal.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(loadedCopy.primitive.boundarySources, expectedLinks)
+  assert.equal(loadedOriginal.primitive.boundarySnapshotState, 'frozen')
+  assert.equal(loadedCopy.primitive.boundarySnapshotState, 'frozen')
+  assert.deepEqual(bottomCubicControl1(loadedOriginal), frozenControl)
+  assert.deepEqual(bottomCubicControl1(loadedCopy), frozenControl)
+  assert.deepEqual(sampleCoonsPatch(loadedOriginal.primitive), frozenMesh)
+  assert.deepEqual(sampleCoonsPatch(loadedCopy.primitive), frozenMesh)
+  assert.equal(coonsPatchBoundaryLinkStatus(loaded.diagram, h0Patch.id).kind, 'linkedStale')
+  assert.equal(coonsPatchBoundaryLinkStatus(loaded.diagram, h1Copy.id).kind, 'linkedStale')
+
+  const missingSourceSynchronization = synchronizeLinkedCoonsPatches(
+    null,
+    loaded.diagram,
+    { mode: 'full' },
+  ).diagram
+  assert.deepEqual(missingSourceSynchronization, loaded.diagram)
+  assert.deepEqual(
+    findCoonsPatch(missingSourceSynchronization, h0Patch.id).primitive,
+    frozenPrimitive,
+  )
+  assert.deepEqual(
+    findCoonsPatch(missingSourceSynchronization, h1Copy.id).primitive,
+    frozenPrimitive,
+  )
+  assert.deepEqual(
+    sampleCoonsPatch(
+      findCoonsPatch(missingSourceSynchronization, h1Copy.id).primitive,
+    ),
+    frozenMesh,
+  )
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(
+      missingSourceSynchronization,
+      h0Patch.id,
+    ).kind,
+    'linkedStale',
+  )
+  assert.equal(
+    coonsPatchBoundaryLinkStatus(
+      missingSourceSynchronization,
+      h1Copy.id,
+    ).kind,
+    'linkedStale',
+  )
+
+  const repairedCandidate: Diagram = {
+    ...missingSourceSynchronization,
+    strata: [
+      staleFixture.removedSource,
+      ...missingSourceSynchronization.strata,
+    ],
+  }
+  const refreshedRepair = updateSymbolicVariableInDiagram(
+    repairedCandidate,
+    'variable-r',
+    { expression: '9' },
+  )
+  assert.equal(refreshedRepair.ok, true)
+  if (!refreshedRepair.ok) {
+    throw new Error(refreshedRepair.error)
+  }
+  const recovered = synchronizeLinkedCoonsPatches(
+    missingSourceSynchronization,
+    refreshedRepair.diagram,
+  ).diagram
+  const recoveredOriginal = findCoonsPatch(recovered, h0Patch.id)
+  const recoveredCopy = findCoonsPatch(recovered, h1Copy.id)
+
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(recovered, recoveredOriginal.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(
+    coonsPatchBoundaryLinkStatus(recovered, recoveredCopy.id),
+    { kind: 'linkedUpToDate' },
+  )
+  assert.deepEqual(recoveredOriginal.primitive.boundarySources, expectedLinks)
+  assert.deepEqual(recoveredCopy.primitive.boundarySources, expectedLinks)
+  assert.equal(recoveredOriginal.primitive.boundarySnapshotState, undefined)
+  assert.equal(recoveredCopy.primitive.boundarySnapshotState, undefined)
+  assert.deepEqual(recoveredOriginal.primitive, recoveredCopy.primitive)
+  const recoveredOriginalControl = bottomCubicControl1(recoveredOriginal)
+  const recoveredCopyControl = bottomCubicControl1(recoveredCopy)
+  assert.equal(recoveredOriginalControl.z, 9)
+  assert.deepEqual(recoveredOriginalControl.symbolic?.z, {
+    kind: 'symbolic',
+    expression: 'R',
+    previewValue: 9,
+  })
+  assert.deepEqual(recoveredCopyControl, recoveredOriginalControl)
+  const recoveredOriginalMesh = sampleCoonsPatch(recoveredOriginal.primitive)
+  const recoveredCopyMesh = sampleCoonsPatch(recoveredCopy.primitive)
+  assert.notDeepEqual(recoveredOriginalMesh, frozenMesh)
+  assert.deepEqual(recoveredCopyMesh, recoveredOriginalMesh)
+  const recoveredValidation = validateDiagram(recovered)
+  assert.equal(
+    recoveredValidation.valid,
+    true,
+    JSON.stringify(recoveredValidation.errors),
+  )
+})
+
 test('save/load, Preview, rendered/exported SVG, and both TikZ modes distinguish Duplicate then Translate', async () => {
   const sourceDiagram = createComplexPatchDiagram(false)
   const duplicated = duplicateCoonsPatch(sourceDiagram, 'patch')
@@ -3063,6 +3681,82 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function createLargeConstantPointPatchDiagram(linked: boolean): Diagram {
+  const source = createPointStratum({
+    ambientDimension: 3,
+    id: 'precision-source',
+    name: 'Large constant source',
+    style: { ...defaultPointStyle },
+    position: point(1e16, 0, 0),
+    layer: 0,
+  })
+  const sourceDiagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [source],
+  }
+  const selections: CoonsPatchBoundaryPathSelections = {
+    bottom: { kind: 'point', sourcePointId: source.id },
+    right: { kind: 'point', sourcePointId: source.id },
+    top: { kind: 'point', sourcePointId: source.id },
+    left: { kind: 'point', sourcePointId: source.id },
+  }
+  const created = createCoonsPatchFromBoundaryPaths(
+    sourceDiagram,
+    selections,
+    {
+      id: 'precision-patch',
+      name: 'Precision probe patch',
+      layer: 2,
+      sampling: { uSegments: 2, vSegments: 2 },
+      keepLinkedToBoundarySources: linked,
+    },
+  )
+
+  if (!created.ok) {
+    throw new Error(`Could not create precision fixture: ${created.error}`)
+  }
+
+  return created.diagram
+}
+
+function createMixedScalePatchDiagram(): Diagram {
+  const lowerLeft = point(0, 0, 0)
+  const lowerRight = point(1e16, 0, 0)
+  const upperLeft = point(0, 1, 0)
+  const upperRight = point(1e16, 1, 0)
+  const patch = createCurvedSheetStratum({
+    id: 'mixed-scale-patch',
+    name: 'Mixed-scale precision probe',
+    layer: 1,
+    primitive: {
+      kind: 'coonsPatch',
+      bottom: {
+        segments: [{ kind: 'line', start: lowerLeft, end: lowerRight }],
+      },
+      right: {
+        segments: [{ kind: 'line', start: lowerRight, end: upperRight }],
+      },
+      top: {
+        segments: [{ kind: 'line', start: upperLeft, end: upperRight }],
+      },
+      left: {
+        segments: [{ kind: 'line', start: lowerLeft, end: upperLeft }],
+      },
+      sampling: { uSegments: 2, vSegments: 2 },
+    },
+  })
+  const diagram: Diagram = {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [patch],
+  }
+
+  if (!validateDiagram(diagram).valid) {
+    throw new Error('Could not create the mixed-scale precision fixture.')
+  }
+
+  return diagram
+}
+
 function createComplexPatchDiagram(linked: boolean): Diagram {
   const base = createEmptyDiagram({ ambientDimension: 3 })
   const arc = createArcPathSegmentFromAngles({
@@ -3166,11 +3860,167 @@ function createComplexPatchDiagram(linked: boolean): Diagram {
   }
 }
 
+function withH1PersistenceSentinels(diagram: Diagram): Diagram {
+  const anchor: CoordinateAnchor = {
+    id: 'h1-persistence-anchor',
+    name: 'H1 persistence anchor',
+    tikzName: 'hOnePersistenceAnchor',
+    position: {
+      kind: 'global',
+      value: symbolicVec3FromVec3(point(7, 8, 9)),
+    },
+  }
+  const label = createTextLabel({
+    ambientDimension: 3,
+    id: 'h1-persistence-label',
+    name: 'H1 persistence label',
+    text: '$H_1$',
+    position: point(-3, 2, 1),
+    layer: 2,
+  })
+
+  return {
+    ...diagram,
+    coordinateAnchors: [...(diagram.coordinateAnchors ?? []), anchor],
+    labels: [...diagram.labels, label],
+  }
+}
+
+function normalizeSavedDiagramFixture(diagram: Diagram): Diagram {
+  const parsed = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
+  }
+  if (!validateDiagram(parsed.diagram).valid) {
+    throw new Error('Normalized persistence fixture is invalid.')
+  }
+
+  return parsed.diagram
+}
+
+function assertActualH1RoundTrip(
+  h0Diagram: Diagram,
+  h1Diagram: Diagram,
+  loadedH1Diagram: Diagram,
+  originalPatchId: string,
+  duplicatePatchId: string,
+): void {
+  assert.equal(validateDiagram(h1Diagram).valid, true)
+  assert.equal(validateDiagram(loadedH1Diagram).valid, true)
+  assert.equal(h1Diagram.strata.length, h0Diagram.strata.length + 1)
+  assert.equal(loadedH1Diagram.strata.length, h1Diagram.strata.length)
+  assert.deepEqual(
+    h1Diagram.strata.map((stratum) => stratum.id),
+    [...h0Diagram.strata.map((stratum) => stratum.id), duplicatePatchId],
+  )
+  assert.deepEqual(
+    loadedH1Diagram.strata.map((stratum) => stratum.id),
+    h1Diagram.strata.map((stratum) => stratum.id),
+  )
+  assert.deepEqual(
+    h1Diagram.strata.slice(0, h0Diagram.strata.length),
+    h0Diagram.strata,
+  )
+  assert.deepEqual(
+    loadedH1Diagram.strata.slice(0, h0Diagram.strata.length),
+    h0Diagram.strata,
+  )
+  assertDiagramLevelDataPreserved(h0Diagram, h1Diagram)
+  assertDiagramLevelDataPreserved(h0Diagram, loadedH1Diagram)
+
+  const h0Patch = findCoonsPatch(h0Diagram, originalPatchId)
+  const h1Original = findCoonsPatch(h1Diagram, originalPatchId)
+  const h1Copy = findCoonsPatch(h1Diagram, duplicatePatchId)
+  const loadedOriginal = findCoonsPatch(loadedH1Diagram, originalPatchId)
+  const loadedCopy = findCoonsPatch(loadedH1Diagram, duplicatePatchId)
+
+  assert.deepEqual(h1Original, h0Patch)
+  assert.deepEqual(loadedOriginal, h0Patch)
+  assert.deepEqual(loadedCopy, h1Copy)
+  assert.equal(h1Copy.id, duplicatePatchId)
+  assert.equal(loadedCopy.id, duplicatePatchId)
+  assertH1DuplicateMetadataAndGeometry(h0Patch, h1Copy)
+  assertH1DuplicateMetadataAndGeometry(h0Patch, loadedCopy)
+}
+
+function assertDiagramLevelDataPreserved(
+  expected: Diagram,
+  actual: Diagram,
+): void {
+  assert.equal(actual.version, expected.version)
+  assert.equal(actual.ambientDimension, expected.ambientDimension)
+  assert.deepEqual(actual.camera, expected.camera)
+  assert.deepEqual(actual.view, expected.view)
+  assert.deepEqual(actual.layers, expected.layers)
+  assert.deepEqual(actual.userStylePresets, expected.userStylePresets)
+  assert.deepEqual(
+    actual.externalTikzStyleSources,
+    expected.externalTikzStyleSources,
+  )
+  assert.deepEqual(
+    actual.importedTikzStyleReferences,
+    expected.importedTikzStyleReferences,
+  )
+  assert.deepEqual(actual.variables, expected.variables)
+  assert.deepEqual(actual.coordinateAnchors, expected.coordinateAnchors)
+  assert.deepEqual(actual.labels, expected.labels)
+  assert.deepEqual(actual.pathCrossings, expected.pathCrossings)
+}
+
+function assertH1DuplicateMetadataAndGeometry(
+  source: CoonsPatchStratum,
+  copy: CoonsPatchStratum,
+): void {
+  assert.notEqual(copy.id, source.id)
+  assert.equal(copy.name, source.name)
+  assert.equal(copy.codim, source.codim)
+  assert.equal(copy.codim, 1)
+  assert.equal(copy.geometricKind, source.geometricKind)
+  assert.equal(copy.geometricKind, 'sheet')
+  assert.equal(copy.kind, source.kind)
+  assert.equal(copy.kind, 'curvedSheet')
+  assert.equal(copy.primitive.kind, 'coonsPatch')
+  assert.equal(copy.layer, source.layer)
+  assert.equal(copy.label, source.label)
+  assert.equal(
+    copy.importedTikzStyleReferenceId,
+    source.importedTikzStyleReferenceId,
+  )
+  assert.deepEqual(copy.style, source.style)
+  assert.equal(copy.style.fillOpacity, source.style.fillOpacity)
+  assert.equal(copy.style.strokeOpacity, source.style.strokeOpacity)
+  assert.deepEqual(copy.primitive.sampling, source.primitive.sampling)
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    assert.deepEqual(copy.primitive[role], source.primitive[role])
+  }
+  assert.deepEqual(
+    sampleCoonsPatch(copy.primitive),
+    sampleCoonsPatch(source.primitive),
+  )
+}
+
 function withFrozenSymbolicBottomControl(
   linked: Diagram,
   storedPreview: number,
   currentVariablePreview: number,
 ): Diagram {
+  return createFrozenSymbolicMissingBottomFixture(
+    linked,
+    storedPreview,
+    currentVariablePreview,
+  ).stale
+}
+
+function createFrozenSymbolicMissingBottomFixture(
+  linked: Diagram,
+  storedPreview: number,
+  currentVariablePreview: number,
+): {
+  stale: Diagram
+  removedSource: Stratum
+  lastValidPatch: CoonsPatchStratum
+} {
   const source = findStratum(linked, 'bottom')
   if (source.geometricKind !== 'curve' || source.kind !== 'concatenatedPath') {
     throw new Error('Expected concatenated bottom source.')
@@ -3213,6 +4063,8 @@ function withFrozenSymbolicBottomControl(
     linked,
     variableDiagram,
   ).diagram
+  const removedSource = structuredClone(findStratum(refreshed, source.id))
+  const lastValidPatch = structuredClone(findCoonsPatch(refreshed, 'patch'))
   const staleCandidate: Diagram = {
     ...refreshed,
     variables: [
@@ -3227,7 +4079,11 @@ function withFrozenSymbolicBottomControl(
     strata: refreshed.strata.filter((stratum) => stratum.id !== source.id),
   }
 
-  return synchronizeLinkedCoonsPatches(refreshed, staleCandidate).diagram
+  return {
+    stale: synchronizeLinkedCoonsPatches(refreshed, staleCandidate).diagram,
+    removedSource,
+    lastValidPatch,
+  }
 }
 
 function diagramWithOtherSheetKinds(diagram: Diagram): Diagram {
@@ -3363,6 +4219,21 @@ function createEditorState(
     sheetPolygonDraft: null,
     layerOperationStatus: '',
     history: createDiagramHistory(diagram),
+  }
+}
+
+function createEditorStateWithSeededHistory(
+  diagram: Diagram,
+  selectedElement: SelectedElement,
+): TestEditorState {
+  return {
+    ...createEditorState(diagram, selectedElement),
+    layerOperationStatus: 'Existing operation status',
+    history: {
+      past: [structuredClone(diagram)],
+      present: structuredClone(diagram),
+      future: [structuredClone(diagram)],
+    },
   }
 }
 

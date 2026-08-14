@@ -1,4 +1,7 @@
-import { validateCurvedSheetPrimitive } from '../geometry/curvedSheets.ts'
+import {
+  sampleCoonsPatch,
+  validateCurvedSheetPrimitive,
+} from '../geometry/curvedSheets.ts'
 import {
   detachSampledCurvedSheetPrimitiveCoordinateReferences,
 } from '../model/coordinateReferences.ts'
@@ -12,9 +15,13 @@ import {
   type TranslationVector,
 } from '../model/translation.ts'
 import type {
+  CoonsBoundarySnapshot,
+  CoordinateComponent,
   CurvedSheetStratum,
   Diagram,
+  PathSegment,
   Stratum,
+  Vec3,
 } from '../model/types.ts'
 import { validateDiagram } from '../model/validation.ts'
 import { duplicateSelectedElements } from './bulkEditing.ts'
@@ -273,6 +280,19 @@ export function translateCoonsPatch(
         ? 'preserveStored'
         : 'evaluateExpressions',
     )
+    const materializedBaseline = translateStratum(
+      localCandidate,
+      zeroTranslationVector(),
+      context,
+    )
+
+    if (!isCoonsPatchStratum(materializedBaseline)) {
+      return translateFailure(
+        diagram,
+        'Translate Coons patch failed: baseline primitive changed kind.',
+      )
+    }
+
     const translated = translateStratum(
       localCandidate,
       normalizedTranslation,
@@ -283,6 +303,19 @@ export function translateCoonsPatch(
       return translateFailure(
         diagram,
         'Translate Coons patch failed: translated primitive changed kind.',
+      )
+    }
+
+    const representability = coonsPatchTranslationRepresentability(
+      materializedBaseline.primitive,
+      translated.primitive,
+      normalizedTranslation,
+    )
+
+    if (!representability.ok) {
+      return translateFailure(
+        diagram,
+        'Translation is too small to change this Coons patch at its current coordinate scale.',
       )
     }
 
@@ -521,4 +554,207 @@ function validationErrorMessage(
   return first === undefined
     ? `${prefix}.`
     : `${prefix}: ${first.path}: ${first.message}`
+}
+
+type TranslationAxis = 'x' | 'y' | 'z'
+
+type RequiredSpatialPreview = {
+  path: string
+  materialized: Vec3
+  stored?: Vec3
+}
+
+type CoonsPatchTranslationRepresentabilityResult =
+  | { ok: true }
+  | {
+      ok: false
+      path: string
+      axis: TranslationAxis
+    }
+
+function coonsPatchTranslationRepresentability(
+  before: CoonsPatchStratum['primitive'],
+  after: CoonsPatchStratum['primitive'],
+  translation: TranslationVector,
+): CoonsPatchTranslationRepresentabilityResult {
+  const beforePreviews = requiredCoonsPatchSpatialPreviews(before)
+  const afterPreviews = requiredCoonsPatchSpatialPreviews(after)
+
+  if (beforePreviews.length !== afterPreviews.length) {
+    throw new Error(
+      'Translated Coons patch changed required spatial preview structure.',
+    )
+  }
+
+  const delta = translationVectorPreview(translation)
+  const axes: readonly TranslationAxis[] = ['x', 'y', 'z']
+
+  for (let index = 0; index < beforePreviews.length; index += 1) {
+    const beforePreview = beforePreviews[index]
+    const afterPreview = afterPreviews[index]
+
+    if (
+      beforePreview === undefined ||
+      afterPreview === undefined ||
+      beforePreview.path !== afterPreview.path
+    ) {
+      throw new Error(
+        'Translated Coons patch changed required spatial preview structure.',
+      )
+    }
+
+    for (const axis of axes) {
+      if (
+        delta[axis] !== 0 &&
+        (afterPreview.materialized[axis] ===
+          beforePreview.materialized[axis] ||
+          (afterPreview.stored ?? afterPreview.materialized)[axis] ===
+            (beforePreview.stored ?? beforePreview.materialized)[axis])
+      ) {
+        return {
+          ok: false,
+          path: beforePreview.path,
+          axis,
+        }
+      }
+    }
+  }
+
+  return { ok: true }
+}
+
+function zeroTranslationVector(): TranslationVector {
+  return {
+    x: { kind: 'numeric', value: 0 },
+    y: { kind: 'numeric', value: 0 },
+    z: { kind: 'numeric', value: 0 },
+  }
+}
+
+function requiredCoonsPatchSpatialPreviews(
+  primitive: CoonsPatchStratum['primitive'],
+): RequiredSpatialPreview[] {
+  const previews: RequiredSpatialPreview[] = []
+
+  for (const role of ['bottom', 'right', 'top', 'left'] as const) {
+    appendCoonsBoundarySpatialPreviews(
+      previews,
+      `primitive.${role}`,
+      primitive[role],
+    )
+  }
+
+  sampleCoonsPatch(primitive).vertices.forEach((point, index) => {
+    appendVec3SpatialPreviews(
+      previews,
+      `primitive.sampledMesh.vertices[${index}]`,
+      point,
+    )
+  })
+
+  return previews
+}
+
+function appendCoonsBoundarySpatialPreviews(
+  previews: RequiredSpatialPreview[],
+  path: string,
+  boundary: CoonsBoundarySnapshot,
+): void {
+  if ('point' in boundary) {
+    appendVec3SpatialPreviews(previews, `${path}.point`, boundary.point)
+    return
+  }
+
+  boundary.segments.forEach((segment, index) => {
+    appendPathSegmentSpatialPreviews(
+      previews,
+      `${path}.segments[${index}]`,
+      segment,
+    )
+  })
+}
+
+function appendPathSegmentSpatialPreviews(
+  previews: RequiredSpatialPreview[],
+  path: string,
+  segment: PathSegment,
+): void {
+  appendVec3SpatialPreviews(previews, `${path}.start`, segment.start)
+  appendVec3SpatialPreviews(previews, `${path}.end`, segment.end)
+
+  switch (segment.kind) {
+    case 'line':
+      return
+    case 'cubicBezier':
+      appendVec3SpatialPreviews(
+        previews,
+        `${path}.control1`,
+        segment.control1,
+      )
+      appendVec3SpatialPreviews(
+        previews,
+        `${path}.control2`,
+        segment.control2,
+      )
+      if (
+        segment.controlMode?.kind === 'workPlaneRelativeCartesian' ||
+        segment.controlMode?.kind === 'workPlaneRelativePolar'
+      ) {
+        appendVec3SpatialPreviews(
+          previews,
+          `${path}.controlMode.frame.origin`,
+          segment.controlMode.frame.origin,
+        )
+      }
+      return
+    case 'arc':
+      appendVec3SpatialPreviews(previews, `${path}.center`, segment.center)
+      if (segment.frame !== undefined) {
+        appendVec3SpatialPreviews(
+          previews,
+          `${path}.frame.origin`,
+          segment.frame.origin,
+        )
+      }
+  }
+}
+
+function appendVec3SpatialPreviews(
+  previews: RequiredSpatialPreview[],
+  path: string,
+  point: Vec3,
+): void {
+  previews.push({
+    path,
+    materialized: { x: point.x, y: point.y, z: point.z },
+    ...(point.symbolic === undefined
+      ? {}
+      : {
+          stored: {
+            x: coordinateComponentStoredPreview(point.symbolic.x),
+            y: coordinateComponentStoredPreview(point.symbolic.y),
+            z: coordinateComponentStoredPreview(point.symbolic.z),
+          },
+        }),
+  })
+
+  if (point.symbolic === undefined) {
+    return
+  }
+
+  if (point.symbolic.source?.kind === 'workPlaneLocal') {
+    appendVec3SpatialPreviews(
+      previews,
+      `${path}.symbolic.source.frame.origin`,
+      point.symbolic.source.frame.origin,
+    )
+  }
+}
+
+function coordinateComponentStoredPreview(
+  component: CoordinateComponent,
+): number {
+  return component.kind === 'numeric'
+    ? component.value
+    : component.previewValue
 }
