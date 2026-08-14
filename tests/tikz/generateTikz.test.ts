@@ -6115,8 +6115,8 @@ test('3D curvedSheet default sampled TikZ output remains bounded', () => {
   assert.doesNotMatch(tikz, /omitted/)
 })
 
-test('3D curvedSheet TikZ export omits meshes above the readable face cap', () => {
-  const diagram = createCurvedHemisphereSheetDiagram()
+test('Coons patch TikZ export includes meshes at the 512-face cap', () => {
+  const diagram = createCoonsPatchDiagram()
   const sheet = diagram.strata[0]
 
   if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'curvedSheet') {
@@ -6125,17 +6125,38 @@ test('3D curvedSheet TikZ export omits meshes above the readable face cap', () =
 
   sheet.primitive = {
     ...sheet.primitive,
-    sampling: { uSegments: 32, vSegments: 9 },
+    sampling: { uSegments: 32, vSegments: 16 },
   }
 
   const tikz = generateTikz(diagram)
 
-  assert.match(tikz, /omitted because its sampled mesh has 288 faces/)
+  assert.match(tikz, /Primitive: coonsPatch; sampling: u=32, v=16; faces=512/)
+  assert.equal((tikz.match(/\\filldraw/g) ?? []).length, 512)
+  assert.doesNotMatch(tikz, /omitted because its sampled mesh/)
+  assert.doesNotMatch(tikz, /NaN|Infinity/)
+})
+
+test('Coons patch TikZ export omits meshes above the 512-face cap', () => {
+  const diagram = createCoonsPatchDiagram()
+  const sheet = diagram.strata[0]
+
+  if (sheet.geometricKind !== 'sheet' || sheet.kind !== 'curvedSheet') {
+    throw new Error('Expected a curved sheet.')
+  }
+
+  sheet.primitive = {
+    ...sheet.primitive,
+    sampling: { uSegments: 27, vSegments: 19 },
+  }
+
+  const tikz = generateTikz(diagram)
+
+  assert.match(tikz, /omitted because its sampled mesh has 513 faces/)
   assert.match(
     tikz,
     new RegExp(`Reduce sampling to at most ${maxCurvedSheetTikzFaces} faces`),
   )
-  assert.doesNotMatch(tikz, /sheetCurvedCurvedHemisphere0p0/)
+  assert.doesNotMatch(tikz, /sheetCurvedCoonsPatch0p0/)
   assert.doesNotMatch(tikz, /NaN|Infinity/)
 })
 

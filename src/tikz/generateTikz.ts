@@ -438,7 +438,7 @@ const inlineMathBaselineTikzOption =
   'baseline={([yshift=-.5ex]current bounding box.center)}'
 const inlineMathCommentSeparatorLine = '%----------------------------------------'
 const TIKZ_INDENT = '    '
-export const maxCurvedSheetTikzFaces = 256
+export const maxCurvedSheetTikzFaces = 512
 const gridTikzEpsilon = gridGeometryEpsilon
 const pathRunLengthEpsilon = 1e-9
 const pathRunLengthSampleCount = 32

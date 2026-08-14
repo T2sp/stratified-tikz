@@ -1123,7 +1123,7 @@ TikZ source remains readable. If sampling fails or would produce non-finite
 coordinates, the generator omits that curved sheet and emits a readable comment
 rather than writing `NaN` or `Infinity`.
 
-TikZ export also caps ordinary curved-sheet mesh output at 256 sampled faces. A
+TikZ export also caps ordinary curved-sheet mesh output at 512 sampled faces. A
 curved sheet above that cap is omitted with a comment asking the user to reduce
 sampling. Automatic surface sorting has its own configurable
 `maxSurfaceFacesForSorting` cap; when that cap is exceeded, sorting is skipped
