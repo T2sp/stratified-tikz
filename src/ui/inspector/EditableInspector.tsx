@@ -197,6 +197,8 @@ export function EditableInspector({
         onSplitPath={onSplitPath}
         onStartPathSplitPick={onStartPathSplitPick}
         layerFilter={layerFilter}
+        onDuplicatePath={onBulkDuplicate}
+        onTranslatePath={onBulkTranslate}
         onDuplicateCoonsPatch={onDuplicateCoonsPatch}
         onTranslateCoonsPatch={onTranslateCoonsPatch}
       />

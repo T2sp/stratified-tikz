@@ -1,7 +1,6 @@
 import {
   useMemo,
   useState,
-  type FormEvent,
 } from 'react'
 import {
   applyBulkStyleField,
@@ -13,10 +12,7 @@ import {
   type BulkStyleField,
 } from '../bulkEditing.ts'
 import type { Diagram, Vec3 } from '../../model/types.ts'
-import {
-  parseTranslationVectorFromInputs,
-  type TranslationVector,
-} from '../../model/translation.ts'
+import type { TranslationVector } from '../../model/translation.ts'
 import { normalizeColorInputValue } from '../colorInput.ts'
 import {
   parseFiniteNumber,
@@ -42,6 +38,7 @@ import {
   type InspectorNumberParser,
 } from './numericInput.ts'
 import { StyleClipboardControls } from './StyleClipboardControls.tsx'
+import { SelectionTranslationSection } from './SelectionTranslationSection.tsx'
 import type { DiagramChangeHandler } from './types.ts'
 
 export type BulkSelectionInspectorProps = {
@@ -138,9 +135,9 @@ export function BulkSelectionInspector({
         onPasteStyle={onPasteStyle}
       />
 
-      <BulkTranslationSection
+      <SelectionTranslationSection
         diagram={diagram}
-        onBulkTranslate={onBulkTranslate}
+        onTranslate={onBulkTranslate}
       />
 
       <BulkPathConcatenationSection
@@ -482,127 +479,6 @@ function formatCoordinate(value: number): string {
   return Number.isInteger(value)
     ? String(value)
     : value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
-}
-
-function BulkTranslationSection({
-  diagram,
-  onBulkTranslate,
-}: {
-  diagram: Diagram
-  onBulkTranslate: (translation: TranslationVector) => void
-}) {
-  const [dxInput, setDxInput] = useState('0')
-  const [dyInput, setDyInput] = useState('0')
-  const [dzInput, setDzInput] = useState('0')
-  const [status, setStatus] = useState('')
-  const parsed = useMemo(
-    () =>
-      parseTranslationVectorFromInputs(diagram, {
-        dx: dxInput,
-        dy: dyInput,
-        dz: dzInput,
-      }),
-    [diagram, dxInput, dyInput, dzInput],
-  )
-  const isZero =
-    parsed.ok &&
-    parsed.preview.x === 0 &&
-    parsed.preview.y === 0 &&
-    parsed.preview.z === 0
-  const canSubmit = parsed.ok && !isZero
-  const errorMessage = parsed.ok
-    ? isZero
-      ? 'Enter a non-zero translation.'
-      : ''
-    : parsed.error
-
-  function submitTranslation(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault()
-
-    if (!parsed.ok) {
-      setStatus(parsed.error)
-      return
-    }
-
-    if (isZero) {
-      setStatus('Enter a non-zero translation.')
-      return
-    }
-
-    onBulkTranslate(parsed.translation)
-    setStatus('')
-  }
-
-  return (
-    <section className="inspector-section">
-      <h3>Translate selected</h3>
-      <form className="inspector-form" onSubmit={submitTranslation}>
-        <BulkTranslationInput
-          label="dx"
-          value={dxInput}
-          invalid={!parsed.ok && parsed.error.startsWith('dx:')}
-          onChange={setDxInput}
-        />
-        <BulkTranslationInput
-          label="dy"
-          value={dyInput}
-          invalid={!parsed.ok && parsed.error.startsWith('dy:')}
-          onChange={setDyInput}
-        />
-        {diagram.ambientDimension === 3 && (
-          <BulkTranslationInput
-            label="dz"
-            value={dzInput}
-            invalid={!parsed.ok && parsed.error.startsWith('dz:')}
-            onChange={setDzInput}
-          />
-        )}
-        <div className="inspector-field">
-          <span className="inspector-field-label">Apply</span>
-          <button
-            type="submit"
-            className="toolbar-button"
-            disabled={!canSubmit}
-            title={errorMessage}
-          >
-            Apply
-          </button>
-        </div>
-        {(status !== '' || errorMessage !== '') && (
-          <p className="inspector-status" role="status" aria-live="polite">
-            {status || errorMessage}
-          </p>
-        )}
-      </form>
-    </section>
-  )
-}
-
-function BulkTranslationInput({
-  label,
-  value,
-  invalid,
-  onChange,
-}: {
-  label: 'dx' | 'dy' | 'dz'
-  value: string
-  invalid: boolean
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="inspector-field">
-      <span className="inspector-field-label">{label}</span>
-      <input
-        className="inspector-input"
-        type="text"
-        inputMode="decimal"
-        aria-label={label}
-        aria-invalid={invalid}
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
-    </label>
-  )
 }
 
 function BulkStyleSections({

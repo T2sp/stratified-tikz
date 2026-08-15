@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createConcatenatedPathStratum,
   createCurveStratum,
   createCurvedSheetStratum,
   createEmptyDiagram,
@@ -34,6 +35,7 @@ import type {
   Stratum,
   TextLabel,
   Vec3,
+  WorkPlaneFrameSnapshot,
 } from '../../src/model/types.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
 import {
@@ -224,6 +226,39 @@ test('bulk duplicate creates new ids and disambiguates path labels', () => {
       copiedPathLabel: 'alpha path copy',
     },
   ])
+})
+
+test('single selected paths can be duplicated across all editable path kinds', () => {
+  for (const pathId of singlePathOperationIds) {
+    const diagram = createSinglePathOperationDiagram()
+    const source = findSingleOperationPath(diagram, pathId)
+    const result = duplicateSelectedElements(diagram, {
+      kind: 'stratum',
+      id: pathId,
+    })
+    const copiedId = `${pathId}-copy`
+    const copied = findSingleOperationPath(result.diagram, copiedId)
+
+    assert.equal(result.duplicatedCount, 1, pathId)
+    assert.deepEqual(
+      result.idChanges,
+      [{ sourceId: pathId, copiedId }],
+      pathId,
+    )
+    assert.deepEqual(
+      result.selectedElement,
+      { kind: 'stratum', id: copiedId },
+      pathId,
+    )
+    assert.deepEqual(
+      copied,
+      { ...source, id: copiedId, inlineNodes: undefined },
+      pathId,
+    )
+    assertIndependentSinglePathGeometry(source, copied, pathId)
+    assert.deepEqual(findSingleOperationPath(diagram, pathId), source, pathId)
+    assert.equal(validateDiagram(result.diagram).valid, true, pathId)
+  }
 })
 
 test('bulk duplicate reserves coordinate anchor ids for copied strata and labels', () => {
@@ -633,6 +668,40 @@ test('bulk translation moves numeric selected points', () => {
   })
 })
 
+test('single selected paths can be translated across all editable path kinds', () => {
+  const delta = { x: 2, y: -3, z: 4 }
+
+  for (const pathId of singlePathOperationIds) {
+    const diagram = createSinglePathOperationDiagram()
+    const source = findSingleOperationPath(diagram, pathId)
+    const untouched = diagram.strata.filter((stratum) => stratum.id !== pathId)
+    const result = translateSelectedElements(
+      diagram,
+      { kind: 'stratum', id: pathId },
+      parseTranslation(diagram, '2', '-3', '4'),
+    )
+
+    assert.equal(result.ok, true, pathId)
+    if (!result.ok) {
+      throw new Error(result.error)
+    }
+
+    const translated = findSingleOperationPath(result.diagram, pathId)
+
+    assert.equal(result.translated, true, pathId)
+    assert.equal(result.translatedCount, 1, pathId)
+    assertTranslatedSinglePathGeometry(source, translated, delta, pathId)
+    assert.deepEqual(translated.style, source.style, pathId)
+    assert.deepEqual(
+      result.diagram.strata.filter((stratum) => stratum.id !== pathId),
+      untouched,
+      pathId,
+    )
+    assert.deepEqual(findSingleOperationPath(diagram, pathId), source, pathId)
+    assert.equal(validateDiagram(result.diagram).valid, true, pathId)
+  }
+})
+
 test('bulk translation adds symbolic deltas to symbolic point expressions', () => {
   const diagram = createBulkPointDiagram()
   const result = translateSelectedElements(
@@ -969,6 +1038,234 @@ function createBulkCurveDiagram(): Diagram {
     ],
     strata: [curveA(), curveB(), curveC()],
     labels: [labelA()],
+  }
+}
+
+const singlePathOperationIds = [
+  'single-polyline',
+  'single-cubic',
+  'single-arc-path',
+  'single-mixed-path',
+] as const
+
+type SinglePathOperationId = (typeof singlePathOperationIds)[number]
+
+type SingleOperationPath =
+  | Extract<CurveStratum, { kind: 'polyline' }>
+  | Extract<CurveStratum, { kind: 'cubicBezier' }>
+  | Extract<CurveStratum, { kind: 'concatenatedPath' }>
+
+function createSinglePathOperationDiagram(): Diagram {
+  return {
+    ...createEmptyDiagram({ ambientDimension: 3 }),
+    strata: [
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'single-polyline',
+        name: 'Single polyline',
+        points: [
+          { x: -1, y: 0, z: 0 },
+          { x: 0, y: 1, z: 1 },
+          { x: 1, y: 0, z: 2 },
+        ],
+      }),
+      createCurveStratum({
+        ambientDimension: 3,
+        id: 'single-cubic',
+        kind: 'cubicBezier',
+        name: 'Single cubic Bezier',
+        points: [
+          { x: 0, y: 0, z: 1 },
+          { x: 1, y: 2, z: 1 },
+          { x: 2, y: -1, z: 1 },
+          { x: 3, y: 0, z: 1 },
+        ],
+      }),
+      createConcatenatedPathStratum({
+        ambientDimension: 3,
+        id: 'single-arc-path',
+        name: 'Single arc path',
+        segments: [
+          {
+            kind: 'arc',
+            start: { x: 1, y: 0, z: 2 },
+            end: { x: 0, y: 1, z: 2 },
+            center: { x: 0, y: 0, z: 2 },
+            radius: 1,
+            startAngleDeg: 0,
+            endAngleDeg: 90,
+            direction: 'counterclockwise',
+            frame: bulkPathXyFrame(2),
+          },
+        ],
+      }),
+      createConcatenatedPathStratum({
+        ambientDimension: 3,
+        id: 'single-mixed-path',
+        name: 'Single mixed path',
+        segments: [
+          {
+            kind: 'line',
+            start: { x: 0, y: 0, z: 3 },
+            end: { x: 1, y: 0, z: 3 },
+          },
+          {
+            kind: 'cubicBezier',
+            start: { x: 1, y: 0, z: 3 },
+            control1: { x: 1.5, y: 1, z: 3 },
+            control2: { x: 2.5, y: 1, z: 3 },
+            end: { x: 3, y: 0, z: 3 },
+          },
+          {
+            kind: 'arc',
+            start: { x: 3, y: 0, z: 3 },
+            end: { x: 4, y: 1, z: 3 },
+            center: { x: 3, y: 1, z: 3 },
+            radius: 1,
+            startAngleDeg: 270,
+            endAngleDeg: 360,
+            direction: 'counterclockwise',
+            frame: bulkPathXyFrame(3),
+          },
+        ],
+      }),
+    ],
+    labels: [],
+  }
+}
+
+function findSingleOperationPath(
+  diagram: Diagram,
+  id: SinglePathOperationId | `${SinglePathOperationId}-copy`,
+): SingleOperationPath {
+  const curve = findCurve(diagram, id)
+
+  if (
+    curve.kind !== 'polyline' &&
+    curve.kind !== 'cubicBezier' &&
+    curve.kind !== 'concatenatedPath'
+  ) {
+    throw new Error(`Expected ${id} to be an editable path.`)
+  }
+
+  return curve
+}
+
+function assertIndependentSinglePathGeometry(
+  source: SingleOperationPath,
+  copied: SingleOperationPath,
+  context: string,
+): void {
+  assert.notEqual(copied, source, context)
+  assert.notEqual(copied.style, source.style, context)
+  assert.notEqual(copied.styleSegments, source.styleSegments, context)
+  assert.equal(copied.kind, source.kind, context)
+
+  if (source.kind === 'concatenatedPath') {
+    if (copied.kind !== 'concatenatedPath') {
+      throw new Error(`Expected ${context} copy to remain a concatenated path.`)
+    }
+
+    assert.notEqual(copied.segments, source.segments, context)
+    for (const [index, sourceSegment] of source.segments.entries()) {
+      const copiedSegment = copied.segments[index]
+
+      assert.notEqual(copiedSegment, sourceSegment, `${context} segment ${index}`)
+      assert.notEqual(
+        copiedSegment?.start,
+        sourceSegment.start,
+        `${context} segment ${index} start`,
+      )
+    }
+    return
+  }
+
+  if (copied.kind !== source.kind) {
+    throw new Error(`Expected ${context} copy to preserve its path kind.`)
+  }
+
+  assert.notEqual(copied.points, source.points, context)
+  for (const [index, sourcePoint] of source.points.entries()) {
+    assert.notEqual(copied.points[index], sourcePoint, `${context} point ${index}`)
+  }
+}
+
+function assertTranslatedSinglePathGeometry(
+  source: SingleOperationPath,
+  translated: SingleOperationPath,
+  delta: Vec3,
+  context: string,
+): void {
+  assert.equal(translated.kind, source.kind, context)
+
+  if (source.kind === 'concatenatedPath') {
+    if (translated.kind !== 'concatenatedPath') {
+      throw new Error(`Expected ${context} translation to remain a concatenated path.`)
+    }
+
+    const expectedSegments = source.segments.map((segment) => {
+      switch (segment.kind) {
+        case 'line':
+          return {
+            ...segment,
+            start: addBulkTranslation(segment.start, delta),
+            end: addBulkTranslation(segment.end, delta),
+          }
+        case 'cubicBezier':
+          return {
+            ...segment,
+            start: addBulkTranslation(segment.start, delta),
+            control1: addBulkTranslation(segment.control1, delta),
+            control2: addBulkTranslation(segment.control2, delta),
+            end: addBulkTranslation(segment.end, delta),
+          }
+        case 'arc':
+          return {
+            ...segment,
+            start: addBulkTranslation(segment.start, delta),
+            end: addBulkTranslation(segment.end, delta),
+            center: addBulkTranslation(segment.center, delta),
+            ...(segment.frame === undefined
+              ? {}
+              : {
+                  frame: {
+                    ...segment.frame,
+                    origin: addBulkTranslation(segment.frame.origin, delta),
+                  },
+                }),
+          }
+      }
+    })
+
+    assert.deepEqual(translated.segments, expectedSegments, context)
+    return
+  }
+
+  if (translated.kind !== source.kind) {
+    throw new Error(`Expected ${context} translation to preserve its path kind.`)
+  }
+
+  assert.deepEqual(
+    translated.points,
+    source.points.map((point) => addBulkTranslation(point, delta)),
+    context,
+  )
+}
+
+function addBulkTranslation(point: Vec3, delta: Vec3): Vec3 {
+  return {
+    x: point.x + delta.x,
+    y: point.y + delta.y,
+    z: point.z + delta.z,
+  }
+}
+
+function bulkPathXyFrame(z: number): WorkPlaneFrameSnapshot {
+  return {
+    origin: { x: 0, y: 0, z },
+    u: { x: 1, y: 0, z: 0 },
+    v: { x: 0, y: 1, z: 0 },
+    normal: { x: 0, y: 0, z: 1 },
   }
 }
 
