@@ -19,6 +19,7 @@ import {
   evaluateWorkPlaneLocalCoordinate,
   type WorkPlaneLocalCoordinateExpressionContext,
 } from '../../src/model/workPlaneLocalCoordinates.ts'
+import { validateDiagram } from '../../src/model/validation.ts'
 import type {
   ClosedPathBoundary,
   CoordinateComponent,
@@ -127,6 +128,52 @@ test('variable updates recompute symbolic coordinate preview values', () => {
     point.position.symbolic?.x.previewValue ?? Number.NaN,
     2 * Math.sqrt(3),
   )
+})
+
+test('variable updates keep symbolic filled-sheet boundaries on their stored plane', () => {
+  const withHeight = expectVariableDiagramOk(
+    addSymbolicVariableToDiagram(
+      emptyThreeDimensionalDiagram,
+      variable('var-h', 'h', '6'),
+    ),
+  )
+  const diagram: Diagram = {
+    ...withHeight,
+    strata: [
+      ...withHeight.strata,
+      {
+        id: 'symbolic-height-filled-sheet',
+        codim: 1,
+        geometricKind: 'sheet',
+        kind: 'workPlaneFilledSheet',
+        name: 'Symbolic Height Filled Sheet',
+        style: sheetStyle(),
+        planeFrame: xyFrame({ x: 0, y: 0, z: 6 }),
+        boundaries: [symbolicHeightSquareBoundary('symbolic-height-boundary', 6)],
+        fillRule: 'nonzero',
+        layer: 0,
+      },
+    ],
+  }
+
+  assert.equal(validateDiagram(diagram).valid, true)
+
+  const updated = expectVariableDiagramOk(
+    updateSymbolicVariableInDiagram(diagram, 'var-h', {
+      expression: '2',
+    }),
+  )
+  const sheet = updated.strata.find(
+    (stratum) => stratum.id === 'symbolic-height-filled-sheet',
+  )
+
+  if (sheet?.kind !== 'workPlaneFilledSheet') {
+    throw new Error('Expected a work-plane filled sheet.')
+  }
+
+  assert.equal(sheet.planeFrame.origin.z, 2)
+  assert.equal(sheet.boundaries[0]?.segments[0]?.start.z, 2)
+  assert.equal(validateDiagram(updated).valid, true)
 })
 
 test('unknown variables and invalid coordinate expressions are rejected', () => {
@@ -2048,6 +2095,42 @@ function squareBoundary3D(id: string, z: number): ClosedPathBoundary {
     { x: 2, y: 0, z },
     { x: 2, y: 2, z },
     { x: 0, y: 2, z },
+  ]
+
+  return {
+    id,
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
+  }
+}
+
+function symbolicHeightSquareBoundary(
+  id: string,
+  height: number,
+): ClosedPathBoundary {
+  const point = (x: number, y: number): Vec3 => ({
+    x,
+    y,
+    z: height,
+    symbolic: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: {
+        kind: 'symbolic',
+        expression: 'h',
+        previewValue: height,
+      },
+    },
+  })
+  const points: [Vec3, Vec3, Vec3, Vec3] = [
+    point(0, 0),
+    point(2, 0),
+    point(2, 2),
+    point(0, 2),
   ]
 
   return {

@@ -24,6 +24,7 @@ import {
   arcScalarPreviewValue,
   type ArcScalarInputValue,
 } from './paths.ts'
+import { reanchorWorkPlaneFrameToClosedPathBoundaries } from './filledBoundaries.ts'
 import { isCoonsPatchBoundarySources } from './types.ts'
 import type {
   AmbientDimension,
@@ -2224,23 +2225,30 @@ function refreshStratumSymbolicCoordinatePreviews(
               ),
             ),
           }
-        case 'workPlaneFilledSheet':
+        case 'workPlaneFilledSheet': {
+          const planeFrame = refreshWorkPlaneFrameSnapshotSymbolicPreviews(
+            stratum.planeFrame,
+            context,
+            `${path}.planeFrame`,
+            errors,
+          )
+          const boundaries = refreshClosedPathBoundaries(
+            stratum.boundaries,
+            ambientDimension,
+            context,
+            `${path}.boundaries`,
+            errors,
+          )
+
           return {
             ...stratum,
-            planeFrame: refreshWorkPlaneFrameSnapshotSymbolicPreviews(
-              stratum.planeFrame,
-              context,
-              `${path}.planeFrame`,
-              errors,
+            planeFrame: reanchorWorkPlaneFrameToClosedPathBoundaries(
+              planeFrame,
+              boundaries,
             ),
-            boundaries: refreshClosedPathBoundaries(
-              stratum.boundaries,
-              ambientDimension,
-              context,
-              `${path}.boundaries`,
-              errors,
-            ),
+            boundaries,
           }
+        }
         case 'curvedSheet':
           return {
             ...stratum,

@@ -2158,6 +2158,46 @@ test('parseSavedDiagramJsonForImport loads numeric-only diagrams immediately', (
   )
 })
 
+test('resolvePendingSymbolicDiagramImport realigns a stale filled-sheet frame', () => {
+  const parsed = parseSavedDiagramJsonForImport(
+    serializeDiagram(staleSymbolicFilledSheetDiagram()),
+  )
+
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok || parsed.kind !== 'needsVariableResolution') {
+    throw new Error('Expected symbolic filled-sheet import to need resolution.')
+  }
+
+  assert.deepEqual(parsed.pendingImport.variables, [
+    {
+      name: 'h',
+      expression: '2',
+      defined: true,
+    },
+  ])
+
+  const resolved = resolvePendingSymbolicDiagramImport(
+    parsed.pendingImport,
+    [{ name: 'h', expression: '2' }],
+  )
+
+  assert.equal(resolved.ok, true)
+  if (!resolved.ok) {
+    throw new Error(resolved.error)
+  }
+
+  const sheet = requireWorkPlaneFilledSheet(resolved.diagram)
+  const validation = validateDiagram(resolved.diagram)
+
+  assert.deepEqual(sheet.planeFrame.origin, { x: 0, y: 0, z: 2 })
+  assert.equal(sheet.boundaries[0]?.segments[0]?.start.z, 2)
+  assert.equal(
+    validation.valid,
+    true,
+    validation.errors.map((issue) => `${issue.path} ${issue.message}`).join('\n'),
+  )
+})
+
 test('parseSavedDiagramJson refreshes valid symbolic Coons boundaries with saved variables', () => {
   const diagram = symbolicCoonsDiagram()
   const primitive = resolvedCoonsPrimitive(diagram)
@@ -2759,6 +2799,74 @@ function squareFilledSheetBoundary(origin: Vec3): ClosedPathBoundary {
   return {
     id: 'legacy-filled-boundary',
     name: 'Legacy filled boundary',
+    segments: [
+      { kind: 'line', start: points[0], end: points[1] },
+      { kind: 'line', start: points[1], end: points[2] },
+      { kind: 'line', start: points[2], end: points[3] },
+      { kind: 'line', start: points[3], end: points[0] },
+    ],
+  }
+}
+
+function staleSymbolicFilledSheetDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 3 })
+
+  diagram.variables = [
+    {
+      id: 'var-h',
+      name: 'h',
+      macroName: 'h',
+      expression: '2',
+      previewValue: 2,
+    },
+  ]
+  diagram.strata.push(
+    createWorkPlaneFilledSheet3DStratum({
+      id: 'stale-symbolic-filled-sheet',
+      name: 'Stale Symbolic Filled Sheet',
+      planeFrame: {
+        origin: { x: 0, y: 0, z: 6 },
+        u: { x: 1, y: 0, z: 0 },
+        v: { x: 0, y: 1, z: 0 },
+        normal: { x: 0, y: 0, z: 1 },
+      },
+      boundaries: [symbolicHeightFilledSheetBoundary('stale-boundary', 2)],
+      fillRule: 'nonzero',
+      layer: 0,
+    }),
+  )
+
+  return diagram
+}
+
+function symbolicHeightFilledSheetBoundary(
+  id: string,
+  height: number,
+): ClosedPathBoundary {
+  const point = (x: number, y: number): Vec3 => ({
+    x,
+    y,
+    z: height,
+    symbolic: {
+      x: { kind: 'numeric', value: x },
+      y: { kind: 'numeric', value: y },
+      z: {
+        kind: 'symbolic',
+        expression: 'h',
+        previewValue: height,
+      },
+    },
+  })
+  const points: [Vec3, Vec3, Vec3, Vec3] = [
+    point(0, 0),
+    point(2, 0),
+    point(2, 2),
+    point(0, 2),
+  ]
+
+  return {
+    id,
+    name: 'Stale boundary',
     segments: [
       { kind: 'line', start: points[0], end: points[1] },
       { kind: 'line', start: points[1], end: points[2] },

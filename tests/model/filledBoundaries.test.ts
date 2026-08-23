@@ -6,6 +6,7 @@ import {
   createFilledRegion2DStratum,
   createWorkPlaneFilledSheet3DStratum,
 } from '../../src/model/constructors.ts'
+import { reanchorWorkPlaneFrameToClosedPathBoundaries } from '../../src/model/filledBoundaries.ts'
 import {
   parseSavedDiagramJson,
   serializeDiagram,
@@ -145,6 +146,39 @@ test('valid 3D work-plane filled sheet with even-odd boundaries validates', () =
   )
 
   assertValid(diagram)
+})
+
+test('stored work-plane frame reanchors to a uniformly offset boundary plane', () => {
+  const frame = xyPlaneFrameAtZ(6)
+  const reanchored = reanchorWorkPlaneFrameToClosedPathBoundaries(
+    frame,
+    [squareBoundary3D('moved-boundary', 2)],
+  )
+
+  assert.deepEqual(reanchored, {
+    ...frame,
+    origin: { x: 0, y: 0, z: 2 },
+  })
+})
+
+test('stored work-plane frame does not reanchor to a non-parallel boundary', () => {
+  const frame = xyPlaneFrameAtZ(6)
+  const boundary = squareBoundary3D('tilted-boundary', 2)
+  boundary.segments[0] = {
+    kind: 'line',
+    start: { x: 0, y: 0, z: 2 },
+    end: { x: 2, y: 0, z: 2.25 },
+  }
+  boundary.segments[1] = {
+    kind: 'line',
+    start: { x: 2, y: 0, z: 2.25 },
+    end: { x: 2, y: 2, z: 2 },
+  }
+
+  assert.equal(
+    reanchorWorkPlaneFrameToClosedPathBoundaries(frame, [boundary]),
+    frame,
+  )
 })
 
 test('3D work-plane filled sheet rejects a non-planar boundary', () => {

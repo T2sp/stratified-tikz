@@ -1,9 +1,14 @@
 import {
+  addVec3,
   dot,
   isFiniteVec3,
+  scaleVec3,
   subtractVec3,
 } from '../geometry/workPlane.ts'
-import { workPlaneLocalCoordinateFromPoint } from '../geometry/bezierControls.ts'
+import {
+  isValidWorkPlaneFrameSnapshot,
+  workPlaneLocalCoordinateFromPoint,
+} from '../geometry/bezierControls.ts'
 import {
   areSegmentsComposable,
   normalizePathSegmentsForAmbientDimension,
@@ -76,6 +81,61 @@ export function pointPlaneSignedDistance(
   point: Vec3,
 ): number {
   return dot(subtractVec3(point, frame.origin), frame.normal)
+}
+
+/**
+ * Keeps a filled sheet's stored basis while moving its derived plane origin to
+ * a parallel boundary plane. Symbolic boundary previews can move uniformly in
+ * the normal direction when variables are updated, while the stored frame is a
+ * concrete snapshot. A tilted or non-planar boundary is deliberately left for
+ * validation to reject.
+ */
+export function reanchorWorkPlaneFrameToClosedPathBoundaries(
+  frame: WorkPlaneFrameSnapshot,
+  boundaries: readonly ClosedPathBoundary[],
+  epsilon = pathEndpointEpsilon,
+): WorkPlaneFrameSnapshot {
+  if (!isValidWorkPlaneFrameSnapshot(frame)) {
+    return frame
+  }
+
+  const points = boundaries.flatMap(closedPathBoundaryCoordinates)
+  const firstPoint = points[0]
+
+  if (firstPoint === undefined || !points.every(isFiniteVec3)) {
+    return frame
+  }
+
+  const signedDistance = pointPlaneSignedDistance(frame, firstPoint)
+
+  if (
+    !Number.isFinite(signedDistance) ||
+    points.some(
+      (point) =>
+        Math.abs(pointPlaneSignedDistance(frame, point) - signedDistance) >
+        epsilon,
+    )
+  ) {
+    return frame
+  }
+
+  if (Math.abs(signedDistance) <= epsilon) {
+    return frame
+  }
+
+  const origin = addVec3(
+    frame.origin,
+    scaleVec3(frame.normal, signedDistance),
+  )
+
+  return isFiniteVec3(origin)
+    ? {
+        ...frame,
+        // planeFrame is derived geometry; do not retain stale symbolic
+        // metadata from an origin that had to be reconciled.
+        origin,
+      }
+    : frame
 }
 
 export function isPointOnWorkPlaneFrame(
