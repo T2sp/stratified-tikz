@@ -1088,7 +1088,9 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: in progress. Phase 31A is implemented; 31B through 31F remain planned.
+Status: in progress. Phase 31A is complete. Phase 31B has an independent adapter
+implementation pending dependency/build/browser verification; 31C through 31F
+remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1138,7 +1140,9 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: planned.
+Status: implemented pending real-engine, lockfile, build, and browser verification.
+The production canvas is unchanged. See [adapter interfaces, limits, assets, and
+verification status](./LABEL_ADAPTER.md).
 
 - Add the justified, pinned MathJax dependency and locally served resources
   compatible with the application's Vite base path.

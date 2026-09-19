@@ -62,8 +62,10 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 Phase 31A defines the pure parser and fallback contract for future typeset label
 preview. It does not connect the parser to production rendering or change the
-appearance of existing labels. MathJax conversion, canvas integration, and
-typeset SVG export remain planned in [Phases 31B–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPTER.md)
+has been implemented, with real-engine/deployment verification pending in the
+current restricted environment. Canvas integration and typeset SVG export
+remain planned in [Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
