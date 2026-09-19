@@ -58,6 +58,97 @@ plus a text input for custom values. Numeric drafts are lenient while typing:
 temporary text such as `.`, `-`, or `1e` stays in the input and shows a warning
 without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
+## Label Preview Input Contract (Phase 31A)
+
+Phase 31A defines the pure parser and fallback contract for future typeset label
+preview. It does not connect the parser to production rendering or change the
+appearance of existing labels. MathJax conversion, canvas integration, and
+typeset SVG export remain planned in [Phases 31B–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+
+The contract applies only to user-authored visible free-label `TextLabel.text`
+and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
+saved-path `pathLabel` identifiers, and previously undisplayed stratum label
+metadata are outside its scope.
+
+The model, Inspector drafts, and saved JSON retain the exact original string.
+Preview parsing does not trim it, add math delimiters, or change the existing
+TikZ label formatter, including export-mode and inline-math newline formatting.
+Parsed runs, generated SVG, metrics, errors, pending conversions, and caches
+belong only to derived runtime state, never `Diagram` or undo history. No saved
+file version or schema change is needed.
+
+### Supported Grammar
+
+Ordinary Unicode, including Japanese and emoji, remains ordinary text. Empty
+input is valid and produces no runs. Whitespace-only input remains a text run.
+Plain `<`, `>`, `&`, quotes, braces, and percent characters are text data; this
+parser does not interpret HTML or validate full text-mode TeX.
+
+| Source form | Preview interpretation |
+| --- | --- |
+| `$...$` or `\(...\)` | Inline math |
+| `$$...$$` or `\[...\]` | Display-style math within the same label |
+| `\$`, `\%`, `\&`, `\_`, `\#`, `\{`, `\}` outside math | The corresponding literal character |
+| Any other text-mode TeX command, including `\textbf{...}` or `\\` | Whole-label `unsupported-text` fallback |
+| Missing, mismatched, or stray math delimiters; malformed math braces | Whole-label `invalid-delimiter` fallback |
+
+Math entry gives `$$` precedence over `$`. Once inside math, the closer matches
+the opener at brace depth zero. An inline dollar closer consumes exactly one
+`$`, so `$x$$y$` is two adjacent inline runs; display dollar math requires `$$`
+to close. Display style changes formula layout without starting a new label or
+paragraph. Top-level delimiter tokens that do not match the expected closer
+are invalid.
+
+Inside math, the scanner consumes a backslash and its following character as
+one escaped token, except when recognizing an unescaped math delimiter. Thus
+`\$` does not end a formula; in `$x\\$`, the two backslashes form one token and
+the final dollar closes the formula. Escaped braces do not affect nesting.
+Delimiter-looking characters inside nested braces, such as
+`$\text{cost $5 and \(x\)}$`, do not end the outer run. Whether these retained
+contents are valid TeX is for the Phase 31B adapter to decide. Outside math,
+`\\` is unsupported rather than an escape for a literal backslash or a visual
+line break.
+
+The TeX body is retained exactly, excluding only its outer delimiters. Unknown
+math commands such as `$\unknowncommand{x}$` are parsed as math and left for
+the adapter to validate; the parser neither evaluates nor expands macros.
+Physical newlines inside math stay in the same run, including in matrices.
+Ordinary text newlines will separate visual lines in the future renderer;
+CRLF may be treated as one visual break without rewriting the original source.
+
+### Results, Bounds, and Exact-Source Fallback
+
+The parser returns a readonly discriminated result: `parsed` with the original
+`source` and text/math runs, or `fallback` with that complete `source` and reason
+`invalid-delimiter`, `unsupported-text`, or `limit`. Run `sourceStart` and
+`sourceEnd` are half-open JavaScript string offsets (UTF-16 code units), so
+`source.slice(sourceStart, sourceEnd)` always reproduces the original run slice,
+including Unicode. Math source ranges include the outer delimiters, while
+`tex` excludes them. Text run `text` cooks only the supported literal escapes;
+it must never be used to reconstruct fallback.
+
+The named limits are `MAX_LABEL_SOURCE_LENGTH = 16384` UTF-16 code units and
+`MAX_LABEL_RUNS = 256`. The scanner performs linear work without macro
+expansion; exceeding either limit returns the complete, untruncated source.
+
+Any invalid delimiter or unsupported text construct fails the entire label,
+even after earlier runs parsed successfully. For example, `Cost \$5` has a
+successful text run displaying `Cost $5`, but `Cost \$5 $x` falls back to the
+entire original source, retaining the backslash and unmatched dollar. Leading,
+trailing, and repeated spaces, tabs, LF, and CRLF remain exact in `source`.
+
+The future renderer must also use the latest complete original input for
+pending conversions, undefined math commands, TeX/output errors, resource
+failures, and bounded-work failures. Literal fallback displays every physical
+source newline as a visual break (CRLF may be one break) and inserts source as
+text, never HTML. It must not show an error SVG, substitute a message, retain a
+previous formula, or partly typeset a failed label. Failure in one label must
+not suppress other labels or diagram geometry. Successful output will combine
+self-contained SVG math geometry with ordinary SVG text, without
+`foreignObject` or rasterized formulas. MathJax is not a full LaTeX engine:
+arbitrary packages, document preambles, and external style-file macros are
+outside this bounded preview language.
+
 ## Export SVG
 
 The SVG export control is a sticky preview edge action at the lower-right of
