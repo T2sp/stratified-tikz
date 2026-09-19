@@ -1090,9 +1090,11 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
 has the targeted ink/advance fix, disposable-worker recovery, and focused
-regressions, but acceptance is incomplete while native browser retry, built-browser
-deployment, and standalone raster checks remain unavailable in the current
-sandbox. 31C through 31F remain planned.
+regressions, but acceptance is incomplete. The 2026-09-20 verification follow-up
+passed fresh deterministic/static checks; the unchanged browser smoke exited 1
+at localhost bind before Chrome launched, with escalation unavailable. Native
+browser retry, built-browser deployment, and standalone raster checks remain
+unverified. 31C through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1143,10 +1145,13 @@ existing label appearance is unchanged.
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
 Status: ink/advance and native-loading fixes implemented; Phase 31B acceptance
-is incomplete. Actual browser retry, deployment, and standalone raster
-verification remain unavailable because the sandbox rejects the smoke-test
-server's localhost bind. The production
-canvas is unchanged. See [adapter interfaces, limits, assets, and verification
+is incomplete. In the 2026-09-20 follow-up, the unchanged fresh-build smoke
+exited 1 with `listen EPERM: operation not permitted 127.0.0.1` before browser
+launch; session policy prohibits escalation. The 102 focused tests, 2,258 full
+tests, build, targeted lint, script syntax, and static asset checks passed.
+Actual browser retry, deployment, and standalone containment remain the open
+gate; no current adapter defect was demonstrated and no production/harness fix
+was made. The production canvas is unchanged. See [adapter interfaces, limits, assets, and verification
 status](./LABEL_ADAPTER.md).
 
 - Added the justified, pinned MathJax dependency and locally served resources

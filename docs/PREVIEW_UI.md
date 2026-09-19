@@ -67,9 +67,13 @@ now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
 advance. Native-module recovery now retires the complete lazy MathJax Worker
 and its runtime/shared/font module map. Phase 31B acceptance remains incomplete:
-actual browser retry, deployment, and standalone raster verification are
-unavailable because the current sandbox rejects the smoke-test server's localhost
-bind. Canvas integration and
+the 2026-09-20 follow-up rebuilt the checkout and ran the existing smoke unchanged,
+but it exited 1 at `listen EPERM: operation not permitted 127.0.0.1` before Chrome
+launched. The session prohibits approval escalation. Fresh static checks, 102
+focused tests, and 2,258 full-suite tests passed; actual browser retry, deployment,
+and standalone raster assertions did not run. See the adapter's
+[current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
+Canvas integration and
 typeset SVG export remain planned in [Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
