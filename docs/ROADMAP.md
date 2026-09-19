@@ -1088,11 +1088,13 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: planned. Implement and review 31A through 31F in order; mark each
-subphase complete only after its own acceptance checks pass.
+Status: in progress. Phase 31A is implemented; 31B through 31F remain planned.
+Implement and review the subphases in order; mark each complete only after its
+own acceptance checks pass.
 
-Implementation/review pairs and their prerequisites are listed in
-[`prompts/phase-31-README.md`](../prompts/phase-31-README.md).
+Start with the [Phase 31A implementation contract](../prompts/phase-31a-implement.md)
+and [review contract](../prompts/phase-31a-review.md). Subsequent subphases have
+matching implementation/review pairs in `prompts/`.
 
 - Typeset user-authored free labels and path inline-node text with MathJax SVG.
 - Preserve ordinary text mixed with supported math delimiters. This is a bounded
@@ -1120,15 +1122,23 @@ Recommended `phaseSlugs` entries:
 
 ### Phase 31A: Label input grammar and exact-source fallback contract
 
-- Add a pure, bounded parser for ordinary Unicode text mixed with `$...$`,
+Status: implemented. The pure parser is not connected to production rendering;
+existing label appearance is unchanged.
+
+- Added a pure, bounded parser for ordinary Unicode text mixed with `$...$`,
   `\(...\)`, `$$...$$`, and `\[...\]`, with explicit delimiter/escape rules.
-- Keep exact original source for whole-label fallback. Ordinary text newlines
-  create visual label lines; math-source newlines remain inside the math run
-  for MathJax; literal fallback preserves all source line breaks.
-- Establish typed contracts, focused tests, and grammar documentation without
+- Keeps exact original source for whole-label fallback. Ordinary text retains
+  newlines for future visual line breaks; math-source newlines remain inside
+  the math run for future MathJax conversion. Literal fallback preserves all
+  source line breaks.
+- Established typed contracts, focused tests, and grammar documentation without
   changing production label rendering yet.
+- Grammar, delimiter precedence, source offsets, and finite limits are specified
+  in [Label Preview Input Contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a).
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
+
+Status: planned.
 
 - Add the justified, pinned MathJax dependency and locally served resources
   compatible with the application's Vite base path.
@@ -1142,6 +1152,8 @@ Recommended `phaseSlugs` entries:
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 
+Status: planned.
+
 - Integrate free labels with the shared renderer, current-source fallback,
   revision-aware async state, and protection against stale completions.
 - Share measured layout between rendering and picking for all nine anchors,
@@ -1151,6 +1163,8 @@ Recommended `phaseSlugs` entries:
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
+Status: planned.
+
 - Reuse the same parser, adapter, cache, renderer, and error behavior for path
   inline-node text, including all five placements and the white label outline.
 - Preserve marker geometry, pointer pass-through, and marker-centered selection
@@ -1159,6 +1173,8 @@ Recommended `phaseSlugs` entries:
   splitting, reversal, and deletion without changing raw text or TikZ meaning.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
+
+Status: planned.
 
 - Capture one consistent click-time diagram/view/options snapshot, settle its
   visible labels, and render a detached export without interrupting live edits.
@@ -1171,6 +1187,8 @@ Recommended `phaseSlugs` entries:
   application, including mixed success/failure labels and a 3D view.
 
 ### Phase 31F: Combined regression coverage, documentation, and completion audit
+
+Status: planned.
 
 - Verify A-E together across errors/recovery, rapid edits, lifecycle changes,
   cache reuse, placement/picking, 2D/3D visibility, and snapshot export.
