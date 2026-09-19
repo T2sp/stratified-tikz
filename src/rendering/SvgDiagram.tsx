@@ -65,8 +65,6 @@ import {
   closedBoundariesToSvgPathData,
   pathSegmentsToSvgPath,
   polylineToSvgPath,
-  regularPolygonPoints,
-  starPolygonPoints,
   svgFillRuleValue,
   type SvgPathSegment,
   svgPointList,
@@ -81,6 +79,13 @@ import {
   type SvgPathCrossingOverlayPrimitive,
 } from './svgPathCrossings.ts'
 import { projectToSvgPoint } from './svgProjection'
+import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
+import {
+  getPointNodeTextLayout,
+  svgPointNodeTextFontFamily,
+  svgPointNodeTextFontSize,
+  svgPointNodeTexPointScale,
+} from './svgPointNodeText.ts'
 import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
@@ -287,7 +292,6 @@ type SelectionCycleFeedback = {
 
 const defaultWidth = 520
 const defaultHeight = 360
-const pointRadiusScale = 1.8
 const highlightColor = '#F4B400'
 const handleFillColor = '#ffffff'
 const handleStrokeColor = '#1D4ED8'
@@ -2468,7 +2472,8 @@ function renderPoint(
     ? hiddenPointStyleFromBase(point.style)
     : point.style
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
-  const radius = Math.max(style.size * pointRadiusScale, 1)
+  const textLayout = getPointNodeTextLayout(point.text)
+  const geometry = svgPointNodeGeometry(style, textLayout, svgPointNodeTexPointScale)
   const fill = style.fill === 'hollow' ? '#ffffff' : style.color
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, point.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
@@ -2485,7 +2490,8 @@ function renderPoint(
   const commonProps = {
     fill,
     stroke: style.color,
-    strokeWidth: 1.4,
+    // TikZ's default node border is 0.4pt; size controls inner sep, not stroke.
+    strokeWidth: 0.4 * svgPointNodeTexPointScale,
     opacity: style.opacity,
     vectorEffect: 'non-scaling-stroke',
   }
@@ -2494,112 +2500,51 @@ function renderPoint(
     'data-occluding-surface-id': occlusion?.occludingFace?.sourceId,
   }
 
-  switch (style.shape) {
-    case 'circle':
-      return {
-        id: point.id,
-        layer: point.layer,
-        element: (
-          <g
-            key={point.id}
-            {...groupProps}
-            {...visibilityDataProps}
-            onClick={(event) =>
-              selectPointElement(
-                event,
-                point.id,
-                onSelectionChange,
-                onPointStratumClick,
-              )
-            }
+  return {
+    id: point.id,
+    layer: point.layer,
+    element: (
+      <g
+        key={point.id}
+        {...groupProps}
+        {...visibilityDataProps}
+        onClick={(event) =>
+          selectPointElement(
+            event,
+            point.id,
+            onSelectionChange,
+            onPointStratumClick,
+          )
+        }
+      >
+        {renderPointHighlight(center, geometry.radius, isSelected)}
+        {geometry.kind === 'circle' ? (
+          <circle {...commonProps} cx={center.x} cy={center.y} r={geometry.radius} />
+        ) : (
+          <polygon
+            {...commonProps}
+            points={svgPointList(geometry.vertices.map((vertex) => ({
+              x: center.x + vertex.x,
+              y: center.y + vertex.y,
+            })))}
+          />
+        )}
+        {textLayout.text.length > 0 && (
+          <text
+            x={center.x}
+            y={center.y + textLayout.baselineOffset}
+            fill="#000000"
+            opacity={style.opacity}
+            fontFamily={svgPointNodeTextFontFamily}
+            fontSize={svgPointNodeTextFontSize}
+            textAnchor="middle"
+            xmlSpace="preserve"
           >
-            {renderPointHighlight(center, radius, isSelected)}
-            <circle {...commonProps} cx={center.x} cy={center.y} r={radius} />
-          </g>
-        ),
-      }
-    case 'square':
-      return {
-        id: point.id,
-        layer: point.layer,
-        element: (
-          <g
-            key={point.id}
-            {...groupProps}
-            {...visibilityDataProps}
-            onClick={(event) =>
-              selectPointElement(
-                event,
-                point.id,
-                onSelectionChange,
-                onPointStratumClick,
-              )
-            }
-          >
-            {renderPointHighlight(center, radius, isSelected)}
-            <polygon
-              {...commonProps}
-              points={svgPointList(
-                regularPolygonPoints(center, radius, 4, Math.PI / 4),
-              )}
-            />
-          </g>
-        ),
-      }
-    case 'triangle':
-      return {
-        id: point.id,
-        layer: point.layer,
-        element: (
-          <g
-            key={point.id}
-            {...groupProps}
-            {...visibilityDataProps}
-            onClick={(event) =>
-              selectPointElement(
-                event,
-                point.id,
-                onSelectionChange,
-                onPointStratumClick,
-              )
-            }
-          >
-            {renderPointHighlight(center, radius, isSelected)}
-            <polygon
-              {...commonProps}
-              points={svgPointList(
-                regularPolygonPoints(center, radius, 3, -Math.PI / 2),
-              )}
-            />
-          </g>
-        ),
-      }
-    case 'star':
-      return {
-        id: point.id,
-        layer: point.layer,
-        element: (
-          <g
-            key={point.id}
-            {...groupProps}
-            {...visibilityDataProps}
-            onClick={(event) =>
-              selectPointElement(
-                event,
-                point.id,
-                onSelectionChange,
-                onPointStratumClick,
-              )
-            }
-          >
-            {renderPointHighlight(center, radius, isSelected)}
-            <polygon
-              {...commonProps}
-              points={svgPointList(starPolygonPoints(center, radius, radius * 0.45))}
-            />
-          </g>
-        ),
-      }
+            {textLayout.text}
+          </text>
+        )}
+      </g>
+    ),
   }
 }
 

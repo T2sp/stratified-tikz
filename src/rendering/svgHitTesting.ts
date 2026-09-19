@@ -37,6 +37,8 @@ import {
 } from './svgPreviewPolicy.ts'
 import { svgLabelAnchorPlacement } from './svgStyle.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
+import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
+import { getPointNodeTextLayout, svgPointNodeTexPointScale } from './svgPointNodeText.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -140,7 +142,6 @@ export type SvgPreviewSelectionCycleResult = {
 }
 
 const defaultHitTolerance = 8
-const pointRadiusScale = 1.8
 const labelHorizontalPadding = 6
 const labelVerticalPadding = 4
 const curveSampleCount = 24
@@ -1147,9 +1148,19 @@ function collectPointCandidate(
   }
 
   const distance = distanceVec2(center, point)
-  const hitRadius = Math.max(pointStratum.style.size * pointRadiusScale, 1) + 6
+  const geometry = svgPointNodeGeometry(
+    pointStratum.style,
+    getPointNodeTextLayout(pointStratum.text),
+    svgPointNodeTexPointScale,
+  )
+  const localPoint = { x: point.x - center.x, y: point.y - center.y }
+  const boundaryDistance = geometry.kind === 'circle'
+    ? Math.max(distance - geometry.radius, 0)
+    : pointInPolygon(localPoint, geometry.vertices)
+      ? 0
+      : distanceToClosedPolyline(localPoint, geometry.vertices)
 
-  if (distance > hitRadius) {
+  if (boundaryDistance > 6) {
     return true
   }
 

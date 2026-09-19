@@ -194,6 +194,16 @@ export function updateLabelById(
   return changed ? { ...diagram, labels } : diagram
 }
 
+export function updatePointTextById(
+  diagram: Diagram,
+  id: string,
+  text: string,
+): Diagram {
+  return updateStratumById(diagram, id, (stratum) =>
+    stratum.geometricKind === 'point' ? { ...stratum, text } : stratum,
+  )
+}
+
 export function removeSelectedElement(
   diagram: Diagram,
   selectedElement: SelectedElement,
@@ -349,6 +359,7 @@ function clearStylePresetReference<T extends { stylePresetId?: string }>(
 export type AddPointStratumOptions = {
   id?: string
   name?: string
+  text?: string
   layer?: number
 }
 
@@ -2422,6 +2433,7 @@ function createPointForDiagram(
     geometricKind: 'point',
     id: options.id ?? makeUniqueId(diagram, 'point'),
     name: options.name ?? 'Point',
+    ...(options.text === undefined ? {} : { text: options.text }),
     style: clonePointStyle(defaultPointStyle),
     position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
     layer: options.layer ?? nextLayer(diagram),

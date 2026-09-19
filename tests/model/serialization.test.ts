@@ -15,6 +15,7 @@ import {
   createCurveStratum,
   createCurvedSheetStratum,
   createEmptyDiagram,
+  createPointStratum,
   createWorkPlaneFilledSheet3DStratum,
 } from '../../src/model/constructors.ts'
 import {
@@ -74,6 +75,102 @@ test('serializeDiagram includes format, version, and diagram data', () => {
   assert.equal('camera' in parsed.diagram, false)
   assert.deepEqual(parsed.diagram.strata, twoDimensionalExample.strata)
   assert.deepEqual(parsed.diagram.labels, twoDimensionalExample.labels)
+})
+
+test('point constructor preserves optional raw node text in 2D and 3D', () => {
+  const text = '  $F^{(1)}L$\n\n$\\alpha \\colon f \\Rightarrow g$  '
+
+  for (const ambientDimension of [2, 3] as const) {
+    const input = {
+      ambientDimension,
+      id: 'point-text',
+      position: { x: 1, y: 2, z: 3 },
+    }
+    const point = createPointStratum({ ...input, text })
+
+    assert.equal(point.text, text)
+    assert.equal(point.codim, ambientDimension)
+    assert.deepEqual(point.position, {
+      x: 1,
+      y: 2,
+      z: ambientDimension === 2 ? 0 : 3,
+    })
+    assert.equal(createPointStratum(input).text, undefined)
+    assert.equal(createPointStratum({ ...input, text: '' }).text, '')
+  }
+})
+
+test('point node text round trips without trimming or LaTeX conversion', () => {
+  for (const ambientDimension of [2, 3] as const) {
+    for (const text of ['', '  $F^{(1)}L$\r\n\n$\\alpha \\colon f \\Rightarrow g$  ']) {
+      const diagram = createEmptyDiagram({ ambientDimension })
+      diagram.strata.push(createPointStratum({
+        ambientDimension,
+        id: 'point-text',
+        text,
+        position: { x: 1, y: 2, z: 0 },
+      }))
+
+      const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+      assert.equal(result.ok, true)
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      const point = result.diagram.strata[0]
+      assert.equal(point?.geometricKind, 'point')
+      if (point?.geometricKind !== 'point') {
+        throw new Error('Expected a loaded point.')
+      }
+      assert.equal(point.text, text)
+    }
+  }
+})
+
+test('old saved point without node text loads and exports an empty body', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(createPointStratum({
+    ambientDimension: 2,
+    id: 'old-point',
+    position: { x: 0, y: 0, z: 0 },
+  }))
+
+  const result = parseSavedDiagramJson(serializeDiagram(diagram))
+
+  assert.equal(result.ok, true)
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  const point = result.diagram.strata[0]
+  assert.equal(point?.geometricKind, 'point')
+  if (point?.geometricKind !== 'point') {
+    throw new Error('Expected a loaded point.')
+  }
+  assert.equal(point.text, undefined)
+  assert.match(generateTikz(result.diagram), /\] at \(pointPoint0p0\) \{\};/)
+})
+
+test('saved point node text rejects non-string values', () => {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata.push(createPointStratum({
+    ambientDimension: 2,
+    id: 'invalid-text-point',
+    position: { x: 0, y: 0, z: 0 },
+  }))
+  const saved = JSON.parse(serializeDiagram(diagram)) as {
+    diagram: { strata: Record<string, unknown>[] }
+  }
+
+  for (const text of [null, 1, true, [], {}]) {
+    saved.diagram.strata[0].text = text
+    const result = parseSavedDiagramJson(JSON.stringify(saved))
+
+    assert.equal(result.ok, false)
+    if (result.ok) {
+      throw new Error('Expected non-string point node text to be rejected.')
+    }
+    assert.match(result.error, /strata\[0\]\.text Point node text must be a string/)
+  }
 })
 
 test('old saved diagram without coordinate anchors loads with an empty anchor list', () => {

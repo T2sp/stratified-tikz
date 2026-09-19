@@ -6354,6 +6354,115 @@ test('label text is preserved without automatic math wrapping', () => {
   assert.match(tikz, /\\node at \(2,3\) \{\$F\^\{\(1\)\}L\$\};/)
 })
 
+test('point node content preserves raw text and existing style in 2D and 3D', () => {
+  const rawText = '  $F^{(1)}L$\n\n$\\alpha \\colon f \\Rightarrow g$  '
+
+  for (const ambientDimension of [2, 3] as const) {
+    for (const text of [undefined, '', 'plain text', '$F$', rawText]) {
+      const diagram = createEmptyDiagram({ ambientDimension })
+      const point: PointStratum = {
+        id: 'node-text',
+        name: 'Node Text',
+        geometricKind: 'point',
+        codim: ambientDimension,
+        ...(text === undefined ? {} : { text }),
+        style: pointStyle({ fill: 'hollow', opacity: 0.6 }),
+        position: { x: 1, y: 2, z: ambientDimension === 2 ? 0 : 3 },
+        layer: 4,
+      }
+      diagram.strata.push(point)
+
+      const tikz = generateTikz(diagram, { exportMode: 'standalone' })
+      const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer4')
+
+      assert.ok(layerBlock.includes(`] at (pointNodeText0p0) {${text ?? ''}};`))
+      assert.match(layerBlock, /fill=white/)
+      assert.match(layerBlock, /opacity=0\.6/)
+      assert.ok(tikz.includes(
+        `\\coordinate (pointNodeText0p0) at ${ambientDimension === 2 ? '(1,2)' : '(1,2,3)'};`,
+      ))
+      assert.equal(point.text, text)
+    }
+  }
+})
+
+test('point node content reaches local plane scopes and global preview fallbacks', () => {
+  for (const fallback of [false, true]) {
+    const frame = xyFrame3D(
+      fallback ? sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0) : { x: 0, y: 0, z: 2 },
+    )
+    const diagram = createLocalSymbolicThreeDimensionalDiagram()
+    diagram.strata.push({
+      id: 'local-node-text',
+      name: 'Local Node Text',
+      geometricKind: 'point',
+      codim: 3,
+      text: '  $F^{(1)}L$  ',
+      style: pointStyle(),
+      position: workPlaneLocalPoint(
+        fallback ? 4 : 2,
+        1,
+        fallback ? 0 : 2,
+        localCoordinateSource(frame, symbolicScalar('R', 2), numericScalar(1)),
+      ),
+      layer: 3,
+    })
+
+    const tikz = generateTikz(diagram)
+    const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer3')
+    const coordinate = fallback ? '(pointLocalNodeText0p0)' : '({\\R},1)'
+
+    assert.ok(layerBlock.includes(`] at ${coordinate} {  $F^{(1)}L$  };`), layerBlock)
+    if (fallback) {
+      assert.match(layerBlock, /uses global preview coordinates/)
+      assert.doesNotMatch(layerBlock, /canvas is plane/)
+    } else {
+      assert.match(layerBlock, /canvas is plane/)
+    }
+  }
+})
+
+test('inline math normalizes point text line breaks in every node output path', () => {
+  const text = '  $F$\r\n\r\n  plain\n text  '
+  const positions: Vec3[] = [
+    { x: 2, y: 1, z: 0 },
+    workPlaneLocalPoint(
+      2, 1, 0,
+      localCoordinateSource(xyFrame3D(), symbolicScalar('R', 2), numericScalar(1)),
+    ),
+    workPlaneLocalPoint(
+      4, 1, 0,
+      localCoordinateSource(
+        xyFrame3D(sourceOnlyWorkPlaneLocalCoordinate(2, 0, 0)),
+        symbolicScalar('R', 2),
+        numericScalar(1),
+      ),
+    ),
+  ]
+
+  for (const position of positions) {
+    const diagram = createLocalSymbolicThreeDimensionalDiagram()
+    const point: PointStratum = {
+      id: 'inline-node-text',
+      name: 'Inline Node Text',
+      geometricKind: 'point',
+      codim: 3,
+      text,
+      style: pointStyle(),
+      position,
+      layer: 2,
+    }
+    diagram.strata.push(point)
+
+    const tikz = generateTikz(diagram, { exportMode: 'inlineMath' })
+
+    expectNoBlankLines(tikz)
+    const layerBlock = extractLayerBlock(tikz, 'stratifiedLayer2')
+    assert.ok(layerBlock.includes('{  $F$ plain text  };'), layerBlock)
+    assert.equal(point.text, text)
+  }
+})
+
 test('point shapes include circle, square, triangle, and star', () => {
   for (const shape of ['circle', 'square', 'triangle', 'star'] satisfies PointShape[]) {
     const tikz = generateTikz(createPointShapeDiagram(shape))

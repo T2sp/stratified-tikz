@@ -217,6 +217,7 @@ export type CreatePointStratumInput = {
   id: string
   name?: string
   label?: string
+  text?: string
   style?: PointStyle
   importedTikzStyleReferenceId?: string
   position: Vec3
@@ -647,6 +648,7 @@ export function createPointStratum({
   id,
   name = 'Point',
   label,
+  text,
   style = defaultPointStyle,
   importedTikzStyleReferenceId,
   position,
@@ -658,6 +660,7 @@ export function createPointStratum({
       codim: ambientDimension === 2 ? 2 : 3,
       geometricKind: 'point',
       name,
+      ...(text === undefined ? {} : { text }),
       style: clonePointStyle(style),
       ...(importedTikzStyleReferenceId === undefined
         ? {}

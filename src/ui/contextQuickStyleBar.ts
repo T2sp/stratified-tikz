@@ -204,7 +204,7 @@ export function createContextQuickStyleBarModel(
         label: contextQuickStyleSelectionLabel('point', bulkModel.count),
         fields: compactFields([
           colorQuickField(fieldsById, 'point.color', 'Color'),
-          sliderQuickField(fieldsById, 'point.size', 'Radius', {
+          sliderQuickField(fieldsById, 'point.size', 'Size', {
             min: 0.1,
             max: 12,
             step: 0.1,

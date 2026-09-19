@@ -55,6 +55,8 @@ import type {
   VisibilityOptions,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { svgPointNodeGeometry } from '../../src/rendering/svgPointNodeGeometry.ts'
+import { getPointNodeTextLayout } from '../../src/rendering/svgPointNodeText.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import {
   projectToSvgPoint,
@@ -640,6 +642,71 @@ test('SVG preview selection candidates include overlapping selectable objects', 
   assert.ok(keys.includes('curve:path-overlap'))
   assert.ok(keys.includes('sheetOrRegion:region-overlap'))
   assert.ok(candidates.length >= 5)
+})
+
+test('point picking follows text-sized node borders and shrinks when text is cleared', () => {
+  for (const ambientDimension of [2, 3] as const) {
+    for (const shape of ['circle', 'square', 'triangle', 'star'] as const) {
+      const diagram = createEmptyDiagram({ ambientDimension })
+      const node = createPointStratum({
+        ambientDimension,
+        id: 'sized-node',
+        text: 'A node with a wide text body',
+        position: { x: 0, y: 0, z: 0 },
+      })
+      node.style.shape = shape
+      diagram.strata = [node]
+      const center = projectToSvgPoint(diagram.camera, node.position, 360)
+      const geometry = svgPointNodeGeometry(node.style, getPointNodeTextLayout(node.text))
+      const localPoint = geometry.kind === 'circle'
+        ? { x: geometry.radius - 1, y: 0 }
+        : geometry.vertices[0]
+      const options = {
+        diagram,
+        camera: diagram.camera,
+        viewportHeight: 360,
+        point: { x: center.x + localPoint.x, y: center.y + localPoint.y },
+      }
+
+      assert.ok(collectSvgPreviewSelectionCandidates(options).some(
+        (candidate) => candidate.id === node.id,
+      ), `${ambientDimension}D ${shape} border must be selectable`)
+
+      diagram.strata = [{ ...node, text: '' }]
+      assert.equal(collectSvgPreviewSelectionCandidates(options).length, 0,
+        `${ambientDimension}D ${shape} must no longer cover the old text border`)
+    }
+  }
+})
+
+test('point picking excludes space outside polygon edges and between star tips', () => {
+  for (const shape of ['square', 'triangle', 'star'] as const) {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    const node = createPointStratum({
+      ambientDimension: 2,
+      id: 'polygon-node',
+      text: 'A deliberately long node body for testing the actual outline',
+      position: { x: 0, y: 0, z: 0 },
+    })
+    node.style.shape = shape
+    diagram.strata = [node]
+    const geometry = svgPointNodeGeometry(node.style, getPointNodeTextLayout(node.text))
+    const center = projectToSvgPoint(diagram.camera, node.position, 360)
+    // Each direction crosses a side/inner star vertex, not an outer vertex.
+    const angle = shape === 'square' ? 0 : shape === 'triangle' ? Math.PI / 2 : -Math.PI / 2 + Math.PI / 5
+    const radius = geometry.radius * 0.95
+    const candidates = collectSvgPreviewSelectionCandidates({
+      diagram,
+      camera: diagram.camera,
+      viewportHeight: 360,
+      point: {
+        x: center.x + Math.cos(angle) * radius,
+        y: center.y + Math.sin(angle) * radius,
+      },
+    })
+
+    assert.equal(candidates.length, 0, `${shape} must use its outline, not its circumcircle`)
+  }
 })
 
 test('SVG preview selection candidate collection bounds coordinate-anchor work before sorting', () => {

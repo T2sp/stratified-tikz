@@ -167,7 +167,7 @@ test('coalesced slider drag stores one undo entry', () => {
   assert.equal(findCurve(undone.editableDiagram, 'curve-a').style.lineWidth, 1.2)
 })
 
-test('point radius shortcut works with step 0.1', () => {
+test('point size shortcut works with step 0.1', () => {
   const diagram = pointDiagram()
   const model = requiredModel(diagram, pointSelection())
   const field = requiredSliderField(model, 'point.size')
@@ -178,7 +178,7 @@ test('point radius shortcut works with step 0.1', () => {
     4.3,
   )
 
-  assert.equal(field.label, 'Radius')
+  assert.equal(field.label, 'Size')
   assert.equal(field.slider.step, 0.1)
   assert.equal(findPoint(updated, 'point-a').style.size, 4.3)
 })

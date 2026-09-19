@@ -5,12 +5,14 @@ import type {
   Stratum,
 } from '../../model/types.ts'
 import {
+  updatePointTextById,
   updateStratumById,
   updateStratumNameById,
 } from '../diagramUpdates.ts'
 import { CurveGeometryEditor } from './CurveGeometryEditor.tsx'
 import { CurvedSheetGeometryEditor } from './CurvedSheetGeometryEditor.tsx'
 import {
+  EditableLongTextField,
   EditableNumberField,
   EditableTextField,
   ReadOnlyField,
@@ -94,6 +96,17 @@ export function StratumInspector({
               )
             }
           />
+          {stratum.geometricKind === 'point' && (
+            <EditableLongTextField
+              label="Node text"
+              value={stratum.text ?? ''}
+              onChange={(text) =>
+                onDiagramChange((currentDiagram) =>
+                  updatePointTextById(currentDiagram, stratum.id, text),
+                )
+              }
+            />
+          )}
           <ReadOnlyField label="Geometric kind" value={stratum.geometricKind} />
           <ReadOnlyField label="Codimension" value={String(stratum.codim)} />
           <EditableNumberField

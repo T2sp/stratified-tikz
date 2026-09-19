@@ -2870,6 +2870,10 @@ function validatePointStratum(
 ): void {
   const expectedCodim = ambientDimension === 2 ? 2 : 3
 
+  if (stratum.text !== undefined && typeof stratum.text !== 'string') {
+    pushError(errors, `${path}.text`, 'Point node text must be a string.')
+  }
+
   if (stratum.codim !== expectedCodim) {
     pushError(
       errors,

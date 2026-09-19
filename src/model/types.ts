@@ -938,6 +938,8 @@ export type PointStratum = {
   geometricKind: 'point'
   name: string
   label?: string
+  /** Raw TikZ node content; omitted content is empty. */
+  text?: string
   stylePresetId?: string
   importedTikzStyleReferenceId?: string
   style: PointStyle

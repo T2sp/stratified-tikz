@@ -4448,6 +4448,7 @@ function emitScopedWorkPlaneLocalPoint(
   point: PointStratum,
   elementIndex: number,
   options: string[],
+  pointText: string,
   visibilityComment: string | null,
   context: GenerateContext,
 ): string[] | null {
@@ -4483,7 +4484,7 @@ function emitScopedWorkPlaneLocalPoint(
     [
       '\\node[',
       ...formatTikzOptions(options),
-      `] at ${localCoordinate.coordinate} {};`,
+      `] at ${localCoordinate.coordinate} {${pointText}};`,
     ],
   )
 
@@ -4503,7 +4504,7 @@ function emitScopedWorkPlaneLocalPoint(
       ...localPreviewFallbackLines(subject, scopedLines.error),
       '\\node[',
       ...formatTikzOptions(options),
-      `] at (${coordinate}) {};`,
+      `] at (${coordinate}) {${pointText}};`,
       '',
     ]
   }
@@ -5856,10 +5857,12 @@ function emitPoint(
     `Point${point.id}`,
     context,
   )
+  const pointText = formatNodeTextForTikz(point.text ?? '', context.exportMode)
   const scopedLocalPoint = emitScopedWorkPlaneLocalPoint(
     point,
     elementIndex,
     options,
+    pointText,
     isHiddenBySurface
       ? `% Auto point visibility: point "${point.name}" [${point.id}] hidden behind ${occludingFaceComment(occlusion)} and dimmed.`
       : null,
@@ -5885,7 +5888,7 @@ function emitPoint(
       : []),
     '\\node[',
     ...formatTikzOptions(options),
-    `] at (${coordinate}) {};`,
+    `] at (${coordinate}) {${pointText}};`,
     '',
   ]
 }
@@ -5930,7 +5933,7 @@ function emitLabel(
       : label
   const options = labelStyleOptions(effectiveLabel, context)
   const coordinate = formatCoordinate(label.position, context.mode, context)
-  const labelText = formatLabelTextForTikz(label.text, context.exportMode)
+  const labelText = formatNodeTextForTikz(label.text, context.exportMode)
   const visibilityComment =
     isHiddenBySurface && context.visibility.labelVisibility === 'autoDim'
       ? [
@@ -5972,18 +5975,18 @@ function occludingFaceComment(occlusion: AnchorOcclusionResult): string {
     : `sheet [${occlusion.occludingFace.sourceId}] face ${occlusion.occludingFace.faceIndex}`
 }
 
-function formatLabelTextForTikz(
-  labelText: string,
+function formatNodeTextForTikz(
+  text: string,
   exportMode: TikzExportMode,
 ): string {
   if (exportMode !== 'inlineMath') {
-    return labelText
+    return text
   }
 
   // Inline math export is commonly pasted into align-like environments, where
-  // physical blank lines are invalid. Normalize raw label line breaks only in
-  // emitted TikZ; the stored label text remains unchanged.
-  return labelText
+  // physical blank lines are invalid. Normalize raw node line breaks only in
+  // emitted TikZ; the stored text remains unchanged.
+  return text
     .replace(/\r\n?/g, '\n')
     .replace(/[^\S\n]*\n+[^\S\n]*/g, ' ')
 }
