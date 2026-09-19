@@ -2,9 +2,9 @@
 
 ## Environment
 
-Work on the current Phase 31B checkout, including the existing uncommitted
-Worker-loading fixes and tests. Preserve all unrelated user work. Do not reset
-the branch or replace the current adapter with an earlier implementation.
+Work on the current Phase 31B checkout, preserving the implemented
+Worker-loading fixes, tests, and any uncommitted user work. Do not reset the
+branch or replace the current adapter with an earlier implementation.
 
 The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
 This project requires Node >=22.12.0.
@@ -39,9 +39,13 @@ listen EPERM: operation not permitted 127.0.0.1
 ```
 
 The failure occurred at the localhost server bind in
-`scripts/checkLabelAssets.mjs`, before Chrome launched. Actual Worker
+`scripts/checkLabelAssets.mjs:120`, before Chrome launched. Actual Worker
 execution, additional-font requests, native-import failure/recovery, and
 standalone SVG rendering were not exercised.
+
+The review session explicitly prohibited permission escalation. Repeating the
+same command under the same restrictions cannot complete browser acceptance;
+the remaining work needs an execution environment that permits this smoke.
 
 This is an environment-blocked verification gap, not an observed runtime
 defect. It leaves the built-asset requirement in
@@ -49,12 +53,18 @@ defect. It leaves the built-asset requirement in
 native-import caching issue as an unfixed code defect based only on this
 blocked run.
 
-The review used Node v26.9.0 and recorded:
+Passing Node tests cannot establish browser loading or recovery:
+`src/rendering/labels/mathjaxEngine.ts` uses installed direct modules when
+`typeof window === 'undefined'`, while production browser conversion uses
+`loadWorkerMathJaxEngine`. Keep this distinction explicit in the verification
+and completion report.
+
+The review used `/opt/homebrew/bin` through `PATH` and recorded:
 
 | Check | Previous review result |
 | --- | --- |
 | Full suite | 2,258 passed; no failures or skips |
-| Seven focused adapter files | 102 passed; no failures or skips |
+| Seven focused adapter files | All passed across overlapping review groups: 43/43, 55/55, and 53/53 |
 | Targeted ESLint | Passed |
 | Both asset-script syntax checks | Passed |
 | `git diff --check` | Passed |
@@ -62,27 +72,33 @@ The review used Node v26.9.0 and recorded:
 | Browser asset/retry/rendering smoke | Exit 1 before browser launch |
 
 Static deployment inspection verified 3 main manifest entries, 43 Worker
-chunks, 83 references, and all 40 additional-font modules. The built Worker URL
-uses `/stratified-tikz/assets/`. The review's
-`/private/tmp/phase31b-review-assets/asset-graph-evidence.json` contains static
-evidence only; it is not a browser acceptance result.
+chunks, 83 references, and all 40 additional-font modules. The review observed
+the emitted Worker URL `/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js`.
+That filename is historical build evidence, not a value to hard-code into
+tests; use the current build's manifests. No browser HTTP requests or raster
+results were obtained.
 
 These are previous results to preserve and recheck, not new results for this
-follow-up.
+follow-up. The focused review groups overlap: do not add their counts or
+report them as a unique total. Run the seven-file command below to record the
+actual non-overlapping focused total for this attempt.
 
 ## What the review confirmed correct
 
 Preserve the current implementation and regressions:
 
-- real public-adapter fraction/radical conversions return finite geometry;
+- real public-adapter fraction/radical conversions return finite geometry and
+  immutable results;
 - a valid run followed by an undefined command returns the exact complete
-  source, including whitespace and delimiters, without partial geometry;
+  source, including tabs, CRLF, and delimiters, without partial geometry; a
+  subsequent valid conversion succeeds;
 - conversion state and errors are isolated and scoped;
 - work, caches, and Worker lifetime are bounded; results are immutable,
   equivalent requests coalesce, and obsolete generations are retired;
 - logical advance is distinct from overflowing ink, and portable SVG
   validation constrains elements, attributes, references, and paint;
-- engine and font dependencies are consistently pinned to `4.1.3`;
+- engine and font dependencies are exactly `4.1.3` in declarations, lockfile,
+  and installed packages;
 - the disposable Worker implementation and native-import regression harness
   already exist;
 - model, persistence, history, TikZ, production canvas integration, and export
@@ -119,9 +135,15 @@ Read at least:
 
 Do not replace the existing assertions with a new, weaker verification path.
 
-## 1. Run the existing smoke in a permitted environment
+## 1. Establish a permitted environment and run the unchanged smoke
 
-Build the current checkout, then execute the existing script unchanged.
+First check the active session's permissions and available browser tooling.
+If it has the same localhost restriction and prohibited escalation as the
+review session, arrange execution in an authorized local session or other
+permitted environment; do not start another implementation rewrite to resolve
+an operating-environment restriction.
+
+Build the current checkout there, then execute the existing script unchanged.
 Use an available external Playwright installation and Chrome/Chromium; do not
 add a project browser-testing dependency.
 
@@ -141,18 +163,29 @@ npm run check:label-assets
 Use actual available paths and a new artifact directory if these differ or
 already contain earlier output. Record the full command, execution environment,
 Node version, actual launched browser version, exit status, and log location.
+Identify the tested revision and any uncommitted code/build changes so results
+from another session can be matched to the reviewed implementation. Rebuild in
+that environment rather than relying on unrelated or stale `dist` output.
 
 If localhost binding or browser launch is denied by the sandbox, use the
 execution environment's supported approval/escalation mechanism when available
-and permitted. Do not assume an earlier run's lack of escalation capability
-applies to the current session. The required action is running this local
-fresh-build smoke with localhost/browser access, not changing the application.
+and permitted. If the current session prohibits escalation, respect that rule;
+do not request a forbidden override. A new session may have different
+permissions, which must be checked rather than assumed. The required action is
+running this local fresh-build smoke with localhost/browser access, not changing
+the application.
 
 If escalation is unavailable or denied, report the exact restriction and keep
 acceptance incomplete. Do not bypass the restriction, disable browser security,
 change the server merely to evade permissions, or replace this check with a
 static-only result. Avoid repeating the same blocked command without a relevant
 environment or permission change.
+
+If no permitted execution environment is accessible, provide a concrete
+handoff: the exact build/smoke commands above with resolved paths, the target
+revision or pending changes, the required localhost/browser capability, and
+the expected logs/artifacts listed below. Record what remains unverified and
+leave Phase 31B incomplete. A handoff is not a passing browser check.
 
 ## 2. Inspect the browser results and saved evidence
 
@@ -195,8 +228,10 @@ Inspect the artifacts emitted by the existing script:
   SVG/PNG/reference PNG files: portable output and raster evidence;
 - the smoke's output log: base-path/font requests and overall result.
 
-An artifact's presence alone does not establish success. Check its contents,
-the current run's final status, and whether all required assertions completed.
+The static `asset-graph-evidence.json` is written before the localhost bind,
+so even a blocked run can produce it. An artifact's presence alone does not
+establish success. Check its contents, the current run's final status, and
+whether all required assertions completed.
 
 ### Interpret exit statuses accurately
 
@@ -310,7 +345,9 @@ run on the same final code/build need not be repeated just because documentation
 was updated. Include any additional changed files in targeted checks, and
 register new unit test files in the explicitly enumerated `npm test` script.
 
-Report actual counts and statuses rather than copying review results. Separate
+Report actual counts and statuses rather than copying review results or adding
+overlapping test groups. Node results exercise their own loading branch and
+must not be described as production browser Worker verification. Separate
 non-failing large-chunk warnings and unchanged global lint debt from new errors.
 
 ## Scope and preservation requirements
@@ -349,10 +386,11 @@ Report:
   that required a code or harness change;
 - files changed and the reason for each change;
 - exact commands, execution environment, Node/browser versions, exit statuses,
-  and focused/full test counts;
+  tested revision/changes, and non-overlapping focused/full test counts;
 - actual failed/restored module requests, same-service recovery, Worker
   retirement, base-path/font loading, and standalone containment evidence;
 - artifact and log paths, with static and browser evidence distinguished;
 - documentation updates and whether every Phase 31B gate now passes;
 - any remaining blocked check, its exact cause, and the assertions that did
-  not run, without claiming completion of Phase 31C or later work.
+  not run; include the concrete permitted-environment handoff if needed,
+  without claiming completion of Phase 31B or later work while its gate is open.
