@@ -20,7 +20,11 @@ export class MathJaxFailure extends Error {
 }
 
 export type EngineMathRun = Readonly<{ tex: string; display: boolean }>
-export type EngineMathSvg = Readonly<{ svg: RawSvgElement }>
+export type EngineMathSvg = Readonly<{
+  svg: RawSvgElement
+  /** True logical advance in em, before MathJax clamps its SVG viewport. */
+  advanceWidth: number
+}>
 export interface MathLabelEngine {
   readonly identity: string
   convert(runs: readonly EngineMathRun[]): Promise<readonly EngineMathSvg[]>

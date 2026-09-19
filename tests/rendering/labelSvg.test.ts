@@ -25,9 +25,9 @@ function fails(raw: RawSvgElement, category: LabelSvgError['category']): void {
   assert.throws(() => validateMathSvg(raw), (error: unknown) => error instanceof LabelSvgError && error.category === category)
 }
 
-test('SVG viewBox supplies em metrics and a baseline without guessing source height', () => {
-  const result = validateMathSvg(svg([element()], { viewBox: '-120 -1250 1750 1775' }))
-  assert.deepEqual(result.metrics, { width: 1.75, ascent: 1.25, descent: 0.525 })
+test('nominal viewport, logical advance and negative ink origin remain distinct', () => {
+  const result = validateMathSvg(svg([element()], { viewBox: '-120 -1250 1750 1775' }), undefined, 0.9)
+  assert.deepEqual(result.metrics, { width: 0.9, ascent: 1.25, descent: 0.525, inkLeft: -0.12, inkRight: 1.63 })
   assert.deepEqual(result.viewBox, [0, -1250, 1750, 1775])
   assert.equal(result.offsetX, 0.12)
   assert.equal(result.svg.attributes.width, '1.75em')
@@ -37,17 +37,17 @@ test('SVG viewBox supplies em metrics and a baseline without guessing source hei
 
 test('empty MathJax geometry has finite zero metrics', () => {
   assert.deepEqual(validateMathSvg(svg([], { viewBox: '0 0 0 0' })).metrics,
-    { width: 0, ascent: 0, descent: 0 })
+    { width: 0, ascent: 0, descent: 0, inkLeft: 0, inkRight: 0 })
 })
 
-test('formula ink wholly above or below baseline normalizes to a viewport positioned at minus ascent', () => {
+test('nominal boxes above or below baseline cannot conceal actual path ink or stroke', () => {
   const below = validateMathSvg(svg([element()], { viewBox: '0 250 1000 500' }))
-  assert.deepEqual(below.viewBox, [0, 0, 1000, 750])
-  assert.deepEqual(below.metrics, { width: 1, ascent: 0, descent: 0.75 })
-  assert.equal(below.svg.attributes.height, '0.75em')
+  assert.deepEqual(below.viewBox, [0, -2, 1002, 752])
+  assert.deepEqual(below.metrics, { width: 1, ascent: 0.002, descent: 0.75, inkLeft: -0.002, inkRight: 1 })
+  assert.equal(below.svg.attributes.height, '0.752em')
   const above = validateMathSvg(svg([element()], { viewBox: '0 -1000 1000 500' }))
-  assert.deepEqual(above.viewBox, [0, -1000, 1000, 1000])
-  assert.deepEqual(above.metrics, { width: 1, ascent: 1, descent: 0 })
+  assert.deepEqual(above.viewBox, [0, -1000, 1002, 1302])
+  assert.deepEqual(above.metrics, { width: 1, ascent: 1, descent: 0.302, inkLeft: -0.002, inkRight: 1 })
 })
 
 test('merror markers fail before their data attributes or classes can disappear', () => {
@@ -85,7 +85,10 @@ test('glyph stroke thickening does not change non-glyph paths or explicit stroke
       element('path', { d: 'M0 0L20 30Z', 'data-c': '42', 'stroke-width': '5' }),
     ]),
   ]))
-  const group = result.svg.children[0]
+  const translated = result.svg.children[0]
+  assert.ok(typeof translated === 'object')
+  assert.equal(translated.attributes.transform, 'translate(10,0)')
+  const group = translated.children[0]
   assert.ok(typeof group === 'object')
   const widths = group.children.map((child) => typeof child === 'object' && child.attributes['stroke-width'])
   assert.deepEqual(widths, ['3', undefined, '5'])
@@ -96,7 +99,7 @@ test('only outer dimensions can use font-relative units; child geometry cannot d
   const result = validateMathSvg(svg([
     element('rect', { x: '2px', y: '3', width: '40px', height: '50', 'stroke-width': '3px' }),
   ], { width: '3ex', height: '1.2em' }))
-  assert.equal(result.svg.attributes.width, '1.5em')
+  assert.equal(result.svg.attributes.width, '1.504em')
   assert.equal(result.svg.attributes.height, '1.2em')
   for (const attributes of [
     { x: '1em' }, { y: '2ex' }, { width: '1em' }, { height: '2ex' },
@@ -168,4 +171,75 @@ test('safe geometry is reusable without IDs or placement-dependent state', () =>
   const second = serializeMathSvg(result)
   assert.equal(first, second)
   assert.doesNotMatch(first, /\bid=|href|url\(|<defs|<use/)
+})
+
+test('ink enclosure uses transformed Bézier controls and negative scale, not the nominal box', async () => {
+  const { measureSvgInkBounds } = await import('../../src/rendering/labels/labelInkBounds.ts')
+  const raw = svg([element('g', { transform: 'translate(-100,25) scale(2,-3)', stroke: 'none' }, [
+    element('path', { d: 'M0 0 C10 40 20 -50 30 5 Q40 80 50 -20 L60 0 H70 V10 Z' }),
+  ])], { viewBox: '0 0 1 1' })
+  const bounds = measureSvgInkBounds(raw)
+  // The control-point hull encloses every point of the cubic/quadratic curves.
+  // Its extrema are independent of the deliberately useless nominal viewBox.
+  assert.deepEqual(bounds, { minX: -100, minY: -215, maxX: 40, maxY: 175 })
+  assert.ok(Object.isFrozen(bounds))
+})
+
+test('nested transform order and inherited stroke widths enclose actual rules and cap corners', async () => {
+  const { measureSvgInkBounds } = await import('../../src/rendering/labels/labelInkBounds.ts')
+  const raw = svg([element('g', { transform: 'translate(10,20)', fill: 'none', stroke: '#000', 'stroke-width': '10' }, [
+    element('g', { transform: 'scale(-2,3) translate(5,-7)', 'stroke-linejoin': 'round', 'stroke-linecap': 'square' }, [
+      element('line', { x1: '0', y1: '0', x2: '10', y2: '10' }),
+    ]),
+  ])])
+  const bounds = measureSvgInkBounds(raw)
+  assert.ok(bounds)
+  const capRadius = 5 * Math.SQRT2
+  assert.deepEqual(bounds, {
+    minX: -2 * (10 + capRadius), minY: -3 * capRadius - 1,
+    maxX: 2 * capRadius, maxY: 3 * (10 + capRadius) - 1,
+  })
+  const miter = measureSvgInkBounds(svg([element('path', {
+    d: 'M0 0L100 0L1 1', fill: 'none', stroke: '#000', 'stroke-width': '10',
+  })]))
+  // No miterlimit override survives validation: default limit 4 bounds every
+  // miter tip by four half-widths, including almost-collinear sharp joins.
+  assert.deepEqual(miter, { minX: -20, minY: -20, maxX: 120, maxY: 21 })
+})
+
+test('rectangles, polylines, polygons, and multiple path subpaths retain their complete hull', async () => {
+  const { measureSvgInkBounds } = await import('../../src/rendering/labels/labelInkBounds.ts')
+  const raw = svg([
+    element('rect', { x: '-10', y: '-20', width: '5', height: '7', rx: '2', ry: '2' }),
+    element('polyline', { points: '0,0 20,30 40,-50' }),
+    element('polygon', { points: '90,100 91,101 95,105' }),
+    element('path', { d: 'M1 2 3 4Z M-100 -200L-99 -199Z' }),
+  ])
+  assert.deepEqual(measureSvgInkBounds(raw), { minX: -100, minY: -200, maxX: 95, maxY: 105 })
+  assert.equal(measureSvgInkBounds(svg([])), null)
+  assert.equal(measureSvgInkBounds(svg([element('g', { fill: 'none', stroke: 'none' }, [element()])])), null)
+})
+
+test('unhandled geometry cannot obtain successful bounds even when invisible or nested', async () => {
+  const { measureSvgInkBounds } = await import('../../src/rendering/labels/labelInkBounds.ts')
+  for (const shape of [
+    element('path', { d: 'M0 0l10 20' }),
+    element('path', { d: 'M0 0S10 20 30 40' }),
+    element('path', { d: 'M0 0A10 20 0 0 1 30 40' }),
+    element('g', { transform: 'rotate(45)' }, [element()]),
+    element('g', { transform: 'matrix(1 0 0 1 0 0)' }, [element()]),
+  ]) {
+    assert.throws(() => measureSvgInkBounds(svg([element('g', { fill: 'none', stroke: 'none' }, [shape])])),
+      (error: unknown) => error instanceof LabelSvgError && error.category === 'output')
+  }
+})
+
+test('ink coordinate overflow and existing validated work budgets fail rather than making huge viewports', async () => {
+  const { measureSvgInkBounds } = await import('../../src/rendering/labels/labelInkBounds.ts')
+  assert.throws(() => measureSvgInkBounds(svg([
+    element('g', { transform: 'scale(100000000)' }, [element('path', { d: 'M0 0L100 100' })]),
+  ])), (error: unknown) => error instanceof LabelSvgError && error.category === 'invalid-metrics')
+  assert.throws(() => validateMathSvg(svg([element('path', { d: 'M0 0' + 'L1 2'.repeat(100) })]),
+    { ...DEFAULT_SVG_LIMITS, maxAttributeCharacters: 200 }),
+  (error: unknown) => error instanceof LabelSvgError && error.category === 'work-limit')
 })

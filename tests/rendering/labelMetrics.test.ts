@@ -116,6 +116,25 @@ test('text glyph overhang contributes to bounds without changing following advan
   assert.equal(result.metrics.width, 1.7)
 })
 
+test('zero-advance math and reduced advance retain both ink sides without moving later runs', () => {
+  const result = layout('$a$$b$T\n$c$', [
+    { width: 0, ascent: 1.4, descent: 0.4, inkLeft: -0.6, inkRight: 0.5 },
+    { width: 0.2, ascent: 0.8, descent: 0.2, inkLeft: -0.1, inkRight: 0.9 },
+    undefined,
+    { width: 0, ascent: 1.1, descent: 0.7, inkLeft: -0.3, inkRight: 0.8 },
+  ])
+  assert.deepEqual(result.placements.slice(0, 3).map(({ x, width }) => [x, width]),
+    [[0, 0], [0, 0.2], [0.2, 0.5]])
+  assert.equal(result.lines[0].width, 0.7)
+  assert.equal(result.lines[0].minX, -0.6)
+  assert.equal(result.lines[0].maxX, 0.9)
+  assert.ok(Math.abs(result.lines[1].baseline - 1.7) < 1e-12)
+  assert.equal(result.bounds.minX, -0.6)
+  assert.equal(result.bounds.minY, -1.4)
+  assert.equal(result.bounds.maxX, 0.9)
+  assert.ok(Math.abs(result.bounds.maxY - 2.4) < 1e-12)
+})
+
 test('measurement normalization does not apply the final label scale twice', () => {
   const result = composeLabelLayout(runs('text $x$'), [undefined, { width: 1, ascent: 1, descent: 0.5 }], {
     ...settings, font: { ...settings.font, sizePx: 40 },

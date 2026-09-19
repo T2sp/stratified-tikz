@@ -1,3 +1,5 @@
+import { measureSvgInkBounds } from './labelInkBounds.ts'
+
 /** DOM-independent, narrow MathJax SVG boundary. All coordinates are 1000/em. */
 export interface RawSvgElement {
   readonly tag: string
@@ -20,10 +22,15 @@ export interface ValidatedSvgElement {
 
 export interface MathSvgGeometry {
   readonly svg: ValidatedSvgElement
-  /** em units, y down, with baseline at y=0. */
-  readonly metrics: Readonly<{ width: number; ascent: number; descent: number }>
-  /** MathJax user units; left edge zero and the vertical interval includes baseline 0. */
+  /** em, y down, baseline 0. width is logical advance, not viewport width. */
+  readonly metrics: Readonly<{
+    width: number; ascent: number; descent: number
+    /** Conservative ink/viewport enclosure relative to the logical run origin. */
+    inkLeft: number; inkRight: number
+  }>
+  /** Ink-enclosing user units; left edge normalized to zero, includes baseline 0. */
   readonly viewBox: readonly [number, number, number, number]
+  /** Translation already applied to SVG children, in em. Place SVG at run.x - offsetX. */
   readonly offsetX: number
   readonly unitsPerEm: 1000
   readonly nodeCount: number
@@ -212,6 +219,9 @@ function styleAttributes(style: string, root: boolean): Record<string, string> {
 export function validateMathSvg(
   raw: RawSvgElement,
   limits: SvgValidationLimits = DEFAULT_SVG_LIMITS,
+  // Standalone validator fixtures may use nominal advance. Production always
+  // supplies the separately captured, unclamped MathJax logical advance.
+  advanceWidth?: number,
 ): MathSvgGeometry {
   if (!raw || raw.tag !== 'svg') fail('Expected one SVG root')
   for (const value of Object.values(limits)) {
@@ -250,6 +260,7 @@ export function validateMathSvg(
       }
       if (name === 'style' || name === 'class' || name.startsWith('data-')) continue
       if (name === 'aria-hidden' || name === 'role' || name === 'focusable') continue
+      if (depth === 0 && ['x', 'y', 'transform'].includes(name)) fail('Unsupported SVG viewport transform')
       if (name === 'xmlns' && depth === 0 && value === 'http://www.w3.org/2000/svg') {
         output[name] = value
       } else if (name === 'xmlns:xlink' && depth === 0 && value === 'http://www.w3.org/1999/xlink') {
@@ -341,28 +352,41 @@ export function validateMathSvg(
   const [x, y, width, height] = bounds
   if (width < 0 || height < 0 || (height === 0 && width !== 0) || Math.abs(y) > 1e7
     || width > 1e7 || height > 1e7) throw new LabelSvgError('invalid-metrics', 'Invalid SVG bounds')
-  const top = Math.min(0, y)
-  const bottom = Math.max(0, y + height)
+  const advance = advanceWidth ?? width / 1000
+  if (!Number.isFinite(advance) || advance < 0 || advance > 10000) {
+    throw new LabelSvgError('invalid-metrics', 'Unsupported logical advance')
+  }
+  const ink = measureSvgInkBounds(svg)
+  const left = Math.min(0, x, ink?.minX ?? 0)
+  const right = Math.max(advance * 1000, x + width, ink?.maxX ?? 0)
+  const top = Math.min(0, y, ink?.minY ?? 0)
+  const bottom = Math.max(0, y + height, ink?.maxY ?? 0)
+  const normalizedWidth = right - left
   const normalizedHeight = bottom - top
-  const viewBox = Object.freeze([0, top, width, normalizedHeight]) as readonly [number, number, number, number]
-  const children = x === 0 ? svg.children : Object.freeze([Object.freeze({
-    tag: 'g', attributes: Object.freeze({ transform: `translate(${-x},0)` }), children: svg.children,
+  if (![left, right, top, bottom, normalizedWidth, normalizedHeight].every((value) =>
+    Number.isFinite(value) && Math.abs(value) <= 1e7)) {
+    throw new LabelSvgError('invalid-metrics', 'SVG ink exceeds bounds')
+  }
+  const viewBox = Object.freeze([0, top, normalizedWidth, normalizedHeight]) as readonly [number, number, number, number]
+  const children = left === 0 ? svg.children : Object.freeze([Object.freeze({
+    tag: 'g', attributes: Object.freeze({ transform: `translate(${-left},0)` }), children: svg.children,
   })])
   const normalizedSvg = Object.freeze({
     ...svg,
     attributes: Object.freeze({
       ...svg.attributes,
       viewBox: viewBox.join(' '),
-      width: `${width / 1000}em`,
+      width: `${normalizedWidth / 1000}em`,
       height: `${normalizedHeight / 1000}em`,
     }),
     children,
   })
   return Object.freeze({
     svg: normalizedSvg,
-    metrics: Object.freeze({ width: width / 1000, ascent: Math.max(0, -top / 1000), descent: bottom / 1000 }),
+    metrics: Object.freeze({ width: advance, ascent: Math.max(0, -top / 1000), descent: bottom / 1000,
+      inkLeft: left / 1000, inkRight: right / 1000 }),
     viewBox,
-    offsetX: -x / 1000,
+    offsetX: -left / 1000,
     unitsPerEm: 1000,
     nodeCount,
     pathCount,

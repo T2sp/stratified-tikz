@@ -161,6 +161,16 @@ async function convert(
   let completedMmlNodes = 0
   let currentMmlNodes = 0
   const svgBudget = { nodes: 0, paths: 0, bytes: 0 }
+  class LabelSVG extends SVG<LiteElement, LiteText, LiteDocument> {
+    advanceWidth = NaN
+
+    protected override createSVG(h: number, d: number, w: number): [LiteElement, LiteElement] {
+      // Pinned MathJax 4.1.3 passes the outer logical bbox here, then clamps
+      // SVG width to >= 0.016em. That viewport is neither advance nor ink.
+      this.advanceWidth = w
+      return super.createSVG(h, d, w)
+    }
+  }
   const tex = new TeX<LiteElement, LiteText, LiteDocument>({
     packages: [...MATHJAX_EXTENSIONS],
     tags: 'none',
@@ -172,7 +182,7 @@ async function convert(
   })
   tex.parseOptions.columnParser = new BoundedColumnParser()
   tex.parseOptions.handlers.add({ environment: ['stz-bounded-ams'] }, {}, 0)
-  const output = new SVG<LiteElement, LiteText, LiteDocument>({
+  const output = new LabelSVG({
     fontCache: 'none',
     fontData,
     dynamicPrefix: fontPrefix,
@@ -217,6 +227,7 @@ async function convert(
   const result: EngineMathSvg[] = []
   try {
     for (const run of runs) {
+      output.advanceWidth = NaN
       // The async document API retries only for actual local font-data loading.
       const node = await document.convertPromise(run.tex, {
         display: run.display,
@@ -233,7 +244,7 @@ async function convert(
       }
       const root = roots[0]
       completedMmlNodes += currentMmlNodes
-      result.push(Object.freeze({ svg: snapshotSvg(root, svgBudget) }))
+      result.push(Object.freeze({ svg: snapshotSvg(root, svgBudget), advanceWidth: output.advanceWidth }))
     }
     return Object.freeze(result)
   } catch (error) {

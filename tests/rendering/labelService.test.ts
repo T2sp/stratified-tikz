@@ -22,7 +22,7 @@ const validSvg = (): RawSvgElement => ({
   ] }],
 })
 function fakeEngine(convert?: MathLabelEngine['convert']): MathLabelEngine {
-  return { identity: MATHJAX_IDENTITY, convert: convert ?? (async (runs) => runs.map(() => ({ svg: validSvg() }))) }
+  return { identity: MATHJAX_IDENTITY, convert: convert ?? (async (runs) => runs.map(() => ({ svg: validSvg(), advanceWidth: 1 }))) }
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -46,7 +46,7 @@ test('Unicode/text, parser failures, unsupported state and parser limits never i
 test('all delimiters pass complete bodies and modes; ordered text whitespace and math newlines survive', async () => {
   const seen: { tex: string; display: boolean }[][] = []
   const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async (runs) => {
-    seen.push([...runs]); return runs.map(() => ({ svg: validSvg() }))
+    seen.push([...runs]); return runs.map(() => ({ svg: validSvg(), advanceWidth: 1 }))
   }) })
   const source = ' 領域 $x$  \t\\(y\\)\n$$a\nb$$ \\[z\\] '
   const result = await service.convert(source, settings)
@@ -62,7 +62,7 @@ test('all delimiters pass complete bodies and modes; ordered text whitespace and
 test('resolved error geometry and a failed later math run discard the entire result', async () => {
   const source = ' \t$x$ then $y$\n '
   const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async () => [
-    { svg: validSvg() }, { svg: { ...validSvg(), children: [{ tag: 'g', attributes: { 'data-mml-node': 'merror' }, children: [] }] } },
+    { svg: validSvg(), advanceWidth: 1 }, { advanceWidth: 1, svg: { ...validSvg(), children: [{ tag: 'g', attributes: { 'data-mml-node': 'merror' }, children: [] }] } },
   ]) })
   const result = await service.convert(source, settings)
   assert.equal(result.kind, 'fallback')
@@ -76,7 +76,7 @@ test('sync throw, async rejection and hook failures do not poison following conv
     let fail = true
     const service = createLabelService({ measurement, loadEngine: async () => fakeEngine((runs) => {
       if (fail) { fail = false; throw new MathJaxFailure(reason, 'development diagnostics') }
-      return Promise.resolve(runs.map(() => ({ svg: validSvg() })))
+      return Promise.resolve(runs.map(() => ({ svg: validSvg(), advanceWidth: 1 })))
     }) })
     const result = await service.convert(' $bad$ \n', settings)
     assert.equal(result.kind === 'fallback' && result.reason, reason)
@@ -99,7 +99,7 @@ test('same requests coalesce, different requests retain their own identity and e
   ready.resolve(fakeEngine(async (runs) => {
     conversions++
     if (runs[0].tex === 'bad') throw new MathJaxFailure('tex-error', 'bad')
-    return runs.map(() => ({ svg: validSvg() }))
+    return runs.map(() => ({ svg: validSvg(), advanceWidth: 1 }))
   }))
   const [x, y, failure] = await Promise.all([first, second, bad])
   assert.equal(x.kind, 'success'); assert.equal(y.kind, 'success'); assert.equal(failure.kind, 'fallback')
@@ -111,7 +111,7 @@ test('same requests coalesce, different requests retain their own identity and e
 test('font generations/layout settings recompute layout without recompiling neutral geometry', async () => {
   let conversions = 0
   const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async (runs) => {
-    conversions++; return runs.map(() => ({ svg: validSvg() }))
+    conversions++; return runs.map(() => ({ svg: validSvg(), advanceWidth: 1 }))
   }) })
   const first = await service.convert('A $x$', settings)
   const second = await service.convert('A $x$', { ...settings, font: { ...settings.font, fontReadinessGeneration: 1 } })
@@ -177,7 +177,7 @@ test('timeout retires generation; late initialization cannot compile or populate
 })
 
 test('late conversion cannot write cache; pending and abandoned work are finitely bounded', async () => {
-  const late = deferred<readonly { svg: RawSvgElement }[]>()
+  const late = deferred<readonly { svg: RawSvgElement; advanceWidth: number }[]>()
   let loads = 0
   const service = createLabelService({ measurement, limits: { pendingRequests: 1, unsettledTasks: 2, settlementMs: 20 },
     loadEngine: async () => ++loads === 1 ? fakeEngine(() => late.promise) : fakeEngine() })
@@ -188,14 +188,14 @@ test('late conversion cannot write cache; pending and abandoned work are finitel
   service.invalidate()
   const fresh = await service.convert('$old$', settings)
   assert.equal(fresh.kind, 'success')
-  late.resolve([{ svg: validSvg() }])
+  late.resolve([{ svg: validSvg(), advanceWidth: 1 }])
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(await service.convert('$old$', settings), fresh)
 })
 
 test('LRU entry and byte limits are enforced, cache configuration is independent', async () => {
   let conversions = 0
-  const engine = fakeEngine(async (runs) => { conversions++; return runs.map(() => ({ svg: validSvg() })) })
+  const engine = fakeEngine(async (runs) => { conversions++; return runs.map(() => ({ svg: validSvg(), advanceWidth: 1 })) })
   const service = createLabelService({ measurement, loadEngine: async () => engine, limits: { cacheEntries: 2 } })
   await service.convert('$a$', settings); await service.convert('$b$', settings)
   await service.convert('$a$', settings); await service.convert('$c$', settings)
@@ -221,7 +221,7 @@ test('invalid numbers, shapes, output URLs, and settings all give exact raw fall
     { ...validSvg(), children: [{ tag: 'script', attributes: {}, children: ['alert(1)'] }] },
     { ...validSvg(), children: [{ tag: 'path', attributes: { fill: 'url(https://example.com/p)' }, children: [] }] },
   ]) {
-    const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async () => [{ svg }]) })
+    const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async () => [{ svg, advanceWidth: 1 }]) })
     const source = ' \t$x$\n '
     const result = await service.convert(source, settings)
     assert.equal(result.kind, 'fallback'); assert.equal(result.source, source)
@@ -229,4 +229,36 @@ test('invalid numbers, shapes, output URLs, and settings all give exact raw fall
   const service = createLabelService({ measurement })
   const result = await service.convert('hello', { ...settings, font: { ...settings.font, sizePx: NaN } })
   assert.equal(result.kind === 'fallback' && result.reason, 'invalid-metrics')
+})
+
+test('missing, negative and nonfinite engine advances cannot reuse nominal viewport metrics', async () => {
+  for (const advanceWidth of [undefined, NaN, Infinity, -0.1]) {
+    const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async () => [
+      { svg: validSvg(), advanceWidth: 1 },
+      // Exercise an untyped engine boundary as well as impossible numeric output.
+      { svg: validSvg(), advanceWidth: advanceWidth as number },
+    ]) })
+    const source = ' \t$x$ then \\(y\\)\r\n '
+    const result = await service.convert(source, settings)
+    assert.equal(result.kind === 'fallback' && result.reason, 'invalid-metrics')
+    assert.equal(result.source, source)
+    assert.equal('runs' in result, false)
+    assert.equal('layout' in result, false)
+  }
+})
+
+test('unsupported ink effects discard earlier geometry without changing the exact complete source', async () => {
+  for (const attributes of [{ d: 'M0 0A50 50 0 0 0 100 100' },
+    { d: 'M0 0L100 100', transform: 'rotate(45)' }]) {
+    const service = createLabelService({ measurement, loadEngine: async () => fakeEngine(async () => [
+      { svg: validSvg(), advanceWidth: 1 },
+      { svg: { ...validSvg(), children: [{ tag: 'path', attributes, children: [] }] }, advanceWidth: 1 },
+    ]) })
+    const source = ' \t$x$ then $y$\n '
+    const result = await service.convert(source, settings)
+    assert.equal(result.kind === 'fallback' && result.reason, 'output-error')
+    assert.equal(result.source, source)
+    assert.equal('runs' in result, false)
+    assert.equal('layout' in result, false)
+  }
 })

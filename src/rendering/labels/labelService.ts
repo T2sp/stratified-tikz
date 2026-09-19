@@ -185,9 +185,12 @@ export function createLabelService(options: LabelServiceOptions) {
         throw new ServiceFailure('output-error')
       }
       let index = 0
-      const runs = parsed.runs.map((run): ConvertedLabelRun => run.kind === 'math'
-        ? { ...run, geometry: validateMathSvg(converted[index++].svg) }
-        : { ...run })
+      const runs = parsed.runs.map((run): ConvertedLabelRun => {
+        if (run.kind !== 'math') return { ...run }
+        const convertedRun = converted[index++]
+        if (!Number.isFinite(convertedRun.advanceWidth)) throw new ServiceFailure('invalid-metrics')
+        return { ...run, geometry: validateMathSvg(convertedRun.svg, undefined, convertedRun.advanceWidth) }
+      })
       const value = freezeDeep(runs)
       // A retired transaction may finish, but cannot populate any live cache.
       if (generation === current) geometryCache.set(key, value)

@@ -3,7 +3,7 @@ export const MATHJAX_VERSION = '4.1.3'
 export const MATHJAX_FONT_VERSION = '4.1.3'
 export const MATHJAX_EXTENSIONS = Object.freeze(['base', 'ams', 'color'])
 export const MATHJAX_IDENTITY =
-  '@mathjax/src@4.1.3;@mathjax/mathjax-newcm-font@4.1.3;base,ams,color;svg-none;inline-unbroken;stz-label-v3'
+  '@mathjax/src@4.1.3;@mathjax/mathjax-newcm-font@4.1.3;base,ams,color;svg-none;inline-unbroken;stz-label-v4-ink'
 
 /** Bounds synchronous TeX work as well as the derived SVG snapshot. */
 export const MATHJAX_LIMITS = Object.freeze({

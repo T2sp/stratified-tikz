@@ -1089,9 +1089,9 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 ## Phase 31: Typeset TeX labels in SVG Preview
 
 Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
-implementation and real-engine/build verification are complete; its browser
-deployment check remains unavailable in the current sandbox. 31C through 31F
-remain planned.
+has the targeted ink/advance fix and real-engine regressions, but acceptance is
+incomplete while built-browser deployment and standalone raster checks remain
+unavailable in the current sandbox. 31C through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1141,9 +1141,9 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: adapter implementation complete; real-engine tests, pinned dependencies,
-and build verified. Browser deployment acceptance remains unverified because
-the sandbox rejects the smoke-test server's localhost bind. The production
+Status: ink/advance fix implemented; Phase 31B acceptance is incomplete.
+Built-browser deployment and standalone raster verification remain unavailable
+because the sandbox rejects the smoke-test server's localhost bind. The production
 canvas is unchanged. See [adapter interfaces, limits, assets, and verification
 status](./LABEL_ADAPTER.md).
 
@@ -1155,8 +1155,12 @@ status](./LABEL_ADAPTER.md).
 - Isolates per-label engine state, constrains generated SVG, and keeps glyph
   geometry self-contained. Bounds work, requests, and cache storage, with a
   recovery policy for transient resource failures.
-- Real adapter tests pass. The built manifest includes every dynamic font-data
-  module; the browser deployment check must still run before canvas integration.
+- Retained geometry and strokes now determine conservative portable ink bounds,
+  independently of true run advance. Unsupported geometry and negative whole-run
+  advances fall back to the exact complete source.
+- Real adapter tests cover overhang, nested/negative spacing, and later-request
+  recovery. Static font assets do not substitute for the still-required browser
+  deployment and standalone raster containment checks.
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 

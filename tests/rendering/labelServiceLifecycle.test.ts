@@ -22,7 +22,7 @@ const svg: RawSvgElement = {
 }
 const engine: MathLabelEngine = {
   identity: MATHJAX_IDENTITY,
-  convert: async (runs) => runs.map(() => ({ svg })),
+  convert: async (runs) => runs.map(() => ({ svg, advanceWidth: 1 })),
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -152,7 +152,7 @@ test('invalidation settles pending consumers before initialization finishes and 
   assert.equal(obsolete.generation, oldGeneration)
   const fresh = await service.convert('$same$', settings)
   assert.equal(fresh.kind, 'success')
-  oldLoader.resolve({ ...engine, convert: async () => { obsoleteConversions++; return [{ svg }] } })
+  oldLoader.resolve({ ...engine, convert: async () => { obsoleteConversions++; return [{ svg, advanceWidth: 1 }] } })
   await nextTurn()
   assert.equal(obsoleteConversions, 0)
   assert.equal(await service.convert('$same$', settings), fresh)

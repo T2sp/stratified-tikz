@@ -3,10 +3,10 @@
 The independent adapter is implemented in `src/rendering/labels/`. It is not
 connected to the production canvas, picking, React lifecycle, or SVG export.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
-remains authoritative. The adapter implementation is complete, with real-engine
-tests and the production build verified. Browser deployment acceptance remains
-unverified because the current sandbox cannot bind the smoke-test server; see
-the verification status below.
+remains authoritative. Phase 31B is **not yet acceptance-complete**. The targeted
+ink-bounds fix and real-engine regressions are implemented, but built-browser
+deployment and standalone raster verification still require an environment that
+permits localhost and Chrome. See the actual verification status below.
 
 ## Dependencies and local assets
 
@@ -120,14 +120,61 @@ a rejected font request to be retried without contaminating another label.
 ## Units, baselines, and SVG portability
 
 All layout coordinates are em. The first alphabetic baseline is `y = 0`, with
-positive y downward. SVG viewBox coordinates use 1,000 user units per em;
-negative viewBox x origins are translated to zero. Vertical viewports include
-the baseline, so an SVG is placed at `baseline - ascent` with height
-`ascent + descent`, even when its ink lies entirely above/below the baseline.
-Actual viewBox extents give
-width, ascent, and descent. External em/ex CSS dimensions are validated, then
-replaced by dimensions derived from the viewBox; source length is never a
-formula-size estimate. Empty formulas may have zero width and height.
+positive y downward. SVG coordinates use 1,000 user units per em. MathJax's
+nominal `viewBox` is a **layout box, not an ink bound**: overlapping glyphs,
+smashed heights, negative spacing, ordinary glyph overhang, and glyph strokes
+can exceed it. The original review reproduced incorrect bounds through the
+production adapter; clipping was supported by inspection, not observed in a
+browser. The fix does not rely on `overflow: visible` or page CSS.
+
+The transient engine result now includes `advanceWidth` in em. An isolated SVG
+subclass captures MathJax 4.1.3's `createSVG(h, d, w)` argument `w` before its
+minimum viewport clamp to 0.016em. `MathSvgGeometry.metrics.width` is this true
+logical advance, including zero; it is never replaced by expanded ink width.
+Only the standalone SVG validator's optional advance argument defaults to the
+nominal width for synthetic callers. The production service requires a finite
+engine advance and never uses that default.
+
+After narrow SVG validation and stylesheet resolution, `labelInkBounds.ts`
+traverses the retained geometry. It encloses absolute `M/L/H/V/C/Q/Z` path
+endpoints and Bézier control hulls, rectangles, lines, polygons and polylines,
+under nested `translate` and `scale` transforms (including negative scales).
+The convex-hull property guarantees containment; these are conservative bounds,
+not a claim to minimal ink rectangles. The inherited stroke width expands each
+shape by a proven stroke envelope: at most four half-widths for the fixed SVG
+miter limit of 4, also covering the admitted cap/join styles and dashes. See
+[SVG stroke joins and miter limits](https://www.w3.org/TR/SVG2/painting.html#StrokeMiterlimitProperty).
+Transparent paint may conservatively enlarge bounds; no geometry is deleted.
+Traversal/tokenization is linear within existing node/depth/payload budgets,
+with at most six path operands retained. This is not a general SVG renderer.
+
+The portable viewport is the union of measured ink, the nominal box, the
+logical advance interval, and baseline zero. It obeys the existing 10,000em
+per-formula extent limit. Its original horizontal enclosure is exposed as
+`metrics.inkLeft` / `metrics.inkRight`; ascent/descent cover the full vertical
+interval about baseline zero. Normalization translates the children once by
+`offsetX = -inkLeft`, and gives `viewBox` a zero left edge. SVG width/height come
+from this enclosure, not the advance or external em/ex dimensions.
+
+For a placement `(x, baseline)`, put the normalized SVG at
+`(x - geometry.offsetX, baseline - geometry.metrics.ascent)`, with dimensions
+`viewBox[2] / 1000` and `viewBox[3] / 1000` em. The next run begins at
+`x + geometry.metrics.width`. Do not translate the children again or use the
+viewport width to advance. Whole-label bounds include both signed ink sides;
+line baselines use enclosed ascent/descent. Final label scaling is applied once.
+Empty math has zero advance; its valid minimum MathJax viewport is retained.
+
+| Construct | Policy |
+| --- | --- |
+| `\rlap`, `\llap`, `\smash` (including indices/descenders and nested uses) | Supported via retained geometry enclosure, preserving true advance. |
+| `\!`, `\kern`, `\mkern`, `\hspace` with negative spacing, including grouped/nested and trailing forms | Supported when the resulting whole math-run advance is nonnegative; actual translated ink is measured. |
+| Any negative whole-run advance, e.g. `\kern-1em x`, trailing `x\kern-1em`, or negative spacing alone | Exact complete-source `invalid-metrics` fallback; backwards run advances are outside this adapter contract. Detected from actual engine output, independent of source spelling/nesting. |
+| Relative/smooth/arc paths, rotation/skew/matrix transforms, root viewport transforms, or other unhandled effects | Exact complete-source `output-error` fallback, even when hidden by paint/opacity. |
+| Fractions, radicals, indices, matrices/rules, ordinary spacing and multiline text/math | Supported; existing parser, resources, work limits and isolation still apply. |
+
+Any rejected later run discards all earlier geometry. Fallback retains the exact
+whole source including delimiters, spaces, tabs and physical newlines; later
+valid requests remain usable. No new persisted field or diagram schema exists.
 
 Text measurements use explicit font family, CSS-pixel normalization size,
 weight, style, and `fontReadinessGeneration`. Each of these, plus provider
@@ -170,6 +217,7 @@ lengths are rejected to prevent dependence on the embedding page's font.
 | Validated SVG nodes / paths / depth | 10,000 / 5,000 / 128 per formula |
 | Engine SVG attribute/text payload | 2,000,000 estimated UTF-16 bytes per whole label |
 | Independent SVG validator attribute/text payload | 2,000,000 code units per formula |
+| Ink measurement | Existing SVG node/depth/payload budgets; at most six path operands; 10,000em viewport span/coordinate limit |
 | Layout fragments / extent | 32,768 fragments / 1,000,000 em |
 | Distinct pending public requests | 32 |
 | Unsettled underlying work, including retired work | 64 mathematical + 64 plain-text requests |
@@ -183,7 +231,8 @@ Their combined bound is 128 entries / 4 MiB. Oversize results are returned but
 not cached. Cache values contain frozen data, never engine or DOM objects.
 
 Geometry keys contain exact source and complete engine/version/configuration
-identity (currently `stz-label-v3`). Layout keys also contain all font and spacing inputs. Concurrent
+identity (currently `stz-label-v4-ink`, changed for the advance/ink contract and
+bounded geometry policy). Layout keys also contain all font and spacing inputs. Concurrent
 identical requests coalesce, including geometry shared across different font
 layouts. Position, camera, pan/zoom, selection, opacity, and foreground color are
 not conversion inputs. A new font generation recomposes layout using cached
@@ -211,13 +260,54 @@ Every new test file is explicitly registered in `npm test`. Tests cover the
 actual adapter with the installed engine as well as deterministic error/resource
 fixtures; real-engine tests fail, rather than skip, when MathJax is unavailable.
 
-Required commands use Node >=22.12 through `PATH=/opt/homebrew/bin:$PATH`:
+Required commands use Node >=22.12. The targeted fix was verified on
+2026-09-20 with Node v26.9.0 using these exact check commands (logs were redirected
+to `/private/tmp/stz-phase31b-fix-verification/`):
 
 ```sh
-npm test
-npm run build
+PATH=/opt/homebrew/bin:$PATH node --test \
+  tests/rendering/labelMetrics.test.ts \
+  tests/rendering/labelSvg.test.ts \
+  tests/rendering/labelService.test.ts \
+  tests/rendering/labelServiceLifecycle.test.ts \
+  tests/rendering/mathjaxAdapter.test.ts \
+  tests/rendering/mathjaxErrors.test.ts
+PATH=/opt/homebrew/bin:$PATH npm test
+PATH=/opt/homebrew/bin:$PATH npm run build
+PATH=/opt/homebrew/bin:$PATH npx eslint \
+  src/rendering/labels/labelSvg.ts \
+  src/rendering/labels/labelMetrics.ts \
+  src/rendering/labels/labelService.ts \
+  src/rendering/labels/mathjaxConfig.ts \
+  src/rendering/labels/mathjaxEngine.ts \
+  src/rendering/labels/mathjaxRuntime.ts \
+  src/rendering/labels/labelInkBounds.ts
+PATH=/opt/homebrew/bin:$PATH node --check scripts/prepareMathjaxAssets.mjs
+PATH=/opt/homebrew/bin:$PATH node --check scripts/checkLabelAssets.mjs
 git diff --check
 ```
+
+| Check | Actual result |
+| --- | --- |
+| Six focused files | Exit 0; 81 passed, 0 failed, 0 skipped (`focused.log`) |
+| Full `npm test` | Exit 0; 2,237 passed, 0 failed, 0 skipped (`npm-test.log`) |
+| Production build | Exit 0 (`build.log`); Vite's non-failing >500kB chunk warnings remain |
+| Seven production modules, targeted ESLint | Exit 0 (`lint.log`) |
+| Both script syntax checks | Exit 0 each |
+| `git diff --check` | Exit 0 |
+
+No test file was added: expanded tests remain in the explicitly enumerated
+six files. The real-adapter file has 19 tests. Its independent bounded oracle
+solves quadratic/cubic derivative roots for actual path extrema (unlike the
+production control hull), includes stroke envelopes and transforms, and checks
+portable viewports, signed run extents, offsets and composed label bounds.
+Known pinned glyph points also establish the reported left/right/top/bottom
+regressions. Coverage includes two lap forms, two smash variants, seven
+nonnegative-total negative-spacing forms, three nested/following-content forms,
+multiline/tab composition, seven negative-total rejections repeated with exact
+entire-source/no-runs/no-layout assertions, and normal fraction/radical/index/
+matrix/empty/safe-spacing/color/rule controls. Cache immutability, failure
+isolation, parser/resource limits and recovery regressions still pass.
 
 `npm run check:label-assets` invokes `scripts/checkLabelAssets.mjs`. Supply an
 installed Playwright through `STZ_PLAYWRIGHT_MODULE` and optionally a Chromium
@@ -226,19 +316,24 @@ application dependencies. The script serves `dist` only below the configured
 base, reads the adapter entry from the manifest, blocks external network
 requests, checks that plain labels do not load MathJax, and requests additional
 font data after the initial formula. It also checks exact-source failure and
-renders standalone colored SVG without a page stylesheet. Zero extra font-data
-requests fail the probe rather than being reported as asset coverage.
+renders standalone colored SVG without a page stylesheet. It checks accepted
+overflow fixtures, zero-advance placement, negative-advance exact fallback and
+recovery. A blank-page native `getBBox()` oracle checks viewport and composed
+label containment; an enlarged reference image detects pixels lost by clipping
+in a standalone SVG image, including strokes. A deliberately cropped real glyph
+must fail both oracles. Zero extra font-data requests fail the probe rather than
+being reported as asset coverage. The original red/blue counts establish paint
+presence only and are retained alongside these stronger containment assertions.
 
-Verification was repeated on 2026-09-20 using Node v26.9.0 via the required
-Homebrew PATH. Both pinned 4.1.3 packages are installed and agree with the
-lockfile. `npm test` passes all 2,223 tests and `npm run build` passes, including
-the actual-engine adapter fixtures. The build reports large-chunk warnings;
-the adapter remains a lazy, separate entry. All 67 focused adapter tests,
-changed-production-file ESLint, both verification-script syntax checks, and
-`git diff --check` pass.
+Both pinned 4.1.3 packages remain installed and agree with the lockfile;
+no dependency, font version, build configuration or asset preparation changes
+were needed. The former review results (2,223 full / 67 focused passing tests)
+are superseded by the targeted-fix results above, not used as evidence for the
+new bounds. Production canvas/picking/React integration and full-diagram export
+waiting remain deferred to later phases.
 
-The built-asset browser smoke was attempted with the cached Playwright and
-installed Google Chrome:
+The built-asset browser smoke was rerun after the fresh successful build with
+the cached Playwright and installed Google Chrome:
 
 ```sh
 PATH=/opt/homebrew/bin:$PATH \
@@ -248,19 +343,38 @@ STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-label-smoke \
 node scripts/checkLabelAssets.mjs
 ```
 
-It stops at the test server's localhost bind with `listen EPERM: operation not
-permitted 127.0.0.1`. Browser base-path loading, additional font network requests,
-and standalone SVG raster verification are **unavailable, not passed**. Run the
-same smoke script in an environment that permits a local server and browser
-before treating deployment acceptance as complete.
+It exits **1** at the test server's localhost bind with `listen EPERM: operation
+not permitted 127.0.0.1`. Full stderr is in
+`/private/tmp/stz-phase31b-fix-verification/browser-smoke.log`. No browser mounting,
+lazy initialization, same-origin network/font request, browser fallback/recovery,
+or standalone paint/containment assertion ran. These are **unavailable, not
+passed**; no SVG/PNG raster artifacts were produced in the requested
+`/private/tmp/stz-label-smoke` directory. A separate direct Chrome launch also
+exited 1 with a closed-target error, SIGABRT, and cleanup `kill EPERM`; its exact
+command and observed error summary are in
+`/private/tmp/stz-phase31b-fix-verification/chrome-probe.txt`. No browser security
+or network checks were weakened. Run the same smoke in an environment permitting
+localhost and Chrome before treating Phase 31B acceptance as complete.
 
 A supplementary static check reads `dist/.vite/manifest.json`, verifies every
 entry file and import/dynamic-import reference, compares its dynamic-font
 entries with the installed package's `mjs/svg/dynamic/*.js`, and checks the
-entry HTML's asset base. All 46 manifest entries and all 40 dynamic font-data
-modules are present; entry URLs use `/stratified-tikz/`, and upstream license
-files are preserved. This check does not substitute for browser verification.
+entry HTML's asset base. The fresh build resolves all **46 manifest entries, 86
+references, and 40 dynamic font-data modules**. Local entry URLs use
+`/stratified-tikz/`; the pre-existing Google Tag Manager URL is recorded separately
+and remains blocked by the smoke's external-network route. Build preparation
+preserves upstream licenses. The supplementary command exits 0:
 
-The recorded pre-change repository lint baseline is 79 errors and 7 warnings
-across 24 files. Repository-wide lint was not rerun because that baseline is
-not clean; unrelated lint debt is unchanged.
+```sh
+PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz-phase31b-fix-verification/check-static-assets.mjs
+```
+
+The script, `static-assets.log`, and `static-assets.json` are retained in that
+verification directory. This is static evidence only and does not substitute
+for browser requests or raster verification.
+
+Repository-wide lint was not rerun: the checkout has pre-existing
+`react-hooks/refs` debt in unchanged `src/rendering/SvgDiagram.tsx`, outside this
+fix. The previously recorded wider baseline was 79 errors and 7 warnings across
+24 files; this task does not reassert those counts as a fresh measurement.
+Only targeted lint was required and run. No unrelated cleanup was made.

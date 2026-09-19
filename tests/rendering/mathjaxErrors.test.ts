@@ -34,7 +34,7 @@ for (const hook of ['formatError', 'compileError', 'typesetError'] as const) {
               else capture[hook](undefined, undefined, new Error('fixture'))
             } catch { /* Simulate a library resolving after displaying its own error geometry. */ }
           }
-          output.push({ svg })
+          output.push({ svg, advanceWidth: 1 })
         }
         capture.check()
         return output
@@ -64,7 +64,7 @@ test('concurrent hook failures are scoped to their own label transaction', async
         await wait
       }
       capture.check()
-      return runs.map(() => ({ svg }))
+      return runs.map(() => ({ svg, advanceWidth: 1 }))
     },
   }) })
   const pending = service.convert('$bad$', settings)
@@ -83,13 +83,13 @@ test('sync and asynchronous unexpected failures and invalid output shapes settle
     async () => [],
     // This unknown cast deliberately models an untyped library boundary.
     async () => null as unknown as Awaited<ReturnType<MathLabelEngine['convert']>>,
-    async () => [{ svg: undefined as unknown as RawSvgElement }],
+    async () => [{ svg: undefined as unknown as RawSvgElement, advanceWidth: 1 }],
   ]
   for (const fail of fixtures) {
     let calls = 0
     const service = createLabelService({ measurement, loadEngine: async () => ({
       identity: MATHJAX_IDENTITY,
-      convert: (runs) => ++calls === 1 ? fail(runs) : Promise.resolve(runs.map(() => ({ svg }))),
+      convert: (runs) => ++calls === 1 ? fail(runs) : Promise.resolve(runs.map(() => ({ svg, advanceWidth: 1 }))),
     }) })
     const source = ' \t$x$\n '
     const result = await service.convert(source, settings)

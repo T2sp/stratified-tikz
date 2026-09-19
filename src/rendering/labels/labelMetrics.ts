@@ -41,11 +41,14 @@ export type LabelLayoutSettings = Readonly<{
 type Placement = Readonly<{
   runIndex: number
   lineIndex: number
+  /** Logical run origin. A normalized math SVG starts at x - geometry.offsetX. */
   x: number
   baseline: number
   width: number
   ascent: number
   descent: number
+  inkLeft?: number
+  inkRight?: number
 }>
 
 /** textStart/textEnd index cooked run.text, not the authoritative source. */

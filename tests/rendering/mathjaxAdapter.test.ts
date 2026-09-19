@@ -6,6 +6,7 @@ import {
   type LabelConversionResult,
 } from '../../src/rendering/labels/labelService.ts'
 import type { LabelLayoutSettings, TextMeasurementProvider } from '../../src/rendering/labels/labelMetrics.ts'
+import type { MathSvgGeometry, ValidatedSvgElement } from '../../src/rendering/labels/labelSvg.ts'
 
 const settings: LabelLayoutSettings = Object.freeze({
   font: Object.freeze({ family: 'serif', sizePx: 16, weight: 'normal', style: 'normal', fontReadinessGeneration: 0 }),
@@ -35,9 +36,164 @@ function success(result: LabelConversionResult, diagnostics: readonly unknown[] 
   for (const run of result.runs) {
     if (run.kind !== 'math') continue
     assert.ok(run.geometry, 'Every successful math run has reusable geometry')
-    for (const value of Object.values(run.geometry.metrics)) assert.ok(Number.isFinite(value) && value >= 0)
+    for (const value of Object.values(run.geometry.metrics)) assert.ok(Number.isFinite(value))
+    for (const key of ['width', 'ascent', 'descent'] as const) assert.ok(run.geometry.metrics[key] >= 0)
   }
   return result
+}
+
+type Point = readonly [number, number]
+type InkBox = Readonly<{ minX: number; minY: number; maxX: number; maxY: number }>
+const TOLERANCE = 1e-8
+
+/**
+ * Independent fixture oracle: solve quadratic/cubic derivative roots for true
+ * path extrema, rather than using the adapter's control-point hull or nominal
+ * MathJax box. No production measurement helper participates in these checks.
+ * The fixed SVG miterlimit also encloses strokes (including glyph blackening).
+ */
+function fixtureInkBounds(svg: ValidatedSvgElement): InkBox | undefined {
+  const allPoints: Point[] = []
+  let count = 0
+  function pathPoints(d: string): Point[] {
+    const tokens = d.match(/[A-Za-z]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g) ?? []
+    assert.ok(tokens.length < 200_000, 'Oracle fixtures remain bounded')
+    const points: Point[] = []
+    let at: Point = [0, 0]
+    let start: Point = at
+    let command = ''
+    let index = 0
+    const takePoint = (): Point => [Number(tokens[index++]), Number(tokens[index++])]
+    const evaluate = (controls: readonly Point[], t: number): Point => {
+      let row = [...controls]
+      while (row.length > 1) row = row.slice(1).map((point, i): Point =>
+        [row[i][0] * (1 - t) + point[0] * t, row[i][1] * (1 - t) + point[1] * t])
+      return row[0]
+    }
+    const curve = (controls: readonly Point[]): void => {
+      const times = [0, 1]
+      for (const axis of [0, 1] as const) {
+        const p = controls.map((point) => point[axis])
+        if (p.length === 3) {
+          const denominator = p[0] - 2 * p[1] + p[2]
+          if (denominator !== 0) times.push((p[0] - p[1]) / denominator)
+        } else {
+          const a = -p[0] + 3 * p[1] - 3 * p[2] + p[3]
+          const b = 2 * (p[0] - 2 * p[1] + p[2])
+          const c = p[1] - p[0]
+          if (Math.abs(a) < 1e-12) {
+            if (Math.abs(b) >= 1e-12) times.push(-c / b)
+          } else {
+            const discriminant = b * b - 4 * a * c
+            if (discriminant >= 0) {
+              times.push((-b + Math.sqrt(discriminant)) / (2 * a), (-b - Math.sqrt(discriminant)) / (2 * a))
+            }
+          }
+        }
+      }
+      points.push(...times.filter((t) => t >= 0 && t <= 1).map((t) => evaluate(controls, t)))
+      at = controls[controls.length - 1]
+    }
+    while (index < tokens.length) {
+      if (/^[A-Za-z]$/.test(tokens[index])) command = tokens[index++]
+      if (command === 'M') {
+        at = takePoint(); start = at; points.push(at); command = 'L'
+      } else if (command === 'L') {
+        at = takePoint(); points.push(at)
+      } else if (command === 'H') {
+        at = [Number(tokens[index++]), at[1]]; points.push(at)
+      } else if (command === 'V') {
+        at = [at[0], Number(tokens[index++])]; points.push(at)
+      } else if (command === 'Q') {
+        curve([at, takePoint(), takePoint()])
+      } else if (command === 'C') {
+        curve([at, takePoint(), takePoint(), takePoint()])
+      } else if (command === 'Z') {
+        at = start; points.push(at); command = ''
+      } else assert.fail(`Fixture needs an independently verified oracle for ${command}`)
+    }
+    return points
+  }
+  type Paint = Readonly<{ fill: boolean; stroke: boolean; width: number; join: string; cap: string }>
+  function visit(node: ValidatedSvgElement, parent: (point: Point) => Point, inherited: Paint): void {
+    assert.ok(++count < 10_000)
+    const string = (name: string, fallback = ''): string => {
+      const value = node.attributes[name]
+      return typeof value === 'string' ? value : fallback
+    }
+    const number = (name: string, fallback = 0): number => Number(string(name, String(fallback)).replace(/px$/, ''))
+    const transforms = [...string('transform').matchAll(/(translate|scale)\(([^)]+)\)/g)]
+    const transform = (point: Point): Point => parent(transforms.reduceRight<Point>((current, match) => {
+      const values = match[2].trim().split(/[\s,]+/).map(Number)
+      return match[1] === 'translate'
+        ? [current[0] + values[0], current[1] + (values[1] ?? 0)]
+        : [current[0] * values[0], current[1] * (values[1] ?? values[0])]
+    }, point))
+    const paint: Paint = {
+      fill: node.attributes.fill === undefined ? inherited.fill : node.attributes.fill !== 'none',
+      stroke: node.attributes.stroke === undefined ? inherited.stroke : node.attributes.stroke !== 'none',
+      width: number('stroke-width', inherited.width),
+      join: string('stroke-linejoin', inherited.join), cap: string('stroke-linecap', inherited.cap),
+    }
+    let points: Point[] = []
+    if (node.tag === 'path') points = pathPoints(string('d'))
+    else if (node.tag === 'rect') {
+      const x = number('x'), y = number('y'), w = number('width'), h = number('height')
+      if (w && h) points = [[x, y], [x + w, y + h]]
+    } else if (node.tag === 'line') points = [[number('x1'), number('y1')], [number('x2'), number('y2')]]
+    else if (node.tag === 'polygon' || node.tag === 'polyline') {
+      const values = string('points').trim().split(/[\s,]+/).map(Number)
+      for (let i = 0; i < values.length; i += 2) points.push([values[i], values[i + 1]])
+    } else assert.ok(node.tag === 'g' || node.tag === 'svg', `Unknown fixture shape ${node.tag}`)
+    if (points.length && (paint.stroke || (paint.fill && node.tag !== 'line'))) {
+      const stroke = paint.stroke ? paint.width / 2 * Math.max(paint.join === 'miter' ? 4 : 1,
+        paint.cap === 'square' ? Math.SQRT2 : 1) : 0
+      const xs = points.map((point) => point[0]), ys = points.map((point) => point[1])
+      for (const x of [Math.min(...xs) - stroke, Math.max(...xs) + stroke]) {
+        for (const y of [Math.min(...ys) - stroke, Math.max(...ys) + stroke]) allPoints.push(transform([x, y]))
+      }
+    }
+    for (const child of node.children) if (typeof child !== 'string') visit(child, transform, paint)
+  }
+  visit(svg, (point) => point, { fill: true, stroke: false, width: 1, join: 'miter', cap: 'butt' })
+  if (allPoints.length === 0) return undefined
+  return {
+    minX: Math.min(...allPoints.map((point) => point[0])), minY: Math.min(...allPoints.map((point) => point[1])),
+    maxX: Math.max(...allPoints.map((point) => point[0])), maxY: Math.max(...allPoints.map((point) => point[1])),
+  }
+}
+
+function encloses(outer: InkBox, inner: InkBox, description: string): void {
+  assert.ok(outer.minX <= inner.minX + TOLERANCE && outer.minY <= inner.minY + TOLERANCE
+    && outer.maxX >= inner.maxX - TOLERANCE && outer.maxY >= inner.maxY - TOLERANCE,
+  `${description}: ${JSON.stringify(outer)} must enclose independent ink ${JSON.stringify(inner)}`)
+}
+
+function assertPortableInk(result: Extract<LabelConversionResult, { kind: 'success' }>): void {
+  for (const placement of result.layout.placements) {
+    if (placement.kind !== 'math') continue
+    const geometry = result.runs[placement.runIndex].geometry
+    assert.ok(geometry)
+    const ink = fixtureInkBounds(geometry.svg)
+    if (!ink) continue
+    const [x, y, width, height] = geometry.viewBox
+    encloses({ minX: x, minY: y, maxX: x + width, maxY: y + height }, ink, `${result.source}: portable viewport`)
+    assert.equal(geometry.svg.attributes.viewBox, geometry.viewBox.join(' '))
+    assert.equal(geometry.svg.attributes.width, `${width / 1000}em`)
+    assert.equal(geometry.svg.attributes.height, `${height / 1000}em`)
+    const relative = { minX: ink.minX / 1000 - geometry.offsetX, maxX: ink.maxX / 1000 - geometry.offsetX,
+      minY: ink.minY / 1000, maxY: ink.maxY / 1000 }
+    encloses({ minX: geometry.metrics.inkLeft, maxX: geometry.metrics.inkRight,
+      minY: -geometry.metrics.ascent, maxY: geometry.metrics.descent }, relative, `${result.source}: run metrics`)
+    encloses(result.layout.bounds, { minX: placement.x + relative.minX, maxX: placement.x + relative.maxX,
+      minY: placement.baseline + relative.minY, maxY: placement.baseline + relative.maxY }, `${result.source}: composed label`)
+  }
+}
+
+function firstGeometry(result: Extract<LabelConversionResult, { kind: 'success' }>): MathSvgGeometry {
+  const geometry = result.runs.find((run) => run.kind === 'math')?.geometry
+  assert.ok(geometry)
+  return geometry
 }
 
 test('installed MathJax through the adapter produces geometry for fractions, radicals, indices, and matrices', async () => {
@@ -54,6 +210,7 @@ test('installed MathJax through the adapter produces geometry for fractions, rad
     assert.ok(run.geometry.metrics.width > 0)
     assert.ok(run.geometry.metrics.ascent > 0)
     assert.doesNotMatch(serializeMathSvg(run.geometry), /class=|data-|currentColor|href=|\bid=|<use|foreignObject/)
+    assertPortableInk(result)
   }
 })
 
@@ -82,6 +239,136 @@ test('mixed Unicode, literal spaces, tabs, and physical matrix newlines preserve
   assert.deepEqual(result.layout.placements.filter((placement) => placement.kind === 'newline')
     .map((placement) => placement.text), ['\r\n', '\n'])
   assert.equal(result.layout.placements.filter((placement) => placement.kind === 'tab').length, 1)
+  assertPortableInk(result)
+})
+
+test('rlap and llap enclose real glyph overhang without changing zero advance or following run origins', async () => {
+  const { service, diagnostics } = adapter()
+  for (const tex of ['\\rlap{x}', '\\llap{x}']) {
+    const result = success(await service.convert('$' + tex + '$A$y$', settings), diagnostics)
+    assertPortableInk(result)
+    const geometry = firstGeometry(result)
+    assert.equal(geometry.metrics.width, 0, `${tex} has zero logical advance`)
+    assert.deepEqual(result.layout.placements.map((placement) => placement.x), [0, 0, 0.5])
+    const ink = fixtureInkBounds(geometry.svg)
+    assert.ok(ink)
+    if (tex.startsWith('\\rlap')) {
+      // The pinned font's x path really reaches x=527 user units; this is not
+      // evidence inferred from MathJax's 16-unit minimum nominal viewport.
+      assert.ok(ink.maxX / 1000 - geometry.offsetX >= 0.527)
+      assert.ok(geometry.metrics.inkRight >= 0.527)
+    } else {
+      // The glyph's x=29 point translated by -572 is left of the run origin.
+      assert.ok(ink.minX / 1000 - geometry.offsetX <= -0.543)
+      assert.ok(result.layout.bounds.minX <= -0.543)
+      assert.ok(geometry.offsetX > 0)
+    }
+    assert.ok(geometry.viewBox[2] / 1000 > geometry.metrics.width)
+  }
+})
+
+test('smash retains ink above and below its nominal box with an unchanged baseline and advance', async () => {
+  const { service, diagnostics } = adapter()
+  for (const expression of ['x', 'x_{gj}']) {
+    const ordinary = success(await service.convert('$' + expression + '$', settings), diagnostics)
+    const smashed = success(await service.convert('$\\smash{' + expression + '}$T', settings), diagnostics)
+    assertPortableInk(smashed)
+    const geometry = firstGeometry(smashed)
+    assert.equal(geometry.metrics.width, firstGeometry(ordinary).metrics.width)
+    assert.equal(smashed.layout.placements[0].baseline, 0)
+    assert.equal(smashed.layout.placements[1].x, geometry.metrics.width)
+    const ink = fixtureInkBounds(geometry.svg)
+    assert.ok(ink && ink.minY <= -442, 'Pinned x glyph rises above smash\'s zero nominal ascent')
+    if (expression === 'x_{gj}') {
+      assert.ok(ink.maxY > 250, 'Descenders and subscripts extend below the nominal 16-unit minimum box')
+      assert.ok(geometry.metrics.descent > 0.25)
+    }
+  }
+})
+
+test('negative spacing forms retain left or right ink while following runs use the true reduced advance', async () => {
+  const { service, diagnostics } = adapter()
+  const xAdvance = firstGeometry(success(await service.convert('$x$', settings), diagnostics)).metrics.width
+  const fixtures = [
+    { tex: '\\!x', adjustment: 0.167, side: 'left' },
+    { tex: 'x\\!', adjustment: 0.167, side: 'right' },
+    { tex: '\\kern-.2em x', adjustment: 0.2, side: 'left' },
+    { tex: 'x\\kern-.2em', adjustment: 0.2, side: 'right' },
+    { tex: '\\mkern-3mu x', adjustment: 0.167, side: 'left' },
+    { tex: '\\hspace{-.2em}x', adjustment: 0.2, side: 'left' },
+    { tex: '{\\kern-.2em {x}}', adjustment: 0.2, side: 'left' },
+  ] as const
+  for (const { tex, adjustment, side } of fixtures) {
+    const result = success(await service.convert('$' + tex + '$T$y$', settings), diagnostics)
+    assertPortableInk(result)
+    const geometry = firstGeometry(result)
+    assert.ok(Math.abs(geometry.metrics.width - (xAdvance - adjustment)) < TOLERANCE, tex)
+    assert.equal(result.layout.placements[1].x, geometry.metrics.width, tex)
+    assert.equal(result.layout.placements[2].x, geometry.metrics.width + 0.5, tex)
+    if (side === 'left') assert.ok(geometry.metrics.inkLeft < 0, tex)
+    else assert.ok(geometry.metrics.inkRight > geometry.metrics.width, tex)
+  }
+})
+
+test('nested overflowing constructs and multiline mixed labels keep every glyph and run origin', async () => {
+  const { service, diagnostics } = adapter()
+  const y = firstGeometry(success(await service.convert('$y$', settings), diagnostics))
+  for (const tex of ['{\\rlap{{x}}}y', '\\llap{\\smash{x_{gj}}}y', '\\smash{\\llap{x_{gj}}}y']) {
+    const result = success(await service.convert('$' + tex + '$', settings), diagnostics)
+    assertPortableInk(result)
+    assert.equal(firstGeometry(result).metrics.width, y.metrics.width)
+    assert.ok(firstGeometry(result).pathCount >= 2, 'Both overlapping and following content survive')
+  }
+  const source = ' \t$\\frac{1}{2}$  \r\nthen \\(\\smash{\\llap{x_{gj}}}y\\)\t$$x\\!$$ end\n '
+  const mixed = success(await service.convert(source, settings), diagnostics)
+  assert.equal(mixed.source, source)
+  assert.equal(mixed.layout.lines.length, 3)
+  assert.equal(mixed.runs.filter((run) => run.kind === 'math').length, 3)
+  assertPortableInk(mixed)
+  const repeated = await service.convert(source, settings)
+  assert.equal(repeated, mixed, 'Successful repeated conversions reuse the immutable result')
+  assert.ok(Object.isFrozen(mixed) && Object.isFrozen(mixed.runs) && Object.isFrozen(mixed.layout.bounds))
+  const geometry = firstGeometry(mixed)
+  assert.ok(Object.isFrozen(geometry.svg.attributes) && Object.isFrozen(geometry.metrics))
+  assert.equal(Reflect.set(geometry.svg.attributes, 'viewBox', '0 0 1 1'), false, 'Frozen geometry must resist mutation')
+  assertPortableInk(success(await service.convert(source, settings), diagnostics))
+})
+
+test('negative total advances reject the exact complete source, discard prior geometry, and preserve request isolation', async () => {
+  const { service, diagnostics } = adapter()
+  const good = success(await service.convert('$\\sqrt{2}+1$', settings), diagnostics)
+  for (const tex of [
+    '\\kern-1em x', 'x\\kern-1em', '\\mkern-18mu x', '\\hspace{-1em}x',
+    '\\!\\!\\!\\!x', '{\\kern-1em {x}}', '\\smash{\\kern-1em x}',
+  ]) {
+    const before = service.stats()
+    const source = '  \t$\\frac{1}{2}$\r\n before \\(' + tex + '\\)  \t\n'
+    const first = await service.convert(source, settings)
+    const repeated = await service.convert(source, settings)
+    for (const result of [first, repeated]) {
+      assert.equal(result.kind, 'fallback', tex)
+      assert.equal(result.kind === 'fallback' && result.reason, 'invalid-metrics', tex)
+      assert.equal(result.source, source, 'Every delimiter, space, tab, and physical newline is authoritative')
+      assert.equal('runs' in result, false, 'No earlier successful fraction may leak from a rejected label')
+      assert.equal('layout' in result, false)
+      assert.ok(Object.isFrozen(result))
+      assert.equal(result.generation, good.generation)
+    }
+    assert.notEqual(first.identity, repeated.identity, 'Conversion failures preserve the existing non-cached request identity policy')
+    assert.deepEqual(service.stats().geometry, before.geometry, 'Rejected labels cannot populate reusable geometry caches')
+    assert.equal(await service.convert('$\\sqrt{2}+1$', settings), good, 'Failure leaves a prior immutable cache entry reusable')
+    assertPortableInk(success(await service.convert('$x+1$', settings), diagnostics))
+  }
+})
+
+test('safe positive spacing and valid empty formulas retain normal following-run advance', async () => {
+  const { service, diagnostics } = adapter()
+  for (const source of ['$x\\,y\\quad z$', '$x\\kern.2em y$', '$x\\mkern3mu y$', '$x\\hspace{.2em}y$', '\\(\\)']) {
+    const result = success(await service.convert(source + 'T', settings), diagnostics)
+    assertPortableInk(result)
+    const geometry = firstGeometry(result)
+    assert.equal(result.layout.placements[1].x, geometry.metrics.width)
+  }
 })
 
 test('undefined macros and malformed TeX resolve to the exact whole-source fallback, then valid requests still succeed', async () => {
@@ -150,18 +437,21 @@ test('real color and framed array geometry remains portable after metadata remov
   assert.match(markup, /(?:fill|stroke)="red"/)
   assert.match(markup, /(?:fill|stroke)="(?:blue|#0000ff|rgb\(0%,\s*0%,\s*100%\))"/i)
   assert.doesNotMatch(markup, /class=|data-|style=|currentColor|href=|\bid=/)
+  assertPortableInk(colored)
   const framed = success(await service.convert('$\\begin{array}{|c|c|}\\hline a&b\\\\\\hline c&d\\\\\\hline\\end{array}$', settings), diagnostics)
   assert.ok(framed.runs[0]?.geometry)
   const frameMarkup = serializeMathSvg(framed.runs[0].geometry)
   assert.match(frameMarkup, /stroke-width="70"/)
   assert.match(frameMarkup, /fill="none"/)
   assert.doesNotMatch(frameMarkup, /class=|data-|style=/)
+  assertPortableInk(framed)
   const dashed = success(await service.convert('$\\begin{array}{c:c}a&b\\\\\\hdashline c&d\\end{array}$', settings), diagnostics)
   assert.ok(dashed.runs[0]?.geometry)
   const dashedMarkup = serializeMathSvg(dashed.runs[0].geometry)
   assert.match(dashedMarkup, /stroke-dasharray="140"/)
   assert.match(dashedMarkup, /stroke-width="70"/)
   assert.doesNotMatch(dashedMarkup, /class=|data-|style=/)
+  assertPortableInk(dashed)
 })
 
 test('actual successful empty math is distinct from parse/output errors', async () => {
@@ -169,9 +459,11 @@ test('actual successful empty math is distinct from parse/output errors', async 
   const result = success(await service.convert('before \\(\\) after', settings), diagnostics)
   assert.equal(result.source, 'before \\(\\) after')
   assert.equal(result.runs[1]?.geometry?.pathCount, 0)
-  // MathJax 4.1.3 gives empty SVGs a minimum viewport of em / 1000.
-  // The adapter uses em=16 and preserves that finite, nonnegative viewport.
-  assert.deepEqual(result.runs[1]?.geometry?.metrics, { width: 0.016, ascent: 0, descent: 0.016 })
+  // MathJax 4.1.3 gives empty SVGs a finite minimum viewport. Its logical
+  // advance is still zero, so following content is not pushed right.
+  assert.deepEqual(result.runs[1]?.geometry?.metrics, { width: 0, ascent: 0, descent: 0.016, inkLeft: 0, inkRight: 0.016 })
+  assert.equal(result.layout.placements[2].x, result.layout.placements[1].x)
+  assertPortableInk(result)
 })
 
 test('literal markup characters remain text data alongside actual math geometry', async () => {
