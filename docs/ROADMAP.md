@@ -1089,9 +1089,10 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 ## Phase 31: Typeset TeX labels in SVG Preview
 
 Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
-has the targeted ink/advance fix and real-engine regressions, but acceptance is
-incomplete while built-browser deployment and standalone raster checks remain
-unavailable in the current sandbox. 31C through 31F remain planned.
+has the targeted ink/advance fix, disposable-worker recovery, and focused
+regressions, but acceptance is incomplete while native browser retry, built-browser
+deployment, and standalone raster checks remain unavailable in the current
+sandbox. 31C through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1141,9 +1142,10 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: ink/advance fix implemented; Phase 31B acceptance is incomplete.
-Built-browser deployment and standalone raster verification remain unavailable
-because the sandbox rejects the smoke-test server's localhost bind. The production
+Status: ink/advance and native-loading fixes implemented; Phase 31B acceptance
+is incomplete. Actual browser retry, deployment, and standalone raster
+verification remain unavailable because the sandbox rejects the smoke-test
+server's localhost bind. The production
 canvas is unchanged. See [adapter interfaces, limits, assets, and verification
 status](./LABEL_ADAPTER.md).
 
@@ -1155,6 +1157,10 @@ status](./LABEL_ADAPTER.md).
 - Isolates per-label engine state, constrains generated SVG, and keeps glyph
   geometry self-contained. Bounds work, requests, and cache storage, with a
   recovery policy for transient resource failures.
+- Resource failure, timeout, and invalidation terminate the lazy MathJax Worker
+  and its whole native module map, including shared dependencies and fonts.
+  Retries reuse fixed asset URLs in a fresh bounded context; actual same-page
+  native-import recovery remains a required browser gate.
 - Retained geometry and strokes now determine conservative portable ink bounds,
   independently of true run advance. Unsupported geometry and negative whole-run
   advances fall back to the exact complete source.

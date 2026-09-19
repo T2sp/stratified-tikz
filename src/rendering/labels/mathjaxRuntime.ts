@@ -25,7 +25,7 @@ import type { RawSvgElement } from './labelSvg.ts'
 import {
   assertSupportedMathRuns, createMathJaxErrorCapture, MathJaxFailure,
   type EngineMathRun, type EngineMathSvg, type MathLabelEngine,
-} from './mathjaxEngine.ts'
+} from './mathjaxShared.ts'
 import { MATHJAX_EXTENSIONS, MATHJAX_IDENTITY, MATHJAX_LIMITS } from './mathjaxConfig.ts'
 import { mathjaxFontImports } from './mathjaxFontImports.generated.ts'
 
@@ -141,6 +141,8 @@ export function createMathJaxEngine(options: Readonly<{
         // MathJax's stock method permanently records shared `failed` state on
         // resource rejection. Bypass that state; setup data/module code alone is
         // shared, and each isolated font instance receives its own glyph maps.
+        // A real native import rejection still poisons this module map: the
+        // owning browser Worker must be terminated before a resource retry.
         dynamic.setup(this)
       } catch (error) {
         throw new MathJaxFailure('resource-error', 'MathJax font-data load failed', { cause: error })

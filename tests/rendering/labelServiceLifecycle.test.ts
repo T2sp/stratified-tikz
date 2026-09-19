@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createLabelService } from '../../src/rendering/labels/labelService.ts'
 import { LabelMetricsError, type LabelLayoutSettings, type TextMeasurementProvider } from '../../src/rendering/labels/labelMetrics.ts'
-import { MATHJAX_IDENTITY, type MathLabelEngine } from '../../src/rendering/labels/mathjaxEngine.ts'
+import { MATHJAX_IDENTITY, MathJaxFailure, type MathLabelEngine } from '../../src/rendering/labels/mathjaxEngine.ts'
 import { type RawSvgElement } from '../../src/rendering/labels/labelSvg.ts'
 
 const settings: LabelLayoutSettings = {
@@ -202,4 +202,163 @@ test('synchronous platform-font failures use the same controlled retry as font r
   failed = false
   service.invalidate()
   assert.equal((await service.convert('ordinary text', settings)).kind, 'success')
+})
+
+test('repeated abortable initialization timeouts release loader slots and preserve same-service recovery', async () => {
+  let available = false
+  let loads = 0
+  let active = 0
+  let peak = 0
+  let abortions = 0
+  const service = createLabelService({
+    measurement,
+    limits: { unsettledTasks: 1, settlementMs: 10, retryDelayMs: 1_000 },
+    loadEngine: (signal) => {
+      loads++
+      if (available) return Promise.resolve(engine)
+      active++
+      peak = Math.max(peak, active)
+      return new Promise<MathLabelEngine>((_, reject) => {
+        signal.addEventListener('abort', () => {
+          active--
+          abortions++
+          reject(new MathJaxFailure('resource-error', 'Retired disposable loader'))
+        }, { once: true })
+      })
+    },
+  })
+  const source = '  \t$x$\r\n  '
+  for (let attempt = 0; attempt < 5; attempt++) {
+    service.invalidate()
+    const pending = service.convert(source, settings)
+    assert.equal(service.convert(source, settings), pending, 'Equivalent requests share the same loader')
+    const failure = await pending
+    assert.equal(failure.kind === 'fallback' && failure.reason, 'timeout')
+    assert.equal(failure.source, source)
+    assert.equal('runs' in failure, false)
+    await nextTurn()
+    assert.equal(service.stats().pending, 0)
+    assert.equal(service.stats().unsettledMathTasks, 0, 'Cancellation releases the sole mathematical task slot')
+    assert.equal((await service.convert('ordinary \t text\r\n', settings)).kind, 'success')
+    assert.equal((await service.convert(source, settings)).kind, 'fallback', 'Cooldown prevents render-triggered retries')
+    assert.equal(loads, attempt + 1)
+  }
+  assert.equal(active, 0)
+  assert.equal(peak, 1)
+  assert.equal(abortions, 5)
+  available = true
+  service.invalidate()
+  const recovered = await service.convert(source, settings)
+  assert.equal(recovered.kind, 'success')
+  assert.equal(await service.convert(source, settings), recovered)
+  assert.equal(loads, 6)
+  assert.equal(service.stats().unsettledTasks, 0)
+})
+
+test('one cancellation settles distinct callers, while equivalent callers coalesce and later retries use a fresh signal', async () => {
+  const signals: AbortSignal[] = []
+  let abortions = 0
+  let available = false
+  const service = createLabelService({ measurement, loadEngine: (signal) => {
+    signals.push(signal)
+    if (available) return Promise.resolve(engine)
+    return new Promise<MathLabelEngine>((_, reject) => {
+      signal.addEventListener('abort', () => {
+        abortions++
+        reject(new MathJaxFailure('resource-error', 'Retired initialization'))
+      }, { once: true })
+    })
+  } })
+  const firstSource = ' \t$x$\r\n '
+  const secondSource = '  $y$\n '
+  const first = service.convert(firstSource, settings)
+  const second = service.convert(secondSource, settings)
+  assert.equal(service.convert(firstSource, settings), first)
+  await nextTurn()
+  assert.equal(signals.length, 1, 'Distinct conversions share generation initialization')
+  service.invalidate()
+  const results = await Promise.all([first, second])
+  assert.deepEqual(results.map((result) => result.source), [firstSource, secondSource])
+  for (const result of results) {
+    assert.equal(result.kind === 'fallback' && result.reason, 'resource-error')
+    assert.equal('runs' in result, false)
+  }
+  await nextTurn()
+  assert.equal(abortions, 1)
+  assert.equal(signals[0].aborted, true)
+  assert.equal(service.stats().unsettledTasks, 0)
+  available = true
+  const recovered = await service.convert(firstSource, settings)
+  assert.equal(recovered.kind, 'success')
+  assert.equal(signals.length, 2)
+  assert.notEqual(signals[0], signals[1])
+  assert.equal(signals[1].aborted, false)
+  assert.equal(await service.convert(firstSource, settings), recovered)
+  service.invalidate()
+  assert.equal(signals[1].aborted, true)
+})
+
+test('invalidation before the scheduled loader starts never creates an abandoned execution context', async () => {
+  let loads = 0
+  const service = createLabelService({ measurement, loadEngine: async () => { loads++; return engine } })
+  const pending = service.convert('  $x$\r\n ', settings)
+  service.invalidate()
+  const retired = await pending
+  assert.equal(retired.kind === 'fallback' && retired.reason, 'resource-error')
+  await nextTurn()
+  assert.equal(loads, 0)
+  assert.equal(service.stats().unsettledTasks, 0)
+  assert.equal((await service.convert('$x$', settings)).kind, 'success')
+  assert.equal(loads, 1)
+})
+
+test('late custom initialization is disposed once without converting or replacing recovered geometry', async () => {
+  const oldLoader = deferred<MathLabelEngine>()
+  let loads = 0
+  let disposals = 0
+  let conversions = 0
+  const service = createLabelService({ measurement, limits: { settlementMs: 10 },
+    loadEngine: () => ++loads === 1 ? oldLoader.promise : Promise.resolve(engine) })
+  const retired = await service.convert('$same$', settings)
+  assert.equal(retired.kind === 'fallback' && retired.reason, 'timeout')
+  service.invalidate()
+  const recovered = await service.convert('$same$', settings)
+  assert.equal(recovered.kind, 'success')
+  oldLoader.resolve({ ...engine,
+    convert: async (runs) => { conversions++; return engine.convert(runs) },
+    dispose: () => { disposals++ },
+  })
+  await nextTurn()
+  assert.equal(disposals, 1)
+  assert.equal(conversions, 0)
+  assert.equal(service.stats().unsettledTasks, 0)
+  assert.equal(await service.convert('$same$', settings), recovered)
+  service.invalidate()
+  assert.equal(disposals, 1)
+})
+
+test('conversion invalidation disposes one shared engine and ignores its delayed successful completion', async () => {
+  const oldConversion = deferred<Awaited<ReturnType<MathLabelEngine['convert']>>>()
+  let loads = 0
+  let disposals = 0
+  const oldEngine: MathLabelEngine = { ...engine,
+    convert: () => oldConversion.promise,
+    dispose: () => { disposals++ },
+  }
+  const service = createLabelService({ measurement,
+    loadEngine: async () => ++loads === 1 ? oldEngine : engine })
+  const first = service.convert('$same$', settings)
+  const second = service.convert('$other$', settings)
+  await nextTurn()
+  service.invalidate()
+  assert.equal((await first).kind, 'fallback')
+  assert.equal((await second).kind, 'fallback')
+  assert.equal(disposals, 1)
+  const recovered = await service.convert('$same$', settings)
+  assert.equal(recovered.kind, 'success')
+  oldConversion.resolve([{ svg, advanceWidth: 1 }])
+  await nextTurn()
+  assert.equal(disposals, 1)
+  assert.equal(service.stats().unsettledTasks, 0)
+  assert.equal(await service.convert('$same$', settings), recovered)
 })

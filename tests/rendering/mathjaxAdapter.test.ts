@@ -476,7 +476,7 @@ test('literal markup characters remain text data alongside actual math geometry'
   assert.equal(result.runs[1]?.kind, 'math')
 })
 
-test('actual additional font-data rejection settles as complete source and controlled retry can recover', async () => {
+test('adapter-level font callback rejection preserves complete source and permits retry (not a native import failure)', async () => {
   const { createMathJaxEngine } = await import('../../src/rendering/labels/mathjaxRuntime.ts')
   let failFont = true
   const requested: string[] = []
@@ -492,12 +492,14 @@ test('actual additional font-data rejection settles as complete source and contr
       },
     }),
   })
-  const source = ' \t$\\mathbb{R}$  \n'
+  const source = '  \t$x$ then $\\mathbb{R}$  \r\n '
   const first = await service.convert(source, settings)
   assert.ok(requested.length > 0, 'Fixture must exercise an actual additional font-data request')
   assert.equal(first.kind, 'fallback')
   assert.equal(first.kind === 'fallback' && first.reason, 'resource-error')
   assert.equal(first.source, source)
+  assert.equal('runs' in first, false)
+  assert.equal('layout' in first, false)
   failFont = false
   service.invalidate()
   success(await service.convert(source, settings), diagnostics)

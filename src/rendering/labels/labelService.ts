@@ -7,7 +7,7 @@ import {
   type TextMeasurementProvider,
 } from './labelMetrics.ts'
 import { validateMathSvg, type MathSvgGeometry } from './labelSvg.ts'
-import { assertSupportedMathRuns, type MathLabelEngine } from './mathjaxEngine.ts'
+import { assertSupportedMathRuns, loadMathJaxEngine, type MathLabelEngine } from './mathjaxEngine.ts'
 import { MATHJAX_IDENTITY } from './mathjaxConfig.ts'
 
 export type LabelFailureReason =
@@ -39,7 +39,7 @@ export const LABEL_SERVICE_LIMITS = Object.freeze({
 
 export type LabelServiceOptions = Readonly<{
   measurement: TextMeasurementProvider
-  loadEngine?: () => Promise<MathLabelEngine>
+  loadEngine?: (signal: AbortSignal) => Promise<MathLabelEngine>
   /** Injected engines must identify every version, extension, and geometry option. */
   configurationIdentity?: string
   limits?: Partial<{ readonly [Key in keyof typeof LABEL_SERVICE_LIMITS]: number }>
@@ -51,7 +51,9 @@ type Generation = {
   number: number
   cancellation: Promise<never>
   cancel: (error: ServiceFailure) => void
+  controller: AbortController
   engine?: Promise<MathLabelEngine>
+  ownedEngine?: MathLabelEngine
   geometryPending: Map<string, Promise<GeometryResult>>
 }
 
@@ -133,8 +135,7 @@ export function createLabelService(options: LabelServiceOptions) {
   const geometryCache = new BoundedCache<GeometryResult>(limits.cacheEntries, limits.cacheBytes)
   const resultCache = new BoundedCache<LabelConversionResult>(limits.cacheEntries, limits.cacheBytes)
   const pending = new Map<string, Promise<LabelConversionResult>>()
-  const loadEngine = options.loadEngine ?? (async () =>
-    (await import('./mathjaxEngine.ts')).loadMathJaxEngine())
+  const loadEngine = options.loadEngine ?? loadMathJaxEngine
 
   function diagnose(error: unknown): void {
     try { options.onDiagnostic?.(error) } catch { /* Diagnostics cannot change label output. */ }
@@ -145,17 +146,25 @@ export function createLabelService(options: LabelServiceOptions) {
     const cancellation = new Promise<never>((_, reject) => { cancel = reject })
     // A plain-text generation may never start a race against cancellation.
     void cancellation.catch(() => undefined)
-    return { number: ++generationNumber, cancellation, cancel, geometryPending: new Map() }
+    return { number: ++generationNumber, cancellation, cancel,
+      controller: new AbortController(), geometryPending: new Map() }
   }
   let current = newGeneration()
 
   function retire(generation: Generation, reason: LabelFailureReason): void {
     if (current !== generation) return
     generation.cancel(new ServiceFailure(reason))
+    generation.controller.abort()
+    disposeEngine(generation.ownedEngine)
+    generation.ownedEngine = undefined
     current = newGeneration()
     pending.clear()
     geometryCache.clear()
     resultCache.clear()
+  }
+
+  function disposeEngine(engine: MathLabelEngine | undefined): void {
+    try { engine?.dispose?.() } catch (error) { diagnose(error) }
   }
 
   function fallback(source: string, reason: LabelFailureReason, generation: Generation): LabelConversionResult {
@@ -173,9 +182,19 @@ export function createLabelService(options: LabelServiceOptions) {
       const mathRuns = parsed.runs.filter((run) => run.kind === 'math')
       if (mathRuns.length === 0) return freezeDeep(parsed.runs)
       // A single shared lazy initialization per service generation.
-      generation.engine ??= Promise.resolve().then(loadEngine).catch((error: unknown) => {
+      generation.engine ??= Promise.resolve().then(() => {
+        if (generation !== current) throw new ServiceFailure('resource-error')
+        return loadEngine(generation.controller.signal)
+      }).then((engine) => {
+        if (generation !== current) {
+          disposeEngine(engine)
+          throw new ServiceFailure('resource-error')
+        }
+        generation.ownedEngine = engine
+        return engine
+      }).catch((error: unknown) => {
         diagnose(error)
-        throw new ServiceFailure('resource-error')
+        throw new ServiceFailure(failureReason(error) === 'timeout' ? 'timeout' : 'resource-error')
       })
       const engine = await generation.engine
       if (generation !== current) throw new ServiceFailure('resource-error')

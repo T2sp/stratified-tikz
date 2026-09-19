@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { readFile, mkdir, writeFile } from 'node:fs/promises'
+import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises'
 import { resolve, extname, sep, isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -17,13 +17,58 @@ const dist = resolve('dist')
 const manifest = JSON.parse(await readFile(resolve(dist, '.vite/manifest.json'), 'utf8'))
 const adapter = Object.values(manifest).find((entry) => entry.isEntry && entry.src === 'src/rendering/labels/labelService.ts')
 assert.ok(adapter, 'Build manifest must include the independently testable label adapter entry')
+const workerManifest = JSON.parse(await readFile(resolve(dist, '.vite/mathjax-worker-manifest.json'), 'utf8'))
+assert.equal(workerManifest.version, 1, 'Worker deployment manifest has the expected version')
+const workerChunks = new Map(workerManifest.chunks.map((chunk) => [chunk.file, chunk]))
+const workerEntry = workerManifest.chunks.find((chunk) => chunk.isEntry)
+const runtimeChunk = workerManifest.chunks.find((chunk) => chunk.sources.some((source) => source.endsWith('/mathjaxRuntime.ts')))
+assert.ok(workerEntry && runtimeChunk && workerEntry !== runtimeChunk,
+  'The lazy worker entry and runtime must both be discoverable')
+const approvedFontNames = (await readdir('node_modules/@mathjax/mathjax-newcm-font/mjs/svg/dynamic'))
+  .filter((name) => name.endsWith('.js')).sort()
+const fontChunks = workerManifest.chunks.filter((chunk) => chunk.sources.some((source) =>
+  /\/@mathjax\/mathjax-newcm-font\/(?:mjs|js)\/svg\/dynamic\/[^/]+\.js$/u.test(source)))
+const emittedFontNames = [...new Set(fontChunks.flatMap((chunk) => chunk.sources.flatMap((source) => {
+  const match = /\/@mathjax\/mathjax-newcm-font\/(?:mjs|js)\/svg\/dynamic\/([^/]+\.js)$/u.exec(source)
+  return match ? [match[1]] : []
+})))].sort()
+assert.deepEqual(emittedFontNames, approvedFontNames, 'Every approved local font module must be emitted in the worker graph')
+let staticReferences = 0
+for (const entry of Object.values(manifest)) {
+  await readFile(resolve(dist, entry.file))
+  for (const reference of [...(entry.imports ?? []), ...(entry.dynamicImports ?? [])]) {
+    assert.ok(manifest[reference], `Missing main graph reference: ${reference}`)
+    staticReferences++
+  }
+  for (const file of [...(entry.assets ?? []), ...(entry.css ?? [])]) await readFile(resolve(dist, file))
+}
+for (const chunk of workerChunks.values()) {
+  await readFile(resolve(dist, chunk.file))
+  for (const reference of [...chunk.imports, ...chunk.dynamicImports]) {
+    assert.ok(workerChunks.has(reference), `Missing worker graph reference: ${reference}`)
+    await readFile(resolve(dist, reference))
+    staticReferences++
+  }
+}
+const transitiveChunk = runtimeChunk.imports.map((file) => workerChunks.get(file))
+  .find((chunk) => chunk && chunk !== workerEntry)
+assert.ok(transitiveChunk, 'The split runtime graph must supply an actual transitive native-module failure fixture')
+const graphEvidence = { mainEntries: Object.keys(manifest).length, workerChunks: workerChunks.size,
+  references: staticReferences, approvedFontModules: emittedFontNames.length,
+  worker: workerEntry.file, runtime: runtimeChunk.file, transitive: transitiveChunk.file }
+console.log(JSON.stringify({ result: 'static-assets-passed', graph: graphEvidence }))
+if (process.env.STZ_SMOKE_ARTIFACT_DIR) {
+  const output = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR)
+  await mkdir(output, { recursive: true })
+  await writeFile(resolve(output, 'asset-graph-evidence.json'), JSON.stringify(graphEvidence, null, 2))
+}
 
 const playwrightModule = process.env.STZ_PLAYWRIGHT_MODULE ?? 'playwright'
 let chromium
 try {
   ;({ chromium } = await import(isAbsolute(playwrightModule) ? pathToFileURL(playwrightModule).href : playwrightModule))
 } catch (error) {
-  throw new Error('Browser check unavailable: provide Playwright through STZ_PLAYWRIGHT_MODULE (no check has passed)', { cause: error })
+  throw new Error('Browser check unavailable: provide Playwright through STZ_PLAYWRIGHT_MODULE (no browser check has passed)', { cause: error })
 }
 
 const mimeTypes = {
@@ -31,11 +76,28 @@ const mimeTypes = {
   '.css': 'text/css', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2',
 }
 const served = []
+const serverRequests = []
+let injectedFailure
+const nativeProbePath = base + '__native_module_failure_probe.js'
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(base)) {
       response.writeHead(404).end('Outside configured application base')
+      return
+    }
+    if (injectedFailure?.path === url.pathname && injectedFailure.active) {
+      const evidence = { path: url.pathname, status: 503, scenario: injectedFailure.name }
+      injectedFailure.hits.push(evidence)
+      serverRequests.push(evidence)
+      response.writeHead(503, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' })
+        .end('Intentional scenario-local native module download failure')
+      return
+    }
+    if (url.pathname === nativeProbePath) {
+      serverRequests.push({ path: url.pathname, status: 200 })
+      response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' })
+        .end('export const recovered = true')
       return
     }
     const relative = decodeURIComponent(url.pathname.slice(base.length)) || 'index.html'
@@ -46,8 +108,10 @@ const server = createServer(async (request, response) => {
     }
     const data = await readFile(file)
     served.push(url.pathname)
+    serverRequests.push({ path: url.pathname, status: 200 })
     response.writeHead(200, { 'Content-Type': mimeTypes[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store' }).end(data)
   } catch {
+    serverRequests.push({ path: new URL(request.url ?? '/', 'http://localhost').pathname, status: 404 })
     response.writeHead(404).end('Missing built asset')
   }
 })
@@ -142,6 +206,211 @@ async function inspectStandalone(page, serialized) {
   }, serialized)
 }
 
+async function installPublicService(page) {
+  await page.evaluate(async ({ adapterUrl }) => {
+    const adapterModule = await import(adapterUrl)
+    // Deliberately use the default production loader, with no injected engine,
+    // font callback, worker factory, short timeout, or substituted import.
+    const service = adapterModule.createLabelService({ measurement: adapterModule.createBrowserTextMeasurementProvider() })
+    globalThis.__labelAssetSmoke = {
+      adapterModule, service, originalService: service, originalPageUrl: location.href,
+      settings: {
+        font: { family: 'Times New Roman, Times, serif', sizePx: 20, weight: '400', style: 'normal', fontReadinessGeneration: 0 },
+        tabSize: 4,
+        lineGapEm: 0.2,
+      },
+    }
+  }, { adapterUrl: origin + base + adapter.file })
+}
+
+// Context-level events include dedicated-worker imports. Only the exact
+// scenario's intentional 503 is exempt; unrelated responses, failed requests,
+// uncaught errors, and new external requests still fail the check.
+async function isolatedBrowserScenario(name, expectedPath) {
+  const context = await browser.newContext({ serviceWorkers: 'block' })
+  const blockedExternal = []
+  const unexpected = []
+  const expectedResponses = []
+  const injectedRequests = new Set()
+  const workers = []
+  const navigations = []
+  await context.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== origin) {
+      blockedExternal.push(url.href)
+      if (url.href !== 'https://www.googletagmanager.com/gtag/js?id=G-1ELW3Y7X1B') {
+        unexpected.push(`Unexpected external request: ${url.href}`)
+      }
+      await route.abort('blockedbyclient')
+    } else await route.continue()
+  })
+  context.on('request', (request) => {
+    if (request.url() === origin + expectedPath && injectedFailure?.name === name && injectedFailure.active) {
+      injectedRequests.add(request)
+    }
+  })
+  context.on('response', (response) => {
+    if (!response.url().startsWith(origin) || response.status() < 400) return
+    const record = { url: response.url(), status: response.status() }
+    if (record.url === origin + expectedPath && record.status === 503 && injectedRequests.has(response.request())) {
+      expectedResponses.push(record)
+    } else unexpected.push(`HTTP ${record.status} ${record.url}`)
+  })
+  context.on('requestfailed', (request) => {
+    if (!request.url().startsWith(origin)) return
+    // Chromium may report an HTTP module rejection as both response(503) and
+    // requestfailed(ERR_ABORTED); allow only that exact server-injected request.
+    if (injectedRequests.has(request) && request.url() === origin + expectedPath &&
+      serverRequests.some((record) => record.path === expectedPath && record.scenario === name && record.status === 503)) return
+    unexpected.push(`${request.failure()?.errorText} ${request.url()}`)
+  })
+  const page = await context.newPage()
+  page.on('pageerror', (error) => unexpected.push(`Uncaught page error: ${error.message}`))
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations.push(frame.url()) })
+  page.on('worker', (worker) => {
+    const evidence = { url: worker.url(), closed: false }
+    workers.push(evidence)
+    worker.on('close', () => { evidence.closed = true })
+  })
+  await page.goto(origin + base, { waitUntil: 'networkidle' })
+  return { context, page, blockedExternal, unexpected, expectedResponses, workers, navigations }
+}
+
+async function inspectNativeFailureCaching() {
+  const name = 'native-module-cache-capability'
+  const scenario = await isolatedBrowserScenario(name, nativeProbePath)
+  const failure = { name, path: nativeProbePath, active: true, hits: [] }
+  try {
+    injectedFailure = failure
+    const first = await scenario.page.evaluate(async (url) => {
+      try { await import(url); return { rejected: false } }
+      catch (error) { return { rejected: true, error: String(error) } }
+    }, origin + nativeProbePath)
+    assert.equal(first.rejected, true, 'Native-cache capability fixture must actually fail its first import')
+    assert.equal(failure.hits.length, 1, 'Native-cache capability fixture must reach the server exactly once')
+    failure.active = false
+    const requestsBeforeRetry = serverRequests.length
+    const second = await scenario.page.evaluate(async (url) => {
+      try { return { rejected: false, recovered: (await import(url)).recovered } }
+      catch (error) { return { rejected: true, error: String(error) } }
+    }, origin + nativeProbePath)
+    const retriedRequests = serverRequests.slice(requestsBeforeRetry).filter((record) => record.path === nativeProbePath)
+    assert.deepEqual(scenario.unexpected, [], 'Native cache capability probe must not conceal unrelated errors')
+    const cachesFailedNativeImports = second.rejected && retriedRequests.length === 0
+    if (!cachesFailedNativeImports) {
+      assert.equal(second.recovered, true, 'Browser must either retain the native failure or actually fetch the restored module')
+      assert.ok(retriedRequests.some((record) => record.status === 200))
+    }
+    return { cachesFailedNativeImports, failedUrl: origin + nativeProbePath,
+      injectedFailures: failure.hits, first, second, restoredResourceRequests: retriedRequests }
+  } finally {
+    injectedFailure = undefined
+    await scenario.context.close()
+  }
+}
+
+async function checkNativeRecovery({ name, chunk, source, warmup }) {
+  const path = base + chunk.file
+  const requestStart = serverRequests.length
+  const scenario = await isolatedBrowserScenario(name, path)
+  const { page } = scenario
+  const failure = { name, path, active: true, hits: [] }
+  try {
+    await installPublicService(page)
+    const convert = (input) => page.evaluate(async (source) => {
+      const { service, settings } = globalThis.__labelAssetSmoke
+      // This is an independent test watchdog, not the service's failure policy.
+      let timer
+      try {
+        return await Promise.race([service.convert(source, settings), new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Public conversion did not settle within 15 seconds')), 15_000)
+        })])
+      } finally { clearTimeout(timer) }
+    }, input)
+    if (warmup) {
+      const ordinary = await convert('$x$')
+      assert.equal(ordinary.kind, 'success', `${name}: ordinary mathematics must work before the font failure`)
+    }
+    assert.ok(!serverRequests.slice(requestStart).some((record) => record.path === path),
+      `${name}: intended module must be cold before failure injection (preload/cache could mask the regression)`)
+    const externalBefore = scenario.blockedExternal.length
+    const navigationBefore = scenario.navigations.length
+    const workersBefore = scenario.workers.length
+    injectedFailure = failure
+    const started = Date.now()
+    const fallback = await convert(source)
+    const elapsedMs = Date.now() - started
+    assert.ok(elapsedMs < 15_000, `${name}: public resource failure exceeded its finite settlement window`)
+    assert.ok(failure.hits.length > 0, `${name}: intended native asset request was never failed`)
+    assert.equal(fallback.kind, 'fallback', `${name}: native request failure must affect conversion: ${JSON.stringify(fallback)}`)
+    assert.equal(fallback.reason, 'resource-error', `${name}: actual resource failure must retain its category`)
+    assert.equal(fallback.source, source, `${name}: fallback must retain delimiters, spaces, tabs, and physical CRLF`)
+    assert.ok(!('runs' in fallback) && !('layout' in fallback), `${name}: no earlier run geometry survives failure`)
+    const plainDuringFailure = await convert('  領域 A\t🙂\r\n B  ')
+    assert.equal(plainDuringFailure.kind, 'success', `${name}: native math failure must leave plain labels usable`)
+    const failedWorkerCount = scenario.workers.length
+    assert.ok(failedWorkerCount > 0, `${name}: default production worker must actually be exercised`)
+    // Restoring the exact URL does not clear any browser cache. Only the public
+    // invalidation and production loader may replace an internal execution realm.
+    failure.active = false
+    const restoredRequestStart = serverRequests.length
+    const recovery = await page.evaluate(async (input) => {
+      const state = globalThis.__labelAssetSmoke
+      const { service, settings } = state
+      service.invalidate()
+      const first = service.convert(input, settings)
+      const second = service.convert(input, settings)
+      const [result, equivalent] = await Promise.all([first, second])
+      const cached = await service.convert(input, settings)
+      const deepFrozen = (value) => value === null || typeof value !== 'object' ||
+        (Object.isFrozen(value) && Object.values(value).every(deepFrozen))
+      return {
+        result, sameService: service === state.originalService, samePage: location.href === state.originalPageUrl,
+        coalesced: first === second && result === equivalent, reusedImmutable: result === cached && deepFrozen(result),
+        stats: service.stats(),
+      }
+    }, source)
+    assert.equal(recovery.result.kind, 'success', `${name}: same-page recovery failed: ${JSON.stringify(recovery.result)}`)
+    assert.equal(recovery.result.source, source)
+    assert.ok(recovery.result.runs.some((run) => run.kind === 'math' && run.geometry.pathCount > 0))
+    assert.equal(recovery.sameService, true, `${name}: service must not be replaced`)
+    assert.equal(recovery.samePage, true, `${name}: page must not be navigated`)
+    assert.equal(scenario.navigations.length, navigationBefore, `${name}: no reload or navigation is permitted`)
+    assert.equal(recovery.coalesced, true, `${name}: equivalent requests must coalesce after recovery`)
+    assert.equal(recovery.reusedImmutable, true, `${name}: recovered success remains immutable and reusable`)
+    assert.ok(recovery.result.generation > fallback.generation)
+    assert.equal(recovery.stats.pending, 0)
+    assert.equal(recovery.stats.unsettledTasks, 0)
+    const restoredRequests = serverRequests.slice(restoredRequestStart).filter((record) => record.path === path)
+    assert.ok(restoredRequests.some((record) => record.status === 200), `${name}: same failed URL must actually load after recovery`)
+    assert.ok(scenario.workers.length > failedWorkerCount, `${name}: native module state must be replaced in a new production realm`)
+    // Playwright's close event can follow the already settled protocol reply.
+    // Wait for that observed lifecycle event with a short independent deadline.
+    const abandonedWorkers = scenario.workers.slice(0, failedWorkerCount)
+    const closeDeadline = Date.now() + 2_000
+    while (abandonedWorkers.some((worker) => !worker.closed) && Date.now() < closeDeadline) {
+      await new Promise((resolveTick) => setTimeout(resolveTick, 10))
+    }
+    assert.ok(abandonedWorkers.every((worker) => worker.closed),
+      `${name}: abandoned production workers must be terminated`)
+    assert.equal((await convert('$z+1$')).kind, 'success', `${name}: later valid math remains usable`)
+    assert.equal((await convert(' plain\ttext\r\n後 ')).kind, 'success', `${name}: later ordinary text remains usable`)
+    assert.deepEqual(scenario.unexpected, [], `${name}: expected injection must not hide unrelated browser failures`)
+    assert.equal(scenario.blockedExternal.length, externalBefore, `${name}: conversion must not attempt external requests`)
+    return {
+      name, failedUrl: origin + path, source, elapsedMs, injectedFailures: failure.hits,
+      observedFailedResponses: scenario.expectedResponses, fallback,
+      recovery: { kind: recovery.result.kind, source: recovery.result.source, generation: recovery.result.generation,
+        sameService: recovery.sameService, samePage: recovery.samePage, coalesced: recovery.coalesced,
+        reusedImmutable: recovery.reusedImmutable, stats: recovery.stats },
+      restoredRequests, workersBefore, workers: scenario.workers.map((worker) => ({ ...worker })),
+    }
+  } finally {
+    injectedFailure = undefined
+    await scenario.context.close()
+  }
+}
+
 try {
   browser = await chromium.launch({
     headless: true,
@@ -161,29 +430,20 @@ try {
   })
   const page = await context.newPage()
   const failures = []
-  page.on('response', (response) => {
+  context.on('response', (response) => {
     if (response.url().startsWith(origin) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`)
   })
-  page.on('requestfailed', (request) => {
+  context.on('requestfailed', (request) => {
     if (request.url().startsWith(origin)) failures.push(`${request.failure()?.errorText} ${request.url()}`)
   })
+  page.on('pageerror', (error) => failures.push(`Uncaught page error: ${error.message}`))
   await page.goto(origin + base, { waitUntil: 'networkidle' })
   assert.ok(await page.locator('#root').evaluate((root) => root.childElementCount > 0), 'Built application mounts under its configured base')
+  assert.ok(blockedExternal.every((url) => url === 'https://www.googletagmanager.com/gtag/js?id=G-1ELW3Y7X1B'),
+    'Only the unchanged application analytics request may be blocked during startup; all other external requests are unexpected')
   const initialExternalCount = blockedExternal.length
 
-  await page.evaluate(async ({ adapterUrl }) => {
-    const adapterModule = await import(adapterUrl)
-    const service = adapterModule.createLabelService({ measurement: adapterModule.createBrowserTextMeasurementProvider() })
-    globalThis.__labelAssetSmoke = {
-      adapterModule,
-      service,
-      settings: {
-        font: { family: 'Times New Roman, Times, serif', sizePx: 20, weight: '400', style: 'normal', fontReadinessGeneration: 0 },
-        tabSize: 4,
-        lineGapEm: 0.2,
-      },
-    }
-  }, { adapterUrl: origin + base + adapter.file })
+  await installPublicService(page)
   const beforePlain = served.length
   const plain = await page.evaluate(async () => {
     const { service, settings } = globalThis.__labelAssetSmoke
@@ -343,6 +603,21 @@ try {
   assert.deepEqual(failures, [], 'All requested built assets must return successfully under the configured base')
   assert.equal(blockedExternal.length, initialExternalCount, 'Label conversion must not attempt external network access')
 
+  const additionalFontChunk = fontChunks.find((chunk) => additionalFontAssets.includes(base + chunk.file))
+  assert.ok(additionalFontChunk, 'Additional-font fixture must be an observed lazy font module from the emitted worker graph')
+  const nativeFailureCaching = await inspectNativeFailureCaching()
+  const nativeRecovery = []
+  for (const fixture of [
+    { name: 'runtime-native-import', chunk: runtimeChunk, source: '  \t$x$ then \\(y+1\\)\r\n trailing  ' },
+    { name: 'additional-font-native-import', chunk: additionalFontChunk,
+      source: '  \t$x$ then \\(\\mathbb{R}+\\mathfrak{g}+\\mathcal{F}\\)\t\r\n trailing  ', warmup: true },
+    { name: 'transitive-native-import', chunk: transitiveChunk, source: '  \t$x$ then \\(y+1\\)\r\n trailing  ' },
+  ]) nativeRecovery.push(await checkNativeRecovery(fixture))
+
+  const nativeEvidence = { browser: await browser.version(), graph: graphEvidence,
+    affectedBrowserRecoveryVerified: nativeFailureCaching.cachesFailedNativeImports,
+    nativeFailureCaching, scenarios: nativeRecovery }
+
   if (process.env.STZ_SMOKE_ARTIFACT_DIR) {
     const output = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR)
     await mkdir(output, { recursive: true })
@@ -358,12 +633,17 @@ try {
       croppedOracle: { geometryInside: sensitivity.geometryInside, outsideInkPixels: sensitivity.outsideInkPixels,
         lostInkPixels: sensitivity.lostInkPixels },
     }, null, 2))
+    await writeFile(resolve(output, 'native-retry-evidence.json'), JSON.stringify(nativeEvidence, null, 2))
   }
   console.log(JSON.stringify({
-    result: 'passed', browser: await browser.version(), base,
+    result: nativeFailureCaching.cachesFailedNativeImports ? 'passed' : 'functional-checks-passed-affected-browser-unverified',
+    browser: await browser.version(), base,
     checks: ['application-mount', 'lazy-plain-labels', 'real-math', 'additional-font-data', 'matrix-newlines',
       'complete-source-fallback', 'overflow-geometry', 'zero-advance-placement', 'negative-advance-fallback-recovery',
-      'standalone-svg-paint', 'native-ink-containment', 'standalone-raster-containment', 'containment-oracle-sensitivity'],
+      'standalone-svg-paint', 'native-ink-containment', 'standalone-raster-containment', 'containment-oracle-sensitivity',
+      'worker-graph-assets', 'native-failure-cache-capability', 'runtime-native-import-recovery',
+      'additional-font-native-import-recovery', 'transitive-native-import-recovery'],
+    nativeEvidence,
     additionalFontAssets, sameOriginAssets: new Set(served).size,
     blockedPreexistingExternalRequests: blockedExternal,
     standalonePixels: { red: raster.red, blue: raster.blue },
@@ -371,6 +651,10 @@ try {
     croppedOracle: { geometryInside: sensitivity.geometryInside, outsideInkPixels: sensitivity.outsideInkPixels,
       lostInkPixels: sensitivity.lostInkPixels },
   }, null, 2))
+  if (!nativeFailureCaching.cachesFailedNativeImports) {
+    console.error('Browser retries failed native imports itself: affected-browser recovery remains unverified (exit 2).')
+    process.exitCode = 2
+  }
 } finally {
   await browser?.close()
   await new Promise((resolveClosed) => server.close(resolveClosed))

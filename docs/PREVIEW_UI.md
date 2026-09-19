@@ -65,9 +65,11 @@ preview. It does not connect the parser to production rendering or change the
 appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPTER.md)
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
-advance. Phase 31B acceptance remains incomplete: browser deployment and
-standalone raster verification are unavailable because the current sandbox
-rejects the smoke-test server's localhost bind. Canvas integration and
+advance. Native-module recovery now retires the complete lazy MathJax Worker
+and its runtime/shared/font module map. Phase 31B acceptance remains incomplete:
+actual browser retry, deployment, and standalone raster verification are
+unavailable because the current sandbox rejects the smoke-test server's localhost
+bind. Canvas integration and
 typeset SVG export remain planned in [Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`

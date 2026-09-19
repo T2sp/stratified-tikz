@@ -4,9 +4,10 @@ The independent adapter is implemented in `src/rendering/labels/`. It is not
 connected to the production canvas, picking, React lifecycle, or SVG export.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
 remains authoritative. Phase 31B is **not yet acceptance-complete**. The targeted
-ink-bounds fix and real-engine regressions are implemented, but built-browser
-deployment and standalone raster verification still require an environment that
-permits localhost and Chrome. See the actual verification status below.
+ink-bounds fix, disposable-worker recovery, and focused regressions are implemented.
+Actual native-import recovery, built-browser deployment, and standalone raster
+verification still require an environment that permits localhost and Chrome.
+See the actual verification status below.
 
 ## Dependencies and local assets
 
@@ -29,9 +30,9 @@ ignored by Git. An incomplete installation fails preparation; it never silently
 omits font ranges. The lockfile must be updated by installing the pinned packages.
 
 Vite sees every possible font import and emits hashed local chunks. No runtime
-URL string is assumed to enter its asset graph. The engine module is a dynamic
-import reached only for mathematical input; individual extra font ranges are
-also dynamic imports. Only a finite package-generated import map can satisfy a
+URL string is assumed to enter its asset graph. Mathematical input lazily creates
+a same-origin ES module Worker, whose dynamic import loads the engine; individual
+extra font ranges are also dynamic imports in that Worker. Only a finite package-generated import map can satisfy a
 font request. There is no CDN loader, arbitrary script injection, runtime
 `require`, or external font URL. SVG uses paths, so no browser math font binaries
 are needed. Assets follow the configured `/stratified-tikz/` base in development
@@ -43,7 +44,10 @@ and MathJax's [local-hosting guidance](https://docs.mathjax.org/en/latest/web/ho
 Until Phase 31C imports the adapter, Vite builds it as a separate `labelAdapter`
 entry with preserved exports and a manifest. The application entry does not
 load it. This makes the real deployable asset graph independently testable
-without changing existing label rendering.
+without changing existing label rendering. Vite also emits
+`.vite/mathjax-worker-manifest.json`, describing every worker chunk, source
+module, static dependency, and dynamic import. The deployment check verifies
+both graphs and compares their font entries against the pinned installation.
 
 ## Public boundary for Phase 31C
 
@@ -114,8 +118,11 @@ handlers bound `alignat`/`alignedat` and related alignment counts before their
 synchronous loops, while retaining ordinary small alignments. `\newcolumntype` and
 `\mmlToken` are outside the supported language.
 Its font subclass loads only approved local modules and performs setup on each
-isolated font instance. It avoids MathJax's shared sticky failure flag, allowing
-a rejected font request to be retried without contaminating another label.
+isolated font instance. It avoids MathJax's shared sticky failure flag. This
+removes an application/library failure cache only: deleting a rejected Promise
+or creating another font/document instance does **not** repair a cached native
+ES module failure. Browser recovery therefore retires the complete Worker as
+described below.
 
 ## Units, baselines, and SVG portability
 
@@ -223,6 +230,10 @@ lengths are rejected to prevent dependence on the embedding page's font.
 | Unsettled underlying work, including retired work | 64 mathematical + 64 plain-text requests |
 | Each completed cache | 64 entries and 2 MiB of estimated UTF-16 JSON/key bytes |
 | Font-data settlement / service deadline / transient retry delay | 8 seconds / 10 seconds / 1 second |
+| Owned browser execution contexts | At most one live Worker per service; zero after retirement, until another accepted math request |
+| Worker transport / worker active conversions | 32 each; no unbounded secondary queue |
+| Worker initialization / individual conversion deadline | 10 seconds each, also bounded by the public service deadline |
+| Native module identities | One fixed emitted graph per Worker; 40 approved lazy font modules; no query/random retry URLs |
 
 Limits apply before initialization where possible; synchronous TeX work is
 bounded by engine/parser limits, not just a Promise timeout. Two independent
@@ -231,9 +242,10 @@ Their combined bound is 128 entries / 4 MiB. Oversize results are returned but
 not cached. Cache values contain frozen data, never engine or DOM objects.
 
 Geometry keys contain exact source and complete engine/version/configuration
-identity (currently `stz-label-v4-ink`, changed for the advance/ink contract and
-bounded geometry policy). Layout keys also contain all font and spacing inputs. Concurrent
-identical requests coalesce, including geometry shared across different font
+identity (currently `stz-label-v5-worker-ink`, changed for the disposable loading
+contract while retaining the advance/ink policy). Layout keys also contain all
+font and spacing inputs. Concurrent identical requests coalesce, including
+geometry shared across different font
 layouts. Position, camera, pan/zoom, selection, opacity, and foreground color are
 not conversion inputs. A new font generation recomposes layout using cached
 math geometry. Paint-only changes call the paint helper.
@@ -246,135 +258,198 @@ retry and generation change. Math resource cooldown does not block plain text;
 font readiness cooldown applies to all labels requiring that font measurement.
 No transient failure is stored as a completed negative cache entry.
 
-JavaScript cannot cancel an arbitrary injected Promise or native module import.
-Retired underlying tasks therefore remain counted until they settle; reaching
-the finite cap returns a work-limit fallback instead of spawning unlimited
-work. Math and plain-text caps are separate so a stalled math loader cannot
-disable ordinary text. Once abandoned work settles, slots become available.
-Consumers must schedule retries on explicit lifecycle/resource changes, not on
-every React render. No worker is required for bounded synchronous TeX expansion.
+### Native module failure recovery and ownership
+
+The former Window runtime import and generated font imports reused fixed native
+module identities. On browsers caching failed module downloads, even a later
+successful network connection and `invalidate()` could not repair those entries.
+The latest review established this by code inspection, **not a browser
+reproduction in this checkout**. Chrome's official
+[155 beta notes](https://developer.chrome.com/blog/chrome-155-beta#avoid_caching_module_failures)
+describe the later native retry behavior change; upgrading Chrome is not the fix.
+
+The production browser loader now creates a dedicated ES module Worker only when
+supported math is requested. `mathjaxWorker.ts` dynamically imports
+`mathjaxRuntime.ts`; runtime code, shared dependencies, and the finite generated
+font map execute in that Worker's global environment and native module map.
+The Window loads only the small service/transport/validation code. In the current
+build, the worker entry has no static dependencies; runtime depends on the entry
+(for shared helpers) and a separate SVG/font-core chunk. That shared chunk and
+all font imports belong to the same disposable context. Changing only the entry
+URL would leave a poisoned shared dependency; terminating the context retires
+**all** of these native identities together.
+
+Runtime import rejection, additional-font rejection, worker errors, or transport
+failure reject initialization/conversions as `resource-error`. The service
+retires that generation. Both service cancellation and transport deadlines
+terminate the Worker, detach its listeners, clear transport timers and pending
+records, and reject every affected conversion. No failed module map remains
+reachable through a reusable engine. Worker termination also discards queued
+execution and ongoing conversion, including synchronous engine work. Browser
+network/VM cleanup timing is browser-managed, but no abandoned Worker is retained
+for reuse and the old context is terminated before a replacement is created.
+There are no extra retry identities, retained context pool, or exhausted lifetime
+retry budget. Healthy code/font modules remain reusable in the one current
+Worker until a resource failure, deadline, or explicit invalidation.
+
+After access returns, the same public service can retry the same original source
+with `invalidate()`, or the next requested conversion after its one-second
+cooldown. Neither path reloads the page. A replacement Worker uses the same URLs
+with a fresh module map; ordinary HTTP caching of successful resources is safe.
+There is no background retry loop. Repeated calls during cooldown do not start
+loaders. Explicit invalidation bypasses cooldown intentionally; consumers should
+use it for resource/document lifecycle changes, not every render.
+
+Equivalent requests still share a Promise; distinct requests share initialization.
+The transport bounds in-flight messages independently of the service limits.
+Typed error categories cross the Worker boundary without relying on cloned Error
+prototypes. The public service validates and deeply freezes cloned SVG results
+before caching them. A later-run failure transfers no partial result: delimiters,
+spaces, tabs, LF and CRLF come from the complete original source. Plain labels
+never initialize a Worker and remain usable during a math-resource outage.
+Scoped TeX state/error capture and all ink/advance validation remain unchanged.
+
+Each service generation supplies an AbortSignal to its loader. Invalidation
+before its scheduled initializer runs starts no Worker. Late readiness/results
+from a retired context cannot enter the new generation's caches. A custom engine
+resolving after retirement is disposed without conversion; a live engine is
+released once through its optional idempotent `dispose()` boundary. Use
+`invalidate()` when abandoning a service to release its healthy Worker as well.
+
+An arbitrary injected loader/measurement Promise cannot be forcibly cancelled.
+Its underlying tasks remain counted until they settle; the existing independent
+64-math/64-plain caps prevent unlimited abandoned work. Production worker work
+rejects promptly on termination and releases those slots. Node real-engine tests
+continue using installed direct modules in a Node-only branch excluded from the
+browser asset graph; those tests verify typesetting, not browser native-cache
+recovery. The existing font callback fixture deliberately rejects **before** its
+native import and remains complementary adapter-level coverage.
 
 ## Verification and current status
 
-Every new test file is explicitly registered in `npm test`. Tests cover the
-actual adapter with the installed engine as well as deterministic error/resource
-fixtures; real-engine tests fail, rather than skip, when MathJax is unavailable.
-
-Required commands use Node >=22.12. The targeted fix was verified on
-2026-09-20 with Node v26.9.0 using these exact check commands (logs were redirected
-to `/private/tmp/stz-phase31b-fix-verification/`):
+Verification for this native-loading fix was run on 2026-09-20 with Node
+`v26.9.0`. `Google Chrome 153.0.8010.52` was reported by the installed executable's
+`--version` command; **no browser launched in the smoke**. Logs are in
+`/private/tmp/stz-phase31b-native-recovery/`. These are new results, not the
+previous review's 81/2,237 counts.
 
 ```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
 PATH=/opt/homebrew/bin:$PATH node --test \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \
   tests/rendering/labelServiceLifecycle.test.ts \
   tests/rendering/mathjaxAdapter.test.ts \
-  tests/rendering/mathjaxErrors.test.ts
+  tests/rendering/mathjaxErrors.test.ts \
+  tests/rendering/mathjaxLoader.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
 PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/labelSvg.ts \
   src/rendering/labels/labelMetrics.ts \
+  src/rendering/labels/labelInkBounds.ts \
   src/rendering/labels/labelService.ts \
   src/rendering/labels/mathjaxConfig.ts \
   src/rendering/labels/mathjaxEngine.ts \
   src/rendering/labels/mathjaxRuntime.ts \
-  src/rendering/labels/labelInkBounds.ts
+  src/rendering/labels/mathjaxShared.ts \
+  src/rendering/labels/mathjaxWorker.ts \
+  src/rendering/labels/mathjaxWorkerClient.ts \
+  src/rendering/labels/mathjaxWorkerProtocol.ts \
+  vite.config.ts \
+  tests/rendering/labelMetrics.test.ts \
+  tests/rendering/labelSvg.test.ts \
+  tests/rendering/labelService.test.ts \
+  tests/rendering/labelServiceLifecycle.test.ts \
+  tests/rendering/mathjaxAdapter.test.ts \
+  tests/rendering/mathjaxErrors.test.ts \
+  tests/rendering/mathjaxLoader.test.ts
 PATH=/opt/homebrew/bin:$PATH node --check scripts/prepareMathjaxAssets.mjs
 PATH=/opt/homebrew/bin:$PATH node --check scripts/checkLabelAssets.mjs
+PATH=/opt/homebrew/bin:$PATH npx eslint scripts/prepareMathjaxAssets.mjs scripts/checkLabelAssets.mjs
 git diff --check
 ```
 
 | Check | Actual result |
 | --- | --- |
-| Six focused files | Exit 0; 81 passed, 0 failed, 0 skipped (`focused.log`) |
-| Full `npm test` | Exit 0; 2,237 passed, 0 failed, 0 skipped (`npm-test.log`) |
-| Production build | Exit 0 (`build.log`); Vite's non-failing >500kB chunk warnings remain |
-| Seven production modules, targeted ESLint | Exit 0 (`lint.log`) |
-| Both script syntax checks | Exit 0 each |
-| `git diff --check` | Exit 0 |
+| Asset preparation | Exit 0 (`prepare.log`); both installed/locked packages remain exactly 4.1.3 |
+| Seven focused files | Exit 0; 102 passed, 0 failed, 0 skipped (`focused.log`) |
+| Full `npm test` | Exit 0; 2,258 passed, 0 failed, 0 skipped (`full.log`) |
+| Production build | Exit 0 (`build.log`); non-failing >500kB chunk warnings remain |
+| Targeted ESLint, all listed production/config/test modules | Exit 0 (`lint.log`) |
+| Both script syntax checks | Exit 0 each (`prepare-syntax.log`, `smoke-syntax.log`) |
+| Additional targeted ESLint for both scripts | Exit 0 (`script-lint.log`) |
+| `git diff --check` | Exit 0 (`diff-check.log`) |
+| Fresh-build browser asset/retry/raster command below | Exit 1 at localhost bind; browser acceptance incomplete (`browser.log`) |
 
-No test file was added: expanded tests remain in the explicitly enumerated
-six files. The real-adapter file has 19 tests. Its independent bounded oracle
-solves quadratic/cubic derivative roots for actual path extrema (unlike the
-production control hull), includes stroke envelopes and transforms, and checks
-portable viewports, signed run extents, offsets and composed label bounds.
-Known pinned glyph points also establish the reported left/right/top/bottom
-regressions. Coverage includes two lap forms, two smash variants, seven
-nonnegative-total negative-spacing forms, three nested/following-content forms,
-multiline/tab composition, seven negative-total rejections repeated with exact
-entire-source/no-runs/no-layout assertions, and normal fraction/radical/index/
-matrix/empty/safe-spacing/color/rule controls. Cache immutability, failure
-isolation, parser/resource limits and recovery regressions still pass.
+The new loader file is registered in the explicit `npm test` list. Its 16 tests
+exercise sticky fixed runtime/shared/font identities across four repeated
+failure/recovery cycles each, one current context, queue limits, cooldown,
+coalescing, native-error events, startup/conversion deadlines, transport failure,
+listener cleanup and ignored late events. Five added service lifecycle tests
+cover aborted initialization, late custom engine disposal, concurrent callers,
+timeout/invalidation and stale conversion completion. These deterministic models
+supplement, and do not replace, real browser native-import failures.
 
-`npm run check:label-assets` invokes `scripts/checkLabelAssets.mjs`. Supply an
-installed Playwright through `STZ_PLAYWRIGHT_MODULE` and optionally a Chromium
-path through `STZ_BROWSER_EXECUTABLE`. These are verification tools, not new
-application dependencies. The script serves `dist` only below the configured
-base, reads the adapter entry from the manifest, blocks external network
-requests, checks that plain labels do not load MathJax, and requests additional
-font data after the initial formula. It also checks exact-source failure and
-renders standalone colored SVG without a page stylesheet. It checks accepted
-overflow fixtures, zero-advance placement, negative-advance exact fallback and
-recovery. A blank-page native `getBBox()` oracle checks viewport and composed
-label containment; an enlarged reference image detects pixels lost by clipping
-in a standalone SVG image, including strokes. A deliberately cropped real glyph
-must fail both oracles. Zero extra font-data requests fail the probe rather than
-being reported as asset coverage. The original red/blue counts establish paint
-presence only and are retained alongside these stronger containment assertions.
+All prior real-engine ink/advance regressions remain: independent extrema/stroke
+containment, overlap/smash geometry, zero advance and following run origins,
+negative-advance exact fallback, isolation and immutable reuse. The browser
+script retains its independent native `getBBox()` and enlarged-viewport raster
+oracles, including a deliberately cropped real glyph that must fail both.
+Nonempty/red/blue pixels remain paint checks only, not clipping evidence.
 
-Both pinned 4.1.3 packages remain installed and agree with the lockfile;
-no dependency, font version, build configuration or asset preparation changes
-were needed. The former review results (2,223 full / 67 focused passing tests)
-are superseded by the targeted-fix results above, not used as evidence for the
-new bounds. Production canvas/picking/React integration and full-diagram export
-waiting remain deferred to later phases.
-
-The built-asset browser smoke was rerun after the fresh successful build with
-the cached Playwright and installed Google Chrome:
+The exact fresh-build smoke invocation was:
 
 ```sh
 PATH=/opt/homebrew/bin:$PATH \
 STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
 STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
 STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-label-smoke \
-node scripts/checkLabelAssets.mjs
+npm run check:label-assets
 ```
 
-It exits **1** at the test server's localhost bind with `listen EPERM: operation
-not permitted 127.0.0.1`. Full stderr is in
-`/private/tmp/stz-phase31b-fix-verification/browser-smoke.log`. No browser mounting,
-lazy initialization, same-origin network/font request, browser fallback/recovery,
-or standalone paint/containment assertion ran. These are **unavailable, not
-passed**; no SVG/PNG raster artifacts were produced in the requested
-`/private/tmp/stz-label-smoke` directory. A separate direct Chrome launch also
-exited 1 with a closed-target error, SIGABRT, and cleanup `kill EPERM`; its exact
-command and observed error summary are in
-`/private/tmp/stz-phase31b-fix-verification/chrome-probe.txt`. No browser security
-or network checks were weakened. Run the same smoke in an environment permitting
-localhost and Chrome before treating Phase 31B acceptance as complete.
+Before binding, its static assertions passed: **3 main manifest entries,
+43 worker chunks, 83 references, and all 40 approved additional-font modules**.
+Every referenced file resolves. The graph is recorded in
+`/private/tmp/stz-label-smoke/asset-graph-evidence.json`, including the runtime,
+worker, and shared-dependency target filenames. Licenses and the configured
+`/stratified-tikz/` base are retained; there is no duplicate Window runtime graph.
+This is deployment inspection, not observed browser network evidence.
 
-A supplementary static check reads `dist/.vite/manifest.json`, verifies every
-entry file and import/dynamic-import reference, compares its dynamic-font
-entries with the installed package's `mjs/svg/dynamic/*.js`, and checks the
-entry HTML's asset base. The fresh build resolves all **46 manifest entries, 86
-references, and 40 dynamic font-data modules**. Local entry URLs use
-`/stratified-tikz/`; the pre-existing Google Tag Manager URL is recorded separately
-and remains blocked by the smoke's external-network route. Build preparation
-preserves upstream licenses. The supplementary command exits 0:
+The command then failed with exactly:
 
-```sh
-PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz-phase31b-fix-verification/check-static-assets.mjs
+```text
+Error: listen EPERM: operation not permitted 127.0.0.1
 ```
 
-The script, `static-assets.log`, and `static-assets.json` are retained in that
-verification directory. This is static evidence only and does not substitute
-for browser requests or raster verification.
+The execution environment prohibits approval escalation, so this run could not
+bind localhost. No security or network assertion was weakened. Application
+mounting, lazy browser initialization, actual same-origin/font requests, native
+failure caching, native runtime/font/transitive failure and same-page recovery,
+matrices/fallback/paint, or standalone native/raster containment **did not run**.
+No new SVG/PNG or native-retry evidence was produced. Phase 31B remains
+**acceptance-incomplete**, and readiness to commit is not asserted from unit or
+static evidence alone.
 
-Repository-wide lint was not rerun: the checkout has pre-existing
-`react-hooks/refs` debt in unchanged `src/rendering/SvgDiagram.tsx`, outside this
-fix. The previously recorded wider baseline was 79 errors and 7 warnings across
-24 files; this task does not reassert those counts as a fresh measurement.
-Only targeted lint was required and run. No unrelated cleanup was made.
+When executable, the smoke first measures whether a real HTTP 503 import remains
+cached in that browser after the exact URL is restored. It then independently
+starts cold pages for runtime, additional-font, and shared-dependency 503 cases.
+Each uses the built public service's default loaders, verifies that the intended
+request reached the server and affected conversion, preserves complete mixed
+source including an earlier valid run and CRLF, restores access, and calls
+`invalidate()` on the same service/page. Recovery must request the same URL with
+HTTP 200, terminate the old internal Worker, and produce immutable successful
+geometry; subsequent math/plain requests must succeed. No page/context/cache is
+replaced between failure and recovery. Expected failures are scoped to the exact
+injected request; unrelated errors and external requests remain failures.
+`native-retry-evidence.json` records URLs, failures, fallback, recovery, contexts,
+and actual browser version. If only a browser that retries failed imports itself
+is available, functional success produces **exit 2**, explicitly leaving affected-
+browser acceptance unverified.
+
+No dependency, pinned version, diagram schema, persistence, TikZ, history, or
+production label rendering changed. `labelMetrics.ts`, `labelInkBounds.ts`, and
+`labelSvg.ts` retain their reviewed geometry. The unchanged `SvgDiagram.tsx`
+`react-hooks/refs` lint debt is outside scope; repository-wide lint was not run.
+Phase 31C canvas/React/picking integration and later export waiting remain deferred.
