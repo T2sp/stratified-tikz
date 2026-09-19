@@ -176,6 +176,12 @@ const phaseSlugs = {
   "28M": "tikz-library-comment-continuations",
   "29": "live-linked-coons-boundaries",
   "30": "coons-patch-duplicate-translate",
+  "31A": "tex-label-input-contract",
+  "31B": "tex-label-svg-adapter",
+  "31C": "tex-free-label-preview",
+  "31D": "tex-path-inline-labels",
+  "31E": "tex-label-svg-export",
+  "31F": "tex-label-regression-docs"
 };
 
 function makePhaseSpec(phase) {

@@ -1085,3 +1085,97 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
   without moving source strata or coordinate anchors.
 - Commit each action as one transaction, so Duplicate followed by Translate
   has two-step Undo/Redo.
+
+## Phase 31: Typeset TeX labels in SVG Preview
+
+Status: planned. Implement and review 31A through 31F in order; mark each
+subphase complete only after its own acceptance checks pass.
+
+Implementation/review pairs and their prerequisites are listed in
+[`prompts/phase-31-README.md`](../prompts/phase-31-README.md).
+
+- Typeset user-authored free labels and path inline-node text with MathJax SVG.
+- Preserve ordinary text mixed with supported math delimiters. This is a bounded
+  math preview, not a full LaTeX engine or arbitrary preamble/package support.
+- On a label error, unsupported input, or resource failure, display that label's
+  entire latest input literally, including delimiters, backslashes, whitespace,
+  and newlines. Pending labels also show their latest source; never retain a
+  stale last-good formula or display a partially compiled label.
+- Preserve authoritative label strings, the JSON schema, existing Undo/Redo,
+  and both TikZ export modes. Keep compiled geometry, metrics, errors, requests,
+  and caches in derived runtime state only.
+
+Recommended `phaseSlugs` entries:
+
+```json
+{
+  "31A": "tex-label-input-contract",
+  "31B": "tex-label-svg-adapter",
+  "31C": "tex-free-label-preview",
+  "31D": "tex-path-inline-labels",
+  "31E": "tex-label-svg-export",
+  "31F": "tex-label-regression-docs"
+}
+```
+
+### Phase 31A: Label input grammar and exact-source fallback contract
+
+- Add a pure, bounded parser for ordinary Unicode text mixed with `$...$`,
+  `\(...\)`, `$$...$$`, and `\[...\]`, with explicit delimiter/escape rules.
+- Keep exact original source for whole-label fallback. Ordinary text newlines
+  create visual label lines; math-source newlines remain inside the math run
+  for MathJax; literal fallback preserves all source line breaks.
+- Establish typed contracts, focused tests, and grammar documentation without
+  changing production label rendering yet.
+
+### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
+
+- Add the justified, pinned MathJax dependency and locally served resources
+  compatible with the application's Vite base path.
+- Convert complete labels into immutable SVG/text results with finite normalized
+  metrics, or exact-source fallback. Detect error output even when conversion
+  resolves successfully; an undefined command is a failure.
+- Isolate per-label engine state, constrain generated SVG, and keep glyph
+  geometry self-contained. Bound work, requests, and cache storage, with a
+  recovery policy for transient resource failures.
+- Test the real adapter and deployment assets before connecting the canvas.
+
+### Phase 31C: Free-label SVG rendering, measured placement, and picking
+
+- Integrate free labels with the shared renderer, current-source fallback,
+  revision-aware async state, and protection against stale completions.
+- Share measured layout between rendering and picking for all nine anchors,
+  preserving font scale, colors, opacity, layer rules, and 3D visibility.
+- Reuse conversion results during moves, pan/zoom, and camera changes. Verify
+  production selection and lifecycle behavior in a browser.
+
+### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
+
+- Reuse the same parser, adapter, cache, renderer, and error behavior for path
+  inline-node text, including all five placements and the white label outline.
+- Preserve marker geometry, pointer pass-through, and marker-centered selection
+  of the owning curve; do not introduce separate selectable formula glyphs.
+- Handle node identity and pending results across path editing, duplication,
+  splitting, reversal, and deletion without changing raw text or TikZ meaning.
+
+### Phase 31E: Settled-label SVG export and standalone SVG fidelity
+
+- Capture one consistent click-time diagram/view/options snapshot, settle its
+  visible labels, and render a detached export without interrupting live edits.
+- Export successful labels as typeset SVG and failed labels as complete captured
+  source. Never mix snapshot revisions or serialize a successful label before
+  its settled result is represented.
+- Preserve self-contained geometry, colors, outlines, literal whitespace,
+  transparent/white backgrounds, and editor-only exclusions after sanitization.
+- Bound export waiting and verify downloaded SVGs by reopening them outside the
+  application, including mixed success/failure labels and a 3D view.
+
+### Phase 31F: Combined regression coverage, documentation, and completion audit
+
+- Verify A-E together across errors/recovery, rapid edits, lifecycle changes,
+  cache reuse, placement/picking, 2D/3D visibility, and snapshot export.
+- Verify unchanged source persistence and TikZ output; register new tests in the
+  explicit test script and run tests, build, and browser/export checks.
+- Update Preview help, specification, and roadmap with the actual supported
+  subset and limits. Record unavailable required checks as unresolved rather
+  than marking the phase complete without evidence.
