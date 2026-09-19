@@ -1,10 +1,10 @@
-# Phase 31B Targeted Fix Prompt: Recover from native module-load failures and verify browser retry
+# Phase 31B Targeted Fix Prompt: Complete blocked browser acceptance and record evidence
 
 ## Environment
 
-Work on the current Phase 31B checkout. Preserve the existing ink-bounds fixes
-and any unrelated user work. Do not reset the branch or replace the current
-adapter with an earlier version.
+Work on the current Phase 31B checkout, including the existing uncommitted
+Worker-loading fixes and tests. Preserve all unrelated user work. Do not reset
+the branch or replace the current adapter with an earlier implementation.
 
 The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
 This project requires Node >=22.12.0.
@@ -15,294 +15,244 @@ Use:
 PATH=/opt/homebrew/bin:$PATH
 ```
 
-Required verification includes focused real-adapter tests, `npm test`,
-`npm run build`, targeted lint, script syntax checks, `git diff --check`, and
-the fresh-build browser asset/retry/raster checks described below.
+This follow-up primarily completes verification. Run the existing browser
+smoke unchanged before deciding whether any implementation change is needed.
+Do not add dependencies, change pinned versions, or redesign the loader merely
+because a sandbox prevented the browser check from starting.
 
-Do not add dependencies or change the pinned MathJax/font versions as a
-workaround. Do not perform repository-wide lint cleanup. Never report an
-unavailable check as passed.
+Required verification includes the fresh-build browser asset/retry/rendering
+smoke, seven focused adapter test files, `npm test`, `npm run build`, targeted
+lint, asset-script syntax checks, and `git diff --check`.
 
 ## Latest review findings
 
 The latest Phase 31B review reported `needs_changes`: no Critical issues,
-exactly one Medium issue, and no Low-priority issues.
+exactly one Medium issue, and no Low-priority issues. It found **no confirmed
+adapter code defect**.
 
-### Medium: transient native module failures can prevent recovery until page reload
+### Medium: required browser acceptance remains unverified
 
-On browsers that cache failed ES module loads, an actual runtime or additional
-font download failure can remain unsuccessful after connectivity returns and
-the public service's `invalidate()` runs:
+Running `npm run check:label-assets` against a fresh build exited 1 with:
 
-- `src/rendering/labels/mathjaxEngine.ts` retries the same runtime import;
-- `scripts/prepareMathjaxAssets.mjs` generates fixed additional-font import
-  specifiers, which are retried with the same module identities;
-- `src/rendering/labels/mathjaxRuntime.ts` deletes its own rejected font-load
-  Promise, but that does not clear the browser's module cache.
+```text
+listen EPERM: operation not permitted 127.0.0.1
+```
 
-This can disable all mathematics, or formulas needing the failed font chunk,
-for the rest of that page session.
+The failure occurred at the localhost server bind in
+`scripts/checkLabelAssets.mjs`, before Chrome launched. Actual Worker
+execution, additional-font requests, native-import failure/recovery, and
+standalone SVG rendering were not exercised.
 
-The finding is **code-supported, not browser-reproduced**. The review recorded
-Chrome `153.0.8010.52` and cited the later behavior change documented in
-[Chrome's official 155 beta notes](https://developer.chrome.com/blog/chrome-155-beta#avoid_caching_module_failures).
-Do not describe that evidence as a successful reproduction in this checkout.
+This is an environment-blocked verification gap, not an observed runtime
+defect. It leaves the built-asset requirement in
+`prompts/phase-31b-implement.md` incomplete. Do not present the earlier
+native-import caching issue as an unfixed code defect based only on this
+blocked run.
 
-The font-retry fixture in `tests/rendering/mathjaxAdapter.test.ts` rejects
-before calling the actual native import. It verifies adapter-level retry,
-but cannot establish recovery from a failed browser module load.
+The review used Node v26.9.0 and recorded:
 
-### Outstanding verification: built browser assets and raster fidelity
+| Check | Previous review result |
+| --- | --- |
+| Full suite | 2,258 passed; no failures or skips |
+| Seven focused adapter files | 102 passed; no failures or skips |
+| Targeted ESLint | Passed |
+| Both asset-script syntax checks | Passed |
+| `git diff --check` | Passed |
+| Production build | Passed; non-failing large-chunk warnings |
+| Browser asset/retry/rendering smoke | Exit 1 before browser launch |
 
-The review's `npm run check:label-assets` exited with `listen EPERM` while
-binding localhost, before browser requests, font loading, or standalone raster
-assertions ran. This is an outstanding acceptance check, not a second Medium
-issue.
+Static deployment inspection verified 3 main manifest entries, 43 Worker
+chunks, 83 references, and all 40 additional-font modules. The built Worker URL
+uses `/stratified-tikz/assets/`. The review's
+`/private/tmp/phase31b-review-assets/asset-graph-evidence.json` contains static
+evidence only; it is not a browser acceptance result.
 
-The review recorded Node v26.9.0, 2,237 passing full-suite tests, 81 passing
-focused adapter tests, passing targeted lint and asset-script syntax checks,
-and a passing build and `git diff --check`. The build emitted non-failing
-chunk-size warnings. Static inspection resolved 46 manifest entries,
-86 references, and all 40 additional font modules under `/stratified-tikz/`.
-These are previous results to preserve and recheck, not browser evidence.
+These are previous results to preserve and recheck, not new results for this
+follow-up.
 
 ## What the review confirmed correct
 
-Preserve the following implementation and regressions:
+Preserve the current implementation and regressions:
 
-- MathJax and the NewCM font are pinned, installed, and locked at `4.1.3`;
-- real-engine conversion preserves exact complete-source fallback, isolated
-  TeX state, scoped errors, and bounded work;
-- logical advance and actual ink bounds are distinct, with independent tests
-  for overlapping and smashed geometry;
-- portable SVG validation, explicit paint, immutable results, cache bounds,
-  and configuration/font identities are sound;
-- assets are local, lazy, and resolved under the configured application base;
-- diagram model, saved JSON, history, and production canvas integration remain
-  unchanged, with Phase 31C correctly deferred.
-
-The previous ink-bounds defect is resolved in the reviewed implementation.
-Keep its geometry and standalone raster regressions; do not reopen that work
-as the primary target of this fix.
+- real public-adapter fraction/radical conversions return finite geometry;
+- a valid run followed by an undefined command returns the exact complete
+  source, including whitespace and delimiters, without partial geometry;
+- conversion state and errors are isolated and scoped;
+- work, caches, and Worker lifetime are bounded; results are immutable,
+  equivalent requests coalesce, and obsolete generations are retired;
+- logical advance is distinct from overflowing ink, and portable SVG
+  validation constrains elements, attributes, references, and paint;
+- engine and font dependencies are consistently pinned to `4.1.3`;
+- the disposable Worker implementation and native-import regression harness
+  already exist;
+- model, persistence, history, TikZ, production canvas integration, and export
+  lifecycle remain unchanged.
 
 The unchanged `src/rendering/SvgDiagram.tsx` has pre-existing
-`react-hooks/refs` lint debt. It is outside this fix.
+`react-hooks/refs` lint debt. Do not perform repository-wide lint cleanup.
 
 ## Goal
 
-Make the production adapter recover from an actual transient runtime or
-additional-font module-load failure on supported browsers. After access is
-restored and `invalidate()` or the documented bounded retry mechanism runs,
-the same public service in the same page must successfully convert the same
-source without a page reload.
+Obtain actual browser evidence for the existing Phase 31B implementation in an
+environment that permits localhost and Chrome/Chromium. Fix only demonstrated
+Phase 31B failures, rerun the applicable checks, and update completion
+documentation to match the observed results.
 
-Correct the loading lifecycle, add regressions that exercise native module
-failures, and complete the built browser asset/raster verification when the
-environment permits it. Keep Phase 31C integration deferred.
+A passing unchanged smoke may require only documentation updates. There is no
+requirement to change production code when verification reveals no defect.
+Keep Phases 31C–31F deferred.
 
-## Required reading before fixing
+## Required reading before proceeding
 
 Read at least:
 
 - `AGENTS.md` and this prompt in full;
-- `prompts/phase-31a-implement.md` and the Phase 31A input/result contract;
 - `prompts/phase-31b-implement.md` and `prompts/phase-31b-review.md`;
-- the latest Phase 31B review report, if available; otherwise use the findings
-  reproduced above as the review summary;
-- `docs/LABEL_ADAPTER.md`, the Phase 31 sections of `docs/PREVIEW_UI.md`, and
-  `docs/ROADMAP.md`;
-- `src/rendering/labels/mathjaxEngine.ts`, `mathjaxRuntime.ts`,
-  `mathjaxConfig.ts`, and `labelService.ts`;
-- `src/rendering/labels/labelMetrics.ts`, `labelInkBounds.ts`, and `labelSvg.ts`;
-- the label metrics, SVG, service, lifecycle, real-adapter, and error tests;
-- `scripts/prepareMathjaxAssets.mjs`, its generated font import map,
-  `scripts/checkLabelAssets.mjs`, `vite.config.ts`, and `package.json`.
+- the latest review report if available; otherwise use the findings above;
+- `docs/LABEL_ADAPTER.md`, especially its loading lifecycle, verification,
+  artifact, and exit-status documentation;
+- the Phase 31 sections of `docs/PREVIEW_UI.md` and `docs/ROADMAP.md`;
+- `scripts/checkLabelAssets.mjs`, `scripts/prepareMathjaxAssets.mjs`,
+  `vite.config.ts`, and `package.json`;
+- the seven focused test files and the adapter/Worker modules they exercise,
+  as needed to diagnose an observed failure.
 
-Inspect the actual production import graph and test assertions. A retry test
-name or deletion from an application-owned Map does not prove that a poisoned
-native module identity can recover.
+Do not replace the existing assertions with a new, weaker verification path.
 
-## 1. Fix recovery at the actual module-loading boundary
+## 1. Run the existing smoke in a permitted environment
 
-Choose the smallest correct local design that can recover despite a cached
-native import failure. Do not prescribe success solely from clearing a
-Promise, creating another MathJax document, or constructing a new service.
+Build the current checkout, then execute the existing script unchanged.
+Use an available external Playwright installation and Chrome/Chromium; do not
+add a project browser-testing dependency.
 
-Cover both the runtime initialization path and the additional-font path.
-Consider transitive/shared imports in the emitted build graph: changing only
-an entry URL is insufficient if its dependencies still use failed identities.
-
-A disposable module execution context or another demonstrably retryable
-same-origin loading design is acceptable. The mechanism is an implementation
-choice, not a requirement to introduce a particular worker architecture.
-Explain why the selected mechanism avoids reusing the failed native module
-state and how its resource lifetime remains bounded.
-
-Required behavior:
-
-- An initial failed download settles within the existing bounded failure
-  policy and returns the typed complete-source fallback.
-- After resource access returns, invalidation/retry permits the same service
-  to produce a successful result for the same source in the same page.
-- Failure during a later math run discards all earlier successful geometry;
-  fallback preserves the complete original source, including delimiters,
-  spaces, tabs, and physical newlines/CRLF.
-- Plain-text labels remain usable, and valid mathematical conversions work
-  after recovery. Preserve lazy initialization for plain-text-only requests.
-- Successful results remain immutable and reusable; concurrent equivalent
-  requests retain the existing coalescing behavior.
-
-Preserve exact dependency versions, the finite approved font set, license
-assets, same-origin requests, and Vite's `/stratified-tikz/` base handling.
-If the build structure changes, ensure every runtime, worker, dependency, and
-font resource is emitted and discoverable by the deployment check. Update the
-asset generator rather than hand-editing its ignored generated output.
-
-Do not use page reloads, a requirement to upgrade the browser, CDN fallback,
-arbitrary remote imports, disabled browser security, or permanent fallback
-after a transient failure as the fix. Do not eagerly load all math/font code
-merely to avoid the failing lazy path.
-
-## 2. Keep retry, storage, and lifecycle bounded
-
-Preserve the existing source/run limits, pending and unsettled work limits,
-cache entry/byte bounds, retry delay, and finite settlement behavior.
-
-Account for resources introduced by the recovery design:
-
-- bound simultaneous and retained loaders, execution contexts, requests,
-  queues, and retry identities;
-- retire or dispose of abandoned contexts/resources when applicable;
-- prevent retry storms during an outage and coalesce shared initialization;
-- ensure timeout, invalidation, and late completion cannot publish obsolete
-  results into the current generation or poison a recovered engine;
-- keep counters and cleanup correct on success, rejection, and timeout;
-- preserve isolated TeX state and scoped error capture across recovery;
-- keep failure categories accurate and update configuration/cache identities
-  if the transient result or loading contract changes.
-
-Deleting an application cache entry does not prove native module storage has
-been released. An unbounded sequence of random/query-suffixed import URLs is
-not an acceptable bounded retry strategy. A finite retry budget that leaves
-the page permanently unable to recover after ordinary transient failures is
-also insufficient. Document the actual lifetime and retry semantics.
-
-Add focused lifecycle regressions for repeated failure/recovery, concurrent
-callers, and completion after timeout/invalidation. Deterministic test seams
-can cover these cases, including a loader that remembers failed identities,
-but must supplement the real browser tests below.
-
-## 3. Add browser regressions for actual failed imports
-
-Extend `scripts/checkLabelAssets.mjs`, or a closely related focused browser
-check, to exercise the built public service with its default production
-loaders. Do not replace the native import with a callback that throws first.
-Keep the existing adapter-level retry fixture as complementary coverage.
-
-Test these independently with initially cold relevant modules:
-
-1. **Runtime failure:** fail a real emitted runtime request, verify bounded
-   complete-source fallback, restore access, call `invalidate()`, and convert
-   the same source successfully using the same service in the same page.
-2. **Additional-font failure:** establish ordinary math success, then fail a
-   real request for a font chunk required by a different formula. Verify
-   complete-source fallback, restore access, invalidate, and successfully
-   convert that same source through the same service and page.
-3. **Transitive failure:** where the chosen build graph has separately loaded
-   shared/dependent modules, fail such a request and verify recovery too. This
-   must catch a design that changes only the entry identity while retaining a
-   poisoned dependency. If no such request exists, explain the built graph.
-
-For the font case, include a mixed label with an earlier valid math run and
-exact whitespace/CRLF so the failure also proves that partial geometry is not
-returned. Verify later valid math and plain-text requests remain usable.
-
-Each scenario must prove that the intended network request actually failed
-and affected conversion. Install the failure before the resource is loaded,
-and guard against warm module caches and Vite preloading bypassing the test.
-Use a controlled request abort or failing response at the real asset boundary;
-record the observed URL, failure, fallback, and subsequent successful result.
-
-A fresh page/context may establish the cold start for each independent
-scenario. Between a scenario's failure and recovery, do not reload/navigate,
-replace the public service, open a new page/context, or clear browser caches.
-An internal disposable context managed by the production recovery mechanism
-is allowed: that is the behavior under test.
-
-Record the actual browser version. Test in an available supported browser
-that exhibits cached native failures; the review's Chrome 153 is the relevant
-starting environment if still available. A newer browser that automatically
-retries failed imports can mask the original defect. If only such a browser
-is available, clearly distinguish its passing check from still-unverified
-recovery on affected browsers. Do not silently narrow browser support.
-
-Keep expected injected request failures local to their test scenarios. Do not
-disable the smoke's general request/error assertions to make fault injection
-pass. Preserve rejection of unexpected external requests and unrelated errors.
-
-## 4. Complete fresh-build asset and standalone SVG verification
-
-Run the browser checks against a fresh production build in an environment
-that permits localhost and Chrome/Chromium. Use an already available external
-Playwright installation; do not add a project dependency just for this check.
-
-The documented command for this checkout is:
+Use a fresh artifact directory for this attempt so old static files or
+screenshots cannot be mistaken for current browser evidence. For this checkout:
 
 ```bash
+PATH=/opt/homebrew/bin:$PATH npm run build
+
 PATH=/opt/homebrew/bin:$PATH \
 STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
 STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-label-smoke \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-browser-acceptance \
 npm run check:label-assets
 ```
 
-Use actual available module/executable paths if these differ, and record the
-exact command. Follow the execution environment's approval rules for local
-server/browser access without weakening browser security or network checks.
+Use actual available paths and a new artifact directory if these differ or
+already contain earlier output. Record the full command, execution environment,
+Node version, actual launched browser version, exit status, and log location.
 
-Preserve checks for application mounting under `/stratified-tikz/`, lazy
-initialization, same-origin assets, additional font-data loading, matrices,
-complete-source fallback, explicit paint, and standalone SVG portability.
+If localhost binding or browser launch is denied by the sandbox, use the
+execution environment's supported approval/escalation mechanism when available
+and permitted. Do not assume an earlier run's lack of escalation capability
+applies to the current session. The required action is running this local
+fresh-build smoke with localhost/browser access, not changing the application.
 
-Keep the independent native-geometry and enlarged-viewport raster checks for
-overlapping/smashed ink. A nonempty image or red/blue pixel count alone must
-not replace the existing clipping oracle. Static manifest/reference checks
-remain useful, but do not replace real browser requests or raster assertions.
+If escalation is unavailable or denied, report the exact restriction and keep
+acceptance incomplete. Do not bypass the restriction, disable browser security,
+change the server merely to evade permissions, or replace this check with a
+static-only result. Avoid repeating the same blocked command without a relevant
+environment or permission change.
 
-If execution is blocked, record the exact command, failure, and assertions
-that did not run. Complete work that can run and keep browser acceptance
-explicitly incomplete. Do not claim Phase 31B complete or ready to commit
-solely from passing unit tests or static deployment evidence.
+## 2. Inspect the browser results and saved evidence
 
-## Scope and preservation requirements
+Keep all existing smoke assertions active. Confirm the run establishes:
 
-Limit changes to the Phase 31B adapter/loading boundary, necessary build and
-asset checks, focused tests, and directly related documentation.
+1. The built app mounts under `/stratified-tikz/`; plain-text and
+   parser-rejected labels do not eagerly load MathJax or font assets.
+2. The real production Worker executes. Runtime, shared dependencies, and
+   additional font data load from the configured same-origin build graph.
+   Conversion introduces no external network dependency.
+3. Fractions, radicals, matrices, multiline labels, and exact complete-source
+   fallback work through the built public service.
+4. The native-cache capability probe actually fails a module request with
+   HTTP 503, restores its exact URL, and measures whether the browser retains
+   the failed import.
+5. Independent runtime, additional-font, and transitive-import scenarios
+   actually fail the intended cold module requests. They return bounded
+   `resource-error` fallback with the exact mixed source, including CRLF,
+   and no partial geometry.
+6. After access is restored, `invalidate()` enables the same public service
+   in the same page to request the same failed URL successfully with HTTP 200.
+   Old Workers terminate; recovered results are immutable and coalesced;
+   subsequent math and plain labels remain usable.
+7. Standalone SVG paint, native ink containment, composed bounds, zero-advance
+   placement, and enlarged-viewport raster containment pass. The deliberately
+   cropped glyph still fails the independent containment oracles.
 
-Do not implement Phase 31C canvas/React/picking integration, Phase 31D path
-labels, or Phase 31E full-diagram export waiting. Do not change diagram schema,
-persisted labels, coordinate placement, undo/history, TikZ source generation,
-or existing point/free/path label rendering.
+Do not reload or replace the page, browser context, public service, or browser
+cache between failure and recovery. The internal Worker replacement performed
+by the production loader is the behavior being verified.
 
-Keep strict TypeScript without `any`, the parser and SVG validation policy,
-supported formulas, actual ink bounds, logical advance, baselines, explicit
-paint, exact-source fallback, isolated state, and immutable caches intact.
-Avoid unrelated UI, lint, or formatting cleanup.
+Inspect the artifacts emitted by the existing script:
+
+- `asset-graph-evidence.json`: static main/Worker graph and approved font set;
+- `native-retry-evidence.json`: actual browser version, native-cache behavior,
+  failed/restored URLs, fallback, same-service recovery, and Worker lifecycle;
+- `containment-evidence.json`: native/raster containment and cropped-oracle
+  sensitivity results;
+- `label-standalone.svg`, `label-standalone.png`, and the fixture
+  SVG/PNG/reference PNG files: portable output and raster evidence;
+- the smoke's output log: base-path/font requests and overall result.
+
+An artifact's presence alone does not establish success. Check its contents,
+the current run's final status, and whether all required assertions completed.
+
+### Interpret exit statuses accurately
+
+- **Exit 0 / `passed`:** all assertions completed and the native-cache probe
+  verified recovery on a browser that caches failed native imports.
+- **Exit 2 / `functional-checks-passed-affected-browser-unverified`:** functional
+  checks passed, but this browser retries failed imports itself. Acceptance
+  for affected browsers remains unverified.
+- **Exit 1:** inspect the actual error. A bind/launch denial is an environment
+  block; an assertion after browser execution may demonstrate an implementation
+  or harness defect. Do not conflate them.
+
+For exit 2, use an available supported browser exhibiting cached failures to
+complete the remaining gate. Do not remove the capability check, convert exit 2
+to success, or silently narrow browser support. Browser version alone is not
+proof of its observed native-import behavior.
+
+## 3. Fix only demonstrated Phase 31B failures
+
+If a runnable smoke exposes a failure:
+
+- preserve the command, failing assertion, and relevant request/render evidence;
+- distinguish adapter behavior, deployment configuration, and a demonstrably
+  incorrect test harness before choosing a fix;
+- make the smallest correction in the responsible Phase 31B code;
+- add a focused regression when needed to retain the demonstrated behavior;
+- rebuild if code or build configuration changes, then rerun the full existing
+  browser smoke and the required checks against the final checkout.
+
+Change the smoke itself only to correct a demonstrated harness defect, with
+equivalent or stronger assertions and an explanation of the original failure.
+Do not suppress unexpected errors, skip failure-injection scenarios, weaken
+same-origin checks, replace real native imports with mocks, or loosen the
+containment oracle just to obtain a pass.
+
+Preserve exact-source fallback, Worker retirement, finite retry/storage/work
+limits, isolated state, immutable cache reuse, ink/advance correctness, local
+lazy assets, and the exact dependency pins. Do not reopen the loading or
+geometry architecture without evidence that the existing implementation fails.
 
 ## Documentation
 
-Update `docs/LABEL_ADAPTER.md` to explain the recovery mechanism, module/cache
-lifetime, invalidation/retry semantics, resource bounds, and actual browser
-evidence. Distinguish an adapter-level rejected Promise from a failed native
-module load; do not claim that clearing the former alone guarantees recovery.
+Update `docs/LABEL_ADAPTER.md` with the actual command, environment/browser
+version, exit status, request/recovery evidence, artifact paths, and remaining
+limitations. Separate static deployment checks, deterministic tests, and real
+browser observations.
 
-Keep `docs/PREVIEW_UI.md` and `docs/ROADMAP.md` consistent where needed.
-Retain the corrected ink/advance policy and mark any outstanding browser gate
-accurately. Production canvas integration remains deferred.
+Keep `docs/PREVIEW_UI.md` and `docs/ROADMAP.md` consistent. If every Phase 31B
+gate passes, replace the current blocked status with the verified adapter
+completion status. If execution remains blocked or exits 2, retain the precise
+outstanding gate. Do not state that historical browser assertions ran when they
+did not, or that production canvas integration is now enabled.
 
 ## Verification
 
-Prepare generated local assets, then run the focused checks:
+Prepare local generated assets and run the seven focused files:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
@@ -312,15 +262,20 @@ PATH=/opt/homebrew/bin:$PATH node --test \
   tests/rendering/labelService.test.ts \
   tests/rendering/labelServiceLifecycle.test.ts \
   tests/rendering/mathjaxAdapter.test.ts \
-  tests/rendering/mathjaxErrors.test.ts
+  tests/rendering/mathjaxErrors.test.ts \
+  tests/rendering/mathjaxLoader.test.ts
 ```
 
-Then run:
+Run the full suite and production build:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
+```
 
+Run targeted lint and script checks:
+
+```bash
 PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/labelSvg.ts \
   src/rendering/labels/labelMetrics.ts \
@@ -329,13 +284,20 @@ PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/mathjaxConfig.ts \
   src/rendering/labels/mathjaxEngine.ts \
   src/rendering/labels/mathjaxRuntime.ts \
+  src/rendering/labels/mathjaxShared.ts \
+  src/rendering/labels/mathjaxWorker.ts \
+  src/rendering/labels/mathjaxWorkerClient.ts \
+  src/rendering/labels/mathjaxWorkerProtocol.ts \
   vite.config.ts \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \
   tests/rendering/labelServiceLifecycle.test.ts \
   tests/rendering/mathjaxAdapter.test.ts \
-  tests/rendering/mathjaxErrors.test.ts
+  tests/rendering/mathjaxErrors.test.ts \
+  tests/rendering/mathjaxLoader.test.ts \
+  scripts/prepareMathjaxAssets.mjs \
+  scripts/checkLabelAssets.mjs
 
 PATH=/opt/homebrew/bin:$PATH node --check scripts/prepareMathjaxAssets.mjs
 PATH=/opt/homebrew/bin:$PATH node --check scripts/checkLabelAssets.mjs
@@ -343,47 +305,54 @@ PATH=/opt/homebrew/bin:$PATH node --check scripts/checkLabelAssets.mjs
 git diff --check
 ```
 
-Include additional changed modules/tests in targeted checks and register any
-new unit test files in the explicitly enumerated `npm test` command. Run the
-browser asset/retry/raster checks above after the successful build.
+Run the browser command above against the successful fresh build. A successful
+run on the same final code/build need not be repeated just because documentation
+was updated. Include any additional changed files in targeted checks, and
+register new unit test files in the explicitly enumerated `npm test` script.
 
-Report actual commands, exit statuses, test counts, browser version, and
-artifact paths. Separate non-failing chunk warnings and unrelated lint debt
-from failures introduced by this change. Do not copy review counts as new
-verification results.
+Report actual counts and statuses rather than copying review results. Separate
+non-failing large-chunk warnings and unchanged global lint debt from new errors.
+
+## Scope and preservation requirements
+
+Limit changes to completion documentation and demonstrated Phase 31B defects.
+No production change is required merely to close a verification-only review.
+
+Do not implement Phases 31C–31F: canvas/React/picking integration, path labels,
+export lifecycle waiting, or later integration work. Do not change diagram
+schema, saved labels, coordinates, history, TikZ generation, or existing
+production label rendering. Keep strict TypeScript without `any` and avoid
+unrelated cleanup.
 
 ## Acceptance criteria
 
 Phase 31B can be called complete only when:
 
-- actual transient runtime and additional-font import failures recover after
-  access returns, using the same public service and page;
-- the solution handles cached native failures, including relevant transitive
-  dependencies, without relying on browser upgrades or page reloads;
-- failure preserves exact complete-source fallback with no partial geometry;
-- retries, resource lifetime, pending work, and caches remain bounded, and
-  stale completions cannot corrupt a later generation;
-- supported formulas, ink/advance correctness, isolation, and local lazy
-  assets remain covered by passing regressions;
-- required focused/full tests, build, targeted lint, syntax, and diff checks
-  pass;
-- built browser retry, base-path/font loading, and standalone raster checks
-  pass with observed evidence, including recovery on an affected browser;
-- documentation accurately states behavior and verification status;
-- no Critical or Medium issue remains and later-phase integration is deferred.
+- the fresh-build browser smoke completes with exit 0 and actual evidence for
+  base-path deployment, Worker execution, additional-font requests, native
+  failure/recovery, and standalone SVG containment;
+- same-page/same-service recovery is verified on an affected browser, with
+  no skipped scenarios or weakened assertions;
+- any demonstrated Phase 31B defect is corrected and regression coverage passes;
+- focused/full tests, build, targeted lint, syntax, and diff checks pass;
+- documentation matches the observed final implementation and verification;
+- no Critical or Medium issue remains, and Phases 31C–31F remain deferred.
+
+An environment block or exit 2 leaves acceptance incomplete. Passing static
+inspection and unit tests alone cannot close this review.
 
 ## Report after implementation
 
 Report:
 
-- files changed, the root cause, and the selected recovery mechanism;
-- how runtime, additional-font, and transitive import failures are handled;
-- why retries avoid poisoned native state and how resources remain bounded;
-- invalidation, concurrency, timeout, and stale-completion behavior;
-- exact-source fallback and preservation of prior ink/advance regressions;
-- focused/full test, build, lint, syntax, and diff-check commands/results;
-- browser version and command, actual injected request failures, same-page
-  recovery evidence, base-path/font requests, raster evidence, and artifacts;
-- any blocked checks, their exact failures, and still-unverified assertions;
-- documentation changes, remaining limitations, and whether every Phase 31B
-  acceptance gate is met, without claiming Phase 31C integration is complete.
+- whether the existing smoke passed unchanged, and any demonstrated defect
+  that required a code or harness change;
+- files changed and the reason for each change;
+- exact commands, execution environment, Node/browser versions, exit statuses,
+  and focused/full test counts;
+- actual failed/restored module requests, same-service recovery, Worker
+  retirement, base-path/font loading, and standalone containment evidence;
+- artifact and log paths, with static and browser evidence distinguished;
+- documentation updates and whether every Phase 31B gate now passes;
+- any remaining blocked check, its exact cause, and the assertions that did
+  not run, without claiming completion of Phase 31C or later work.
