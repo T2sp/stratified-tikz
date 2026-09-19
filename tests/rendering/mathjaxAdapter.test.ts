@@ -210,3 +210,50 @@ test('actual additional font-data rejection settles as complete source and contr
   service.invalidate()
   success(await service.convert(source, settings), diagnostics)
 })
+
+test('real TeX work limits include macro expansion and array templates before large allocations', async () => {
+  const { service, diagnostics } = adapter()
+  for (const source of [
+    ' prefix $' + '\\TeX '.repeat(1_001) + '$ \t\n',
+    ' prefix $\\begin{array}{*{100000000}{c}}x\\end{array}$ \t\n',
+    // Empty repeated templates also used to allocate an enormous Array first.
+    ' prefix $\\begin{array}{*{100000000}{}}x\\end{array}$ \t\n',
+    ' prefix $\\begin{array}{*{256}{' + 'c'.repeat(65) + '}}x\\end{array}$ \t\n',
+    ' prefix $\\begin{array}{' + 'c'.repeat(257) + '}x\\end{array}$ \t\n',
+    ...['alignat', 'alignat*', 'alignedat', 'xalignat', 'xalignat*', 'xxalignat'].map((name) =>
+      ' prefix $\\begin{' + name + '}{' + '9'.repeat(400) + '}a&b\\end{' + name + '}$ \t\n'),
+    ' prefix $\\begin{alignedat}[t]{129}a&b\\end{alignedat}$ \t\n',
+  ]) {
+    const result = await service.convert(source, settings)
+    assert.equal(result.kind, 'fallback')
+    assert.equal(result.kind === 'fallback' && result.reason, 'limit', source)
+    assert.equal(result.source, source)
+    assert.equal('runs' in result, false)
+    success(await service.convert('$\\sqrt{2}+1$', settings), diagnostics)
+  }
+  success(await service.convert('$\\begin{array}{*{2}{c}}a&b\\\\c&d\\end{array}$', settings), diagnostics)
+  success(await service.convert('$\\begin{alignedat}[t]{1}a&=b\\end{alignedat}$', settings), diagnostics)
+})
+
+test('array definitions and direct MathML attribute injection are unsupported before engine loading', async () => {
+  let loads = 0
+  const service = createLabelService({ measurement, loadEngine: async () => {
+    loads++
+    throw new Error('Unsupported input must not initialize MathJax')
+  } })
+  for (const source of [
+    ' $\\newcolumntype{Q}{c}\\begin{array}{Q}x\\end{array}$\n',
+    ' $\\mmlToken{mi}[href="https://example.com"]{x}$\t ',
+    ' $\\mmlToken{mi}[style="background:url(https://example.com)"]{x}$ ',
+  ]) {
+    const result = await service.convert(source, settings)
+    assert.equal(result.kind === 'fallback' && result.reason, 'unsupported-input')
+    assert.equal(result.source, source)
+  }
+  assert.equal(loads, 0)
+
+  // Built-in MathJax macros legitimately expand to mmlToken internally. Source
+  // restrictions must leave that controlled engine implementation usable.
+  const actual = adapter()
+  success(await actual.service.convert('$x\\bmod y\\pmod{2}$', settings), actual.diagnostics)
+})

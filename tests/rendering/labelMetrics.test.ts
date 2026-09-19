@@ -180,6 +180,14 @@ test('layout fragment and accumulated extent limits settle with an explicit erro
   const many: readonly LabelRun[] = [{ kind: 'text', sourceStart: 0, sourceEnd: MAX_LABEL_LAYOUT_FRAGMENTS + 1, text: '\n'.repeat(MAX_LABEL_LAYOUT_FRAGMENTS + 1) }]
   assert.throws(() => composeLabelLayout(many, [], settings, provider), (error: unknown) => error instanceof LabelMetricsError && error.reason === 'work-limit')
   assert.throws(() => layout('$x$$y$', [{ width: 1_000_000, ascent: 1, descent: 0 }, { width: 1, ascent: 1, descent: 0 }]), (error: unknown) => error instanceof LabelMetricsError && error.reason === 'work-limit')
+  // Finite individual ink coordinates can still span more than the allowed
+  // whole-label width when a glyph has both left and right overhang.
+  assert.throws(() => composeLabelLayout(runs('x'), [], settings, {
+    ...provider,
+    measure: () => ({ width: 20, ascent: 16, descent: 4, inkLeft: -18_000_000, inkRight: 18_000_000 }),
+  }), (error: unknown) => error instanceof LabelMetricsError && error.reason === 'work-limit')
+  assert.throws(() => layout('$x$', [{ width: 1, ascent: 900_000, descent: 900_000 }]),
+    (error: unknown) => error instanceof LabelMetricsError && error.reason === 'work-limit')
 })
 
 test('browser-only provider does not silently invent metrics when canvas is unavailable', async () => {

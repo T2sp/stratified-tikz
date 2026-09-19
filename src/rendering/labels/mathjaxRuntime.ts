@@ -4,6 +4,13 @@ import { SVG } from '@mathjax/src/js/output/svg.js'
 import { liteAdaptor } from '@mathjax/src/js/adaptors/liteAdaptor.js'
 import { RegisterHTMLHandler } from '@mathjax/src/js/handlers/html.js'
 import { STATE } from '@mathjax/src/js/core/MathItem.js'
+import { ColumnParser, type ColumnState } from '@mathjax/src/js/input/tex/ColumnParser.js'
+import { EnvironmentMap } from '@mathjax/src/js/input/tex/TokenMap.js'
+import ParseMethods from '@mathjax/src/js/input/tex/ParseMethods.js'
+import { AmsMethods } from '@mathjax/src/js/input/tex/ams/AmsMethods.js'
+import type TexParser from '@mathjax/src/js/input/tex/TexParser.js'
+import type { StackItem } from '@mathjax/src/js/input/tex/StackItem.js'
+import type { ParseMethod } from '@mathjax/src/js/input/tex/Types.js'
 import type { MathItem } from '@mathjax/src/js/core/MathItem.js'
 import type { MathDocument } from '@mathjax/src/js/core/MathDocument.js'
 import type { MmlNode } from '@mathjax/src/js/core/MmlTree/MmlNode.js'
@@ -56,6 +63,70 @@ mathjax.asyncIsSynchronous = false
 type LiteMathItem = MathItem<LiteElement, LiteText, LiteDocument>
 type LiteMathDocument = MathDocument<LiteElement, LiteText, LiteDocument>
 
+/** Bound array repetition before MathJax allocates its expanded template. */
+class BoundedColumnParser extends ColumnParser {
+  constructor() {
+    super()
+    // The pinned implementation checks n++ > MAXCOLUMNS before processing.
+    this.MAXCOLUMNS = MATHJAX_LIMITS.maxArrayColumns - 1
+  }
+
+  override repeat(state: ColumnState): void {
+    const start = state.i
+    const countSource = this.getBraces(state)
+    const columns = this.getBraces(state)
+    const count = parseInt(countSource)
+    if (String(count) === countSource && count >= 0 && (
+      count > MATHJAX_LIMITS.maxArrayColumns ||
+      count * columns.length + state.template.length - state.i > MATHJAX_LIMITS.maxArrayTemplateLength
+    )) {
+      throw new MathJaxFailure('limit', 'Array template expansion limit exceeded')
+    }
+    // Preserve the pinned engine's exact syntax/error behavior for valid-sized
+    // and malformed counts; only its unbounded allocation needs interception.
+    state.i = start
+    super.repeat(state)
+  }
+}
+
+// The AMS alignat methods expand their numeric count with an unbounded loop,
+// independent of maxMacros/maxBuffer. Intercept the same raw argument before
+// invoking the stock method, without changing any shared MathJax method/map.
+function checkAlignmentCount(parser: TexParser, begin: StackItem, optionalAlignment: boolean): void {
+  const start = parser.i
+  const name = `\\begin{${begin.getName()}}`
+  try {
+    if (optionalAlignment) parser.GetBrackets(name)
+    const source = parser.GetArgument(name)
+    if (/^\d+$/u.test(source) && Number(source) > MATHJAX_LIMITS.maxArrayColumns / 2) {
+      throw new MathJaxFailure('limit', 'AMS alignment column limit exceeded')
+    }
+  } finally {
+    parser.i = start
+  }
+}
+
+function boundedAlignAt(parser: TexParser, begin: StackItem, numbered: boolean, taggable: boolean) {
+  checkAlignmentCount(parser, begin, !taggable)
+  return AmsMethods.AlignAt(parser, begin, numbered, taggable)
+}
+
+function boundedXalignAt(parser: TexParser, begin: StackItem, numbered: boolean, padded: boolean) {
+  checkAlignmentCount(parser, begin, false)
+  return AmsMethods.XalignAt(parser, begin, numbered, padded)
+}
+
+// EnvironmentMap invokes these with a string environment name / begin StackItem;
+// the upstream generic ParseMethod signature also covers unrelated token maps.
+new EnvironmentMap('stz-bounded-ams', ParseMethods.environment as ParseMethod, {
+  alignat: [boundedAlignAt as ParseMethod, null, true, true],
+  'alignat*': [boundedAlignAt as ParseMethod, null, false, true],
+  alignedat: [boundedAlignAt as ParseMethod, null, false, false],
+  xalignat: [boundedXalignAt as ParseMethod, null, true, true],
+  'xalignat*': [boundedXalignAt as ParseMethod, null, false, true],
+  xxalignat: [boundedXalignAt as ParseMethod, null, false, false],
+})
+
 /** A fresh whole-label input/document/output state; only code and fonts are reused. */
 export function createMathJaxEngine(options: Readonly<{
   /** Deterministic resource-failure fixtures; production uses only local imports. */
@@ -99,6 +170,8 @@ async function convert(
     maxTemplateSubtitutions: MATHJAX_LIMITS.maxTemplateSubstitutions,
     formatError: errors.formatError,
   })
+  tex.parseOptions.columnParser = new BoundedColumnParser()
+  tex.parseOptions.handlers.add({ environment: ['stz-bounded-ams'] }, {}, 0)
   const output = new SVG<LiteElement, LiteText, LiteDocument>({
     fontCache: 'none',
     fontData,

@@ -3,8 +3,10 @@
 The independent adapter is implemented in `src/rendering/labels/`. It is not
 connected to the production canvas, picking, React lifecycle, or SVG export.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
-remains authoritative. Completion requires the real-engine and built-browser
-checks below; see the current verification status at the end of this document.
+remains authoritative. The adapter implementation is complete, with real-engine
+tests and the production build verified. Browser deployment acceptance remains
+unverified because the current sandbox cannot bind the smoke-test server; see
+the verification status below.
 
 ## Dependencies and local assets
 
@@ -84,7 +86,7 @@ does not add a paragraph break or page margins. Fractions, radicals, indices,
 integrals, and AMS matrices are intended fixtures. Physical newlines inside a
 formula remain part of that single conversion.
 
-Definitions, user macro/environment changes, tags, references, counters,
+Definitions, user macro/environment/array-column changes, tags, references, counters,
 document/preamble commands, `require`, autoload, URL/HTML commands, external
 resources, and custom color definitions are rejected. Unknown commands fail
 through TeX. `noerrors` and `noundefined` are absent. `\color` and `\textcolor`
@@ -104,6 +106,13 @@ resolved Promise alone cannot establish success. See the official
 
 MathJax 4.1.3 exposes the expansion option with the spelling
 `maxTemplateSubtitutions`; the adapter uses that version-specific spelling.
+Its `TexError` values are plain objects, so work-limit failures are classified
+by the installed version's error IDs, independently of syntax-error wording.
+A per-conversion bounded column parser checks `*{N}{...}` array repetition
+before MathJax allocates the expanded template. Per-parser AMS environment
+handlers bound `alignat`/`alignedat` and related alignment counts before their
+synchronous loops, while retaining ordinary small alignments. `\newcolumntype` and
+`\mmlToken` are outside the supported language.
 Its font subclass loads only approved local modules and performs setup on each
 isolated font instance. It avoids MathJax's shared sticky failure flag, allowing
 a rejected font request to be retried without contaminating another label.
@@ -143,6 +152,9 @@ attributes before class/data attributes are removed. `currentColor` becomes a
 typed foreground token; the final paint helper replaces it with an explicit
 approved color and preserves internal formula colors. No page stylesheet is
 needed. See [MathJax SVG options](https://docs.mathjax.org/en/latest/options/output/svg.html).
+Glyph stroke thickening applies only to glyph paths, as in the installed
+MathJax stylesheet. Inner geometry uses numeric user units or px; child em/ex
+lengths are rejected to prevent dependence on the embedding page's font.
 
 ## Work, cache, timeout, and retry limits
 
@@ -151,6 +163,8 @@ needed. See [MathJax SVG options](https://docs.mathjax.org/en/latest/options/out
 | Original source / parsed runs | Phase 31A: 16,384 UTF-16 code units / 256 runs |
 | Macro expansions / template substitutions | 1,000 each |
 | TeX buffer / brace nesting | 16,384 code units / 128 levels |
+| Array repetition / column-parser steps / expanded template | 256 repeats / 256 steps / 16,384 code units, checked before repetition allocation |
+| AMS alignment pairs (`alignat` family) | 128 pairs, checked before count expansion |
 | Intermediate MathML nodes | 12,000 per whole label |
 | Engine snapshot nodes / paths / depth | 10,000 / 5,000 per whole label / 128 levels |
 | Validated SVG nodes / paths / depth | 10,000 / 5,000 / 128 per formula |
@@ -169,7 +183,7 @@ Their combined bound is 128 entries / 4 MiB. Oversize results are returned but
 not cached. Cache values contain frozen data, never engine or DOM objects.
 
 Geometry keys contain exact source and complete engine/version/configuration
-identity. Layout keys also contain all font and spacing inputs. Concurrent
+identity (currently `stz-label-v3`). Layout keys also contain all font and spacing inputs. Concurrent
 identical requests coalesce, including geometry shared across different font
 layouts. Position, camera, pan/zoom, selection, opacity, and foreground color are
 not conversion inputs. A new font generation recomposes layout using cached
@@ -215,17 +229,38 @@ font data after the initial formula. It also checks exact-source failure and
 renders standalone colored SVG without a page stylesheet. Zero extra font-data
 requests fail the probe rather than being reported as asset coverage.
 
-Current environment limitation: package installation is blocked by
-`getaddrinfo ENOTFOUND registry.npmjs.org`. The pinned package lockfile update,
-real-engine verification, and complete build therefore remain unverified.
-Headless Chrome also aborts with SIGABRT/EPERM in the current sandbox. Browser
-verification is unavailable, not passed. `npm test` and `npm run build` stop in
-their preparation hooks because the package is missing. Running the test list
-without preparation (`npm --ignore-scripts test`) executes 2,217 tests: 2,207
-pass and the 10 real-engine tests fail due to missing dependencies. This includes
-51 passing new independent metrics, SVG, service/lifecycle, and error-hook tests.
-Changed-file ESLint, both verification-script syntax checks, and `git diff --check`
-pass. The built-asset script cannot start without the new build manifest.
-The pre-change repository lint baseline is
-79 errors and 7 warnings across 24 files; unrelated lint debt is not changed.
-Phase 31B must not be marked complete until the outstanding verification is run.
+Verification was repeated on 2026-09-20 using Node v26.9.0 via the required
+Homebrew PATH. Both pinned 4.1.3 packages are installed and agree with the
+lockfile. `npm test` passes all 2,223 tests and `npm run build` passes, including
+the actual-engine adapter fixtures. The build reports large-chunk warnings;
+the adapter remains a lazy, separate entry. All 67 focused adapter tests,
+changed-production-file ESLint, both verification-script syntax checks, and
+`git diff --check` pass.
+
+The built-asset browser smoke was attempted with the cached Playwright and
+installed Google Chrome:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-label-smoke \
+node scripts/checkLabelAssets.mjs
+```
+
+It stops at the test server's localhost bind with `listen EPERM: operation not
+permitted 127.0.0.1`. Browser base-path loading, additional font network requests,
+and standalone SVG raster verification are **unavailable, not passed**. Run the
+same smoke script in an environment that permits a local server and browser
+before treating deployment acceptance as complete.
+
+A supplementary static check reads `dist/.vite/manifest.json`, verifies every
+entry file and import/dynamic-import reference, compares its dynamic-font
+entries with the installed package's `mjs/svg/dynamic/*.js`, and checks the
+entry HTML's asset base. All 46 manifest entries and all 40 dynamic font-data
+modules are present; entry URLs use `/stratified-tikz/`, and upstream license
+files are preserved. This check does not substitute for browser verification.
+
+The recorded pre-change repository lint baseline is 79 errors and 7 warnings
+across 24 files. Repository-wide lint was not rerun because that baseline is
+not clean; unrelated lint debt is unchanged.

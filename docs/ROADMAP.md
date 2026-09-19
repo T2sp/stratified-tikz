@@ -1088,8 +1088,9 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: in progress. Phase 31A is complete. Phase 31B has an independent adapter
-implementation pending dependency/build/browser verification; 31C through 31F
+Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
+implementation and real-engine/build verification are complete; its browser
+deployment check remains unavailable in the current sandbox. 31C through 31F
 remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
@@ -1140,19 +1141,22 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: implemented pending real-engine, lockfile, build, and browser verification.
-The production canvas is unchanged. See [adapter interfaces, limits, assets, and
-verification status](./LABEL_ADAPTER.md).
+Status: adapter implementation complete; real-engine tests, pinned dependencies,
+and build verified. Browser deployment acceptance remains unverified because
+the sandbox rejects the smoke-test server's localhost bind. The production
+canvas is unchanged. See [adapter interfaces, limits, assets, and verification
+status](./LABEL_ADAPTER.md).
 
-- Add the justified, pinned MathJax dependency and locally served resources
+- Added the justified, pinned MathJax dependency and locally served resources
   compatible with the application's Vite base path.
-- Convert complete labels into immutable SVG/text results with finite normalized
+- Converts complete labels into immutable SVG/text results with finite normalized
   metrics, or exact-source fallback. Detect error output even when conversion
   resolves successfully; an undefined command is a failure.
-- Isolate per-label engine state, constrain generated SVG, and keep glyph
-  geometry self-contained. Bound work, requests, and cache storage, with a
+- Isolates per-label engine state, constrains generated SVG, and keeps glyph
+  geometry self-contained. Bounds work, requests, and cache storage, with a
   recovery policy for transient resource failures.
-- Test the real adapter and deployment assets before connecting the canvas.
+- Real adapter tests pass. The built manifest includes every dynamic font-data
+  module; the browser deployment check must still run before canvas integration.
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 

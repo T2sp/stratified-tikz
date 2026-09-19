@@ -98,3 +98,24 @@ test('sync and asynchronous unexpected failures and invalid output shapes settle
     assert.equal((await service.convert('$y$', settings)).kind, 'success')
   }
 })
+
+test('MathJax plain TexError limit IDs differ from similarly worded ordinary syntax errors', async () => {
+  for (const [id, expected] of [
+    ['MaxBufferSize', 'limit'], ['MaxMacroSub1', 'limit'], ['MaxMacroSub2', 'limit'],
+    ['MaxTemplateSubs', 'limit'], ['MaxColumns', 'limit'], ['TooManyAligns', 'tex-error'],
+  ]) {
+    const service = createLabelService({ measurement, loadEngine: async () => ({
+      identity: MATHJAX_IDENTITY,
+      convert: async () => {
+        const capture = createMathJaxErrorCapture()
+        // Installed MathJax TexError deliberately does not extend Error.
+        capture.formatError(undefined, { id, message: 'Too many alignment characters' })
+        return []
+      },
+    }) })
+    const source = ' \t$x$\n '
+    const result = await service.convert(source, settings)
+    assert.equal(result.kind === 'fallback' && result.reason, expected, id)
+    assert.equal(result.source, source)
+  }
+})

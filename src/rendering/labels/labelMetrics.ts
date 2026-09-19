@@ -224,7 +224,8 @@ export function composeLabelLayout(
   const minY = -lines[0].ascent
   const last = lines[lines.length - 1]
   const maxY = last.baseline + last.descent
-  if (![minX, maxX, minY, maxY].every((value) => Number.isFinite(value) && Math.abs(value) <= MAX_LABEL_METRIC_EM)) {
+  if (![minX, maxX, minY, maxY].every((value) => Number.isFinite(value) && Math.abs(value) <= MAX_LABEL_METRIC_EM)
+    || maxX - minX > MAX_LABEL_METRIC_EM || maxY - minY > MAX_LABEL_METRIC_EM) {
     throw new LabelMetricsError('work-limit', 'Label bounds exceed metric limit')
   }
   return Object.freeze({

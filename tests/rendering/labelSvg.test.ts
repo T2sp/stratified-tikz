@@ -62,7 +62,7 @@ test('merror markers fail before their data attributes or classes can disappear'
 
 test('glyphs, frames, dashed and dotted lines retain their MathJax stylesheet paint', () => {
   const result = validateMathSvg(svg([
-    element(),
+    element('path', { d: 'M0 0L200 300Z', 'data-c': '41' }),
     element('rect', { x: '0', y: '0', width: '10', height: '20', 'data-frame': 'true', class: 'mjx-dashed' }),
     element('line', { x1: '0', x2: '10', y1: '0', y2: '20', 'data-line': 'true', class: 'mjx-dotted' }),
   ], { style: 'vertical-align: -0.6ex;' }))
@@ -75,6 +75,33 @@ test('glyphs, frames, dashed and dotted lines retain their MathJax stylesheet pa
   assert.match(markup, /stroke-linecap="round"/)
   assert.match(markup, /fill="#123456"/)
   assert.doesNotMatch(markup, /currentColor|class=|data-|style=|href|\bid=/)
+})
+
+test('glyph stroke thickening does not change non-glyph paths or explicit stroke widths', () => {
+  const result = validateMathSvg(svg([
+    element('g', { 'stroke-width': '0' }, [
+      element('path', { d: 'M0 0L20 30Z', 'data-c': '41' }),
+      element('path', { d: 'M0 0L20 30Z' }),
+      element('path', { d: 'M0 0L20 30Z', 'data-c': '42', 'stroke-width': '5' }),
+    ]),
+  ]))
+  const group = result.svg.children[0]
+  assert.ok(typeof group === 'object')
+  const widths = group.children.map((child) => typeof child === 'object' && child.attributes['stroke-width'])
+  assert.deepEqual(widths, ['3', undefined, '5'])
+  assert.doesNotMatch(serializeMathSvg(result), /class=|data-/)
+})
+
+test('only outer dimensions can use font-relative units; child geometry cannot depend on page fonts', () => {
+  const result = validateMathSvg(svg([
+    element('rect', { x: '2px', y: '3', width: '40px', height: '50', 'stroke-width': '3px' }),
+  ], { width: '3ex', height: '1.2em' }))
+  assert.equal(result.svg.attributes.width, '1.5em')
+  assert.equal(result.svg.attributes.height, '1.2em')
+  for (const attributes of [
+    { x: '1em' }, { y: '2ex' }, { width: '1em' }, { height: '2ex' },
+    { 'stroke-width': '1em' }, { style: 'stroke-width: 1ex;' },
+  ]) fails(svg([element('rect', attributes)]), 'output')
 })
 
 test('foreground painting preserves formula colors and cannot mutate reusable geometry', () => {

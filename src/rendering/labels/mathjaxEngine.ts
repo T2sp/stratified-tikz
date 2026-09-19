@@ -39,11 +39,17 @@ export async function loadMathJaxEngine(): Promise<MathLabelEngine> {
 
 export { MATHJAX_IDENTITY }
 
+// MathJax 4.1.3's TexError is a plain object, not an Error subclass. Match its
+// pinned implementation IDs rather than mistaking syntax-error wording
+// such as "Too many alignment characters" for a bounded-work failure.
+const workLimitIds = new Set(['MaxBufferSize', 'MaxMacroSub1', 'MaxMacroSub2', 'MaxTemplateSubs', 'MaxColumns'])
+
 /** The same request-scoped hooks are usable by deterministic failure fixtures. */
 export function createMathJaxErrorCapture() {
   let failure: MathJaxFailure | undefined
   const capture = (reason: 'tex-error' | 'output-error', error: unknown): never => {
-    const isLimit = error instanceof Error && /maximum|buffer|substitution|expansion|too many/i.test(error.message)
+    const isLimit = typeof error === 'object' && error !== null && 'id' in error &&
+      typeof error.id === 'string' && workLimitIds.has(error.id)
     failure = error instanceof MathJaxFailure
       ? error : new MathJaxFailure(isLimit ? 'limit' : reason, `MathJax ${reason}`, { cause: error })
     throw failure
@@ -62,6 +68,7 @@ const unsupportedCommands = new Set([
   'providecommand', 'newenvironment', 'renewenvironment', 'newif', 'csname',
   'endcsname', 'catcode', 'require', 'autoload', 'href', 'url', 'htmlClass',
   'htmlId', 'htmlStyle', 'htmlData', 'class', 'style', 'cssId', 'unicode',
+  'mmlToken', 'newcolumntype',
   'label', 'ref', 'eqref', 'tag', 'notag', 'nonumber', 'definecolor',
   'documentclass', 'usepackage', 'include', 'input', 'write', 'read', 'openout',
   'special', 'includegraphics', 'hsize', 'vsize', 'setcounter', 'newcounter',

@@ -88,9 +88,13 @@ function numberList(value: string): number[] {
   return values.map(finiteNumber)
 }
 
-function length(value: string): number {
+function length(value: string, allowFontUnits = false): number {
   const match = LENGTH_PATTERN.exec(value)
   if (!match) fail('Invalid SVG length')
+  // Inner geometry is expressed in MathJax user units (px is equivalent there).
+  // Leaving em/ex on a child would make its shape depend on an embedding page's
+  // font instead of the validated viewBox and reusable em metrics.
+  if (!allowFontUnits && (match[2] === 'em' || match[2] === 'ex')) fail('Font-relative SVG geometry')
   return finiteNumber(match[1])
 }
 
@@ -193,7 +197,7 @@ function styleAttributes(style: string, root: boolean): Record<string, string> {
     const property = declaration.slice(0, colon).trim()
     const value = declaration.slice(colon + 1).trim()
     if (root && property === 'vertical-align') {
-      length(value)
+      length(value, true)
     } else if (property === 'color' || property === 'fill' || property === 'stroke'
       || property === 'stroke-width') {
       values[property] = value
@@ -253,7 +257,8 @@ export function validateMathSvg(
       } else if (PAINT_ATTRIBUTES.has(name)) {
         if (name !== 'color') output[name] = paint(value, currentColor)
       } else if (NUMERIC_ATTRIBUTES.has(name)) {
-        const number = name.includes('opacity') ? finiteNumber(value) : length(value)
+        const number = name.includes('opacity') ? finiteNumber(value)
+          : length(value, depth === 0 && (name === 'width' || name === 'height'))
         if (['width', 'height', 'rx', 'ry', 'stroke-width'].includes(name) && number < 0) fail('Negative SVG size')
         if (name.includes('opacity') && (number < 0 || number > 1)) fail('Invalid SVG opacity')
         output[name] = value
@@ -300,8 +305,9 @@ export function validateMathSvg(
       output['stroke-width'] = '70'
       output.fill = 'none'
     }
-    // MathJax 4 SVG blacker=3 is normally supplied by a page stylesheet.
-    if (node.tag === 'path' && !('stroke-width' in output)) output['stroke-width'] = '3'
+    // MathJax 4's blacker=3 stylesheet targets glyph paths only. Paths used
+    // for rules/enclosures must keep their inherited or explicit stroke width.
+    if (node.tag === 'path' && 'data-c' in attrs && !('stroke-width' in output)) output['stroke-width'] = '3'
     if (depth === 0) {
       output.xmlns = 'http://www.w3.org/2000/svg'
       output.fill ??= currentColor
