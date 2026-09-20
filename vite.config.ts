@@ -45,8 +45,8 @@ export default defineConfig({
   build: {
     manifest: true,
     rollupOptions: {
-      // Build the inactive Phase 31B adapter and its local font asset graph.
-      // The editor entry does not import or initialize it until Phase 31C.
+      // Keep the independently testable adapter entry alongside the editor.
+      // Free-label rendering uses it; MathJax still loads lazily in its worker.
       input: {
         app: resolve(import.meta.dirname, 'index.html'),
         labelAdapter: resolve(import.meta.dirname, 'src/rendering/labels/labelService.ts'),

@@ -35,7 +35,8 @@ import {
   shouldRenderStratumInSvgPreview,
   shouldRenderTextLabelInSvgPreview,
 } from './svgPreviewPolicy.ts'
-import { svgLabelAnchorPlacement } from './svgStyle.ts'
+import { currentSvgLabelBounds, type SvgFreeLabelBoundsSnapshot } from './svgLabelBounds.ts'
+import { literalSvgLabelLayout, normalizeSvgLabelFontSize, placeSvgLabel, svgLabelLayoutSettings } from './labels/svgLabelLayout.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
 import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
 import { getPointNodeTextLayout, svgPointNodeTexPointScale } from './svgPointNodeText.ts'
@@ -89,6 +90,8 @@ export type CollectSvgPreviewSelectionCandidatesOptions = {
   point: Vec2
   layerFilter?: LayerFilter
   visibility?: SvgSelectionCandidateVisibility
+  /** Local bounds from the currently committed label renderer revision. */
+  labelBounds?: SvgFreeLabelBoundsSnapshot
   showCoordinateAnchors?: boolean
   pathIntersectionCandidates?: readonly PathIntersectionCandidate[]
   tolerance?: number
@@ -221,6 +224,7 @@ export function collectSvgPreviewSelectionCandidates(
     point,
     layerFilter = allLayersFilter,
     visibility,
+    labelBounds,
     showCoordinateAnchors = true,
     pathIntersectionCandidates,
     tolerance = defaultHitTolerance,
@@ -263,6 +267,7 @@ export function collectSvgPreviewSelectionCandidates(
       layerFilter,
       visibility,
       tolerance,
+      labelBounds,
     )
   }
 
@@ -690,6 +695,7 @@ function collectLabelCandidates(
   layerFilter: LayerFilter,
   visibility: SvgSelectionCandidateVisibility | undefined,
   tolerance: number,
+  labelBounds: SvgFreeLabelBoundsSnapshot | undefined,
 ): void {
   for (const label of diagram.labels) {
     if (!canCollectMoreCandidates(budget)) {
@@ -712,6 +718,7 @@ function collectLabelCandidates(
       viewportHeight,
       point,
       tolerance,
+      labelBounds,
     )
 
     if (budget.projectionBudgetExhausted) {
@@ -1442,6 +1449,7 @@ function labelHitDistance(
   viewportHeight: number,
   point: Vec2,
   tolerance: number,
+  labelBounds: SvgFreeLabelBoundsSnapshot | undefined,
 ): number | null {
   const anchor = projectModelPointWithBudget(
     budget,
@@ -1458,18 +1466,20 @@ function labelHitDistance(
     return null
   }
 
-  const fontSize = label.style.fontSize * 1.35
-  const placement = svgLabelAnchorPlacement(label.style.anchor, fontSize)
-  const textCenter = {
-    x: anchor.x + placement.dx,
-    y: anchor.y + placement.dy,
-  }
-  const width = Math.max(label.text.length * fontSize * 0.58, fontSize * 0.75)
-  const height = fontSize
-  const horizontalRadius = width / 2 + labelHorizontalPadding
-  const verticalRadius = height / 2 + labelVerticalPadding
-  const dx = Math.max(Math.abs(point.x - textCenter.x) - horizontalRadius, 0)
-  const dy = Math.max(Math.abs(point.y - textCenter.y) - verticalRadius, 0)
+  const fontSize = normalizeSvgLabelFontSize(label.style.fontSize * 1.35)
+  // Non-browser callers may request literal geometry without a renderer. The
+  // production canvas always supplies its committed, revision-matched snapshot.
+  const bounds = labelBounds === undefined
+    ? placeSvgLabel(literalSvgLabelLayout(label.text, svgLabelLayoutSettings(fontSize)).layout,
+      fontSize, label.style.anchor).bounds
+    : currentSvgLabelBounds(label, labelBounds)
+  if (bounds === null || label.text.length === 0) return null
+  const localX = point.x - anchor.x
+  const localY = point.y - anchor.y
+  const dx = Math.max(bounds.minX - labelHorizontalPadding - localX,
+    localX - bounds.maxX - labelHorizontalPadding, 0)
+  const dy = Math.max(bounds.minY - labelVerticalPadding - localY,
+    localY - bounds.maxY - labelVerticalPadding, 0)
   const distance = Math.hypot(dx, dy)
 
   return distance <= tolerance ? distance : null

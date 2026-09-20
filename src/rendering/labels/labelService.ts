@@ -84,6 +84,10 @@ class BoundedCache<T> {
     this.entries.set(key, entry)
     return entry.value
   }
+  /** Pure lookup for render-time exact-revision cache inspection. */
+  peek(key: string): T | undefined {
+    return this.entries.get(key)?.value
+  }
   set(key: string, value: T): void {
     const bytes = 2 * (key.length + JSON.stringify(value).length)
     if (bytes > this.maxBytes || this.maxEntries === 0) return
@@ -318,6 +322,16 @@ export function createLabelService(options: LabelServiceOptions) {
 
   return Object.freeze({
     convert,
+    /** Does not start conversion, measure text, or change LRU/cache state. */
+    peek: (source: string, settings: LabelLayoutSettings): LabelConversionResult | undefined =>
+      resultCache.peek(JSON.stringify([configurationIdentity, options.measurement.identity, source, {
+        font: {
+          family: settings.font.family, sizePx: settings.font.sizePx,
+          weight: settings.font.weight, style: settings.font.style,
+          fontReadinessGeneration: settings.font.fontReadinessGeneration,
+        },
+        tabSize: settings.tabSize, lineGapEm: settings.lineGapEm,
+      }])),
     /** Explicit resource retry or document/config lifecycle reset; no automatic render loop. */
     invalidate: () => { retryAfter = 0; fontRetryAfter = 0; retire(current, 'resource-error') },
     get generation() { return current.number },

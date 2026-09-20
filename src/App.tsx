@@ -847,6 +847,8 @@ function App() {
     useState<SvgPreviewBackgroundMode>(defaultSvgPreviewBackgroundMode)
   const [svgPreviewExportStatus, setSvgPreviewExportStatus] =
     useState<string>('')
+  // Runtime document ownership, deliberately outside Diagram and undo history.
+  const [labelDocumentRevision, setLabelDocumentRevision] = useState(0)
   const [showCoordinateAnchors, setShowCoordinateAnchors] =
     useState<boolean>(true)
   const [tikzExportMode, setTikzExportMode] =
@@ -1440,6 +1442,7 @@ function App() {
   function selectExample(exampleId: ExampleId): void {
     const nextExample = getExampleOption(exampleId)
     const nextDiagram = cloneDiagram(nextExample.diagram)
+    setLabelDocumentRevision((revision) => revision + 1)
 
     setSelectedExampleId(exampleId)
     if (effectiveExampleBarState === 'compact') {
@@ -1905,6 +1908,7 @@ function App() {
     diagram: Diagram,
     warnings: readonly string[],
   ): void {
+    setLabelDocumentRevision((revision) => revision + 1)
     setPendingSymbolicImport(null)
     setSymbolicImportDrafts([])
     setSymbolicImportStatus('')
@@ -8698,6 +8702,7 @@ function App() {
               {renderLayerManagerOverlay()}
               <SvgDiagram
                 diagram={editableDiagram}
+                labelDocumentRevision={labelDocumentRevision}
                 fitToView
                 cameraOverride={previewCameraOverride}
                 cameraViewAdjustment={previewCameraAdjustment}

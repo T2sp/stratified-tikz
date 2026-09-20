@@ -60,9 +60,9 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 ## Label Preview Input Contract (Phase 31A)
 
-Phase 31A defines the pure parser and fallback contract for future typeset label
-preview. It does not connect the parser to production rendering or change the
-appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPTER.md)
+Phase 31A defines the pure parser and fallback contract. Phase 31C connects free
+labels to the production SVG Preview through the shared `SvgTexLabel` renderer.
+The [Phase 31B adapter](./LABEL_ADAPTER.md)
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
 advance. Native-module recovery now retires the complete lazy MathJax Worker
@@ -77,8 +77,9 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Canvas integration and typeset SVG export remain planned in
-[Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Path inline-node integration, waiting for settled labels during SVG export, and
+the combined audit remain assigned to
+[Phases 31D–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -128,7 +129,7 @@ The TeX body is retained exactly, excluding only its outer delimiters. Unknown
 math commands such as `$\unknowncommand{x}$` are parsed as math and left for
 the adapter to validate; the parser neither evaluates nor expands macros.
 Physical newlines inside math stay in the same run, including in matrices.
-Ordinary text newlines will separate visual lines in the future renderer;
+Ordinary text newlines separate visual lines in the free-label renderer;
 CRLF may be treated as one visual break without rewriting the original source.
 
 ### Results, Bounds, and Exact-Source Fallback
@@ -152,17 +153,78 @@ successful text run displaying `Cost $5`, but `Cost \$5 $x` falls back to the
 entire original source, retaining the backslash and unmatched dollar. Leading,
 trailing, and repeated spaces, tabs, LF, and CRLF remain exact in `source`.
 
-The future renderer must also use the latest complete original input for
+The free-label renderer also uses the latest complete original input for
 pending conversions, undefined math commands, TeX/output errors, resource
 failures, and bounded-work failures. Literal fallback displays every physical
 source newline as a visual break (CRLF may be one break) and inserts source as
-text, never HTML. It must not show an error SVG, substitute a message, retain a
-previous formula, or partly typeset a failed label. Failure in one label must
-not suppress other labels or diagram geometry. Successful output will combine
+text, never HTML. It never shows an error SVG, substitutes a message, retains a
+previous formula, or partly typesets a failed label. Failure in one label does
+not suppress other labels or diagram geometry. Successful output combines
 self-contained SVG math geometry with ordinary SVG text, without
 `foreignObject` or rasterized formulas. MathJax is not a full LaTeX engine:
 arbitrary packages, document preambles, and external style-file macros are
 outside this bounded preview language.
+
+### Free-label rendering and editing (Phase 31C)
+
+Valid free-label math, including fractions and mixed Japanese text/math, uses
+self-contained SVG geometry alongside ordinary SVG text. Pending and failed
+labels show their complete current source. Leading, trailing, and repeated
+spaces remain visible; tabs advance to four-space tab stops from the line start.
+LF, CR, and CRLF make physical lines in ordinary text and literal fallback;
+newlines inside successful math stay inside that formula. The original string
+also remains available as the label's accessible description. Empty labels
+have no visible or selectable text geometry.
+
+The text font is explicitly the Preview's sans-serif font stack and is measured
+after browser font readiness. The existing `style.fontSize * 1.35` scale remains.
+All nine anchors align the overall measured rectangle, including tall math,
+descenders, and multiple lines. Drawing and overlap picking use the same
+committed local bounds, projected at the current model position. Ordinary click,
+Alt/Option-click cycling, layer locking/filtering, autoHide/autoDim, selected
+position markers, and work-plane-based drag handles keep their existing roles.
+
+Each Preview owns a derived label runtime. Source/font request identities and
+component subscription generations reject obsolete completions. Document
+replacement starts a new label ownership revision even when imported IDs are
+reused. Camera changes, movement, selection, color, and opacity reuse conversion
+results; font changes remeasure text while retaining valid math geometry.
+Measurement failure uses a finite literal layout. Runtime results and bounds
+never enter JSON, Undo/Redo, or either TikZ output; the Inspector continues to
+edit the raw source.
+
+For pathological inputs, the display font is capped at 4096 SVG units and
+unavailable text metrics use bounded emergency spacing. The complete source
+and saved style remain unchanged.
+
+Only free labels use this integration in 31C. Path inline nodes remain for 31D;
+coordinate names, axis captions, handles, saved path identifiers, and attached
+stratum metadata are unchanged.
+
+### Free-label verification
+
+`npm test` explicitly includes the layout, lifecycle, and picking tests. The
+browser check uses the production `SvgDiagram`, real MathJax, controlled request
+completion, and the existing selection/drag/export handlers. It uses the same
+external Playwright/Chrome arrangement as the adapter check; no dependency was
+added. Its development fixture is not an application build entry.
+
+```bash
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31c-browser-acceptance \
+npm run check:free-labels
+```
+
+Use a fresh artifact directory for each acceptance attempt. Optionally set
+`STZ_BROWSER_BASE_URL=http://127.0.0.1:5173` to use an existing development server.
+Current session: Node v26.9.0; 2,281 tests, build, focused lint, and diff check
+passed. Browser acceptance remains pending: localhost listen was denied with
+`EPERM`, Chrome launch aborted, and Computer Use reported Chrome access was not
+approved. These failures occurred before the browser assertions; they are not
+browser verification evidence. Phase 31C must not be marked acceptance-complete
+until the real-browser check passes.
 
 ## Export SVG
 
@@ -177,6 +239,12 @@ exported viewBox behind the diagram.
 Export includes the current SVG Preview view, including visible diagram
 geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
 preview-only data attributes are removed from the exported SVG.
+
+Export currently clones what is visible: settled free-label formulas remain SVG
+geometry, and pending/failed labels remain their current literal source.
+Transparent and white backgrounds are supported, and label hit rectangles and
+selected-position markers are excluded. Waiting for a consistent settled-label
+snapshot is deferred to Phase 31E.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently

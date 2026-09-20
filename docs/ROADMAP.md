@@ -1094,7 +1094,8 @@ The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
 code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
 Actual additional-font loading, same-service native-import recovery, Worker
 retirement, and standalone SVG containment are verified; earlier sandbox
-`EPERM` attempts are historical. 31C through 31F remain planned.
+`EPERM` attempts are historical. 31C is implemented with its production-browser
+acceptance check pending; 31D through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1178,14 +1179,26 @@ run. The production canvas is unchanged. See
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 
-Status: planned.
+Status: implemented; acceptance pending the actual production-browser check.
 
-- Integrate free labels with the shared renderer, current-source fallback,
-  revision-aware async state, and protection against stale completions.
-- Share measured layout between rendering and picking for all nine anchors,
-  preserving font scale, colors, opacity, layer rules, and 3D visibility.
-- Reuse conversion results during moves, pan/zoom, and camera changes. Verify
-  production selection and lifecycle behavior in a browser.
+- Free labels now use `SvgTexLabel` and a Preview-owned runtime with complete
+  current-source fallback, subscription generations, and document ownership
+  revisions. Derived state stays outside the model and Undo/Redo.
+- Measured text/math layout supplies all nine anchors and revision-matched
+  picking bounds. The existing font scale, explicit paint, layer/occlusion
+  rules, selection markers, and drag paths are preserved.
+- Conversion geometry is reused across duplicate labels and measurement
+  changes; placement, camera, selection, and paint are separate inputs.
+- Added 23 focused Node tests and an external-Playwright harness exercising the
+  production renderer and selection handlers (`npm run check:free-labels`).
+  Full tests (2,281), build, focused lint, and `git diff --check` passed. Existing
+  App/SvgDiagram lint debt is unchanged; repository-wide lint was not run.
+- Actual browser acceptance is **not passed**: this session's localhost bind
+  returned `EPERM`, Chrome launch aborted, and Computer Use denied Google Chrome
+  access. The harness is typechecked; its browser assertions remain unverified.
+  See [the execution command](./PREVIEW_UI.md#free-label-verification).
+- Inline-node integration (31D) and settled export preparation (31E) remain
+  deferred. Current SVG export continues to clone visible formulas/fallback.
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
