@@ -30,8 +30,8 @@ lint, asset-script syntax checks, and `git diff --check`.
 ## Latest review findings
 
 The latest Phase 31B review reported `needs_changes`: no Critical issues,
-exactly one Medium issue, and no Low-priority issues. It found **no confirmed
-adapter code defect**.
+exactly one Medium issue, and no Low-priority issues. **No new implementation
+defect was confirmed.** The review preserved the existing documentation edits.
 
 ### Medium M1: required browser acceptance remains unverified
 
@@ -46,7 +46,7 @@ The failure occurred at `listen(0, '127.0.0.1')` in
 `scripts/checkLabelAssets.mjs:120`, before Chrome launched. Actual base-path
 and additional-font requests, native-import failure/recovery, Worker retirement,
 and standalone SVG raster containment were not exercised. The review's
-[execution log](/private/tmp/stz-review31b-browser.log) records the static pass
+[browser-check log](/private/tmp/stz-31b-review-browser.log) records the static pass
 and subsequent bind failure; it contains no browser execution evidence.
 
 Repeating the same command under unchanged localhost restrictions cannot
@@ -70,18 +70,20 @@ The review used `PATH=/opt/homebrew/bin:$PATH` with Node `v26.9.0` and recorded:
 
 | Check | Previous review result |
 | --- | --- |
-| Full suite | 2,258 passed; no failures or skips |
-| Seven focused adapter files | 102 passed; no failures or skips; subset of the full suite |
-| Targeted ESLint | Passed |
-| Both asset-script syntax checks | Passed |
-| `git diff --check` | Passed |
-| Production build | Passed; non-failing large-chunk warnings |
-| Browser asset/retry/rendering smoke | Exit 1 before browser launch |
+| Full suite | Exit 0; 2,258 passed; no failures or skips |
+| Seven focused adapter files | Exit 0; 102 passed; included in the full-suite total |
+| Targeted ESLint across 21 implementation/configuration/test/script files | Exit 0 |
+| Both asset-script syntax checks | Exit 0 |
+| `git diff --check` | Exit 0 |
+| Production build | Exit 0; non-failing large-chunk warnings |
+| Browser asset/retry/rendering smoke | Exit 1; static assertions passed, browser launch blocked |
 
 Static deployment inspection verified 3 main manifest entries, 43 Worker
 chunks, 83 references, and all 40 additional-font modules. Referenced files
-exist, and the emitted Worker URL uses `/stratified-tikz/`. These are
-filesystem/build observations, not browser HTTP requests or raster results.
+exist; observed built paths include
+`/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js` and
+`/stratified-tikz/assets/fraktur-0I2mShNq.js`. These are filesystem/build
+observations, not browser HTTP requests or raster results.
 Resolve current hashed asset filenames from the fresh build's manifests;
 do not hard-code filenames from an earlier build.
 
@@ -94,11 +96,10 @@ separately for this attempt.
 
 Preserve the current implementation and regressions:
 
-- real public-adapter fraction/radical/index conversions return finite geometry
-  and immutable results;
+- real public-adapter fraction/radical conversions return finite metrics, with
+  substantive coverage for immutable geometry;
 - a valid run followed by an undefined command returns the exact complete
   source, including spaces, tabs, CRLF, and delimiters, without partial geometry;
-  a subsequent valid conversion succeeds;
 - conversion state and errors are isolated and scoped;
 - work, caches, and Worker lifetime are bounded; results are immutable,
   equivalent requests coalesce, and obsolete generations are retired;
@@ -111,8 +112,11 @@ Preserve the current implementation and regressions:
 - model, persistence, history, TikZ, production canvas integration, and export
   lifecycle remain unchanged.
 
-The unchanged `src/rendering/SvgDiagram.tsx` has pre-existing
-`react-hooks/refs` lint debt. Do not perform repository-wide lint cleanup.
+The review separately ran `npx eslint src/rendering/SvgDiagram.tsx`, which
+exited 1 for the pre-existing `react-hooks/refs` error at line 942. That file
+is unchanged since its earlier commit. Repository-wide lint was not run;
+do not confuse this baseline debt with the passing targeted check or perform
+repository-wide lint cleanup.
 
 ## Goal
 
@@ -202,13 +206,15 @@ Keep all existing smoke assertions active. Confirm the run establishes:
    parser-rejected labels do not eagerly load MathJax or font assets.
 2. The real production Worker executes. Runtime, shared dependencies, and
    additional font data load from the configured same-origin build graph.
-   Conversion introduces no external network dependency.
+   Keep the smoke's external-access blocking enabled: conversion must succeed
+   using local assets and must not attempt external requests. Preserve its
+   existing handling of the blocked pre-existing application analytics request.
 3. Fractions, radicals, matrices, multiline labels, and exact complete-source
    fallback work through the built public service.
 4. The native-cache capability probe actually fails a module request with
    HTTP 503, restores its exact URL, and measures whether the browser retains
    the failed import.
-5. Independent runtime, additional-font, and transitive-import scenarios
+5. Independent runtime, additional-font, and shared/transitive-import scenarios
    actually fail the intended cold module requests. They return bounded
    `resource-error` fallback with the exact mixed source, including CRLF,
    and no partial geometry.

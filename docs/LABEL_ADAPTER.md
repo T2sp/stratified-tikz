@@ -329,8 +329,8 @@ native import and remains complementary adapter-level coverage.
 
 ## Verification and current status
 
-The latest verification-only follow-up began on **2026-09-20 at 04:06 JST**, against
-checkout `ff37dfffad2b5973071a8bffca1b06df4105b234`, on macOS 26.6.2 (25G83),
+The latest verification-only follow-up began on **2026-09-20 at 20:44 JST**, against
+checkout `9762ccc0cb35c3e9374e91649e16e8f04db3b33b`, on macOS 26.6.2 (25G83),
 Darwin arm64. The shell was zsh with `PATH=/opt/homebrew/bin:$PATH`;
 `/opt/homebrew/bin/node` reported **v26.9.0**, npm **11.19.1**.
 The installed executable reported **Google Chrome 153.0.8010.52** using
@@ -344,25 +344,31 @@ fresh build regenerated ignored font imports, licenses, and `dist/` from this
 checkout. `environment.json` records tracked code/test/script input SHA-256
 hashes; `build-output-sha256.json` identifies the generated assets and build.
 
-Before repeating the previously blocked smoke, a minimal Node HTTP capability
-probe tested the same `listen(0, '127.0.0.1')` operation. It exited **1** with
-`listen EPERM: operation not permitted 127.0.0.1`. This session again prohibits
-escalation, and no permitted alternative execution environment was accessible.
-Accordingly, **`npm run check:label-assets` was not rerun** under the unchanged
-restriction. Its current exit status is **not available**, not 1, 2, or 0.
-The smoke and every assertion remain unchanged. No current runtime or harness
-defect was demonstrated; Phase 31B remains acceptance-incomplete.
+The active session's permissions and available browser paths were checked afresh.
+After a successful fresh build, **the existing smoke ran unchanged once**, at
+20:45 JST. Static asset assertions passed, then `listen(0, '127.0.0.1')` in
+`scripts/checkLabelAssets.mjs:120` was denied. The command exited **1** with
+`listen EPERM: operation not permitted 127.0.0.1`, before Chrome launched.
+This session prohibits escalation, and no permitted alternative execution
+environment was accessible. The blocked command was not repeated. The smoke
+and every assertion remain unchanged. No current runtime or harness defect was
+demonstrated; Phase 31B remains acceptance-incomplete.
 
-All current logs and supplemental static inspection are in the fresh directory
-`/private/tmp/stz-phase31b-verification-_sohhkx7/`. Its `browser/` subdirectory
-remains empty. `environment.json` records paths, permissions, and versions;
-`*-result.json` records executed argv, times, environment, log paths, and exits.
-`browser-status.json` records the unexecuted smoke and blocking prerequisite.
+All current logs and evidence are in the fresh directory
+`/private/tmp/stz-phase31b-acceptance-vxrg2k7p/`. Its `browser/` subdirectory
+contains only the smoke's **static** `asset-graph-evidence.json`.
+`environment.json` records permissions, versions, the clean initial revision,
+and tracked input hashes. `*-result.json` records exact commands, exits and log
+paths; the build, smoke and test records also include timestamps and environment.
+`browser.log` and `browser-result.json` record this attempt's actual smoke failure.
 The external `run-check.py` captures stdout/stderr and preserves child exits;
-it does not alter repository scripts. Full probe code/command and the exact error
-are in `localhost-capability-result.json` and `localhost-capability.log`.
+it does not alter repository scripts.
 
-Historical results remain separate. The prior verification-only attempt at
+Historical results remain separate. The 04:06 JST attempt at
+`ff37dfffad2b5973071a8bffca1b06df4105b234` used a minimal localhost capability
+probe, which exited 1 with the same `EPERM`; it did not rerun the smoke. Its
+logs and supplemental static inspection remain in
+`/private/tmp/stz-phase31b-verification-_sohhkx7/`. The earlier attempt at
 `138a4e1f621ec35cb9bad10c2192ff2a0c91fba6` ran the unchanged smoke and exited 1
 at bind before Chrome launched; its logs and smoke-generated static graph remain
 in `/private/tmp/stz-phase31b-browser-acceptance/`. The native-loading fix logs are in
@@ -387,6 +393,11 @@ PATH=/opt/homebrew/bin:$PATH node --test \
   tests/rendering/mathjaxLoader.test.ts
 PATH=/opt/homebrew/bin:$PATH npm test
 PATH=/opt/homebrew/bin:$PATH npm run build
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-acceptance-vxrg2k7p/browser \
+npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/labelSvg.ts \
   src/rendering/labels/labelMetrics.ts \
@@ -421,11 +432,10 @@ git diff --check
 | Full `npm test` | Exit 0; 2,258 passed, 0 failed, 0 skipped (`full.log`) |
 | Production build | Exit 0 (`build.log`); non-failing >500kB chunk warnings remain |
 | Targeted ESLint, all 21 listed production/config/test/script files | Exit 0 (`targeted-eslint.log`) |
-| Both script syntax checks | Exit 0 each (`prepare-syntax.log`, `smoke-syntax.log`) |
+| Both script syntax checks | Exit 0 each (`prepare-assets-syntax.log`, `check-assets-syntax.log`) |
 | `git diff --check` | Exit 0 (`diff-check.log`) |
-| Supplemental fresh-build static inspection | Exit 0 (`static-inspection.log` / `.json`); no browser assertions |
-| Localhost capability probe | Exit 1 (`localhost-capability.log`); `listen EPERM` |
-| Browser asset/retry/raster smoke | Not rerun: same confirmed bind restriction, escalation prohibited; no current browser exit or log |
+| Fresh-build static asset assertions in the unchanged smoke | Passed (`browser.log`, `browser/asset-graph-evidence.json`); no browser assertions |
+| Browser asset/retry/raster smoke | Exit 1 (`browser.log`); `listen EPERM` before browser launch; escalation prohibited |
 
 All seven focused files ran in one command: **102 is a non-overlapping total**.
 It is a subset of the full suite, not an additional 102 unique full-suite tests.
@@ -449,11 +459,11 @@ Nonempty/red/blue pixels remain paint checks only, not clipping evidence.
 
 ### Fresh static deployment inspection
 
-After the successful fresh build, supplemental filesystem inspection found
+After the successful fresh build, the unchanged smoke's static assertions found
 **3 main manifest entries,
 43 worker chunks, 83 references, and all 40 approved additional-font modules**.
 Every referenced file resolves. The graph is recorded in this attempt's
-`static-inspection.json`, including
+`browser/asset-graph-evidence.json`, including
 these target paths (static build identities, **not observed HTTP requests**):
 
 - Worker: `/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js`
@@ -463,15 +473,14 @@ these target paths (static build identities, **not observed HTTP requests**):
 Licenses and the configured `/stratified-tikz/` base are retained; there is no
 duplicate Window runtime graph.
 These names came from the current manifests; they are not hard-coded fixtures.
-This is supplemental deployment inspection, not a replacement smoke or observed
-browser network evidence. The same file records installed/locked/declared 4.1.3
-pins, the Worker URL in the built adapter, and the emitted license file. The
-inspection command was `python3 /private/tmp/stz-phase31b-verification-_sohhkx7/inspect-build.py`;
-its source, argv/status metadata, and build hashes are retained alongside it.
+These are filesystem/build observations, not browser network evidence. Supplemental
+`static-details.json` records installed/locked/declared 4.1.3 pins and the Worker
+URL found in the emitted adapter. `build-output-sha256.json` identifies this
+fresh build's files, generated font imports, and licenses.
 
 ### Browser prerequisite block and outstanding assertions
 
-The capability probe failed with exactly:
+The unchanged smoke failed at its localhost bind with exactly:
 
 ```text
 Error: listen EPERM: operation not permitted 127.0.0.1
@@ -480,7 +489,7 @@ Error: listen EPERM: operation not permitted 127.0.0.1
 The current session uses `workspace-write` sandboxing, restricted network access,
 and approval policy **`never`**; its execution instructions prohibit supplying
 `sandbox_permissions`. Supported escalation is therefore unavailable in this
-session. The probe's `listen(0, '127.0.0.1')` was denied; browser launch was never
+session. The smoke's `listen(0, '127.0.0.1')` was denied; browser launch was never
 attempted. This is an environment block, not an observed runtime defect. The
 blocked command was not repeated, and no alternate server or security bypass
 was used. No security or network assertion was weakened. Application
@@ -491,10 +500,10 @@ There are **no actual failed/restored module requests**, HTTP 503/200 recovery
 observations, same-service recovery, or Worker retirement events from this run.
 `native-retry-evidence.json`, `containment-evidence.json`, `label-standalone.svg`,
 `label-standalone.png`, and fixture SVG/PNG/reference PNG files are absent in the
-fresh directory. **`asset-graph-evidence.json` is also absent in this attempt**,
-because the smoke was not rerun. That file can be written before a smoke's bind
-failure, so the historical copy is only static evidence. Current supplemental
-inspection and execution logs/metadata are not browser evidence. Phase 31B remains
+fresh directory. **`browser/asset-graph-evidence.json` is present**, because the
+smoke writes it before binding; its contents establish static deployment only.
+Current supplemental inspection and execution logs/metadata are not browser
+evidence. Phase 31B remains
 **acceptance-incomplete**, and readiness to commit is not asserted from unit or
 static evidence alone.
 
@@ -518,7 +527,7 @@ the existing smoke unchanged unless an executed assertion demonstrates a defect.
 | --- | --- |
 | 0 / `passed` | All assertions completed, including same-service recovery on a browser observed to cache failed native imports. |
 | 2 / `functional-checks-passed-affected-browser-unverified` | Functional assertions completed, but this browser retries failed imports itself; the affected-browser gate remains open. Use an available supported affected browser to finish it. |
-| 1 | Inspect the actual error: earlier smoke attempts stopped at bind before launch; an assertion failure after browser execution requires separate diagnosis. The current capability probe's exit 1 is not a smoke result. |
+| 1 | Inspect the actual error: this attempt stopped at bind before launch; an assertion failure after browser execution requires separate diagnosis. |
 
 A browser version or an artifact's presence alone cannot establish those gates.
 
@@ -526,7 +535,7 @@ A browser version or an artifact's presence alone cannot establish those gates.
 
 Run in an authorized local session with permission to bind an ephemeral port on
 `127.0.0.1` and launch Chrome/Chromium through the existing external Playwright.
-The target is `ff37dfffad2b5973071a8bffca1b06df4105b234` plus the three pending
+The target is `9762ccc0cb35c3e9374e91649e16e8f04db3b33b` plus the three pending
 documentation changes listed above; production/build/test inputs are unchanged.
 Preserve any subsequent user work, record it with the new run, and rebuild there.
 Do not reuse this session's `dist/` as evidence for another checkout.

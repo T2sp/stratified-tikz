@@ -67,11 +67,11 @@ now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
 advance. Native-module recovery now retires the complete lazy MathJax Worker
 and its runtime/shared/font module map. Phase 31B acceptance remains incomplete:
-the latest 2026-09-20 follow-up at `ff37dff` confirmed the same localhost restriction
-with a capability probe (`listen EPERM: operation not permitted 127.0.0.1`, exit 1).
-Escalation is prohibited, so the unchanged smoke was not repeated; earlier smoke
-attempts also stopped before browser launch. The fresh build, supplemental static
-inspection, 102 focused tests, and 2,258 full-suite tests passed. Real-engine Node
+the latest 2026-09-20 follow-up at `9762ccc` ran the unchanged smoke against a
+fresh build. Its static assertions passed, then localhost binding failed
+(`listen EPERM: operation not permitted 127.0.0.1`, exit 1) before Chrome launched.
+Escalation is prohibited, so the blocked command was not repeated. The fresh build,
+102 focused tests, and 2,258 full-suite tests passed. Real-engine Node
 tests use the direct-module branch; browser Worker retry, deployment, and standalone
 raster assertions remain unverified. A permitted-environment handoff is recorded
 with the adapter's
