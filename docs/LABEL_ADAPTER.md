@@ -3,11 +3,12 @@
 The independent adapter is implemented in `src/rendering/labels/`. It is not
 connected to the production canvas, picking, React lifecycle, or SVG export.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
-remains authoritative. Phase 31B is **not yet acceptance-complete**. The targeted
+remains authoritative. Phase 31B is **acceptance-complete**. The targeted
 ink-bounds fix, disposable-worker recovery, and focused regressions are implemented.
-Actual native-import recovery, built-browser deployment, and standalone raster
-verification still require an environment that permits localhost and Chrome.
-See the actual verification status below.
+An authorized terminal run on 2026-09-20 at 22:55 JST completed the unchanged
+built-browser smoke with exit 0, including native-import recovery on an affected
+browser and standalone raster containment. See the evidence below; production
+canvas integration remains deferred to Phase 31C.
 
 ## Dependencies and local assets
 
@@ -264,9 +265,11 @@ The former Window runtime import and generated font imports reused fixed native
 module identities. On browsers caching failed module downloads, even a later
 successful network connection and `invalidate()` could not repair those entries.
 An earlier review identified this in the former loader by code inspection,
-**not a browser reproduction in this checkout**. The latest review found no
-confirmed defect in the current Worker adapter; its remaining Medium issue is
-the unverified browser acceptance gate. Chrome's official
+**not a browser reproduction of that former loader**. The subsequent review
+found no confirmed defect in the current Worker adapter. Its remaining Medium
+verification gap was closed by the authorized-terminal browser run recorded
+below, including observed native failure caching and same-service recovery.
+Chrome's official
 [155 beta notes](https://developer.chrome.com/blog/chrome-155-beta#avoid_caching_module_failures)
 describe the later native retry behavior change; upgrading Chrome is not the fix.
 
@@ -329,14 +332,91 @@ native import and remains complementary adapter-level coverage.
 
 ## Verification and current status
 
-The latest verification-only follow-up recorded its environment on **2026-09-20
-at 21:21:59 JST**, against checkout `3dac474a507822f0c1762fd2cc5b84469c557a81`,
+### Browser acceptance completed in an authorized terminal
+
+The user executed the handoff command below in a normal macOS terminal on
+**2026-09-20 at 22:55:57 JST**. The fresh build and unchanged
+`npm run check:label-assets` both exited **0**. The final smoke result is
+`passed`, not the partial-success exit 2.
+
+Evidence is saved in
+`/private/tmp/stz-phase31b-browser-acceptance.hKjXxy/`:
+
+- `environment.log` records macOS 26.6.2 (25G83), arm64, Node v26.9.0,
+  npm 11.19.1, and checkout `880cdde79dbdfe31b9f95f5f230b470469d5a640`;
+- `checkout.patch` captures only the three pre-existing documentation edits.
+  It was compared with `git diff --binary HEAD` before this evidence update and
+  matched exactly. The reviewed production, test, build, and smoke inputs are
+  unchanged;
+- `build.log`, `build.exit-status`, `browser.log`, and `browser.exit-status`
+  record the fresh build and actual browser execution. The build retains its
+  non-failing large-chunk warnings;
+- `asset-graph-evidence.json`, `native-retry-evidence.json`, and
+  `containment-evidence.json` contain the static, recovery, and rendering results;
+- `label-standalone.svg/.png` and the per-fixture SVG/PNG/reference PNG files
+  retain portable output and independent raster evidence.
+
+The actual launched browser was **Chrome 153.0.8010.52**. Its native-cache probe
+returned `cachesFailedNativeImports: true`: the initial HTTP 503 import failed,
+and importing the restored exact URL in the same realm failed again without a
+new request. `affectedBrowserRecoveryVerified: true` therefore establishes the
+previously outstanding affected-browser gate, rather than relying on a newer
+browser's automatic retry behavior.
+
+The smoke served `http://127.0.0.1:62143/stratified-tikz/`. It mounted the built
+app, retained lazy loading for plain labels, and observed these additional-font
+requests after ordinary math succeeded:
+
+- `/stratified-tikz/assets/double-struck-CaR4az1O.js`;
+- `/stratified-tikz/assets/fraktur-0I2mShNq.js`;
+- `/stratified-tikz/assets/calligraphic-B-Bp6LQs.js`.
+
+These are actual browser requests from this run. External access remained
+blocked; only the existing startup analytics request was observed and blocked,
+and conversion introduced no external requests. Static assertions also passed
+for 3 main entries, 43 Worker chunks, 83 references, and all 40 approved fonts.
+The ephemeral port and hashed filenames identify this build, not future fixtures.
+
+All three cold-module recovery scenarios passed through the built service's
+default production loader:
+
+| Failed module | Observed failed/restored request | Recovery |
+| --- | --- | --- |
+| Runtime: `mathjaxRuntime-BQPLTncu.js` | HTTP 503, then HTTP 200 at the same URL | Success after `invalidate()` in the same service and page |
+| Additional font: `calligraphic-B-Bp6LQs.js` | HTTP 503, then HTTP 200 at the same URL | Success after `invalidate()` in the same service and page |
+| Shared dependency: `svg-Cy2x9LIX.js` | HTTP 503, then HTTP 200 at the same URL | Success after `invalidate()` in the same service and page |
+
+Every first conversion returned exact complete-source `resource-error` fallback
+with tabs, spaces, delimiters, and CRLF preserved and no partial geometry. Every
+recovery recorded `sameService`, `samePage`, `coalesced`, and `reusedImmutable`
+as true, with no pending or unsettled tasks left. The abandoned Worker closed;
+a new production Worker loaded the same fixed graph. Subsequent valid math and
+plain-text requests succeeded. No page reload or browser-cache clearing was used.
+
+All **15** standalone math-run fixtures passed native geometry, composed label
+bounds, and enlarged-viewport raster checks, including overlapping/smashed ink
+and zero-advance placement. Every fixture had visible ink, `geometryInside: true`,
+`outsideInkPixels: 0`, and `lostInkPixels: 0`. The deliberately cropped glyph
+failed both independent oracles as intended: `geometryInside: false` and
+1,165 outside/lost ink pixels. Standalone paint also survived serialization
+(369 red and 2,337 blue pixels in its dedicated probe).
+
+This run closes the browser acceptance gap from the sandboxed attempts below.
+Their passing 144 focused tests, 2,258 full-suite tests, targeted lint, and script
+syntax checks apply to the same unchanged code. No production or harness fix
+was needed. Phase 31B is complete; Phases 31C–31F remain planned. The prior
+`EPERM` logs remain historical evidence and do not invalidate this completed run.
+
+### Earlier sandboxed verification (22:08 JST)
+
+The earlier verification-only follow-up recorded its environment on **2026-09-20
+at 22:08:47 JST**, against checkout `880cdde79dbdfe31b9f95f5f230b470469d5a640`,
 on macOS 26.6.2 (25G83), Darwin arm64.
 The shell was zsh with `PATH=/opt/homebrew/bin:$PATH`;
 `/opt/homebrew/bin/node` reported **v26.9.0**, npm **11.19.1**.
-The installed Chrome application's `Info.plist` reports **153.0.8010.52**;
-**no browser launched**, so there is no observed launched-browser
-version or native-cache capability result.
+The installed Chrome application's `Info.plist` reported **153.0.8010.52**;
+**no browser launched in that earlier attempt**, so it produced no observed
+launched-browser version or native-cache capability result.
 
 The initial working tree was clean. No adapter, test, dependency, build
 configuration, or smoke-script change was made. Only this document,
@@ -347,28 +427,40 @@ hashes; `build-output-sha256.json` identifies the generated assets and build.
 
 The active session's permissions and available browser paths were checked afresh.
 After a successful fresh build, **the existing smoke ran unchanged once**, at
-21:22 JST. Static asset assertions passed, then `listen(0, '127.0.0.1')` in
+22:09 JST. Static asset assertions passed, then `listen(0, '127.0.0.1')` in
 `scripts/checkLabelAssets.mjs:120` was denied. The command exited **1** with
 `listen EPERM: operation not permitted 127.0.0.1`, before Chrome launched.
-This session prohibits escalation, and no permitted alternative execution
+That session prohibited escalation, and no permitted alternative execution
 environment was accessible. The blocked command was not repeated. The smoke
 and every assertion remain unchanged. No current runtime or harness defect was
-demonstrated; Phase 31B remains acceptance-incomplete.
+demonstrated; Phase 31B remained acceptance-incomplete at that time.
 
-All current logs and evidence are in the fresh directory
-`/private/tmp/stz-phase31b-acceptance-rv0ubxrs/`. Its `browser/` subdirectory
+All logs and evidence for that sandboxed attempt are in the directory
+`/private/tmp/stz-phase31b-acceptance-do1_0hri/`. Its `browser/` subdirectory
 contains only the smoke's **static** `asset-graph-evidence.json`.
 `environment.json` records permissions, versions, the clean initial revision,
-and tracked input hashes. `*-result.json` records exact commands, exits and log
-paths; the build, smoke and test records also include timestamps and environment.
+and tracked input hashes. `*-result.json` and `targeted-summary.json` record exact
+commands, exits and log paths; the build, smoke and test records also include
+timestamps and environment.
 `browser.log` and `browser-result.json` record this attempt's actual smoke failure.
 The external `run-check.py` captures stdout/stderr and preserves child exits;
 it does not alter repository scripts. Targeted lint and syntax logs were copied
-from this attempt's parallel check directory
-`/private/tmp/stz-phase31b-targeted.TByMBI/`; their result records retain the
-original paths and exact commands.
+from this attempt's parallel checks, whose original log paths begin with
+`/private/tmp/stz-phase31b-20260920T130821933Z-targeted-`;
+`targeted-summary.json` retains those paths and exact commands.
 
-Historical results remain separate. The preceding 20:44 JST follow-up at
+Historical results remain separate. The preceding review reported 144 focused tests
+and 2,258 full-suite tests passing (the focused tests are included in the full
+suite), with build, targeted lint, syntax and diff checks passing. Its unchanged
+smoke passed static assertions and exited 1 at bind before Chrome launched.
+Those review logs remain `/private/tmp/stz-review31b-focused.log`,
+`/private/tmp/stz-review31b-tests.log`, `/private/tmp/stz-review31b-build.log`, and
+`/private/tmp/stz-review31b-assets.log`; they are not this follow-up's evidence.
+The 21:21 JST follow-up at `3dac474a507822f0c1762fd2cc5b84469c557a81` used seven
+focused files (102 passing tests), passed its full suite and build, then the smoke
+exited 1 at bind. Its evidence remains in
+`/private/tmp/stz-phase31b-acceptance-rv0ubxrs/`.
+The preceding 20:44 JST follow-up at
 `9762ccc0cb35c3e9374e91649e16e8f04db3b33b` also passed its deterministic checks
 and fresh build, then the unchanged smoke exited 1 at bind before Chrome launched.
 Its logs and static artifact remain in
@@ -392,6 +484,8 @@ The check commands executed by the logging helpers were:
 ```sh
 PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
 PATH=/opt/homebrew/bin:$PATH node --test \
+  tests/rendering/labelText.test.ts \
+  tests/rendering/labelTextPreservation.test.ts \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \
@@ -404,9 +498,10 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 PATH=/opt/homebrew/bin:$PATH \
 STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
 STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-acceptance-rv0ubxrs/browser \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-acceptance-do1_0hri/browser \
 npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npx eslint \
+  src/rendering/labelText.ts \
   src/rendering/labels/labelSvg.ts \
   src/rendering/labels/labelMetrics.ts \
   src/rendering/labels/labelInkBounds.ts \
@@ -419,6 +514,8 @@ PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/mathjaxWorkerClient.ts \
   src/rendering/labels/mathjaxWorkerProtocol.ts \
   vite.config.ts \
+  tests/rendering/labelText.test.ts \
+  tests/rendering/labelTextPreservation.test.ts \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \
@@ -436,18 +533,22 @@ git diff --check
 | Check | Actual result |
 | --- | --- |
 | Asset preparation | Exit 0 (`prepare.log`); both installed/locked packages remain exactly 4.1.3 |
-| Seven focused files | Exit 0; 102 passed, 0 failed, 0 skipped (`focused.log`) |
+| Nine focused parser/adapter files | Exit 0; 144 passed, 0 failed, 0 skipped (`focused.log`) |
 | Full `npm test` | Exit 0; 2,258 passed, 0 failed, 0 skipped (`full.log`) |
 | Production build | Exit 0 (`build.log`); non-failing >500kB chunk warnings remain |
-| Targeted ESLint, all 21 listed production/config/test/script files | Exit 0 (`targeted-eslint.log`) |
+| Targeted ESLint, all 24 listed production/config/test/script files | Exit 0 (`targeted-eslint.log`) |
 | Both script syntax checks | Exit 0 each (`prepare-assets-syntax.log`, `check-assets-syntax.log`) |
 | `git diff --check` | Exit 0 (`diff-check.log`) |
 | Fresh-build static asset assertions in the unchanged smoke | Passed (`browser.log`, `browser/asset-graph-evidence.json`); no browser assertions |
 | Browser asset/retry/raster smoke | Exit 1 (`browser.log`); `listen EPERM` before browser launch; escalation prohibited |
 
-All seven focused files ran in one command: **102 is a non-overlapping total**.
-It is a subset of the full suite, not an additional 102 unique full-suite tests.
+All nine focused files ran in one command, including both text/parser files:
+**144 is a non-overlapping total**. It is a subset of the full suite, not an
+additional 144 unique full-suite tests.
 These are this attempt's observed results, not sums of historical review groups.
+Real-engine Node conversions use the `typeof window === 'undefined'` direct-module
+branch in `mathjaxEngine.ts`. They do not exercise the browser's production
+`loadWorkerMathJaxEngine` branch or establish browser loading/recovery.
 
 The loader file is registered in the explicit `npm test` list. Its 16 tests
 exercise sticky fixed runtime/shared/font identities across four repeated
@@ -465,7 +566,7 @@ script retains its independent native `getBBox()` and enlarged-viewport raster
 oracles, including a deliberately cropped real glyph that must fail both.
 Nonempty/red/blue pixels remain paint checks only, not clipping evidence.
 
-### Fresh static deployment inspection
+### Static deployment inspection in the earlier sandboxed attempt
 
 After the successful fresh build, the unchanged smoke's static assertions found
 **3 main manifest entries,
@@ -488,7 +589,7 @@ These are filesystem/build observations, not browser network evidence. Supplemen
 chunk resolved from the fresh Worker manifest. `build-output-sha256.json` identifies this
 fresh build's files, generated font imports, and licenses.
 
-### Browser prerequisite block and outstanding assertions
+### Historical browser prerequisite block
 
 The unchanged smoke failed at its localhost bind with exactly:
 
@@ -496,10 +597,10 @@ The unchanged smoke failed at its localhost bind with exactly:
 Error: listen EPERM: operation not permitted 127.0.0.1
 ```
 
-The current session uses `workspace-write` sandboxing, restricted network access,
-and approval policy **`never`**; its execution instructions prohibit supplying
-`sandbox_permissions`. Supported escalation is therefore unavailable in this
-session. The smoke's `listen(0, '127.0.0.1')` was denied; browser launch was never
+That sandboxed session used `workspace-write` sandboxing, restricted network access,
+and approval policy **`never`**; its execution instructions prohibited supplying
+`sandbox_permissions`. Supported escalation was unavailable in that session.
+The smoke's `listen(0, '127.0.0.1')` was denied; browser launch was never
 attempted. This is an environment block, not an observed runtime defect. The
 blocked command was not repeated, and no alternate server or security bypass
 was used. No security or network assertion was weakened. Application
@@ -512,10 +613,10 @@ observations, same-service recovery, or Worker retirement events from this run.
 `label-standalone.png`, and fixture SVG/PNG/reference PNG files are absent in the
 fresh directory. **`browser/asset-graph-evidence.json` is present**, because the
 smoke writes it before binding; its contents establish static deployment only.
-Current supplemental inspection and execution logs/metadata are not browser
-evidence. Phase 31B remains
-**acceptance-incomplete**, and readiness to commit is not asserted from unit or
-static evidence alone.
+Supplemental inspection and execution logs/metadata from that attempt are not
+browser evidence. Phase 31B was **acceptance-incomplete** until the later
+authorized-terminal run above supplied the missing observations; its completion
+is not based on unit or static evidence alone.
 
 When executable, the smoke first measures whether a real HTTP 503 import remains
 cached in that browser after the exact URL is restored. It then independently
@@ -541,12 +642,14 @@ the existing smoke unchanged unless an executed assertion demonstrates a defect.
 
 A browser version or an artifact's presence alone cannot establish those gates.
 
-### Handoff to a permitted execution environment
+### Reusable command for a permitted execution environment
 
-Run in an authorized local session with permission to bind an ephemeral port on
+This handoff was executed successfully in the authorized-terminal run above.
+For future verification, run in a local session with permission to bind an
+ephemeral port on
 `127.0.0.1` and launch Chrome/Chromium through the existing external Playwright.
-The target is `3dac474a507822f0c1762fd2cc5b84469c557a81` plus the three pending
-documentation changes listed above; production/build/test inputs are unchanged.
+The successful run targeted `880cdde79dbdfe31b9f95f5f230b470469d5a640` plus the
+three pending documentation changes; production/build/test inputs were unchanged.
 Preserve any subsequent user work, record it with the new run, and rebuild there.
 Do not reuse this session's `dist/` as evidence for another checkout.
 
@@ -597,9 +700,10 @@ files. Check the native-cache probe, all three failed/restored module URLs and
 503/200 responses, same-service recovery, old Worker closure, and both containment
 oracles including the cropped control. Artifact presence alone does not suffice;
 exit 2 still requires an available supported browser observed to cache failures.
-This handoff has not been executed and does not close the remaining Medium gate.
-The same commands are saved in this attempt's `run-permitted-acceptance.sh`;
-`zsh -n` passed (`handoff-syntax.log`), checking syntax only.
+The executed handoff produced `stz-phase31b-browser-acceptance.hKjXxy` and closed
+the remaining Medium verification gap. The earlier sandboxed attempt's copy,
+`run-permitted-acceptance.sh`, had only been syntax-checked at that time;
+the terminal build/browser logs now provide the actual execution evidence.
 
 No dependency, pinned version, diagram schema, persistence, TikZ, history, or
 production label rendering changed. `labelMetrics.ts`, `labelInkBounds.ts`, and

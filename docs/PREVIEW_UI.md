@@ -66,18 +66,19 @@ appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPT
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
 advance. Native-module recovery now retires the complete lazy MathJax Worker
-and its runtime/shared/font module map. Phase 31B acceptance remains incomplete:
-the latest 2026-09-20 (21:22 JST) follow-up at `3dac474` ran the unchanged smoke against a
-fresh build. Its static assertions passed, then localhost binding failed
-(`listen EPERM: operation not permitted 127.0.0.1`, exit 1) before Chrome launched.
-Escalation is prohibited, so the blocked command was not repeated. The fresh build,
-102 focused tests, and 2,258 full-suite tests passed. Real-engine Node
-tests use the direct-module branch; browser Worker retry, deployment, and standalone
-raster assertions remain unverified. A permitted-environment handoff is recorded
-with the adapter's
+and its runtime/shared/font module map. Phase 31B is acceptance-complete:
+the 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
+code and ran the unchanged smoke successfully (exit 0) in Chrome 153.0.8010.52.
+It verified same-origin additional-font requests, runtime/font/shared-module
+failure and same-service recovery on a browser observed to cache failed imports,
+Worker retirement, and all 15 standalone SVG containment fixtures. Earlier
+`EPERM` attempts stopped before browser launch; this later run supplies their
+missing evidence. The 144 focused parser/adapter tests (included in the full
+suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
+code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Canvas integration and
-typeset SVG export remain planned in [Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Canvas integration and typeset SVG export remain planned in
+[Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,

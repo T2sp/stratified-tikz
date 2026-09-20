@@ -1088,14 +1088,13 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
-has the targeted ink/advance fix, disposable-worker recovery, and focused
-regressions, but acceptance is incomplete. The latest 2026-09-20 (21:22 JST) follow-up at
-`3dac474` passed fresh deterministic checks and the build. The unchanged smoke
-passed its static assertions, then exited 1 at localhost binding (`listen EPERM`)
-before Chrome launched. Escalation is prohibited; no blocked retry was made. Native
-browser retry, built-browser deployment, and standalone raster checks remain
-unverified. 31C through 31F remain planned.
+Status: in progress. Phases 31A and 31B are complete. The independent adapter's
+ink/advance fix, disposable-worker recovery, and regressions passed their checks.
+The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
+code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
+Actual additional-font loading, same-service native-import recovery, Worker
+retirement, and standalone SVG containment are verified; earlier sandbox
+`EPERM` attempts are historical. 31C through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1145,20 +1144,18 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: ink/advance and native-loading fixes implemented; Phase 31B acceptance
-is incomplete. In the latest 2026-09-20 (21:22 JST) follow-up at `3dac474`, the unchanged smoke
-ran against a fresh build and exited 1 with
-`listen EPERM: operation not permitted 127.0.0.1` before Chrome launched;
-session policy prohibits escalation. Its only smoke artifact is the static
-asset graph; browser assertions did not run. The 102 focused tests, 2,258 full
-tests, fresh build, targeted lint, script syntax, and smoke's static checks
-passed. Real-engine Node tests use direct modules; they and the deterministic
-lifecycle tests cannot establish browser Worker recovery.
-Actual browser retry, deployment, and standalone containment remain the open
-gate; no current adapter defect was demonstrated and no production/harness fix
-was made. A concrete handoff requires an authorized localhost/browser environment
-and another fresh build. The production canvas is unchanged. See [adapter interfaces, limits, assets, and verification
-status](./LABEL_ADAPTER.md).
+Status: complete. The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde`
+passed a fresh build and the unchanged browser smoke (exit 0), closing the
+earlier environment-blocked gate. Chrome 153.0.8010.52 was observed to cache
+failed native imports, and all runtime/font/shared-module failure scenarios
+recovered in the same service/page after invalidation, with old Workers retired.
+Actual base-path/font requests and all 15 standalone SVG containment fixtures
+passed. Evidence is in `/private/tmp/stz-phase31b-browser-acceptance.hKjXxy/`.
+The 144 focused parser/adapter tests (included in the full suite), 2,258 full
+tests, targeted lint, and script syntax checks passed on the same unchanged
+production code. No production or harness correction was needed for the terminal
+run. The production canvas is unchanged. See
+[adapter interfaces, limits, assets, and verification status](./LABEL_ADAPTER.md).
 
 - Added the justified, pinned MathJax dependency and locally served resources
   compatible with the application's Vite base path.
@@ -1171,13 +1168,13 @@ status](./LABEL_ADAPTER.md).
 - Resource failure, timeout, and invalidation terminate the lazy MathJax Worker
   and its whole native module map, including shared dependencies and fonts.
   Retries reuse fixed asset URLs in a fresh bounded context; actual same-page
-  native-import recovery remains a required browser gate.
+  native-import recovery passed the affected-browser acceptance gate.
 - Retained geometry and strokes now determine conservative portable ink bounds,
   independently of true run advance. Unsupported geometry and negative whole-run
   advances fall back to the exact complete source.
 - Real adapter tests cover overhang, nested/negative spacing, and later-request
-  recovery. Static font assets do not substitute for the still-required browser
-  deployment and standalone raster containment checks.
+  recovery. Browser deployment and standalone raster containment also passed,
+  with actual requests and independent geometry/raster evidence.
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 
