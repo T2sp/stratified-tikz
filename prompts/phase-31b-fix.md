@@ -5,6 +5,9 @@
 Work on the current Phase 31B checkout, preserving the implemented
 Worker-loading fixes, tests, and any uncommitted user work. Do not reset the
 branch or replace the current adapter with an earlier implementation.
+In particular, preserve the existing changes in `docs/LABEL_ADAPTER.md`,
+`docs/PREVIEW_UI.md`, and `docs/ROADMAP.md`; update their verification evidence
+in place only as needed after this follow-up.
 
 The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
 This project requires Node >=22.12.0.
@@ -30,22 +33,26 @@ The latest Phase 31B review reported `needs_changes`: no Critical issues,
 exactly one Medium issue, and no Low-priority issues. It found **no confirmed
 adapter code defect**.
 
-### Medium: required browser acceptance remains unverified
+### Medium M1: required browser acceptance remains unverified
 
-Running `npm run check:label-assets` against a fresh build exited 1 with:
+Running `npm run check:label-assets` against a fresh build passed its static
+asset checks, then exited 1 with:
 
 ```text
 listen EPERM: operation not permitted 127.0.0.1
 ```
 
-The failure occurred at the localhost server bind in
-`scripts/checkLabelAssets.mjs:120`, before Chrome launched. Actual Worker
-execution, additional-font requests, native-import failure/recovery, and
-standalone SVG rendering were not exercised.
+The failure occurred at `listen(0, '127.0.0.1')` in
+`scripts/checkLabelAssets.mjs:120`, before Chrome launched. Actual base-path
+and additional-font requests, native-import failure/recovery, Worker retirement,
+and standalone SVG raster containment were not exercised. The review's
+[execution log](/private/tmp/stz-review31b-browser.log) records the static pass
+and subsequent bind failure; it contains no browser execution evidence.
 
-The review session explicitly prohibited permission escalation. Repeating the
-same command under the same restrictions cannot complete browser acceptance;
-the remaining work needs an execution environment that permits this smoke.
+Repeating the same command under unchanged localhost restrictions cannot
+complete browser acceptance. The remaining work needs an execution environment
+that permits this smoke; determine the current session's capabilities instead
+of assuming an earlier session's permission policy still applies.
 
 This is an environment-blocked verification gap, not an observed runtime
 defect. It leaves the built-asset requirement in
@@ -59,12 +66,12 @@ Passing Node tests cannot establish browser loading or recovery:
 `loadWorkerMathJaxEngine`. Keep this distinction explicit in the verification
 and completion report.
 
-The review used `/opt/homebrew/bin` through `PATH` and recorded:
+The review used `PATH=/opt/homebrew/bin:$PATH` with Node `v26.9.0` and recorded:
 
 | Check | Previous review result |
 | --- | --- |
 | Full suite | 2,258 passed; no failures or skips |
-| Seven focused adapter files | All passed across overlapping review groups: 43/43, 55/55, and 53/53 |
+| Seven focused adapter files | 102 passed; no failures or skips; subset of the full suite |
 | Targeted ESLint | Passed |
 | Both asset-script syntax checks | Passed |
 | `git diff --check` | Passed |
@@ -72,26 +79,26 @@ The review used `/opt/homebrew/bin` through `PATH` and recorded:
 | Browser asset/retry/rendering smoke | Exit 1 before browser launch |
 
 Static deployment inspection verified 3 main manifest entries, 43 Worker
-chunks, 83 references, and all 40 additional-font modules. The review observed
-the emitted Worker URL `/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js`.
-That filename is historical build evidence, not a value to hard-code into
-tests; use the current build's manifests. No browser HTTP requests or raster
-results were obtained.
+chunks, 83 references, and all 40 additional-font modules. Referenced files
+exist, and the emitted Worker URL uses `/stratified-tikz/`. These are
+filesystem/build observations, not browser HTTP requests or raster results.
+Resolve current hashed asset filenames from the fresh build's manifests;
+do not hard-code filenames from an earlier build.
 
 These are previous results to preserve and recheck, not new results for this
-follow-up. The focused review groups overlap: do not add their counts or
-report them as a unique total. Run the seven-file command below to record the
-actual non-overlapping focused total for this attempt.
+follow-up. The 102 focused tests are included in the 2,258 full-suite tests;
+do not add these counts. Run the commands below and record their actual results
+separately for this attempt.
 
 ## What the review confirmed correct
 
 Preserve the current implementation and regressions:
 
-- real public-adapter fraction/radical conversions return finite geometry and
-  immutable results;
+- real public-adapter fraction/radical/index conversions return finite geometry
+  and immutable results;
 - a valid run followed by an undefined command returns the exact complete
-  source, including tabs, CRLF, and delimiters, without partial geometry; a
-  subsequent valid conversion succeeds;
+  source, including spaces, tabs, CRLF, and delimiters, without partial geometry;
+  a subsequent valid conversion succeeds;
 - conversion state and errors are isolated and scoped;
 - work, caches, and Worker lifetime are bounded; results are immutable,
   equivalent requests coalesce, and obsolete generations are retired;
@@ -138,10 +145,10 @@ Do not replace the existing assertions with a new, weaker verification path.
 ## 1. Establish a permitted environment and run the unchanged smoke
 
 First check the active session's permissions and available browser tooling.
-If it has the same localhost restriction and prohibited escalation as the
-review session, arrange execution in an authorized local session or other
-permitted environment; do not start another implementation rewrite to resolve
-an operating-environment restriction.
+If localhost is blocked and the session cannot authorize the required access,
+arrange execution in an authorized local session or other permitted environment.
+Do not start another implementation rewrite to resolve an operating-environment
+restriction.
 
 Build the current checkout there, then execute the existing script unchanged.
 Use an available external Playwright installation and Chrome/Chromium; do not
@@ -345,9 +352,10 @@ run on the same final code/build need not be repeated just because documentation
 was updated. Include any additional changed files in targeted checks, and
 register new unit test files in the explicitly enumerated `npm test` script.
 
-Report actual counts and statuses rather than copying review results or adding
-overlapping test groups. Node results exercise their own loading branch and
-must not be described as production browser Worker verification. Separate
+Report actual counts and statuses rather than copying review results. Keep
+focused and full-suite totals separate because the focused files are a subset
+of the full suite. Node results exercise their own loading branch and must not
+be described as production browser Worker verification. Separate
 non-failing large-chunk warnings and unchanged global lint debt from new errors.
 
 ## Scope and preservation requirements
@@ -386,7 +394,7 @@ Report:
   that required a code or harness change;
 - files changed and the reason for each change;
 - exact commands, execution environment, Node/browser versions, exit statuses,
-  tested revision/changes, and non-overlapping focused/full test counts;
+  tested revision/changes, and separate focused/full test counts;
 - actual failed/restored module requests, same-service recovery, Worker
   retirement, base-path/font loading, and standalone containment evidence;
 - artifact and log paths, with static and browser evidence distinguished;

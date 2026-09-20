@@ -329,29 +329,47 @@ native import and remains complementary adapter-level coverage.
 
 ## Verification and current status
 
-The verification-only follow-up ran on **2026-09-20 (JST)**, against
-checkout `138a4e1f621ec35cb9bad10c2192ff2a0c91fba6`, on macOS 26.6.2 (25G83),
+The latest verification-only follow-up began on **2026-09-20 at 04:06 JST**, against
+checkout `ff37dfffad2b5973071a8bffca1b06df4105b234`, on macOS 26.6.2 (25G83),
 Darwin arm64. The shell was zsh with `PATH=/opt/homebrew/bin:$PATH`;
 `/opt/homebrew/bin/node` reported **v26.9.0**, npm **11.19.1**.
 The installed executable reported **Google Chrome 153.0.8010.52** using
 `--version`; **no browser launched**, so there is no observed launched-browser
 version or native-cache capability result.
 
-The fresh build passed before the existing smoke ran unchanged. The smoke again
-exited 1 at localhost bind, before any browser assertion. No adapter or harness
-defect was demonstrated, and this follow-up changes only completion documentation.
-All current logs and the new static artifact are in
-`/private/tmp/stz-phase31b-browser-acceptance/`, created empty for this attempt.
-`environment.json` records the checkout, paths, permissions, versions, and input
-hashes; `*-result.json` records executed commands, times, environment, and exits.
-The external logging helper `run-check.py` captures stdout/stderr and preserves
-the child exit status; it does not modify the smoke or its assertions.
+The initial working tree was clean. No adapter, test, dependency, build
+configuration, or smoke-script change was made. Only this document,
+`PREVIEW_UI.md`, and `ROADMAP.md` changed in this follow-up. Preparation and the
+fresh build regenerated ignored font imports, licenses, and `dist/` from this
+checkout. `environment.json` records tracked code/test/script input SHA-256
+hashes; `build-output-sha256.json` identifies the generated assets and build.
 
-Historical results remain separate: the native-loading fix logs are in
+Before repeating the previously blocked smoke, a minimal Node HTTP capability
+probe tested the same `listen(0, '127.0.0.1')` operation. It exited **1** with
+`listen EPERM: operation not permitted 127.0.0.1`. This session again prohibits
+escalation, and no permitted alternative execution environment was accessible.
+Accordingly, **`npm run check:label-assets` was not rerun** under the unchanged
+restriction. Its current exit status is **not available**, not 1, 2, or 0.
+The smoke and every assertion remain unchanged. No current runtime or harness
+defect was demonstrated; Phase 31B remains acceptance-incomplete.
+
+All current logs and supplemental static inspection are in the fresh directory
+`/private/tmp/stz-phase31b-verification-_sohhkx7/`. Its `browser/` subdirectory
+remains empty. `environment.json` records paths, permissions, and versions;
+`*-result.json` records executed argv, times, environment, log paths, and exits.
+`browser-status.json` records the unexecuted smoke and blocking prerequisite.
+The external `run-check.py` captures stdout/stderr and preserves child exits;
+it does not alter repository scripts. Full probe code/command and the exact error
+are in `localhost-capability-result.json` and `localhost-capability.log`.
+
+Historical results remain separate. The prior verification-only attempt at
+`138a4e1f621ec35cb9bad10c2192ff2a0c91fba6` ran the unchanged smoke and exited 1
+at bind before Chrome launched; its logs and smoke-generated static graph remain
+in `/private/tmp/stz-phase31b-browser-acceptance/`. The native-loading fix logs are in
 `/private/tmp/stz-phase31b-native-recovery/`, with static evidence in
 `/private/tmp/stz-label-smoke/`; the subsequent review's static artifact is in
-`/private/tmp/phase31b-review-assets/`. Both previously reported 102 focused and
-2,258 full tests passing, with browser execution blocked. The counts below are
+`/private/tmp/phase31b-review-assets/`. Earlier reported tests passed with browser
+execution blocked. The counts below are
 from fresh executions, not copied from those reports. None of those historical
 static artifacts establishes browser acceptance.
 
@@ -405,11 +423,13 @@ git diff --check
 | Targeted ESLint, all 21 listed production/config/test/script files | Exit 0 (`targeted-eslint.log`) |
 | Both script syntax checks | Exit 0 each (`prepare-syntax.log`, `smoke-syntax.log`) |
 | `git diff --check` | Exit 0 (`diff-check.log`) |
-| Fresh-build browser asset/retry/raster command below | Exit 1 at localhost bind; browser acceptance incomplete (`browser.log`) |
+| Supplemental fresh-build static inspection | Exit 0 (`static-inspection.log` / `.json`); no browser assertions |
+| Localhost capability probe | Exit 1 (`localhost-capability.log`); `listen EPERM` |
+| Browser asset/retry/raster smoke | Not rerun: same confirmed bind restriction, escalation prohibited; no current browser exit or log |
 
-Lint/syntax logs and exact argv/status metadata were also retained in their
-original fresh directory `/private/tmp/stz-phase31b-review-checks-7hzjvsia/`;
-copies are included above, with metadata in `lint-syntax-results.json`.
+All seven focused files ran in one command: **102 is a non-overlapping total**.
+It is a subset of the full suite, not an additional 102 unique full-suite tests.
+These are this attempt's observed results, not sums of historical review groups.
 
 The loader file is registered in the explicit `npm test` list. Its 16 tests
 exercise sticky fixed runtime/shared/font identities across four repeated
@@ -427,20 +447,13 @@ script retains its independent native `getBBox()` and enlarged-viewport raster
 oracles, including a deliberately cropped real glyph that must fail both.
 Nonempty/red/blue pixels remain paint checks only, not clipping evidence.
 
-The exact fresh-build smoke invocation was:
+### Fresh static deployment inspection
 
-```sh
-PATH=/opt/homebrew/bin:$PATH \
-STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
-STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-browser-acceptance \
-python3 /private/tmp/stz-phase31b-browser-acceptance/run-check.py browser npm run check:label-assets
-```
-
-Before binding, its static assertions passed: **3 main manifest entries,
+After the successful fresh build, supplemental filesystem inspection found
+**3 main manifest entries,
 43 worker chunks, 83 references, and all 40 approved additional-font modules**.
-Every referenced file resolves. The graph is recorded in
-`/private/tmp/stz-phase31b-browser-acceptance/asset-graph-evidence.json`, including
+Every referenced file resolves. The graph is recorded in this attempt's
+`static-inspection.json`, including
 these target paths (static build identities, **not observed HTTP requests**):
 
 - Worker: `/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js`
@@ -449,11 +462,16 @@ these target paths (static build identities, **not observed HTTP requests**):
 
 Licenses and the configured `/stratified-tikz/` base are retained; there is no
 duplicate Window runtime graph.
-This is deployment inspection, not observed browser network evidence.
-`static-inspection.json` separately records the installed/locked/declared 4.1.3
-pins, the Worker URL in the built adapter, and the emitted license file.
+These names came from the current manifests; they are not hard-coded fixtures.
+This is supplemental deployment inspection, not a replacement smoke or observed
+browser network evidence. The same file records installed/locked/declared 4.1.3
+pins, the Worker URL in the built adapter, and the emitted license file. The
+inspection command was `python3 /private/tmp/stz-phase31b-verification-_sohhkx7/inspect-build.py`;
+its source, argv/status metadata, and build hashes are retained alongside it.
 
-The command then failed with exactly:
+### Browser prerequisite block and outstanding assertions
+
+The capability probe failed with exactly:
 
 ```text
 Error: listen EPERM: operation not permitted 127.0.0.1
@@ -462,7 +480,7 @@ Error: listen EPERM: operation not permitted 127.0.0.1
 The current session uses `workspace-write` sandboxing, restricted network access,
 and approval policy **`never`**; its execution instructions prohibit supplying
 `sandbox_permissions`. Supported escalation is therefore unavailable in this
-session. The server's `listen(0, '127.0.0.1')` was denied; browser launch was never
+session. The probe's `listen(0, '127.0.0.1')` was denied; browser launch was never
 attempted. This is an environment block, not an observed runtime defect. The
 blocked command was not repeated, and no alternate server or security bypass
 was used. No security or network assertion was weakened. Application
@@ -473,9 +491,10 @@ There are **no actual failed/restored module requests**, HTTP 503/200 recovery
 observations, same-service recovery, or Worker retirement events from this run.
 `native-retry-evidence.json`, `containment-evidence.json`, `label-standalone.svg`,
 `label-standalone.png`, and fixture SVG/PNG/reference PNG files are absent in the
-fresh directory. Only `asset-graph-evidence.json` is smoke-generated evidence;
-the separate static inspection and execution logs/metadata are not browser
-evidence. Phase 31B remains
+fresh directory. **`asset-graph-evidence.json` is also absent in this attempt**,
+because the smoke was not rerun. That file can be written before a smoke's bind
+failure, so the historical copy is only static evidence. Current supplemental
+inspection and execution logs/metadata are not browser evidence. Phase 31B remains
 **acceptance-incomplete**, and readiness to commit is not asserted from unit or
 static evidence alone.
 
@@ -499,9 +518,69 @@ the existing smoke unchanged unless an executed assertion demonstrates a defect.
 | --- | --- |
 | 0 / `passed` | All assertions completed, including same-service recovery on a browser observed to cache failed native imports. |
 | 2 / `functional-checks-passed-affected-browser-unverified` | Functional assertions completed, but this browser retries failed imports itself; the affected-browser gate remains open. Use an available supported affected browser to finish it. |
-| 1 | Inspect the actual error: this attempt stopped at bind before launch; an assertion failure after browser execution would require separate diagnosis. |
+| 1 | Inspect the actual error: earlier smoke attempts stopped at bind before launch; an assertion failure after browser execution requires separate diagnosis. The current capability probe's exit 1 is not a smoke result. |
 
 A browser version or an artifact's presence alone cannot establish those gates.
+
+### Handoff to a permitted execution environment
+
+Run in an authorized local session with permission to bind an ephemeral port on
+`127.0.0.1` and launch Chrome/Chromium through the existing external Playwright.
+The target is `ff37dfffad2b5973071a8bffca1b06df4105b234` plus the three pending
+documentation changes listed above; production/build/test inputs are unchanged.
+Preserve any subsequent user work, record it with the new run, and rebuild there.
+Do not reuse this session's `dist/` as evidence for another checkout.
+
+The resolved commands below create a new artifact directory on every attempt,
+save the full logs and actual exit statuses, and run the existing smoke unchanged.
+The subshell returns the build failure or smoke exit without closing the terminal:
+
+```sh
+(
+cd /Users/takamatoshinori/Desktop/stratified-tikz || exit 1
+STZ_ACCEPTANCE_DIR="$(mktemp -d /private/tmp/stz-phase31b-browser-acceptance.XXXXXX)" || exit 1
+{
+  date '+%Y-%m-%dT%H:%M:%S%z'
+  sw_vers
+  uname -m
+  git rev-parse HEAD
+  git status --short
+  PATH=/opt/homebrew/bin:$PATH node --version
+  PATH=/opt/homebrew/bin:$PATH npm --version
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --version
+} > "$STZ_ACCEPTANCE_DIR/environment.log" 2>&1
+git diff --binary HEAD > "$STZ_ACCEPTANCE_DIR/checkout.patch"
+PATH=/opt/homebrew/bin:$PATH npm run build > "$STZ_ACCEPTANCE_DIR/build.log" 2>&1
+stz_build_status=$?
+printf '%s\n' "$stz_build_status" > "$STZ_ACCEPTANCE_DIR/build.exit-status"
+stz_acceptance_status=$stz_build_status
+if [ "$stz_build_status" -eq 0 ]; then
+  PATH=/opt/homebrew/bin:$PATH \
+  STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+  STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  STZ_SMOKE_ARTIFACT_DIR="$STZ_ACCEPTANCE_DIR" \
+  npm run check:label-assets > "$STZ_ACCEPTANCE_DIR/browser.log" 2>&1
+  stz_smoke_status=$?
+  printf '%s\n' "$stz_smoke_status" > "$STZ_ACCEPTANCE_DIR/browser.exit-status"
+  stz_acceptance_status=$stz_smoke_status
+fi
+printf 'Evidence directory: %s\n' "$STZ_ACCEPTANCE_DIR"
+exit "$stz_acceptance_status"
+)
+```
+
+Inspect `browser.log` for the final result, base-path/font requests, and actual
+launched version; the installed executable's `--version` is not launch evidence.
+Expected smoke artifacts are `asset-graph-evidence.json`,
+`native-retry-evidence.json`, `containment-evidence.json`,
+`label-standalone.svg`, `label-standalone.png`, and fixture SVG/PNG/reference PNG
+files. Check the native-cache probe, all three failed/restored module URLs and
+503/200 responses, same-service recovery, old Worker closure, and both containment
+oracles including the cropped control. Artifact presence alone does not suffice;
+exit 2 still requires an available supported browser observed to cache failures.
+This handoff has not been executed and does not close the remaining Medium gate.
+The same commands are saved in this attempt's `run-permitted-acceptance.sh`;
+`zsh -n` passed (`handoff-syntax.log`), checking syntax only.
 
 No dependency, pinned version, diagram schema, persistence, TikZ, history, or
 production label rendering changed. `labelMetrics.ts`, `labelInkBounds.ts`, and
