@@ -1,5 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import {
+  browserChecksForPhase,
+  runPhaseVerification,
+  verificationMatchesCheckout,
+} from "./phase-verification.mjs";
 
 // const phase = process.argv[2];
 // const mode = process.argv[3] ?? "implement";
@@ -26,14 +31,20 @@ const phaseInput = process.argv[2];
 const mode = process.argv[3] ?? "implement";
 
 if (!phaseInput) {
-  console.error("Usage: node scripts/automation/run-phase.mjs <phase> [implement|fix]");
+  console.error("Usage: node scripts/automation/run-phase.mjs <phase> [implement|fix|verify]");
   console.error("Example: node scripts/automation/run-phase.mjs 9C");
   console.error("Example: node scripts/automation/run-phase.mjs 9C fix");
+  console.error("Example: node scripts/automation/run-phase.mjs 31C verify");
   process.exit(1);
 }
 
 const phase = phaseInput.toUpperCase();
-const phaseLower = phase.toLowerCase();
+
+if (!["implement", "fix", "verify"].includes(mode)) {
+  console.error(`Unknown mode: ${mode}`);
+  console.error("Use 'implement', 'fix', or 'verify'.");
+  process.exit(1);
+}
 
 const phaseSlugs = {
   "9B": "layer-aware-tikz-output",
@@ -262,8 +273,10 @@ function checkoutPhaseBranch(branch) {
   }
 }
 
-function runCodex(promptFile, logFile) {
-  const prompt = readFileSync(promptFile, "utf8");
+function runCodex(promptFile, logFile, verificationContext = "") {
+  const prompt = [readFileSync(promptFile, "utf8"), verificationContext]
+    .filter(Boolean)
+    .join("\n\n");
 
   console.log(`\nRunning Codex with prompt: ${promptFile}`);
 
@@ -338,9 +351,52 @@ function extractReviewJson(reviewText) {
   return JSON.parse(match[1]);
 }
 
-function runVerification() {
-  run("npm", ["test"]);
-  run("npm", ["run", "build"]);
+function runVerification(stage) {
+  try {
+    return runPhaseVerification({ phase, cwd: process.cwd(), env, stage });
+  } catch (error) {
+    console.error(error.message);
+    console.error("Verification failed. Not committing or pushing.");
+    process.exit(error.exitCode ?? 1);
+  }
+}
+
+function implementationVerificationContext() {
+  const browserChecks = browserChecksForPhase(phase);
+  return [
+    "## Parent-runner verification",
+    "After this implementation/fix turn, the parent runner will execute npm test, npm run build, and git diff --check before starting review.",
+    browserChecks.length
+      ? `It will also execute these required browser checks directly, outside this child Codex sandbox: ${browserChecks.join(", ")}.`
+      : "No additional browser check is configured for this phase.",
+    "Complete the requested implementation and harness changes. If browser startup is restricted in this child session, leave the browser result pending for the parent runner; do not weaken assertions or change sandbox permissions.",
+    "The parent runner records logs and browser artifacts, stops on failed or incomplete verification, and supplies the evidence to the review turn.",
+  ].join("\n");
+}
+
+function reviewVerificationContext(report) {
+  return [
+    "## Verification evidence from the parent runner",
+    "The parent runner has completed verification outside the child Codex sandbox on the current checkout.",
+    `Summary: ${report.summaryPath}`,
+    `Artifact directory: ${report.artifactDir}`,
+    `Tested revision: ${report.checkout.revision}`,
+    `Checkout fingerprint (tracked changes and untracked files included): ${report.checkout.fingerprint}`,
+    "Checks:",
+    ...report.checks.map((check) =>
+      `- ${check.name}: ${check.status}, exit ${check.exitCode}; log ${check.logPath}` +
+      (check.artifactDir ? `; browser evidence ${check.artifactDir}` : "")),
+    "Read the saved report and relevant browser evidence, compare their checkout identity with the files being reviewed, and assess the assertions and production code independently.",
+    "For matching current evidence, use these parent-run browser results to satisfy the browser execution requirement. You do not need to repeat those browser commands inside the restricted child sandbox.",
+    "A child-sandbox localhost/Chrome restriction does not invalidate a successful matching parent run. Missing, failed, incomplete, or stale evidence still blocks acceptance; never substitute static results for browser results.",
+    "Keep this review read-only. Any checkout change during review invalidates this verification and the runner will stop before committing.",
+  ].join("\n");
+}
+
+if (mode === "verify") {
+  const verification = runVerification("manual");
+  console.log(`\nVerification passed. Evidence: ${verification.summaryPath}`);
+  process.exit(0);
 }
 
 mkdirSync("logs/codex", { recursive: true });
@@ -374,20 +430,15 @@ const promptLogName =
 const commitMessage =
   mode === "fix" ? spec.fixCommitMessage : spec.commitMessage;
 
-if (mode !== "implement" && mode !== "fix") {
-  console.error(`Unknown mode: ${mode}`);
-  console.error("Use either 'implement' or 'fix'.");
-  process.exit(1);
-}
-
 // runCodex(spec.implementPrompt, `logs/codex/${phase}-implement.log`);
-runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`);
+runCodex(promptToRun, `logs/codex/${phase}-${promptLogName}.log`, implementationVerificationContext());
 
-runVerification();
+const verification = runVerification("before-review");
 
 const reviewOutput = runCodex(
   spec.reviewPrompt,
   `logs/codex/${phase}-review.log`,
+  reviewVerificationContext(verification),
 );
 
 let reviewJson;
@@ -417,7 +468,12 @@ if (!reviewJson.ready_to_commit) {
   process.exit(1);
 }
 
-runVerification();
+// Review is read-only: reuse the verified result only for the exact same tree.
+// A second successful test run cannot make a review of different code current.
+if (!verificationMatchesCheckout(verification, { cwd: process.cwd(), env })) {
+  console.error("Checkout changed during review. Verification and review are stale; not committing or pushing.");
+  process.exit(1);
+}
 
 const status = capture("git", ["status", "--porcelain"]);
 

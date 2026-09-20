@@ -1,0 +1,318 @@
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, relative } from 'node:path'
+import test from 'node:test'
+import {
+  browserChecksForPhase,
+  captureCheckoutIdentity,
+  runPhaseVerification,
+  verificationMatchesCheckout,
+} from '../../scripts/automation/phase-verification.mjs'
+
+const freeLabelGroups = [
+  'existing-renderer-regressions',
+  'independent-oracle-negative-controls',
+  'boundary-anchor-camera-matrix',
+  'inverted-success-and-failure-races',
+  'pending-lock-and-autohide',
+  'deletion-and-unmount',
+  'real-App-input-JSON-history-reused-ID-load',
+  'current-SVG-cloning',
+]
+
+// The fake command records observable process boundaries. It never invokes npm,
+// Codex, a server, or a browser; the verification helper still executes real git.
+const fakeNpm = `#!${process.execPath}
+const fs = require('node:fs')
+const path = require('node:path')
+const args = process.argv.slice(2)
+const command = args.join(' ')
+const artifacts = process.env.STZ_SMOKE_ARTIFACT_DIR
+fs.appendFileSync(process.env.STZ_TEST_COMMAND_LOG, JSON.stringify({
+  args,
+  cwd: process.cwd(),
+  artifacts,
+  baseUrl: process.env.STZ_BROWSER_BASE_URL ?? null,
+  playwright: process.env.STZ_PLAYWRIGHT_MODULE,
+  browser: process.env.STZ_BROWSER_EXECUTABLE,
+}) + '\\n')
+console.log('fixture stdout: ' + command)
+console.error('fixture stderr: ' + command)
+if (command === process.env.STZ_TEST_FAIL_COMMAND) {
+  process.exit(Number(process.env.STZ_TEST_EXIT_CODE || 1))
+}
+if (command === 'run build' && process.env.STZ_TEST_CHANGE_CHECKOUT === 'true') {
+  fs.appendFileSync('tracked.txt', 'build modified source\\n')
+}
+if (command.startsWith('run check:')) {
+  fs.mkdirSync(artifacts, { recursive: true })
+  const save = (name, value) => fs.writeFileSync(path.join(artifacts, name), JSON.stringify(value))
+  if (command === 'run check:label-assets') {
+    save('asset-graph-evidence.json', { main: 'main.js', workers: ['worker.js'] })
+    save('containment-evidence.json', { fixtures: [{ geometryInside: true }] })
+    const mode = process.env.STZ_TEST_ASSET_EVIDENCE
+    if (mode === 'invalid') {
+      fs.writeFileSync(path.join(artifacts, 'native-retry-evidence.json'), '{truncated')
+    } else if (mode !== 'missing') {
+      save('native-retry-evidence.json', {
+        browser: 'fixture Chromium',
+        affectedBrowserRecoveryVerified: mode !== 'unverified',
+        nativeFailureCaching: { cachesFailedNativeImports: mode !== 'unverified' },
+        scenarios: ['runtime-native-import', 'additional-font-native-import', 'transitive-native-import']
+          .map(name => ({ name, recovery: { kind: 'success' } })),
+      })
+    }
+  } else if (command === 'run check:free-labels') {
+    const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS)
+    const incomplete = process.env.STZ_TEST_FREE_EVIDENCE === 'incomplete'
+    save('free-labels-evidence.json', {
+      result: 'passed', stage: 'complete', environment: { browserVersion: 'fixture Chromium' },
+      completed: incomplete ? groups.slice(0, -1) : groups,
+      incompleteGroups: incomplete ? groups.slice(-1) : [],
+      unexecuted: [], pageErrors: [], evidence: groups.map(name => ({ name })),
+    })
+  }
+}
+`
+
+function checkoutFixture(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'stz-phase-verification-test-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const cwd = join(root, 'checkout')
+  const bin = join(root, 'bin')
+  const commandLog = join(root, 'commands.jsonl')
+  mkdirSync(cwd)
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'npm'), fakeNpm, { mode: 0o755 })
+  const env = {
+    ...process.env,
+    PATH: `${bin}:${dirname(process.execPath)}:${process.env.PATH ?? ''}`,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    STZ_TEST_COMMAND_LOG: commandLog,
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(freeLabelGroups),
+    STZ_PLAYWRIGHT_MODULE: join(root, 'external playwright', 'index.mjs'),
+    STZ_BROWSER_EXECUTABLE: join(root, 'Chrome Browser'),
+  }
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    return result.stdout
+  }
+  git('init', '--quiet')
+  git('config', 'user.name', 'Verification Test')
+  git('config', 'user.email', 'verification-test@example.invalid')
+  writeFileSync(join(cwd, 'tracked.txt'), 'original source\n')
+  writeFileSync(join(cwd, '.gitignore'), 'dist/\n')
+  git('add', '.')
+  git('-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '-m', 'fixture')
+  return {
+    cwd,
+    env,
+    git,
+    commands: () => {
+      try {
+        return readFileSync(commandLog, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
+      } catch (error) {
+        if (error.code === 'ENOENT') return []
+        throw error
+      }
+    },
+  }
+}
+
+function verify(t, fixture, phase, options = {}) {
+  const registerCleanup = (report) => {
+    if (report?.artifactDir) {
+      t.after(() => rmSync(report.artifactDir, { recursive: true, force: true }))
+    }
+  }
+  try {
+    const report = runPhaseVerification({ phase, cwd: fixture.cwd, env: fixture.env, ...options })
+    registerCleanup(report)
+    return report
+  } catch (error) {
+    registerCleanup(error.report)
+    throw error
+  }
+}
+
+function failedVerification(t, fixture, phase, options = {}) {
+  try {
+    verify(t, fixture, phase, options)
+  } catch (error) {
+    assert.ok(error.report, 'Failures retain a verification report')
+    return error
+  }
+  assert.fail('Expected verification to fail')
+}
+
+function storedReport(report) {
+  return JSON.parse(readFileSync(report.summaryPath, 'utf8'))
+}
+
+test('browser gates apply to 31B and all subsequent label subphases only', () => {
+  assert.deepEqual(browserChecksForPhase('31B'), ['check:label-assets'])
+  for (const phase of ['31C', '31D', '31E', '31F']) {
+    assert.deepEqual(browserChecksForPhase(phase), ['check:label-assets', 'check:free-labels'])
+  }
+  for (const phase of ['30', '31A', '32A']) {
+    assert.deepEqual(browserChecksForPhase(phase), [])
+  }
+})
+
+test('31C builds before browser checks and preserves isolated browser evidence and logs', (t) => {
+  const fixture = checkoutFixture(t)
+  const inheritedArtifacts = join(fixture.cwd, 'stale-evidence')
+  fixture.env.STZ_SMOKE_ARTIFACT_DIR = inheritedArtifacts
+  fixture.env.STZ_BROWSER_BASE_URL = 'http://stale-server.invalid/'
+  const report = verify(t, fixture, '31C', { stage: 'before-review' })
+
+  assert.equal(report.status, 'passed')
+  assert.equal(report.phase, '31C')
+  assert.equal(report.stage, 'before-review')
+  assert.deepEqual(report.checks.map(({ command, args }) => [command, ...args]), [
+    ['npm', 'test'], ['npm', 'run', 'build'], ['git', 'diff', '--check'],
+    ['npm', 'run', 'check:label-assets'], ['npm', 'run', 'check:free-labels'],
+  ])
+  assert.deepEqual(fixture.commands().map(({ args }) => args), [
+    ['test'], ['run', 'build'], ['run', 'check:label-assets'], ['run', 'check:free-labels'],
+  ])
+  const browserCommands = fixture.commands().filter(({ args }) => args[1]?.startsWith('check:'))
+  assert.equal(new Set(browserCommands.map(({ artifacts }) => artifacts)).size, 2)
+  for (const command of browserCommands) {
+    assert.equal(command.cwd, fixture.cwd)
+    assert.equal(command.baseUrl, null, 'A server for another checkout must not be reused')
+    assert.equal(command.playwright, fixture.env.STZ_PLAYWRIGHT_MODULE)
+    assert.equal(command.browser, fixture.env.STZ_BROWSER_EXECUTABLE)
+    assert.notEqual(command.artifacts, inheritedArtifacts)
+    assert.ok(!relative(report.artifactDir, command.artifacts).startsWith('..'))
+  }
+  for (const check of report.checks) {
+    assert.equal(check.status, 'passed')
+    assert.equal(check.exitCode, 0)
+    if (check.command === 'npm') {
+      const log = readFileSync(check.logPath, 'utf8')
+      assert.match(log, /fixture stdout:/)
+      assert.match(log, /fixture stderr:/)
+    }
+  }
+  assert.deepEqual(storedReport(report), report)
+  assert.equal(verificationMatchesCheckout(report, fixture), true)
+})
+
+test('31B runs the asset browser gate without requiring later free-label assertions', (t) => {
+  const fixture = checkoutFixture(t)
+  const first = verify(t, fixture, '31B')
+  const second = verify(t, fixture, '31B')
+  assert.notEqual(first.artifactDir, second.artifactDir, 'Each invocation retains its own evidence')
+  assert.deepEqual(first.checks.filter(({ name }) => name.startsWith('check:')).map(({ name }) => name), ['check:label-assets'])
+  assert.equal(fixture.commands().some(({ args }) => args.includes('check:free-labels')), false)
+})
+
+test('other phases run tests, build, and whitespace verification without a browser', (t) => {
+  const fixture = checkoutFixture(t)
+  const report = verify(t, fixture, '30')
+  assert.deepEqual(report.checks.map(({ command, args }) => [command, ...args]), [
+    ['npm', 'test'], ['npm', 'run', 'build'], ['git', 'diff', '--check'],
+  ])
+  assert.deepEqual(fixture.commands().map(({ args }) => args), [['test'], ['run', 'build']])
+})
+
+test('an unavailable affected-browser check preserves exit 2 and cannot pass 31B', (t) => {
+  const fixture = checkoutFixture(t)
+  fixture.env.STZ_TEST_FAIL_COMMAND = 'run check:label-assets'
+  fixture.env.STZ_TEST_EXIT_CODE = '2'
+  const error = failedVerification(t, fixture, '31B')
+  assert.equal(error.exitCode, 2)
+  assert.match(error.message, /check:label-assets/)
+  assert.equal(error.report.status, 'failed')
+  assert.equal(error.report.checks.at(-1).exitCode, 2)
+  assert.match(readFileSync(error.report.checks.at(-1).logPath, 'utf8'), /fixture stderr: run check:label-assets/)
+  assert.equal(storedReport(error.report).status, 'failed')
+  assert.equal(verificationMatchesCheckout(error.report, fixture), false)
+})
+
+for (const mode of ['missing', 'invalid', 'unverified']) {
+  test(`exit 0 with ${mode} native-browser evidence does not establish acceptance`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_ASSET_EVIDENCE = mode
+    const error = failedVerification(t, fixture, '31C')
+    assert.match(error.message, /check:label-assets/)
+    assert.notEqual(error.exitCode, 0)
+    assert.equal(error.report.status, 'failed')
+    assert.equal(fixture.commands().some(({ args }) => args.includes('check:free-labels')), false)
+    assert.equal(storedReport(error.report).status, 'failed')
+  })
+}
+
+test('31C requires every browser scenario group even if the command exits successfully', (t) => {
+  const fixture = checkoutFixture(t)
+  fixture.env.STZ_TEST_FREE_EVIDENCE = 'incomplete'
+  const error = failedVerification(t, fixture, '31C')
+  assert.match(error.message, /check:free-labels/)
+  assert.equal(error.report.status, 'failed')
+  assert.equal(storedReport(error.report).status, 'failed')
+})
+
+for (const command of ['test', 'run build']) {
+  test(`${command} failure stops later checks and preserves command diagnostics`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FAIL_COMMAND = command
+    fixture.env.STZ_TEST_EXIT_CODE = '17'
+    const error = failedVerification(t, fixture, '31C')
+    assert.equal(error.exitCode, 17)
+    assert.equal(error.report.status, 'failed')
+    assert.deepEqual(fixture.commands().map(({ args }) => args.join(' ')), command === 'test' ? ['test'] : ['test', 'run build'])
+    const failedCheck = error.report.checks.at(-1)
+    assert.equal(failedCheck.exitCode, 17)
+    assert.match(readFileSync(failedCheck.logPath, 'utf8'), /fixture stderr:/)
+  })
+}
+
+test('whitespace errors fail before any browser starts', (t) => {
+  const fixture = checkoutFixture(t)
+  writeFileSync(join(fixture.cwd, 'tracked.txt'), 'bad trailing whitespace  \n')
+  const error = failedVerification(t, fixture, '31C')
+  assert.equal(error.report.checks.at(-1).name, 'git-diff-check')
+  assert.match(readFileSync(error.report.checks.at(-1).logPath, 'utf8'), /trailing whitespace/)
+  assert.equal(fixture.commands().some(({ args }) => args[1]?.startsWith('check:')), false)
+})
+
+test('checkout identity includes current untracked contents and changes invalidate saved evidence', (t) => {
+  const fixture = checkoutFixture(t)
+  const untracked = join(fixture.cwd, 'browser fixture 日本語.txt')
+  writeFileSync(untracked, 'original fixture\n')
+  const report = verify(t, fixture, '31C')
+  const initial = captureCheckoutIdentity(fixture)
+  assert.equal(verificationMatchesCheckout(report, fixture), true)
+
+  writeFileSync(untracked, 'updated fixture\n')
+  assert.notDeepEqual(captureCheckoutIdentity(fixture), initial)
+  assert.equal(verificationMatchesCheckout(report, fixture), false, 'Same-name untracked fixture changes invalidate acceptance')
+  writeFileSync(untracked, 'original fixture\n')
+  assert.equal(verificationMatchesCheckout(report, fixture), true)
+
+  writeFileSync(join(fixture.cwd, 'tracked.txt'), 'updated source\n')
+  assert.equal(verificationMatchesCheckout(report, fixture), false)
+  fixture.git('add', 'tracked.txt')
+  assert.equal(verificationMatchesCheckout(report, fixture), false, 'Staged changes must also invalidate acceptance')
+})
+
+test('verification rejects source mutations during the checks', (t) => {
+  const fixture = checkoutFixture(t)
+  fixture.env.STZ_TEST_CHANGE_CHECKOUT = 'true'
+  const error = failedVerification(t, fixture, '31B')
+  assert.match(error.message, /checkout changed/i)
+  assert.equal(error.report.status, 'failed')
+  assert.equal(storedReport(error.report).status, 'failed')
+})

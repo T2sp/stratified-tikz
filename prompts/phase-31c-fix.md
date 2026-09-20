@@ -1,12 +1,15 @@
-# Phase 31C Targeted Fix Prompt: Complete browser coverage for bounds, races, and editor workflows
+# Phase 31C Targeted Fix Prompt: Correct browser font measurement and finish acceptance
 
 ## Environment
 
-Work on the current Phase 31C checkout. Preserve the implemented free-label
-renderer, runtime, layout/picking integration, tests, and any uncommitted user
-work. Do not reset the branch or replace the implementation with an earlier
-version. Inspect the current checkout before applying the findings below;
-review line numbers identify starting points and may have moved.
+Work on the current Phase 31C checkout, preserving the free-label renderer,
+strengthened browser harness, actual App fixture, tests, documentation, and any
+uncommitted user work. Do not reset the branch or restore an earlier version.
+
+The latest review covered `4b25b82` plus working-tree changes, including
+then-untracked browser scripts and fixtures. Those files may since have been
+committed. Inspect the current revision and pending changes; do not check out
+the bare historical commit and accidentally omit the harness improvements.
 
 The default shell may use Node v16.17.0 at `/usr/local/bin/node`.
 This project requires Node >=22.12.0.
@@ -17,420 +20,453 @@ Use:
 PATH=/opt/homebrew/bin:$PATH
 ```
 
-This is a targeted acceptance follow-up. Extend the existing browser harness
-to cover the missing behavior, then run it in a permitted browser-capable
-environment. No production defect was confirmed by the review; change
-production behavior only when a concrete failure demonstrates the need.
-Small test seams may be added when necessary to exercise the actual App.
-Do not add dependencies or change the pinned MathJax versions.
+The authorized browser run has now reached an assertion and exposed a confirmed
+harness font-measurement defect. Correct that targeted defect, preserve the
+strengthened coverage, and run the full check in a permitted environment.
+Do not add dependencies, change pinned MathJax versions, or redesign production
+rendering/picking without evidence of a separate production defect.
 
-Required verification includes the extended browser check, focused tests,
-`npm test`, `npm run build`, targeted lint, browser-fixture TypeScript checks,
+Required verification includes actual browser acceptance, focused tests,
+`npm test`, `npm run build`, strict fixture TypeScript, targeted lint, all four
 browser-script syntax checks, and `git diff --check`.
 
-## Latest review findings
+## Latest review findings and browser follow-up
 
-The latest Phase 31C review reported `needs_changes`: no Critical issues,
-exactly one Medium issue, and no Low-priority issues. It found no concrete
-production defect by code inspection and modified no source files.
+The latest review reported `needs_changes`: no Critical issues, exactly one
+Medium issue, and no Low-priority issues. **No concrete implementation defect
+was found.** No source files were modified by the review.
 
-### Medium M1: required browser verification is incomplete
+### Historical review: local-server startup was blocked
 
-M1 has two distinct parts: the browser run was blocked by the environment,
-and the current assertions do not cover all required acceptance cases.
-Running the existing harness unchanged successfully would not close M1.
-
-- `scripts/checkFreeLabels.mjs:61` clicks label centers, leaving just-inside
-  and just-outside boundary picking unverified.
-- Its delayed-result checks around line 255 check source/state/style but not
-  resulting bounds and actual pointer selection.
-- Its visibility checks around line 222 run after settlement, leaving layer
-  locking and autoHide transitions during pending conversion untested.
-- `scripts/fixtures/freeLabels.tsx:124` and its mutation/history helpers
-  bypass actual App document-load and editor-input paths. Calling those
-  helpers alone does not verify App revision invalidation or editing history.
-- Native-bounds assertions around fixture line 278 include the transparent
-  rectangle generated from the published bounds. An oversized hit rectangle
-  can therefore make the assertion pass without matching visible content.
-
-The configured `check:free-labels` command exited 1 before browser assertions:
+`npm run check:free-labels` reached development-server startup in
+`scripts/checkFreeLabels.mjs:59`, then exited 1 with:
 
 ```text
-listen EPERM: operation not permitted 127.0.0.1
+listen EPERM: operation not permitted 127.0.0.1:5173
 ```
 
-Computer Use also reported that Chrome access was not approved. These are
-execution restrictions, not evidence that a rendering assertion failed.
-The additional `check:label-assets` attempt passed static asset checks but
-its configured browser stage encountered the same bind restriction; an
-earlier unconfigured attempt also lacked the default Playwright import.
+Chrome never launched and zero browser assertions ran. The recorded evidence
+at `/private/tmp/stz-review31c-browser/free-labels-evidence.json` contains:
 
-The review recorded these historical results:
+- `result: "failed"` and `stage: "development-server-listen"`;
+- `environment.browserVersion: null`;
+- empty `completed` and `evidence` arrays;
+- all eight required scenario groups incomplete and unexecuted;
+- the `EPERM` error and checkout identity, including pending harness files.
+
+That restriction describes the earlier review environment. The authorized
+Terminal attempt below supersedes it as the latest browser outcome; do not
+continue reporting the current failure as pre-launch `EPERM`.
+
+### Current M1 follow-up: an incorrect font measurement fails the tab assertion
+
+The user ran the existing harness in an authorized Terminal. Evidence is in
+`/private/tmp/stz-phase31c-browser-acceptance.POb7Fz`. It identifies revision
+`4b09c181dcea6b7db9f46daf7d82ef322ef4e3ee`, with only this prompt modified,
+Node v26.9.0, Chrome `153.0.8010.52`, and a development origin at
+`http://127.0.0.1:5174`. The browser command exited 1 at `renderer-fixture`:
+
+```text
+AssertionError [ERR_ASSERTION]: Tab advances to a measured four-space stop
+scripts/checkFreeLabels.mjs:150:10
+```
+
+Chrome launched and initial renderer/source/state/whitespace assertions ran.
+The check failed before the first grouped evidence record. `completed: []`
+therefore means no complete scenario group, not zero executed assertions.
+The current `unexecuted` field is inferred from an empty evidence array and
+does not accurately distinguish this partial renderer run from a startup
+failure. The later geometry/race/policy/App groups did not run.
+
+A separate permitted diagnostic reproduced the same fallback source and font
+through the production fixture. Its script and measurements are retained at
+`/private/tmp/stz-phase31c-tab-diagnostic.mjs` and
+`/private/tmp/stz-phase31c-tab-diagnostic.json`. These establish the cause:
+
+| Measurement | Observed value |
+| --- | --- |
+| `getComputedStyle(text).font` | Empty string |
+| Canvas font after assigning that shorthand | `10px sans-serif` (unchanged default) |
+| Displayed font size | `24.3px` |
+| Space advance from incorrect default Canvas font | 2.7783203125 |
+| Space advance with explicit displayed font | 5.382659912109375 |
+| First fragment's SVG text advance | 212.21875 |
+| First fragment's explicit-font Canvas advance | 212.2062225341797 |
+| Actual next-fragment x | 215.306396484375 |
+| Incorrect shorthand-based expected tab x | 222.265625 |
+| Explicit-font Canvas expected tab x | 215.306396484375 |
+| Independent SVG-space expected tab x | 215.625 |
+
+The displayed family is `Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto,
+sans-serif`, with normal style and weight 400. The diagnostic native SVG space
+advance is 5.390625; its expected stop differs from the actual position by
+about 0.319, within the existing 0.5-unit assertion tolerance. The production
+position matches the explicit-font Canvas computation exactly.
+
+The failing oracle assigns an empty computed `font` shorthand to a new Canvas
+context, silently leaving its default 10px font active. It then combines that
+incorrect space width with the actual SVG text advance. This confirms a
+**harness defect for this failure**, not a production tab-layout defect.
+Do not change production tab positions or widen tolerances to match the bad
+oracle. These measurements diagnose one assertion; they do not establish a
+passing full browser run or rule out failures in later groups.
+
+The earlier review also found missing coverage. The follow-up has now added
+independent content measurements, boundary probes, controlled races, pending
+policy checks, and actual App workflows. Preserve these assertions; do not
+present the earlier coverage gaps as still-unimplemented work or start another
+rewrite without a demonstrated failure.
+
+The latest review used Node v26.9.0 with `/opt/homebrew/bin` first in `PATH`:
 
 | Check | Previous review result |
 | --- | --- |
-| Full suite | Passed; 2,281 tests |
-| Production build | Passed; nonblocking chunk-size warning |
-| `git diff --check` | Passed |
-| Focused ESLint | Passed |
-| Browser-fixture TypeScript and browser-script syntax | Passed |
-| Required free-label browser acceptance | Unavailable; exit 1 before assertions |
-| Repository-wide lint | Skipped; unchanged baseline debt of 10 errors and 4 warnings in App/SvgDiagram confirmed against `HEAD` |
+| Full suite | Exit 0; 2,281 passed, none failed or skipped |
+| Focused layout/runtime/picking | Exit 0; 23 passed, included in the full-suite total |
+| Strict fixture TypeScript | Exit 0 |
+| Four browser-script syntax checks | Exit 0 |
+| Targeted ESLint | Exit 0 |
+| `git diff --check` | Exit 0 |
+| Production build | Exit 0; nonblocking chunk-size warning |
+| Review's free-label browser check | Exit 1 before browser launch; no assertions executed |
 
-Do not copy these historical results into this follow-up's completion report.
-Record new commands, counts, statuses, and evidence separately. Passing Node
-helpers or the Phase 31B adapter smoke cannot establish Phase 31C browser
-positioning, event behavior, or App workflows.
+Repository-wide lint was skipped. App/SvgDiagram diagnostics showed 10 errors
+and 4 warnings, unchanged against both the review's `HEAD` and pre-31C
+`fb8b380`. Keep baseline debt separate from targeted check results.
+
+These are historical results, not new evidence for this attempt. Passing Node
+helpers, build/static inspection, or the Phase 31B adapter smoke cannot replace
+Phase 31C production-renderer and App browser verification.
 
 ## What the review confirmed correct
 
 Preserve the implementation supported by code inspection:
 
-- Conversion uses an effect-owned controller with request identity and
-  generation checks.
-- Rendering and picking share committed layout bounds; anchors use measured
-  extents rather than successful formulas' raw source length.
-- Pending and failure rendering use the complete latest source as SVG text.
-- Immutable geometry is reused without shared DOM nodes; camera, position,
-  and paint remain separate from conversion inputs.
-- Runtime results stay outside the diagram model, history, and TikZ.
-- Current SVG export cloning retains settled formula geometry.
-- Inline-node conversion and settled-export waiting remain deferred.
+- source/font identity checks and effect-owned generation cleanup reject stale
+  results;
+- rendering and picking share current measured bounds, nine-anchor placement,
+  and the established font scale;
+- literal fallback uses React text, and immutable geometry receives current
+  color and opacity;
+- runtime results remain outside the model and history;
+- browser tests now exercise production components and actual App events;
+- inline-node conversion and settled-export waiting remain deferred.
 
-These are code-inspection findings, not a substitute for browser observations.
+These are code-inspection findings, not evidence that browser assertions passed.
 
 ## Goal
 
-Close M1 with independent geometric assertions and real browser interactions
-through production rendering, picking, and App editing/loading paths. Retain
-reproducible evidence. Fix only demonstrated Phase 31C defects, then update
-the completion documentation to match the actual outcome.
+Correct the confirmed test-only font-measurement defect and obtain complete
+Phase 31C browser evidence in an environment permitting the local development
+server and Chrome/Chromium. Fix only further demonstrated failures, rerun the
+applicable checks, and update documentation to reflect the actual result.
 
-Keep Phase 31D inline-node integration, Phase 31E settled-export waiting, and
-Phase 31F's combined completion audit deferred.
+Keep 31D inline nodes, 31E settled-export waiting, and 31F's combined audit
+deferred. A production change is not required to fix this diagnosed assertion.
 
-## Required reading before fixing
+## Required reading before proceeding
 
 Read at least:
 
-- `AGENTS.md`, this prompt, and `prompts/phase-31c-implement.md` and
+- `AGENTS.md`, this prompt, `prompts/phase-31c-implement.md`, and
   `prompts/phase-31c-review.md`;
 - the latest review report, or the findings reproduced above;
-- `scripts/checkFreeLabels.mjs`, `scripts/fixtures/freeLabels.tsx`, and
-  `scripts/fixtures/freeLabels.html`;
-- `src/rendering/SvgTexLabel.tsx`, `src/rendering/SvgDiagram.tsx`,
-  `src/rendering/labels/svgLabelLayout.ts`,
-  `src/rendering/labels/svgLabelRuntime.ts`,
-  `src/rendering/svgLabelBounds.ts`, and `src/rendering/svgHitTesting.ts`;
-- the shared label service/metrics and the projection, visibility, layer,
-  selection, and drag paths used by these components;
-- `src/App.tsx`, especially free-label input, document loading/reset,
-  `labelDocumentRevision`, and Undo/Redo;
-- production serialization, history, TikZ, and current SVG-export paths;
-- `tests/rendering/svgLabelLayout.test.ts`,
-  `tests/rendering/svgLabelRuntime.test.ts`,
-  `tests/rendering/svgLabelPicking.test.ts`, and related existing tests;
-- Phase 31 sections of `docs/PREVIEW_UI.md` and `docs/ROADMAP.md`, plus
-  `package.json`, `vite.config.ts`, and the fixture type-check setup.
+- the authorized run's `free-labels-evidence.json`, `browser.log`, and
+  `failure.png`, plus the separate tab diagnostic described above;
+- the free-label verification section of `docs/PREVIEW_UI.md` and Phase 31
+  entries in `docs/ROADMAP.md`;
+- `scripts/checkFreeLabels.mjs`, `scripts/checkFreeLabelGeometry.mjs`,
+  `scripts/checkFreeLabelRaces.mjs`, and `scripts/checkFreeLabelsApp.mjs`;
+- `scripts/fixtures/freeLabels.tsx`, `scripts/fixtures/freeLabelsApp.tsx`,
+  their HTML entries, `scripts/fixtures/labelBrowserOracle.ts`, and
+  `scripts/fixtures/tsconfig.json`;
+- `package.json`, `vite.config.ts`, and the focused tests;
+- production renderer, runtime/layout/picking helpers, and App input/load/
+  revision/history paths as needed to diagnose any observed failure.
 
-## 1. Measure visible content independently
+Do not replace the existing assertions with a weaker verification path.
 
-Replace or supplement the circular native-bounds assertions. Measure actual
-painted math/text independently of `data-label-bounds`, runtime layout output,
-and transparent picking rectangles. Exclude editor-only overlays and handles.
-Retain visible MathJax rectangles and fraction rules; excluding every `rect`
-would also remove real formula content from the measurement.
-Both the automated script and any retained fixture self-checks must use a
-valid oracle; do not leave a misleading self-check labeled as proof of bounds.
+## 1. Correct the confirmed font oracle and preserve failure diagnostics
 
-Possible approaches include native measurements of the visible descendants
-with their real SVG transforms, or raster measurements of an isolated visible
-content clone. Do not measure the whole label group when it still contains
-the hit rectangle, and do not populate expected dimensions from the same
-production layout function being checked.
+Fix the tab-space measurement in `scripts/checkFreeLabels.mjs:142`. Do not
+assume the computed `font` shorthand is nonempty or accepted by Canvas.
 
-Compare in a common coordinate system, including nested SVG viewBox transforms
-and the canvas-to-client transform. Distinguish glyph ink from logical advance,
-font leading, and the established picking tolerance. Exact equality between
-ink and the full layout box is not required; document bounded allowances so
-arbitrarily inflated bounds cannot pass merely by containing all ink.
+Prefer measuring a space through a temporary SVG text clone with the same
+displayed font/whitespace properties, cleaning it up in `finally`. Alternatively,
+construct a valid Canvas font from explicit computed longhands, check the font
+actually accepted by the context, and match kerning/text-rendering properties
+using valid Canvas values. Keep the measurement independent of production
+layout results; do not read the tab's expected x from its actual placement.
+Avoid hard-coded 24.3px fonts or diagnostic widths in the implementation.
 
-Include a negative control showing that the oracle rejects a deliberately
-inflated or displaced published/hit box while visible content stays unchanged.
-Keep this perturbation local to the test and restore it before other checks.
-Save the independent extents, published bounds, transforms, and tolerances in
-the evidence so a reviewer can evaluate the comparison.
+Audit the same assumption in `scripts/fixtures/labelBrowserOracle.ts:67`,
+which measures leading/trailing whitespace using the computed shorthand.
+Correct that test-only measurement consistently without weakening the alpha-
+pixel oracle, its negative controls, or its finite whitespace allowances.
+Retain visible fraction rules and other painted rectangles.
 
-## 2. Exercise actual boundary picking
+Add meaningful browser regression evidence for the empty/unusable shorthand
+case using the displayed non-default font. Cover tab advance and literal edge
+whitespace, verify current font properties are used, and show that measuring
+with the unrelated default 10px font is not accepted as a valid oracle.
+Preserve the existing 0.5-unit tab tolerance; the diagnostic native SVG result
+already satisfies it. Keep CRLF-as-one-line-break and complete-source checks.
 
-Use both a tall nested fraction and a compact formula whose raw TeX source is
-substantially longer than its rendered display. Choose supported examples and
-record the sources and measured sizes; the compact case must detect reuse of
-the old raw-character-count hit width.
+Persist fragment text, x/y, SVG advance, computed font longhands/shorthand,
+effective measurement font or SVG clone properties, measured space width,
+expected stop, actual x, and delta before the assertion can throw. Distinguish
+diagnostic observations from a passing scenario record. Record the current
+checkpoint or started groups so partial renderer execution is not reported as
+zero browser assertions merely because no group completed. Keep incomplete
+groups and overall failure status accurate; do not mark a group complete early.
 
-For both formulas, exercise center, north, and east anchors:
+The production calculation in `labelMetrics.ts` and placement in
+`SvgTexLabel.tsx` are consistent with the measured correct font. Leave them
+unchanged unless a further independent browser failure demonstrates a defect.
 
-- in 2D before camera changes;
-- after nontrivial 2D pan/zoom;
-- in 3D with a changed camera and a nonzero-depth label position.
+## 2. Establish a permitted environment and run the corrected check
 
-Retain existing coverage of all nine anchors. Verify projected anchor placement
-against independently measured content and the documented layout allowances.
+Check the active session's permissions and available tools. Use the supported
+approval/escalation mechanism for local-server/browser execution when available
+and permitted; do not assume an earlier session's `never` policy applies now.
+If escalation is prohibited or approval is denied, respect that restriction
+and use an authorized Terminal or CI environment for the handoff.
 
-For each required case, send real pointer clicks just inside and outside each
-relevant edge. Convert SVG coordinates to browser client coordinates using
-the actual transform. Outside probes must lie beyond the applicable picking
-tolerance, and both probes must avoid unrelated geometry or drag handles.
-Include a point inside the obsolete raw-source estimate but outside the
-correct compact-formula hit area.
+Do not repeatedly run the same command under unchanged restrictions, disable
+browser security, or silently change persistent runner/sandbox settings.
+Changing a port to evade a permission denial does not complete acceptance.
 
-Check normal clicks and production Alt-click/cycling behavior. Reset selection
-between probes so an outside click cannot pass because an earlier selection
-remained. Assert the actual selected target and callback/event behavior;
-calling a pure hit-test helper or assigning selection directly is insufficient.
-Preserve overlapping compiled/fallback label cycling and the single-event
-policy for internal formula paths. Verify conversion invocation counts stay
-unchanged for camera, position, paint, and selection-only changes.
+Use the existing external Playwright and Chrome/Chromium arrangement. Resolve
+actual tool paths and retain the complete current checkout, including any
+still-untracked scripts/fixtures. If moving to another environment, transfer
+the pending changes and files; the historical base commit alone is insufficient.
 
-## 3. Verify bounds and picking after asynchronous races
-
-Use deterministic held completions, not arbitrary sleeps. Wait until the
-intended request is actually pending before changing state or releasing it.
-Use visibly different sizes for old and new inputs so stale bounds are
-observable, rather than two similarly sized identifiers.
-
-For two successive edits, release the newer request first and the older
-request last. Cover both obsolete success and obsolete failure. At the current
-pending state, after the newer completion, and after the obsolete completion:
-
-- verify the complete current source and visible pending/ready/fallback output;
-- independently inspect current visible extents and revision-matched bounds;
-- probe actual selection at current boundaries and at a point that would
-  have selected only the stale larger layout;
-- verify the current position, font size/anchor, color, opacity, and selection
-  are not restored from obsolete request state;
-- verify JSON, history, and both TikZ outputs are unchanged by completion alone.
-
-Retain valid-invalid-valid, deletion, and unmount checks, including no
-resurrected DOM or selectable stale geometry. Assert observations after React
-has committed each release; disappearance of a DOM pending marker alone does
-not prove that a hidden, deleted, or unmounted request finished.
-
-Repeat the reused-ID scenario through the actual App document replacement
-path: start a held request in document A, load document B with the same label
-ID and different content/layout through production loading, then complete A.
-Verify B's source, independently measured bounds, pointer selection, and
-history remain correct. A second `fixture.mount()` that manually increments
-its own revision does not establish App load/reset behavior.
-
-## 4. Exercise visibility and locking while pending
-
-Hold a fresh conversion and establish that it is still pending. While it is
-pending, lock its layer and exercise the production 3D autoHide policy.
-Use production controls or visibility/layer props rather than merely changing
-DOM styles. Assert policy behavior before and after releasing the request.
-
-- Locked labels remain unselectable and cannot start a drag through either
-  normal pointer handling or Alt-click/cycling.
-- Auto-hidden labels expose no selectable geometry. Completing their held
-  conversion must not make them visible or selectable while autoHide applies.
-- Unlocking or restoring visibility uses the latest source and bounds, with
-  the normal interaction behavior restored.
-- Preserve existing hidden/filtered-layer and autoDim checks; dimmed labels
-  keep the established opacity and picking policy.
-
-Verify pending status using request instrumentation when the rendered label
-is hidden or unmounted. Do not let the test silently become a settled-state
-check or treat absence of a DOM pending marker as proof of completion.
-
-## 5. Verify actual App input, JSON loading, and editing history
-
-Keep the focused production-renderer fixture, but add coverage that mounts
-the real App or drives the application page. Use real label editor input,
-production JSON load/save controls, and Undo/Redo controls or shortcuts.
-Do not satisfy these cases solely through fixture `mutateLabel`, `mount`,
-`undo`, or direct model/history assignment.
-
-A small development-only seam may control adapter completion or expose
-read-only diagnostics. It must not replace App input handlers, document
-revision changes, serialization, or history transitions with fixture copies.
-Keep test controls out of normal product flows and production build entries.
-
-Verify:
-
-1. The label editor retains authoritative raw source through valid, invalid,
-   and valid-again edits; pending/failure displays the latest complete source.
-2. Saved JSON and reloaded labels preserve delimiters, backslashes, Unicode,
-   spacing, and supported physical newlines without runtime results/metrics.
-   Exercise exact CRLF preservation through JSON import/export where native
-   textarea newline normalization would otherwise obscure the distinction.
-3. Normal editing follows the existing history commit/coalescing semantics.
-   Undo returns to the expected preceding edit and Redo reapplies it; arriving
-   conversions add no history step and do not clear an existing redo branch.
-4. Undo/Redo while conversion is held cannot let an obsolete result overwrite
-   the restored source, bounds, or current pointer behavior.
-5. The actual load/reset route with reused IDs satisfies section 3. Verify
-   the production document-revision lifecycle rather than assuming it from
-   a fixture-provided counter.
-6. Both TikZ export modes remain determined by the model and existing
-   formatting policy; result arrival does not alter their output.
-
-Retain current SVG-cloning checks for settled formulas and pending literal
-fallback. Do not introduce waiting for settled labels; that belongs to 31E.
-
-## 6. Run the strengthened check in a permitted environment
-
-Use an available external Playwright installation and Chrome/Chromium, as the
-existing harness does. Resolve actual paths before execution and create a
-fresh evidence directory. For the current machine, the documented setup is:
+Use a fresh artifact directory. The following block runs from this repository
+on the current machine and preserves the browser process's exit status:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
-STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
+(
+  cd /Users/takamatoshinori/Desktop/stratified-tikz || exit 1
+  export PATH=/opt/homebrew/bin:$PATH
+  STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
+  printf 'Evidence directory: %s\n' "$STZ_31C_EVIDENCE_DIR"
 
-PATH=/opt/homebrew/bin:$PATH \
-STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
-STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
-npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
-STZ_31C_BROWSER_STATUS=$?
-printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
-printf 'Evidence directory: %s\nBrowser exit status: %s\n' "$STZ_31C_EVIDENCE_DIR" "$STZ_31C_BROWSER_STATUS"
-test "$STZ_31C_BROWSER_STATUS" -eq 0
+  node scripts/prepareMathjaxAssets.mjs >"$STZ_31C_EVIDENCE_DIR/prepare.log" 2>&1
+  STZ_31C_PREPARE_STATUS=$?
+  printf '%s\n' "$STZ_31C_PREPARE_STATUS" >"$STZ_31C_EVIDENCE_DIR/prepare.exit-status"
+  if [ "$STZ_31C_PREPARE_STATUS" -ne 0 ]; then
+    cat "$STZ_31C_EVIDENCE_DIR/prepare.log"
+    exit "$STZ_31C_PREPARE_STATUS"
+  fi
+
+  STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+  STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
+  npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
+  STZ_31C_BROWSER_STATUS=$?
+  printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
+  printf 'Browser exit status: %s\n' "$STZ_31C_BROWSER_STATUS"
+  if [ "$STZ_31C_BROWSER_STATUS" -ne 0 ]; then
+    tail -n 60 "$STZ_31C_EVIDENCE_DIR/browser.log"
+  fi
+  exit "$STZ_31C_BROWSER_STATUS"
+)
 ```
 
-The script currently starts a Vite development server and loads the fixture;
-do not describe this as a built-asset browser test. An explicitly configured
-`STZ_BROWSER_BASE_URL` must point to a permitted server serving this checkout
-and its development fixtures. A production build alone does not serve them.
+This check starts a **Vite development server** and loads development fixtures
+using the production renderer and actual App. It is not a `dist` asset smoke.
+An explicitly configured `STZ_BROWSER_BASE_URL` must point to a permitted
+development server serving this exact checkout and its fixtures. A production
+build alone does not serve them. Check for a stale inherited base URL before
+running; use the default local server when no external origin is intended.
 
-Check the active session's actual permissions. If localhost/browser access
-is blocked, use the supported approval/escalation mechanism when available
-and permitted. Do not infer that this session has the previous session's
-policy. Do not repeatedly rerun the same blocked command without a relevant
-environment change, disable browser security, or silently change persistent
-sandbox/runner settings.
+Record the exact command, Node version, actually launched browser version,
+exit status, and artifact path. The harness records the current revision,
+tracked diff/hash, and complete untracked contents/hashes. Match these to the
+reviewed code; preserve later compatible commits rather than forcing the old
+revision name.
 
-Complete the harness improvements and independent checks even when browser
-execution needs a separate authorized Terminal or CI run. If no permitted
-browser environment is accessible, provide a concrete handoff with the final
-commands, resolved paths, tested revision/pending diff, and expected artifacts.
-Keep browser acceptance incomplete; neither a handoff nor static-only success
-counts as a passing run.
+If no permitted environment is accessible, provide this concrete command with
+resolved paths and the final checkout identity/pending-file handoff. State
+which assertions did not run and keep acceptance incomplete. A handoff is not
+a browser pass, and an installed browser version is not a launched-browser
+observation.
 
-Retain `free-labels-evidence.json`, browser logs/exit status, and screenshots
-covering the required cases, not just the final page. Extend evidence with
-scenario names, sources, anchors/cameras, independent and published bounds,
-pointer coordinates and selected targets, completion order, pending policy
-transitions, App actions, and history observations. Record Node/browser versions
-and the checkout revision plus any uncommitted changes. Record failures and
-unexecuted scenarios accurately; do not emit an overall pass after a skip.
+## 3. Inspect all browser scenarios and saved evidence
 
-The Phase 31B asset smoke is separate. Rerun it when adapter/loading/build
-changes warrant it, using a fresh build and configured external browser tools.
-Preserve its existing assertions and report its static and browser stages
-separately; it cannot substitute for the extended free-label check.
+Keep the current assertions active and inspect their actual results:
 
-## Verification
+1. Existing renderer regressions: real MathJax, mixed Japanese/text/math,
+   physical lines, complete current-source fallback and whitespace, finite
+   dimensions, nine anchors, paint, duplicate immutable geometry, click/cycling/
+   drag behavior, and conversion reuse.
+2. Independent content oracle: alpha-pixel/native content measurements exclude
+   transparent hit boxes and overlays but retain painted formula rules.
+   Inflated/displaced bounds negative controls must be rejected. Preserve
+   documented finite ink/advance/leading allowances and coordinate transforms.
+3. Boundary matrix: tall and compact formulas across center/north/east in 2D,
+   after pan/zoom, and under a changed 3D camera. All 18 cases must run, with
+   real normal/Alt probes, selected targets, callback counts, and obsolete
+   raw-source-width probes for compact formulas.
+4. Controlled races: source, independent bounds, and actual picking agree at
+   pending, newer-completed, and obsolete-completed stages. Obsolete success
+   and failure both run; current placement/style/selection and model/history/
+   both TikZ modes remain unaffected by stale completion.
+5. Pending policy: locking removes interaction/drag access while a request is
+   held; autoHide stays hidden and unselectable after delivery. Unlocking,
+   restored visibility, hidden/filtered layers, and autoDim preserve policy.
+6. Deletion/unmount: held request instrumentation proves delivery even when
+   DOM pending markers disappear; stale results cannot resurrect content.
+7. Actual App: textarea edits, valid-invalid-valid, JSON download/import/reload
+   with raw source and CRLF, Undo/Redo while held, preserved redo branches, and
+   real loads reusing label IDs and advancing document revisions. Preserve
+   both TikZ modes and revision-correct picking.
+8. Current SVG cloning: transparent/white export retains settled geometry and
+   current literal fallback and removes overlays. Do not require or introduce
+   31E waiting for settlement.
 
-Run the focused layout/runtime/picking tests and the full suite/build:
+Inspect `free-labels-evidence.json`, `browser.log`, `browser.exit-status`,
+`checkout.diff`, and `checkout-untracked.json`, plus `geometry-*.png`, race/
+policy screenshots, `app-*.png`, downloaded App JSON, and `settled-export.png`.
+Screenshots alone do not replace assertions or measured/pointer evidence.
 
-```bash
-PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
-PATH=/opt/homebrew/bin:$PATH node --test \
-  tests/rendering/svgLabelLayout.test.ts \
-  tests/rendering/svgLabelRuntime.test.ts \
-  tests/rendering/svgLabelPicking.test.ts
+### Interpret completion accurately
 
-PATH=/opt/homebrew/bin:$PATH npm test
-PATH=/opt/homebrew/bin:$PATH npm run build
+Require all of the following:
 
-PATH=/opt/homebrew/bin:$PATH node --check scripts/checkFreeLabels.mjs
-PATH=/opt/homebrew/bin:$PATH node node_modules/eslint/bin/eslint.js \
-  scripts/checkFreeLabels.mjs \
-  scripts/fixtures/freeLabels.tsx \
-  src/rendering/SvgTexLabel.tsx \
-  src/rendering/labels/svgLabelLayout.ts \
-  src/rendering/labels/svgLabelRuntime.ts \
-  src/rendering/svgLabelBounds.ts \
-  src/rendering/svgHitTesting.ts \
-  tests/rendering/svgLabelLayout.test.ts \
-  tests/rendering/svgLabelRuntime.test.ts \
-  tests/rendering/svgLabelPicking.test.ts
+- browser command exit 0;
+- evidence `result: "passed"`, `stage: "complete"`, and a real
+  `environment.browserVersion`;
+- all eight scenario groups present in `completed`;
+- empty `incompleteGroups` and `unexecuted`, and no uncaught `pageErrors`;
+- per-scenario geometry/pointer/race/App observations and corresponding
+  artifacts for this exact implementation.
 
-git diff --check
+The eight group names are:
+
+```text
+existing-renderer-regressions
+independent-oracle-negative-controls
+boundary-anchor-camera-matrix
+inverted-success-and-failure-races
+pending-lock-and-autohide
+deletion-and-unmount
+real-App-input-JSON-history-reused-ID-load
+current-SVG-cloning
 ```
 
-Include all additional changed files in targeted checks. Register any new Node
-test files explicitly in `npm test`. Type-check all development TS/TSX fixtures
-with strict settings: the current application build includes `src` and does
-not include `scripts/fixtures`. Use a reproducible fixture tsconfig with the
-app's compiler options, `strict: true`, Vite/DOM types, and the fixture entry
-files. Do not rely on a previous session's `/private/tmp` config still existing.
+A failed run can still save checkout metadata, partial evidence, and a failure
+screenshot if it reached a page. Report the failing stage and incomplete groups.
+Do not label a pre-launch failure, partial run, or skipped scenario as a pass.
+Do not import Phase 31B's special exit-2 interpretation into this script.
 
-If touching App/SvgDiagram, compare their lint diagnostics against the baseline
-and introduce no new failures. Keep the review's unchanged 10 errors and
-4 warnings distinct from targeted check results; do not perform unrelated
-lint cleanup. Run repository-wide lint only if the repository is lint-clean.
+## 4. Fix only further demonstrated Phase 31C failures
 
-Run the strengthened browser command on the final implementation. Report
-actual results and counts, with focused tests identified as a subset of the
-full suite. A successful browser run does not need repeating for subsequent
-documentation-only changes. Nonblocking build-size warnings are not failures.
+After correcting the confirmed oracle defect, retain evidence for any further
+assertion failure and diagnose whether it is in the product or test setup.
+Make the smallest justified fix, add focused regressions where appropriate,
+and rerun affected browser coverage and required checks. Do not infer that
+fixing the first assertion completes the previously unexecuted groups.
+
+Do not weaken independent measurement, widen tolerances without measured
+justification, replace pointer probes with direct selection, bypass App
+handlers with fixture state assignment, skip race/pending cases, suppress
+unexpected browser errors, or force completion flags to obtain a pass.
+
+Keep test seams development-gated and preserve source ownership, generation
+cleanup, anchors, picking policy, immutable reuse, 2D/3D interactions, layer/
+occlusion behavior, and SVG cloning. Runtime results stay outside model JSON,
+history, and TikZ.
 
 ## Documentation
 
-Update the Phase 31C verification section in `docs/PREVIEW_UI.md` with actual
-coverage, reproducible commands, environment, exit status, artifact locations,
-and any remaining limitations. Correct claims based on the old circular
-bounds assertion or fixture-only App coverage.
+Update `docs/PREVIEW_UI.md` with actual commands, execution environment,
+Node/launched-browser versions, exit status, checkout identity, observations,
+artifact paths, and remaining limitations. Distinguish implemented tests from
+executed tests. Keep historical blocked attempts identified as historical.
+Record the authorized Chrome run's tab assertion separately from historical
+`EPERM` attempts and from the subsequent font diagnostic. Do not describe the
+current state as solely a browser-startup restriction or claim full acceptance
+from the targeted diagnostic.
 
-Keep `docs/ROADMAP.md` consistent: mark 31C complete only after all required
-browser cases actually pass. Keep historical blocked attempts identifiable
-as historical. Preserve Phase 31B's verified evidence and leave 31D/31E/31F
-deferred. Do not rewrite unrelated documentation.
+Keep `docs/ROADMAP.md` consistent. Mark 31C acceptance complete only after all
+required groups pass. Preserve Phase 31B's verified evidence and keep 31D–31F
+deferred. If the run remains blocked or fails, retain the precise open gate.
+
+## Verification
+
+Run focused tests, full suite, build, strict fixture TypeScript, and script
+checks with the required Node PATH:
+
+```bash
+export PATH=/opt/homebrew/bin:$PATH
+node scripts/prepareMathjaxAssets.mjs
+node --test \
+  tests/rendering/svgLabelLayout.test.ts \
+  tests/rendering/svgLabelRuntime.test.ts \
+  tests/rendering/svgLabelPicking.test.ts
+npm test
+npm run build
+node node_modules/typescript/bin/tsc -p scripts/fixtures/tsconfig.json --noEmit
+node --check scripts/checkFreeLabels.mjs
+node --check scripts/checkFreeLabelGeometry.mjs
+node --check scripts/checkFreeLabelRaces.mjs
+node --check scripts/checkFreeLabelsApp.mjs
+node node_modules/eslint/bin/eslint.js \
+  scripts/checkFreeLabels.mjs scripts/checkFreeLabelGeometry.mjs \
+  scripts/checkFreeLabelRaces.mjs scripts/checkFreeLabelsApp.mjs \
+  scripts/fixtures/freeLabels.tsx scripts/fixtures/freeLabelsApp.tsx \
+  scripts/fixtures/labelBrowserOracle.ts \
+  src/rendering/SvgTexLabel.tsx src/rendering/labels/svgLabelLayout.ts \
+  src/rendering/labels/svgLabelRuntime.ts src/rendering/svgLabelBounds.ts \
+  src/rendering/svgHitTesting.ts tests/rendering/svgLabelLayout.test.ts \
+  tests/rendering/svgLabelRuntime.test.ts tests/rendering/svgLabelPicking.test.ts
+git diff --check
+```
+
+Run the browser command above on the final corrected harness. A successful run
+need not be repeated for later documentation-only changes. Include additional
+modified files in targeted checks and register new Node tests explicitly in
+`npm test`. Record actual results; focused counts are included in the full
+suite and must not be added to its total.
+
+If touching App/SvgDiagram, compare diagnostics against the baseline and
+introduce no new failures. Run repository-wide lint only if lint-clean; avoid
+unrelated baseline cleanup. Report nonblocking chunk-size warnings separately.
+
+The Phase 31B asset/browser smoke is separate. Rerun it if adapter/loading/build
+changes warrant it, with a fresh build and configured browser tools; its
+success does not replace Phase 31C interaction evidence.
 
 ## Scope and preservation requirements
 
-Limit changes to the acceptance harness, focused regressions, necessary small
-test seams, completion documentation, and any demonstrated Phase 31C defect.
-Do not proactively redesign the adapter, lifecycle, or picking architecture.
+Limit changes to the confirmed test-oracle fix, related diagnostic/regression
+coverage, completion documentation, and any further demonstrated Phase 31C
+product or harness defect. Use strict TypeScript without `any`.
 
 Preserve raw-source authority, JSON schema, coordinates, history semantics,
-both TikZ modes, 2D/3D interactions, layer and occlusion policy, immutable
-conversion reuse, exact-source fallback, and current SVG export behavior.
-Use strict TypeScript without `any`. Keep derived results out of persistence
-and history. Do not add inline-node typesetting, new stratum-label uses,
-settled-export waiting, dependencies, or unrelated cleanup.
+both TikZ modes, free-label behavior, existing user changes, and dependencies.
+Do not implement inline-node conversion, new stratum-label uses, settled-export
+waiting, or unrelated cleanup.
 
 ## Acceptance criteria
 
-Phase 31C can be called complete only when:
+Phase 31C can be called complete only when the font oracle uses actual displayed
+font metrics without relaxing the existing tolerance, the strengthened check
+passes all eight groups on the identified current implementation, saved
+evidence supports every required observation, any demonstrated defects are
+fixed, required non-browser checks pass, and documentation matches the result.
+No Critical or Medium issue may remain; 31D–31F remain deferred.
 
-- independent content measurement detects incorrect bounds without using
-  the transparent hit rectangle as its own oracle;
-- tall/compact formulas pass center/north/east boundary picking in 2D,
-  after pan/zoom, and in 3D through production pointer/event paths;
-- current bounds and selection remain correct after inverted completions,
-  obsolete failure, and actual App document loads reusing label IDs;
-- lock/autoHide behavior is verified while pending and after completion;
-- actual App input, JSON, and Undo/Redo preserve source and history, with
-  no conversion-derived history entries or stale restored layouts;
-- the extended browser check passes with saved, reviewable evidence and no
-  omitted required cases;
-- relevant tests, build, fixture type-check, targeted lint, syntax, and diff
-  checks pass, and documentation accurately reports their scope;
-- no Critical or Medium issue remains and later subphases stay deferred.
-
-Environment restrictions or unexecuted browser assertions leave M1 open.
-Passing pure helpers or the old harness alone cannot close it.
+An environment block, partial run, or unexecuted browser assertion leaves M1
+open. Node tests and static inspection alone cannot close it.
 
 ## Report after implementation
 
-Report files changed and why; how each M1 coverage gap is now tested; any
-demonstrated production defect and its minimal fix; exact commands, exit
-statuses, Node/browser versions, revision/diff identity, and separate
-focused/full test counts; browser artifact paths and measured/pointer/race/App
-evidence; baseline lint debt and nonblocking warnings; documentation status;
-and any remaining blocked check with its exact cause and concrete handoff.
+Report the confirmed font-oracle defect and fix, its independent regression
+evidence, further observed failures and minimal fixes; files modified;
+exact commands, versions, exit statuses,
+revision/pending-file identity, and focused/full counts; scenario evidence,
+logs and artifact paths; documentation status; and remaining blocked checks,
+exact restrictions, and a concrete permitted-environment handoff if needed.
 State explicitly whether every Phase 31C acceptance gate passed.
