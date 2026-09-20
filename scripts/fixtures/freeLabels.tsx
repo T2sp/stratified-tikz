@@ -22,6 +22,7 @@ import type { GeometryHandleDragSession } from '../../src/ui/geometryHandles.ts'
 import { commitDiagramChange, createDiagramHistory, redoLastDiagramChange, undoLastDiagramChange } from '../../src/ui/undo.ts'
 import type { UndoableEditorState } from '../../src/ui/undo.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
+import { inspectAndAssertLabelContent } from './labelBrowserOracle.ts'
 
 type LabelInput = { id: string; text: string; position?: Vec3; layer?: number; style?: Partial<LabelStyle> }
 type FixtureOptions = {
@@ -31,6 +32,7 @@ type FixtureOptions = {
   occlusion?: 'autoHide' | 'autoDim'
 }
 type Deferred = { promise: Promise<void>; release(): void; fail: boolean; requests: Promise<LabelConversionResult>[] }
+type RequestObservation = { id: number; source: string; fontSize: number; held: boolean; phase: 'converting' | 'held' | 'delivered'; result?: string }
 const container = document.getElementById('root')!
 let root = createRoot(container)
 let sourceRevision = 0
@@ -43,6 +45,8 @@ let invocationCount = 0
 let requestCount = 0
 let dragCount = 0
 const selectionEvents: SelectedElement[] = []
+const callbackEvents: { selection: SelectedElement; options: unknown }[] = []
+const requests: RequestObservation[] = []
 const holds = new Map<string, Deferred>()
 const measurement = createBrowserTextMeasurementProvider()
 
@@ -75,13 +79,17 @@ function makeRuntime() {
     convert(source, settings) {
       requestCount++
       const held = holds.get(source)
-      const conversion = ownedService.convert(source, settings)
-      if (!held) return conversion
-      const completion = conversion.then(async (result) => {
-        await held.promise
-        return held.fail ? { ...result, kind: 'fallback', reason: 'output-error' } as LabelConversionResult : result
+      const request: RequestObservation = { id: requestCount, source, fontSize: settings.font.sizePx, held: !!held, phase: 'converting' }
+      requests.push(request)
+      const completion = ownedService.convert(source, settings).then(async (result) => {
+        if (held) { request.phase = 'held'; await held.promise }
+        const delivered: LabelConversionResult = held?.fail
+          ? { ...result, kind: 'fallback', reason: 'output-error' } : result
+        request.phase = 'delivered'
+        request.result = delivered.kind
+        return delivered
       })
-      held.requests.push(completion)
+      held?.requests.push(completion)
       return completion
     },
   } })
@@ -100,8 +108,9 @@ function redraw() {
     labelRuntime={runtime}
     labelDocumentRevision={sourceRevision}
     {...props}
-    onSelectionChange={(selectedElement) => {
+    onSelectionChange={(selectedElement, options) => {
       selectionEvents.push(selectedElement)
+      callbackEvents.push({ selection: selectedElement, options })
       editor = { ...editor, selectedElement }
       redraw()
     }}
@@ -143,6 +152,8 @@ function mount(options: FixtureOptions) {
   editor = { editableDiagram: diagram, selectedElement: null, layerFilter: { kind: 'all' },
     polylineDraft: null, cubicBezierDraft: null, pathDraft: null, sheetPolygonDraft: null, history: createDiagramHistory(diagram) }
   selectionEvents.length = 0
+  callbackEvents.length = 0
+  dragCount = 0
   redraw()
 }
 
@@ -155,9 +166,10 @@ function mutateLabel(id: string, change: Partial<TextLabel>) {
 
 function state() {
   const diagram = editor.editableDiagram
-  const camera = resolveSvgCamera(diagram, 900, 700, props)
+  const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
   return {
-    invocationCount, requestCount, dragCount, selection: editor.selectedElement, selectionEvents,
+    invocationCount, requestCount, dragCount, selection: editor.selectedElement, selectionEvents, callbackEvents,
+    requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
     labels: diagram.labels,
     positions: Object.fromEntries(diagram.labels.map((label) => [label.id, projectToSvgPoint(camera, label.position, 700)])),
     json: serializeDiagram(diagram), history: JSON.stringify(editor.history),
@@ -167,6 +179,19 @@ function state() {
 
 const api = {
   mount, mutateLabel, state,
+  inspectContent(id: string) {
+    const label = editor.editableDiagram.labels.find((entry) => entry.id === id)
+    if (!label) throw new Error(`Unknown label ${id}`)
+    return inspectAndAssertLabelContent(id, { fontSize: label.style.fontSize * 1.35 })
+  },
+  setLayers(layers: Diagram['layers']) {
+    editor = { ...editor, editableDiagram: { ...editor.editableDiagram, layers } }
+    redraw()
+  },
+  setVisibility(labelVisibility: 'autoHide' | 'autoDim' | 'alwaysForeground') {
+    props = { ...props, visibilityOptions: { ...defaultVisibilityOptions, enabled: true, labelVisibility } }
+    redraw()
+  },
   deleteLabel(id: string) {
     editor = { ...editor, editableDiagram: { ...editor.editableDiagram, labels: editor.editableDiagram.labels.filter((label) => label.id !== id) } }
     redraw()
@@ -183,13 +208,14 @@ const api = {
   },
   async release(source: string, fail = false) {
     const held = holds.get(source)
-    if (held) {
+    if (!held || held.requests.length === 0) throw new Error(`Release before request started: ${source}`)
+    {
       held.fail = fail
       holds.delete(source)
       held.release()
       await Promise.allSettled(held.requests)
       // Allow React to commit every released subscriber before observation.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     }
   },
   async changeService(mode: typeof serviceMode) {
@@ -252,14 +278,13 @@ async function runSelfChecks() {
     mount({ labels: sources.map((text, index) => ({ id: `check${index}`, text })) })
     const before = state()
     await waitSettled()
-    sources.forEach((text, index) => {
+    for (const [index, text] of sources.entries()) {
       const element = displayed(`check${index}`)
       assertBrowser(element.getAttribute('data-label-source') === text, `Exact source ${index}`)
       assertBrowser(element.getAttribute('data-label-state') === (index < 6 ? 'ready' : 'fallback'), `Result ${index}`)
       assertBrowser((element.querySelectorAll('[data-label-math]').length > 0) === (index < 6), `Whole-label result ${index}`)
-      const bounds = element.getBBox()
-      assertBrowser([bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite), `Finite bounds ${index}`)
-    })
+      await api.inspectContent(`check${index}`)
+    }
     const after = state()
     assertBrowser(before.json === after.json && before.history === after.history && before.tikz === after.tikz && before.inlineTikz === after.inlineTikz,
       'Conversion did not change JSON/history/either TikZ output')
@@ -274,21 +299,20 @@ async function runSelfChecks() {
     const anchors: LabelAnchor[] = ['center', 'north', 'south', 'east', 'west', 'north east', 'north west', 'south east', 'south west']
     mount({ labels: anchors.map((anchor, index) => ({ id: `a${index}`, text: '$\\frac{x_1}{y^2}$', style: { anchor, fontSize: 22, color: '#d02080', opacity: 0.6 } })) })
     await waitSettled()
-    anchors.forEach((anchor, index) => {
+    for (const [index, anchor] of anchors.entries()) {
       const element = displayed(`a${index}`)
       const [minX, minY, maxX, maxY] = element.getAttribute('data-label-bounds')!.split(' ').map(Number)
-      const native = element.getBBox()
-      assertBrowser(Math.abs(native.x - minX) < 1 && Math.abs(native.y - minY) < 1 && Math.abs(native.x + native.width - maxX) < 1 && Math.abs(native.y + native.height - maxY) < 1, 'Drawing and published bounds agree')
+      await api.inspectContent(`a${index}`)
       assertBrowser(Math.abs(anchor.includes('west') ? minX : anchor.includes('east') ? maxX : minX + maxX) < 1e-6, `${anchor} horizontal anchor`)
       assertBrowser(Math.abs(anchor.includes('north') ? minY : anchor.includes('south') ? maxY : minY + maxY) < 1e-6, `${anchor} vertical anchor`)
-    })
+    }
     const count = invocationCount
     mutateLabel('a0', { position: { x: 0.7, y: 0.2, z: 0 }, style: { ...editor.editableDiagram.labels[0].style, color: '#2040b0', opacity: 0.3, fontSize: 30 } })
     api.setProps({ cameraViewAdjustment: { zoom: 1.8, pan: { x: 20, y: -10 } } })
     api.select({ kind: 'label', id: 'a0' })
     await waitSettled()
     assertBrowser(invocationCount === count, 'Movement/font/color/opacity/camera/selection reuse math conversion')
-    record(`PASS: nine anchors, native bounds, tall math, paint/font/camera reuse (engine count ${count})`)
+    record(`PASS: nine anchors, independent visible-content extents, tall math, paint/font/camera reuse (engine count ${count})`)
 
     mount({ ambientDimension: 3, labels: [{ id: 'projected', text: '$\\alpha \\Rightarrow g$', position: { x: 0.6, y: 0.4, z: 0.7 } }] })
     await waitSettled()

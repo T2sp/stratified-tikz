@@ -6,32 +6,67 @@
  * STZ_BROWSER_EXECUTABLE=/absolute/path/to/chrome node scripts/checkFreeLabels.mjs
  */
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createServer } from 'vite'
+import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
+import { runRaceChecks } from './checkFreeLabelRaces.mjs'
+import { runAppChecks } from './checkFreeLabelsApp.mjs'
 
-const playwrightModule = process.env.STZ_PLAYWRIGHT_MODULE ?? 'playwright'
-let chromium
-try {
-  ;({ chromium } = await import(isAbsolute(playwrightModule) ? pathToFileURL(playwrightModule).href : playwrightModule))
-} catch (error) {
-  throw new Error('Browser check unavailable: provide STZ_PLAYWRIGHT_MODULE (no browser check has passed)', { cause: error })
-}
-const server = process.env.STZ_BROWSER_BASE_URL ? null
-  : await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
-if (server) await server.listen()
-const address = server?.httpServer.address()
-assert.ok(process.env.STZ_BROWSER_BASE_URL || (address && typeof address !== 'string'))
-const origin = process.env.STZ_BROWSER_BASE_URL ?? `http://127.0.0.1:${address.port}`
+const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
+await mkdir(artifactDir, { recursive: true })
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
+const diff = git('diff', 'HEAD', '--binary')
+const untrackedNames = git('ls-files', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean)
+const untracked = Object.fromEntries(await Promise.all(untrackedNames.map(async (file) => [file, await readFile(file, 'utf8')])))
+const checkout = { revision: git('rev-parse', 'HEAD').trim(), status: git('status', '--short'),
+  trackedDiffSha256: createHash('sha256').update(diff).digest('hex'),
+  untrackedSha256: Object.fromEntries(Object.entries(untracked).map(([file, text]) =>
+    [file, createHash('sha256').update(text).digest('hex')])) }
+await writeFile(resolve(artifactDir, 'checkout.diff'), diff)
+await writeFile(resolve(artifactDir, 'checkout-untracked.json'), JSON.stringify(untracked, null, 2))
+const scenarios = [
+  'existing-renderer-regressions', 'independent-oracle-negative-controls', 'boundary-anchor-camera-matrix',
+  'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount',
+  'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
+]
+const completed = []
 const evidence = []
-let browser
+const pageErrors = []
+const environment = { nodeVersion: process.version, browserVersion: null,
+  playwrightModule: process.env.STZ_PLAYWRIGHT_MODULE ?? 'playwright',
+  browserExecutable: process.env.STZ_BROWSER_EXECUTABLE ?? null,
+  serverKind: 'Vite development server (production renderer and development fixtures)',
+  baseUrl: process.env.STZ_BROWSER_BASE_URL ?? null }
+let browser, server, page
+let stage = 'playwright-import'
+async function save(result, error) {
+  await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout,
+    completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
+    unexecuted: evidence.length === 0 ? scenarios : [],
+    coverageNote: 'A group is complete only after every assertion returns; partial progress is recorded in evidence.', evidence, pageErrors,
+    error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, null, 2) + '\n')
+}
 try {
+  const moduleName = environment.playwrightModule
+  const { chromium } = await import(isAbsolute(moduleName) ? pathToFileURL(moduleName).href : moduleName)
+  stage = 'development-server-listen'
+  server = process.env.STZ_BROWSER_BASE_URL ? null
+    : await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
+  if (server) await server.listen()
+  const address = server?.httpServer.address()
+  assert.ok(process.env.STZ_BROWSER_BASE_URL || (address && typeof address !== 'string'))
+  const origin = process.env.STZ_BROWSER_BASE_URL ?? `http://127.0.0.1:${address.port}`
+  environment.baseUrl = origin
+  stage = 'browser-launch'
   browser = await chromium.launch({ headless: true,
     ...(process.env.STZ_BROWSER_EXECUTABLE ? { executablePath: process.env.STZ_BROWSER_EXECUTABLE } : {}) })
-  const environment = { browserVersion: browser.version(), nodeVersion: process.version }
-  const page = await browser.newPage({ viewport: { width: 1100, height: 850 } })
-  const pageErrors = []
+  environment.browserVersion = browser.version()
+  stage = 'renderer-fixture'
+  page = await browser.newPage({ viewport: { width: 1100, height: 850 } })
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabels.html`)
   await page.waitForFunction(() => window.stzLabels !== undefined)
@@ -44,7 +79,7 @@ try {
     const outer = document.querySelector(`[data-label-id="${labelId}"]`)
     const node = outer?.querySelector('[data-label-state]')
     if (!node) return null
-    const box = node.getBBox()
+    const box = node.querySelector(':scope > g').getBBox()
     const rect = node.getBoundingClientRect()
     return {
       source: node.getAttribute('data-label-source'), state: node.getAttribute('data-label-state'),
@@ -65,7 +100,8 @@ try {
   }
   async function record(name, details = {}) {
     evidence.push({ name, ...details })
-    console.log(JSON.stringify({ result: 'passed', name, ...details }))
+    console.log(JSON.stringify({ result: 'passed', name }))
+    await save('running')
   }
 
   const fallbackSource = '  "<>&"  \\textbf{bad}\t keep \\slash\r\n tail  '
@@ -124,16 +160,8 @@ try {
     const item = await inspect(`anchor${index}`)
     assert.equal(item.paint, '#d02080')
     assert.equal(item.paintOpacity, '0.6')
-    const projected = anchored.positions[`anchor${index}`]
-    // Native layout bounds must be on the requested side of the projected
-    // anchor. Vertical font line metrics may leave harmless leading around ink.
-    const x = item.rect.x, y = item.rect.y, w = item.rect.width, h = item.rect.height
-    if (anchor.includes('west')) assert.ok(Math.abs(x - projected.x) < 2, `${anchor} left`)
-    else if (anchor.includes('east')) assert.ok(Math.abs(x + w - projected.x) < 2, `${anchor} right`)
-    else assert.ok(Math.abs(x + w / 2 - projected.x) < 2, `${anchor} horizontal center`)
-    if (anchor.includes('north')) assert.ok(Math.abs(y - projected.y) < 2, `${anchor} top`)
-    else if (anchor.includes('south')) assert.ok(Math.abs(y + h - projected.y) < 2, `${anchor} bottom`)
-    else assert.ok(Math.abs(y + h / 2 - projected.y) < 2, `${anchor} vertical center`)
+    const measured = await page.evaluate((id) => window.stzLabels.inspectContent(id), `anchor${index}`)
+    await record(`legacy-anchor-${anchor}`, { measurement: measured, camera: anchored.camera })
   }
   const beforeColor = await state()
   await page.evaluate(() => window.stzLabels.mutateLabel('anchor0', { style: { kind: 'labelStyle', color: '#2040b0', opacity: 0.4, fontSize: 32, anchor: 'center' } }))
@@ -252,54 +280,12 @@ try {
   }
   await record('locked/hidden/filtered layers and autoHide/autoDim preserve picking policy')
 
-  await page.evaluate(() => window.stzLabels.hold('$oldA$'))
-  await page.evaluate(() => window.stzLabels.hold('$newB$'))
-  await mount([{ id: 'race', text: '$oldA$', position: { x: 0, y: 0, z: 0 } }])
-  assert.equal((await inspect('race')).state, 'pending')
-  await page.evaluate(() => window.stzLabels.mutateLabel('race', { text: '$newB$' }))
-  assert.equal((await inspect('race')).source, '$newB$')
-  assert.equal((await inspect('race')).state, 'pending')
-  const pendingExport = await page.evaluate(() => window.stzLabels.export())
-  assert.ok(pendingExport.includes('$newB$'))
-  await page.evaluate(() => {
-    window.stzLabels.mutateLabel('race', { position: { x: 1, y: 1, z: 0 }, style: { color: '#2070b0', opacity: 0.3 } })
-    window.stzLabels.select({ kind: 'label', id: 'race' })
-  })
-  await page.evaluate(() => window.stzLabels.release('$newB$'))
-  await settled()
-  await page.evaluate(() => window.stzLabels.release('$oldA$', true))
-  assert.equal((await inspect('race')).source, '$newB$')
-  assert.equal((await inspect('race')).state, 'ready')
-  assert.equal((await inspect('race')).paint, '#2070b0')
-  assert.equal((await inspect('race')).paintOpacity, '0.3')
-  assert.equal((await state()).selection.id, 'race')
-  assert.deepEqual((await state()).labels[0].position, { x: 1, y: 1, z: 0 })
-  await page.evaluate(() => window.stzLabels.mutateLabel('race', { text: 'invalid $' }))
-  assert.equal((await inspect('race')).source, 'invalid $')
-  assert.equal((await inspect('race')).math, 0)
-  await settled()
-  await page.evaluate(() => window.stzLabels.mutateLabel('race', { text: '$newB$' }))
-  await settled()
-  assert.equal((await inspect('race')).state, 'ready')
-  await record('controlled completion inversion and obsolete failure, valid-invalid-valid, pending export')
-
-  await page.evaluate(() => window.stzLabels.hold('$deleteMe$'))
-  await page.evaluate(() => window.stzLabels.mutateLabel('race', { text: '$deleteMe$' }))
-  await page.evaluate(() => window.stzLabels.deleteLabel('race'))
-  await page.evaluate(() => window.stzLabels.release('$deleteMe$'))
-  assert.equal(await label('race').count(), 0)
-  await page.evaluate(() => window.stzLabels.hold('$oldDocument$'))
-  await mount([{ id: 'reused', text: '$oldDocument$' }])
-  await mount([{ id: 'reused', text: '$newDocument$' }])
-  await settled()
-  await page.evaluate(() => window.stzLabels.release('$oldDocument$'))
-  assert.equal((await inspect('reused')).source, '$newDocument$')
-  await page.evaluate(() => window.stzLabels.hold('$unmounted$'))
-  await page.evaluate(() => window.stzLabels.mutateLabel('reused', { text: '$unmounted$' }))
-  await page.evaluate(() => window.stzLabels.unmount())
-  await page.evaluate(() => window.stzLabels.release('$unmounted$'))
-  assert.equal(await page.locator('svg.svg-diagram').count(), 0)
-  await record('deleted labels, reused imported IDs, and unmount reject stale completions')
+  stage = 'independent-geometry-and-boundary-picking'
+  await runGeometryChecks({ page, record, artifactDir })
+  completed.push('independent-oracle-negative-controls', 'boundary-anchor-camera-matrix')
+  stage = 'controlled-races-and-pending-policy'
+  await runRaceChecks({ page, record, artifactDir })
+  completed.push('inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount')
 
   for (const mode of ['load-error', 'output-error']) {
     await page.evaluate((value) => window.stzLabels.changeService(value), mode)
@@ -337,14 +323,20 @@ try {
     assert.equal(parsed.foreign, 0)
   }
   await record('currently visible transparent/white SVG export retains settled geometry and literal fallback; editor overlays removed')
+  completed.push('existing-renderer-regressions', 'current-SVG-cloning')
+  await page.screenshot({ path: resolve(artifactDir, 'settled-export.png'), fullPage: true })
+  stage = 'real-App-workflows'
+  await runAppChecks({ browser, origin, record, artifactDir })
+  completed.push('real-App-input-JSON-history-reused-ID-load')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')
-  if (process.env.STZ_SMOKE_ARTIFACT_DIR) {
-    const output = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR)
-    await mkdir(output, { recursive: true })
-    await page.screenshot({ path: resolve(output, 'free-labels.png'), fullPage: true })
-    await writeFile(resolve(output, 'free-labels-evidence.json'), JSON.stringify({ result: 'passed', ...environment, evidence, pageErrors }, null, 2) + '\n')
-  }
-  console.log(JSON.stringify({ result: 'free-label-browser-check-passed', ...environment, checks: evidence.length }))
+  stage = 'complete'
+  await save('passed')
+  console.log(JSON.stringify({ result: 'free-label-browser-check-passed', environment, checks: evidence.length, artifactDir }))
+} catch (error) {
+  if (page) await page.screenshot({ path: resolve(artifactDir, 'failure.png'), fullPage: true }).catch(() => {})
+  await save('failed', error)
+  console.error(`Free-label browser acceptance failed at ${stage}; evidence: ${artifactDir}`)
+  throw error
 } finally {
   await browser?.close()
   await server?.close()

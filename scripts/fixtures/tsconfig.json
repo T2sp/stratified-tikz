@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.app.json",
+  "compilerOptions": {
+    "strict": true,
+    "tsBuildInfoFile": "../../node_modules/.tmp/tsconfig.fixtures.tsbuildinfo",
+    "types": ["vite/client"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}

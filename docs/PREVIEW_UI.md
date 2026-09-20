@@ -203,28 +203,155 @@ stratum metadata are unchanged.
 
 ### Free-label verification
 
-`npm test` explicitly includes the layout, lifecycle, and picking tests. The
-browser check uses the production `SvgDiagram`, real MathJax, controlled request
-completion, and the existing selection/drag/export handlers. It uses the same
-external Playwright/Chrome arrangement as the adapter check; no dependency was
-added. Its development fixture is not an application build entry.
+Phase 31C acceptance is **incomplete**. The targeted M1 follow-up extends the
+browser harness; its new browser assertions have not run successfully. The old
+whole-group `getBBox()` comparison included the transparent picking rectangle
+and was not independent evidence of visible bounds. Fixture mutation/history
+helpers were also not proof of actual App input or document loading.
+
+The strengthened `npm run check:free-labels` uses a **Vite development server**,
+production `SvgDiagram`, and a separate fixture mounting the real `App`. These
+fixtures are not production build entries. No dependencies or MathJax versions
+changed. `App` has only a development-gated runtime injection and read-only,
+serialized diagnostics; editor, load/save, revision, selection, and history
+handlers remain the production handlers.
+
+The harness now contains these required assertions (coverage implemented,
+**browser observations still pending**):
+
+- Independent alpha-pixel extents of an isolated visible-content SVG clone.
+  Native descendant bounds and full `getScreenCTM()` transforms size the raster;
+  neither published bounds nor the picking rectangle sizes the oracle. Editor
+  overlays are excluded and painted MathJax rectangles/fraction rules retained.
+  Raster density is four samples per SVG unit, capped at 4096 on the longest
+  side. Allowances per published edge are 0.35 em + 1 SVG unit horizontally,
+  plus independently measured literal edge whitespace, and 0.85 em + 1 vertically
+  for font leading; ink may protrude by at most 1 unit. Hit/published agreement
+  tolerance is 0.01. These finite allowances distinguish ink from advance and
+  leading without permitting arbitrary inflation. Negative controls inflate or
+  displace both published and hit boxes by 8 em, require rejection with unchanged
+  ink, and restore the DOM in `finally`. Retained fixture self-checks use this
+  same independent oracle.
+- All nine anchors, plus 18 required boundary cases: tall nested fraction
+  `$\frac{1}{1+\frac{x}{1+\frac{y}{z}}}$` and compact
+  `$\mathord{\mathord{\mathord{\alpha}}}$`, each with center/north/east in 2D,
+  after pan/zoom, and after a changed 3D camera at nonzero depth. Each case records
+  22 real pointer probes, canvas/client transforms, actual selected targets and
+  callback counts. Blank canvas clicks clear selection before probes. Normal
+  clicks use the hit rectangle; Alt cycling retains 6/4 units padding plus
+  8 units tolerance (14 horizontally, 12 vertically). Compact cases also probe
+  inside the obsolete raw-character estimate and outside the measured hit area.
+  Glyph clicks, mixed compiled/fallback cycling, and camera/position/paint/
+  selection conversion counts are checked separately.
+- Held completions record started requests, current font size, held state, and
+  delivery even after hidden/deleted/unmounted DOM disappears. Newer completion
+  precedes obsolete success or failure, with independent bounds and real boundary
+  and stale-layout-only clicks at pending, current-ready, and obsolete-completed
+  stages. Completion alone must preserve model, history, both TikZ modes, current
+  position/style and selection. Releases wait for request promises and two
+  animation frames. Locking removes a previously usable drag handle while pending;
+  autoHide transitions from pending autoDim and stays hidden after delivery.
+  Restored visibility/unlocking, hidden/filtered layers and autoDim remain covered.
+- Real App textarea edits valid → invalid → valid; actual JSON import/download/
+  reload with delimiters, backslashes, Unicode, spaces, physical newlines and
+  exact CRLF; actual Undo/Redo while held and preservation of an existing redo
+  branch; actual JSON document replacement with reused IDs and observed App
+  document revisions. Both production TikZ modes and current SVG cloning remain
+  checked. Runtime state is never assigned into App model/history by the fixture.
+
+New verification on 2026-09-21, at base revision
+`4b25b823fab52157eef0b7c9b313a199c9d5aee5` plus this follow-up diff:
+
+| Check | New result |
+| --- | --- |
+| Asset preparation | exit 0 |
+| Focused layout/runtime/picking | exit 0; 23 passed (subset of full suite) |
+| `npm test` | exit 0; 2,281 passed, none failed/skipped |
+| `npm run build` | exit 0; nonblocking chunk-size warning |
+| Strict development-fixture TypeScript | exit 0 |
+| Targeted lint and all four browser-script syntax checks | exit 0 |
+| App/SvgDiagram lint comparison against HEAD | unchanged 10 errors / 4 warnings; raw lint exit 1, baseline comparison passed |
+| `git diff --check` | exit 0 |
+| Strengthened free-label browser acceptance | **exit 1 before assertions**, `listen EPERM: operation not permitted 127.0.0.1:5173` |
+
+Node is v26.9.0, resolved at `/opt/homebrew/Cellar/node/26.9.0/bin/node`.
+Installed Chrome is 153.0.8010.52 (read from its application metadata); **Chrome
+was not launched by this attempt**, so there is no observed browser version or
+browser pass. This session permits workspace writes but has approval policy
+`never`; no escalation is available and no external development origin was
+configured. No browser-security or persistent runner settings were changed.
+
+Verification logs/statuses are in
+`/private/tmp/stz-phase31c-verification.n21xIe`. The strengthened browser attempt
+is retained in `/private/tmp/stz-phase31c-browser-acceptance.2ni7DV`:
+`browser.log`, `browser.exit-status`, `free-labels-evidence.json`, `checkout.diff`,
+and `checkout-untracked.json`. The evidence records zero completed browser
+groups and all required groups unexecuted. **No screenshots, measured extents,
+pointer results, race observations or App observations were produced**, since
+server startup failed. The tracked code diff SHA-256 for that attempt is
+`a906ef520e7189ac24fbdc8e918a10abe774ee7257b4cc5134ddc764376663e7`;
+per-file hashes and complete untracked harness contents are in the evidence.
+After that blocked attempt, the App script's multiline-input and stale-point
+assertions were refined and syntax/lint checked again. No browser assertion ran
+on either snapshot; the denied bind was not repeated without an environment
+change. `final-handoff.json`, `final-checkout.diff`, and
+`final-pending-files.tar.gz` in the same evidence directory identify and retain
+the final pending implementation (including untracked files). Earlier blocked
+review attempts remain historical; their reported results are not this
+follow-up's results.
+
+Run the final harness in an authorized Terminal or CI checkout containing this
+pending diff; a handoff is not acceptance. The resolved external tool paths are:
 
 ```bash
+PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
+STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
 PATH=/opt/homebrew/bin:$PATH \
 STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
 STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31c-browser-acceptance \
-npm run check:free-labels
+STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
+npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
+STZ_31C_BROWSER_STATUS=$?
+printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
+printf 'Evidence directory: %s\nBrowser exit status: %s\n' "$STZ_31C_EVIDENCE_DIR" "$STZ_31C_BROWSER_STATUS"
+test "$STZ_31C_BROWSER_STATUS" -eq 0
 ```
 
-Use a fresh artifact directory for each acceptance attempt. Optionally set
-`STZ_BROWSER_BASE_URL=http://127.0.0.1:5173` to use an existing development server.
-Current session: Node v26.9.0; 2,281 tests, build, focused lint, and diff check
-passed. Browser acceptance remains pending: localhost listen was denied with
-`EPERM`, Chrome launch aborted, and Computer Use reported Chrome access was not
-approved. These failures occurred before the browser assertions; they are not
-browser verification evidence. Phase 31C must not be marked acceptance-complete
-until the real-browser check passes.
+An explicitly set `STZ_BROWSER_BASE_URL` must serve **this checkout and its
+development fixtures** (for example, an authorized `npm run dev` server).
+A production build does not serve the fixtures. A successful run must retain
+`free-labels-evidence.json` with every completion group, per-scenario geometry/
+pointer/race/App observations, `geometry-*.png`, race/policy screenshots,
+`app-*.png`, App downloaded JSON, `settled-export.png`, logs/status, and checkout
+identity. Failures retain partial evidence and a failure screenshot if a page
+was reached; they never emit an overall pass.
+
+Reproduce the non-browser checks with:
+
+```bash
+export PATH=/opt/homebrew/bin:$PATH
+node scripts/prepareMathjaxAssets.mjs
+node --test tests/rendering/svgLabelLayout.test.ts tests/rendering/svgLabelRuntime.test.ts tests/rendering/svgLabelPicking.test.ts
+npm test
+npm run build
+node node_modules/typescript/bin/tsc -p scripts/fixtures/tsconfig.json --noEmit
+for script in scripts/checkFreeLabel*.mjs; do node --check "$script" || exit 1; done
+node node_modules/eslint/bin/eslint.js \
+  scripts/checkFreeLabel*.mjs scripts/fixtures/freeLabels.tsx \
+  scripts/fixtures/freeLabelsApp.tsx scripts/fixtures/labelBrowserOracle.ts \
+  src/rendering/SvgTexLabel.tsx src/rendering/labels/svgLabelLayout.ts \
+  src/rendering/labels/svgLabelRuntime.ts src/rendering/svgLabelBounds.ts \
+  src/rendering/svgHitTesting.ts tests/rendering/svgLabelLayout.test.ts \
+  tests/rendering/svgLabelRuntime.test.ts tests/rendering/svgLabelPicking.test.ts
+git diff --check
+```
+
+The reproducible fixture config extends application compiler options and enables
+strict checking plus Vite/DOM types for all development TS/TSX fixtures. Compare
+App/SvgDiagram lint separately against HEAD; repository-wide lint is skipped
+because that baseline is not clean. No adapter/loading/build configuration
+changed, so the independent Phase 31B asset/browser smoke was not rerun; its
+previous verified evidence remains separate. Phase 31D, 31E, and 31F are deferred.
 
 ## Export SVG
 

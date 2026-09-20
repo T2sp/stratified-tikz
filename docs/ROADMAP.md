@@ -1189,14 +1189,26 @@ Status: implemented; acceptance pending the actual production-browser check.
   rules, selection markers, and drag paths are preserved.
 - Conversion geometry is reused across duplicate labels and measurement
   changes; placement, camera, selection, and paint are separate inputs.
-- Added 23 focused Node tests and an external-Playwright harness exercising the
-  production renderer and selection handlers (`npm run check:free-labels`).
-  Full tests (2,281), build, focused lint, and `git diff --check` passed. Existing
-  App/SvgDiagram lint debt is unchanged; repository-wide lint was not run.
-- Actual browser acceptance is **not passed**: this session's localhost bind
-  returned `EPERM`, Chrome launch aborted, and Computer Use denied Google Chrome
-  access. The harness is typechecked; its browser assertions remain unverified.
-  See [the execution command](./PREVIEW_UI.md#free-label-verification).
+- Targeted M1 follow-up extends the development-server browser harness with
+  independent raster ink bounds and negative controls; 18 tall/compact anchor/
+  camera boundary cases; instrumented inverted completions and pending lock/
+  autoHide transitions; and real App editor, JSON, Undo/Redo and reused-ID loading.
+  The old transparent-hit-rectangle bounds assertion is replaced. These browser
+  assertions are implemented but **unexecuted**, not observed acceptance evidence.
+- New 2026-09-21 verification at `4b25b823` plus the follow-up diff: focused
+  23 tests (subset of the full 2,281) passed; build, strict fixture typecheck,
+  targeted lint, all browser-script syntax checks and diff check passed. Build
+  emitted only a nonblocking size warning. App/SvgDiagram lint debt remains
+  10 errors / 4 warnings against HEAD; repository-wide lint was not run.
+- Strengthened browser command exited **1 before assertions** at Vite
+  startup: `listen EPERM: operation not permitted 127.0.0.1:5173`. No Chrome
+  launch or browser observations occurred in this attempt. Evidence (including
+  explicit unexecuted groups and checkout diff identity) is in
+  `/private/tmp/stz-phase31c-browser-acceptance.2ni7DV`. Approval policy is `never`
+  and no permitted external development origin was configured. **M1 remains open;
+  Phase 31C is not acceptance-complete.** Earlier localhost/Chrome/Computer Use
+  restrictions recorded by the review are historical attempts. See the
+  [coverage, new results and authorized-run handoff](./PREVIEW_UI.md#free-label-verification).
 - Inline-node integration (31D) and settled export preparation (31E) remain
   deferred. Current SVG export continues to clone visible formulas/fallback.
 
