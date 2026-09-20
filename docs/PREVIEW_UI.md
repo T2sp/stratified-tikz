@@ -62,8 +62,23 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 Phase 31A defines the pure parser and fallback contract for future typeset label
 preview. It does not connect the parser to production rendering or change the
-appearance of existing labels. MathJax conversion, canvas integration, and
-typeset SVG export remain planned in [Phases 31B–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPTER.md)
+now separates true math advance from a conservative enclosure of retained SVG
+ink, with exact whole-source fallback for unsupported geometry or negative total
+advance. Native-module recovery now retires the complete lazy MathJax Worker
+and its runtime/shared/font module map. Phase 31B is acceptance-complete:
+the 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
+code and ran the unchanged smoke successfully (exit 0) in Chrome 153.0.8010.52.
+It verified same-origin additional-font requests, runtime/font/shared-module
+failure and same-service recovery on a browser observed to cache failed imports,
+Worker retirement, and all 15 standalone SVG containment fixtures. Earlier
+`EPERM` attempts stopped before browser launch; this later run supplies their
+missing evidence. The 144 focused parser/adapter tests (included in the full
+suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
+code. See the adapter's
+[current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
+Canvas integration and typeset SVG export remain planned in
+[Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,

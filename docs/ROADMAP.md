@@ -1088,7 +1088,13 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: in progress. Phase 31A is implemented; 31B through 31F remain planned.
+Status: in progress. Phases 31A and 31B are complete. The independent adapter's
+ink/advance fix, disposable-worker recovery, and regressions passed their checks.
+The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
+code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
+Actual additional-font loading, same-service native-import recovery, Worker
+retirement, and standalone SVG containment are verified; earlier sandbox
+`EPERM` attempts are historical. 31C through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1138,17 +1144,37 @@ existing label appearance is unchanged.
 
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
-Status: planned.
+Status: complete. The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde`
+passed a fresh build and the unchanged browser smoke (exit 0), closing the
+earlier environment-blocked gate. Chrome 153.0.8010.52 was observed to cache
+failed native imports, and all runtime/font/shared-module failure scenarios
+recovered in the same service/page after invalidation, with old Workers retired.
+Actual base-path/font requests and all 15 standalone SVG containment fixtures
+passed. Evidence is in `/private/tmp/stz-phase31b-browser-acceptance.hKjXxy/`.
+The 144 focused parser/adapter tests (included in the full suite), 2,258 full
+tests, targeted lint, and script syntax checks passed on the same unchanged
+production code. No production or harness correction was needed for the terminal
+run. The production canvas is unchanged. See
+[adapter interfaces, limits, assets, and verification status](./LABEL_ADAPTER.md).
 
-- Add the justified, pinned MathJax dependency and locally served resources
+- Added the justified, pinned MathJax dependency and locally served resources
   compatible with the application's Vite base path.
-- Convert complete labels into immutable SVG/text results with finite normalized
+- Converts complete labels into immutable SVG/text results with finite normalized
   metrics, or exact-source fallback. Detect error output even when conversion
   resolves successfully; an undefined command is a failure.
-- Isolate per-label engine state, constrain generated SVG, and keep glyph
-  geometry self-contained. Bound work, requests, and cache storage, with a
+- Isolates per-label engine state, constrains generated SVG, and keeps glyph
+  geometry self-contained. Bounds work, requests, and cache storage, with a
   recovery policy for transient resource failures.
-- Test the real adapter and deployment assets before connecting the canvas.
+- Resource failure, timeout, and invalidation terminate the lazy MathJax Worker
+  and its whole native module map, including shared dependencies and fonts.
+  Retries reuse fixed asset URLs in a fresh bounded context; actual same-page
+  native-import recovery passed the affected-browser acceptance gate.
+- Retained geometry and strokes now determine conservative portable ink bounds,
+  independently of true run advance. Unsupported geometry and negative whole-run
+  advances fall back to the exact complete source.
+- Real adapter tests cover overhang, nested/negative spacing, and later-request
+  recovery. Browser deployment and standalone raster containment also passed,
+  with actual requests and independent geometry/raster evidence.
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 
