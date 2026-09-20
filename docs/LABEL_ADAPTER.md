@@ -329,12 +329,13 @@ native import and remains complementary adapter-level coverage.
 
 ## Verification and current status
 
-The latest verification-only follow-up began on **2026-09-20 at 20:44 JST**, against
-checkout `9762ccc0cb35c3e9374e91649e16e8f04db3b33b`, on macOS 26.6.2 (25G83),
-Darwin arm64. The shell was zsh with `PATH=/opt/homebrew/bin:$PATH`;
+The latest verification-only follow-up recorded its environment on **2026-09-20
+at 21:21:59 JST**, against checkout `3dac474a507822f0c1762fd2cc5b84469c557a81`,
+on macOS 26.6.2 (25G83), Darwin arm64.
+The shell was zsh with `PATH=/opt/homebrew/bin:$PATH`;
 `/opt/homebrew/bin/node` reported **v26.9.0**, npm **11.19.1**.
-The installed executable reported **Google Chrome 153.0.8010.52** using
-`--version`; **no browser launched**, so there is no observed launched-browser
+The installed Chrome application's `Info.plist` reports **153.0.8010.52**;
+**no browser launched**, so there is no observed launched-browser
 version or native-cache capability result.
 
 The initial working tree was clean. No adapter, test, dependency, build
@@ -346,7 +347,7 @@ hashes; `build-output-sha256.json` identifies the generated assets and build.
 
 The active session's permissions and available browser paths were checked afresh.
 After a successful fresh build, **the existing smoke ran unchanged once**, at
-20:45 JST. Static asset assertions passed, then `listen(0, '127.0.0.1')` in
+21:22 JST. Static asset assertions passed, then `listen(0, '127.0.0.1')` in
 `scripts/checkLabelAssets.mjs:120` was denied. The command exited **1** with
 `listen EPERM: operation not permitted 127.0.0.1`, before Chrome launched.
 This session prohibits escalation, and no permitted alternative execution
@@ -355,16 +356,23 @@ and every assertion remain unchanged. No current runtime or harness defect was
 demonstrated; Phase 31B remains acceptance-incomplete.
 
 All current logs and evidence are in the fresh directory
-`/private/tmp/stz-phase31b-acceptance-vxrg2k7p/`. Its `browser/` subdirectory
+`/private/tmp/stz-phase31b-acceptance-rv0ubxrs/`. Its `browser/` subdirectory
 contains only the smoke's **static** `asset-graph-evidence.json`.
 `environment.json` records permissions, versions, the clean initial revision,
 and tracked input hashes. `*-result.json` records exact commands, exits and log
 paths; the build, smoke and test records also include timestamps and environment.
 `browser.log` and `browser-result.json` record this attempt's actual smoke failure.
 The external `run-check.py` captures stdout/stderr and preserves child exits;
-it does not alter repository scripts.
+it does not alter repository scripts. Targeted lint and syntax logs were copied
+from this attempt's parallel check directory
+`/private/tmp/stz-phase31b-targeted.TByMBI/`; their result records retain the
+original paths and exact commands.
 
-Historical results remain separate. The 04:06 JST attempt at
+Historical results remain separate. The preceding 20:44 JST follow-up at
+`9762ccc0cb35c3e9374e91649e16e8f04db3b33b` also passed its deterministic checks
+and fresh build, then the unchanged smoke exited 1 at bind before Chrome launched.
+Its logs and static artifact remain in
+`/private/tmp/stz-phase31b-acceptance-vxrg2k7p/`. The 04:06 JST attempt at
 `ff37dfffad2b5973071a8bffca1b06df4105b234` used a minimal localhost capability
 probe, which exited 1 with the same `EPERM`; it did not rerun the smoke. Its
 logs and supplemental static inspection remain in
@@ -396,7 +404,7 @@ PATH=/opt/homebrew/bin:$PATH npm run build
 PATH=/opt/homebrew/bin:$PATH \
 STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
 STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-acceptance-vxrg2k7p/browser \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase31b-acceptance-rv0ubxrs/browser \
 npm run check:label-assets
 PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/labelSvg.ts \
@@ -463,19 +471,21 @@ After the successful fresh build, the unchanged smoke's static assertions found
 **3 main manifest entries,
 43 worker chunks, 83 references, and all 40 approved additional-font modules**.
 Every referenced file resolves. The graph is recorded in this attempt's
-`browser/asset-graph-evidence.json`, including
-these target paths (static build identities, **not observed HTTP requests**):
+`browser/asset-graph-evidence.json`; `static-details.json` adds the font example.
+Together they record these target paths (static build identities,
+**not observed HTTP requests**):
 
 - Worker: `/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js`
 - Runtime: `/stratified-tikz/assets/mathjaxRuntime-BQPLTncu.js`
 - Shared dependency: `/stratified-tikz/assets/svg-Cy2x9LIX.js`
+- Additional font example: `/stratified-tikz/assets/fraktur-0I2mShNq.js`
 
 Licenses and the configured `/stratified-tikz/` base are retained; there is no
 duplicate Window runtime graph.
 These names came from the current manifests; they are not hard-coded fixtures.
 These are filesystem/build observations, not browser network evidence. Supplemental
-`static-details.json` records installed/locked/declared 4.1.3 pins and the Worker
-URL found in the emitted adapter. `build-output-sha256.json` identifies this
+`static-details.json` records installed/locked/declared 4.1.3 pins and the fraktur
+chunk resolved from the fresh Worker manifest. `build-output-sha256.json` identifies this
 fresh build's files, generated font imports, and licenses.
 
 ### Browser prerequisite block and outstanding assertions
@@ -535,7 +545,7 @@ A browser version or an artifact's presence alone cannot establish those gates.
 
 Run in an authorized local session with permission to bind an ephemeral port on
 `127.0.0.1` and launch Chrome/Chromium through the existing external Playwright.
-The target is `9762ccc0cb35c3e9374e91649e16e8f04db3b33b` plus the three pending
+The target is `3dac474a507822f0c1762fd2cc5b84469c557a81` plus the three pending
 documentation changes listed above; production/build/test inputs are unchanged.
 Preserve any subsequent user work, record it with the new run, and rebuild there.
 Do not reuse this session's `dist/` as evidence for another checkout.

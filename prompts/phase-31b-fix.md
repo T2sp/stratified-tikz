@@ -24,14 +24,14 @@ Do not add dependencies, change pinned versions, or redesign the loader merely
 because a sandbox prevented the browser check from starting.
 
 Required verification includes the fresh-build browser asset/retry/rendering
-smoke, seven focused adapter test files, `npm test`, `npm run build`, targeted
+smoke, focused parser/adapter tests, `npm test`, `npm run build`, targeted
 lint, asset-script syntax checks, and `git diff --check`.
 
 ## Latest review findings
 
 The latest Phase 31B review reported `needs_changes`: no Critical issues,
-exactly one Medium issue, and no Low-priority issues. **No new implementation
-defect was confirmed.** The review preserved the existing documentation edits.
+exactly one Medium issue, and no Low-priority issues. **No implementation
+defect was confirmed.** The review edited no source or documentation files.
 
 ### Medium M1: required browser acceptance remains unverified
 
@@ -46,7 +46,7 @@ The failure occurred at `listen(0, '127.0.0.1')` in
 `scripts/checkLabelAssets.mjs:120`, before Chrome launched. Actual base-path
 and additional-font requests, native-import failure/recovery, Worker retirement,
 and standalone SVG raster containment were not exercised. The review's
-[browser-check log](/private/tmp/stz-31b-review-browser.log) records the static pass
+[asset-smoke log](/private/tmp/stz-review31b-assets.log) records the static pass
 and subsequent bind failure; it contains no browser execution evidence.
 
 Repeating the same command under unchanged localhost restrictions cannot
@@ -71,24 +71,27 @@ The review used `PATH=/opt/homebrew/bin:$PATH` with Node `v26.9.0` and recorded:
 | Check | Previous review result |
 | --- | --- |
 | Full suite | Exit 0; 2,258 passed; no failures or skips |
-| Seven focused adapter files | Exit 0; 102 passed; included in the full-suite total |
-| Targeted ESLint across 21 implementation/configuration/test/script files | Exit 0 |
+| Focused parser/adapter tests | Exit 0; 144 passed; included in the full-suite total |
+| Targeted lint | Passed |
 | Both asset-script syntax checks | Exit 0 |
 | `git diff --check` | Exit 0 |
 | Production build | Exit 0; non-failing large-chunk warnings |
 | Browser asset/retry/rendering smoke | Exit 1; static assertions passed, browser launch blocked |
 
+Review logs: [full tests](/private/tmp/stz-review31b-tests.log),
+[focused tests](/private/tmp/stz-review31b-focused.log),
+[build](/private/tmp/stz-review31b-build.log), and the asset-smoke log above.
+Keep these historical results separate from this follow-up's new evidence.
+
 Static deployment inspection verified 3 main manifest entries, 43 Worker
 chunks, 83 references, and all 40 additional-font modules. Referenced files
-exist; observed built paths include
-`/stratified-tikz/assets/mathjaxWorker-DfxTIyyr.js` and
-`/stratified-tikz/assets/fraktur-0I2mShNq.js`. These are filesystem/build
-observations, not browser HTTP requests or raster results.
+exist, and the emitted Worker URL uses `/stratified-tikz/assets/`. These are
+filesystem/build observations, not browser HTTP requests or raster results.
 Resolve current hashed asset filenames from the fresh build's manifests;
 do not hard-code filenames from an earlier build.
 
 These are previous results to preserve and recheck, not new results for this
-follow-up. The 102 focused tests are included in the 2,258 full-suite tests;
+follow-up. The 144 focused tests are included in the 2,258 full-suite tests;
 do not add these counts. Run the commands below and record their actual results
 separately for this attempt.
 
@@ -96,8 +99,8 @@ separately for this attempt.
 
 Preserve the current implementation and regressions:
 
-- real public-adapter fraction/radical conversions return finite metrics, with
-  substantive coverage for immutable geometry;
+- real public-adapter conversions succeed for fractions, radicals, indices,
+  matrices, and additional-font glyphs, with finite metrics and immutable results;
 - a valid run followed by an undefined command returns the exact complete
   source, including spaces, tabs, CRLF, and delimiters, without partial geometry;
 - conversion state and errors are isolated and scoped;
@@ -112,10 +115,14 @@ Preserve the current implementation and regressions:
 - model, persistence, history, TikZ, production canvas integration, and export
   lifecycle remain unchanged.
 
-The review separately ran `npx eslint src/rendering/SvgDiagram.tsx`, which
-exited 1 for the pre-existing `react-hooks/refs` error at line 942. That file
-is unchanged since its earlier commit. Repository-wide lint was not run;
-do not confuse this baseline debt with the passing targeted check or perform
+The successful additional-font conversions above use the Node loading branch;
+they do not prove deployed browser font requests or Worker recovery. No
+adapter-derived state enters diagram persistence or history, and production
+canvas integration remains assigned to Phase 31C.
+
+The review reproduced the pre-existing `react-hooks/refs` error in
+`src/rendering/SvgDiagram.tsx:942`. Repository-wide lint was not run; do not
+confuse this unrelated baseline debt with the passing targeted check or perform
 repository-wide lint cleanup.
 
 ## Goal
@@ -141,7 +148,7 @@ Read at least:
 - the Phase 31 sections of `docs/PREVIEW_UI.md` and `docs/ROADMAP.md`;
 - `scripts/checkLabelAssets.mjs`, `scripts/prepareMathjaxAssets.mjs`,
   `vite.config.ts`, and `package.json`;
-- the seven focused test files and the adapter/Worker modules they exercise,
+- the focused parser/adapter test files and the modules they exercise,
   as needed to diagnose an observed failure.
 
 Do not replace the existing assertions with a new, weaker verification path.
@@ -300,11 +307,15 @@ did not, or that production canvas integration is now enabled.
 
 ## Verification
 
-Prepare local generated assets and run the seven focused files:
+Prepare local generated assets and run the focused parser/adapter files.
+Include the two text/parser files as well as the seven adapter files; the
+previous seven-file command alone does not cover the review's 144-test set.
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
 PATH=/opt/homebrew/bin:$PATH node --test \
+  tests/rendering/labelText.test.ts \
+  tests/rendering/labelTextPreservation.test.ts \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \
@@ -325,6 +336,7 @@ Run targeted lint and script checks:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH npx eslint \
+  src/rendering/labelText.ts \
   src/rendering/labels/labelSvg.ts \
   src/rendering/labels/labelMetrics.ts \
   src/rendering/labels/labelInkBounds.ts \
@@ -337,6 +349,8 @@ PATH=/opt/homebrew/bin:$PATH npx eslint \
   src/rendering/labels/mathjaxWorkerClient.ts \
   src/rendering/labels/mathjaxWorkerProtocol.ts \
   vite.config.ts \
+  tests/rendering/labelText.test.ts \
+  tests/rendering/labelTextPreservation.test.ts \
   tests/rendering/labelMetrics.test.ts \
   tests/rendering/labelSvg.test.ts \
   tests/rendering/labelService.test.ts \

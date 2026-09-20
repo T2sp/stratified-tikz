@@ -1090,8 +1090,8 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 Status: in progress. Phase 31A is complete. Phase 31B's independent adapter
 has the targeted ink/advance fix, disposable-worker recovery, and focused
-regressions, but acceptance is incomplete. The latest 2026-09-20 follow-up at
-`9762ccc` passed fresh deterministic checks and the build. The unchanged smoke
+regressions, but acceptance is incomplete. The latest 2026-09-20 (21:22 JST) follow-up at
+`3dac474` passed fresh deterministic checks and the build. The unchanged smoke
 passed its static assertions, then exited 1 at localhost binding (`listen EPERM`)
 before Chrome launched. Escalation is prohibited; no blocked retry was made. Native
 browser retry, built-browser deployment, and standalone raster checks remain
@@ -1146,7 +1146,7 @@ existing label appearance is unchanged.
 ### Phase 31B: MathJax-to-SVG adapter, metrics, isolated conversion, and cache
 
 Status: ink/advance and native-loading fixes implemented; Phase 31B acceptance
-is incomplete. In the latest 2026-09-20 follow-up at `9762ccc`, the unchanged smoke
+is incomplete. In the latest 2026-09-20 (21:22 JST) follow-up at `3dac474`, the unchanged smoke
 ran against a fresh build and exited 1 with
 `listen EPERM: operation not permitted 127.0.0.1` before Chrome launched;
 session policy prohibits escalation. Its only smoke artifact is the static
