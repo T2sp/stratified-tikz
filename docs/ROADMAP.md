@@ -1440,11 +1440,32 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: implemented; standalone browser acceptance pending parent verification.
-The child verification environment blocks local server startup with `listen
-EPERM`, so no save/reopen browser assertions have passed in this implementation
-turn. `check:free-labels` now requires a dedicated settled-export group for
-31E/31F, including downloaded 2D/3D files reopened outside the application.
+Status: export implementation retained; autoDim diagnosis and complete standalone
+acceptance pending fresh parent verification. Independent review has not run.
+The executed parent report `stz-phase31e-before-review-r43lZG` passed ten groups
+and 120 scenario records with no page errors, then failed the dimmed formula
+path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
+31D's candidate-cycle and recovery checks passed on that snapshot. The old
+report did not retain the failed export or settlement outcome, so its cause
+cannot be determined from the live preview screenshot.
+
+The targeted child follow-up adds bounded, source-specific timing/outcome,
+detached/serialized SVG, opacity, and standalone observations before assertions,
+plus exact-source foreground negative controls and settlement regressions.
+The 20,000 ms fixture versus 10,050 ms export boundary is an unconfirmed timing
+hypothesis; no limit increase, sleep, retry-to-pass, production-markup change,
+or visibility relaxation was applied. The new child browser attempt stopped
+at Vite `listen EPERM` before Chrome; it does not supersede the parent's actual
+assertion. See [SVG export verification](./PREVIEW_UI.md#export-svg) and
+`/private/tmp/stz-31e-diagnostic-checks/handoff.json` for commands, results,
+checkout identity and retained evidence.
+
+The normal order remains fix, matching complete parent verification, then
+independent review. `check:free-labels` still requires all eleven groups for
+31E/31F, including all visibility policies and downloaded transparent/white
+2D/3D files reopened outside the application. The standalone workflow and
+failure/retry gates remain unverified on this follow-up checkout; Phase 31E
+must not be called complete until verification and review succeed.
 
 The exporter captures a detached copy of the committed SVG and immutable label
 inputs before awaiting conversion. A shared synchronous label view renders the

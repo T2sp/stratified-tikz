@@ -21,6 +21,13 @@ type Held = {
   requests: Promise<LabelConversionResult>[]
   completed: number
   released: boolean
+  heldAt: number
+  releasedAt?: number
+}
+type ConversionObservation = {
+  id: number; source: string; requestedAt: number; convertedAt?: number; deliveredAt?: number
+  heldAt?: number; releasedAt?: number; conversionKind?: string; conversionReason?: string
+  deliveredKind?: string; deliveredReason?: string; identity?: string
 }
 const measurement = createBrowserTextMeasurementProvider()
 const service = createLabelService({ measurement, limits: { settlementMs: 30_000 } })
@@ -28,12 +35,21 @@ const held = new Map<string, Held>()
 const completionOrder: { source: string; kind: string }[] = []
 let snapshot: AppLabelBrowserSnapshot | undefined
 let requests = 0
+const conversions: ConversionObservation[] = []
 const runtime = createSvgLabelRuntime({ measurement, service: {
   peek(source, settings) { return held.has(source) ? undefined : service.peek(source, settings) },
   convert(source, settings) {
     requests++
     const hold = held.get(source)
-    const conversion = service.convert(source, settings)
+    const observation: ConversionObservation = { id: requests, source, requestedAt: Date.now(), heldAt: hold?.heldAt }
+    conversions.push(observation)
+    const conversion = service.convert(source, settings).then((result) => {
+      Object.assign(observation, { convertedAt: Date.now(), conversionKind: result.kind,
+        conversionReason: result.kind === 'fallback' ? result.reason : undefined, identity: result.identity })
+      if (!hold) Object.assign(observation, { deliveredAt: Date.now(), deliveredKind: result.kind,
+        deliveredReason: result.kind === 'fallback' ? result.reason : undefined })
+      return result
+    })
     if (!hold) return conversion
     const pending = conversion.then(async (result): Promise<LabelConversionResult> => {
       await hold.promise
@@ -41,6 +57,8 @@ const runtime = createSvgLabelRuntime({ measurement, service: {
         ? { ...result, kind: 'fallback', reason: hold.reason }
         : result
       hold.completed++
+      Object.assign(observation, { releasedAt: hold.releasedAt, deliveredAt: Date.now(), deliveredKind: delivered.kind,
+        deliveredReason: delivered.kind === 'fallback' ? delivered.reason : undefined })
       completionOrder.push({ source, kind: delivered.kind })
       return delivered
     })
@@ -59,7 +77,7 @@ const api = {
     if (held.has(source)) throw new Error(`Already held: ${source}`)
     let release = () => {}
     const promise = new Promise<void>((resolve) => { release = resolve })
-    held.set(source, { promise, release, fail: false, reason: 'output-error', requests: [], completed: 0, released: false })
+    held.set(source, { promise, release, fail: false, reason: 'output-error', requests: [], completed: 0, released: false, heldAt: Date.now() })
   },
   pending(source: string) {
     const hold = held.get(source)
@@ -71,12 +89,21 @@ const api = {
     hold.fail = fail
     hold.reason = reason
     hold.released = true
+    hold.releasedAt = Date.now()
     held.delete(source)
     hold.release()
     await Promise.all(hold.requests)
     await frame()
     await frame()
     return { source, started: hold.requests.length, completed: hold.completed, fail }
+  },
+  exportDiagnostics(sources: string[]) {
+    return { now: Date.now(), serviceSettlementMs: 30_000,
+      labelDocumentRevision: snapshot?.labelDocumentRevision,
+      sources: sources.map((source) => {
+        const matching = conversions.filter((conversion) => conversion.source === source)
+        return { source, requestCount: matching.length, requests: matching.slice(-8).map((entry) => ({ ...entry })) }
+      }) }
   },
   inspectContent(id: string) {
     if (!snapshot) throw new Error('App has not committed')

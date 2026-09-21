@@ -15,6 +15,23 @@ import {
 
 const svgNamespace = 'http://www.w3.org/2000/svg'
 
+export type SvgExportPreparationObservation = Readonly<
+  | { kind: 'preparation-started'; startedAt: number; settlementMs: number }
+  | { kind: 'label-settled'; source: string; ownerIdentity?: string; requestIdentity: string;
+    startedAt: number; completedAt: number; deadline: number; settlementMs: number;
+    outcome: 'success' | 'service-fallback' | 'export-timeout' | 'output-error'; state: SvgLabelState }
+  | { kind: 'label-rendered'; source: string; ownerIdentity?: string; requestIdentity: string;
+    renderedAt: number; markup: string }
+  | { kind: 'preparation-completed'; completedAt: number; outcome: 'success' | 'failure' | 'cancelled' }
+>
+type SvgExportPreparationObserver = (observation: SvgExportPreparationObservation) => void
+
+/** Optional runtime evidence only; observation cannot interrupt export or reach
+ * the detached/live DOM. Callers choose which bounded summaries to retain. */
+function observeExport(observer: SvgExportPreparationObserver | undefined, observation: SvgExportPreparationObservation): void {
+  try { observer?.(Object.freeze(observation)) } catch { /* Diagnostics do not change output. */ }
+}
+
 /** The DOM clone is the complete committed render revision, including projection,
  * viewport, draw order, layer filters and inherited dimming. It never references
  * live geometry or mutable Diagram/camera objects. Only conversion capabilities
@@ -50,6 +67,9 @@ export function captureSvgExportSnapshot(svg: SVGSVGElement, options: SvgPreview
 }
 
 function aborted(): Error { return new Error('SVG export cancelled.') }
+class SvgExportTimeout extends Error {
+  constructor() { super('timeout') }
+}
 
 /** A second bound protects the export boundary (including injected services and
  * literal font readiness). Production conversion itself remains bounded by the
@@ -58,7 +78,7 @@ function within<T>(work: Promise<T>, milliseconds: number, signal?: AbortSignal)
   return new Promise((resolve, reject) => {
     const cancel = () => finish(() => reject(aborted()))
     let finished = false
-    const timer = setTimeout(() => finish(() => reject(new Error('timeout'))), Math.max(0, milliseconds))
+    const timer = setTimeout(() => finish(() => reject(new SvgExportTimeout())), Math.max(0, milliseconds))
     function finish(action: () => void): void {
       if (finished) return
       finished = true
@@ -75,7 +95,7 @@ function within<T>(work: Promise<T>, milliseconds: number, signal?: AbortSignal)
 export async function settleSvgExportLabels(
   captures: readonly SvgLabelExportCapture[],
   signal?: AbortSignal,
-  options: Readonly<{ settlementMs?: number }> = {},
+  options: Readonly<{ settlementMs?: number; observe?: SvgExportPreparationObserver }> = {},
 ): Promise<readonly SvgLabelState[]> {
   if (signal?.aborted) throw aborted()
   const settlementMs = options.settlementMs ?? LABEL_SERVICE_LIMITS.settlementMs + 50
@@ -83,20 +103,32 @@ export async function settleSvgExportLabels(
   return Promise.all(captures.map(async (capture): Promise<SvgLabelState> => {
     const { source, settings, runtime, ownerIdentity } = capture
     const requestIdentity = svgLabelRequestIdentity({ source, settings, ownerIdentity })
-    const deadline = Date.now() + settlementMs
+    const startedAt = Date.now()
+    const deadline = startedAt + settlementMs
     let result: LabelConversionResult | undefined
     let reason: SvgLabelState['reason'] = 'output-error'
+    let outcome: Extract<SvgExportPreparationObservation, { kind: 'label-settled' }>['outcome'] = 'output-error'
+    function observed(state: SvgLabelState): SvgLabelState {
+      observeExport(options.observe, { kind: 'label-settled', source, ownerIdentity, requestIdentity,
+        startedAt, completedAt: Date.now(), deadline, settlementMs, outcome, state })
+      return state
+    }
     try {
       result = await within(Promise.resolve().then(() =>
         runtime.service.peek(source, settings) ?? runtime.service.convert(source, settings)), settlementMs, signal)
       if (result?.source === source && result.kind === 'success') {
-        return Object.freeze({ source, requestIdentity, status: 'ready', layout: result.layout, estimated: false, result })
+        outcome = 'success'
+        return observed(Object.freeze({ source, requestIdentity, status: 'ready', layout: result.layout, estimated: false, result }))
       }
-      if (result?.source === source && result.kind === 'fallback') reason = result.reason
+      if (result?.source === source && result.kind === 'fallback') {
+        reason = result.reason
+        outcome = 'service-fallback'
+      }
       else result = undefined
     } catch (error) {
       if (signal?.aborted) throw aborted()
       if (error instanceof Error && error.message === 'timeout') reason = 'timeout'
+      if (error instanceof SvgExportTimeout) outcome = 'export-timeout'
     }
     // Parser failure may precede font loading in the service. Keep the same
     // measured multiline/tab layout as the preview, with one shared deadline.
@@ -107,18 +139,29 @@ export async function settleSvgExportLabels(
       } catch { /* Font failure retains the complete finite literal layout. */ }
     }
     if (signal?.aborted) throw aborted()
-    return Object.freeze({ source, requestIdentity, status: 'fallback', reason, result,
-      ...literalSvgLabelLayout(source, settings, runtime.measurement) })
+    return observed(Object.freeze({ source, requestIdentity, status: 'fallback', reason, result,
+      ...literalSvgLabelLayout(source, settings, runtime.measurement) }))
   }))
 }
 
 /** Synchronous shared rendering after settlement: no temporary React root,
  * commit timer, live-label replacement or dependence on the live DOM's state. */
-export async function prepareSettledSvgExport(snapshot: SvgExportSnapshot, signal?: AbortSignal): Promise<string | null> {
+export async function prepareSettledSvgExport(
+  snapshot: SvgExportSnapshot,
+  signal?: AbortSignal,
+  options: Readonly<{ observe?: SvgExportPreparationObserver }> = {},
+): Promise<string | null> {
+  const complete = (text: string | null): string | null => {
+    observeExport(options.observe, { kind: 'preparation-completed', completedAt: Date.now(),
+      outcome: signal?.aborted ? 'cancelled' : text === null ? 'failure' : 'success' })
+    return text
+  }
+  observeExport(options.observe, { kind: 'preparation-started', startedAt: Date.now(),
+    settlementMs: LABEL_SERVICE_LIMITS.settlementMs + 50 })
   try {
     const entries = snapshot.labels.slice()
-    const states = await settleSvgExportLabels(entries.map(({ capture }) => capture), signal)
-    if (signal?.aborted) return null
+    const states = await settleSvgExportLabels(entries.map(({ capture }) => capture), signal, options)
+    if (signal?.aborted) return complete(null)
     const parser = new DOMParser()
     entries.forEach(({ capture, target }, index) => {
       const markup = renderToStaticMarkup(createElement(SvgTexLabelView, { capture, state: states[index] }))
@@ -127,13 +170,18 @@ export async function prepareSettledSvgExport(snapshot: SvgExportSnapshot, signa
       const document = parser.parseFromString(`<svg xmlns="${svgNamespace}">${markup}</svg>`, 'image/svg+xml')
       const label = document.documentElement.firstElementChild
       if (document.querySelector('parsererror') || label === null) throw new Error('Invalid label SVG.')
+      if (options.observe !== undefined) {
+        observeExport(options.observe, { kind: 'label-rendered', source: capture.source,
+          ownerIdentity: capture.ownerIdentity, requestIdentity: states[index].requestIdentity,
+          renderedAt: Date.now(), markup: label.outerHTML })
+      }
       target.replaceWith(snapshot.root.ownerDocument.importNode(label, true))
     })
     const text = createSvgPreviewExportText(snapshot.root, snapshot)
-    if (text === null) return null
+    if (text === null) return complete(null)
     const document = parser.parseFromString(text, 'image/svg+xml')
-    return isStandaloneSvgDocument(document) ? text : null
-  } catch { return null }
+    return complete(isStandaloneSvgDocument(document) ? text : null)
+  } catch { return complete(null) }
 }
 
 function isStandaloneSvgDocument(document: Document): boolean {

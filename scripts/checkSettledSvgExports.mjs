@@ -9,10 +9,12 @@ import { pathToFileURL } from 'node:url'
 const buttonName = 'Export current diagram view as SVG'
 const excluded = '[data-svg-export-exclude="true"], [data-svg-background="true"], .svg-coordinate-anchors, .svg-coordinate-source-highlights, .svg-coordinate-axes-guide, .svg-geometry-handle, .svg-path-draft, .svg-path-intersection-candidates, .svg-selection-cycle-feedback, .svg-work-plane-preview'
 
-export async function runSettledSvgExportChecks({ browser, origin, record, artifactDir }) {
+export async function runSettledSvgExportChecks({ browser, origin, record, observe, artifactDir }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = []
   const downloads = []
+  let currentSources = []
+  let checkpoint = 'app-startup'
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('download', (download) => downloads.push(download))
   const state = () => page.evaluate(() => window.stzAppLabels.state())
@@ -22,6 +24,19 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
   const release = (source, fail = false) => page.evaluate(({ text, failure }) =>
     window.stzAppLabels.release(text, failure, 'resource-error'), { text: source, failure: fail })
   const frame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  async function diagnostic(name, details = {}) {
+    checkpoint = name
+    const app = await page.evaluate((sources) => ({
+      conversion: window.stzAppLabels?.exportDiagnostics(sources),
+      status: document.querySelector('.svg-export-status')?.textContent,
+      pending: document.querySelector('.svg-export-button')?.getAttribute('aria-busy'),
+      labels: [...document.querySelectorAll('[data-label-state]')].map((node) => ({
+        source: node.getAttribute('data-label-source'), state: node.getAttribute('data-label-state'),
+        requestIdentity: node.getAttribute('data-label-request'), ownerIdentity: node.getAttribute('data-label-owner'),
+      })),
+    }), currentSources)
+    await observe(name, { ...details, app, downloads: downloads.length, pageErrors: [...errors] })
+  }
   async function load(json, name) {
     const revision = (await state()).labelDocumentRevision
     const chooser = page.waitForEvent('filechooser')
@@ -127,6 +142,9 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
       await writeFile(resolve(artifactDir, `${name}-raster.png`), Buffer.from(observed.png.split(',')[1], 'base64'))
       delete observed.png
       await standalone.screenshot({ path: resolve(artifactDir, `${name}-standalone.png`), fullPage: true })
+      const observedPath = resolve(artifactDir, `${name}-standalone.json`)
+      await writeFile(observedPath, JSON.stringify({ path, observed, requests }, null, 2) + '\n')
+      await diagnostic(`${name}-reopened-before-assertions`, { path, observedPath })
       assert.equal(observed.forbidden, 0, 'Only self-contained SVG geometry and ordinary text remain')
       assert.deepEqual(observed.unexpectedAttributes, [], 'Metadata, events and CSS classes are removed')
       assert.equal(observed.currentColor, false, 'Standalone paint does not depend on currentColor')
@@ -156,6 +174,11 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
         for (const text of label.texts) assert.ok(text.xmlSpace === 'preserve' && /pre|break-spaces/.test(text.whiteSpace))
       }
       return { path, text, observed }
+    } catch (error) {
+      const screenshot = resolve(artifactDir, `${name}-standalone-failure.png`)
+      await standalone.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
+      await diagnostic(`${name}-reopen-failure`, { path, requests, screenshot, message: error.message }).catch(() => {})
+      throw error
     } finally {
       await standalone.close()
     }
@@ -193,6 +216,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
     await page.waitForFunction(() => window.stzAppLabels !== undefined && document.querySelector('svg.svg-diagram'))
     const fixture = await page.evaluate(() => window.stzAppLabels.exportDocumentJson(2))
     const { sources } = fixture
+    currentSources = Object.values(sources)
     for (const source of [sources.edit, sources.repeated, sources.inline, sources.resource, sources.hidden]) await hold(source)
     await load(fixture.json, 'settled-export-2d')
     await page.waitForFunction((inputs) => inputs.every((source) => window.stzAppLabels.pending(source)?.started > 0),
@@ -208,12 +232,14 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
     await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
     const captured = await capturedView()
     const before = await state()
+    await diagnostic('settled-export-App-pending-capture', { captured, documentRevision: before.labelDocumentRevision })
     const firstDownloading = page.waitForEvent('download')
     await button().evaluate((element) => { element.click(); element.click() })
     await page.waitForFunction(() => document.querySelector('.svg-export-button')?.getAttribute('aria-busy') === 'true')
     assert.equal(await button().isDisabled(), true)
     assert.match(await status().innerText(), /Preparing SVG export/)
     await frame()
+    await diagnostic('settled-export-App-held-after-duplicate-click')
     assert.equal(downloads.length, 0, 'No download occurs while represented labels are held')
     assert.equal((await state()).json, before.json)
     assert.equal((await state()).history, before.history)
@@ -231,6 +257,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
     nextModel.diagram.labels.find(({ id }) => id === 'export-hidden').text = 'Now visible Ω'
     await load(JSON.stringify(nextModel), 'settled-export-later-3d')
     const afterEdits = await state()
+    await diagnostic('settled-export-App-later-document-before-release', { documentRevision: afterEdits.labelDocumentRevision })
     await release(sources.edit)
     await release(sources.repeated)
     await release(sources.inline)
@@ -253,6 +280,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
 
     await page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
     const captured3d = await capturedView()
+    await diagnostic('settled-export-App-3d-before-download', { captured: captured3d })
     assert.notDeepEqual(captured3d.labels, captured.labels, 'Second capture observes the later 3D document and styles')
     const liveBefore = await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML)
     const secondDownloading = page.waitForEvent('download')
@@ -277,6 +305,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
     try {
       await button().click()
       await page.waitForFunction(() => document.querySelector('.svg-export-status')?.textContent.includes('SVG export failed.'))
+      await diagnostic('settled-export-App-serialization-failure-before-assertions')
       assert.equal(await button().isDisabled(), false, 'Serialization failure restores the export action')
       assert.equal(downloads.length, 2, 'Serialization failure never downloads malformed output')
       assert.equal(await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML), liveBefore)
@@ -293,6 +322,11 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
     await record('settled-export-serialization-failure-and-successful-retry', { path: retry.path, downloads: downloads.length })
     assert.deepEqual(errors, [], 'Export and standalone reopen cause no browser errors')
   } catch (error) {
+    const failedCheckpoint = checkpoint
+    await diagnostic('settled-export-App-failure', { failedCheckpoint, message: error.message }).catch(() => {})
+    const livePath = resolve(artifactDir, 'settled-export-failure-live-preview.svg')
+    const live = await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML).catch(() => null)
+    if (live !== null) await writeFile(livePath, live)
     await page.screenshot({ path: resolve(artifactDir, 'settled-export-failure.png'), fullPage: true }).catch(() => {})
     throw error
   } finally {
@@ -302,10 +336,35 @@ export async function runSettledSvgExportChecks({ browser, origin, record, artif
 
 /** Exercise production occlusion/layer policy before DOM capture. Filtering and
  * autoDim retain visible dimmed labels; autoHide and hidden layers remove them. */
-export async function runSettledSvgVisibilityChecks({ page, record }) {
+export async function runSettledSvgVisibilityChecks({ page, record, observe, artifactDir }) {
   await page.evaluate(() => window.stzLabels.changeService('real'))
   for (const policy of ['autoHide', 'autoDim', 'layerFilter', 'hiddenLayer']) {
     const source = `$\\frac{${policy}}{x}$`
+    const name = `settled-export-${policy}`
+    async function retain(checkpoint) {
+      const bundle = await page.evaluate(() => window.stzVisibilityExport.report())
+      const paths = {}
+      for (const key of ['serialized', 'liveAtCapture', 'liveAfter', 'cloneAtCapture', 'detachedBeforeSanitization']) {
+        if (bundle[key] !== null) {
+          paths[key] = resolve(artifactDir, `${name}-${checkpoint}-${key}.svg`)
+          await writeFile(paths[key], bundle[key])
+        }
+        delete bundle[key]
+      }
+      for (const [index, event] of bundle.events.entries()) {
+        if (event.kind !== 'label-rendered') continue
+        const path = resolve(artifactDir, `${name}-${checkpoint}-label-${index}-before-sanitize.svg`)
+        await writeFile(path, event.markup)
+        event.markupPath = path
+        delete event.markup
+      }
+      paths.diagnostic = resolve(artifactDir, `${name}-${checkpoint}.json`)
+      await writeFile(paths.diagnostic, JSON.stringify({ ...bundle, paths }, null, 2) + '\n')
+      await observe(`${name}-${checkpoint}`, { policy, source, paths, done: bundle.done,
+        observed: bundle.observed, events: bundle.events, conversion: bundle.conversion })
+      return { ...bundle, paths }
+    }
+    await observe(`${name}-setup`, { policy, source })
     await page.evaluate(({ source, policy }) => {
       window.stzLabels.hold(source)
       window.stzLabels.mount({ ambientDimension: 3, occlusion: ['autoHide', 'autoDim'].includes(policy) ? policy : undefined,
@@ -315,53 +374,162 @@ export async function runSettledSvgVisibilityChecks({ page, record }) {
       if (policy === 'layerFilter') window.stzLabels.filter(1)
     }, { source, policy })
     const before = await page.evaluate(() => window.stzLabels.state())
-    const capture = await page.evaluate(async () => {
+    const capture = await page.evaluate(async ({ policy, source }) => {
       const { captureSvgExportSnapshot, prepareSettledSvgExport, releaseSvgExportSnapshot } = await import('/stratified-tikz/src/ui/svgSettledExport.ts')
+      const { inspectSettledSvgLabel, hasExpectedSettledMath, checkSettledSvgLabelControls } = await import('/stratified-tikz/scripts/fixtures/settledSvgExportOracle.ts')
       const svg = document.querySelector('svg.svg-diagram')
+      const capturedAt = Date.now()
       const snapshot = captureSvgExportSnapshot(svg, { backgroundMode: 'transparent' })
       const paintOpacity = (node) => {
         let result = 1
-        for (let current = node; current && current !== svg; current = current.parentElement) {
+        for (let current = node; current; current = current.parentElement) {
           if (current.hasAttribute('opacity')) result *= Number(current.getAttribute('opacity'))
         }
         return result
       }
       const visible = svg.querySelector('[data-label-state] > g')
-      const state = { done: false, result: null, count: snapshot.labels.length, opacity: visible ? paintOpacity(visible) : null }
+      const model = window.stzLabels.state()
+      const captured = { capturedAt, count: snapshot.labels.length, opacity: visible ? paintOpacity(visible) : null,
+        documentRevision: model.sourceRevision, camera: model.camera, backgroundMode: snapshot.backgroundMode,
+        liveLabel: inspectSettledSvgLabel(svg, source),
+        labels: snapshot.labels.map(({ capture, target }) => {
+          const inputs = { ...capture }
+          delete inputs.runtime
+          return { ...inputs, requestIdentity: target.getAttribute('data-label-request'),
+            capturedState: target.getAttribute('data-label-state'), attributes: Object.fromEntries([...target.attributes].map(({ name, value }) => [name, value])) }
+        }) }
+      // XMLSerializer retains namespace bindings when saving HTML-owned SVG
+      // nodes; outerHTML alone is not a standalone XML namespace snapshot.
+      const serialize = (node) => new XMLSerializer().serializeToString(node)
+      const liveAtCapture = serialize(svg)
+      const cloneAtCapture = serialize(snapshot.root)
+      const state = { done: false, result: null, events: [], captured, liveAtCapture, cloneAtCapture,
+        detachedBeforeSanitization: null, detachedLabel: null, liveBeforeSerialization: null, liveAtCompletion: null }
       window.stzVisibilityExport = state
-      state.promise = prepareSettledSvgExport(snapshot).then((result) => { state.result = result; state.done = true; releaseSvgExportSnapshot(snapshot) })
-      return { count: state.count, opacity: state.opacity }
-    })
-    const dimmed = policy === 'autoDim' || policy === 'layerFilter'
-    if (dimmed) {
-      assert.equal(capture.count, 1, 'Dimmed label is represented in the captured view')
-      assert.ok(capture.opacity > 0 && capture.opacity < 0.7)
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-      assert.equal(await page.evaluate(() => window.stzVisibilityExport.done), false, 'Dimmed label is settled normally')
-      await page.evaluate((source) => window.stzLabels.release(source), source)
-    } else assert.equal(capture.count, 0, 'Hidden label is absent from export settlement')
-    await page.waitForFunction(() => window.stzVisibilityExport.done)
-    const observed = await page.evaluate(() => {
-      const text = window.stzVisibilityExport.result
-      if (!text) throw new Error('Visibility export failed')
-      const document = new DOMParser().parseFromString(text, 'image/svg+xml')
-      const label = [...document.querySelectorAll('g > title')][0]?.parentElement
-      let opacity = 1
-      for (let current = label?.querySelector(':scope > g'); current; current = current.parentElement) {
-        if (current.hasAttribute('opacity')) opacity *= Number(current.getAttribute('opacity'))
+      state.report = () => {
+        const document = state.result === null ? null : new DOMParser().parseFromString(state.result, 'image/svg+xml')
+        const first = document?.querySelector('g > title')?.parentElement
+        const exactTitle = document && [...document.querySelectorAll('g > title')].find((title) => title.textContent === source)
+        const exact = exactTitle?.parentElement
+        const paint = exact && [...exact.children].find((node) => node.localName === 'g')
+        const oracle = document ? inspectSettledSvgLabel(document, source) : null
+        return { policy, source, done: state.done, captured, events: state.events,
+          clock: 'Date.now() milliseconds since Unix epoch',
+          serialized: state.result, liveAtCapture, cloneAtCapture, liveAfter: serialize(svg),
+          detachedBeforeSanitization: state.detachedBeforeSanitization,
+          conversion: window.stzLabels.exportDiagnostics(source),
+          detachedLabel: state.detachedLabel,
+          livePreservedDuringSerialization: state.liveBeforeSerialization === state.liveAtCompletion,
+          observed: document ? { oracle, expectedMath: hasExpectedSettledMath(oracle),
+            labels: document.querySelectorAll('g > title').length,
+            opacity: paint ? paintOpacity(paint) : null,
+            originalSelector: { source: first?.querySelector('title')?.textContent,
+              namespace: first?.namespaceURI, formulas: first?.querySelectorAll('svg path').length ?? 0 },
+            negativeControls: checkSettledSvgLabelControls(state.result, source) } : null }
       }
-      return { formulas: label?.querySelectorAll('svg path').length ?? 0, opacity,
-        labels: document.querySelectorAll('g > title').length, state: window.stzLabels.state() }
-    })
-    assert.equal(observed.labels, capture.count)
-    if (dimmed) {
-      assert.ok(observed.formulas > 0)
-      assert.equal(observed.opacity, capture.opacity, 'Captured opacity including occlusion dimming survives class removal')
-    } else assert.equal(observed.state.requestCount, before.requestCount, 'Excluded labels cause no export conversion requests')
-    assert.equal(observed.state.json, before.json)
-    assert.equal(observed.state.history, before.history)
-    await record(`settled-export-${policy}-visibility`, { capture, observed })
+      state.promise = prepareSettledSvgExport(snapshot, undefined, { observe(event) {
+        if (event.kind === 'label-settled') {
+          const { state: settled, ...timing } = event
+          const result = settled.result
+          const geometryTags = (node) => [node.tag, ...node.children.flatMap((child) => typeof child === 'string' ? [] : geometryTags(child))]
+          state.events.push({ ...timing, status: settled.status, reason: settled.reason, estimated: settled.estimated,
+            layout: settled.layout,
+            conversion: result ? { source: result.source, kind: result.kind, reason: result.kind === 'fallback' ? result.reason : undefined,
+              identity: result.identity, configurationIdentity: result.configurationIdentity, generation: result.generation,
+              runs: result.kind === 'success' ? result.runs.map((run) => ({ kind: run.kind,
+                geometry: run.geometry ? { viewBox: run.geometry.viewBox,
+                  tags: geometryTags(run.geometry.svg).reduce((counts, tag) => ({ ...counts, [tag]: (counts[tag] ?? 0) + 1 }), {}) } : null })) : null } : null })
+        } else state.events.push(event)
+        if (event.kind === 'label-rendered') state.liveBeforeSerialization = svg.outerHTML
+        if (event.kind === 'preparation-completed') {
+          state.detachedBeforeSanitization = serialize(snapshot.root)
+          state.detachedLabel = inspectSettledSvgLabel(snapshot.root, source)
+          state.liveAtCompletion = svg.outerHTML
+          // Empty captures still have a synchronous serialization boundary.
+          state.liveBeforeSerialization ??= state.liveAtCompletion
+        }
+      } }).then((result) => {
+        state.result = result
+        state.done = true
+        state.completedAt = Date.now()
+        releaseSvgExportSnapshot(snapshot)
+      })
+      return captured
+    }, { policy, source })
+    try {
+      await retain('captured')
+      const dimmed = policy === 'autoDim' || policy === 'layerFilter'
+      if (dimmed) {
+        assert.equal(capture.count, 1, 'Dimmed label is represented in the captured view')
+        assert.ok(capture.opacity > 0 && capture.opacity < 0.7)
+        assert.equal(capture.labels[0].source, source)
+        assert.equal(capture.labels[0].capturedState, 'pending', 'Delivery is held at capture')
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+        await retain('held-before-release')
+        assert.equal(await page.evaluate(() => window.stzVisibilityExport.done), false, 'Dimmed label is settled normally')
+        await page.evaluate((source) => window.stzLabels.release(source), source)
+      } else assert.equal(capture.count, 0, 'Hidden label is absent from export settlement')
+      await page.waitForFunction(() => window.stzVisibilityExport.done)
+      const bundle = await retain('completed')
+      // The file and screenshot below are the detached export, never the live preview.
+      if (bundle.paths.serialized) {
+        const standalone = await page.context().newPage()
+        try {
+          await standalone.goto(pathToFileURL(bundle.paths.serialized).href)
+          const reopened = await standalone.evaluate((source) => {
+            const titles = [...document.querySelectorAll('g > title')].filter((node) => node.textContent === source)
+            const label = titles[0]?.parentElement
+            const paint = label && [...label.children].find((node) => node.localName === 'g')
+            const foreground = paint?.lastElementChild
+            const box = foreground?.getBBox()
+            let opacity = 1
+            for (let current = foreground; current; current = current.parentElement) opacity *= Number(getComputedStyle(current).opacity)
+            return { source: titles[0]?.textContent, matchingTitles: titles.length,
+              parseErrors: document.querySelectorAll('parsererror').length,
+              foregroundPaths: foreground?.querySelectorAll('svg path').length ?? 0, opacity,
+              box: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null }
+          }, source)
+          const screenshot = resolve(artifactDir, `${name}-standalone.png`)
+          await standalone.screenshot({ path: screenshot, fullPage: true })
+          await observe(`${name}-standalone-reopen`, { policy, source, reopened, screenshot, svg: bundle.paths.serialized })
+          assert.equal(reopened.parseErrors, 0)
+          assert.equal(reopened.matchingTitles, capture.count)
+          if (dimmed) {
+            assert.equal(reopened.source, source)
+            assert.ok(reopened.foregroundPaths > 0, 'Saved dimmed SVG reopens with its own foreground formula paths')
+            assert.ok(Object.values(reopened.box).every(Number.isFinite) && reopened.box.width > 0 && reopened.box.height > 0)
+            assert.equal(reopened.opacity, capture.opacity)
+          }
+        } finally { await standalone.close() }
+      }
+      await page.screenshot({ path: resolve(artifactDir, `${name}-live-preview.png`), fullPage: true })
+      const observed = bundle.observed
+      assert.ok(observed, 'Settled serialization succeeded')
+      assert.equal(observed.labels, capture.count)
+      if (dimmed) {
+        assert.equal(observed.expectedMath, true, 'The exact captured label foreground contains successful math, not raw fallback or unrelated paths')
+        for (const [control, result] of Object.entries(observed.negativeControls)) {
+          assert.equal(result.missingControlTarget, false, `Negative control exercised the captured label: ${control}`)
+          assert.equal(result.rejected, true, `Reject genuinely missing foreground formula: ${control}`)
+        }
+        assert.ok(observed.originalSelector.formulas > 0, 'Retain the original positive geometry assertion')
+        assert.equal(observed.opacity, capture.opacity, 'Captured opacity including occlusion dimming survives class removal')
+        const settlement = bundle.events.filter(({ kind }) => kind === 'label-settled')
+        assert.equal(settlement.length, 1)
+        assert.equal(settlement[0].outcome, 'success', 'Expected valid math must settle successfully')
+      }
+      const after = await page.evaluate(() => window.stzLabels.state())
+      if (!dimmed) assert.equal(after.requestCount, before.requestCount, 'Excluded labels cause no export conversion requests')
+      for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(after[key], before[key])
+      assert.equal(bundle.livePreservedDuringSerialization, true, 'Detached serialization leaves live geometry untouched')
+      await record(`${name}-visibility`, { capture, observed, diagnostic: bundle.paths.diagnostic })
+    } catch (error) {
+      await retain('failure').catch(() => {})
+      await page.screenshot({ path: resolve(artifactDir, `${name}-failure-live-preview.png`), fullPage: true }).catch(() => {})
+      throw error
+    }
   }
+  await observe('settled-export-invalid-viewport-started', {})
   const invalidViewport = await page.evaluate(async () => {
     const { captureSvgExportSnapshot, prepareSettledSvgExport, releaseSvgExportSnapshot } = await import('/stratified-tikz/src/ui/svgSettledExport.ts')
     const svg = document.querySelector('svg.svg-diagram')
@@ -375,6 +543,7 @@ export async function runSettledSvgVisibilityChecks({ page, record }) {
     releaseSvgExportSnapshot(retry)
     return { failure, retrySucceeded: success !== null, livePreserved: before === svg.outerHTML }
   })
+  await observe('settled-export-invalid-viewport-observed', invalidViewport)
   assert.deepEqual(invalidViewport, { failure: null, retrySucceeded: true, livePreserved: true },
     'Malformed detached viewport fails without mutating live SVG and a later valid capture succeeds')
   await record('settled-export-invalid-viewport-retry', invalidViewport)

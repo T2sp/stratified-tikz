@@ -6,14 +6,14 @@ import { emptyTwoDimensionalDiagram } from '../../src/examples/index.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import { defaultLabelStyle } from '../../src/model/styles.ts'
 import { generateTikz } from '../../src/tikz/index.ts'
-import { createLabelService, type LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
+import { createLabelService, LABEL_SERVICE_LIMITS, type LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import type { TextMeasurementProvider } from '../../src/rendering/labels/labelMetrics.ts'
 import { MATHJAX_IDENTITY, type MathLabelEngine } from '../../src/rendering/labels/mathjaxEngine.ts'
 import { placeSvgLabel, svgLabelLayoutSettings } from '../../src/rendering/labels/svgLabelLayout.ts'
 import { createSvgLabelRuntime, initialSvgLabelState, type SvgLabelRuntime, type SvgLabelState } from '../../src/rendering/labels/svgLabelRuntime.ts'
 import { captureSvgLabelExport, getSvgLabelExportCapture, registerSvgLabelExportCapture, type SvgLabelExportCapture } from '../../src/rendering/svgLabelExportRegistry.ts'
 import { SvgTexLabelView } from '../../src/rendering/svgLabelView.ts'
-import { createSvgExportController, settleSvgExportLabels } from '../../src/ui/svgSettledExport.ts'
+import { createSvgExportController, settleSvgExportLabels, type SvgExportPreparationObservation } from '../../src/ui/svgSettledExport.ts'
 import { createDiagramHistory } from '../../src/ui/undo.ts'
 import type { SvgPreviewBackgroundMode } from '../../src/ui/svgPreviewExport.ts'
 
@@ -199,6 +199,74 @@ test('outstanding conversion is bounded and timeout fallback allows a later succ
   held.resolve(result)
   await nextTurn()
   assert.equal(timedOut.status, 'fallback')
+})
+
+test('settlement evidence distinguishes held dimmed success, service fallback, and the export deadline without changing captured output', async () => {
+  const base = runtime()
+  const source = '$\\frac{autoDim}{x}$'
+  const converted = await base.service.convert(source, svgLabelLayoutSettings(20))
+  const held = deferred<LabelConversionResult>()
+  const labelRuntime = createSvgLabelRuntime({ measurement, service: {
+    peek: () => undefined, convert: () => held.promise,
+  } })
+  const captured = capture(source, labelRuntime, { opacity: 0.175, ownerIdentity: 'document/free/dimmed' })
+  const events: SvgExportPreparationObservation[] = []
+  const observe = (event: SvgExportPreparationObservation) => { events.push(event) }
+  const pending = settleSvgExportLabels([captured], undefined, { observe })
+  await nextTurn()
+  assert.deepEqual(events, [], 'Held delivery has not settled the export')
+  held.resolve(converted)
+  const [success] = await pending
+  const evidence = events[0]
+  assert.equal(evidence.kind, 'label-settled')
+  if (evidence.kind !== 'label-settled') throw new Error('Missing label evidence')
+  assert.equal(evidence.outcome, 'success')
+  assert.equal(evidence.source, source)
+  assert.equal(evidence.ownerIdentity, captured.ownerIdentity)
+  assert.equal(evidence.requestIdentity, success.requestIdentity)
+  assert.equal(evidence.state, success)
+  assert.equal(evidence.state.result, converted)
+  assert.equal(evidence.deadline - evidence.startedAt, LABEL_SERVICE_LIMITS.settlementMs + 50)
+  assert.ok(evidence.completedAt >= evidence.startedAt)
+  assert.equal(Object.isFrozen(evidence), true)
+  assert.match(markup(captured, success), /<path /)
+  assert.match(markup(captured, success), /opacity="0.175"/)
+  assert.equal(captured.source, source)
+
+  const serviceFailure = createSvgLabelRuntime({ measurement, service: {
+    peek: () => undefined,
+    convert: async () => ({ ...converted, kind: 'fallback', reason: 'timeout' }),
+  } })
+  const [failed] = await settleSvgExportLabels([capture(source, serviceFailure)], undefined, { observe })
+  const serviceEvidence = events.at(-1)
+  assert.equal(serviceEvidence?.kind, 'label-settled')
+  if (serviceEvidence?.kind !== 'label-settled') throw new Error('Missing service evidence')
+  assert.equal(serviceEvidence.outcome, 'service-fallback')
+  assert.equal(serviceEvidence.state.reason, 'timeout')
+  assert.equal(literal(failed), source)
+
+  const late = deferred<LabelConversionResult>()
+  const overdue = createSvgLabelRuntime({ measurement, service: {
+    peek: () => undefined, convert: () => late.promise,
+  } })
+  const [timedOut] = await settleSvgExportLabels([capture(source, overdue)], undefined, { settlementMs: 5, observe })
+  const deadlineEvidence = events.at(-1)
+  assert.equal(deadlineEvidence?.kind, 'label-settled')
+  if (deadlineEvidence?.kind !== 'label-settled') throw new Error('Missing deadline evidence')
+  assert.equal(deadlineEvidence.outcome, 'export-timeout')
+  assert.equal(deadlineEvidence.state.reason, 'timeout')
+  assert.equal(deadlineEvidence.state.result, undefined)
+  assert.equal(deadlineEvidence.deadline - deadlineEvidence.startedAt, 5)
+  assert.equal(literal(timedOut), source)
+  assert.doesNotMatch(markup(captured, timedOut), /<path /)
+  late.resolve(converted)
+  await nextTurn()
+  assert.equal(events.length, 3, 'Late preview success cannot revise completed export evidence')
+  assert.equal(timedOut.status, 'fallback')
+  const [observedWithFailure] = await settleSvgExportLabels([captured], undefined, {
+    observe: () => { throw new Error('diagnostic storage failed') },
+  })
+  assert.equal(observedWithFailure.status, 'ready', 'Diagnostic failures cannot change settlement')
 })
 
 test('real resource loading deadline retires the adapter and same-service export retry succeeds', async () => {

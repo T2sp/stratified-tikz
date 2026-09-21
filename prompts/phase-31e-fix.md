@@ -1,4 +1,4 @@
-# Phase 31E Targeted Fix Prompt: Diagnose dimmed-label export geometry and complete standalone acceptance
+# Phase 31E Targeted Fix Prompt: Repair standalone browser-page ownership and finish export acceptance
 
 ## Environment
 
@@ -6,16 +6,15 @@ Work on the current `phase/31e-tex-label-svg-export` checkout. Preserve the
 pending Phase 31E implementation, fixtures, tests, documentation and user
 changes. Do not reset the branch or rerun implementation from scratch.
 
-The failed parent run used `7714be1ec5bafc2c99df74055e32ee7bfdaceec8` plus
-working-tree changes, including these five then-untracked files:
+The latest parent run used `0295895ef059f2ccd0279308bbfe171d1c5ec7f7` plus
+nine modified tracked files and two untracked files:
+`scripts/fixtures/settledSvgExportOracle.ts` and
+`tests/scripts/settledSvgExportOracle.test.ts`. The eleven-file handoff is
+`/private/tmp/stz-31e-diagnostic-checks/handoff.json`. Preserve the added
+settlement observations, policy-specific artifacts, exact-source oracle,
+negative controls and registered regressions.
 
-- `scripts/checkSettledSvgExports.mjs`;
-- `src/rendering/svgLabelExportRegistry.ts`;
-- `src/rendering/svgLabelView.ts`;
-- `src/ui/svgSettledExport.ts`;
-- `tests/ui/svgSettledExport.test.ts`.
-
-Inspect current status; these files may since have been committed. Preserve
+Inspect current status; files may since have been committed or changed. Preserve
 Phase 31D's merged candidate-cycle correction and recovery coverage. This
 failure belongs to 31E export acceptance, not the historical 31D Alt assertion.
 
@@ -34,99 +33,119 @@ out of scope. Settled export is required in this phase, not deferred to 31F.
 
 ## Latest execution findings
 
-The supplied report is a **parent verification failure before 31E review**,
-not a review with severity counts. Do not invent a review result or approval.
-Browser startup succeeded; historical child `EPERM` attempts are separate.
+The supplied report contains a child handoff followed by a **new parent
+verification failure before 31E review**. The child's `listen EPERM` restriction
+and statement that parent evidence was pending are historical within this log.
+The parent did launch Chrome and encountered the concrete harness error below.
+No new review ran; do not invent severity counts, `REVIEW_JSON` or approval.
+
+### Current failure: attempting a second page in a page-owned context
 
 Parent evidence directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-r43lZG
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4
 ```
 
 Read `verification.json`, `05-check-free-labels/command.log`, and these files
 inside `05-check-free-labels/artifacts/`:
 
-- `free-labels-evidence.json`;
-- `checkout.diff` and `checkout-untracked.json`;
-- `failure.png` and the preceding scenario observations.
+- `free-labels-evidence.json`, `checkout.diff`, `checkout-untracked.json`;
+- `settled-export-autoHide-completed.json` and
+  `settled-export-autoHide-failure.json`;
+- `settled-export-autoHide-completed-serialized.svg`, the retained capture/live/
+  detached SVGs, and `settled-export-autoHide-failure-live-preview.png`.
 
-The checkout did not change during verification. Its fingerprint was
-`0b8395cac3fad28b360ad8ac377f00bfdc086a2375a291d6273208aedefcc467`;
+The checkout was unchanged during verification. Its fingerprint was
+`0f048c1fb81251ba0652e4335077c3e24418e21ad0468bf0b439511f68efcd34`, and
 tracked diff SHA-256 was
-`0d224801f40eec510dcd36183d022506864987d9dd44cfe20bbd28a06c82b5e9`.
-The report also hashes all five untracked files. The run used Node v26.9.0,
-Chrome `153.0.8010.52`, and the Vite production-component fixture at
-`http://127.0.0.1:5174`.
-
-### Current failure: dimmed exported label has no observed formula paths
+`4a33aa2a09b5e9b97b54f29e9cd8b4dc5bac1f7fe0f603b9de70a5cbdb2f78ff`.
+The report also hashes both untracked oracle/test files. It used Node v26.9.0,
+Chrome `153.0.8010.52`, and the Vite fixture at `http://127.0.0.1:5174`.
 
 `check:free-labels` exited 1 at `settled-SVG-export-standalone`:
 
 ```text
-AssertionError [ERR_ASSERTION]:
-assert.ok(observed.formulas > 0)
-runSettledSvgVisibilityChecks
-scripts/checkSettledSvgExports.mjs:358
+Error: Please use browser.newContext()
+    at _BrowserContext.newPage (.../playwright-core/lib/coreBundle.js:62018:17)
+    at runSettledSvgVisibilityChecks (scripts/checkSettledSvgExports.mjs:476:49)
+    at scripts/checkFreeLabels.mjs:456:3
 ```
 
-The visibility loop is ordered `autoHide`, `autoDim`, `layerFilter`,
-`hiddenLayer`. Only `settled-export-autoHide-visibility` was recorded as passed.
-The failing iteration is therefore **autoDim**, with source:
+The last checkpoint is `settled-export-autoHide-failure`. The new diagnostic
+reopen code calls `page.context().newPage()` while the main fixture page was
+created with `browser.newPage()` in `scripts/checkFreeLabels.mjs` near line 96.
+The installed Playwright implementation creates an implicitly page-owned
+context for that convenience API, then rejects another page in it with exactly
+this error. This is a **confirmed browser-harness API misuse**, not a Vite
+permission failure or evidence of a product SVG-rendering defect.
 
-```text
-$\frac{autoDim}{x}$
-```
+The autoHide export was already serialized before the invalid page creation:
 
-The failing code counts `label.querySelectorAll('svg path')`, where `label`
-is the parent of the first `g > title` in the parsed exported SVG. The earlier
-assertions established a captured visible label, dimmed opacity, pending export
-while delivery was held, and an exported label count matching the capture.
-The formula-path count was zero. These observations do not yet establish why.
+| Saved observation | Latest result |
+| --- | --- |
+| Captured label count / source-specific conversion requests | 0 / 0 |
+| Preparation outcome | `success`, about 8 ms |
+| Exported label count / math paths | 0 / 0, appropriate for this hidden label |
+| Live SVG preserved during serialization | `true` |
+| Standalone reopening | Failed before a standalone page was created |
 
-`failure.png` shows the fraction in the live dimmed preview after delivery.
-That screenshot is not the detached exported SVG and cannot prove its content.
-The failing export string, selected label subtree, conversion outcome/reason
-and precise timings were not retained before the assertion. In particular,
-do not conclude that the selector is wrong or that export lost geometry solely
-from the live screenshot and zero count.
+Zero formula paths are correct for this autoHide case. It must not be subjected
+to the positive math requirement used for visible dimmed labels. Although the
+serialization diagnostics are saved, the full autoHide scenario did not pass
+and no `settled-export-autoHide-visibility` record was emitted in this run.
 
-### Passing results and the actual remaining gap
+### Earlier autoDim issue remains a separate, unverified follow-up
+
+The preceding parent run in `stz-phase31e-before-review-r43lZG` passed autoHide
+and failed `assert.ok(observed.formulas > 0)` for `$\frac{autoDim}{x}$`.
+It did not retain the failing exported SVG or settlement outcome. Its live
+preview showed the formula, which did not establish detached export success.
+
+The follow-up has now implemented diagnostic retention and exact-source oracle
+checks; preserve them instead of implementing another diagnostic framework.
+However, the latest run fails at autoHide reopening **before autoDim begins**.
+It neither reproduces nor resolves the original zero-path observation. The
+20,000 ms fixture service versus 10,050 ms export boundary remains an unconfirmed
+timing hypothesis for that older failure. Repair page ownership first, then
+use the existing diagnostics to determine the autoDim result and fix any
+remaining demonstrated problem.
+
+### Passing results and unexecuted scenarios
 
 | Check | Latest parent result |
 | --- | --- |
-| `npm test` | Exit 0; 2,380 passed, none failed or skipped |
+| `npm test` | Exit 0; 2,390 passed, none failed or skipped |
 | `npm run build` | Exit 0; existing nonblocking chunk-size warning |
 | `git diff --check` | Exit 0 |
 | `check:label-assets` | Exit 0 |
-| `check:free-labels` | Exit 1 at autoDim export geometry |
-| 31E independent review | Not reached in this run |
+| `check:free-labels` | Exit 1 at autoHide standalone page creation |
+| 31E independent review | Not reached |
 
-All ten preceding free-label/inline-node/App groups completed. There are 120
-passing scenario records and no `pageErrors`. The 31D initial/moved-camera
-interaction and same-owner valid–invalid–valid recovery records are present;
-do not reopen their old coverage or Alt-cycle failures as current blockers.
+All ten preceding free-label/inline-node/App groups completed. There are 119
+passing scenario records and no `pageErrors`; the thrown Node-side Playwright
+error is still fatal. Preserve 31D's passing camera interaction, candidate
+cycling, same-owner recovery and halo checks.
 
-The eleventh group, `settled-SVG-export-standalone`, started but is incomplete.
-Its `unexecuted: []` field is group-level bookkeeping: it does not mean every
-export scenario ran. Specifically, these checks were not reached:
+The eleventh group started but did not complete. Its `unexecuted: []` field
+tracks groups, not individual scenarios. AutoDim, layerFilter, hiddenLayer,
+invalid-viewport retry and the actual App settled-download/reopen workflow
+were not reached. No new standalone visibility scenario passed in this run.
+The existing `settled-export.png` belongs to earlier current-SVG-cloning checks;
+it is not proof that these new workflows completed.
 
-- the rest of autoDim, then layerFilter and hiddenLayer visibility;
-- malformed detached viewport and successful retry;
-- `runSettledSvgExportChecks`, including actual App downloads, click-time
-  edit/document isolation, standalone reopening, white/transparent output,
-  3D export, resource recovery and serialization-failure retry.
-
-The existing `settled-export.png` comes from earlier current-SVG-cloning checks,
-not from successful execution of the new settled-download/reopen workflow.
-Passing helper tests or an in-app screenshot cannot close this gate.
+The child reported 115 focused tests (included in 2,390 full-suite passes),
+strict fixture TypeScript, targeted ESLint, syntax checks and diff checks.
+Its exact commands are retained in `/private/tmp/stz-31e-diagnostic-checks/`.
+Treat those as prior results, not verification of the next correction.
 
 ## Goal
 
-Identify whether the zero-path observation comes from export settlement,
-detached rendering/sanitization, fixture timing, or the browser oracle. Apply
-an evidence-supported minimal correction, preserve snapshot/visibility/fallback
-contracts, and obtain complete fresh 31E parent evidence before review.
+Correct the confirmed page/context ownership misuse with a small harness
+change. Then execute autoDim and all remaining settled-export checks, diagnosing
+any actual geometry/timing/oracle failure with the retained evidence. Preserve
+snapshot/visibility/fallback contracts and obtain complete fresh parent evidence
+before independent review.
 
 ## Required reading before fixing
 
@@ -134,46 +153,77 @@ Read at least:
 
 - `AGENTS.md`, this prompt, `prompts/phase-31e-implement.md`, and
   `prompts/phase-31e-review.md`;
-- the failed parent evidence above, including the pending-file snapshot;
+- the latest parent evidence and child handoff above, including the pending-file
+  snapshot; use the earlier autoDim report only as historical evidence;
 - `scripts/checkSettledSvgExports.mjs`, `scripts/checkFreeLabels.mjs`,
   `scripts/fixtures/freeLabels.tsx`, `scripts/fixtures/freeLabelsApp.tsx`, and
   `scripts/fixtures/tsconfig.json`;
 - `src/ui/svgSettledExport.ts`, `src/ui/svgPreviewExport.ts`,
   `src/rendering/svgLabelExportRegistry.ts`, `src/rendering/svgLabelView.ts`,
   `SvgTexLabel`, shared label service/runtime and relevant App export handling;
+- `scripts/fixtures/settledSvgExportOracle.ts`,
+  `tests/scripts/settledSvgExportOracle.test.ts`, and the new observer regressions;
+- the installed Playwright `Browser.newPage` and `BrowserContext.newPage`
+  ownership guards where needed to confirm the error; do not modify the runtime;
 - `src/ui/fileTransfer.ts`, registered export/file-transfer tests, `package.json`,
   and relevant preview/roadmap documentation;
 - `scripts/automation/phase-verification.mjs`, `run-phase.mjs`, and their tests.
 
-## 1. Retain the failing export and settlement observations before assertions
+## 1. Repair standalone-page ownership without losing the live fixture
 
-Extend the existing harness observation/artifact plumbing rather than starting
-another independent acceptance framework. Keep policy-specific checkpoints so
-failures distinguish autoHide, autoDim, layerFilter and hiddenLayer.
+Pass the existing `browser` into `runSettledSvgVisibilityChecks` at its call
+site if needed. Create the standalone reopen page with a supported ownership
+model, following the existing `readStandalone` pattern in this harness:
 
-Before the formula assertion, retain a bounded diagnostic bundle containing:
+- create an independent `browser.newPage(...)`, then close that page in
+  `finally` (its implicitly owned context is released with it); or
+- explicitly create `browser.newContext(...)`, create its page inside the
+  protected block, and close the owned context in `finally`, including when
+  page creation or navigation fails.
 
-- policy, exact source, owner/request/document identity, captured label count,
-  source/settings/style, camera, and background mode;
-- the exact serialized settled SVG and a separately identified live-preview
-  snapshot; the exported target label subtree, title/source, namespace and
-  selected foreground;
-- XML parse errors, label/title counts, nested SVG counts, foreground path and
-  other geometry counts, and literal text fragments in the exported label;
-- actual conversion kind/reason and export settlement outcome, including
-  whether captured output used success, timeout or another complete fallback;
-- timing for capture, conversion request/start/completion, hold, release,
-  export completion and deadline, plus applicable service/export limits;
-- captured and exported effective opacity, including ancestor opacity, and
-  relevant explicit color/transform/visibility attributes;
-- saved export rendering/reopen observations and screenshots where available.
+Choose one small, consistent approach. Keep viewport and other relevant
+options explicit. The existing main fixture page/context must remain open
+and untouched for subsequent visibility policies; do not navigate it to the
+exported SVG or close its context during diagnostic cleanup.
 
-Persist useful state before assertions and retain it on failure. Distinguish
-successful scenario records from diagnostics. Do not copy the entire accumulated
-request history into every checkpoint when only current-source requests matter.
-Do not add model fields or user-facing debug controls for this investigation.
+Continue opening the exact saved serialized SVG with its `file://` URL outside
+the application. Retain screenshots, exact-source/foreground geometry,
+namespace, opacity and bounds assertions. Observe standalone page errors and
+preserve the policy/checkpoint/file path and failure details. Ensure cleanup
+also runs on assertion/navigation failure without masking the original error.
 
-## 2. Diagnose the cause and make the smallest justified correction
+Inspect related page creation in the same workflow for this specific ownership
+mistake. Existing standalone `browser.newPage()` calls are valid; do not turn
+the fix into a wholesale browser lifecycle rewrite. No product source change
+is needed to repair this confirmed harness error.
+
+Do not patch Playwright private ownership fields, modify its installed package,
+upgrade dependencies, disable the ownership guard, swallow the error, or skip
+saved-file reopening. Do not change sandbox flags or start another automation
+flow to evade it. A static syntax check or mock alone cannot establish the
+repair: require successful native autoHide reopening, then continue the full
+browser workflow. Add focused tests only for meaningful new helper behavior.
+
+## 2. Preserve the implemented diagnostics and resolve any remaining autoDim failure
+
+The previous follow-up already added the evidence needed for the original
+failure. Retain the production observation hook, source-specific request and
+settlement timings, policy-specific pre-assertion artifacts, exact-source
+foreground oracle and negative controls. Keep observers non-mutating and
+preserve the pinned conversion/export limits.
+
+For each policy, preserve capture/live/detached/serialized SVGs and its bounded
+JSON diagnostics: exact source/owner/settings, conversion kind/reason, deadline
+and hold/release ordering, foreground geometry/text/namespace, effective opacity,
+serialization non-mutation and standalone reopen measurements. Keep diagnostics
+separate from passed scenario records. Do not duplicate the entire accumulated
+request history at each checkpoint or add model/UI debug fields.
+
+The latest autoHide files establish that retention now works for that empty
+capture. They do not establish that a visible successful formula survives
+export. Once reopening works, obtain the corresponding autoDim artifacts and
+use actual observations to diagnose its result; do not declare the old issue
+fixed merely because the page-creation exception is gone.
 
 Compare the captured revision, conversion result, detached label before
 sanitization, serialized XML and browser-selected subtree. The shared
@@ -238,7 +288,7 @@ workflow. Preserve and verify:
 - serialization/invalid-viewport failure without malformed downloads or
   live-view mutation, followed by successful retry.
 
-Do not treat fixing the first autoDim assertion as full acceptance. Diagnose
+Do not treat fixing page creation or one autoDim assertion as full acceptance. Diagnose
 and minimally fix any later observed failure. Preserve the ten preceding
 groups and the additional `settled-SVG-export-standalone` group: 31E requires
 **all eleven**, with actual saved/downloaded/reopened artifacts for this group.
@@ -253,6 +303,7 @@ Run focused checks with the required Node PATH:
 ```bash
 export PATH=/opt/homebrew/bin:$PATH
 node --test \
+  tests/scripts/settledSvgExportOracle.test.ts \
   tests/ui/svgSettledExport.test.ts \
   tests/ui/svgPreviewExport.test.ts \
   tests/ui/fileTransfer.test.ts \
@@ -269,6 +320,8 @@ node --check scripts/checkFreeLabelsApp.mjs
 node node_modules/eslint/bin/eslint.js \
   scripts/checkSettledSvgExports.mjs scripts/checkFreeLabels.mjs \
   scripts/fixtures/freeLabels.tsx scripts/fixtures/freeLabelsApp.tsx \
+  scripts/fixtures/settledSvgExportOracle.ts \
+  tests/scripts/settledSvgExportOracle.test.ts \
   src/ui/svgSettledExport.ts src/ui/svgPreviewExport.ts src/ui/fileTransfer.ts \
   src/rendering/svgLabelExportRegistry.ts src/rendering/svgLabelView.ts \
   src/rendering/SvgTexLabel.tsx tests/ui/svgSettledExport.test.ts \
@@ -307,10 +360,12 @@ restricted child environment. Partial or stale evidence cannot close the gate.
 
 Update only relevant Phase 31E preview/export and roadmap status. Record the
 actual diagnosis, minimal fix, commands, versions, exit statuses, checkout
-identity and retained artifacts. Distinguish historical startup restrictions
-from this executed parent assertion and the new outcome. The preceding ten
-groups passed in this run; do not describe the old 31D failures as unresolved
-on this snapshot or infer an independent review result from browser success.
+identity and retained artifacts. Distinguish the earlier autoDim assertion,
+child startup restriction, this confirmed autoHide page-ownership error and
+new results. Replace stale claims that fresh parent verification is still
+pending with its actual failed/partial result until a new complete run passes.
+The preceding ten groups passed; do not reopen old 31D failures or infer an
+independent review result from browser success.
 
 The normal runner performs fix -> parent verification -> independent review.
 This run failed before the 31E review. A standalone `verify` success does not
@@ -318,8 +373,12 @@ itself run review or establish approval. Keep that order and commit gate.
 
 31E is ready for review only when:
 
-- the zero-formula-path observation has an evidence-supported explanation and
-  minimal fix, with useful failing-case artifacts and a meaningful regression;
+- standalone reopening uses valid page/context ownership and closes only its
+  own resources, with native autoHide reopen evidence and retained failures;
+- the earlier autoDim zero-path issue is resolved or its current non-reproduction
+  is reported accurately, with successful current-source settlement/geometry,
+  measured timings and complete retained evidence; any remaining failure has
+  an evidence-supported diagnosis and minimal correction;
 - all visibility policies pass and successful dimmed math retains captured
   geometry and effective opacity without live/model/history mutation;
 - actual App downloads and standalone reopen checks pass in both background
@@ -335,10 +394,11 @@ succeed. Phase 31F remains deferred.
 
 ## Report after implementation
 
-Report changed files; exact failure policy/source and retained SVG/settlement
-measurements; whether the cause was product export, fixture timing or oracle;
-the minimal correction and regression; visibility/opacity and full standalone
-results; preserved snapshot/raw-source/history behavior; commands, versions,
-exit statuses and focused/full counts; evidence paths and checkout identity;
-and remaining unavailable or failing checks. State parent verification and
-independent review status separately, without claiming future steps passed.
+Report changed files; the page/context ownership cause and minimal repair;
+cleanup behavior and native saved-file reopen results; autoDim's actual
+settlement/geometry/timing outcome, separating any further product/fixture/oracle
+issue from the confirmed API misuse; all visibility and standalone results;
+preserved snapshot/raw-source/history behavior; commands, versions, exit
+statuses and focused/full counts; evidence paths and checkout identity; and
+unavailable or failing checks. State parent verification and independent review
+status separately, without claiming future steps passed.
