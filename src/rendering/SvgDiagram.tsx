@@ -72,6 +72,8 @@ import {
 import { curveArrowheadsForSvgPreview } from './svgArrows.ts'
 import {
   pathInlineNodesForSvgPreview,
+  svgPathInlineNodeLabelAnchor,
+  svgPathInlineNodeLabelIdentity,
   type SvgPathInlineNodePreview,
 } from './svgPathInlineNodes.ts'
 import {
@@ -187,7 +189,8 @@ export type SvgDiagramProps = {
   labelDocumentRevision?: number | string
   /** Optional owner for embedding/testing the shared production renderer. */
   labelRuntime?: SvgLabelRuntime
-  onLabelLayoutChange?: (id: string, snapshot: SvgTexLabelSnapshot | null) => void
+  /** Shared settled view for free and inline labels; ownerIdentity is the registry key. */
+  onLabelLayoutChange?: (id: string, snapshot: SvgTexLabelSnapshot | null, ownerIdentity: string) => void
   width?: number
   height?: number
   fitToView?: boolean
@@ -535,6 +538,7 @@ export function SvgDiagram({
             onCurveStratumClick,
             onPointStratumClick,
             onCanvasClick,
+            { runtime: labelRuntime, documentRevision: labelDocumentRevision, onLayout: onLabelLayoutChange },
           ),
           stratum.geometricKind,
         ),
@@ -558,7 +562,8 @@ export function SvgDiagram({
             (snapshot) => {
               if (snapshot === null) labelBounds.delete(label.id)
               else labelBounds.set(label.id, snapshot)
-              onLabelLayoutChange?.(label.id, snapshot)
+              onLabelLayoutChange?.(label.id, snapshot,
+                JSON.stringify(['free-label', labelDocumentRevision, label.id]))
             },
           ),
           'label',
@@ -1743,6 +1748,12 @@ function renderCoordinateAxisGuide(
   )
 }
 
+type SvgDiagramLabelRendering = Readonly<{
+  runtime: SvgLabelRuntime
+  documentRevision: number | string
+  onLayout: SvgDiagramProps['onLabelLayoutChange']
+}>
+
 function renderStratum(
   diagram: Diagram,
   stratum: Stratum,
@@ -1760,6 +1771,7 @@ function renderStratum(
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
   onCanvasClick: SvgDiagramProps['onCanvasClick'],
+  labelRendering: SvgDiagramLabelRendering,
 ): RenderItemElement {
   switch (stratum.geometricKind) {
     case 'region':
@@ -1798,6 +1810,7 @@ function renderStratum(
         onSelectionChange,
         onCurveStratumClick,
         onCanvasClick,
+        labelRendering,
       )
     case 'point':
       return renderPoint(
@@ -2141,6 +2154,7 @@ function renderCurve(
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onCurveStratumClick: SvgDiagramProps['onCurveStratumClick'],
   onCanvasClick: SvgDiagramProps['onCanvasClick'],
+  labelRendering: SvgDiagramLabelRendering,
 ): RenderItemElement {
   const occlusion = curveOcclusionById.get(curve.id)
   const pathData = curveToSvgPathData(curve, camera, viewportHeight)
@@ -2256,7 +2270,7 @@ function renderCurve(
           />
         ))}
         {inlineNodes.map((node) =>
-          renderPathInlineNodePreview(node, curve, isSelected),
+          renderPathInlineNodePreview(node, curve, isSelected, labelRendering),
         )}
       </g>
     ),
@@ -2267,16 +2281,18 @@ function renderPathInlineNodePreview(
   node: SvgPathInlineNodePreview,
   curve: CurveStratum,
   isSelected: boolean,
+  labelRendering: SvgDiagramLabelRendering,
 ): ReactElement {
   const markerRadius = node.marker === 'dot' ? 4.2 : 3.4
   const stroke = isSelected ? highlightColor : curve.style.strokeColor
   const fill = node.marker === 'dot' ? curve.style.strokeColor : '#ffffff'
   const labelX = node.center.x + node.labelOffset.x
   const labelY = node.center.y + node.labelOffset.y
+  const ownerIdentity = svgPathInlineNodeLabelIdentity(labelRendering.documentRevision, curve.id, node.id)
 
   return (
     <g
-      key={`${curve.id}-inline-node-${node.id}`}
+      key={ownerIdentity}
       pointerEvents="none"
       data-path-inline-node-id={node.id}
       data-path-inline-node-path-id={node.pathId}
@@ -2293,53 +2309,22 @@ function renderPathInlineNodePreview(
         vectorEffect="non-scaling-stroke"
       />
       {node.text.trim().length > 0 && (
-        <text
-          x={labelX}
-          y={labelY}
-          fill="#111827"
+        <SvgTexLabel
+          runtime={labelRendering.runtime}
+          ownerIdentity={ownerIdentity}
+          source={node.text}
+          position={{ x: labelX, y: labelY }}
+          color="#111827"
+          opacity={1}
           fontSize={12}
-          textAnchor={svgInlineNodeTextAnchor(node.placement)}
-          dominantBaseline={svgInlineNodeDominantBaseline(node.placement)}
-          paintOrder="stroke"
-          stroke="#ffffff"
-          strokeWidth={3}
-          strokeLinejoin="round"
-        >
-          {node.text}
-        </text>
+          anchor={svgPathInlineNodeLabelAnchor(node.placement)}
+          outline={{ color: '#ffffff', width: 3 }}
+          boundsTarget={false}
+          onLayout={(snapshot) => labelRendering.onLayout?.(node.id, snapshot, ownerIdentity)}
+        />
       )}
     </g>
   )
-}
-
-function svgInlineNodeTextAnchor(
-  placement: SvgPathInlineNodePreview['placement'],
-): 'start' | 'middle' | 'end' {
-  switch (placement) {
-    case 'left':
-      return 'end'
-    case 'right':
-      return 'start'
-    case 'above':
-    case 'below':
-    case 'center':
-      return 'middle'
-  }
-}
-
-function svgInlineNodeDominantBaseline(
-  placement: SvgPathInlineNodePreview['placement'],
-): 'auto' | 'central' | 'hanging' {
-  switch (placement) {
-    case 'above':
-      return 'auto'
-    case 'below':
-      return 'hanging'
-    case 'left':
-    case 'right':
-    case 'center':
-      return 'central'
-  }
 }
 
 function curveToSvgPathData(
@@ -2660,6 +2645,7 @@ function renderLabel(
         )}
         <SvgTexLabel
           runtime={labelRuntime}
+          ownerIdentity={JSON.stringify(['free-label', documentRevision, label.id])}
           source={label.text}
           position={position}
           color={style.color}

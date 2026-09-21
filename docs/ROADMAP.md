@@ -1259,19 +1259,37 @@ commands. All eight 31C groups completed with no page errors or unexecuted group
   authored coordinates remain strict and native matrix readback uses float32
   precision. Obsolete App completions must preserve position without corrective
   pan. No production code changed. **M1's browser-evidence gap is closed.**
-- Inline-node integration (31D) and settled export preparation (31E) remain
-  deferred. Current SVG export continues to clone visible formulas/fallback.
+- This subphase leaves inline-node integration to 31D below and settled export
+  preparation to 31E. Current SVG export clones visible formulas/fallback.
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
-Status: planned.
+Status: implementation and local checks passed on 2026-09-21; required parent
+browser verification pending. Not marked complete until those checks pass.
 
-- Reuse the same parser, adapter, cache, renderer, and error behavior for path
-  inline-node text, including all five placements and the white label outline.
-- Preserve marker geometry, pointer pass-through, and marker-centered selection
-  of the owning curve; do not introduce separate selectable formula glyphs.
-- Handle node identity and pending results across path editing, duplication,
-  splitting, reversal, and deletion without changing raw text or TikZ meaning.
+- Inline-node text now uses `SvgTexLabel`, the same parser, adapter, cache,
+  exact-source fallback, lifecycle controller, and measured layout as free
+  labels. Five measured anchors retain the 14-unit marker offset and font 12.
+- Decorative white halos use non-scaling strokes behind all foreground runs,
+  preserve transparent formula paints, and remain inaccessible in Preview and
+  current SVG exports. Marker geometry/highlights, pointer pass-through, preview
+  cap, and marker-centered owning-curve selection remain unchanged.
+- Collision-safe document/path/node ownership and source/font request identity
+  guard stale completions. Both label kinds publish through the shared layout
+  callback for 31E; model, history, and raw TikZ semantics are unchanged.
+- Added 13 Node regressions for real-engine placement, ownership/cache/settings
+  races, raw text and path-operation/selection semantics, plus an export halo
+  accessibility regression. All 2,312 tests, build, strict fixture TypeScript,
+  focused lint, browser-script syntax, and diff check passed. Existing build
+  size warning and unchanged lint debt are separate from this subphase.
+- The production browser harness adds two required inline-node groups with
+  native geometry/pixel outline evidence, pointer probes, path operations,
+  delayed completions, shared snapshots, and SVG cloning. Both browser commands
+  were blocked by local-listen `EPERM` before launch; only the asset command's
+  static graph check ran successfully. The parent runner must complete
+  `check:label-assets` and `check:free-labels`; no browser pass is claimed.
+- 31E's settled export wait/snapshot policy and 31F's combined completion audit
+  remain deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 

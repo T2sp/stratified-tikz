@@ -60,8 +60,9 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 ## Label Preview Input Contract (Phase 31A)
 
-Phase 31A defines the pure parser and fallback contract. Phase 31C connects free
-labels to the production SVG Preview through the shared `SvgTexLabel` renderer.
+Phase 31A defines the pure parser and fallback contract. Phases 31C and 31D
+connect free labels and path inline-node text to the production SVG Preview
+through the shared `SvgTexLabel` renderer.
 The [Phase 31B adapter](./LABEL_ADAPTER.md)
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
@@ -77,9 +78,8 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Path inline-node integration, waiting for settled labels during SVG export, and
-the combined audit remain assigned to
-[Phases 31D–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Waiting for settled labels during SVG export and the combined audit remain
+assigned to [Phases 31E–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -129,7 +129,7 @@ The TeX body is retained exactly, excluding only its outer delimiters. Unknown
 math commands such as `$\unknowncommand{x}$` are parsed as math and left for
 the adapter to validate; the parser neither evaluates nor expands macros.
 Physical newlines inside math stay in the same run, including in matrices.
-Ordinary text newlines separate visual lines in the free-label renderer;
+Ordinary text newlines separate visual lines in the shared label renderer;
 CRLF may be treated as one visual break without rewriting the original source.
 
 ### Results, Bounds, and Exact-Source Fallback
@@ -153,7 +153,7 @@ successful text run displaying `Cost $5`, but `Cost \$5 $x` falls back to the
 entire original source, retaining the backslash and unmatched dollar. Leading,
 trailing, and repeated spaces, tabs, LF, and CRLF remain exact in `source`.
 
-The free-label renderer also uses the latest complete original input for
+The shared label renderer also uses the latest complete original input for
 pending conversions, undefined math commands, TeX/output errors, resource
 failures, and bounded-work failures. Literal fallback displays every physical
 source newline as a visual break (CRLF may be one break) and inserts source as
@@ -197,9 +197,89 @@ For pathological inputs, the display font is capped at 4096 SVG units and
 unavailable text metrics use bounded emergency spacing. The complete source
 and saved style remain unchanged.
 
-Only free labels use this integration in 31C. Path inline nodes remain for 31D;
-coordinate names, axis captions, handles, saved path identifiers, and attached
+Coordinate names, axis captions, handles, saved path identifiers, and attached
 stratum metadata are unchanged.
+
+### Path inline-node text (Phase 31D)
+
+Path inline nodes use the same parser, MathJax adapter, immutable conversion
+cache, literal fallback, and SVG label renderer as free labels. For example,
+enter `射 $f$ : $\frac{a}{b}$` in a path node's text field to combine Japanese
+text with two math runs. The Inspector, saved JSON, and Undo/Redo retain that
+exact source. Generated TikZ `node[pos=..., ...]` uses the original text through
+the existing export-mode formatter. This remains an attachment to the existing
+path and does not split or change its geometry.
+
+All five placements use the complete measured label bounds, including tall
+fractions and multiple text/math runs. Above and below align the bottom and
+top edges respectively; left and right align the right and left edges. Those
+edges stay at the existing 14-unit offset from the projected marker center.
+Center placement centers the bounds on the marker. Font size remains 12 SVG
+units, with the existing dark label color and white outline. The outline uses
+display-unit widths for both text and formula geometry and has no rectangular
+background; its decorative geometry is non-interactive and hidden from
+accessibility descriptions.
+
+Pending or failed node labels display their complete latest source, including
+delimiters, backslashes, spaces, tabs, and physical newlines. For example,
+`Map $f$ $\unknowncommand{x}$` falls back as a whole label, including the
+otherwise valid `$f$` run. One failing node does not suppress its siblings or
+the path. Empty and whitespace-only node text still produces no visible label,
+and Preview retains its existing limit of the first 128 inline nodes per path.
+
+Marker geometry, dot/non-dot appearance, selected-path highlighting, and
+geometry-derived 2D/3D positions are preserved. Label glyphs pass pointer events
+through and do not become selection targets. Alt/Option-click overlap cycling
+continues to use the marker-centered tolerance and priority and selects the
+owning curve, independently of the size of its text or formula.
+
+Runtime ownership distinguishes the current document, owning path, and inline
+node, so node IDs may repeat on different paths. Source and font settings
+identify each conversion; obsolete completions after editing, duplication,
+splitting, reversal, deletion, or document replacement cannot replace current
+content. Position, placement, selection, and camera changes reuse unchanged
+conversion results. Committed node results are available through the same
+revision-aware layout interface as free labels for subsequent export work.
+
+Saved-path `pathLabel` names and UI captions are not typeset. Existing SVG
+export includes currently settled node formulas and current literal fallback;
+waiting for a consistent settled snapshot remains Phase 31E. The combined
+regression and completion audit remains Phase 31F.
+
+The shared `onLabelLayoutChange(id, snapshot, ownerIdentity)` callback publishes
+current free-label and inline-node layouts. Consumers key by `ownerIdentity`,
+not by the path-local node ID. Inline owner identities encode document revision,
+path ID, and node ID; request identities also include original source and font
+settings. A `null` snapshot retires that owner. No separate export registry or
+model/history fields are introduced.
+
+### Inline-node verification
+
+`npm run check:free-labels` now also requires the groups
+`inline-node-rendering-placement-halo-picking` and
+`inline-node-lifecycle-path-operations-export`. The production-renderer fixture
+exercises five placements at two camera zoom levels, 2D/3D supported path kinds,
+real pointer/Alt-click selection, delayed completions, font readiness, path
+operations, shared layout callbacks, exact fallback, and current SVG cloning.
+The independent halo oracle rasterizes foreground, halo, and combined layers,
+checks source-over compositing and display-unit outline extent, and rejects
+opaque backgrounds and white ghosts from transparent formulas. PNGs and SVGs
+are retained alongside the existing checkout-identified browser evidence.
+
+The 2026-09-21 child implementation run passed all 2,312 Node tests, production
+build, strict fixture TypeScript, focused lint (apart from unchanged baseline
+debt below), script syntax checks, and `git diff --check`. New Node files are
+registered in `npm test`. The build retains its existing large-chunk warning.
+`SvgDiagram.tsx` has the same one `react-hooks/refs` diagnostic as HEAD; the
+documented App/SvgDiagram total is 10 errors / 4 warnings, so repository-wide
+lint was not run.
+
+Both required browser commands remain **pending parent verification**:
+`check:label-assets` passed its static asset graph check, then failed to listen
+on `127.0.0.1` with `EPERM`; `check:free-labels` likewise failed at development
+server startup before browser launch or assertions. This is not a browser pass.
+The parent runner must execute both commands outside the child sandbox and
+retain all ten completed groups before Phase 31D is marked complete.
 
 ### Free-label verification
 
@@ -527,7 +607,9 @@ App/SvgDiagram lint separately against HEAD; repository-wide lint is skipped
 because that baseline is not clean. No adapter/loading/build configuration
 changed. The authorized parent run also passed the independent Phase 31B
 `check:label-assets`; its evidence remains separate from the Phase 31C results.
-Phase 31D, 31E, and 31F are deferred.
+The historical free-label verification above predates inline-node integration;
+see the Phase 31D implementation and pending browser verification above.
+Phase 31E and Phase 31F remain deferred.
 
 ## Export SVG
 
@@ -543,8 +625,9 @@ Export includes the current SVG Preview view, including visible diagram
 geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
 preview-only data attributes are removed from the exported SVG.
 
-Export currently clones what is visible: settled free-label formulas remain SVG
-geometry, and pending/failed labels remain their current literal source.
+Export currently clones what is visible: settled free-label and path inline-node
+formulas remain SVG geometry, and pending/failed labels remain their current
+literal source.
 Transparent and white backgrounds are supported, and label hit rectangles and
 selected-position markers are excluded. Waiting for a consistent settled-label
 snapshot is deferred to Phase 31E.

@@ -180,9 +180,17 @@ function isExcludedSvgPreviewExportElement(
 function removeSvgPreviewExportMetadataAttributes(
   element: SvgPreviewExportElementLike,
 ): void {
+  // The shared label renderer duplicates text for its decorative outline. Keep
+  // that copy hidden from assistive technology after its runtime marker goes.
+  const isDecorativeLabelHalo = element.getAttribute('data-label-halo') === 'true'
+
   for (const attribute of Array.from(element.attributes)) {
     const name = attribute.name
     const lowerName = name.toLowerCase()
+
+    if (isDecorativeLabelHalo && lowerName === 'aria-hidden' && attribute.value === 'true') {
+      continue
+    }
 
     if (
       metadataAttributeNames.has(lowerName) ||

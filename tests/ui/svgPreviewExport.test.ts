@@ -252,6 +252,48 @@ test('SVG preview export sanitizer removes editor chrome and metadata', () => {
   assert.match(exported, /height="360"/)
 })
 
+test('SVG preview export keeps only decorative label halo copies hidden from accessibility', () => {
+  for (const backgroundMode of ['transparent', 'white'] as const) {
+    for (const haloAttributes of [
+      { 'data-label-halo': 'true', 'aria-hidden': 'true' },
+      { 'aria-hidden': 'true', 'data-label-halo': 'true' },
+    ]) {
+      const halo = new FakeSvgElement('g', {
+        id: 'halo',
+        ...haloAttributes,
+        'aria-label': 'Duplicated label',
+        'data-label-state': 'ready',
+        'pointer-events': 'none',
+        role: 'presentation',
+      }, [new FakeSvgElement('text', { fill: 'none', stroke: '#ffffff', 'stroke-width': '3' })])
+      const svg = new FakeSvgElement('svg', { viewBox: '0 0 520 360' }, [
+        halo,
+        new FakeSvgElement('g', { id: 'foreground', 'aria-hidden': 'true' }, [
+          new FakeSvgElement('text', { fill: '#111111' }),
+        ]),
+        new FakeSvgElement('g', { id: 'not-halo', 'data-label-halo': 'false', 'aria-hidden': 'true' }),
+        new FakeSvgElement('g', { id: 'not-hidden', 'data-label-halo': 'true', 'aria-hidden': 'false' }),
+      ])
+      const liveBefore = svg.serialize()
+      const clone = exportClone(svg, { backgroundMode })
+      const exportedHalo = clone.children.find((child) => child.getAttribute('id') === 'halo')
+      assert.ok(exportedHalo)
+      assert.equal(exportedHalo.getAttribute('aria-hidden'), 'true')
+      assert.equal(exportedHalo.getAttribute('pointer-events'), 'none')
+      assert.equal(exportedHalo.children[0].getAttribute('stroke'), '#ffffff')
+      for (const id of ['foreground', 'not-halo', 'not-hidden']) {
+        const element = clone.children.find((child) => child.getAttribute('id') === id)
+        assert.ok(element)
+        assert.equal(element.getAttribute('aria-hidden'), null)
+      }
+      const exported = clone.serialize()
+      assert.equal(countMatches(exported, /aria-hidden="true"/gu), 1)
+      assert.doesNotMatch(exported, /data-label|aria-label|role=/u)
+      assert.equal(svg.serialize(), liveBefore)
+    }
+  }
+})
+
 test('SVG preview export preserves diagram primitives and current view coordinates', () => {
   const svg = new FakeSvgElement('svg', { viewBox: '0 0 520 360' }, [
     new FakeSvgElement('polygon', { points: '100,250 260,210 240,90' }),
