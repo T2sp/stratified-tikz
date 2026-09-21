@@ -255,95 +255,126 @@ model/history fields are introduced.
 
 ### Inline-node verification
 
-`npm run check:free-labels` now also requires the groups
-`inline-node-rendering-placement-halo-picking` and
-`inline-node-lifecycle-path-operations-export`. The production-renderer fixture
-exercises five placements at two camera zoom levels, 2D/3D supported path kinds,
-real pointer/Alt-click selection, delayed completions, font readiness, path
-operations, shared layout callbacks, exact fallback, and current SVG cloning.
-The independent halo oracle rasterizes foreground, halo, and combined layers,
-checks source-over compositing and display-unit outline extent, and rejects
-opaque backgrounds and white ghosts from transparent formulas. PNGs and SVGs
-are retained alongside the existing checkout-identified browser evidence.
+`npm run check:free-labels` requires the two inline-node groups in addition to
+all eight existing free-label groups. The fixture retains all five placements
+at zoom 1 and 1.4, mixed Japanese/text/nested fractions, transparent math,
+2D/3D path kinds, real pointer/Alt cycling, ownership and delayed completions,
+font readiness, path operations, raw history/TikZ data and current SVG cloning.
+Phase 31D acceptance is **incomplete**; independent review has not run.
 
-The initial 2026-09-21 child implementation run passed all 2,312 Node tests, production
-build, strict fixture TypeScript, focused lint (apart from unchanged baseline
-debt below), script syntax checks, and `git diff --check`. New Node files are
-registered in `npm test`. The build retains its existing large-chunk warning.
-`SvgDiagram.tsx` has the same one `react-hooks/refs` diagnostic as HEAD; the
-documented App/SvgDiagram total is 10 errors / 4 warnings, so repository-wide
-lint was not run.
+The execution history must distinguish these results:
 
-Phase 31D browser acceptance remains **incomplete**, with three distinct runs:
+- The original implementation child and previous diagnostic child could not
+  start their local server (`EPERM`). These are startup blocks, not pixel
+  results. The previous handoff is `/private/tmp/stz-phase31d-targeted-handoff.json`.
+- The first authorized parent launched Chrome and failed before retaining the
+  failing operands (`stz-phase31d-before-review-gRWdxT`). The subsequent parent
+  run **did retain them** at
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-if6x1M/`.
+  Node v26.9.0 / Chrome 153.0.8010.52, Vite fixture `http://127.0.0.1:5174`:
+  tests, build, diff check and `check:label-assets` exited 0;
+  `check:free-labels` exited 1 at `inline-above-zoom-1`.
+  `maxCompositeError=5.082352941176467` failed `<=2`; the preceding
+  `compositeCompared=1130 > dark=31` passed. Seven groups and 75 scenarios
+  passed, with no page errors. Inline rendering was partial; inline lifecycle
+  and real App were unexecuted. This stopped verification **before review**.
+- This fix starts from clean `2622458c5e652febdfb1b065be1d1b33d84bdd5e` on
+  `phase/31d-tex-path-inline-labels`. The eight previously pending files are
+  committed unchanged: the diff from `6fd794c8a98bfda62e0d8173409d38dfc23dde82`,
+  excluding the later fix prompt, has SHA-256
+  `6679416198d0a12c59aa6376e137fd475dced9d96ce80ba919baa633d0f29e28`.
+  All four original implementation files remain tracked.
 
-- The initial child could not start its local server (`EPERM`). Its evidence at
-  `/private/tmp/stz-phase31d-browser-final/free-labels-evidence.json` did not
-  establish browser acceptance.
-- The later parent **did launch Chrome 153.0.8010.52**, using Node v26.9.0.
-  Its tests, build, diff check and `check:label-assets` passed, but
-  `check:free-labels` exited 1 at the first inline halo case (`above`, zoom 1,
-  `日本語 $\frac{O_1}{1+\frac{a}{b}}$ and $g^2$`). The failed condition was
-  `compositeCompared > dark && maxCompositeError <= 2`. Neither operand's
-  values were saved, so production paint versus oracle error is **not yet
-  diagnosed**. Seven groups and 75 scenarios passed; the inline rendering
-  group was partial, and inline lifecycle and real App groups were unexecuted.
-  This was a verification failure before review, not a completed review.
-  Evidence: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-gRWdxT/verification.json`
-  and its `05-check-free-labels/artifacts/` directory.
-- This targeted child attempt retained the pending implementation, now committed
-  at `6fd794c8a98bfda62e0d8173409d38dfc23dde82`. The original tracked snapshot
-  (SHA-256 `79a9ab2cdea4fc276fe4e80d04f454a0b901144634b4e81717371fcf5e51bbad`)
-  and all four formerly untracked files matched the checkout before these fixes;
-  those files are now tracked. The diagnostic browser command again failed
-  at `development-server-listen` (`EPERM`, Node v26.9.0), before Chrome launch.
-  Evidence: `/private/tmp/stz-phase31d-halo-diagnostic-20260921/free-labels-evidence.json`;
-  command log: `/private/tmp/stz-phase31d-halo-diagnostic-20260921.log`.
-  Its individual exit status was not retained: the shell wrapper exited 0
-  after printing that failure log. The harness report is explicitly `failed`,
-  with no identified browser, completed group or passing observation.
-  This new startup block supplies no pixel measurements and does not explain
-  or supersede the parent's executed assertion failure.
+The saved worst pixel is `(98,21)` in a 115 × 34 raster with viewBox
+`[-58,-27,115,34]`. Foreground `[16,23,38,222]` over halo `[255,255,255,255]`
+calculates to `[46.9294118,53.0235294,66.0823529,255]`, while the outlined SVG
+produces `[43,49,61,255]`. Premultiplication leaves the same blue-channel
+error; alpha is already fully opaque. Independently decoding the saved PNGs
+finds that all 21 errors above 2 are among 749 opaque-white-halo pixels. The
+other 381 compared pixels retain maximum source-over error 0.4899135447.
+The foreground and halo subtrees match the corresponding outlined subtrees.
+The worst region contains MathJax fill plus a 3-unit stroke scaled to 0.036
+SVG display units. This narrows the discrepancy to direct primitive painting
+versus a flattened transparent-foreground reference; it does **not** prove
+that final readback rounding alone explains 5.08235, or that production paint
+violates the white-halo contract.
 
-The targeted changes save each halo case's identity, source, bounds, font/paint
-styles, nested transforms/viewBoxes, layer order and pixel statistics **before
-asserting**. Bounded worst-pixel records retain foreground/halo/outlined and
-expected RGBA, with separate color, alpha and premultiplied differences.
-Foreground, halo-only, outlined, independently expected, amplified RGB/alpha
-difference PNGs, native screenshots and reproducing SVGs are saved. Checkpoints
-and diagnostics are observations, not passing scenarios. The compound
-assertion is split so the next failure names its operand, value, placement and
-zoom. The original comparison and tolerance remain unchanged; premultiplied
-results are diagnostic only. No production halo correction, replacement
-compositing oracle, or new browser negative-control result is claimed without
-the missing actual-browser measurements.
+The targeted change is an oracle correction, with production paint unchanged.
+It adds a separately rendered foreground on an independent white rectangle,
+with identical SVG size, viewBox, transforms, geometry and explicit paint.
+Only when the halo-only RGBA is exactly `[255,255,255,255]` is that direct
+white-backdrop reference used. There the local destination is the same opaque
+white, so no reconstruction of a flattened foreground's coverage is needed.
+All other pixels retain the original source-over calculation and its tolerance
+of 2. The maximum straight-alpha bound stays 2 over the **same 1,130 pixels**
+for the retained case; the reference partition must sum to the original
+population. An additional maximum premultiplied RGB/alpha bound of 2 checks
+**every** raster pixel, including low-alpha/transparent pixels. No tolerance
+was fitted to 5.08235 and no partially transparent foreground was discarded.
+The opaque-white comparison expects the same direct paint operations on the
+same byte-valued local backdrop; the existing two-byte allowance remains for
+raster/readback quantization, not an accumulation allowance for arbitrary
+primitive overlap. New browser measurements must still validate this change.
 
-The parent gate now accepts complete legacy eight-group or extended ten-group
-31C evidence, and requires all ten groups for 31D/31E/31F. Behavioral helper and
-runner tests reject either/both missing inline groups, partial extensions,
-duplicates, unsupported groups, incomplete/unexecuted work, browser errors,
-nonzero exits and checkout changes, while retaining 31B verification.
+Pre-assertion retention preserves every original metric and layer PNG/SVG,
+original calculated expectation/differences, bounded worst samples, native
+metadata and full-page screenshot. Original `maxCompositeError` remains a
+flattened-reference diagnostic. Added artifacts include `foregroundOnWhite`,
+`backdropExpected`, `backdropDifference`, each original worst pixel's direct
+reference, and bounded worst samples for both new comparisons. On the first
+placement the browser also independently removes foreground strokes or adds
+foreground isolation, retaining each controlled experiment as diagnostics.
+These experiments have **not yet executed in this child**; a thin-stroke or
+isolation mechanism must not be reported as measured until their values exist.
 
-Current focused verification with `/opt/homebrew/bin` first in `PATH`: the five
-requested Node test files passed **85 tests** (exit 0), including the 53 parent
-gate/runner tests. Strict fixture TypeScript, all requested browser-script and
-changed automation/test syntax checks, targeted ESLint and `git diff --check`
-passed (exit 0). `npm test` passed **2,348 tests** and `npm run build` passed
-(both exit 0; existing chunk-size warning only). Logs are
-`/private/tmp/stz-phase31d-focused.log`, `/private/tmp/stz-phase31d-static-checks.json`,
-`/private/tmp/stz-phase31d-npm-test.log` and `/private/tmp/stz-phase31d-npm-build.log`.
-Full-suite/build results and
-the final dirty-checkout fingerprint are retained in
-`/private/tmp/stz-phase31d-targeted-handoff.json`; the focused count is a subset
-of the full suite. Production renderer, parser/runtime, pinned MathJax, model,
-history, marker/picking, path operations and SVG/TikZ export code are unchanged
-by this diagnostic/gate patch. Their existing browser assertions remain in the
-full harness and still need execution on this checkout.
+Six browser negative controls mutate only a fresh tested output, leaving all
+reference images unchanged: halo above foreground, missing halo, oversized
+halo, opaque rectangle, wrong foreground color and wrong foreground opacity.
+Each must fail the independent comparison; corresponding solid-pixel, white
+outline, extent and transparent-gap checks also reject their specific defects.
+The normal placement matrix and transparent-math case retain all existing
+width, inner-color, counter/gap, accessibility and picking assertions. A group
+is completed only after all assertions return. These added browser controls
+are implemented, **not observed passes**.
 
-The authorized parent/Terminal must run
+The phase-aware parent validator and its tests are unchanged by this fix. It
+accepts complete eight- or ten-group 31C evidence and requires all ten groups
+for 31D–31F. Its 53 behavioral helper/runner tests still reject missing inline
+groups, duplicate/unsupported/incomplete reports, browser errors, nonzero exits
+and checkout changes, while preserving 31B and verification-before-review.
+
+Current child verification uses Node v26.9.0 with `/opt/homebrew/bin` first in
+`PATH`. The five requested focused test files plus
+`tests/scripts/inlineLabelComposite.test.ts` passed **93 tests** (exit 0),
+including eight new numeric comparison tests and the 53 parent tests. The new
+file is registered in `npm test`; focused counts are included in the full
+suite. `npm test` passed **2,356 tests**, `npm run build` exited 0 (the existing
+large-chunk warning only), and fixture TypeScript, the five requested script
+syntax checks, targeted ESLint (including both new files) and `git diff --check`
+all exited 0. `SvgDiagram` was not touched; repository-wide lint was not run
+because its previously documented lint debt remains out of scope. Exact
+commands, logs and final pending-checkout identity are retained in
+`/private/tmp/stz-phase31d-compositing-fix/handoff.json`.
+Production renderer, parser/adapter/runtime, pinned MathJax, model/history,
+marker/picking, path operations and SVG/TikZ export remain unchanged.
+
+A direct external-Playwright Chrome launch from this child exited 1
+(`Target page, context or browser has been closed`, SIGABRT; cleanup reported
+`kill EPERM`). No browser version or new pixels were obtained. Native Terminal
+and Chrome UI access were also denied by the tool. These restrictions are
+separate from the parent's **executed** halo assertion. The saved-image numeric
+analysis and an unexecuted local reproduction are retained under
+`/private/tmp/stz-phase31d-compositing-fix/`; they are not acceptance evidence.
+
+The authorized parent must execute the complete gate on this final checkout:
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`.
-Do not use this child handoff as acceptance: the halo cause/fix, all ten
-completed browser groups (including both inline groups and real App), fresh
-asset checks and subsequent review remain pending. 31E/31F remain deferred.
+It must identify a browser, exit 0, report `passed`/`complete`, finish all ten
+groups (including both inline groups and real App), and leave no incomplete,
+unexecuted or page-error entries. The white-backdrop diagnosis, negative
+controls, full placement/halo matrix, lifecycle/App/export observations and
+fresh `check:label-assets` remain pending. `verify` does not run review;
+subsequent independent review is a separate requirement. 31E's settled-export
+waiting and 31F's combined audit remain deferred.
 
 ### Free-label verification
 

@@ -22,10 +22,10 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
   const state = () => page.evaluate(() => window.stzLabels.state())
   const mount = (curves, extra = {}) => page.evaluate((value) => window.stzLabels.mount(value), { labels: [], curves, ...extra })
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
-  const inspect = (pathId, nodeId = 'shared', rasterize = false) => page.evaluate(async (input) => {
+  const inspect = (pathId, nodeId = 'shared', rasterize = false, controls = false) => page.evaluate(async (input) => {
     const { inspectInlineLabel } = await import('./inlineLabelBrowserOracle.ts')
-    return inspectInlineLabel(input.pathId, input.nodeId, input.rasterize)
-  }, { pathId, nodeId, rasterize })
+    return inspectInlineLabel(input.pathId, input.nodeId, input.rasterize, input.controls)
+  }, { pathId, nodeId, rasterize, controls })
   const mutate = (pathId, change, nodeId = 'shared') => page.evaluate((input) =>
     window.stzLabels.mutateInlineNode(input.pathId, input.nodeId, input.change), { pathId, nodeId, change })
   const hold = (source) => page.evaluate((value) => window.stzLabels.hold(value), source)
@@ -108,7 +108,8 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
     for (const placement of placements) {
       const caseName = `inline-${placement}-zoom-${zoom}`
       await startGroup('inline-node-rendering-placement-halo-picking', caseName)
-      const observed = await inspect(placement, 'shared', true)
+      const controls = placement === 'above' && zoom === 1
+      const observed = await inspect(placement, 'shared', true, controls)
       await retainRaster(caseName, observed, { placement, zoom, source })
       const { label, marker } = observed
       const [offsetX, offsetY] = placement === 'above' ? [0, -14] : placement === 'below' ? [0, 14]
@@ -134,13 +135,45 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
       assert.equal(raster.darkPreserved, raster.dark, `${caseName}: white halo preserves all solid inner glyph pixels`)
       assert.ok(raster.compositeCompared > raster.dark,
         `${caseName}: compositeCompared=${raster.compositeCompared} must exceed dark=${raster.dark}`)
-      assert.ok(raster.maxCompositeError <= 2,
-        `${caseName}: independent foreground-over-halo maxCompositeError=${raster.maxCompositeError} must be <=2`)
+      assert.equal(raster.opaqueWhiteCompared + raster.sourceOverCompared, raster.compositeCompared,
+        `${caseName}: both references cover the entire original comparison population`)
+      assert.ok(raster.maxSourceOverError <= 2,
+        `${caseName}: unchanged partial-halo source-over maxSourceOverError=${raster.maxSourceOverError} must be <=2`)
+      assert.ok(raster.maxBackdropCompositeError <= 2,
+        `${caseName}: independent same-backdrop maxBackdropCompositeError=${raster.maxBackdropCompositeError} must be <=2`)
+      assert.ok(raster.maxBackdropPremultipliedError <= 2,
+        `${caseName}: all-pixel color/alpha maxBackdropPremultipliedError=${raster.maxBackdropPremultipliedError} must be <=2`)
       assert.ok(raster.addedWhite > 10, `${caseName}: addedWhite=${raster.addedWhite} must exceed 10 visible outline pixels`)
       assert.ok(raster.furthestAddedPixel <= 3,
         `${caseName}: furthestAddedPixel=${raster.furthestAddedPixel} must be <=3 display units`)
       assert.ok(raster.distantClear > 10, `${caseName}: distantClear=${raster.distantClear} must exceed 10 gap pixels`)
       assert.equal(raster.distantFilled, 0, `${caseName}: fraction gaps and text spaces have no opaque background`)
+      if (controls) {
+        assert.ok(raster.opaqueWhiteCompared > 0 && raster.sourceOverCompared > 0, 'Both independent references are exercised')
+        assert.deepEqual(raster.negativeControls.map(({ variant }) => variant), [
+          'halo-over-foreground', 'missing-halo', 'oversized-halo', 'rectangular-background', 'wrong-color', 'wrong-opacity',
+        ])
+        for (const control of raster.negativeControls) {
+          assert.ok(control.maxBackdropCompositeError > 2 || control.maxBackdropPremultipliedError > 2,
+            `${caseName}: comparator must reject ${control.variant} against unmodified independent references`)
+          if (control.variant === 'halo-over-foreground') assert.ok(control.darkPreserved < control.dark)
+          if (control.variant === 'missing-halo') assert.equal(control.addedWhite, 0)
+          if (control.variant === 'oversized-halo') assert.ok(control.furthestAddedPixel > 3)
+          if (control.variant === 'rectangular-background') assert.ok(control.distantFilled > 0)
+        }
+        assert.deepEqual(raster.experiments.map(({ variant }) => variant), ['no-foreground-stroke', 'isolated-foreground'])
+        // The changed references must also agree when thin MathJax strokes are
+        // removed or foreground isolation is requested. Their original-layer
+        // discrepancies are retained as diagnostics, not passing scenarios.
+        for (const experiment of raster.experiments) {
+          assert.ok(experiment.maxBackdropCompositeError <= 2 && experiment.maxBackdropPremultipliedError <= 2,
+            `${caseName}: independent references disagree in ${experiment.variant}`)
+        }
+        await record('inline-halo-independent-reference-rejects-six-bad-outputs', {
+          controls: raster.negativeControls.map(({ variant, maxBackdropCompositeError, maxBackdropPremultipliedError }) =>
+            ({ variant, maxBackdropCompositeError, maxBackdropPremultipliedError })),
+        })
+      }
       placementEvidence.push(observed)
     }
     assert.equal((await state()).invocationCount, beforeCamera.invocationCount, 'Camera motion reuses unchanged inline conversion')
@@ -155,8 +188,12 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
   await retainRaster('inline-transparent-math', transparent, { placement: 'above', zoom: 1, source: transparent.label.source })
   assert.equal(transparent.label.math, 1, 'Transparent supported math remains successfully typeset')
   assert.equal(transparent.label.raster.darkPreserved, transparent.label.raster.dark, 'inline-transparent-math: solid glyph preservation')
-  assert.ok(transparent.label.raster.maxCompositeError <= 2,
-    `inline-transparent-math: maxCompositeError=${transparent.label.raster.maxCompositeError} must be <=2`)
+  assert.ok(transparent.label.raster.maxSourceOverError <= 2,
+    `inline-transparent-math: unchanged partial-halo maxSourceOverError=${transparent.label.raster.maxSourceOverError} must be <=2`)
+  assert.ok(transparent.label.raster.maxBackdropCompositeError <= 2,
+    `inline-transparent-math: maxBackdropCompositeError=${transparent.label.raster.maxBackdropCompositeError} must be <=2`)
+  assert.ok(transparent.label.raster.maxBackdropPremultipliedError <= 2,
+    `inline-transparent-math: all-pixel maxBackdropPremultipliedError=${transparent.label.raster.maxBackdropPremultipliedError} must be <=2`)
   assert.ok(transparent.label.raster.furthestAddedPixel <= 3,
     `inline-transparent-math: furthestAddedPixel=${transparent.label.raster.furthestAddedPixel} must be <=3; no white ghost`)
   assert.equal(transparent.label.raster.distantFilled, 0, 'inline-transparent-math: transparent gaps')

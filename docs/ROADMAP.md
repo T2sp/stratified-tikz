@@ -1264,57 +1264,62 @@ commands. All eight 31C groups completed with no page errors or unexecuted group
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
-Status: incomplete. The 2026-09-21 parent browser run reached inline rendering
-and failed the first halo compositing assertion before review. A targeted child
-patch adds retained diagnostics and corrects the parent group gate; the halo
-cause/fix and full browser acceptance still require authorized parent execution.
+Status: incomplete; targeted oracle correction awaits authorized browser
+verification, followed separately by independent review.
 
-- Inline-node text now uses `SvgTexLabel`, the same parser, adapter, cache,
-  exact-source fallback, lifecycle controller, and measured layout as free
-  labels. Five measured anchors retain the 14-unit marker offset and font 12.
-- Decorative white halos use non-scaling strokes behind all foreground runs,
-  preserve transparent formula paints, and remain inaccessible in Preview and
-  current SVG exports. Marker geometry/highlights, pointer pass-through, preview
-  cap, and marker-centered owning-curve selection remain unchanged.
-- Collision-safe document/path/node ownership and source/font request identity
-  guard stale completions. Both label kinds publish through the shared layout
-  callback for 31E; model, history, and raw TikZ semantics are unchanged.
-- Added 13 Node regressions for real-engine placement, ownership/cache/settings
-  races, raw text and path-operation/selection semantics, plus an export halo
-  accessibility regression. The initial child passed all 2,312 tests, build, strict fixture TypeScript,
-  focused lint, browser-script syntax, and diff check passed. Existing build
-  size warning and unchanged lint debt are separate from this subphase.
-- The production browser harness adds two required inline-node groups with
-  native geometry/pixel outline evidence, pointer probes, path operations,
-  delayed completions, shared snapshots, and SVG cloning. The initial child's
-  `EPERM` was followed by an executed parent run: Node v26.9.0 / Chrome
-  153.0.8010.52, `check:label-assets` exit 0, `check:free-labels` exit 1 at
-  `above`, zoom 1. Seven groups completed; the inline rendering group was
-  partial and inline lifecycle/real App were unexecuted. Missing pixel values
-  prevent attribution to production paint or the oracle. Evidence remains at
-  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-gRWdxT`.
-- The targeted child started from clean `6fd794c8a98bfda62e0d8173409d38dfc23dde82`,
-  matching the parent's implementation snapshot and four now-tracked pending
-  files. Diagnostic observations now precede assertions and retain independent
-  layer/expected/difference PNGs, SVGs, styles and bounded worst-pixel samples.
-  Production paint and the original two-byte tolerance are unchanged pending
-  measured diagnosis. This child's direct browser retry failed at server
-  startup (`EPERM`); evidence is `/private/tmp/stz-phase31d-halo-diagnostic-20260921`.
-  The individual command exit status was not retained (the log-printing wrapper
-  exited 0); its explicit failed report is not accepted as a browser pass.
-- The phase-aware parent gate preserves complete 31C eight-group evidence and
-  accepts the complete shared ten-group harness, but requires ten for 31D and
-  later inheriting phases. Rejection tests cover missing inline groups,
-  malformed/incomplete reports, browser errors, nonzero exits and changed
-  checkouts, with 31B retained. Focused checks passed 85 tests, including 53
-  helper/runner tests; the full suite passed 2,348 tests and build exited 0
-  (existing size warning only). Fixture TypeScript, targeted lint and syntax checks passed.
-  Full-suite/build results and the exact final pending-checkout identity are in
-  `/private/tmp/stz-phase31d-targeted-handoff.json`. The full parent command
+- Inline-node text uses the shared `SvgTexLabel` parser, adapter, cache,
+  exact-source fallback, lifecycle controller and measured layout. Five anchors
+  retain the 14-unit marker offsets and font 12. Decorative white halos,
+  marker/highlight geometry, pointer pass-through and marker-centered owning
+  curve selection are preserved. Owner identity includes document/path/node;
+  derived state stays outside model/history and raw TikZ data.
+- The initial child server `EPERM` and previous diagnostic-child block remain
+  historical. The latest authorized parent did launch Chrome 153.0.8010.52
+  under Node v26.9.0 and failed `check:free-labels` (exit 1) at `above`, zoom 1:
+  `maxCompositeError=5.082352941176467 > 2`, after `1130 > 31` passed. Tests,
+  build, diff check and label assets exited 0. Seven groups completed, inline
+  rendering was partial, and inline lifecycle/real App were unexecuted.
+  Retained operands, PNG/SVGs and checkout snapshot are in
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-if6x1M/`.
+  Verification stopped before review; no review result is claimed.
+- The current fix starts at clean `2622458c5e652febdfb1b065be1d1b33d84bdd5e`.
+  Previously pending implementation/diagnostic/validation changes are committed
+  and preserved (previous eight-file diff SHA-256
+  `6679416198d0a12c59aa6376e137fd475dced9d96ce80ba919baa633d0f29e28`).
+  Independent saved-PNG decoding reproduces the opaque worst pixel exactly:
+  expected blue 66.08235 versus actual 61. All 21 errors above 2 occur among
+  749 opaque-white-halo pixels; the other 381 have max error 0.4899135447.
+  Premultiplication alone does not fix it. Direct thin fill/stroke painting
+  versus a flattened transparent foreground is the targeted oracle assumption;
+  its precise rasterization mechanism still needs controlled browser evidence.
+- The oracle adds an independent direct foreground-on-white reference only at
+  exact opaque-white halo pixels; all other pixels retain the original
+  source-over comparison. Both keep maximum tolerance 2, with the same original
+  pixel population and an additional all-pixel premultiplied RGB/alpha bound 2.
+  Production paint is unchanged. Original pre-assertion diagnostics remain;
+  the added white reference, bounded samples, difference PNGs, stroke/isolation
+  experiments and six bad-output controls are retained before assertions.
+  Controls cover wrong layer order, missing/oversized outlines, opaque gaps,
+  color and opacity errors. Their browser results and the complete ten-group
+  matrix remain **pending**, not passing scenarios.
+- Phase-aware parent validation is unchanged: complete 31C eight-/ten-group
+  evidence is accepted; 31D–31F require ten. Rejection tests preserve missing,
+  malformed, duplicate, unsupported, incomplete/error/nonzero and changed-tree
+  cases plus 31B behavior. Current child focused checks pass 93 tests, including
+  eight new numeric tests and 53 parent helper/runner tests (Node v26.9.0,
+  exit 0). `npm test` passed all 2,356 tests (including the focused subset);
+  build, fixture TypeScript, requested syntax checks, targeted lint and diff
+  check exited 0. The existing build-size warning/lint debt are separate.
+  Exact commands and final dirty-checkout identity are recorded at
+  `/private/tmp/stz-phase31d-compositing-fix/handoff.json`.
+- This child's direct Chrome launch exited 1 before new measurements; Terminal
+  and Chrome UI access were denied. This does not explain away the executed
+  parent assertion. The outer parent must run
   `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
-  and subsequent review remain required; no complete 31D browser pass is claimed.
-- 31E's settled export wait/snapshot policy and 31F's combined completion audit
-  remain deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
+  on the corrected checkout and obtain complete ten-group evidence, then run
+  independent review separately. `verify` itself does not review or commit.
+- 31E's settled export wait/snapshot policy and 31F's combined audit remain
+  deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
