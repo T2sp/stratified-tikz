@@ -2,9 +2,10 @@
  * The fixture controls conversion timing only; edits, imports and downloads use
  * the real controls. No application CSS or runtime is present in reopened files. */
 import assert from 'node:assert/strict'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { captureStandaloneSvg, measureStandaloneSvg } from './standaloneSvgCapture.mjs'
 
 const buttonName = 'Export current diagram view as SVG'
 const excluded = '[data-svg-export-exclude="true"], [data-svg-background="true"], .svg-coordinate-anchors, .svg-coordinate-source-highlights, .svg-coordinate-axes-guide, .svg-geometry-handle, .svg-path-draft, .svg-path-intersection-candidates, .svg-selection-cycle-feedback, .svg-work-plane-preview'
@@ -15,6 +16,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
   const downloads = []
   let currentSources = []
   let checkpoint = 'app-startup'
+  let appFailed = false
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('download', (download) => downloads.push(download))
   const state = () => page.evaluate(() => window.stzAppLabels.state())
@@ -68,11 +70,20 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
     const text = await readFile(path, 'utf8')
     const standalone = await browser.newPage({ viewport: { width: 1600, height: 1200 } })
     const requests = []
+    const pageErrors = []
+    const observedPath = resolve(artifactDir, `${name}-standalone.json`)
+    const reopen = { path, requests, pageErrors, observed: null,
+      capture: { status: 'not-attempted', requestedPath: resolve(artifactDir, `${name}-standalone.png`), fileExists: false },
+      rasterImage: { status: 'not-attempted', requestedPath: resolve(artifactDir, `${name}-raster.png`), fileExists: false } }
+    const persist = () => writeFile(observedPath, JSON.stringify(reopen, null, 2) + '\n')
+    let reopenFailed = false
     standalone.on('request', (request) => requests.push(request.url()))
-    standalone.on('pageerror', (error) => errors.push(error.message))
+    standalone.on('pageerror', (error) => { errors.push(error.message); pageErrors.push(error.message) })
     try {
       await standalone.goto(pathToFileURL(path).href)
-      const observed = await standalone.evaluate(async () => {
+      reopen.document = await measureStandaloneSvg(standalone)
+      await persist()
+      const { png, ...observed } = await standalone.evaluate(async () => {
         const svg = document.documentElement
         if (svg.localName !== 'svg' || document.querySelector('parsererror')) throw new Error('Downloaded file is not well-formed SVG')
         const labels = [...svg.querySelectorAll('title')].filter((title) => title.parentElement.localName === 'g').map((title) => {
@@ -139,12 +150,21 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
           png: canvas.toDataURL(),
         }
       })
-      await writeFile(resolve(artifactDir, `${name}-raster.png`), Buffer.from(observed.png.split(',')[1], 'base64'))
-      delete observed.png
-      await standalone.screenshot({ path: resolve(artifactDir, `${name}-standalone.png`), fullPage: true })
-      const observedPath = resolve(artifactDir, `${name}-standalone.json`)
-      await writeFile(observedPath, JSON.stringify({ path, observed, requests }, null, 2) + '\n')
+      reopen.observed = observed
+      await persist()
+      await diagnostic(`${name}-reopened-before-images`, { path, observedPath })
+      reopen.rasterImage.status = 'pending'
+      await persist()
+      await writeFile(reopen.rasterImage.requestedPath, Buffer.from(png.split(',')[1], 'base64'))
+      const rasterFile = await stat(reopen.rasterImage.requestedPath)
+      assert.ok(rasterFile.isFile() && rasterFile.size > 0, 'Browser raster PNG was retained')
+      Object.assign(reopen.rasterImage, { status: 'saved', fileExists: true, retainedPath: reopen.rasterImage.requestedPath })
+      await captureStandaloneSvg(standalone, reopen.capture.requestedPath, async (capture) => {
+        reopen.capture = capture
+        await persist()
+      })
       await diagnostic(`${name}-reopened-before-assertions`, { path, observedPath })
+      assert.deepEqual(pageErrors, [], 'Standalone SVG raises no browser errors')
       assert.equal(observed.forbidden, 0, 'Only self-contained SVG geometry and ordinary text remain')
       assert.deepEqual(observed.unexpectedAttributes, [], 'Metadata, events and CSS classes are removed')
       assert.equal(observed.currentColor, false, 'Standalone paint does not depend on currentColor')
@@ -175,12 +195,25 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
       }
       return { path, text, observed }
     } catch (error) {
-      const screenshot = resolve(artifactDir, `${name}-standalone-failure.png`)
-      await standalone.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
-      await diagnostic(`${name}-reopen-failure`, { path, requests, screenshot, message: error.message }).catch(() => {})
+      reopenFailed = true
+      reopen.error = { message: error.message, stack: error.stack }
+      if (reopen.rasterImage.status === 'pending') {
+        reopen.rasterImage.status = 'failed'
+        reopen.rasterImage.fileExists = await stat(reopen.rasterImage.requestedPath).then((file) => file.isFile(), () => false)
+      }
+      await persist().catch(() => {})
+      // The required bounded attempt already records failure. Do not repeat it
+      // and do not advertise an intended failure-image path as retained evidence.
+      await diagnostic(`${name}-reopen-failure`, { path, observedPath, requests, pageErrors,
+        capture: reopen.capture, error: reopen.error }).catch(() => {})
       throw error
     } finally {
-      await standalone.close()
+      await standalone.close().catch(async (error) => {
+        reopen.cleanupError = { message: error.message, stack: error.stack }
+        await persist().catch(() => {})
+        await diagnostic(`${name}-standalone-cleanup-failure`, { path, observedPath, error: reopen.cleanupError }).catch(() => {})
+        if (!reopenFailed) throw error
+      })
     }
   }
   function assertLabels(result, sources, resourceFailed) {
@@ -322,15 +355,20 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
     await record('settled-export-serialization-failure-and-successful-retry', { path: retry.path, downloads: downloads.length })
     assert.deepEqual(errors, [], 'Export and standalone reopen cause no browser errors')
   } catch (error) {
+    appFailed = true
     const failedCheckpoint = checkpoint
     await diagnostic('settled-export-App-failure', { failedCheckpoint, message: error.message }).catch(() => {})
     const livePath = resolve(artifactDir, 'settled-export-failure-live-preview.svg')
     const live = await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML).catch(() => null)
-    if (live !== null) await writeFile(livePath, live)
+    if (live !== null) await writeFile(livePath, live).catch(() => {})
     await page.screenshot({ path: resolve(artifactDir, 'settled-export-failure.png'), fullPage: true }).catch(() => {})
     throw error
   } finally {
-    await page.close()
+    await page.close().catch(async (error) => {
+      await observe('settled-export-App-cleanup-failure', {
+        error: { message: error.message, stack: error.stack } }).catch(() => {})
+      if (!appFailed) throw error
+    })
   }
 }
 
@@ -476,14 +514,21 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
         let standalone
         let standaloneFailed = false
         const pageErrors = []
+        const requests = []
+        const observedPath = resolve(artifactDir, `${name}-standalone.json`)
         const reopenDetails = { policy, source, svg: bundle.paths.serialized,
-          viewport: { width: 1100, height: 850 } }
+          viewport: { width: 1100, height: 850 }, requests, pageErrors,
+          capture: { status: 'not-attempted', requestedPath: resolve(artifactDir, `${name}-standalone.png`), fileExists: false } }
+        const persist = () => writeFile(observedPath, JSON.stringify(reopenDetails, null, 2) + '\n')
         try {
           // The fixture's browser.newPage() owns its context and cannot share it.
           // A separate page owns only its own context, like readStandalone above.
           standalone = await browser.newPage({ viewport: reopenDetails.viewport })
           standalone.on('pageerror', (error) => pageErrors.push(error.message))
+          standalone.on('request', (request) => requests.push(request.url()))
           await standalone.goto(pathToFileURL(bundle.paths.serialized).href)
+          reopenDetails.document = await measureStandaloneSvg(standalone)
+          await persist()
           const reopened = await standalone.evaluate((source) => {
             const titles = [...document.querySelectorAll('g > title')].filter((node) => node.textContent === source)
             const label = titles[0]?.parentElement
@@ -499,10 +544,16 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
               foregroundPaths: foreground?.querySelectorAll('svg path').length ?? 0, opacity,
               box: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null }
           }, source)
-          const screenshot = resolve(artifactDir, `${name}-standalone.png`)
-          await standalone.screenshot({ path: screenshot, fullPage: true })
-          await observe(`${name}-standalone-reopen`, { ...reopenDetails, reopened, screenshot, pageErrors })
+          reopenDetails.reopened = reopened
+          await persist()
+          await observe(`${name}-standalone-before-image`, { policy, source, observedPath, reopened })
+          await captureStandaloneSvg(standalone, reopenDetails.capture.requestedPath, async (capture) => {
+            reopenDetails.capture = capture
+            await persist()
+          })
+          await observe(`${name}-standalone-reopen`, { ...reopenDetails, observedPath })
           assert.deepEqual(pageErrors, [], 'Standalone SVG raises no browser errors')
+          assert.deepEqual(requests, [pathToFileURL(bundle.paths.serialized).href], 'Standalone visibility export requests only its own file')
           assert.equal(reopened.namespace.root, 'http://www.w3.org/2000/svg')
           assert.equal(reopened.parseErrors, 0)
           assert.equal(reopened.matchingTitles, capture.count)
@@ -516,15 +567,15 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
           }
         } catch (error) {
           standaloneFailed = true
-          const screenshot = resolve(artifactDir, `${name}-standalone-failure.png`)
-          await standalone?.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
-          await observe(`${name}-standalone-failure`, { ...reopenDetails, pageErrors, screenshot,
-            error: { message: error.message, stack: error.stack } }).catch(() => {})
+          reopenDetails.error = { message: error.message, stack: error.stack }
+          await persist().catch(() => {})
+          await observe(`${name}-standalone-failure`, { ...reopenDetails, observedPath }).catch(() => {})
           throw error
         } finally {
           await standalone?.close().catch(async (error) => {
-            await observe(`${name}-standalone-cleanup-failure`, { ...reopenDetails,
-              error: { message: error.message, stack: error.stack } }).catch(() => {})
+            reopenDetails.cleanupError = { message: error.message, stack: error.stack }
+            await persist().catch(() => {})
+            await observe(`${name}-standalone-cleanup-failure`, { ...reopenDetails, observedPath }).catch(() => {})
             if (!standaloneFailed) throw error
           })
         }

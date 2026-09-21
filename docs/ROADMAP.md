@@ -1440,9 +1440,10 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: export implementation and diagnostics retained; standalone page-ownership
-misuse corrected in the harness. Latest parent verification is failed/partial;
-fresh verification of the correction and independent review remain outstanding.
+Status: export implementation and diagnostics retained; independent-page reopening
+now reaches native evaluation. Latest parent verification failed at standalone
+full-page capture; bounded capture is implemented but native verification and
+independent review remain outstanding.
 The earlier parent report `stz-phase31e-before-review-r43lZG` passed ten groups
 and 120 scenario records with no page errors, then failed the dimmed formula
 path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
@@ -1465,18 +1466,51 @@ passed. AutoDim and all later export scenarios were not reached. Node tests
 (2,390), build, diff and label-assets checks passed; free-label acceptance exited
 1. This confirmed API misuse is distinct from the older autoDim assertion.
 
-The correction passes the browser into visibility checks, opens the exact saved
-file in an independent page with explicit viewport, observes standalone errors,
-and closes only its owned page/context even on navigation/assertion failure,
-without masking the original error. The clean starting commit `70c7548`
-contains the prior eleven-file diagnostic handoff unchanged. The corrected
-child browser attempt was blocked at Vite `listen EPERM` before Chrome; native
-reopen, autoDim timings/geometry and the later App scenarios remain unverified.
-See [SVG export verification](./PREVIEW_UI.md#export-svg) and
-`/private/tmp/stz-31e-page-ownership-jcajtsos/handoff.json` for fresh child
-commands/results, final checkout identity and retained evidence. Production
-snapshot/raw-source/history behavior, timing limits, diagnostics, oracle
-negative controls and 31D regressions are preserved.
+The latest parent report `stz-phase31e-before-review-xlQmJP` passed tests (2,390),
+build, diff and label-assets checks, then failed free-label acceptance after ten
+completed groups and 119 passing records, with no page errors. The independent
+autoHide page was created and its file navigation/evaluation returned, confirming
+progress past ownership failure. A `fullPage: true` screenshot timed out after
+30 seconds, after `fonts loaded`; the catch repeated that unsupported capture.
+Neither standalone PNG exists. AutoHide's saved 435-byte SVG is 900×700 with
+`viewBox="0 0 900 700"`; preparation succeeded in 1 ms with zero labels/requests
+and preserved live SVG. The computed reopen result was not saved before capture,
+and autoDim or later standalone scenarios were not reached. Checkout fingerprint
+`30d91d9fa20a47d12152c5d7e31923e35b103bba6c82917088e889293125a5df`
+and tracked diff SHA-256
+`d77a5cbf567c69135fbc48a7e39b5b2daf22b57ce63512647d4348c860e7733d`
+were unchanged. Node v26.9.0, Chrome 153.0.8010.52 and external Playwright 1.62.1
+ran this parent check. No independent review ran.
+
+Installed Playwright's full-page sizing waits for both document body and root,
+after font readiness. This supports the SVG XML/body-dependent sizing diagnosis;
+the parent's unsaved content type/body state still needs native measurement.
+The bounded-capture correction uses one finite `fullPage: false` viewport
+screenshot, with measured whole-root coverage, at most one viewport expansion,
+8,192-pixel side/16,777,216-pixel area limits and a 5,000 ms timeout. Both
+standalone paths persist observations before capture, verify actual PNG file
+dimensions before reporting retention, and preserve the original error without
+a second failure screenshot. Independent-page cleanup remains intact.
+
+This follow-up started clean at `5f357d1`, preserving the committed runner
+changes. Its focused saved-SVG reproduction stopped during Chrome launch with
+SIGABRT (`kill EPERM` during cleanup), before navigation, so it provides no new
+body measurements, PNG, autoDim outcome or App acceptance. See
+[SVG export verification](./PREVIEW_UI.md#export-svg),
+`/private/tmp/stz-31e-bounded-capture/native-reproduction.json` and
+`/private/tmp/stz-31e-bounded-capture/handoff.json` for current child results and
+checkout identity. This restriction is distinct from the parent screenshot
+timeout and historical child Vite startup failure. Production/fixture/oracle
+semantics, snapshot/raw-source/history behavior, conversion limits, diagnostics,
+negative controls, 31D regressions and runner gates are preserved.
+
+Current child verification used Node v26.9.0/npm 11.19.1: 128 focused tests
+(including 13 new registered helper tests) and all 2,403 full-suite tests passed
+with no failures or skips. Build exited 0 with the existing chunk-size warning;
+strict fixture TypeScript, eight syntax checks, targeted ESLint and diff checks
+also exited 0. Commands, statuses and logs are recorded in
+`/private/tmp/stz-31e-bounded-capture/checks.json`. Parent browser verification
+remains pending and independent review has not run.
 
 The normal order remains fix, matching complete parent verification, then
 independent review. `check:free-labels` still requires all eleven groups for

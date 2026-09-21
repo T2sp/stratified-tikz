@@ -1021,7 +1021,7 @@ production markup, visibility policy, and export semantics were not changed to
 make this hypothesis pass. The only production addition is optional runtime
 observation; it adds no model fields or UI controls.
 
-The latest executed parent verification is **failed/partial**, not pending:
+The historical page-ownership parent verification is **failed/partial**:
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4/verification.json`.
 It used Node v26.9.0, Chrome 153.0.8010.52 and Vite at `http://127.0.0.1:5174`,
 with unchanged checkout fingerprint
@@ -1044,7 +1044,7 @@ layerFilter, hiddenLayer, invalid-viewport retry and actual App downloads were
 not reached; the report's empty `unexecuted` list tracks started groups only.
 It neither reproduces nor resolves the historical autoDim failure.
 
-The ownership correction starts from clean commit
+The ownership correction started from clean commit
 `70c7548b5dd832b90acb5d6116f2055c507042e8`, which preserves the eleven-file
 diagnostic handoff at `/private/tmp/stz-31e-diagnostic-checks/handoff.json`.
 The harness now passes its browser to the visibility checks and opens the exact
@@ -1057,7 +1057,7 @@ fixture stays open for subsequent policies. Production code, conversion limits,
 pending-at-capture coverage, exact-source oracle/negative controls, 31D checks,
 and the runner's eleven-group/review/commit gates are preserved.
 
-The corrected child browser attempt exited 1 at Vite `listen EPERM` on
+Its child browser attempt exited 1 at Vite `listen EPERM` on
 `127.0.0.1:5173`, before Chrome launch; all eleven groups were unexecuted.
 This startup restriction is separate from both parent failures. Its exact
 command/environment/log and checkout snapshot are retained in
@@ -1066,7 +1066,7 @@ command/environment/log and checkout snapshot are retained in
 native reopen or autoDim outcome. The earlier child startup evidence remains
 at `/private/tmp/stz-31e-diagnostic-start/free-labels-evidence.json`.
 
-Current child commands, exit statuses and logs are retained in
+Historical ownership-fix commands, exit statuses and logs are retained in
 `/private/tmp/stz-31e-page-ownership-jcajtsos/focused-static-checks.json` and
 `full-checks.json`; final checkout identity is in `handoff.json` there.
 With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
@@ -1074,11 +1074,86 @@ With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
 skips. Build exited 0 with the existing chunk-size warning. Strict fixture
 TypeScript, six script syntax checks, targeted ESLint and diff checks exited 0.
 No new helper/test file or dependency was needed for the ownership correction.
-Fresh matching parent browser verification of this ownership correction is
-still required; independent review has not run.
-The authorized outer runner must complete all eleven groups, retain the new
-autoDim measurements and actual downloaded/reopened artifacts, and resolve any
-observed failure before independent review. Standalone verification can use
+
+The latest executed parent verification is **failed/partial**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-xlQmJP/verification.json`.
+It used Node v26.9.0, Chrome 153.0.8010.52, external Playwright 1.62.1 and Vite at
+`http://127.0.0.1:5174`. Revision `70c7548b5dd832b90acb5d6116f2055c507042e8`
+and the pending snapshot were unchanged during verification: checkout fingerprint
+`30d91d9fa20a47d12152c5d7e31923e35b103bba6c82917088e889293125a5df`,
+tracked diff SHA-256
+`d77a5cbf567c69135fbc48a7e39b5b2daf22b57ce63512647d4348c860e7733d`.
+Tests (2,390), build, diff and label-assets checks exited 0; free-label acceptance
+exited 1 after ten completed groups and 119 passing scenario records, with no
+page errors. The independent autoHide page was created, navigated to the saved
+SVG, and evaluated successfully, confirming that the ownership repair reached
+this path. Its required `fullPage: true` screenshot then timed out after
+30 seconds, after the log reported `fonts loaded`. The eleventh group remained
+incomplete and no new standalone visibility scenario passed.
+
+The retained `settled-export-autoHide-completed.json` and companion SVGs show
+successful preparation in 1 ms, zero captured labels/requests (correct for
+autoHide), preserved live SVG, and a 435-byte serialized SVG with width 900,
+height 700 and `viewBox="0 0 900 700"`. The computed reopen result was lost
+because it was written only after capture. Neither the normal standalone PNG
+nor its attempted failure PNG exists; the diagnostic's failure image path was
+only an intended path. `settled-export-autoHide-failure-live-preview.png` is
+retained, but depicts the application, not the standalone export. AutoDim,
+layerFilter, hiddenLayer, invalid-viewport retry and actual App downloads were
+not reached. This screenshot failure does not resolve the older autoDim result.
+
+Inspection of installed `playwright-core/lib/coreBundle.js` version 1.62.1
+shows that `screenshotPage` finishes font readiness before its full-page branch.
+That branch's `_fullPageSize` waits for both `document.body` and
+`document.documentElement`; it returns no size while either is absent. The
+export is an SVG XML document, so this is the source-supported explanation of
+the timeout. The parent did not persist the reopened document's content type
+or body state; those browser facts still require native measurement.
+
+The bounded-capture follow-up starts from clean commit
+`5f357d1b186302fda951ff073f2e32c68a34b2ce`, preserving the committed runner
+changes. Both standalone visibility and actual-download reopening now use
+`scripts/standaloneSvgCapture.mjs`. It records document URL/type/readiness,
+root namespace/dimensions/viewBox/client bounds, parser errors, HTML-body
+presence, viewport, scroll position and device pixel ratio. A finite viewport
+may expand once, followed by remeasurement; coverage must contain the complete
+SVG root, within an 8,192-pixel side limit and 16,777,216-pixel area limit.
+Capture uses `fullPage: false`, `scale: 'css'` and a 5,000 ms timeout, retaining
+font readiness and the unchanged standalone SVG. A PNG is recorded as retained
+only after its file, PNG header and dimensions are checked against the measured
+coverage. Existing export raster/background/color/halo assertions remain.
+
+DOM, exact-source geometry/opacity, raster/request and image-attempt diagnostics
+are persisted before image capture and assertions. Required capture failures
+still fail the scenario; failure diagnostics retain the original error without
+attempting a second screenshot. Independent pages retain their existing owned
+resource cleanup, and cleanup failures do not replace primary failures. No
+production, fixture, oracle, conversion-limit or runner change is part of this
+capture correction.
+
+The focused child reproduction opened no SVG: Chrome launch ended with SIGABRT
+and cleanup logged `kill EPERM`, before navigation. Its saved source hash,
+command error and stage are retained at
+`/private/tmp/stz-31e-bounded-capture/native-reproduction.json`. It yields no new
+document/body measurements, standalone PNG, autoDim timing/geometry or App
+download acceptance. This child launch restriction is distinct from the
+executed parent screenshot timeout and historical Vite/ownership failures.
+With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
+128 focused tests, including 13 new capture-helper tests registered in
+`package.json`; these are included in the full `npm test` total of 2,403, with
+zero failures or skips. `npm run build` exited 0 with the existing chunk-size
+warning. Strict fixture TypeScript, eight script syntax checks (the six existing
+scripts plus the capture helper and its test), targeted ESLint and
+`git diff --check` all exited 0. Exact commands, exit statuses and log paths are
+retained in `/private/tmp/stz-31e-bounded-capture/checks.json`; the final checkout
+identity and handoff are in `/private/tmp/stz-31e-bounded-capture/handoff.json`.
+
+Fresh matching parent verification of bounded capture and all eleven groups
+remains required, followed by independent review, which has not run. The outer
+runner must retain successful native document/body and complete PNG coverage
+measurements, autoDim settlement/geometry, every visibility policy and actual
+download/reopen/failure-retry artifacts, resolving any further demonstrated
+failure before review. Standalone verification can use
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
 it does not run review or establish approval. Phase 31E is not complete and
 31F remains deferred.
