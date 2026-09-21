@@ -7,8 +7,11 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { captureStandaloneSvg, measureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { assertStandaloneSvgOpacity, standaloneSvgOpacityTolerance } from './standaloneSvgOpacity.mjs'
+import { ownPageEvent } from './ownedPageEvent.mjs'
 
 const buttonName = 'Export current diagram view as SVG'
+const actionTimeoutMs = 5_000
+const eventTimeoutMs = 20_000
 const excluded = '[data-svg-export-exclude="true"], [data-svg-background="true"], .svg-coordinate-anchors, .svg-coordinate-source-highlights, .svg-coordinate-axes-guide, .svg-geometry-handle, .svg-path-draft, .svg-path-intersection-candidates, .svg-selection-cycle-feedback, .svg-work-plane-preview'
 
 /** Supplement the saved/reopened acceptance cases with a focused native-DOM
@@ -112,8 +115,17 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
   let currentSources = []
   let checkpoint = 'app-startup'
   let appFailed = false
+  let tracing = false
+  const waits = new Set()
+  const downloadEvents = []
+  const actionEvents = []
+  page.setDefaultTimeout(actionTimeoutMs)
+  page.setDefaultNavigationTimeout(10_000)
   page.on('pageerror', (error) => errors.push(error.message))
-  page.on('download', (download) => downloads.push(download))
+  page.on('download', (download) => {
+    downloads.push(download)
+    downloadEvents.push({ at: Date.now(), filename: download.suggestedFilename(), count: downloads.length })
+  })
   const state = () => page.evaluate(() => window.stzAppLabels.state())
   const button = () => page.getByRole('button', { name: buttonName, exact: true })
   const status = () => page.locator('.svg-export-status')
@@ -121,26 +133,109 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
   const release = (source, fail = false) => page.evaluate(({ text, failure }) =>
     window.stzAppLabels.release(text, failure, 'resource-error'), { text: source, failure: fail })
   const frame = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-  async function diagnostic(name, details = {}) {
+  async function diagnostic(name, details = {}, includeRequests = false) {
     checkpoint = name
-    const app = await page.evaluate((sources) => ({
-      conversion: window.stzAppLabels?.exportDiagnostics(sources),
-      status: document.querySelector('.svg-export-status')?.textContent,
-      pending: document.querySelector('.svg-export-button')?.getAttribute('aria-busy'),
-      labels: [...document.querySelectorAll('[data-label-state]')].map((node) => ({
-        source: node.getAttribute('data-label-source'), state: node.getAttribute('data-label-state'),
-        requestIdentity: node.getAttribute('data-label-request'), ownerIdentity: node.getAttribute('data-label-owner'),
-      })),
-    }), currentSources)
-    await observe(name, { ...details, app, downloads: downloads.length, pageErrors: [...errors] })
+    const app = await page.evaluate(({ sources, includeRequests }) => {
+      const conversion = window.stzAppLabels?.exportDiagnostics(sources)
+      if (conversion && !includeRequests) conversion.sources = conversion.sources.map(({ source, requestCount, requests }) =>
+        ({ source, requestCount, latest: requests.at(-1) }))
+      return {
+        conversion,
+        documentRevision: window.stzAppLabels?.state().labelDocumentRevision,
+        ambientDimension: window.stzAppLabels ? JSON.parse(window.stzAppLabels.state().json).diagram.ambientDimension : null,
+        background: document.querySelector('[aria-label="SVG export background"]')?.value,
+        status: document.querySelector('.svg-export-status')?.textContent,
+        pending: document.querySelector('.svg-export-button')?.getAttribute('aria-busy'),
+        transitions: window.stzExportUiObservations?.entries,
+        labels: [...document.querySelectorAll('[data-label-state]')].map((node) => ({
+          source: node.getAttribute('data-label-source'), state: node.getAttribute('data-label-state'),
+          requestIdentity: node.getAttribute('data-label-request'), ownerIdentity: node.getAttribute('data-label-owner'),
+        })),
+      }
+    }, { sources: currentSources, includeRequests }).catch((error) => ({ diagnosticError: error.message }))
+    await observe(name, { at: Date.now(), ...details, app, downloads: downloads.length,
+      downloadEvents: [...downloadEvents], actionEvents: [...actionEvents], pageErrors: [...errors] })
   }
-  async function load(json, name) {
+  async function eventAction(name, event, action, timeoutMs = eventTimeoutMs) {
+    const wait = ownPageEvent(page, event, { timeoutMs, name })
+    waits.add(wait)
+    try {
+      // The listener and its nonrejecting outcome already exist before any
+      // diagnostics, click or intervening edit can suspend this function.
+      const { event: received, value } = await wait.run(async (guard) => {
+        await diagnostic(`${name}-listener-armed`, { event, eventTimeoutMs: timeoutMs, actionTimeoutMs })
+        guard.check()
+        return action(guard)
+      })
+      await diagnostic(`${name}-event-and-action-completed`, { event })
+      return { event: received, value }
+    } finally {
+      wait.dispose()
+      // A timed-out native operation is cancelled by page.close in the outer
+      // finally, then drained there. Never leave a rejecting promise behind.
+    }
+  }
+  async function nativeClick(name, locator, options = {}, check = () => {}) {
+    await diagnostic(`${name}-native-click-started`, { trial: options.trial ?? false })
+    check()
+    actionEvents.push({ name, at: Date.now(), phase: 'started', trial: options.trial ?? false })
+    try {
+      await locator.click({ timeout: actionTimeoutMs, ...options })
+    } catch (error) {
+      checkpoint = `${name}-native-click-failed`
+      actionEvents.push({ name, at: Date.now(), phase: 'failed', error: { message: error.message, stack: error.stack } })
+      // Let the coordinator cancel the event deadline immediately. Persist the
+      // complete native call log in the outer failure/trial diagnostic, so slow
+      // diagnostic I/O cannot turn an already failed click into an event timeout.
+      throw error
+    }
+    actionEvents.push({ name, at: Date.now(), phase: 'completed', trial: options.trial ?? false })
+    await diagnostic(`${name}-native-click-completed`, { trial: options.trial ?? false })
+  }
+  async function accessDiagnostic(name) {
+    const count = await button().count()
+    const access = await page.evaluate(() => {
+      const target = document.querySelector('.svg-export-button')
+      const bounds = target?.getBoundingClientRect()
+      const box = (rect) => rect && ({ x: rect.x, y: rect.y, width: rect.width, height: rect.height })
+      const point = bounds && { x: (Math.max(0, bounds.left) + Math.min(innerWidth, bounds.right)) / 2,
+        y: (Math.max(0, bounds.top) + Math.min(innerHeight, bounds.bottom)) / 2 }
+      const hit = point && document.elementFromPoint(point.x, point.y)
+      const describe = (node) => ({ tag: node.localName, id: node.id, class: node.getAttribute('class'),
+        ariaLabel: node.getAttribute('aria-label'), bounds: box(node.getBoundingClientRect()),
+        zIndex: getComputedStyle(node).zIndex, pointerEvents: getComputedStyle(node).pointerEvents })
+      return { bounds: box(bounds), point, viewport: { width: innerWidth, height: innerHeight },
+        scroll: { x: scrollX, y: scrollY }, hit: hit ? describe(hit) : null,
+        reachable: Boolean(hit && (hit === target || target?.contains(hit))),
+        inspectorIntercepts: Boolean(hit?.closest('#preview-inspector-drawer')),
+        hitStack: point ? document.elementsFromPoint(point.x, point.y).slice(0, 12).map(describe) : [],
+        drawers: [...document.querySelectorAll('[id$="drawer"]')].map(describe) }
+    })
+    Object.assign(access, { count, visible: count === 1 && await button().isVisible(), enabled: count === 1 && await button().isEnabled() })
+    await diagnostic(name, { access }, true)
+    return access
+  }
+  async function appScreenshot(name) {
+    const path = resolve(artifactDir, `${name}.png`)
+    try {
+      await page.screenshot({ path, fullPage: false, timeout: 5_000 })
+      await diagnostic(`${name}-image`, { path, saved: (await stat(path)).size > 0 })
+    } catch (error) {
+      await diagnostic(`${name}-image-failed`, { requestedPath: path, message: error.message }).catch(() => {})
+    }
+  }
+  async function load(json, name, check = () => {}) {
     const revision = (await state()).labelDocumentRevision
-    const chooser = page.waitForEvent('filechooser')
-    await page.getByRole('button', { name: 'Load JSON', exact: true }).click()
-    await (await chooser).setFiles({ name: `${name}.json`, mimeType: 'application/json', buffer: Buffer.from(json) })
+    check()
+    const { event: chooser } = await eventAction(name, 'filechooser', (guard) =>
+      nativeClick(name, page.getByRole('button', { name: 'Load JSON', exact: true }), {}, () => { check(); guard.check() }), 10_000)
+    check()
+    await chooser.setFiles({ name: `${name}.json`, mimeType: 'application/json', buffer: Buffer.from(json) }, { timeout: actionTimeoutMs })
+    check()
     await page.waitForFunction((before) => window.stzAppLabels.state().labelDocumentRevision > before, revision)
+    check()
     await frame()
+    check()
   }
   async function capturedView() {
     return page.evaluate((exclusions) => {
@@ -160,8 +255,10 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
   async function readStandalone(download, name, background, captured) {
     assert.equal(download.suggestedFilename(), 'stratified-tikz-preview.svg', 'Filename policy is unchanged')
     const path = resolve(artifactDir, `${name}.svg`)
+    await diagnostic(`${name}-saveAs-started`, { path })
     await download.saveAs(path)
     assert.equal(await download.failure(), null, 'Browser accepted the download handoff')
+    await diagnostic(`${name}-saveAs-completed`, { path, bytes: (await stat(path)).size })
     const text = await readFile(path, 'utf8')
     const standalone = await browser.newPage({ viewport: { width: 1600, height: 1200 } })
     const requests = []
@@ -342,6 +439,23 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
   try {
     await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`)
     await page.waitForFunction(() => window.stzAppLabels !== undefined && document.querySelector('svg.svg-diagram'))
+    await page.evaluate(() => {
+      const entries = []
+      const sample = () => {
+        const entry = { status: document.querySelector('.svg-export-status')?.textContent,
+          busy: document.querySelector('.svg-export-button')?.getAttribute('aria-busy') }
+        const last = entries.at(-1)
+        if (last?.status === entry.status && last?.busy === entry.busy) return
+        entries.push({ at: Date.now(), ...entry })
+        if (entries.length > 30) entries.shift()
+      }
+      const observer = new MutationObserver(sample)
+      observer.observe(document.querySelector('.svg-export-control'), {
+        childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-busy', 'disabled'],
+      })
+      sample()
+      window.stzExportUiObservations = { entries, observer }
+    })
     const fixture = await page.evaluate(() => window.stzAppLabels.exportDocumentJson(2))
     const { sources } = fixture
     currentSources = Object.values(sources)
@@ -361,38 +475,61 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
     const captured = await capturedView()
     const before = await state()
     await diagnostic('settled-export-App-pending-capture', { captured, documentRevision: before.labelDocumentRevision })
-    const firstDownloading = page.waitForEvent('download')
-    await button().evaluate((element) => { element.click(); element.click() })
-    await page.waitForFunction(() => document.querySelector('.svg-export-button')?.getAttribute('aria-busy') === 'true')
-    assert.equal(await button().isDisabled(), true)
-    assert.match(await status().innerText(), /Preparing SVG export/)
-    await frame()
-    await diagnostic('settled-export-App-held-after-duplicate-click')
-    assert.equal(downloads.length, 0, 'No download occurs while represented labels are held')
-    assert.equal((await state()).json, before.json)
-    assert.equal((await state()).history, before.history)
-    await field.fill(sources.after)
-    await inspector.getByRole('textbox', { name: 'Font size', exact: true }).fill('16')
-    await page.waitForFunction((source) => JSON.parse(window.stzAppLabels.state().json).diagram.labels.find(({ id }) => id === 'export-edit').text === source, sources.after)
-    await page.getByLabel('SVG export background', { exact: true }).selectOption('white')
-    const next = await page.evaluate(() => window.stzAppLabels.exportDocumentJson(3))
-    const nextModel = JSON.parse(next.json)
-    const changed = nextModel.diagram.labels.find(({ id }) => id === 'export-edit')
-    changed.text = sources.after
-    changed.position = { x: -1.5, y: 1.3, z: 1 }
-    changed.style = { ...changed.style, color: '#9020a0', fontSize: 16, opacity: 0.8, anchor: 'east' }
-    nextModel.diagram.layers[1].visible = true
-    nextModel.diagram.labels.find(({ id }) => id === 'export-hidden').text = 'Now visible Ω'
-    await load(JSON.stringify(nextModel), 'settled-export-later-3d')
-    const afterEdits = await state()
-    await diagnostic('settled-export-App-later-document-before-release', { documentRevision: afterEdits.labelDocumentRevision })
-    await release(sources.edit)
-    await release(sources.repeated)
-    await release(sources.inline)
-    await frame()
-    assert.equal(downloads.length, 0, 'One outstanding represented label still blocks the captured file')
-    await release(sources.resource, true)
-    const first = await readStandalone(await firstDownloading, 'export-click-time-2d-transparent', 'transparent', captured)
+    const { event: firstDownload, value: afterEdits } = await eventAction('settled-export-first', 'download', async ({ check }) => {
+      await button().evaluate((element) => { element.click(); element.click() })
+      check()
+      await page.waitForFunction(() => document.querySelector('.svg-export-button')?.getAttribute('aria-busy') === 'true')
+      check()
+      assert.equal(await button().isDisabled(), true)
+      check()
+      assert.match(await status().innerText(), /Preparing SVG export/)
+      check()
+      await frame()
+      check()
+      await diagnostic('settled-export-App-held-after-duplicate-click')
+      check()
+      assert.equal(downloads.length, 0, 'No download occurs while represented labels are held')
+      assert.equal((await state()).json, before.json)
+      check()
+      assert.equal((await state()).history, before.history)
+      check()
+      await field.fill(sources.after)
+      check()
+      await inspector.getByRole('textbox', { name: 'Font size', exact: true }).fill('16')
+      check()
+      await page.waitForFunction((source) => JSON.parse(window.stzAppLabels.state().json).diagram.labels.find(({ id }) => id === 'export-edit').text === source, sources.after)
+      check()
+      await page.getByLabel('SVG export background', { exact: true }).selectOption('white')
+      check()
+      const next = await page.evaluate(() => window.stzAppLabels.exportDocumentJson(3))
+      check()
+      const nextModel = JSON.parse(next.json)
+      const changed = nextModel.diagram.labels.find(({ id }) => id === 'export-edit')
+      changed.text = sources.after
+      changed.position = { x: -1.5, y: 1.3, z: 1 }
+      changed.style = { ...changed.style, color: '#9020a0', fontSize: 16, opacity: 0.8, anchor: 'east' }
+      nextModel.diagram.layers[1].visible = true
+      nextModel.diagram.labels.find(({ id }) => id === 'export-hidden').text = 'Now visible Ω'
+      await load(JSON.stringify(nextModel), 'settled-export-later-3d', check)
+      check()
+      const afterEdits = await state()
+      check()
+      await diagnostic('settled-export-App-later-document-before-release', { documentRevision: afterEdits.labelDocumentRevision })
+      check()
+      await release(sources.edit)
+      check()
+      await release(sources.repeated)
+      check()
+      await release(sources.inline)
+      check()
+      await frame()
+      check()
+      assert.equal(downloads.length, 0, 'One outstanding represented label still blocks the captured file')
+      await release(sources.resource, true)
+      check()
+      return afterEdits
+    }, 30_000)
+    const first = await readStandalone(firstDownload, 'export-click-time-2d-transparent', 'transparent', captured)
     assertLabels(first.observed, sources, true)
     assert.ok(!first.observed.labels.some(({ source }) => [sources.after, sources.hidden, 'Now visible Ω'].includes(source)))
     assert.equal((await page.evaluate((source) => window.stzAppLabels.pending(source), sources.hidden)).started, 0,
@@ -407,13 +544,45 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
       path: first.path, beforeRevision: before.labelDocumentRevision, laterRevision: afterEdits.labelDocumentRevision })
 
     await page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
+    await page.context().tracing.start({ screenshots: false, snapshots: true, sources: false })
+    tracing = true
+    await button().scrollIntoViewIfNeeded({ timeout: actionTimeoutMs })
+    const access = await accessDiagnostic('settled-export-App-3d-native-access')
+    assert.equal(access.count, 1)
+    assert.equal(access.visible && access.enabled, true)
+    await appScreenshot('settled-export-App-3d-before-click')
+    if (access.inspectorIntercepts) {
+      // A trial performs native actionability checks without dispatching a
+      // click. Confirm the measured interception before dismissing the drawer;
+      // no forced click, speculative layout change, or duplicate export retry.
+      let interception
+      try {
+        await nativeClick('settled-export-inspector-trial', button(), { trial: true, timeout: 1_500 })
+      } catch (error) { interception = error }
+      if (interception) {
+        const measured = await accessDiagnostic('settled-export-App-3d-after-trial')
+        if (!measured.inspectorIntercepts || !/intercepts pointer events/.test(interception.message)) throw interception
+        assert.equal(downloads.length, 1, 'Native trial cannot initiate another export')
+        await diagnostic('settled-export-inspector-interception-confirmed', {
+          reason: 'Inspector owns the native click point and Playwright reports intercepted pointer events',
+          actionError: { message: interception.message, stack: interception.stack },
+        })
+        await nativeClick('settled-export-close-inspector', page.getByRole('button', { name: 'Close inspector drawer', exact: true }))
+        await button().scrollIntoViewIfNeeded({ timeout: actionTimeoutMs })
+        const exposed = await accessDiagnostic('settled-export-App-3d-inspector-closed')
+        assert.equal(exposed.reachable, true, 'Normal drawer dismissal exposes the export action')
+        assert.equal((await state()).json, afterEdits.json)
+        assert.equal((await state()).history, afterEdits.history)
+      }
+    }
     const captured3d = await capturedView()
-    await diagnostic('settled-export-App-3d-before-download', { captured: captured3d })
+    assert.equal(await page.getByLabel('SVG export background', { exact: true }).inputValue(), 'white')
+    await diagnostic('settled-export-App-3d-before-download', { captured: captured3d }, true)
     assert.notDeepEqual(captured3d.labels, captured.labels, 'Second capture observes the later 3D document and styles')
     const liveBefore = await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML)
-    const secondDownloading = page.waitForEvent('download')
-    await button().click()
-    const second = await readStandalone(await secondDownloading, 'export-later-3d-white', 'white', captured3d)
+    const { event: secondDownload } = await eventAction('settled-export-second', 'download', ({ check }) =>
+      nativeClick('settled-export-second', button(), {}, check))
+    const second = await readStandalone(secondDownload, 'export-later-3d-white', 'white', captured3d)
     assertLabels(second.observed, { ...sources, edit: sources.after }, false)
     assert.ok(second.observed.labels.some(({ source }) => source === 'Now visible Ω'))
     await page.waitForFunction(() => !document.querySelector('.svg-export-button')?.disabled)
@@ -430,40 +599,68 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
       window.stzRestoreExportSerializer = () => { XMLSerializer.prototype.serializeToString = original }
       XMLSerializer.prototype.serializeToString = () => { throw new Error('Injected serialization infrastructure failure') }
     })
+    let serializationScenarioError
     try {
-      await button().click()
+      await nativeClick('settled-export-serialization-failure', button())
       await page.waitForFunction(() => document.querySelector('.svg-export-status')?.textContent.includes('SVG export failed.'))
       await diagnostic('settled-export-App-serialization-failure-before-assertions')
       assert.equal(await button().isDisabled(), false, 'Serialization failure restores the export action')
       assert.equal(downloads.length, 2, 'Serialization failure never downloads malformed output')
       assert.equal(await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML), liveBefore)
+      assert.equal((await state()).json, afterEdits.json)
+      assert.equal((await state()).history, afterEdits.history)
+    } catch (error) {
+      serializationScenarioError = error
+      throw error
     } finally {
-      await page.evaluate(() => { window.stzRestoreExportSerializer(); delete window.stzRestoreExportSerializer })
+      await page.evaluate(() => { window.stzRestoreExportSerializer(); delete window.stzRestoreExportSerializer }).catch(async (error) => {
+        await diagnostic('settled-export-serializer-restore-failure', { message: error.message }).catch(() => {})
+        if (!serializationScenarioError) throw error
+      })
     }
-    const retryDownloading = page.waitForEvent('download')
-    await button().click()
-    const retry = await readStandalone(await retryDownloading, 'export-serialization-retry', 'white', captured3d)
+    const { event: retryDownload } = await eventAction('settled-export-retry', 'download', ({ check }) =>
+      nativeClick('settled-export-retry', button(), {}, check))
+    const retry = await readStandalone(retryDownload, 'export-serialization-retry', 'white', captured3d)
     assertLabels(retry.observed, { ...sources, edit: sources.after }, false)
     await page.waitForFunction(() => !document.querySelector('.svg-export-button')?.disabled)
     assert.equal(downloads.length, 3)
     assert.equal(await status().innerText(), 'SVG exported with white background.')
+    assert.equal(await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML), liveBefore)
+    assert.equal((await state()).json, afterEdits.json)
+    assert.equal((await state()).history, afterEdits.history)
     await record('settled-export-serialization-failure-and-successful-retry', { path: retry.path, downloads: downloads.length })
     assert.deepEqual(errors, [], 'Export and standalone reopen cause no browser errors')
   } catch (error) {
     appFailed = true
     const failedCheckpoint = checkpoint
-    await diagnostic('settled-export-App-failure', { failedCheckpoint, message: error.message }).catch(() => {})
+    await diagnostic('settled-export-App-failure', { failedCheckpoint, message: error.message, stack: error.stack }, true).catch(() => {})
+    await accessDiagnostic('settled-export-App-failure-access').catch(() => {})
     const livePath = resolve(artifactDir, 'settled-export-failure-live-preview.svg')
     const live = await page.locator('svg.svg-diagram').evaluate((node) => node.outerHTML).catch(() => null)
     if (live !== null) await writeFile(livePath, live).catch(() => {})
-    await page.screenshot({ path: resolve(artifactDir, 'settled-export-failure.png'), fullPage: true }).catch(() => {})
+    await appScreenshot('settled-export-failure')
     throw error
   } finally {
-    await page.close().catch(async (error) => {
-      await observe('settled-export-App-cleanup-failure', {
-        error: { message: error.message, stack: error.stack } }).catch(() => {})
-      if (!appFailed) throw error
+    for (const wait of waits) wait.dispose()
+    let cleanupError
+    async function cleanup(name, action) {
+      try { await action() } catch (error) {
+        cleanupError ??= error
+        await observe(name, { error: { message: error.message, stack: error.stack } }).catch(() => {})
+      }
+    }
+    if (tracing) await cleanup('settled-export-trace-failure', async () => {
+      const path = resolve(artifactDir, 'settled-export-App-native-trace.zip')
+      await page.context().tracing.stop({ path })
+      await observe('settled-export-native-trace-saved', { path, bytes: (await stat(path)).size })
     })
+    await cleanup('settled-export-observer-cleanup-failure', () => page.evaluate(() => {
+      window.stzExportUiObservations?.observer.disconnect()
+      delete window.stzExportUiObservations
+    }))
+    await cleanup('settled-export-App-cleanup-failure', () => page.close())
+    await Promise.all([...waits].map((wait) => wait.drain()))
+    if (!appFailed && cleanupError) throw cleanupError
   }
 }
 

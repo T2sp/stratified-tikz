@@ -1440,12 +1440,14 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: export implementation, SVG-context correction and bounded capture
-retained. The latest parent verification reopened autoDim with its complete
-foreground, then failed strict equality between captured opacity
-`0.24499999999999997` and computed opacity `0.245`. A harness-only `1e-12`
-absolute tolerance addresses that representation difference; fresh complete
-matching parent verification and independent review remain outstanding.
+Status: export implementation, SVG-context correction, bounded captures and
+the finite/range-checked `1e-12` computed-opacity comparison are retained. The
+latest parent run `ylXZks` passed every visibility policy, native boundary and
+the first transparent 2D App download/reopen, then exited on an unhandled second
+download-wait rejection. Promise ownership and failure reporting are corrected;
+the second native click's cause still requires measured parent diagnostics.
+Fresh complete matching parent verification and independent review remain
+outstanding; 3D white export and subsequent failure/retry are pending.
 The earlier parent report `stz-phase31e-before-review-r43lZG` passed ten groups
 and 120 scenario records with no page errors, then failed the dimmed formula
 path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
@@ -1576,7 +1578,7 @@ Exact commands, statuses and logs are retained under
 `handoff.json`. These child checks precede the latest parent run and do not
 replace complete native verification or independent review.
 
-The latest parent report, `stz-phase31e-before-review-t7U6g3/verification.json`
+The historical parent report, `stz-phase31e-before-review-t7U6g3/verification.json`
 under `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/`, is failed/partial
 before review. It verified unchanged revision `d1b72b3240177dfa368b43255ca07fd5738e3920`
 plus five tracked modifications and the untracked boundary fixture, fingerprint
@@ -1622,17 +1624,62 @@ tests passed within the 2,409 passing full-suite tests, with no failures/skips.
 Build (existing nonblocking chunk-size warning), strict fixture TypeScript,
 targeted ESLint including the helper and tests, ten syntax checks and diff
 checks exited 0. Command logs and final checkout identity are retained in
-`/private/tmp/stz-31e-opacity-comparison/`, including `handoff.json`. These are
-child results; fresh browser verification remains assigned to the outer parent.
+`/private/tmp/stz-31e-opacity-comparison/`, including `handoff.json`. These child
+results preceded the latest executed parent run below.
 
-The normal order remains fix, matching complete parent verification, then
+The latest parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-ylXZks/verification.json`.
+It checked unchanged revision `4c1dd9faeca926cbbda81edb57f82ebe89fb26a1` plus the
+opacity correction, fingerprint
+`91e464c7d49d376ce1d32f95bc73479e3ab28b277644c90406fe53b5a5a1c9e9`, using
+Node v26.9.0, Chrome 153.0.8010.52, external Playwright and Vite port 5174.
+Tests (2,409 passing, none failed/skipped), build, diff and label-assets exited 0.
+All four visibility policies, invalid-viewport retry, native render-boundary and
+zero-label controls passed. The first actual transparent 2D App export downloaded
+and reopened after held conversion, edits, later document load and duplicate
+clicks; its SVG, standalone and raster evidence are retained. These results
+supersede the opacity child's pending native status.
+
+Free-label verification exited 1 on an unhandled second-download timeout. Its
+event promise could reject while the intervening native click was pending.
+The last saved checkpoint precedes that click: revision 2/later 3D, one download,
+no pending labels, earlier transparent success and expected resource fallback.
+No post-click evidence explains the missing download. Browser evidence remained
+`running` with ten completed groups and 127 passing records; an empty
+`unexecuted` array does not complete the eleventh group. No page errors were
+recorded before that checkpoint; their later state is unknown. This parent run
+was not a child browser startup restriction and never reached independent review.
+
+The follow-up owns staged download/filechooser event and action outcomes from
+creation, retains immediate events, separates finite native-action and event
+deadlines, guards cancelled continuations and removes listeners/timers before
+closing and draining outstanding work. Failed evidence is saved before optional
+bounded images; secondary diagnostics/cleanup failures preserve the primary
+error, and successful evidence waits for resource cleanup. Regressions include
+strict subprocess coverage for early rejection and the actual harness failure
+path. This child used Node v26.9.0/npm 11.19.1 from clean revision
+`474aa9d5ec32bd8cee575e7d969bfdd0c4bad212`: 147 focused tests passed within
+2,422 passing full-suite tests, including thirteen added regressions. Build,
+strict fixture TypeScript, targeted ESLint, thirteen syntax checks and diff
+checks exited 0 (existing chunk-size warning only). Logs/results/checkout
+identity are in `/private/tmp/stz-31e-owned-downloads/handoff.json`, separate
+from parent-native and independent-review status; no new native attempt was
+made in this child.
+
+New native checkpoints record button bounds/hit stack/drawers and native trace,
+App status/request state, events and file save/reopen progress. Inspector
+interception remains unconfirmed: only a measured hit plus a native trial's
+interception log enables dismissal through the real close control before the
+native export click. Browser execution remains assigned to the outer parent.
+The later 3D white download/reopen, transient resource recovery, injected
+serialization failure and successful retry remain unverified.
+
+The normal order remains fix, fresh matching complete parent verification, then
 independent review. `check:free-labels` still requires all eleven groups for
-31E/31F, including all four visibility policies, invalid-viewport retry, native
-boundary controls and downloaded transparent/white 2D/3D files reopened outside
-the application. Neither partial `t7U6g3` nor historical `Qku3Ld` verifies this
-opacity correction. The remaining standalone workflow and failure/retry gates
-require fresh complete evidence; Phase 31E must not be called complete until
-verification and independent review succeed. Phase 31F remains deferred.
+31E/31F with no incomplete/unexecuted groups or page errors. Partial `ylXZks`
+evidence cannot verify this correction; standalone `31E verify` does not run
+review or establish approval. Phase 31E must not be called complete until both
+gates succeed. Phase 31F remains deferred.
 
 The exporter captures a detached copy of the committed SVG and immutable label
 inputs before awaiting conversion. A shared synchronous label view renders the

@@ -1256,7 +1256,7 @@ Its log is `/private/tmp/stz-31e-svg-boundary/browser-startup.log`, with checkou
 identity and checks in that directory's `handoff.json`. That child restriction
 does not describe the subsequent parent execution.
 
-The latest executed parent verification is **failed/partial, before review**:
+The historical SVG-context parent verification was **failed/partial, before review**:
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-t7U6g3/verification.json`.
 It tested revision `d1b72b3240177dfa368b43255ca07fd5738e3920` plus five modified
 tracked files and the untracked boundary fixture, recorded in
@@ -1278,7 +1278,7 @@ verified 1100×850 PNGs covering their entire 900×700 SVG root; autoDim's PNG i
 These observations demonstrate the repaired label subtree for this executed
 case; the historical `Qku3Ld` title-only defect did not recur.
 
-The new blocker is strict equality across numeric representations: captured
+That run's blocker was strict equality across numeric representations: captured
 `0.7 * 0.35` is `0.24499999999999997`, and that raw opacity attribute survives
 detached rendering, sanitization and serialization unchanged. The native product
 of `Number(getComputedStyle(ancestor).opacity)` is `0.245`, an absolute difference
@@ -1322,17 +1322,82 @@ nonblocking chunk-size warning. Logs and command results are retained under
 `/private/tmp/stz-31e-opacity-comparison/` (`focused.log`, `npm-test.log`,
 `npm-build.log`, `fixture-typescript.log`, `targeted-eslint.log` and
 `syntax-results.json`); final checkout identity is recorded in `handoff.json`.
-These are child checks, separate from pending parent browser verification.
+These child checks preceded the executed parent verification below.
 
-Fresh complete matching parent verification remains required for the opacity
-correction and all eleven groups, followed by independent review, which has
-not run. This fix child leaves browser execution to the outer parent runner.
-The production SVG-context regression and bounded screenshot helper remain
-required: complete pre/post-sanitization label subtrees, all four visibility
-policies, invalid-viewport retry, native boundary controls, actual transparent/
-white App downloads/reopens and subsequent 3D view must execute successfully.
-Neither the partial `t7U6g3` run nor historical `Qku3Ld` verifies this corrected
-checkout. Standalone verification can use
+The latest parent verification is **failed/partial, before independent review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-ylXZks/verification.json`.
+It checked revision `4c1dd9faeca926cbbda81edb57f82ebe89fb26a1` plus four tracked
+changes and the two opacity helper/test files, with unchanged fingerprint
+`91e464c7d49d376ce1d32f95bc73479e3ab28b277644c90406fe53b5a5a1c9e9`.
+Node v26.9.0, Chrome 153.0.8010.52, external Playwright and Vite at
+`http://127.0.0.1:5174` ran the checks. Tests (2,409 passed, none failed or
+skipped), build, diff and label-assets checks exited 0. All four visibility
+policies, invalid-viewport retry, the native SVG render boundary and zero-label
+case passed. The first actual transparent 2D App export downloaded and reopened;
+its 23,341-byte SVG, standalone observations/PNG and raster PNG are retained.
+This included pending capture, intervening text/style/background edits and a
+later 3D document load, synchronous duplicate-click isolation and unchanged
+current model/history. The title/subtree, opacity comparison and bounded
+standalone capture corrections passed these native checks.
+
+The process then exited 1 with an unhandled rejection from the second download
+wait while the intervening native `locator.click()` had not returned. The event
+promise was created before the click but not observed until after it. The final
+saved checkpoint is `settled-export-App-3d-before-download`: document revision 2,
+one download, the previous transparent-export success status, `aria-busy=false`,
+no pending labels and the expected resource fallback. Existing recorded
+conversions were delivered. No post-click result, failure diagnostic or failure
+image was saved, so this evidence does not establish whether the click was
+intercepted, preparation failed, or the download handoff failed. Page errors were
+empty at the saved checkpoint; their later state is unknown. Browser evidence
+remained `running` with ten completed groups, 127 passing records and one
+incomplete group; `unexecuted: []` does not make that partial report complete.
+This was an executed parent failure, not a child browser startup restriction.
+
+The targeted harness correction uses `scripts/ownedPageEvent.mjs` for all three
+staged downloads and the local file chooser. Listeners are installed before
+actions; event and action outcomes have rejection ownership from creation.
+Native actions have a separate 5-second deadline, ordinary downloads 20 seconds,
+the first held/edit/load/release workflow 30 seconds, and file choosers 10 seconds.
+Cancellation guards stop later staged work, dispose removes listeners/timers,
+and page closure cancels outstanding Playwright work before it is drained.
+Immediate events remain retained while action completion is still required.
+The first deliberate synchronous double-click and intervening edits are retained.
+The outer harness persists terminal failed evidence before its optional
+5-second viewport screenshot, preserves the primary error if diagnostic/image/
+cleanup work fails, attempts browser and server cleanup independently, and
+reports success only after cleanup succeeds. Helper regressions cover early
+event rejection, action errors/call logs, immediate and delayed delivery, page
+closure, intervening failure and cleanup; strict subprocess regressions exercise
+both promise ownership and the actual harness failure-evidence path.
+
+The next native run records listener/action/event/save/reopen checkpoints,
+bounded App status transitions, document/background/request state, and the
+export button's count, visibility, enabled state, bounds, viewport, scroll,
+drawers and hit stack. A focused trace retains native actionability diagnostics.
+Inspector interception remains an unconfirmed hypothesis. Only when the actual
+hit test identifies it does the harness perform a native trial click; a retained
+interception error plus a confirming hit test permits the real **Close inspector
+drawer** control, followed by a native export click and model/history checks.
+No forced click or handler invocation replaces the later native export action.
+
+This child used Node v26.9.0/npm 11.19.1 with the required PATH, starting from
+clean revision `474aa9d5ec32bd8cee575e7d969bfdd0c4bad212`. Its eleven focused
+files passed 147 tests, including ten event-ownership and three actual-harness
+failure regressions, within 2,422 passing full-suite tests (none failed/skipped).
+Build, strict fixture TypeScript, targeted ESLint, thirteen syntax checks and
+`git diff --check` exited 0; the existing nonblocking chunk-size warning remains.
+Logs, command results and final checkout identity are retained separately in
+`/private/tmp/stz-31e-owned-downloads/handoff.json`. No production source or
+MathJax/shared rendering semantics changed. Browser execution is assigned to
+the outer parent runner. The actual
+later 3D white download/reopen, resource-failure recovery in that export, injected
+serialization failure and successful retry remain pending until executed.
+Fresh matching `passed`/`complete` evidence must preserve all earlier checks and
+complete all eleven groups with no incomplete/unexecuted groups or page errors.
+The partial `ylXZks` result verifies progress on its recorded checkout; it cannot
+verify this subsequent correction. Independent review has not run. Standalone
+verification can use
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
 it does not run review or establish approval. The fix → complete parent
 verification → independent review order and commit/push gates remain unchanged.
