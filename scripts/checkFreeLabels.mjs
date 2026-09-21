@@ -15,6 +15,7 @@ import { createServer } from 'vite'
 import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
+import { runInlineLabelChecks } from './checkInlineLabels.mjs'
 
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
 await mkdir(artifactDir, { recursive: true })
@@ -32,6 +33,7 @@ const scenarios = [
   'existing-renderer-regressions', 'independent-oracle-negative-controls', 'boundary-anchor-camera-matrix',
   'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount',
   'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
+  'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
 ]
 const completed = []
 const started = []
@@ -441,6 +443,8 @@ try {
   await record('currently visible transparent/white SVG export retains settled geometry and literal fallback; editor overlays removed')
   await page.screenshot({ path: resolve(artifactDir, 'settled-export.png'), fullPage: true })
   await completeGroup('current-SVG-cloning')
+  stage = 'inline-node-production-rendering-and-path-lifecycle'
+  await runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'real-App-workflows'
   await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })

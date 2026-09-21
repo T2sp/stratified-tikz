@@ -4,6 +4,7 @@ import {
 import type {
   AmbientDimension,
   CurveStratum,
+  LabelAnchor,
   PathInlineNode,
   PathInlineNodePlacement,
   Vec2,
@@ -22,6 +23,26 @@ export type SvgPathInlineNodePreview = {
 
 const labelOffsetDistance = 14
 export const maxSvgPathInlineNodePreviews = 128
+
+/** A node ID is local to its path; imported documents may reuse both IDs. */
+export function svgPathInlineNodeLabelIdentity(
+  documentRevision: number | string,
+  pathId: string,
+  nodeId: string,
+): string {
+  return JSON.stringify(['path-inline-node', documentRevision, pathId, nodeId])
+}
+
+/** Align measured bounds at the existing marker-relative offset. */
+export function svgPathInlineNodeLabelAnchor(placement: PathInlineNodePlacement): LabelAnchor {
+  switch (placement) {
+    case 'above': return 'south'
+    case 'below': return 'north'
+    case 'left': return 'east'
+    case 'right': return 'west'
+    case 'center': return 'center'
+  }
+}
 
 export function pathInlineNodesForSvgPreview(
   curve: CurveStratum,

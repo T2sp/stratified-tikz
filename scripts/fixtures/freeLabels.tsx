@@ -4,17 +4,22 @@ import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { SvgDiagram } from '../../src/rendering/SvgDiagram.tsx'
 import type { SvgDiagramProps } from '../../src/rendering/SvgDiagram.tsx'
-import type { Diagram, LabelAnchor, LabelStyle, TextLabel, Vec3 } from '../../src/model/types.ts'
-import { createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
+import type { SvgTexLabelSnapshot } from '../../src/rendering/SvgTexLabel.tsx'
+import type { CurveStratum, Diagram, LabelAnchor, LabelStyle, PathInlineNode, TextLabel, Vec3 } from '../../src/model/types.ts'
+import { createCurveStratum, createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
 import { defaultLabelStyle, defaultSheetStyle } from '../../src/model/styles.ts'
-import { defaultVisibilityOptions } from '../../src/model/visibility.ts'
-import { serializeDiagram } from '../../src/model/serialization.ts'
+import { defaultVisibilityOptions, resolveVisibilityOptions } from '../../src/model/visibility.ts'
+import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
+import { pathInlineNodePoint } from '../../src/model/pathInlineNodes.ts'
+import { reverseCurvePathDirection } from '../../src/model/paths.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
 import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import { loadMathJaxEngine, MathJaxFailure } from '../../src/rendering/labels/mathjaxEngine.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { collectSvgPreviewSelectionCandidates, createSvgSelectionCandidateVisibility } from '../../src/rendering/svgHitTesting.ts'
+import { mapClientPointToViewBox } from '../../src/rendering/svgViewBox.ts'
 import { projectToSvgPoint, svgPointToModelOnWorkPlane } from '../../src/rendering/svgProjection.ts'
 import { createSvgPreviewExportText } from '../../src/ui/svgPreviewExport.ts'
 import { applyGeometryHandleDragToEditorState, startGeometryHandleDragSession } from '../../src/ui/geometryHandles.ts'
@@ -23,10 +28,15 @@ import { commitDiagramChange, createDiagramHistory, redoLastDiagramChange, undoL
 import type { UndoableEditorState } from '../../src/ui/undo.ts'
 import type { SelectedElement } from '../../src/ui/selection.ts'
 import { inspectAndAssertLabelContent } from './labelBrowserOracle.ts'
+import { applyBulkDeleteToEditorState, applyBulkDuplicateToEditorState } from '../../src/ui/bulkEditing.ts'
+import { applySplitSelectedPathToEditorState } from '../../src/ui/pathSplitting.ts'
 
 type LabelInput = { id: string; text: string; position?: Vec3; layer?: number; style?: Partial<LabelStyle> }
+type CurveInput = { id: string; inlineNodes: PathInlineNode[]; points?: Vec3[]; layer?: number; color?: `#${string}`; kind?: 'polyline' | 'cubicBezier'; pathLabel?: string }
 type FixtureOptions = {
   labels: LabelInput[]
+  curves?: CurveInput[]
+  paths?: CurveStratum[]
   ambientDimension?: 2 | 3
   layers?: Diagram['layers']
   occlusion?: 'autoHide' | 'autoDim'
@@ -47,6 +57,7 @@ let dragCount = 0
 const selectionEvents: SelectedElement[] = []
 const callbackEvents: { selection: SelectedElement; options: unknown }[] = []
 const requests: RequestObservation[] = []
+const layouts = new Map<string, { id: string; source: string; requestIdentity: string; status: SvgTexLabelSnapshot['status'] }>()
 const holds = new Map<string, Deferred>()
 const measurement = createBrowserTextMeasurementProvider()
 
@@ -107,6 +118,10 @@ function redraw() {
     showGeometryHandles
     labelRuntime={runtime}
     labelDocumentRevision={sourceRevision}
+    onLabelLayoutChange={(id, snapshot, ownerIdentity) => {
+      if (snapshot === null) layouts.delete(ownerIdentity)
+      else layouts.set(ownerIdentity, { id, source: snapshot.source, requestIdentity: snapshot.requestIdentity, status: snapshot.status })
+    }}
     {...props}
     onSelectionChange={(selectedElement, options) => {
       selectionEvents.push(selectedElement)
@@ -142,6 +157,12 @@ function mount(options: FixtureOptions) {
     position: position ?? { x: ((index % 3) - 1) * 2.8, y: (1 - Math.floor(index / 3)) * 1.6, z: 0 },
     style: { ...defaultLabelStyle, fontSize: 18, ...style },
   }))
+  diagram.strata = [...(options.paths ?? []), ...(options.curves ?? []).map((curve, index) => {
+    const result = createCurveStratum({ ambientDimension: diagram.ambientDimension, id: curve.id, name: curve.id,
+      kind: curve.kind, inlineNodes: curve.inlineNodes, pathLabel: curve.pathLabel, layer: curve.layer ?? index,
+      points: curve.points ?? [{ x: -1.5, y: 1.5 - index, z: 0 }, { x: 1.5, y: 1.5 - index, z: 0 }] })
+    return curve.color ? { ...result, style: { ...result.style, strokeColor: curve.color } } : result
+  })]
   if (options.layers) diagram.layers = options.layers
   if (options.occlusion) {
     diagram.camera = { mode: '3d', kind: 'orthographic', thetaDeg: 90, phiDeg: 0, zoom: 100, pan: { x: 450, y: 350 } }
@@ -164,21 +185,115 @@ function mutateLabel(id: string, change: Partial<TextLabel>) {
   redraw()
 }
 
+function mutateCurve(id: string, update: (curve: CurveStratum) => CurveStratum) {
+  const diagram = { ...editor.editableDiagram, strata: editor.editableDiagram.strata.map((stratum) =>
+    stratum.id === id && stratum.geometricKind === 'curve' ? update(stratum) : stratum) }
+  editor = commitDiagramChange(editor, { ...editor, editableDiagram: diagram })
+  redraw()
+}
+
+function mutateInlineNode(pathId: string, nodeId: string, change: Partial<PathInlineNode>) {
+  mutateCurve(pathId, (curve) => ({ ...curve, inlineNodes: curve.inlineNodes?.map((node) =>
+    node.id === nodeId ? { ...node, ...change, options: { ...node.options, ...change.options } } : node) }))
+}
+
 function state() {
   const diagram = editor.editableDiagram
   const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
   return {
     invocationCount, requestCount, dragCount, selection: editor.selectedElement, selectionEvents, callbackEvents,
+    layouts: Object.fromEntries(layouts),
     requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
     labels: diagram.labels,
+    curves: diagram.strata.filter((stratum) => stratum.geometricKind === 'curve'),
+    nodePositions: Object.fromEntries(diagram.strata.flatMap((curve) => curve.geometricKind !== 'curve' ? []
+      : (curve.inlineNodes ?? []).flatMap((node) => {
+        const point = pathInlineNodePoint(curve, node, diagram.ambientDimension)
+        return point ? [[JSON.stringify([curve.id, node.id]), projectToSvgPoint(camera, point, 700)]] : []
+      }))),
     positions: Object.fromEntries(diagram.labels.map((label) => [label.id, projectToSvgPoint(camera, label.position, 700)])),
     json: serializeDiagram(diagram), history: JSON.stringify(editor.history),
     tikz: generateTikz(diagram), inlineTikz: generateTikz(diagram, { exportMode: 'inlineMath' }),
   }
 }
 
+/** Bounded, read-only native-event diagnostics for the curve-only 3D fixture.
+ * Capture before React handles the click; read feedback after its real handler.
+ * No cycle helper, selection setter, or mutable runtime state is exposed. */
+function observeInlineSelectionClicks() {
+  const svg = container.querySelector<SVGSVGElement>('svg.svg-diagram')!
+  const mountedDiagram = editor.editableDiagram, mountedRuntime = runtime
+  const elements = Array.from(svg.querySelectorAll('[data-path-inline-node-path-id], [data-label-state]'))
+  const feedback = () => {
+    const text = svg.querySelector('.svg-selection-cycle-feedback text')?.textContent ?? null
+    const match = text === null ? null : /^Selected (\d+)\/(\d+): (.*)$/u.exec(text)
+    return { text, index: match ? Number(match[1]) - 1 : null,
+      count: match ? Number(match[2]) : null, description: match?.[3] ?? null }
+  }
+  function candidatesAt(event: MouseEvent) {
+    const diagram = editor.editableDiagram
+    // With only curves there are no free-label bounds or point/label occlusion
+    // maps to mirror. Reject reuse on a scene where that would cease to hold.
+    if (diagram.ambientDimension !== 3 || diagram.labels.length !== 0
+      || diagram.strata.some((stratum) => stratum.geometricKind !== 'curve')) {
+      throw new Error('Inline click diagnostics require the curve-only 3D fixture')
+    }
+    const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
+    const visibilityOptions = resolveVisibilityOptions(diagram, props.visibilityOptions)
+    const bounds = svg.getBoundingClientRect()
+    const client = { x: event.clientX, y: event.clientY }
+    const point = mapClientPointToViewBox(client, bounds, { width: 900, height: 700 })
+    const collection = collectSvgPreviewSelectionCandidates({ diagram, camera, viewportHeight: 700, point,
+      layerFilter: editor.layerFilter, showCoordinateAnchors: props.showCoordinateAnchors,
+      visibility: createSvgSelectionCandidateVisibility({ visibilityOptions }), includeDiagnostics: true })
+    return { altKey: event.altKey, isTrusted: event.isTrusted, client, point,
+      bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+      camera, sourceRevision, renderEpoch, layerFilter: editor.layerFilter, visibilityOptions,
+      selectionBefore: editor.selectedElement, callbacksBefore: callbackEvents.length,
+      feedbackBefore: feedback(), ...collection }
+  }
+  const events: ReturnType<typeof candidatesAt>[] = []
+  const limit = 16
+  let dropped = 0
+  const capture = (event: MouseEvent) => {
+    if (!(event.target instanceof Node) || !svg.contains(event.target)) return
+    if (events.length === limit) { dropped++; return }
+    events.push(candidatesAt(event))
+  }
+  document.addEventListener('click', capture, true)
+  return {
+    read() {
+      return structuredClone({ events, limit, dropped, feedback: feedback(),
+        continuity: { svg: svg === container.querySelector('svg.svg-diagram'),
+          elements: elements.every((element) => element.isConnected && svg.contains(element)),
+          diagram: mountedDiagram === editor.editableDiagram, runtime: mountedRuntime === runtime } })
+    },
+    dispose() { document.removeEventListener('click', capture, true) },
+  }
+}
+
 const api = {
-  mount, mutateLabel, state,
+  mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks,
+  reverseCurve(id: string) { mutateCurve(id, (curve) => reverseCurvePathDirection(curve) ?? curve) },
+  duplicateCurve(id: string) {
+    editor = applyBulkDuplicateToEditorState({ ...editor, selectedElement: { kind: 'stratum', id }, layerOperationStatus: '' })
+    redraw()
+  },
+  splitCurve(id: string, segmentIndex = 0, t = 0.5) {
+    editor = applySplitSelectedPathToEditorState({ ...editor, selectedElement: { kind: 'stratum', id }, layerOperationStatus: '' }, { segmentIndex, t })
+    redraw()
+  },
+  deleteCurve(id: string) {
+    editor = applyBulkDeleteToEditorState({ ...editor, selectedElement: { kind: 'stratum', id }, layerOperationStatus: '' })
+    redraw()
+  },
+  roundTrip() {
+    const parsed = parseSavedDiagramJson(serializeDiagram(editor.editableDiagram))
+    if (!parsed.ok) throw new Error(parsed.error)
+    sourceRevision++
+    editor = { ...editor, editableDiagram: parsed.diagram }
+    redraw()
+  },
   inspectContent(id: string) {
     const label = editor.editableDiagram.labels.find((entry) => entry.id === id)
     if (!label) throw new Error(`Unknown label ${id}`)
@@ -197,6 +312,7 @@ const api = {
     redraw()
   },
   setProps(next: Partial<SvgDiagramProps>) { props = { ...props, ...next }; redraw() },
+  refreshFonts() { document.fonts.dispatchEvent(new Event('loadingdone')) },
   select(selectedElement: SelectedElement) { editor = { ...editor, selectedElement }; redraw() },
   filter(layer: number | null) { editor = { ...editor, layerFilter: layer === null ? { kind: 'all' } : { kind: 'layer', layer } }; redraw() },
   undo() { editor = undoLastDiagramChange(editor); redraw() },

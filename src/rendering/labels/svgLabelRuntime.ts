@@ -14,7 +14,12 @@ import { literalSvgLabelLayout } from './svgLabelLayout.ts'
 export type SvgLabelService = Pick<ReturnType<typeof createLabelService>, 'convert' | 'peek'>
   & Partial<Pick<ReturnType<typeof createLabelService>, 'invalidate'>>
 
-export type SvgLabelRequest = Readonly<{ source: string; settings: LabelLayoutSettings }>
+export type SvgLabelRequest = Readonly<{
+  source: string
+  settings: LabelLayoutSettings
+  /** Document + mounted model owner, distinct from the shared conversion cache key. */
+  ownerIdentity?: string
+}>
 export type SvgLabelState = Readonly<{
   source: string
   requestIdentity: string
@@ -76,7 +81,7 @@ export function createSvgLabelRuntime(options: Readonly<{
 export function svgLabelRequestIdentity(request: SvgLabelRequest): string {
   const { font, tabSize, lineGapEm } = request.settings
   return JSON.stringify([request.source, font.family, font.sizePx, font.weight,
-    font.style, font.fontReadinessGeneration, tabSize, lineGapEm])
+    font.style, font.fontReadinessGeneration, tabSize, lineGapEm, request.ownerIdentity])
 }
 
 function readyState(request: SvgLabelRequest, result: Extract<LabelConversionResult, { kind: 'success' }>): SvgLabelState {

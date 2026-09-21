@@ -28,6 +28,11 @@ const freeLabelGroups = [
   'real-App-input-JSON-history-reused-ID-load',
   'current-SVG-cloning',
 ]
+const inlineLabelGroups = [
+  'inline-node-rendering-placement-halo-picking',
+  'inline-node-lifecycle-path-operations-export',
+]
+const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
 
 // The fake command records observable process boundaries. It never invokes npm,
 // Codex, a server, or a browser; the verification helper still executes real git.
@@ -79,6 +84,7 @@ if (command.startsWith('run check:')) {
       completed: incomplete ? groups.slice(0, -1) : groups,
       incompleteGroups: incomplete ? groups.slice(-1) : [],
       unexecuted: [], pageErrors: [], evidence: groups.map(name => ({ name })),
+      ...JSON.parse(process.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE || '{}'),
     })
   }
 }
@@ -264,6 +270,79 @@ test('31C requires every browser scenario group even if the command exits succes
   assert.equal(storedReport(error.report).status, 'failed')
 })
 
+for (const phase of ['31C', '31D', '31E', '31F']) {
+  test(`${phase} accepts all ten groups from the extended shared harness`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
+    const report = verify(t, fixture, phase)
+    assert.equal(report.status, 'passed')
+    assert.equal(report.checks.at(-1).name, 'check:free-labels')
+    assert.equal(report.checks.at(-1).exitCode, 0)
+    assert.equal(verificationMatchesCheckout(report, fixture), true)
+  })
+}
+
+for (const missing of [inlineLabelGroups, ...inlineLabelGroups.map(group => [group])]) {
+  test(`31D rejects exit-zero evidence missing ${missing.join(' and ')}`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups.filter(group => !missing.includes(group)))
+    const error = failedVerification(t, fixture, '31D')
+    assert.match(error.message, /Phase 31D.*10 required groups/)
+    assert.equal(error.report.checks.at(-1).exitCode, 0, 'The command succeeds but its evidence fails')
+    assert.equal(error.report.checks.at(-1).status, 'failed')
+    assert.equal(verificationMatchesCheckout(error.report, fixture), false)
+  })
+}
+
+for (const phase of ['31C', '31D']) {
+  for (const [name, override] of [
+    ['duplicate group', { completed: [...allLabelGroups, allLabelGroups[0]] }],
+    ['unsupported group', { completed: [...allLabelGroups, 'unsupported-group'] }],
+    ['incomplete group', { incompleteGroups: [inlineLabelGroups[0]] }],
+    ['unexecuted group', { unexecuted: [inlineLabelGroups[1]] }],
+    ['browser error', { pageErrors: ['Uncaught fixture error'] }],
+    ['missing completion list', { completed: null }],
+    ['missing browser identity', { environment: { browserVersion: '' } }],
+    ['unfinished stage', { stage: 'inline-node-rendering' }],
+    ['failed result', { result: 'failed' }],
+  ]) {
+    test(`${phase} rejects ${name} even when the browser command exits zero`, (t) => {
+      const fixture = checkoutFixture(t)
+      fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
+      fixture.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE = JSON.stringify(override)
+      const error = failedVerification(t, fixture, phase)
+      assert.match(error.message, /check:free-labels evidence is incomplete or invalid/)
+      const check = error.report.checks.at(-1)
+      assert.equal(check.status, 'failed')
+      assert.equal(check.exitCode, 0)
+      assert.equal(readFileSync(check.exitStatusPath, 'utf8'), '0\n')
+      assert.equal(storedReport(error.report).status, 'failed')
+      assert.equal(verificationMatchesCheckout(error.report, fixture), false)
+    })
+  }
+}
+
+for (const group of inlineLabelGroups) {
+  test(`31C rejects a partially executed inline extension containing only ${group}`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify([...freeLabelGroups, group])
+    const error = failedVerification(t, fixture, '31C')
+    assert.match(error.message, /only complete supported group sets/)
+    assert.equal(error.report.checks.at(-1).exitCode, 0)
+  })
+}
+
+test('31D preserves a nonzero browser exit even when earlier checks succeed', (t) => {
+  const fixture = checkoutFixture(t)
+  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
+  fixture.env.STZ_TEST_FAIL_COMMAND = 'run check:free-labels'
+  fixture.env.STZ_TEST_EXIT_CODE = '17'
+  const error = failedVerification(t, fixture, '31D')
+  assert.equal(error.exitCode, 17)
+  assert.equal(error.report.status, 'failed')
+  assert.equal(error.report.checks.at(-1).exitCode, 17)
+})
+
 for (const command of ['test', 'run build']) {
   test(`${command} failure stops later checks and preserves command diagnostics`, (t) => {
     const fixture = checkoutFixture(t)
@@ -308,11 +387,14 @@ test('checkout identity includes current untracked contents and changes invalida
   assert.equal(verificationMatchesCheckout(report, fixture), false, 'Staged changes must also invalidate acceptance')
 })
 
-test('verification rejects source mutations during the checks', (t) => {
-  const fixture = checkoutFixture(t)
-  fixture.env.STZ_TEST_CHANGE_CHECKOUT = 'true'
-  const error = failedVerification(t, fixture, '31B')
-  assert.match(error.message, /checkout changed/i)
-  assert.equal(error.report.status, 'failed')
-  assert.equal(storedReport(error.report).status, 'failed')
-})
+for (const phase of ['31B', '31D']) {
+  test(`${phase} verification rejects source mutations during the checks`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
+    fixture.env.STZ_TEST_CHANGE_CHECKOUT = 'true'
+    const error = failedVerification(t, fixture, phase)
+    assert.match(error.message, /checkout changed/i)
+    assert.equal(error.report.status, 'failed')
+    assert.equal(storedReport(error.report).status, 'failed')
+  })
+}
