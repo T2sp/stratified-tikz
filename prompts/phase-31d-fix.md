@@ -1,4 +1,4 @@
-# Phase 31D Targeted Fix Prompt: Complete 3D inline-node interaction and same-node recovery coverage
+# Phase 31D Targeted Fix Prompt: Diagnose 3D overlap Alt cycling and finish browser acceptance
 
 ## Environment
 
@@ -7,11 +7,15 @@ Phase 31D implementation, fixtures, tests, documentation and all user changes,
 including untracked files. Inspect current status first; do not reset the
 branch, restore a historical base, or rerun implementation from scratch.
 
-The reviewed checkout was `2622458c5e652febdfb1b065be1d1b33d84bdd5e` plus
-working-tree changes. Preserve the corrected halo oracle and its
-`scripts/fixtures/inlineLabelComposite.ts` helper and
-`tests/scripts/inlineLabelComposite.test.ts` regression tests. These files were
-untracked in the matching parent evidence; they may since have been committed.
+The latest failed parent verification used
+`14875dbbf61a2a61e031a40261ab14037e63a43c` plus five modified files:
+`docs/PREVIEW_UI.md`, `docs/ROADMAP.md`, `scripts/checkFreeLabelGeometry.mjs`,
+`scripts/checkInlineLabels.mjs`, and
+`scripts/fixtures/inlineLabelBrowserOracle.ts`. There were no untracked files.
+Preserve this added 3D interaction/recovery coverage and its diagnostics, along
+with the corrected halo oracle, `scripts/fixtures/inlineLabelComposite.ts`,
+and `tests/scripts/inlineLabelComposite.test.ts`. Inspect current status rather
+than assuming the working tree still matches the recorded snapshot.
 
 The default shell may select Node v16.17.0 at `/usr/local/bin/node`, whereas
 this project requires Node >=22.12.0. Use:
@@ -22,87 +26,115 @@ export PATH=/opt/homebrew/bin:$PATH
 
 Keep strict TypeScript, avoid `any`, and add no dependencies. Preserve pinned
 MathJax and the shared parser/adapter/cache/runtime architecture. Limit work
-to the two browser-coverage gaps below and failures they demonstrate. Phase
+to the failing 3D Alt-cycle assertion and remaining acceptance checks below. Phase
 31E settled-export waiting and 31F's combined audit remain deferred.
 
-## Latest review findings
+## Latest execution findings
 
-The latest review **ran** and reported `needs_changes`: no Critical issues,
-one Medium issue, and no Low-priority issues. No production defect was found
-and no source files were modified by review. The Medium issue is incomplete
-coverage of two explicitly required production browser scenarios.
+The supplied report is a **parent verification failure before the next review**.
+The preceding independent review did run and found two missing browser cases;
+the follow-up has now implemented those cases. Do not describe them as still
+absent, reuse the preceding review as approval of the changed harness, or
+invent a new `REVIEW_JSON` result for this failed verification attempt.
 
-### M1. 3D marker interaction and same-node recovery remain unverified
+### Current failure: two Alt clicks select the same curve owner
 
-- In `scripts/checkInlineLabels.mjs`, the 3D checks around line 202 verify
-  projection and conversion reuse after camera movement, but do not click
-  markers. The pointer/Alt-click section around line 244 mounts a fresh fixture
-  without `ambientDimension: 3`; `scripts/fixtures/freeLabels.tsx` defaults to
-  2D around line 149. Passing 2D picking and 3D projection checks does not
-  establish owning-curve selection before and after 3D camera movement.
-- Inline editing around line 324 reaches invalid-source fallback, then mounts
-  another document. It never edits that same document/path/node back to valid
-  text. A fresh mount resets document identity and history, so it cannot prove
-  same-node valid–invalid–valid recovery.
-
-Line numbers identify the reviewed version; locate the current equivalent
-sections. These are acceptance gaps, not observed rendering defects.
-Strengthen the harness first; change product code only if the added checks
-demonstrate a defect.
-
-### Passing evidence and resolved work to preserve
-
-Matching parent evidence is retained at:
+Parent evidence directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-Fiv3uY
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-2KaWQt
 ```
 
-Read `verification.json`, both browser command logs/artifacts, and
-`05-check-free-labels/artifacts/free-labels-evidence.json`. Its checkout
-fingerprint is:
+Read `verification.json`, `05-check-free-labels/command.log`, and these files
+inside `05-check-free-labels/artifacts/`:
+
+- `free-labels-evidence.json`;
+- `checkout.diff` and `checkout-untracked.json`;
+- `inline-3d-interaction-initial-camera.png` and `failure.png`.
+
+The checkout was unchanged during verification. Its fingerprint was
+`49077e86deb20d3f7fd111e2de41533f54848ae78481cdc2f9d79c7f3ac24a47`, and
+tracked diff SHA-256 was
+`2f1d06c077ab8ff8fd908682260f1b18f43921c17138a23e2b7b4c36e7011c66`.
+The run used Node v26.9.0 and Chrome `153.0.8010.52` with the Vite fixture at
+`http://127.0.0.1:5174`. Browser startup succeeded; this is not the historical
+child `EPERM` restriction.
+
+`check:free-labels` exited 1 at
+`inline-node-production-rendering-and-path-lifecycle`, at the assertion near
+`scripts/checkInlineLabels.mjs:390`:
 
 ```text
-b08ec90799f1b9d2edbf63946db7edba81a928a67b2730f70e9bff3e5db29f00
+3D overlap cycles both curve owners with reused local IDs
+actual:   Set(1) { 'pick3dB' }
+expected: Set(2) { 'pick3dA', 'pick3dB' }
 ```
 
-The parent used Node v26.9.0 and Chrome `153.0.8010.52`. Both browser commands
-passed, all ten groups completed, and no page errors were recorded. Review
-confirmed the checkout still matched and inspected screenshots/raster evidence;
-it did not repeat browser execution. Group completion establishes the existing
-assertions passed, not that the two absent scenarios were tested.
+The last checkpoint is
+`inline-3d-interaction-initial-camera/overlap-alt-1`. This failed in the initial
+camera, before the changed-camera iteration. Saved observations establish:
 
-| Check | Latest review / matching parent result |
+| Observation | Recorded result |
 | --- | --- |
-| Review `npm test` | Exit 0; 2,356 passed, none failed or skipped |
-| Review `npm run build` | Exit 0; nonblocking chunk-size warning |
-| Strict fixture TypeScript, targeted lint, five browser-script syntax checks | Passed |
-| `git diff --check` | Passed |
-| Parent `check:label-assets` and `check:free-labels` | Passed; complete matching browser evidence |
-| Independent review | Executed; two missing scenarios under one Medium issue |
+| Local overlap node ID | `overlap`, reused on `pick3dA` and `pick3dB` |
+| Both marker/client centers | `(450, 307.5735778808594)` |
+| First Alt click | `pick3dB`, exactly one replace-selection callback |
+| Second Alt click | `pick3dB`, exactly one replace-selection callback |
+| Selection highlight after first click | B marker highlighted |
+| Runtime owner identities | Distinct path owners under document revision 50 |
 
-These are prior results, not verification of this next change. Existing
-App/SvgDiagram lint debt remains 10 errors / 4 warnings; repository-wide lint
-was not run. Keep unrelated lint cleanup out of scope.
+The initial camera's independent ordinary/Alt marker probes for each owner,
+selected highlights, overlap-normal click and blank reset reached their
+assertions successfully. The full new 3D scenario did not complete. The
+saved observations lack the actual ordered hit-candidate list and cycle
+index/count/reset trace. Repeated owner IDs alone do not establish whether
+cycling was correct, reset, or stuck.
 
-The former halo-compositing assertion has been resolved. Review accepted
-glyph-local halos and formula detail at both tested zoom levels. Preserve the
-independent raster oracle, compositing helper, quantitative comparisons, six
-negative controls, and diagnostics retained before assertions. Do not reopen
-the earlier `maxCompositeError=5.082352941176467` failure as the current issue
-or weaken thresholds to add coverage.
+### What passed, and what remains unexecuted
+
+| Check | Latest parent result |
+| --- | --- |
+| `npm test` | Exit 0; 2,356 passed, none failed or skipped |
+| `npm run build` | Exit 0; existing nonblocking chunk-size warning |
+| `git diff --check` | Exit 0 |
+| `check:label-assets` | Exit 0 |
+| `check:free-labels` | Exit 1 at the initial-camera overlap assertion |
+| Next independent review | Not reached in this run |
+
+Seven of ten groups completed, with 82 passing scenario records and no
+`pageErrors`. The inline rendering/placement/halo/picking group started but
+remains incomplete. These groups were not started:
+
+- `inline-node-lifecycle-path-operations-export`;
+- `real-App-input-JSON-history-reused-ID-load`.
+
+The new glyph-only probes after the failed assertion, moved-camera interaction,
+and same-owner valid–invalid–valid recovery did not execute. Recovery is now
+implemented in the working tree, including A-ready/B-fallback/C-pending/C-ready,
+DOM continuity, raw-source/history invariants and late obsolete-failure checks;
+its presence is not browser acceptance. Preserve it and run it after correcting
+this blocker. Later adapter-failure/cap/path-operation/export checks must also
+remain in the full run.
+
+Both halo zoom matrices, six independent negative controls, transparent math,
+2D/3D supported-path projection and existing 2D marker/Alt behavior passed in
+this run. Keep the repaired halo oracle, tolerances and diagnostics; the former
+`maxCompositeError=5.082352941176467` failure is historical and resolved.
+The earlier complete browser run in `stz-phase31d-before-review-Fiv3uY` did not
+contain these new assertions and cannot replace current acceptance.
 
 Preserve phase-aware parent validation: 31D–31F require all ten groups; 31C
 accepts its complete eight- or ten-group reports. Missing/malformed/incomplete
 reports, browser errors, nonzero exits and checkout changes must still fail.
-There is no demonstrated need to change automation or sandbox settings.
+Existing App/SvgDiagram lint debt is separate (10 errors / 4 warnings at the
+previous review). Do not change automation, sandbox settings or unrelated lint.
 
 ## Goal
 
-Add real browser evidence for owning-curve selection in 3D before and after
-camera movement and valid–invalid–valid editing of one continuously mounted
-inline node. Obtain fresh matching parent verification, then leave the result
-for independent review. Verification alone is not review approval.
+Explain and minimally fix the failing overlap assertion using the actual
+candidate-cycling contract. Preserve real 3D interaction and same-owner recovery
+coverage, obtain complete fresh parent verification, then reach independent
+review. Verification alone is not review approval.
 
 ## Required reading before fixing
 
@@ -110,66 +142,100 @@ Read at least:
 
 - `AGENTS.md`, this prompt, `prompts/phase-31d-implement.md`, and
   `prompts/phase-31d-review.md`;
-- the latest review log/summary in `logs/codex/` and matching parent evidence
-  above, including checkout identity and pending files;
+- the failed parent evidence above and preceding review log/summary in
+  `logs/codex/`, keeping their different checkout/execution status explicit;
 - `scripts/checkInlineLabels.mjs`, `scripts/checkFreeLabelGeometry.mjs`,
   `scripts/checkFreeLabels.mjs`, and `scripts/fixtures/freeLabels.tsx`;
 - `scripts/fixtures/inlineLabelBrowserOracle.ts`,
   `scripts/fixtures/inlineLabelComposite.ts`, and fixture TypeScript settings;
+- `src/rendering/svgHitTesting.ts`, its candidate collection, ordering and
+  `nextSvgPreviewSelectionCycle`, `tests/rendering/svgHelpers.test.ts`, and
+  `SvgDiagram` capture/bubbling selection handlers;
 - `src/rendering/SvgTexLabel.tsx`, `src/rendering/svgPathInlineNodes.ts`,
-  relevant `SvgDiagram` pointer/picking code and shared label runtime;
+  and the shared label runtime;
 - inline-node runtime/semantics tests, editor history handling, `package.json`,
   and Phase 31D preview/roadmap documentation;
 - the existing parent evidence contract in
   `scripts/automation/phase-verification.mjs` and `run-phase.mjs`.
 
-## 1. Exercise actual 3D selection before and after camera movement
+## 1. Diagnose candidate cycling before changing the assertion or product
 
-Extend the existing production fixture and pointer helpers. Mount an explicitly
-3D scene with nontrivial z coordinates and at least two curve owners that reuse
-the same local inline-node ID, with distinguishable source text. Keep dot/non-dot
-and selected-marker behavior covered.
+Inspect the saved two-click trace and compare the new 3D crossing scene with
+its passing 2D counterpart. The harness currently assumes that two Alt clicks
+must produce two distinct owning-curve IDs. Production cycling operates on
+hit candidates, which can include both an inline marker and its curve body:
 
-Test both the initial camera and a changed 3D camera on the same mounted
-document/runtime. Change rotation and pan/zoom through the existing camera
-props path. Assert the projection actually moves, while document revision,
-owner identities, raw data/history and conversion count remain unchanged.
-Do not return to 2D, mount another document, or recreate the renderer between
-the two camera states.
+- inline candidate stable ID: `pathInlineNode:<pathId>:<nodeId>`;
+- curve candidate stable ID: `curve:<pathId>`;
+- both may select the same `{ kind: 'stratum', id: <pathId> }`.
 
-At each camera state:
+`compareSvgPreviewSelectionCandidates` orders candidates by hit-kind priority,
+exact distance, then stable ID. `nextSvgPreviewSelectionCycle` continues when
+the point and ordered candidate keys are stable; a new cycle starts at index 1
+when multiple candidates exist. Thus distinct successive candidates can
+legitimately select B twice. Crossing 3D curves can also differ in projected
+hit distances from the coincident 2D fixture. This is a source-supported
+hypothesis for the failing expectation, not a measured diagnosis of this run.
 
-- Read current marker geometry and transform coordinates to browser client
-  coordinates using the current SVG screen transform. Remeasure after camera
-  changes; do not click cached pre-movement positions.
-- Use real browser mouse events for ordinary marker selection and Alt-click
-  owning-curve selection. Cover each intended owner and an overlapping-marker
-  case in which consecutive Alt-clicks cycle through both curve owners despite
-  their reused local node ID. Assert `stratum`/curve selection, correct owner
-  IDs, and exactly one selection callback per click.
-- Reset independent probes through an actual blank-canvas click. Do not reset
-  between consecutive clicks intended to test Alt cycling. Do not substitute
-  fixture `select()` calls or direct callback invocation for pointer behavior.
-- Click a visible glyph location outside every marker's selection tolerance
-  (currently 10 SVG units) and outside underlying curve hit geometry. Prove
-  both ordinary and Alt-click leave the selection empty. Choose a scene where
-  the glyph-only point intersects rendered text and cannot legitimately select
-  a nearby curve. Keep text `pointer-events: none` and no label hit rectangle;
-  do not satisfy nonselection by clicking arbitrary blank space.
-- Check the selected marker highlight and preserve marker-centered picking;
-  measured text bounds must not become inline-node selection targets.
+Retain a focused native-browser reproduction with the same curves, camera,
+local IDs and marker-centered click point. Add bounded read-only diagnostics:
 
-Retain the supported-path projection matrix and 2D pointer tests. The new
-interaction scenario can use a focused 3D scene; it need not duplicate the
-entire path-kind matrix. Record camera parameters, owner tuples, marker/probe
-coordinates, observed selections/callback counts, and screenshots for both
-camera states so evidence distinguishes them from the old 2D tests.
+- actual event `altKey`, client coordinates and mapped SVG point, including
+  any fractional-coordinate rounding; current camera and document identity;
+- the ordered candidates' stable IDs, kinds, distances and owning selections
+  at that exact point, using the actual fixture model/filter/visibility state;
+- cycle index/count and visible selection-cycle feedback, selected owner and
+  callback count for each click; enough trace to distinguish normal advance,
+  candidate-list changes, reset and remount;
+- marker/owner geometry before and after the sequence, keeping observations
+  available if a later assertion fails.
 
-## 2. Recover the same inline node from valid through invalid back to valid
+Use the existing production collector for diagnostics if helpful, but do not
+replace native clicks or expected fixture-owner membership with calls to the
+cycle helper. Retain independent marker/glyph geometry and actual callbacks
+as browser acceptance. Avoid exposing mutable runtime state just for tests.
 
-Extend the current `identityA` editing lifecycle through recovery before the
-subsequent operations fixture is mounted. Keep the same document revision,
-path ID, local node ID and runtime owner tuple throughout:
+Determine the cause and apply the smallest correction:
+
+- If each click advances through stable distinct candidates that share an
+  owner, correct the harness's two-click/unique-owner assumption. Exercise one
+  bounded complete candidate cycle (and wrap where needed), assert advancement
+  and stable membership, and require both expected owning curves to be reached.
+  Tie the bound to the verified candidate count, with a small explicit upper
+  bound for this fixture. Do not merely increase `2`, retry until success, or
+  loop until both IDs happen to appear.
+- If candidate membership/order unexpectedly changes, trace real event point,
+  rounding, geometry, visibility, selection redraw and document continuity.
+  If the cycle actually resets or stops advancing under stable valid input,
+  fix the demonstrated production or fixture defect and add a focused
+  regression. Do not assume this is a production failure from B/B alone.
+
+Do not deduplicate production candidates by owner, alter priority/tolerance or
+initial-cycle semantics, force selected IDs, weaken the expected owner set, or
+use an artificial click point that no longer tests overlapping markers merely
+to make this test green. Candidate-level cycling is existing behavior that
+must remain compatible. Add meaningful helper tests only for changed logic;
+full browser evidence is still required.
+
+## 2. Complete the implemented 3D and same-owner recovery scenarios
+
+Preserve the new continuously mounted 3D fixture. At both initial and moved
+cameras, retain ordinary and Alt marker selection for both owners, dot/non-dot
+highlights, exactly one selection callback per click, complete overlap cycling,
+and glyph-only ordinary/Alt nonselection outside all marker/curve tolerances.
+Use current client/SVG transforms after camera movement; retain nonzero z,
+projection-change assertions, reused local IDs and distinct runtime owners.
+
+Reset independent probes by actual blank-canvas clicks, but do not reset or
+remount within a cycle. Preserve the same document/runtime across camera
+changes, with unchanged raw data/history and conversion count. Retain native
+filled-glyph probes rather than bounding-box or arbitrary blank-space probes,
+all supported-path projection checks, and the existing 2D interaction checks.
+Save identifiable passing records and screenshots for both 3D camera states.
+
+Execute and preserve the already-added `identityA` recovery lifecycle before
+the operations fixture is mounted. It was not reached in this parent run.
+Keep the same document revision, path ID, local node ID and runtime owner tuple:
 
 ```text
 valid A (ready) -> invalid B (whole-source fallback)
@@ -234,10 +300,10 @@ inline-node-rendering-placement-halo-picking
 inline-node-lifecycle-path-operations-export
 ```
 
-Add identifiable records for 3D interaction before/after camera movement and
-same-owner recovery. Save useful observations before assertions so failure
-retains current source, geometry, camera, event and owner context. Do not
-rename old passing records or mark groups complete without running new checks.
+Retain identifiable records for 3D interaction before/after camera movement
+and same-owner recovery. Extend the existing pre-assertion diagnostics with
+candidate/cycle details. Save current source, geometry, camera, event and owner
+context on failure. Do not mark groups complete without running every check.
 
 Preserve shared conversion/cache/fallback/stale-result protection, the preview
 cap, empty-text behavior, font size 12, 14-unit placement offsets, supported
@@ -259,6 +325,7 @@ Run focused checks with the required Node PATH:
 ```bash
 export PATH=/opt/homebrew/bin:$PATH
 node --test \
+  tests/rendering/svgHelpers.test.ts \
   tests/rendering/svgInlineLabelRuntime.test.ts \
   tests/integration/phase31dInlineNodeSemantics.test.ts \
   tests/scripts/inlineLabelComposite.test.ts \
@@ -273,6 +340,7 @@ node --check scripts/checkFreeLabelRaces.mjs
 node --check scripts/checkFreeLabelsApp.mjs
 node node_modules/eslint/bin/eslint.js \
   scripts/checkInlineLabels.mjs scripts/checkFreeLabels.mjs \
+  scripts/checkFreeLabelGeometry.mjs \
   scripts/fixtures/inlineLabelBrowserOracle.ts \
   scripts/fixtures/inlineLabelComposite.ts scripts/fixtures/freeLabels.tsx \
   tests/scripts/inlineLabelComposite.test.ts \
@@ -305,8 +373,8 @@ pending for that authorized parent; do not change sandbox settings or weaken
 checks. In a standalone run, use supported permission escalation when necessary
 and available, or hand off to the authorized Terminal.
 
-Obtain new matching parent evidence after adding the scenarios. The prior
-passing evidence cannot establish assertions it never contained. Review may
+Obtain new matching parent evidence after correcting this failure. Neither
+prior passing evidence nor this incomplete run establishes the remaining cases. Review may
 use a fresh successful matching parent run without repeating browser commands
 inside a restricted child sandbox. Failed, partial or stale evidence still
 blocks acceptance; isolated diagnostics cannot replace the complete run.
@@ -315,17 +383,22 @@ blocks acceptance; isolated diagnostics cannot replace the complete run.
 
 Update only relevant Phase 31D portions of `docs/PREVIEW_UI.md` and
 `docs/ROADMAP.md`. Record actual new coverage, commands, versions, exit statuses,
-checkout identity and evidence paths. Correct any current-status claim that
-review has never run or that the resolved halo assertion still blocks progress.
-Preserve earlier attempts as historical records and keep 31E/31F deferred.
+checkout identity and evidence paths. Distinguish the preceding completed
+review, the child's historical startup restriction, this executed parent
+assertion and the new result. Replace stale statements that new parent browser
+verification has not yet run with its actual failed/partial status until a
+fresh complete run succeeds. Preserve history and keep 31E/31F deferred.
 
 The normal runner performs fix -> parent verification -> independent review.
-The latest run reached review and stopped because review found the two coverage
-gaps. Keep this order and the existing commit gate. A passing standalone
-`verify` does not itself run review or establish review approval.
+The preceding run reached review; this latest follow-up stopped in parent
+`before-review` verification and did not run another review. Existing review
+logs do not change that fact. Keep this order and the commit gate. A passing
+standalone `verify` does not run review or establish review approval.
 
 31D is ready for re-review only when:
 
+- the saved B/B failure has an evidence-supported explanation and minimal
+  correction, with a bounded native candidate-cycle trace reaching both owners;
 - real ordinary/Alt interactions select correct curve owners in 3D before and
   after camera movement, with reused local IDs and glyph-only nonselection;
 - one continuously mounted owner completes valid–invalid–valid recovery with
@@ -345,8 +418,10 @@ required verification and subsequent independent review succeed.
 
 ## Report after implementation
 
-Report changed files; exact added 3D click/camera and same-owner recovery
-assertions; demonstrated product/oracle/fixture failures and minimal fixes;
+Report changed files; the observed candidate order, cycle indices and owner
+sequence explaining B/B; whether the defect was the test expectation, fixture
+or production behavior; the minimal fix and focused regression; completed 3D
+camera/glyph and same-owner recovery scenarios;
 preserved halo and regression results; how intentional history edits were
 distinguished from render-side mutation; commands, versions, exit statuses
 and focused/full counts; fresh evidence paths and checkout identity;

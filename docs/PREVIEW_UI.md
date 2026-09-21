@@ -260,7 +260,11 @@ all eight existing free-label groups. The fixture retains all five placements
 at zoom 1 and 1.4, mixed Japanese/text/nested fractions, transparent math,
 2D/3D path kinds, real pointer/Alt cycling, ownership and delayed completions,
 font readiness, path operations, raw history/TikZ data and current SVG cloning.
-Phase 31D acceptance is **incomplete**; independent review has not run.
+Phase 31D acceptance is **incomplete**. Independent review ran and returned
+`needs_changes`: no Critical issues, one Medium issue, and no Low-priority
+issues. The issue is missing 3D marker interaction and same-node recovery
+coverage. The accepted halo correction is preserved; the new scenarios below
+await fresh parent verification and a separate independent re-review.
 
 The execution history must distinguish these results:
 
@@ -278,14 +282,16 @@ The execution history must distinguish these results:
   `compositeCompared=1130 > dark=31` passed. Seven groups and 75 scenarios
   passed, with no page errors. Inline rendering was partial; inline lifecycle
   and real App were unexecuted. This stopped verification **before review**.
-- This fix starts from clean `2622458c5e652febdfb1b065be1d1b33d84bdd5e` on
+- The prior halo-oracle fix started from clean
+  `2622458c5e652febdfb1b065be1d1b33d84bdd5e` on
   `phase/31d-tex-path-inline-labels`. The eight previously pending files are
   committed unchanged: the diff from `6fd794c8a98bfda62e0d8173409d38dfc23dde82`,
   excluding the later fix prompt, has SHA-256
   `6679416198d0a12c59aa6376e137fd475dced9d96ce80ba919baa633d0f29e28`.
   All four original implementation files remain tracked.
 
-The saved worst pixel is `(98,21)` in a 115 × 34 raster with viewBox
+For that earlier failed run, the saved worst pixel is `(98,21)` in a 115 × 34
+raster with viewBox
 `[-58,-27,115,34]`. Foreground `[16,23,38,222]` over halo `[255,255,255,255]`
 calculates to `[46.9294118,53.0235294,66.0823529,255]`, while the outlined SVG
 produces `[43,49,61,255]`. Premultiplication leaves the same blue-channel
@@ -299,7 +305,8 @@ versus a flattened transparent-foreground reference; it does **not** prove
 that final readback rounding alone explains 5.08235, or that production paint
 violates the white-halo contract.
 
-The targeted change is an oracle correction, with production paint unchanged.
+The prior targeted change was an oracle correction, with production paint
+unchanged.
 It adds a separately rendered foreground on an independent white rectangle,
 with identical SVG size, viewBox, transforms, geometry and explicit paint.
 Only when the halo-only RGBA is exactly `[255,255,255,255]` is that direct
@@ -314,7 +321,8 @@ was fitted to 5.08235 and no partially transparent foreground was discarded.
 The opaque-white comparison expects the same direct paint operations on the
 same byte-valued local backdrop; the existing two-byte allowance remains for
 raster/readback quantization, not an accumulation allowance for arbitrary
-primitive overlap. New browser measurements must still validate this change.
+primitive overlap. The subsequent matching parent run validated this correction,
+as recorded below.
 
 Pre-assertion retention preserves every original metric and layer PNG/SVG,
 original calculated expectation/differences, bounded worst samples, native
@@ -324,8 +332,9 @@ flattened-reference diagnostic. Added artifacts include `foregroundOnWhite`,
 reference, and bounded worst samples for both new comparisons. On the first
 placement the browser also independently removes foreground strokes or adds
 foreground isolation, retaining each controlled experiment as diagnostics.
-These experiments have **not yet executed in this child**; a thin-stroke or
-isolation mechanism must not be reported as measured until their values exist.
+These experiments were unexecuted in the prior child. The subsequent parent
+retained their browser diagnostics with the placement evidence; the original
+flattened-reference discrepancy is not a current acceptance blocker.
 
 Six browser negative controls mutate only a fresh tested output, leaving all
 reference images unchanged: halo above foreground, missing halo, oversized
@@ -334,8 +343,8 @@ Each must fail the independent comparison; corresponding solid-pixel, white
 outline, extent and transparent-gap checks also reject their specific defects.
 The normal placement matrix and transparent-math case retain all existing
 width, inner-color, counter/gap, accessibility and picking assertions. A group
-is completed only after all assertions return. These added browser controls
-are implemented, **not observed passes**.
+is completed only after all assertions return. These six controls and the
+placement matrix subsequently passed in the matching parent run below.
 
 The phase-aware parent validator and its tests are unchanged by this fix. It
 accepts complete eight- or ten-group 31C evidence and requires all ten groups
@@ -343,7 +352,8 @@ for 31D–31F. Its 53 behavioral helper/runner tests still reject missing inline
 groups, duplicate/unsupported/incomplete reports, browser errors, nonzero exits
 and checkout changes, while preserving 31B and verification-before-review.
 
-Current child verification uses Node v26.9.0 with `/opt/homebrew/bin` first in
+The prior compositing-fix child verification used Node v26.9.0 with
+`/opt/homebrew/bin` first in
 `PATH`. The five requested focused test files plus
 `tests/scripts/inlineLabelComposite.test.ts` passed **93 tests** (exit 0),
 including eight new numeric comparison tests and the 53 parent tests. The new
@@ -358,7 +368,7 @@ commands, logs and final pending-checkout identity are retained in
 Production renderer, parser/adapter/runtime, pinned MathJax, model/history,
 marker/picking, path operations and SVG/TikZ export remain unchanged.
 
-A direct external-Playwright Chrome launch from this child exited 1
+A direct external-Playwright Chrome launch from the prior child exited 1
 (`Target page, context or browser has been closed`, SIGABRT; cleanup reported
 `kill EPERM`). No browser version or new pixels were obtained. Native Terminal
 and Chrome UI access were also denied by the tool. These restrictions are
@@ -366,15 +376,111 @@ separate from the parent's **executed** halo assertion. The saved-image numeric
 analysis and an unexecuted local reproduction are retained under
 `/private/tmp/stz-phase31d-compositing-fix/`; they are not acceptance evidence.
 
-The authorized parent must execute the complete gate on this final checkout:
-`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`.
-It must identify a browser, exit 0, report `passed`/`complete`, finish all ten
-groups (including both inline groups and real App), and leave no incomplete,
-unexecuted or page-error entries. The white-backdrop diagnosis, negative
-controls, full placement/halo matrix, lifecycle/App/export observations and
-fresh `check:label-assets` remain pending. `verify` does not run review;
-subsequent independent review is a separate requirement. 31E's settled-export
-waiting and 31F's combined audit remain deferred.
+The subsequent authorized parent verification passed under Node v26.9.0 and
+Chrome 153.0.8010.52 at
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-Fiv3uY/`.
+`verification.json` records exit 0 for `npm test` (2,356 passing tests),
+`npm run build`, `git diff --check`, `check:label-assets`, and
+`check:free-labels`. The two browser command logs and their artifacts are in
+`04-check-label-assets/` and `05-check-free-labels/`.
+`05-check-free-labels/artifacts/free-labels-evidence.json` reports
+`result: "passed"`, `stage: "complete"`, all ten groups complete, and empty
+`incompleteGroups`, `unexecuted`, and `pageErrors`. Its matching checkout was
+`2622458c5e652febdfb1b065be1d1b33d84bdd5e` plus working-tree changes, with
+fingerprint `b08ec90799f1b9d2edbf63946db7edba81a928a67b2730f70e9bff3e5db29f00`.
+The then-untracked `scripts/fixtures/inlineLabelComposite.ts` and
+`tests/scripts/inlineLabelComposite.test.ts` are included in that identity;
+they are now tracked and preserved.
+
+The independent review in `logs/codex/31D-review-summary.json` accepted the
+halo/raster evidence, including formula detail at both zoom levels, and found
+no production defect. It ran tests (2,356 passed), build, fixture TypeScript,
+targeted lint, all five requested browser-script syntax checks and diff check
+successfully. It used the matching parent browser evidence without repeating
+the browser commands. Its one Medium finding identifies assertions that were
+absent: the old 3D projection checks did not click markers, and editing mounted
+a new document before recovering the invalid inline node. Ten completed groups
+proved the old assertions passed, not these missing scenarios.
+
+The current targeted coverage fix starts from clean
+`14875dbbf61a2a61e031a40261ab14037e63a43c` on
+`phase/31d-tex-path-inline-labels`. It adds assertions inside the existing two
+inline groups:
+
+- `inline-3d-interaction-initial-camera` and
+  `inline-3d-interaction-moved-camera` retain one explicitly 3D document,
+  renderer and runtime. Two curve owners have nonzero z coordinates,
+  distinguishable sources and reused local IDs. Current marker geometry and
+  SVG screen transforms drive real ordinary/Alt mouse clicks for both owners;
+  consecutive Alt-clicks at their overlapping markers cycle through both
+  curve owners without an intervening reset. Independent probes reset by an
+  actual blank-canvas click. Each click checks the selected `stratum` owner
+  and exactly one callback; dot/non-dot markers and selected highlights are
+  checked. A native filled-glyph point is proved outside every marker's
+  10-unit tolerance and both curves' hit geometry before ordinary and Alt
+  nonselection probes. Rotation, pan and zoom use the existing camera props
+  path; marker motion is measured while owner identity, document revision,
+  raw model/history/TikZ and conversion count remain unchanged. Camera,
+  owner, marker/probe, callback and selection diagnostics plus screenshots
+  distinguish both states.
+- `inline-same-owner-valid-invalid-valid-recovery` extends `identityA/shared`
+  before mounting the operations fixture. Observations and screenshots retain
+  A-ready, B-fallback, C-pending, C-ready and a late obsolete failure. DOM
+  handles verify continuous owner, marker and label mounting. Invalid B
+  immediately removes A's compiled glyphs and displays all current literal
+  fragments, including spaces, tab, CRLF, ordinary text and invalid math,
+  without injecting markup. A distinct valid C is held by the production
+  delivery hook, checked as whole-current-source pending literal output, then
+  released to two current math runs and current measured layout. Source/font
+  request identity, the same document/path/node owner, positions/options,
+  marker and sibling isolation are checked at each stage. The inverted
+  completion and obsolete-failure assertions remain; a late failure must not
+  replace recovered glyphs or bounds.
+
+Each deliberate text edit uses `mutateInlineNode`/`commitDiagramChange` and
+must change only the intended text plus its normal undo entry. The harness
+captures a new baseline immediately after each edit, then compares settlement
+and delivery release against that baseline for serialized JSON, history,
+selection and both TikZ modes. It does not require history to remain unchanged
+across user edits. Existing Undo/Redo, 2D pointer tests, supported-path
+projection, halo thresholds/negative controls, path operations, App workflows
+and current SVG cloning remain in their original groups.
+
+The current child attempted `PATH=/opt/homebrew/bin:$PATH npm run check:free-labels`
+under Node v26.9.0 with the external Playwright module and installed Chrome
+executable. It exited 1 at `development-server-listen` because binding
+`127.0.0.1:5173` returned `EPERM`, before browser launch. No browser version or
+new scenario measurements were obtained; all ten groups remain unexecuted in
+this attempt. The diagnostic report is
+`/private/tmp/stz-phase31d-coverage-fix-browser/free-labels-evidence.json` and
+its command log is `/private/tmp/stz-phase31d-coverage-fix-browser.log`.
+This child restriction is separate from the prior successful parent run.
+Current child verification under Node v26.9.0 passed the six requested
+focused test files: **93 tests**, none failed or skipped (a subset of the full
+suite). Strict fixture TypeScript, the five browser-script `node --check`
+commands, targeted ESLint including changed `scripts/checkFreeLabelGeometry.mjs`,
+and `git diff --check` all exited 0. Exact command arguments, exit statuses and
+log paths are retained in
+`/private/tmp/stz-phase31d-coverage-fix/focused-checks.json`. `npm test` exited
+0 with **2,356 passing tests**, none failed or skipped; the 93 focused tests
+are included in that total. `npm run build` exited 0 with the existing
+chunk-size warning only. Full command arguments, exit statuses and logs are
+in `/private/tmp/stz-phase31d-coverage-fix/full-checks.json`. No production
+files changed; App/SvgDiagram's existing 10 lint errors and 4 warnings remain
+out of scope, and repository-wide lint was not run. The final handoff at
+`/private/tmp/stz-phase31d-coverage-fix/handoff.json` records the final
+tracked/untracked checkout identity. Fresh parent browser verification for
+these new assertions is pending.
+
+The authorized parent must execute
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
+on the final tracked/untracked checkout, obtain an identified browser and
+`passed`/`complete` evidence with all ten groups and no incomplete, unexecuted
+or page-error entries, and retain the new records above. Historical parent
+success does not verify the added assertions. The normal order remains fix,
+parent verification, independent review; `verify` alone does not run review
+or approve completion. 31E's settled-export waiting and 31F's combined audit
+remain deferred.
 
 ### Free-label verification
 

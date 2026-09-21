@@ -8,7 +8,7 @@ const eventList = (state) => state.callbackEvents ?? state.selectionEvents
 
 /** Clicks are genuine mouse events. Reset via the canvas before EVERY probe;
  * neither a preexisting selection nor a selected drag handle can mask a miss. */
-export async function probePoint({ page, point, expected, state, alt = false, resetPoint }) {
+export async function probePoint({ page, point, expected, state, alt = false, resetPoint, observe }) {
   const blank = resetPoint ?? await page.evaluate(() => {
     const svg = document.querySelector('svg.svg-diagram')
     const point = new DOMPoint(30, 30).matrixTransform(svg.getScreenCTM())
@@ -16,13 +16,16 @@ export async function probePoint({ page, point, expected, state, alt = false, re
   })
   await page.mouse.click(blank.x, blank.y)
   const reset = await state()
+  await observe?.('reset', { point: blank, selected: reset.selection, callbacks: eventList(reset) })
   assert.equal(reset.selection, null, 'Blank canvas click clears selection before probe')
   const before = eventList(reset).length
   if (alt) await page.keyboard.down('Alt')
   try { await page.mouse.click(point.x, point.y) } finally { if (alt) await page.keyboard.up('Alt') }
   const after = await state()
-  assert.deepEqual(after.selection, expected, `${alt ? 'Alt' : 'normal'} pointer ${JSON.stringify(point)} selection`)
   const callbacks = eventList(after).slice(before)
+  await observe?.('click', { point, mode: alt ? 'alt' : 'normal', expected, selected: after.selection, callbacks,
+    reset: { point: blank, selected: reset.selection } })
+  assert.deepEqual(after.selection, expected, `${alt ? 'Alt' : 'normal'} pointer ${JSON.stringify(point)} selection`)
   assert.equal(callbacks.length, 1, 'Exactly one production selection callback for one pointer click')
   return { point, mode: alt ? 'alt' : 'normal', expected, selected: after.selection, callbacks,
     reset: { point: blank, selected: reset.selection } }

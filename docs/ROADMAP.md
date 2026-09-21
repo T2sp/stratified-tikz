@@ -1095,7 +1095,8 @@ code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
 Actual additional-font loading, same-service native-import recovery, Worker
 retirement, and standalone SVG containment are verified; earlier sandbox
 `EPERM` attempts are historical. 31C is implemented with its production-browser
-acceptance check pending; 31D through 31F remain planned.
+acceptance check pending. Phase 31D implementation and acceptance status are
+recorded below; 31E and 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1264,8 +1265,10 @@ commands. All eight 31C groups completed with no page errors or unexecuted group
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
-Status: incomplete; targeted oracle correction awaits authorized browser
-verification, followed separately by independent review.
+Status: incomplete; independent review returned `needs_changes` for two
+missing browser scenarios under one Medium issue. The targeted coverage fix
+awaits fresh parent verification and independent re-review. The halo oracle
+correction passed matching parent verification and was accepted by review.
 
 - Inline-node text uses the shared `SvgTexLabel` parser, adapter, cache,
   exact-source fallback, lifecycle controller and measured layout. Five anchors
@@ -1274,15 +1277,15 @@ verification, followed separately by independent review.
   curve selection are preserved. Owner identity includes document/path/node;
   derived state stays outside model/history and raw TikZ data.
 - The initial child server `EPERM` and previous diagnostic-child block remain
-  historical. The latest authorized parent did launch Chrome 153.0.8010.52
+  historical. An earlier authorized parent did launch Chrome 153.0.8010.52
   under Node v26.9.0 and failed `check:free-labels` (exit 1) at `above`, zoom 1:
   `maxCompositeError=5.082352941176467 > 2`, after `1130 > 31` passed. Tests,
   build, diff check and label assets exited 0. Seven groups completed, inline
   rendering was partial, and inline lifecycle/real App were unexecuted.
   Retained operands, PNG/SVGs and checkout snapshot are in
   `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-if6x1M/`.
-  Verification stopped before review; no review result is claimed.
-- The current fix starts at clean `2622458c5e652febdfb1b065be1d1b33d84bdd5e`.
+  That earlier verification stopped before review.
+- The prior oracle fix started at clean `2622458c5e652febdfb1b065be1d1b33d84bdd5e`.
   Previously pending implementation/diagnostic/validation changes are committed
   and preserved (previous eight-file diff SHA-256
   `6679416198d0a12c59aa6376e137fd475dced9d96ce80ba919baa633d0f29e28`).
@@ -1291,7 +1294,8 @@ verification, followed separately by independent review.
   749 opaque-white-halo pixels; the other 381 have max error 0.4899135447.
   Premultiplication alone does not fix it. Direct thin fill/stroke painting
   versus a flattened transparent foreground is the targeted oracle assumption;
-  its precise rasterization mechanism still needs controlled browser evidence.
+  its independent white-backdrop comparison subsequently passed the parent
+  browser matrix and was accepted by review.
 - The oracle adds an independent direct foreground-on-white reference only at
   exact opaque-white halo pixels; all other pixels retain the original
   source-over comparison. Both keep maximum tolerance 2, with the same original
@@ -1300,24 +1304,83 @@ verification, followed separately by independent review.
   the added white reference, bounded samples, difference PNGs, stroke/isolation
   experiments and six bad-output controls are retained before assertions.
   Controls cover wrong layer order, missing/oversized outlines, opaque gaps,
-  color and opacity errors. Their browser results and the complete ten-group
-  matrix remain **pending**, not passing scenarios.
+  color and opacity errors. All six controls and the complete ten-group matrix
+  passed in the matching `Fiv3uY` parent run recorded below.
 - Phase-aware parent validation is unchanged: complete 31C eight-/ten-group
   evidence is accepted; 31D–31F require ten. Rejection tests preserve missing,
   malformed, duplicate, unsupported, incomplete/error/nonzero and changed-tree
-  cases plus 31B behavior. Current child focused checks pass 93 tests, including
+  cases plus 31B behavior. The prior child focused checks passed 93 tests,
+  including
   eight new numeric tests and 53 parent helper/runner tests (Node v26.9.0,
   exit 0). `npm test` passed all 2,356 tests (including the focused subset);
   build, fixture TypeScript, requested syntax checks, targeted lint and diff
   check exited 0. The existing build-size warning/lint debt are separate.
-  Exact commands and final dirty-checkout identity are recorded at
+  Those commands and that dirty-checkout identity are recorded at
   `/private/tmp/stz-phase31d-compositing-fix/handoff.json`.
-- This child's direct Chrome launch exited 1 before new measurements; Terminal
-  and Chrome UI access were denied. This does not explain away the executed
-  parent assertion. The outer parent must run
-  `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
-  on the corrected checkout and obtain complete ten-group evidence, then run
-  independent review separately. `verify` itself does not review or commit.
+- The prior child's direct Chrome launch exited 1 before measurements;
+  Terminal and Chrome UI access were denied. The subsequent authorized parent
+  passed under Node v26.9.0 / Chrome 153.0.8010.52, with exit 0 for all 2,356
+  tests, build, diff check, `check:label-assets` and `check:free-labels`.
+  Evidence is retained at
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-Fiv3uY/`:
+  `verification.json`, both browser command logs/artifacts, and
+  `05-check-free-labels/artifacts/free-labels-evidence.json`. The browser report
+  is `passed`/`complete`, all ten groups completed, with no incomplete groups,
+  unexecuted cases or page errors. Checkout fingerprint:
+  `b08ec90799f1b9d2edbf63946db7edba81a928a67b2730f70e9bff3e5db29f00` at
+  `2622458c5e652febdfb1b065be1d1b33d84bdd5e` plus changes, including the two
+  then-untracked compositing helper/test files (now tracked and preserved).
+- Independent review ran, used that matching parent browser evidence, passed
+  2,356 tests/build/static/diff checks and found no production defect.
+  `logs/codex/31D-review-summary.json` records `needs_changes` with zero
+  Critical, one Medium and zero Low-priority issues: actual 3D owning-curve
+  clicks and recovery of the same continuously mounted inline node were
+  absent. Halo compositing is resolved; prior group completion cannot prove
+  assertions the old harness never contained.
+- The current fix starts from clean
+  `14875dbbf61a2a61e031a40261ab14037e63a43c`. The existing rendering group gains
+  `inline-3d-interaction-initial-camera` and `inline-3d-interaction-moved-camera`:
+  one 3D document with nonzero z, reused local IDs, real ordinary/Alt owner
+  selection, overlapping-marker cycling, blank-canvas resets, dot/non-dot
+  highlighting and native-glyph nonselection outside marker/curve tolerance.
+  Coordinates are remeasured through the current SVG screen transform after
+  rotation and pan/zoom; unchanged owner/revision, raw data/history/TikZ and
+  conversion count are checked, with camera/event/geometry evidence and
+  screenshots for both states.
+- The existing lifecycle group gains
+  `inline-same-owner-valid-invalid-valid-recovery`: A-ready, exact B fallback,
+  held C-pending, C-ready and late obsolete-failure observations before any
+  new mount. Same DOM/runtime owner and sibling isolation are checked with
+  current source/font request identity, glyphs and measured layout. Text edits
+  keep their normal undo entries; snapshots immediately after each intentional
+  edit are compared with asynchronous settlement/release so rendering cannot
+  alter JSON, history, selection or either TikZ mode. Existing inverted races,
+  Undo/Redo, halo oracle, 2D/path matrix, App and export assertions remain.
+- This child attempted `npm run check:free-labels` with `/opt/homebrew/bin`
+  first in `PATH` (Node v26.9.0). It exited 1 at development-server startup:
+  `listen EPERM` at `127.0.0.1:5173`, before browser launch, with all ten groups
+  unexecuted and no identified browser. Diagnostics are retained at
+  `/private/tmp/stz-phase31d-coverage-fix-browser/free-labels-evidence.json` and
+  `/private/tmp/stz-phase31d-coverage-fix-browser.log`.
+- Current child verification under Node v26.9.0 passed 93 focused tests with
+  no failures or skips (included in the full-suite total). Strict fixture
+  TypeScript, all five requested script syntax checks, targeted ESLint expanded
+  to `scripts/checkFreeLabelGeometry.mjs` and diff check exited 0. Exact commands
+  and logs are in `/private/tmp/stz-phase31d-coverage-fix/focused-checks.json`.
+  `npm test` exited 0 with 2,356 passes and no failures/skips (including the
+  focused subset); `npm run build` exited 0 with the existing chunk warning.
+  Full commands/statuses/logs are in
+  `/private/tmp/stz-phase31d-coverage-fix/full-checks.json`. No production files
+  changed; existing App/SvgDiagram lint debt is untouched and repository-wide
+  lint was not run. `/private/tmp/stz-phase31d-coverage-fix/handoff.json`
+  records the final tracked/untracked checkout identity. Fresh matching
+  browser evidence for the added scenarios remains pending for
+  the authorized parent command
+  `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`.
+  The normal order remains fix, complete parent verification, independent
+  review. The final tracked/untracked checkout must pass all ten groups with
+  identifiable new scenario records before re-review; `verify` itself does
+  not review, approve completion or commit.
 - 31E's settled export wait/snapshot policy and 31F's combined audit remain
   deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
 

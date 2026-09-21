@@ -27,7 +27,7 @@ export async function inspectInlineLabel(pathId: string, nodeId: string, rasteri
   const markerState = { x: marker.cx.baseVal.value, y: marker.cy.baseVal.value, r: marker.r.baseVal.value,
     fill: marker.getAttribute('fill'), fillOpacity: marker.getAttribute('fill-opacity'),
     stroke: marker.getAttribute('stroke'), strokeWidth: marker.getAttribute('stroke-width'),
-    client: { x: markerPoint.x, y: markerPoint.y } }
+    matrix: matrixData(matrix), client: { x: markerPoint.x, y: markerPoint.y } }
   if (!node) return { pathId, nodeId, marker: markerState, label: null }
   const content = required(node.querySelector<SVGGElement>('[data-label-content]'), 'Foreground content missing')
   const halo = required(node.querySelector<SVGGElement>('[data-label-halo]'), 'Decorative halo missing')
@@ -44,7 +44,8 @@ export async function inspectInlineLabel(pathId: string, nodeId: string, rasteri
   const texts = Array.from(content.querySelectorAll('text'), (text) => ({ text: text.textContent,
     x: text.x.baseVal.getItem(0)?.value, y: text.y.baseVal.getItem(0)?.value,
     xmlSpace: text.getAttribute('xml:space'), whiteSpace: getComputedStyle(text).whiteSpace,
-    fontSize: getComputedStyle(text).fontSize, fill: getComputedStyle(text).fill }))
+    fontSize: getComputedStyle(text).fontSize, fontFamily: getComputedStyle(text).fontFamily,
+    fill: getComputedStyle(text).fill }))
   const result = { pathId, nodeId, marker: markerState, label: {
     source: node.getAttribute('data-label-source'), status: node.getAttribute('data-label-state'),
     owner: node.getAttribute('data-label-owner'),
@@ -54,6 +55,7 @@ export async function inspectInlineLabel(pathId: string, nodeId: string, rasteri
     matrix: matrixData(required(node.getScreenCTM(), 'Label matrix missing')),
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     math: content.querySelectorAll('[data-label-math]').length,
+    mathPaths: Array.from(content.querySelectorAll('[data-label-math] path'), (path) => path.getAttribute('d')),
     literal: Array.from(content.querySelectorAll('[data-label-literal]'), (text) => text.textContent), texts,
     halos: node.querySelectorAll('[data-label-halo]').length, haloHidden: halo.getAttribute('aria-hidden'),
     haloPointerEvents: getComputedStyle(halo).pointerEvents,
@@ -66,6 +68,72 @@ export async function inspectInlineLabel(pathId: string, nodeId: string, rasteri
     raster: rasterize ? await rasterEvidence(node, native, controls) : undefined,
   } }
   return result
+}
+
+/** Native filled glyph probe for the focused two-point-polyline 3D scene.
+ * Distances use the outer SVG coordinate system, never CSS pixel estimates or
+ * production label bounds/picking. No opaque bounding rectangle is a glyph. */
+export function inspectInlineGlyphProbe(pathId: string, nodeId: string) {
+  const outer = required(document.querySelector<SVGGElement>(
+    `[data-path-inline-node-path-id="${CSS.escape(pathId)}"][data-path-inline-node-id="${CSS.escape(nodeId)}"]`), 'Inline-node group missing')
+  const svg = required(outer.ownerSVGElement, 'Outer SVG missing')
+  const screen = required(svg.getScreenCTM(), 'SVG screen transform missing')
+  const toSvg = screen.inverse()
+  const groups = Array.from(svg.querySelectorAll<SVGGElement>('[data-path-inline-node-path-id]'))
+  const markers = groups.map((group) => {
+    const circle = required(group.querySelector<SVGCircleElement>(':scope > circle'), 'Marker missing')
+    const point = new DOMPoint(circle.cx.baseVal.value, circle.cy.baseVal.value)
+      .matrixTransform(required(circle.getScreenCTM(), 'Marker transform missing')).matrixTransform(toSvg)
+    return { pathId: group.getAttribute('data-path-inline-node-path-id'), nodeId: group.getAttribute('data-path-inline-node-id'),
+      x: point.x, y: point.y }
+  })
+  const owners = [...new Set(groups.map((group) => required(group.parentElement, 'Curve group missing')))]
+  const segments = owners.flatMap((owner) => Array.from(owner.querySelectorAll<SVGPathElement>(
+    ':scope > path:not([data-svg-export-exclude]):not([data-svg-arrow-preview])'), (path) => {
+    const matrix = toSvg.multiply(required(path.getScreenCTM(), 'Curve transform missing'))
+    const length = path.getTotalLength()
+    const start = path.getPointAtLength(0).matrixTransform(matrix)
+    const end = path.getPointAtLength(length).matrixTransform(matrix)
+    // Reject curved/polysegment fixture changes: endpoint distances are valid
+    // here only because each rendered path is one straight line.
+    if (Math.abs(length - Math.hypot(end.x - start.x, end.y - start.y)) > 0.01) {
+      throw new Error('Glyph probe requires straight two-point curves')
+    }
+    return { pathId: owner.querySelector('[data-path-inline-node-path-id]')?.getAttribute('data-path-inline-node-path-id'),
+      start: { x: start.x, y: start.y }, end: { x: end.x, y: end.y },
+      tolerance: 8 + Number.parseFloat(getComputedStyle(path).strokeWidth) / 2 }
+  }))
+  const distanceToSegment = (point: DOMPoint, segment: typeof segments[number]) => {
+    const dx = segment.end.x - segment.start.x, dy = segment.end.y - segment.start.y
+    const t = Math.max(0, Math.min(1, ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / (dx * dx + dy * dy)))
+    return Math.hypot(point.x - segment.start.x - t * dx, point.y - segment.start.y - t * dy)
+  }
+  for (const path of outer.querySelectorAll<SVGPathElement>('[data-label-content] [data-label-math] path')) {
+    const matrix = required(path.getScreenCTM(), 'Glyph transform missing')
+    const box = path.getBBox(), paint = getComputedStyle(path)
+    if (paint.fill === 'none' || paint.fill === 'transparent' || Number(paint.fillOpacity) === 0) continue
+    for (let row = 1; row < 20; row++) for (let column = 1; column < 20; column++) {
+      const local = new DOMPoint(box.x + box.width * column / 20, box.y + box.height * row / 20)
+      if (!path.isPointInFill(local)) continue
+      const candidate = local.matrixTransform(matrix)
+      const client = new DOMPoint(Math.round(candidate.x), Math.round(candidate.y))
+      const clickLocal = client.matrixTransform(matrix.inverse())
+      // Use the exact integer client location sent to the mouse, and prove
+      // rounding did not turn a filled-glyph probe into a neighboring gap.
+      if (!path.isPointInFill(clickLocal)) continue
+      const point = client.matrixTransform(toSvg)
+      if (point.x < 20 || point.x > 880 || point.y < 20 || point.y > 680) continue
+      const markerDistances = markers.map((marker) => ({ ...marker, distance: Math.hypot(point.x - marker.x, point.y - marker.y), tolerance: 10 }))
+      const curveDistances = segments.map((segment) => ({ ...segment, distance: distanceToSegment(point, segment) }))
+      if (markerDistances.some(({ distance }) => distance <= 12)
+        || curveDistances.some(({ distance, tolerance }) => distance <= tolerance + 2)) continue
+      return { pathId, nodeId, client: { x: client.x, y: client.y }, svg: { x: point.x, y: point.y },
+        glyph: { point: { x: clickLocal.x, y: clickLocal.y }, d: path.getAttribute('d'), insideFill: path.isPointInFill(clickLocal),
+          fill: paint.fill, pointerEvents: paint.pointerEvents, matrix: matrixData(matrix) },
+        screen: matrixData(screen), markerDistances, curveDistances }
+    }
+  }
+  throw new Error(`No visible filled glyph outside every marker/curve tolerance: ${pathId}/${nodeId}`)
 }
 
 async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: number; maxX: number; maxY: number }, controls: boolean) {

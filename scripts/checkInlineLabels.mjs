@@ -279,6 +279,138 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
   for (const alt of [false, true]) await probePoint({ page, state, point: marker, expected: null, alt })
   await record('inline-dot-nondot-highlight-native-pointer-and-marker-centered-Alt-owner-cycling', { normal, cycle, selectedMarker, glyphProbes, toleranceProbes })
 
+  // One continuously mounted 3D document: unique marker probes on each owner,
+  // plus a common model point whose markers overlap under both cameras.
+  const interactionCurves = [
+    curve('pick3dA', [node('shared', 'A $\\frac{P_1}{Q^2}$', 'above', 'dot', 0.2),
+      node('overlap', '$a$', 'above', 'dot')], 0,
+    { points: [{ x: -2, y: 0, z: 0.2 }, { x: 2, y: 0, z: 1 }] }),
+    curve('pick3dB', [node('shared', 'B $\\frac{R_2}{S^3}$', 'below', 'none', 0.2),
+      node('overlap', '$b$', 'below', 'none')], 0,
+    { points: [{ x: 0, y: -2, z: 1 }, { x: 0, y: 2, z: 0.2 }] }),
+  ]
+  await startGroup('inline-node-rendering-placement-halo-picking', 'inline-3d-interaction-mount')
+  await mount(interactionCurves, { ambientDimension: 3 })
+  await settle()
+  const mounted3d = await page.evaluateHandle(() => Array.from(document.querySelectorAll(
+    'svg.svg-diagram, [data-path-inline-node-path-id], [data-label-state]')))
+  const cameraStart = await state()
+  const cameras = [null, { mode: '3d', kind: 'orthographic', thetaDeg: 70, phiDeg: 40, zoom: 125, pan: { x: 425, y: 335 } }]
+  const ownerIds = ['pick3dA', 'pick3dB']
+  const initialMarkers = []
+  const initialOwners = []
+  for (const [cameraIndex, cameraOverride] of cameras.entries()) {
+    const name = `inline-3d-interaction-${cameraIndex === 0 ? 'initial-camera' : 'moved-camera'}`
+    await startGroup('inline-node-rendering-placement-halo-picking', name)
+    // Every independent probe resets using the actual blank canvas. The
+    // consecutive overlap clicks below deliberately have no intervening reset.
+    const blank = await page.evaluate(() => {
+      const svg = document.querySelector('svg.svg-diagram')
+      const point = new DOMPoint(30, 30).matrixTransform(svg.getScreenCTM())
+      return { x: point.x, y: point.y }
+    })
+    await probePoint({ page, state, point: blank, expected: null,
+      observe: (stage, details) => observe(`${name}/blank-${stage}`, details) })
+    const beforeMovement = await state()
+    if (cameraOverride) {
+      await page.evaluate((camera) => window.stzLabels.setProps({ cameraOverride: camera }), cameraOverride)
+      await settle()
+    }
+    const current = await state()
+    const continuousMount = await page.evaluate((elements) => elements.every((element) => element.isConnected)
+      && elements[0] === document.querySelector('svg.svg-diagram'), mounted3d)
+    const markers = []
+    for (const pathId of ownerIds) for (const nodeId of ['shared', 'overlap']) markers.push(await inspect(pathId, nodeId))
+    await screenshot(name)
+    const context = { cameraIndex, cameraOverride, camera: current.camera, sourceRevision: current.sourceRevision,
+      ambientDimension: JSON.parse(current.json).diagram.ambientDimension, curves: current.curves,
+      markers, ownerTuples: markers.map(({ label }) => JSON.parse(label.owner)), continuousMount,
+      beforeMovement, current, screenshot: `${name}.png` }
+    await observe(name, context)
+    assert.equal(context.ambientDimension, 3)
+    assert.ok(continuousMount, '3D camera update retains the same SVG, marker owners and label elements')
+    assert.equal(current.sourceRevision, cameraStart.sourceRevision)
+    assert.equal(current.invocationCount, cameraStart.invocationCount, '3D interaction/camera changes reuse conversions')
+    rawInvariant(beforeMovement, current)
+    rawInvariant(cameraStart, current)
+    if (cameraIndex === 0) {
+      initialMarkers.push(...markers.map(({ marker }) => marker))
+      initialOwners.push(...markers.map(({ label }) => label.owner))
+    } else {
+      assert.deepEqual(markers.map(({ label }) => label.owner), initialOwners)
+      for (const [index, { marker }] of markers.entries()) assert.ok(
+        Math.hypot(marker.x - initialMarkers[index].x, marker.y - initialMarkers[index].y) > 5,
+        'Rotation and pan/zoom actually move every 3D marker')
+    }
+    assert.notEqual(markers[0].label.request, markers[2].label.request, 'Shared local node ID keeps distinct owner/source requests')
+    for (const [index, item] of markers.entries()) {
+      const { pathId, nodeId, marker, label } = item
+      const expected = current.nodePositions[JSON.stringify([pathId, nodeId])]
+      close(marker.x, expected.x); close(marker.y, expected.y)
+      assert.deepEqual(JSON.parse(label.owner), ['path-inline-node', current.sourceRevision, pathId, nodeId])
+      assert.equal(label.pointerEvents, 'none'); assert.equal(label.hitRectangles, 0)
+      close(marker.r, index < 2 ? 4.2 : 3.4)
+      assert.equal(marker.fill, index < 2 ? '#000000' : '#ffffff')
+    }
+    const probes = []
+    for (const pathId of ownerIds) for (const alt of [false, true]) {
+      // Remeasure from the current screen CTM, including after selection redraw.
+      const measured = await inspect(pathId)
+      const probe = await probePoint({ page, state, point: measured.marker.client, expected: selection(pathId), alt,
+        observe: (stage, details) => observe(`${name}/${pathId}-${alt ? 'alt' : 'normal'}-${stage}`, { camera: current.camera, measured, ...details }) })
+      const highlighted = await inspect(pathId)
+      await observe(`${name}/${pathId}-highlight`, { probe, highlighted })
+      close(highlighted.marker.r, (pathId === 'pick3dA' ? 4.2 : 3.4) + 1.4)
+      assert.equal(highlighted.marker.strokeWidth, '2')
+      assert.equal(highlighted.marker.stroke, '#F4B400')
+      probes.push({ ...probe, highlighted: highlighted.marker })
+    }
+    const overlap = await inspect('pick3dB', 'overlap')
+    const overlapNormal = await probePoint({ page, state, point: overlap.marker.client, expected: selection('pick3dB'),
+      observe: (stage, details) => observe(`${name}/overlap-normal-${stage}`, { camera: current.camera, overlap, ...details }) })
+    await probePoint({ page, state, point: blank, expected: null,
+      observe: (stage, details) => observe(`${name}/overlap-blank-${stage}`, details) })
+    const cycles = []
+    await page.keyboard.down('Alt')
+    try {
+      for (let index = 0; index < 2; index++) {
+        const measured = await inspect('pick3dA', 'overlap'), other = await inspect('pick3dB', 'overlap')
+        close(measured.marker.x, other.marker.x); close(measured.marker.y, other.marker.y)
+        const before = await state()
+        await page.mouse.click(measured.marker.client.x, measured.marker.client.y)
+        const after = await state()
+        const event = { index, measured, other, selected: after.selection, callbacks: after.callbackEvents.slice(before.callbackEvents.length) }
+        await observe(`${name}/overlap-alt-${index}`, { camera: current.camera, ...event })
+        assert.equal(event.callbacks.length, 1)
+        assert.equal(event.selected?.kind, 'stratum')
+        assert.ok(ownerIds.includes(event.selected.id))
+        cycles.push(event)
+      }
+    } finally { await page.keyboard.up('Alt') }
+    assert.deepEqual(new Set(cycles.map(({ selected }) => selected.id)), new Set(ownerIds), '3D overlap cycles both curve owners with reused local IDs')
+    await screenshot(`${name}-selected`)
+    const glyphClicks = []
+    for (const alt of [false, true]) {
+      const glyph = await page.evaluate(async () => {
+        const { inspectInlineGlyphProbe } = await import('./inlineLabelBrowserOracle.ts')
+        return inspectInlineGlyphProbe('pick3dA', 'shared')
+      })
+      await observe(`${name}/glyph-${alt ? 'alt' : 'normal'}-geometry`, glyph)
+      assert.equal(glyph.glyph.insideFill, true, 'Probe intersects native filled MathJax glyph ink')
+      assert.equal(glyph.glyph.pointerEvents, 'none')
+      assert.equal(glyph.markerDistances.length, 4)
+      assert.equal(glyph.curveDistances.length, 2)
+      assert.ok(glyph.markerDistances.every(({ distance, tolerance }) => distance > tolerance))
+      assert.ok(glyph.curveDistances.every(({ distance, tolerance }) => distance > tolerance))
+      glyphClicks.push({ glyph, ...await probePoint({ page, state, point: glyph.client, expected: null, alt,
+        observe: (stage, details) => observe(`${name}/glyph-${alt ? 'alt' : 'normal'}-${stage}`, { glyph, ...details }) }) })
+    }
+    rawInvariant(cameraStart, await state())
+    assert.equal((await state()).invocationCount, cameraStart.invocationCount)
+    await record(name, { ...context, probes, overlapNormal, cycles, glyphClicks, selectedScreenshot: `${name}-selected.png` })
+  }
+  await mounted3d.dispose()
+
   for (const mode of ['load-error', 'output-error']) {
     await page.evaluate((value) => window.stzLabels.changeService(value), mode)
     await mount([curve('adapterFailure', [node('shared', '$x$'), node('sibling', 'ordinary 日本語', 'below')])])
@@ -300,32 +432,194 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
 
   await startGroup('inline-node-lifecycle-path-operations-export')
   const oldSource = '$inlineOld_{WWWW}$', newSource = '$inlineNew_i$'
+  const invalidSource = '  B <tag> $g$ \\unknownRecovery{bad}\t keep  $broken\r\n tail  '
+  const recoveredSource = ' recovered $\\frac{p}{q}$ and $\\Omega^2$ '
+  const inlineText = (snapshot) => snapshot.curves.find(({ id }) => id === 'identityA').inlineNodes
+    .find(({ id }) => id === 'shared')
+  const invariantResults = (before, after) => Object.fromEntries([
+    ...['json', 'history', 'tikz', 'inlineTikz'].map((key) => [key, before[key] === after[key]]),
+    ['selection', JSON.stringify(before.selection) === JSON.stringify(after.selection)],
+  ])
+  function assertOnlyTextEdit(before, after, source) {
+    const previousSource = inlineText(before).text
+    const expected = JSON.parse(before.json)
+    expected.diagram.strata.find(({ id }) => id === 'identityA').inlineNodes.find(({ id }) => id === 'shared').text = source
+    assert.deepEqual(JSON.parse(after.json), expected, 'Intentional edit changes only the targeted owner text')
+    assert.equal(after.sourceRevision, before.sourceRevision, 'Editing does not replace the mounted document')
+    assert.deepEqual(after.selection, before.selection, 'Text editing preserves selection')
+    const previousHistory = JSON.parse(before.history), currentHistory = JSON.parse(after.history)
+    const expectedPresent = structuredClone(previousHistory.present)
+    expectedPresent.strata.find(({ id }) => id === 'identityA').inlineNodes.find(({ id }) => id === 'shared').text = source
+    assert.deepEqual(currentHistory.past, [...previousHistory.past, previousHistory.present], 'Each text edit records its normal undo entry')
+    assert.deepEqual(currentHistory.present, expectedPresent)
+    assert.deepEqual(currentHistory.future, [])
+    assert.equal(after.tikz, before.tikz.replace(previousSource, source), 'Standalone TikZ changes only the exact current raw text')
+    const inlineSource = (text) => text.replace(/\r\n?/gu, '\n').split('\n').filter((line) => !/^\s*$/u.test(line)).join('\n')
+    assert.equal(after.inlineTikz, before.inlineTikz.replace(inlineSource(previousSource), inlineSource(source)),
+      'Inline TikZ retains current text with only its established physical-line formatting')
+  }
+  // The synchronous DOM capture is in the same task as flushSync editing. It
+  // observes removal of obsolete geometry before conversion can settle.
+  const editText = (source) => page.evaluate((text) => {
+    window.stzLabels.mutateInlineNode('identityA', 'shared', { text })
+    const label = document.querySelector('[data-path-inline-node-path-id="identityA"][data-path-inline-node-id="shared"] [data-label-state]')
+    const content = label.querySelector('[data-label-content]')
+    return { state: window.stzLabels.state(), immediate: {
+      source: label.getAttribute('data-label-source'), status: label.getAttribute('data-label-state'),
+      owner: label.getAttribute('data-label-owner'), request: label.getAttribute('data-label-request'),
+      math: content.querySelectorAll('[data-label-math]').length,
+      literal: Array.from(content.querySelectorAll('[data-label-literal]'), (entry) => entry.textContent),
+      tags: Array.from(content.children, (entry) => entry.tagName),
+    } }
+  }, source)
   await hold(oldSource); await hold(newSource)
   await mount([curve('identityA', [node('shared', oldSource)]), curve('identityB', [node('shared', '$b$')], -1)])
   await held(oldSource)
-  await mutate('identityA', { text: newSource })
+  const beforeFirstEdit = await state()
+  const firstEdit = await editText(newSource)
+  await observe('inline-identity-first-intentional-edit', { before: beforeFirstEdit, after: firstEdit })
+  assertOnlyTextEdit(beforeFirstEdit, firstEdit.state, newSource)
   await held(newSource)
   const pending = await checkStatus('identityA', newSource, 'pending')
   assert.deepEqual(pending.label.literal, [newSource])
+  rawInvariant(firstEdit.state, await state())
   await page.evaluate(() => window.stzLabels.refreshFonts())
   await page.waitForFunction((value) => window.stzLabels.state().requests.filter((entry) => entry.source === value && entry.held).length >= 2, newSource)
+  rawInvariant(firstEdit.state, await state())
   await mutate('identityA', { position: { kind: 'segment', segmentIndex: 0, value: 0.7 }, options: { placement: 'right' } })
   await page.evaluate(() => window.stzLabels.select({ kind: 'stratum', id: 'identityB' }))
   const beforeRelease = await state()
   await release(newSource)
   await settle()
+
+  // Keep handles to the actual mounted DOM owners throughout A -> B -> C.
+  // Runtime ownership and sourceRevision alone could otherwise miss a remount.
+  const recoveryElements = await page.evaluateHandle(() => {
+    const outer = document.querySelector('[data-path-inline-node-path-id="identityA"][data-path-inline-node-id="shared"]')
+    return { outer, marker: outer.querySelector(':scope > circle'), label: outer.querySelector('[data-label-state]') }
+  })
+  async function recoveryObservation(stage, source, baseline) {
+    const current = await state(), observed = await inspect('identityA'), sibling = await inspect('identityB')
+    const continuity = await page.evaluate((elements) => {
+      const outer = document.querySelector('[data-path-inline-node-path-id="identityA"][data-path-inline-node-id="shared"]')
+      return { outer: elements.outer === outer, marker: elements.marker === outer?.querySelector(':scope > circle'),
+        label: elements.label === outer?.querySelector('[data-label-state]') }
+    }, recoveryElements)
+    const evidence = { stage, expectedSource: source, current, observed, sibling, continuity,
+      invariants: invariantResults(baseline, current) }
+    await screenshot(`inline-same-owner-recovery-${stage}`)
+    await observe(`inline-same-owner-recovery-${stage}`, evidence)
+    return evidence
+  }
+  const aReady = await recoveryObservation('A-ready', newSource, beforeRelease)
   const newest = await checkStatus('identityA', newSource)
+  assert.equal(newest.label.math, 1)
+  assert.ok(newest.label.mathPaths.length > 0, 'Valid A has actual compiled glyph geometry')
   assert.ok(JSON.parse(newest.label.request)[5] > JSON.parse(pending.label.request)[5], 'Latest font-readiness generation owns the completed layout')
-  rawInvariant(beforeRelease, await state())
-  await release(oldSource, true)
-  assert.deepEqual((await inspect('identityA')).label, newest.label, 'Late obsolete failure cannot change current source/settings/placement')
-  rawInvariant(beforeRelease, await state())
+  rawInvariant(beforeRelease, aReady.current)
   await checkStatus('identityB', '$b$')
-  await mutate('identityA', { text: 'current invalid $' })
-  assert.equal((await inspect('identityA')).label.math, 0)
+  function assertRecoveryIdentity(evidence, expectedStatus) {
+    const { current, observed, sibling, continuity } = evidence
+    assert.deepEqual(continuity, { outer: true, marker: true, label: true }, 'Recovery keeps the same mounted node and marker elements')
+    assert.equal(current.sourceRevision, aReady.current.sourceRevision)
+    assert.equal(observed.pathId, 'identityA'); assert.equal(observed.nodeId, 'shared')
+    assert.equal(observed.label.owner, newest.label.owner)
+    assert.equal(observed.label.source, evidence.expectedSource)
+    assert.equal(observed.label.status, expectedStatus)
+    const request = JSON.parse(observed.label.request), originalRequest = JSON.parse(newest.label.request)
+    assert.equal(request[0], evidence.expectedSource)
+    assert.deepEqual(request.slice(1), originalRequest.slice(1), 'Current source retains current font/settings and runtime owner identity')
+    assert.deepEqual(JSON.parse(observed.label.owner), ['path-inline-node', current.sourceRevision, 'identityA', 'shared'])
+    assert.deepEqual(current.layouts[observed.label.owner], { id: 'shared', source: evidence.expectedSource,
+      requestIdentity: observed.label.request, status: expectedStatus })
+    assert.deepEqual(observed.marker, newest.marker, 'Text editing preserves marker geometry, appearance and identity')
+    assert.deepEqual(inlineText(current), { ...inlineText(aReady.current), text: evidence.expectedSource },
+      'Position, options, marker setting and local node identity survive recovery')
+    assert.deepEqual(sibling, aReady.sibling, 'Sibling with the reused local node ID keeps its own text, status, owner and glyphs')
+    assert.deepEqual(current.layouts[sibling.label.owner], aReady.current.layouts[sibling.label.owner])
+    assert.equal(observed.label.pointerEvents, 'none')
+    assert.equal(observed.label.hitRectangles, 0)
+    assert.ok(observed.label.texts.every(({ fontSize }) => fontSize === '12px'))
+    const translation = /^translate\(([-+\d.eE]+)[ ,]+([-+\d.eE]+)\)$/u.exec(observed.label.transform)
+    assert.ok(translation)
+    close(Number(translation[1]), observed.marker.x + 14); close(Number(translation[2]), observed.marker.y)
+    const { bounds, native } = observed.label
+    assert.ok(Object.values(bounds).every(Number.isFinite))
+    close(bounds.minX, 0); close(bounds.minY + bounds.maxY, 0)
+    for (const edge of ['minX', 'minY']) assert.ok(native[edge] >= bounds[edge] - 1)
+    for (const edge of ['maxX', 'maxY']) assert.ok(native[edge] <= bounds[edge] + 1)
+    for (const edge of ['minX', 'maxX']) assert.ok(Math.abs(native[edge] - bounds[edge]) < 7)
+    for (const edge of ['minY', 'maxY']) assert.ok(Math.abs(native[edge] - bounds[edge]) < 12)
+  }
+  function assertWholeLiteral(observed, source) {
+    assert.equal(observed.label.math, 0, 'Whole-current-source fallback has no obsolete compiled math')
+    assert.deepEqual(observed.label.mathPaths, [])
+    assert.deepEqual(observed.label.literal, source.split(/\t|\r\n/u), 'Every complete literal fragment preserves exact whitespace, delimiters and raw text')
+    assert.deepEqual(observed.label.texts.map(({ text }) => text), source.split(/\t|\r\n/u), 'Fallback contains only complete current-source text')
+    assert.ok(observed.label.texts.every(({ whiteSpace, xmlSpace }) => whiteSpace === 'pre' || xmlSpace === 'preserve'))
+  }
+  assertRecoveryIdentity(aReady, 'ready')
+
+  const bEdit = await editText(invalidSource)
+  await observe('inline-same-owner-recovery-B-immediate', { before: aReady.current, edit: bEdit })
+  assertOnlyTextEdit(aReady.current, bEdit.state, invalidSource)
+  assert.equal(bEdit.immediate.source, invalidSource)
+  assert.equal(bEdit.immediate.owner, newest.label.owner)
+  assert.equal(bEdit.immediate.math, 0, 'Invalid B removes valid A glyphs synchronously with its edit')
+  assert.deepEqual(bEdit.immediate.literal, invalidSource.split(/\t|\r\n/u))
+  assert.deepEqual(bEdit.immediate.tags, ['text', 'text', 'text'], 'Raw markup-like text is never injected as elements')
   await settle()
-  await checkStatus('identityA', 'current invalid $', 'fallback')
-  await record('inline-same-node-ID-across-owners-source-font-placement-and-inverted-failure', { pending, newest, requests: (await state()).requests })
+  const bFallback = await recoveryObservation('B-fallback', invalidSource, bEdit.state)
+  assertRecoveryIdentity(bFallback, 'fallback')
+  assertWholeLiteral(bFallback.observed, invalidSource)
+  const literalTexts = bFallback.observed.label.texts
+  close(literalTexts[0].y, literalTexts[1].y)
+  assert.ok(literalTexts[1].x > literalTexts[0].x, 'A literal tab advances the complete following fragment')
+  assert.ok(literalTexts[2].y > literalTexts[1].y, 'The original CRLF places the complete trailing fragment on its next line')
+  assert.notDeepEqual(bFallback.observed.label.bounds, newest.label.bounds, 'Fallback measures current B, not old A')
+  rawInvariant(bEdit.state, bFallback.current)
+
+  await hold(recoveredSource)
+  const cEdit = await editText(recoveredSource)
+  await observe('inline-same-owner-recovery-C-immediate', { before: bFallback.current, edit: cEdit })
+  assertOnlyTextEdit(bFallback.current, cEdit.state, recoveredSource)
+  assert.equal(cEdit.immediate.math, 0)
+  assert.deepEqual(cEdit.immediate.literal, [recoveredSource])
+  await held(recoveredSource)
+  const cPending = await recoveryObservation('C-pending', recoveredSource, cEdit.state)
+  assertRecoveryIdentity(cPending, 'pending')
+  assertWholeLiteral(cPending.observed, recoveredSource)
+  assert.notEqual(cPending.observed.label.request, newest.label.request)
+  assert.notEqual(cPending.observed.label.request, bFallback.observed.label.request)
+  assert.notDeepEqual(cPending.observed.label.bounds, bFallback.observed.label.bounds, 'Pending C uses current literal layout, not stale B layout')
+  rawInvariant(cEdit.state, cPending.current)
+  await release(recoveredSource)
+  await settle()
+  const cReady = await recoveryObservation('C-ready', recoveredSource, cEdit.state)
+  assertRecoveryIdentity(cReady, 'ready')
+  assert.equal(cReady.observed.label.request, cPending.observed.label.request, 'Settlement retains the current C request')
+  assert.equal(cReady.observed.label.math, 2, 'Recovered C renders both current math runs')
+  assert.deepEqual(cReady.observed.label.literal, [])
+  assert.deepEqual(cReady.observed.label.texts.map(({ text }) => text), [' recovered ', ' and ', ' '])
+  assert.equal(cReady.observed.label.mathPaths.length, 4, 'C contains p, q, Omega and 2 glyph paths')
+  assert.ok(cReady.observed.label.mathPaths.every((path) => !newest.label.mathPaths.includes(path)),
+    'Distinct C glyphs contain none of the obsolete A glyph geometry')
+  assert.notDeepEqual(cReady.observed.label.bounds, cPending.observed.label.bounds, 'Ready C measures compiled current content')
+  assert.notDeepEqual(cReady.observed.label.bounds, newest.label.bounds, 'A layout cannot survive valid C recovery')
+  rawInvariant(cEdit.state, cReady.current)
+
+  // The original obsolete request completes only after the same owner has fully
+  // recovered, so its failure cannot restore either earlier glyphs or bounds.
+  await release(oldSource, true)
+  const afterObsoleteFailure = await recoveryObservation('C-ready-after-obsolete-failure', recoveredSource, cEdit.state)
+  assertRecoveryIdentity(afterObsoleteFailure, 'ready')
+  assert.deepEqual(afterObsoleteFailure.observed, cReady.observed, 'Late obsolete failure cannot replace recovered C glyphs, settings, marker or layout')
+  rawInvariant(cEdit.state, afterObsoleteFailure.current)
+  await record('inline-same-node-ID-across-owners-source-font-placement-and-inverted-failure', {
+    pending, newest, recovered: cReady.observed, requests: afterObsoleteFailure.current.requests,
+  })
+  await record('inline-same-owner-valid-invalid-valid-recovery', { aReady, bEdit, bFallback, cEdit, cPending, cReady, afterObsoleteFailure })
+  await recoveryElements.dispose()
 
   const operationSource = '  raw $\\frac{a}{b}$ text  '
   await mount([curve('operations', [node('shared', operationSource, 'above', 'dot', 0.25), node('late', '日本語 $g$', 'below', 'none', 0.75)])])
