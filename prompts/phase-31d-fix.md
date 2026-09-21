@@ -1,4 +1,4 @@
-# Phase 31D Targeted Fix Prompt: Diagnose inline-label halo pixels and complete browser acceptance
+# Phase 31D Targeted Fix Prompt: Resolve the measured halo compositing mismatch and reach review
 
 ## Environment
 
@@ -7,11 +7,14 @@ pending Phase 31D implementation, browser fixtures, tests, documentation and
 all user changes. Do not reset the branch, restore the historical base, or
 rerun the original implementation from scratch.
 
-The failing parent run used revision
-`df37d4f2887dc7b40b9eb7df91b113cd9e35062e` plus a working-tree implementation.
+The latest failing parent run used revision
+`6fd794c8a98bfda62e0d8173409d38dfc23dde82` plus eight modified files.
 Its tracked diff SHA-256 was
-`79a9ab2cdea4fc276fe4e80d04f454a0b901144634b4e81717371fcf5e51bbad`.
-These required files were untracked and must not be omitted:
+`6679416198d0a12c59aa6376e137fd475dced9d96ce80ba919baa633d0f29e28`,
+with no untracked files. Preserve the newly added diagnostic retention and
+phase-aware parent validation, including their regression tests.
+
+These original implementation files are now tracked and must be retained:
 
 - `scripts/checkInlineLabels.mjs`;
 - `scripts/fixtures/inlineLabelBrowserOracle.ts`;
@@ -34,25 +37,25 @@ deferred.
 
 ## Latest execution findings
 
-The supplied report is an implementation run stopped by **parent verification
-before review**, not a completed review with severity counts. Do not invent
-review findings, a `REVIEW_JSON` result, or approval to commit.
+The supplied report is a **fix run stopped by parent verification before
+review**, not a completed review with severity counts. Do not invent review
+findings, a `REVIEW_JSON` result, or approval to commit.
 
 ### Historical child attempt: server startup was blocked
 
-The implementation child reported `EPERM` during local-server startup and
-retained `/private/tmp/stz-phase31d-browser-final/free-labels-evidence.json`.
-That attempt did not provide actual browser acceptance. The later authorized
-parent run below launched Chrome and supersedes the startup restriction as
-the current failure. Do not describe this failure as a sandbox configuration
-problem or change permissions to make an assertion pass.
+Both the original implementation child and the latest fix child reported
+server-startup `EPERM`. The latest child handoff is retained at
+`/private/tmp/stz-phase31d-targeted-handoff.json`. These blocked attempts do
+not establish browser acceptance. The authorized parent subsequently launched
+Chrome and retained the actual assertion and pixel measurements below.
+Do not describe the current failure as a sandbox configuration problem.
 
 ### Current failure: inline-label halo compositing assertion
 
 Parent evidence directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-gRWdxT
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-if6x1M
 ```
 
 Read `verification.json`, `05-check-free-labels/command.log`, and
@@ -62,34 +65,70 @@ Read `verification.json`, `05-check-free-labels/command.log`, and
 The run used Node v26.9.0 and Chrome `153.0.8010.52`, with the Vite development
 fixture at `http://127.0.0.1:5174`. It reached
 `inline-node-production-rendering-and-path-lifecycle` and exited 1 at
-`scripts/checkInlineLabels.mjs:114`:
+`scripts/checkInlineLabels.mjs:137`:
 
 ```text
-AssertionError [ERR_ASSERTION]: Antialiased glyph pixels equal independent
-foreground-over-halo compositing within byte rounding
+AssertionError [ERR_ASSERTION]: inline-above-zoom-1: independent
+foreground-over-halo maxCompositeError=5.082352941176467 must be <=2
 ```
 
-The actual condition is:
+The failing condition is now identified:
 
 ```js
-raster.compositeCompared > raster.dark && raster.maxCompositeError <= 2
+raster.maxCompositeError <= 2
 ```
 
-The saved evidence does not contain these failing values. It therefore does
-not establish which operand failed, how large the difference was, or whether
-the production renderer or the test oracle is wrong. Do not assume this is
-another confirmed 31C-style oracle defect, or declare a production halo defect
-from the assertion message alone.
+The preceding `compositeCompared > dark` assertion passed. The earlier parent
+run in `stz-phase31d-before-review-gRWdxT` lacked the operands and failed before
+saving images; that diagnostic gap is resolved. Do not repeat the old claim
+that the operand or pixel values are unavailable. What remains unresolved is
+the cause of the discrepancy and the correct production/oracle/fixture fix.
 
-The loop starts with placement `above`, zoom `1`, and the mixed source:
+The saved checkpoint is placement `above`, zoom `1`, and the mixed source:
 
 ```text
 日本語 $\frac{O_1}{1+\frac{a}{b}}$ and $g^2$
 ```
 
-The preceding placement/native-bounds/accessibility assertions and the solid
-inner-glyph assertion returned successfully for that first case. The failure
-precedes its PNG writes and placement evidence record. The initial inline
+The `inline-above-zoom-1` entry in `diagnostics` records:
+
+| Measurement | Observed value |
+| --- | --- |
+| Raster size / viewBox | 115 × 34 / `[-58, -27, 115, 34]` |
+| Solid dark pixels / preserved | 31 / 31 |
+| Composite pixels compared | 1,130 |
+| Maximum straight-alpha comparison error | 5.082352941176467 |
+| Maximum premultiplied RGB error | 5.082352941176467 |
+| Maximum alpha error | 0.46666666666664014 |
+| Added white pixels | 586 |
+| Furthest added pixel | 2.23606797749979 |
+| Distant clear / filled pixels | 485 / 0 |
+
+The worst pixel is raster `(98, 21)`, blue channel:
+
+| Layer / calculation | RGBA |
+| --- | --- |
+| Foreground alone | `[16, 23, 38, 222]` |
+| Halo alone | `[255, 255, 255, 255]` |
+| Actual outlined output | `[43, 49, 61, 255]` |
+| Independently calculated source-over | `[46.929411764705875, 53.0235294117647, 66.08235294117647, 255]` |
+
+Both the expected and actual composite are fully opaque here. The same
+5.08235 difference remains in premultiplied RGB; merely switching comparison
+space or excluding low-alpha output cannot explain or remove this failure.
+The straight-alpha discrepancy is not by itself proof of a product defect.
+
+The following artifacts are already saved before the assertion, with prefix
+`inline-above-zoom-1-` in the artifact directory:
+
+- `foreground.png`, `halo.png`, `outlined.png`, and `expected.png`;
+- `difference.png` and `alphaDifference.png` (diagnostic gain 32);
+- `foreground.svg`, `halo.svg`, and `outlined.svg`;
+- `native.png`, a full-page screenshot rather than a pixel-aligned label crop.
+
+The preceding placement/native-bounds/accessibility and solid-pixel assertions
+passed for this case. Later outline/gap values above were recorded as
+diagnostics but their assertions had not run. The initial inline
 valid/mixed/ordinary/Japanese/whole-source-fallback scenario passed; the full
 placement/halo matrix did not.
 
@@ -102,29 +141,49 @@ were not executed:
 
 The report contains 75 passing scenario records and no uncaught `pageErrors`;
 neither fact establishes overall acceptance. Parent test, build, diff check
-and `check:label-assets` passed. The implementation reported 2,312 passing
-Node tests, strict fixture TypeScript, targeted lint and syntax checks. These
-are previous results, not new verification of the fix. The nonblocking build
-size warning and reported existing `SvgDiagram` lint debt are separate.
+and `check:label-assets` passed. The latest child reported 85 focused tests
+(included in 2,348 full-suite passes), strict fixture TypeScript, targeted
+lint, syntax checks and build success. These are previous results, not new
+verification of the next fix. The nonblocking build size warning and existing
+lint debt are separate.
 
-### Additional code-supported acceptance-gate mismatch
+### Completed follow-up work to preserve
 
-The current `scripts/checkFreeLabels.mjs` requires ten completed groups, but
-`scripts/automation/phase-verification.mjs` still requires exactly the eight
-31C group names in `validateBrowserEvidence`. A successful ten-group browser
-run would consequently be rejected by the parent. This is a concrete code
-inconsistency found while preparing this prompt; the attached failed run did
-not reach that validator after a successful browser command.
+The previous prompt's two supporting fixes are implemented:
 
-Resolve this narrow mismatch as part of completing 31D. Do not weaken the
-parent's evidence, exit-status, or checkout-identity checks.
+- `retainRaster` and the `observe` path save all current failing-case artifacts
+  and bounded numeric/paint diagnostics before assertions; assertions now
+  identify their operand and placement/zoom.
+- The parent accepts complete eight- or ten-group 31C evidence and requires
+  all ten groups for 31D–31F. Tests reject missing groups, duplicates/unsupported
+  names, malformed or incomplete reports, browser errors, nonzero exits and
+  checkout changes. Phase 31B behavior is preserved.
+
+Do not reimplement these as if they were still missing, restore the old
+eight-only validator, or broaden the automation work. Preserve their tests
+and confirm them alongside the targeted halo fix.
+
+### Review has not run
+
+`scripts/automation/run-phase.mjs` calls the implementation/fix child first,
+then `runVerification("before-review")`, then the review child. A verification
+exception exits the process in `runVerification`, before the review call.
+The supplied run therefore never reached `prompts/phase-31d-review.md`.
+At prompt preparation, neither `logs/codex/31D-review.log` nor
+`logs/codex/31D-review-summary.json` existed.
+
+The `verify` mode exits after verification and **does not run review**, even
+when verification succeeds. A passing manual verification is not a review
+pass. Completing this targeted fix should allow a normal automated fix run
+to reach its subsequent independent review. Do not change this execution
+order, bypass the gate, or invoke commit/push to manufacture completion.
 
 ## Goal
 
-Identify and minimally fix the demonstrated halo assertion failure, retain
-independent visual and interaction coverage, reconcile the parent evidence
-gate with the extended harness, and obtain a complete authorized 31D
-verification result for the exact corrected checkout.
+Use the saved measurements to identify and minimally fix the halo mismatch,
+retain independent visual and interaction coverage and the completed support
+fixes, then obtain complete authorized 31D verification. Keep subsequent
+independent review explicitly separate from verification success.
 
 ## Required reading before fixing
 
@@ -148,14 +207,15 @@ Inspect actual behavior and assertions. The implementation report's claims
 about shared rendering, lifecycle and interaction are preservation targets,
 not substitutes for the still-unexecuted browser checks.
 
-## 1. Preserve failing-case diagnostics before asserting
+## 1. Start from the retained failure and preserve its diagnostics
 
-The inline harness currently saves raster images and calls `record` after
-its pixel assertions. Extend its diagnostic path so an assertion cannot erase
-the evidence needed to explain it. Reuse the existing started/checkpoint/
-diagnostic convention; diagnostic observations must not count as passes.
+Read the existing `inline-above-zoom-1` diagnostic and its images/SVGs first.
+The failure is now reproducible from retained data; another diagnostic-only
+rewrite or report that the failing operand is unknown is not the requested
+fix. Validate the source-over calculation for the listed worst pixels and
+compare the saved SVG structures before requesting new browser measurements.
 
-Before asserting each halo case, retain:
+Keep the implemented pre-assertion retention of:
 
 - placement, zoom, source, path/node/owner/request identity, font and color;
 - native/published bounds, SVG/viewBox/raster sizes, transforms and relevant
@@ -168,35 +228,55 @@ Before asserting each halo case, retain:
 - foreground-only, halo-only and outlined PNGs, plus expected/difference
   visualizations and serialized SVG sufficient to reproduce the discrepancy.
 
-Split the compound assertion or include each operand's values in its error.
-Ensure failure identifies the precise placement/zoom and assertion. Keep
-diagnostic work bounded and clean up temporary clones/resources in `finally`.
-Do not mark the group complete until all of its assertions return.
+Keep the split assertions, precise checkpoints, bounded work and temporary
+resource cleanup. Extend diagnostics only when a specific unresolved cause
+requires additional evidence. Record new experiments as diagnostics, not
+passing scenarios; never complete a group before all assertions return.
 
 ## 2. Diagnose compositing and apply the smallest justified fix
 
-Reproduce the first failure with the actual production component and browser.
-Compare the native painted label with the isolated foreground/halo/composite
-rasters and trace the first differing pixels. Investigate, without assuming
-the answer:
+Use the saved SVGs to construct a focused reproduction with the same viewport,
+transforms, source and paint, and compare it with the mounted production
+component in a permitted browser. Keep this separate from full acceptance.
+Trace the listed worst pixels and determine which compositing/rasterization
+assumption or production operation accounts for the measured difference.
+
+The saved foreground subtree and halo subtree match their respective
+subtrees in the outlined clone structurally. The native metadata records
+opacity 1, normal blending and default isolation. Worst samples occur around
+nested MathJax geometry, whose paths include inherited fill/stroke and a
+stroke width in MathJax units. These observations narrow investigation but
+do not prove a cause. Investigate:
 
 - straight-alpha versus premultiplied-alpha calculations and the information
   lost when separately rasterized layers are read back as 8-bit Canvas pixels;
 - intermediate rounding, low-alpha color reconstruction and whether the
-  existing two-byte comparison is valid for the chosen measurement method;
+  tolerance of 2 per 8-bit channel is valid for the chosen measurement method;
+- per-primitive fill/stroke antialiasing, overlap and group isolation when
+  painting directly onto the halo versus flattening foreground alone onto a
+  transparent surface and then composing its pixels;
 - inherited styles/fonts/colors, group opacity and isolation, serialization,
   viewBox alignment and nested transforms in the cloned SVGs;
 - actual foreground/halo order, transparent paint, stroke scaling and formula
   geometry in `SvgTexLabel`.
 
-These are investigation directions, not diagnosed causes. Support the chosen
-fix with saved numeric and visual evidence. If the oracle is incorrect, fix
-the oracle without adjusting production paint to match it. If the product
+Test these factors with controlled comparisons that change one relevant
+condition at a time. Preserve raster alignment and distinguish native CSS/
+SVG inheritance from isolated-clone state. A full-page screenshot is useful
+for appearance, but is not a same-resolution pixel oracle without explicit
+coordinate/DPR alignment.
+
+These are investigation directions, not diagnosed causes. In particular,
+premultiplied comparison alone still fails on the recorded opaque worst pixel.
+Support the chosen fix with saved numeric and visual evidence. If the oracle
+is incorrect, fix it without adjusting production paint to match it. If the product
 violates the white-halo contract, make a targeted renderer correction and
 demonstrate that it fixes the visible failure.
 
-Keep the current tolerance unless a measured numerical analysis shows it is
-invalid. Do not merely raise `2`, drop partially transparent pixels, replace
+Keep the current tolerance for the unchanged comparison. If the comparison
+itself is invalid, justify an alternative using independent measurements and
+a defensible error bound, not a threshold chosen to cover 5.08235. Do not
+merely raise `2` to `6`, drop partially transparent pixels, replace
 maximum error with a forgiving average, remove the compositing assertion, or
 derive the expected image from the outlined image being tested. Any replacement
 comparison must be independent, quantitatively bounded and sensitive to real
@@ -216,20 +296,10 @@ Retain and execute:
 - current transparent/white SVG cloning with settled formulas and literal
   fallback. The new settled-export waiting policy remains outside 31D.
 
-## 3. Reconcile the parent verification contract
+## 3. Preserve the repaired parent verification contract
 
-Make the parent validate the actual required group names for the requested
-phase. Preserve the eight free-label groups and require both inline groups
-for 31D and subsequent phases that already inherit this verification. Use a
-small shared definition or explicit phase-aware required/allowed sets; do not
-trust a browser report to define its own acceptance requirements.
-
-Keep 31C's existing eight-group evidence validation supported, and explicitly
-handle the shared harness's now-complete ten-group output when run for 31C.
-Legitimate added groups must not make a complete current run fail solely on
-the old length check. Conversely, 31D must never accept only the old eight.
-
-Add behavioral helper/runner regressions for:
+The phase-aware validator and its behavioral regressions are already present.
+Retain and run the checks for:
 
 - valid 31C evidence and valid complete ten-group 31D evidence;
 - the chosen 31C handling of the extended shared harness;
@@ -238,8 +308,10 @@ Add behavioral helper/runner regressions for:
   errors, even when the command exits 0 and claims `passed`;
 - preservation of 31B verification and checkout-change rejection.
 
-Do not change the child sandbox flags, bypass parent verification, or mark a
-nonzero browser command as accepted. Do not modify commit/push behavior.
+No further automation change is expected unless a new concrete defect is
+demonstrated. Do not change the child sandbox flags or review order, bypass
+parent verification, or accept a nonzero browser command. Do not modify
+commit/push behavior or introduce a new review mode in this halo fix.
 
 ## 4. Finish the complete browser run
 
@@ -367,7 +439,7 @@ Report changed files; which compositing operand failed and its recorded values;
 whether the root cause was production rendering, oracle or fixture setup;
 the minimal fix and any justified comparison change; negative-control and
 full placement/halo results; preserved marker/path/lifecycle/App/export
-behavior; the parent group-validation correction and rejection tests; exact
+behavior; preservation of the parent group-validation fix and rejection tests; exact
 commands, versions, exit statuses and focused/full counts; evidence paths
 and checkout identity; documentation status; and any remaining unavailable or
 failing checks. State whether all Phase 31D gates actually passed, or which

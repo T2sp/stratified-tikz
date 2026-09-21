@@ -266,7 +266,7 @@ checks source-over compositing and display-unit outline extent, and rejects
 opaque backgrounds and white ghosts from transparent formulas. PNGs and SVGs
 are retained alongside the existing checkout-identified browser evidence.
 
-The 2026-09-21 child implementation run passed all 2,312 Node tests, production
+The initial 2026-09-21 child implementation run passed all 2,312 Node tests, production
 build, strict fixture TypeScript, focused lint (apart from unchanged baseline
 debt below), script syntax checks, and `git diff --check`. New Node files are
 registered in `npm test`. The build retains its existing large-chunk warning.
@@ -274,12 +274,76 @@ registered in `npm test`. The build retains its existing large-chunk warning.
 documented App/SvgDiagram total is 10 errors / 4 warnings, so repository-wide
 lint was not run.
 
-Both required browser commands remain **pending parent verification**:
-`check:label-assets` passed its static asset graph check, then failed to listen
-on `127.0.0.1` with `EPERM`; `check:free-labels` likewise failed at development
-server startup before browser launch or assertions. This is not a browser pass.
-The parent runner must execute both commands outside the child sandbox and
-retain all ten completed groups before Phase 31D is marked complete.
+Phase 31D browser acceptance remains **incomplete**, with three distinct runs:
+
+- The initial child could not start its local server (`EPERM`). Its evidence at
+  `/private/tmp/stz-phase31d-browser-final/free-labels-evidence.json` did not
+  establish browser acceptance.
+- The later parent **did launch Chrome 153.0.8010.52**, using Node v26.9.0.
+  Its tests, build, diff check and `check:label-assets` passed, but
+  `check:free-labels` exited 1 at the first inline halo case (`above`, zoom 1,
+  `日本語 $\frac{O_1}{1+\frac{a}{b}}$ and $g^2$`). The failed condition was
+  `compositeCompared > dark && maxCompositeError <= 2`. Neither operand's
+  values were saved, so production paint versus oracle error is **not yet
+  diagnosed**. Seven groups and 75 scenarios passed; the inline rendering
+  group was partial, and inline lifecycle and real App groups were unexecuted.
+  This was a verification failure before review, not a completed review.
+  Evidence: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-gRWdxT/verification.json`
+  and its `05-check-free-labels/artifacts/` directory.
+- This targeted child attempt retained the pending implementation, now committed
+  at `6fd794c8a98bfda62e0d8173409d38dfc23dde82`. The original tracked snapshot
+  (SHA-256 `79a9ab2cdea4fc276fe4e80d04f454a0b901144634b4e81717371fcf5e51bbad`)
+  and all four formerly untracked files matched the checkout before these fixes;
+  those files are now tracked. The diagnostic browser command again failed
+  at `development-server-listen` (`EPERM`, Node v26.9.0), before Chrome launch.
+  Evidence: `/private/tmp/stz-phase31d-halo-diagnostic-20260921/free-labels-evidence.json`;
+  command log: `/private/tmp/stz-phase31d-halo-diagnostic-20260921.log`.
+  Its individual exit status was not retained: the shell wrapper exited 0
+  after printing that failure log. The harness report is explicitly `failed`,
+  with no identified browser, completed group or passing observation.
+  This new startup block supplies no pixel measurements and does not explain
+  or supersede the parent's executed assertion failure.
+
+The targeted changes save each halo case's identity, source, bounds, font/paint
+styles, nested transforms/viewBoxes, layer order and pixel statistics **before
+asserting**. Bounded worst-pixel records retain foreground/halo/outlined and
+expected RGBA, with separate color, alpha and premultiplied differences.
+Foreground, halo-only, outlined, independently expected, amplified RGB/alpha
+difference PNGs, native screenshots and reproducing SVGs are saved. Checkpoints
+and diagnostics are observations, not passing scenarios. The compound
+assertion is split so the next failure names its operand, value, placement and
+zoom. The original comparison and tolerance remain unchanged; premultiplied
+results are diagnostic only. No production halo correction, replacement
+compositing oracle, or new browser negative-control result is claimed without
+the missing actual-browser measurements.
+
+The parent gate now accepts complete legacy eight-group or extended ten-group
+31C evidence, and requires all ten groups for 31D/31E/31F. Behavioral helper and
+runner tests reject either/both missing inline groups, partial extensions,
+duplicates, unsupported groups, incomplete/unexecuted work, browser errors,
+nonzero exits and checkout changes, while retaining 31B verification.
+
+Current focused verification with `/opt/homebrew/bin` first in `PATH`: the five
+requested Node test files passed **85 tests** (exit 0), including the 53 parent
+gate/runner tests. Strict fixture TypeScript, all requested browser-script and
+changed automation/test syntax checks, targeted ESLint and `git diff --check`
+passed (exit 0). `npm test` passed **2,348 tests** and `npm run build` passed
+(both exit 0; existing chunk-size warning only). Logs are
+`/private/tmp/stz-phase31d-focused.log`, `/private/tmp/stz-phase31d-static-checks.json`,
+`/private/tmp/stz-phase31d-npm-test.log` and `/private/tmp/stz-phase31d-npm-build.log`.
+Full-suite/build results and
+the final dirty-checkout fingerprint are retained in
+`/private/tmp/stz-phase31d-targeted-handoff.json`; the focused count is a subset
+of the full suite. Production renderer, parser/runtime, pinned MathJax, model,
+history, marker/picking, path operations and SVG/TikZ export code are unchanged
+by this diagnostic/gate patch. Their existing browser assertions remain in the
+full harness and still need execution on this checkout.
+
+The authorized parent/Terminal must run
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`.
+Do not use this child handoff as acceptance: the halo cause/fix, all ten
+completed browser groups (including both inline groups and real App), fresh
+asset checks and subsequent review remain pending. 31E/31F remain deferred.
 
 ### Free-label verification
 

@@ -7,8 +7,17 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const runner = fileURLToPath(new URL('../../scripts/automation/run-phase.mjs', import.meta.url))
+const freeLabelGroups = [
+  'existing-renderer-regressions', 'independent-oracle-negative-controls', 'boundary-anchor-camera-matrix',
+  'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount',
+  'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
+]
+const inlineLabelGroups = [
+  'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
+]
+const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
 
-function fixture(t) {
+function fixture(t, phase = '31B') {
   const cwd = mkdtempSync(join(tmpdir(), 'stz-runner-test-'))
   const artifacts = new Set()
   t.after(() => {
@@ -23,11 +32,12 @@ function fixture(t) {
   }
   mkdirSync(join(cwd, 'prompts'))
   writeFileSync(join(cwd, '.gitignore'), 'logs/\n')
-  writeFileSync(join(cwd, 'prompts/phase-31b-implement.md'), 'IMPLEMENT_FIXTURE')
-  writeFileSync(join(cwd, 'prompts/phase-31b-review.md'), 'REVIEW_FIXTURE')
+  writeFileSync(join(cwd, `prompts/phase-${phase.toLowerCase()}-implement.md`), 'IMPLEMENT_FIXTURE')
+  writeFileSync(join(cwd, `prompts/phase-${phase.toLowerCase()}-review.md`), 'REVIEW_FIXTURE')
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({
     private: true,
-    scripts: { test: 'node check.cjs test', build: 'node check.cjs build', 'check:label-assets': 'node check.cjs browser' },
+    scripts: { test: 'node check.cjs test', build: 'node check.cjs build',
+      'check:label-assets': 'node check.cjs browser', 'check:free-labels': 'node check.cjs free-browser' },
   }))
   writeFileSync(join(cwd, 'check.cjs'), `
 const { mkdirSync, writeFileSync, appendFileSync } = require('node:fs');
@@ -43,6 +53,16 @@ if (stage === 'browser') {
     'asset-graph-evidence.json': { mainEntries: 3, workerChunks: 43, approvedFontModules: 40 },
     'containment-evidence.json': { fixtures: [], croppedOracle: { geometryInside: false, outsideInkPixels: 1, lostInkPixels: 1 } },
   })) writeFileSync(join(dir, file), JSON.stringify(value));
+}
+if (stage === 'free-browser') {
+  const dir = process.env.STZ_SMOKE_ARTIFACT_DIR;
+  mkdirSync(dir, { recursive: true });
+  const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS);
+  writeFileSync(join(dir, 'free-labels-evidence.json'), JSON.stringify({
+    result: 'passed', stage: 'complete', environment: { browserVersion: 'fixture-browser' },
+    completed: groups, incompleteGroups: [], unexecuted: [], pageErrors: [],
+    ...JSON.parse(process.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE || '{}'),
+  }));
 }
 `)
   const codex = join(cwd, 'codex-fixture.cjs')
@@ -72,9 +92,9 @@ if (prompt.startsWith('REVIEW_FIXTURE')) {
   const initialHead = git('rev-parse', 'HEAD')
   const initialBranch = git('branch', '--show-current')
   const run = (mode, extraEnv = {}) => {
-    const result = spawnSync(process.execPath, [runner, '31B', mode], {
+    const result = spawnSync(process.execPath, [runner, phase, mode], {
       cwd, encoding: 'utf8', timeout: 60_000,
-      env: { ...env, CODEX_BIN: codex, ...extraEnv },
+      env: { ...env, CODEX_BIN: codex, STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(allLabelGroups), ...extraEnv },
     })
     try {
       const checks = readFileSync(join(cwd, 'logs/checks.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)
@@ -101,6 +121,47 @@ test('verify mode accepts pending changes and never invokes Codex or changes bra
   assert.match(git('status', '--short'), /pending\.txt/)
   const checks = readFileSync(join(cwd, 'logs/checks.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)
   assert.deepEqual(checks.map(check => check.stage), ['test', 'build', 'browser'])
+})
+
+for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups]]) {
+  test(`${phase} verify accepts its complete ${groups.length}-group browser report`, t => {
+    const { cwd, git, run, initialHead, initialBranch } = fixture(t, phase)
+    writeFileSync(join(cwd, 'pending.txt'), 'uncommitted inline fixture')
+    const result = run('verify', {
+      CODEX_BIN: join(cwd, 'must-not-run-codex'),
+      STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(groups),
+    })
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.match(result.stdout, /Verification passed/)
+    assert.equal(git('rev-parse', 'HEAD'), initialHead)
+    assert.equal(git('branch', '--show-current'), initialBranch)
+    const checks = readFileSync(join(cwd, 'logs/checks.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)
+    assert.deepEqual(checks.map(check => check.stage), ['test', 'build', 'browser', 'free-browser'])
+  })
+}
+
+for (const missing of [inlineLabelGroups, ...inlineLabelGroups.map(group => [group])]) {
+  test(`31D verify rejects missing ${missing.join(' and ')} with exit-zero browser command`, t => {
+    const { git, run, initialHead, initialBranch } = fixture(t, '31D')
+    const result = run('verify', {
+      STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(allLabelGroups.filter(group => !missing.includes(group))),
+    })
+    assert.equal(result.status, 1, result.stdout + result.stderr)
+    assert.match(result.stderr, /Phase 31D.*10 required groups/)
+    assert.match(result.stderr, /Verification failed. Not committing or pushing/)
+    assert.equal(git('rev-parse', 'HEAD'), initialHead)
+    assert.equal(git('branch', '--show-current'), initialBranch)
+  })
+}
+
+test('31D implementation with old eight-group evidence stops before review', t => {
+  const { cwd, git, run, initialHead } = fixture(t, '31D')
+  const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(freeLabelGroups) })
+  assert.equal(result.status, 1, result.stdout + result.stderr)
+  assert.match(result.stderr, /Phase 31D.*10 required groups/)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.equal(git('rev-list', '--count', 'HEAD'), '1')
 })
 
 test('parent browser evidence is handed to the review while child Codex remains sandboxed', t => {

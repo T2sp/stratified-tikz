@@ -1264,8 +1264,10 @@ commands. All eight 31C groups completed with no page errors or unexecuted group
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
-Status: implementation and local checks passed on 2026-09-21; required parent
-browser verification pending. Not marked complete until those checks pass.
+Status: incomplete. The 2026-09-21 parent browser run reached inline rendering
+and failed the first halo compositing assertion before review. A targeted child
+patch adds retained diagnostics and corrects the parent group gate; the halo
+cause/fix and full browser acceptance still require authorized parent execution.
 
 - Inline-node text now uses `SvgTexLabel`, the same parser, adapter, cache,
   exact-source fallback, lifecycle controller, and measured layout as free
@@ -1279,15 +1281,38 @@ browser verification pending. Not marked complete until those checks pass.
   callback for 31E; model, history, and raw TikZ semantics are unchanged.
 - Added 13 Node regressions for real-engine placement, ownership/cache/settings
   races, raw text and path-operation/selection semantics, plus an export halo
-  accessibility regression. All 2,312 tests, build, strict fixture TypeScript,
+  accessibility regression. The initial child passed all 2,312 tests, build, strict fixture TypeScript,
   focused lint, browser-script syntax, and diff check passed. Existing build
   size warning and unchanged lint debt are separate from this subphase.
 - The production browser harness adds two required inline-node groups with
   native geometry/pixel outline evidence, pointer probes, path operations,
-  delayed completions, shared snapshots, and SVG cloning. Both browser commands
-  were blocked by local-listen `EPERM` before launch; only the asset command's
-  static graph check ran successfully. The parent runner must complete
-  `check:label-assets` and `check:free-labels`; no browser pass is claimed.
+  delayed completions, shared snapshots, and SVG cloning. The initial child's
+  `EPERM` was followed by an executed parent run: Node v26.9.0 / Chrome
+  153.0.8010.52, `check:label-assets` exit 0, `check:free-labels` exit 1 at
+  `above`, zoom 1. Seven groups completed; the inline rendering group was
+  partial and inline lifecycle/real App were unexecuted. Missing pixel values
+  prevent attribution to production paint or the oracle. Evidence remains at
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-gRWdxT`.
+- The targeted child started from clean `6fd794c8a98bfda62e0d8173409d38dfc23dde82`,
+  matching the parent's implementation snapshot and four now-tracked pending
+  files. Diagnostic observations now precede assertions and retain independent
+  layer/expected/difference PNGs, SVGs, styles and bounded worst-pixel samples.
+  Production paint and the original two-byte tolerance are unchanged pending
+  measured diagnosis. This child's direct browser retry failed at server
+  startup (`EPERM`); evidence is `/private/tmp/stz-phase31d-halo-diagnostic-20260921`.
+  The individual command exit status was not retained (the log-printing wrapper
+  exited 0); its explicit failed report is not accepted as a browser pass.
+- The phase-aware parent gate preserves complete 31C eight-group evidence and
+  accepts the complete shared ten-group harness, but requires ten for 31D and
+  later inheriting phases. Rejection tests cover missing inline groups,
+  malformed/incomplete reports, browser errors, nonzero exits and changed
+  checkouts, with 31B retained. Focused checks passed 85 tests, including 53
+  helper/runner tests; the full suite passed 2,348 tests and build exited 0
+  (existing size warning only). Fixture TypeScript, targeted lint and syntax checks passed.
+  Full-suite/build results and the exact final pending-checkout identity are in
+  `/private/tmp/stz-phase31d-targeted-handoff.json`. The full parent command
+  `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
+  and subsequent review remain required; no complete 31D browser pass is claimed.
 - 31E's settled export wait/snapshot policy and 31F's combined completion audit
   remain deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
 

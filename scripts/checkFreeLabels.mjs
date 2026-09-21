@@ -444,7 +444,7 @@ try {
   await page.screenshot({ path: resolve(artifactDir, 'settled-export.png'), fullPage: true })
   await completeGroup('current-SVG-cloning')
   stage = 'inline-node-production-rendering-and-path-lifecycle'
-  await runInlineLabelChecks({ page, record, artifactDir, startGroup, completeGroup })
+  await runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'real-App-workflows'
   await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })

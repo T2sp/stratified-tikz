@@ -18,7 +18,7 @@ const rawInvariant = (before, after) => {
   assert.deepEqual(after.selection, before.selection, 'Label completion preserves selection')
 }
 
-export async function runInlineLabelChecks({ page, record, artifactDir, startGroup, completeGroup }) {
+export async function runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup }) {
   const state = () => page.evaluate(() => window.stzLabels.state())
   const mount = (curves, extra = {}) => page.evaluate((value) => window.stzLabels.mount(value), { labels: [], curves, ...extra })
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -35,6 +35,23 @@ export async function runInlineLabelChecks({ page, record, artifactDir, startGro
   const rendered = (pathId, nodeId = 'shared') => page.locator(
     `[data-path-inline-node-path-id="${pathId}"][data-path-inline-node-id="${nodeId}"]`)
   async function screenshot(name) { await page.screenshot({ path: resolve(artifactDir, `${name}.png`), fullPage: true }) }
+  async function retainRaster(name, observed, context) {
+    const raster = observed.label.raster
+    const artifacts = {}
+    for (const [kind, data] of Object.entries(raster.images)) {
+      artifacts[kind] = `${name}-${kind}.png`
+      await writeFile(resolve(artifactDir, artifacts[kind]), Buffer.from(data.split(',')[1], 'base64'))
+    }
+    for (const [kind, svg] of Object.entries(raster.svgs)) {
+      artifacts[`${kind}Svg`] = `${name}-${kind}.svg`
+      await writeFile(resolve(artifactDir, artifacts[`${kind}Svg`]), svg)
+    }
+    delete raster.images; delete raster.svgs
+    artifacts.native = `${name}-native.png`
+    await screenshot(`${name}-native`)
+    raster.artifacts = artifacts
+    await observe(name, { ...context, observed })
+  }
   async function checkStatus(pathId, source, expected = 'ready', nodeId = 'shared') {
     const observed = await inspect(pathId, nodeId)
     assert.equal(observed.label.source, source)
@@ -89,7 +106,10 @@ export async function runInlineLabelChecks({ page, record, artifactDir, startGro
     await page.evaluate((value) => window.stzLabels.setProps({ cameraViewAdjustment: { zoom: value, pan: { x: 0, y: 0 } } }), zoom)
     const placementEvidence = []
     for (const placement of placements) {
+      const caseName = `inline-${placement}-zoom-${zoom}`
+      await startGroup('inline-node-rendering-placement-halo-picking', caseName)
       const observed = await inspect(placement, 'shared', true)
+      await retainRaster(caseName, observed, { placement, zoom, source })
       const { label, marker } = observed
       const [offsetX, offsetY] = placement === 'above' ? [0, -14] : placement === 'below' ? [0, 14]
         : placement === 'left' ? [-14, 0] : placement === 'right' ? [14, 0] : [0, 0]
@@ -110,16 +130,17 @@ export async function runInlineLabelChecks({ page, record, artifactDir, startGro
       assert.equal(label.haloPointerEvents, 'none')
       assert.equal(label.haloTitles, 0, 'Decorative duplicate is not another accessible formula')
       const raster = label.raster
-      assert.ok(raster.dark > 10 && raster.darkPreserved === raster.dark, 'White halo preserves all solid inner glyph pixels')
-      assert.ok(raster.compositeCompared > raster.dark && raster.maxCompositeError <= 2,
-        'Antialiased glyph pixels equal independent foreground-over-halo compositing within byte rounding')
-      assert.ok(raster.addedWhite > 10, 'Actual raster contains a visible white outline')
-      assert.ok(raster.furthestAddedPixel <= 3, 'Outline remains display-unit sized through scaled MathJax geometry')
-      assert.ok(raster.distantClear > 10 && raster.distantFilled === 0, 'Fraction gaps and text spaces have no opaque background')
-      for (const [kind, data] of [['foreground', raster.foregroundDataUrl], ['outlined', raster.outlinedDataUrl]]) {
-        await writeFile(resolve(artifactDir, `inline-${placement}-zoom-${zoom}-${kind}.png`), Buffer.from(data.split(',')[1], 'base64'))
-      }
-      delete raster.foregroundDataUrl; delete raster.outlinedDataUrl
+      assert.ok(raster.dark > 10, `${caseName}: dark=${raster.dark} must exceed 10 solid inner glyph pixels`)
+      assert.equal(raster.darkPreserved, raster.dark, `${caseName}: white halo preserves all solid inner glyph pixels`)
+      assert.ok(raster.compositeCompared > raster.dark,
+        `${caseName}: compositeCompared=${raster.compositeCompared} must exceed dark=${raster.dark}`)
+      assert.ok(raster.maxCompositeError <= 2,
+        `${caseName}: independent foreground-over-halo maxCompositeError=${raster.maxCompositeError} must be <=2`)
+      assert.ok(raster.addedWhite > 10, `${caseName}: addedWhite=${raster.addedWhite} must exceed 10 visible outline pixels`)
+      assert.ok(raster.furthestAddedPixel <= 3,
+        `${caseName}: furthestAddedPixel=${raster.furthestAddedPixel} must be <=3 display units`)
+      assert.ok(raster.distantClear > 10, `${caseName}: distantClear=${raster.distantClear} must exceed 10 gap pixels`)
+      assert.equal(raster.distantFilled, 0, `${caseName}: fraction gaps and text spaces have no opaque background`)
       placementEvidence.push(observed)
     }
     assert.equal((await state()).invocationCount, beforeCamera.invocationCount, 'Camera motion reuses unchanged inline conversion')
@@ -129,16 +150,16 @@ export async function runInlineLabelChecks({ page, record, artifactDir, startGro
 
   await mount([curve('transparentMath', [node('shared', 'before $\\color{transparent}{WWW}$ after')])])
   await settle()
+  await startGroup('inline-node-rendering-placement-halo-picking', 'inline-transparent-math')
   const transparent = await inspect('transparentMath', 'shared', true)
+  await retainRaster('inline-transparent-math', transparent, { placement: 'above', zoom: 1, source: transparent.label.source })
   assert.equal(transparent.label.math, 1, 'Transparent supported math remains successfully typeset')
-  assert.ok(transparent.label.raster.darkPreserved === transparent.label.raster.dark)
-  assert.ok(transparent.label.raster.maxCompositeError <= 2)
-  assert.ok(transparent.label.raster.furthestAddedPixel <= 3, 'Invisible math cannot leave a white halo ghost away from visible text')
-  assert.equal(transparent.label.raster.distantFilled, 0)
-  for (const [kind, data] of [['foreground', transparent.label.raster.foregroundDataUrl], ['outlined', transparent.label.raster.outlinedDataUrl]]) {
-    await writeFile(resolve(artifactDir, `inline-transparent-math-${kind}.png`), Buffer.from(data.split(',')[1], 'base64'))
-  }
-  delete transparent.label.raster.foregroundDataUrl; delete transparent.label.raster.outlinedDataUrl
+  assert.equal(transparent.label.raster.darkPreserved, transparent.label.raster.dark, 'inline-transparent-math: solid glyph preservation')
+  assert.ok(transparent.label.raster.maxCompositeError <= 2,
+    `inline-transparent-math: maxCompositeError=${transparent.label.raster.maxCompositeError} must be <=2`)
+  assert.ok(transparent.label.raster.furthestAddedPixel <= 3,
+    `inline-transparent-math: furthestAddedPixel=${transparent.label.raster.furthestAddedPixel} must be <=3; no white ghost`)
+  assert.equal(transparent.label.raster.distantFilled, 0, 'inline-transparent-math: transparent gaps')
   await record('inline-transparent-formula-does-not-produce-white-ghost', transparent)
 
   for (const ambientDimension of [2, 3]) {

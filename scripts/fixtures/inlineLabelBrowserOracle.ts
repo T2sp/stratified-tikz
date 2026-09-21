@@ -6,6 +6,15 @@ const required = <T,>(value: T | null, message: string): T => {
   return value
 }
 const matrixData = ({ a, b, c, d, e, f }: DOMMatrix) => ({ a, b, c, d, e, f })
+const paintProperties = ['font-family', 'font-size', 'font-weight', 'font-style', 'font-kerning',
+  'text-rendering', 'white-space', 'color', 'fill', 'fill-opacity', 'stroke', 'stroke-opacity',
+  'stroke-width', 'vector-effect', 'opacity', 'isolation', 'mix-blend-mode', 'pointer-events']
+function describe(element: SVGElement) {
+  const style = getComputedStyle(element)
+  return { tag: element.tagName, attributes: Object.fromEntries(Array.from(element.attributes, ({ name, value }) => [name, value])),
+    computed: Object.fromEntries(paintProperties.map((name) => [name, style.getPropertyValue(name)])),
+    matrix: element instanceof SVGGraphicsElement && element.getScreenCTM() ? matrixData(element.getScreenCTM()!) : null }
+}
 export async function inspectInlineLabel(pathId: string, nodeId: string, rasterize = false) {
   const outer = required(document.querySelector<SVGGElement>(
     `[data-path-inline-node-path-id="${CSS.escape(pathId)}"][data-path-inline-node-id="${CSS.escape(nodeId)}"]`), 'Inline-node group missing')
@@ -48,6 +57,10 @@ export async function inspectInlineLabel(pathId: string, nodeId: string, rasteri
     haloPointerEvents: getComputedStyle(halo).pointerEvents,
     haloTitles: halo.querySelectorAll('title,desc,[role="img"],[aria-label]').length,
     hitRectangles: node.querySelectorAll(':scope > rect[data-svg-export-exclude]').length,
+    paint: rasterize ? { node: describe(node), parent: describe(outer), svg: describe(required(node.ownerSVGElement, 'SVG missing')),
+      // DOM order is paint order; include nested viewBoxes and MathJax transforms.
+      descendantCount: node.querySelectorAll('*').length, descendantLimit: 512,
+      descendants: Array.from(node.querySelectorAll<SVGElement>('*')).slice(0, 512).map(describe) } : undefined,
     raster: rasterize ? await rasterEvidence(node, native) : undefined,
   } }
   return result
@@ -57,7 +70,9 @@ async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: numb
   const margin = 7
   const left = Math.floor(box.minX) - margin, top = Math.floor(box.minY) - margin
   const width = Math.ceil(box.maxX) - left + margin, height = Math.ceil(box.maxY) - top + margin
-  if (width * height > 1_000_000) throw new Error('Inline raster oracle work bound exceeded')
+  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0 || width * height > 1_000_000) {
+    throw new Error('Inline raster oracle work bound exceeded')
+  }
   async function paint(layer: 'foreground' | 'halo' | 'outlined') {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
@@ -69,19 +84,35 @@ async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: numb
     if (layer === 'foreground') clone.querySelectorAll('[data-label-halo]').forEach((entry) => entry.remove())
     if (layer === 'halo') clone.querySelectorAll('[data-label-content]').forEach((entry) => entry.remove())
     svg.append(clone)
-    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }))
+    const serializedSvg = new XMLSerializer().serializeToString(svg)
+    const url = URL.createObjectURL(new Blob([serializedSvg], { type: 'image/svg+xml' }))
     const canvas = document.createElement('canvas')
     canvas.width = width; canvas.height = height
-    const context = required(canvas.getContext('2d', { willReadFrequently: true }), 'Raster context missing')
+    const image = new Image()
     try {
-      const image = new Image(); image.src = url
+      const context = required(canvas.getContext('2d', { willReadFrequently: true }), 'Raster context missing')
+      image.src = url
       await image.decode(); context.drawImage(image, 0, 0)
-    } finally { URL.revokeObjectURL(url) }
-    return { pixels: context.getImageData(0, 0, width, height).data, dataUrl: canvas.toDataURL() }
+      return { pixels: context.getImageData(0, 0, width, height).data, dataUrl: canvas.toDataURL(), serializedSvg }
+    } finally { URL.revokeObjectURL(url); image.removeAttribute('src'); svg.remove(); canvas.width = 0; canvas.height = 0 }
   }
   const foreground = await paint('foreground'), halo = await paint('halo'), outlined = await paint('outlined')
   let dark = 0, darkPreserved = 0, addedWhite = 0, distantClear = 0, distantFilled = 0
   let compositeCompared = 0, maxCompositeError = 0
+  let maxAlphaError = 0, maxPremultipliedError = 0
+  const worstPixels: { x: number; y: number; channel: number; premultipliedChannel: number;
+    foreground: number[]; halo: number[]; outlined: number[];
+    expected: number[]; colorDifference: number; alphaDifference: number; premultipliedDifference: number }[] = []
+  const worstPremultipliedPixels: typeof worstPixels = []
+  const expectedPixels = new Uint8ClampedArray(width * height * 4)
+  const differencePixels = new Uint8ClampedArray(width * height * 4)
+  const alphaDifferencePixels = new Uint8ClampedArray(width * height * 4)
+  const retainWorst = (list: typeof worstPixels, sample: typeof worstPixels[number], premultiplied = false) => {
+    const error = (pixel: typeof sample) => Math.max(pixel.alphaDifference,
+      premultiplied ? pixel.premultipliedDifference : pixel.colorDifference)
+    if (list.length === 12 && error(sample) <= error(list[list.length - 1])) return
+    list.push(sample); list.sort((a, b) => error(b) - error(a)); list.length = Math.min(list.length, 12)
+  }
   const distances: number[] = []
   const ink = (pixels: Uint8ClampedArray, index: number) => pixels[index + 3] > 40
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
@@ -95,14 +126,33 @@ async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: numb
     // layers, rather than requiring partially transparent edges to stay dark.
     const frontAlpha = foreground.pixels[index + 3] / 255, haloAlpha = halo.pixels[index + 3] / 255
     const expectedAlpha = frontAlpha + haloAlpha * (1 - frontAlpha)
+    const expected = [0, 1, 2].map((channel) => expectedAlpha === 0 ? 0 :
+      (foreground.pixels[index + channel] * frontAlpha
+        + halo.pixels[index + channel] * haloAlpha * (1 - frontAlpha)) / expectedAlpha)
+    expected.push(expectedAlpha * 255)
+    expectedPixels.set(expected, index)
+    const alphaDifference = Math.abs(expected[3] - outlined.pixels[index + 3])
+    const colorDifferences = expected.slice(0, 3).map((value, channel) => Math.abs(value - outlined.pixels[index + channel]))
+    const premultipliedDifferences = expected.slice(0, 3).map((value, channel) =>
+      Math.abs(value * expectedAlpha - outlined.pixels[index + channel] * outlined.pixels[index + 3] / 255))
+    maxAlphaError = Math.max(maxAlphaError, alphaDifference)
+    maxPremultipliedError = Math.max(maxPremultipliedError, ...premultipliedDifferences)
+    differencePixels.set([...premultipliedDifferences.map((value) => value * 32), 255], index)
+    alphaDifferencePixels.set([alphaDifference * 32, alphaDifference * 32, alphaDifference * 32, 255], index)
+    const colorDifference = Math.max(...colorDifferences)
+    const premultipliedDifference = Math.max(...premultipliedDifferences)
+    const sample = { x, y, channel: alphaDifference > colorDifference ? 3 : colorDifferences.indexOf(colorDifference),
+      premultipliedChannel: alphaDifference > premultipliedDifference ? 3 : premultipliedDifferences.indexOf(premultipliedDifference),
+      foreground: Array.from(foreground.pixels.slice(index, index + 4)), halo: Array.from(halo.pixels.slice(index, index + 4)),
+      outlined: Array.from(outlined.pixels.slice(index, index + 4)), expected, colorDifference, alphaDifference,
+      premultipliedDifference }
+    // Diagnostic only: do not discard low-alpha pixels while investigating the
+    // original straight-alpha assertion. These values do not count as passes.
+    retainWorst(worstPremultipliedPixels, sample, true)
     if (expectedAlpha * 255 > 40) {
       compositeCompared++
-      maxCompositeError = Math.max(maxCompositeError, Math.abs(expectedAlpha * 255 - outlined.pixels[index + 3]))
-      for (const channel of [0, 1, 2]) {
-        const expected = (foreground.pixels[index + channel] * frontAlpha
-          + halo.pixels[index + channel] * haloAlpha * (1 - frontAlpha)) / expectedAlpha
-        maxCompositeError = Math.max(maxCompositeError, Math.abs(expected - outlined.pixels[index + channel]))
-      }
+      maxCompositeError = Math.max(maxCompositeError, alphaDifference, colorDifference)
+      retainWorst(worstPixels, sample)
     }
     if (ink(foreground.pixels, index)) continue
     let nearest = Infinity
@@ -114,7 +164,9 @@ async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: numb
     }
     if (ink(outlined.pixels, index)) {
       if ([0, 1, 2].every((channel) => outlined.pixels[index + channel] > 235)) addedWhite++
-      distances.push(nearest)
+      // Infinity would become null across Playwright/JSON, hiding an oversized
+      // outline. Six is the conservative lower bound outside this search.
+      distances.push(Number.isFinite(nearest) ? nearest : 6)
     }
     // Internal blank pixels far from glyphs must remain transparent. This
     // rejects solid formula backgrounds while allowing the intended halo.
@@ -123,6 +175,21 @@ async function rasterEvidence(node: SVGGElement, box: { minX: number; minY: numb
       if (ink(outlined.pixels, index)) distantFilled++
     }
   }
-  return { width, height, dark, darkPreserved, compositeCompared, maxCompositeError, addedWhite, distantClear, distantFilled,
-    furthestAddedPixel: Math.max(0, ...distances), foregroundDataUrl: foreground.dataUrl, outlinedDataUrl: outlined.dataUrl }
+  function png(pixels: Uint8ClampedArray) {
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height
+    try {
+      const context = required(canvas.getContext('2d'), 'Visualization context missing')
+      const data = context.createImageData(width, height); data.data.set(pixels); context.putImageData(data, 0, 0)
+      return canvas.toDataURL()
+    } finally { canvas.width = 0; canvas.height = 0 }
+  }
+  return { width, height, viewBox: [left, top, width, height], dark, darkPreserved, compositeCompared, maxCompositeError,
+    maxAlphaError, maxPremultipliedError, worstPixels, worstPremultipliedPixels,
+    diagnosticComparison: { space: 'premultiplied byte RGB and byte alpha', pixels: width * height, differenceGain: 32,
+      acceptance: 'Unchanged straight-alpha maxCompositeError <= 2 for expected alpha > 40; premultiplied values are diagnostics only' },
+    addedWhite, distantClear, distantFilled,
+    furthestAddedPixel: distances.reduce((maximum, value) => Math.max(maximum, value), 0),
+    images: { foreground: foreground.dataUrl, halo: halo.dataUrl, outlined: outlined.dataUrl,
+      expected: png(expectedPixels), difference: png(differencePixels), alphaDifference: png(alphaDifferencePixels) },
+    svgs: { foreground: foreground.serializedSvg, halo: halo.serializedSvg, outlined: outlined.serializedSvg } }
 }

@@ -25,6 +25,11 @@ const freeLabelGroups = [
   "real-App-input-JSON-history-reused-ID-load",
   "current-SVG-cloning",
 ];
+const inlineLabelGroups = [
+  "inline-node-rendering-placement-halo-picking",
+  "inline-node-lifecycle-path-operations-export",
+];
+const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups];
 
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
@@ -114,7 +119,7 @@ function evidenceObject(artifactDir, name) {
   return evidence;
 }
 
-function validateBrowserEvidence(name, artifactDir) {
+function validateBrowserEvidence(name, artifactDir, phase) {
   if (name === "check:label-assets") {
     const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
     if (typeof evidence.browser !== "string" || evidence.browser.trim() === ""
@@ -132,10 +137,16 @@ function validateBrowserEvidence(name, artifactDir) {
     || evidence.environment.browserVersion.trim() === "") {
     throw new Error("Free-label browser verification did not reach complete with an identified browser");
   }
-  if (!Array.isArray(evidence.completed) || evidence.completed.length !== freeLabelGroups.length
-    || new Set(evidence.completed).size !== freeLabelGroups.length
-    || !freeLabelGroups.every((group) => evidence.completed.includes(group))) {
-    throw new Error("Free-label browser evidence must complete all eight required groups");
+  // 31C supports its original report and the now-extended shared harness. Any
+  // inline extension must be complete; 31D and its successors require both.
+  const requiredGroups = phase === "31C" ? freeLabelGroups : allLabelGroups;
+  const completed = evidence.completed;
+  if (!Array.isArray(completed)
+    || new Set(completed).size !== completed.length
+    || completed.some((group) => !allLabelGroups.includes(group))
+    || !requiredGroups.every((group) => completed.includes(group))
+    || ![requiredGroups.length, allLabelGroups.length].includes(completed.length)) {
+    throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
   for (const key of ["incompleteGroups", "unexecuted", "pageErrors"]) {
     if (!Array.isArray(evidence[key]) || evidence[key].length !== 0) {
@@ -197,7 +208,7 @@ function runCheck(report, { name, command, args, cwd, env, browser = false }) {
     }
     if (browser) {
       try {
-        validateBrowserEvidence(name, check.artifactDir);
+        validateBrowserEvidence(name, check.artifactDir, report.phase);
       } catch (error) {
         throw commandError(`${name} evidence is incomplete or invalid: ${error.message}`);
       }
