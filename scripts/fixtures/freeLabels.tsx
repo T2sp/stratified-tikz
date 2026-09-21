@@ -228,7 +228,8 @@ function state() {
   const diagram = editor.editableDiagram
   const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
   return {
-    invocationCount, requestCount, dragCount, selection: editor.selectedElement, selectionEvents, callbackEvents,
+    invocationCount, requestCount, dragCount, serviceEpoch, serviceStats: service.stats(),
+    selection: editor.selectedElement, selectionEvents, callbackEvents,
     layouts: Object.fromEntries(layouts),
     requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
     labels: diagram.labels,
@@ -379,6 +380,10 @@ const api = {
     root = createRoot(container)
     renderEpoch++
   },
+  // A transient resource outage can recover through the mounted production
+  // runtime and the same public service. Unlike changeService this does not
+  // replace the service, root, document, subscriptions, or current selection.
+  setServiceMode(mode: typeof serviceMode) { serviceMode = mode },
   unmount() { flushSync(() => root.render(null)) },
   remount() { renderEpoch++; redraw() },
   export(backgroundMode: 'transparent' | 'white' = 'transparent') {

@@ -17,6 +17,7 @@ const inlineLabelGroups = [
 ]
 const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
 const settledExportGroups = [...allLabelGroups, 'settled-SVG-export-standalone']
+const combinedLabelGroups = [...settledExportGroups, 'combined-free-inline-workflows']
 
 function fixture(t, phase = '31B') {
   const cwd = mkdtempSync(join(tmpdir(), 'stz-runner-test-'))
@@ -124,7 +125,7 @@ test('verify mode accepts pending changes and never invokes Codex or changes bra
   assert.deepEqual(checks.map(check => check.stage), ['test', 'build', 'browser'])
 })
 
-for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups], ['31E', settledExportGroups]]) {
+for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups], ['31E', settledExportGroups], ['31F', combinedLabelGroups]]) {
   test(`${phase} verify accepts its complete ${groups.length}-group browser report`, t => {
     const { cwd, git, run, initialHead, initialBranch } = fixture(t, phase)
     writeFileSync(join(cwd, 'pending.txt'), 'uncommitted inline fixture')
@@ -160,6 +161,16 @@ test('31D implementation with old eight-group evidence stops before review', t =
   const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(freeLabelGroups) })
   assert.equal(result.status, 1, result.stdout + result.stderr)
   assert.match(result.stderr, /Phase 31D.*10 required groups/)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.equal(git('rev-list', '--count', 'HEAD'), '1')
+})
+
+test('31F implementation with old eleven-group evidence stops before review', t => {
+  const { cwd, git, run, initialHead } = fixture(t, '31F')
+  const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(settledExportGroups) })
+  assert.equal(result.status, 1, result.stdout + result.stderr)
+  assert.match(result.stderr, /Phase 31F.*12 required groups/)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.equal(git('rev-list', '--count', 'HEAD'), '1')

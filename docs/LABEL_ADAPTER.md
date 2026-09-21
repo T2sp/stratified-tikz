@@ -1,14 +1,16 @@
 # Phase 31B label conversion service
 
-The independent adapter is implemented in `src/rendering/labels/`. It is not
-connected to the production canvas, picking, React lifecycle, or SVG export.
+The adapter is implemented in `src/rendering/labels/` and shared by production
+free-label and path inline-node Preview rendering, measured picking and settled
+SVG export. Its service remains independent of diagram state and React.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
 remains authoritative. Phase 31B is **acceptance-complete**. The targeted
 ink-bounds fix, disposable-worker recovery, and focused regressions are implemented.
 An authorized terminal run on 2026-09-20 at 22:55 JST completed the unchanged
 built-browser smoke with exit 0, including native-import recovery on an affected
-browser and standalone raster containment. See the evidence below; production
-canvas integration remains deferred to Phase 31C.
+browser and standalone raster containment. See the historical evidence below;
+the later A–E integration and pending fresh Phase 31F gate are recorded in the
+[completion audit](./PHASE_31_COMPLETION_AUDIT.md).
 
 ## Dependencies and local assets
 
@@ -42,10 +44,10 @@ and production. Licenses are served below
 [Vite's asset graph and base-path handling](https://vite.dev/guide/assets.html)
 and MathJax's [local-hosting guidance](https://docs.mathjax.org/en/latest/web/hosting.html).
 
-Until Phase 31C imports the adapter, Vite builds it as a separate `labelAdapter`
-entry with preserved exports and a manifest. The application entry does not
-load it. This makes the real deployable asset graph independently testable
-without changing existing label rendering. Vite also emits
+Vite retains a separate `labelAdapter` entry with preserved exports and a
+manifest alongside the application entry, which now consumes the adapter.
+MathJax itself remains lazy inside the Worker. The separate entry keeps the
+real deployable asset graph independently testable. Vite also emits
 `.vite/mathjax-worker-manifest.json`, describing every worker chunk, source
 module, static dependency, and dynamic import. The deployment check verifies
 both graphs and compares their font entries against the pinned installation.
@@ -69,12 +71,13 @@ work `limit`, `unsupported-input`, `tex-error`, `output-error`, `resource-error`
 `invalid-metrics`, and `timeout`. Diagnostics go only to an optional development
 callback. A throwing diagnostic observer cannot change the visible result.
 
-The future consumer must display its latest original source while pending or
-failed, as ordinary text with preserved whitespace and physical newlines. It
-must compare its own current input/document revision and service generation
-before accepting a completion. Service identities do not replace that consumer
-check. No React subscription, label ID, diagram reference, placement, selection,
-history entry, or persisted derived state is introduced here.
+The shared Preview consumer displays its latest original source while pending
+or failed, as ordinary text with preserved whitespace and physical newlines.
+It compares its current source/font/document ownership and subscription
+generation before accepting completion. Service identities do not replace
+that consumer check. The service itself introduces no React subscription,
+label ID, diagram reference, placement, selection, history entry or persisted
+derived state.
 
 `createBrowserTextMeasurementProvider()` provides actual canvas text metrics and
 font readiness. A deterministic `TextMeasurementProvider` can be supplied for
@@ -705,8 +708,10 @@ the remaining Medium verification gap. The earlier sandboxed attempt's copy,
 `run-permitted-acceptance.sh`, had only been syntax-checked at that time;
 the terminal build/browser logs now provide the actual execution evidence.
 
-No dependency, pinned version, diagram schema, persistence, TikZ, history, or
-production label rendering changed. `labelMetrics.ts`, `labelInkBounds.ts`, and
+That Phase 31B follow-up changed no dependency, pinned version, diagram schema,
+persistence, TikZ, history or production label rendering. `labelMetrics.ts`, `labelInkBounds.ts`, and
 `labelSvg.ts` retain their reviewed geometry. The unchanged `SvgDiagram.tsx`
 `react-hooks/refs` lint debt is outside scope; repository-wide lint was not run.
-Phase 31C canvas/React/picking integration and later export waiting remain deferred.
+Canvas/React/picking integration and export waiting were deferred at that
+historical handoff; the accepted 31C–31E integration is now described in
+[Preview UI](./PREVIEW_UI.md#label-preview-input-contract-phase-31a).

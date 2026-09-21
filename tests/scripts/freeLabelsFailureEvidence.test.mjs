@@ -88,7 +88,7 @@ function assertFailedReport(report) {
   assert.equal(report.result, 'failed')
   assert.equal(report.stage, 'renderer-fixture')
   assert.deepEqual(report.completed, [])
-  assert.equal(report.incompleteGroups.length, 11)
+  assert.equal(report.incompleteGroups.length, 12)
   assert.deepEqual(report.unexecuted, report.incompleteGroups)
   assert.equal(report.error.message, primaryMessage)
   assert.equal(report.error.code, 'STZ_TEST_NAVIGATION')
