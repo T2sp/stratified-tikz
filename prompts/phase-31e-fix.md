@@ -34,6 +34,34 @@ model text. Limit work to the confirmed export defect and further demonstrated
 31E regressions. Phase 31F's combined audit and unrelated lint cleanup remain
 out of scope. Settled export is required in this phase, not deferred to 31F.
 
+## Execution priority for this follow-up
+
+The supplied report combines the earlier **screenshot-correction child
+handoff** with its subsequent **failed parent verification**. These are two
+stages of the same run, not evidence that the production subtree-loss fix has
+already been attempted. The parent evidence directory remains
+`stz-phase31e-before-review-Qku3Ld`; a repeated copy of that log is not a new
+verification result.
+
+Complete the work in this order:
+
+1. Confirm the current production render/parse/extract/replace path against the
+   retained title-only artifact. The faulty implementation is in
+   `src/ui/svgSettledExport.ts`, not the bounded screenshot helper.
+2. Correct that production boundary as specified in section 1 and add the
+   regression in section 2. If a later checkout already contains a correction,
+   identify it and verify the actual path instead of duplicating the change.
+3. Preserve the completed screenshot work and run the applicable checks. A
+   child browser-startup restriction does not prevent the source correction or
+   available Node regressions; report remaining native checks accurately.
+4. Hand off the corrected checkout for fresh parent verification of all eleven
+   groups, followed by independent review.
+
+A screenshot-only change or another report of its passing helper tests does
+not fulfill this follow-up. The requested result is a production correction
+that retains the captured label subtree, with regression evidence. Do not stop
+at the diagnosis or replace this implementation task with another fix prompt.
+
 ## Latest execution findings
 
 This is a **parent verification failure before independent 31E review**.
@@ -42,6 +70,14 @@ autoDim standalone PNG was saved successfully. The failing assertion now
 detects missing exported foreground geometry. Do not describe the current
 failure as a screenshot timeout, child sandbox restriction, or page/context
 ownership error. Do not invent severity counts, `REVIEW_JSON` or approval.
+
+The child handoff at `/private/tmp/stz-31e-bounded-capture/handoff.json` records
+128 focused tests within 2,403 full tests and no child-native PNG because its
+Chrome startup was blocked. Preserve those results as child-only history.
+The subsequent parent observations below establish actual document/body state
+and saved PNGs. Do not carry the child's "No new document/body measurement or
+native PNG exists" statement into the current combined status, or treat the
+parent's successful image capture as successful foreground verification.
 
 ### Current failure: a successful conversion exports only its title
 
@@ -437,6 +473,15 @@ Do not mark 31E complete before required verification and independent review
 succeed. Phase 31F remains deferred.
 
 ## Report after implementation
+
+Lead with the new production correction and its status. Identify the exact
+production function/files changed (or the existing correction verified), the
+regression that detects the former title-only output, and the current checkout
+fingerprint. Report fresh test results separately from the historical
+screenshot handoff. If native verification remains for the parent, name that
+pending gate explicitly; do not imply the old Qku3Ld evidence verifies the new
+checkout or that "Implemented the bounded screenshot correction" describes
+the work requested here.
 
 Report changed files; the reproduced React SVG-context/title-hoisting behavior;
 the corrected render/parse/extract/replace boundary and validation; regression
