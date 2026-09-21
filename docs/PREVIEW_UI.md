@@ -60,9 +60,24 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 ## Label Preview Input Contract (Phase 31A)
 
-Phase 31A defines the pure parser and fallback contract. Phases 31C and 31D
-connect free labels and path inline-node text to the production SVG Preview
-through the shared `SvgTexLabel` renderer.
+Free labels and path inline-node text use the same parser, MathJax conversion,
+SVG renderer and measured layout. The Inspector always edits the original
+source. Enter ordinary text or explicitly delimit each formula:
+
+| Entered source | Display after settlement |
+| --- | --- |
+| `Region A / 領域 A` | Ordinary Unicode text |
+| `$\frac{a_1}{\sqrt{x}}$` | A typeset fraction, subscript and root |
+| `Map $f$ : \(A \to B\)` | Ordinary prose and two formulas on one baseline |
+| `Cost \$5` | `Cost $5` |
+| `Map $f$ then $\unknowncommand{x}$` | The complete literal `Map $f$ then $\unknowncommand{x}$` |
+| `prefix $x` | The complete literal `prefix $x` |
+
+While conversion is pending, the label displays its complete latest source.
+An error in any run leaves that entire source visible, including all delimiters
+and backslashes. Repairing the input restores typesetting when its own result
+is ready. There is no need to remove or recreate the label.
+
 The [Phase 31B adapter](./LABEL_ADAPTER.md)
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
@@ -78,9 +93,10 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Settled-label SVG export is implemented as described in [Export SVG](#export-svg),
-with its standalone browser gate pending. The combined audit remains assigned
-to [Phase 31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Settled-label SVG export passed its Phase 31E standalone browser gate and
+independent review; see [Export SVG](#export-svg). Fresh verification of the
+combined Phase 31F changes remains pending. Historical evidence below records
+the earlier subphases and does not count as a new run of this checkout.
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -166,6 +182,17 @@ self-contained SVG math geometry with ordinary SVG text, without
 arbitrary packages, document preambles, and external style-file macros are
 outside this bounded preview language.
 
+Importing a TikZ style or supplying an external preamble does not make its
+macros or LaTeX packages available to Preview. The configured MathJax subset
+is `base`, `ams`, and `color` at version 4.1.3, with packaged New Computer
+Modern SVG data at version 4.1.3. Fractions, scripts, roots, integrals, matrices,
+and supported formula colors are covered; every TeX command and exact
+TeX-engine typography are not promised. Ordinary Unicode text uses the local
+browser font stack. See the [specification](./SPEC.md#bounded-tex-label-preview)
+for work/resource limits and the supported-output boundary. Resources are
+served with the application, without a CDN fallback; this does not promise an
+offline installation or that an unfetched lazy resource is already available.
+
 ### Free-label rendering and editing (Phase 31C)
 
 Valid free-label math, including fractions and mixed Japanese text/math, uses
@@ -176,6 +203,10 @@ LF, CR, and CRLF make physical lines in ordinary text and literal fallback;
 newlines inside successful math stay inside that formula. The original string
 also remains available as the label's accessible description. Empty labels
 have no visible or selectable text geometry.
+
+The shared label group exposes its original source as its image name/title;
+the white-outline copy is decorative and hidden from accessibility. It does
+not add a second accessible formula or replace the source with MathJax markup.
 
 The text font is explicitly the Preview's sans-serif font stack and is measured
 after browser font readiness. The existing `style.fontSize * 1.35` scale remains.
@@ -261,16 +292,17 @@ all eight existing free-label groups. The fixture retains all five placements
 at zoom 1 and 1.4, mixed Japanese/text/nested fractions, transparent math,
 2D/3D path kinds, real pointer/Alt cycling, ownership and delayed completions,
 font readiness, path operations, raw history/TikZ data and current SVG cloning.
-Phase 31D acceptance is **incomplete**. The preceding independent review
-returned `needs_changes`: no Critical issues, one Medium issue, and no
-Low-priority issues. Its missing 3D marker interaction and same-node recovery
-cases were subsequently implemented. Parent verification then executed the
-changed harness and failed its initial-camera overlap expectation in
-`stz-phase31d-before-review-2KaWQt`; it stopped before another review. The
-current candidate-cycle correction requires fresh complete parent evidence
-and a separate independent re-review. The accepted halo correction is preserved.
+Phase 31D acceptance is **complete**. The final matching parent run
+`stz-phase31d-before-review-4WOk2Y` passed all ten groups and 119 scenarios in
+Chrome 153.0.8010.52, with no page errors. Its initial and moved-camera native
+Alt cycles reached both curve owners through the complete candidate cycle;
+same-node valid–invalid–valid recovery and late completion checks passed.
+`logs/codex/31D-review.log` and `31D-review-summary.json` record the independent
+passing review with no findings. The later complete Phase 31E parent run below
+also retained these checks. Fresh Phase 31F acceptance remains a separate gate.
 
-The execution history must distinguish these results:
+The following execution history precedes that passing result. References to
+pending work in this history describe those earlier snapshots:
 
 - The original implementation child and previous diagnostic child could not
   start their local server (`EPERM`). These are startup blocks, not pixel
@@ -565,7 +597,7 @@ repository-wide lint was not run. Final tracked/untracked checkout identity
 is recorded separately in `/private/tmp/stz-phase31d-alt-cycle/handoff.json`
 so documenting the fingerprint does not itself change that fingerprint.
 
-After this child handoff, the normal outer runner must perform complete parent
+After that historical child handoff, the normal outer runner had to perform complete parent
 verification and then independent review. For standalone verification, the
 authorized parent command is
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
@@ -574,8 +606,8 @@ on the final tracked/untracked checkout. It must obtain an identified browser an
 or page-error entries, and retain the new records above. Historical parent
 success does not verify the added assertions. The normal order remains fix,
 parent verification, independent review; `verify` alone does not run review
-or approve completion. 31E's settled-export waiting and 31F's combined audit
-remain deferred.
+or approve completion. The complete 31D parent/review result above supersedes
+that handoff; 31E completion is recorded under [Export SVG](#export-svg).
 
 ### Free-label verification
 
@@ -904,9 +936,11 @@ because that baseline is not clean. No adapter/loading/build configuration
 changed. The authorized parent run also passed the independent Phase 31B
 `check:label-assets`; its evidence remains separate from the Phase 31C results.
 The historical free-label verification above predates inline-node integration;
-see the Phase 31D implementation and pending browser verification above.
-The Phase 31E export changes and pending browser gate are described below;
-Phase 31F remains deferred.
+see the completed Phase 31D verification above and Phase 31E export verification
+below. The combined Phase 31F browser execution passed in `HHcakE`; its parent
+validation failed on a stale verifier. The corrected-runner verification and
+independent review gates remain open; see the
+[combined audit](./PHASE_31_COMPLETION_AUDIT.md).
 
 ## Export SVG
 
@@ -946,7 +980,8 @@ Hidden layers and labels removed by `autoHide` are not awaited. Labels retained
 by `autoDim` or layer filtering are settled and retain their captured opacity.
 Resource loading and conversion use the adapter's finite-work limits, with a
 bounded export wait also covering injected/outstanding services and fallback
-font readiness. A transient resource failure does not poison future exports.
+font readiness: 10,050 ms per represented label by default. A transient resource
+failure does not poison future exports.
 
 The exporter clones the committed SVG synchronously, captures immutable inputs
 from the shared label renderer, and replaces the clone's label subtrees by
@@ -983,8 +1018,50 @@ colors, outlines, placement, references, backgrounds, overlays, duplicates,
 visibility/dimming, retry after resource failure, and serialization failure.
 SVG files, standalone screenshots, raster PNGs, and per-scenario observations
 are retained with the existing browser evidence. The parent verifier requires
-all eleven groups for 31E/31F and rejects older ten-group reports for these
-phases; earlier phases retain their complete historical group sets.
+all eleven groups for 31E. Phase 31F adds `combined-free-inline-workflows` and
+requires all twelve; an older eleven-group report cannot establish 31F
+acceptance. Earlier phases retain their complete historical group sets.
+
+The **31F `HHcakE` browser command passed but parent validation failed** on
+2026-09-21. Its `verification.json` is under
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31f-before-review-HHcakE/`.
+Node v26.9.0 / Chrome 153.0.8010.52 executed all twelve groups, 144 successful
+scenarios and 15 combined records, with no incomplete/unexecuted groups or page
+errors. Its real transparent/white downloads and serialization retry reopened
+successfully. The parent retained the verifier loaded before implementation
+changed its policy; that stale eleven-group validator rejected the valid new
+group despite command exit zero. The checkout fingerprint stayed
+`9109342812ad20fc3f5db0c01787af3b3fd03d349fe09e65bf1a3aa66f854e56`.
+This is separate from earlier child-only localhost `EPERM` attempts.
+Independent 31F review was not reached. Fresh accepted verification through the
+corrected runner remains required; the failed report is retained unchanged.
+The [combined audit](./PHASE_31_COMPLETION_AUDIT.md) maps these observations to
+actual SVGs, standalone screenshots, raster images and logs.
+
+The final **Phase 31E parent verification and independent review passed** on
+2026-09-21. The parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-fIMqou/verification.json`.
+It checked revision `474aa9d5ec32bd8cee575e7d969bfdd0c4bad212` plus the retained
+fixes, fingerprint
+`cb434f93e961ef9221cab28f454aa52601bc80a77831e4b7ab748519e44c906f`.
+Node v26.9.0 and Chrome 153.0.8010.52 passed tests (2,422), build, diff and both
+browser commands. The free-label report is `passed` / `complete`, with all
+eleven groups and no incomplete/unexecuted groups or page errors. Actual 2D
+transparent and 3D white App downloads reopened outside the app as `file://`
+SVGs, retaining formulas, Unicode, multiline fallback, colors and outlines
+without external resources. Failure/recovery and serialization-retry checks
+also completed. The report's `05-check-free-labels/artifacts/` contains the
+SVGs, standalone images and observations.
+
+`logs/codex/31E-review.log` and `31E-review-summary.json` record an independent
+pass with no findings on the same fingerprint. The review's unchanged test
+rerun passed all 2,422 tests after one initial existing runner-fixture subprocess
+timeout; its 77 focused tests also passed. These are prior-phase results,
+not verification of the new Phase 31F changes. The
+[combined audit](./PHASE_31_COMPLETION_AUDIT.md) records the current gate.
+
+The following history preserves the earlier failures and corrections. Their
+then-pending checks were completed by `fIMqou` and the independent review above.
 
 The earlier parent run on 2026-09-21 failed **before independent review** at
 `settled-export-autoDim-visibility`, source `$\frac{autoDim}{x}$`, because the
@@ -1401,7 +1478,9 @@ verification can use
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
 it does not run review or establish approval. The fix → complete parent
 verification → independent review order and commit/push gates remain unchanged.
-Phase 31E is not complete and 31F remains deferred.
+That was the earlier handoff status. The complete `fIMqou` parent evidence and
+passing independent review above close Phase 31E; Phase 31F still requires
+fresh matching verification of its combined coverage and documentation.
 
 ## Add Path
 

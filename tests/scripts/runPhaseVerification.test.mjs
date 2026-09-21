@@ -34,6 +34,7 @@ const inlineLabelGroups = [
 ]
 const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
 const settledExportGroups = [...allLabelGroups, 'settled-SVG-export-standalone']
+const combinedLabelGroups = [...settledExportGroups, 'combined-free-inline-workflows']
 
 // The fake command records observable process boundaries. It never invokes npm,
 // Codex, a server, or a browser; the verification helper still executes real git.
@@ -283,7 +284,7 @@ for (const phase of ['31C', '31D']) {
   })
 }
 
-for (const phase of ['31C', '31D', '31E', '31F']) {
+for (const phase of ['31C', '31D', '31E']) {
   test(`${phase} accepts all eleven groups including standalone SVG export`, (t) => {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(settledExportGroups)
@@ -296,11 +297,28 @@ for (const phase of ['31E', '31F']) {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
     const error = failedVerification(t, fixture, phase)
-    assert.match(error.message, /11 required groups/)
+    assert.match(error.message, phase === '31F' ? /12 required groups/ : /11 required groups/)
     assert.equal(error.report.checks.at(-1).exitCode, 0)
     assert.equal(error.report.status, 'failed')
   })
 }
+
+for (const phase of ['31C', '31D', '31E', '31F']) {
+  test(`${phase} accepts all twelve groups including combined free/path workflows`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(combinedLabelGroups)
+    assert.equal(verify(t, fixture, phase).status, 'passed')
+  })
+}
+
+test('31F rejects historical standalone evidence without the combined workflow', (t) => {
+  const fixture = checkoutFixture(t)
+  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(settledExportGroups)
+  const error = failedVerification(t, fixture, '31F')
+  assert.match(error.message, /Phase 31F.*12 required groups/)
+  assert.equal(error.report.checks.at(-1).exitCode, 0)
+  assert.equal(verificationMatchesCheckout(error.report, fixture), false)
+})
 
 for (const missing of [inlineLabelGroups, ...inlineLabelGroups.map(group => [group])]) {
   test(`31D rejects exit-zero evidence missing ${missing.join(' and ')}`, (t) => {

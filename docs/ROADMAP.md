@@ -1088,17 +1088,23 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 
 ## Phase 31: Typeset TeX labels in SVG Preview
 
-Status: in progress. Phases 31A and 31B are complete. The independent adapter's
-ink/advance fix, disposable-worker recovery, and regressions passed their checks.
-The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
-code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
-Actual additional-font loading, same-service native-import recovery, Worker
-retirement, and standalone SVG containment are verified; earlier sandbox
-`EPERM` attempts are historical. 31C is implemented with its production-browser
-acceptance check pending. Phase 31D implementation and acceptance status are
-recorded below; 31E and 31F remain planned.
-Implement and review the subphases in order; mark each complete only after its
-own acceptance checks pass.
+Status: in progress. Phases 31A–31E have passed their required acceptance gates;
+31F combined regression coverage and documentation are implemented. The
+`HHcakE` parent browser command passed all twelve groups, but its stale verifier
+rejected the report before review. Fresh accepted verification using the
+corrected runner and independent review remain pending.
+Phase 31 is **not complete** until those gates pass. The latest accepted 31E
+snapshot completed all eleven then-required browser groups in Chrome
+153.0.8010.52, including actual 2D transparent and 3D white App downloads and
+standalone reopening. The new 31F group makes twelve groups mandatory for 31F;
+historical eleven-group evidence does not verify it. See the
+[completion audit](./PHASE_31_COMPLETION_AUDIT.md) for the acceptance matrix,
+current checks and concrete follow-up.
+
+Historical B/C review summaries retain their earlier browser-blocked findings.
+The later authorized B/C runs and matching passing D/E parent verification and
+independent reviews supersede those verification gaps; they are not open
+production defects. Earlier attempts remain below as history, not new evidence.
 
 Start with the [Phase 31A implementation contract](../prompts/phase-31a-implement.md)
 and [review contract](../prompts/phase-31a-review.md). Subsequent subphases have
@@ -1130,17 +1136,17 @@ Recommended `phaseSlugs` entries:
 
 ### Phase 31A: Label input grammar and exact-source fallback contract
 
-Status: implemented. The pure parser is not connected to production rendering;
-existing label appearance is unchanged.
+Status: complete. The pure parser is shared by production free-label and
+inline-node rendering and settled export through the conversion service.
 
 - Added a pure, bounded parser for ordinary Unicode text mixed with `$...$`,
   `\(...\)`, `$$...$$`, and `\[...\]`, with explicit delimiter/escape rules.
 - Keeps exact original source for whole-label fallback. Ordinary text retains
-  newlines for future visual line breaks; math-source newlines remain inside
-  the math run for future MathJax conversion. Literal fallback preserves all
+  newlines for visual line breaks; math-source newlines remain inside
+  the math run for MathJax conversion. Literal fallback preserves all
   source line breaks.
-- Established typed contracts, focused tests, and grammar documentation without
-  changing production label rendering yet.
+- Established typed contracts, focused tests and grammar documentation; later
+  subphases integrated this same contract without changing stored label source.
 - Grammar, delimiter precedence, source offsets, and finite limits are specified
   in [Label Preview Input Contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a).
 
@@ -1156,7 +1162,7 @@ passed. Evidence is in `/private/tmp/stz-phase31b-browser-acceptance.hKjXxy/`.
 The 144 focused parser/adapter tests (included in the full suite), 2,258 full
 tests, targeted lint, and script syntax checks passed on the same unchanged
 production code. No production or harness correction was needed for the terminal
-run. The production canvas is unchanged. See
+run. Free/path Preview and settled export now consume this adapter. See
 [adapter interfaces, limits, assets, and verification status](./LABEL_ADAPTER.md).
 
 - Added the justified, pinned MathJax dependency and locally served resources
@@ -1265,12 +1271,15 @@ commands. All eight 31C groups completed with no page errors or unexecuted group
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 
-Status: incomplete. The preceding independent review returned `needs_changes`
-for two then-missing browser scenarios under one Medium issue. Those cases
-were implemented; the next parent verification executed the changed harness
-and failed its initial-camera overlap assertion before another review. The
-current candidate-cycle correction awaits complete parent verification and
-independent re-review. The accepted halo oracle correction remains preserved.
+Status: complete. Matching parent verification in
+`stz-phase31d-before-review-4WOk2Y` passed all ten required groups and 119
+scenarios in Chrome 153.0.8010.52, including native complete-candidate cycling
+in both 3D camera states and same-node valid–invalid–valid recovery.
+`logs/codex/31D-review.log` and `31D-review-summary.json` record a passing
+independent review with no findings. Required tests (2,356), build, diff and
+both browser commands passed. The later accepted 31E run retained these checks.
+The following history preserves the earlier findings and their corrections;
+references to pending work describe those earlier snapshots.
 
 - Inline-node text uses the shared `SvgTexLabel` parser, adapter, cache,
   exact-source fallback, lifecycle controller and measured layout. Five anchors
@@ -1435,19 +1444,33 @@ independent re-review. The accepted halo oracle correction remains preserved.
   review. The final tracked/untracked checkout must pass all ten groups with
   identifiable new scenario records before re-review; `verify` itself does
   not review, approve completion or commit.
-- 31E's settled export wait/snapshot policy and 31F's combined audit remain
-  deferred. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
+- At that historical handoff 31E and 31F were deferred. The later 31D parent
+  verification/review above closed its gate; current export and audit status
+  follow below. See [inline-node verification](./PREVIEW_UI.md#inline-node-verification).
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: export implementation, SVG-context correction, bounded captures and
-the finite/range-checked `1e-12` computed-opacity comparison are retained. The
-latest parent run `ylXZks` passed every visibility policy, native boundary and
-the first transparent 2D App download/reopen, then exited on an unhandled second
-download-wait rejection. Promise ownership and failure reporting are corrected;
-the second native click's cause still requires measured parent diagnostics.
-Fresh complete matching parent verification and independent review remain
-outstanding; 3D white export and subsequent failure/retry are pending.
+Status: complete. The final parent run
+`stz-phase31e-before-review-fIMqou/verification.json`, under
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/`, passed tests (2,422), build,
+diff and both browser commands on 2026-09-21. It used Node v26.9.0 and Chrome
+153.0.8010.52 on revision `474aa9d5ec32bd8cee575e7d969bfdd0c4bad212` plus the
+recorded fixes, fingerprint
+`cb434f93e961ef9221cab28f454aa52601bc80a77831e4b7ab748519e44c906f`.
+All eleven groups completed without incomplete/unexecuted groups or page errors.
+Actual 2D transparent and 3D white downloads reopened outside the app with
+formulas, Unicode, literal multiline fallback, paint and outlines intact.
+Resource recovery and serialization failure/retry also passed.
+
+The independent `logs/codex/31E-review.log` and `31E-review-summary.json` report
+`pass` with no findings on that exact fingerprint. The review passed 77 focused
+tests and the unchanged 2,422-test rerun after one initial existing runner-fixture
+subprocess timeout; build and focused checks passed. Existing App/SvgDiagram
+lint debt (10 errors and 4 warnings) and the nonblocking Vite chunk-size warning
+are separate. See [Export SVG](./PREVIEW_UI.md#export-svg) for retained artifacts.
+
+The following history records earlier failed/partial runs and targeted fixes.
+Their then-pending browser/review gates were closed by the final result above.
 The earlier parent report `stz-phase31e-before-review-r43lZG` passed ten groups
 and 120 scenario records with no page errors, then failed the dimmed formula
 path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
@@ -1674,12 +1697,12 @@ native export click. Browser execution remains assigned to the outer parent.
 The later 3D white download/reopen, transient resource recovery, injected
 serialization failure and successful retry remain unverified.
 
-The normal order remains fix, fresh matching complete parent verification, then
-independent review. `check:free-labels` still requires all eleven groups for
-31E/31F with no incomplete/unexecuted groups or page errors. Partial `ylXZks`
-evidence cannot verify this correction; standalone `31E verify` does not run
-review or establish approval. Phase 31E must not be called complete until both
-gates succeed. Phase 31F remains deferred.
+The required order was fix, fresh matching complete parent verification, then
+independent review. Partial `ylXZks` evidence could not verify the correction;
+standalone `31E verify` did not run review or establish approval. The later
+`fIMqou` parent result completed all eleven 31E groups and the independent
+review above closed its gate. Phase 31F now requires twelve groups and its own
+matching verification/review before completion.
 
 The exporter captures a detached copy of the committed SVG and immutable label
 inputs before awaiting conversion. A shared synchronous label view renders the
@@ -1699,12 +1722,44 @@ editing remains available. See [SVG export](./PREVIEW_UI.md) for behavior.
 
 ### Phase 31F: Combined regression coverage, documentation, and completion audit
 
-Status: planned.
+Status: implemented; final completion gates remain open. Initial implementation
+checks passed 2,434 Node tests, production build, focused static checks and diff
+check. The child's browser attempts stopped before launch at localhost `EPERM`.
+The subsequent `HHcakE` parent ran both browser commands successfully: its
+free-label report completed all twelve groups, 144 passing scenarios and 15
+combined records in Chrome 153.0.8010.52, including the real transparent/white
+standalone downloads and serialization retry. Its before/after fingerprint was
+`9109342812ad20fc3f5db0c01787af3b3fd03d349fe09e65bf1a3aa66f854e56`.
 
-- Verify A-E together across errors/recovery, rapid edits, lifecycle changes,
-  cache reuse, placement/picking, 2D/3D visibility, and snapshot export.
-- Verify unchanged source persistence and TikZ output; register new tests in the
-  explicit test script and run tests, build, and browser/export checks.
-- Update Preview help, specification, and roadmap with the actual supported
-  subset and limits. Record unavailable required checks as unresolved rather
-  than marking the phase complete without evidence.
+The parent nevertheless marked verification failed because it retained the
+old eleven-group verifier imported before its implementation child edited the
+on-disk policy. The browser's exit zero and complete report do not change that
+failed parent status. Independent 31F review was not reached. The targeted
+runner correction loads the current verifier in a fresh process after the child;
+its running-parent regression proves eleven-to-twelve-group policy refresh and
+detects the old retained-import behavior. The corrected child invocation passed
+all 2,447 tests, build and diff checks, then stopped at the asset gate's localhost
+`EPERM`; it supplies no new native browser pass. A fresh parent/Terminal invocation
+must accept evidence for the corrected checkout before
+independent review. See the [audit](./PHASE_31_COMPLETION_AUDIT.md) for exact
+report/log paths, inspected artifacts and remaining gates.
+
+- Combine A–E regression fixtures across errors/recovery, rapid edits, lifecycle
+  changes, cache reuse, placement/picking, 2D/3D visibility and snapshot export.
+- Compare actual serialized diagrams, history and both generated TikZ modes;
+  register new Node tests in the explicit test script.
+- Add `combined-free-inline-workflows` to native acceptance while retaining all
+  eleven prior groups and standalone export checks. The parent verifier rejects
+  older reports that omit this twelfth group.
+- Document the observed grammar, exact-source fallback, configured MathJax
+  subset, resources, limits, accessibility, editing and export behavior in
+  Preview help and the specification. The
+  [completion audit](./PHASE_31_COMPLETION_AUDIT.md) maps acceptance rows to
+  fixtures and distinguishes child startup failures, executed parent browser
+  passes, stale parent validation and the fresh verification/review gates.
+- Before completion, the parent runner must run `npm test`, `npm run build`,
+  `git diff --check`, `check:label-assets` and `check:free-labels` with
+  `/opt/homebrew/bin` first in `PATH`, retain logs/artifacts for this final
+  checkout through a fresh invocation of the corrected runner, then complete
+  independent review. Neither a child startup failure nor successful browser
+  stdout without an accepted parent report closes the gate. No gate is waived.

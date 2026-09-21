@@ -985,6 +985,184 @@ The app must not automatically wrap label content in `$...$`.
 
 The app should preserve the label content exactly, except for minimal escaping needed to keep the generated TikZ syntactically valid.
 
+## Bounded TeX-label preview
+
+Only visible free `TextLabel.text` and path inline-node `text` are interpreted
+by this preview language. Coordinate identifiers, axes, guides, handles, UI
+captions, saved-path `pathLabel` identifiers and undisplayed stratum label
+metadata are excluded. Model strings, editor drafts and JSON remain original
+source; conversion and SVG export neither add delimiters nor rewrite TikZ.
+The existing standalone/inline-math TikZ formatter, four-space indentation and
+blank-line-free inline output remain authoritative for TikZ export.
+
+### Delimiters, escapes and Unicode
+
+The shared linear scanner accepts ordinary Unicode text, including Japanese,
+emoji, empty and whitespace-only strings, mixed with these math runs:
+
+| Source form | Meaning |
+| --- | --- |
+| `$...$`, `\(...\)` | Inline math |
+| `$$...$$`, `\[...\]` | Display-style math within the current label line |
+| `\$`, `\%`, `\&`, `\_`, `\#`, `\{`, `\}` outside math | Literal `$`, `%`, `&`, `_`, `#`, `{`, `}` in successful text |
+
+`$$` takes precedence when opening math. The closer must match at brace depth
+zero. A `$` closer consumes one dollar, so `$x$$y$` is two adjacent inline
+runs; display math requires a two-dollar closer. Missing, mismatched or stray
+delimiters and malformed brace nesting fail the whole label. Within math a
+backslash and its next character are consumed together; escaped braces do not
+change nesting, and delimiter-looking tokens inside nested braces do not close
+the run. The exact TeX body is retained, excluding only its outer delimiters.
+Parsing does not establish that the retained TeX is valid.
+
+Only ordinary-text LF, CR and CRLF make visual label lines; CRLF is one visual
+break while the original string remains unchanged. Physical newlines inside
+math stay in the same math run, including matrix input. Display delimiters do
+not insert paragraph breaks. Multiple text/math runs share each line's
+baseline. Spaces are retained and tabs advance to four-space stops from the
+line start. Source offsets are half-open JavaScript UTF-16 string offsets.
+
+Other text-mode commands, a trailing backslash and TeX `\\` outside math are
+unsupported. Ordinary `<`, `>`, `&`, quotes, braces and percent characters are
+text data, never HTML. For example:
+
+```text
+Region A / 領域 A
+$\frac{a_1}{\sqrt{x}}$
+Map $f$ : \(A \to B\)
+Cost \$5
+Map $f$ then $\unknowncommand{x}$
+prefix $x
+```
+
+The first four examples succeed; `Cost \$5` displays `Cost $5`. The last two
+display their entire source literally, including the otherwise valid `$f$`,
+backslashes and unmatched delimiter. The exact-source rule also applies when
+an earlier run succeeded and a later one failed.
+
+### Configured mathematics and resource boundary
+
+The exact packages are `@mathjax/src@4.1.3` and
+`@mathjax/mathjax-newcm-font@4.1.3`, configured with `base`, `ams` and `color`.
+The tested subset includes fractions, roots, subscripts/superscripts, integrals,
+AMS matrices and supported named/numeric formula colors. `\text{...}` inside
+math is evaluated by that configuration. It is not a full LaTeX text engine:
+text-mode commands such as `\textbf{...}`, arbitrary packages/preambles and
+external style-file macros are outside scope. Imported TikZ styles and external
+preambles do not add macros or packages to Preview.
+
+User macro/environment/array-column definitions, document commands, tags,
+references, counters, custom color definitions, `\require`, autoload,
+URL/HTML commands and external resources are rejected. Unknown commands and
+malformed TeX fail rather than becoming MathJax error text. Fresh TeX/document/
+font state isolates each complete label. The `noerrors` and `noundefined`
+extensions are not enabled; error hooks and generated-tree inspection both
+participate in failure detection.
+
+Successful formulas contain validated SVG geometry with explicit paint;
+ordinary text remains SVG text. `fontCache: 'none'` avoids external or shared
+glyph references. The narrow validator rejects HTML, scripts, event handlers,
+external references, unsupported transforms/paths and MathJax's font-dependent
+text-glyph fallback. Unsupported geometry or a negative total math-run advance
+falls back, even if MathJax conversion resolved. Geometry metrics distinguish
+logical advance from conservative ink bounds; this does not promise identical
+TeX-engine typography or support for every MathJax command.
+
+Normal development/build/test preparation verifies the pinned packages,
+generates the finite map of 40 additional SVG font-data modules, and retains
+their licenses. Mathematical input lazily starts one same-origin module Worker
+per service; assets follow the configured application base
+(`/stratified-tikz/`). Plain input and parser failures do not load MathJax.
+No implicit CDN fallback or offline installation is provided. Standalone SVG
+formula geometry needs no MathJax runtime or remote font, while ordinary text
+continues to use the viewer's available font stack.
+
+### Work limits, failure and retry
+
+These are the production defaults, not configurable editor preferences:
+
+| Boundary | Limit |
+| --- | --- |
+| Source / total text and math runs | 16,384 UTF-16 code units / 256 runs |
+| Macro expansions / template substitutions | 1,000 each |
+| TeX buffer / brace nesting | 16,384 code units / 128 levels |
+| Array repetition / column-parser steps / expanded template | 256 / 256 / 16,384 code units |
+| AMS alignment pairs | 128 |
+| Intermediate MathML nodes | 12,000 per label |
+| Engine SVG nodes / paths / depth | 10,000 / 5,000 per label / 128 levels |
+| Engine SVG attribute/text payload | 2,000,000 estimated UTF-16 bytes per label |
+| Independent SVG validation | 10,000 nodes, 5,000 paths, depth 128, 2,000,000 attribute/text code units per formula |
+| Formula viewport coordinates/span | 10,000 em |
+| Layout fragments / metric extent | 32,768 / 1,000,000 em |
+| Rendered font-size cap | 4,096 SVG units; saved style is unchanged |
+| Distinct pending service requests | 32 |
+| Unsettled underlying work, including retired tasks | 64 mathematical plus 64 plain-text requests |
+| Each of two deterministic LRU caches | 64 entries and 2 MiB estimated UTF-16 JSON/key bytes |
+| Worker transport / active conversions | 32 each |
+| Font-data deadline / service deadline | 8 seconds / 10 seconds |
+| Worker initialization / conversion deadline | 10 seconds each, also bounded by the service deadline |
+| Transient retry cooldown | 1 second |
+| Export settlement deadline | 10,050 ms per represented label, including literal font readiness |
+
+Input limits apply without truncating source. Engine limits bound synchronous
+work in addition to Worker/service deadlines. A failed initialization, font
+resource or deadline retires the affected service generation and Worker,
+clears caches, and permits another request after the cooldown. Explicit service
+invalidation permits immediate retry. It does not retry on every render or
+permanently cache transient failure. An existing failed display is retried by
+a new request, such as an edit, remount or export; late old work cannot populate
+the replacement cache. Math-resource cooldown does not prevent plain text.
+
+Pending input and every delimiter, unsupported-input, TeX, output, metrics,
+resource or work-limit failure display the **complete latest original source**
+as literal text. Delimiters, backslashes, leading/trailing/repeated spaces, tabs
+and physical line breaks are retained; CRLF may be one visual break. There is
+no partial formula, error SVG, substitute message or previous successful
+formula. A failed label leaves other labels and diagram geometry usable.
+Unavailable measurement uses a finite literal layout.
+
+### Revision, interaction, persistence and export
+
+The production parser, conversion service, `SvgTexLabel` view, measured bounds
+and picking share the same source/font revision. Ownership includes document
+revision and mounted label owner; inline owners also include path and node IDs.
+Edits, deletion, loads with reused IDs, unmount and Undo/Redo retire obsolete
+subscriptions. Completion does not restore an older position, style or selection.
+
+Free labels use all nine measured anchors, the established font scale and
+revision-matched click bounds. Path labels retain five placements, 14-unit
+marker offsets, font size 12, white outlines and `pointerEvents="none"`.
+Alt/Option-click still selects the owning curve through the existing marker
+candidate; formula glyphs create no new path hit target. Visibility, layer
+locking/filtering, dimming and projection retain their established policies.
+Pan, zoom, camera, position, placement, selection and paint changes reuse
+unchanged math geometry; font changes can remeasure layout. Each label exposes
+one source-named image group; decorative outline copies remain hidden from
+accessibility.
+
+Parsed runs, markup, metrics, errors, cache entries, pending requests, layout
+bounds and export captures are runtime-only. They never enter `Diagram`, saved
+JSON or undo history, and conversion adds no history entry or schema version.
+The editor's ordinary user edits retain existing Undo/Redo semantics.
+
+SVG export synchronously captures committed diagram/view/visibility/style and
+background before waiting. It settles only represented labels and renders the
+shared view into a detached snapshot. Later edits or loads affect the live
+Preview and the next export, without mixing revisions into the pending file.
+Successful labels are typeset and failed labels contain complete captured
+source. Transparent mode adds no background; white mode adds one white
+viewBox-sized background rectangle. Sanitization removes editor overlays and
+metadata while preserving formula geometry, explicit paint, opacity, measured
+placement, whitespace and path outlines. One export runs at a time; errors
+restore the action without downloading invalid SVG. See
+[Preview UI](./PREVIEW_UI.md#export-svg) and the
+[Phase 31 completion audit](./PHASE_31_COMPLETION_AUDIT.md) for verification.
+The `HHcakE` parent executed all twelve 31F browser groups and actual standalone
+exports successfully, but a stale eleven-group verifier rejected its evidence
+before independent review. Phase 31 remains incomplete until a fresh invocation
+of the corrected runner accepts evidence for the final checkout and independent
+review succeeds. Browser command exit zero alone does not close that gate.
+
 ## Label placement
 
 In 2D mode, a label position is stored internally as a `Vec3` with `z = 0`.

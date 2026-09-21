@@ -16,6 +16,7 @@ import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
+import { runCombinedLabelChecks } from './checkCombinedLabels.mjs'
 import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
@@ -36,6 +37,7 @@ const scenarios = [
   'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
   'settled-SVG-export-standalone',
+  'combined-free-inline-workflows',
 ]
 const completed = []
 const started = []
@@ -459,6 +461,8 @@ try {
   await completeGroup('current-SVG-cloning')
   stage = 'inline-node-production-rendering-and-path-lifecycle'
   await runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
+  stage = 'combined-free-inline-workflows'
+  await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'real-App-workflows'
   await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })

@@ -1,10 +1,13 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import {
-  browserChecksForPhase,
-  runPhaseVerification,
-  verificationMatchesCheckout,
-} from "./phase-verification.mjs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
+// Keep the identity guard fixed in the parent: a read-only review must not be
+// able to redefine this guard or replace the in-memory report it checks.
+// This guard neither runs verification nor selects/validates browser groups.
+import { verificationMatchesCheckout } from "./phase-verification.mjs";
 
 // const phase = process.argv[2];
 // const mode = process.argv[3] ?? "implement";
@@ -351,18 +354,76 @@ function extractReviewJson(reviewText) {
   return JSON.parse(match[1]);
 }
 
-function runVerification(stage) {
+// Resolve beside this runner, never from PATH or a different working tree.
+// A new process loads the verifier AND its local dependencies after the child
+// finishes. Re-importing the startup URL would retain the old ESM module graph.
+function runVerifierWorker(stage, operation = "verify") {
+  const handoffDir = mkdtempSync(join(tmpdir(), "stz-phase-verifier-"));
+  const responsePath = join(handoffDir, "response.json");
+  console.log(`Verifier handoff: ${responsePath}`);
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./phase-verification-worker.mjs", import.meta.url)),
+    phase, stage, responsePath, operation,
+  ], { cwd: process.cwd(), env, stdio: "inherit" });
   try {
-    return runPhaseVerification({ phase, cwd: process.cwd(), env, stage });
+    // The file is unique to this invocation. Missing/malformed output or a
+    // worker crash can never reuse a previous successful verification.
+    const response = JSON.parse(readFileSync(responsePath, "utf8"));
+    if (result.error || result.status !== 0 || response?.error) {
+      throw new Error(response?.error?.message ?? result.error?.message
+        ?? `Verifier worker failed: ${result.signal ?? result.status}`);
+    }
+    if (!response || typeof response !== "object" || Array.isArray(response)) {
+      throw new Error("Verifier worker must return a JSON object");
+    }
+    return response;
   } catch (error) {
     console.error(error.message);
+    if (result.error) console.error(result.error.message);
+    if (result.signal) console.error(`Verifier worker signal: ${result.signal}`);
+    console.error(`Verifier handoff: ${responsePath}`);
     console.error("Verification failed. Not committing or pushing.");
-    process.exit(error.exitCode ?? 1);
+    process.exit(result.status || 1);
+  }
+}
+
+function runVerification(stage) {
+  const { report, requiredChecks } = runVerifierWorker(stage);
+  try {
+    if (report?.phase !== phase || report.stage !== stage || report.status !== "passed"
+      || typeof report.artifactDir !== "string" || !isAbsolute(report.artifactDir)
+      || report.summaryPath !== join(report.artifactDir, "verification.json")
+      || !/^[a-f0-9]{64}$/.test(report.checkout?.fingerprint ?? "")
+      || report.checkoutAfter?.fingerprint !== report.checkout.fingerprint
+      || !Array.isArray(requiredChecks)
+      || !isDeepStrictEqual(requiredChecks.slice(0, 3), ["npm-test", "npm-build", "git-diff-check"])
+      || !Array.isArray(report.checks)
+      || !isDeepStrictEqual(report.checks.map((check) => check.name), requiredChecks)
+      || report.checks.some((check) => check.status !== "passed" || check.exitCode !== 0 || check.signal !== null
+        || typeof check.logPath !== "string" || !isAbsolute(check.logPath))) {
+      throw new Error("Verifier worker returned an incomplete or invalid report");
+    }
+    if (!isDeepStrictEqual(JSON.parse(readFileSync(report.summaryPath, "utf8")), report)) {
+      throw new Error("Verifier worker report does not match its saved evidence");
+    }
+    if (!verificationMatchesCheckout(report, { cwd: process.cwd(), env })) {
+      throw new Error("Verifier worker report does not match the current checkout");
+    }
+    return report;
+  } catch (error) {
+    console.error(error.message);
+    if (report?.summaryPath) console.error(`Verification evidence: ${report.summaryPath}`);
+    console.error("Verification failed. Not committing or pushing.");
+    process.exit(1);
   }
 }
 
 function implementationVerificationContext() {
-  const browserChecks = browserChecksForPhase(phase);
+  const { browserChecks } = runVerifierWorker("before-implementation", "browser-checks");
+  if (!Array.isArray(browserChecks) || browserChecks.some((name) => typeof name !== "string")) {
+    console.error("Verifier worker returned invalid browser-check selection. Not starting implementation.");
+    process.exit(1);
+  }
   return [
     "## Parent-runner verification",
     "After this implementation/fix turn, the parent runner will execute npm test, npm run build, and git diff --check before starting review.",
