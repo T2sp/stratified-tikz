@@ -1089,8 +1089,10 @@ Recommended `phaseSlugs` entry: `"30": "coons-patch-duplicate-translate"`.
 ## Phase 31: Typeset TeX labels in SVG Preview
 
 Status: in progress. Phases 31A–31E have passed their required acceptance gates;
-31F combined regression coverage and documentation are implemented, with fresh
-matching parent/browser verification and independent review still pending.
+31F combined regression coverage and documentation are implemented. The
+`HHcakE` parent browser command passed all twelve groups, but its stale verifier
+rejected the report before review. Fresh accepted verification using the
+corrected runner and independent review remain pending.
 Phase 31 is **not complete** until those gates pass. The latest accepted 31E
 snapshot completed all eleven then-required browser groups in Chrome
 153.0.8010.52, including actual 2D transparent and 3D white App downloads and
@@ -1720,11 +1722,27 @@ editing remains available. See [SVG export](./PREVIEW_UI.md) for behavior.
 
 ### Phase 31F: Combined regression coverage, documentation, and completion audit
 
-Status: implemented; 2,434 Node tests, production build, focused static checks
-and diff check pass. Fresh parent browser verification and independent review
-remain pending. Both child browser attempts stopped before launch because
-localhost listening was denied (`EPERM`); no browser assertion passed in that
-attempt. See the audit for logs and the required twelve-group gate.
+Status: implemented; final completion gates remain open. Initial implementation
+checks passed 2,434 Node tests, production build, focused static checks and diff
+check. The child's browser attempts stopped before launch at localhost `EPERM`.
+The subsequent `HHcakE` parent ran both browser commands successfully: its
+free-label report completed all twelve groups, 144 passing scenarios and 15
+combined records in Chrome 153.0.8010.52, including the real transparent/white
+standalone downloads and serialization retry. Its before/after fingerprint was
+`9109342812ad20fc3f5db0c01787af3b3fd03d349fe09e65bf1a3aa66f854e56`.
+
+The parent nevertheless marked verification failed because it retained the
+old eleven-group verifier imported before its implementation child edited the
+on-disk policy. The browser's exit zero and complete report do not change that
+failed parent status. Independent 31F review was not reached. The targeted
+runner correction loads the current verifier in a fresh process after the child;
+its running-parent regression proves eleven-to-twelve-group policy refresh and
+detects the old retained-import behavior. The corrected child invocation passed
+all 2,447 tests, build and diff checks, then stopped at the asset gate's localhost
+`EPERM`; it supplies no new native browser pass. A fresh parent/Terminal invocation
+must accept evidence for the corrected checkout before
+independent review. See the [audit](./PHASE_31_COMPLETION_AUDIT.md) for exact
+report/log paths, inspected artifacts and remaining gates.
 
 - Combine A–E regression fixtures across errors/recovery, rapid edits, lifecycle
   changes, cache reuse, placement/picking, 2D/3D visibility and snapshot export.
@@ -1737,9 +1755,11 @@ attempt. See the audit for logs and the required twelve-group gate.
   subset, resources, limits, accessibility, editing and export behavior in
   Preview help and the specification. The
   [completion audit](./PHASE_31_COMPLETION_AUDIT.md) maps acceptance rows to
-  fixtures and distinguishes current checks from historical browser evidence.
+  fixtures and distinguishes child startup failures, executed parent browser
+  passes, stale parent validation and the fresh verification/review gates.
 - Before completion, the parent runner must run `npm test`, `npm run build`,
   `git diff --check`, `check:label-assets` and `check:free-labels` with
   `/opt/homebrew/bin` first in `PATH`, retain logs/artifacts for this final
-  checkout and complete independent review. A sandbox startup failure is a
-  pending browser result, never a pass. No required gate is waived.
+  checkout through a fresh invocation of the corrected runner, then complete
+  independent review. Neither a child startup failure nor successful browser
+  stdout without an accepted parent report closes the gate. No gate is waived.

@@ -937,7 +937,10 @@ changed. The authorized parent run also passed the independent Phase 31B
 `check:label-assets`; its evidence remains separate from the Phase 31C results.
 The historical free-label verification above predates inline-node integration;
 see the completed Phase 31D verification above and Phase 31E export verification
-below. The combined Phase 31F audit remains pending its fresh parent checks.
+below. The combined Phase 31F browser execution passed in `HHcakE`; its parent
+validation failed on a stale verifier. The corrected-runner verification and
+independent review gates remain open; see the
+[combined audit](./PHASE_31_COMPLETION_AUDIT.md).
 
 ## Export SVG
 
@@ -1018,6 +1021,22 @@ are retained with the existing browser evidence. The parent verifier requires
 all eleven groups for 31E. Phase 31F adds `combined-free-inline-workflows` and
 requires all twelve; an older eleven-group report cannot establish 31F
 acceptance. Earlier phases retain their complete historical group sets.
+
+The **31F `HHcakE` browser command passed but parent validation failed** on
+2026-09-21. Its `verification.json` is under
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31f-before-review-HHcakE/`.
+Node v26.9.0 / Chrome 153.0.8010.52 executed all twelve groups, 144 successful
+scenarios and 15 combined records, with no incomplete/unexecuted groups or page
+errors. Its real transparent/white downloads and serialization retry reopened
+successfully. The parent retained the verifier loaded before implementation
+changed its policy; that stale eleven-group validator rejected the valid new
+group despite command exit zero. The checkout fingerprint stayed
+`9109342812ad20fc3f5db0c01787af3b3fd03d349fe09e65bf1a3aa66f854e56`.
+This is separate from earlier child-only localhost `EPERM` attempts.
+Independent 31F review was not reached. Fresh accepted verification through the
+corrected runner remains required; the failed report is retained unchanged.
+The [combined audit](./PHASE_31_COMPLETION_AUDIT.md) maps these observations to
+actual SVGs, standalone screenshots, raster images and logs.
 
 The final **Phase 31E parent verification and independent review passed** on
 2026-09-21. The parent report is

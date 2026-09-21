@@ -9,8 +9,14 @@ ink-bounds fix, disposable-worker recovery, and focused regressions are implemen
 An authorized terminal run on 2026-09-20 at 22:55 JST completed the unchanged
 built-browser smoke with exit 0, including native-import recovery on an affected
 browser and standalone raster containment. See the historical evidence below;
-the later A–E integration and pending fresh Phase 31F gate are recorded in the
-[completion audit](./PHASE_31_COMPLETION_AUDIT.md).
+the later A–E integration and Phase 31F status are recorded in the
+[completion audit](./PHASE_31_COMPLETION_AUDIT.md). In 31F, the `HHcakE` parent
+accepted `check:label-assets` and executed all twelve free-label browser groups
+successfully. Its retained pre-implementation verifier rejected that complete
+report using the old eleven-group contract; this was an automation failure
+before review, not an adapter or browser startup failure. Fresh accepted
+verification through the corrected runner and independent 31F review remain
+required.
 
 ## Dependencies and local assets
 

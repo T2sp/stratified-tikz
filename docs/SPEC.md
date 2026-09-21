@@ -1157,6 +1157,11 @@ placement, whitespace and path outlines. One export runs at a time; errors
 restore the action without downloading invalid SVG. See
 [Preview UI](./PREVIEW_UI.md#export-svg) and the
 [Phase 31 completion audit](./PHASE_31_COMPLETION_AUDIT.md) for verification.
+The `HHcakE` parent executed all twelve 31F browser groups and actual standalone
+exports successfully, but a stale eleven-group verifier rejected its evidence
+before independent review. Phase 31 remains incomplete until a fresh invocation
+of the corrected runner accepts evidence for the final checkout and independent
+review succeeds. Browser command exit zero alone does not close that gate.
 
 ## Label placement
 
