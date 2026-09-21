@@ -6,6 +6,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { captureStandaloneSvg, measureStandaloneSvg } from './standaloneSvgCapture.mjs'
+import { assertStandaloneSvgOpacity, standaloneSvgOpacityTolerance } from './standaloneSvgOpacity.mjs'
 
 const buttonName = 'Export current diagram view as SVG'
 const excluded = '[data-svg-export-exclude="true"], [data-svg-background="true"], .svg-coordinate-anchors, .svg-coordinate-source-highlights, .svg-coordinate-axes-guide, .svg-geometry-handle, .svg-path-draft, .svg-path-intersection-candidates, .svg-selection-cycle-feedback, .svg-work-plane-preview'
@@ -629,16 +630,27 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
             const paint = label && [...label.children].find((node) => node.localName === 'g')
             const foreground = paint?.lastElementChild
             const box = foreground?.getBBox()
-            let opacity = 1
-            for (let current = foreground; current; current = current.parentElement) opacity *= Number(getComputedStyle(current).opacity)
+            let opacity = foreground ? 1 : null
+            const opacityAncestors = []
+            for (let current = foreground; current; current = current.parentElement) {
+              const computed = getComputedStyle(current).opacity
+              const value = computed.trim() === '' ? NaN : Number(computed)
+              opacityAncestors.push({ tag: current.localName, attribute: current.getAttribute('opacity'), computed })
+              // Missing/invalid CSSOM values must not turn into zero opacity.
+              opacity = opacity !== null && Number.isFinite(value) && value >= 0 && value <= 1 ? opacity * value : null
+            }
             return { source: titles[0]?.textContent, matchingTitles: titles.length,
               namespace: { root: document.documentElement.namespaceURI,
                 label: label?.namespaceURI, foreground: foreground?.namespaceURI },
               parseErrors: document.querySelectorAll('parsererror').length,
-              foregroundPaths: foreground?.querySelectorAll('svg path').length ?? 0, opacity,
+              foregroundPaths: foreground?.querySelectorAll('svg path').length ?? 0, opacity, opacityAncestors,
               box: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null }
           }, source)
           reopenDetails.reopened = reopened
+          if (dimmed) reopenDetails.opacityComparison = { captured: capture.opacity, computed: reopened.opacity,
+            absoluteError: Number.isFinite(reopened.opacity) && Number.isFinite(capture.opacity)
+              ? Math.abs(reopened.opacity - capture.opacity) : null,
+            tolerance: standaloneSvgOpacityTolerance }
           await persist()
           await observe(`${name}-standalone-before-image`, { policy, source, observedPath, reopened })
           await captureStandaloneSvg(standalone, reopenDetails.capture.requestedPath, async (capture) => {
@@ -657,7 +669,7 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
             assert.equal(reopened.namespace.foreground, 'http://www.w3.org/2000/svg')
             assert.ok(reopened.foregroundPaths > 0, 'Saved dimmed SVG reopens with its own foreground formula paths')
             assert.ok(Object.values(reopened.box).every(Number.isFinite) && reopened.box.width > 0 && reopened.box.height > 0)
-            assert.equal(reopened.opacity, capture.opacity)
+            assertStandaloneSvgOpacity(reopened.opacity, capture.opacity)
           }
         } catch (error) {
           standaloneFailed = true

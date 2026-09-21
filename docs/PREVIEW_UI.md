@@ -1151,7 +1151,7 @@ scripts plus the capture helper and its test), targeted ESLint and
 retained in `/private/tmp/stz-31e-bounded-capture/checks.json`; the final checkout
 identity and handoff are in `/private/tmp/stz-31e-bounded-capture/handoff.json`.
 
-The latest executed parent verification is **failed/partial, before review**:
+The historical parent verification was **failed/partial, before review**:
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-Qku3Ld/verification.json`.
 It tested revision `5f357d1b186302fda951ff073f2e32c68a34b2ce` with the four
 modified tracked files and two untracked bounded-capture files recorded in
@@ -1191,7 +1191,7 @@ errors were observed. Policy-specific capture/live/detached/serialized SVGs,
 completion records and failure diagnostics remain under that run's
 `05-check-free-labels/artifacts/` directory.
 
-The confirmed render boundary in `prepareSettledSvgExport()` rendered
+That confirmed render boundary in `prepareSettledSvgExport()` rendered
 `SvgTexLabelView` without a React SVG parent, then wrapped the finished string.
 Installed React DOM 19.2.7 renders that case in HTML context and hoists the
 title before its owning group. Parsing the string wrapper and selecting its
@@ -1232,8 +1232,8 @@ Additional controls corrupt a valid foreground/structure and must be rejected;
 they do not pass trivially because the original foreground is missing. The
 native fixture's execution remains a parent gate.
 
-Fresh correction checks used `/opt/homebrew/bin` first in `PATH`, Node v26.9.0
-and npm 11.19.1 from starting revision
+The SVG-context correction child used `/opt/homebrew/bin` first in `PATH`,
+Node v26.9.0 and npm 11.19.1 from starting revision
 `d1b72b3240177dfa368b43255ca07fd5738e3920`. The requested eight focused test
 files passed 130/130, included in the full `npm test` result of 2,405/2,405,
 with no failed or skipped tests. The two added Node cases live in the already
@@ -1247,27 +1247,96 @@ Exact commands/statuses and logs are retained in
 `targeted-eslint-result.json`, `syntax-results.json` and their referenced logs.
 Installed React DOM 19.2.7's bare-group versus SVG-parent reproduction is saved
 in `react-context-reproduction.json` in that directory.
-These are fresh child results, separate from the historical 128/2,403 handoff.
+Those child results are separate from the historical 128/2,403 handoff and the
+subsequent parent execution below.
 
-This correction child attempted normal installed Chrome launch through the
-external Playwright runtime; it failed before creating pages with SIGABRT and
-cleanup `kill EPERM`. The fresh log is
-`/private/tmp/stz-31e-svg-boundary/browser-startup.log`. This establishes no
-native result for the correction. The `Qku3Ld` document/body observations and
-saved PNGs remain actual historical parent evidence, distinct from this child
-restriction. Final correction identity and checks are retained in
-`/private/tmp/stz-31e-svg-boundary/handoff.json`.
+The SVG-context correction child's installed Chrome launch through external
+Playwright failed before creating pages with SIGABRT and cleanup `kill EPERM`.
+Its log is `/private/tmp/stz-31e-svg-boundary/browser-startup.log`, with checkout
+identity and checks in that directory's `handoff.json`. That child restriction
+does not describe the subsequent parent execution.
 
-Fresh matching parent verification of the production correction and all eleven
-groups remains required, followed by independent review, which has not run.
-The outer runner must retain complete label groups before/after sanitization,
-source-specific foreground/bounds/captured opacity, every visibility policy
-and actual download/reopen/failure-retry artifacts, resolving any further
-demonstrated failure before review. The `Qku3Ld` result is retained failure
-evidence, not verification of this correction. Standalone verification can use
+The latest executed parent verification is **failed/partial, before review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-t7U6g3/verification.json`.
+It tested revision `d1b72b3240177dfa368b43255ca07fd5738e3920` plus five modified
+tracked files and the untracked boundary fixture, recorded in
+`05-check-free-labels/artifacts/checkout.diff` and `checkout-untracked.json`.
+The checkout was unchanged during verification, with fingerprint
+`8eaf530b72fe06ff821eeb4e173e6abff5559bdfaa52f59aba68870189ad235b`.
+Node v26.9.0, Chrome 153.0.8010.52, external Playwright and Vite at
+`http://127.0.0.1:5174` ran the checks. Tests (2,405 passed, none failed or
+skipped), build, diff and label-assets checks exited 0. Free-label acceptance
+exited 1 after ten completed groups and 120 passing records, with no page errors.
+
+AutoHide passed. AutoDim reached and passed exact source, SVG root/label/
+foreground namespace, eight own foreground paths and finite positive bounds
+(approximately 73.5561×29.8807) after reopening. Its pending captured label
+settled `success`/`ready` in 148 ms within 10,050 ms; the 6,176-byte serialized
+SVG retains the complete label group and formula geometry. Both policies saved
+verified 1100×850 PNGs covering their entire 900×700 SVG root; autoDim's PNG is
+6,541 bytes. Neither standalone page made external requests or reported errors.
+These observations demonstrate the repaired label subtree for this executed
+case; the historical `Qku3Ld` title-only defect did not recur.
+
+The new blocker is strict equality across numeric representations: captured
+`0.7 * 0.35` is `0.24499999999999997`, and that raw opacity attribute survives
+detached rendering, sanitization and serialization unchanged. The native product
+of `Number(getComputedStyle(ancestor).opacity)` is `0.245`, an absolute difference
+of `2.7755575615628914e-17`. This is a harness comparison failure, not evidence
+of a production dimming defect. The completed/standalone JSON, capture/live/
+detached/serialized SVGs, PNGs and failure diagnostics remain in that report's
+`05-check-free-labels/artifacts/` directory. AutoDim's later detached/oracle
+assertions did not execute although their diagnostic observations were saved.
+Layer filtering, hidden-layer exclusion, invalid-viewport retry, the native
+boundary fixture and actual App download/reopen workflow remain unexecuted in
+this run. `unexecuted: []` records started groups, not all assertions within them.
+
+The follow-up uses `scripts/standaloneSvgOpacity.mjs` only for the harness
+comparison between captured numeric opacity and the independent native
+computed-style ancestor product. Both values must first be numbers, finite
+and within `[0, 1]`; missing, null, non-numeric,
+non-finite or out-of-range observations cannot pass by coercion. It then uses
+an explicit absolute tolerance of `1e-12`, enough for the observed CSSOM
+serialization/arithmetic difference on these fixtures. Production opacity,
+capture and serialization are unchanged. Exact raw-attribute comparisons remain
+exact, as do source, identity, count and namespace contracts; geometry checks
+stay intact. The opacity regressions accept the reported pair and equal values
+including zero and one, and reject missing dimming (`0.7` or `1`), doubled dimming (`0.08575`),
+zero versus nonzero, and `2e-12`/`1e-10` drift in either direction. These errors
+exceed the bound; the separate exact-source geometry oracle and its
+valid-foreground negative controls
+remain intact. A later material mismatch requires diagnosis, not a wider bound.
+The existing standalone record now includes raw ancestor opacity attributes,
+computed-style strings, the product and captured comparison/error/tolerance
+before image capture. Four helper regressions in
+`tests/scripts/standaloneSvgOpacity.test.mjs` are registered in `npm test`.
+
+The opacity correction child's checks used `/opt/homebrew/bin` first in `PATH`,
+Node v26.9.0 and npm 11.19.1, from revision
+`4c1dd9faeca926cbbda81edb57f82ebe89fb26a1`. The nine focused files passed
+134/134 tests, including the four comparator regressions; all are included in
+the full `npm test` result of 2,409/2,409, with no failures or skips. Build,
+strict fixture TypeScript, targeted ESLint including both added files, ten
+script syntax checks and diff checks exited 0. Build retains the existing
+nonblocking chunk-size warning. Logs and command results are retained under
+`/private/tmp/stz-31e-opacity-comparison/` (`focused.log`, `npm-test.log`,
+`npm-build.log`, `fixture-typescript.log`, `targeted-eslint.log` and
+`syntax-results.json`); final checkout identity is recorded in `handoff.json`.
+These are child checks, separate from pending parent browser verification.
+
+Fresh complete matching parent verification remains required for the opacity
+correction and all eleven groups, followed by independent review, which has
+not run. This fix child leaves browser execution to the outer parent runner.
+The production SVG-context regression and bounded screenshot helper remain
+required: complete pre/post-sanitization label subtrees, all four visibility
+policies, invalid-viewport retry, native boundary controls, actual transparent/
+white App downloads/reopens and subsequent 3D view must execute successfully.
+Neither the partial `t7U6g3` run nor historical `Qku3Ld` verifies this corrected
+checkout. Standalone verification can use
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
-it does not run review or establish approval. Phase 31E is not complete and
-31F remains deferred.
+it does not run review or establish approval. The fix → complete parent
+verification → independent review order and commit/push gates remain unchanged.
+Phase 31E is not complete and 31F remains deferred.
 
 ## Add Path
 
