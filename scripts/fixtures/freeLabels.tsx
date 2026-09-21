@@ -1,0 +1,435 @@
+// Development-only browser fixture. All drawing, picking, geometry editing,
+// history, conversion, and export operations below use production modules.
+import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
+import { SvgDiagram } from '../../src/rendering/SvgDiagram.tsx'
+import type { SvgDiagramProps } from '../../src/rendering/SvgDiagram.tsx'
+import type { Diagram, LabelAnchor, LabelStyle, TextLabel, Vec3 } from '../../src/model/types.ts'
+import { createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
+import { defaultLabelStyle, defaultSheetStyle } from '../../src/model/styles.ts'
+import { defaultVisibilityOptions } from '../../src/model/visibility.ts'
+import { serializeDiagram } from '../../src/model/serialization.ts'
+import { generateTikz } from '../../src/tikz/generateTikz.ts'
+import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
+import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
+import { loadMathJaxEngine, MathJaxFailure } from '../../src/rendering/labels/mathjaxEngine.ts'
+import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
+import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { projectToSvgPoint, svgPointToModelOnWorkPlane } from '../../src/rendering/svgProjection.ts'
+import { createSvgPreviewExportText } from '../../src/ui/svgPreviewExport.ts'
+import { applyGeometryHandleDragToEditorState, startGeometryHandleDragSession } from '../../src/ui/geometryHandles.ts'
+import type { GeometryHandleDragSession } from '../../src/ui/geometryHandles.ts'
+import { commitDiagramChange, createDiagramHistory, redoLastDiagramChange, undoLastDiagramChange } from '../../src/ui/undo.ts'
+import type { UndoableEditorState } from '../../src/ui/undo.ts'
+import type { SelectedElement } from '../../src/ui/selection.ts'
+import { inspectAndAssertLabelContent } from './labelBrowserOracle.ts'
+
+type LabelInput = { id: string; text: string; position?: Vec3; layer?: number; style?: Partial<LabelStyle> }
+type FixtureOptions = {
+  labels: LabelInput[]
+  ambientDimension?: 2 | 3
+  layers?: Diagram['layers']
+  occlusion?: 'autoHide' | 'autoDim'
+}
+type Deferred = { promise: Promise<void>; release(): void; fail: boolean; requests: Promise<LabelConversionResult>[] }
+type RequestObservation = { id: number; source: string; fontSize: number; held: boolean; phase: 'converting' | 'held' | 'delivered'; result?: string }
+const container = document.getElementById('root')!
+let root = createRoot(container)
+let sourceRevision = 0
+let renderEpoch = 0
+let editor: UndoableEditorState
+let props: Partial<SvgDiagramProps> = {}
+let dragSession: GeometryHandleDragSession | null = null
+let serviceMode: 'real' | 'load-error' | 'output-error' = 'real'
+let invocationCount = 0
+let requestCount = 0
+let dragCount = 0
+const selectionEvents: SelectedElement[] = []
+const callbackEvents: { selection: SelectedElement; options: unknown }[] = []
+const requests: RequestObservation[] = []
+const holds = new Map<string, Deferred>()
+const measurement = createBrowserTextMeasurementProvider()
+
+function makeService() {
+  return createLabelService({
+    measurement,
+    limits: { settlementMs: 20_000 },
+    async loadEngine(signal) {
+      if (serviceMode === 'load-error') throw new MathJaxFailure('resource-error', 'Intentional fixture load failure')
+      const engine = await loadMathJaxEngine(signal)
+      return {
+        identity: engine.identity,
+        dispose: () => engine.dispose?.(),
+        async convert(runs) {
+          invocationCount++
+          if (serviceMode === 'output-error') throw new MathJaxFailure('output-error', 'Intentional fixture output failure')
+          return engine.convert(runs)
+        },
+      }
+    },
+  })
+}
+let service = makeService()
+function makeRuntime() {
+  const ownedService = service
+  return createSvgLabelRuntime({ measurement, service: {
+    peek(source, settings) {
+      return holds.has(source) ? undefined : ownedService.peek(source, settings)
+    },
+    convert(source, settings) {
+      requestCount++
+      const held = holds.get(source)
+      const request: RequestObservation = { id: requestCount, source, fontSize: settings.font.sizePx, held: !!held, phase: 'converting' }
+      requests.push(request)
+      const completion = ownedService.convert(source, settings).then(async (result) => {
+        if (held) { request.phase = 'held'; await held.promise }
+        const delivered: LabelConversionResult = held?.fail
+          ? { ...result, kind: 'fallback', reason: 'output-error' } : result
+        request.phase = 'delivered'
+        request.result = delivered.kind
+        return delivered
+      })
+      held?.requests.push(completion)
+      return completion
+    },
+  } })
+}
+let runtime = makeRuntime()
+
+function redraw() {
+  flushSync(() => root.render(<SvgDiagram
+    key={renderEpoch}
+    diagram={editor.editableDiagram}
+    width={900}
+    height={700}
+    selectedElement={editor.selectedElement}
+    layerFilter={editor.layerFilter}
+    showGeometryHandles
+    labelRuntime={runtime}
+    labelDocumentRevision={sourceRevision}
+    {...props}
+    onSelectionChange={(selectedElement, options) => {
+      selectionEvents.push(selectedElement)
+      callbackEvents.push({ selection: selectedElement, options })
+      editor = { ...editor, selectedElement }
+      redraw()
+    }}
+    onGeometryHandleDragStart={() => { dragSession = startGeometryHandleDragSession(editor.editableDiagram) }}
+    onGeometryHandleDrag={(target, point, height, camera) => {
+      if (!dragSession) return
+      dragCount++
+      const position = svgPointToModelOnWorkPlane(camera, point, height, { kind: 'xy', z: 0 })
+      editor = applyGeometryHandleDragToEditorState(editor, dragSession, target, position)
+      redraw()
+    }}
+    onGeometryHandleDragEnd={() => { dragSession = null }}
+  />))
+  document.getElementById('interaction-status')!.textContent = JSON.stringify({
+    selection: editor.selectedElement, clicks: selectionEvents.length, drags: dragCount,
+    labels: editor.editableDiagram.labels.map(({ id, position }) => ({ id, position })),
+  })
+}
+
+function mount(options: FixtureOptions) {
+  sourceRevision++
+  props = {}
+  const diagram = createEmptyDiagram({ ambientDimension: options.ambientDimension ?? 2 })
+  diagram.camera = diagram.ambientDimension === 2
+    ? { mode: '2d', scale: 100, origin: { x: 450, y: 350 } }
+    : { mode: '3d', kind: 'orthographic', thetaDeg: 45, phiDeg: 25, zoom: 100, pan: { x: 450, y: 350 } }
+  diagram.labels = options.labels.map(({ id, text, position, layer, style }, index): TextLabel => ({
+    id, name: id, geometricKind: 'label', text, layer: layer ?? index + 1,
+    position: position ?? { x: ((index % 3) - 1) * 2.8, y: (1 - Math.floor(index / 3)) * 1.6, z: 0 },
+    style: { ...defaultLabelStyle, fontSize: 18, ...style },
+  }))
+  if (options.layers) diagram.layers = options.layers
+  if (options.occlusion) {
+    diagram.camera = { mode: '3d', kind: 'orthographic', thetaDeg: 90, phiDeg: 0, zoom: 100, pan: { x: 450, y: 350 } }
+    diagram.strata = [createSheetStratum({ ambientDimension: 3, id: 'sheet', name: 'Occluding sheet', style: defaultSheetStyle,
+      corners: [{ x: -2, y: 0, z: -2 }, { x: 2, y: 0, z: -2 }, { x: 2, y: 0, z: 2 }, { x: -2, y: 0, z: 2 }], layer: 0 })]
+    props.visibilityOptions = { ...defaultVisibilityOptions, enabled: true, labelVisibility: options.occlusion }
+  }
+  editor = { editableDiagram: diagram, selectedElement: null, layerFilter: { kind: 'all' },
+    polylineDraft: null, cubicBezierDraft: null, pathDraft: null, sheetPolygonDraft: null, history: createDiagramHistory(diagram) }
+  selectionEvents.length = 0
+  callbackEvents.length = 0
+  dragCount = 0
+  redraw()
+}
+
+function mutateLabel(id: string, change: Partial<TextLabel>) {
+  const diagram = { ...editor.editableDiagram, labels: editor.editableDiagram.labels.map((label) =>
+    label.id === id ? { ...label, ...change, style: { ...label.style, ...change.style } } : label) }
+  editor = commitDiagramChange(editor, { ...editor, editableDiagram: diagram })
+  redraw()
+}
+
+function state() {
+  const diagram = editor.editableDiagram
+  const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
+  return {
+    invocationCount, requestCount, dragCount, selection: editor.selectedElement, selectionEvents, callbackEvents,
+    requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
+    labels: diagram.labels,
+    positions: Object.fromEntries(diagram.labels.map((label) => [label.id, projectToSvgPoint(camera, label.position, 700)])),
+    json: serializeDiagram(diagram), history: JSON.stringify(editor.history),
+    tikz: generateTikz(diagram), inlineTikz: generateTikz(diagram, { exportMode: 'inlineMath' }),
+  }
+}
+
+const api = {
+  mount, mutateLabel, state,
+  inspectContent(id: string) {
+    const label = editor.editableDiagram.labels.find((entry) => entry.id === id)
+    if (!label) throw new Error(`Unknown label ${id}`)
+    return inspectAndAssertLabelContent(id, { fontSize: label.style.fontSize * 1.35 })
+  },
+  setLayers(layers: Diagram['layers']) {
+    editor = { ...editor, editableDiagram: { ...editor.editableDiagram, layers } }
+    redraw()
+  },
+  setVisibility(labelVisibility: 'autoHide' | 'autoDim' | 'alwaysForeground') {
+    props = { ...props, visibilityOptions: { ...defaultVisibilityOptions, enabled: true, labelVisibility } }
+    redraw()
+  },
+  deleteLabel(id: string) {
+    editor = { ...editor, editableDiagram: { ...editor.editableDiagram, labels: editor.editableDiagram.labels.filter((label) => label.id !== id) } }
+    redraw()
+  },
+  setProps(next: Partial<SvgDiagramProps>) { props = { ...props, ...next }; redraw() },
+  select(selectedElement: SelectedElement) { editor = { ...editor, selectedElement }; redraw() },
+  filter(layer: number | null) { editor = { ...editor, layerFilter: layer === null ? { kind: 'all' } : { kind: 'layer', layer } }; redraw() },
+  undo() { editor = undoLastDiagramChange(editor); redraw() },
+  redo() { editor = redoLastDiagramChange(editor); redraw() },
+  hold(source: string) {
+    let release = () => {}
+    const promise = new Promise<void>((resolve) => { release = resolve })
+    holds.set(source, { promise, release, fail: false, requests: [] })
+  },
+  async release(source: string, fail = false) {
+    const held = holds.get(source)
+    if (!held || held.requests.length === 0) throw new Error(`Release before request started: ${source}`)
+    {
+      held.fail = fail
+      holds.delete(source)
+      held.release()
+      await Promise.allSettled(held.requests)
+      // Allow React to commit every released subscriber before observation.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    }
+  },
+  async changeService(mode: typeof serviceMode) {
+    root.unmount()
+    service.invalidate()
+    serviceMode = mode
+    holds.clear()
+    service = makeService()
+    runtime = makeRuntime()
+    root = createRoot(container)
+    renderEpoch++
+  },
+  unmount() { flushSync(() => root.render(null)) },
+  remount() { renderEpoch++; redraw() },
+  export(backgroundMode: 'transparent' | 'white' = 'transparent') {
+    return createSvgPreviewExportText(container.querySelector('svg.svg-diagram')!, { backgroundMode })
+  },
+  runSelfChecks,
+}
+declare global { interface Window { stzLabels: typeof api } }
+window.stzLabels = api
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+function assertBrowser(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message)
+}
+function displayed(id: string) {
+  const element = container.querySelector<SVGGElement>(`[data-label-id="${id}"] [data-label-state]`)
+  assertBrowser(element, `${id}: mounted production label`)
+  return element
+}
+async function waitSettled() {
+  const deadline = performance.now() + 30_000
+  while (container.querySelector('[data-label-state="pending"]')) {
+    assertBrowser(performance.now() < deadline, 'Labels settled within the bounded browser check')
+    await nextFrame()
+  }
+}
+function showOverlap(fallback = false) {
+  mount({ labels: ['overlapA', 'overlapB'].map((id) => ({ id,
+    text: fallback ? 'literal $invalid' : '$\\frac{F^{(1)}L}{\\alpha \\Rightarrow \\beta}$',
+    position: { x: 0, y: 0, z: 0 }, style: { fontSize: 32 },
+  })) })
+}
+
+/** Available to native UI automation without console/code injection. These are
+ * real DOM assertions; native click/Alt-click/drag remain separate UI checks. */
+async function runSelfChecks() {
+  const status = document.getElementById('check-status')!
+  const evidence: string[] = []
+  const record = (message: string) => { evidence.push(message); status.textContent = evidence.join('\n') }
+  status.textContent = 'Running checks against the production renderer…'
+  try {
+    const literal = '  "<>&" \\textbf{bad}\t keep \\slash\r\n tail  '
+    const sources = [
+      '$F^{(1)}L$', '$\\alpha \\colon f \\Rightarrow g$', '$\\frac{1}{1+\\frac{x}{y}}$',
+      '日本語 $x_i$ と $\\beta$', 'first $x$\nsecond $y$',
+      '$\\begin{matrix}a & b \\\\\n c & d\\end{matrix}$', literal, '$\\unknownPreviewMacro{x}$', 'invalid $',
+    ]
+    mount({ labels: sources.map((text, index) => ({ id: `check${index}`, text })) })
+    const before = state()
+    await waitSettled()
+    for (const [index, text] of sources.entries()) {
+      const element = displayed(`check${index}`)
+      assertBrowser(element.getAttribute('data-label-source') === text, `Exact source ${index}`)
+      assertBrowser(element.getAttribute('data-label-state') === (index < 6 ? 'ready' : 'fallback'), `Result ${index}`)
+      assertBrowser((element.querySelectorAll('[data-label-math]').length > 0) === (index < 6), `Whole-label result ${index}`)
+      await api.inspectContent(`check${index}`)
+    }
+    const after = state()
+    assertBrowser(before.json === after.json && before.history === after.history && before.tikz === after.tikz && before.inlineTikz === after.inlineTikz,
+      'Conversion did not change JSON/history/either TikZ output')
+    assertBrowser(displayed('check3').querySelectorAll('[data-label-math]').length === 2, 'Multiple Japanese/math runs')
+    assertBrowser(displayed('check5').querySelectorAll('[data-label-math]').length === 1, 'Math newline remains one formula')
+    assertBrowser(!container.querySelector('foreignObject,image'), 'Only SVG text/geometry')
+    const literalText = displayed('check6').querySelectorAll('text')
+    assertBrowser(literalText.length === 3 && literalText[0].textContent?.startsWith('  "<>&"'), 'Literal spaces/tab/CRLF fragments')
+    assertBrowser(Array.from(literalText).every((node) => getComputedStyle(node).whiteSpace === 'pre'), 'Whitespace preserved visually')
+    record('PASS: real MathJax, Japanese, fractions, multiple runs, math/text newlines, exact literal fallback, JSON/history/TikZ unchanged')
+
+    const anchors: LabelAnchor[] = ['center', 'north', 'south', 'east', 'west', 'north east', 'north west', 'south east', 'south west']
+    mount({ labels: anchors.map((anchor, index) => ({ id: `a${index}`, text: '$\\frac{x_1}{y^2}$', style: { anchor, fontSize: 22, color: '#d02080', opacity: 0.6 } })) })
+    await waitSettled()
+    for (const [index, anchor] of anchors.entries()) {
+      const element = displayed(`a${index}`)
+      const [minX, minY, maxX, maxY] = element.getAttribute('data-label-bounds')!.split(' ').map(Number)
+      await api.inspectContent(`a${index}`)
+      assertBrowser(Math.abs(anchor.includes('west') ? minX : anchor.includes('east') ? maxX : minX + maxX) < 1e-6, `${anchor} horizontal anchor`)
+      assertBrowser(Math.abs(anchor.includes('north') ? minY : anchor.includes('south') ? maxY : minY + maxY) < 1e-6, `${anchor} vertical anchor`)
+    }
+    const count = invocationCount
+    mutateLabel('a0', { position: { x: 0.7, y: 0.2, z: 0 }, style: { ...editor.editableDiagram.labels[0].style, color: '#2040b0', opacity: 0.3, fontSize: 30 } })
+    api.setProps({ cameraViewAdjustment: { zoom: 1.8, pan: { x: 20, y: -10 } } })
+    api.select({ kind: 'label', id: 'a0' })
+    await waitSettled()
+    assertBrowser(invocationCount === count, 'Movement/font/color/opacity/camera/selection reuse math conversion')
+    record(`PASS: nine anchors, independent visible-content extents, tall math, paint/font/camera reuse (engine count ${count})`)
+
+    mount({ ambientDimension: 3, labels: [{ id: 'projected', text: '$\\alpha \\Rightarrow g$', position: { x: 0.6, y: 0.4, z: 0.7 } }] })
+    await waitSettled()
+    const beforeCamera = invocationCount
+    api.setProps({ cameraOverride: { mode: '3d', kind: 'orthographic', thetaDeg: 70, phiDeg: 40, zoom: 130, pan: { x: 440, y: 320 } } })
+    await nextFrame()
+    const projectedPosition = state().positions.projected
+    const projectionTransform = displayed('projected').getCTM()!
+    assertBrowser(Math.abs(projectionTransform.e - projectedPosition.x) < 1e-6 && Math.abs(projectionTransform.f - projectedPosition.y) < 1e-6, '3D label follows model projection')
+    assertBrowser(invocationCount === beforeCamera, '3D camera changes reuse math')
+    mount({ labels: [
+      { id: 'visible', text: '$x$', layer: 1 }, { id: 'locked', text: '$y$', layer: 2 }, { id: 'hidden', text: '$z$', layer: 3 },
+    ], layers: [{ value: 1, name: 'Visible' }, { value: 2, name: 'Locked', locked: true }, { value: 3, name: 'Hidden', visible: false }] })
+    await waitSettled()
+    assertBrowser(!container.querySelector('[data-label-id="hidden"] [data-label-state]'), 'Hidden layer has no rendered label geometry')
+    assertBrowser(getComputedStyle(displayed('locked').querySelector('rect')!).pointerEvents === 'none', 'Locked label descendants honor outer pointer policy')
+    api.filter(2)
+    assertBrowser(getComputedStyle(displayed('visible').querySelector('rect')!).pointerEvents === 'none', 'Filtered label descendants honor outer pointer policy')
+    for (const policy of ['autoHide', 'autoDim'] as const) {
+      mount({ ambientDimension: 3, occlusion: policy, labels: [{ id: 'occluded', text: '$x$', layer: 0, position: { x: 0, y: -1, z: 0 } }] })
+      await waitSettled()
+      const visibility = container.querySelector('[data-label-id="occluded"]')!.getAttribute('data-label-visibility')
+      assertBrowser(visibility === (policy === 'autoHide' ? 'hidden' : 'dimmed'), `${policy} surface policy`)
+      if (policy === 'autoHide') assertBrowser(!container.querySelector('[data-label-id="occluded"] [data-label-state]'), 'autoHide removes selectable formula geometry')
+      else assertBrowser(Number(displayed('occluded').querySelector(':scope > g')!.getAttribute('opacity')) < 1, 'autoDim affects formula opacity')
+    }
+    record('PASS: 3D projection/reuse, locked/hidden/filtered descendants, autoHide/autoDim')
+
+    api.hold('$browserOld$')
+    api.hold('$browserNew$')
+    mount({ labels: [{ id: 'race', text: '$browserOld$' }] })
+    await nextFrame()
+    mutateLabel('race', { text: '$browserNew$' })
+    await nextFrame()
+    assertBrowser(displayed('race').getAttribute('data-label-state') === 'pending', 'Controlled latest pending source')
+    assertBrowser(api.export()?.includes('$browserNew$'), 'Pending source retained in SVG clone')
+    await api.release('$browserNew$')
+    await waitSettled()
+    await api.release('$browserOld$', true)
+    assertBrowser(displayed('race').getAttribute('data-label-source') === '$browserNew$' && displayed('race').getAttribute('data-label-state') === 'ready', 'Obsolete failure cannot overwrite success')
+    mutateLabel('race', { text: 'invalid $' })
+    assertBrowser(displayed('race').querySelectorAll('[data-label-math]').length === 0, 'No last-good math after invalid edit')
+    await waitSettled()
+    mutateLabel('race', { text: '$browserNew$' })
+    await waitSettled()
+    api.hold('$browserDeleted$')
+    mutateLabel('race', { text: '$browserDeleted$' })
+    await nextFrame()
+    api.deleteLabel('race')
+    await api.release('$browserDeleted$')
+    assertBrowser(!container.querySelector('[data-label-id="race"]'), 'Deleted label not resurrected')
+    api.hold('$browserOldDoc$')
+    mount({ labels: [{ id: 'sameId', text: '$browserOldDoc$' }] })
+    await nextFrame()
+    mount({ labels: [{ id: 'sameId', text: '$browserNewDoc$' }] })
+    await waitSettled()
+    await api.release('$browserOldDoc$')
+    assertBrowser(displayed('sameId').getAttribute('data-label-source') === '$browserNewDoc$', 'Reused document ID rejects obsolete request')
+    api.hold('$browserUnmount$')
+    mutateLabel('sameId', { text: '$browserUnmount$' })
+    await nextFrame()
+    api.unmount()
+    await api.release('$browserUnmount$')
+    assertBrowser(!container.querySelector('svg'), 'No resurrection after unmount')
+    record('PASS: controlled inverted completions, obsolete failure, valid-invalid-valid, deletion, reused document IDs, unmount')
+
+    for (const mode of ['load-error', 'output-error'] as const) {
+      await api.changeService(mode)
+      mount({ labels: [{ id: 'failed', text: '$x$' }, { id: 'sibling', text: '日本語 text' }] })
+      await waitSettled()
+      assertBrowser(displayed('failed').getAttribute('data-label-state') === 'fallback', `${mode} fallback`)
+      assertBrowser(displayed('sibling').getAttribute('data-label-state') === 'ready', `${mode} sibling isolation`)
+    }
+    await api.changeService('real')
+    mount({ labels: [{ id: 'limit', text: 'x'.repeat(16_385) }, { id: 'valid', text: '$x^2$' }] })
+    await waitSettled()
+    assertBrowser(displayed('limit').getAttribute('data-label-state') === 'fallback' && displayed('limit').getAttribute('data-label-source')?.length === 16_385, 'Complete bounded-input fallback')
+    assertBrowser(displayed('valid').getAttribute('data-label-state') === 'ready', 'Input limit isolation')
+    record('PASS: mounted load/output/input-limit failures are exact-source and isolated')
+
+    mount({ labels: [{ id: 'exportMath', text: '$\\frac{a}{b}$' }, { id: 'exportLiteral', text: literal }] })
+    await waitSettled()
+    api.select({ kind: 'label', id: 'exportMath' })
+    for (const background of ['transparent', 'white'] as const) {
+      const exported = api.export(background)
+      assertBrowser(exported, 'Current SVG export')
+      const parsed = new DOMParser().parseFromString(exported, 'image/svg+xml')
+      assertBrowser(!parsed.querySelector('parsererror, foreignObject, image') && parsed.querySelector('path'), 'Standalone normalized formula SVG')
+      assertBrowser(exported.includes('&lt;&gt;&amp;') && !exported.includes('data-svg-export-exclude'), 'Literal text survives; overlays removed')
+    }
+    showOverlap()
+    await waitSettled()
+    assertBrowser(displayed('overlapA').querySelector('[data-label-math]') && displayed('overlapB').querySelector('[data-label-math]'), 'Duplicates have independent DOM geometry')
+    const ids = Array.from(container.querySelectorAll('[data-label-state] [id]'), (node) => node.id)
+    assertBrowser(ids.length === new Set(ids).size, 'No duplicate formula IDs')
+    record('PASS: transparent/white current-view SVG clone, exact fallback, duplicate formulas')
+    record('SELF-CHECKS PASSED. Native UI check remains: click the formula at canvas center, then Alt-click twice; drag the selected anchor. Use buttons for fallback/locked/3D cases.')
+    return { result: 'passed', evidence, invocationCount, requestCount }
+  } catch (error) {
+    record(`FAILED: ${error instanceof Error ? error.message : String(error)}`)
+    return { result: 'failed', evidence, invocationCount, requestCount }
+  }
+}
+
+document.getElementById('run-checks')!.addEventListener('click', () => { void runSelfChecks() })
+document.getElementById('show-overlap')!.addEventListener('click', () => showOverlap())
+document.getElementById('show-fallback')!.addEventListener('click', () => showOverlap(true))
+document.getElementById('show-locked')!.addEventListener('click', () => mount({
+  labels: [{ id: 'locked', text: '$\\frac{x}{y}$', layer: 1, position: { x: 0, y: 0, z: 0 }, style: { fontSize: 40 } }],
+  layers: [{ value: 1, name: 'Locked', locked: true }],
+}))
+document.getElementById('show-drag')!.addEventListener('click', () => {
+  mount({ ambientDimension: 3, labels: [{ id: 'drag3d', text: '$F^{(1)}L$', position: { x: 0, y: 0, z: 0 }, style: { fontSize: 36 } }] })
+  api.select({ kind: 'label', id: 'drag3d' })
+})
+mount({ labels: [
+  { id: 'formula', text: '$F^{(1)}L$' },
+  { id: 'alpha', text: '$\\alpha \\colon f \\Rightarrow g$' },
+  { id: 'japanese', text: '日本語 $\\frac{x}{y}$' },
+] })

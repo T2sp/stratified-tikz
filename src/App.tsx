@@ -11,6 +11,7 @@ import {
   type SetStateAction,
 } from 'react'
 import './App.css'
+import type { SvgLabelRuntime } from './rendering/labels/svgLabelRuntime.ts'
 import cameraReferenceGraphicUrl from './assets/camera-3d-coords.svg'
 import {
   defaultExampleId,
@@ -639,7 +640,23 @@ function labelVisibilityPolicyFromSelectValue(
     : defaultVisibilityOptions.labelVisibility
 }
 
-function App() {
+/** Development fixture diagnostics are serialized, read-only observations.
+ * Inputs, document replacement, selection, and history still use the App UI. */
+export type AppLabelBrowserSnapshot = Readonly<{
+  json: string
+  history: string
+  selection: string
+  labelDocumentRevision: number
+}>
+
+type AppProps = Readonly<{
+  labelBrowserTest?: Readonly<{
+    runtime: SvgLabelRuntime
+    observe(snapshot: AppLabelBrowserSnapshot): void
+  }>
+}>
+
+function App({ labelBrowserTest }: AppProps = {}) {
   const [selectedExampleId, setSelectedExampleId] =
     useState<ExampleId>(defaultExampleId)
   const [exampleBarState, setExampleBarState] =
@@ -847,6 +864,8 @@ function App() {
     useState<SvgPreviewBackgroundMode>(defaultSvgPreviewBackgroundMode)
   const [svgPreviewExportStatus, setSvgPreviewExportStatus] =
     useState<string>('')
+  // Runtime document ownership, deliberately outside Diagram and undo history.
+  const [labelDocumentRevision, setLabelDocumentRevision] = useState(0)
   const [showCoordinateAnchors, setShowCoordinateAnchors] =
     useState<boolean>(true)
   const [tikzExportMode, setTikzExportMode] =
@@ -1000,6 +1019,16 @@ function App() {
   )
   const diagramMatchesSelectedExample =
     editableDiagramSignature === selectedExampleDiagramSignature
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      labelBrowserTest?.observe({
+        json: editableDiagramSignature,
+        history: JSON.stringify(history),
+        selection: JSON.stringify(selectedElement),
+        labelDocumentRevision,
+      })
+    }
+  }, [editableDiagramSignature, history, selectedElement, labelDocumentRevision, labelBrowserTest])
   const effectiveExampleBarState = shouldCollapseExampleBarForDiagramChange(
     diagramMatchesSelectedExample,
   )
@@ -1440,6 +1469,7 @@ function App() {
   function selectExample(exampleId: ExampleId): void {
     const nextExample = getExampleOption(exampleId)
     const nextDiagram = cloneDiagram(nextExample.diagram)
+    setLabelDocumentRevision((revision) => revision + 1)
 
     setSelectedExampleId(exampleId)
     if (effectiveExampleBarState === 'compact') {
@@ -1905,6 +1935,7 @@ function App() {
     diagram: Diagram,
     warnings: readonly string[],
   ): void {
+    setLabelDocumentRevision((revision) => revision + 1)
     setPendingSymbolicImport(null)
     setSymbolicImportDrafts([])
     setSymbolicImportStatus('')
@@ -8698,6 +8729,8 @@ function App() {
               {renderLayerManagerOverlay()}
               <SvgDiagram
                 diagram={editableDiagram}
+                labelRuntime={import.meta.env.DEV ? labelBrowserTest?.runtime : undefined}
+                labelDocumentRevision={labelDocumentRevision}
                 fitToView
                 cameraOverride={previewCameraOverride}
                 cameraViewAdjustment={previewCameraAdjustment}

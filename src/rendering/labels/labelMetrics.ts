@@ -252,10 +252,13 @@ export function createBrowserTextMeasurementProvider(): TextMeasurementProvider 
     context.textAlign = 'left'
     context.textBaseline = 'alphabetic'
     context.direction = 'ltr'
+    // Match SvgTexLabel explicitly, including exported SVG without app CSS.
+    context.fontKerning = 'normal'
+    context.textRendering = 'optimizeLegibility'
     return context
   }
   return Object.freeze({
-    identity: 'browser-canvas-text-v1',
+    identity: 'browser-canvas-text-v2',
     async ready(font: LabelFont, text = 'Mg'): Promise<void> {
       if (typeof document === 'undefined' || document.fonts === undefined) {
         throw new LabelMetricsError('font', 'Browser font readiness is unavailable')

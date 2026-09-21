@@ -60,9 +60,9 @@ without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
 ## Label Preview Input Contract (Phase 31A)
 
-Phase 31A defines the pure parser and fallback contract for future typeset label
-preview. It does not connect the parser to production rendering or change the
-appearance of existing labels. The independent [Phase 31B adapter](./LABEL_ADAPTER.md)
+Phase 31A defines the pure parser and fallback contract. Phase 31C connects free
+labels to the production SVG Preview through the shared `SvgTexLabel` renderer.
+The [Phase 31B adapter](./LABEL_ADAPTER.md)
 now separates true math advance from a conservative enclosure of retained SVG
 ink, with exact whole-source fallback for unsupported geometry or negative total
 advance. Native-module recovery now retires the complete lazy MathJax Worker
@@ -77,8 +77,9 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Canvas integration and typeset SVG export remain planned in
-[Phases 31C–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Path inline-node integration, waiting for settled labels during SVG export, and
+the combined audit remain assigned to
+[Phases 31D–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -128,7 +129,7 @@ The TeX body is retained exactly, excluding only its outer delimiters. Unknown
 math commands such as `$\unknowncommand{x}$` are parsed as math and left for
 the adapter to validate; the parser neither evaluates nor expands macros.
 Physical newlines inside math stay in the same run, including in matrices.
-Ordinary text newlines will separate visual lines in the future renderer;
+Ordinary text newlines separate visual lines in the free-label renderer;
 CRLF may be treated as one visual break without rewriting the original source.
 
 ### Results, Bounds, and Exact-Source Fallback
@@ -152,17 +153,381 @@ successful text run displaying `Cost $5`, but `Cost \$5 $x` falls back to the
 entire original source, retaining the backslash and unmatched dollar. Leading,
 trailing, and repeated spaces, tabs, LF, and CRLF remain exact in `source`.
 
-The future renderer must also use the latest complete original input for
+The free-label renderer also uses the latest complete original input for
 pending conversions, undefined math commands, TeX/output errors, resource
 failures, and bounded-work failures. Literal fallback displays every physical
 source newline as a visual break (CRLF may be one break) and inserts source as
-text, never HTML. It must not show an error SVG, substitute a message, retain a
-previous formula, or partly typeset a failed label. Failure in one label must
-not suppress other labels or diagram geometry. Successful output will combine
+text, never HTML. It never shows an error SVG, substitutes a message, retains a
+previous formula, or partly typesets a failed label. Failure in one label does
+not suppress other labels or diagram geometry. Successful output combines
 self-contained SVG math geometry with ordinary SVG text, without
 `foreignObject` or rasterized formulas. MathJax is not a full LaTeX engine:
 arbitrary packages, document preambles, and external style-file macros are
 outside this bounded preview language.
+
+### Free-label rendering and editing (Phase 31C)
+
+Valid free-label math, including fractions and mixed Japanese text/math, uses
+self-contained SVG geometry alongside ordinary SVG text. Pending and failed
+labels show their complete current source. Leading, trailing, and repeated
+spaces remain visible; tabs advance to four-space tab stops from the line start.
+LF, CR, and CRLF make physical lines in ordinary text and literal fallback;
+newlines inside successful math stay inside that formula. The original string
+also remains available as the label's accessible description. Empty labels
+have no visible or selectable text geometry.
+
+The text font is explicitly the Preview's sans-serif font stack and is measured
+after browser font readiness. The existing `style.fontSize * 1.35` scale remains.
+All nine anchors align the overall measured rectangle, including tall math,
+descenders, and multiple lines. Drawing and overlap picking use the same
+committed local bounds, projected at the current model position. Ordinary click,
+Alt/Option-click cycling, layer locking/filtering, autoHide/autoDim, selected
+position markers, and work-plane-based drag handles keep their existing roles.
+
+Each Preview owns a derived label runtime. Source/font request identities and
+component subscription generations reject obsolete completions. Document
+replacement starts a new label ownership revision even when imported IDs are
+reused. Camera changes, movement, selection, color, and opacity reuse conversion
+results; font changes remeasure text while retaining valid math geometry.
+Measurement failure uses a finite literal layout. Runtime results and bounds
+never enter JSON, Undo/Redo, or either TikZ output; the Inspector continues to
+edit the raw source.
+
+For pathological inputs, the display font is capped at 4096 SVG units and
+unavailable text metrics use bounded emergency spacing. The complete source
+and saved style remain unchanged.
+
+Only free labels use this integration in 31C. Path inline nodes remain for 31D;
+coordinate names, axis captions, handles, saved path identifiers, and attached
+stratum metadata are unchanged.
+
+### Free-label verification
+
+Phase 31C browser acceptance is **verified on 2026-09-21**. The authorized
+`node scripts/automation/run-phase.mjs 31C verify` run exited 0: all 2,298 tests,
+build, diff check, `check:label-assets`, and `check:free-labels` passed. Chrome
+153.0.8010.52 completed all eight required groups, including 18 boundary matrix
+cases and real App workflows, with 99 passing records and no incomplete groups,
+unexecuted groups or page errors. Earlier failures and blocked attempts are
+retained below as history; the complete authorized result supersedes them.
+
+The parent report and command logs are in
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31c-manual-wU4DY3`.
+`verification.json` records the unchanged checkout before/after verification;
+`05-check-free-labels/artifacts/free-labels-evidence.json` records `passed` /
+`complete`, individual observations, screenshots, downloads and checkout identity.
+The verified revision is `476a39f3315eaeb6d0c85bd95e98ab44a4c0aede` plus tracked
+diff SHA-256 `75fec69996c3603806f0a4855f78c66ee45aa7229bb8fc77fd166a65d6590497`,
+with no untracked files. Subsequent changes only update these documentation
+outcomes. Strict fixture TypeScript, targeted ESLint and all four script syntax
+checks also passed. Build retains its nonblocking chunk-size warning.
+
+The latest reported tab failure (manual run `stz-phase31c-manual-jPvNY7`)
+exposed a second oracle issue: multiplying a rounded one-space SVG advance
+selected the wrong four-space stop near a boundary. At 32.4px it expected
+282.5 while the actual next fragment began at 310.10882568359375.
+`measureSvgTabStop` now measures complete whitespace prefixes independently,
+bracketing the fragment between consecutive stops. Its expected position is
+310.109375 (delta -0.00054931640625); the 0.5-unit tab tolerance is unchanged.
+Both font sizes, literal edge whitespace, raw source/CRLF preservation and
+default-font negative controls passed. The diagnostic is retained at
+`/private/tmp/stz-phase31c-tab-grid-diagnostic.json`.
+
+Execution then exposed additional test setup assumptions, corrected without
+production changes:
+
+- Occlusion labels explicitly share the sheet's layer so `layerThenDepth`
+  permits occlusion. Restored autoDim selection checks normal label selection,
+  then Alt cycling through sheet and label, with one callback per click.
+- Authored anchor translations still match model projections within `1e-5`.
+  Native matrix readback separately allows one coordinate-dependent float32
+  ULP plus `1e-5`; Chrome rounded x=533.1764222669804 to 533.1764526367188.
+  Ink containment, hit geometry and boundary tolerances are unchanged.
+- Real App checks use its pan number inputs to bring long pending text inside
+  the canvas, then remeasure client coordinates. Raw text and pointer probes
+  are unchanged; pan must preserve JSON/history. After obsolete completions,
+  corrective pan is forbidden so it cannot hide an incorrect position change.
+  The TikZ mode selector also accounts for option text inside its wrapping label.
+
+**M1's required-browser-evidence gap is closed for this verified snapshot.**
+
+The strengthened `npm run check:free-labels` uses a **Vite development server**,
+production `SvgDiagram`, and a separate fixture mounting the real `App`. These
+fixtures are not production build entries. No dependencies or MathJax versions
+changed. `App` has only a development-gated runtime injection and read-only,
+serialized diagnostics; editor, load/save, revision, selection, and history
+handlers remain the production handlers.
+
+The harness contains these required assertions, all observed in the complete
+authorized browser run:
+
+- Independent alpha-pixel extents of an isolated visible-content SVG clone.
+  Native descendant bounds and full `getScreenCTM()` transforms size the raster;
+  neither published bounds nor the picking rectangle sizes the oracle. Editor
+  overlays are excluded and painted MathJax rectangles/fraction rules retained.
+  Raster density is four samples per SVG unit, capped at 4096 on the longest
+  side. Allowances per published edge are 0.35 em + 1 SVG unit horizontally,
+  plus independently measured literal edge whitespace, and 0.85 em + 1 vertically
+  for font leading; ink may protrude by at most 1 unit. Hit/published agreement
+  tolerance is 0.01. These finite allowances distinguish ink from advance and
+  leading without permitting arbitrary inflation. Negative controls inflate or
+  displace both published and hit boxes by 8 em, require rejection with unchanged
+  ink, and restore the DOM in `finally`. Retained fixture self-checks use this
+  same independent oracle.
+- All nine anchors, plus 18 required boundary cases: tall nested fraction
+  `$\frac{1}{1+\frac{x}{1+\frac{y}{z}}}$` and compact
+  `$\mathord{\mathord{\mathord{\alpha}}}$`, each with center/north/east in 2D,
+  after pan/zoom, and after a changed 3D camera at nonzero depth. Each case records
+  22 real pointer probes, canvas/client transforms, actual selected targets and
+  callback counts. Blank canvas clicks clear selection before probes. Normal
+  clicks use the hit rectangle; Alt cycling retains 6/4 units padding plus
+  8 units tolerance (14 horizontally, 12 vertically). Compact cases also probe
+  inside the obsolete raw-character estimate and outside the measured hit area.
+  Glyph clicks, mixed compiled/fallback cycling, and camera/position/paint/
+  selection conversion counts are checked separately.
+- Held completions record started requests, current font size, held state, and
+  delivery even after hidden/deleted/unmounted DOM disappears. Newer completion
+  precedes obsolete success or failure, with independent bounds and real boundary
+  and stale-layout-only clicks at pending, current-ready, and obsolete-completed
+  stages. Completion alone must preserve model, history, both TikZ modes, current
+  position/style and selection. Releases wait for request promises and two
+  animation frames. Locking removes a previously usable drag handle while pending;
+  autoHide transitions from pending autoDim and stays hidden after delivery.
+  Restored visibility/unlocking, hidden/filtered layers and autoDim remain covered.
+- Real App textarea edits valid → invalid → valid; actual JSON import/download/
+  reload with delimiters, backslashes, Unicode, spaces, physical newlines and
+  exact CRLF; actual Undo/Redo while held and preservation of an existing redo
+  branch; actual JSON document replacement with reused IDs and observed App
+  document revisions. Both production TikZ modes and current SVG cloning remain
+  checked. Runtime state is never assigned into App model/history by the fixture.
+
+Historical verification on 2026-09-21, at base revision
+`4b25b823fab52157eef0b7c9b313a199c9d5aee5` plus this follow-up diff:
+
+| Check | Historical result |
+| --- | --- |
+| Asset preparation | exit 0 |
+| Focused layout/runtime/picking | exit 0; 23 passed (subset of full suite) |
+| `npm test` | exit 0; 2,281 passed, none failed/skipped |
+| `npm run build` | exit 0; nonblocking chunk-size warning |
+| Strict development-fixture TypeScript | exit 0 |
+| Targeted lint and all four browser-script syntax checks | exit 0 |
+| App/SvgDiagram lint comparison against HEAD | unchanged 10 errors / 4 warnings; raw lint exit 1, baseline comparison passed |
+| `git diff --check` | exit 0 |
+| Strengthened free-label browser acceptance | **exit 1 before assertions**, `listen EPERM: operation not permitted 127.0.0.1:5173` |
+
+Node was v26.9.0, resolved at `/opt/homebrew/Cellar/node/26.9.0/bin/node`.
+Installed Chrome was 153.0.8010.52 (read from its application metadata); **Chrome
+was not launched by this attempt**, so there is no observed browser version or
+browser pass for it. That session permitted workspace writes but had approval
+policy `never`; no escalation was available and no external development origin was
+configured. No browser-security or persistent runner settings were changed.
+
+Those historical verification logs/statuses are in
+`/private/tmp/stz-phase31c-verification.n21xIe`. The strengthened browser attempt
+is retained in `/private/tmp/stz-phase31c-browser-acceptance.2ni7DV`:
+`browser.log`, `browser.exit-status`, `free-labels-evidence.json`, `checkout.diff`,
+and `checkout-untracked.json`. The evidence records zero completed browser
+groups and all required groups unexecuted. **No screenshots, measured extents,
+pointer results, race observations or App observations were produced**, since
+server startup failed. The tracked code diff SHA-256 for that attempt is
+`a906ef520e7189ac24fbdc8e918a10abe774ee7257b4cc5134ddc764376663e7`;
+per-file hashes and complete untracked harness contents are in the evidence.
+After that blocked attempt, the App script's multiline-input and stale-point
+assertions were refined and syntax/lint checked again. No browser assertion ran
+on either snapshot; the denied bind was not repeated without an environment
+change. `final-handoff.json`, `final-checkout.diff`, and
+`final-pending-files.tar.gz` in the same evidence directory identify and retain
+the final pending implementation (including untracked files). Earlier blocked
+review attempts remain historical; their reported results are not this
+follow-up's results. The review attempt at
+`/private/tmp/stz-review31c-browser/free-labels-evidence.json` likewise failed
+before launch at `development-server-listen`, with `browserVersion: null`, no
+executed assertions and all eight groups incomplete/unexecuted.
+
+The subsequent **authorized Terminal run** is retained in
+`/private/tmp/stz-phase31c-browser-acceptance.POb7Fz`, including
+`free-labels-evidence.json`, `browser.log`, `browser.exit-status`, `failure.png`,
+and checkout artifacts. It used Node v26.9.0 and **launched Chrome
+153.0.8010.52** against `http://127.0.0.1:5174`, at revision
+`4b09c181dcea6b7db9f46daf7d82ef322ef4e3ee` with only
+`prompts/phase-31c-fix.md` modified (tracked diff SHA-256
+`593ad6f08a702fd53493f298e44baeaa66cd47cfca3d2bb4aa8d249e748fe260`, no
+untracked files). The command exited **1** at `renderer-fixture` on
+`Tab advances to a measured four-space stop`. Initial renderer/source/state/
+whitespace assertions executed; no group completed. Its empty `completed`
+array does not mean zero assertions ran. The old `unexecuted` calculation used
+an empty grouped evidence array and incorrectly classified this partial renderer
+execution. Geometry, races, policy, App and SVG-cloning groups did not run.
+
+The separate permitted diagnostic script and measurements are
+`/private/tmp/stz-phase31c-tab-diagnostic.mjs` and
+`/private/tmp/stz-phase31c-tab-diagnostic.json`. The displayed fallback used
+normal weight 400, size 24.3px and family
+`Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif`, but computed
+`font` shorthand was empty. Assigning it to Canvas silently retained
+`10px sans-serif`: space advance 2.7783203125, instead of 5.382659912109375 with
+explicit displayed font longhands. The first SVG fragment advanced 212.21875;
+the incorrect oracle expected tab x = 222.265625, while production placed the
+next fragment at 215.306396484375, exactly matching explicit-font Canvas
+measurement. Independent SVG-space measurement gave width 5.390625 and
+expected x = 215.625, within the existing 0.5-unit tolerance (delta about
+0.319). This diagnoses a **harness font oracle defect**, not a production
+tab-layout defect. It proves neither the later scenarios nor a full acceptance
+pass; production metrics and placement and the tab tolerance remain unchanged.
+
+The first targeted correction on revision
+`476a39f3315eaeb6d0c85bd95e98ab44a4c0aede` plus the pending diff uses
+`measureSvgTextAdvance` in the development fixture oracle. It measures temporary
+SVG text clones with the displayed font and spacing longhands, preserves
+whitespace, and removes each clone in `finally`. Both tab-space measurement and
+the alpha-pixel oracle's finite literal-edge whitespace allowance use this
+independent path. Painted fraction rules, negative controls and all existing
+tolerances are retained. No production renderer, metrics, picking, App or
+adapter code changed, and no dependencies or pinned versions changed.
+
+Browser regressions now check tab advance and literal leading/trailing spaces
+at the initial font and after changing the model font size to 24. They verify
+current clone font/spacing properties and reject the unrelated default 10px
+Canvas measurement after deliberately assigning empty or invalid shorthand.
+The tab tolerance remains 0.5 SVG units; complete-source and CRLF-as-one-line-
+break assertions remain active. Fragment text, x/y, SVG advance, computed font
+shorthand/longhands, clone properties, measured spaces, expected stop, actual x
+and delta are saved as diagnostics **before** assertions. Started groups and
+checkpoints distinguish partial execution from no execution; diagnostics do
+not count as passing evidence, and a group completes only after all of its
+assertions return. At that child-session handoff these regressions were
+implemented but not browser-verified; the later authorized run above verifies them.
+
+Earlier child-session non-browser verification used Node v26.9.0 with
+`PATH=/opt/homebrew/bin:$PATH`; logs and individual exit-status files are in
+`/private/tmp/stz-phase31c-checks.LSbuyz`:
+
+| Check | Earlier child-session result |
+| --- | --- |
+| Asset preparation | exit 0 |
+| Focused layout/runtime/picking | exit 0; 23 passed (included in full suite) |
+| `npm test` | exit 0; 2,298 passed, none failed/skipped |
+| `npm run build` | exit 0; nonblocking chunk-size warning |
+| Strict fixture TypeScript | exit 0 |
+| Targeted ESLint | exit 0 |
+| All four browser-script syntax checks | exit 0 |
+| `git diff --check` | exit 0 |
+| Corrected `npm run check:free-labels` | exit 1 at development-server startup; no browser assertions executed |
+
+No Node tests were added by this fix; the full-suite count includes tests from
+the preserved later checkout and must not be added to the focused count.
+Repository-wide lint was not run; the historical App/SvgDiagram baseline debt
+of 10 errors and 4 warnings is separate from the passing targeted lint, and
+neither production file was modified.
+
+The earlier corrected browser attempt is in
+`/private/tmp/stz-phase31c-browser-acceptance.Rzi8z7`. It ran the exact resolved
+command below, with no inherited `STZ_BROWSER_BASE_URL`, and failed with
+`listen EPERM: operation not permitted 127.0.0.1:5173` at
+`development-server-listen`. That child session's approval policy was `never`;
+no escalation was permitted. The denied bind was not retried, no port was changed
+to evade it, and no browser or persistent sandbox settings were changed.
+`browser.exit-status` is 1 and `free-labels-evidence.json` records
+`browserVersion: null`: Chrome did not launch. Started/completed groups,
+checkpoints, diagnostics and evidence are empty; all eight groups remain
+incomplete/unexecuted, and no screenshot or geometry/pointer/race/App/export
+observations were produced. This fresh environment block does not replace the
+earlier authorized run's observed tab assertion or its font diagnosis.
+
+The browser snapshot records revision
+`476a39f3315eaeb6d0c85bd95e98ab44a4c0aede`, tracked diff SHA-256
+`a2cd3360dcd02d5e6a2a0953a083744545070efff8bd3d43db477f2919b71d6d`, and no
+untracked files. Its six modified files are `docs/PREVIEW_UI.md`,
+`docs/ROADMAP.md`, `scripts/checkFreeLabels.mjs`,
+`scripts/checkFreeLabelGeometry.mjs`, `scripts/checkFreeLabelRaces.mjs`, and
+`scripts/fixtures/labelBrowserOracle.ts`. Browser logs/status and
+`checkout.diff` / `checkout-untracked.json` retain that exact snapshot. Later
+documentation-only updates are included in the final handoff files
+`/private/tmp/stz-phase31c-checks.LSbuyz/final-checkout.json`,
+`final-checkout.diff`, and `final-checkout-untracked.json`. Preserve the complete
+current checkout for the parent run; the historical base alone is insufficient.
+
+At that handoff the parent runner was scheduled to run `check:label-assets` and
+`check:free-labels` outside the child sandbox, retaining logs and artifacts and
+stopping on failed or incomplete verification. M1 remained open until the
+complete authorized parent run recorded at the start of this section.
+
+To reproduce the check, run the harness in the parent runner's authorized environment or an
+authorized Terminal/CI checkout containing the complete current pending diff;
+a handoff is not acceptance. Check that `STZ_BROWSER_BASE_URL` is unset unless
+an external development origin is intended. The resolved external tool paths
+and exit-status-preserving command are:
+
+```bash
+(
+  cd /Users/takamatoshinori/Desktop/stratified-tikz || exit 1
+  export PATH=/opt/homebrew/bin:$PATH
+  STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
+  printf 'Evidence directory: %s\n' "$STZ_31C_EVIDENCE_DIR"
+  node scripts/prepareMathjaxAssets.mjs >"$STZ_31C_EVIDENCE_DIR/prepare.log" 2>&1
+  STZ_31C_PREPARE_STATUS=$?
+  printf '%s\n' "$STZ_31C_PREPARE_STATUS" >"$STZ_31C_EVIDENCE_DIR/prepare.exit-status"
+  if [ "$STZ_31C_PREPARE_STATUS" -ne 0 ]; then
+    cat "$STZ_31C_EVIDENCE_DIR/prepare.log"
+    exit "$STZ_31C_PREPARE_STATUS"
+  fi
+  STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+  STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
+  npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
+  STZ_31C_BROWSER_STATUS=$?
+  printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
+  printf 'Browser exit status: %s\n' "$STZ_31C_BROWSER_STATUS"
+  if [ "$STZ_31C_BROWSER_STATUS" -ne 0 ]; then
+    tail -n 60 "$STZ_31C_EVIDENCE_DIR/browser.log"
+  fi
+  exit "$STZ_31C_BROWSER_STATUS"
+)
+```
+
+An explicitly set `STZ_BROWSER_BASE_URL` must serve **this checkout and its
+development fixtures** (for example, an authorized `npm run dev` server).
+A production build does not serve the fixtures. A successful run must retain
+`free-labels-evidence.json` with every completion group, per-scenario geometry/
+pointer/race/App observations, `geometry-*.png`, race/policy screenshots,
+`app-*.png`, App downloaded JSON, `settled-export.png`, logs/status, and checkout
+identity. Failures retain partial evidence and a failure screenshot if a page
+was reached; they never emit an overall pass. Acceptance requires exit 0,
+`result: "passed"`, `stage: "complete"`, an actually launched browser version,
+empty `incompleteGroups`, `unexecuted` and `pageErrors`, and all eight completed
+groups: `existing-renderer-regressions`, `independent-oracle-negative-controls`,
+`boundary-anchor-camera-matrix`, `inverted-success-and-failure-races`,
+`pending-lock-and-autohide`, `deletion-and-unmount`,
+`real-App-input-JSON-history-reused-ID-load`, and `current-SVG-cloning`.
+
+Reproduce the non-browser checks with:
+
+```bash
+export PATH=/opt/homebrew/bin:$PATH
+node scripts/prepareMathjaxAssets.mjs
+node --test tests/rendering/svgLabelLayout.test.ts tests/rendering/svgLabelRuntime.test.ts tests/rendering/svgLabelPicking.test.ts
+npm test
+npm run build
+node node_modules/typescript/bin/tsc -p scripts/fixtures/tsconfig.json --noEmit
+for script in scripts/checkFreeLabel*.mjs; do node --check "$script" || exit 1; done
+node node_modules/eslint/bin/eslint.js \
+  scripts/checkFreeLabel*.mjs scripts/fixtures/freeLabels.tsx \
+  scripts/fixtures/freeLabelsApp.tsx scripts/fixtures/labelBrowserOracle.ts \
+  src/rendering/SvgTexLabel.tsx src/rendering/labels/svgLabelLayout.ts \
+  src/rendering/labels/svgLabelRuntime.ts src/rendering/svgLabelBounds.ts \
+  src/rendering/svgHitTesting.ts tests/rendering/svgLabelLayout.test.ts \
+  tests/rendering/svgLabelRuntime.test.ts tests/rendering/svgLabelPicking.test.ts
+git diff --check
+```
+
+The reproducible fixture config extends application compiler options and enables
+strict checking plus Vite/DOM types for all development TS/TSX fixtures. Compare
+App/SvgDiagram lint separately against HEAD; repository-wide lint is skipped
+because that baseline is not clean. No adapter/loading/build configuration
+changed. The authorized parent run also passed the independent Phase 31B
+`check:label-assets`; its evidence remains separate from the Phase 31C results.
+Phase 31D, 31E, and 31F are deferred.
 
 ## Export SVG
 
@@ -177,6 +542,12 @@ exported viewBox behind the diagram.
 Export includes the current SVG Preview view, including visible diagram
 geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
 preview-only data attributes are removed from the exported SVG.
+
+Export currently clones what is visible: settled free-label formulas remain SVG
+geometry, and pending/failed labels remain their current literal source.
+Transparent and white backgrounds are supported, and label hit rectangles and
+selected-position markers are excluded. Waiting for a consistent settled-label
+snapshot is deferred to Phase 31E.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently

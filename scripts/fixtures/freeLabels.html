@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Production free-label browser checks</title>
+    <style>
+      body { margin: 0; font: 14px system-ui, sans-serif; }
+      #root { width: 900px; height: 700px; }
+      svg.svg-diagram { width: 900px; height: 700px; }
+      #checks { position: absolute; left: 910px; top: 10px; width: 300px; }
+      #checks button { display: block; margin: 8px 0; padding: 6px; }
+      #check-status { white-space: pre-wrap; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <aside id="checks">
+      <button id="run-checks">Run label browser checks</button>
+      <button id="show-overlap">Show compiled overlap</button>
+      <button id="show-fallback">Show fallback overlap</button>
+      <button id="show-locked">Show locked formula</button>
+      <button id="show-drag">Show 3D label drag</button>
+      <p id="interaction-status">No selection</p>
+      <pre id="check-status">Production SvgDiagram is ready for browser verification.</pre>
+    </aside>
+    <script type="module" src="./freeLabels.tsx"></script>
+  </body>
+</html>

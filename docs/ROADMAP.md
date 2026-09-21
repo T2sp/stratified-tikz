@@ -1094,7 +1094,8 @@ The 2026-09-20 (22:55 JST) authorized-terminal run at `880cdde` rebuilt the same
 code and passed the unchanged browser smoke (exit 0) in Chrome 153.0.8010.52.
 Actual additional-font loading, same-service native-import recovery, Worker
 retirement, and standalone SVG containment are verified; earlier sandbox
-`EPERM` attempts are historical. 31C through 31F remain planned.
+`EPERM` attempts are historical. 31C is implemented with its production-browser
+acceptance check pending; 31D through 31F remain planned.
 Implement and review the subphases in order; mark each complete only after its
 own acceptance checks pass.
 
@@ -1178,14 +1179,88 @@ run. The production canvas is unchanged. See
 
 ### Phase 31C: Free-label SVG rendering, measured placement, and picking
 
-Status: planned.
+Status: implemented and browser acceptance verified on 2026-09-21. The authorized
+parent `31C verify` run passed tests, build, diff check and both required browser
+commands. All eight 31C groups completed with no page errors or unexecuted groups.
 
-- Integrate free labels with the shared renderer, current-source fallback,
-  revision-aware async state, and protection against stale completions.
-- Share measured layout between rendering and picking for all nine anchors,
-  preserving font scale, colors, opacity, layer rules, and 3D visibility.
-- Reuse conversion results during moves, pan/zoom, and camera changes. Verify
-  production selection and lifecycle behavior in a browser.
+- Free labels now use `SvgTexLabel` and a Preview-owned runtime with complete
+  current-source fallback, subscription generations, and document ownership
+  revisions. Derived state stays outside the model and Undo/Redo.
+- Measured text/math layout supplies all nine anchors and revision-matched
+  picking bounds. The existing font scale, explicit paint, layer/occlusion
+  rules, selection markers, and drag paths are preserved.
+- Conversion geometry is reused across duplicate labels and measurement
+  changes; placement, camera, selection, and paint are separate inputs.
+- Targeted M1 follow-up extends the development-server browser harness with
+  independent raster ink bounds and negative controls; 18 tall/compact anchor/
+  camera boundary cases; instrumented inverted completions and pending lock/
+  autoHide transitions; and real App editor, JSON, Undo/Redo and reused-ID loading.
+  The old transparent-hit-rectangle bounds assertion is replaced. Coverage is
+  implemented; the early authorized run executed only initial renderer
+  assertions, leaving complete evidence pending until the final run below.
+- Historical 2026-09-21 verification at `4b25b823` plus the follow-up diff: focused
+  23 tests (subset of the full 2,281) passed; build, strict fixture typecheck,
+  targeted lint, all browser-script syntax checks and diff check passed. Build
+  emitted only a nonblocking size warning. App/SvgDiagram lint debt remains
+  10 errors / 4 warnings against HEAD; repository-wide lint was not run.
+- The historical strengthened browser command exited **1 before assertions** at Vite
+  startup: `listen EPERM: operation not permitted 127.0.0.1:5173`. No Chrome
+  launch or browser observations occurred in this attempt. Evidence (including
+  explicit unexecuted groups and checkout diff identity) is in
+  `/private/tmp/stz-phase31c-browser-acceptance.2ni7DV`; the separate review's
+  `/private/tmp/stz-review31c-browser` attempt was also blocked before launch.
+- The later authorized Terminal run at `4b09c181dcea6b7db9f46daf7d82ef322ef4e3ee`
+  plus a prompt-only diff launched Chrome 153.0.8010.52 using Node v26.9.0 and
+  development origin `http://127.0.0.1:5174`. It exited **1** at
+  `renderer-fixture` on `Tab advances to a measured four-space stop`. Evidence
+  and a failure screenshot are in `/private/tmp/stz-phase31c-browser-acceptance.POb7Fz`.
+  Initial assertions ran, but `completed: []` means no complete group; its old
+  `unexecuted` field incorrectly classified partial renderer progress.
+- The independent `/private/tmp/stz-phase31c-tab-diagnostic.json` explains that
+  failure: empty computed `font` left Canvas at its unrelated default 10px font.
+  Production tab placement exactly matched the explicit displayed-font Canvas
+  measurement, and independent native SVG space measurement was within the
+  unchanged 0.5-unit tolerance. This is a harness defect, not evidence of a
+  production layout defect or a complete browser pass.
+- The targeted fix at `476a39f3315eaeb6d0c85bd95e98ab44a4c0aede` plus the pending
+  diff uses temporary SVG text clones with current displayed font/spacing for
+  tab stops and literal-edge whitespace. New browser regressions cover empty/
+  unusable shorthand, reject unrelated default-10px metrics, and check a changed
+  font without widening tolerances. Diagnostics are saved before assertions;
+  started groups/checkpoints distinguish partial execution from no execution.
+  Production code is unchanged. These regressions subsequently passed in the
+  complete authorized browser run.
+- Earlier child-session checks passed with Node v26.9.0: 23 focused tests (included in all
+  2,298 tests, none failed/skipped), build, strict fixture TypeScript, targeted
+  lint, all four script syntax checks and diff check. Build emitted only the
+  nonblocking chunk-size warning. Logs are in
+  `/private/tmp/stz-phase31c-checks.LSbuyz`; final checkout metadata/diff in its
+  `final-checkout.*` files include the documentation updates.
+- The corrected child-session browser attempt in
+  `/private/tmp/stz-phase31c-browser-acceptance.Rzi8z7` exited **1** at
+  `development-server-listen` with `EPERM` on `127.0.0.1:5173`. Chrome did not
+  launch, all eight groups are incomplete/unexecuted, and no browser
+  observations were produced. That session prohibited escalation; the parent
+  runner subsequently executed both browser checks outside the child sandbox.
+  The prior authorized renderer assertion remains a distinct historical result.
+  M1 remained open at that handoff. See
+  [coverage, outcomes and authorized-run handoff](./PREVIEW_UI.md#free-label-verification).
+- The final authorized run is retained in
+  `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31c-manual-wU4DY3`.
+  Node v26.9.0: 2,298 tests passed; build and diff check passed; both browser
+  commands exited 0. Chrome 153.0.8010.52 completed all eight 31C groups with
+  99 passing records, including all 18 boundary matrix cases and the real App
+  editor/history/JSON/reused-ID workflows. The runner verified an unchanged
+  checkout. Strict fixture TypeScript, targeted lint and script syntax checks
+  also passed; the build warning remains nonblocking.
+  The follow-up corrects test-only whitespace rounding, same-layer occlusion
+  setup, native SVG matrix precision, overlap-cycle expectations, and App
+  framing/selector assumptions. Original tab/ink/picking tolerances are retained;
+  authored coordinates remain strict and native matrix readback uses float32
+  precision. Obsolete App completions must preserve position without corrective
+  pan. No production code changed. **M1's browser-evidence gap is closed.**
+- Inline-node integration (31D) and settled export preparation (31E) remain
+  deferred. Current SVG export continues to clone visible formulas/fallback.
 
 ### Phase 31D: Path inline-node TeX labels through the shared SVG renderer
 

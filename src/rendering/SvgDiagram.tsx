@@ -91,8 +91,10 @@ import {
   filledSurfaceStyleToSvgAttributes,
   hiddenCurveStyleToSvgStrokeAttributes,
   svgPathCrossingMarkerStyle,
-  svgLabelAnchorPlacement,
 } from './svgStyle'
+import { SvgTexLabel, type SvgTexLabelSnapshot } from './SvgTexLabel.tsx'
+import { createSvgLabelRuntime, type SvgLabelRuntime } from './labels/svgLabelRuntime.ts'
+import type { SvgFreeLabelBounds } from './svgLabelBounds.ts'
 import {
   curvedSheetSvgMeshesFromPreparedScene,
   type SvgCurvedSheetMesh,
@@ -181,6 +183,11 @@ export type SvgCanvasClickTarget =
 
 export type SvgDiagramProps = {
   diagram: Diagram
+  /** Replace this ownership revision when importing/replacing a document. */
+  labelDocumentRevision?: number | string
+  /** Optional owner for embedding/testing the shared production renderer. */
+  labelRuntime?: SvgLabelRuntime
+  onLabelLayoutChange?: (id: string, snapshot: SvgTexLabelSnapshot | null) => void
   width?: number
   height?: number
   fitToView?: boolean
@@ -299,6 +306,9 @@ const handleRadius = 5.6
 
 export function SvgDiagram({
   diagram: sourceDiagram,
+  labelDocumentRevision = 0,
+  labelRuntime: suppliedLabelRuntime,
+  onLabelLayoutChange,
   width = defaultWidth,
   height = defaultHeight,
   fitToView = false,
@@ -331,6 +341,17 @@ export function SvgDiagram({
   onCoordinateAnchorDragEnd,
   onCameraDrag,
 }: SvgDiagramProps): ReactElement {
+  const labelRuntime = useMemo(() => suppliedLabelRuntime ?? createSvgLabelRuntime(), [suppliedLabelRuntime])
+  // This map is written only by committed label layout effects and read only by
+  // event handlers. React owns/subscribes to the results inside SvgTexLabel.
+  const labelBounds = useMemo(() => {
+    // The document revision owns the map even when imported model IDs repeat.
+    void labelDocumentRevision
+    return new Map<string, SvgFreeLabelBounds>()
+  }, [labelDocumentRevision])
+  useEffect(() => () => {
+    if (suppliedLabelRuntime === undefined) labelRuntime.dispose()
+  }, [labelRuntime, suppliedLabelRuntime])
   const geometryHandlePointerControllerRef = useRef(
     createSvgGeometryHandlePointerController(),
   )
@@ -532,6 +553,13 @@ export function SvgDiagram({
             labelOcclusionById,
             visibilityOptions,
             onSelectionChange,
+            labelRuntime,
+            labelDocumentRevision,
+            (snapshot) => {
+              if (snapshot === null) labelBounds.delete(label.id)
+              else labelBounds.set(label.id, snapshot)
+              onLabelLayoutChange?.(label.id, snapshot)
+            },
           ),
           'label',
         ),
@@ -675,6 +703,7 @@ export function SvgDiagram({
           point: svgPoint,
           layerFilter,
           visibility: selectionCandidateVisibility,
+          labelBounds,
           showCoordinateAnchors,
           pathIntersectionCandidates,
         })
@@ -2558,6 +2587,9 @@ function renderLabel(
   labelOcclusionById: AnchorOcclusionById,
   visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
+  labelRuntime: SvgLabelRuntime,
+  documentRevision: number | string,
+  onLayout: (snapshot: SvgTexLabelSnapshot | null) => void,
 ): RenderItemElement {
   const occlusion = labelOcclusionById.get(label.id)
   const isHiddenBySurface = occlusion?.visibility === 'hidden'
@@ -2571,7 +2603,8 @@ function renderLabel(
       layer: label.layer,
       element: (
         <g
-          key={label.id}
+          key={`${documentRevision}:${label.id}`}
+          data-label-id={label.id}
           data-label-visibility="hidden"
           data-occluding-surface-id={occlusion.occludingFace?.sourceId}
         />
@@ -2594,14 +2627,14 @@ function renderLabel(
     isSelectable &&
     isSelectedElement(selectedElement, { kind: 'label', id: label.id })
   const fontSize = style.fontSize * 1.35
-  const anchorPlacement = svgLabelAnchorPlacement(style.anchor, fontSize)
 
   return {
     id: label.id,
     layer: label.layer,
     element: (
       <g
-        key={label.id}
+        key={`${documentRevision}:${label.id}`}
+        data-label-id={label.id}
         className={svgPreviewElementClassName(isIncludedByFilter, isSelectable)}
         opacity={previewElementOpacity(isIncludedByFilter)}
         pointerEvents={isSelectable ? undefined : 'none'}
@@ -2625,18 +2658,16 @@ function renderLabel(
             data-svg-export-exclude="true"
           />
         )}
-        <text
-          x={position.x}
-          y={position.y + anchorPlacement.dy}
-          fill={style.color}
+        <SvgTexLabel
+          runtime={labelRuntime}
+          source={label.text}
+          position={position}
+          color={style.color}
           opacity={style.opacity}
           fontSize={fontSize}
-          textAnchor={anchorPlacement.textAnchor}
-          dominantBaseline={anchorPlacement.dominantBaseline}
-          dx={anchorPlacement.dx}
-        >
-          {label.text}
-        </text>
+          anchor={style.anchor}
+          onLayout={onLayout}
+        />
       </g>
     ),
   }
