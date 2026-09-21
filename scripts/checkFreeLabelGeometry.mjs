@@ -67,13 +67,23 @@ export async function probeLabelBoundaries({ page, id, evidence, state, resetPoi
 
 function verifyIndependentAnchor(measurement, anchor, projected) {
   const { inkSvg, localToSvg, tolerances } = measurement
-  assert.ok(Math.abs(localToSvg.e - projected.x) < 1e-5 && Math.abs(localToSvg.f - projected.y) < 1e-5,
-    'Actual rendered anchor follows projected model coordinates')
+  const translation = /^translate\(([-+\d.eE]+)[ ,]+([-+\d.eE]+)\)$/u.exec(measurement.anchorTransform)
+  assert.ok(translation, 'Rendered anchor has a single translation')
+  const authored = { x: Number(translation[1]), y: Number(translation[2]) }
+  assert.ok(Math.abs(authored.x - projected.x) < 1e-5 && Math.abs(authored.y - projected.y) < 1e-5,
+    'Authored anchor follows projected model coordinates')
+  // Chrome exposes SVG matrices with float32-rounded translations. Keep the
+  // authored-coordinate check strict and bound only this native readback by
+  // one float32 ULP at the coordinate magnitude (about 0.00006 at x=533).
+  const nativeAllowance = Object.fromEntries(['x', 'y'].map((axis) =>
+    [axis, 2 ** (Math.floor(Math.log2(Math.max(1, Math.abs(projected[axis])))) - 23) + 1e-5]))
+  assert.ok(Math.abs(localToSvg.e - projected.x) <= nativeAllowance.x && Math.abs(localToSvg.f - projected.y) <= nativeAllowance.y,
+    'Native rendered anchor follows projected model coordinates within SVG matrix precision')
   const measuredX = anchor.includes('west') ? inkSvg.minX : anchor.includes('east') ? inkSvg.maxX : (inkSvg.minX + inkSvg.maxX) / 2
   const measuredY = anchor.includes('north') ? inkSvg.minY : anchor.includes('south') ? inkSvg.maxY : (inkSvg.minY + inkSvg.maxY) / 2
   assert.ok(Math.abs(measuredX - projected.x) <= tolerances.horizontal, `${anchor} ink horizontal placement within documented advance allowance`)
   assert.ok(Math.abs(measuredY - projected.y) <= tolerances.vertical, `${anchor} ink vertical placement within documented leading allowance`)
-  return { projected, measuredInkAnchor: { x: measuredX, y: measuredY },
+  return { projected, authored, nativeAllowance, measuredInkAnchor: { x: measuredX, y: measuredY },
     deviations: { x: measuredX - projected.x, y: measuredY - projected.y }, tolerances }
 }
 
@@ -110,7 +120,7 @@ async function negativeControls(page, id) {
   }, id)
 }
 
-export async function runGeometryChecks({ page, record, artifactDir }) {
+export async function runGeometryChecks({ page, record, artifactDir, startGroup, completeGroup }) {
   const state = () => page.evaluate(() => window.stzLabels.state())
   const mount = (options) => page.evaluate((next) => window.stzLabels.mount(next), options)
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
@@ -120,6 +130,7 @@ export async function runGeometryChecks({ page, record, artifactDir }) {
     await page.screenshot({ path, fullPage: true })
     return path
   }
+  await startGroup('independent-oracle-negative-controls')
   const anchors = ['center', 'north', 'south', 'east', 'west', 'north east', 'north west', 'south east', 'south west']
   const tall = '$\\frac{1}{1+\\frac{x}{1+\\frac{y}{z}}}$'
   const compact = '$\\mathord{\\mathord{\\mathord{\\alpha}}}$'
@@ -137,6 +148,9 @@ export async function runGeometryChecks({ page, record, artifactDir }) {
   }
   await record('independent-content-negative-controls-inflation-and-displacement', { controls,
     screenshot: await screenshot('negative-controls-restored') })
+
+  await completeGroup('independent-oracle-negative-controls')
+  await startGroup('boundary-anchor-camera-matrix')
 
   // A pointer physically over filled glyph ink still produces exactly one
   // outer-label callback: internal MathJax paths are not independent targets.
@@ -235,4 +249,5 @@ export async function runGeometryChecks({ page, record, artifactDir }) {
     assert.equal((await state()).invocationCount, conversionCount, 'Position/paint/opacity do not recompile')
     await record(`boundary-position-paint-reuse/${formula}/${anchor}`, { source, anchor, measurement: moved, probes, conversionCount })
   }
+  await completeGroup('boundary-anchor-camera-matrix')
 }

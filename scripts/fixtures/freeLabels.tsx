@@ -332,7 +332,7 @@ async function runSelfChecks() {
     api.filter(2)
     assertBrowser(getComputedStyle(displayed('visible').querySelector('rect')!).pointerEvents === 'none', 'Filtered label descendants honor outer pointer policy')
     for (const policy of ['autoHide', 'autoDim'] as const) {
-      mount({ ambientDimension: 3, occlusion: policy, labels: [{ id: 'occluded', text: '$x$', position: { x: 0, y: -1, z: 0 } }] })
+      mount({ ambientDimension: 3, occlusion: policy, labels: [{ id: 'occluded', text: '$x$', layer: 0, position: { x: 0, y: -1, z: 0 } }] })
       await waitSettled()
       const visibility = container.querySelector('[data-label-id="occluded"]')!.getAttribute('data-label-visibility')
       assertBrowser(visibility === (policy === 'autoHide' ? 'hidden' : 'dimmed'), `${policy} surface policy`)

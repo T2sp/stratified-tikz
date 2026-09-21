@@ -34,6 +34,9 @@ const scenarios = [
   'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
 ]
 const completed = []
+const started = []
+const checkpoints = []
+const diagnostics = []
 const evidence = []
 const pageErrors = []
 const environment = { nodeVersion: process.version, browserVersion: null,
@@ -43,12 +46,32 @@ const environment = { nodeVersion: process.version, browserVersion: null,
   baseUrl: process.env.STZ_BROWSER_BASE_URL ?? null }
 let browser, server, page
 let stage = 'playwright-import'
+let checkpoint = null
 async function save(result, error) {
   await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout,
-    completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
-    unexecuted: evidence.length === 0 ? scenarios : [],
-    coverageNote: 'A group is complete only after every assertion returns; partial progress is recorded in evidence.', evidence, pageErrors,
+    checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
+    unexecuted: scenarios.filter((name) => !started.includes(name)),
+    coverageNote: 'Started/checkpoints and diagnostics describe execution, not passing assertions. Evidence records passed scenarios; groups complete only after all their assertions return.',
+    diagnostics, evidence, pageErrors,
     error: error ? { message: error.message, stack: error.stack, code: error.code } : undefined }, null, 2) + '\n')
+}
+async function startGroup(group, name = group) {
+  assert.ok(scenarios.includes(group), `Known scenario group: ${group}`)
+  if (!started.includes(group)) started.push(group)
+  checkpoint = { group, name }
+  checkpoints.push(checkpoint)
+  await save('running')
+}
+async function completeGroup(group) {
+  assert.ok(started.includes(group) && !completed.includes(group), `Started, incomplete group: ${group}`)
+  completed.push(group)
+  await save('running')
+}
+async function observe(name, details) {
+  checkpoint = { group: checkpoint?.group, name }
+  checkpoints.push(checkpoint)
+  diagnostics.push({ name, ...details })
+  await save('running')
 }
 try {
   const moduleName = environment.playwrightModule
@@ -105,6 +128,7 @@ try {
   }
 
   const fallbackSource = '  "<>&"  \\textbf{bad}\t keep \\slash\r\n tail  '
+  await startGroup('existing-renderer-regressions', 'initial-renderer-source-state-and-whitespace')
   const sources = [
     { id: 'F', text: '$F^{(1)}L$' },
     { id: 'alpha', text: '$\\alpha \\colon f \\Rightarrow g$' },
@@ -134,22 +158,107 @@ try {
   for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(after[key], initial[key], `${key} unaffected by arrivals`)
   assert.equal(await page.locator('foreignObject, image').count(), 0)
   assert.equal(await page.locator('script:not([type="module"])').count(), 0)
-  const fallbackSpacing = await page.evaluate(() => {
-    const node = document.querySelector('[data-label-id="fallback"] [data-label-state]')
-    return Array.from(node.querySelectorAll('text'), (text) => ({
-      text: text.textContent, whiteSpace: getComputedStyle(text).whiteSpace, xmlSpace: text.getAttribute('xml:space'),
-      x: text.x.baseVal.getItem(0).value, y: text.y.baseVal.getItem(0).value, width: text.getComputedTextLength(),
-      spaceWidth: (() => { const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); context.font = getComputedStyle(text).font; return context.measureText(' ').width })(),
-      tspans: Array.from(text.querySelectorAll('tspan'), (span) => ({ text: span.textContent, x: span.getAttribute('x'), y: span.getAttribute('y') })),
-    }))
-  })
-  assert.ok(fallbackSpacing.every((text) => /pre|break-spaces/.test(text.whiteSpace) || text.xmlSpace === 'preserve'))
-  assert.ok(fallbackSpacing.map((text) => text.text).join('').includes('  "<>&"  \\textbf{bad}'))
-  assert.equal(fallbackSpacing.length, 3, 'Tab and CRLF split the literal into positioned fragments')
-  const stop = fallbackSpacing[0].spaceWidth * 4
-  assert.ok(Math.abs(fallbackSpacing[1].x - (Math.floor(fallbackSpacing[0].width / stop) + 1) * stop) < 0.5, 'Tab advances to a measured four-space stop')
-  assert.equal(fallbackSpacing[0].y, fallbackSpacing[1].y)
-  assert.ok(fallbackSpacing[2].y > fallbackSpacing[1].y, 'CRLF is exactly one physical line break')
+  async function checkLiteralFont(name) {
+    const observation = await page.evaluate(async () => {
+      const { measureSvgTextAdvance, measureSvgTabStop } = await import('./labelBrowserOracle.ts')
+      const node = document.querySelector('[data-label-id="fallback"] [data-label-state]')
+      const fragments = Array.from(node.querySelectorAll('text'), (text) => {
+        const value = text.textContent
+        const style = getComputedStyle(text)
+        const space = measureSvgTextAdvance(text, ' ')
+        const leading = measureSvgTextAdvance(text, value.match(/^\s*/u)[0])
+        const trailing = measureSvgTextAdvance(text, value.match(/\s*$/u)[0])
+        // These deliberately broken Canvas measurements are negative controls,
+        // never the oracle. Exercise empty/invalid input even on browsers that
+        // can serialize this particular computed font shorthand.
+        const canvasAttempts = [style.font, '', 'not-a-valid-font'].map((assignedFont) => {
+          const context = document.createElement('canvas').getContext('2d')
+          const initialFont = context.font
+          context.font = assignedFont
+          return { assignedFont, initialFont, acceptedFont: context.font,
+            spaceWidth: context.measureText(' ').width,
+            leadingWidth: context.measureText(leading.text).width,
+            trailingWidth: context.measureText(trailing.text).width }
+        })
+        return { text: value, whiteSpace: style.whiteSpace, xmlSpace: text.getAttribute('xml:space'),
+          x: text.x.baseVal.getItem(0).value, y: text.y.baseVal.getItem(0).value,
+          width: text.getComputedTextLength(), space, leading, trailing, canvasAttempts,
+          tspans: Array.from(text.querySelectorAll('tspan'), (span) => ({ text: span.textContent, x: span.getAttribute('x'), y: span.getAttribute('y') })) }
+      })
+      const first = fragments[0], actualX = fragments[1]?.x
+      const tab = measureSvgTabStop(node.querySelector('text'), first.x + first.width)
+      const stop = tab.interval.advance
+      const expectedX = tab.advance
+      const roundedSingleSpaceStop = first.space.advance * 4
+      const roundedSingleSpaceExpectedX = (Math.floor((first.x + first.width) / roundedSingleSpaceStop) + 1) * roundedSingleSpaceStop
+      const negativeControls = first.canvasAttempts.map((attempt) => {
+        const wrongStop = attempt.spaceWidth * 4
+        const wrongExpectedX = (Math.floor((first.x + first.width) / wrongStop) + 1) * wrongStop
+        return { ...attempt, expectedX: wrongExpectedX, actualX, delta: actualX - wrongExpectedX }
+      })
+      return { source: node.getAttribute('data-label-source'), fragments, tab, stop, expectedX, actualX,
+        roundedSingleSpaceExpectedX, roundedSingleSpaceDelta: actualX - roundedSingleSpaceExpectedX,
+        delta: actualX - expectedX, tolerance: 0.5, negativeControls,
+        remainingMeasurementClones: node.querySelectorAll('[data-label-oracle-measurement]').length }
+    })
+    // Persist observations BEFORE the tab assertion (and separately from PASS
+    // records), so a partial renderer failure still has its complete font data.
+    await observe(name, observation)
+    observation.content = await page.evaluate(async () => {
+      const { inspectLabelContent } = await import('./labelBrowserOracle.ts')
+      return inspectLabelContent('fallback')
+    })
+    await observe(`${name}-independent-content`, observation)
+    const { fragments, content } = observation
+    assert.equal(observation.source, fallbackSource, 'Complete raw source including tab and CRLF remains authoritative')
+    assert.ok(fragments.every((text) => /pre|break-spaces/.test(text.whiteSpace) || text.xmlSpace === 'preserve'))
+    assert.deepEqual(fragments.map(({ text }) => text), fallbackSource.split(/\t|\r\n/u), 'Complete literal fragments preserve edge/repeated whitespace')
+    assert.equal(fragments.length, 3, 'Tab and CRLF split the literal into positioned fragments')
+    assert.equal(observation.tab.method, 'svg-whitespace-grid')
+    assert.equal(observation.tab.next.text.length, observation.tab.index * 4, 'Expected tab position measures the complete space prefix')
+    assert.ok(observation.tab.previous.advance <= fragments[0].x + fragments[0].width, 'Preceding tab stop is at or before the current text advance')
+    assert.ok(observation.tab.next.advance > fragments[0].x + fragments[0].width, 'A tab advances strictly beyond the current text advance')
+    assert.ok(Math.abs(observation.delta) < 0.5, 'Tab advances to a measured four-space stop')
+    assert.equal(fragments[0].y, fragments[1].y)
+    assert.ok(fragments[2].y > fragments[1].y, 'CRLF is exactly one physical line break')
+    assert.equal(observation.remainingMeasurementClones, 0, 'Temporary oracle text is removed')
+    for (const fragment of fragments) {
+      for (const measurement of [fragment.space, fragment.leading, fragment.trailing]) {
+        assert.equal(measurement.method, 'svg-text-clone')
+        assert.deepEqual(measurement.effective.properties, measurement.computed.properties, 'Clone uses current displayed font/spacing longhands')
+        assert.equal(measurement.effective.xmlSpace, measurement.computed.xmlSpace)
+        assert.ok(Number.isFinite(measurement.advance) && measurement.advance >= 0)
+      }
+      assert.notEqual(Number.parseFloat(fragment.space.computed.properties['font-size']), 10, 'Regression uses the displayed non-default font')
+      assert.ok(fragment.space.advance > 0)
+      for (const attempt of fragment.canvasAttempts.slice(1)) {
+        assert.equal(attempt.acceptedFont, attempt.initialFont, 'Empty/unusable shorthand silently retains unrelated Canvas default')
+        assert.ok(Math.abs(fragment.space.advance - attempt.spaceWidth) > 0.5, 'Default 10px space advance is not a valid displayed-font oracle')
+        for (const edge of ['leading', 'trailing']) if (fragment[edge].text.length) {
+          assert.ok(Math.abs(fragment[edge].advance - attempt[`${edge}Width`]) > 0.5, 'Default font is rejected for literal edge whitespace too')
+        }
+      }
+    }
+    for (const control of observation.negativeControls.slice(1)) {
+      assert.ok(Math.abs(control.delta) >= 0.5, 'Bad default-font tab oracle fails the unchanged tolerance')
+    }
+    const edgeAdvance = Math.max(...fragments.flatMap(({ leading, trailing }) => [leading.advance, trailing.advance]))
+    assert.equal(content.tolerances.whitespaceAdvance, edgeAdvance, 'Content allowance uses independent displayed-font edge advances')
+    assert.equal(content.tolerances.horizontal, content.fontSize * 0.35 + edgeAdvance + 1, 'Finite horizontal allowance is unchanged')
+    await page.evaluate(async (measurement) => {
+      const { assertLabelContent } = await import('./labelBrowserOracle.ts')
+      assertLabelContent(measurement)
+    }, content)
+    await record(name, observation)
+    return observation
+  }
+  const firstFont = await checkLiteralFont('literal-tab-and-edge-whitespace-displayed-font')
+  await page.evaluate(() => window.stzLabels.mutateLabel('fallback', { style: { fontSize: 24 } }))
+  await settled()
+  const changedFont = await checkLiteralFont('literal-tab-and-edge-whitespace-changed-font')
+  assert.notEqual(changedFont.fragments[0].space.computed.properties['font-size'], firstFont.fragments[0].space.computed.properties['font-size'])
+  assert.ok(changedFont.fragments[0].space.advance > firstFont.fragments[0].space.advance, 'Oracle remeasures the current font after an edit')
+  assert.ok(changedFont.content.tolerances.whitespaceAdvance > firstFont.content.tolerances.whitespaceAdvance, 'Edge allowance follows the current font')
   await record('real MathJax, Japanese/multiple runs/newlines, whole-source failure, raw model/TikZ/history preservation', { mathInvocations: after.invocationCount })
 
   const anchors = ['center', 'north', 'south', 'east', 'west', 'north east', 'north west', 'south east', 'south west']
@@ -264,9 +373,12 @@ try {
   await click('visible')
   assert.equal((await state()).selection, null)
   for (const policy of ['autoHide', 'autoDim']) {
-    await mount([{ id: 'occluded', text: '$x$', position: { x: 0, y: -1, z: 0 } }], { ambientDimension: 3, occlusion: policy })
+    // Match the sheet's layer so layerThenDepth can apply depth occlusion.
+    await mount([{ id: 'occluded', text: '$x$', layer: 0, position: { x: 0, y: -1, z: 0 } }], { ambientDimension: 3, occlusion: policy })
     await settled()
+    await observe(`settled-${policy}-visibility`, { state: await state(), visibility: await page.locator('[data-label-id="occluded"]').getAttribute('data-label-visibility') })
     assert.equal(await page.locator(`[data-label-visibility="${policy === 'autoHide' ? 'hidden' : 'dimmed'}"]`).count(), 1)
+    assert.equal(await page.locator('[data-label-id="occluded"]').getAttribute('data-occluding-surface-id'), 'sheet')
     if (policy === 'autoHide') {
       assert.equal(await label('occluded').count(), 0)
       await page.keyboard.down('Alt')
@@ -281,11 +393,12 @@ try {
   await record('locked/hidden/filtered layers and autoHide/autoDim preserve picking policy')
 
   stage = 'independent-geometry-and-boundary-picking'
-  await runGeometryChecks({ page, record, artifactDir })
-  completed.push('independent-oracle-negative-controls', 'boundary-anchor-camera-matrix')
+  await runGeometryChecks({ page, record, artifactDir, startGroup, completeGroup })
   stage = 'controlled-races-and-pending-policy'
-  await runRaceChecks({ page, record, artifactDir })
-  completed.push('inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount')
+  await runRaceChecks({ page, record, artifactDir, startGroup, completeGroup })
+
+  stage = 'renderer-failure-isolation'
+  await startGroup('existing-renderer-regressions', 'mounted-load-output-and-input-limit-failures')
 
   for (const mode of ['load-error', 'output-error']) {
     await page.evaluate((value) => window.stzLabels.changeService(value), mode)
@@ -305,6 +418,9 @@ try {
   assert.equal((await inspect('good')).state, 'ready')
   await record('actual mounted load/output/input-limit failures remain isolated exact-source fallback')
 
+  await completeGroup('existing-renderer-regressions')
+  stage = 'current-SVG-cloning'
+  await startGroup('current-SVG-cloning')
   await mount([{ id: 'exportMath', text: '$\\frac{a}{b}$' }, { id: 'exportFallback', text: fallbackSource }])
   await settled()
   await page.evaluate(() => window.stzLabels.select({ kind: 'label', id: 'exportMath' }))
@@ -323,13 +439,16 @@ try {
     assert.equal(parsed.foreign, 0)
   }
   await record('currently visible transparent/white SVG export retains settled geometry and literal fallback; editor overlays removed')
-  completed.push('existing-renderer-regressions', 'current-SVG-cloning')
   await page.screenshot({ path: resolve(artifactDir, 'settled-export.png'), fullPage: true })
+  await completeGroup('current-SVG-cloning')
   stage = 'real-App-workflows'
+  await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })
-  completed.push('real-App-input-JSON-history-reused-ID-load')
+  await completeGroup('real-App-input-JSON-history-reused-ID-load')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')
+  assert.deepEqual(new Set(completed), new Set(scenarios), 'All required groups completed')
   stage = 'complete'
+  checkpoint = { name: 'complete' }
   await save('passed')
   console.log(JSON.stringify({ result: 'free-label-browser-check-passed', environment, checks: evidence.length, artifactDir }))
 } catch (error) {

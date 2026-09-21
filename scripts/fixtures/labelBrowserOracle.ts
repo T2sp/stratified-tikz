@@ -25,6 +25,95 @@ function required<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) throw new Error(message)
   return value
 }
+
+const textMetricProperties = [
+  'font-family', 'font-size', 'font-style', 'font-weight', 'font-stretch',
+  'font-size-adjust', 'font-kerning', 'font-optical-sizing', 'font-feature-settings',
+  'font-variation-settings', 'font-variant-ligatures', 'font-variant-caps',
+  'font-variant-numeric', 'font-variant-east-asian', 'font-variant-position',
+  'font-synthesis', 'letter-spacing', 'word-spacing', 'text-rendering',
+  'white-space', 'tab-size', 'direction', 'unicode-bidi', 'writing-mode', 'text-orientation',
+] as const
+
+function textMetricStyle(text: SVGTextElement) {
+  const style = getComputedStyle(text)
+  return {
+    // Diagnostic only: this shorthand can be empty even with a valid displayed
+    // font. Never assign it to Canvas, whose default would silently survive.
+    font: style.font,
+    properties: Object.fromEntries(textMetricProperties.map((property) => [property, style.getPropertyValue(property)])),
+    xmlSpace: text.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'space'),
+  }
+}
+
+/** Measure independently through the displayed SVG font, including whitespace.
+ *
+ * The temporary sibling retains the original inheritance context, and explicit
+ * computed longhands prevent selector or font-shorthand serialization changes
+ * from selecting another font. It is never included in ink/export measurements.
+ */
+export function measureSvgTextAdvance(text: SVGTextElement, value: string) {
+  const parent = required(text.parentElement, 'SVG text measurement requires a connected parent')
+  if (!text.isConnected) throw new Error('SVG text measurement requires displayed text')
+  const computed = textMetricStyle(text)
+  const clone = text.cloneNode(false) as SVGTextElement
+  clone.removeAttribute('id')
+  // Positioning/whole-fragment length constraints must not alter the advance of
+  // the replacement string. Font and whitespace properties remain identical.
+  for (const attribute of ['transform', 'dx', 'dy', 'rotate', 'textLength', 'lengthAdjust']) clone.removeAttribute(attribute)
+  clone.setAttribute('x', '0')
+  clone.setAttribute('y', '0')
+  clone.setAttribute('data-svg-export-exclude', 'true')
+  clone.setAttribute('data-label-oracle-measurement', 'true')
+  for (const [property, value] of Object.entries(computed.properties)) {
+    if (value !== '') clone.style.setProperty(property, value, 'important')
+  }
+  clone.style.setProperty('opacity', '0', 'important')
+  clone.style.setProperty('pointer-events', 'none', 'important')
+  clone.textContent = value
+  try {
+    parent.append(clone)
+    const effective = textMetricStyle(clone)
+    const advance = clone.getComputedTextLength()
+    if (!Number.isFinite(advance) || advance < 0) throw new Error('SVG text measurement returned a nonfinite or negative advance')
+    return { method: 'svg-text-clone' as const, text: value, advance, computed, effective }
+  } finally {
+    clone.remove()
+  }
+}
+
+/** Locate the next tab on an independently measured SVG whitespace grid.
+ * Short SVG advances are rounded, so multiplying a single-space measurement
+ * can select the wrong stop near a boundary. Measure each complete prefix
+ * instead; neither the interval estimate nor its rounding is accumulated.
+ */
+export function measureSvgTabStop(text: SVGTextElement, position: number, tabSize = 4) {
+  if (!Number.isFinite(position) || position < 0 || !Number.isInteger(tabSize) || tabSize < 1 || tabSize > 32) {
+    throw new Error('Invalid SVG tab measurement input')
+  }
+  const interval = measureSvgTextAdvance(text, ' '.repeat(tabSize))
+  if (interval.advance <= 0) throw new Error('SVG tab interval must have positive advance')
+  const measureStop = (index: number) => {
+    if (!Number.isSafeInteger(index) || index < 0 || index * tabSize > 16_384) {
+      throw new Error('SVG tab measurement exceeds the fixture work bound')
+    }
+    return measureSvgTextAdvance(text, ' '.repeat(index * tabSize))
+  }
+  let index = Math.floor(position / interval.advance) + 1
+  let previous = measureStop(index - 1), next = measureStop(index)
+  while (previous.advance > position) {
+    index--
+    next = previous
+    previous = measureStop(index - 1)
+  }
+  while (next.advance <= position) {
+    index++
+    previous = next
+    next = measureStop(index)
+  }
+  return { method: 'svg-whitespace-grid' as const, position, tabSize, index, interval, previous, next, advance: next.advance }
+}
+
 function painted(element: SVGGraphicsElement, root: SVGGElement): boolean {
   if (element.closest('[data-svg-export-exclude],defs,clipPath,mask')) return false
   const style = getComputedStyle(element)
@@ -61,15 +150,16 @@ export async function inspectLabelContent(id: string, options: { fontSize?: numb
   // Derive whitespace allowance from displayed text, independently of layout.
   // This allows intentional leading/trailing spaces, but never raw TeX length
   // for successful formulas. Internal tabs/newlines already position fragments.
-  const context = required(document.createElement('canvas').getContext('2d'), 'Canvas unavailable')
   let whitespaceAdvance = 0
-  for (const text of content.querySelectorAll('text')) {
-    context.font = getComputedStyle(text).font
+  const whitespaceMeasurements = Array.from(content.querySelectorAll('text'), (text) => {
     const value = text.textContent ?? ''
     const leading = value.match(/^\s*/u)?.[0] ?? ''
     const trailing = value.match(/\s*$/u)?.[0] ?? ''
-    whitespaceAdvance = Math.max(whitespaceAdvance, context.measureText(leading).width, context.measureText(trailing).width)
-  }
+    const leadingMeasurement = measureSvgTextAdvance(text, leading)
+    const trailingMeasurement = measureSvgTextAdvance(text, trailing)
+    whitespaceAdvance = Math.max(whitespaceAdvance, leadingMeasurement.advance, trailingMeasurement.advance)
+    return { text: value, leading: leadingMeasurement, trailing: trailingMeasurement }
+  })
   const padding = Math.max(4, fontSize * 0.25)
   const viewport = { minX: native.minX - padding, minY: native.minY - padding,
     maxX: native.maxX + padding, maxY: native.maxY + padding }
@@ -113,12 +203,13 @@ export async function inspectLabelContent(id: string, options: { fontSize?: numb
   const hit = node.querySelector<SVGRectElement>(':scope > rect[data-svg-export-exclude]')
   return {
     id, source: node.getAttribute('data-label-source'), status: node.getAttribute('data-label-state'),
-    request: node.getAttribute('data-label-request'), fontSize,
+    request: node.getAttribute('data-label-request'), fontSize, anchorTransform: node.getAttribute('transform'),
     ink, native, published, hit: hit ? asBounds(hit.getBBox()) : null,
     inkSvg: transformBounds(ink, localToSvg), inkClient: transformBounds(ink, localToClient),
     publishedSvg: transformBounds(published, localToSvg), publishedClient: transformBounds(published, localToClient),
     localToClient: matrixData(localToClient), localToSvg: matrixData(localToSvg), svgToClient: matrixData(svgToClient),
     descendants: measured, paintedRectangles: measured.filter(({ tag }) => tag === 'rect').length,
+    whitespaceMeasurements,
     raster: { width: raster.width, height: raster.height, viewport, pixels: { left, top, right, bottom } },
     tolerances: {
       // Math italic bearings/advance and SVG antialiasing: at most 0.35 em

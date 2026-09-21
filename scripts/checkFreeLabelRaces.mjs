@@ -10,7 +10,7 @@ function unchanged(before, after) {
   assert.deepEqual(after.selection, before.selection, 'Completion preserves current selection')
 }
 
-export async function runRaceChecks({ page, record, artifactDir }) {
+export async function runRaceChecks({ page, record, artifactDir, startGroup, completeGroup }) {
   const state = () => page.evaluate(() => window.stzLabels.state())
   const mount = (options) => page.evaluate((value) => window.stzLabels.mount(value), options)
   const mutate = (id, change) => page.evaluate(({ id, change }) => window.stzLabels.mutateLabel(id, change), { id, change })
@@ -65,6 +65,7 @@ export async function runRaceChecks({ page, record, artifactDir }) {
     return { ...current, measurement }
   }
 
+  await startGroup('inverted-success-and-failure-races')
   for (const obsoleteFailure of [false, true]) {
     const name = obsoleteFailure ? 'obsolete-failure' : 'obsolete-success'
     const oldSource = `$WWWWWWWWWWWW${obsoleteFailure ? 'W' : 'M'}$`
@@ -106,6 +107,8 @@ export async function runRaceChecks({ page, record, artifactDir }) {
   await mutate('race', { text: '$j_2$' })
   await snapshot('valid-again', 'race', '$j_2$', 'ready')
 
+  await completeGroup('inverted-success-and-failure-races')
+  await startGroup('deletion-and-unmount')
   for (const action of ['delete', 'unmount']) {
     const source = `$WWWWWWWW${action === 'delete' ? 'D' : 'U'}$`
     await hold(source)
@@ -125,6 +128,8 @@ export async function runRaceChecks({ page, record, artifactDir }) {
     await record(`held-${action}-completed`, { source, requests, visible, history: before.history })
   }
 
+  await completeGroup('deletion-and-unmount')
+  await startGroup('pending-lock-and-autohide')
   const lockedSource = '$\\frac{lockedPending}{k}$'
   await hold(lockedSource)
   await mount({ labels: [{ id: 'policy', text: lockedSource, layer: 1, position: { x: 0, y: 0, z: 0 } }] })
@@ -170,7 +175,7 @@ export async function runRaceChecks({ page, record, artifactDir }) {
   const hiddenSource = '$\\frac{hiddenPending}{h}$'
   await hold(hiddenSource)
   await mount({ ambientDimension: 3, occlusion: 'autoDim', labels: [
-    { id: 'policy', text: hiddenSource, position: { x: 0, y: -1, z: 0 } },
+    { id: 'policy', text: hiddenSource, layer: 0, position: { x: 0, y: -1, z: 0 } },
   ] })
   await held(hiddenSource)
   const dimmedPending = await inspect('policy')
@@ -190,7 +195,18 @@ export async function runRaceChecks({ page, record, artifactDir }) {
   const restored = await inspect('policy')
   const point = client(restored.localToClient, { x: (restored.published.minX + restored.published.maxX) / 2,
     y: (restored.published.minY + restored.published.maxY) / 2 })
-  await probePoint({ page, point, expected: { kind: 'label', id: 'policy' }, state })
-  await probePoint({ page, point, expected: { kind: 'label', id: 'policy' }, state, alt: true })
-  await record('autodim-restored-current-layout-and-selection', { source: hiddenSource, measurement: restored, dimOpacity, state: await state() })
+  const normal = await probePoint({ page, point, expected: { kind: 'label', id: 'policy' }, state })
+  // The sheet remains a selectable overlap candidate. The first Alt click
+  // deliberately skips the normal top candidate; the next must reach the label.
+  const firstAlt = await probePoint({ page, point, expected: { kind: 'stratum', id: 'sheet' }, state, alt: true })
+  const before = (await state()).callbackEvents.length
+  await page.keyboard.down('Alt')
+  try { await page.mouse.click(point.x, point.y) } finally { await page.keyboard.up('Alt') }
+  const after = await state()
+  assert.deepEqual(after.selection, { kind: 'label', id: 'policy' }, 'Restored dimmed label participates in overlap cycling')
+  const callbacks = after.callbackEvents.slice(before)
+  assert.equal(callbacks.length, 1, 'One callback when cycling back to the dimmed label')
+  await record('autodim-restored-current-layout-and-selection', { source: hiddenSource, measurement: restored, dimOpacity,
+    normal, firstAlt, secondAlt: { point, selected: after.selection, callbacks }, state: after })
+  await completeGroup('pending-lock-and-autohide')
 }

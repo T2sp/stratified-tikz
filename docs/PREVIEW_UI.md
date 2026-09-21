@@ -203,11 +203,53 @@ stratum metadata are unchanged.
 
 ### Free-label verification
 
-Phase 31C acceptance is **incomplete**. The targeted M1 follow-up extends the
-browser harness; its new browser assertions have not run successfully. The old
-whole-group `getBBox()` comparison included the transparent picking rectangle
-and was not independent evidence of visible bounds. Fixture mutation/history
-helpers were also not proof of actual App input or document loading.
+Phase 31C browser acceptance is **verified on 2026-09-21**. The authorized
+`node scripts/automation/run-phase.mjs 31C verify` run exited 0: all 2,298 tests,
+build, diff check, `check:label-assets`, and `check:free-labels` passed. Chrome
+153.0.8010.52 completed all eight required groups, including 18 boundary matrix
+cases and real App workflows, with 99 passing records and no incomplete groups,
+unexecuted groups or page errors. Earlier failures and blocked attempts are
+retained below as history; the complete authorized result supersedes them.
+
+The parent report and command logs are in
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31c-manual-wU4DY3`.
+`verification.json` records the unchanged checkout before/after verification;
+`05-check-free-labels/artifacts/free-labels-evidence.json` records `passed` /
+`complete`, individual observations, screenshots, downloads and checkout identity.
+The verified revision is `476a39f3315eaeb6d0c85bd95e98ab44a4c0aede` plus tracked
+diff SHA-256 `75fec69996c3603806f0a4855f78c66ee45aa7229bb8fc77fd166a65d6590497`,
+with no untracked files. Subsequent changes only update these documentation
+outcomes. Strict fixture TypeScript, targeted ESLint and all four script syntax
+checks also passed. Build retains its nonblocking chunk-size warning.
+
+The latest reported tab failure (manual run `stz-phase31c-manual-jPvNY7`)
+exposed a second oracle issue: multiplying a rounded one-space SVG advance
+selected the wrong four-space stop near a boundary. At 32.4px it expected
+282.5 while the actual next fragment began at 310.10882568359375.
+`measureSvgTabStop` now measures complete whitespace prefixes independently,
+bracketing the fragment between consecutive stops. Its expected position is
+310.109375 (delta -0.00054931640625); the 0.5-unit tab tolerance is unchanged.
+Both font sizes, literal edge whitespace, raw source/CRLF preservation and
+default-font negative controls passed. The diagnostic is retained at
+`/private/tmp/stz-phase31c-tab-grid-diagnostic.json`.
+
+Execution then exposed additional test setup assumptions, corrected without
+production changes:
+
+- Occlusion labels explicitly share the sheet's layer so `layerThenDepth`
+  permits occlusion. Restored autoDim selection checks normal label selection,
+  then Alt cycling through sheet and label, with one callback per click.
+- Authored anchor translations still match model projections within `1e-5`.
+  Native matrix readback separately allows one coordinate-dependent float32
+  ULP plus `1e-5`; Chrome rounded x=533.1764222669804 to 533.1764526367188.
+  Ink containment, hit geometry and boundary tolerances are unchanged.
+- Real App checks use its pan number inputs to bring long pending text inside
+  the canvas, then remeasure client coordinates. Raw text and pointer probes
+  are unchanged; pan must preserve JSON/history. After obsolete completions,
+  corrective pan is forbidden so it cannot hide an incorrect position change.
+  The TikZ mode selector also accounts for option text inside its wrapping label.
+
+**M1's required-browser-evidence gap is closed for this verified snapshot.**
 
 The strengthened `npm run check:free-labels` uses a **Vite development server**,
 production `SvgDiagram`, and a separate fixture mounting the real `App`. These
@@ -216,8 +258,8 @@ changed. `App` has only a development-gated runtime injection and read-only,
 serialized diagnostics; editor, load/save, revision, selection, and history
 handlers remain the production handlers.
 
-The harness now contains these required assertions (coverage implemented,
-**browser observations still pending**):
+The harness contains these required assertions, all observed in the complete
+authorized browser run:
 
 - Independent alpha-pixel extents of an isolated visible-content SVG clone.
   Native descendant bounds and full `getScreenCTM()` transforms size the raster;
@@ -259,10 +301,10 @@ The harness now contains these required assertions (coverage implemented,
   document revisions. Both production TikZ modes and current SVG cloning remain
   checked. Runtime state is never assigned into App model/history by the fixture.
 
-New verification on 2026-09-21, at base revision
+Historical verification on 2026-09-21, at base revision
 `4b25b823fab52157eef0b7c9b313a199c9d5aee5` plus this follow-up diff:
 
-| Check | New result |
+| Check | Historical result |
 | --- | --- |
 | Asset preparation | exit 0 |
 | Focused layout/runtime/picking | exit 0; 23 passed (subset of full suite) |
@@ -274,14 +316,14 @@ New verification on 2026-09-21, at base revision
 | `git diff --check` | exit 0 |
 | Strengthened free-label browser acceptance | **exit 1 before assertions**, `listen EPERM: operation not permitted 127.0.0.1:5173` |
 
-Node is v26.9.0, resolved at `/opt/homebrew/Cellar/node/26.9.0/bin/node`.
-Installed Chrome is 153.0.8010.52 (read from its application metadata); **Chrome
+Node was v26.9.0, resolved at `/opt/homebrew/Cellar/node/26.9.0/bin/node`.
+Installed Chrome was 153.0.8010.52 (read from its application metadata); **Chrome
 was not launched by this attempt**, so there is no observed browser version or
-browser pass. This session permits workspace writes but has approval policy
-`never`; no escalation is available and no external development origin was
+browser pass for it. That session permitted workspace writes but had approval
+policy `never`; no escalation was available and no external development origin was
 configured. No browser-security or persistent runner settings were changed.
 
-Verification logs/statuses are in
+Those historical verification logs/statuses are in
 `/private/tmp/stz-phase31c-verification.n21xIe`. The strengthened browser attempt
 is retained in `/private/tmp/stz-phase31c-browser-acceptance.2ni7DV`:
 `browser.log`, `browser.exit-status`, `free-labels-evidence.json`, `checkout.diff`,
@@ -298,23 +340,150 @@ change. `final-handoff.json`, `final-checkout.diff`, and
 `final-pending-files.tar.gz` in the same evidence directory identify and retain
 the final pending implementation (including untracked files). Earlier blocked
 review attempts remain historical; their reported results are not this
-follow-up's results.
+follow-up's results. The review attempt at
+`/private/tmp/stz-review31c-browser/free-labels-evidence.json` likewise failed
+before launch at `development-server-listen`, with `browserVersion: null`, no
+executed assertions and all eight groups incomplete/unexecuted.
 
-Run the final harness in an authorized Terminal or CI checkout containing this
-pending diff; a handoff is not acceptance. The resolved external tool paths are:
+The subsequent **authorized Terminal run** is retained in
+`/private/tmp/stz-phase31c-browser-acceptance.POb7Fz`, including
+`free-labels-evidence.json`, `browser.log`, `browser.exit-status`, `failure.png`,
+and checkout artifacts. It used Node v26.9.0 and **launched Chrome
+153.0.8010.52** against `http://127.0.0.1:5174`, at revision
+`4b09c181dcea6b7db9f46daf7d82ef322ef4e3ee` with only
+`prompts/phase-31c-fix.md` modified (tracked diff SHA-256
+`593ad6f08a702fd53493f298e44baeaa66cd47cfca3d2bb4aa8d249e748fe260`, no
+untracked files). The command exited **1** at `renderer-fixture` on
+`Tab advances to a measured four-space stop`. Initial renderer/source/state/
+whitespace assertions executed; no group completed. Its empty `completed`
+array does not mean zero assertions ran. The old `unexecuted` calculation used
+an empty grouped evidence array and incorrectly classified this partial renderer
+execution. Geometry, races, policy, App and SVG-cloning groups did not run.
+
+The separate permitted diagnostic script and measurements are
+`/private/tmp/stz-phase31c-tab-diagnostic.mjs` and
+`/private/tmp/stz-phase31c-tab-diagnostic.json`. The displayed fallback used
+normal weight 400, size 24.3px and family
+`Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif`, but computed
+`font` shorthand was empty. Assigning it to Canvas silently retained
+`10px sans-serif`: space advance 2.7783203125, instead of 5.382659912109375 with
+explicit displayed font longhands. The first SVG fragment advanced 212.21875;
+the incorrect oracle expected tab x = 222.265625, while production placed the
+next fragment at 215.306396484375, exactly matching explicit-font Canvas
+measurement. Independent SVG-space measurement gave width 5.390625 and
+expected x = 215.625, within the existing 0.5-unit tolerance (delta about
+0.319). This diagnoses a **harness font oracle defect**, not a production
+tab-layout defect. It proves neither the later scenarios nor a full acceptance
+pass; production metrics and placement and the tab tolerance remain unchanged.
+
+The first targeted correction on revision
+`476a39f3315eaeb6d0c85bd95e98ab44a4c0aede` plus the pending diff uses
+`measureSvgTextAdvance` in the development fixture oracle. It measures temporary
+SVG text clones with the displayed font and spacing longhands, preserves
+whitespace, and removes each clone in `finally`. Both tab-space measurement and
+the alpha-pixel oracle's finite literal-edge whitespace allowance use this
+independent path. Painted fraction rules, negative controls and all existing
+tolerances are retained. No production renderer, metrics, picking, App or
+adapter code changed, and no dependencies or pinned versions changed.
+
+Browser regressions now check tab advance and literal leading/trailing spaces
+at the initial font and after changing the model font size to 24. They verify
+current clone font/spacing properties and reject the unrelated default 10px
+Canvas measurement after deliberately assigning empty or invalid shorthand.
+The tab tolerance remains 0.5 SVG units; complete-source and CRLF-as-one-line-
+break assertions remain active. Fragment text, x/y, SVG advance, computed font
+shorthand/longhands, clone properties, measured spaces, expected stop, actual x
+and delta are saved as diagnostics **before** assertions. Started groups and
+checkpoints distinguish partial execution from no execution; diagnostics do
+not count as passing evidence, and a group completes only after all of its
+assertions return. At that child-session handoff these regressions were
+implemented but not browser-verified; the later authorized run above verifies them.
+
+Earlier child-session non-browser verification used Node v26.9.0 with
+`PATH=/opt/homebrew/bin:$PATH`; logs and individual exit-status files are in
+`/private/tmp/stz-phase31c-checks.LSbuyz`:
+
+| Check | Earlier child-session result |
+| --- | --- |
+| Asset preparation | exit 0 |
+| Focused layout/runtime/picking | exit 0; 23 passed (included in full suite) |
+| `npm test` | exit 0; 2,298 passed, none failed/skipped |
+| `npm run build` | exit 0; nonblocking chunk-size warning |
+| Strict fixture TypeScript | exit 0 |
+| Targeted ESLint | exit 0 |
+| All four browser-script syntax checks | exit 0 |
+| `git diff --check` | exit 0 |
+| Corrected `npm run check:free-labels` | exit 1 at development-server startup; no browser assertions executed |
+
+No Node tests were added by this fix; the full-suite count includes tests from
+the preserved later checkout and must not be added to the focused count.
+Repository-wide lint was not run; the historical App/SvgDiagram baseline debt
+of 10 errors and 4 warnings is separate from the passing targeted lint, and
+neither production file was modified.
+
+The earlier corrected browser attempt is in
+`/private/tmp/stz-phase31c-browser-acceptance.Rzi8z7`. It ran the exact resolved
+command below, with no inherited `STZ_BROWSER_BASE_URL`, and failed with
+`listen EPERM: operation not permitted 127.0.0.1:5173` at
+`development-server-listen`. That child session's approval policy was `never`;
+no escalation was permitted. The denied bind was not retried, no port was changed
+to evade it, and no browser or persistent sandbox settings were changed.
+`browser.exit-status` is 1 and `free-labels-evidence.json` records
+`browserVersion: null`: Chrome did not launch. Started/completed groups,
+checkpoints, diagnostics and evidence are empty; all eight groups remain
+incomplete/unexecuted, and no screenshot or geometry/pointer/race/App/export
+observations were produced. This fresh environment block does not replace the
+earlier authorized run's observed tab assertion or its font diagnosis.
+
+The browser snapshot records revision
+`476a39f3315eaeb6d0c85bd95e98ab44a4c0aede`, tracked diff SHA-256
+`a2cd3360dcd02d5e6a2a0953a083744545070efff8bd3d43db477f2919b71d6d`, and no
+untracked files. Its six modified files are `docs/PREVIEW_UI.md`,
+`docs/ROADMAP.md`, `scripts/checkFreeLabels.mjs`,
+`scripts/checkFreeLabelGeometry.mjs`, `scripts/checkFreeLabelRaces.mjs`, and
+`scripts/fixtures/labelBrowserOracle.ts`. Browser logs/status and
+`checkout.diff` / `checkout-untracked.json` retain that exact snapshot. Later
+documentation-only updates are included in the final handoff files
+`/private/tmp/stz-phase31c-checks.LSbuyz/final-checkout.json`,
+`final-checkout.diff`, and `final-checkout-untracked.json`. Preserve the complete
+current checkout for the parent run; the historical base alone is insufficient.
+
+At that handoff the parent runner was scheduled to run `check:label-assets` and
+`check:free-labels` outside the child sandbox, retaining logs and artifacts and
+stopping on failed or incomplete verification. M1 remained open until the
+complete authorized parent run recorded at the start of this section.
+
+To reproduce the check, run the harness in the parent runner's authorized environment or an
+authorized Terminal/CI checkout containing the complete current pending diff;
+a handoff is not acceptance. Check that `STZ_BROWSER_BASE_URL` is unset unless
+an external development origin is intended. The resolved external tool paths
+and exit-status-preserving command are:
 
 ```bash
-PATH=/opt/homebrew/bin:$PATH node scripts/prepareMathjaxAssets.mjs
-STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
-PATH=/opt/homebrew/bin:$PATH \
-STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
-STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
-npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
-STZ_31C_BROWSER_STATUS=$?
-printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
-printf 'Evidence directory: %s\nBrowser exit status: %s\n' "$STZ_31C_EVIDENCE_DIR" "$STZ_31C_BROWSER_STATUS"
-test "$STZ_31C_BROWSER_STATUS" -eq 0
+(
+  cd /Users/takamatoshinori/Desktop/stratified-tikz || exit 1
+  export PATH=/opt/homebrew/bin:$PATH
+  STZ_31C_EVIDENCE_DIR="$(mktemp -d /private/tmp/stz-phase31c-browser-acceptance.XXXXXX)" || exit 1
+  printf 'Evidence directory: %s\n' "$STZ_31C_EVIDENCE_DIR"
+  node scripts/prepareMathjaxAssets.mjs >"$STZ_31C_EVIDENCE_DIR/prepare.log" 2>&1
+  STZ_31C_PREPARE_STATUS=$?
+  printf '%s\n' "$STZ_31C_PREPARE_STATUS" >"$STZ_31C_EVIDENCE_DIR/prepare.exit-status"
+  if [ "$STZ_31C_PREPARE_STATUS" -ne 0 ]; then
+    cat "$STZ_31C_EVIDENCE_DIR/prepare.log"
+    exit "$STZ_31C_PREPARE_STATUS"
+  fi
+  STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+  STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  STZ_SMOKE_ARTIFACT_DIR="$STZ_31C_EVIDENCE_DIR" \
+  npm run check:free-labels >"$STZ_31C_EVIDENCE_DIR/browser.log" 2>&1
+  STZ_31C_BROWSER_STATUS=$?
+  printf '%s\n' "$STZ_31C_BROWSER_STATUS" >"$STZ_31C_EVIDENCE_DIR/browser.exit-status"
+  printf 'Browser exit status: %s\n' "$STZ_31C_BROWSER_STATUS"
+  if [ "$STZ_31C_BROWSER_STATUS" -ne 0 ]; then
+    tail -n 60 "$STZ_31C_EVIDENCE_DIR/browser.log"
+  fi
+  exit "$STZ_31C_BROWSER_STATUS"
+)
 ```
 
 An explicitly set `STZ_BROWSER_BASE_URL` must serve **this checkout and its
@@ -324,7 +493,13 @@ A production build does not serve the fixtures. A successful run must retain
 pointer/race/App observations, `geometry-*.png`, race/policy screenshots,
 `app-*.png`, App downloaded JSON, `settled-export.png`, logs/status, and checkout
 identity. Failures retain partial evidence and a failure screenshot if a page
-was reached; they never emit an overall pass.
+was reached; they never emit an overall pass. Acceptance requires exit 0,
+`result: "passed"`, `stage: "complete"`, an actually launched browser version,
+empty `incompleteGroups`, `unexecuted` and `pageErrors`, and all eight completed
+groups: `existing-renderer-regressions`, `independent-oracle-negative-controls`,
+`boundary-anchor-camera-matrix`, `inverted-success-and-failure-races`,
+`pending-lock-and-autohide`, `deletion-and-unmount`,
+`real-App-input-JSON-history-reused-ID-load`, and `current-SVG-cloning`.
 
 Reproduce the non-browser checks with:
 
@@ -350,8 +525,9 @@ The reproducible fixture config extends application compiler options and enables
 strict checking plus Vite/DOM types for all development TS/TSX fixtures. Compare
 App/SvgDiagram lint separately against HEAD; repository-wide lint is skipped
 because that baseline is not clean. No adapter/loading/build configuration
-changed, so the independent Phase 31B asset/browser smoke was not rerun; its
-previous verified evidence remains separate. Phase 31D, 31E, and 31F are deferred.
+changed. The authorized parent run also passed the independent Phase 31B
+`check:label-assets`; its evidence remains separate from the Phase 31C results.
+Phase 31D, 31E, and 31F are deferred.
 
 ## Export SVG
 

@@ -54,7 +54,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   }
   async function tikz() {
     const result = {}
-    const select = page.getByLabel('TikZ export mode:', { exact: true })
+    // The wrapping label also contains the option text in its label string.
+    const select = page.getByLabel(/^TikZ export mode:/)
     for (const mode of ['standalone', 'inlineMath']) {
       await select.selectOption(mode)
       result[mode] = await page.getByRole('textbox', { name: 'Generated TikZ source' }).inputValue()
@@ -78,7 +79,38 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     await page.keyboard.press('Escape')
     await page.waitForFunction(() => window.stzAppLabels.state().selection === null)
   }
-  async function geometry() {
+  async function geometry(preserveView = false) {
+    // App's initial Fit uses model positions, not text extents. A long pending
+    // source can extend beyond that view. Pan through the real controls before
+    // measuring; never clamp probes or shorten the source to make them fit.
+    const framing = await page.evaluate(() => {
+      const svg = document.querySelector('svg.svg-diagram')
+      const node = document.querySelector('[data-label-id="app-label"] [data-label-state]')
+      const [minX, minY, maxX, maxY] = node.getAttribute('data-label-bounds').split(' ').map(Number)
+      const matrix = svg.getScreenCTM().inverse().multiply(node.getScreenCTM())
+      const center = new DOMPoint((minX + maxX) / 2, (minY + maxY) / 2).matrixTransform(matrix)
+      const view = svg.viewBox.baseVal
+      return { dx: view.x + view.width / 2 - center.x, dy: center.y - view.y - view.height / 2,
+        width: maxX - minX, height: maxY - minY, viewWidth: view.width, viewHeight: view.height }
+    })
+    assert.ok(framing.width + 32 < framing.viewWidth && framing.height + 28 < framing.viewHeight,
+      'App fixture fits the label and every outside boundary probe in the viewBox')
+    if (preserveView) assert.ok(Math.abs(framing.dx) <= 0.001 && Math.abs(framing.dy) <= 0.001,
+      'Obsolete completion must preserve the framed position without corrective pan')
+    if (Math.abs(framing.dx) > 0.001 || Math.abs(framing.dy) > 0.001) {
+      const before = await state()
+      if (!await page.getByRole('spinbutton', { name: 'pan x value', exact: true }).count()) {
+        await page.locator('.camera-summary-toggle').click()
+      }
+      for (const [axis, delta] of [['x', framing.dx], ['y', framing.dy]]) {
+        const field = page.getByRole('spinbutton', { name: `pan ${axis} value`, exact: true })
+        await field.fill(String(Number((Number(await field.inputValue()) + delta).toFixed(6))))
+      }
+      const after = await state()
+      assert.equal(after.json, before.json, 'Preview pan preserves the authoritative diagram')
+      assert.equal(after.history, before.history, 'Preview pan adds no diagram history entry')
+      actions.push({ action: 'pan preview to frame pointer probes', ...framing })
+    }
     await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
     return page.evaluate(() => window.stzAppLabels.inspectContent('app-label'))
@@ -117,10 +149,10 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     assert.deepEqual(selected, expected, `Real App ${alt ? 'Alt-' : ''}click at ${JSON.stringify(point)}`)
     return { point, alt, selection: selected, surface }
   }
-  async function inspectStage(name, text, status, obsoletePoint) {
+  async function inspectStage(name, text, status, obsoletePoint, preserveView = false) {
     await closeInspector()
     await settled(status)
-    const painted = await geometry()
+    const painted = await geometry(preserveView)
     const actual = await page.locator('[data-label-id="app-label"] [data-label-state]').evaluate((element) => ({
       source: element.getAttribute('data-label-source'), status: element.getAttribute('data-label-state'),
       request: JSON.parse(element.getAttribute('data-label-request')),
@@ -268,7 +300,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     const redoBranch = await invariant()
     assert.ok((await history()).future.length > 0, 'Undo has an existing redo branch before the old result arrives')
     await release(obsolete)
-    await inspectStage('undo-held-obsolete-completed', valid, 'ready', staleOnly)
+    await inspectStage('undo-held-obsolete-completed', valid, 'ready', staleOnly, true)
     assert.deepEqual(await invariant(), redoBranch, 'Obsolete completion preserves the restored model and existing redo branch')
     await historyAction('Redo', obsolete)
     await inspectStage('redo-after-held-completion', obsolete, 'ready')
@@ -328,7 +360,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     await release(documentA)
     assert.equal((await state()).labelDocumentRevision, revisionB)
     assert.deepEqual((await state()).selection, selectionB, 'Obsolete document completion cannot restore its old selection')
-    const afterA = await inspectStage('document-b-after-a-completes', documentB, 'ready', oldOnly)
+    const afterA = await inspectStage('document-b-after-a-completes', documentB, 'ready', oldOnly, true)
     for (const key of ['ink', 'published', 'localToSvg']) {
       assert.deepEqual(afterA.painted[key], b.painted[key], `Document B ${key} remains unchanged after the obsolete document completes`)
     }
