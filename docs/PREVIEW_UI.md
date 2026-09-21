@@ -78,8 +78,9 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Waiting for settled labels during SVG export and the combined audit remain
-assigned to [Phases 31E–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Settled-label SVG export is implemented as described in [Export SVG](#export-svg),
+with its standalone browser gate pending. The combined audit remains assigned
+to [Phase 31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -239,19 +240,19 @@ identify each conversion; obsolete completions after editing, duplication,
 splitting, reversal, deletion, or document replacement cannot replace current
 content. Position, placement, selection, and camera changes reuse unchanged
 conversion results. Committed node results are available through the same
-revision-aware layout interface as free labels for subsequent export work.
+revision-aware layout interface as free labels.
 
-Saved-path `pathLabel` names and UI captions are not typeset. Existing SVG
-export includes currently settled node formulas and current literal fallback;
-waiting for a consistent settled snapshot remains Phase 31E. The combined
+Saved-path `pathLabel` names and UI captions are not typeset. SVG export settles
+the free-label and inline-node sources captured at the export click. The combined
 regression and completion audit remains Phase 31F.
 
 The shared `onLabelLayoutChange(id, snapshot, ownerIdentity)` callback publishes
 current free-label and inline-node layouts. Consumers key by `ownerIdentity`,
 not by the path-local node ID. Inline owner identities encode document revision,
 path ID, and node ID; request identities also include original source and font
-settings. A `null` snapshot retires that owner. No separate export registry or
-model/history fields are introduced.
+settings. A `null` snapshot retires that owner. Phase 31E additionally associates
+immutable committed inputs with their rendered elements in a runtime WeakMap;
+no conversion or export state enters the model or history.
 
 ### Inline-node verification
 
@@ -904,7 +905,8 @@ changed. The authorized parent run also passed the independent Phase 31B
 `check:label-assets`; its evidence remains separate from the Phase 31C results.
 The historical free-label verification above predates inline-node integration;
 see the Phase 31D implementation and pending browser verification above.
-Phase 31E and Phase 31F remain deferred.
+The Phase 31E export changes and pending browser gate are described below;
+Phase 31F remains deferred.
 
 ## Export SVG
 
@@ -916,21 +918,490 @@ remain gray on screen; that editor-only background is not inherited by the
 download. White export instead adds an explicit white rectangle covering the
 exported viewBox behind the diagram.
 
-Export includes the current SVG Preview view, including visible diagram
-geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
-preview-only data attributes are removed from the exported SVG.
+Every click captures the currently committed view: diagram geometry, camera,
+viewport, visible layers and filtering, label text and style, draw order, and
+the selected background. The capture happens before waiting for conversion.
+Editing, camera movement, layer changes, Undo/Redo, deletion, and document loads
+remain available during preparation. They affect the next export; a pending
+file retains its complete click-time view.
 
-Export currently clones what is visible: settled free-label and path inline-node
-formulas remain SVG geometry, and pending/failed labels remain their current
-literal source.
-Transparent and white backgrounds are supported, and label hit rectangles and
-selected-position markers are excluded. Waiting for a consistent settled-label
-snapshot is deferred to Phase 31E.
+`Preparing SVG export…` appears in the accessible status area while the export
+button is disabled and busy. Only one request may be pending; repeated clicks
+are ignored, including clicks before the disabled state has committed. The
+action is restored after success or failure. Success is reported after the
+completed SVG has been handed to the browser for download. An infrastructure
+failure reports `SVG export failed` and does not download malformed output.
+
+Export settles every represented free label and path inline-node label through
+the shared bounded conversion service and cache. Successful formulas use
+self-contained SVG geometry alongside ordinary Unicode text. Failed labels
+contain their complete captured source, including delimiters, backslashes,
+markup characters, edge/repeated spaces, tabs, and physical newlines, as literal
+SVG text. Unsupported input, undefined commands, parse/output errors, resource
+failures, and exhausted work limits affect only their own labels. There is no
+pending state in the downloaded file. This remains a bounded preview language,
+not a full LaTeX engine.
+
+Hidden layers and labels removed by `autoHide` are not awaited. Labels retained
+by `autoDim` or layer filtering are settled and retain their captured opacity.
+Resource loading and conversion use the adapter's finite-work limits, with a
+bounded export wait also covering injected/outstanding services and fallback
+font readiness. A transient resource failure does not poison future exports.
+
+The exporter clones the committed SVG synchronously, captures immutable inputs
+from the shared label renderer, and replaces the clone's label subtrees by
+synchronously rendering their settled results with the same pure layout/view.
+Server rendering places the shared label view inside an actual React SVG
+wrapper. The parser validates and extracts its single direct label group; only
+that group replaces the captured target, so the wrapper adds no final viewport.
+It does not depend on a live React update committing after a conversion promise
+resolves. It creates no temporary React root and never replaces live labels.
+Request identities guard completion, status, cancellation, and cleanup; detached
+nodes and download object URLs are released after their owning request.
+
+Sanitization removes editor chrome, handles, cursor/work-plane guides, selection
+and hover feedback, label hit rectangles, classes, and preview-only metadata.
+Explicit paint, opacity, transforms, baseline/anchor placement, whitespace
+layout, and path-label white outlines remain. Formula geometry uses local,
+collision-free definitions/paths without application styles, remote fonts,
+`foreignObject`, or bitmap formulas. Transparent output has no added background
+rectangle; white output has exactly one behind the captured diagram.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently
 selected SVG background remains active for the current component lifetime, but
 is export-only and is not included in saved diagram JSON.
+
+Phase 31E's focused Node coverage is registered in `npm test`. The shared
+`check:free-labels` harness now also requires `settled-SVG-export-standalone`.
+It controls free/path conversion timing, edits text and font size through the
+real Inspector during preparation, loads a changed 3D document, and downloads
+both transparent and white files through the production action. It saves the
+files and reopens them as standalone `file://` SVGs in browser pages without
+the application. Assertions cover geometry/text, literal markup and whitespace,
+colors, outlines, placement, references, backgrounds, overlays, duplicates,
+visibility/dimming, retry after resource failure, and serialization failure.
+SVG files, standalone screenshots, raster PNGs, and per-scenario observations
+are retained with the existing browser evidence. The parent verifier requires
+all eleven groups for 31E/31F and rejects older ten-group reports for these
+phases; earlier phases retain their complete historical group sets.
+
+The earlier parent run on 2026-09-21 failed **before independent review** at
+`settled-export-autoDim-visibility`, source `$\frac{autoDim}{x}$`, because the
+parsed export had zero observed formula paths. Node v26.9.0 and Chrome
+153.0.8010.52 ran against the Vite production-component fixture. All ten
+preceding groups completed (120 successful scenario records, no page errors),
+including 31D candidate cycling and same-owner recovery. Only autoHide had
+completed in the eleventh group; layerFilter, hiddenLayer, invalid-viewport
+retry, actual App downloads and standalone reopen were not reached. The live
+preview screenshot does not establish what the failed export contained.
+
+The report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-r43lZG/verification.json`,
+with checkout fingerprint
+`0b8395cac3fad28b360ad8ac377f00bfdc086a2375a291d6273208aedefcc467`.
+That report is historical; the subsequent parent result is described below.
+
+The diagnostic follow-up added policy-specific diagnostics to the existing
+harness before assertions: exact capture/source/owner/settings/style/camera,
+source-filtered conversion identities and timestamps, the actual export
+settlement outcome/deadline, pre-sanitization label markup, serialized SVG,
+and separately identified live-preview SVGs. Exported label/foreground
+namespaces, paths, other geometry, literal fragments, ancestor paint/opacity,
+and standalone reopen screenshots/observations are retained. App download
+observations are also persisted before their assertions. Diagnostics are not
+passing scenario records. The exact-source foreground oracle rejects missing
+math, whole-source fallback, unrelated paths, and halo-only geometry; the
+original positive path assertion remains.
+
+The earlier `r43lZG` autoDim cause cannot be recovered from its missing output.
+At the diagnostic stage, the fixture's 20,000 ms versus the export boundary's
+10,050 ms suggested a timing hypothesis; neither a string-rendering test nor
+the live preview established the detached export's contents. The later
+`Qku3Ld` run below measured successful conversion well within the deadline and
+retained a title-only detached subtree, establishing its production failure.
+Limits, hold/release order, cache ownership and visibility policy were not
+changed to make the hypothesis pass. The diagnostic production addition is a
+non-mutating optional runtime observer, with no model fields or UI controls.
+
+The historical page-ownership parent verification is **failed/partial**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4/verification.json`.
+It used Node v26.9.0, Chrome 153.0.8010.52 and Vite at `http://127.0.0.1:5174`,
+with unchanged checkout fingerprint
+`0f048c1fb81251ba0652e4335077c3e24418e21ad0468bf0b439511f68efcd34`
+and tracked diff SHA-256
+`4a33aa2a09b5e9b97b54f29e9cd8b4dc5bac1f7fe0f603b9de70a5cbdb2f78ff`.
+Tests (2,390), build, diff and label-assets checks exited 0. Free-label acceptance
+exited 1 after ten completed groups and 119 passing records, with no page errors.
+The eleventh group failed at `settled-export-autoHide-failure` before reopening:
+`page.context().newPage()` tried to add a page to the context implicitly owned
+by the fixture's `browser.newPage()`. Playwright rejected that API use with
+`Please use browser.newContext()`. This is a harness ownership error.
+
+The retained `05-check-free-labels/artifacts/settled-export-autoHide-completed.json`
+and companion capture/live/detached/serialized SVGs show successful preparation
+in 8 ms, zero captured labels and source-specific requests, zero math paths,
+and preserved live SVG. Those zero counts are correct for autoHide. No native
+standalone page was created and no new visibility scenario passed. AutoDim,
+layerFilter, hiddenLayer, invalid-viewport retry and actual App downloads were
+not reached; the report's empty `unexecuted` list tracks started groups only.
+It neither reproduces nor resolves the historical autoDim failure.
+
+The ownership correction started from clean commit
+`70c7548b5dd832b90acb5d6116f2055c507042e8`, which preserves the eleven-file
+diagnostic handoff at `/private/tmp/stz-31e-diagnostic-checks/handoff.json`.
+The harness now passes its browser to the visibility checks and opens the exact
+saved SVG in an independent `browser.newPage()` with an explicit 1100×850
+viewport. It records standalone errors, namespaces, geometry, opacity and bounds,
+and closes only that page and its implicitly owned context in `finally`.
+Navigation/assertion failures retain the policy, source, file path and error;
+a cleanup error is recorded without replacing an original failure. The live
+fixture stays open for subsequent policies. Production code, conversion limits,
+pending-at-capture coverage, exact-source oracle/negative controls, 31D checks,
+and the runner's eleven-group/review/commit gates are preserved.
+
+Its child browser attempt exited 1 at Vite `listen EPERM` on
+`127.0.0.1:5173`, before Chrome launch; all eleven groups were unexecuted.
+This startup restriction is separate from both parent failures. Its exact
+command/environment/log and checkout snapshot are retained in
+`/private/tmp/stz-31e-page-ownership-jcajtsos/browser-check.json` and
+`browser-artifacts/free-labels-evidence.json` in that directory. It verifies no
+native reopen or autoDim outcome. The earlier child startup evidence remains
+at `/private/tmp/stz-31e-diagnostic-start/free-labels-evidence.json`.
+
+Historical ownership-fix commands, exit statuses and logs are retained in
+`/private/tmp/stz-31e-page-ownership-jcajtsos/focused-static-checks.json` and
+`full-checks.json`; final checkout identity is in `handoff.json` there.
+With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
+115 focused tests, included in the full 2,390-test total, with no failures or
+skips. Build exited 0 with the existing chunk-size warning. Strict fixture
+TypeScript, six script syntax checks, targeted ESLint and diff checks exited 0.
+No new helper/test file or dependency was needed for the ownership correction.
+
+The historical full-page-capture parent verification is **failed/partial**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-xlQmJP/verification.json`.
+It used Node v26.9.0, Chrome 153.0.8010.52, external Playwright 1.62.1 and Vite at
+`http://127.0.0.1:5174`. Revision `70c7548b5dd832b90acb5d6116f2055c507042e8`
+and the pending snapshot were unchanged during verification: checkout fingerprint
+`30d91d9fa20a47d12152c5d7e31923e35b103bba6c82917088e889293125a5df`,
+tracked diff SHA-256
+`d77a5cbf567c69135fbc48a7e39b5b2daf22b57ce63512647d4348c860e7733d`.
+Tests (2,390), build, diff and label-assets checks exited 0; free-label acceptance
+exited 1 after ten completed groups and 119 passing scenario records, with no
+page errors. The independent autoHide page was created, navigated to the saved
+SVG, and evaluated successfully, confirming that the ownership repair reached
+this path. Its required `fullPage: true` screenshot then timed out after
+30 seconds, after the log reported `fonts loaded`. The eleventh group remained
+incomplete and no new standalone visibility scenario passed.
+
+The retained `settled-export-autoHide-completed.json` and companion SVGs show
+successful preparation in 1 ms, zero captured labels/requests (correct for
+autoHide), preserved live SVG, and a 435-byte serialized SVG with width 900,
+height 700 and `viewBox="0 0 900 700"`. The computed reopen result was lost
+because it was written only after capture. Neither the normal standalone PNG
+nor its attempted failure PNG exists; the diagnostic's failure image path was
+only an intended path. `settled-export-autoHide-failure-live-preview.png` is
+retained, but depicts the application, not the standalone export. AutoDim,
+layerFilter, hiddenLayer, invalid-viewport retry and actual App downloads were
+not reached. This screenshot failure does not resolve the older autoDim result.
+
+Inspection of installed `playwright-core/lib/coreBundle.js` version 1.62.1
+shows that `screenshotPage` finishes font readiness before its full-page branch.
+That branch's `_fullPageSize` waits for both `document.body` and
+`document.documentElement`; it returns no size while either is absent. The
+export is an SVG XML document, so this is the source-supported explanation of
+the timeout. The parent did not persist the reopened document's content type
+or body state; the later `Qku3Ld` run below supplies those native measurements.
+
+The bounded-capture follow-up starts from clean commit
+`5f357d1b186302fda951ff073f2e32c68a34b2ce`, preserving the committed runner
+changes. Both standalone visibility and actual-download reopening now use
+`scripts/standaloneSvgCapture.mjs`. It records document URL/type/readiness,
+root namespace/dimensions/viewBox/client bounds, parser errors, HTML-body
+presence, viewport, scroll position and device pixel ratio. A finite viewport
+may expand once, followed by remeasurement; coverage must contain the complete
+SVG root, within an 8,192-pixel side limit and 16,777,216-pixel area limit.
+Capture uses `fullPage: false`, `scale: 'css'` and a 5,000 ms timeout, retaining
+font readiness and the unchanged standalone SVG. A PNG is recorded as retained
+only after its file, PNG header and dimensions are checked against the measured
+coverage. Existing export raster/background/color/halo assertions remain.
+
+DOM, exact-source geometry/opacity, raster/request and image-attempt diagnostics
+are persisted before image capture and assertions. Required capture failures
+still fail the scenario; failure diagnostics retain the original error without
+attempting a second screenshot. Independent pages retain their existing owned
+resource cleanup, and cleanup failures do not replace primary failures. No
+production, fixture, oracle, conversion-limit or runner change is part of this
+capture correction.
+
+The historical bounded-capture child reproduction opened no SVG: Chrome launch
+ended with SIGABRT and cleanup logged `kill EPERM`, before navigation. Its saved
+source hash, command error and stage are retained at
+`/private/tmp/stz-31e-bounded-capture/native-reproduction.json`. That child run
+alone supplied no document/body measurements, standalone PNG, autoDim
+timing/geometry or App acceptance. Its launch restriction is distinct from the
+executed parent failures and does not describe the subsequent `Qku3Ld` run.
+With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
+128 focused tests, including 13 new capture-helper tests registered in
+`package.json`; these are included in the full `npm test` total of 2,403, with
+zero failures or skips. `npm run build` exited 0 with the existing chunk-size
+warning. Strict fixture TypeScript, eight script syntax checks (the six existing
+scripts plus the capture helper and its test), targeted ESLint and
+`git diff --check` all exited 0. Exact commands, exit statuses and log paths are
+retained in `/private/tmp/stz-31e-bounded-capture/checks.json`; the final checkout
+identity and handoff are in `/private/tmp/stz-31e-bounded-capture/handoff.json`.
+
+The historical parent verification was **failed/partial, before review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-Qku3Ld/verification.json`.
+It tested revision `5f357d1b186302fda951ff073f2e32c68a34b2ce` with the four
+modified tracked files and two untracked bounded-capture files recorded in
+`05-check-free-labels/artifacts/checkout.diff` and `checkout-untracked.json`.
+Checkout fingerprint
+`1cfe1d338e653e6040d1922168cc25607c68778f4e6b651cb1989103aa35a80c`
+was unchanged during verification. Node v26.9.0, Chrome 153.0.8010.52, external
+Playwright and Vite at `http://127.0.0.1:5174` ran the checks. Tests (2,403),
+build, diff and label-assets checks exited 0; free-label acceptance exited 1
+after ten completed groups and 120 passing scenario records, without page
+errors. AutoHide passed; autoDim failed on the missing foreground element's
+namespace. Root/label-owner namespaces and XML parsing passed. The eleventh
+group remains incomplete; `unexecuted: []` records started groups, not completion
+of later layer-filter, hidden-layer, invalid-viewport/retry or App-download cases.
+
+The retained autoDim capture owns source `$\frac{autoDim}{x}$`, color `#802080`
+and effective opacity `0.24499999999999997`. Settlement reported `success` and
+`ready` after 137 ms within its 10,050 ms budget, with one math SVG containing
+12 groups, eight paths and one rectangle. Nevertheless,
+`settled-export-autoDim-completed-label-2-before-sanitize.svg` contains only
+the title, and `settled-export-autoDim-completed-detachedBeforeSanitization.svg`
+already has no label paint or foreground. The final `-serialized.svg` is
+472 bytes, containing sheet geometry and the formula's title. This is a
+production subtree-loss defect before sanitization, not a conversion deadline
+or selector-only failure. Existing whole-render-string tests missed it because
+paths still appeared elsewhere in the rendered string.
+
+The matching `settled-export-autoHide-standalone.json` and
+`settled-export-autoDim-standalone.json` retain actual browser observations:
+`image/svg+xml`, no HTML body, valid SVG namespace, no parser errors, and a
+900×700 root completely covered by the 1100×850 viewport. Both corresponding
+`-standalone.png` files exist with verified 1100×850 dimensions. Independent
+page ownership and the bounded capture therefore passed on these visibility
+paths. AutoDim still has no reopened foreground or bounds, so its saved PNG
+does not establish formula fidelity. No external requests or standalone page
+errors were observed. Policy-specific capture/live/detached/serialized SVGs,
+completion records and failure diagnostics remain under that run's
+`05-check-free-labels/artifacts/` directory.
+
+That confirmed render boundary in `prepareSettledSvgExport()` rendered
+`SvgTexLabelView` without a React SVG parent, then wrapped the finished string.
+Installed React DOM 19.2.7 renders that case in HTML context and hoists the
+title before its owning group. Parsing the string wrapper and selecting its
+first child therefore replaced the captured label with only the title. An
+actual React `<svg xmlns="http://www.w3.org/2000/svg">` parent must exist during
+server rendering; adding its namespace afterward cannot restore SVG context.
+
+The correction in `src/ui/svgSettledExport.ts` now uses
+`renderSettledSvgLabelDocument()` for that React SVG context and
+`extractSettledSvgLabel()` before `prepareSettledSvgExport()` imports/replaces
+the captured target. Validation rejects parser errors, a wrong root/descendant
+namespace, title-only or extra wrapper children, mismatched captured
+source/request/owner/state, or missing title, paint, foreground, outline or
+expected rendered runs. Literal fragments and math descendant structure are
+checked against the settled result. The returned group retains the shared
+renderer's title, placement/layout transforms, explicit paint/captured opacity, foreground
+and separate glyph-local halo. Only the temporary wrapper is discarded;
+successful math is not converted to fallback to conceal structural failure.
+Actual conversion failures still use the complete literal source. Empty
+labels and snapshots with zero represented labels remain valid. Invalid
+structure makes preparation fail without a malformed download. The shared
+renderer, pinned adapter, live preview, capture/settlement/cancellation policy,
+authoritative model/history and TikZ source remain unchanged.
+
+Two added tests in the already registered `tests/ui/svgSettledExport.test.ts`
+reproduce installed React's bare-render title hoisting and exercise the
+production SVG-context helper for successful math, Unicode, full-source literal
+fallback, empty source and an inline halo. The native regression in
+`scripts/fixtures/settledSvgBoundaryFixture.ts` calls the real
+`prepareSettledSvgExport()` through parsing, extraction, replacement,
+sanitization and final serialization. It inspects the selected subtree and
+same captured owners in the final document, with source-specific geometry,
+position/color/opacity, literal fragments/whitespace and separate foreground
+and halo. A native control reconstructs the former bare-render/first-child
+boundary through replacement, sanitization and final parsing: the selected
+title and final SVG lack math although the intermediate document has paths.
+Additional controls corrupt a valid foreground/structure and must be rejected;
+they do not pass trivially because the original foreground is missing. The
+native fixture's execution remains a parent gate.
+
+The SVG-context correction child used `/opt/homebrew/bin` first in `PATH`,
+Node v26.9.0 and npm 11.19.1 from starting revision
+`d1b72b3240177dfa368b43255ca07fd5738e3920`. The requested eight focused test
+files passed 130/130, included in the full `npm test` result of 2,405/2,405,
+with no failed or skipped tests. The two added Node cases live in the already
+registered export test file; `package.json` and the 13 capture-helper tests are
+preserved. `npm run build` exited 0 with the existing chunk-size warning.
+Strict fixture TypeScript, targeted ESLint including the new boundary fixture,
+all eight requested script syntax checks, and `git diff --check` exited 0.
+Exact commands/statuses and logs are retained in
+`/private/tmp/stz-31e-svg-boundary/` as `focused-result.json`,
+`npm-test-result.json`, `npm-build-result.json`, `fixture-typescript-result.json`,
+`targeted-eslint-result.json`, `syntax-results.json` and their referenced logs.
+Installed React DOM 19.2.7's bare-group versus SVG-parent reproduction is saved
+in `react-context-reproduction.json` in that directory.
+Those child results are separate from the historical 128/2,403 handoff and the
+subsequent parent execution below.
+
+The SVG-context correction child's installed Chrome launch through external
+Playwright failed before creating pages with SIGABRT and cleanup `kill EPERM`.
+Its log is `/private/tmp/stz-31e-svg-boundary/browser-startup.log`, with checkout
+identity and checks in that directory's `handoff.json`. That child restriction
+does not describe the subsequent parent execution.
+
+The historical SVG-context parent verification was **failed/partial, before review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-t7U6g3/verification.json`.
+It tested revision `d1b72b3240177dfa368b43255ca07fd5738e3920` plus five modified
+tracked files and the untracked boundary fixture, recorded in
+`05-check-free-labels/artifacts/checkout.diff` and `checkout-untracked.json`.
+The checkout was unchanged during verification, with fingerprint
+`8eaf530b72fe06ff821eeb4e173e6abff5559bdfaa52f59aba68870189ad235b`.
+Node v26.9.0, Chrome 153.0.8010.52, external Playwright and Vite at
+`http://127.0.0.1:5174` ran the checks. Tests (2,405 passed, none failed or
+skipped), build, diff and label-assets checks exited 0. Free-label acceptance
+exited 1 after ten completed groups and 120 passing records, with no page errors.
+
+AutoHide passed. AutoDim reached and passed exact source, SVG root/label/
+foreground namespace, eight own foreground paths and finite positive bounds
+(approximately 73.5561×29.8807) after reopening. Its pending captured label
+settled `success`/`ready` in 148 ms within 10,050 ms; the 6,176-byte serialized
+SVG retains the complete label group and formula geometry. Both policies saved
+verified 1100×850 PNGs covering their entire 900×700 SVG root; autoDim's PNG is
+6,541 bytes. Neither standalone page made external requests or reported errors.
+These observations demonstrate the repaired label subtree for this executed
+case; the historical `Qku3Ld` title-only defect did not recur.
+
+That run's blocker was strict equality across numeric representations: captured
+`0.7 * 0.35` is `0.24499999999999997`, and that raw opacity attribute survives
+detached rendering, sanitization and serialization unchanged. The native product
+of `Number(getComputedStyle(ancestor).opacity)` is `0.245`, an absolute difference
+of `2.7755575615628914e-17`. This is a harness comparison failure, not evidence
+of a production dimming defect. The completed/standalone JSON, capture/live/
+detached/serialized SVGs, PNGs and failure diagnostics remain in that report's
+`05-check-free-labels/artifacts/` directory. AutoDim's later detached/oracle
+assertions did not execute although their diagnostic observations were saved.
+Layer filtering, hidden-layer exclusion, invalid-viewport retry, the native
+boundary fixture and actual App download/reopen workflow remain unexecuted in
+this run. `unexecuted: []` records started groups, not all assertions within them.
+
+The follow-up uses `scripts/standaloneSvgOpacity.mjs` only for the harness
+comparison between captured numeric opacity and the independent native
+computed-style ancestor product. Both values must first be numbers, finite
+and within `[0, 1]`; missing, null, non-numeric,
+non-finite or out-of-range observations cannot pass by coercion. It then uses
+an explicit absolute tolerance of `1e-12`, enough for the observed CSSOM
+serialization/arithmetic difference on these fixtures. Production opacity,
+capture and serialization are unchanged. Exact raw-attribute comparisons remain
+exact, as do source, identity, count and namespace contracts; geometry checks
+stay intact. The opacity regressions accept the reported pair and equal values
+including zero and one, and reject missing dimming (`0.7` or `1`), doubled dimming (`0.08575`),
+zero versus nonzero, and `2e-12`/`1e-10` drift in either direction. These errors
+exceed the bound; the separate exact-source geometry oracle and its
+valid-foreground negative controls
+remain intact. A later material mismatch requires diagnosis, not a wider bound.
+The existing standalone record now includes raw ancestor opacity attributes,
+computed-style strings, the product and captured comparison/error/tolerance
+before image capture. Four helper regressions in
+`tests/scripts/standaloneSvgOpacity.test.mjs` are registered in `npm test`.
+
+The opacity correction child's checks used `/opt/homebrew/bin` first in `PATH`,
+Node v26.9.0 and npm 11.19.1, from revision
+`4c1dd9faeca926cbbda81edb57f82ebe89fb26a1`. The nine focused files passed
+134/134 tests, including the four comparator regressions; all are included in
+the full `npm test` result of 2,409/2,409, with no failures or skips. Build,
+strict fixture TypeScript, targeted ESLint including both added files, ten
+script syntax checks and diff checks exited 0. Build retains the existing
+nonblocking chunk-size warning. Logs and command results are retained under
+`/private/tmp/stz-31e-opacity-comparison/` (`focused.log`, `npm-test.log`,
+`npm-build.log`, `fixture-typescript.log`, `targeted-eslint.log` and
+`syntax-results.json`); final checkout identity is recorded in `handoff.json`.
+These child checks preceded the executed parent verification below.
+
+The latest parent verification is **failed/partial, before independent review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-ylXZks/verification.json`.
+It checked revision `4c1dd9faeca926cbbda81edb57f82ebe89fb26a1` plus four tracked
+changes and the two opacity helper/test files, with unchanged fingerprint
+`91e464c7d49d376ce1d32f95bc73479e3ab28b277644c90406fe53b5a5a1c9e9`.
+Node v26.9.0, Chrome 153.0.8010.52, external Playwright and Vite at
+`http://127.0.0.1:5174` ran the checks. Tests (2,409 passed, none failed or
+skipped), build, diff and label-assets checks exited 0. All four visibility
+policies, invalid-viewport retry, the native SVG render boundary and zero-label
+case passed. The first actual transparent 2D App export downloaded and reopened;
+its 23,341-byte SVG, standalone observations/PNG and raster PNG are retained.
+This included pending capture, intervening text/style/background edits and a
+later 3D document load, synchronous duplicate-click isolation and unchanged
+current model/history. The title/subtree, opacity comparison and bounded
+standalone capture corrections passed these native checks.
+
+The process then exited 1 with an unhandled rejection from the second download
+wait while the intervening native `locator.click()` had not returned. The event
+promise was created before the click but not observed until after it. The final
+saved checkpoint is `settled-export-App-3d-before-download`: document revision 2,
+one download, the previous transparent-export success status, `aria-busy=false`,
+no pending labels and the expected resource fallback. Existing recorded
+conversions were delivered. No post-click result, failure diagnostic or failure
+image was saved, so this evidence does not establish whether the click was
+intercepted, preparation failed, or the download handoff failed. Page errors were
+empty at the saved checkpoint; their later state is unknown. Browser evidence
+remained `running` with ten completed groups, 127 passing records and one
+incomplete group; `unexecuted: []` does not make that partial report complete.
+This was an executed parent failure, not a child browser startup restriction.
+
+The targeted harness correction uses `scripts/ownedPageEvent.mjs` for all three
+staged downloads and the local file chooser. Listeners are installed before
+actions; event and action outcomes have rejection ownership from creation.
+Native actions have a separate 5-second deadline, ordinary downloads 20 seconds,
+the first held/edit/load/release workflow 30 seconds, and file choosers 10 seconds.
+Cancellation guards stop later staged work, dispose removes listeners/timers,
+and page closure cancels outstanding Playwright work before it is drained.
+Immediate events remain retained while action completion is still required.
+The first deliberate synchronous double-click and intervening edits are retained.
+The outer harness persists terminal failed evidence before its optional
+5-second viewport screenshot, preserves the primary error if diagnostic/image/
+cleanup work fails, attempts browser and server cleanup independently, and
+reports success only after cleanup succeeds. Helper regressions cover early
+event rejection, action errors/call logs, immediate and delayed delivery, page
+closure, intervening failure and cleanup; strict subprocess regressions exercise
+both promise ownership and the actual harness failure-evidence path.
+
+The next native run records listener/action/event/save/reopen checkpoints,
+bounded App status transitions, document/background/request state, and the
+export button's count, visibility, enabled state, bounds, viewport, scroll,
+drawers and hit stack. A focused trace retains native actionability diagnostics.
+Inspector interception remains an unconfirmed hypothesis. Only when the actual
+hit test identifies it does the harness perform a native trial click; a retained
+interception error plus a confirming hit test permits the real **Close inspector
+drawer** control, followed by a native export click and model/history checks.
+No forced click or handler invocation replaces the later native export action.
+
+This child used Node v26.9.0/npm 11.19.1 with the required PATH, starting from
+clean revision `474aa9d5ec32bd8cee575e7d969bfdd0c4bad212`. Its eleven focused
+files passed 147 tests, including ten event-ownership and three actual-harness
+failure regressions, within 2,422 passing full-suite tests (none failed/skipped).
+Build, strict fixture TypeScript, targeted ESLint, thirteen syntax checks and
+`git diff --check` exited 0; the existing nonblocking chunk-size warning remains.
+Logs, command results and final checkout identity are retained separately in
+`/private/tmp/stz-31e-owned-downloads/handoff.json`. No production source or
+MathJax/shared rendering semantics changed. Browser execution is assigned to
+the outer parent runner. The actual
+later 3D white download/reopen, resource-failure recovery in that export, injected
+serialization failure and successful retry remain pending until executed.
+Fresh matching `passed`/`complete` evidence must preserve all earlier checks and
+complete all eleven groups with no incomplete/unexecuted groups or page errors.
+The partial `ylXZks` result verifies progress on its recorded checkout; it cannot
+verify this subsequent correction. Independent review has not run. Standalone
+verification can use
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
+it does not run review or establish approval. The fix → complete parent
+verification → independent review order and commit/push gates remain unchanged.
+Phase 31E is not complete and 31F remains deferred.
 
 ## Add Path
 

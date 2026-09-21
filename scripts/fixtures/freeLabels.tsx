@@ -13,7 +13,8 @@ import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/seriali
 import { pathInlineNodePoint } from '../../src/model/pathInlineNodes.ts'
 import { reverseCurvePathDirection } from '../../src/model/paths.ts'
 import { generateTikz } from '../../src/tikz/generateTikz.ts'
-import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
+import { createBrowserTextMeasurementProvider, createLabelService, LABEL_SERVICE_LIMITS } from '../../src/rendering/labels/labelService.ts'
+import { parseLabelText } from '../../src/rendering/labelText.ts'
 import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import { loadMathJaxEngine, MathJaxFailure } from '../../src/rendering/labels/mathjaxEngine.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
@@ -41,8 +42,14 @@ type FixtureOptions = {
   layers?: Diagram['layers']
   occlusion?: 'autoHide' | 'autoDim'
 }
-type Deferred = { promise: Promise<void>; release(): void; fail: boolean; requests: Promise<LabelConversionResult>[] }
-type RequestObservation = { id: number; source: string; fontSize: number; held: boolean; phase: 'converting' | 'held' | 'delivered'; result?: string }
+type Deferred = { promise: Promise<void>; release(): void; fail: boolean; requests: Promise<LabelConversionResult>[]; heldAt: number; releasedAt?: number }
+type RequestObservation = {
+  id: number; serviceEpoch: number; source: string; fontSize: number; held: boolean
+  phase: 'converting' | 'held' | 'delivered'; result?: string; reason?: string
+  requestedAt: number; engineStartedAt?: number; engineCompletedAt?: number; convertedAt?: number
+  heldAt?: number; releasedAt?: number; deliveredAt?: number
+  conversion?: { kind: string; reason?: string; identity: string; generation: number; configurationIdentity: string }
+}
 const container = document.getElementById('root')!
 let root = createRoot(container)
 let sourceRevision = 0
@@ -60,11 +67,14 @@ const requests: RequestObservation[] = []
 const layouts = new Map<string, { id: string; source: string; requestIdentity: string; status: SvgTexLabelSnapshot['status'] }>()
 const holds = new Map<string, Deferred>()
 const measurement = createBrowserTextMeasurementProvider()
+const fixtureSettlementMs = 20_000
+let serviceEpoch = 0
 
 function makeService() {
+  const epoch = ++serviceEpoch
   return createLabelService({
     measurement,
-    limits: { settlementMs: 20_000 },
+    limits: { settlementMs: fixtureSettlementMs },
     async loadEngine(signal) {
       if (serviceMode === 'load-error') throw new MathJaxFailure('resource-error', 'Intentional fixture load failure')
       const engine = await loadMathJaxEngine(signal)
@@ -73,8 +83,17 @@ function makeService() {
         dispose: () => engine.dispose?.(),
         async convert(runs) {
           invocationCount++
-          if (serviceMode === 'output-error') throw new MathJaxFailure('output-error', 'Intentional fixture output failure')
-          return engine.convert(runs)
+          const matching = requests.filter((request) => {
+            if (request.serviceEpoch !== epoch || request.phase !== 'converting') return false
+            const parsed = parseLabelText(request.source)
+            return parsed.kind === 'parsed'
+              && JSON.stringify(parsed.runs.filter((run) => run.kind === 'math').map(({ tex, display }) => ({ tex, display }))) === JSON.stringify(runs)
+          })
+          matching.forEach((request) => { request.engineStartedAt = Date.now() })
+          try {
+            if (serviceMode === 'output-error') throw new MathJaxFailure('output-error', 'Intentional fixture output failure')
+            return await engine.convert(runs)
+          } finally { matching.forEach((request) => { request.engineCompletedAt = Date.now() }) }
         },
       }
     },
@@ -83,6 +102,7 @@ function makeService() {
 let service = makeService()
 function makeRuntime() {
   const ownedService = service
+  const epoch = serviceEpoch
   return createSvgLabelRuntime({ measurement, service: {
     peek(source, settings) {
       return holds.has(source) ? undefined : ownedService.peek(source, settings)
@@ -90,14 +110,21 @@ function makeRuntime() {
     convert(source, settings) {
       requestCount++
       const held = holds.get(source)
-      const request: RequestObservation = { id: requestCount, source, fontSize: settings.font.sizePx, held: !!held, phase: 'converting' }
+      const request: RequestObservation = { id: requestCount, serviceEpoch: epoch, source, fontSize: settings.font.sizePx,
+        held: !!held, heldAt: held?.heldAt, requestedAt: Date.now(), phase: 'converting' }
       requests.push(request)
       const completion = ownedService.convert(source, settings).then(async (result) => {
+        request.convertedAt = Date.now()
+        request.conversion = { kind: result.kind, reason: result.kind === 'fallback' ? result.reason : undefined,
+          identity: result.identity, generation: result.generation, configurationIdentity: result.configurationIdentity }
         if (held) { request.phase = 'held'; await held.promise }
         const delivered: LabelConversionResult = held?.fail
           ? { ...result, kind: 'fallback', reason: 'output-error' } : result
         request.phase = 'delivered'
         request.result = delivered.kind
+        request.reason = delivered.kind === 'fallback' ? delivered.reason : undefined
+        request.releasedAt = held?.releasedAt
+        request.deliveredAt = Date.now()
         return delivered
       })
       held?.requests.push(completion)
@@ -320,19 +347,27 @@ const api = {
   hold(source: string) {
     let release = () => {}
     const promise = new Promise<void>((resolve) => { release = resolve })
-    holds.set(source, { promise, release, fail: false, requests: [] })
+    holds.set(source, { promise, release, fail: false, requests: [], heldAt: Date.now() })
   },
   async release(source: string, fail = false) {
     const held = holds.get(source)
     if (!held || held.requests.length === 0) throw new Error(`Release before request started: ${source}`)
     {
       held.fail = fail
+      held.releasedAt = Date.now()
       holds.delete(source)
       held.release()
       await Promise.allSettled(held.requests)
       // Allow React to commit every released subscriber before observation.
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     }
+  },
+  exportDiagnostics(source: string) {
+    const matching = requests.filter((request) => request.source === source)
+    return { source, serviceEpoch, sourceRevision, now: Date.now(),
+      limits: { serviceMs: fixtureSettlementMs, productionServiceMs: LABEL_SERVICE_LIMITS.settlementMs },
+      requestCount: matching.length, requests: matching.slice(-8).map((request) => ({ ...request })),
+      heldAt: holds.get(source)?.heldAt }
   },
   async changeService(mode: typeof serviceMode) {
     root.unmount()

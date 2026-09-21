@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client'
 import App from '../../src/App.tsx'
 import type { AppLabelBrowserSnapshot } from '../../src/App.tsx'
 import '../../src/index.css'
-import { createEmptyDiagram } from '../../src/model/constructors.ts'
-import { defaultLabelStyle } from '../../src/model/styles.ts'
+import { createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
+import { defaultCurveStyle, defaultLabelStyle } from '../../src/model/styles.ts'
 import type { LabelStyle, Vec3 } from '../../src/model/types.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
 import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
@@ -17,9 +17,17 @@ type Held = {
   promise: Promise<void>
   release(): void
   fail: boolean
+  reason: 'output-error' | 'resource-error'
   requests: Promise<LabelConversionResult>[]
   completed: number
   released: boolean
+  heldAt: number
+  releasedAt?: number
+}
+type ConversionObservation = {
+  id: number; source: string; requestedAt: number; convertedAt?: number; deliveredAt?: number
+  heldAt?: number; releasedAt?: number; conversionKind?: string; conversionReason?: string
+  deliveredKind?: string; deliveredReason?: string; identity?: string
 }
 const measurement = createBrowserTextMeasurementProvider()
 const service = createLabelService({ measurement, limits: { settlementMs: 30_000 } })
@@ -27,19 +35,30 @@ const held = new Map<string, Held>()
 const completionOrder: { source: string; kind: string }[] = []
 let snapshot: AppLabelBrowserSnapshot | undefined
 let requests = 0
+const conversions: ConversionObservation[] = []
 const runtime = createSvgLabelRuntime({ measurement, service: {
   peek(source, settings) { return held.has(source) ? undefined : service.peek(source, settings) },
   convert(source, settings) {
     requests++
     const hold = held.get(source)
-    const conversion = service.convert(source, settings)
+    const observation: ConversionObservation = { id: requests, source, requestedAt: Date.now(), heldAt: hold?.heldAt }
+    conversions.push(observation)
+    const conversion = service.convert(source, settings).then((result) => {
+      Object.assign(observation, { convertedAt: Date.now(), conversionKind: result.kind,
+        conversionReason: result.kind === 'fallback' ? result.reason : undefined, identity: result.identity })
+      if (!hold) Object.assign(observation, { deliveredAt: Date.now(), deliveredKind: result.kind,
+        deliveredReason: result.kind === 'fallback' ? result.reason : undefined })
+      return result
+    })
     if (!hold) return conversion
     const pending = conversion.then(async (result): Promise<LabelConversionResult> => {
       await hold.promise
       const delivered: LabelConversionResult = hold.fail
-        ? { ...result, kind: 'fallback', reason: 'output-error' }
+        ? { ...result, kind: 'fallback', reason: hold.reason }
         : result
       hold.completed++
+      Object.assign(observation, { releasedAt: hold.releasedAt, deliveredAt: Date.now(), deliveredKind: delivered.kind,
+        deliveredReason: delivered.kind === 'fallback' ? delivered.reason : undefined })
       completionOrder.push({ source, kind: delivered.kind })
       return delivered
     })
@@ -58,23 +77,33 @@ const api = {
     if (held.has(source)) throw new Error(`Already held: ${source}`)
     let release = () => {}
     const promise = new Promise<void>((resolve) => { release = resolve })
-    held.set(source, { promise, release, fail: false, requests: [], completed: 0, released: false })
+    held.set(source, { promise, release, fail: false, reason: 'output-error', requests: [], completed: 0, released: false, heldAt: Date.now() })
   },
   pending(source: string) {
     const hold = held.get(source)
     return hold ? { started: hold.requests.length, completed: hold.completed, released: hold.released } : null
   },
-  async release(source: string, fail = false) {
+  async release(source: string, fail = false, reason: Held['reason'] = 'output-error') {
     const hold = held.get(source)
     if (!hold || hold.requests.length === 0) throw new Error(`No started held request: ${source}`)
     hold.fail = fail
+    hold.reason = reason
     hold.released = true
+    hold.releasedAt = Date.now()
     held.delete(source)
     hold.release()
     await Promise.all(hold.requests)
     await frame()
     await frame()
     return { source, started: hold.requests.length, completed: hold.completed, fail }
+  },
+  exportDiagnostics(sources: string[]) {
+    return { now: Date.now(), serviceSettlementMs: 30_000,
+      labelDocumentRevision: snapshot?.labelDocumentRevision,
+      sources: sources.map((source) => {
+        const matching = conversions.filter((conversion) => conversion.source === source)
+        return { source, requestCount: matching.length, requests: matching.slice(-8).map((entry) => ({ ...entry })) }
+      }) }
   },
   inspectContent(id: string) {
     if (!snapshot) throw new Error('App has not committed')
@@ -89,6 +118,37 @@ const api = {
       text: source, position: options.position ?? { x: 0, y: 0, z: 0 },
       style: { ...defaultLabelStyle, fontSize: 18, ...options.style } }]
     return serializeDiagram(diagram)
+  },
+  exportDocumentJson(ambientDimension: 2 | 3 = 2) {
+    const diagram = createEmptyDiagram({ ambientDimension })
+    const z = ambientDimension === 3 ? 0.5 : 0
+    const sources = {
+      edit: 'Before $\\alpha^2$', after: 'After $\\beta^3$', ordinary: '日本語 Ω ordinary',
+      repeated: '$\\frac{x_1}{y^2}$', inline: '経路 $\\sum_{k=1}^{n}k$',
+      malformed: '  "<>&"  $\\undefinedExportCommand{raw}$\t keep literal\n tail  ',
+      resource: 'resource $\\gamma$', hidden: '$\\hiddenExportCommand$',
+    }
+    diagram.layers = [{ value: 0, name: 'Visible', visible: true }, { value: 1, name: 'Hidden', visible: false }]
+    diagram.labels = [
+      { id: 'export-edit', text: sources.edit, position: { x: -2, y: 1.7, z }, color: '#c02060', anchor: 'west' as const },
+      { id: 'export-ordinary', text: sources.ordinary, position: { x: -1, y: 0.9, z }, color: '#304060', anchor: 'center' as const },
+      { id: 'export-repeat', text: sources.repeated, position: { x: 1.4, y: 1.7, z }, color: '#7030b0', anchor: 'east' as const },
+      { id: 'export-malformed', text: sources.malformed, position: { x: -2, y: -0.3, z }, color: '#602040', anchor: 'west' as const },
+      { id: 'export-resource', text: sources.resource, position: { x: 1, y: -1.1, z }, color: '#406020', anchor: 'center' as const },
+      { id: 'export-hidden', text: sources.hidden, position: { x: 0, y: 0, z }, color: '#ff0000', anchor: 'center' as const },
+    ].map(({ id, text, position, color, anchor }) => ({
+      id, name: id, geometricKind: 'label', text, position, layer: id === 'export-hidden' ? 1 : 0,
+      style: { ...defaultLabelStyle, color: color as `#${string}`, fontSize: 12, opacity: id === 'export-edit' ? 0.65 : 1, anchor },
+    }))
+    diagram.strata = [createCurveStratum({ ambientDimension, id: 'export-path', layer: 0,
+      points: [{ x: -2, y: -1.8, z: 0 }, { x: 2, y: -1.8, z }],
+      style: { ...defaultCurveStyle, strokeColor: '#008080' },
+      inlineNodes: [
+        { id: 'repeated', text: sources.repeated, position: { kind: 'segment', segmentIndex: 0, value: 0.3 }, options: { placement: 'above', marker: 'dot' } },
+        { id: 'mixed', text: sources.inline, position: { kind: 'segment', segmentIndex: 0, value: 0.8 }, options: { placement: 'below', marker: 'none' } },
+      ],
+    })]
+    return { json: serializeDiagram(diagram), sources }
   },
 }
 declare global { interface Window { stzAppLabels: typeof api } }

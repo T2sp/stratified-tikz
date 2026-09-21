@@ -12,6 +12,12 @@ import {
 } from 'react'
 import './App.css'
 import type { SvgLabelRuntime } from './rendering/labels/svgLabelRuntime.ts'
+import {
+  captureSvgExportSnapshot,
+  createSvgExportController,
+  prepareSettledSvgExport,
+  releaseSvgExportSnapshot,
+} from './ui/svgSettledExport.ts'
 import cameraReferenceGraphicUrl from './assets/camera-3d-coords.svg'
 import {
   defaultExampleId,
@@ -347,7 +353,6 @@ import {
   isAddPathTool,
   coordinateAnchorVisibilityAriaLabel,
   coordinateAnchorVisibilityButtonLabel,
-  createSvgPreviewExportText,
   previewToolbarTopTools,
   runPreviewOverlayAction,
   shouldHandlePreviewCanvasCreationClick,
@@ -369,7 +374,6 @@ import {
   svgPreviewExportMimeType,
   svgPreviewBackgroundModeFromSelectValue,
   svgPreviewBackgroundModeOptions,
-  svgPreviewExportSuccessMessage,
   startCoordinateAnchorDragSession,
   startGeometryHandleDragSession,
   type BulkFieldScalarValue,
@@ -864,6 +868,7 @@ function App({ labelBrowserTest }: AppProps = {}) {
     useState<SvgPreviewBackgroundMode>(defaultSvgPreviewBackgroundMode)
   const [svgPreviewExportStatus, setSvgPreviewExportStatus] =
     useState<string>('')
+  const [svgPreviewExportPending, setSvgPreviewExportPending] = useState(false)
   // Runtime document ownership, deliberately outside Diagram and undo history.
   const [labelDocumentRevision, setLabelDocumentRevision] = useState(0)
   const [showCoordinateAnchors, setShowCoordinateAnchors] =
@@ -909,6 +914,20 @@ function App({ labelBrowserTest }: AppProps = {}) {
   const [pathSplitPickState, setPathSplitPickState] =
     useState<PathSplitPickState | null>(null)
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
+  const [svgExportController] = useState(() => createSvgExportController({
+    prepare: prepareSettledSvgExport,
+    release: releaseSvgExportSnapshot,
+    download: (text) => downloadTextFile(text, {
+      filename: defaultSvgPreviewExportFilename,
+      mimeType: svgPreviewExportMimeType,
+    }),
+    onStatus: (status) => {
+      setSvgPreviewExportPending(status.kind === 'pending')
+      setSvgPreviewExportStatus(status.message)
+      if (status.kind !== 'pending') setCopyStatus(status.kind === 'success' ? 'downloaded' : 'failed')
+    },
+  }))
+  useEffect(() => () => svgExportController.cancel(), [svgExportController])
   const [cameraControl, setCameraControl] = useState<OrthographicCamera3D>(() =>
     createInitialCameraControlState(),
   )
@@ -1219,44 +1238,18 @@ function App({ labelBrowserTest }: AppProps = {}) {
   }
 
   function exportSvgPreview(): void {
-    const previewSvg =
-      previewStageRef.current?.querySelector<SVGSVGElement>('svg.svg-diagram') ??
-      null
-    const svgText =
-      previewSvg === null
-        ? null
-        : createSvgPreviewExportText(previewSvg, {
-            backgroundMode: svgPreviewBackgroundMode,
-          })
-
-    if (svgText === null) {
-      setCopyStatus('failed')
-      setSvgPreviewExportStatus(
-        svgPreviewBackgroundMode === 'white'
-          ? 'SVG export failed. White background requires a valid viewBox or numeric width and height.'
-          : 'SVG export failed.',
-      )
-      return
-    }
-
-    const downloaded = downloadTextFile(svgText, {
-      filename: defaultSvgPreviewExportFilename,
-      mimeType: svgPreviewExportMimeType,
+    void svgExportController.start(() => {
+      const previewSvg = previewStageRef.current?.querySelector<SVGSVGElement>('svg.svg-diagram')
+      if (!previewSvg) throw new Error('SVG preview unavailable.')
+      return captureSvgExportSnapshot(previewSvg, { backgroundMode: svgPreviewBackgroundMode })
     })
-
-    setCopyStatus(downloaded ? 'downloaded' : 'failed')
-    setSvgPreviewExportStatus(
-      downloaded
-        ? svgPreviewExportSuccessMessage(svgPreviewBackgroundMode)
-        : 'SVG export download failed.',
-    )
   }
 
   function updateSvgPreviewBackgroundMode(value: string): void {
     setSvgPreviewBackgroundMode(
       svgPreviewBackgroundModeFromSelectValue(value),
     )
-    setSvgPreviewExportStatus('')
+    if (!svgExportController.pending) setSvgPreviewExportStatus('')
   }
 
   function updateCoordinateAxesTikzExport(includeAxes: boolean): void {
@@ -6555,6 +6548,8 @@ function App({ labelBrowserTest }: AppProps = {}) {
               className="preview-overlay-button preview-edge-action-button svg-export-button"
               aria-label={svgPreviewExportButtonLabel}
               title={svgPreviewExportButtonLabel}
+              disabled={svgPreviewExportPending}
+              aria-busy={svgPreviewExportPending}
               onClick={exportSvgPreview}
             >
               Export SVG

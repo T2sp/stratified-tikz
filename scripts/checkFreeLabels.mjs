@@ -16,6 +16,7 @@ import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
+import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
 await mkdir(artifactDir, { recursive: true })
@@ -34,6 +35,7 @@ const scenarios = [
   'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount',
   'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
+  'settled-SVG-export-standalone',
 ]
 const completed = []
 const started = []
@@ -49,6 +51,7 @@ const environment = { nodeVersion: process.version, browserVersion: null,
 let browser, server, page
 let stage = 'playwright-import'
 let checkpoint = null
+let primaryFailure
 async function save(result, error) {
   await writeFile(resolve(artifactDir, 'free-labels-evidence.json'), JSON.stringify({ result, stage, environment, checkout,
     checkpoint, started, checkpoints, completed, incompleteGroups: scenarios.filter((name) => !completed.includes(name)),
@@ -74,6 +77,17 @@ async function observe(name, details) {
   checkpoints.push(checkpoint)
   diagnostics.push({ name, ...details })
   await save('running')
+}
+function secondaryFailure(name, error) {
+  diagnostics.push({ name, error: { message: error.message, stack: error.stack } })
+  console.error(`Free-label browser ${name}: ${error.message}`)
+}
+async function saveFailure() {
+  try {
+    await save('failed', primaryFailure)
+  } catch (error) {
+    secondaryFailure('failure-evidence-write-failed', error)
+  }
 }
 try {
   const moduleName = environment.playwrightModule
@@ -449,18 +463,48 @@ try {
   await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })
   await completeGroup('real-App-input-JSON-history-reused-ID-load')
+  stage = 'settled-SVG-export-standalone'
+  await startGroup('settled-SVG-export-standalone')
+  await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })
+  await runSettledSvgExportChecks({ browser, origin, record, observe, artifactDir })
+  await completeGroup('settled-SVG-export-standalone')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')
   assert.deepEqual(new Set(completed), new Set(scenarios), 'All required groups completed')
-  stage = 'complete'
-  checkpoint = { name: 'complete' }
-  await save('passed')
-  console.log(JSON.stringify({ result: 'free-label-browser-check-passed', environment, checks: evidence.length, artifactDir }))
+  stage = 'resource-cleanup'
 } catch (error) {
-  if (page) await page.screenshot({ path: resolve(artifactDir, 'failure.png'), fullPage: true }).catch(() => {})
-  await save('failed', error)
+  primaryFailure = error
+  // Failure observations must survive even if optional image capture stalls or
+  // rejects. No diagnostic or teardown error may replace the scenario error.
+  await saveFailure()
   console.error(`Free-label browser acceptance failed at ${stage}; evidence: ${artifactDir}`)
-  throw error
+  if (page) {
+    try {
+      await page.screenshot({ path: resolve(artifactDir, 'failure.png'), fullPage: false, timeout: 5_000 })
+    } catch (screenshotError) {
+      secondaryFailure('failure-screenshot-failed', screenshotError)
+    }
+  }
 } finally {
-  await browser?.close()
-  await server?.close()
+  // Attempt both owned resources even when one close fails. A teardown failure
+  // after otherwise successful checks is still a failed verification.
+  for (const [name, resource] of [['browser', browser], ['server', server]]) {
+    if (!resource) continue
+    try {
+      await resource.close()
+    } catch (error) {
+      if (!primaryFailure) {
+        primaryFailure = error
+        stage = `${name}-cleanup`
+      } else {
+        secondaryFailure(`${name}-cleanup-failed`, error)
+      }
+      await saveFailure()
+    }
+  }
+  if (primaryFailure) await saveFailure()
 }
+if (primaryFailure) throw primaryFailure
+stage = 'complete'
+checkpoint = { name: 'complete' }
+await save('passed')
+console.log(JSON.stringify({ result: 'free-label-browser-check-passed', environment, checks: evidence.length, artifactDir }))
