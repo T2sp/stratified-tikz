@@ -155,7 +155,7 @@ function removeExcludedSvgPreviewExportChildren(
   }
 }
 
-function isExcludedSvgPreviewExportElement(
+export function isExcludedSvgPreviewExportElement(
   element: SvgPreviewExportElementLike,
 ): boolean {
   if (

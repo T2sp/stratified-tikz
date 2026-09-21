@@ -78,8 +78,9 @@ missing evidence. The 144 focused parser/adapter tests (included in the full
 suite), 2,258 full-suite tests, and targeted checks passed on the same unchanged
 code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
-Waiting for settled labels during SVG export and the combined audit remain
-assigned to [Phases 31E–31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
+Settled-label SVG export is implemented as described in [Export SVG](#export-svg),
+with its standalone browser gate pending. The combined audit remains assigned
+to [Phase 31F](./ROADMAP.md#phase-31-typeset-tex-labels-in-svg-preview).
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
 and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
@@ -239,19 +240,19 @@ identify each conversion; obsolete completions after editing, duplication,
 splitting, reversal, deletion, or document replacement cannot replace current
 content. Position, placement, selection, and camera changes reuse unchanged
 conversion results. Committed node results are available through the same
-revision-aware layout interface as free labels for subsequent export work.
+revision-aware layout interface as free labels.
 
-Saved-path `pathLabel` names and UI captions are not typeset. Existing SVG
-export includes currently settled node formulas and current literal fallback;
-waiting for a consistent settled snapshot remains Phase 31E. The combined
+Saved-path `pathLabel` names and UI captions are not typeset. SVG export settles
+the free-label and inline-node sources captured at the export click. The combined
 regression and completion audit remains Phase 31F.
 
 The shared `onLabelLayoutChange(id, snapshot, ownerIdentity)` callback publishes
 current free-label and inline-node layouts. Consumers key by `ownerIdentity`,
 not by the path-local node ID. Inline owner identities encode document revision,
 path ID, and node ID; request identities also include original source and font
-settings. A `null` snapshot retires that owner. No separate export registry or
-model/history fields are introduced.
+settings. A `null` snapshot retires that owner. Phase 31E additionally associates
+immutable committed inputs with their rendered elements in a runtime WeakMap;
+no conversion or export state enters the model or history.
 
 ### Inline-node verification
 
@@ -904,7 +905,8 @@ changed. The authorized parent run also passed the independent Phase 31B
 `check:label-assets`; its evidence remains separate from the Phase 31C results.
 The historical free-label verification above predates inline-node integration;
 see the Phase 31D implementation and pending browser verification above.
-Phase 31E and Phase 31F remain deferred.
+The Phase 31E export changes and pending browser gate are described below;
+Phase 31F remains deferred.
 
 ## Export SVG
 
@@ -916,21 +918,79 @@ remain gray on screen; that editor-only background is not inherited by the
 download. White export instead adds an explicit white rectangle covering the
 exported viewBox behind the diagram.
 
-Export includes the current SVG Preview view, including visible diagram
-geometry, labels, and arrow previews. Editor chrome, hit-test metadata, and
-preview-only data attributes are removed from the exported SVG.
+Every click captures the currently committed view: diagram geometry, camera,
+viewport, visible layers and filtering, label text and style, draw order, and
+the selected background. The capture happens before waiting for conversion.
+Editing, camera movement, layer changes, Undo/Redo, deletion, and document loads
+remain available during preparation. They affect the next export; a pending
+file retains its complete click-time view.
 
-Export currently clones what is visible: settled free-label and path inline-node
-formulas remain SVG geometry, and pending/failed labels remain their current
-literal source.
-Transparent and white backgrounds are supported, and label hit rectangles and
-selected-position markers are excluded. Waiting for a consistent settled-label
-snapshot is deferred to Phase 31E.
+`Preparing SVG export…` appears in the accessible status area while the export
+button is disabled and busy. Only one request may be pending; repeated clicks
+are ignored, including clicks before the disabled state has committed. The
+action is restored after success or failure. Success is reported after the
+completed SVG has been handed to the browser for download. An infrastructure
+failure reports `SVG export failed` and does not download malformed output.
+
+Export settles every represented free label and path inline-node label through
+the shared bounded conversion service and cache. Successful formulas use
+self-contained SVG geometry alongside ordinary Unicode text. Failed labels
+contain their complete captured source, including delimiters, backslashes,
+markup characters, edge/repeated spaces, tabs, and physical newlines, as literal
+SVG text. Unsupported input, undefined commands, parse/output errors, resource
+failures, and exhausted work limits affect only their own labels. There is no
+pending state in the downloaded file. This remains a bounded preview language,
+not a full LaTeX engine.
+
+Hidden layers and labels removed by `autoHide` are not awaited. Labels retained
+by `autoDim` or layer filtering are settled and retain their captured opacity.
+Resource loading and conversion use the adapter's finite-work limits, with a
+bounded export wait also covering injected/outstanding services and fallback
+font readiness. A transient resource failure does not poison future exports.
+
+The exporter clones the committed SVG synchronously, captures immutable inputs
+from the shared label renderer, and replaces the clone's label subtrees by
+synchronously rendering their settled results with the same pure layout/view.
+It does not depend on a live React update committing after a conversion promise
+resolves. It creates no temporary React root and never replaces live labels.
+Request identities guard completion, status, cancellation, and cleanup; detached
+nodes and download object URLs are released after their owning request.
+
+Sanitization removes editor chrome, handles, cursor/work-plane guides, selection
+and hover feedback, label hit rectangles, classes, and preview-only metadata.
+Explicit paint, opacity, transforms, baseline/anchor placement, whitespace
+layout, and path-label white outlines remain. Formula geometry uses local,
+collision-free definitions/paths without application styles, remote fonts,
+`foreignObject`, or bitmap formulas. Transparent output has no added background
+rectangle; white output has exactly one behind the captured diagram.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently
 selected SVG background remains active for the current component lifetime, but
 is export-only and is not included in saved diagram JSON.
+
+Phase 31E's focused Node coverage is registered in `npm test`. The shared
+`check:free-labels` harness now also requires `settled-SVG-export-standalone`.
+It controls free/path conversion timing, edits text and font size through the
+real Inspector during preparation, loads a changed 3D document, and downloads
+both transparent and white files through the production action. It saves the
+files and reopens them as standalone `file://` SVGs in browser pages without
+the application. Assertions cover geometry/text, literal markup and whitespace,
+colors, outlines, placement, references, backgrounds, overlays, duplicates,
+visibility/dimming, retry after resource failure, and serialization failure.
+SVG files, standalone screenshots, raster PNGs, and per-scenario observations
+are retained with the existing browser evidence. The parent verifier requires
+all eleven groups for 31E/31F and rejects older ten-group reports for these
+phases; earlier phases retain their complete historical group sets.
+
+The child-session attempt on 2026-09-21 used Node v26.9.0, the installed external
+Playwright module, and the configured Google Chrome executable. It stopped at
+Vite server startup with `listen EPERM: operation not permitted 127.0.0.1:5173`;
+Chrome did not launch and no browser assertion or standalone reopen ran.
+`/private/tmp/stz-phase31e-browser-child/free-labels-evidence.json` records the
+failed startup and all eleven incomplete groups. **Standalone-fidelity
+acceptance remains unresolved until the authorized parent runner completes
+`check:label-assets` and `check:free-labels` on the final checkout.**
 
 ## Add Path
 

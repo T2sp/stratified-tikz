@@ -33,6 +33,7 @@ const inlineLabelGroups = [
   'inline-node-lifecycle-path-operations-export',
 ]
 const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
+const settledExportGroups = [...allLabelGroups, 'settled-SVG-export-standalone']
 
 // The fake command records observable process boundaries. It never invokes npm,
 // Codex, a server, or a browser; the verification helper still executes real git.
@@ -270,7 +271,7 @@ test('31C requires every browser scenario group even if the command exits succes
   assert.equal(storedReport(error.report).status, 'failed')
 })
 
-for (const phase of ['31C', '31D', '31E', '31F']) {
+for (const phase of ['31C', '31D']) {
   test(`${phase} accepts all ten groups from the extended shared harness`, (t) => {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
@@ -279,6 +280,25 @@ for (const phase of ['31C', '31D', '31E', '31F']) {
     assert.equal(report.checks.at(-1).name, 'check:free-labels')
     assert.equal(report.checks.at(-1).exitCode, 0)
     assert.equal(verificationMatchesCheckout(report, fixture), true)
+  })
+}
+
+for (const phase of ['31C', '31D', '31E', '31F']) {
+  test(`${phase} accepts all eleven groups including standalone SVG export`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(settledExportGroups)
+    assert.equal(verify(t, fixture, phase).status, 'passed')
+  })
+}
+
+for (const phase of ['31E', '31F']) {
+  test(`${phase} rejects older passing evidence without standalone SVG save/reopen`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(allLabelGroups)
+    const error = failedVerification(t, fixture, phase)
+    assert.match(error.message, /11 required groups/)
+    assert.equal(error.report.checks.at(-1).exitCode, 0)
+    assert.equal(error.report.status, 'failed')
   })
 }
 

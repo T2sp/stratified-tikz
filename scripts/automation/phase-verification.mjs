@@ -29,7 +29,9 @@ const inlineLabelGroups = [
   "inline-node-rendering-placement-halo-picking",
   "inline-node-lifecycle-path-operations-export",
 ];
-const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups];
+const settledExportGroups = ["settled-SVG-export-standalone"];
+const inlineCompleteGroups = [...freeLabelGroups, ...inlineLabelGroups];
+const allLabelGroups = [...inlineCompleteGroups, ...settledExportGroups];
 
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
@@ -137,15 +139,17 @@ function validateBrowserEvidence(name, artifactDir, phase) {
     || evidence.environment.browserVersion.trim() === "") {
     throw new Error("Free-label browser verification did not reach complete with an identified browser");
   }
-  // 31C supports its original report and the now-extended shared harness. Any
-  // inline extension must be complete; 31D and its successors require both.
-  const requiredGroups = phase === "31C" ? freeLabelGroups : allLabelGroups;
+  // Earlier phases accept their complete historical report or a complete later
+  // extension. 31E/F must include downloaded, reopened standalone export checks.
+  const requiredGroups = phase === "31C" ? freeLabelGroups
+    : phase === "31D" ? inlineCompleteGroups : allLabelGroups;
   const completed = evidence.completed;
   if (!Array.isArray(completed)
     || new Set(completed).size !== completed.length
     || completed.some((group) => !allLabelGroups.includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![requiredGroups.length, allLabelGroups.length].includes(completed.length)) {
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups].some((groups) =>
+      groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
   for (const key of ["incompleteGroups", "unexecuted", "pageErrors"]) {

@@ -16,6 +16,7 @@ const inlineLabelGroups = [
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
 ]
 const allLabelGroups = [...freeLabelGroups, ...inlineLabelGroups]
+const settledExportGroups = [...allLabelGroups, 'settled-SVG-export-standalone']
 
 function fixture(t, phase = '31B') {
   const cwd = mkdtempSync(join(tmpdir(), 'stz-runner-test-'))
@@ -123,7 +124,7 @@ test('verify mode accepts pending changes and never invokes Codex or changes bra
   assert.deepEqual(checks.map(check => check.stage), ['test', 'build', 'browser'])
 })
 
-for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups]]) {
+for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups], ['31E', settledExportGroups]]) {
   test(`${phase} verify accepts its complete ${groups.length}-group browser report`, t => {
     const { cwd, git, run, initialHead, initialBranch } = fixture(t, phase)
     writeFileSync(join(cwd, 'pending.txt'), 'uncommitted inline fixture')

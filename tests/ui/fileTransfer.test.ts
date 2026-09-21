@@ -103,5 +103,65 @@ test('download helper reports failures without leaking object URLs', () => {
     ),
     false,
   )
-  assert.deepEqual(calls, ['create-url', 'append', 'revoke:blob:test-url'])
+  assert.deepEqual(calls, ['create-url', 'append', 'remove', 'revoke:blob:test-url'])
+})
+
+test('download failure during append removes the anchor and revokes its URL', () => {
+  const calls: string[] = []
+  const environment: TextFileDownloadEnvironment = {
+    createObjectUrl: () => 'blob:append-failure',
+    revokeObjectUrl: (url) => calls.push(`revoke:${url}`),
+    createAnchor: () => ({
+      href: '', download: '',
+      click: () => calls.push('click'),
+      remove: () => calls.push('remove'),
+    }),
+    appendAnchor: () => {
+      calls.push('append')
+      throw new Error('append failed')
+    },
+  }
+
+  assert.equal(downloadTextFile('<svg/>', {
+    filename: 'diagram.svg', mimeType: 'image/svg+xml;charset=utf-8',
+  }, environment), false)
+  assert.deepEqual(calls, ['append', 'remove', 'revoke:blob:append-failure'])
+})
+
+test('URL creation failure removes the allocated anchor without revoking a nonexistent URL', () => {
+  const calls: string[] = []
+  const environment: TextFileDownloadEnvironment = {
+    createObjectUrl: () => { throw new Error('URL allocation failed') },
+    revokeObjectUrl: (url) => calls.push(`revoke:${url}`),
+    createAnchor: () => ({
+      href: '', download: '',
+      click: () => calls.push('click'),
+      remove: () => calls.push('remove'),
+    }),
+    appendAnchor: () => calls.push('append'),
+  }
+
+  assert.equal(downloadTextFile('<svg/>', {
+    filename: 'diagram.svg', mimeType: 'image/svg+xml;charset=utf-8',
+  }, environment), false)
+  assert.deepEqual(calls, ['remove'])
+})
+
+test('failing anchor cleanup still revokes the URL and preserves the successful handoff', () => {
+  const calls: string[] = []
+  const environment: TextFileDownloadEnvironment = {
+    createObjectUrl: () => 'blob:cleanup-failure',
+    revokeObjectUrl: (url) => calls.push(`revoke:${url}`),
+    createAnchor: () => ({
+      href: '', download: '',
+      click: () => calls.push('click'),
+      remove: () => { throw new Error('remove failed') },
+    }),
+    appendAnchor: () => calls.push('append'),
+  }
+
+  assert.equal(downloadTextFile('<svg/>', {
+    filename: 'diagram.svg', mimeType: 'image/svg+xml;charset=utf-8',
+  }, environment), true)
+  assert.deepEqual(calls, ['append', 'click', 'revoke:blob:cleanup-failure'])
 })

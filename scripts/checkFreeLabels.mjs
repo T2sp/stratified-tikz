@@ -16,6 +16,7 @@ import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
+import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
 await mkdir(artifactDir, { recursive: true })
@@ -34,6 +35,7 @@ const scenarios = [
   'inverted-success-and-failure-races', 'pending-lock-and-autohide', 'deletion-and-unmount',
   'real-App-input-JSON-history-reused-ID-load', 'current-SVG-cloning',
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
+  'settled-SVG-export-standalone',
 ]
 const completed = []
 const started = []
@@ -449,6 +451,11 @@ try {
   await startGroup('real-App-input-JSON-history-reused-ID-load')
   await runAppChecks({ browser, origin, record, artifactDir })
   await completeGroup('real-App-input-JSON-history-reused-ID-load')
+  stage = 'settled-SVG-export-standalone'
+  await startGroup('settled-SVG-export-standalone')
+  await runSettledSvgVisibilityChecks({ page, record })
+  await runSettledSvgExportChecks({ browser, origin, record, artifactDir })
+  await completeGroup('settled-SVG-export-standalone')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')
   assert.deepEqual(new Set(completed), new Set(scenarios), 'All required groups completed')
   stage = 'complete'

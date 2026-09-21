@@ -1440,7 +1440,17 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: planned.
+Status: implemented; standalone browser acceptance pending parent verification.
+The child verification environment blocks local server startup with `listen
+EPERM`, so no save/reopen browser assertions have passed in this implementation
+turn. `check:free-labels` now requires a dedicated settled-export group for
+31E/31F, including downloaded 2D/3D files reopened outside the application.
+
+The exporter captures a detached copy of the committed SVG and immutable label
+inputs before awaiting conversion. A shared synchronous label view renders the
+settled results into that copy before sanitization; React commit timing cannot
+leave successful labels pending in the file. One export runs at a time while
+editing remains available. See [SVG export](./PREVIEW_UI.md) for behavior.
 
 - Capture one consistent click-time diagram/view/options snapshot, settle its
   visible labels, and render a detached export without interrupting live edits.

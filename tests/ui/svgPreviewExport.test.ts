@@ -417,7 +417,6 @@ test('switching export modes changes only the cloned SVG background content', ()
     'SVG exported with transparent background.')
   assert.equal(svgPreviewExportSuccessMessage('white'),
     'SVG exported with white background.')
-  assert.match(appSource, /setSvgPreviewExportStatus\(\s*downloaded/)
 })
 
 test('2D pan and zoom transforms export in transparent and white modes', () => {
@@ -472,10 +471,8 @@ test('3D projected surfaces, curves, and arrows export in both modes', () => {
 
 test('SVG preview export uses the SVG diagram only, not the surrounding UI', () => {
   assert.match(appSource, /querySelector<SVGSVGElement>\('svg\.svg-diagram'\)/)
-  assert.match(
-    appSource,
-    /createSvgPreviewExportText\(previewSvg, \{\s*backgroundMode: svgPreviewBackgroundMode,/,
-  )
+  // Async capture, settlement and download status are exercised behaviorally
+  // in svgSettledExport.test.ts and the production browser export harness.
   assert.match(appSource, /filename: defaultSvgPreviewExportFilename/)
   assert.match(appSource, /mimeType: svgPreviewExportMimeType/)
   assert.equal(defaultSvgPreviewExportFilename, 'stratified-tikz-preview.svg')

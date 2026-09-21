@@ -41,23 +41,24 @@ export function downloadTextFile(
   environment: TextFileDownloadEnvironment = browserTextFileDownloadEnvironment(),
 ): boolean {
   let url: string | null = null
+  let anchor: DownloadAnchor | null = null
 
   try {
     const blob = new Blob([text], { type: options.mimeType })
-    const anchor = environment.createAnchor()
+    anchor = environment.createAnchor()
 
     url = environment.createObjectUrl(blob)
     anchor.href = url
     anchor.download = options.filename
     environment.appendAnchor(anchor)
     anchor.click()
-    anchor.remove()
     return true
   } catch {
     return false
   } finally {
+    try { anchor?.remove() } catch { /* Cleanup cannot change the handoff result. */ }
     if (url !== null) {
-      environment.revokeObjectUrl(url)
+      try { environment.revokeObjectUrl(url) } catch { /* The URL owner may already be disposed. */ }
     }
   }
 }
