@@ -1440,25 +1440,43 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: export implementation retained; autoDim diagnosis and complete standalone
-acceptance pending fresh parent verification. Independent review has not run.
-The executed parent report `stz-phase31e-before-review-r43lZG` passed ten groups
+Status: export implementation and diagnostics retained; standalone page-ownership
+misuse corrected in the harness. Latest parent verification is failed/partial;
+fresh verification of the correction and independent review remain outstanding.
+The earlier parent report `stz-phase31e-before-review-r43lZG` passed ten groups
 and 120 scenario records with no page errors, then failed the dimmed formula
 path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
 31D's candidate-cycle and recovery checks passed on that snapshot. The old
 report did not retain the failed export or settlement outcome, so its cause
 cannot be determined from the live preview screenshot.
 
-The targeted child follow-up adds bounded, source-specific timing/outcome,
+The diagnostic follow-up added bounded, source-specific timing/outcome,
 detached/serialized SVG, opacity, and standalone observations before assertions,
 plus exact-source foreground negative controls and settlement regressions.
 The 20,000 ms fixture versus 10,050 ms export boundary is an unconfirmed timing
 hypothesis; no limit increase, sleep, retry-to-pass, production-markup change,
-or visibility relaxation was applied. The new child browser attempt stopped
-at Vite `listen EPERM` before Chrome; it does not supersede the parent's actual
-assertion. See [SVG export verification](./PREVIEW_UI.md#export-svg) and
-`/private/tmp/stz-31e-diagnostic-checks/handoff.json` for commands, results,
-checkout identity and retained evidence.
+or visibility relaxation was applied. The subsequent parent report
+`stz-phase31e-before-review-HVvae4` passed ten groups and 119 scenario records,
+then failed before autoHide reopening: `page.context().newPage()` attempted
+a second page in the fixture's implicitly page-owned context. AutoHide
+serialization succeeded in 8 ms with zero represented labels/requests (correct
+for hidden labels) and preserved live SVG; no new standalone visibility scenario
+passed. AutoDim and all later export scenarios were not reached. Node tests
+(2,390), build, diff and label-assets checks passed; free-label acceptance exited
+1. This confirmed API misuse is distinct from the older autoDim assertion.
+
+The correction passes the browser into visibility checks, opens the exact saved
+file in an independent page with explicit viewport, observes standalone errors,
+and closes only its owned page/context even on navigation/assertion failure,
+without masking the original error. The clean starting commit `70c7548`
+contains the prior eleven-file diagnostic handoff unchanged. The corrected
+child browser attempt was blocked at Vite `listen EPERM` before Chrome; native
+reopen, autoDim timings/geometry and the later App scenarios remain unverified.
+See [SVG export verification](./PREVIEW_UI.md#export-svg) and
+`/private/tmp/stz-31e-page-ownership-jcajtsos/handoff.json` for fresh child
+commands/results, final checkout identity and retained evidence. Production
+snapshot/raw-source/history behavior, timing limits, diagnostics, oracle
+negative controls and 31D regressions are preserved.
 
 The normal order remains fix, matching complete parent verification, then
 independent review. `check:free-labels` still requires all eleven groups for

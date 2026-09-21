@@ -294,7 +294,7 @@ function runCodex(promptFile, logFile, verificationContext = "") {
     "-c",
     "model_reasoning_effort=ultra",
     "-c",
-    "features.fast_mode=true",
+    // "features.fast_mode=true",
     prompt,
   ];
 

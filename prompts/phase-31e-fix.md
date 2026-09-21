@@ -1,4 +1,4 @@
-# Phase 31E Targeted Fix Prompt: Repair standalone browser-page ownership and finish export acceptance
+# Phase 31E Targeted Fix Prompt: Bound standalone SVG screenshots and finish export acceptance
 
 ## Environment
 
@@ -6,13 +6,14 @@ Work on the current `phase/31e-tex-label-svg-export` checkout. Preserve the
 pending Phase 31E implementation, fixtures, tests, documentation and user
 changes. Do not reset the branch or rerun implementation from scratch.
 
-The latest parent run used `0295895ef059f2ccd0279308bbfe171d1c5ec7f7` plus
-nine modified tracked files and two untracked files:
-`scripts/fixtures/settledSvgExportOracle.ts` and
-`tests/scripts/settledSvgExportOracle.test.ts`. The eleven-file handoff is
-`/private/tmp/stz-31e-diagnostic-checks/handoff.json`. Preserve the added
-settlement observations, policy-specific artifacts, exact-source oracle,
-negative controls and registered regressions.
+The latest parent run used `70c7548b5dd832b90acb5d6116f2055c507042e8` plus
+five modified tracked files: `docs/PREVIEW_UI.md`, `docs/ROADMAP.md`,
+`scripts/automation/run-phase.mjs`, `scripts/checkFreeLabels.mjs`, and
+`scripts/checkSettledSvgExports.mjs`. There were no untracked files. Preserve
+the independent standalone-page ownership correction, settlement observations,
+policy-specific artifacts, exact-source oracle, negative controls and tests.
+Preserve the user's pending runner changes; screenshot repair does not require
+changing runner configuration, sandbox settings or review gates.
 
 Inspect current status; files may since have been committed or changed. Preserve
 Phase 31D's merged candidate-cycle correction and recovery coverage. This
@@ -33,18 +34,18 @@ out of scope. Settled export is required in this phase, not deferred to 31F.
 
 ## Latest execution findings
 
-The supplied report contains a child handoff followed by a **new parent
-verification failure before 31E review**. The child's `listen EPERM` restriction
-and statement that parent evidence was pending are historical within this log.
-The parent did launch Chrome and encountered the concrete harness error below.
-No new review ran; do not invent severity counts, `REVIEW_JSON` or approval.
+This is a **parent verification failure before 31E review**. Chrome started,
+the preceding ten groups completed, and the new standalone page was created.
+Do not describe the current error as historical Vite `EPERM` or the earlier
+`Please use browser.newContext()` failure. No new review ran; do not invent
+severity counts, `REVIEW_JSON` or approval.
 
-### Current failure: attempting a second page in a page-owned context
+### Current failure: full-page screenshot of a standalone SVG times out
 
 Parent evidence directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-xlQmJP
 ```
 
 Read `verification.json`, `05-check-free-labels/command.log`, and these files
@@ -53,65 +54,88 @@ inside `05-check-free-labels/artifacts/`:
 - `free-labels-evidence.json`, `checkout.diff`, `checkout-untracked.json`;
 - `settled-export-autoHide-completed.json` and
   `settled-export-autoHide-failure.json`;
-- `settled-export-autoHide-completed-serialized.svg`, the retained capture/live/
-  detached SVGs, and `settled-export-autoHide-failure-live-preview.png`.
+- `settled-export-autoHide-completed-serialized.svg` and retained capture/live/
+  detached SVGs;
+- the `settled-export-autoHide-standalone-failure` diagnostic and
+  `settled-export-autoHide-failure-live-preview.png`.
 
 The checkout was unchanged during verification. Its fingerprint was
-`0f048c1fb81251ba0652e4335077c3e24418e21ad0468bf0b439511f68efcd34`, and
+`30d91d9fa20a47d12152c5d7e31923e35b103bba6c82917088e889293125a5df`, and
 tracked diff SHA-256 was
-`4a33aa2a09b5e9b97b54f29e9cd8b4dc5bac1f7fe0f603b9de70a5cbdb2f78ff`.
-The report also hashes both untracked oracle/test files. It used Node v26.9.0,
-Chrome `153.0.8010.52`, and the Vite fixture at `http://127.0.0.1:5174`.
+`d77a5cbf567c69135fbc48a7e39b5b2daf22b57ce63512647d4348c860e7733d`.
+The run used Node v26.9.0, Chrome `153.0.8010.52`, the external Playwright
+runtime, and the Vite fixture at `http://127.0.0.1:5174`.
 
 `check:free-labels` exited 1 at `settled-SVG-export-standalone`:
 
 ```text
-Error: Please use browser.newContext()
-    at _BrowserContext.newPage (.../playwright-core/lib/coreBundle.js:62018:17)
-    at runSettledSvgVisibilityChecks (scripts/checkSettledSvgExports.mjs:476:49)
-    at scripts/checkFreeLabels.mjs:456:3
+page.screenshot: Timeout 30000ms exceeded.
+Call log:
+  - taking page screenshot
+  - waiting for fonts to load...
+  - fonts loaded
+at runSettledSvgVisibilityChecks (scripts/checkSettledSvgExports.mjs:503:28)
 ```
 
-The last checkpoint is `settled-export-autoHide-failure`. The new diagnostic
-reopen code calls `page.context().newPage()` while the main fixture page was
-created with `browser.newPage()` in `scripts/checkFreeLabels.mjs` near line 96.
-The installed Playwright implementation creates an implicitly page-owned
-context for that convenience API, then rejects another page in it with exactly
-this error. This is a **confirmed browser-harness API misuse**, not a Vite
-permission failure or evidence of a product SVG-rendering defect.
+This is the first **autoHide** iteration. The independent `browser.newPage`,
+`file://` navigation and `standalone.evaluate` returned before the failing
+`standalone.screenshot({ fullPage: true })`. Thus the former page/context
+ownership blocker is repaired in this path. Preserve that correction and its
+cleanup; do not reimplement it as still missing.
 
-The autoHide export was already serialized before the invalid page creation:
+The computed `reopened` result was only going to be recorded after the image
+operation, so it was lost when that operation threw. The subsequent namespace,
+geometry and opacity assertions also did not run. Navigation/evaluation success
+is not complete standalone acceptance.
 
 | Saved observation | Latest result |
 | --- | --- |
-| Captured label count / source-specific conversion requests | 0 / 0 |
-| Preparation outcome | `success`, about 8 ms |
-| Exported label count / math paths | 0 / 0, appropriate for this hidden label |
+| Policy / source | autoHide / `$\frac{autoHide}{x}$` |
+| Serialized SVG | 435 bytes, SVG XML root, width 900, height 700 |
+| Root viewBox | `0 0 900 700` |
+| Standalone viewport | 1100 × 850 |
+| Captured labels / source-specific conversion requests | 0 / 0 |
+| Preparation outcome | `success`, about 1 ms |
+| Exported labels / math paths | 0 / 0, appropriate for this hidden label |
 | Live SVG preserved during serialization | `true` |
-| Standalone reopening | Failed before a standalone page was created |
+| Standalone screenshot | Timed out after 30 seconds |
 
-Zero formula paths are correct for this autoHide case. It must not be subjected
-to the positive math requirement used for visible dimmed labels. Although the
-serialization diagnostics are saved, the full autoHide scenario did not pass
-and no `settled-export-autoHide-visibility` record was emitted in this run.
+The file contains sheet geometry but no visible label or formula. Zero math
+paths are correct for autoHide, not a recurrence of the old autoDim failure.
 
-### Earlier autoDim issue remains a separate, unverified follow-up
+The catch block retries the same full-page screenshot before recording the
+original error. Neither the normal standalone PNG nor the attempted failure
+PNG exists in this evidence directory, even though the diagnostic lists the
+intended failure path. Do not present that path as a retained image.
 
-The preceding parent run in `stz-phase31e-before-review-r43lZG` passed autoHide
-and failed `assert.ok(observed.formulas > 0)` for `$\frac{autoDim}{x}$`.
-It did not retain the failing exported SVG or settlement outcome. Its live
-preview showed the formula, which did not establish detached export success.
+### Source-supported cause to confirm and correct
 
-The follow-up has now implemented diagnostic retention and exact-source oracle
-checks; preserve them instead of implementing another diagnostic framework.
-However, the latest run fails at autoHide reopening **before autoDim begins**.
-It neither reproduces nor resolves the original zero-path observation. The
-20,000 ms fixture service versus 10,050 ms export boundary remains an unconfirmed
-timing hypothesis for that older failure. Repair page ownership first, then
-use the existing diagnostics to determine the autoDim result and fix any
-remaining demonstrated problem.
+The installed external `playwright-core` is version 1.62.1. In its bundled
+`lib/coreBundle.js`, `_fullPageSize` waits for both `document.body` and
+`document.documentElement`; it returns no size while either is absent.
+`screenshotPage` takes that branch when `fullPage` is true, after its font
+readiness step. The saved file is an SVG XML document, not an HTML document
+with a body. This strongly explains the timeout after `fonts loaded`.
 
-### Passing results and unexecuted scenarios
+The actual reopened page's content type/body state was not persisted. Confirm
+that state during the focused reproduction instead of claiming a newly measured
+browser fact. The log does not establish a font-loading timeout. Do not disable
+font readiness or enlarge timeouts as the assumed solution.
+
+The same `fullPage: true` pattern appears in the visibility success/failure
+captures near lines 503/520 and the actual download `readStandalone` success/
+failure captures near lines 144/179. Locate their current equivalents. Fixing
+only the first call can leave the same blocker later in acceptance.
+
+### Historical issues and the remaining gate
+
+The ownership failure in `stz-phase31e-before-review-HVvae4` is historical.
+The earlier run in `stz-phase31e-before-review-r43lZG` failed the autoDim
+positive geometry assertion for `$\frac{autoDim}{x}$`; its original failing
+SVG/outcome was not saved. The current run still does not reach autoDim, so
+its cause and acceptance remain unresolved. The 20,000 ms fixture service vs
+10,050 ms export boundary is a hypothesis for that older issue, not an
+explanation of this 30-second screenshot timeout.
 
 | Check | Latest parent result |
 | --- | --- |
@@ -119,33 +143,25 @@ remaining demonstrated problem.
 | `npm run build` | Exit 0; existing nonblocking chunk-size warning |
 | `git diff --check` | Exit 0 |
 | `check:label-assets` | Exit 0 |
-| `check:free-labels` | Exit 1 at autoHide standalone page creation |
+| `check:free-labels` | Exit 1 at autoHide standalone screenshot |
 | 31E independent review | Not reached |
 
-All ten preceding free-label/inline-node/App groups completed. There are 119
-passing scenario records and no `pageErrors`; the thrown Node-side Playwright
-error is still fatal. Preserve 31D's passing camera interaction, candidate
-cycling, same-owner recovery and halo checks.
-
-The eleventh group started but did not complete. Its `unexecuted: []` field
-tracks groups, not individual scenarios. AutoDim, layerFilter, hiddenLayer,
-invalid-viewport retry and the actual App settled-download/reopen workflow
-were not reached. No new standalone visibility scenario passed in this run.
-The existing `settled-export.png` belongs to earlier current-SVG-cloning checks;
-it is not proof that these new workflows completed.
-
-The child reported 115 focused tests (included in 2,390 full-suite passes),
-strict fixture TypeScript, targeted ESLint, syntax checks and diff checks.
-Its exact commands are retained in `/private/tmp/stz-31e-diagnostic-checks/`.
-Treat those as prior results, not verification of the next correction.
+There are 119 passing scenario records, ten completed groups and no reported
+`pageErrors`. The Node-side screenshot timeout still makes the run fail.
+The eleventh group started but remains incomplete; `unexecuted: []` tracks
+groups, not individual checks. No complete new visibility scenario passed.
+AutoDim, layerFilter, hiddenLayer, invalid-viewport retry and actual App
+settled-download/reopen scenarios were not reached. Preserve the passing 31D
+camera/candidate-cycle/recovery/halo and App regressions. The older
+`settled-export.png` belongs to current-SVG-cloning, not this failed reopen.
 
 ## Goal
 
-Correct the confirmed page/context ownership misuse with a small harness
-change. Then execute autoDim and all remaining settled-export checks, diagnosing
-any actual geometry/timing/oracle failure with the retained evidence. Preserve
-snapshot/visibility/fallback contracts and obtain complete fresh parent evidence
-before independent review.
+Use a bounded screenshot path suitable for a standalone SVG document, retain
+reopen observations before image capture, and preserve the repaired ownership
+and cleanup. Then execute autoDim and all remaining export checks, resolving
+any further demonstrated failures with actual evidence, and obtain complete
+fresh parent verification before independent review.
 
 ## Required reading before fixing
 
@@ -153,8 +169,8 @@ Read at least:
 
 - `AGENTS.md`, this prompt, `prompts/phase-31e-implement.md`, and
   `prompts/phase-31e-review.md`;
-- the latest parent evidence and child handoff above, including the pending-file
-  snapshot; use the earlier autoDim report only as historical evidence;
+- the latest parent evidence above, including the pending-file snapshot; use
+  earlier ownership/autoDim reports as distinct historical evidence;
 - `scripts/checkSettledSvgExports.mjs`, `scripts/checkFreeLabels.mjs`,
   `scripts/fixtures/freeLabels.tsx`, `scripts/fixtures/freeLabelsApp.tsx`, and
   `scripts/fixtures/tsconfig.json`;
@@ -163,48 +179,84 @@ Read at least:
   `SvgTexLabel`, shared label service/runtime and relevant App export handling;
 - `scripts/fixtures/settledSvgExportOracle.ts`,
   `tests/scripts/settledSvgExportOracle.test.ts`, and the new observer regressions;
-- the installed Playwright `Browser.newPage` and `BrowserContext.newPage`
-  ownership guards where needed to confirm the error; do not modify the runtime;
+- the installed external Playwright screenshot path, especially
+  `_fullPageSize`, `screenshotPage` and font-readiness ordering in
+  `playwright-core/lib/coreBundle.js`; do not modify the installed runtime;
 - `src/ui/fileTransfer.ts`, registered export/file-transfer tests, `package.json`,
   and relevant preview/roadmap documentation;
 - `scripts/automation/phase-verification.mjs`, `run-phase.mjs`, and their tests.
 
-## 1. Repair standalone-page ownership without losing the live fixture
+## 1. Capture standalone SVGs without an HTML-body-dependent full-page path
 
-Pass the existing `browser` into `runSettledSvgVisibilityChecks` at its call
-site if needed. Create the standalone reopen page with a supported ownership
-model, following the existing `readStandalone` pattern in this harness:
+Use the saved 435-byte autoHide SVG for a focused native-browser reproduction;
+it does not require rerunning conversion to investigate screenshot behavior.
+Keep the file unchanged and open it directly as `file://` in the independent
+standalone page. Before any screenshot, retain:
 
-- create an independent `browser.newPage(...)`, then close that page in
-  `finally` (its implicitly owned context is released with it); or
-- explicitly create `browser.newContext(...)`, create its page inside the
-  protected block, and close the owned context in `finally`, including when
-  page creation or navigation fails.
+- URL, content type, ready state, root local name/namespace, whether an HTML
+  body exists, and parser errors;
+- root width/height/viewBox, finite client bounds, current viewport, scroll
+  position and device pixel ratio;
+- the already computed exact-source/label/geometry/opacity observations,
+  browser errors, requested image path and capture options.
 
-Choose one small, consistent approach. Keep viewport and other relevant
-options explicit. The existing main fixture page/context must remain open
-and untouched for subsequent visibility policies; do not navigate it to the
-exported SVG or close its context during diagnostic cleanup.
+Confirm the body-less SVG/full-page-size interaction against the installed
+screenshot code, then make a small harness correction. Prefer a viewport
+screenshot with `fullPage` omitted/false, or an explicit bounded clip that
+avoids `_fullPageSize`. The current 900 × 700 SVG should fit the 1100 × 850
+viewport; verify the actual root bounds rather than relying on those constants.
+For later exports, ensure the measured complete SVG fits the chosen viewport/
+clip, adjusting a finite viewport when necessary. Do not silently crop labels,
+white outlines, geometry or background edges. Keep dimensions and capture
+limits finite; a screenshot of a blank corner is not acceptance.
 
-Continue opening the exact saved serialized SVG with its `file://` URL outside
-the application. Retain screenshots, exact-source/foreground geometry,
-namespace, opacity and bounds assertions. Observe standalone page errors and
-preserve the policy/checkpoint/file path and failure details. Ensure cleanup
-also runs on assertion/navigation failure without masking the original error.
+Use the supported bounded capture approach consistently for standalone SVG
+success and failure paths in both the visibility helper and `readStandalone`.
+A small shared helper is reasonable if it prevents divergent handling. Ordinary
+HTML application screenshots need not change. Do not broadly refactor browser
+lifecycle or export rendering for this harness issue.
 
-Inspect related page creation in the same workflow for this specific ownership
-mistake. Existing standalone `browser.newPage()` calls are valid; do not turn
-the fix into a wholesale browser lifecycle rewrite. No product source change
-is needed to repair this confirmed harness error.
+Keep the exported SVG unchanged and standalone. Do not insert an HTML body,
+wrap the export in the app/HTML to make full-page sizing work, navigate the live
+fixture away, or patch the Playwright runtime. Preserve the independent page
+ownership and `finally` cleanup, closing only resources owned by this reopen.
+Do not change production font/conversion/export limits, disable font waiting,
+or merely increase the 30-second timeout.
 
-Do not patch Playwright private ownership fields, modify its installed package,
-upgrade dependencies, disable the ownership guard, swallow the error, or skip
-saved-file reopening. Do not change sandbox flags or start another automation
-flow to evade it. A static syntax check or mock alone cannot establish the
-repair: require successful native autoHide reopening, then continue the full
-browser workflow. Add focused tests only for meaningful new helper behavior.
+Require actual native success with the saved SVG and then the full workflow.
+Retain a real PNG with measured coverage of the export; preserve existing
+browser-raster assertions for transparent/white backgrounds, color and halos.
+Viewport margins or the browser's page background are not substitutes for
+checking the exported SVG's own alpha/background pixels.
 
-## 2. Preserve the implemented diagnostics and resolve any remaining autoDim failure
+## 2. Save observations before capture and bound failure handling
+
+In the current visibility path, `reopened` exists before the screenshot but
+is only persisted afterward. Move the diagnostic checkpoint/JSON write ahead
+of image capture and assertions. Similarly preserve `readStandalone`'s DOM/
+geometry/raster/request observations before its screenshot; the existing raster
+PNG must not be the only surviving evidence if that capture fails.
+
+Keep these observations diagnostic until the complete scenario passes. Record
+image success only after capture/write succeeds and the file exists. On failure,
+retain the original error and available measurements before any optional error
+screenshot. Record unsuccessful image attempts as failed/missing, not as paths
+to nonexistent evidence.
+
+Do not spend another default 30 seconds repeating the same full-page operation
+in the catch block. Any best-effort diagnostic capture must use a supported,
+explicitly bounded path; its failure and cleanup errors must not overwrite the
+primary failure. A normal required capture failure must not be swallowed and
+reported as a passing scenario. Keep all required file reopening and visual
+checks, and retain page-error collection and independent-resource cleanup.
+
+Avoid sleeps, retry-until-green loops or a second diagnostics-only redesign.
+The previous observation/oracle infrastructure is present; extend it only where
+this screenshot failure currently loses results. Add focused tests only for
+meaningful new helper/coverage logic; static checks do not replace native
+standalone capture evidence.
+
+## 3. Preserve diagnostics and resolve any remaining autoDim failure
 
 The previous follow-up already added the evidence needed for the original
 failure. Retain the production observation hook, source-specific request and
@@ -219,11 +271,11 @@ serialization non-mutation and standalone reopen measurements. Keep diagnostics
 separate from passed scenario records. Do not duplicate the entire accumulated
 request history at each checkpoint or add model/UI debug fields.
 
-The latest autoHide files establish that retention now works for that empty
-capture. They do not establish that a visible successful formula survives
-export. Once reopening works, obtain the corresponding autoDim artifacts and
-use actual observations to diagnose its result; do not declare the old issue
-fixed merely because the page-creation exception is gone.
+The retained autoHide files describe an empty label capture. They do not
+establish that a visible successful formula survives export. Once native
+capture works, obtain autoDim's corresponding artifacts and diagnose its
+actual result; neither successful page creation nor successful screenshot
+capture alone resolves the historical positive-math assertion.
 
 Compare the captured revision, conversion result, detached label before
 sanitization, serialized XML and browser-selected subtree. The shared
@@ -269,7 +321,7 @@ Intentional user edits during a pending export remain permitted; compare
 asynchronous completion against the state after those edits. Do not require
 history to stay unchanged across deliberate edits.
 
-## 3. Finish the complete standalone browser workflow
+## 4. Finish the complete standalone browser workflow
 
 Run all remaining visibility checks and the existing actual App download/reopen
 workflow. Preserve and verify:
@@ -288,8 +340,8 @@ workflow. Preserve and verify:
 - serialization/invalid-viewport failure without malformed downloads or
   live-view mutation, followed by successful retry.
 
-Do not treat fixing page creation or one autoDim assertion as full acceptance. Diagnose
-and minimally fix any later observed failure. Preserve the ten preceding
+Do not treat one successful screenshot or autoDim assertion as full acceptance.
+Diagnose and minimally fix any later observed failure. Preserve the ten preceding
 groups and the additional `settled-SVG-export-standalone` group: 31E requires
 **all eleven**, with actual saved/downloaded/reopened artifacts for this group.
 The parent validator already implements the extended group contract; retain
@@ -360,10 +412,10 @@ restricted child environment. Partial or stale evidence cannot close the gate.
 
 Update only relevant Phase 31E preview/export and roadmap status. Record the
 actual diagnosis, minimal fix, commands, versions, exit statuses, checkout
-identity and retained artifacts. Distinguish the earlier autoDim assertion,
-child startup restriction, this confirmed autoHide page-ownership error and
-new results. Replace stale claims that fresh parent verification is still
-pending with its actual failed/partial result until a new complete run passes.
+identity and retained artifacts. Distinguish historical autoDim/ownership/
+startup failures, the repaired independent-page path, this executed screenshot
+timeout and new results. Replace stale claims that ownership repair still
+awaits a parent attempt with this run's actual progress and failed status.
 The preceding ten groups passed; do not reopen old 31D failures or infer an
 independent review result from browser success.
 
@@ -373,8 +425,11 @@ itself run review or establish approval. Keep that order and commit gate.
 
 31E is ready for review only when:
 
-- standalone reopening uses valid page/context ownership and closes only its
-  own resources, with native autoHide reopen evidence and retained failures;
+- a standalone SVG uses a supported bounded capture path with native evidence
+  of the document/body state, complete image coverage and a real saved PNG;
+- pre-capture DOM/geometry observations survive image failure, failure handling
+  is bounded and truthful, and independent pages are cleaned up without
+  altering the live fixture or masking primary errors;
 - the earlier autoDim zero-path issue is resolved or its current non-reproduction
   is reported accurately, with successful current-source settlement/geometry,
   measured timings and complete retained evidence; any remaining failure has
@@ -394,10 +449,11 @@ succeed. Phase 31F remains deferred.
 
 ## Report after implementation
 
-Report changed files; the page/context ownership cause and minimal repair;
-cleanup behavior and native saved-file reopen results; autoDim's actual
-settlement/geometry/timing outcome, separating any further product/fixture/oracle
-issue from the confirmed API misuse; all visibility and standalone results;
+Report changed files; the measured standalone document/body state and
+screenshot-size mechanism; minimal capture correction and full-export coverage;
+retained pre-image diagnostics, actual PNG paths and bounded failure/cleanup
+behavior; autoDim's actual settlement/geometry/timing outcome and any further
+product/fixture/oracle issue; all visibility and standalone results;
 preserved snapshot/raw-source/history behavior; commands, versions, exit
 statuses and focused/full counts; evidence paths and checkout identity; and
 unavailable or failing checks. State parent verification and independent review

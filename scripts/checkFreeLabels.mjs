@@ -453,7 +453,7 @@ try {
   await completeGroup('real-App-input-JSON-history-reused-ID-load')
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
-  await runSettledSvgVisibilityChecks({ page, record, observe, artifactDir })
+  await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })
   await runSettledSvgExportChecks({ browser, origin, record, observe, artifactDir })
   await completeGroup('settled-SVG-export-standalone')
   assert.deepEqual(pageErrors, [], 'Browser raised no uncaught errors')

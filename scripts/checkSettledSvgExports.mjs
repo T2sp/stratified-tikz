@@ -336,7 +336,7 @@ export async function runSettledSvgExportChecks({ browser, origin, record, obser
 
 /** Exercise production occlusion/layer policy before DOM capture. Filtering and
  * autoDim retain visible dimmed labels; autoHide and hidden layers remove them. */
-export async function runSettledSvgVisibilityChecks({ page, record, observe, artifactDir }) {
+export async function runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir }) {
   await page.evaluate(() => window.stzLabels.changeService('real'))
   for (const policy of ['autoHide', 'autoDim', 'layerFilter', 'hiddenLayer']) {
     const source = `$\\frac{${policy}}{x}$`
@@ -473,8 +473,16 @@ export async function runSettledSvgVisibilityChecks({ page, record, observe, art
       const bundle = await retain('completed')
       // The file and screenshot below are the detached export, never the live preview.
       if (bundle.paths.serialized) {
-        const standalone = await page.context().newPage()
+        let standalone
+        let standaloneFailed = false
+        const pageErrors = []
+        const reopenDetails = { policy, source, svg: bundle.paths.serialized,
+          viewport: { width: 1100, height: 850 } }
         try {
+          // The fixture's browser.newPage() owns its context and cannot share it.
+          // A separate page owns only its own context, like readStandalone above.
+          standalone = await browser.newPage({ viewport: reopenDetails.viewport })
+          standalone.on('pageerror', (error) => pageErrors.push(error.message))
           await standalone.goto(pathToFileURL(bundle.paths.serialized).href)
           const reopened = await standalone.evaluate((source) => {
             const titles = [...document.querySelectorAll('g > title')].filter((node) => node.textContent === source)
@@ -485,22 +493,41 @@ export async function runSettledSvgVisibilityChecks({ page, record, observe, art
             let opacity = 1
             for (let current = foreground; current; current = current.parentElement) opacity *= Number(getComputedStyle(current).opacity)
             return { source: titles[0]?.textContent, matchingTitles: titles.length,
+              namespace: { root: document.documentElement.namespaceURI,
+                label: label?.namespaceURI, foreground: foreground?.namespaceURI },
               parseErrors: document.querySelectorAll('parsererror').length,
               foregroundPaths: foreground?.querySelectorAll('svg path').length ?? 0, opacity,
               box: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null }
           }, source)
           const screenshot = resolve(artifactDir, `${name}-standalone.png`)
           await standalone.screenshot({ path: screenshot, fullPage: true })
-          await observe(`${name}-standalone-reopen`, { policy, source, reopened, screenshot, svg: bundle.paths.serialized })
+          await observe(`${name}-standalone-reopen`, { ...reopenDetails, reopened, screenshot, pageErrors })
+          assert.deepEqual(pageErrors, [], 'Standalone SVG raises no browser errors')
+          assert.equal(reopened.namespace.root, 'http://www.w3.org/2000/svg')
           assert.equal(reopened.parseErrors, 0)
           assert.equal(reopened.matchingTitles, capture.count)
           if (dimmed) {
             assert.equal(reopened.source, source)
+            assert.equal(reopened.namespace.label, 'http://www.w3.org/2000/svg')
+            assert.equal(reopened.namespace.foreground, 'http://www.w3.org/2000/svg')
             assert.ok(reopened.foregroundPaths > 0, 'Saved dimmed SVG reopens with its own foreground formula paths')
             assert.ok(Object.values(reopened.box).every(Number.isFinite) && reopened.box.width > 0 && reopened.box.height > 0)
             assert.equal(reopened.opacity, capture.opacity)
           }
-        } finally { await standalone.close() }
+        } catch (error) {
+          standaloneFailed = true
+          const screenshot = resolve(artifactDir, `${name}-standalone-failure.png`)
+          await standalone?.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
+          await observe(`${name}-standalone-failure`, { ...reopenDetails, pageErrors, screenshot,
+            error: { message: error.message, stack: error.stack } }).catch(() => {})
+          throw error
+        } finally {
+          await standalone?.close().catch(async (error) => {
+            await observe(`${name}-standalone-cleanup-failure`, { ...reopenDetails,
+              error: { message: error.message, stack: error.stack } }).catch(() => {})
+            if (!standaloneFailed) throw error
+          })
+        }
       }
       await page.screenshot({ path: resolve(artifactDir, `${name}-live-preview.png`), fullPage: true })
       const observed = bundle.observed

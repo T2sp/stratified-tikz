@@ -983,7 +983,7 @@ are retained with the existing browser evidence. The parent verifier requires
 all eleven groups for 31E/31F and rejects older ten-group reports for these
 phases; earlier phases retain their complete historical group sets.
 
-The executed parent run on 2026-09-21 failed **before independent review** at
+The earlier parent run on 2026-09-21 failed **before independent review** at
 `settled-export-autoDim-visibility`, source `$\frac{autoDim}{x}$`, because the
 parsed export had zero observed formula paths. Node v26.9.0 and Chrome
 153.0.8010.52 ran against the Vite production-component fixture. All ten
@@ -997,10 +997,9 @@ The report is
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-r43lZG/verification.json`,
 with checkout fingerprint
 `0b8395cac3fad28b360ad8ac377f00bfdc086a2375a291d6273208aedefcc467`.
-The current baseline `0295895ef059f2ccd0279308bbfe171d1c5ec7f7` contains the
-same pending implementation, including all five formerly untracked files.
+That report is historical; the subsequent parent result is described below.
 
-The targeted follow-up adds policy-specific diagnostics to the existing
+The diagnostic follow-up added policy-specific diagnostics to the existing
 harness before assertions: exact capture/source/owner/settings/style/camera,
 source-filtered conversion identities and timestamps, the actual export
 settlement outcome/deadline, pre-sanitization label markup, serialized SVG,
@@ -1012,7 +1011,7 @@ passing scenario records. The exact-source foreground oracle rejects missing
 math, whole-source fallback, unrelated paths, and halo-only geometry; the
 original positive path assertion remains.
 
-**The cause is not yet established.** Static inspection and focused tests show
+**The earlier autoDim cause is not yet established.** Static inspection and focused tests show
 successful dimmed geometry survives the shared view; they cannot decide why
 this parent export observed no paths. The fixture allows 20,000 ms while the
 export boundary allows 10,050 ms, and autoDim is the first cold real-service
@@ -1022,23 +1021,61 @@ production markup, visibility policy, and export semantics were not changed to
 make this hypothesis pass. The only production addition is optional runtime
 observation; it adds no model fields or UI controls.
 
-This follow-up child attempted `check:free-labels` with Node v26.9.0 and the same
-external Playwright/Chrome configuration, but Vite `listen` was blocked with
-`EPERM` at `127.0.0.1:5173`, before Chrome launched. Evidence is retained at
-`/private/tmp/stz-31e-diagnostic-start/free-labels-evidence.json`. This new child
-restriction and the historical child startup restriction are separate from the
-executed parent assertion. No failing serialized autoDim SVG was available in
-the old report, and none can be produced in this restricted child.
+The latest executed parent verification is **failed/partial**, not pending:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4/verification.json`.
+It used Node v26.9.0, Chrome 153.0.8010.52 and Vite at `http://127.0.0.1:5174`,
+with unchanged checkout fingerprint
+`0f048c1fb81251ba0652e4335077c3e24418e21ad0468bf0b439511f68efcd34`
+and tracked diff SHA-256
+`4a33aa2a09b5e9b97b54f29e9cd8b4dc5bac1f7fe0f603b9de70a5cbdb2f78ff`.
+Tests (2,390), build, diff and label-assets checks exited 0. Free-label acceptance
+exited 1 after ten completed groups and 119 passing records, with no page errors.
+The eleventh group failed at `settled-export-autoHide-failure` before reopening:
+`page.context().newPage()` tried to add a page to the context implicitly owned
+by the fixture's `browser.newPage()`. Playwright rejected that API use with
+`Please use browser.newContext()`. This is a harness ownership error.
 
-Child check commands, exit statuses, logs, and final checkout identity are in
-`/private/tmp/stz-31e-diagnostic-checks/focused-checks.json`, `full-checks.json`,
-and `handoff.json`. With `/opt/homebrew/bin` first in `PATH` (Node v26.9.0),
-115 focused tests passed, included in the full total of 2,390; no failures or
+The retained `05-check-free-labels/artifacts/settled-export-autoHide-completed.json`
+and companion capture/live/detached/serialized SVGs show successful preparation
+in 8 ms, zero captured labels and source-specific requests, zero math paths,
+and preserved live SVG. Those zero counts are correct for autoHide. No native
+standalone page was created and no new visibility scenario passed. AutoDim,
+layerFilter, hiddenLayer, invalid-viewport retry and actual App downloads were
+not reached; the report's empty `unexecuted` list tracks started groups only.
+It neither reproduces nor resolves the historical autoDim failure.
+
+The ownership correction starts from clean commit
+`70c7548b5dd832b90acb5d6116f2055c507042e8`, which preserves the eleven-file
+diagnostic handoff at `/private/tmp/stz-31e-diagnostic-checks/handoff.json`.
+The harness now passes its browser to the visibility checks and opens the exact
+saved SVG in an independent `browser.newPage()` with an explicit 1100×850
+viewport. It records standalone errors, namespaces, geometry, opacity and bounds,
+and closes only that page and its implicitly owned context in `finally`.
+Navigation/assertion failures retain the policy, source, file path and error;
+a cleanup error is recorded without replacing an original failure. The live
+fixture stays open for subsequent policies. Production code, conversion limits,
+pending-at-capture coverage, exact-source oracle/negative controls, 31D checks,
+and the runner's eleven-group/review/commit gates are preserved.
+
+The corrected child browser attempt exited 1 at Vite `listen EPERM` on
+`127.0.0.1:5173`, before Chrome launch; all eleven groups were unexecuted.
+This startup restriction is separate from both parent failures. Its exact
+command/environment/log and checkout snapshot are retained in
+`/private/tmp/stz-31e-page-ownership-jcajtsos/browser-check.json` and
+`browser-artifacts/free-labels-evidence.json` in that directory. It verifies no
+native reopen or autoDim outcome. The earlier child startup evidence remains
+at `/private/tmp/stz-31e-diagnostic-start/free-labels-evidence.json`.
+
+Current child commands, exit statuses and logs are retained in
+`/private/tmp/stz-31e-page-ownership-jcajtsos/focused-static-checks.json` and
+`full-checks.json`; final checkout identity is in `handoff.json` there.
+With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
+115 focused tests, included in the full 2,390-test total, with no failures or
 skips. Build exited 0 with the existing chunk-size warning. Strict fixture
-TypeScript, six browser-script syntax checks, targeted ESLint (including the
-new oracle/test), and diff checks exited 0. App/SvgDiagram and the runner's
-eleven-group/review/commit gates were not changed. Fresh matching **parent
-verification remains pending**.
+TypeScript, six script syntax checks, targeted ESLint and diff checks exited 0.
+No new helper/test file or dependency was needed for the ownership correction.
+Fresh matching parent browser verification of this ownership correction is
+still required; independent review has not run.
 The authorized outer runner must complete all eleven groups, retain the new
 autoDim measurements and actual downloaded/reopened artifacts, and resolve any
 observed failure before independent review. Standalone verification can use
