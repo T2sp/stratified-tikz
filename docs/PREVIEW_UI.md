@@ -260,11 +260,14 @@ all eight existing free-label groups. The fixture retains all five placements
 at zoom 1 and 1.4, mixed Japanese/text/nested fractions, transparent math,
 2D/3D path kinds, real pointer/Alt cycling, ownership and delayed completions,
 font readiness, path operations, raw history/TikZ data and current SVG cloning.
-Phase 31D acceptance is **incomplete**. Independent review ran and returned
-`needs_changes`: no Critical issues, one Medium issue, and no Low-priority
-issues. The issue is missing 3D marker interaction and same-node recovery
-coverage. The accepted halo correction is preserved; the new scenarios below
-await fresh parent verification and a separate independent re-review.
+Phase 31D acceptance is **incomplete**. The preceding independent review
+returned `needs_changes`: no Critical issues, one Medium issue, and no
+Low-priority issues. Its missing 3D marker interaction and same-node recovery
+cases were subsequently implemented. Parent verification then executed the
+changed harness and failed its initial-camera overlap expectation in
+`stz-phase31d-before-review-2KaWQt`; it stopped before another review. The
+current candidate-cycle correction requires fresh complete parent evidence
+and a separate independent re-review. The accepted halo correction is preserved.
 
 The execution history must distinguish these results:
 
@@ -402,9 +405,9 @@ absent: the old 3D projection checks did not click markers, and editing mounted
 a new document before recovering the invalid inline node. Ten completed groups
 proved the old assertions passed, not these missing scenarios.
 
-The current targeted coverage fix starts from clean
+The preceding targeted coverage fix started from clean
 `14875dbbf61a2a61e031a40261ab14037e63a43c` on
-`phase/31d-tex-path-inline-labels`. It adds assertions inside the existing two
+`phase/31d-tex-path-inline-labels`. It added assertions inside the existing two
 inline groups:
 
 - `inline-3d-interaction-initial-camera` and
@@ -412,8 +415,8 @@ inline groups:
   renderer and runtime. Two curve owners have nonzero z coordinates,
   distinguishable sources and reused local IDs. Current marker geometry and
   SVG screen transforms drive real ordinary/Alt mouse clicks for both owners;
-  consecutive Alt-clicks at their overlapping markers cycle through both
-  curve owners without an intervening reset. Independent probes reset by an
+  Alt-clicks at their overlapping markers are required to reach both curve
+  owners without an intervening reset. Independent probes reset by an
   actual blank-canvas click. Each click checks the selected `stratum` owner
   and exactly one callback; dot/non-dot markers and selected highlights are
   checked. A native filled-glyph point is proved outside every marker's
@@ -446,7 +449,7 @@ across user edits. Existing Undo/Redo, 2D pointer tests, supported-path
 projection, halo thresholds/negative controls, path operations, App workflows
 and current SVG cloning remain in their original groups.
 
-The current child attempted `PATH=/opt/homebrew/bin:$PATH npm run check:free-labels`
+That coverage-fix child attempted `PATH=/opt/homebrew/bin:$PATH npm run check:free-labels`
 under Node v26.9.0 with the external Playwright module and installed Chrome
 executable. It exited 1 at `development-server-listen` because binding
 `127.0.0.1:5173` returned `EPERM`, before browser launch. No browser version or
@@ -455,7 +458,7 @@ this attempt. The diagnostic report is
 `/private/tmp/stz-phase31d-coverage-fix-browser/free-labels-evidence.json` and
 its command log is `/private/tmp/stz-phase31d-coverage-fix-browser.log`.
 This child restriction is separate from the prior successful parent run.
-Current child verification under Node v26.9.0 passed the six requested
+That preceding coverage-fix child verification under Node v26.9.0 passed the six requested
 focused test files: **93 tests**, none failed or skipped (a subset of the full
 suite). Strict fixture TypeScript, the five browser-script `node --check`
 commands, targeted ESLint including changed `scripts/checkFreeLabelGeometry.mjs`,
@@ -468,13 +471,104 @@ chunk-size warning only. Full command arguments, exit statuses and logs are
 in `/private/tmp/stz-phase31d-coverage-fix/full-checks.json`. No production
 files changed; App/SvgDiagram's existing 10 lint errors and 4 warnings remain
 out of scope, and repository-wide lint was not run. The final handoff at
-`/private/tmp/stz-phase31d-coverage-fix/handoff.json` records the final
-tracked/untracked checkout identity. Fresh parent browser verification for
-these new assertions is pending.
+`/private/tmp/stz-phase31d-coverage-fix/handoff.json` records that handoff's
+tracked/untracked checkout identity. These are historical checks of the
+coverage fix, not verification of the current candidate-cycle correction.
 
-The authorized parent must execute
+The subsequent parent **did execute** the added assertions under Node v26.9.0
+and Chrome 153.0.8010.52, with the Vite fixture at `http://127.0.0.1:5174`.
+Evidence is retained in
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31d-before-review-2KaWQt/`.
+Its `verification.json` reports tests (2,356 passed), build, diff check and
+`check:label-assets` exit 0; `check:free-labels` exits 1 at
+`inline-node-production-rendering-and-path-lifecycle`. The unchanged checkout
+was revision `14875dbbf61a2a61e031a40261ab14037e63a43c` plus five modified files,
+with no untracked files, tracked diff SHA-256
+`2f1d06c077ab8ff8fd908682260f1b18f43921c17138a23e2b7b4c36e7011c66` and fingerprint
+`49077e86deb20d3f7fd111e2de41533f54848ae78481cdc2f9d79c7f3ac24a47`.
+The free-label report retains 82 passing records and seven completed groups,
+with no page errors. Its last checkpoint is
+`inline-3d-interaction-initial-camera/overlap-alt-1`: two native Alt clicks
+each selected `pick3dB` with exactly one replace-selection callback, failing
+the expectation that two clicks must reach both owners. Independent ordinary
+and Alt probes for both initial-camera owners, highlights, normal overlap and
+blank reset reached their assertions. Both halo zoom matrices, all six
+negative controls, transparent math, supported-path projection and 2D picking
+passed. Initial-camera glyph probes, moved-camera interaction and same-owner
+recovery were not reached; inline lifecycle/path/export and real-App groups
+were unexecuted. Their implemented coverage remains preserved and required.
+
+The current targeted correction starts from clean
+`1f43eefe171c2c834060e10418aae80876ed0651`. The failed parent's `failure.png`
+visibly reads `Selected 3/4: path "pick3dB"` after the second click. Production
+cycles candidates, including distinct inline markers and curve bodies that
+can select the same owner. The retained image supports advancement to index
+2 of four candidates; the saved JSON lacks the ordered list and first-click
+cycle feedback. Source reconstruction at the saved DOM marker center (and
+its integer floor/round alternatives) gives
+`pathInlineNode:pick3dA:overlap`, `pathInlineNode:pick3dB:overlap`,
+`curve:pick3dB`, `curve:pick3dA`, predicting indices `1, 2, 3, 0, 1` and owners
+`B, B, A, A, B` for one full cycle plus wrap. This reconstruction is not a
+fresh native-browser measurement. It explains why the two-click/unique-owner
+expectation is invalid under the existing candidate contract, without claiming
+that the missing complete native trace has run.
+
+At the saved DOM y coordinate `307.5735778808594`, curve B's reconstructed
+distance is about `0.00000985` SVG units and curve A's is `0.00001502`.
+Their exact projected center is `307.57359312880715`; the tiny difference is
+enough to order the curve candidates by distance. The coincident 2D fixture
+has zero distances, so its bodies sort A then B and the first two owners are
+B then A. These source-only comparisons and explicit event-point hypotheses
+are retained in `/private/tmp/stz-phase31d-alt-cycle/source-model-reproduction.json`
+with a rerunnable `reproduce.mjs`; the next native trace records the actual
+event coordinates instead of assuming a rounding rule.
+
+The harness now verifies candidate membership/count before using that count
+for one complete native Alt cycle plus wrap, with an explicit fixture maximum
+of four candidates. It requires actual visible cycle feedback to advance,
+stable ordered membership, both expected curve owners and exactly one callback
+per click. A bounded read-only fixture observer retains actual event modifiers,
+client coordinates, mapped SVG coordinates, fractional rounding, camera,
+document/runtime continuity, candidate IDs/kinds/distances/owners and current
+feedback before assertions. Marker/owner geometry is retained before and after
+the sequence. Native clicks and independent geometry remain the acceptance
+inputs; production selection priorities, tolerances, initial index and
+candidate identity are unchanged. No production file or dependency changes.
+
+The current child attempted the same browser command under Node v26.9.0 on an
+intermediate diagnostic checkout, after adding the fixture observer but before
+the bounded-cycle harness correction. It is not evidence for the final tree.
+It exited 1 at `development-server-listen`: `listen EPERM` on
+`127.0.0.1:5173`, before Chrome launched. All ten groups were unexecuted and
+the report has no browser version or scenario measurements. This is a new
+child startup restriction, separate from the executed parent B/B assertion.
+Its report is `/private/tmp/stz-phase31d-alt-cycle-browser/free-labels-evidence.json`
+and log is `/private/tmp/stz-phase31d-alt-cycle-browser.log`. The report records
+only `scripts/fixtures/freeLabels.tsx` modified at revision
+`1f43eefe171c2c834060e10418aae80876ed0651`. This restricted attempt does not
+establish browser acceptance.
+
+Current child checks with `PATH=/opt/homebrew/bin:$PATH` (Node v26.9.0) passed
+all seven requested focused test files: **197 tests**, none failed or skipped,
+included within **2,356 passing full-suite tests** from `npm test` (exit 0).
+`npm run build` exited 0 with the existing nonblocking chunk-size warning.
+Strict fixture TypeScript, all five browser-script syntax checks, the requested
+targeted ESLint including the changed fixture, and `git diff --check` exited 0.
+Exact commands/statuses/log paths are retained in
+`/private/tmp/stz-phase31d-alt-cycle/focused-checks.json` and
+`/private/tmp/stz-phase31d-alt-cycle/full-checks.json`. The regression is the
+native full-cycle assertion; no production helper changed or new helper unit
+test was added. The corrected halo oracle, its tests and all later assertions
+are unchanged. Existing App/SvgDiagram lint debt remains outside this fix;
+repository-wide lint was not run. Final tracked/untracked checkout identity
+is recorded separately in `/private/tmp/stz-phase31d-alt-cycle/handoff.json`
+so documenting the fingerprint does not itself change that fingerprint.
+
+After this child handoff, the normal outer runner must perform complete parent
+verification and then independent review. For standalone verification, the
+authorized parent command is
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31D verify`
-on the final tracked/untracked checkout, obtain an identified browser and
+on the final tracked/untracked checkout. It must obtain an identified browser and
 `passed`/`complete` evidence with all ten groups and no incomplete, unexecuted
 or page-error entries, and retain the new records above. Historical parent
 success does not verify the added assertions. The normal order remains fix,

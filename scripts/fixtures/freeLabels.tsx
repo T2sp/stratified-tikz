@@ -8,7 +8,7 @@ import type { SvgTexLabelSnapshot } from '../../src/rendering/SvgTexLabel.tsx'
 import type { CurveStratum, Diagram, LabelAnchor, LabelStyle, PathInlineNode, TextLabel, Vec3 } from '../../src/model/types.ts'
 import { createCurveStratum, createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
 import { defaultLabelStyle, defaultSheetStyle } from '../../src/model/styles.ts'
-import { defaultVisibilityOptions } from '../../src/model/visibility.ts'
+import { defaultVisibilityOptions, resolveVisibilityOptions } from '../../src/model/visibility.ts'
 import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
 import { pathInlineNodePoint } from '../../src/model/pathInlineNodes.ts'
 import { reverseCurvePathDirection } from '../../src/model/paths.ts'
@@ -18,6 +18,8 @@ import type { LabelConversionResult } from '../../src/rendering/labels/labelServ
 import { loadMathJaxEngine, MathJaxFailure } from '../../src/rendering/labels/mathjaxEngine.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
+import { collectSvgPreviewSelectionCandidates, createSvgSelectionCandidateVisibility } from '../../src/rendering/svgHitTesting.ts'
+import { mapClientPointToViewBox } from '../../src/rendering/svgViewBox.ts'
 import { projectToSvgPoint, svgPointToModelOnWorkPlane } from '../../src/rendering/svgProjection.ts'
 import { createSvgPreviewExportText } from '../../src/ui/svgPreviewExport.ts'
 import { applyGeometryHandleDragToEditorState, startGeometryHandleDragSession } from '../../src/ui/geometryHandles.ts'
@@ -215,8 +217,63 @@ function state() {
   }
 }
 
+/** Bounded, read-only native-event diagnostics for the curve-only 3D fixture.
+ * Capture before React handles the click; read feedback after its real handler.
+ * No cycle helper, selection setter, or mutable runtime state is exposed. */
+function observeInlineSelectionClicks() {
+  const svg = container.querySelector<SVGSVGElement>('svg.svg-diagram')!
+  const mountedDiagram = editor.editableDiagram, mountedRuntime = runtime
+  const elements = Array.from(svg.querySelectorAll('[data-path-inline-node-path-id], [data-label-state]'))
+  const feedback = () => {
+    const text = svg.querySelector('.svg-selection-cycle-feedback text')?.textContent ?? null
+    const match = text === null ? null : /^Selected (\d+)\/(\d+): (.*)$/u.exec(text)
+    return { text, index: match ? Number(match[1]) - 1 : null,
+      count: match ? Number(match[2]) : null, description: match?.[3] ?? null }
+  }
+  function candidatesAt(event: MouseEvent) {
+    const diagram = editor.editableDiagram
+    // With only curves there are no free-label bounds or point/label occlusion
+    // maps to mirror. Reject reuse on a scene where that would cease to hold.
+    if (diagram.ambientDimension !== 3 || diagram.labels.length !== 0
+      || diagram.strata.some((stratum) => stratum.geometricKind !== 'curve')) {
+      throw new Error('Inline click diagnostics require the curve-only 3D fixture')
+    }
+    const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
+    const visibilityOptions = resolveVisibilityOptions(diagram, props.visibilityOptions)
+    const bounds = svg.getBoundingClientRect()
+    const client = { x: event.clientX, y: event.clientY }
+    const point = mapClientPointToViewBox(client, bounds, { width: 900, height: 700 })
+    const collection = collectSvgPreviewSelectionCandidates({ diagram, camera, viewportHeight: 700, point,
+      layerFilter: editor.layerFilter, showCoordinateAnchors: props.showCoordinateAnchors,
+      visibility: createSvgSelectionCandidateVisibility({ visibilityOptions }), includeDiagnostics: true })
+    return { altKey: event.altKey, isTrusted: event.isTrusted, client, point,
+      bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+      camera, sourceRevision, renderEpoch, layerFilter: editor.layerFilter, visibilityOptions,
+      selectionBefore: editor.selectedElement, callbacksBefore: callbackEvents.length,
+      feedbackBefore: feedback(), ...collection }
+  }
+  const events: ReturnType<typeof candidatesAt>[] = []
+  const limit = 16
+  let dropped = 0
+  const capture = (event: MouseEvent) => {
+    if (!(event.target instanceof Node) || !svg.contains(event.target)) return
+    if (events.length === limit) { dropped++; return }
+    events.push(candidatesAt(event))
+  }
+  document.addEventListener('click', capture, true)
+  return {
+    read() {
+      return structuredClone({ events, limit, dropped, feedback: feedback(),
+        continuity: { svg: svg === container.querySelector('svg.svg-diagram'),
+          elements: elements.every((element) => element.isConnected && svg.contains(element)),
+          diagram: mountedDiagram === editor.editableDiagram, runtime: mountedRuntime === runtime } })
+    },
+    dispose() { document.removeEventListener('click', capture, true) },
+  }
+}
+
 const api = {
-  mount, mutateLabel, mutateInlineNode, state,
+  mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks,
   reverseCurve(id: string) { mutateCurve(id, (curve) => reverseCurvePathDirection(curve) ?? curve) },
   duplicateCurve(id: string) {
     editor = applyBulkDuplicateToEditorState({ ...editor, selectedElement: { kind: 'stratum', id }, layerOperationStatus: '' })

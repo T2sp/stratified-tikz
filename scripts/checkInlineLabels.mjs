@@ -368,25 +368,88 @@ export async function runInlineLabelChecks({ page, record, observe, artifactDir,
     const overlap = await inspect('pick3dB', 'overlap')
     const overlapNormal = await probePoint({ page, state, point: overlap.marker.client, expected: selection('pick3dB'),
       observe: (stage, details) => observe(`${name}/overlap-normal-${stage}`, { camera: current.camera, overlap, ...details }) })
+    const clickTrace = await page.evaluateHandle(() => window.stzLabels.observeInlineSelectionClicks())
     await probePoint({ page, state, point: blank, expected: null,
       observe: (stage, details) => observe(`${name}/overlap-blank-${stage}`, details) })
+    const resetTrace = await clickTrace.evaluate((trace) => trace.read())
+    await observe(`${name}/overlap-cycle-reset`, resetTrace)
+    assert.equal(resetTrace.feedback.text, null, 'Blank native click clears the previous cycle feedback')
     const cycles = []
+    let clickLimit = 1
+    let cycleCandidates
+    const expectedKeys = ownerIds.flatMap((id) => [`pathInlineNode:${id}:overlap`, `curve:${id}`])
     await page.keyboard.down('Alt')
     try {
-      for (let index = 0; index < 2; index++) {
+      // The first real click supplies the verified candidate count. Traverse
+      // exactly one full candidate cycle and one wrap, never retry for an owner.
+      // A marker and its curve body can legitimately select the same owner.
+      for (let index = 0; index < clickLimit; index++) {
         const measured = await inspect('pick3dA', 'overlap'), other = await inspect('pick3dB', 'overlap')
-        close(measured.marker.x, other.marker.x); close(measured.marker.y, other.marker.y)
         const before = await state()
+        const traceBefore = await clickTrace.evaluate((trace) => trace.read())
+        await observe(`${name}/overlap-alt-${index}-before`, { measured, other, traceBefore,
+          camera: before.camera, sourceRevision: before.sourceRevision, selected: before.selection })
+        close(measured.marker.x, other.marker.x); close(measured.marker.y, other.marker.y)
         await page.mouse.click(measured.marker.client.x, measured.marker.client.y)
         const after = await state()
-        const event = { index, measured, other, selected: after.selection, callbacks: after.callbackEvents.slice(before.callbackEvents.length) }
+        const trace = await clickTrace.evaluate((observer) => observer.read())
+        const native = trace.events.at(-1)
+        const event = { index, measured, other, native, feedback: trace.feedback,
+          continuity: trace.continuity, eventCount: trace.events.length, droppedEvents: trace.dropped,
+          requestedClient: measured.marker.client,
+          clientDelta: native ? { x: native.client.x - measured.marker.client.x, y: native.client.y - measured.marker.client.y } : null,
+          selected: after.selection, callbacks: after.callbackEvents.slice(before.callbackEvents.length),
+          geometryAfter: [await inspect('pick3dA', 'overlap'), await inspect('pick3dB', 'overlap')] }
         await observe(`${name}/overlap-alt-${index}`, { camera: current.camera, ...event })
+        assert.equal(trace.dropped, 0)
+        assert.equal(trace.events.length - traceBefore.events.length, 1, 'Exactly one native click was observed')
+        assert.equal(native.altKey, true); assert.equal(native.isTrusted, true)
+        assert.equal(native.callbacksBefore, before.callbackEvents.length)
+        assert.equal(native.sourceRevision, cameraStart.sourceRevision)
+        assert.deepEqual(native.camera, current.camera)
+        assert.deepEqual(trace.continuity, { svg: true, elements: true, diagram: true, runtime: true })
+        assert.equal(native.diagnostics.truncated, false)
+        assert.ok(native.candidates.length > 1 && native.candidates.length <= 4, 'This fixture has at most four overlapping candidates')
+        assert.deepEqual(new Set(native.candidates.map(({ stableId }) => stableId)), new Set(expectedKeys),
+          'Both fixture markers and both curve bodies are present, with no unexpected targets')
+        if (index === 0) {
+          cycleCandidates = native.candidates
+          clickLimit = cycleCandidates.length + 1
+          assert.equal(native.feedbackBefore.text, null, 'The first Alt click starts after the blank reset')
+        } else {
+          assert.deepEqual(native.candidates, cycleCandidates, 'Selection redraw preserves ordered candidates and exact distances')
+          assert.deepEqual(native.point, cycles[0].native.point, 'The actual mapped click point remains stable')
+          assert.deepEqual(measured.marker.client, cycles[0].requestedClient, 'Remeasuring preserves the overlapping-marker click point')
+          assert.deepEqual(native.feedbackBefore, cycles[index - 1].feedback, 'Cycle feedback survives between consecutive clicks')
+        }
+        const expectedIndex = (index + 1) % cycleCandidates.length
+        const candidate = cycleCandidates[expectedIndex]
+        assert.equal(trace.feedback.count, cycleCandidates.length)
+        assert.equal(trace.feedback.index, expectedIndex, 'Visible cycle index advances through every candidate and wraps without resetting')
+        assert.equal(trace.feedback.text, `Selected ${expectedIndex + 1}/${cycleCandidates.length}: ${candidate.description}`)
+        assert.deepEqual(event.selected, candidate.selection, 'The actual callback owner matches the visibly selected candidate')
         assert.equal(event.callbacks.length, 1)
+        assert.deepEqual(event.callbacks[0], { selection: event.selected, options: { mode: 'replace' } })
         assert.equal(event.selected?.kind, 'stratum')
         assert.ok(ownerIds.includes(event.selected.id))
+        for (const [ownerIndex, observed] of event.geometryAfter.entries()) {
+          const previous = ownerIndex === 0 ? measured : other
+          assert.equal(observed.label.owner, previous.label.owner)
+          assert.equal(observed.label.request, previous.label.request)
+          close(observed.marker.x, previous.marker.x); close(observed.marker.y, previous.marker.y)
+          close(observed.marker.r, (ownerIndex === 0 ? 4.2 : 3.4) + (observed.pathId === event.selected.id ? 1.4 : 0))
+        }
         cycles.push(event)
       }
-    } finally { await page.keyboard.up('Alt') }
+    } finally {
+      await page.keyboard.up('Alt')
+      await clickTrace.evaluate((trace) => trace.dispose())
+      await clickTrace.dispose()
+    }
+    assert.equal(cycles.length, cycleCandidates.length + 1)
+    assert.deepEqual(new Set(cycles.slice(0, -1).map(({ feedback }) => feedback.index)),
+      new Set(cycleCandidates.map((_, index) => index)), 'One complete cycle visits each candidate index exactly once')
+    assert.deepEqual(cycles.at(-1).feedback, cycles[0].feedback, 'The bounded final click wraps to the initial candidate')
     assert.deepEqual(new Set(cycles.map(({ selected }) => selected.id)), new Set(ownerIds), '3D overlap cycles both curve owners with reused local IDs')
     await screenshot(`${name}-selected`)
     const glyphClicks = []
