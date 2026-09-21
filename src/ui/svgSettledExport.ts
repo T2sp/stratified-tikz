@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { LABEL_SERVICE_LIMITS, type LabelConversionResult } from '../rendering/labels/labelService.ts'
+import type { ValidatedSvgElement } from '../rendering/labels/labelSvg.ts'
 import { literalSvgLabelLayout } from '../rendering/labels/svgLabelLayout.ts'
 import { svgLabelRequestIdentity, type SvgLabelState } from '../rendering/labels/svgLabelRuntime.ts'
 import { getSvgLabelExportCapture, type SvgLabelExportCapture } from '../rendering/svgLabelExportRegistry.ts'
@@ -144,6 +145,76 @@ export async function settleSvgExportLabels(
   }))
 }
 
+/** Supply SVG context to React itself: wrapping an already rendered string is
+ * too late, because the HTML server renderer hoists title out of its label. */
+export function renderSettledSvgLabelDocument(capture: SvgLabelExportCapture, state: SvgLabelState): string {
+  return renderToStaticMarkup(createElement('svg', { xmlns: svgNamespace },
+    createElement(SvgTexLabelView, { capture, state })))
+}
+
+function hasSettledGeometryStructure(element: Element, geometry: ValidatedSvgElement): boolean {
+  const expected = geometry.children.filter((child): child is ValidatedSvgElement => typeof child !== 'string')
+  const children = Array.from(element.children)
+  return element.localName === geometry.tag && children.length === expected.length &&
+    expected.every((child, index) => hasSettledGeometryStructure(children[index], child))
+}
+
+/** Validate the exact direct subtree before replacement. A parseable document or
+ * a non-null first child does not prove that the captured label survived SSR. */
+export function extractSettledSvgLabel(
+  document: Document, capture: SvgLabelExportCapture, state: SvgLabelState,
+): Element {
+  const invalid = () => { throw new Error('Invalid settled label SVG.') }
+  const isSvg = (element: Element | undefined | null, name: string): element is Element =>
+    element?.namespaceURI === svgNamespace && element.localName === name
+  const root = document.documentElement
+  if (!isSvg(root, 'svg') || document.querySelector('parsererror') || root.childNodes.length !== 1) invalid()
+  const label = root.firstElementChild
+  if (!isSvg(label, 'g') || label.childNodes.length !== label.children.length) throw new Error('Invalid settled label SVG.')
+  if (Array.from(root.querySelectorAll('*')).some((element) => element.namespaceURI !== svgNamespace)) invalid()
+  if (state.status === 'pending' || state.source !== capture.source ||
+    state.requestIdentity !== svgLabelRequestIdentity(capture) ||
+    label.getAttribute('data-label-request') !== state.requestIdentity ||
+    label.getAttribute('data-label-state') !== state.status ||
+    label.getAttribute('data-label-owner') !== (capture.ownerIdentity ?? null)) invalid()
+
+  const [title, ...body] = Array.from(label.children)
+  // XML normalizes physical line endings; request identity above retains the
+  // complete source (JSON-escaped), including whitespace, without normalization.
+  if (!isSvg(title, 'title') || title.children.length !== 0 ||
+    title.textContent !== capture.source.replace(/\r\n?/g, '\n')) invalid()
+  if (body.length === 2 && isSvg(body[0], 'rect') &&
+    body[0].getAttribute('data-svg-export-exclude') === 'true') body.shift()
+  const paint = body[0]
+  if (body.length !== 1 || !isSvg(paint, 'g')) invalid()
+  const groups = Array.from(paint.children)
+  const foreground = groups.at(-1)
+  if (groups.length !== (capture.outline ? 2 : 1) ||
+    !isSvg(foreground, 'g') || foreground.getAttribute('data-label-content') !== 'true') {
+    throw new Error('Invalid settled label SVG.')
+  }
+  if (capture.outline && (!isSvg(groups[0], 'g') ||
+    groups[0].getAttribute('data-label-halo') !== 'true' ||
+    groups[0].getAttribute('aria-hidden') !== 'true')) invalid()
+
+  // Require the renderer's visible runs, rather than a path anywhere in the
+  // document (which could belong to a sheet, another label, or only the halo).
+  // Empty labels and legitimate empty math are allowed by their settled layout.
+  const runs = state.layout.placements.filter((item) => item.kind === 'math' || item.kind === 'text')
+  for (const group of groups) {
+    const children = Array.from(group.children)
+    if (children.length !== runs.length || runs.some((run, index) => {
+      const child = children[index]
+      if (!isSvg(child, run.kind === 'math' ? 'svg' : 'text')) return true
+      if (run.kind === 'text') return child.children.length !== 0 ||
+        child.textContent !== run.text.replace(/\r\n?/g, '\n')
+      const geometry = state.result?.kind === 'success' ? state.result.runs[run.runIndex]?.geometry : undefined
+      return geometry === undefined || !hasSettledGeometryStructure(child, geometry.svg)
+    })) invalid()
+  }
+  return label
+}
+
 /** Synchronous shared rendering after settlement: no temporary React root,
  * commit timer, live-label replacement or dependence on the live DOM's state. */
 export async function prepareSettledSvgExport(
@@ -164,12 +235,11 @@ export async function prepareSettledSvgExport(
     if (signal?.aborted) return complete(null)
     const parser = new DOMParser()
     entries.forEach(({ capture, target }, index) => {
-      const markup = renderToStaticMarkup(createElement(SvgTexLabelView, { capture, state: states[index] }))
+      const markup = renderSettledSvgLabelDocument(capture, states[index])
       // Only the shared renderer's escaped text and validated geometry enter
       // this parser. Raw user input is never interpolated as SVG markup.
-      const document = parser.parseFromString(`<svg xmlns="${svgNamespace}">${markup}</svg>`, 'image/svg+xml')
-      const label = document.documentElement.firstElementChild
-      if (document.querySelector('parsererror') || label === null) throw new Error('Invalid label SVG.')
+      const document = parser.parseFromString(markup, 'image/svg+xml')
+      const label = extractSettledSvgLabel(document, capture, states[index])
       if (options.observe !== undefined) {
         observeExport(options.observe, { kind: 'label-rendered', source: capture.source,
           ownerIdentity: capture.ownerIdentity, requestIdentity: states[index].requestIdentity,
@@ -185,7 +255,7 @@ export async function prepareSettledSvgExport(
 }
 
 function isStandaloneSvgDocument(document: Document): boolean {
-  if (document.documentElement.localName !== 'svg' ||
+  if (document.documentElement.localName !== 'svg' || document.documentElement.namespaceURI !== svgNamespace ||
     document.querySelector('parsererror, script, style, foreignObject, image')) return false
   const root = document.documentElement
   const viewBox = root.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number)

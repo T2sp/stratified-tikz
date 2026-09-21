@@ -1440,10 +1440,11 @@ independent re-review. The accepted halo oracle correction remains preserved.
 
 ### Phase 31E: Settled-label SVG export and standalone SVG fidelity
 
-Status: export implementation and diagnostics retained; independent-page reopening
-now reaches native evaluation. Latest parent verification failed at standalone
-full-page capture; bounded capture is implemented but native verification and
-independent review remain outstanding.
+Status: export implementation, diagnostics and bounded capture retained. The
+latest parent verification saved native autoHide/autoDim PNGs, then failed on
+autoDim's missing exported foreground. The production render-boundary correction
+is implemented; fresh matching parent verification and independent review remain
+outstanding.
 The earlier parent report `stz-phase31e-before-review-r43lZG` passed ten groups
 and 120 scenario records with no page errors, then failed the dimmed formula
 path assertion for `$\frac{autoDim}{x}$`. This is a 31E acceptance failure;
@@ -1454,9 +1455,11 @@ cannot be determined from the live preview screenshot.
 The diagnostic follow-up added bounded, source-specific timing/outcome,
 detached/serialized SVG, opacity, and standalone observations before assertions,
 plus exact-source foreground negative controls and settlement regressions.
-The 20,000 ms fixture versus 10,050 ms export boundary is an unconfirmed timing
-hypothesis; no limit increase, sleep, retry-to-pass, production-markup change,
-or visibility relaxation was applied. The subsequent parent report
+The 20,000 ms fixture versus 10,050 ms export boundary was an unconfirmed timing
+hypothesis at that stage; the later `Qku3Ld` record measures successful
+conversion within the deadline and loss of its detached subtree. No limit
+increase, sleep, retry-to-pass or visibility relaxation was applied. The
+subsequent parent report
 `stz-phase31e-before-review-HVvae4` passed ten groups and 119 scenario records,
 then failed before autoHide reopening: `page.context().newPage()` attempted
 a second page in the fixture's implicitly page-owned context. AutoHide
@@ -1466,8 +1469,8 @@ passed. AutoDim and all later export scenarios were not reached. Node tests
 (2,390), build, diff and label-assets checks passed; free-label acceptance exited
 1. This confirmed API misuse is distinct from the older autoDim assertion.
 
-The latest parent report `stz-phase31e-before-review-xlQmJP` passed tests (2,390),
-build, diff and label-assets checks, then failed free-label acceptance after ten
+The historical parent report `stz-phase31e-before-review-xlQmJP` passed tests
+(2,390), build, diff and label-assets checks, then failed free-label acceptance after ten
 completed groups and 119 passing records, with no page errors. The independent
 autoHide page was created and its file navigation/evaluation returned, confirming
 progress past ownership failure. A `fullPage: true` screenshot timed out after
@@ -1484,7 +1487,7 @@ ran this parent check. No independent review ran.
 
 Installed Playwright's full-page sizing waits for both document body and root,
 after font readiness. This supports the SVG XML/body-dependent sizing diagnosis;
-the parent's unsaved content type/body state still needs native measurement.
+that parent's unsaved content type/body state was later measured in `Qku3Ld`.
 The bounded-capture correction uses one finite `fullPage: false` viewport
 screenshot, with measured whole-root coverage, at most one viewport expansion,
 8,192-pixel side/16,777,216-pixel area limits and a 5,000 ms timeout. Both
@@ -1492,25 +1495,88 @@ standalone paths persist observations before capture, verify actual PNG file
 dimensions before reporting retention, and preserve the original error without
 a second failure screenshot. Independent-page cleanup remains intact.
 
-This follow-up started clean at `5f357d1`, preserving the committed runner
-changes. Its focused saved-SVG reproduction stopped during Chrome launch with
-SIGABRT (`kill EPERM` during cleanup), before navigation, so it provides no new
+The bounded-capture follow-up started clean at `5f357d1`, preserving the
+committed runner changes. Its focused saved-SVG reproduction stopped during
+Chrome launch with SIGABRT (`kill EPERM` during cleanup), before navigation, so it provides no new
 body measurements, PNG, autoDim outcome or App acceptance. See
 [SVG export verification](./PREVIEW_UI.md#export-svg),
 `/private/tmp/stz-31e-bounded-capture/native-reproduction.json` and
-`/private/tmp/stz-31e-bounded-capture/handoff.json` for current child results and
+`/private/tmp/stz-31e-bounded-capture/handoff.json` for historical child results and
 checkout identity. This restriction is distinct from the parent screenshot
 timeout and historical child Vite startup failure. Production/fixture/oracle
 semantics, snapshot/raw-source/history behavior, conversion limits, diagnostics,
 negative controls, 31D regressions and runner gates are preserved.
 
-Current child verification used Node v26.9.0/npm 11.19.1: 128 focused tests
+That child verification used Node v26.9.0/npm 11.19.1: 128 focused tests
 (including 13 new registered helper tests) and all 2,403 full-suite tests passed
 with no failures or skips. Build exited 0 with the existing chunk-size warning;
 strict fixture TypeScript, eight syntax checks, targeted ESLint and diff checks
 also exited 0. Commands, statuses and logs are recorded in
-`/private/tmp/stz-31e-bounded-capture/checks.json`. Parent browser verification
-remains pending and independent review has not run.
+`/private/tmp/stz-31e-bounded-capture/checks.json`. These child-only results
+precede the executed parent result below; they are not new correction results.
+
+The latest parent report, `stz-phase31e-before-review-Qku3Ld/verification.json`
+under `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/`, is failed/partial
+before independent review. Node v26.9.0, Chrome 153.0.8010.52, external
+Playwright and Vite at `http://127.0.0.1:5174` ran tests (2,403), build, diff and
+label-assets checks successfully; free-label acceptance exited 1. Ten groups
+and 120 scenario records passed without page errors, including autoHide, but
+autoDim failed the foreground namespace assertion. Its root/owner namespaces
+and XML parsing passed. The eleventh group is incomplete; remaining policies,
+invalid-viewport retry and actual App download/reopen were not reached.
+Revision `5f357d1b186302fda951ff073f2e32c68a34b2ce` plus four tracked changes and
+two untracked capture files were unchanged, with fingerprint
+`1cfe1d338e653e6040d1922168cc25607c68778f4e6b651cb1989103aa35a80c`.
+
+Both visibility captures saved verified 1100×850 standalone PNGs, covering a
+900×700 SVG root. Native observations show `image/svg+xml`, no HTML body,
+valid SVG namespace, no parser errors, no external requests and no page errors.
+AutoDim source `$\frac{autoDim}{x}$` settled `success`/`ready` in 137 ms within
+10,050 ms, with eight math paths and a rectangle at captured effective opacity
+`0.24499999999999997`. Its selected detached node is nevertheless only a title
+before sanitization; its 472-byte final SVG has no formula foreground/bounds.
+The `05-check-free-labels/artifacts/settled-export-autoDim-completed*` SVG/JSON
+files, both policies' `-standalone.json`/`.png` files, and failure diagnostics
+retain this evidence. Successful image capture is not foreground verification.
+
+The confirmed production defect is HTML-context React server rendering in
+`prepareSettledSvgExport()`: React DOM 19.2.7 hoists the label title before its
+group, and the post-render XML wrapper's first-child extraction retains only
+that title. `renderSettledSvgLabelDocument()` now renders the shared view inside
+an actual React SVG parent. `extractSettledSvgLabel()` validates the SVG root,
+single direct label group, namespace, captured source/request/owner/state and
+required title/paint/foreground/halo/run structure before replacement. It retains
+raw-source text, layout, paint, foreground and inline halo, and fails preparation
+on invalid structure; empty/zero-label exports remain valid. The wrapper does
+not survive as a nested viewport. Whole-render-string assertions could not
+detect the old subtree loss. The older `r43lZG` output remains unavailable, so
+this confirmed `Qku3Ld` cause does not establish every detail of that older run.
+
+New Node regressions reproduce installed React title hoisting and exercise the
+production SVG-context renderer. The native `settledSvgBoundaryFixture.ts`
+regression exercises real preparation and final XML, including literal/inline
+labels, chosen/replaced subtrees, captured owners and malformed-structure
+controls against valid foreground geometry. The correction child's Chrome
+launch stopped with SIGABRT (`kill EPERM` during cleanup) before any page, so
+native regression, visibility and actual App download/reopen checks remain for
+the parent. Fresh startup evidence is
+`/private/tmp/stz-31e-svg-boundary/browser-startup.log`; final identity and
+command results are retained in that directory's `handoff.json`. This new
+restriction does not erase the prior parent's saved PNGs or imply that its
+failed foreground check verifies the correction.
+
+Fresh correction verification from revision
+`d1b72b3240177dfa368b43255ca07fd5738e3920` used Node v26.9.0/npm 11.19.1 with
+`/opt/homebrew/bin` first in `PATH`: 130 focused tests and 2,405 full-suite tests
+passed, with none failed or skipped; the focused tests are included in the full
+total. Build exited 0 with the existing chunk-size warning. Strict fixture
+TypeScript, targeted ESLint including the new fixture, eight script syntax
+checks and diff checks exited 0. The added two Node regressions are in the
+existing registered export test; no dependency or package registration changed.
+Exact commands, statuses and logs are retained under
+`/private/tmp/stz-31e-svg-boundary/`, with final checkout identity in
+`handoff.json`. These are child checks; native parent verification and
+independent review remain separate pending gates.
 
 The normal order remains fix, matching complete parent verification, then
 independent review. `check:free-labels` still requires all eleven groups for

@@ -951,6 +951,9 @@ font readiness. A transient resource failure does not poison future exports.
 The exporter clones the committed SVG synchronously, captures immutable inputs
 from the shared label renderer, and replaces the clone's label subtrees by
 synchronously rendering their settled results with the same pure layout/view.
+Server rendering places the shared label view inside an actual React SVG
+wrapper. The parser validates and extracts its single direct label group; only
+that group replaces the captured target, so the wrapper adds no final viewport.
 It does not depend on a live React update committing after a conversion promise
 resolves. It creates no temporary React root and never replaces live labels.
 Request identities guard completion, status, cancellation, and cleanup; detached
@@ -1011,15 +1014,15 @@ passing scenario records. The exact-source foreground oracle rejects missing
 math, whole-source fallback, unrelated paths, and halo-only geometry; the
 original positive path assertion remains.
 
-**The earlier autoDim cause is not yet established.** Static inspection and focused tests show
-successful dimmed geometry survives the shared view; they cannot decide why
-this parent export observed no paths. The fixture allows 20,000 ms while the
-export boundary allows 10,050 ms, and autoDim is the first cold real-service
-conversion after autoHide. This remains a timing hypothesis pending measured
-conversion/export outcomes. Limits, hold/release order, cache ownership,
-production markup, visibility policy, and export semantics were not changed to
-make this hypothesis pass. The only production addition is optional runtime
-observation; it adds no model fields or UI controls.
+The earlier `r43lZG` autoDim cause cannot be recovered from its missing output.
+At the diagnostic stage, the fixture's 20,000 ms versus the export boundary's
+10,050 ms suggested a timing hypothesis; neither a string-rendering test nor
+the live preview established the detached export's contents. The later
+`Qku3Ld` run below measured successful conversion well within the deadline and
+retained a title-only detached subtree, establishing its production failure.
+Limits, hold/release order, cache ownership and visibility policy were not
+changed to make the hypothesis pass. The diagnostic production addition is a
+non-mutating optional runtime observer, with no model fields or UI controls.
 
 The historical page-ownership parent verification is **failed/partial**:
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-HVvae4/verification.json`.
@@ -1075,7 +1078,7 @@ skips. Build exited 0 with the existing chunk-size warning. Strict fixture
 TypeScript, six script syntax checks, targeted ESLint and diff checks exited 0.
 No new helper/test file or dependency was needed for the ownership correction.
 
-The latest executed parent verification is **failed/partial**:
+The historical full-page-capture parent verification is **failed/partial**:
 `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-xlQmJP/verification.json`.
 It used Node v26.9.0, Chrome 153.0.8010.52, external Playwright 1.62.1 and Vite at
 `http://127.0.0.1:5174`. Revision `70c7548b5dd832b90acb5d6116f2055c507042e8`
@@ -1108,7 +1111,7 @@ That branch's `_fullPageSize` waits for both `document.body` and
 `document.documentElement`; it returns no size while either is absent. The
 export is an SVG XML document, so this is the source-supported explanation of
 the timeout. The parent did not persist the reopened document's content type
-or body state; those browser facts still require native measurement.
+or body state; the later `Qku3Ld` run below supplies those native measurements.
 
 The bounded-capture follow-up starts from clean commit
 `5f357d1b186302fda951ff073f2e32c68a34b2ce`, preserving the committed runner
@@ -1131,13 +1134,13 @@ resource cleanup, and cleanup failures do not replace primary failures. No
 production, fixture, oracle, conversion-limit or runner change is part of this
 capture correction.
 
-The focused child reproduction opened no SVG: Chrome launch ended with SIGABRT
-and cleanup logged `kill EPERM`, before navigation. Its saved source hash,
-command error and stage are retained at
-`/private/tmp/stz-31e-bounded-capture/native-reproduction.json`. It yields no new
-document/body measurements, standalone PNG, autoDim timing/geometry or App
-download acceptance. This child launch restriction is distinct from the
-executed parent screenshot timeout and historical Vite/ownership failures.
+The historical bounded-capture child reproduction opened no SVG: Chrome launch
+ended with SIGABRT and cleanup logged `kill EPERM`, before navigation. Its saved
+source hash, command error and stage are retained at
+`/private/tmp/stz-31e-bounded-capture/native-reproduction.json`. That child run
+alone supplied no document/body measurements, standalone PNG, autoDim
+timing/geometry or App acceptance. Its launch restriction is distinct from the
+executed parent failures and does not describe the subsequent `Qku3Ld` run.
 With `/opt/homebrew/bin` first in `PATH`, Node v26.9.0 and npm 11.19.1 passed
 128 focused tests, including 13 new capture-helper tests registered in
 `package.json`; these are included in the full `npm test` total of 2,403, with
@@ -1148,12 +1151,120 @@ scripts plus the capture helper and its test), targeted ESLint and
 retained in `/private/tmp/stz-31e-bounded-capture/checks.json`; the final checkout
 identity and handoff are in `/private/tmp/stz-31e-bounded-capture/handoff.json`.
 
-Fresh matching parent verification of bounded capture and all eleven groups
-remains required, followed by independent review, which has not run. The outer
-runner must retain successful native document/body and complete PNG coverage
-measurements, autoDim settlement/geometry, every visibility policy and actual
-download/reopen/failure-retry artifacts, resolving any further demonstrated
-failure before review. Standalone verification can use
+The latest executed parent verification is **failed/partial, before review**:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31e-before-review-Qku3Ld/verification.json`.
+It tested revision `5f357d1b186302fda951ff073f2e32c68a34b2ce` with the four
+modified tracked files and two untracked bounded-capture files recorded in
+`05-check-free-labels/artifacts/checkout.diff` and `checkout-untracked.json`.
+Checkout fingerprint
+`1cfe1d338e653e6040d1922168cc25607c68778f4e6b651cb1989103aa35a80c`
+was unchanged during verification. Node v26.9.0, Chrome 153.0.8010.52, external
+Playwright and Vite at `http://127.0.0.1:5174` ran the checks. Tests (2,403),
+build, diff and label-assets checks exited 0; free-label acceptance exited 1
+after ten completed groups and 120 passing scenario records, without page
+errors. AutoHide passed; autoDim failed on the missing foreground element's
+namespace. Root/label-owner namespaces and XML parsing passed. The eleventh
+group remains incomplete; `unexecuted: []` records started groups, not completion
+of later layer-filter, hidden-layer, invalid-viewport/retry or App-download cases.
+
+The retained autoDim capture owns source `$\frac{autoDim}{x}$`, color `#802080`
+and effective opacity `0.24499999999999997`. Settlement reported `success` and
+`ready` after 137 ms within its 10,050 ms budget, with one math SVG containing
+12 groups, eight paths and one rectangle. Nevertheless,
+`settled-export-autoDim-completed-label-2-before-sanitize.svg` contains only
+the title, and `settled-export-autoDim-completed-detachedBeforeSanitization.svg`
+already has no label paint or foreground. The final `-serialized.svg` is
+472 bytes, containing sheet geometry and the formula's title. This is a
+production subtree-loss defect before sanitization, not a conversion deadline
+or selector-only failure. Existing whole-render-string tests missed it because
+paths still appeared elsewhere in the rendered string.
+
+The matching `settled-export-autoHide-standalone.json` and
+`settled-export-autoDim-standalone.json` retain actual browser observations:
+`image/svg+xml`, no HTML body, valid SVG namespace, no parser errors, and a
+900×700 root completely covered by the 1100×850 viewport. Both corresponding
+`-standalone.png` files exist with verified 1100×850 dimensions. Independent
+page ownership and the bounded capture therefore passed on these visibility
+paths. AutoDim still has no reopened foreground or bounds, so its saved PNG
+does not establish formula fidelity. No external requests or standalone page
+errors were observed. Policy-specific capture/live/detached/serialized SVGs,
+completion records and failure diagnostics remain under that run's
+`05-check-free-labels/artifacts/` directory.
+
+The confirmed render boundary in `prepareSettledSvgExport()` rendered
+`SvgTexLabelView` without a React SVG parent, then wrapped the finished string.
+Installed React DOM 19.2.7 renders that case in HTML context and hoists the
+title before its owning group. Parsing the string wrapper and selecting its
+first child therefore replaced the captured label with only the title. An
+actual React `<svg xmlns="http://www.w3.org/2000/svg">` parent must exist during
+server rendering; adding its namespace afterward cannot restore SVG context.
+
+The correction in `src/ui/svgSettledExport.ts` now uses
+`renderSettledSvgLabelDocument()` for that React SVG context and
+`extractSettledSvgLabel()` before `prepareSettledSvgExport()` imports/replaces
+the captured target. Validation rejects parser errors, a wrong root/descendant
+namespace, title-only or extra wrapper children, mismatched captured
+source/request/owner/state, or missing title, paint, foreground, outline or
+expected rendered runs. Literal fragments and math descendant structure are
+checked against the settled result. The returned group retains the shared
+renderer's title, placement/layout transforms, explicit paint/captured opacity, foreground
+and separate glyph-local halo. Only the temporary wrapper is discarded;
+successful math is not converted to fallback to conceal structural failure.
+Actual conversion failures still use the complete literal source. Empty
+labels and snapshots with zero represented labels remain valid. Invalid
+structure makes preparation fail without a malformed download. The shared
+renderer, pinned adapter, live preview, capture/settlement/cancellation policy,
+authoritative model/history and TikZ source remain unchanged.
+
+Two added tests in the already registered `tests/ui/svgSettledExport.test.ts`
+reproduce installed React's bare-render title hoisting and exercise the
+production SVG-context helper for successful math, Unicode, full-source literal
+fallback, empty source and an inline halo. The native regression in
+`scripts/fixtures/settledSvgBoundaryFixture.ts` calls the real
+`prepareSettledSvgExport()` through parsing, extraction, replacement,
+sanitization and final serialization. It inspects the selected subtree and
+same captured owners in the final document, with source-specific geometry,
+position/color/opacity, literal fragments/whitespace and separate foreground
+and halo. A native control reconstructs the former bare-render/first-child
+boundary through replacement, sanitization and final parsing: the selected
+title and final SVG lack math although the intermediate document has paths.
+Additional controls corrupt a valid foreground/structure and must be rejected;
+they do not pass trivially because the original foreground is missing. The
+native fixture's execution remains a parent gate.
+
+Fresh correction checks used `/opt/homebrew/bin` first in `PATH`, Node v26.9.0
+and npm 11.19.1 from starting revision
+`d1b72b3240177dfa368b43255ca07fd5738e3920`. The requested eight focused test
+files passed 130/130, included in the full `npm test` result of 2,405/2,405,
+with no failed or skipped tests. The two added Node cases live in the already
+registered export test file; `package.json` and the 13 capture-helper tests are
+preserved. `npm run build` exited 0 with the existing chunk-size warning.
+Strict fixture TypeScript, targeted ESLint including the new boundary fixture,
+all eight requested script syntax checks, and `git diff --check` exited 0.
+Exact commands/statuses and logs are retained in
+`/private/tmp/stz-31e-svg-boundary/` as `focused-result.json`,
+`npm-test-result.json`, `npm-build-result.json`, `fixture-typescript-result.json`,
+`targeted-eslint-result.json`, `syntax-results.json` and their referenced logs.
+Installed React DOM 19.2.7's bare-group versus SVG-parent reproduction is saved
+in `react-context-reproduction.json` in that directory.
+These are fresh child results, separate from the historical 128/2,403 handoff.
+
+This correction child attempted normal installed Chrome launch through the
+external Playwright runtime; it failed before creating pages with SIGABRT and
+cleanup `kill EPERM`. The fresh log is
+`/private/tmp/stz-31e-svg-boundary/browser-startup.log`. This establishes no
+native result for the correction. The `Qku3Ld` document/body observations and
+saved PNGs remain actual historical parent evidence, distinct from this child
+restriction. Final correction identity and checks are retained in
+`/private/tmp/stz-31e-svg-boundary/handoff.json`.
+
+Fresh matching parent verification of the production correction and all eleven
+groups remains required, followed by independent review, which has not run.
+The outer runner must retain complete label groups before/after sanitization,
+source-specific foreground/bounds/captured opacity, every visibility policy
+and actual download/reopen/failure-retry artifacts, resolving any further
+demonstrated failure before review. The `Qku3Ld` result is retained failure
+evidence, not verification of this correction. Standalone verification can use
 `PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 31E verify`;
 it does not run review or establish approval. Phase 31E is not complete and
 31F remains deferred.

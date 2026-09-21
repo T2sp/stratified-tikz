@@ -13,7 +13,7 @@ import { placeSvgLabel, svgLabelLayoutSettings } from '../../src/rendering/label
 import { createSvgLabelRuntime, initialSvgLabelState, type SvgLabelRuntime, type SvgLabelState } from '../../src/rendering/labels/svgLabelRuntime.ts'
 import { captureSvgLabelExport, getSvgLabelExportCapture, registerSvgLabelExportCapture, type SvgLabelExportCapture } from '../../src/rendering/svgLabelExportRegistry.ts'
 import { SvgTexLabelView } from '../../src/rendering/svgLabelView.ts'
-import { createSvgExportController, settleSvgExportLabels, type SvgExportPreparationObservation } from '../../src/ui/svgSettledExport.ts'
+import { createSvgExportController, renderSettledSvgLabelDocument, settleSvgExportLabels, type SvgExportPreparationObservation } from '../../src/ui/svgSettledExport.ts'
 import { createDiagramHistory } from '../../src/ui/undo.ts'
 import type { SvgPreviewBackgroundMode } from '../../src/ui/svgPreviewExport.ts'
 
@@ -47,11 +47,51 @@ function capture(source: string, labelRuntime: SvgLabelRuntime, overrides: Parti
     anchor: 'center', settings: svgLabelLayoutSettings(20), ...overrides })
 }
 function markup(captured: SvgLabelExportCapture, state: SvgLabelState): string {
-  return renderToStaticMarkup(createElement(SvgTexLabelView, { capture: captured, state }))
+  return renderSettledSvgLabelDocument(captured, state)
 }
 function literal(state: SvgLabelState): string {
   return state.layout.placements.map((item) => item.kind === 'math' ? '' : item.text).join('')
 }
+
+test('production detached document gives React SVG context before it can hoist the owning title', async () => {
+  const captured = capture('$x$', runtime(), { ownerIdentity: 'doc/free/x', opacity: 0.245 })
+  const [state] = await settleSvgExportLabels([captured])
+  const bare = renderToStaticMarkup(createElement(SvgTexLabelView, { capture: captured, state }))
+  // Reproduce the old blind spot: the whole string has math, but its first
+  // extracted element would be only the hoisted title. Native extraction and
+  // the full prepare path are covered by settledSvgBoundaryFixture in Chrome.
+  assert.ok(bare.startsWith('<title>$x$</title><g '))
+  assert.match(bare, /<path /)
+  const output = renderSettledSvgLabelDocument(captured, state)
+  assert.ok(output.startsWith('<svg xmlns="http://www.w3.org/2000/svg"><g '))
+  assert.ok(output.indexOf('<g ') < output.indexOf('<title>$x$</title>'))
+  assert.ok(output.endsWith('</g></g></g></svg>'))
+  assert.match(output, /data-label-content="true"><svg[^>]*>.*<path /)
+  assert.match(output, /translate\(123 87\)/)
+  assert.match(output, /opacity="0.245"/)
+  assert.match(output, /fill="#2456ab"/)
+})
+
+test('production SVG document context retains empty, Unicode, full-source fallback and inline halo labels', async () => {
+  const labelRuntime = runtime()
+  for (const source of ['', '日本語 Ω', '  <svg> & "quoted" $unclosed\t\n tail \\  ', '$x$']) {
+    const captured = capture(source, labelRuntime, {
+      ownerIdentity: 'doc/path/shared', outline: { color: '#ffffff', width: 3 },
+    })
+    const [state] = await settleSvgExportLabels([captured])
+    const output = renderSettledSvgLabelDocument(captured, state)
+    assert.ok(output.startsWith('<svg xmlns="http://www.w3.org/2000/svg"><g '))
+    assert.ok(output.indexOf('<g ') < output.indexOf('<title>'))
+    assert.match(output, /data-label-halo="true" aria-hidden="true"/)
+    assert.match(output, /data-label-content="true"/)
+    if (source.includes('unclosed')) {
+      assert.equal(state.status, 'fallback')
+      assert.equal(literal(state), source)
+      assert.match(output, /&lt;svg&gt; &amp; &quot;quoted&quot;/)
+      assert.doesNotMatch(output, /<path /)
+    }
+  }
+})
 
 test('several pending free/path labels all settle before export and deferred live commits are irrelevant', async () => {
   const base = runtime()

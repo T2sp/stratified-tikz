@@ -10,6 +10,100 @@ import { captureStandaloneSvg, measureStandaloneSvg } from './standaloneSvgCaptu
 const buttonName = 'Export current diagram view as SVG'
 const excluded = '[data-svg-export-exclude="true"], [data-svg-background="true"], .svg-coordinate-anchors, .svg-coordinate-source-highlights, .svg-coordinate-axes-guide, .svg-geometry-handle, .svg-path-draft, .svg-path-intersection-candidates, .svg-selection-cycle-feedback, .svg-work-plane-preview'
 
+/** Supplement the saved/reopened acceptance cases with a focused native-DOM
+ * regression at the precise server-render/parse/extract/replace boundary. */
+async function runSettledSvgBoundaryChecks({ page, record, observe, artifactDir }) {
+  const sources = {
+    math: '$\\frac{boundary}{x}$', repeated: '$\\frac{repeat}{x}$', inline: '経路 $\\frac{inline}{x}$',
+    ordinary: '日本語 Ω café "<>&"',
+    malformed: '  "<svg onload=\'x\'> &" $\\undefinedBoundaryCommand{x}$\t keep \\slash\n tail  ',
+    failed: '  resource $\\gamma$\t <>&\n tail  ', empty: '',
+  }
+  const held = [sources.math, sources.repeated, sources.inline, sources.failed]
+  await observe('settled-export-render-boundary-started', { sources })
+  await page.evaluate(async ({ sources, held }) => {
+    await window.stzLabels.changeService('real')
+    held.forEach((source) => window.stzLabels.hold(source))
+    const inlineNode = (text) => ({ id: 'shared', text,
+      position: { kind: 'segment', segmentIndex: 0, value: 0.5 }, options: { placement: 'above', marker: 'none' } })
+    window.stzLabels.mount({ labels: ['math', 'ordinary', 'malformed', 'failed', 'empty', 'repeated'].map((kind, index) => ({
+      id: `boundary-${kind}`, text: sources[kind], layer: 0,
+      position: { x: (index % 3 - 1) * 2, y: 2 - Math.floor(index / 3) * 1.4, z: 0 },
+      style: { color: '#802080', opacity: 0.7, anchor: 'west', fontSize: 13 },
+    })), curves: [sources.repeated, sources.inline].map((text, index) => ({
+      id: `boundary-path-${index}`, layer: 0, color: '#008080', inlineNodes: [inlineNode(text)],
+      points: [{ x: -2, y: -1 - index, z: 0 }, { x: 2, y: -1 - index, z: 0 }],
+    })) })
+    window.stzLabels.filter(1)
+  }, { sources, held })
+  await page.waitForFunction((held) => held.every((source) => window.stzLabels.state().requests.some((request) => request.source === source && request.held)), held)
+  const before = await page.evaluate(() => window.stzLabels.state())
+  await page.evaluate(async () => {
+    const { runSettledSvgBoundaryRegression } = await import('/stratified-tikz/scripts/fixtures/settledSvgBoundaryFixture.ts')
+    const state = { done: false, result: null, error: null }
+    window.stzBoundaryExport = state
+    // Invocation synchronously captures the committed pending scene. Delivery
+    // is released by the caller only after this evaluation has returned.
+    state.promise = runSettledSvgBoundaryRegression(document.querySelector('svg.svg-diagram')).then((result) => {
+      state.result = result
+    }, (error) => { state.error = { message: error.message, stack: error.stack, boundaryDiagnostic: error.boundaryDiagnostic } }).finally(() => { state.done = true })
+  })
+  for (const source of held) await page.evaluate(({ source, fail }) => window.stzLabels.release(source, fail), { source, fail: source === sources.failed })
+  await page.waitForFunction(() => window.stzBoundaryExport.done)
+  const result = await page.evaluate(() => ({ ...window.stzBoundaryExport, promise: undefined }))
+  const diagnosticPath = resolve(artifactDir, 'settled-export-render-boundary.json')
+  const persist = () => writeFile(diagnosticPath, JSON.stringify(result, null, 2) + '\n')
+  if (result.result) {
+    const bundle = result.result
+    bundle.paths = {}
+    for (const key of ['detached', 'serialized']) {
+      bundle.paths[key] = resolve(artifactDir, `settled-export-render-boundary-${key}.svg`)
+      await writeFile(bundle.paths[key], bundle[key])
+      delete bundle[key]
+    }
+    bundle.paths.selected = []
+    for (const [index, markup] of bundle.selected.entries()) {
+      const path = resolve(artifactDir, `settled-export-render-boundary-selected-${index}.svg`)
+      await writeFile(path, markup)
+      bundle.paths.selected.push(path)
+    }
+    delete bundle.selected
+  }
+  await persist()
+  await observe('settled-export-render-boundary-observed', { diagnosticPath, error: result.error })
+  assert.equal(result.error, null, 'Actual production preparation preserves the selected and serialized subtree')
+  const bundle = result.result
+  assert.equal(bundle.labels.length, 8, 'All free, inline and empty captured owners survive')
+  assert.ok(bundle.captured.filter(({ source }) => held.includes(source)).every(({ status }) => status === 'pending'), 'Successful/failing conversions were pending at capture')
+  assert.ok(bundle.captured.every(({ effectiveOpacity }) => effectiveOpacity > 0 && effectiveOpacity < 0.7), 'Layer filtering supplied captured dimmed opacity')
+  assert.deepEqual(bundle.labels.filter(({ source }) => [sources.malformed, sources.failed].includes(source)).map(({ settled }) => settled), ['fallback', 'fallback'])
+  assert.equal(bundle.labels.find(({ source }) => source === sources.ordinary).settled, 'ready')
+  const empty = bundle.labels.find(({ source }) => source === '')
+  assert.equal(empty.foregroundPaths, 0, 'An empty label remains a valid owning group')
+  assert.equal(empty.textFragments.join(''), '')
+  const inlineOwners = bundle.captured.filter(({ outline }) => outline).map(({ ownerIdentity }) => ownerIdentity)
+  assert.equal(inlineOwners.length, 2)
+  assert.equal(new Set(inlineOwners).size, 2, 'Reused path-local node IDs retain distinct captured owners')
+  assert.equal(bundle.labels.filter(({ source }) => source === sources.repeated).length, 2, 'Repeated formulas retain both captured owners')
+  assert.deepEqual(bundle.oldBoundary, { selectedName: 'title', wholeStringHasPaths: true, selectedHasMath: false, serializedHasMath: false, validatorRejected: true },
+    'The installed React/native XML negative control detects the former first-child defect')
+  assert.ok(Object.values(bundle.invalidStructures).every(Boolean))
+  assert.equal(bundle.livePreservedDuringRendering, true)
+  const after = await page.evaluate(() => window.stzLabels.state())
+  for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(after[key], before[key])
+  await record('settled-export-render-boundary', { diagnosticPath, ...bundle.paths,
+    labels: bundle.labels.map(({ finalMarkup: _markup, ...label }) => label), oldBoundary: bundle.oldBoundary,
+    invalidStructures: bundle.invalidStructures, negativeControls: bundle.negativeControls })
+  await page.evaluate(() => window.stzLabels.mount({ labels: [] }))
+  const zero = await page.evaluate(async () => {
+    const { runSettledSvgBoundaryRegression } = await import('/stratified-tikz/scripts/fixtures/settledSvgBoundaryFixture.ts')
+    return runSettledSvgBoundaryRegression(document.querySelector('svg.svg-diagram'))
+  })
+  assert.equal(zero.labels.length, 0, 'A zero-label scene remains valid through actual preparation')
+  await writeFile(resolve(artifactDir, 'settled-export-render-boundary-zero-labels.svg'), zero.serialized)
+  await record('settled-export-render-boundary-zero-labels', { count: zero.labels.length })
+}
+
 export async function runSettledSvgExportChecks({ browser, origin, record, observe, artifactDir }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = []
@@ -585,6 +679,10 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
       assert.ok(observed, 'Settled serialization succeeded')
       assert.equal(observed.labels, capture.count)
       if (dimmed) {
+        assert.equal(bundle.detachedLabel?.label?.namespace, 'http://www.w3.org/2000/svg', 'Detached replacement is the owning label group before sanitization')
+        assert.equal(bundle.detachedLabel?.label?.source, source)
+        assert.ok(bundle.detachedLabel?.foreground?.paths > 0, 'Detached replacement retains its own foreground before sanitization')
+        assert.equal(bundle.detachedLabel.foreground.effectiveOpacity, capture.opacity)
         assert.equal(observed.expectedMath, true, 'The exact captured label foreground contains successful math, not raw fallback or unrelated paths')
         for (const [control, result] of Object.entries(observed.negativeControls)) {
           assert.equal(result.missingControlTarget, false, `Negative control exercised the captured label: ${control}`)
@@ -625,4 +723,5 @@ export async function runSettledSvgVisibilityChecks({ browser, page, record, obs
   assert.deepEqual(invalidViewport, { failure: null, retrySucceeded: true, livePreserved: true },
     'Malformed detached viewport fails without mutating live SVG and a later valid capture succeeds')
   await record('settled-export-invalid-viewport-retry', invalidViewport)
+  await runSettledSvgBoundaryChecks({ page, record, observe, artifactDir })
 }
