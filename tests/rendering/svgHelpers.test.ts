@@ -55,8 +55,7 @@ import type {
   VisibilityOptions,
 } from '../../src/model/types.ts'
 import { resolveSvgCamera } from '../../src/rendering/svgCamera.ts'
-import { svgPointNodeGeometry } from '../../src/rendering/svgPointNodeGeometry.ts'
-import { getPointNodeTextLayout } from '../../src/rendering/svgPointNodeText.ts'
+import { pendingSvgPointNodeGeometry } from '../../src/rendering/svgPointNodeLayout.ts'
 import { curvedSheetToSvgMesh } from '../../src/rendering/curvedSheetMesh.ts'
 import {
   projectToSvgPoint,
@@ -657,7 +656,7 @@ test('point picking follows text-sized node borders and shrinks when text is cle
       node.style.shape = shape
       diagram.strata = [node]
       const center = projectToSvgPoint(diagram.camera, node.position, 360)
-      const geometry = svgPointNodeGeometry(node.style, getPointNodeTextLayout(node.text))
+      const geometry = pendingSvgPointNodeGeometry(node)
       const localPoint = geometry.kind === 'circle'
         ? { x: geometry.radius - 1, y: 0 }
         : geometry.vertices[0]
@@ -690,7 +689,7 @@ test('point picking excludes space outside polygon edges and between star tips',
     })
     node.style.shape = shape
     diagram.strata = [node]
-    const geometry = svgPointNodeGeometry(node.style, getPointNodeTextLayout(node.text))
+    const geometry = pendingSvgPointNodeGeometry(node)
     const center = projectToSvgPoint(diagram.camera, node.position, 360)
     // Each direction crosses a side/inner star vertex, not an outer vertex.
     const angle = shape === 'square' ? 0 : shape === 'triangle' ? Math.PI / 2 : -Math.PI / 2 + Math.PI / 5

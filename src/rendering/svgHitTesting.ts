@@ -38,8 +38,7 @@ import {
 import { currentSvgLabelBounds, type SvgFreeLabelBoundsSnapshot } from './svgLabelBounds.ts'
 import { literalSvgLabelLayout, normalizeSvgLabelFontSize, placeSvgLabel, svgLabelLayoutSettings } from './labels/svgLabelLayout.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
-import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
-import { getPointNodeTextLayout, svgPointNodeTexPointScale } from './svgPointNodeText.ts'
+import { currentSvgPointNodeGeometry, pendingSvgPointNodeGeometry, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -91,6 +90,9 @@ export type CollectSvgPreviewSelectionCandidatesOptions = {
   layerFilter?: LayerFilter
   visibility?: SvgSelectionCandidateVisibility
   /** Local bounds from the currently committed label renderer revision. */
+  pointCommits?: SvgPointNodeCommits
+  pointDocumentRevision?: number | string
+  pointFontGeneration?: number
   labelBounds?: SvgFreeLabelBoundsSnapshot
   showCoordinateAnchors?: boolean
   pathIntersectionCandidates?: readonly PathIntersectionCandidate[]
@@ -225,6 +227,7 @@ export function collectSvgPreviewSelectionCandidates(
     layerFilter = allLayersFilter,
     visibility,
     labelBounds,
+    pointCommits, pointDocumentRevision = 0, pointFontGeneration = 0,
     showCoordinateAnchors = true,
     pathIntersectionCandidates,
     tolerance = defaultHitTolerance,
@@ -281,6 +284,7 @@ export function collectSvgPreviewSelectionCandidates(
       point,
       layerFilter,
       visibility,
+      pointCommits, pointDocumentRevision, pointFontGeneration,
     )
   }
 
@@ -754,6 +758,9 @@ function collectPointStratumCandidates(
   point: Vec2,
   layerFilter: LayerFilter,
   visibility: SvgSelectionCandidateVisibility | undefined,
+  pointCommits: SvgPointNodeCommits | undefined,
+  documentRevision: number | string,
+  fontGeneration: number,
 ): void {
   for (const stratum of diagram.strata) {
     if (!canCollectMoreCandidates(budget)) {
@@ -788,6 +795,7 @@ function collectPointStratumCandidates(
         camera,
         viewportHeight,
         point,
+        pointCommits, documentRevision, fontGeneration,
       ) === false
     ) {
       break
@@ -1138,6 +1146,9 @@ function collectPointCandidate(
   camera: Diagram['camera'],
   viewportHeight: number,
   point: Vec2,
+  pointCommits: SvgPointNodeCommits | undefined,
+  documentRevision: number | string,
+  fontGeneration: number,
 ): boolean {
   const center = projectModelPointWithBudget(
     budget,
@@ -1155,11 +1166,9 @@ function collectPointCandidate(
   }
 
   const distance = distanceVec2(center, point)
-  const geometry = svgPointNodeGeometry(
-    pointStratum.style,
-    getPointNodeTextLayout(pointStratum.text),
-    svgPointNodeTexPointScale,
-  )
+  const geometry = pointCommits === undefined ? pendingSvgPointNodeGeometry(pointStratum)
+    : currentSvgPointNodeGeometry(pointStratum, pointCommits, documentRevision, fontGeneration)
+  if (geometry === null) return true
   const localPoint = { x: point.x - center.x, y: point.y - center.y }
   const boundaryDistance = geometry.kind === 'circle'
     ? Math.max(distance - geometry.radius, 0)

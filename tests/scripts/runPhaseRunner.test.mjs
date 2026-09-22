@@ -474,3 +474,28 @@ test('a review cannot redefine the identity gate or rewrite the verified report 
   assert.equal(git('rev-list', '--count', 'HEAD'), '1')
   assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
 })
+
+for (const phase of ['32A', '32B', '32C', '32D']) {
+  test(`${phase} runner rejects old Phase 31F evidence before review or commit`, (t) => {
+    const { cwd, git, run, initialHead } = fixture(t, phase)
+    const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /15 required groups/)
+    assert.equal(git('rev-parse', 'HEAD'), initialHead)
+    assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+    assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
+  })
+}
+test('32A running parent refreshes point browser policy after its implementation child', (t) => {
+  const current = readFileSync(join(automationDir, 'phase-verification.mjs'), 'utf8')
+  const obsolete = current.replace('if (["31C", "31D", "31E", "31F", ...Object.keys(phase32Groups)].includes(normalized))',
+    'if (["31C", "31D", "31E", "31F"].includes(normalized))')
+  assert.notEqual(obsolete, current)
+  const { cwd, git, run, initialHead } = fixture(t, '32A', { initialFiles: { [verifierFile]: obsolete } })
+  const result = run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /15 required groups/)
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+})

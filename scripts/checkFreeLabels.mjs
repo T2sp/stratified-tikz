@@ -16,6 +16,8 @@ import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
+import { runPointNodeChecks } from './checkPointNodes.mjs'
+import { pointNodeScenarios } from './automation/phase-verification.mjs'
 import { runCombinedLabelChecks } from './checkCombinedLabels.mjs'
 import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
@@ -38,6 +40,7 @@ const scenarios = [
   'inline-node-rendering-placement-halo-picking', 'inline-node-lifecycle-path-operations-export',
   'settled-SVG-export-standalone',
   'combined-free-inline-workflows',
+  ...Object.keys(pointNodeScenarios),
 ]
 const completed = []
 const started = []
@@ -71,6 +74,11 @@ async function startGroup(group, name = group) {
 }
 async function completeGroup(group) {
   assert.ok(started.includes(group) && !completed.includes(group), `Started, incomplete group: ${group}`)
+  if (pointNodeScenarios[group]) {
+    for (const name of pointNodeScenarios[group]) {
+      assert.ok(evidence.some((entry) => entry.name === name && entry.group === group && entry.result === 'passed'), `Completed scenario: ${name}`)
+    }
+  }
   completed.push(group)
   await save('running')
 }
@@ -465,6 +473,7 @@ try {
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'real-App-workflows'
   await startGroup('real-App-input-JSON-history-reused-ID-load')
+  await runPointNodeChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup })
   await runAppChecks({ browser, origin, record, artifactDir })
   await completeGroup('real-App-input-JSON-history-reused-ID-load')
   stage = 'settled-SVG-export-standalone'

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import App from '../../src/App.tsx'
 import type { AppLabelBrowserSnapshot } from '../../src/App.tsx'
 import '../../src/index.css'
-import { createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
+import { createPointStratum, createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
 import { defaultCurveStyle, defaultLabelStyle } from '../../src/model/styles.ts'
 import type { LabelStyle, Vec3 } from '../../src/model/types.ts'
 import { serializeDiagram } from '../../src/model/serialization.ts'
@@ -117,6 +117,13 @@ const api = {
     diagram.labels = [{ id: 'app-label', name: 'App acceptance label', geometricKind: 'label', layer: 0,
       text: source, position: options.position ?? { x: 0, y: 0, z: 0 },
       style: { ...defaultLabelStyle, fontSize: 18, ...options.style } }]
+    return serializeDiagram(diagram)
+  },
+  pointDocumentJson(ambientDimension: 2 | 3 = 2, text?: string) {
+    const diagram = createEmptyDiagram({ ambientDimension })
+    if (text !== undefined) diagram.strata = [createPointStratum({ ambientDimension, id: 'app-point', text,
+      position: { x: 0, y: 0, z: 0 }, style: { kind: 'pointStyle', shape: 'circle', size: 3,
+        color: '#3870a0', opacity: .65, fill: 'hollow' } })]
     return serializeDiagram(diagram)
   },
   exportDocumentJson(ambientDimension: 2 | 3 = 2) {

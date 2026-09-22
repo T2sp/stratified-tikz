@@ -5,6 +5,7 @@ import type { ValidatedSvgElement } from '../rendering/labels/labelSvg.ts'
 import { literalSvgLabelLayout } from '../rendering/labels/svgLabelLayout.ts'
 import { svgLabelRequestIdentity, type SvgLabelState } from '../rendering/labels/svgLabelRuntime.ts'
 import { getSvgLabelExportCapture, type SvgLabelExportCapture } from '../rendering/svgLabelExportRegistry.ts'
+import { SvgPointNodeView } from '../rendering/svgPointNodeView.ts'
 import { SvgTexLabelView } from '../rendering/svgLabelView.ts'
 import {
   createSvgPreviewExportText,
@@ -57,7 +58,7 @@ export function captureSvgExportSnapshot(svg: SVGSVGElement, options: SvgPreview
       labels.push({ target: clone, capture })
       return
     }
-    if (live.hasAttribute('data-label-request')) {
+    if (live.hasAttribute('data-label-request') || live.hasAttribute('data-point-request')) {
       throw new Error('The committed label revision is unavailable.')
     }
     const children = Array.from(clone.children)
@@ -149,7 +150,7 @@ export async function settleSvgExportLabels(
  * too late, because the HTML server renderer hoists title out of its label. */
 export function renderSettledSvgLabelDocument(capture: SvgLabelExportCapture, state: SvgLabelState): string {
   return renderToStaticMarkup(createElement('svg', { xmlns: svgNamespace },
-    createElement(SvgTexLabelView, { capture, state })))
+    createElement(capture.pointStyle ? SvgPointNodeView : SvgTexLabelView, { capture, state })))
 }
 
 function hasSettledGeometryStructure(element: Element, geometry: ValidatedSvgElement): boolean {
@@ -169,6 +170,24 @@ export function extractSettledSvgLabel(
     element?.namespaceURI === svgNamespace && element.localName === name
   const root = document.documentElement
   if (!isSvg(root, 'svg') || document.querySelector('parsererror') || root.childNodes.length !== 1) invalid()
+  if (capture.pointStyle) {
+    const point = root.firstElementChild
+    if (!isSvg(point, 'g') || point.getAttribute('data-point-request') !== state.requestIdentity
+      || point.children.length !== 2 || point.childNodes.length !== 2) throw new Error('Invalid settled point SVG.')
+    // Compare the complete pure reconstruction, including contour, placement and
+    // paint, then apply the existing strict body validator in SVG context.
+    const expected = new DOMParser().parseFromString(renderSettledSvgLabelDocument(capture, state), 'image/svg+xml')
+    if (!point.isEqualNode(expected.documentElement.firstElementChild)) throw new Error('Invalid settled point SVG.')
+    const body = point.lastElementChild!
+    root.replaceChildren(body)
+    try {
+      extractSettledSvgLabel(document, { ...capture, pointStyle: undefined, position: { x: 0, y: 0 } }, state)
+    } finally {
+      point.appendChild(body)
+      root.replaceChildren(point)
+    }
+    return point
+  }
   const label = root.firstElementChild
   if (!isSvg(label, 'g') || label.childNodes.length !== label.children.length) throw new Error('Invalid settled label SVG.')
   if (Array.from(root.querySelectorAll('*')).some((element) => element.namespaceURI !== svgNamespace)) invalid()

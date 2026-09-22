@@ -1,7 +1,7 @@
 # Phase 31B label conversion service
 
 The adapter is implemented in `src/rendering/labels/` and shared by production
-free-label and path inline-node Preview rendering, measured picking and settled
+free-label, path inline-node, and point-body Preview rendering, measured picking and settled
 SVG export. Its service remains independent of diagram state and React.
 Phase 31A's [input contract](./PREVIEW_UI.md#label-preview-input-contract-phase-31a)
 remains authoritative. Phase 31B is **acceptance-complete**. The targeted
@@ -14,9 +14,8 @@ the later A–E integration and Phase 31F status are recorded in the
 accepted `check:label-assets` and executed all twelve free-label browser groups
 successfully. Its retained pre-implementation verifier rejected that complete
 report using the old eleven-group contract; this was an automation failure
-before review, not an adapter or browser startup failure. Fresh accepted
-verification through the corrected runner and independent 31F review remain
-required.
+before review, not an adapter or browser startup failure. The subsequent `im78Xe` parent accepted fresh verification and independent
+31F review passed; the completion audit records the inspected report and artifacts.
 
 ## Dependencies and local assets
 
@@ -721,3 +720,21 @@ persistence, TikZ, history or production label rendering. `labelMetrics.ts`, `la
 Canvas/React/picking integration and export waiting were deferred at that
 historical handoff; the accepted 31C–31E integration is now described in
 [Preview UI](./PREVIEW_UI.md#label-preview-input-contract-phase-31a).
+
+
+## Phase 32A point integration
+
+Point bodies reuse `useSvgLabelState`, the same runtime/service/cache, and the
+validated `SvgTexLabelView` body. No second MathJax engine is instantiated.
+Point font measurement uses the established 12-unit Times serif preview font;
+MathJax retains its measured advance/ink/depth. A committed layout sizes the
+entire node and is shared with picking and selection. Font readiness invalidates
+the layout identity without storing runtime data in the diagram.
+
+Export capture now optionally owns a whole point (frozen explicit legacy style,
+position and body inputs). Settlement reconstructs both shape and body from one
+layout, preserving the captured parent opacity. Empty point bodies retain their
+legacy contour size. Runtime failures, parser failures, and export deadlines
+retain complete literal source. Point browser acceptance is pending in this
+child environment; see `PHASE_32A_IMPLEMENTATION.md`. Paint expansion, new shape
+algorithms and layout/anchor controls remain 32B–32D work.

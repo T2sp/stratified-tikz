@@ -1722,7 +1722,9 @@ editing remains available. See [SVG export](./PREVIEW_UI.md) for behavior.
 
 ### Phase 31F: Combined regression coverage, documentation, and completion audit
 
-Status: implemented; final completion gates remain open. Initial implementation
+Status: acceptance-complete in the later `im78Xe` parent run and independent
+passing review on 2026-09-21; see the updated completion audit. The following
+paragraphs preserve the earlier failed runs and correction history. Initial implementation
 checks passed 2,434 Node tests, production build, focused static checks and diff
 check. The child's browser attempts stopped before launch at localhost `EPERM`.
 The subsequent `HHcakE` parent ran both browser commands successfully: its
@@ -1766,8 +1768,9 @@ report/log paths, inspected artifacts and remaining gates.
 
 ## Phase 32: Point-node math, paint, geometric shapes, and layout
 
-Status: planned; implementation has not started. Close the recorded Phase 31F
-verification/review gates before starting this sequence. The detailed scope,
+Status: 32A implementation and acceptance harness added; fresh parent browser
+verification and independent review remain open. The 31F prerequisite was
+confirmed from accepted evidence before implementation. 32B–32D remain planned. The detailed scope,
 compatibility rules, reference fixtures, and acceptance criteria are in the
 [Phase 32 implementation plan](./PHASE_32_PLAN.md).
 
@@ -1782,5 +1785,7 @@ Shape construction in 32C must already use each shape's body-fitting rules.
 32D completes configurable layout and anchor fidelity; it is not a generic
 bounding-box scaling pass. Preserve legacy square/triangle regular polygons,
 white hollow fill, and the existing `size / 2` inner-separation convention.
-Phase 32 adds planned work only; it does not change Phase 31 completion status
-or register executable automation phases yet.
+Phase 32A adds no schema or TikZ changes; it does not implement later stages.
+See [32A verification and handoff](PHASE_32A_IMPLEMENTATION.md) for executed checks
+and the pending browser/review gates. The four slugs are registered, with
+cumulative browser requirements for the implemented 32A groups.

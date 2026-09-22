@@ -34,10 +34,37 @@ const inlineCompleteGroups = [...freeLabelGroups, ...inlineLabelGroups];
 const allLabelGroups = [...inlineCompleteGroups, ...settledExportGroups];
 const combinedLabelGroups = [...allLabelGroups, "combined-free-inline-workflows"];
 
+// Cumulative: later groups become mandatory when their implementation lands.
+export const pointNodeScenarios = {
+  "point-node-body-layout-lifecycle": [
+    "point-language-shapes-2d-3d", "point-valid-invalid-valid-exact-source",
+    "point-A-B-C-delete-duplicate-history-load", "point-resource-retry-font-readiness",
+    "point-native-direct-cursor-workplanes-inspector-persistence",
+  ],
+  "point-node-picking-visibility": [
+    "point-contour-boundaries-cycling", "point-camera-pan-zoom-drag",
+    "point-hidden-filtered-locked-dimmed-siblings",
+  ],
+  "point-node-settled-export": [
+    "point-native-pending-transparent-edit", "point-native-pending-white-load",
+    "point-whole-node-fallback-opacity-validation",
+  ],
+};
+export function pointNodeScenarioArtifacts(name) {
+  return [`${name}.json`, ...(name.startsWith("point-native-pending-")
+    ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`]
+    : name === "point-whole-node-fallback-opacity-validation" ? ["point-fallback.svg"]
+      : name === "point-native-direct-cursor-workplanes-inspector-persistence"
+        ? ["point-native-2d.json", "point-native-3d.json"] : [])];
+}
+const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
+const phase32Groups = { "32A": pointNodeGroups, "32B": pointNodeGroups,
+  "32C": pointNodeGroups, "32D": pointNodeGroups };
+
 export function browserChecksForPhase(phase) {
   const normalized = String(phase).toUpperCase();
   if (normalized === "31B") return ["check:label-assets"];
-  if (["31C", "31D", "31E", "31F"].includes(normalized)) {
+  if (["31C", "31D", "31E", "31F", ...Object.keys(phase32Groups)].includes(normalized)) {
     return ["check:label-assets", "check:free-labels"];
   }
   return [];
@@ -122,7 +149,7 @@ function evidenceObject(artifactDir, name) {
   return evidence;
 }
 
-function validateBrowserEvidence(name, artifactDir, phase) {
+function validateBrowserEvidence(name, artifactDir, phase, checkout) {
   if (name === "check:label-assets") {
     const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
     if (typeof evidence.browser !== "string" || evidence.browser.trim() === ""
@@ -143,15 +170,15 @@ function validateBrowserEvidence(name, artifactDir, phase) {
   // Earlier phases accept their complete historical report or a complete later
   // extension. 31E includes standalone exports; 31F also requires the combined
   // free/path workflow so an older passing report cannot close its audit.
-  const requiredGroups = phase === "31C" ? freeLabelGroups
+  const requiredGroups = phase32Groups[phase] ?? (phase === "31C" ? freeLabelGroups
     : phase === "31D" ? inlineCompleteGroups
-      : phase === "31F" ? combinedLabelGroups : allLabelGroups;
+      : phase === "31F" ? combinedLabelGroups : allLabelGroups);
   const completed = evidence.completed;
   if (!Array.isArray(completed)
     || new Set(completed).size !== completed.length
-    || completed.some((group) => !combinedLabelGroups.includes(group))
+    || completed.some((group) => !pointNodeGroups.includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeGroups].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
@@ -160,6 +187,45 @@ function validateBrowserEvidence(name, artifactDir, phase) {
       throw new Error(`Free-label browser evidence ${key} must be an empty array`);
     }
   }
+  if (phase32Groups[phase]) {
+    if (evidence.checkout?.revision !== checkout.revision
+      || evidence.checkout?.trackedDiffSha256 !== checkout.trackedDiffSha256
+      || JSON.stringify(Object.entries(evidence.checkout?.untrackedSha256 ?? {}).sort()) !==
+        JSON.stringify(Object.entries(checkout.untrackedSha256).sort())) {
+      throw new Error("Point-node browser evidence checkout mismatch");
+    }
+    for (const [group, names] of Object.entries(pointNodeScenarios)) {
+      for (const name of names) {
+        const records = evidence.evidence?.filter((entry) => entry.name === name) ?? [];
+        if (records.length !== 1 || records[0].group !== group || records[0].result !== "passed"
+          || !Array.isArray(records[0].artifacts) || records[0].artifacts.length === 0
+          || !pointNodeScenarioArtifacts(name).every((file) => records[0].artifacts.includes(file))) {
+          throw new Error(`Missing completed point-node scenario: ${name}`);
+        }
+        for (const artifact of records[0].artifacts) {
+          if (typeof artifact !== "string" || !artifact || artifact.includes("..")
+            || resolve(artifactDir, artifact) !== join(artifactDir, artifact)
+            || !existsSync(join(artifactDir, artifact)) || lstatSync(join(artifactDir, artifact)).size === 0) {
+            throw new Error(`Missing point-node artifact: ${artifact}`);
+          }
+          const bytes = readFileSync(join(artifactDir, artifact));
+          if (artifact.endsWith(".json")) {
+            const value = JSON.parse(bytes.toString());
+            if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
+          } else if (artifact.endsWith(".svg")) {
+            const svg = bytes.toString();
+            if (!svg.includes('<svg') || !svg.includes('data-point-node=') || !svg.includes('data-point-contour=')) {
+              throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
+            }
+          } else if (artifact.endsWith(".png") && (bytes.length < 24
+            || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))) {
+            throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
+          }
+        }
+      }
+    }
+  }
+
 }
 
 function saveReport(report) {
@@ -215,7 +281,7 @@ function runCheck(report, { name, command, args, cwd, env, browser = false }) {
     }
     if (browser) {
       try {
-        validateBrowserEvidence(name, check.artifactDir, report.phase);
+        validateBrowserEvidence(name, check.artifactDir, report.phase, report.checkout);
       } catch (error) {
         throw commandError(`${name} evidence is incomplete or invalid: ${error.message}`);
       }

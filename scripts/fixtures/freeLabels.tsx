@@ -5,9 +5,9 @@ import { flushSync } from 'react-dom'
 import { SvgDiagram } from '../../src/rendering/SvgDiagram.tsx'
 import type { SvgDiagramProps } from '../../src/rendering/SvgDiagram.tsx'
 import type { SvgTexLabelSnapshot } from '../../src/rendering/SvgTexLabel.tsx'
-import type { CurveStratum, Diagram, LabelAnchor, LabelStyle, PathInlineNode, TextLabel, Vec3 } from '../../src/model/types.ts'
-import { createCurveStratum, createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
-import { defaultLabelStyle, defaultSheetStyle } from '../../src/model/styles.ts'
+import type { PointStratum, PointStyle, CurveStratum, Diagram, LabelAnchor, LabelStyle, PathInlineNode, TextLabel, Vec3 } from '../../src/model/types.ts'
+import { createPointStratum, createCurveStratum, createEmptyDiagram, createSheetStratum } from '../../src/model/constructors.ts'
+import { defaultPointStyle, defaultLabelStyle, defaultSheetStyle } from '../../src/model/styles.ts'
 import { defaultVisibilityOptions, resolveVisibilityOptions } from '../../src/model/visibility.ts'
 import { parseSavedDiagramJson, serializeDiagram } from '../../src/model/serialization.ts'
 import { pathInlineNodePoint } from '../../src/model/pathInlineNodes.ts'
@@ -36,6 +36,7 @@ type LabelInput = { id: string; text: string; position?: Vec3; layer?: number; s
 type CurveInput = { id: string; inlineNodes: PathInlineNode[]; points?: Vec3[]; layer?: number; color?: `#${string}`; kind?: 'polyline' | 'cubicBezier'; pathLabel?: string }
 type FixtureOptions = {
   labels: LabelInput[]
+  points?: { id: string; text: string; position?: Vec3; layer?: number; style?: Partial<PointStyle> }[]
   curves?: CurveInput[]
   paths?: CurveStratum[]
   ambientDimension?: 2 | 3
@@ -184,7 +185,10 @@ function mount(options: FixtureOptions) {
     position: position ?? { x: ((index % 3) - 1) * 2.8, y: (1 - Math.floor(index / 3)) * 1.6, z: 0 },
     style: { ...defaultLabelStyle, fontSize: 18, ...style },
   }))
-  diagram.strata = [...(options.paths ?? []), ...(options.curves ?? []).map((curve, index) => {
+  diagram.strata = [...(options.points ?? []).map((point) => createPointStratum({
+    ambientDimension: diagram.ambientDimension, ...point, position: point.position ?? { x: 0, y: 0, z: 0 },
+    style: { ...defaultPointStyle, fill: 'hollow', ...point.style },
+  })), ...(options.paths ?? []), ...(options.curves ?? []).map((curve, index) => {
     const result = createCurveStratum({ ambientDimension: diagram.ambientDimension, id: curve.id, name: curve.id,
       kind: curve.kind, inlineNodes: curve.inlineNodes, pathLabel: curve.pathLabel, layer: curve.layer ?? index,
       points: curve.points ?? [{ x: -1.5, y: 1.5 - index, z: 0 }, { x: 1.5, y: 1.5 - index, z: 0 }] })
@@ -193,7 +197,7 @@ function mount(options: FixtureOptions) {
   if (options.layers) diagram.layers = options.layers
   if (options.occlusion) {
     diagram.camera = { mode: '3d', kind: 'orthographic', thetaDeg: 90, phiDeg: 0, zoom: 100, pan: { x: 450, y: 350 } }
-    diagram.strata = [createSheetStratum({ ambientDimension: 3, id: 'sheet', name: 'Occluding sheet', style: defaultSheetStyle,
+    diagram.strata = [...diagram.strata, createSheetStratum({ ambientDimension: 3, id: 'sheet', name: 'Occluding sheet', style: defaultSheetStyle,
       corners: [{ x: -2, y: 0, z: -2 }, { x: 2, y: 0, z: -2 }, { x: 2, y: 0, z: 2 }, { x: -2, y: 0, z: 2 }], layer: 0 })]
     props.visibilityOptions = { ...defaultVisibilityOptions, enabled: true, labelVisibility: options.occlusion }
   }
@@ -233,6 +237,7 @@ function state() {
     layouts: Object.fromEntries(layouts),
     requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
     labels: diagram.labels,
+    points: diagram.strata.filter((stratum) => stratum.geometricKind === 'point'),
     curves: diagram.strata.filter((stratum) => stratum.geometricKind === 'curve'),
     nodePositions: Object.fromEntries(diagram.strata.flatMap((curve) => curve.geometricKind !== 'curve' ? []
       : (curve.inlineNodes ?? []).flatMap((node) => {
@@ -302,6 +307,13 @@ function observeInlineSelectionClicks() {
 
 const api = {
   mount, mutateLabel, mutateInlineNode, state, observeInlineSelectionClicks,
+  mutatePoint(id: string, change: Partial<PointStratum>) {
+    const diagram = { ...editor.editableDiagram, strata: editor.editableDiagram.strata.map((point) =>
+      point.id === id && point.geometricKind === 'point'
+        ? { ...point, ...change, style: { ...point.style, ...change.style } } : point) }
+    editor = commitDiagramChange(editor, { ...editor, editableDiagram: diagram })
+    redraw()
+  },
   reverseCurve(id: string) { mutateCurve(id, (curve) => reverseCurvePathDirection(curve) ?? curve) },
   duplicateCurve(id: string) {
     editor = applyBulkDuplicateToEditorState({ ...editor, selectedElement: { kind: 'stratum', id }, layerOperationStatus: '' })

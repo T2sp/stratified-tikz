@@ -1159,9 +1159,9 @@ restore the action without downloading invalid SVG. See
 [Phase 31 completion audit](./PHASE_31_COMPLETION_AUDIT.md) for verification.
 The `HHcakE` parent executed all twelve 31F browser groups and actual standalone
 exports successfully, but a stale eleven-group verifier rejected its evidence
-before independent review. Phase 31 remains incomplete until a fresh invocation
-of the corrected runner accepts evidence for the final checkout and independent
-review succeeds. Browser command exit zero alone does not close that gate.
+before independent review. The subsequent fresh `im78Xe` parent report was
+accepted and independent review passed for the matching checkout, closing Phase
+31. Browser command exit zero alone does not close a later stage's gate.
 
 ## Label placement
 
@@ -1310,3 +1310,45 @@ or:
 ```text
 Segment style: densely dotted
 ```
+
+
+## Phase 32A point-node body contract
+
+Add point creates `geometricKind: "point"`, codim 2 in ambient dimension 2 and
+codim 3 in ambient dimension 3. The optional raw `text` field now uses the Phase
+31 bounded Unicode/math grammar through the existing service and worker. There
+is no schema/version change, migration, dependency addition or TikZ modification.
+Point bodies do not automatically gain math delimiters. Standalone/inline TikZ
+continues to emit the exact stored node text with existing point style options.
+Arbitrary packages, preambles, external-style macros and PGF execution remain
+unsupported by Preview; unsupported source receives whole-source literal fallback.
+
+`useSvgLabelState` owns the effect-only subscription shared with `SvgTexLabel`.
+`SvgPointNode` commits one source/font/document/owner revision. The pure
+`svgPointNodeLayout` separates body placement/baselines, contour geometry,
+painted bounds, and anchor-clearance bounds (the latter currently coincide with
+painted bounds; no new anchor controls). `SvgPointNodeView` renders both contour
+and body from it. Committed point geometry is runtime-only and drives picking;
+source, shape/size, font generation or document mismatches cannot supply bounds.
+A mounted pending point publishes the same finite full-source literal layout
+used in its view. Nonmounted helper callers use the shared bounded literal policy.
+
+Legacy circle, square/triangle regular polygons and star fitting is retained,
+using the measured full body. Empty input retains zero content dimensions;
+whitespace is preserved and measured rather than collapsed. Legacy paint and
+`size / 2` inner separation are unchanged. Source-independent camera, position
+and paint updates do not start new compilation.
+
+The SVG capture registry stores a frozen `pointStyle` with the existing immutable
+body capture. Its registration is on the complete point; traversal stops there,
+so its nested body is not captured twice. The detached export settles through the
+existing deadline and full-source fallback, reconstructs the whole point using
+the shared view, validates both contour and body, and retains cloned parent
+visibility/opacity. Overlay exclusion and duplicate-click policy are unchanged.
+
+32A acceptance remains gated on fresh parent browser evidence and independent
+review. Native assertions are registered for the three point groups in addition
+to all twelve Phase 31F groups; missing scenario records/artifacts, terminal
+failure, page errors, and checkout mismatches stop the runner before review.
+The fresh-process verifier loading contract remains in force. 32B–32D slugs
+inherit completed groups; their future groups must be activated in those stages.

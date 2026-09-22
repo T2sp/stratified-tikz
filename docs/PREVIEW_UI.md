@@ -58,9 +58,31 @@ plus a text input for custom values. Numeric drafts are lenient while typing:
 temporary text such as `.`, `-`, or `1e` stays in the input and shows a warning
 without mutating the saved diagram. A valid draft such as `.5` commits normally.
 
+## Add point math bodies (Phase 32A)
+
+The Node-verified implementation uses the same bounded text/math language below
+for a point's **Node text** field. Create the point through direct or cursor
+input, then edit that field in the Inspector. Its body, circle/regular polygon/
+star contour, selection highlight, and picking use one current measured layout.
+Pending and failed conversion show the whole latest source literally, preserving
+edge/repeated spaces, tabs and physical lines. Empty source retains the old empty
+node size. Text remains black, hollow remains white-filled, `size / 2` remains
+inner separation, and the border remains 0.4pt. Independent paint controls and
+new geometric shapes are deferred to 32B/32C.
+
+SVG export captures the complete point and rebuilds both its body and contour
+after settlement; editing or loading another diagram during export affects the
+next export. Raw JSON, history and standalone/inline TikZ remain authoritative
+and unchanged by conversion. No formula cache or measurements are saved.
+Native Add point, picking, font-ready, and downloaded standalone coverage is
+implemented in `checkPointNodes.mjs` / `checkPointNodesApp.mjs`; execution in the
+32A child stopped at localhost `EPERM`. Support is not yet browser-accepted:
+fresh parent verification of all 15 groups and independent review remain required.
+See [32A verification and handoff](PHASE_32A_IMPLEMENTATION.md).
+
 ## Label Preview Input Contract (Phase 31A)
 
-Free labels and path inline-node text use the same parser, MathJax conversion,
+Free labels, path inline-node text, and Add point bodies use the same parser, MathJax conversion,
 SVG renderer and measured layout. The Inspector always edits the original
 source. Enter ordinary text or explicitly delimit each formula:
 
@@ -95,11 +117,11 @@ code. See the adapter's
 [current evidence and commands](./LABEL_ADAPTER.md#verification-and-current-status).
 Settled-label SVG export passed its Phase 31E standalone browser gate and
 independent review; see [Export SVG](#export-svg). Fresh verification of the
-combined Phase 31F changes remains pending. Historical evidence below records
+combined Phase 31F changes passed in the later `im78Xe` parent run and independent review (see the completion audit). Historical evidence below records
 the earlier subphases and does not count as a new run of this checkout.
 
 The contract applies only to user-authored visible free-label `TextLabel.text`
-and path inline-node `text`. Coordinate names, axes, handles, toolbar text,
+and path inline-node `text`, plus point-stratum `text` in Phase 32A. Coordinate names, axes, handles, toolbar text,
 saved-path `pathLabel` identifiers, and previously undisplayed stratum label
 metadata are outside its scope.
 
@@ -938,8 +960,8 @@ changed. The authorized parent run also passed the independent Phase 31B
 The historical free-label verification above predates inline-node integration;
 see the completed Phase 31D verification above and Phase 31E export verification
 below. The combined Phase 31F browser execution passed in `HHcakE`; its parent
-validation failed on a stale verifier. The corrected-runner verification and
-independent review gates remain open; see the
+validation failed on a stale verifier. The later `im78Xe` corrected-runner
+verification and independent review closed those gates; see the
 [combined audit](./PHASE_31_COMPLETION_AUDIT.md).
 
 ## Export SVG
@@ -1033,8 +1055,9 @@ changed its policy; that stale eleven-group validator rejected the valid new
 group despite command exit zero. The checkout fingerprint stayed
 `9109342812ad20fc3f5db0c01787af3b3fd03d349fe09e65bf1a3aa66f854e56`.
 This is separate from earlier child-only localhost `EPERM` attempts.
-Independent 31F review was not reached. Fresh accepted verification through the
-corrected runner remains required; the failed report is retained unchanged.
+Independent 31F review was not reached in that failed run; its report is retained
+unchanged. The later accepted `im78Xe` verification and independent review closed
+31F, as recorded at the start of the updated audit.
 The [combined audit](./PHASE_31_COMPLETION_AUDIT.md) maps these observations to
 actual SVGs, standalone screenshots, raster images and logs.
 
@@ -1479,8 +1502,8 @@ verification can use
 it does not run review or establish approval. The fix → complete parent
 verification → independent review order and commit/push gates remain unchanged.
 That was the earlier handoff status. The complete `fIMqou` parent evidence and
-passing independent review above close Phase 31E; Phase 31F still requires
-fresh matching verification of its combined coverage and documentation.
+passing independent review above close Phase 31E; the subsequent `im78Xe`
+verification and review also closed Phase 31F. Phase 32A requires its own evidence.
 
 ## Add Path
 

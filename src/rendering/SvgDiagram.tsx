@@ -81,13 +81,8 @@ import {
   type SvgPathCrossingOverlayPrimitive,
 } from './svgPathCrossings.ts'
 import { projectToSvgPoint } from './svgProjection'
-import { svgPointNodeGeometry } from './svgPointNodeGeometry.ts'
-import {
-  getPointNodeTextLayout,
-  svgPointNodeTextFontFamily,
-  svgPointNodeTextFontSize,
-  svgPointNodeTexPointScale,
-} from './svgPointNodeText.ts'
+import { SvgPointNode } from './SvgPointNode.tsx'
+import { svgPointNodeOwner, type SvgPointNodeCommit } from './svgPointNodeLayout.ts'
 import {
   curveStyleToSvgStrokeAttributes,
   filledSurfaceStyleToSvgAttributes,
@@ -352,6 +347,10 @@ export function SvgDiagram({
     void labelDocumentRevision
     return new Map<string, SvgFreeLabelBounds>()
   }, [labelDocumentRevision])
+  const pointCommits = useMemo(() => {
+    void labelDocumentRevision
+    return new Map<string, SvgPointNodeCommit>()
+  }, [labelDocumentRevision])
   useEffect(() => () => {
     if (suppliedLabelRuntime === undefined) labelRuntime.dispose()
   }, [labelRuntime, suppliedLabelRuntime])
@@ -538,7 +537,7 @@ export function SvgDiagram({
             onCurveStratumClick,
             onPointStratumClick,
             onCanvasClick,
-            { runtime: labelRuntime, documentRevision: labelDocumentRevision, onLayout: onLabelLayoutChange },
+            { runtime: labelRuntime, documentRevision: labelDocumentRevision, onLayout: onLabelLayoutChange, pointCommits },
           ),
           stratum.geometricKind,
         ),
@@ -709,6 +708,9 @@ export function SvgDiagram({
           layerFilter,
           visibility: selectionCandidateVisibility,
           labelBounds,
+          pointCommits,
+          pointDocumentRevision: labelDocumentRevision,
+          pointFontGeneration: labelRuntime.getFontGeneration(),
           showCoordinateAnchors,
           pathIntersectionCandidates,
         })
@@ -1752,6 +1754,7 @@ type SvgDiagramLabelRendering = Readonly<{
   runtime: SvgLabelRuntime
   documentRevision: number | string
   onLayout: SvgDiagramProps['onLabelLayoutChange']
+  pointCommits: Map<string, SvgPointNodeCommit>
 }>
 
 function renderStratum(
@@ -1824,6 +1827,7 @@ function renderStratum(
         visibilityOptions,
         onSelectionChange,
         onPointStratumClick,
+        labelRendering,
       )
   }
 }
@@ -2461,6 +2465,7 @@ function renderPoint(
   visibilityOptions: VisibilityOptions,
   onSelectionChange: SvgDiagramProps['onSelectionChange'],
   onPointStratumClick: SvgDiagramProps['onPointStratumClick'],
+  labelRendering: SvgDiagramLabelRendering,
 ): RenderItemElement {
   const occlusion = pointOcclusionById.get(point.id)
   const isHiddenBySurface = occlusion?.visibility === 'hidden'
@@ -2486,9 +2491,6 @@ function renderPoint(
     ? hiddenPointStyleFromBase(point.style)
     : point.style
   const center = projectToSvgPoint(camera, point.position, viewportHeight)
-  const textLayout = getPointNodeTextLayout(point.text)
-  const geometry = svgPointNodeGeometry(style, textLayout, svgPointNodeTexPointScale)
-  const fill = style.fill === 'hollow' ? '#ffffff' : style.color
   const isIncludedByFilter = layerFilterIncludesLayer(layerFilter, point.layer)
   const isSelectable = isLayerSelectableByLayerFilter(
     diagram,
@@ -2501,14 +2503,6 @@ function renderPoint(
     opacity: previewElementOpacity(isIncludedByFilter),
     pointerEvents: isSelectable ? undefined : 'none',
   } as const
-  const commonProps = {
-    fill,
-    stroke: style.color,
-    // TikZ's default node border is 0.4pt; size controls inner sep, not stroke.
-    strokeWidth: 0.4 * svgPointNodeTexPointScale,
-    opacity: style.opacity,
-    vectorEffect: 'non-scaling-stroke',
-  }
   const visibilityDataProps = {
     'data-point-visibility': isHiddenBySurface ? 'dimmed' : 'visible',
     'data-occluding-surface-id': occlusion?.occludingFace?.sourceId,
@@ -2519,7 +2513,8 @@ function renderPoint(
     layer: point.layer,
     element: (
       <g
-        key={point.id}
+        key={svgPointNodeOwner(labelRendering.documentRevision, point.id)}
+        data-point-id={point.id}
         {...groupProps}
         {...visibilityDataProps}
         onClick={(event) =>
@@ -2531,32 +2526,13 @@ function renderPoint(
           )
         }
       >
-        {renderPointHighlight(center, geometry.radius, isSelected)}
-        {geometry.kind === 'circle' ? (
-          <circle {...commonProps} cx={center.x} cy={center.y} r={geometry.radius} />
-        ) : (
-          <polygon
-            {...commonProps}
-            points={svgPointList(geometry.vertices.map((vertex) => ({
-              x: center.x + vertex.x,
-              y: center.y + vertex.y,
-            })))}
-          />
-        )}
-        {textLayout.text.length > 0 && (
-          <text
-            x={center.x}
-            y={center.y + textLayout.baselineOffset}
-            fill="#000000"
-            opacity={style.opacity}
-            fontFamily={svgPointNodeTextFontFamily}
-            fontSize={svgPointNodeTextFontSize}
-            textAnchor="middle"
-            xmlSpace="preserve"
-          >
-            {textLayout.text}
-          </text>
-        )}
+        <SvgPointNode runtime={labelRendering.runtime} source={point.text ?? ''}
+          position={center} style={style} selected={isSelected}
+          ownerIdentity={svgPointNodeOwner(labelRendering.documentRevision, point.id)}
+          onLayout={(snapshot) => {
+            if (snapshot === null) labelRendering.pointCommits.delete(point.id)
+            else labelRendering.pointCommits.set(point.id, snapshot)
+          }} />
       </g>
     ),
   }
@@ -3124,31 +3100,6 @@ function renderConcatenatedPathDraft(
         />
       ))}
     </g>
-  )
-}
-
-function renderPointHighlight(
-  center: Vec2,
-  radius: number,
-  isSelected: boolean,
-): ReactElement | null {
-  if (!isSelected) {
-    return null
-  }
-
-  return (
-    <circle
-      cx={center.x}
-      cy={center.y}
-      r={radius + 6}
-      fill="none"
-      stroke={highlightColor}
-      strokeOpacity={0.85}
-      strokeWidth={3}
-      vectorEffect="non-scaling-stroke"
-      pointerEvents="none"
-      data-svg-export-exclude="true"
-    />
   )
 }
 
