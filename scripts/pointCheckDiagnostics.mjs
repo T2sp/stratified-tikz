@@ -1,6 +1,22 @@
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+/** Bound page/evidence diagnostics and own late rejections after a deadline. */
+export async function boundedPointDiagnostic(operation, name, timeoutMs = 2000) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('Point diagnostic timeout must be finite and positive')
+  let timer
+  const outcome = Promise.resolve().then(operation).then(
+    (value) => ({ ok: true, value }), (error) => ({ ok: false, error }))
+  try {
+    const result = await Promise.race([outcome, new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false,
+        error: new Error(`Timed out after ${timeoutMs}ms during ${name}`) }), timeoutMs)
+    })])
+    if (!result.ok) throw result.error
+    return result.value
+  } finally { clearTimeout(timer) }
+}
+
 /** Called before assertions. Diagnostic records never count as passing scenarios. */
 export function createPointDiagnostics({ artifactDir, observe }) {
   let index = 0
@@ -18,7 +34,7 @@ export function createPointDiagnostics({ artifactDir, observe }) {
 export async function capturePointCheck(capture, diagnose) {
   let point
   try { point = await capture() } catch (error) {
-    try { await diagnose({ captureError: { message: error.message, stack: error.stack } }) }
+    try { await boundedPointDiagnostic(() => diagnose({ captureError: { message: error.message, stack: error.stack } }), 'point capture failure evidence') }
     catch (diagnosticError) { console.error('Point capture diagnostics:', diagnosticError) }
     throw error
   }

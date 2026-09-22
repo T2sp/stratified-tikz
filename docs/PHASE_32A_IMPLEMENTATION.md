@@ -666,3 +666,141 @@ remaining native 3D, point export and subsequent App/export scenarios. Then revi
 the exact matching tree against `prompts/phase-32a-review.md`; standalone verify
 does not perform independent review. No independent acceptance review ran during
 this fix. **32A remains pending acceptance; 32B–32D remain deferred.**
+
+## Targeted standalone SVG/XML oracle Canvas correction (2026-09-22)
+
+This section supersedes the prior native execution status, while preserving the
+historical reports above. The starting tree was clean on
+`phase/32a-tex-labeled-node`, HEAD `1876a0aa8bb92db605f66f8c7eb0911d1756633c`.
+All previous implementation, source/metric/persistence/locator fixes, verifier
+policy, tests and fixtures were preserved. Only test-oracle code, affected browser
+consumers, focused tests and these completion documents changed. No production
+runtime, layout, export, model/schema, dependency or 32B–32D behavior changed.
+
+### Actual parent evidence and distinct child restriction
+
+The inspected parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-iP6w9K/verification.json`;
+the associated verifier response is `stz-phase-verifier-lqcAeD/response.json` in
+the same temp root. Tests **2,559**, build, diff and label assets passed. Free
+labels failed at `point-node-settled-export`, with **11/15 complete groups, 117
+passing records and eight completed point scenarios**, no page errors, and
+matching before/after fingerprint
+`2e7adfc033330b2bc09d475b57252a27b2c40f453bb868c1a3413f04a1a99610`
+on revision `9be2a400f875d5d0d95f9ac9c14f7e3cc673b998` plus changes.
+
+The completed aggregate native scenario covers both 2D and 3D direct/cursor,
+xy/xz/yz work planes, Inspector, history, both TikZ modes and JSON persistence.
+All four `point-native-{2,3}d[-standalone].json` downloads and the scenario JSON
+were inspected. Do not describe 3D or persistence as wholly unexecuted. The four
+incomplete groups remain `point-node-body-layout-lifecycle`,
+`point-node-settled-export`, `real-App-input-JSON-history-reused-ID-load`, and
+`settled-SVG-export-standalone`: a scenario pass is not a group completion.
+
+The first transparent pending export was downloaded and reopened through
+`file://`. Its SVG-namespace XML root and captured formula/fallback sources are
+present. Observation 0186 records `getContext is not a function`; 0187 contains
+App setup diagnostics, not standalone document details. The standalone JSON/PNG,
+fallback metrics, geometry assertions, white export and whole-node fallback had
+not completed. File existence and parsing are not acceptance of these checks.
+
+The cause is the test observer's HTML assumption: `document.createElement('canvas')`
+does not select the XHTML Canvas interface in SVG/XML. The throw happened before
+the null-context guard and before line metrics. Live HTML success did not cover
+this boundary; it supplies no evidence of an exported-source or geometry defect.
+
+A bounded attempt to inspect native document/element properties on that exact
+saved SVG is retained in `/private/tmp/stz-32a-bounded-canvas/diagnosis.json`,
+`command.log` and `diagnose.mjs`. Chrome aborted at startup (`SIGABRT`, cleanup
+`kill EPERM`); no page opened and no fresh native properties were obtained.
+This is separate from both the historical observer failure and localhost EPERM.
+A parent-ready current-observer reproduction is
+`/private/tmp/stz-32a-bounded-canvas/recheck-observer.mjs`: it retains pre-metric
+document/Canvas context, checks both exact multiline fallback sources with the
+shared observer, document immutability and requests, without screenshots. It has
+passed syntax checking but has not run in a browser. It writes a new report and
+does not overwrite the original failed attempt or historical parent evidence.
+
+### Correction, collection boundary and diagnostics
+
+- `scripts/fixtures/labelBrowserOracle.ts` adds `createOracleCanvas`: use the
+  observed node's `ownerDocument.createElementNS` with the XHTML namespace;
+  require correct owner/namespace/name, a detached unparented Canvas, callable
+  `getContext`, a non-null 2D context and `measureText`. Errors remain explicit;
+  no placeholder metrics, inserted HTML body/Canvas/foreignObject/style/script,
+  separate font document or PNG replacement is used.
+- Both `inspectPositionedLiteral` and the live-HTML raster `inspectLabelContent`
+  use the helper. The latter's consumers are free-label geometry and renderer/App
+  fixture checks. Other live-only Canvas code remains unchanged. The existing
+  namespace-explicit temporary SVG root/probe and font-readiness reads now use
+  the observed owner document too. No production `labelMetrics.ts` changed.
+- `scripts/pointLiteralOracle.mjs` injects the same observer into HTML App and
+  saved top-level SVG/XML pages. Native assertions check the real
+  `HTMLCanvasElement` interface, namespace, document ownership, detached state
+  and usable context. Whole-document serialization is compared synchronously
+  before/after metrics and probe cleanup; mutation fails the check. Source/title
+  selection and XML newline handling retain their existing contract.
+- `inspectOracleDocumentContext` records URL/content type, root/body and observed
+  node namespaces/interfaces, font properties/readiness, and both legacy versus
+  explicit Canvas creation: interface, capabilities, owner identity, connection,
+  parent and context availability/errors. `checkPointNodesApp.mjs` persists this
+  before standalone metrics and passes the saved SVG path to all four affected
+  calls (transparent, white, pre- and post-sanitization whole-node fallback).
+  Bounded failure collection runs on the actual standalone page before closing,
+  including geometry, evidence, capture and cleanup failures. It preserves the
+  original error/path, owns late diagnostic rejections and never records a pass
+  or initiates another screenshot. `pointCheckDiagnostics.mjs` also bounds the
+  existing collection-failure evidence callback.
+- Explicit font longhands/effective Canvas configuration, font line boxes and
+  per-line ink expansion, native SVG whitespace/tab advances, current fragments,
+  baselines/centering/extents/containment, font identity, and all corruption
+  controls remain intact. No return to SVG `Mg` line heights or widened tolerance.
+  Transparent/white workflows still use the original multiline/tab/CRLF inputs,
+  original captured-source semantics, strict geometry/opacity/resource checks
+  and required standalone JSON/PNG capture.
+
+`tests/scripts/pointOracleCanvas.test.ts` adds **15** registered boundary tests
+for owner/namespace/detachment/context dispatch, missing/noncallable capabilities,
+null context, original exceptions and diagnostic properties. Five additional
+`pointCheckDiagnostics.test.mjs` cases check pre-metric persistence, mutation and
+capability rejection, primary error ownership, saved path before close and
+bounded failures/late rejection. These controlled doubles establish boundary
+logic, not native XML interfaces. The same checks must execute in actual HTML
+and saved file pages through the existing acceptance scenarios. The previous
+metric and positioned-source tests remain unchanged.
+
+### Executed checks and exact parent handoff
+
+All commands use `/opt/homebrew/bin` first in PATH, Node **v26.9.0**.
+
+| Check | Actual result / retained log |
+| --- | --- |
+| Focused oracle/metrics/diagnostics/capture/verifier/runner suite | **159 passed**, zero failed/skipped; `/private/tmp/stz-32a-canvas-focused.log` |
+| `npm test` | **2,579 passed**, zero failed/skipped; `/private/tmp/stz-32a-canvas-test.log` |
+| `npm run build` | Passed; existing >500 kB warning; `/private/tmp/stz-32a-canvas-build.log` |
+| Strict fixture TypeScript | Passed; `/private/tmp/stz-32a-canvas-fixture-tsc.log` |
+| Strict new-test TypeScript (`--ignoreConfig --strict`, DOM/Node types) | Passed; `/private/tmp/stz-32a-canvas-test-tsc.log` |
+| Targeted TS ESLint / recommended JS rules / changed-script syntax | Passed; `/private/tmp/stz-32a-canvas-ts-lint.log`, `/private/tmp/stz-32a-canvas-js-checks.log` |
+| `git diff --check` | Passed |
+| Direct `check:free-labels` with installed external Playwright/Chrome | Blocked at `development-server-listen`, `listen EPERM 127.0.0.1:5173`; `/private/tmp/stz-32a-canvas-free-labels.log` and `/private/tmp/stz-32a-canvas-free-labels/free-labels-evidence.json`. **0/15 groups**, no scenarios or browser artifacts accepted. |
+
+After these documentation edits, hold the final tree fixed and run:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+The final verifier result and checkout identity (including the untracked Canvas
+test) are retained outside the tree as
+`/private/tmp/stz-32a-canvas-final-verification.json` and
+`/private/tmp/stz-32a-canvas-final-checkout.json`; stdout is
+`/private/tmp/stz-32a-canvas-final-verify.log`. The final response reports that
+execution result. Keeping identity outside this document avoids a hash cycle.
+
+The browser-capable parent must execute the same verifier on the exact final
+checkout, finish all **15 groups / 11 named point scenarios** and their required
+artifacts, then independently review that matching tree against
+`prompts/phase-32a-review.md`. The fresh-process verifier, sanitized-SVG policy,
+checkout matching, and pre-review/commit gates are unchanged. A standalone
+`verify` does not review. No new native acceptance or independent acceptance
+review is claimed by this child. **32A remains pending; 32B–32D remain deferred.**

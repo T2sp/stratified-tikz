@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { cleanupPointCheck, capturePointCheck } from './pointCheckDiagnostics.mjs'
-import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint } from './pointLiteralOracle.mjs'
+import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint, diagnoseStandalonePointFailure } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { selectPointCoordinateMode, checkPointCoordinateModeBoundary } from './pointNativeCoordinateMode.mjs'
@@ -24,9 +24,10 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   const inspect = async (id) => {
     return capturePointCheck(() => inspectPoint(page, id), (details) => diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, { id, ...details }))
   }
-  const standaloneLiteral = (page, source) => capturePointCheck(
-    () => observePointLiteral(page, { source, standalone: true }),
-    (details) => diagnose(exportGroup, scenario, { source, standalone: true, ...details }))
+  const standaloneLiteral = (page, source, svgPath) => capturePointCheck(
+    () => observePointLiteral(page, { source, standalone: true,
+      diagnose: (details) => diagnose(exportGroup, scenario, { source, svgPath, standalone: true, ...details }) }),
+    (details) => diagnose(exportGroup, scenario, { source, svgPath, standalone: true, ...details }))
   const state = () => page.evaluate(() => window.stzAppLabels.state())
   const model = async () => JSON.parse((await state()).json).diagram
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -261,10 +262,10 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       let standaloneFailure
       try {
         await standalone.goto(pathToFileURL(svgPath).href)
+        const fallback = await standaloneLiteral(standalone, fallbackSource, svgPath)
         const output = await inspectStandalonePoint(standalone, source)
-        const fallback = await standaloneLiteral(standalone, fallbackSource)
         const fallbackGeometry = await inspectStandalonePoint(standalone, fallbackSource)
-        const standaloneMetric = await standaloneLiteral(standalone, nativeInvalidSource)
+        const standaloneMetric = await standaloneLiteral(standalone, nativeInvalidSource, svgPath)
         await diagnose(exportGroup, scenario, { pendingMetric, standaloneMetric })
         assertPositionedLiteral(standaloneMetric, nativeInvalidSource)
         for (const property of ['font-family', 'font-size', 'font-style', 'font-weight', 'font-kerning', 'text-rendering']) {
@@ -301,7 +302,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.deepEqual(output.paints, { fill: '#ffffff', stroke: '#3870a0', text: '#000000' })
         assert.deepEqual(standaloneErrors, [])
         assert.deepEqual(requests, [pathToFileURL(svgPath).href])
-        const details = { pending, pendingFallback, pendingMetric, standaloneMetric, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName }
+        const details = { pending, pendingFallback, pendingMetric, standaloneMetric, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName, svgPath }
         const jsonName = `${scenario}-standalone.json`
         await writeFile(resolve(artifactDir, jsonName), JSON.stringify(details, null, 2))
         await observe(`${scenario}-standalone-observed`, details)
@@ -314,9 +315,17 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         await saved(scenario, details, exportGroup)
       } catch (error) {
         standaloneFailure = error
+        await diagnoseStandalonePointFailure({ page: standalone, source: fallbackSource, svgPath, primary: error,
+          diagnose: (details) => diagnose(exportGroup, scenario, { ...details, requests, standaloneErrors }) })
         throw error
       } finally {
-        await cleanupPointCheck(standaloneFailure, () => standalone.close())
+        await cleanupPointCheck(standaloneFailure, async () => {
+          try { await standalone.close() } catch (error) {
+            await diagnoseStandalonePointFailure({ page: standalone, source: fallbackSource, svgPath, primary: standaloneFailure ?? error,
+              diagnose: (details) => diagnose(exportGroup, scenario, { ...details, cleanupError: { message: error.message, stack: error.stack } }) })
+            throw error
+          }
+        })
       }
     }
     // Native DOM boundary: complete point capture, dimmed parent, exact fallback,
@@ -353,19 +362,33 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     await writeFile(renderedPath, boundary.rendered)
     const reopened = await browser.newPage()
     let reopenFailure
+    let reopenedPath = renderedPath
     try {
       await reopened.goto(pathToFileURL(renderedPath).href)
-      boundary.serialized = await standaloneLiteral(reopened, boundary.source)
+      boundary.serialized = await standaloneLiteral(reopened, boundary.source, renderedPath)
       await diagnose(exportGroup, scenario, { boundary })
       assertPositionedLiteral(boundary.serialized, boundary.source)
+      reopenedPath = fallbackPath
       await reopened.goto(pathToFileURL(fallbackPath).href)
-      boundary.visible = await standaloneLiteral(reopened, boundary.source)
+      boundary.visible = await standaloneLiteral(reopened, boundary.source, fallbackPath)
       boundary.geometry = await inspectStandalonePoint(reopened, boundary.source)
       await diagnose(exportGroup, scenario, { boundary })
       assertPositionedLiteral(boundary.visible, boundary.source)
       assert.ok(Number(boundary.geometry.parentOpacity) < 1)
-    } catch (error) { reopenFailure = error; throw error }
-    finally { await cleanupPointCheck(reopenFailure, () => reopened.close()) }
+    } catch (error) {
+      reopenFailure = error
+      await diagnoseStandalonePointFailure({ page: reopened, source: boundary.source, svgPath: reopenedPath, primary: error,
+        diagnose: (details) => diagnose(exportGroup, scenario, details) })
+      throw error
+    } finally {
+      await cleanupPointCheck(reopenFailure, async () => {
+        try { await reopened.close() } catch (error) {
+          await diagnoseStandalonePointFailure({ page: reopened, source: boundary.source, svgPath: reopenedPath, primary: reopenFailure ?? error,
+            diagnose: (details) => diagnose(exportGroup, scenario, { ...details, cleanupError: { message: error.message, stack: error.stack } }) })
+          throw error
+        }
+      })
+    }
     await saved('point-whole-node-fallback-opacity-validation', boundary, exportGroup)
     assert.deepEqual(errors, [])
     await completeGroup(exportGroup)

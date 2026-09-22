@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { createPointDiagnostics, cleanupPointCheck, capturePointCheck } from '../../scripts/pointCheckDiagnostics.mjs'
 import { runPointThenAppChecks } from '../../scripts/checkPointNodes.mjs'
 import { captureNativePointSetup, diagnoseNativePointFailure } from '../../scripts/pointNativeSetupDiagnostics.mjs'
+import { observePointLiteral, assertOracleCanvasDocument, diagnoseStandalonePointFailure } from '../../scripts/pointLiteralOracle.mjs'
 
 test('point matrix saves the failing current case before assertions, without passing or starting the App group', async (t) => {
   const artifactDir = await mkdtemp(join(tmpdir(), 'stz-point-diagnostics-'))
@@ -52,6 +53,81 @@ test('metric collection failure is saved before rethrow and diagnostic failure c
   const data = JSON.parse(await readFile(join(artifactDir, 'point-observation-0001.json'), 'utf8'))
   assert.equal(data.captureError.message, primary.message)
   assert.equal(data.result, 'observed')
+})
+
+// Scheduling/failure tests only: actual HTMLCanvasElement/XML creation is
+// asserted by the same wrapper in native App and saved file:// export checks.
+const svgDocumentContext = {
+  url: 'file:///tmp/point.svg', contentType: 'image/svg+xml', body: null, bodyFound: true,
+  root: { localName: 'svg', namespaceURI: 'http://www.w3.org/2000/svg' },
+  canvas: { namespaceURI: 'http://www.w3.org/1999/xhtml', localName: 'canvas', htmlCanvasElement: true,
+    ownerDocumentMatches: true, isConnected: false, parentNodePresent: false,
+    getContext: 'function', context2dAvailable: true, measureText: 'function' },
+}
+
+test('literal collection saves document/Canvas context before metrics and reports cleaned-up document', async () => {
+  const order = [], observations = []
+  const page = { evaluate: async (_fn, { mode }) => {
+    order.push(mode)
+    return mode === 'context' ? svgDocumentContext : { point: { source: '  $bad\t\n tail  ' }, documentUnchanged: true }
+  } }
+  const result = await observePointLiteral(page, { source: '  $bad\t\n tail  ', standalone: true,
+    diagnose: async (details) => { order.push('persist'); observations.push(details) } })
+  assert.deepEqual(order, ['context', 'persist', 'metrics'])
+  assert.equal(observations[0].boundary, 'before-literal-metrics')
+  assert.equal(result.documentContext, svgDocumentContext)
+  assert.equal(result.documentUnchanged, true)
+})
+
+test('literal metric failure preserves its native error and context despite evidence failure', async () => {
+  const observations = []
+  const page = { evaluate: async (_fn, { mode }) => mode === 'context' ? svgDocumentContext : {
+    collectionError: { message: 'Oracle Canvas 2D context unavailable', name: 'Error', stack: 'native metric stack' }, documentUnchanged: true,
+  } }
+  await assert.rejects(observePointLiteral(page, { source: '$bad', standalone: true, diagnose: async (details) => {
+    observations.push(details)
+    if (details.captureError) throw new Error('secondary evidence write')
+  } }), (error) => error.message === 'Oracle Canvas 2D context unavailable' && error.stack === 'native metric stack')
+  assert.equal(observations[1].boundary, 'literal-collection-failure')
+  assert.equal(observations[1].documentContext, svgDocumentContext)
+  assert.equal(observations[1].documentUnchanged, true)
+})
+
+test('literal collection rejects document mutation and unusable or wrong-document Canvas evidence', async () => {
+  const page = { evaluate: async (_fn, { mode }) => mode === 'context' ? svgDocumentContext : { point: {}, documentUnchanged: false } }
+  await assert.rejects(observePointLiteral(page, { standalone: true }), /leaves the document unchanged/)
+  for (const [property, value] of Object.entries({ namespaceURI: 'http://www.w3.org/2000/svg', htmlCanvasElement: false,
+    ownerDocumentMatches: false, isConnected: true, parentNodePresent: true, getContext: 'undefined', context2dAvailable: false, measureText: 'undefined' })) {
+    assert.throws(() => assertOracleCanvasDocument({ ...svgDocumentContext, canvas: { ...svgDocumentContext.canvas, [property]: value } }, true))
+  }
+  assert.throws(() => assertOracleCanvasDocument({ ...svgDocumentContext, url: 'http://localhost/inline-svg' }, true), /saved file directly/)
+  assert.throws(() => assertOracleCanvasDocument({ ...svgDocumentContext, contentType: 'text/html' }, true))
+})
+
+test('standalone failure records the saved path and actual file-page context before closing', async () => {
+  const order = [], primary = new Error('geometry or PNG failure'), observations = []
+  const page = { evaluate: async () => { order.push('context'); return svgDocumentContext },
+    close: async () => { order.push('close') } }
+  await diagnoseStandalonePointFailure({ page, source: '$bad', svgPath: '/tmp/point.svg', primary,
+    diagnose: async (details) => { order.push('persist'); observations.push(details) } })
+  await page.close()
+  assert.deepEqual(order, ['context', 'persist', 'close'])
+  assert.equal(observations[0].svgPath, '/tmp/point.svg')
+  assert.equal(observations[0].error.message, primary.message)
+  assert.equal(observations[0].documentContext, svgDocumentContext)
+})
+
+test('standalone failure owns bounded capture/write failures and late rejection without replacing primary', async () => {
+  const primary = new Error('original metric failure'), observations = []
+  let rejectCapture
+  const page = { evaluate: () => new Promise((_resolve, reject) => { rejectCapture = reject }) }
+  await diagnoseStandalonePointFailure({ page, source: '$bad', svgPath: '/tmp/point.svg', primary, timeoutMs: 15,
+    diagnose: async (details) => { observations.push(details); throw new Error('secondary write') } })
+  assert.match(observations[0].contextError.message, /Timed out after 15ms/)
+  assert.equal(observations[0].error.message, primary.message)
+  assert.equal(observations[0].svgPath, '/tmp/point.svg')
+  rejectCapture(new Error('late page close'))
+  await new Promise((resolve) => setTimeout(resolve, 0))
 })
 
 // These cases exercise capture/write failure ownership only. Their stub pages
