@@ -1,13 +1,15 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
 Status: 32A implementation, source/position and native line-metric corrections,
-and the targeted JSON persistence-oracle correction are delivered. Fresh complete
-parent browser acceptance and independent review remain pending. The latest
-historical parent passed seven point scenarios and the native 2D metric/recovery
-checks, then failed at the JSON save oracle (required UI view metadata was absent
-from its model-only expectation). The corrected harness checks exact document
-content plus independently observed UI metadata, both modes in 2D/3D, strict
-reload and restoration. This child's localhost EPERM supplies no browser pass.
+JSON persistence-oracle correction, and the scoped native 3D coordinate-mode
+locator fix are delivered. Fresh complete parent browser acceptance and independent
+review remain pending. The latest historical parent passed seven point scenarios
+and both native 2D JSON save/reload modes, then timed out locating the 3D wrapped
+Coordinate mode select by exact label text. The corrected harness checks the
+active Point form, unique visible/enabled control, explicit global selection and
+exact model coordinates, with live setup/failure diagnostics and a real-form DOM
+regression. Native 3D and remaining exports still require parent execution.
+This child's localhost EPERM supplies no browser pass; 32B–32D remain deferred.
 See PHASE_32A_IMPLEMENTATION.md for evidence and exact final-checkout handoff.
 
 Implement the following stages in the user's requested order. Each stage must

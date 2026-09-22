@@ -8,6 +8,8 @@ import { cleanupPointCheck, capturePointCheck } from './pointCheckDiagnostics.mj
 import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
+import { selectPointCoordinateMode, checkPointCoordinateModeBoundary } from './pointNativeCoordinateMode.mjs'
+import { captureNativePointSetup, diagnoseNativePointFailure } from './pointNativeSetupDiagnostics.mjs'
 
 const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
@@ -67,14 +69,44 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       await load(await fixture(ambientDimension))
       await page.getByLabel('Add point menu', { exact: true }).click()
       await page.getByRole('button', { name: 'Direct input', exact: true }).click()
-      const form = page.locator('.direct-input-drawer-form')
-      if (ambientDimension === 3) await form.getByLabel('Coordinate mode', { exact: true }).selectOption('global')
-      for (const [axis, value] of [['x', '.4'], ['y', '.7'], ...(ambientDimension === 3 ? [['z', '.2']] : [])]) {
-        await form.getByRole('textbox', { name: axis, exact: true }).fill(value)
+      const drawer = page.locator('#direct-input-drawer')
+      const form = drawer.locator('.direct-input-drawer-form')
+      const setup = await captureNativePointSetup(page)
+      const locatorMatches = {
+        exactLabelCount: await form.getByLabel('Coordinate mode', { exact: true }).count(),
+        prefixLabelCount: await form.getByLabel(/^Coordinate mode/).count(),
+        scopedSelectCount: await form.locator('.direct-coordinate-mode-field select').count(),
       }
+      await diagnose(bodyGroup, scenario, { boundary: 'before-direct-coordinate-mode', ambientDimension, setup, locatorMatches })
+      assert.equal((await model()).ambientDimension, ambientDimension, 'Loaded point document dimension')
+      assert.equal(await form.count(), 1, 'One active direct creation form')
+      assert.equal(await form.isVisible(), true)
+      assert.equal(await form.getAttribute('aria-label'), 'Direct creation')
+      assert.equal(await drawer.locator('#direct-input-drawer-heading').textContent(), 'Point')
+      const pointMenu = page.locator('.preview-toolbar-menu').filter({ has: page.getByLabel('Add point menu', { exact: true }) })
+      assert.equal(await pointMenu.count(), 1)
+      assert.equal(await pointMenu.getByRole('button', { name: 'Direct input', exact: true, includeHidden: true }).getAttribute('aria-pressed'), 'true')
+      if (ambientDimension === 3) {
+        await checkPointCoordinateModeBoundary({ browser, form,
+          diagnose: (details) => diagnose(bodyGroup, scenario, { ambientDimension, ...details }) })
+        await selectPointCoordinateMode(form, 'global')
+      } else {
+        assert.equal(await form.locator('.direct-coordinate-mode-field select').count(), 0, '2D has no coordinate-mode select')
+        assert.equal(await form.getByRole('textbox', { name: 'z', exact: true }).count(), 0, '2D enters x/y only')
+      }
+      for (const [axis, value] of [['x', '.4'], ['y', '.7'], ...(ambientDimension === 3 ? [['z', '.2']] : [])]) {
+        const field = form.getByRole('textbox', { name: axis, exact: true })
+        assert.equal(await field.count(), 1, `One ${axis} coordinate input`)
+        assert.equal(await field.isVisible(), true)
+        assert.equal(await field.isEnabled(), true)
+        await field.fill(value)
+        assert.equal(await field.inputValue(), value)
+      }
+      await diagnose(bodyGroup, scenario, { boundary: 'before-direct-create', ambientDimension, setup: await captureNativePointSetup(page) })
       await form.getByRole('button', { name: 'Create', exact: true }).click()
       let points = (await model()).strata.filter((s) => s.geometricKind === 'point')
-      assert.equal(points.length, 1); assert.equal(points[0].codim, ambientDimension)
+      await diagnose(bodyGroup, scenario, { boundary: 'after-direct-create', ambientDimension, points, state: await state() })
+      assert.equal(points.length, 1); assert.equal(points[0].geometricKind, 'point'); assert.equal(points[0].codim, ambientDimension)
       assert.deepEqual(points[0].position, { x: .4, y: .7, z: ambientDimension === 3 ? .2 : 0 })
       const close = page.getByRole('button', { name: 'Close direct input drawer', exact: true })
       if (await close.count()) await close.click()
@@ -178,7 +210,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.deepEqual(JSON.parse(reloaded.loaded.history).future, [], 'Document replacement clears the redo branch')
         persistence.push({ download, reloaded })
       }
-      entries.push({ ambientDimension, direct: rendered, invalidBody, metricComparison, cursors, code, persistence,
+      entries.push({ ambientDimension, setup, locatorMatches, direct: rendered, invalidBody, metricComparison, cursors, code, persistence,
         jsonPath: persistence[0].download.path, beforeSave: persistence[0].download.before, loaded: persistence[0].reloaded.loaded })
     }
     await saved('point-native-direct-cursor-workplanes-inspector-persistence', entries, bodyGroup)
@@ -339,9 +371,11 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     await completeGroup(exportGroup)
   } catch (error) {
     primary = error
-    try { await observe('point-native-primary-failure', { message: error.message, stack: error.stack, errors }) }
-    catch (diagnosticError) { console.error('Point failure diagnostics:', diagnosticError) }
-    throw error
+    await diagnoseNativePointFailure({ page, primary: error,
+      diagnose: async (details) => {
+        await diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, details)
+        await observe('point-native-primary-failure', { message: error.message, stack: error.stack, errors })
+      }, details: { errors } })
   } finally {
     for (const wait of owned) wait.dispose(primary)
     await cleanupPointCheck(primary, () => page.close())

@@ -1,16 +1,16 @@
-# Phase 32A Targeted Fix Prompt: Locate the native 3D coordinate-mode control correctly
+# Phase 32A Targeted Fix Prompt: Create the literal oracle Canvas correctly in standalone SVG documents
 
 ## Environment
 
 Work on the current Phase 32A checkout (reported branch:
 `phase/32a-tex-labeled-node`). Inspect status first and preserve the implementation,
-previous oracle and persistence fixes, verifier correction, fixtures, tests,
-documentation, and all user changes, including untracked files. Do not reset or
-restart implementation.
+previous source/metric/persistence/locator fixes, verifier correction, fixtures,
+tests, documentation, and all user changes, including untracked files. Do not
+reset or restart implementation.
 
-The latest parent checked revision `a0eefe53c396884dc0193600902104248ee423e2`
+The latest parent checked revision `9be2a400f875d5d0d95f9ac9c14f7e3cc673b998`
 plus working-tree changes. Its before/after fingerprint was
-`26469eb29c4ebfd0699ae7c3675ea62d00922ce6dd39c4ddc1805b96981a46b8`.
+`2e7adfc033330b2bc09d475b57252a27b2c40f453bb868c1a3413f04a1a99610`.
 This matched the inspected checkout before this prompt update. The prompt changes
 checkout identity; obtain fresh evidence for the final corrected tree.
 
@@ -20,200 +20,213 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Limit work to the demonstrated native 3D coordinate-mode locator mismatch,
-focused interaction regressions and diagnostics, and further demonstrated 32A
-acceptance failures. Keep strict TypeScript and avoid new dependencies, schema
-changes, unrelated lint cleanup, or new rendering features. Preserve the shared
-MathJax/runtime/layout/export design and leave 32B-32D deferred.
+Limit work to the demonstrated standalone SVG/XML Canvas-creation mismatch,
+affected test-oracle consumers, focused regressions and diagnostics, and further
+demonstrated 32A acceptance failures. Keep strict TypeScript and avoid new
+dependencies, schema changes, unrelated lint cleanup, or new rendering features.
+Preserve shared MathJax/runtime/layout/export behavior and leave 32B-32D deferred.
 
 ## Latest execution findings
 
-The latest parent reached the 3D native direct-input iteration and timed out
-while locating its coordinate-mode select. This is a new browser-harness failure.
-The previous 2D JSON persistence comparison now passes in both export modes.
-Do not describe the current failure as child localhost `EPERM`, the historical
-line-metric mismatch, or a recurrence of missing view-metadata expectations.
+The native direct/cursor/Inspector/persistence scenario now passes, including
+both 2D and 3D. The latest parent next fails while observing literal fallback in
+the first downloaded standalone SVG. This is not the child's localhost `EPERM`,
+the earlier coordinate-mode locator timeout, or a demonstrated exported-geometry
+or source-preservation defect.
 
 Read this parent directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-aRv0pQ
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-iP6w9K
 ```
 
 Inspect `verification.json`, `05-check-free-labels/command.log`, and these files
 inside `05-check-free-labels/artifacts/`:
 
 - `free-labels-evidence.json` and the checkout snapshots;
-- `point-native-2d.json` and `point-native-2d-standalone.json`;
-- `point-observation-0139.json` through `point-observation-0148.json`, including
-  both modes' download and reload observations, and preceding rendering evidence.
+- `point-native-direct-cursor-workplanes-inspector-persistence.json` and all four
+  `point-native-{2,3}d[-standalone].json` downloads;
+- `point-native-pending-transparent-edit.svg`, the actual downloaded SVG;
+- point export observations through `point-observation-0187.json`, including
+  the literal collection error and native-failure diagnostics.
 
 Verifier handoff:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-bHe6qE/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-lqcAeD/response.json
 ```
 
 | Observation | Actual parent result |
 | --- | --- |
-| `npm test` | Exit 0; 2,534 passed |
+| `npm test` | Exit 0; 2,559 passed |
 | Build / diff / `check:label-assets` | Exit 0 |
-| `check:free-labels` | Exit 1 at `checkPointNodesApp.mjs:71` |
-| Failure stage | `point-node-native-input` |
-| Failure | 30-second `locator.selectOption` timeout |
-| Completed groups / passing records | 11 of 15 / 116 |
-| Completed point scenarios | 7 of 11 |
-| Page errors | Empty |
+| `check:free-labels` | Exit 1 at standalone literal observation |
+| Failure stage | `point-node-settled-export` |
+| Native call site | `checkPointNodesApp.mjs:265` |
+| Completed groups / passing records | 11 of 15 / 117 |
+| Completed point scenarios | 8 of 11 |
+| Page errors | Empty; the evaluated observer throws |
 | Checkout before/after | Same fingerprint |
 | Independent review | Not reached |
 
-The seven completed point scenarios remain:
-`point-language-shapes-2d-3d`, `point-valid-invalid-valid-exact-source`,
-`point-A-B-C-delete-duplicate-history-load`, `point-resource-retry-font-readiness`,
-`point-contour-boundaries-cycling`, `point-camera-pan-zoom-drag`, and
-`point-hidden-filtered-locked-dimmed-siblings`.
+The eight completed point scenarios are the previous seven fixture scenarios
+plus `point-native-direct-cursor-workplanes-inspector-persistence`. Preserve that
+new native pass; do not continue describing 3D input or JSON persistence as wholly
+unexecuted. The source and line-metric corrections also remain intact.
 
-Within the incomplete native scenario, the 2D direct/Inspector/cursor workflow
-and both JSON save/reload modes completed before the 3D iteration. Download and
-reload observations 0141/0143 and 0146/0148 also pass a read-only replay through
-the current persistence assertions. This is corroborating saved evidence, not a
-new browser run or a completed aggregate scenario.
+`point-native-pending-transparent-edit` started, downloaded its SVG, and reopened
+it through `file://`. The file parses as XML with an SVG-namespace root and contains
+the captured formula and fallback sources. The observer failed before completing
+fallback metrics, geometry assertions, standalone evidence JSON, or PNG capture;
+file existence and successful parsing are not acceptance of those checks.
 
-Native 3D point creation has not reached coordinate entry or Create. Its later
-Inspector, work-plane cursor, and persistence assertions remain unexecuted.
-Point settled exports and the later general App/settled-export groups were not
-executed. Four groups remain incomplete: `point-node-body-layout-lifecycle`,
-`point-node-settled-export`, `real-App-input-JSON-history-reused-ID-load`, and
-`settled-SVG-export-standalone`. The child's reported 0/15 execution is separate
-from this parent's partial run.
+The white export and whole-node fallback scenarios were not reached, nor were
+the later general App and settled-export groups. The report still lists four
+incomplete groups: `point-node-body-layout-lifecycle`, `point-node-settled-export`,
+`real-App-input-JSON-history-reused-ID-load`, and `settled-SVG-export-standalone`.
+Keep the reported group completion distinct from individual scenario passes.
+The child's 0/15 pre-launch result is separate from this parent run.
 
-## Confirmed selector mismatch
+## Confirmed immediate cause: HTML Canvas creation assumed an HTML document
 
-The failing interaction is:
+`checkPointNodesApp.mjs` opens the saved SVG with:
 
 ```js
-const form = page.locator('.direct-input-drawer-form')
-if (ambientDimension === 3) {
-  await form.getByLabel('Coordinate mode', { exact: true }).selectOption('global')
-}
+await standalone.goto(pathToFileURL(svgPath).href)
 ```
 
-The production form in `src/App.tsx:6879-6910` has a wrapping label containing
-both the heading and the select, without a separate `aria-label` or
-`aria-labelledby` on that select. Its relevant structure is:
+It then calls `observePointLiteral()`, which injects the shared test-only observer
+into that page. `inspectPositionedLiteral()` currently executes:
 
-```html
-<label class="direct-create-field direct-coordinate-mode-field">
-  <span>Coordinate mode</span>
-  <select>
-    <option value="global">Global 3D coordinates</option>
-    <option value="workPlaneLocal">Active work-plane local coordinates</option>
-  </select>
-</label>
+```ts
+const context = required(
+  document.createElement('canvas').getContext('2d'),
+  'Oracle Canvas unavailable',
+)
 ```
 
-The installed Playwright label engine obtains associated label text through
-`getElementLabels()` and recursively collects it with `elementText()`. That text
-includes the option descendants, so exact matching against only `Coordinate mode`
-cannot locate this select. These functions were inspected in the installed
-`playwright-core/lib/coreBundle.js` under the configured external Node runtime.
-Do not conflate this text-matching rule with an unverified claim about the
-browser's accessible-name calculation for role locators.
+The source is `scripts/fixtures/labelBrowserOracle.ts:350`; the stack's anonymous
+line refers to the transpiled/injected copy. In an SVG/XML document,
+`document.createElement('canvas')` does not create an HTML Canvas element.
+The resulting element has no `getContext` method, causing:
 
-The `global` option value is correct. `directCoordinateModesForAmbientDimension()`
-in `src/ui/directInputDrawer.ts` returns `global` and `workPlaneLocal` in 3D.
-The production conditional includes 3D `createPoint`, and the control belongs
-inside the scoped direct-creation form. Increasing the wait cannot correct the
-exact-text mismatch.
+```text
+page.evaluate: TypeError: document.createElement(...).getContext is not a function
+```
 
-The failed native form's DOM was not retained in the existing point observations.
-Confirm its live state in the corrected native workflow and distinguish a missing
-form/control from a naming mismatch if the observed UI differs. No production
-rendering, persistence, or coordinate-model defect is demonstrated by this timeout.
+The exception occurs before `required()` can check for a null 2D context and before
+any baseline/extent comparison. Live App checks used an HTML document, so their
+success did not exercise this creation boundary.
+
+The same repository already uses namespace-explicit Canvas creation for standalone
+SVG raster observation in `scripts/checkSettledSvgExports.mjs:316`. Use that
+established approach with the target node's owner document, for example:
+
+```ts
+node.ownerDocument.createElementNS('http://www.w3.org/1999/xhtml', 'canvas')
+```
+
+Keep the Canvas detached and in the same document/font context. The required
+namespace is XHTML, not the SVG namespace. Inspect native document/element
+properties in the bounded reproduction to retain direct evidence of this cause.
+Do not infer that the downloaded SVG or browser Canvas implementation is broken.
 
 ## Goal and required reading
 
-Make native 3D direct point creation select the intended global-coordinate control
-reliably, prove the resulting coordinates, and finish the remaining acceptance
-workflow while retaining all previous assertions.
+Make the independent literal observer obtain a real 2D Canvas context in both
+live HTML and standalone SVG/XML pages, without changing the exported document,
+font/line-metric contract, or acceptance strength. Complete fresh native export
+verification after the correction.
 
 Read `AGENTS.md`, `prompts/phase-32a-implement.md`,
 `prompts/phase-32a-review.md`, `docs/PHASE_32A_IMPLEMENTATION.md`, and:
 
-- `scripts/checkPointNodesApp.mjs`, `scripts/checkPointNodes.mjs`,
-  `scripts/checkFreeLabels.mjs`, and point diagnostic helpers;
-- the direct-creation form, tool/drawer transitions, and relevant work-plane and
-  camera controls in `src/App.tsx`;
-- `src/ui/directInputDrawer.ts`, applicable direct-creation tests, and fixture
-  setup in `scripts/fixtures/freeLabelsApp.tsx`;
-- `scripts/appJsonPersistence.mjs`, the persistence expectation/tests, and
-  `scripts/automation/phase-verification.mjs`.
+- `scripts/fixtures/labelBrowserOracle.ts`,
+  `scripts/fixtures/positionedLiteralAssertions.ts`, and `scripts/pointLiteralOracle.mjs`;
+- `scripts/checkPointNodesApp.mjs`, `scripts/pointCheckDiagnostics.mjs`,
+  `scripts/checkSettledSvgExports.mjs`, and `scripts/standaloneSvgCapture.mjs`;
+- `tests/scripts/pointLiteralMetrics.test.ts`, existing point oracle/diagnostic
+  tests, fixture TypeScript settings, `package.json`, and verifier requirements.
 
-## 1. Correct the locator while keeping the native interaction
+## 1. Correct document-aware Canvas creation and error handling
 
-Use a unique locator scoped to the active direct-creation form that matches the
-actual production control. Candidates include a verified role/name locator,
-`form.getByLabel(/^Coordinate mode/)`, or the existing
-`.direct-coordinate-mode-field select` inside that form. Verify the chosen
-locator against the real rendered App; do not assume changing to another exact
-name automatically solves the problem.
+Create an HTML Canvas explicitly through the observed node's `ownerDocument`,
+with the XHTML namespace. Keep strict types and check the resulting Canvas
+capability and 2D context; report unsupported/missing capabilities clearly instead
+of making an unchecked method call or silently returning placeholder metrics.
 
-Assert that the loaded document is 3D and the intended point-creation form is
-active. Require one visible, enabled select with the expected option values;
-select `global` and verify the selected value before filling coordinates.
-Then require x/y/z fields and retain exact created model position
-`{ x: .4, y: .7, z: .2 }`, point kind, and `codim: 3` assertions. Preserve the
-2D x/y input and z=0 behavior without requiring a 3D-only select there.
+The measurement Canvas must remain detached. Do not insert a body, canvas,
+foreignObject, stylesheet, or script element into the downloaded SVG, wrap it in
+an HTML page, measure with a separate App document's fonts, or replace the native
+SVG observation with a PNG. Retain the existing direct `file://` reopen workflow
+and its request/sanitization checks.
 
-Do not use `.first()` to hide ambiguity, silently skip a missing control, rely
-on its default selection, extend the timeout alone, select an unrelated global
-control, or mutate the model/React state through fixture shortcuts. Do not rename
-production controls or add test-only accessibility labels solely to accommodate
-the stale locator. A production accessibility change needs separate evidence.
+Continue using explicit computed font longhands and effective Canvas configuration,
+font-line boxes plus per-line ink expansion, native SVG whitespace advances,
+current-source fragments, baseline/centering/bounds, and containment checks.
+Do not switch back to SVG `Mg` bounds for line height, widen tolerances, or import
+production layout output to manufacture expected values.
 
-Audit adjacent 3D-only locators before proceeding, but change only demonstrated
-mismatches. Source inspection already shows explicit labels for Work-plane preset,
-Fixed x/y/z coordinate, and camera numeric fields; the checkbox controls do not
-have the same nested-option text issue. The TikZ mode locator already uses a
-prefix regular expression. Preserve these interactions and verify them natively.
+Audit related DOM creation in the shared injected observer for HTML-document
+assumptions. The other `createElement('canvas')` in `inspectLabelContent()` is
+currently used by the live HTML oracle; determine actual affected consumers and
+keep any shared correction small. This failure alone does not justify changing
+production `labelMetrics.ts` or unrelated browser code.
 
-## 2. Add focused coverage and useful setup diagnostics
+## 2. Test the actual document/Canvas creation boundary
 
-Add a focused regression that exercises the actual wrapped-label/select boundary
-and the corrected target selection. A mock that merely returns an element for
-any locator string cannot catch this failure. Retain the native App workflow as
-the acceptance proof for both dimensions.
+Existing `pointLiteralMetrics.test.ts` supplies Canvas metric callbacks and
+configuration test doubles; it does not exercise DOM Canvas creation. Retain
+those tests and cover the missing boundary.
 
-Check uniqueness, valid option selection, and resulting global coordinate entry.
-If a reusable selection helper is introduced, test that absent/ambiguous controls
-or an invalid option fail rather than being treated as success. Keep this bounded;
-no general UI-selector framework or unrelated test rewrite is needed.
+Add focused checks for correct namespace, owner document, detached state, and
+usable 2D context. If a helper is introduced, cover missing `getContext` or null
+context with clear failures. A type assertion or permissive mock alone cannot
+prove that a real SVG/XML document produces an HTMLCanvasElement.
 
-Record the native setup before the vulnerable selection, and preserve useful
-failure observations before closing that page: dimension/document revision,
-active form/tool information where observable, matching control counts,
-labels/select DOM, option values, current value, visibility, and enabled state.
-Capture actual failing-page diagnostics with a bounded operation; preserve the
-original selection error if capture or cleanup also fails. Maintain existing
-point stages and honest observation-versus-pass accounting.
+Obtain browser coverage using the same observer in the live HTML App and in an
+actual saved SVG opened as a top-level `file://` document. An inline SVG under
+HTML, `page.setContent()` with HTML, or only a detached DOMParser document is not
+an equivalent replacement for the failed workflow. Reuse the saved failing SVG
+for a bounded diagnosis, then run the real current-tree export scenarios.
 
-## 3. Preserve completed fixes and finish the remaining workflow
+Check that the observer leaves the exported document unchanged after temporary
+SVG probes are cleaned up. Preserve exact visible text/whitespace, XML newline
+normalization, font identity, baseline and extent checks, and existing corruption
+controls. Test both transparent and white export workflows; do not reduce the
+fixture to a single simple line to avoid fallback whitespace coverage.
 
-Retain exact-source/visible-fragment separation, independent line/ink metrics,
-native SVG whitespace/containment checks, existing tolerances, corruption
-controls, and font/viewport/CTM diagnostics.
+## 3. Save standalone document diagnostics before metrics can throw
 
-Preserve the successful 2D persistence correction: exact non-view content and
-expected UI view metadata, model-only `state().json`, separate read-only UI
-settings, download model/history invariance, strict reload payload equality,
-and restored controls. Complete the 3D camera/axes/visibility and both export-mode
-save/reload assertions; their presence in source is not a native pass.
+The current collection wrapper preserves the primary error, but its error record
+lacks the standalone document/Canvas context. Record URL, content type, root
+local name/namespace, relevant body/font properties, created Canvas namespace and
+interface/capabilities, owner-document identity, connection state, and 2D-context
+availability before the metric call or in a bounded failure path.
 
-Finish native 3D direct creation, Inspector recovery/history, xy/xz/yz cursor
-placement, persistence, all three point settled-export scenarios, and subsequent
-general App/settled-export groups. Keep the sanitized-SVG verifier correction,
-structural checks, required artifacts, and all Phase 31 regressions. Diagnose
-any further demonstrated 32A failure from fresh evidence without relaxing gates.
+Capture these details from the standalone page before it is closed. Existing
+native App setup diagnostics alone cannot describe its XML document. Preserve
+the saved SVG path and original error if observation, evidence writing, capture,
+or cleanup fails. Never turn diagnostic collection into an additional unbounded
+screenshot wait or count it as a passing scenario.
+
+## 4. Preserve previous fixes and complete the remaining acceptance
+
+Retain the native coordinate-mode locator fix and state/coordinate assertions,
+2D/3D direct/cursor/work-plane/Inspector/history coverage, and both modes' JSON
+persistence checks. Keep model-only `state().json`, independently observed UI
+metadata, strict save/reload assertions, and restored controls.
+
+Finish `point-native-pending-transparent-edit`,
+`point-native-pending-white-load`, and `point-whole-node-fallback-opacity-validation`,
+then the remaining general App/settled-export groups. Preserve source/history
+isolation, current captured-source export semantics, contour/opacity validation,
+external-resource checks, required standalone JSON/PNG artifacts, bounded capture,
+and the corrected sanitized-SVG verifier policy.
+
+If additional failures are demonstrated after Canvas collection works, retain
+their evidence and fix only the specific 32A issue. Do not weaken the assertions
+or broaden into 32B-32D to obtain a pass.
 
 ## Verification and completion
 
@@ -247,9 +260,10 @@ documentation with actual native results and remaining gates.
 
 ## Report after fixing
 
-Report the observed control/label structure, chosen locator and state assertions,
-focused regressions, setup/failure diagnostics, changed files, actual check
-results, and fresh parent scenario/artifact results with checkout identity.
-Separate previous oracle/persistence fixes, child `EPERM`, this parent locator
-timeout, subsequent verification, and independent review. Keep 32A pending until
-its gates pass and leave 32B-32D outside this fix.
+Report the observed HTML/XML document difference, Canvas creation/capability
+correction, affected consumers, collection-boundary regressions, preserved metric
+assertions, document-context diagnostics, changed files, actual check results,
+and fresh parent scenario/artifact results with checkout identity. Separate prior
+fixes, child `EPERM`, this parent standalone observer failure, subsequent native
+acceptance, and independent review. Keep 32A pending until its gates pass and
+leave 32B-32D outside this fix.

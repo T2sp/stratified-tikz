@@ -551,3 +551,118 @@ command on the final tree, retain all fifteen complete groups, eleven named poin
 scenarios and required native/download/reopen artifacts, then independently review
 that exact matching checkout against `prompts/phase-32a-review.md`. Standalone
 verify does not perform review. **32A remains pending; 32B–32D remain deferred.**
+
+## Targeted native 3D coordinate-mode locator fix (2026-09-22)
+
+The starting checkout was clean on `phase/32a-tex-labeled-node`, HEAD
+`9be2a400f875d5d0d95f9ac9c14f7e3cc673b998`. Prior implementation, oracle/metrics,
+persistence, sanitized-SVG verifier, fixtures and user changes are preserved.
+This fix changes only browser harness code, focused tests, test registration and
+completion documentation. No production control, schema, dependency, coordinate
+model, rendering or deferred 32B–32D feature changed.
+
+### Historical evidence and actual mismatch
+
+The inspected parent is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-aRv0pQ/verification.json`,
+with handoff `stz-phase-verifier-bHe6qE/response.json` under the same temp root.
+Its before/after fingerprint is
+`26469eb29c4ebfd0699ae7c3675ea62d00922ce6dd39c4ddc1805b96981a46b8` on the older
+`a0eefe53c396884dc0193600902104248ee423e2` plus working changes. It passed tests
+(2,534), build, diff and assets, then failed at `point-node-native-input`: 11/15
+groups, 116 passing records, seven completed point scenarios, no page errors.
+The failure was a 30-second exact-label `selectOption` timeout before native 3D
+coordinate entry or Create. Independent review was not reached.
+
+Both 2D direct/Inspector/cursor and JSON save/reload modes ran before that failure.
+Read-only replay of observations 0141/0146 (download) and 0143/0148 (reload) passes
+the current persistence assertions and independently recomputed expectations.
+Both `point-native-2d*.json` files match the recorded bytes. Preceding rendering
+observation 0133 passes the current literal assertions in native/isolated/resized
+contexts. These are historical observations, not a new browser run or completion
+of the aggregate native scenario. The four former untracked persistence files
+match their archived snapshots byte for byte.
+
+Production `renderDirectCreationForm()` wraps a heading span and an unlabeled
+select in `label.direct-coordinate-mode-field`. The select's options are
+`global` / `workPlaneLocal`, displayed as “Global 3D coordinates” / “Active
+work-plane local coordinates”. Playwright's associated-label text collection
+includes these descendants, explaining why exact `Coordinate mode` fails. This
+does not assert a browser accessible-name rule for role locators. The failed
+historical form DOM was not saved; fresh live confirmation remains a parent gate.
+
+### Correction, regressions and diagnostics
+
+- `scripts/checkPointNodesApp.mjs` scopes the form through `#direct-input-drawer`,
+  asserts the loaded dimension, one visible `Direct creation` form, its `Point`
+  heading and the Add point menu's pressed Direct input button. In 3D it calls
+  `selectPointCoordinateMode()` on that form, then requires one visible/enabled
+  x/y/z field. Exact point kind, codim 3 and `{x:.4,y:.7,z:.2}` remain asserted.
+  2D retains x/y with z=0 and has no 3D mode control. Native work-plane, camera,
+  Inspector, history, both persistence modes and all export assertions remain.
+- `scripts/pointNativeCoordinateMode.mjs` uses the form-scoped
+  `.direct-coordinate-mode-field select`; requires one visible/enabled control
+  and exact option values; explicitly selects `global` and checks the returned
+  and current values. It uses neither `.first()` nor a default-value assumption.
+  The browser regression copies the actual live App form HTML to an isolated
+  page, reproduces the wrapped-label boundary with real Playwright locators,
+  checks both valid selections plus an unrelated outside select, and rejects
+  absent/ambiguous forms/controls, disabled control and invalid option. That page
+  does not edit App model or React state. The original App still creates points
+  through native fields and Create. This DOM regression awaits parent execution.
+- `scripts/pointNativeSetupDiagnostics.mjs` records read-only dimension/document
+  revision/model, drawer/form/tool state, labels and select DOM, scoped/global
+  counts, option values/selection, visibility/enabled state and coordinate fields.
+  Setup is saved before selection, and values and created model are saved around
+  Create. Live exact-label/prefix/scoped-selector counts distinguish a naming
+  mismatch from a missing form/control. On failure the actual page is captured
+  before close, including the isolated regression page if it fails. Capture and
+  failure recording each have a two-second deadline, owned timers and handled
+  late rejections; capture/write/cleanup failures preserve the original error.
+  Numbered records remain observations, not passing scenario records.
+- `tests/scripts/pointNativeCoordinateMode.test.mjs` adds 20 registered,
+  selector-aware orchestration tests for selection, missing/ambiguous/hidden/
+  disabled controls, incorrect options, invalid selection, unchanged values and
+  original rejection. They explicitly do not substitute for the DOM regression.
+  Five additions to `pointCheckDiagnostics.test.mjs` cover failing-page evidence,
+  bounded capture/write failure, late rejection ownership and timer cleanup.
+- Adjacent Work-plane preset, Fixed x/y/z and camera numeric labels were checked
+  against App JSX and have explicit accessibility labels. Checkbox controls lack
+  the nested-option issue; TikZ mode uses a prefix regex. No additional mismatch
+  was demonstrated, and these interactions are unchanged.
+
+### Executed checks and exact final-tree handoff
+
+All commands use `/opt/homebrew/bin` first, Node v26.9.0.
+
+| Check | Actual result |
+| --- | --- |
+| Focused selection/diagnostics, prior oracle/persistence, direct creation and runner/verifier/failure regressions | 294 passed, zero failures/skips; `/private/tmp/stz-32a-coordinate-focused.log` |
+| Full `npm test` | 2,559 passed, zero failures/skips; `/private/tmp/stz-32a-coordinate-test.log` |
+| `npm run build` | Passed; existing >500 kB chunk warning; `/private/tmp/stz-32a-coordinate-build.log` |
+| Strict fixture TypeScript | Passed; `/private/tmp/stz-32a-coordinate-fixture-tsc.log` |
+| Targeted recommended JS lint / changed-script syntax | Passed; `/private/tmp/stz-32a-coordinate-{lint,syntax}.log` |
+| `git diff --check` | Passed |
+| Configured direct `check:free-labels` | Failed before launch at `development-server-listen`, `listen EPERM 127.0.0.1:5173`; `/private/tmp/stz-32a-coordinate-free-labels.log` and same-named artifact directory. Zero passing scenarios; all 15 groups unexecuted. |
+
+The child startup restriction is separate from the historical parent locator
+timeout and from the already corrected oracle/persistence failures. No fresh
+native 3D creation, work-plane, persistence or settled-export pass is claimed.
+The full 15 groups, 11 point identities, artifacts, structural checks, checkout
+matching, fresh verifier and pre-review/commit failure gates are unchanged.
+
+After documentation is fixed, hold the final tree constant and execute:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+Its actual report and tracked/untracked checkout identity are retained outside
+the tree as `/private/tmp/stz-32a-coordinate-final-verification.json` and
+`/private/tmp/stz-32a-coordinate-final-checkout.json`, avoiding a self-referential
+hash. The final response supplies the observed result. The browser-capable parent
+must obtain complete matching evidence, including live setup/selection and all
+remaining native 3D, point export and subsequent App/export scenarios. Then review
+the exact matching tree against `prompts/phase-32a-review.md`; standalone verify
+does not perform independent review. No independent acceptance review ran during
+this fix. **32A remains pending acceptance; 32B–32D remain deferred.**
