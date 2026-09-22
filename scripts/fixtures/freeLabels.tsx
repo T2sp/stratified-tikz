@@ -233,6 +233,7 @@ function state() {
   const camera = resolveSvgCamera(diagram, 900, 700, { ...props, viewAdjustment: props.cameraViewAdjustment })
   return {
     invocationCount, requestCount, dragCount, serviceEpoch, serviceStats: service.stats(),
+    fontGeneration: runtime.getFontGeneration(),
     selection: editor.selectedElement, selectionEvents, callbackEvents,
     layouts: Object.fromEntries(layouts),
     requests: requests.map((entry) => ({ ...entry })), sourceRevision, camera,
@@ -353,6 +354,8 @@ const api = {
   },
   setProps(next: Partial<SvgDiagramProps>) { props = { ...props, ...next }; redraw() },
   refreshFonts() { document.fonts.dispatchEvent(new Event('loadingdone')) },
+  pointRuntime() { return { identity: `${measurement.identity}:${serviceEpoch}`,
+    fontGeneration: runtime.getFontGeneration(), documentRevision: sourceRevision } },
   select(selectedElement: SelectedElement) { editor = { ...editor, selectedElement }; redraw() },
   filter(layer: number | null) { editor = { ...editor, layerFilter: layer === null ? { kind: 'all' } : { kind: 'layer', layer } }; redraw() },
   undo() { editor = undoLastDiagramChange(editor); redraw() },

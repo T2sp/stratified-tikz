@@ -1,20 +1,18 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation, source/position and native line-metric corrections,
-JSON persistence-oracle correction, scoped native 3D coordinate-mode locator fix,
-and standalone SVG/XML oracle Canvas correction are delivered. Fresh complete
-parent browser acceptance and independent review remain pending. The latest
-historical parent (`iP6w9K`) passed eight point scenarios, including native 2D/3D
-direct/cursor/work-plane/Inspector/history and both JSON save/reload modes. It
-completed 11/15 groups and 117 passing records, then failed collecting literal
-metrics in the first downloaded SVG: XML `createElement('canvas')` supplied no
-`getContext`. The oracle now creates a detached XHTML Canvas through the observed
-node's owner document, checks its capabilities, records document context before
-metrics, and verifies probe cleanup. The transparent/white and whole-node exports
-and later App/settled-export groups still require fresh parent completion. This
-child's localhost EPERM and Chrome startup abort supply no browser pass;
-32B–32D remain deferred.
-See PHASE_32A_IMPLEMENTATION.md for evidence and exact final-checkout handoff.
+Status: 32A implementation and the source/metric/persistence/coordinate/XML-Canvas
+corrections are preserved. The latest historical parent (`cCLyYw`) completed
+11/15 groups and eight point scenarios, then failed the first point export's
+radius comparison against a renderer contaminated by the font-readiness test.
+Chrome reported the injected family's name as `"Times New Roman"`; name-based
+cleanup missed it. The targeted harness fix owns and removes that exact face,
+checks native metric/contour restoration in the reused page, and validates
+click-time App/download/reference font compatibility before geometry assertions.
+Fresh complete parent browser acceptance and independent review remain pending.
+The child cannot start the localhost server (`EPERM`); this supplies no native
+pass. All 15 groups / 11 point scenarios and required artifacts remain mandatory.
+32B–32D remain deferred. See PHASE_32A_IMPLEMENTATION.md for actual results and
+final-checkout handoff.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

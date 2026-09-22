@@ -10,6 +10,7 @@ import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { selectPointCoordinateMode, checkPointCoordinateModeBoundary } from './pointNativeCoordinateMode.mjs'
 import { captureNativePointSetup, diagnoseNativePointFailure } from './pointNativeSetupDiagnostics.mjs'
+import { assertPointExportCompatibility } from './pointExportReference.mjs'
 
 const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
@@ -241,17 +242,31 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       assertPositionedLiteral(pendingMetric.literalObservation, nativeInvalidSource)
       await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
       const before = await state()
-      const { event: download, value: after } = await eventAction(scenario, 'download', async ({ check }) => {
-        await page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click()
-        check()
-        assert.equal((await state()).history, before.history)
-        await field.fill('$laterPoint$'); check()
-        if (background === 'white') await load(await fixture(2, '$loadedPoint$'))
-        check()
-        const edited = await state()
-        await page.evaluate((s) => window.stzAppLabels.release(s), source)
-        return edited
-      })
+      await page.evaluate(() => window.stzAppLabels.armPointExportClick(['app-point', 'fallback-point']))
+      let clickObservation, clickFailure, download, after
+      try {
+        const action = await eventAction(scenario, 'download', async ({ check }) => {
+          await page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click()
+          check()
+          const captured = await page.evaluate(() => window.stzAppLabels.pointExportClick())
+          await diagnose(exportGroup, scenario, { boundary: 'export-click', captured })
+          assert.equal(captured.error, undefined, 'Click-time observation completed')
+          clickObservation = captured.snapshot
+          assert.ok(clickObservation, 'Native export click was observed')
+          assert.equal(clickObservation.documentUnchanged, true)
+          assert.equal(clickObservation.json, before.json)
+          assert.equal(clickObservation.history, before.history)
+          assert.equal((await state()).history, before.history)
+          await field.fill('$laterPoint$'); check()
+          if (background === 'white') await load(await fixture(2, '$loadedPoint$'))
+          check()
+          const edited = await state()
+          await page.evaluate((s) => window.stzAppLabels.release(s), source)
+          return edited
+        })
+        download = action.event; after = action.value
+      } catch (error) { clickFailure = error; throw error }
+      finally { await cleanupPointCheck(clickFailure, () => page.evaluate(() => window.stzAppLabels.releasePointExportClick())) }
       const svgName = `${scenario}.svg`, svgPath = resolve(artifactDir, svgName)
       await download.saveAs(svgPath)
       const xml = await readFile(svgPath, 'utf8')
@@ -264,6 +279,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         await standalone.goto(pathToFileURL(svgPath).href)
         const fallback = await standaloneLiteral(standalone, fallbackSource, svgPath)
         const output = await inspectStandalonePoint(standalone, source)
+        const outputLiteral = await standaloneLiteral(standalone, source, svgPath)
         const fallbackGeometry = await inspectStandalonePoint(standalone, fallbackSource)
         const standaloneMetric = await standaloneLiteral(standalone, nativeInvalidSource, svgPath)
         await diagnose(exportGroup, scenario, { pendingMetric, standaloneMetric })
@@ -273,14 +289,42 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         }
         // A native settled body supplies the committed bounds removed by export
         // sanitization. Check the download's contour against that same source/font.
-        await rendererPage.evaluate(({ source, fallbackSource }) => window.stzLabels.mount({ labels: [], points: [
-          { id: 'export-reference', text: source, style: { shape: 'circle', size: 3 } },
-          { id: 'fallback-reference', text: fallbackSource, style: { shape: 'circle', size: 3 } },
-        ] }), { source, fallbackSource })
-        await rendererPage.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
+        // Use only the immutable native click observations, including style.
+        // The live App has deliberately moved on to a different source/document.
+        await rendererPage.evaluate((points) => window.stzLabels.mount({ labels: [], points }),
+          clickObservation.points.map((point, index) => ({ id: index === 0 ? 'export-reference' : 'fallback-reference',
+            text: point.source, style: point.style })))
+        await rendererPage.evaluate(async () => { await document.fonts.ready })
+        await rendererPage.waitForFunction(() => {
+          const runtime = window.stzLabels.pointRuntime()
+          return document.fonts.status === 'loaded' && ['export-reference', 'fallback-reference'].every((id) => {
+            const point = document.querySelector(`[data-point-id="${id}"] [data-point-node]`)
+            const body = point?.querySelector('[data-label-state]')
+            const request = JSON.parse(body?.getAttribute('data-label-request') ?? 'null')
+            const owner = JSON.parse(point?.getAttribute('data-point-node') ?? 'null')
+            return body && body.getAttribute('data-label-state') !== 'pending'
+              && request?.[5] === runtime.fontGeneration && owner?.[1] === runtime.documentRevision
+              && request?.[8] === point.getAttribute('data-point-node')
+              && point.getAttribute('data-point-request') === body.getAttribute('data-label-request')
+          })
+        }, undefined, { timeout: 30_000 })
         const reference = await inspectPoint(rendererPage, 'export-reference')
         const fallbackReference = await inspectPoint(rendererPage, 'fallback-reference')
-        await diagnose(exportGroup, scenario, { pending, pendingFallback, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName })
+        const compatibility = {
+          compiled: { click: clickObservation.points[0], saved: { ...output, literalObservation: outputLiteral }, reference },
+          fallback: { click: clickObservation.points[1], saved: { ...fallbackGeometry, literalObservation: fallback }, reference: fallbackReference },
+        }
+        const [x0, y0, x1, y1] = reference.bounds
+        const expectedRadius = Math.hypot((x1 - x0) / 2 + 1.8, (y1 - y0) / 2 + 1.8)
+        const geometryOperands = { source, fallbackSource, style: reference.style, bounds: reference.bounds,
+          padding: 1.8, expectedRadius, actualRadius: output.radius, difference: output.radius - expectedRadius,
+          referenceRadius: reference.radius, fallbackBounds: fallbackReference.bounds,
+          fallbackReferenceRadius: fallbackReference.radius, fallbackActualRadius: fallbackGeometry.radius,
+          fallbackDifference: fallbackGeometry.radius - fallbackReference.radius }
+        await diagnose(exportGroup, scenario, { pending, pendingFallback, output, fallback, fallbackGeometry, reference, fallbackReference,
+          clickObservation, compatibility, geometryOperands, before, after, requests, standaloneErrors, svgName })
+        assertPointExportCompatibility(compatibility.compiled)
+        assertPointExportCompatibility(compatibility.fallback)
         assert.equal(JSON.parse(pending.request)[0], source)
         assert.equal(output.source, source); assert.equal(output.math, 1); assert.ok(output.paths > 0)
         assert.deepEqual(output.texts, [`captured ${dimension} `])
@@ -289,7 +333,6 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.ok(body.x >= shape.x && body.y >= shape.y && body.x + body.width <= shape.x + shape.width && body.y + body.height <= shape.y + shape.height)
         assert.notEqual(output.radius, pending.radius)
         assertPointLayout(reference); assertPointLayout(fallbackReference)
-        const [x0, y0, x1, y1] = reference.bounds
         assert.ok(Math.abs(output.radius - Math.hypot((x1 - x0) / 2 + 1.8, (y1 - y0) / 2 + 1.8)) < 1e-8)
         assert.equal(output.radius, reference.radius)
         assert.equal(fallbackGeometry.radius, fallbackReference.radius)
@@ -302,7 +345,8 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.deepEqual(output.paints, { fill: '#ffffff', stroke: '#3870a0', text: '#000000' })
         assert.deepEqual(standaloneErrors, [])
         assert.deepEqual(requests, [pathToFileURL(svgPath).href])
-        const details = { pending, pendingFallback, pendingMetric, standaloneMetric, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName, svgPath }
+        const details = { pending, pendingFallback, pendingMetric, standaloneMetric, output, fallback, fallbackGeometry, reference, fallbackReference,
+          clickObservation, compatibility, geometryOperands, before, after, requests, standaloneErrors, svgName, svgPath }
         const jsonName = `${scenario}-standalone.json`
         await writeFile(resolve(artifactDir, jsonName), JSON.stringify(details, null, 2))
         await observe(`${scenario}-standalone-observed`, details)

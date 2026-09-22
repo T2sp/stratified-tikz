@@ -5,6 +5,7 @@ import { pointNodeScenarioArtifacts } from './automation/phase-verification.mjs'
 import { observePointLiteral, assertPositionedLiteral, pointLiteralNegativeControls } from './pointLiteralOracle.mjs'
 import { createPointDiagnostics, capturePointCheck } from './pointCheckDiagnostics.mjs'
 import { runNativePointChecks } from './checkPointNodesApp.mjs'
+import { withOwnedFontFace, observeOwnedFontFace, assertRestoredPointFont } from './ownedFontFace.mjs'
 
 export async function inspectPoint(page, id) {
   const point = await page.evaluate((id) => {
@@ -22,7 +23,8 @@ export async function inspectPoint(page, id) {
       : { x: contour.points.getItem(0).x, y: contour.points.getItem(0).y }
     const model = JSON.parse((window.stzLabels ?? window.stzAppLabels).state().json).diagram
     const stratum = model.strata.find((item) => item.id === id)
-    return { ambientDimension: model.ambientDimension, pointShape: stratum?.style.shape, modelSource: stratum?.text ?? '',
+    return { ambientDimension: model.ambientDimension, pointShape: stratum?.style.shape, style: stratum?.style,
+      runtime: (window.stzLabels ?? window.stzAppLabels).pointRuntime(), modelSource: stratum?.text ?? '',
       source: body.getAttribute('data-label-source'), request: body.getAttribute('data-label-request'),
       pointRequest: point.getAttribute('data-point-request'), owner: point.getAttribute('data-point-node'),
       status: body.getAttribute('data-label-state'), math: body.querySelectorAll('[data-label-math]').length,
@@ -170,27 +172,91 @@ export async function runPointNodeChecks(context) {
   await mutate({ text: 'mmmm WWWW $unclosed' }); await settle()
   const beforeFontFace = await inspect(), beforeFontModel = await state()
   assertPositionedLiteral(beforeFontFace.literalObservation, beforeFontFace.source)
-  await page.evaluate(async () => {
-    const font = new FontFace('Times New Roman', 'local("Courier New")')
-    document.fonts.add(font)
-    await font.load()
-    await document.fonts.ready
-    document.fonts.dispatchEvent(new Event('loadingdone'))
+  const settleFont = async () => {
+    await page.evaluate(async () => {
+      await document.fonts.ready
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    })
+    await page.waitForFunction(() => {
+      const point = document.querySelector('[data-point-id="p"] [data-point-node]')
+      const body = point?.querySelector('[data-label-state]')
+      const request = body?.getAttribute('data-label-request')
+      const runtime = window.stzLabels.pointRuntime()
+      return document.fonts.status === 'loaded' && body?.getAttribute('data-label-state') !== 'pending'
+        && request && JSON.parse(request)[5] === runtime.fontGeneration
+        && point.getAttribute('data-point-request') === request
+        && JSON.parse(request)[8] === point.getAttribute('data-point-node')
+        && JSON.parse(point.getAttribute('data-point-node'))[1] === runtime.documentRevision
+    }, undefined, { timeout: 30_000 })
+  }
+  let beforeOwnership, afterFontFace, afterOwnership, afterFontRemoval, restoredOwnership, laterReference
+  const lifecycle = await withOwnedFontFace(page, {
+    family: 'Times New Roman', source: 'local("Courier New")',
+    acquired: async (handle) => {
+      beforeOwnership = await observeOwnedFontFace(handle)
+      await diagnose(bodyGroup, scenario, { boundary: 'before-injected-font', beforeFontFace, beforeOwnership, beforeFontModel })
+    },
+    use: async (handle) => {
+      await settleFont()
+      afterFontFace = await inspect()
+      afterOwnership = await observeOwnedFontFace(handle)
+      await diagnose(bodyGroup, scenario, { boundary: 'after-injected-font', beforeFontFace, afterFontFace, beforeOwnership, afterOwnership, state: await state() })
+      assertPointLayout(afterFontFace)
+      assertPositionedLiteral(afterFontFace.literalObservation, afterFontFace.source)
+      assert.equal(afterOwnership.ownedFacePresent, true)
+      assert.ok(afterOwnership.previousFaces.every((face) => face.present))
+      assert.equal(afterOwnership.sameDocument, true)
+      assert.equal(afterFontFace.runtime.identity, beforeFontFace.runtime.identity)
+      assert.equal(afterFontFace.runtime.documentRevision, beforeFontFace.runtime.documentRevision)
+      assert.equal(JSON.parse(afterFontFace.request)[5], afterFontFace.runtime.fontGeneration)
+      assert.notEqual(afterFontFace.request, beforeFontFace.request)
+      assert.notEqual(afterFontFace.literalObservation.lines[0].width, beforeFontFace.literalObservation.lines[0].width, 'Owned native font changes actual width')
+      assert.notEqual(afterFontFace.radius, beforeFontFace.radius, 'Font-ready ink measurement changes the contour')
+      await page.mouse.click(afterFontFace.outside.x, afterFontFace.outside.y); assert.equal((await state()).selection, null)
+      await page.mouse.click(afterFontFace.inside.x, afterFontFace.inside.y); assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
+      assert.equal(Number((await inspect()).highlight), afterFontFace.radius + 6)
+      invariant(beforeFontModel, await state())
+    },
+    restore: async (removal, handle) => {
+      await settleFont()
+      afterFontRemoval = await inspect()
+      restoredOwnership = await observeOwnedFontFace(handle)
+      const restoredModel = await state()
+      await diagnose(bodyGroup, scenario, { boundary: 'after-injected-font-removal', beforeFontFace, afterFontFace,
+        afterFontRemoval, beforeOwnership, afterOwnership, restoredOwnership, removal, beforeFontModel, restoredModel })
+      assertPointLayout(afterFontRemoval)
+      assertPositionedLiteral(afterFontRemoval.literalObservation, afterFontRemoval.source)
+      assert.equal(restoredOwnership.ownedFacePresent, false)
+      assert.ok(restoredOwnership.previousFaces.every((face) => face.present))
+      assert.equal(restoredOwnership.sameDocument, true)
+      assert.equal(restoredOwnership.sameFontFaceSet, true)
+      assertRestoredPointFont(beforeFontFace, afterFontRemoval)
+      assert.notEqual(afterFontRemoval.request, afterFontFace?.request ?? beforeFontFace.request)
+      invariant(beforeFontModel, restoredModel)
+      // mount() deliberately reuses this document and runtime. A later reference
+      // must retain the restored native measurements under its new owner.
+      await mount([{ id: 'p', text: beforeFontFace.source, style: beforeFontFace.style }])
+      await settleFont()
+      laterReference = await inspect()
+      const referenceOwnership = await observeOwnedFontFace(handle)
+      await diagnose(bodyGroup, scenario, { boundary: 'later-reference-same-page', beforeFontFace, afterFontRemoval,
+        laterReference, referenceOwnership, state: await state() })
+      assertPointLayout(laterReference)
+      assertPositionedLiteral(laterReference.literalObservation, laterReference.source)
+      assertRestoredPointFont(beforeFontFace, laterReference, { sameOwner: false })
+      assert.notEqual(laterReference.owner, beforeFontFace.owner)
+      assert.equal(referenceOwnership.sameDocument, true)
+      assert.equal(referenceOwnership.ownedFacePresent, false)
+      return { restoredModel, referenceOwnership }
+    },
+    diagnoseFailure: ({ primary, cleanupErrors, removal }) => diagnose(bodyGroup, scenario, {
+      boundary: 'injected-font-lifecycle-failure', beforeFontFace, afterFontFace, afterFontRemoval, laterReference,
+      beforeOwnership, afterOwnership, restoredOwnership, removal,
+      error: { message: primary.message, stack: primary.stack },
+      cleanupErrors: cleanupErrors.map((error) => ({ message: error.message, stack: error.stack })) }),
   })
-  await settle()
-  const afterFontFace = await inspect(); assertPointLayout(afterFontFace)
-  assertPositionedLiteral(afterFontFace.literalObservation, afterFontFace.source)
-  assert.notEqual(afterFontFace.request, beforeFontFace.request)
-  assert.notEqual(afterFontFace.radius, beforeFontFace.radius, 'Font-ready ink measurement changes the contour')
-  await page.mouse.click(afterFontFace.outside.x, afterFontFace.outside.y); assert.equal((await state()).selection, null)
-  await page.mouse.click(afterFontFace.inside.x, afterFontFace.inside.y); assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
-  assert.equal(Number((await inspect()).highlight), afterFontFace.radius + 6)
-  invariant(beforeFontModel, await state())
-  await saved('point-resource-retry-font-readiness', { failed, recovered, beforeFontFace, afterFontFace, state: await state() }, bodyGroup)
-  await page.evaluate(() => {
-    for (const font of document.fonts) if (font.family === 'Times New Roman') document.fonts.delete(font)
-    document.fonts.dispatchEvent(new Event('loadingdone'))
-  })
+  await saved('point-resource-retry-font-readiness', { failed, recovered, beforeFontFace, afterFontFace, afterFontRemoval,
+    laterReference, beforeOwnership, afterOwnership, restoredOwnership, lifecycle, state: await state() }, bodyGroup)
 
 
   context.setStage?.(pickingGroup)

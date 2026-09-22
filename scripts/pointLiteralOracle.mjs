@@ -110,7 +110,7 @@ export async function inspectStandalonePoint(page, source) {
     if (!contour) throw new Error('Standalone contour missing')
     const paint = [...body.children].find((e) => e.localName === 'g'), content = [...paint.children].at(-1)
     const b = body.getBBox(), c = contour.getBBox()
-    return { source: titles[0].textContent, transform: point.getAttribute('transform'),
+    return { source: titles[0].textContent, transform: point.getAttribute('transform'), contourKind: contour.localName,
       contour: contour.outerHTML, radius: Number(contour.getAttribute('r')),
       body: { x: b.x, y: b.y, width: b.width, height: b.height },
       shape: { x: c.x, y: c.y, width: c.width, height: c.height },

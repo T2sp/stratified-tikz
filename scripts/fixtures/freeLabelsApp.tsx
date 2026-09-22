@@ -12,7 +12,8 @@ import { serializeDiagram } from '../../src/model/serialization.ts'
 import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
 import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
-import { inspectAndAssertLabelContent } from './labelBrowserOracle.ts'
+import { inspectAndAssertLabelContent, inspectPositionedLiteral, inspectOracleDocumentContext } from './labelBrowserOracle.ts'
+import type { Diagram, PointStratum } from '../../src/model/types.ts'
 
 type Held = {
   promise: Promise<void>
@@ -68,11 +69,55 @@ const runtime = createSvgLabelRuntime({ measurement, service: {
   },
 } })
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const pointRuntime = () => ({ identity: measurement.identity,
+  fontGeneration: runtime.getFontGeneration(), documentRevision: snapshot?.labelDocumentRevision })
+function pointExportClickSnapshot(ids: string[]) {
+  if (!snapshot) throw new Error('App has not committed its diagnostics')
+  const model = JSON.parse(snapshot.json) as { diagram: Diagram }
+  const serialize = () => new XMLSerializer().serializeToString(document)
+  const before = serialize()
+  const points = ids.map((id) => {
+    const stratum = model.diagram.strata.find((item): item is PointStratum => item.id === id && item.geometricKind === 'point')
+    const point = document.querySelector<SVGGElement>(`[data-point-id="${CSS.escape(id)}"] [data-point-node]`)
+    const body = point?.querySelector<SVGGElement>('[data-label-state]')
+    if (!stratum || !point || !body) throw new Error(`Missing export-click point ${id}`)
+    const source = stratum.text ?? ''
+    const documentContext = inspectOracleDocumentContext(body)
+    const literalObservation = inspectPositionedLiteral(body, source)
+    return { id, source, modelSource: source, style: structuredClone(stratum.style),
+      request: body.getAttribute('data-label-request'), pointRequest: point.getAttribute('data-point-request'),
+      owner: point.getAttribute('data-point-node'), status: body.getAttribute('data-label-state'), runtime: pointRuntime(),
+      literalObservation: { ...literalObservation, documentContext, documentUnchanged: before === serialize() } }
+  })
+  return { json: snapshot.json, history: snapshot.history, runtime: pointRuntime(), points,
+    documentUnchanged: before === serialize() }
+}
+let exportClick: ReturnType<typeof pointExportClickSnapshot> | undefined
+let exportClickError: string | undefined
+let releaseExportClick: (() => void) | undefined
 const api = {
   jsonPersistenceExpectation,
+  pointRuntime,
+  // Capture at the native click boundary, before the production handler owns
+  // its immutable snapshot. Later edits/loads must not supply these inputs.
+  armPointExportClick(ids: string[]) {
+    releaseExportClick?.()
+    exportClick = undefined; exportClickError = undefined
+    const button = document.querySelector('button[aria-label="Export current diagram view as SVG"]')
+    if (!button) throw new Error('SVG export button missing')
+    const capture = () => {
+      try { exportClick = pointExportClickSnapshot(ids) }
+      catch (error) { exportClickError = error instanceof Error ? error.message : String(error) }
+    }
+    button.addEventListener('click', capture, { capture: true, once: true })
+    releaseExportClick = () => button.removeEventListener('click', capture, true)
+  },
+  pointExportClick() { return { snapshot: exportClick, error: exportClickError } },
+  releasePointExportClick() { releaseExportClick?.(); releaseExportClick = undefined },
   state() {
     if (!snapshot) throw new Error('App has not committed its diagnostics')
     return { ...snapshot, selection: JSON.parse(snapshot.selection) as unknown, requests,
+      fontGeneration: runtime.getFontGeneration(),
       completionOrder: [...completionOrder] }
   },
   hold(source: string) {

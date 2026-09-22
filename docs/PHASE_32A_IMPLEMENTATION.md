@@ -804,3 +804,128 @@ artifacts, then independently review that matching tree against
 checkout matching, and pre-review/commit gates are unchanged. A standalone
 `verify` does not review. No new native acceptance or independent acceptance
 review is claimed by this child. **32A remains pending; 32B–32D remain deferred.**
+
+## Targeted injected-font lifetime and export-reference correction (2026-09-23)
+
+The starting checkout was clean on `phase/32a-tex-labeled-node`, revision
+`d02c0d4dd5994d38294f80f228fe8124a4ae5258`. It already includes the previous
+source/metrics/persistence/coordinate/XML-Canvas and sanitized-SVG verifier
+corrections. Those changes, fixtures, tests, and historical evidence were
+preserved. This correction changes only the test harness, focused regressions,
+and completion documentation; no production geometry, runtime, schema,
+dependency, or 32B–32D feature changed.
+
+### Latest historical parent evidence
+
+The inspected parent is `stz-phase32a-before-review-cCLyYw`, with verifier handoff
+`stz-phase-verifier-PqPABV/response.json`, under the supplied macOS temporary
+root. Its before/after fingerprint is
+`768bdd23b2f9b1dc705ba07b9ad83bcbe1eaf2b871df8f62255d29e142296fa2` at revision
+`1876a0aa8bb92db605f66f8c7eb0911d1756633c` plus the recorded changes.
+Test/build/diff/assets passed (2,579 tests); free-labels failed after 11/15
+groups, 117 passing records, and eight named point scenarios. Both page-error
+lists are empty. These are historical results, not acceptance of this tree.
+
+The font-readiness artifact records the injected face as
+`{"family":"\"Times New Roman\"","style":"normal","weight":"normal","status":"loaded"}`.
+The previous unquoted family comparison did not delete it. For the same source,
+`Mg` Canvas width changed from 16.669921875 to 14.40234375 and font-box
+ascent/descent from 11/3 to 10/4. No restoration evidence was recorded.
+Observation 0191 has App/download face sets empty but a contaminated renderer
+reference: compiled radius 38.717011003498015 versus 51.16800759663269;
+fallback radius 42.20426518730068 versus 56.04634566087673. This is a test-state
+leak, not evidence that production padding or circle fitting is wrong.
+
+The four native 2D/3D JSON downloads and native interaction/persistence record
+were inspected. Observations 0186–0193 and the transparent SVG confirm the
+same-owner detached XHTML Canvas fix now works in XML; exact-source metrics
+passed before the radius assertion. The transparent scenario did not complete
+its standalone JSON/PNG acceptance. White, whole-node fallback, and subsequent
+general App/settled-export groups were not reached. The earlier `iP6w9K` XML
+exception and child startup EPERM remain separate historical results.
+
+### Owned lifetime, restoration, and reference guards
+
+- `scripts/ownedFontFace.mjs` retains the actual face, original document/set,
+  and pre-existing face identities in a browser handle before registration.
+  Acquisition, add/load, measurements, assertions, evidence, restoration, and
+  handle disposal share `try/finally`. Cleanup deletes only that face; it never
+  clears the set or selects by family spelling. Removal, restoration, or
+  diagnostics cannot replace a primary test error; cleanup failure alone fails.
+- `scripts/checkPointNodes.mjs` records before/add/removal native observations,
+  waits for font readiness and current local request/owner/contour settlement,
+  and requires restored source, style, native widths/line boxes, bounds/body,
+  contour/radius, and unchanged model/history/TikZ. The existing font-change
+  width, contour, picking and highlight assertions remain. A subsequent mount
+  in the same page/runtime must retain restored measurements under a new owner.
+  The scenario is recorded passed only after restoration and handle disposal.
+- `scripts/fixtures/freeLabels.tsx` and `freeLabelsApp.tsx` expose read-only
+  runtime generation/document diagnostics. The App fixture observes the native
+  export button's capture phase, preserving source/style/model/history and
+  independent font/Canvas observations before the production handler captures
+  its export. The observer leaves the document unchanged and is removed in
+  cleanup. Later `$laterPoint$` / `$loadedPoint$` edits remain intact.
+- `scripts/pointExportReference.mjs` rejects incompatible click/download/reference
+  source, point style, declared font, FontFaceSet descriptors, Canvas probes,
+  exact-source advances, line metrics, stale local generations/owners, and
+  unsettled references. Local generation/owner values are not compared across
+  documents. SVG advances may differ by viewport; Canvas measurements are
+  compared in declared local font units. XML newline normalization is limited
+  to the saved title comparison. Family quote handling for CSS declarations
+  never selects or deletes FontFaces; face descriptors remain exact.
+- `scripts/checkPointNodesApp.mjs` constructs the independent renderer references
+  from captured source/style, records compatibility inputs and geometry operands
+  before checking them, and then retains the original `1.8` padding formula,
+  `<1e-8` tolerance, both strict radius comparisons, containment, pending/settled
+  size change, source/paint/resource, standalone fallback, and race isolation
+  assertions. `pointLiteralOracle.mjs` additionally reports the saved contour
+  element kind. Detached XHTML Canvas capabilities, document immutability,
+  whitespace/line-metric checks and earlier negative controls are preserved.
+
+`package.json` registers 14 `ownedFontFace.test.mjs` and 31
+`pointExportReference.test.mjs` tests. The ownership double preserves quoted
+families and rejects every deletion target except the actual owned object;
+pre-existing and later same-family faces survive. Tests cover loading,
+acquisition/evidence, measurement/assertion, cleanup, restoration, disposal and
+secondary diagnostic failures. Metric, generation, request, owner, source,
+style and saved-output corruptions are rejected. A historical diagnostic replay
+is retained in `/private/tmp/stz-32a-font-historical-negative.json`: actual
+App/download Canvas metrics match; the original reference also fails paint
+compatibility; aligning only that wrapper style as an explicit negative control
+still fails native font compatibility. This replay is not new native acceptance.
+
+### Executed child checks and final handoff
+
+Node **v26.9.0**, `/opt/homebrew/bin` first in PATH:
+
+| Check | Actual result / retained log |
+| --- | --- |
+| Focused lifecycle/reference/oracle/point-runtime/verifier/runner suite | **196 passed**, zero failed/skipped; `/private/tmp/stz-32a-font-focused.log`; strengthened lifecycle controls subsequently passed all 14 lifecycle tests and the full suite |
+| `npm test` | **2,624 passed**, zero failed/skipped; `/private/tmp/stz-32a-font-test.log` |
+| `npm run build` | Passed; existing >500 kB chunk warning; `/private/tmp/stz-32a-font-build.log` |
+| Strict fixture TypeScript | Passed; `/private/tmp/stz-32a-font-fixture-tsc.log` |
+| Targeted fixture ESLint, recommended JS rules, changed-script syntax | Passed; `/private/tmp/stz-32a-font-ts-lint.log`, `/private/tmp/stz-32a-font-js-checks.log` |
+| `git diff --check` | Passed |
+| Direct `check:free-labels` | Failed before browser startup: `listen EPERM 127.0.0.1:5173`; `/private/tmp/stz-32a-font-browser.log` and `/private/tmp/stz-32a-font-browser/free-labels-evidence.json`; **0/15 groups**, no native point scenarios/artifacts accepted |
+
+After these documentation edits, the final tree is held fixed for:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+The exact final checkout (including all four new untracked helper/test files)
+and final verifier report are retained outside the tree at
+`/private/tmp/stz-32a-font-final-checkout.json` and
+`/private/tmp/stz-32a-font-final-verification.json`; stdout is
+`/private/tmp/stz-32a-font-final-verify.log`. The final response reports its actual
+result. Keeping the identity outside this document avoids a fingerprint cycle.
+
+The browser-capable parent must rerun this command on the exact corrected tree,
+complete all **15 groups / 11 named point scenarios**, and supply every required
+JSON/SVG/PNG artifact with matching before/after identity. No historical partial
+passes are reused; no counts, artifacts, sandbox restrictions, fresh-process
+loading, or pre-review/commit failure gates were weakened. After accepted complete
+verification, a separate independent review must inspect that matching checkout
+against `prompts/phase-32a-review.md`. Standalone `verify` does not perform review.
+**32A remains pending; 32B–32D remain deferred.**
