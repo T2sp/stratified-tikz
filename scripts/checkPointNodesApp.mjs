@@ -4,9 +4,11 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
-import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
+import { cleanupPointCheck, capturePointCheck } from './pointCheckDiagnostics.mjs'
 import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
+
+const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
 export async function runNativePointChecks({ browser, origin, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe, diagnose, setStage }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
@@ -17,10 +19,11 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   let scenario = 'point-native-direct-cursor-workplanes-inspector-persistence'
   setStage?.('point-node-native-input')
   const inspect = async (id) => {
-    const point = await inspectPoint(page, id)
-    await diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, { id, point })
-    return point
+    return capturePointCheck(() => inspectPoint(page, id), (details) => diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, { id, ...details }))
   }
+  const standaloneLiteral = (page, source) => capturePointCheck(
+    () => observePointLiteral(page, { source, standalone: true }),
+    (details) => diagnose(exportGroup, scenario, { source, standalone: true, ...details }))
   const state = () => page.evaluate(() => window.stzAppLabels.state())
   const model = async () => JSON.parse((await state()).json).diagram
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -81,9 +84,25 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       await settle(); assert.equal((await state()).json, before.json); assert.equal((await state()).history, before.history)
       const rendered = await inspect(points[0].id); assertPointLayout(rendered); assert.equal(rendered.source, source)
       assert.ok(code.standalone.includes(source) && code.inlineMath.includes(source))
-      const invalid = '  $\\missingNativePoint$\t\n tail  '
+      const invalid = nativeInvalidSource
       await field.fill(invalid); await settle()
       const invalidBody = await inspect(points[0].id)
+      // Same exact source/font at the real App viewport, a second native
+      // viewport, and the isolated renderer. Keep CSS/viewBox/transforms intact;
+      // collect both APIs before asserting, without attributing box differences.
+      await rendererPage.evaluate(({ text, ambientDimension }) => window.stzLabels.mount({ ambientDimension, labels: [], points: [{ id: 'metric-reference', text }] }), { text: invalid, ambientDimension })
+      await rendererPage.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
+      const isolated = await capturePointCheck(() => inspectPoint(rendererPage, 'metric-reference'),
+        (details) => diagnose(bodyGroup, scenario, { context: 'isolated-metric-reference', ambientDimension, ...details }))
+      await page.setViewportSize({ width: 1440, height: 1080 })
+      const resized = await inspect(points[0].id)
+      await page.setViewportSize({ width: 1600, height: 1200 })
+      const metricComparison = { ambientDimension, invalidBody, isolated, resized }
+      await diagnose(bodyGroup, scenario, { metricComparison })
+      assertPositionedLiteral(isolated.literalObservation, invalid)
+      assertPositionedLiteral(resized.literalObservation, invalid)
+      const ctm = invalidBody.literalObservation.coordinateContext.rootToScreen
+      assert.ok(Math.abs(ctm.a - 1) > .001 || Math.abs(ctm.d - 1) > .001, 'Native App exercises nonidentity viewport scaling')
       assert.equal(invalidBody.status, 'fallback'); assertPositionedLiteral(invalidBody.literalObservation, invalid); assertPointLayout(invalidBody)
       assert.equal(await field.inputValue(), invalid)
       assert.equal((await model()).strata.find((s) => s.id === points[0].id).text, invalid)
@@ -124,7 +143,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       const path = resolve(artifactDir, `point-native-${ambientDimension}d.json`); await download.saveAs(path)
       const json = await readFile(path, 'utf8'); assert.deepEqual(JSON.parse(json), JSON.parse(beforeSave.json))
       await load(json); await settle(); assert.deepEqual(await model(), JSON.parse(json).diagram)
-      entries.push({ ambientDimension, direct: rendered, invalidBody, cursors, code, jsonPath: path, beforeSave, loaded: await state() })
+      entries.push({ ambientDimension, direct: rendered, invalidBody, metricComparison, cursors, code, jsonPath: path, beforeSave, loaded: await state() })
     }
     await saved('point-native-direct-cursor-workplanes-inspector-persistence', entries, bodyGroup)
     setStage?.('point-node-settled-export')
@@ -140,12 +159,17 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       const fallbackPoint = structuredClone(documentJson.diagram.strata[0])
       Object.assign(fallbackPoint, { id: 'fallback-point', text: fallbackSource, position: { x: 2, y: -1.6, z: 0 } })
       documentJson.diagram.strata.push(fallbackPoint)
+      const metricPoint = structuredClone(fallbackPoint)
+      Object.assign(metricPoint, { id: 'metric-point', text: nativeInvalidSource, position: { x: -2, y: -1.6, z: 0 } })
+      documentJson.diagram.strata.push(metricPoint)
       await load(JSON.stringify(documentJson))
       await page.waitForFunction((s) => window.stzAppLabels.pending(s)?.started > 0, source)
       const field = await selectInspector('app-point')
       const pending = await inspect('app-point'); assert.equal(pending.status, 'pending'); assertPointLayout(pending); assertPositionedLiteral(pending.literalObservation, source)
       const pendingFallback = await inspect('fallback-point')
       assertPositionedLiteral(pendingFallback.literalObservation, fallbackSource)
+      const pendingMetric = await inspect('metric-point')
+      assertPositionedLiteral(pendingMetric.literalObservation, nativeInvalidSource)
       await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
       const before = await state()
       const { event: download, value: after } = await eventAction(scenario, 'download', async ({ check }) => {
@@ -170,8 +194,14 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       try {
         await standalone.goto(pathToFileURL(svgPath).href)
         const output = await inspectStandalonePoint(standalone, source)
-        const fallback = await observePointLiteral(standalone, { source: fallbackSource, standalone: true })
+        const fallback = await standaloneLiteral(standalone, fallbackSource)
         const fallbackGeometry = await inspectStandalonePoint(standalone, fallbackSource)
+        const standaloneMetric = await standaloneLiteral(standalone, nativeInvalidSource)
+        await diagnose(exportGroup, scenario, { pendingMetric, standaloneMetric })
+        assertPositionedLiteral(standaloneMetric, nativeInvalidSource)
+        for (const property of ['font-family', 'font-size', 'font-style', 'font-weight', 'font-kerning', 'text-rendering']) {
+          assert.equal(standaloneMetric.font.properties[property], pendingMetric.literalObservation.font.properties[property], `Standalone font ${property}`)
+        }
         // A native settled body supplies the committed bounds removed by export
         // sanitization. Check the download's contour against that same source/font.
         await rendererPage.evaluate(({ source, fallbackSource }) => window.stzLabels.mount({ labels: [], points: [
@@ -203,7 +233,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.deepEqual(output.paints, { fill: '#ffffff', stroke: '#3870a0', text: '#000000' })
         assert.deepEqual(standaloneErrors, [])
         assert.deepEqual(requests, [pathToFileURL(svgPath).href])
-        const details = { pending, pendingFallback, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName }
+        const details = { pending, pendingFallback, pendingMetric, standaloneMetric, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName }
         const jsonName = `${scenario}-standalone.json`
         await writeFile(resolve(artifactDir, jsonName), JSON.stringify(details, null, 2))
         await observe(`${scenario}-standalone-observed`, details)
@@ -257,11 +287,11 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     let reopenFailure
     try {
       await reopened.goto(pathToFileURL(renderedPath).href)
-      boundary.serialized = await observePointLiteral(reopened, { source: boundary.source, standalone: true })
+      boundary.serialized = await standaloneLiteral(reopened, boundary.source)
       await diagnose(exportGroup, scenario, { boundary })
       assertPositionedLiteral(boundary.serialized, boundary.source)
       await reopened.goto(pathToFileURL(fallbackPath).href)
-      boundary.visible = await observePointLiteral(reopened, { source: boundary.source, standalone: true })
+      boundary.visible = await standaloneLiteral(reopened, boundary.source)
       boundary.geometry = await inspectStandalonePoint(reopened, boundary.source)
       await diagnose(exportGroup, scenario, { boundary })
       assertPositionedLiteral(boundary.visible, boundary.source)

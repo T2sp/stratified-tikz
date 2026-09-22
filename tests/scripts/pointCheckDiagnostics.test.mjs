@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createPointDiagnostics, cleanupPointCheck } from '../../scripts/pointCheckDiagnostics.mjs'
+import { createPointDiagnostics, cleanupPointCheck, capturePointCheck } from '../../scripts/pointCheckDiagnostics.mjs'
 import { runPointThenAppChecks } from '../../scripts/checkPointNodes.mjs'
 
 test('point matrix saves the failing current case before assertions, without passing or starting the App group', async (t) => {
@@ -38,4 +38,17 @@ test('point cleanup preserves the primary assertion and rejects otherwise unowne
   const failure = new Error('cleanup'), cleanup = async () => { throw failure }
   await cleanupPointCheck(new Error('primary assertion'), cleanup)
   await assert.rejects(cleanupPointCheck(undefined, cleanup), (error) => error === failure)
+})
+
+
+test('metric collection failure is saved before rethrow and diagnostic failure cannot replace it', async (t) => {
+  const artifactDir = await mkdtemp(join(tmpdir(), 'stz-point-metric-failure-'))
+  t.after(() => rm(artifactDir, { recursive: true, force: true }))
+  const primary = new Error('Canvas configuration unavailable')
+  const diagnose = createPointDiagnostics({ artifactDir, observe: async () => { throw new Error('secondary write') } })
+  await assert.rejects(capturePointCheck(async () => { throw primary },
+    (details) => diagnose('point-node-body-layout-lifecycle', 'native-metrics', details)), (e) => e === primary)
+  const data = JSON.parse(await readFile(join(artifactDir, 'point-observation-0001.json'), 'utf8'))
+  assert.equal(data.captureError.message, primary.message)
+  assert.equal(data.result, 'observed')
 })

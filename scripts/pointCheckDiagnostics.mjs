@@ -13,6 +13,19 @@ export function createPointDiagnostics({ artifactDir, observe }) {
   }
 }
 
+/** Collection can fail before an assertion (font/CTM/browser errors). Save that
+ * failure too, and never let an evidence-write failure replace its cause. */
+export async function capturePointCheck(capture, diagnose) {
+  let point
+  try { point = await capture() } catch (error) {
+    try { await diagnose({ captureError: { message: error.message, stack: error.stack } }) }
+    catch (diagnosticError) { console.error('Point capture diagnostics:', diagnosticError) }
+    throw error
+  }
+  await diagnose({ point })
+  return point
+}
+
 /** Cleanup cannot replace an assertion failure; without one, cleanup still fails. */
 export async function cleanupPointCheck(primary, cleanup) {
   try { await cleanup() } catch (error) { if (!primary) throw error }

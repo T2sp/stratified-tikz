@@ -93,3 +93,13 @@ test('same-owner pending/failure/recovery observations cannot retain prior visib
     assert.throws(() => assertPositionedLiteral(output, source))
   }
 })
+
+
+test('a displaced final line inside unchanged bounds fails the baseline contract with axis diagnostics', () => {
+  const output = rendered(reported)
+  const last = output.fragments.at(-1)!
+  last.y -= 1; last.baseline -= 1; last.bounds.minY -= 1; last.bounds.maxY -= 1
+  assert.ok(last.bounds.minY + output.offset.f >= output.bounds![1])
+  assert.ok(last.bounds.maxY + output.offset.f <= output.bounds![3])
+  assert.throws(() => assertPositionedLiteral(output, reported), /fragment 2 y \(line baseline\): actual=.*expected=.*delta=-1[^,]*, tolerance=0.5 local units/)
+})

@@ -288,3 +288,150 @@ parent must run the exact command above on the final checkout, inspect all
 fifteen completed groups/eleven point scenarios and artifacts, and then perform
 independent review against `prompts/phase-32a-review.md`. No independent review
 has run in this fix turn. **32A remains pending; 32B–32D remain deferred.**
+
+## Native literal line-metric correction (2026-09-22)
+
+This later correction started with a clean `phase/32a-tex-labeled-node` checkout,
+HEAD `b0bd6b85144af46bed2194592a44b3be92639736`. The implementation and earlier
+source/visible-fragment correction were already present and were preserved.
+There are no production, dependency, schema, paint, or shape changes in this fix.
+
+### Observed failure and limits
+
+The actual parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-ni1bPs/verification.json`;
+the verifier handoff is `stz-phase-verifier-7wjjNZ/response.json` in the same temp
+root. The report's before/after fingerprint is
+`6bc7f77ac305194a1cde6557f21b8c3d33cd32852d3f2ed4eafc50c542d068df`.
+Node v26.9.0 / Chrome 153.0.8010.53 passed tests (2,485), build, diff and assets.
+The free-label check passed 11/15 groups, 116 records and seven point scenarios,
+then failed at `point-node-native-input`, with no page errors. Four groups and
+four point scenarios remained incomplete. Independent review was not reached.
+These historical passes are partial evidence, not acceptance of this correction.
+
+`point-observation-0127.json` retains the exact native Inspector input
+`'  $\\missingNativePoint$\t\n tail  '`. The second line's actual y was
+16.399999618530273; the oracle expected 15.81269874572754 (difference
+0.587300872802734, tolerance .5). Its SVG `Mg` ascent/descent were
+10.661375999450684 / 2.7513227462768555. The expected height was
+29.225397491455077 versus the published 30.4 (height tolerance 1).
+The preceding isolated observation `0003` had SVG ascent/descent 11/3.
+Source/model/request/title and visible text were correct. A replay through the
+assertion is saved at `/private/tmp/stz-32a-metrics-historical-replay.json`;
+that replay is explicitly not new native measurement or acceptance.
+
+The old oracle treated the SVG box as the font line box. Production initializes
+lines with independently obtained Canvas font bounds and expands each line for
+fragment ink. The historical report did not measure that Canvas configuration.
+Neither browser scaling/hinting/font substitution nor universal production
+correctness is established by these observations.
+
+An initial exact-workflow attempt in this child, with the supported external
+Playwright and Chrome paths, failed before browser launch at Vite
+`listen EPERM 127.0.0.1:5173`. Log: `/private/tmp/stz-32a-metrics-before.log`;
+report: `/private/tmp/stz-free-labels-1790082055396/free-labels-evidence.json`.
+This is separate from the parent's real native metric failure and from the
+older implementation child's startup restriction. No permissions were changed.
+
+### Independent contract and consumers
+
+`labelBrowserOracle.ts` now constructs Canvas font configuration from computed
+family/size/style/weight longhands, checks assignment using two sentinel fonts,
+and records the effective font, alignment, baseline, kerning and rendering.
+Unsupported spacing/stretch fails explicitly. CSS/request identities, font
+readiness and FontFaceSet entries are recorded; these do not pretend to identify
+the platform's resolved font face for each individual glyph.
+
+`collectLiteralMetrics` uses Canvas fontBoundingBoxAscent/Descent (actual ink
+fallback when unavailable), expands each physical line with its fragments' ink,
+and advances by previous descent + .2 em gap + next ascent. CRLF is one break;
+empty/whitespace-only lines and boundary tabs contribute logical extents.
+Canvas advance/ink overhang defines logical bounds. Baseline, centering, width,
+height and all published edges use this one contract. No production measurement
+provider/composer, actual fragment positions, or published bounds are inputs to
+these expectations; no measured font, 16.4 baseline or 11/3 box is hardcoded.
+
+Native SVG clones still independently measure `Mg`, fragment bounds/advances
+and complete space prefixes for tabs. Actual x is checked against both native
+SVG and Canvas advances. Native foreground containment is checked separately,
+including sanitized exports without published bounds. Existing .5 position,
+.001 transform and 1 extent/containment tolerances are unchanged. The observation
+records both measurement APIs, selected per-line metrics, font longhands,
+viewBox/viewport, DPR, root/body/content CTMs, local coordinates, deltas and
+tolerances. Local units are explicitly distinct from CSS screen pixels.
+
+All existing pending/resource, language, recovery, native Inspector/redo and
+standalone fallback consumers use the shared corrected collector. The native
+workflow keeps both 2D/3D direct/cursor/work-plane/history/persistence sequences.
+It additionally compares the exact invalid source in the original App viewport,
+a resized native viewport, and the isolated renderer, before assertions. The App
+must exercise a nonidentity viewport scale. Both pending transparent/white
+exports retain the earlier multiline fallback and now also reopen that exact
+Inspector source, checking exported font longhands against the live source.
+No App CSS or styling is injected into the standalone document.
+
+`positionedLiteralAssertions.ts` reports the differing axis/metric, actual,
+expected, delta and tolerance. `capturePointCheck` records collection failures
+before rethrow, preserving their primary error if diagnostics also fail. Passing
+scenario records still occur only after every assertion succeeds.
+
+### Regressions and additional demonstrated gate correction
+
+The existing SSR/negative-control tests remain. The explicitly registered
+`pointLiteralMetrics.test.ts` exercises the real collection/calculation boundary
+with differing SVG/Canvas boxes, exact Inspector source, per-line ink expansion,
+empty/whitespace lines, all physical newline encodings, boundary tabs, font-box
+fallback, longhand configuration and rejected Canvas font assignment. Synthetic
+metrics test the contract; native font/transform claims still require the parent.
+A final-line displacement inside unchanged enclosing bounds now fails specifically
+on y baseline, in both the SSR test and the native mutation harness. Missing and
+stale text, changed edge spaces, collapsed tabs/lines, transforms and damaged
+bounds remain negative controls. Diagnostics tests cover measurement failure
+plus secondary evidence-write failure.
+
+Inspection also demonstrated a later artifact-gate mismatch: the sanitizer
+removes all `data-*` attributes, but the verifier required point runtime markers
+in downloaded SVG. Replacing the fake command's SVG with a complete sanitized
+point reproduced rejection in the existing cumulative tests; failure log:
+`/private/tmp/stz-32a-metrics-sanitized-gate-before.log`. The gate now checks a
+balanced SVG envelope with sibling contour and titled painted body, instead of
+removed markers. Tests reject missing bodies/contours, broken nesting and fake
+markup in comments. This is an artifact envelope check; native reopen/geometry/
+paint assertions remain mandatory. No group/scenario/artifact counts, fresh
+worker, checkout matching or pre-review/commit gates were reduced.
+
+### Executed checks and final handoff
+
+All commands used `/opt/homebrew/bin` first in PATH (Node v26.9.0).
+
+| Check | Observed result |
+| --- | --- |
+| Focused oracle/metrics/diagnostics/verifier/runner/failure tests | 124 passed; `/private/tmp/stz-32a-metrics-focused-all.log` |
+| `npm test` | 2,496 passed, no failures/skips; `/private/tmp/stz-32a-metrics-test.log` |
+| `npm run build` | Passed; existing >500 kB chunk warning; `/private/tmp/stz-32a-metrics-build.log` |
+| Strict fixture TypeScript | Passed; `/private/tmp/stz-32a-metrics-fixture-tsc.log` |
+| Strict oracle-test TypeScript | Passed; `/private/tmp/stz-32a-metrics-test-tsc.log` |
+| Targeted TS and recommended JS lint | Passed; `/private/tmp/stz-32a-metrics-{lint,script-lint}.log` |
+| Changed script syntax / `git diff --check` | Passed |
+| Initial direct native reproduction | Startup restricted as recorded above; no native acceptance |
+
+After documentation is fixed, run and retain fresh final-checkout evidence:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+The result and matching identity are retained outside the checkout at
+`/private/tmp/stz-32a-metrics-final-verification.json` and
+`/private/tmp/stz-32a-metrics-final-checkout.json`, to avoid a self-referential
+fingerprint. The final response reports the observed result of that run. The
+supported direct final browser command uses `STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32a-metrics-final-free-labels`,
+`STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs`
+and `STZ_BROWSER_EXECUTABLE=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`.
+A startup-blocked result leaves acceptance pending; it is never a native pass.
+
+The browser-capable parent must execute fresh verification on this exact tree,
+including the new untracked test, retain all fifteen complete groups/eleven
+named point scenarios and artifacts, then perform independent review against
+`prompts/phase-32a-review.md`. No new native completion or independent review is
+claimed by this child. **32A remains pending acceptance; 32B–32D remain deferred.**

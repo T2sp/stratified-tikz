@@ -54,7 +54,7 @@ export async function inspectStandalonePoint(page, source) {
 /** Deliberately corrupt only foreground DOM while leaving source/request intact. */
 export async function pointLiteralNegativeControls(page, id, source, diagnose) {
   const controls = []
-  for (const kind of ['missing-fragment', 'edge-spaces', 'tab-collapse', 'line-collapse', 'stale-content']) {
+  for (const kind of ['missing-fragment', 'edge-spaces', 'tab-collapse', 'line-collapse', 'line-displaced-inside-bounds', 'stale-content']) {
     const original = await page.evaluate(({ id, kind }) => {
       const body = document.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-label-state]`)
       const content = body.querySelector('[data-label-content]'), saved = content.innerHTML
@@ -63,6 +63,9 @@ export async function pointLiteralNegativeControls(page, id, source, diagnose) {
       if (kind === 'edge-spaces') texts[0].textContent = texts[0].textContent.trimStart()
       if (kind === 'tab-collapse') texts[1].setAttribute('x', texts[0].getAttribute('x'))
       if (kind === 'line-collapse') texts[2].setAttribute('y', texts[0].getAttribute('y'))
+      // Move the final line upward by one local unit. The unchanged enclosing
+      // box still contains it; only the declared baseline contract rejects it.
+      if (kind === 'line-displaced-inside-bounds') texts[2].setAttribute('y', String(Number(texts[2].getAttribute('y')) - 1))
       if (kind === 'stale-content') texts[0].textContent = '$obsoletePoint$'
       return saved
     }, { id, kind })
@@ -70,10 +73,11 @@ export async function pointLiteralNegativeControls(page, id, source, diagnose) {
     try {
       const observation = await observePointLiteral(page, { id, source })
       await diagnose(kind, observation)
-      let rejected = false
-      try { assertPositionedLiteral(observation, source) } catch { rejected = true }
+      let rejected = false, reason
+      try { assertPositionedLiteral(observation, source) } catch (error) { rejected = true; reason = error.message }
       if (!rejected) throw new Error(`Point whitespace control was accepted: ${kind}`)
-      controls.push({ kind, rejected, observation })
+      if (kind === 'line-displaced-inside-bounds' && !reason.includes('y (line baseline)')) throw new Error(`Displaced line rejected for wrong reason: ${reason}`)
+      controls.push({ kind, rejected, reason, observation })
     } catch (error) { primary = error; throw error }
     finally {
       await cleanupPointCheck(primary, () => page.evaluate(({ id, original }) => {

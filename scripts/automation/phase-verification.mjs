@@ -149,6 +149,36 @@ function evidenceObject(artifactDir, name) {
   return evidence;
 }
 
+/** Artifact envelope check, not an XML safety/parser replacement. Native reopen
+ * checks validate rendering/paint/geometry. Sanitized SVG has no data-* markers;
+ * require balanced elements and an actual sibling contour + titled body tree. */
+export function hasWholePointSvg(svg) {
+  const stack = [], roots = [];
+  const tokens = svg.match(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<(?:"[^"]*"|'[^']*'|[^'">])*>/gu) ?? [];
+  for (const token of tokens) {
+    if (token.startsWith("<!--") || token.startsWith("<?")) continue;
+    const closing = /^<\/([\w:-]+)\s*>$/u.exec(token);
+    if (closing) {
+      if (stack.pop()?.name !== closing[1]) return false;
+      continue;
+    }
+    const name = /^<([\w:-]+)(?:\s|\/?>)/u.exec(token)?.[1];
+    if (!name) return false;
+    const element = { name, children: [] };
+    const parent = stack.at(-1);
+    (parent ? parent.children : roots).push(element);
+    if (!token.endsWith("/>")) stack.push(element);
+  }
+  if (stack.length || roots.length !== 1 || roots[0].name !== "svg") return false;
+  const hasPaint = (node) => node.children.some((child) => ["text", "path", "rect", "use"].includes(child.name) || hasPaint(child));
+  const wholePoint = (node) => (node.name === "g"
+    && node.children.some((child) => ["circle", "polygon"].includes(child.name))
+    && node.children.some((child) => child.name === "g"
+      && child.children.some((entry) => entry.name === "title") && hasPaint(child)))
+    || node.children.some(wholePoint);
+  return wholePoint(roots[0]);
+}
+
 function validateBrowserEvidence(name, artifactDir, phase, checkout) {
   if (name === "check:label-assets") {
     const evidence = evidenceObject(artifactDir, "native-retry-evidence.json");
@@ -214,7 +244,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             if (!value || typeof value !== "object") throw new Error(`Invalid point-node JSON: ${artifact}`);
           } else if (artifact.endsWith(".svg")) {
             const svg = bytes.toString();
-            if (!svg.includes('<svg') || !svg.includes('data-point-node=') || !svg.includes('data-point-contour=')) {
+            if (!hasWholePointSvg(svg)) {
               throw new Error(`Invalid whole-point SVG artifact: ${artifact}`);
             }
           } else if (artifact.endsWith(".png") && (bytes.length < 24

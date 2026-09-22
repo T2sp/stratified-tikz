@@ -247,6 +247,82 @@ export async function inspectAndAssertLabelContent(id: string, options: { fontSi
   return evidence
 }
 
+export type OracleCanvasMetrics = Pick<TextMetrics, 'width' | 'actualBoundingBoxAscent' |
+  'actualBoundingBoxDescent' | 'actualBoundingBoxLeft' | 'actualBoundingBoxRight'> &
+  Partial<Pick<TextMetrics, 'fontBoundingBoxAscent' | 'fontBoundingBoxDescent'>>
+
+/** Construct a Canvas font from longhands, never the often-empty SVG shorthand.
+ * Two sentinels detect a rejected assignment even if one matches the requested
+ * font. Record the browser's canonical configuration as well as the request. */
+export function configureLiteralCanvas(context: CanvasRenderingContext2D, properties: Record<string, string>) {
+  const requested = `${properties['font-style']} ${properties['font-weight']} ${properties['font-size']} ${properties['font-family']}`
+  context.font = '1px monospace'; context.font = requested
+  const effective = context.font
+  context.font = '2px serif'; context.font = requested
+  if (context.font !== effective) throw new Error(`Oracle Canvas rejected font: ${requested}`)
+  context.textAlign = 'left'; context.textBaseline = 'alphabetic'; context.direction = 'ltr'
+  context.fontKerning = properties['font-kerning'] as CanvasFontKerning
+  context.textRendering = properties['text-rendering'].toLowerCase() === 'optimizelegibility' ? 'optimizeLegibility' : 'auto'
+  // These fixtures use the established normal stretch/spacing contract. Do not
+  // silently measure an unsupported inherited font configuration as normal.
+  if (!['normal', '100%'].includes(properties['font-stretch']) ||
+    !['normal', '0px'].includes(properties['letter-spacing']) ||
+    !['normal', '0px'].includes(properties['word-spacing'])) throw new Error('Unsupported literal oracle font spacing/stretch')
+  return { requested, effective: context.font, textAlign: context.textAlign, textBaseline: context.textBaseline,
+    direction: context.direction, fontKerning: context.fontKerning, textRendering: context.textRendering,
+    fontStretch: context.fontStretch, letterSpacing: context.letterSpacing, wordSpacing: context.wordSpacing }
+}
+
+/** Independent collection boundary. Canvas font boxes define logical lines;
+ * fragment ink may expand EACH line. SVG boxes are observations, never line
+ * metrics. All values here are local SVG units (CSS px at the declared size),
+ * with no viewport/CTM scale applied. The explicit contract adds .2 em leading.
+ * Source splitting and measurement are independent of production placements. */
+export function collectLiteralMetrics<S extends { advance: number; bounds: OracleBounds }, T extends { advance: number }>(source: string, fontSize: number, tabSize: number,
+  canvas: (text: string) => OracleCanvasMetrics,
+  svg: (text: string) => S,
+  tabStop: (x: number) => T) {
+  const fontProbe = canvas('Mg'), svgProbe = svg('Mg'), space = canvas(' ')
+  const ascent = fontProbe.fontBoundingBoxAscent ?? fontProbe.actualBoundingBoxAscent
+  const descent = fontProbe.fontBoundingBoxDescent ?? fontProbe.actualBoundingBoxDescent
+  const lineGap = fontSize * .2
+  if (![ascent, descent, lineGap, space.width].every((n) => Number.isFinite(n) && n >= 0) || space.width === 0) {
+    throw new Error('Invalid independent Canvas line/space metrics')
+  }
+  const expected: { text: string; x: number; y: number; logicalX: number; line: number }[] = []
+  const tabs: T[] = []
+  const measurements: { text: string; line: number; canvas: OracleCanvasMetrics; svg: S }[] = []
+  const lines: { width: number; svgWidth: number; baseline: number; ascent: number; descent: number }[] = []
+  let minX = 0, maxX = 0
+  for (const [lineIndex, line] of (source === '' ? [] : source.split(/\r\n|[\r\n]/u)).entries()) {
+    let x = 0, nativeX = 0, lineAscent = ascent, lineDescent = descent
+    for (const [index, text] of line.split('\t').entries()) {
+      if (index) {
+        const tab = tabStop(nativeX); tabs.push(tab); nativeX = tab.advance
+        const interval = tabSize * space.width
+        x = (Math.floor(x / interval) + 1) * interval
+      }
+      if (!text) continue
+      const measured = canvas(text), native = svg(text)
+      measurements.push({ text, line: lineIndex, canvas: measured, svg: native })
+      expected.push({ text, x: nativeX, logicalX: x, y: 0, line: lineIndex })
+      lineAscent = Math.max(lineAscent, measured.actualBoundingBoxAscent, 0)
+      lineDescent = Math.max(lineDescent, measured.actualBoundingBoxDescent, 0)
+      minX = Math.min(minX, x - measured.actualBoundingBoxLeft)
+      maxX = Math.max(maxX, x + measured.actualBoundingBoxRight, x + measured.width)
+      x += measured.width; nativeX += native.advance
+    }
+    maxX = Math.max(maxX, x)
+    const previous = lines.at(-1)
+    lines.push({ width: x, svgWidth: nativeX, ascent: lineAscent, descent: lineDescent,
+      baseline: previous ? previous.baseline + previous.descent + lineGap + lineAscent : 0 })
+  }
+  for (const fragment of expected) fragment.y = lines[fragment.line].baseline
+  return { expected, lines, tabs, measurements, fontProbe, svgProbe, space, lineGap,
+    lineContract: { ascent, descent, method: 'Canvas font box, per-line ink expansion, previous descent + gap + next ascent' },
+    extent: { minX, maxX, minY: -(lines[0]?.ascent ?? 0), maxY: (lines.at(-1)?.baseline ?? 0) + (lines.at(-1)?.descent ?? 0) } }
+}
+
 /** Explicit body root works for points, inline nodes, free labels and sanitized
  * standalone SVG. Only direct foreground text counts; titles/halos never do. */
 export function inspectPositionedLiteral(node: SVGGElement, source: string, xml = false, sanitized = false) {
@@ -271,28 +347,15 @@ export function inspectPositionedLiteral(node: SVGGElement, source: string, xml 
     const font = textMetricStyle(fontText)
     const fontSize = Number.parseFloat(font.properties['font-size'])
     const tabSize = Number.parseFloat(font.properties['tab-size'])
-    const fontBox = measureSvgTextAdvance(fontText, 'Mg').bounds
-    const expected: { text: string; x: number; y: number }[] = []
-    const tabs: ReturnType<typeof measureSvgTabStop>[] = []
-    const lines: { width: number; baseline: number; ascent: number; descent: number }[] = []
-    let baseline = 0, minX = 0, maxX = 0
-    for (const line of source === '' ? [] : source.split(/\r\n|[\r\n]/u)) {
-      let x = 0
-      const parts = line.split('\t')
-      const ascent = Math.max(-fontBox.minY, 0), descent = Math.max(fontBox.maxY, 0)
-      for (const [index, text] of parts.entries()) {
-        if (index) { const tab = measureSvgTabStop(fontText, x, tabSize); tabs.push(tab); x = tab.advance }
-        if (text) {
-          expected.push({ text, x, y: baseline })
-          const measured = measureSvgTextAdvance(fontText, text)
-          minX = Math.min(minX, x + measured.bounds.minX); maxX = Math.max(maxX, x + measured.bounds.maxX)
-          x += measured.advance
-        }
-      }
-      maxX = Math.max(maxX, x)
-      lines.push({ width: x, baseline, ascent, descent })
-      baseline += ascent + descent + fontSize * .2
-    }
+    const context = required(document.createElement('canvas').getContext('2d'), 'Oracle Canvas unavailable')
+    const canvasConfiguration = configureLiteralCanvas(context, font.properties)
+    const measured = collectLiteralMetrics(source, fontSize, tabSize, (text) => {
+      const m = context.measureText(text)
+      return { width: m.width, actualBoundingBoxAscent: m.actualBoundingBoxAscent,
+        actualBoundingBoxDescent: m.actualBoundingBoxDescent, actualBoundingBoxLeft: m.actualBoundingBoxLeft,
+        actualBoundingBoxRight: m.actualBoundingBoxRight, fontBoundingBoxAscent: m.fontBoundingBoxAscent,
+        fontBoundingBoxDescent: m.fontBoundingBoxDescent }
+    }, (text) => measureSvgTextAdvance(fontText, text), (x) => measureSvgTabStop(fontText, x, tabSize))
     const contentMatrix = required(content.getScreenCTM(), 'Foreground transform missing')
     const fragments = texts.map((text) => {
       const matrix = contentMatrix.inverse().multiply(required(text.getScreenCTM(), 'Text transform missing'))
@@ -303,13 +366,24 @@ export function inspectPositionedLiteral(node: SVGGElement, source: string, xml 
         font: computed.properties, xmlSpace: computed.xmlSpace, visible: painted(text, node) }
     })
     const relative = required(node.getScreenCTM(), 'Body transform missing').inverse().multiply(contentMatrix)
+    const root = required(node.ownerSVGElement, 'Root SVG missing')
+    const rootBox = root.getBoundingClientRect()
     return { source: node.getAttribute('data-label-source'), request: node.getAttribute('data-label-request'),
       pointRequest: node.parentElement?.getAttribute('data-point-request') ?? null,
       title: Array.from(node.children).find((e) => e.localName === 'title')?.textContent ?? null,
       status: node.getAttribute('data-label-state'), xml, sanitized,
       math: Array.from(content.children).filter((e) => e.localName === 'svg').length,
-      fragments, expected, lines, tabs, offset: matrixData(relative),
-      extent: { minX, maxX, minY: -(lines[0]?.ascent ?? 0), maxY: (lines.at(-1)?.baseline ?? 0) + (lines.at(-1)?.descent ?? 0) },
+      fragments, ...measured, offset: matrixData(relative), font, canvasConfiguration,
+      fontReadiness: { status: document.fonts.status, checked: document.fonts.check(canvasConfiguration.requested, source || 'Mg'),
+        faces: Array.from(document.fonts, (face) => ({ family: face.family, style: face.style, weight: face.weight, status: face.status })) },
+      coordinateContext: { units: 'local SVG units; CTMs map to CSS screen pixels', devicePixelRatio,
+        viewport: { width: innerWidth, height: innerHeight }, viewBox: root.getAttribute('viewBox'),
+        svgViewport: { x: rootBox.x, y: rootBox.y, width: rootBox.width, height: rootBox.height },
+        rootToScreen: matrixData(required(root.getScreenCTM(), 'SVG CTM missing')),
+        bodyToScreen: matrixData(required(node.getScreenCTM(), 'Body CTM missing')), contentToScreen: matrixData(contentMatrix) },
+      deltas: fragments.map((fragment, index) => ({ x: fragment.x - (measured.expected[index]?.x ?? NaN),
+        y: fragment.y - (measured.expected[index]?.y ?? NaN), baseline: fragment.baseline - (measured.expected[index]?.y ?? NaN) })),
+      tolerances: { position: .5, transform: .001, extent: 1, containment: 1 },
       bounds: node.getAttribute('data-label-bounds')?.split(' ').map(Number) ?? null,
       native: transformBounds(asBounds(content.getBBox()), relative),
       measurementClones: node.querySelectorAll('[data-label-oracle-measurement]').length - (reference ? 0 : 1) }

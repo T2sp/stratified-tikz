@@ -18,6 +18,7 @@ import {
   captureCheckoutIdentity,
   runPhaseVerification,
   verificationMatchesCheckout,
+  hasWholePointSvg,
 } from '../../scripts/automation/phase-verification.mjs'
 
 const freeLabelGroups = [
@@ -87,7 +88,7 @@ if (command.startsWith('run check:')) {
     if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
-          ? '<svg><g data-point-node="fixture"><circle data-point-contour="true"/></g></svg>'
+          ? '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
           : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : '{}'
         fs.writeFileSync(path.join(artifacts, artifact), content)
       }
@@ -450,6 +451,17 @@ for (const phase of ['31B', '31D']) {
 }
 
 const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
+test('point SVG artifact gate accepts sanitized structure and rejects absent/damaged bodies and contours', () => {
+  const body = '<g><title>literal &lt;source&gt;</title><g><g><text x="0" y="0">literal</text></g></g></g>'
+  assert.equal(hasWholePointSvg(`<svg><g><circle r="20"/>${body}</g></svg>`), true)
+  assert.equal(hasWholePointSvg(`<svg><g><polygon points="0,0 20,0 0,20"/>${body}</g></svg>`), true)
+  for (const broken of [
+    '<svg><g data-point-node="fixture"><circle data-point-contour="true"/></g></svg>',
+    `<svg><g>${body}</g></svg>`, `<svg><circle r="20"/>${body}</svg>`,
+    `<svg><g><circle r="20"/>${body}</svg>`, '<svg><g><circle/><g><title>absent ink</title></g></g></svg>',
+    `<!-- <g><circle/>${body}</g> --><svg/>`,
+  ]) assert.equal(hasWholePointSvg(broken), false, broken)
+})
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'

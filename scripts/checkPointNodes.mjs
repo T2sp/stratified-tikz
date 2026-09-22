@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pointNodeScenarioArtifacts } from './automation/phase-verification.mjs'
 import { observePointLiteral, assertPositionedLiteral, pointLiteralNegativeControls } from './pointLiteralOracle.mjs'
-import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { createPointDiagnostics, capturePointCheck } from './pointCheckDiagnostics.mjs'
 import { runNativePointChecks } from './checkPointNodesApp.mjs'
 
 export async function inspectPoint(page, id) {
@@ -64,9 +64,7 @@ export async function runPointNodeChecks(context) {
   const diagnose = createPointDiagnostics(context)
   let scenario = 'point-language-shapes-2d-3d', caseDetails = {}
   const inspect = async () => {
-    const point = await inspectPoint(page, 'p')
-    await diagnose(scenario.startsWith('point-contour') || scenario.startsWith('point-camera') || scenario.startsWith('point-hidden') ? pickingGroup : bodyGroup, scenario, { ...caseDetails, point })
-    return point
+    return capturePointCheck(() => inspectPoint(page, 'p'), (details) => diagnose(scenario.startsWith('point-contour') || scenario.startsWith('point-camera') || scenario.startsWith('point-hidden') ? pickingGroup : bodyGroup, scenario, { ...caseDetails, ...details }))
   }
   const mutate = (change) => page.evaluate((change) => window.stzLabels.mutatePoint('p', change), change)
   const invariant = (a, b) => { for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(a[key], b[key], key) }
@@ -96,7 +94,8 @@ export async function runPointNodeChecks(context) {
       observed.push({ ambientDimension, shape, text, point })
     }
   }
-  for (const text of ['  $bad\t\tend  ', '\n\t$bad\r\n\r tail  \t\n', '\t\n\r\n\r\t']) {
+  for (const text of ['  $bad\t\tend  ', '\n\t$bad\r\n\r tail  \t\n', '\t\n\r\n\r\t',
+    '  $\\missingNativePoint$\t\n tail  ', '$bad\nA\u0302\u0301\t\n\n日g\r\n \t\r\t']) {
     caseDetails = { ambientDimension: 2, shape: 'circle', source: text }
     await mount([{ id: 'p', text }]); await settle()
     const point = await inspect(); assertPointLayout(point)
