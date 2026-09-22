@@ -2,6 +2,7 @@
 // serialized read-only diagnostics. No fixture model/history mutation helpers.
 import { createRoot } from 'react-dom/client'
 import App from '../../src/App.tsx'
+import { jsonPersistenceExpectation } from './jsonPersistenceExpectation.ts'
 import type { AppLabelBrowserSnapshot } from '../../src/App.tsx'
 import '../../src/index.css'
 import { createPointStratum, createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
@@ -68,6 +69,7 @@ const runtime = createSvgLabelRuntime({ measurement, service: {
 } })
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 const api = {
+  jsonPersistenceExpectation,
   state() {
     if (!snapshot) throw new Error('App has not committed its diagnostics')
     return { ...snapshot, selection: JSON.parse(snapshot.selection) as unknown, requests,

@@ -1,12 +1,14 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation, source/position separation, and native literal
-line-metric oracle corrections delivered; fresh complete parent browser
-verification and independent review remain required. The latest historical
-parent passed seven point scenarios before the native Inspector metric mismatch.
-The 2026-09-22 correction independently measures Canvas logical lines and SVG
-foreground geometry; see PHASE_32A_IMPLEMENTATION.md for results and handoff.
-32B–32D remain planned.
+Status: 32A implementation, source/position and native line-metric corrections,
+and the targeted JSON persistence-oracle correction are delivered. Fresh complete
+parent browser acceptance and independent review remain pending. The latest
+historical parent passed seven point scenarios and the native 2D metric/recovery
+checks, then failed at the JSON save oracle (required UI view metadata was absent
+from its model-only expectation). The corrected harness checks exact document
+content plus independently observed UI metadata, both modes in 2D/3D, strict
+reload and restoration. This child's localhost EPERM supplies no browser pass.
+See PHASE_32A_IMPLEMENTATION.md for evidence and exact final-checkout handoff.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

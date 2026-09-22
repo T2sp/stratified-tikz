@@ -435,3 +435,119 @@ including the new untracked test, retain all fifteen complete groups/eleven
 named point scenarios and artifacts, then perform independent review against
 `prompts/phase-32a-review.md`. No new native completion or independent review is
 claimed by this child. **32A remains pending acceptance; 32B–32D remain deferred.**
+
+## Targeted native JSON persistence oracle correction (2026-09-22)
+
+The starting checkout was clean on `phase/32a-tex-labeled-node`, HEAD
+`a0eefe53c396884dc0193600902104248ee423e2`; prior implementation, source/position
+and native Canvas line-metric corrections, sanitized-SVG verifier policy,
+fixtures and tests were already committed and preserved. No production save/load,
+model, rendering, schema, dependency or Phase 32B–32D behavior changed.
+
+### Actual parent failure
+
+The inspected report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32a-before-review-wOC4BM/verification.json`,
+with verifier response in `stz-phase-verifier-pMecCj/response.json` under that temp
+root. Its before/after fingerprint was
+`5a4c860a5254711ef637fd7d7345eda3d70c07c188845fba0b0affafa96e92c9` on revision
+`b0bd6b85144af46bed2194592a44b3be92639736` plus changes. Tests (2,496), build, diff
+and assets passed. Free labels failed at `point-node-native-input`, 11/15 groups,
+116 passing records, seven completed point scenarios, no page errors.
+
+`point-native-2d.json` matches raw point source, IDs, coordinates, codim, styles,
+layers and labels. Its additional `view.exportMode: inlineMath` is required UI
+persistence: both TikZ checks leave that mode selected. `state().json` deliberately
+serializes only the editable model, while Download JSON includes current UI
+options. The old whole-file save equality compared different contracts.
+Observations 0133–0138 confirm native 2D metric/recovery/cursor progress; 0133
+records baseline 16.399999618530273 versus 16.4 and bounds height 30.4. This was
+neither lost point text nor the earlier line-metric failure. Native 2D reload,
+3D, settled point exports, and subsequent App/export groups were not reached.
+The aggregate native scenario was not a pass. Independent review was not reached.
+
+### Corrected boundaries and evidence
+
+- `src/App.tsx` adds only a DEV read-only serialized `uiSettings` observation.
+  Its effect tracks mode, axis, camera and visibility changes. The independent
+  `json` model/history signature retains its previous meaning.
+- `scripts/fixtures/jsonPersistenceExpectation.ts` takes the original snapshot
+  and independently observed UI settings, never the download. Existing production
+  parsing/serialization and UI-option rules supply only expected view metadata;
+  all non-view fields come unchanged from the original document. This preserves
+  existing view values, applicable overrides, camera normalization, explicit
+  standalone mode, 3D false axis flags, and omission of default visibility.
+- `scripts/appJsonPersistence.mjs` compares the complete downloaded document,
+  reports difference paths, and asserts that download changes neither model,
+  history, selected settings nor document revision. Actual controls cross-check
+  the separate settings observation. Reload compares the entire saved payload
+  strictly, including its view, and checks restored UI state and selected controls.
+- `checkPointNodesApp.mjs` retains native direct/cursor/work-plane/Inspector,
+  recovery, history, both TikZ outputs and all rendering checks. It now downloads
+  and loads both inlineMath and standalone in each dimension. In 3D it changes
+  theta/phi/zoom/pan, saves false and true axis flags and nondefault visibility.
+  Before each reload it changes mode and applicable camera/axis/visibility controls
+  so restoration is observable. Load revision, cleared selection and redo branch
+  are checked separately from download invariance. Original native artifact names
+  remain; each dimension also writes a `-standalone.json` download.
+- `checkFreeLabelsApp.mjs` uses the same save assertion for every download and
+  strict reload checks for previously downloaded payloads, retaining CRLF/raw text,
+  history, both TikZ modes and conversion isolation checks. Filechooser/download
+  waits are owned; cleanup preserves primary errors and failure capture is bounded.
+  The renderer-only point snapshot/history consumers were audited and remain
+  model-only invariants.
+- Numbered point observations now include before-download, downloaded raw bytes,
+  parsed payload, expected metadata/document, independent settings/controls,
+  dimension/scenario/path and difference paths before assertions. Before-reload
+  and post-load model/control observations survive failures before the aggregate
+  scenario artifact exists. General App records use `app-persistence-*.json`.
+  A secondary diagnostic-write failure cannot replace a persistence mismatch;
+  observations never count as passing scenarios.
+
+### Registered regressions and actual checks
+
+`jsonPersistenceOracle.test.ts` exercises the same save/reload assertions used by
+the browser harness with independently constructed expected files in both modes
+and dimensions. It rejects missing/stale/incorrect mode, missing/stale camera,
+incorrect/missing axis, missing/stale/incorrect visibility, modified whitespace,
+text, coordinates, IDs, codim, style, layer, unrelated document fields, format,
+version and extra metadata. It covers defaults, existing view values, camera
+normalization, strict reload corruption and download/history isolation.
+`jsonPersistenceBrowserBoundary.test.mjs` runs the actual save/load orchestration
+with a deterministic event source, separate model/UI/download inputs, saved bytes,
+pre-assertion evidence, stale-observation rejection and failing post-load controls.
+These Node tests do not establish native browser acceptance.
+
+All commands used `/opt/homebrew/bin` first (Node v26.9.0):
+
+| Check | Actual result |
+| --- | --- |
+| New persistence tests | 38 passed; `/private/tmp/stz-32a-persistence-focused.log` |
+| Prior oracle/metrics/diagnostics/runner/verifier/failure tests plus initial 32 persistence tests | 166 passed; `/private/tmp/stz-32a-persistence-regressions.log` |
+| Full `npm test` | 2,534 passed, zero failures/skips; `/private/tmp/stz-32a-persistence-test.log` |
+| `npm run build` | Passed; existing >500 kB chunk warning; `/private/tmp/stz-32a-persistence-build.log` |
+| Strict fixture TypeScript / strict new-test TypeScript | Passed; `/private/tmp/stz-32a-persistence-{fixture,test}-tsc.log` |
+| New/changed fixture/test lint; recommended JS rules with browser/Node globals | Passed |
+| App targeted lint | Same baseline 9 errors/4 warnings, same rule/severity/message headlines; `/private/tmp/stz-32a-persistence-{baseline,app}-lint.json`; no unrelated cleanup |
+| Changed script syntax / `git diff --check` | Passed |
+| Direct configured `check:free-labels` | Blocked before browser launch at `development-server-listen`, `EPERM 127.0.0.1:5173`; `/private/tmp/stz-32a-persistence-free-labels.log` and matching artifact directory. All 15 groups unexecuted; zero new browser passes. |
+
+The direct run is an intermediate-tree startup failure, separate from the actual
+parent assertion above. No sandbox permissions, counts, verifier rules, artifacts,
+scenario identities or acceptance gates were relaxed.
+
+After these documentation edits, hold the checkout fixed and run:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+Final results and the exact tracked/untracked identity are retained outside the
+checkout at `/private/tmp/stz-32a-persistence-final-verification.json` and
+`/private/tmp/stz-32a-persistence-final-checkout.json` to avoid a self-referential
+fingerprint. The final response reports that run's actual result. A startup block
+is never an acceptance pass. The browser-capable parent must execute the same
+command on the final tree, retain all fifteen complete groups, eleven named point
+scenarios and required native/download/reopen artifacts, then independently review
+that exact matching checkout against `prompts/phase-32a-review.md`. Standalone
+verify does not perform review. **32A remains pending; 32B–32D remain deferred.**

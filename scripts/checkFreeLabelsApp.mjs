@@ -1,14 +1,23 @@
 /** Real-App acceptance. All model edits, imports, downloads and history changes
  * go through production controls; the fixture only holds adapter completions. */
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { ownPageEvent } from './ownedPageEvent.mjs'
+import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
+import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 
 export async function runAppChecks({ browser, origin, record, artifactDir }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
   const actions = []
+  const downloads = new Map(), owned = []
+  let primary, persistenceIndex = 0
+  const diagnosePersistence = async (details) => {
+    await writeFile(resolve(artifactDir, `app-persistence-${String(++persistenceIndex).padStart(4, '0')}.json`),
+      JSON.stringify({ scenario: 'real-App-input-JSON-history-reused-ID-load', result: 'observed', ...details }, null, 2))
+  }
   const state = () => page.evaluate(() => window.stzAppLabels.state())
   const model = async () => JSON.parse((await state()).json).diagram
   const history = async () => JSON.parse((await state()).history)
@@ -32,26 +41,26 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   const documentJson = (text, options = {}) => page.evaluate(({ input, settings }) => window.stzAppLabels.documentJson(input, settings), { input: text, settings: options })
   async function load(text, name) {
     const before = await state()
-    const chooser = page.waitForEvent('filechooser')
-    await page.getByRole('button', { name: 'Load JSON', exact: true }).click()
-    await (await chooser).setFiles({ name: `${name}.json`, mimeType: 'application/json', buffer: Buffer.from(text) })
+    await diagnosePersistence({ boundary: 'before-load', name, before, payload: text })
+    const wait = ownPageEvent(page, 'filechooser', { name, timeoutMs: 30_000 }); owned.push(wait)
+    const { event: chooser } = await wait.run(() => page.getByRole('button', { name: 'Load JSON', exact: true }).click({ timeout: 5000 }))
+    await chooser.setFiles({ name: `${name}.json`, mimeType: 'application/json', buffer: Buffer.from(text) })
     await page.waitForFunction((revision) => window.stzAppLabels.state().labelDocumentRevision > revision, before.labelDocumentRevision)
     const after = await state()
+    await diagnosePersistence({ boundary: 'after-load', name, before, loaded: after, payload: text })
+    if (downloads.has(text)) await checkAppJsonReload({ page, saved: downloads.get(text), diagnose: diagnosePersistence })
     assert.equal(after.labelDocumentRevision, before.labelDocumentRevision + 1, 'Production JSON load advances document ownership once')
     assert.equal(after.selection, null, 'Production load clears the current selection')
     actions.push({ action: 'Load JSON', name, beforeRevision: before.labelDocumentRevision, afterRevision: after.labelDocumentRevision,
       history: JSON.parse(after.history) })
   }
   async function save(name) {
-    const downloading = page.waitForEvent('download')
-    await page.getByRole('button', { name: 'Download JSON', exact: true }).click()
-    const download = await downloading
-    const target = resolve(artifactDir, `${name}.json`)
-    await download.saveAs(target)
-    const text = await readFile(target, 'utf8')
-    actions.push({ action: 'Download JSON', path: target, source: JSON.parse(text).diagram.labels[0].text })
-    return text
+    const saved = await saveAppJson({ page, artifactDir, name, diagnose: diagnosePersistence, owned })
+    downloads.set(saved.json, saved)
+    actions.push({ action: 'Download JSON', path: saved.path, source: saved.payload.diagram.labels[0].text })
+    return saved.json
   }
+
   async function tikz() {
     const result = {}
     // The wrapping label also contains the option text in its label string.
@@ -372,9 +381,12 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     await record('app-reused-id-production-document-load', { pendingA, revisionB, completionOrder: (await state()).completionOrder, actions: [...actions] })
     assert.deepEqual(errors, [], 'No App browser errors')
   } catch (error) {
-    await page.screenshot({ path: resolve(artifactDir, 'app-failure.png'), fullPage: true }).catch(() => {})
+    primary = error
+    await page.screenshot({ path: resolve(artifactDir, 'app-failure.png'), fullPage: true, timeout: 5000 }).catch(() => {})
     throw error
   } finally {
-    await page.close()
+    for (const wait of owned) wait.dispose()
+    await cleanupPointCheck(primary, () => page.close())
+    for (const wait of owned) await cleanupPointCheck(primary, () => wait.drain())
   }
 }

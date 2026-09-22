@@ -7,6 +7,7 @@ import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { cleanupPointCheck, capturePointCheck } from './pointCheckDiagnostics.mjs'
 import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
+import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 
 const nativeInvalidSource = '  $\\missingNativePoint$\t\n tail  '
 
@@ -138,12 +139,47 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         cursors.push({ plane, created, body: cursorBody })
         await page.getByRole('button', { name: 'Close inspector drawer', exact: true }).click()
       }
-      const beforeSave = await state()
-      const { event: download } = await eventAction('point-json', 'download', () => page.getByRole('button', { name: 'Download JSON', exact: true }).click())
-      const path = resolve(artifactDir, `point-native-${ambientDimension}d.json`); await download.saveAs(path)
-      const json = await readFile(path, 'utf8'); assert.deepEqual(JSON.parse(json), JSON.parse(beforeSave.json))
-      await load(json); await settle(); assert.deepEqual(await model(), JSON.parse(json).diagram)
-      entries.push({ ambientDimension, direct: rendered, invalidBody, metricComparison, cursors, code, jsonPath: path, beforeSave, loaded: await state() })
+      // Exercise both explicitly saved modes in each dimension. The first save
+      // retains tikz()'s inline selection; the second overrides stored metadata.
+      const persistence = []
+      if (ambientDimension === 3) {
+        if (!await page.getByRole('spinbutton', { name: 'theta value', exact: true }).count()) {
+          await page.locator('.camera-summary-toggle').click()
+        }
+        for (const [label, value] of [['theta', '41'], ['phi', '-28'], ['zoom', '1.3'], ['pan x', '12'], ['pan y', '-9']]) {
+          await page.getByRole('spinbutton', { name: `${label} value`, exact: true }).fill(value)
+        }
+      }
+      for (const mode of ['inlineMath', 'standalone']) {
+        await page.getByLabel(/^TikZ export mode:/).selectOption(mode)
+        if (ambientDimension === 3) {
+          await page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode === 'standalone')
+          await page.getByLabel('Enable approximate 3D visibility', { exact: true }).check()
+          await page.getByLabel('Auto depth-sort surfaces', { exact: true }).uncheck()
+        }
+        const diagnosePersistence = (details) => diagnose(bodyGroup, scenario, { mode, ...details })
+        const download = await saveAppJson({ page, artifactDir, owned,
+          name: `point-native-${ambientDimension}d${mode === 'standalone' ? '-standalone' : ''}`, diagnose: diagnosePersistence })
+        // Change real controls before loading: restoration cannot pass merely
+        // because the pre-load settings happened to equal the saved ones.
+        await page.getByLabel(/^TikZ export mode:/).selectOption(mode === 'inlineMath' ? 'standalone' : 'inlineMath')
+        if (ambientDimension === 3) {
+          await page.getByLabel('Show xyz axes in TikZ output', { exact: true }).setChecked(mode !== 'standalone')
+          await page.getByLabel('Auto depth-sort surfaces', { exact: true }).check()
+          await page.getByLabel('Enable approximate 3D visibility', { exact: true }).uncheck()
+          await page.getByRole('spinbutton', { name: 'theta value', exact: true }).fill('63')
+        }
+        const beforeLoad = await state()
+        await diagnosePersistence({ boundary: 'before-reload', beforeLoad, download })
+        await load(download.json); await settle()
+        const reloaded = await checkAppJsonReload({ page, saved: download, diagnose: diagnosePersistence })
+        assert.equal(reloaded.loaded.labelDocumentRevision, beforeLoad.labelDocumentRevision + 1)
+        assert.equal(reloaded.loaded.selection, null)
+        assert.deepEqual(JSON.parse(reloaded.loaded.history).future, [], 'Document replacement clears the redo branch')
+        persistence.push({ download, reloaded })
+      }
+      entries.push({ ambientDimension, direct: rendered, invalidBody, metricComparison, cursors, code, persistence,
+        jsonPath: persistence[0].download.path, beforeSave: persistence[0].download.before, loaded: persistence[0].reloaded.loaded })
     }
     await saved('point-native-direct-cursor-workplanes-inspector-persistence', entries, bodyGroup)
     setStage?.('point-node-settled-export')
