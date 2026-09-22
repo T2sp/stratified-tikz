@@ -1763,3 +1763,24 @@ report/log paths, inspected artifacts and remaining gates.
   checkout through a fresh invocation of the corrected runner, then complete
   independent review. Neither a child startup failure nor successful browser
   stdout without an accepted parent report closes the gate. No gate is waived.
+
+## Phase 32: Point-node math, paint, geometric shapes, and layout
+
+Status: planned; implementation has not started. Close the recorded Phase 31F
+verification/review gates before starting this sequence. The detailed scope,
+compatibility rules, reference fixtures, and acceptance criteria are in the
+[Phase 32 implementation plan](./PHASE_32_PLAN.md).
+
+| Subphase | Responsibility |
+| --- | --- |
+| 32A | Apply the shared MathJax runtime to Add point bodies; synchronize contour, picking, and whole-node settled SVG export |
+| 32B | Separate text/fill/border paint and faithfully import ordered style options while preserving old documents |
+| 32C | Implement all eleven `shapes.geometric` shapes, their parameters, and shape-specific body fitting |
+| 32D | Complete per-shape spacing, minimum-dimension and anchor behavior across preview, editing, and export |
+
+Shape construction in 32C must already use each shape's body-fitting rules.
+32D completes configurable layout and anchor fidelity; it is not a generic
+bounding-box scaling pass. Preserve legacy square/triangle regular polygons,
+white hollow fill, and the existing `size / 2` inner-separation convention.
+Phase 32 adds planned work only; it does not change Phase 31 completion status
+or register executable automation phases yet.

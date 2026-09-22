@@ -295,7 +295,7 @@ function runCodex(promptFile, logFile, verificationContext = "") {
     "--sandbox",
     "workspace-write",
     "-c",
-    "model_reasoning_effort=ultra",
+    "model_reasoning_effort=high",
     "-c",
     "features.fast_mode=true",
     prompt,
