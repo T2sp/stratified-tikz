@@ -1,12 +1,22 @@
 # Phase 31 combined label audit
 
 Phase 31F adds combined regression coverage and reconciles the label documentation.
-**Phase 31 is not complete.** The `HHcakE` parent run executed all twelve browser
-groups successfully, including `combined-free-inline-workflows`, but rejected
-the complete report using a stale eleven-group verifier retained from parent
-startup. Independent 31F review was not reached. A fresh invocation of the
-corrected runner must accept evidence for the final checkout before review;
-the failed parent report remains failed.
+**Phase 31 completed its acceptance gate on 2026-09-21.** The later fresh
+`im78Xe` parent report passed all five commands with matching before/after
+fingerprint `2e0cf23896484601b3579d6a4126c17324eed1f5026dbfba17ef88b6c730b829`.
+Its actual browser report records twelve completed groups, 144 scenarios, Chrome
+153.0.8010.52, and no incomplete groups or page errors. Independent review in
+`logs/codex/31F-review.log` accepted that exact evidence and inspected the
+transparent/white standalone artifacts; `31F-review-summary.json` reports pass.
+The accepted changes were committed as `0990623` and merged as `0b619f1`.
+At 32A prerequisite inspection, production files and the verifier/worker remained
+unchanged since that completion; subsequent changes added the Phase 32 plan and
+prompts and adjusted the runner. The retained failed runs below remain historical
+failures, not acceptance evidence for 32A.
+
+Accepted report: `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase31f-before-review-im78Xe/verification.json`.
+The following detailed audit describes the earlier failures and correction.
+References below to pending final acceptance describe the pre-`im78Xe` state.
 
 ## Prerequisites and production integration
 

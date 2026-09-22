@@ -1,4 +1,4 @@
-import type { LabelAnchor } from '../model/types.ts'
+import type { LabelAnchor, PointStyle } from '../model/types.ts'
 import type { LabelLayoutSettings } from './labels/labelMetrics.ts'
 import { normalizeSvgLabelFontSize, svgLabelFontFamily } from './labels/svgLabelLayout.ts'
 import type { SvgLabelRuntime } from './labels/svgLabelRuntime.ts'
@@ -6,6 +6,8 @@ import type { SvgLabelRuntime } from './labels/svgLabelRuntime.ts'
 /** Runtime-only committed label inputs. No model objects or callbacks are retained. */
 export type SvgLabelExportCapture = Readonly<{
   runtime: SvgLabelRuntime
+  /** When present this capture owns the entire point, including its contour. */
+  pointStyle?: Readonly<PointStyle>
   source: string
   position: Readonly<{ x: number; y: number }>
   fontSize: number
@@ -26,6 +28,7 @@ type SvgLabelExportCaptureInput = Omit<SvgLabelExportCapture, 'fontFamily' | 'bo
 export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLabelExportCapture {
   return Object.freeze({
     runtime: input.runtime,
+    pointStyle: input.pointStyle === undefined ? undefined : Object.freeze({ ...input.pointStyle }),
     source: input.source,
     position: Object.freeze({ x: input.position.x, y: input.position.y }),
     fontSize: normalizeSvgLabelFontSize(input.fontSize),

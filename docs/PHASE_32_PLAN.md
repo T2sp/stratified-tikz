@@ -1,6 +1,18 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: planned; no Phase 32 implementation has started.
+Status: 32A implementation and the source/metric/persistence/coordinate/XML-Canvas
+corrections are preserved. The latest historical parent (`cCLyYw`) completed
+11/15 groups and eight point scenarios, then failed the first point export's
+radius comparison against a renderer contaminated by the font-readiness test.
+Chrome reported the injected family's name as `"Times New Roman"`; name-based
+cleanup missed it. The targeted harness fix owns and removes that exact face,
+checks native metric/contour restoration in the reused page, and validates
+click-time App/download/reference font compatibility before geometry assertions.
+Fresh complete parent browser acceptance and independent review remain pending.
+The child cannot start the localhost server (`EPERM`); this supplies no native
+pass. All 15 groups / 11 point scenarios and required artifacts remain mandatory.
+32B–32D remain deferred. See PHASE_32A_IMPLEMENTATION.md for actual results and
+final-checkout handoff.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.
@@ -12,10 +24,9 @@ remain usable and pass its own acceptance checks before the next stage begins.
 | 32C | All eleven `shapes.geometric` shapes and their documented shape parameters |
 | 32D | Complete shape-specific spacing, minimum dimensions, and anchors |
 
-The existing Phase 31F completion audit still records open verification/review
-gates. Confirm and close those gates against the current checkout before starting
-32A; this plan does not change Phase 31's status or treat historical evidence as
-verification of later changes.
+The 31F prerequisite was confirmed from the accepted `im78Xe` parent report and
+independent passing review before 32A implementation; see PHASE_31_COMPLETION_AUDIT.md.
+Historical evidence does not verify later Phase 32 changes.
 
 ## Scope and compatibility
 
@@ -303,8 +314,9 @@ fresh accepted verification and independent review before each stage completes.
 
 During implementation, prepare matching `prompts/phase-32a-implement.md` /
 `phase-32a-review.md` through 32D in the existing prompt format, and register
-their phase slugs and verification policy in `scripts/automation/`. This plan
-does not yet add runnable phases or change the automation's behavior.
+their phase slugs and verification policy in `scripts/automation/`. The 32A
+implementation registers all four slugs and activates its cumulative browser
+requirements; future groups remain the responsibility of their own subphase.
 
 Suggested slugs: `32A: point-node-mathjax`, `32B: point-node-paint`,
 `32C: point-node-geometric-shapes`, `32D: point-node-layout-anchors`.

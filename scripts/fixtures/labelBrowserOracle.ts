@@ -26,6 +26,69 @@ function required<T>(value: T | null | undefined, message: string): T {
   return value
 }
 
+const oracleHtmlNamespace = 'http://www.w3.org/1999/xhtml'
+
+function requireOracleCanvasContext(canvas: Element, owner: Document, options?: CanvasRenderingContext2DSettings) {
+  if (canvas.namespaceURI !== oracleHtmlNamespace || canvas.localName !== 'canvas') {
+    throw new Error('Oracle Canvas creation did not produce an XHTML canvas')
+  }
+  if (canvas.ownerDocument !== owner) throw new Error('Oracle Canvas has the wrong owner document')
+  if (canvas.isConnected || canvas.parentNode !== null) throw new Error('Oracle Canvas must remain detached')
+  if (!('getContext' in canvas) || typeof canvas.getContext !== 'function') {
+    throw new Error('Oracle Canvas getContext capability unavailable')
+  }
+  // The namespace and capability checks precede this DOM type narrowing; an
+  // XML createElement("canvas") is an Element, despite HTML-centric DOM types.
+  const context = (canvas as HTMLCanvasElement).getContext('2d', options)
+  if (context === null || context === undefined) throw new Error('Oracle Canvas 2D context unavailable')
+  if (typeof context.measureText !== 'function') throw new Error('Oracle Canvas 2D measureText capability unavailable')
+  return { canvas: canvas as HTMLCanvasElement, context }
+}
+
+/** Detached, in the observed node's document/font context, including XML SVG. */
+export function createOracleCanvas(node: Element, options?: CanvasRenderingContext2DSettings) {
+  const owner = node.ownerDocument
+  const canvas = owner.createElementNS(oracleHtmlNamespace, 'canvas')
+  return requireOracleCanvasContext(canvas, owner, options)
+}
+
+/** Collection diagnostics run before metrics and do not mutate the document.
+ * Keep the legacy creation observation to expose the HTML/XML boundary using
+ * native element interfaces, not just the reported document content type. */
+export function inspectOracleDocumentContext(node: Element) {
+  const owner = node.ownerDocument, view = owner.defaultView
+  const errorText = (error: unknown) => error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  const describeElement = (element: Element) => ({ localName: element.localName, namespaceURI: element.namespaceURI,
+    interface: element.constructor.name, ownerDocumentMatches: element.ownerDocument === owner,
+    isConnected: element.isConnected, parentNodePresent: element.parentNode !== null })
+  const describeCanvas = (explicitNamespace: boolean) => {
+    try {
+      const canvas = explicitNamespace ? owner.createElementNS(oracleHtmlNamespace, 'canvas') : owner.createElement('canvas')
+      let context: CanvasRenderingContext2D | null = null, error: string | null = null
+      try {
+        // The corrected branch uses precisely the same checks as measurement.
+        if (explicitNamespace) context = requireOracleCanvasContext(canvas, owner).context
+        else if ('getContext' in canvas && typeof canvas.getContext === 'function') context = (canvas as HTMLCanvasElement).getContext('2d')
+      } catch (cause) { error = errorText(cause) }
+      return { ...describeElement(canvas), htmlCanvasElement: view ? canvas instanceof view.HTMLCanvasElement : null,
+        getContext: 'getContext' in canvas ? typeof canvas.getContext : 'undefined', context2dAvailable: context !== null,
+        contextInterface: context?.constructor.name ?? null, measureText: typeof context?.measureText, error }
+    } catch (cause) { return { creationError: errorText(cause) } }
+  }
+  const fontNode = node.querySelector('text') ?? node
+  const style = view?.getComputedStyle(fontNode)
+  return {
+    url: owner.URL, contentType: owner.contentType,
+    root: owner.documentElement ? describeElement(owner.documentElement) : null,
+    body: owner.body ? { ...describeElement(owner.body), font: view?.getComputedStyle(owner.body).font ?? null } : null,
+    fonts: owner.fonts ? { status: owner.fonts.status, size: owner.fonts.size,
+      faces: Array.from(owner.fonts, (face) => ({ family: face.family, style: face.style, weight: face.weight, status: face.status })) } : null,
+    observedNode: describeElement(node), fontNode: { ...describeElement(fontNode),
+      font: style?.font ?? null, properties: style ? Object.fromEntries(textMetricProperties.map((property) => [property, style.getPropertyValue(property)])) : null },
+    legacyCanvas: describeCanvas(false), canvas: describeCanvas(true),
+  }
+}
+
 const textMetricProperties = [
   'font-family', 'font-size', 'font-style', 'font-weight', 'font-stretch',
   'font-size-adjust', 'font-kerning', 'font-optical-sizing', 'font-feature-settings',
@@ -76,7 +139,7 @@ export function measureSvgTextAdvance(text: SVGTextElement, value: string) {
     const effective = textMetricStyle(clone)
     const advance = clone.getComputedTextLength()
     if (!Number.isFinite(advance) || advance < 0) throw new Error('SVG text measurement returned a nonfinite or negative advance')
-    return { method: 'svg-text-clone' as const, text: value, advance, computed, effective }
+    return { method: 'svg-text-clone' as const, text: value, advance, bounds: asBounds(clone.getBBox()), computed, effective }
   } finally {
     clone.remove()
   }
@@ -166,7 +229,7 @@ export async function inspectLabelContent(id: string, options: { fontSize?: numb
   const width = viewport.maxX - viewport.minX, height = viewport.maxY - viewport.minY
   const rasterScale = Math.min(4, 4096 / Math.max(width, height))
   if (!(rasterScale > 0 && width * height * rasterScale ** 2 < 20_000_000)) throw new Error(`${id}: oracle raster limit`)
-  const isolated = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  const isolated = node.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg')
   isolated.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   isolated.setAttribute('width', String(Math.ceil(width * rasterScale)))
   isolated.setAttribute('height', String(Math.ceil(height * rasterScale)))
@@ -175,11 +238,10 @@ export async function inspectLabelContent(id: string, options: { fontSize?: numb
   const clone = content.cloneNode(true) as SVGGElement
   clone.querySelectorAll('[data-svg-export-exclude],title,desc').forEach((element) => element.remove())
   isolated.append(clone)
-  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(isolated)], { type: 'image/svg+xml' }))
-  const raster = document.createElement('canvas')
+  const { canvas: raster, context: rasterContext } = createOracleCanvas(node, { willReadFrequently: true })
   raster.width = Math.ceil(width * rasterScale)
   raster.height = Math.ceil(height * rasterScale)
-  const rasterContext = required(raster.getContext('2d', { willReadFrequently: true }), 'Raster context unavailable')
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(isolated)], { type: 'image/svg+xml' }))
   try {
     const image = new Image()
     image.src = url
@@ -245,4 +307,147 @@ export async function inspectAndAssertLabelContent(id: string, options: { fontSi
   const evidence = await inspectLabelContent(id, options)
   assertLabelContent(evidence)
   return evidence
+}
+
+export type OracleCanvasMetrics = Pick<TextMetrics, 'width' | 'actualBoundingBoxAscent' |
+  'actualBoundingBoxDescent' | 'actualBoundingBoxLeft' | 'actualBoundingBoxRight'> &
+  Partial<Pick<TextMetrics, 'fontBoundingBoxAscent' | 'fontBoundingBoxDescent'>>
+
+/** Construct a Canvas font from longhands, never the often-empty SVG shorthand.
+ * Two sentinels detect a rejected assignment even if one matches the requested
+ * font. Record the browser's canonical configuration as well as the request. */
+export function configureLiteralCanvas(context: CanvasRenderingContext2D, properties: Record<string, string>) {
+  const requested = `${properties['font-style']} ${properties['font-weight']} ${properties['font-size']} ${properties['font-family']}`
+  context.font = '1px monospace'; context.font = requested
+  const effective = context.font
+  context.font = '2px serif'; context.font = requested
+  if (context.font !== effective) throw new Error(`Oracle Canvas rejected font: ${requested}`)
+  context.textAlign = 'left'; context.textBaseline = 'alphabetic'; context.direction = 'ltr'
+  context.fontKerning = properties['font-kerning'] as CanvasFontKerning
+  context.textRendering = properties['text-rendering'].toLowerCase() === 'optimizelegibility' ? 'optimizeLegibility' : 'auto'
+  // These fixtures use the established normal stretch/spacing contract. Do not
+  // silently measure an unsupported inherited font configuration as normal.
+  if (!['normal', '100%'].includes(properties['font-stretch']) ||
+    !['normal', '0px'].includes(properties['letter-spacing']) ||
+    !['normal', '0px'].includes(properties['word-spacing'])) throw new Error('Unsupported literal oracle font spacing/stretch')
+  return { requested, effective: context.font, textAlign: context.textAlign, textBaseline: context.textBaseline,
+    direction: context.direction, fontKerning: context.fontKerning, textRendering: context.textRendering,
+    fontStretch: context.fontStretch, letterSpacing: context.letterSpacing, wordSpacing: context.wordSpacing }
+}
+
+/** Independent collection boundary. Canvas font boxes define logical lines;
+ * fragment ink may expand EACH line. SVG boxes are observations, never line
+ * metrics. All values here are local SVG units (CSS px at the declared size),
+ * with no viewport/CTM scale applied. The explicit contract adds .2 em leading.
+ * Source splitting and measurement are independent of production placements. */
+export function collectLiteralMetrics<S extends { advance: number; bounds: OracleBounds }, T extends { advance: number }>(source: string, fontSize: number, tabSize: number,
+  canvas: (text: string) => OracleCanvasMetrics,
+  svg: (text: string) => S,
+  tabStop: (x: number) => T) {
+  const fontProbe = canvas('Mg'), svgProbe = svg('Mg'), space = canvas(' ')
+  const ascent = fontProbe.fontBoundingBoxAscent ?? fontProbe.actualBoundingBoxAscent
+  const descent = fontProbe.fontBoundingBoxDescent ?? fontProbe.actualBoundingBoxDescent
+  const lineGap = fontSize * .2
+  if (![ascent, descent, lineGap, space.width].every((n) => Number.isFinite(n) && n >= 0) || space.width === 0) {
+    throw new Error('Invalid independent Canvas line/space metrics')
+  }
+  const expected: { text: string; x: number; y: number; logicalX: number; line: number }[] = []
+  const tabs: T[] = []
+  const measurements: { text: string; line: number; canvas: OracleCanvasMetrics; svg: S }[] = []
+  const lines: { width: number; svgWidth: number; baseline: number; ascent: number; descent: number }[] = []
+  let minX = 0, maxX = 0
+  for (const [lineIndex, line] of (source === '' ? [] : source.split(/\r\n|[\r\n]/u)).entries()) {
+    let x = 0, nativeX = 0, lineAscent = ascent, lineDescent = descent
+    for (const [index, text] of line.split('\t').entries()) {
+      if (index) {
+        const tab = tabStop(nativeX); tabs.push(tab); nativeX = tab.advance
+        const interval = tabSize * space.width
+        x = (Math.floor(x / interval) + 1) * interval
+      }
+      if (!text) continue
+      const measured = canvas(text), native = svg(text)
+      measurements.push({ text, line: lineIndex, canvas: measured, svg: native })
+      expected.push({ text, x: nativeX, logicalX: x, y: 0, line: lineIndex })
+      lineAscent = Math.max(lineAscent, measured.actualBoundingBoxAscent, 0)
+      lineDescent = Math.max(lineDescent, measured.actualBoundingBoxDescent, 0)
+      minX = Math.min(minX, x - measured.actualBoundingBoxLeft)
+      maxX = Math.max(maxX, x + measured.actualBoundingBoxRight, x + measured.width)
+      x += measured.width; nativeX += native.advance
+    }
+    maxX = Math.max(maxX, x)
+    const previous = lines.at(-1)
+    lines.push({ width: x, svgWidth: nativeX, ascent: lineAscent, descent: lineDescent,
+      baseline: previous ? previous.baseline + previous.descent + lineGap + lineAscent : 0 })
+  }
+  for (const fragment of expected) fragment.y = lines[fragment.line].baseline
+  return { expected, lines, tabs, measurements, fontProbe, svgProbe, space, lineGap,
+    lineContract: { ascent, descent, method: 'Canvas font box, per-line ink expansion, previous descent + gap + next ascent' },
+    extent: { minX, maxX, minY: -(lines[0]?.ascent ?? 0), maxY: (lines.at(-1)?.baseline ?? 0) + (lines.at(-1)?.descent ?? 0) } }
+}
+
+/** Explicit body root works for points, inline nodes, free labels and sanitized
+ * standalone SVG. Only direct foreground text counts; titles/halos never do. */
+export function inspectPositionedLiteral(node: SVGGElement, source: string, xml = false, sanitized = false) {
+  const paint = required(Array.from(node.children).find((e) => e.localName === 'g') as SVGGElement | undefined, 'Label paint missing')
+  const content = required(Array.from(paint.children).filter((e) => e.localName === 'g'
+    && !e.hasAttribute('data-label-halo') && e.getAttribute('aria-hidden') !== 'true').at(-1) as SVGGElement | undefined, 'Label foreground missing')
+  const texts = Array.from(content.children).filter((e): e is SVGTextElement => e.localName === 'text' && !e.hasAttribute('data-label-oracle-measurement'))
+  const reference = texts[0]
+  // Whitespace-only sources with no glyphs still have explicit captured font
+  // identity; use a temporary SVG probe, never a default Canvas shorthand.
+  const probe = node.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'text')
+  if (!reference) {
+    const identity = JSON.parse(required(node.getAttribute('data-label-request'), 'Glyphless probe needs font identity')) as [string, string, number, string, string]
+    probe.setAttribute('font-family', identity[1]); probe.setAttribute('font-size', String(identity[2]))
+    probe.setAttribute('font-weight', identity[3]); probe.setAttribute('font-style', identity[4])
+    probe.style.whiteSpace = 'pre'; probe.style.tabSize = '4'
+    probe.setAttribute('xml:space', 'preserve'); probe.setAttribute('data-label-oracle-measurement', 'true')
+    probe.style.opacity = '0'; content.append(probe)
+  }
+  try {
+    const fontText = reference ?? probe
+    const font = textMetricStyle(fontText)
+    const fontSize = Number.parseFloat(font.properties['font-size'])
+    const tabSize = Number.parseFloat(font.properties['tab-size'])
+    const { context } = createOracleCanvas(node)
+    const canvasConfiguration = configureLiteralCanvas(context, font.properties)
+    const measured = collectLiteralMetrics(source, fontSize, tabSize, (text) => {
+      const m = context.measureText(text)
+      return { width: m.width, actualBoundingBoxAscent: m.actualBoundingBoxAscent,
+        actualBoundingBoxDescent: m.actualBoundingBoxDescent, actualBoundingBoxLeft: m.actualBoundingBoxLeft,
+        actualBoundingBoxRight: m.actualBoundingBoxRight, fontBoundingBoxAscent: m.fontBoundingBoxAscent,
+        fontBoundingBoxDescent: m.fontBoundingBoxDescent }
+    }, (text) => measureSvgTextAdvance(fontText, text), (x) => measureSvgTabStop(fontText, x, tabSize))
+    const contentMatrix = required(content.getScreenCTM(), 'Foreground transform missing')
+    const fragments = texts.map((text) => {
+      const matrix = contentMatrix.inverse().multiply(required(text.getScreenCTM(), 'Text transform missing'))
+      const x = text.x.baseVal.getItem(0).value, y = text.y.baseVal.getItem(0).value
+      const computed = textMetricStyle(text)
+      return { text: text.textContent ?? '', x, y, baseline: new DOMPoint(x, y).matrixTransform(matrix).y,
+        transform: text.getAttribute('transform'), matrix: matrixData(matrix), bounds: asBounds(text.getBBox()),
+        font: computed.properties, xmlSpace: computed.xmlSpace, visible: painted(text, node) }
+    })
+    const relative = required(node.getScreenCTM(), 'Body transform missing').inverse().multiply(contentMatrix)
+    const root = required(node.ownerSVGElement, 'Root SVG missing')
+    const rootBox = root.getBoundingClientRect()
+    return { source: node.getAttribute('data-label-source'), request: node.getAttribute('data-label-request'),
+      pointRequest: node.parentElement?.getAttribute('data-point-request') ?? null,
+      title: Array.from(node.children).find((e) => e.localName === 'title')?.textContent ?? null,
+      status: node.getAttribute('data-label-state'), xml, sanitized,
+      math: Array.from(content.children).filter((e) => e.localName === 'svg').length,
+      fragments, ...measured, offset: matrixData(relative), font, canvasConfiguration,
+      fontReadiness: { status: node.ownerDocument.fonts.status, checked: node.ownerDocument.fonts.check(canvasConfiguration.requested, source || 'Mg'),
+        faces: Array.from(node.ownerDocument.fonts, (face) => ({ family: face.family, style: face.style, weight: face.weight, status: face.status })) },
+      coordinateContext: { units: 'local SVG units; CTMs map to CSS screen pixels', devicePixelRatio,
+        viewport: { width: innerWidth, height: innerHeight }, viewBox: root.getAttribute('viewBox'),
+        svgViewport: { x: rootBox.x, y: rootBox.y, width: rootBox.width, height: rootBox.height },
+        rootToScreen: matrixData(required(root.getScreenCTM(), 'SVG CTM missing')),
+        bodyToScreen: matrixData(required(node.getScreenCTM(), 'Body CTM missing')), contentToScreen: matrixData(contentMatrix) },
+      deltas: fragments.map((fragment, index) => ({ x: fragment.x - (measured.expected[index]?.x ?? NaN),
+        y: fragment.y - (measured.expected[index]?.y ?? NaN), baseline: fragment.baseline - (measured.expected[index]?.y ?? NaN) })),
+      tolerances: { position: .5, transform: .001, extent: 1, containment: 1 },
+      bounds: node.getAttribute('data-label-bounds')?.split(' ').map(Number) ?? null,
+      native: transformBounds(asBounds(content.getBBox()), relative),
+      measurementClones: node.querySelectorAll('[data-label-oracle-measurement]').length - (reference ? 0 : 1) }
+  } finally { probe.remove() }
 }

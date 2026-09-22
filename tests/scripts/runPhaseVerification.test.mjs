@@ -13,9 +13,12 @@ import { dirname, join, relative } from 'node:path'
 import test from 'node:test'
 import {
   browserChecksForPhase,
+  pointNodeScenarios,
+  pointNodeScenarioArtifacts,
   captureCheckoutIdentity,
   runPhaseVerification,
   verificationMatchesCheckout,
+  hasWholePointSvg,
 } from '../../scripts/automation/phase-verification.mjs'
 
 const freeLabelGroups = [
@@ -81,11 +84,21 @@ if (command.startsWith('run check:')) {
   } else if (command === 'run check:free-labels') {
     const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS)
     const incomplete = process.env.STZ_TEST_FREE_EVIDENCE === 'incomplete'
+    const pointEvidence = JSON.parse(process.env.STZ_TEST_POINT_EVIDENCE || '{}')
+    if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
+      for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
+        const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
+          ? '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
+          : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : '{}'
+        fs.writeFileSync(path.join(artifacts, artifact), content)
+      }
+    }
     save('free-labels-evidence.json', {
       result: 'passed', stage: 'complete', environment: { browserVersion: 'fixture Chromium' },
       completed: incomplete ? groups.slice(0, -1) : groups,
       incompleteGroups: incomplete ? groups.slice(-1) : [],
       unexecuted: [], pageErrors: [], evidence: groups.map(name => ({ name })),
+      ...pointEvidence,
       ...JSON.parse(process.env.STZ_TEST_FREE_EVIDENCE_OVERRIDE || '{}'),
     })
   }
@@ -170,10 +183,10 @@ function storedReport(report) {
 
 test('browser gates apply to 31B and all subsequent label subphases only', () => {
   assert.deepEqual(browserChecksForPhase('31B'), ['check:label-assets'])
-  for (const phase of ['31C', '31D', '31E', '31F']) {
+  for (const phase of ['31C', '31D', '31E', '31F', '32A', '32B', '32C', '32D']) {
     assert.deepEqual(browserChecksForPhase(phase), ['check:label-assets', 'check:free-labels'])
   }
-  for (const phase of ['30', '31A', '32A']) {
+  for (const phase of ['30', '31A', '33A']) {
     assert.deepEqual(browserChecksForPhase(phase), [])
   }
 })
@@ -434,5 +447,54 @@ for (const phase of ['31B', '31D']) {
     assert.match(error.message, /checkout changed/i)
     assert.equal(error.report.status, 'failed')
     assert.equal(storedReport(error.report).status, 'failed')
+  })
+}
+
+const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
+test('point SVG artifact gate accepts sanitized structure and rejects absent/damaged bodies and contours', () => {
+  const body = '<g><title>literal &lt;source&gt;</title><g><g><text x="0" y="0">literal</text></g></g></g>'
+  assert.equal(hasWholePointSvg(`<svg><g><circle r="20"/>${body}</g></svg>`), true)
+  assert.equal(hasWholePointSvg(`<svg><g><polygon points="0,0 20,0 0,20"/>${body}</g></svg>`), true)
+  for (const broken of [
+    '<svg><g data-point-node="fixture"><circle data-point-contour="true"/></g></svg>',
+    `<svg><g>${body}</g></svg>`, `<svg><circle r="20"/>${body}</svg>`,
+    `<svg><g><circle r="20"/>${body}</svg>`, '<svg><g><circle/><g><title>absent ink</title></g></g></svg>',
+    `<!-- <g><circle/>${body}</g> --><svg/>`,
+  ]) assert.equal(hasWholePointSvg(broken), false, broken)
+})
+function completePointEvidence(fixture) {
+  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
+  fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
+  const evidence = { checkout: captureCheckoutIdentity({ cwd: fixture.cwd, env: fixture.env }),
+    evidence: Object.entries(pointNodeScenarios).flatMap(([group, names]) => names.map((name) =>
+      ({ group, name, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) }))) }
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  return evidence
+}
+for (const phase of ['32A', '32B', '32C', '32D']) {
+  test(`${phase} requires cumulative implemented point scenarios and accepts complete evidence`, (t) => {
+    assert.deepEqual(browserChecksForPhase(phase), ['check:label-assets', 'check:free-labels'])
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    assert.equal(verify(t, fixture, phase).status, 'passed')
+  })
+  test(`${phase} rejects an otherwise successful Phase 31F report`, (t) => {
+    const fixture = checkoutFixture(t)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(combinedLabelGroups)
+    assert.throws(() => verify(t, fixture, phase), /15 required groups/)
+  })
+}
+for (const fault of ['scenarios', 'terminal', 'identity', 'artifacts', 'corrupt-artifacts', 'page-error']) {
+  test(`32A rejects exit-zero point evidence with missing ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    const evidence = completePointEvidence(fixture)
+    if (fault === 'scenarios') evidence.evidence.pop()
+    if (fault === 'terminal') evidence.evidence[0].result = 'started'
+    if (fault === 'identity') evidence.checkout.trackedDiffSha256 = 'obsolete'
+    if (fault === 'artifacts') fixture.env.STZ_TEST_POINT_ARTIFACTS = 'no'
+    if (fault === 'corrupt-artifacts') fixture.env.STZ_TEST_POINT_CORRUPT = 'yes'
+    if (fault === 'page-error') evidence.pageErrors = ['unhandled rejection']
+    fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+    assert.throws(() => verify(t, fixture, '32A'), /incomplete or invalid/)
   })
 }
