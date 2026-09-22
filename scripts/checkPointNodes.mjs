@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pointNodeScenarioArtifacts } from './automation/phase-verification.mjs'
+import { observePointLiteral, assertPositionedLiteral, pointLiteralNegativeControls } from './pointLiteralOracle.mjs'
+import { createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { runNativePointChecks } from './checkPointNodesApp.mjs'
 
 export async function inspectPoint(page, id) {
-  return page.evaluate((id) => {
-    const outer = document.querySelector(`[data-point-id="${id}"]`)
+  const point = await page.evaluate((id) => {
+    const outer = document.querySelector(`[data-point-id="${CSS.escape(id)}"]`)
     const point = outer?.querySelector('[data-point-node]')
     if (!point) return null
     const body = point.querySelector('[data-label-state]')
@@ -18,11 +20,13 @@ export async function inspectPoint(page, id) {
     const coord = (x, y) => { const p = new DOMPoint(x, y).matrixTransform(matrix); return { x: p.x, y: p.y } }
     const east = contour.localName === 'circle' ? { x: Number(contour.getAttribute('r')), y: 0 }
       : { x: contour.points.getItem(0).x, y: contour.points.getItem(0).y }
-    return { source: body.getAttribute('data-label-source'), request: body.getAttribute('data-label-request'),
+    const model = JSON.parse((window.stzLabels ?? window.stzAppLabels).state().json).diagram
+    const stratum = model.strata.find((item) => item.id === id)
+    return { ambientDimension: model.ambientDimension, pointShape: stratum?.style.shape, modelSource: stratum?.text ?? '',
+      source: body.getAttribute('data-label-source'), request: body.getAttribute('data-label-request'),
       pointRequest: point.getAttribute('data-point-request'), owner: point.getAttribute('data-point-node'),
       status: body.getAttribute('data-label-state'), math: body.querySelectorAll('[data-label-math]').length,
       texts: [...body.querySelectorAll('text')].map((e) => e.textContent),
-      literal: [...body.querySelectorAll('[data-label-literal]')].map((e) => e.textContent).join(''),
       bounds, body: { x: b.x, y: b.y, width: b.width, height: b.height },
       shape: { x: shape.x, y: shape.y, width: shape.width, height: shape.height },
       radius: contour.localName === 'circle' ? Number(contour.getAttribute('r')) : null,
@@ -33,11 +37,14 @@ export async function inspectPoint(page, id) {
       highlight: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r'),
     }
   }, id)
+  if (point) point.literalObservation = await observePointLiteral(page, { id })
+  return point
 }
 export function assertPointLayout(point) {
   assert.ok(point)
   assert.equal(point.pointRequest, point.request, 'Contour and body share the same committed request')
   assert.equal(JSON.parse(point.request)[0], point.source)
+  assert.equal(point.modelSource, point.source, 'Exact model/editor source including structural whitespace')
   assert.ok([...point.bounds, ...Object.values(point.shape)].every(Number.isFinite))
   const [x0, y0, x1, y1] = point.bounds
   // Native SVG bounds, not another invocation of the layout helper.
@@ -54,7 +61,13 @@ export async function runPointNodeChecks(context) {
   const state = () => page.evaluate(() => window.stzLabels.state())
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
   const mount = (points, extra = {}) => page.evaluate((options) => window.stzLabels.mount(options), { labels: [], points, ...extra })
-  const inspect = () => inspectPoint(page, 'p')
+  const diagnose = createPointDiagnostics(context)
+  let scenario = 'point-language-shapes-2d-3d', caseDetails = {}
+  const inspect = async () => {
+    const point = await inspectPoint(page, 'p')
+    await diagnose(scenario.startsWith('point-contour') || scenario.startsWith('point-camera') || scenario.startsWith('point-hidden') ? pickingGroup : bodyGroup, scenario, { ...caseDetails, point })
+    return point
+  }
   const mutate = (change) => page.evaluate((change) => window.stzLabels.mutatePoint('p', change), change)
   const invariant = (a, b) => { for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(a[key], b[key], key) }
   async function saved(name, details, group) {
@@ -63,6 +76,7 @@ export async function runPointNodeChecks(context) {
     await observe(`${name}-observed`, { artifact })
     await record(name, { group, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) })
   }
+  context.setStage?.(bodyGroup)
   await startGroup(bodyGroup)
   await page.evaluate(() => window.stzLabels.changeService('real'))
   const language = ['', '   ', 'plain gyp', '日本語', '$x_1^2$', '\\(\\sqrt{x}\\)', '$$\\frac{a}{b}$$', '\\[g_j\\]',
@@ -70,35 +84,49 @@ export async function runPointNodeChecks(context) {
   const observed = []
   for (const ambientDimension of [2, 3]) for (const shape of ['circle', 'square', 'triangle', 'star']) {
     for (const text of language) {
+      caseDetails = { ambientDimension, shape, source: text }
       await mount([{ id: 'p', text, style: { shape } }], { ambientDimension })
       const before = await state()
       await settle()
       const point = await inspect(); assertPointLayout(point)
       assert.equal(point.source, text)
       assert.equal(point.status, text.includes('unknown') ? 'fallback' : 'ready')
-      if (point.status === 'fallback') assert.equal(point.literal, text)
+      if (point.status === 'fallback') assertPositionedLiteral(point.literalObservation, text)
       invariant(before, await state())
       observed.push({ ambientDimension, shape, text, point })
     }
   }
-  await saved('point-language-shapes-2d-3d', observed, bodyGroup)
+  for (const text of ['  $bad\t\tend  ', '\n\t$bad\r\n\r tail  \t\n', '\t\n\r\n\r\t']) {
+    caseDetails = { ambientDimension: 2, shape: 'circle', source: text }
+    await mount([{ id: 'p', text }]); await settle()
+    const point = await inspect(); assertPointLayout(point)
+    assertPositionedLiteral(point.literalObservation, text)
+    observed.push({ ...caseDetails, point })
+  }
+  const controlSource = language.at(-1)
+  await mount([{ id: 'p', text: controlSource }]); await settle()
+  const controls = await pointLiteralNegativeControls(page, 'p', controlSource,
+    (control, observation) => diagnose(bodyGroup, scenario, { control, observation }))
+  await saved('point-language-shapes-2d-3d', { cases: observed, controls }, bodyGroup)
+  scenario = 'point-valid-invalid-valid-exact-source'; caseDetails = {}
   await mount([{ id: 'p', text: '$x$' }]); await settle()
   const repairs = []
   for (const text of ['$x$', '  $\\unknownPointMacro$\t\\slash\n tail  ', '$\\frac{g_j}{\\sqrt{x}}$']) {
     await mutate({ text }); await settle()
     const point = await inspect(); assertPointLayout(point)
     assert.equal(point.source, text)
-    if (text.includes('unknown')) { assert.equal(point.literal, text); assert.equal(point.math, 0) }
+    if (text.includes('unknown')) { assertPositionedLiteral(point.literalObservation, text); assert.equal(point.math, 0) }
     else assert.equal(point.math, 1)
     repairs.push(point)
   }
   await saved('point-valid-invalid-valid-exact-source', repairs, bodyGroup)
-  const sources = ['$pointA$', '$\\frac{pointB}{2}$', '$pointC_j$']
+  scenario = 'point-A-B-C-delete-duplicate-history-load'
+  const sources = ['  $pointA$\t\t end  ', '$\\frac{pointB}{2}$\r\n\r next ', '$pointC_j$\n\n\ttail']
   await page.evaluate((sources) => sources.forEach((s) => window.stzLabels.hold(s)), sources)
   for (const text of sources) {
     await mutate({ text })
     await page.waitForFunction((s) => window.stzLabels.state().requests.some((r) => r.source === s && r.phase === 'held'), text)
-    const pending = await inspect(); assertPointLayout(pending); assert.equal(pending.literal, text)
+    const pending = await inspect(); assert.equal(pending.status, 'pending'); assertPointLayout(pending); assertPositionedLiteral(pending.literalObservation, text)
   }
   for (const text of [sources[2], sources[0], sources[1]]) {
     await page.evaluate((s) => window.stzLabels.release(s), text)
@@ -126,9 +154,10 @@ export async function runPointNodeChecks(context) {
   invariant(current, await state())
   await saved('point-A-B-C-delete-duplicate-history-load', { sources, current, point: await inspect() }, bodyGroup)
 
+  scenario = 'point-resource-retry-font-readiness'
   await page.evaluate(() => window.stzLabels.changeService('load-error'))
-  await mount([{ id: 'p', text: '$resourcePoint$' }]); await settle()
-  const failed = await inspect(); assert.equal(failed.status, 'fallback'); assert.equal(failed.literal, failed.source)
+  await mount([{ id: 'p', text: '  $resourcePoint$\t\t\r\n\tend  \r\n' }]); await settle()
+  const failed = await inspect(); assert.equal(failed.status, 'fallback'); assertPositionedLiteral(failed.literalObservation, failed.source); assertPointLayout(failed)
   await page.evaluate(() => window.stzLabels.setServiceMode('real'))
   await page.waitForFunction(() => Date.now() >= window.stzLabels.state().serviceStats.retryAfter)
   const beforeFont = await state()
@@ -141,6 +170,7 @@ export async function runPointNodeChecks(context) {
   // A late native font changes actual ordinary-text width, not just a counter.
   await mutate({ text: 'mmmm WWWW $unclosed' }); await settle()
   const beforeFontFace = await inspect(), beforeFontModel = await state()
+  assertPositionedLiteral(beforeFontFace.literalObservation, beforeFontFace.source)
   await page.evaluate(async () => {
     const font = new FontFace('Times New Roman', 'local("Courier New")')
     document.fonts.add(font)
@@ -150,6 +180,7 @@ export async function runPointNodeChecks(context) {
   })
   await settle()
   const afterFontFace = await inspect(); assertPointLayout(afterFontFace)
+  assertPositionedLiteral(afterFontFace.literalObservation, afterFontFace.source)
   assert.notEqual(afterFontFace.request, beforeFontFace.request)
   assert.notEqual(afterFontFace.radius, beforeFontFace.radius, 'Font-ready ink measurement changes the contour')
   await page.mouse.click(afterFontFace.outside.x, afterFontFace.outside.y); assert.equal((await state()).selection, null)
@@ -163,7 +194,9 @@ export async function runPointNodeChecks(context) {
   })
 
 
+  context.setStage?.(pickingGroup)
   await startGroup(pickingGroup)
+  scenario = 'point-contour-boundaries-cycling'
   const probes = []
   for (const shape of ['circle', 'square', 'triangle', 'star']) {
     await mount([{ id: 'p', text: '$\\frac{wide}{g_j}$', style: { shape } }]); await settle()
@@ -187,6 +220,7 @@ export async function runPointNodeChecks(context) {
   }
   assert.deepEqual(new Set(cycles.map((c) => c.id)), new Set(['p', 'q']))
   await saved('point-contour-boundaries-cycling', { probes, cycles }, pickingGroup)
+  scenario = 'point-camera-pan-zoom-drag'
   await mount([{ id: 'p', text: '$cameraPoint$', position: { x: 1, y: .4, z: .7 } }], { ambientDimension: 3 }); await settle()
   const beforeCamera = await state(), oldPoint = await inspect()
   await page.evaluate(() => window.stzLabels.setProps({ cameraOverride: { mode: '3d', kind: 'orthographic', thetaDeg: 65, phiDeg: 35, zoom: 90, pan: { x: 450, y: 350 } },
@@ -210,6 +244,7 @@ export async function runPointNodeChecks(context) {
   assert.equal(Number((await inspect()).opacity), .45)
   await saved('point-camera-pan-zoom-drag', { beforeCamera, oldPoint, moved, dragged, after: await state() }, pickingGroup)
 
+  scenario = 'point-hidden-filtered-locked-dimmed-siblings'
   await mount([{ id: 'p', text: '$policyPoint$', layer: 0 }], { labels: [{ id: 'free', text: '$free$', position: { x: 2, y: 2, z: 0 } }],
     curves: [{ id: 'path', inlineNodes: [{ id: 'inline', text: '$inline$', position: { kind: 'segment', segmentIndex: 0, value: .5 }, options: { placement: 'above', marker: 'dot' } }] }] })
   await settle()
@@ -228,6 +263,17 @@ export async function runPointNodeChecks(context) {
   assert.equal(await inspect(), null)
   await saved('point-hidden-filtered-locked-dimmed-siblings', { locked, filtered, dimmed, siblingRequests }, pickingGroup)
   await completeGroup(pickingGroup)
-  await runNativePointChecks({ ...context, saved })
+  await runNativePointChecks({ ...context, saved, diagnose })
   await completeGroup(bodyGroup)
+}
+
+/** Keep the later App group honestly unexecuted if a point assertion fails. */
+export async function runPointThenAppChecks(context, runAppChecks) {
+  context.setStage('point-node-checks')
+  await runPointNodeChecks(context)
+  context.setStage('real-App-workflows')
+  const group = 'real-App-input-JSON-history-reused-ID-load'
+  await context.startGroup(group)
+  await runAppChecks(context)
+  await context.completeGroup(group)
 }

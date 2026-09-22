@@ -1,7 +1,10 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation in progress; fresh parent verification and independent
-review required. 32B–32D remain planned.
+Status: 32A implementation and targeted positioned-whitespace oracle fix delivered;
+fresh parent browser verification and independent review remain required. The
+2026-09-22 fix checks source identity separately from native foreground layout;
+see PHASE_32A_IMPLEMENTATION.md for tests, failure evidence and final checkout
+handoff. 32B–32D remain planned.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

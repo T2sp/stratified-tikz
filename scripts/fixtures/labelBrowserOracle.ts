@@ -76,7 +76,7 @@ export function measureSvgTextAdvance(text: SVGTextElement, value: string) {
     const effective = textMetricStyle(clone)
     const advance = clone.getComputedTextLength()
     if (!Number.isFinite(advance) || advance < 0) throw new Error('SVG text measurement returned a nonfinite or negative advance')
-    return { method: 'svg-text-clone' as const, text: value, advance, computed, effective }
+    return { method: 'svg-text-clone' as const, text: value, advance, bounds: asBounds(clone.getBBox()), computed, effective }
   } finally {
     clone.remove()
   }
@@ -245,4 +245,73 @@ export async function inspectAndAssertLabelContent(id: string, options: { fontSi
   const evidence = await inspectLabelContent(id, options)
   assertLabelContent(evidence)
   return evidence
+}
+
+/** Explicit body root works for points, inline nodes, free labels and sanitized
+ * standalone SVG. Only direct foreground text counts; titles/halos never do. */
+export function inspectPositionedLiteral(node: SVGGElement, source: string, xml = false, sanitized = false) {
+  const paint = required(Array.from(node.children).find((e) => e.localName === 'g') as SVGGElement | undefined, 'Label paint missing')
+  const content = required(Array.from(paint.children).filter((e) => e.localName === 'g'
+    && !e.hasAttribute('data-label-halo') && e.getAttribute('aria-hidden') !== 'true').at(-1) as SVGGElement | undefined, 'Label foreground missing')
+  const texts = Array.from(content.children).filter((e): e is SVGTextElement => e.localName === 'text' && !e.hasAttribute('data-label-oracle-measurement'))
+  const reference = texts[0]
+  // Whitespace-only sources with no glyphs still have explicit captured font
+  // identity; use a temporary SVG probe, never a default Canvas shorthand.
+  const probe = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+  if (!reference) {
+    const identity = JSON.parse(required(node.getAttribute('data-label-request'), 'Glyphless probe needs font identity')) as [string, string, number, string, string]
+    probe.setAttribute('font-family', identity[1]); probe.setAttribute('font-size', String(identity[2]))
+    probe.setAttribute('font-weight', identity[3]); probe.setAttribute('font-style', identity[4])
+    probe.style.whiteSpace = 'pre'; probe.style.tabSize = '4'
+    probe.setAttribute('xml:space', 'preserve'); probe.setAttribute('data-label-oracle-measurement', 'true')
+    probe.style.opacity = '0'; content.append(probe)
+  }
+  try {
+    const fontText = reference ?? probe
+    const font = textMetricStyle(fontText)
+    const fontSize = Number.parseFloat(font.properties['font-size'])
+    const tabSize = Number.parseFloat(font.properties['tab-size'])
+    const fontBox = measureSvgTextAdvance(fontText, 'Mg').bounds
+    const expected: { text: string; x: number; y: number }[] = []
+    const tabs: ReturnType<typeof measureSvgTabStop>[] = []
+    const lines: { width: number; baseline: number; ascent: number; descent: number }[] = []
+    let baseline = 0, minX = 0, maxX = 0
+    for (const line of source === '' ? [] : source.split(/\r\n|[\r\n]/u)) {
+      let x = 0
+      const parts = line.split('\t')
+      const ascent = Math.max(-fontBox.minY, 0), descent = Math.max(fontBox.maxY, 0)
+      for (const [index, text] of parts.entries()) {
+        if (index) { const tab = measureSvgTabStop(fontText, x, tabSize); tabs.push(tab); x = tab.advance }
+        if (text) {
+          expected.push({ text, x, y: baseline })
+          const measured = measureSvgTextAdvance(fontText, text)
+          minX = Math.min(minX, x + measured.bounds.minX); maxX = Math.max(maxX, x + measured.bounds.maxX)
+          x += measured.advance
+        }
+      }
+      maxX = Math.max(maxX, x)
+      lines.push({ width: x, baseline, ascent, descent })
+      baseline += ascent + descent + fontSize * .2
+    }
+    const contentMatrix = required(content.getScreenCTM(), 'Foreground transform missing')
+    const fragments = texts.map((text) => {
+      const matrix = contentMatrix.inverse().multiply(required(text.getScreenCTM(), 'Text transform missing'))
+      const x = text.x.baseVal.getItem(0).value, y = text.y.baseVal.getItem(0).value
+      const computed = textMetricStyle(text)
+      return { text: text.textContent ?? '', x, y, baseline: new DOMPoint(x, y).matrixTransform(matrix).y,
+        transform: text.getAttribute('transform'), matrix: matrixData(matrix), bounds: asBounds(text.getBBox()),
+        font: computed.properties, xmlSpace: computed.xmlSpace, visible: painted(text, node) }
+    })
+    const relative = required(node.getScreenCTM(), 'Body transform missing').inverse().multiply(contentMatrix)
+    return { source: node.getAttribute('data-label-source'), request: node.getAttribute('data-label-request'),
+      pointRequest: node.parentElement?.getAttribute('data-point-request') ?? null,
+      title: Array.from(node.children).find((e) => e.localName === 'title')?.textContent ?? null,
+      status: node.getAttribute('data-label-state'), xml, sanitized,
+      math: Array.from(content.children).filter((e) => e.localName === 'svg').length,
+      fragments, expected, lines, tabs, offset: matrixData(relative),
+      extent: { minX, maxX, minY: -(lines[0]?.ascent ?? 0), maxY: (lines.at(-1)?.baseline ?? 0) + (lines.at(-1)?.descent ?? 0) },
+      bounds: node.getAttribute('data-label-bounds')?.split(' ').map(Number) ?? null,
+      native: transformBounds(asBounds(content.getBBox()), relative),
+      measurementClones: node.querySelectorAll('[data-label-oracle-measurement]').length - (reference ? 0 : 1) }
+  } finally { probe.remove() }
 }

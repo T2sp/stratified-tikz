@@ -4,14 +4,23 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
+import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
+import { observePointLiteral, assertPositionedLiteral, inspectStandalonePoint } from './pointLiteralOracle.mjs'
 import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
 
-export async function runNativePointChecks({ browser, origin, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe }) {
+export async function runNativePointChecks({ browser, origin, page: rendererPage, artifactDir, saved, startGroup, completeGroup, observe, diagnose, setStage }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = [], owned = []
   page.on('pageerror', (e) => errors.push(e.message))
   let primary
   const bodyGroup = 'point-node-body-layout-lifecycle', exportGroup = 'point-node-settled-export'
+  let scenario = 'point-native-direct-cursor-workplanes-inspector-persistence'
+  setStage?.('point-node-native-input')
+  const inspect = async (id) => {
+    const point = await inspectPoint(page, id)
+    await diagnose(scenario === 'point-native-direct-cursor-workplanes-inspector-persistence' ? bodyGroup : exportGroup, scenario, { id, point })
+    return point
+  }
   const state = () => page.evaluate(() => window.stzAppLabels.state())
   const model = async () => JSON.parse((await state()).json).diagram
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -29,7 +38,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
   async function selectInspector(id) {
     await page.getByRole('button', { name: 'Select', exact: true }).click()
     await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
-    const point = await inspectPoint(page, id)
+    const point = await inspect(id)
     await page.mouse.click(point.center.x, point.center.y)
     const open = page.getByRole('button', { name: 'Open inspector drawer', exact: true })
     if (await open.count()) await open.click()
@@ -70,18 +79,20 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       await field.fill(source)
       const before = await state(), code = await tikz()
       await settle(); assert.equal((await state()).json, before.json); assert.equal((await state()).history, before.history)
-      const rendered = await inspectPoint(page, points[0].id); assertPointLayout(rendered); assert.equal(rendered.source, source)
+      const rendered = await inspect(points[0].id); assertPointLayout(rendered); assert.equal(rendered.source, source)
       assert.ok(code.standalone.includes(source) && code.inlineMath.includes(source))
       const invalid = '  $\\missingNativePoint$\t\n tail  '
       await field.fill(invalid); await settle()
-      const invalidBody = await inspectPoint(page, points[0].id)
-      assert.equal(invalidBody.status, 'fallback'); assert.equal(invalidBody.literal, invalid)
+      const invalidBody = await inspect(points[0].id)
+      assert.equal(invalidBody.status, 'fallback'); assertPositionedLiteral(invalidBody.literalObservation, invalid); assertPointLayout(invalidBody)
+      assert.equal(await field.inputValue(), invalid)
+      assert.equal((await model()).strata.find((s) => s.id === points[0].id).text, invalid)
       await page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
-      await settle(); assert.equal((await inspectPoint(page, points[0].id)).source, source)
+      await settle(); assert.equal((await inspect(points[0].id)).source, source)
       await page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click()
-      await settle(); assert.equal((await inspectPoint(page, points[0].id)).source, invalid)
+      await settle(); assertPositionedLiteral((await inspect(points[0].id)).literalObservation, invalid)
       await field.fill(source); await settle()
-      assert.equal((await inspectPoint(page, points[0].id)).status, 'ready')
+      assert.equal((await inspect(points[0].id)).status, 'ready')
       await page.getByRole('button', { name: 'Close inspector drawer', exact: true }).click()
       const cursors = []
       for (const plane of ambientDimension === 3 ? ['xy', 'xz', 'yz'] : ['xy']) {
@@ -104,7 +115,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
         assert.equal(created.position[ambientDimension === 2 ? 'z' : { xy: 'z', xz: 'y', yz: 'x' }[plane]], ambientDimension === 2 ? 0 : 1.25)
         const cursorField = await selectInspector(created.id)
         await cursorField.fill(`cursor ${plane} $g_j$`); await settle()
-        const cursorBody = await inspectPoint(page, created.id); assertPointLayout(cursorBody)
+        const cursorBody = await inspect(created.id); assertPointLayout(cursorBody)
         cursors.push({ plane, created, body: cursorBody })
         await page.getByRole('button', { name: 'Close inspector drawer', exact: true }).click()
       }
@@ -116,16 +127,25 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       entries.push({ ambientDimension, direct: rendered, invalidBody, cursors, code, jsonPath: path, beforeSave, loaded: await state() })
     }
     await saved('point-native-direct-cursor-workplanes-inspector-persistence', entries, bodyGroup)
+    setStage?.('point-node-settled-export')
     await startGroup(exportGroup)
-    for (const [background, dimension, scenario] of [
+    const fallbackSource = '  $bad\t\t\r\n\r tail  \t\n'
+    for (const [background, dimension, exportScenario] of [
       ['transparent', 2, 'point-native-pending-transparent-edit'], ['white', 3, 'point-native-pending-white-load'],
     ]) {
+      scenario = exportScenario
       const source = `captured ${dimension} $\\frac{a_1}{\\sqrt{x}}$`
       await page.evaluate((s) => window.stzAppLabels.hold(s), source)
-      await load(await fixture(dimension, source))
+      const documentJson = JSON.parse(await fixture(dimension, source))
+      const fallbackPoint = structuredClone(documentJson.diagram.strata[0])
+      Object.assign(fallbackPoint, { id: 'fallback-point', text: fallbackSource, position: { x: 2, y: -1.6, z: 0 } })
+      documentJson.diagram.strata.push(fallbackPoint)
+      await load(JSON.stringify(documentJson))
       await page.waitForFunction((s) => window.stzAppLabels.pending(s)?.started > 0, source)
       const field = await selectInspector('app-point')
-      const pending = await inspectPoint(page, 'app-point'); assert.equal(pending.status, 'pending'); assertPointLayout(pending)
+      const pending = await inspect('app-point'); assert.equal(pending.status, 'pending'); assertPointLayout(pending); assertPositionedLiteral(pending.literalObservation, source)
+      const pendingFallback = await inspect('fallback-point')
+      assertPositionedLiteral(pendingFallback.literalObservation, fallbackSource)
       await page.getByLabel('SVG export background', { exact: true }).selectOption(background)
       const before = await state()
       const { event: download, value: after } = await eventAction(scenario, 'download', async ({ check }) => {
@@ -142,40 +162,48 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       const svgName = `${scenario}.svg`, svgPath = resolve(artifactDir, svgName)
       await download.saveAs(svgPath)
       const xml = await readFile(svgPath, 'utf8')
-      assert.ok(xml.includes('data-point-node') && !xml.includes('data-svg-export-exclude'))
+      assert.ok(!xml.includes('data-svg-export-exclude'))
       const standalone = await browser.newPage({ viewport: { width: 1000, height: 800 } })
       const requests = [], standaloneErrors = []
       standalone.on('request', (r) => requests.push(r.url())); standalone.on('pageerror', (e) => standaloneErrors.push(e.message))
       let standaloneFailure
       try {
         await standalone.goto(pathToFileURL(svgPath).href)
-        const output = await standalone.evaluate(() => {
-          const p = document.querySelector('[data-point-node]'), body = p?.querySelector('[data-label-state]'), contour = p?.querySelector('[data-point-contour]')
-          if (!p || !body || !contour) throw new Error('Missing standalone point')
-          const bounds = body.getAttribute('data-label-bounds').split(' ').map(Number)
-          return { source: body.getAttribute('data-label-source'), request: body.getAttribute('data-label-request'),
-            pointRequest: p.getAttribute('data-point-request'), bounds, radius: Number(contour.getAttribute('r')),
-            math: body.querySelectorAll('[data-label-math]').length, status: body.getAttribute('data-label-state'),
-            transform: p.getAttribute('transform'), opacity: contour.getAttribute('opacity'),
-            backgrounds: document.querySelectorAll('[data-stratified-tikz-export-background]').length,
-            forbidden: document.querySelectorAll('parsererror, script, style, image, foreignObject').length,
-            paints: { fill: contour.getAttribute('fill'), stroke: contour.getAttribute('stroke'),
-              text: body.querySelector('[data-label-content]').parentElement.getAttribute('fill') },
-            unresolvedPaint: [...document.querySelectorAll('*')].some((e) => [...e.attributes].some((a) => /currentColor/i.test(a.value))),
-            externalReferences: [...document.querySelectorAll('[href]')].map((e) => e.getAttribute('href')).filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))) }
-        })
-        assert.equal(output.source, source); assert.equal(output.status, 'ready'); assert.equal(output.math, 1)
-        assert.equal(output.pointRequest, output.request); assert.equal(output.transform, pending.transform)
-        const [x0, y0, x1, y1] = output.bounds
-        assert.ok(Math.abs(output.radius - Math.hypot((x1 - x0) / 2 + 1.8, (y1 - y0) / 2 + 1.8)) < 1e-8)
+        const output = await inspectStandalonePoint(standalone, source)
+        const fallback = await observePointLiteral(standalone, { source: fallbackSource, standalone: true })
+        const fallbackGeometry = await inspectStandalonePoint(standalone, fallbackSource)
+        // A native settled body supplies the committed bounds removed by export
+        // sanitization. Check the download's contour against that same source/font.
+        await rendererPage.evaluate(({ source, fallbackSource }) => window.stzLabels.mount({ labels: [], points: [
+          { id: 'export-reference', text: source, style: { shape: 'circle', size: 3 } },
+          { id: 'fallback-reference', text: fallbackSource, style: { shape: 'circle', size: 3 } },
+        ] }), { source, fallbackSource })
+        await rendererPage.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'))
+        const reference = await inspectPoint(rendererPage, 'export-reference')
+        const fallbackReference = await inspectPoint(rendererPage, 'fallback-reference')
+        await diagnose(exportGroup, scenario, { pending, pendingFallback, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName })
+        assert.equal(JSON.parse(pending.request)[0], source)
+        assert.equal(output.source, source); assert.equal(output.math, 1); assert.ok(output.paths > 0)
+        assert.deepEqual(output.texts, [`captured ${dimension} `])
+        assert.equal(output.transform, pending.transform)
+        const { body, shape } = output
+        assert.ok(body.x >= shape.x && body.y >= shape.y && body.x + body.width <= shape.x + shape.width && body.y + body.height <= shape.y + shape.height)
         assert.notEqual(output.radius, pending.radius)
+        assertPointLayout(reference); assertPointLayout(fallbackReference)
+        const [x0, y0, x1, y1] = reference.bounds
+        assert.ok(Math.abs(output.radius - Math.hypot((x1 - x0) / 2 + 1.8, (y1 - y0) / 2 + 1.8)) < 1e-8)
+        assert.equal(output.radius, reference.radius)
+        assert.equal(fallbackGeometry.radius, fallbackReference.radius)
+        assertPositionedLiteral(fallbackReference.literalObservation, fallbackSource)
+        assertPositionedLiteral(fallback, fallbackSource)
+        assert.ok(fallbackGeometry.radius > 0)
         assert.equal(Number(output.opacity), .65)
         assert.equal(output.backgrounds, background === 'white' ? 1 : 0)
         assert.equal(output.forbidden, 0); assert.equal(output.unresolvedPaint, false); assert.deepEqual(output.externalReferences, [])
         assert.deepEqual(output.paints, { fill: '#ffffff', stroke: '#3870a0', text: '#000000' })
         assert.deepEqual(standaloneErrors, [])
         assert.deepEqual(requests, [pathToFileURL(svgPath).href])
-        const details = { pending, output, before, after, requests, standaloneErrors, svgName }
+        const details = { pending, pendingFallback, output, fallback, fallbackGeometry, reference, fallbackReference, before, after, requests, standaloneErrors, svgName }
         const jsonName = `${scenario}-standalone.json`
         await writeFile(resolve(artifactDir, jsonName), JSON.stringify(details, null, 2))
         await observe(`${scenario}-standalone-observed`, details)
@@ -183,18 +211,19 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
           await writeFile(resolve(artifactDir, jsonName), JSON.stringify({ ...details, capture }, null, 2))
         })
         await settle()
-        assert.equal((await inspectPoint(page, 'app-point')).source, background === 'white' ? '$loadedPoint$' : '$laterPoint$')
+        assert.equal((await inspect('app-point')).source, background === 'white' ? '$loadedPoint$' : '$laterPoint$')
         assert.equal((await state()).json, after.json); assert.equal((await state()).history, after.history)
         await saved(scenario, details, exportGroup)
       } catch (error) {
         standaloneFailure = error
         throw error
       } finally {
-        try { await standalone.close() } catch (error) { if (!standaloneFailure) throw error }
+        await cleanupPointCheck(standaloneFailure, () => standalone.close())
       }
     }
     // Native DOM boundary: complete point capture, dimmed parent, exact fallback,
     // no nested capture and strict contour validation (including a negative control).
+    scenario = 'point-whole-node-fallback-opacity-validation'
     await rendererPage.evaluate(() => window.stzLabels.mount({ labels: [], points: [{ id: 'fallback', text: '  $bad\t\n end  ', layer: 0 }] }))
     await rendererPage.evaluate(() => window.stzLabels.filter(1))
     const boundary = await rendererPage.evaluate(async () => {
@@ -206,20 +235,39 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
       const input = capture.labels[0].capture
       const parser = new DOMParser()
       const doc = parser.parseFromString(api.renderSettledSvgLabelDocument(input, states[0]), 'image/svg+xml')
+      const rendered = new XMLSerializer().serializeToString(doc)
+      const request = doc.querySelector('[data-label-state]').getAttribute('data-label-request')
+      const pointRequest = doc.querySelector('[data-point-node]').getAttribute('data-point-request')
       doc.querySelector('[data-point-contour]').setAttribute('r', '1')
       let rejected = false
       try { api.extractSettledSvgLabel(doc, input, states[0]) } catch { rejected = true }
       const xml = await api.prepareSettledSvgExport(capture)
       api.releaseSvgExportSnapshot(capture)
       if (!xml) throw new Error('Whole point fallback export failed')
-      const final = parser.parseFromString(xml, 'image/svg+xml')
-      return { rejected, xml, state: states[0].status, source: input.source,
-        text: [...final.querySelectorAll('[data-label-literal]')].map((n) => n.textContent).join(''),
-        parentOpacity: final.querySelector('[data-point-node]').parentElement.getAttribute('opacity') }
+      return { rejected, xml, rendered, request, pointRequest, state: states[0].status, source: input.source }
     })
-    assert.equal(boundary.rejected, true); assert.equal(boundary.state, 'fallback'); assert.equal(boundary.text, boundary.source)
-    assert.ok(Number(boundary.parentOpacity) < 1)
-    await writeFile(resolve(artifactDir, 'point-fallback.svg'), boundary.xml)
+    await diagnose(exportGroup, scenario, { boundary })
+    assert.equal(boundary.rejected, true); assert.equal(boundary.state, 'fallback')
+    assert.equal(JSON.parse(boundary.request)[0], boundary.source); assert.equal(boundary.pointRequest, boundary.request)
+    const fallbackPath = resolve(artifactDir, 'point-fallback.svg')
+    await writeFile(fallbackPath, boundary.xml)
+    const renderedPath = resolve(artifactDir, 'point-fallback-before-sanitization.svg')
+    await writeFile(renderedPath, boundary.rendered)
+    const reopened = await browser.newPage()
+    let reopenFailure
+    try {
+      await reopened.goto(pathToFileURL(renderedPath).href)
+      boundary.serialized = await observePointLiteral(reopened, { source: boundary.source, standalone: true })
+      await diagnose(exportGroup, scenario, { boundary })
+      assertPositionedLiteral(boundary.serialized, boundary.source)
+      await reopened.goto(pathToFileURL(fallbackPath).href)
+      boundary.visible = await observePointLiteral(reopened, { source: boundary.source, standalone: true })
+      boundary.geometry = await inspectStandalonePoint(reopened, boundary.source)
+      await diagnose(exportGroup, scenario, { boundary })
+      assertPositionedLiteral(boundary.visible, boundary.source)
+      assert.ok(Number(boundary.geometry.parentOpacity) < 1)
+    } catch (error) { reopenFailure = error; throw error }
+    finally { await cleanupPointCheck(reopenFailure, () => reopened.close()) }
     await saved('point-whole-node-fallback-opacity-validation', boundary, exportGroup)
     assert.deepEqual(errors, [])
     await completeGroup(exportGroup)
@@ -230,7 +278,7 @@ export async function runNativePointChecks({ browser, origin, page: rendererPage
     throw error
   } finally {
     for (const wait of owned) wait.dispose(primary)
-    try { await page.close() } catch (error) { if (!primary) throw error }
+    await cleanupPointCheck(primary, () => page.close())
     await Promise.all(owned.map((wait) => wait.drain()))
   }
 }

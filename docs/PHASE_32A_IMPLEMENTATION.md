@@ -163,3 +163,128 @@ pending acceptance and 32B–32D unimplemented. Child startup restrictions suppl
 no point-browser pass and do not invalidate the historical accepted 31F report.
 The final child checkout identity is retained separately at
 `/private/tmp/stz-32a-final-checkout.json` to avoid a self-referential document hash.
+
+## Targeted positioned-whitespace fix (2026-09-22)
+
+This section supersedes the earlier child-check counts for the targeted fix.
+The starting checkout was clean on `phase/32a-tex-labeled-node`, HEAD
+`ad10fe2866c5bc69cf6ec88bc981a48ce127e70f`. Existing implementation, fixtures,
+prompts and earlier evidence were preserved. No production renderer, layout,
+model, schema, dependency or 32B–32D feature was changed.
+
+### Cause and corrected call sites
+
+The historical parent `stz-phase32a-before-review-VOwz7Y` report failed in the
+point language matrix, before independent review: 10/15 groups and 109 passing
+records, with no point scenario artifacts. Its `real-App-workflows` stage did
+not mean the later App checks had run. The previous implementation child's
+localhost `EPERM` was a separate startup failure. Neither report passes this fix.
+
+The reported source `  $\\unknownPointMacro$\t\\slash\n tail  ` has three visible
+SVG text fragments; its tab and newline are represented by coordinates, not
+text glyph elements. Joining only `[data-label-literal]` therefore cannot equal
+raw source. The retained `/private/tmp/stz-32a-whitespace-diagnosis-KXYWFo/`
+reproduction establishes this representation only, not native acceptance.
+
+- `scripts/checkPointNodes.mjs`: `inspectPoint` now collects a positioned
+  foreground observation, exact model/source/request identity, ambient dimension,
+  shape and contour. The language matrix, same-owner valid/invalid/valid,
+  A–B–C pending states, resource failure, and both font-readiness states use the
+  separate source/visual contract. No `point.literal` string consumers remain.
+- `scripts/checkPointNodesApp.mjs`: Inspector failure/redo and pending download
+  bodies use the same checker. Both actual transparent and white downloads now
+  include a multiline fallback point, reopened alongside the settled formula.
+  The whole-node fallback boundary retains exact JSON-escaped request source,
+  contour corruption rejection, capture count, and inherited dimming, and saves
+  both pre-sanitization and final SVG for native observation.
+- The export audit also found that the old point assertions selected runtime
+  `data-*` attributes after `createSvgPreviewExportText` removes them. This is
+  established by the existing sanitizer and its registered tests, independently
+  of browser execution. Standalone selection now uses the unique direct source
+  title and foreground structure. Raw JSON request identity is checked in the
+  serialized pre-sanitization boundary; XML-normalized titles/attributes are
+  checked appropriately. Final sanitized SVG is checked by actual text, native
+  positions/bounds, paint, contour, and a settled native reference's bounds.
+  Production sanitization and strict contour extraction are unchanged.
+
+### Independent observations and regressions
+
+`labelBrowserOracle.ts` supplies the shared SVG measurement implementation;
+`pointLiteralOracle.mjs` injects that same trusted test code into live and
+`file://` documents without a network request, script element or App stylesheet.
+`positionedLiteralAssertions.ts` checks source separately from visible text.
+Only direct foreground text is observed; titles, halos, math descendants,
+unrelated owners and measurement clones cannot replace missing literal text.
+The observer records text, x/y, transformed baseline, transforms, computed font
+longhands/whitespace properties, native bounds, line extents and full-space-prefix
+SVG tab measurements. It does not use production layout records as expectations,
+an empty Canvas font shorthand or a guessed native character width.
+
+Coverage is intentionally not Cartesian:
+
+- Existing 2D/3D × four-shape language cases retain the exact reported invalid
+  source and all previously required inputs.
+- Additional small cases cover consecutive tabs, LF/CRLF/CR, leading/empty/
+  trailing lines, boundary tabs, edge/repeated spaces, and glyphless whitespace.
+  Pending A–B–C and resource failure also contain structural whitespace.
+- `pointLiteralOracle.test.ts` observes text/x/y from actual production point SSR
+  (not concatenated layout records) for pending and fallback output, reproduces
+  the old false failure, checks XML normalization and same-owner stale content,
+  and rejects missing fragments, changed edge spaces, collapsed tab/line positions,
+  transformed text and shortened line bounds with unchanged source metadata.
+  Its synthetic measurement adapter is explicitly not native-browser evidence.
+- Five browser negative controls mutate actual foreground DOM, keeping request
+  metadata unchanged: drop a fragment, trim leading spaces, collapse a tab,
+  collapse a baseline, and display stale content. Their observations are retained
+  inside the language scenario. These native controls await parent execution.
+- `pointCheckDiagnostics.test.mjs` executes the actual point/App sequencing entry
+  point with an injected early missing-point observation. It verifies the current
+  case is saved before failure, no passing scenario is recorded and the later App
+  group remains unexecuted; it also checks diagnostic-write and cleanup behavior.
+  Both new test files are registered in `package.json` (14 tests total).
+
+### Failure artifacts and verification gates
+
+`pointCheckDiagnostics.mjs` writes numbered `point-observation-*.json` files
+before assertions, separately from passing records. Records include group,
+scenario and point/source/font/geometry observations. Native downloads retain
+observations before bounded screenshots. Cleanup preserves the original error.
+`checkFreeLabels.mjs` uses point-specific stages and starts the later App group
+only after point checks return. The existing fifteen groups, eleven named point
+scenarios, mandatory artifacts, fresh verifier, checkout comparison and
+pre-review/commit gates are unchanged.
+
+Executed with Node v26.9.0 and `/opt/homebrew/bin` first in PATH:
+
+| Command/check | Observed result |
+| --- | --- |
+| Focused oracle/diagnostics tests | 14 passed; `/private/tmp/stz-32a-fix-oracle.log` |
+| Earlier focused point/runtime/runner/failure suite | 117 passed; `/private/tmp/stz-32a-fix-focused.log` (before the extra cleanup regression; full suite includes it) |
+| `npm test` | 2,485 passed, zero failed/skipped; `/private/tmp/stz-32a-fix-test-final.log` |
+| `npm run build` | Passed; existing >500 kB chunk warning; `/private/tmp/stz-32a-fix-build.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json --noEmit` | Passed; `/private/tmp/stz-32a-fix-fixture-tsc.log` |
+| Strict new-test TypeScript (`--ignoreConfig --noEmit --strict --allowImportingTsExtensions --module esnext --moduleResolution bundler --target es2023 --jsx react-jsx --skipLibCheck --types node`) | Passed; `/private/tmp/stz-32a-fix-test-tsc.log` |
+| Targeted TS ESLint and recommended JS rules with Node/browser globals | Passed; `/private/tmp/stz-32a-fix-{lint,script-lint}.log` |
+| Changed script `node --check`; `git diff --check` | Passed |
+| `node scripts/automation/run-phase.mjs 32A verify` during work | Node/build/diff passed; `check:label-assets` blocked by `listen EPERM 127.0.0.1`, no browser launched; `stz-phase32a-manual-hPEtGV/verification.json` under the system temp directory. This intermediate tree is not final identity evidence. |
+| Direct `npm run check:free-labels`, with installed external Playwright/Chrome paths configured | Blocked at `development-server-listen`, `EPERM 127.0.0.1:5173`; `/private/tmp/stz-32a-fix-free-labels-configured.log` and `/private/tmp/stz-32a-fix-free-labels-configured/free-labels-evidence.json`. All 15 groups unexecuted, zero passing scenarios. |
+
+An initial unconfigured direct browser command reported missing local Playwright;
+using the existing supported external installation then reached the real server
+restriction above. No dependency or sandbox setting was changed.
+
+After these edits, the exact final command is run again with the tree held fixed:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32A verify
+```
+
+Its report is copied to `/private/tmp/stz-32a-whitespace-final-verification.json`,
+with the matching tracked/untracked checkout identity retained separately at
+`/private/tmp/stz-32a-whitespace-final-checkout.json`; this avoids a document hash
+self-reference. The final transcript reports that run's observed result. A
+failed/startup-blocked report is never acceptance evidence. The browser-capable
+parent must run the exact command above on the final checkout, inspect all
+fifteen completed groups/eleven point scenarios and artifacts, and then perform
+independent review against `prompts/phase-32a-review.md`. No independent review
+has run in this fix turn. **32A remains pending; 32B–32D remain deferred.**

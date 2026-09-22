@@ -16,7 +16,7 @@ import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
-import { runPointNodeChecks } from './checkPointNodes.mjs'
+import { runPointThenAppChecks } from './checkPointNodes.mjs'
 import { pointNodeScenarios } from './automation/phase-verification.mjs'
 import { runCombinedLabelChecks } from './checkCombinedLabels.mjs'
 import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
@@ -83,7 +83,7 @@ async function completeGroup(group) {
   await save('running')
 }
 async function observe(name, details) {
-  checkpoint = { group: checkpoint?.group, name }
+  checkpoint = { group: details.group ?? checkpoint?.group, name }
   checkpoints.push(checkpoint)
   diagnostics.push({ name, ...details })
   await save('running')
@@ -471,11 +471,8 @@ try {
   await runInlineLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   stage = 'combined-free-inline-workflows'
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
-  stage = 'real-App-workflows'
-  await startGroup('real-App-input-JSON-history-reused-ID-load')
-  await runPointNodeChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup })
-  await runAppChecks({ browser, origin, record, artifactDir })
-  await completeGroup('real-App-input-JSON-history-reused-ID-load')
+  await runPointThenAppChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
+    setStage: (value) => { stage = value } }, runAppChecks)
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })
