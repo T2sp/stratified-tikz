@@ -195,7 +195,7 @@ const phaseSlugs = {
   "31C": "tex-free-label-preview",
   "31D": "tex-path-inline-labels",
   "31E": "tex-label-svg-export",
-  "31F": "tex-label-regression-docs"
+  "31F": "tex-label-regression-docs",
   "32A": "tex-labeled-node",
   "32B": "color-opacity-outline",
   "32C": "shapes-geometry",
