@@ -68,6 +68,7 @@ import {
   defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
+  normalizePointStyle,
   defaultSheetStyle,
 } from '../model/styles.ts'
 import { resolveSymbolicVariables } from '../model/variables.ts'
@@ -328,7 +329,7 @@ export function updateStratumStyleById(
       case 'point': {
         const style = updater(stratum.style)
         return style.kind === 'pointStyle'
-          ? clearStylePresetReference({ ...stratum, style })
+          ? clearStylePresetReference({ ...stratum, style: clonePointStyle(style) })
           : stratum
       }
     }
@@ -2434,7 +2435,7 @@ function createPointForDiagram(
     id: options.id ?? makeUniqueId(diagram, 'point'),
     name: options.name ?? 'Point',
     ...(options.text === undefined ? {} : { text: options.text }),
-    style: clonePointStyle(defaultPointStyle),
+    style: normalizePointStyle(defaultPointStyle),
     position: normalizePointForAmbientDimension(diagram.ambientDimension, position),
     layer: options.layer ?? nextLayer(diagram),
   }

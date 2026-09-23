@@ -480,7 +480,7 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     const { cwd, git, run, initialHead } = fixture(t, phase)
     const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /15 required groups/)
+    assert.match(result.stderr, phase === '32A' ? /15 required groups/ : /16 required groups/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
     assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
     assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
@@ -498,4 +498,19 @@ test('32A running parent refreshes point browser policy after its implementation
   assert.match(result.stderr, /15 required groups/)
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+})
+
+test('32B live parent reloads newly required paint evidence before review and commit', (t) => {
+  const current = readFileSync(join(automationDir, 'phase-verification.mjs'), 'utf8')
+  const obsolete = current.replace('"32B": pointNodeGroups', '"32B": pointNodeMathGroups')
+  assert.notEqual(obsolete, current)
+  const { cwd, git, run, initialHead } = fixture(t, '32B', { initialFiles: { [verifierFile]: obsolete } })
+  const pointMathGroups = [...combinedLabelGroups, 'point-node-body-layout-lifecycle', 'point-node-picking-visibility', 'point-node-settled-export']
+  const result = run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
+    STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(pointMathGroups) })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /16 required groups/)
+  assert.equal(git('rev-parse', 'HEAD'), initialHead)
+  assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
+  assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
 })

@@ -38,7 +38,7 @@ import {
 import { currentSvgLabelBounds, type SvgFreeLabelBoundsSnapshot } from './svgLabelBounds.ts'
 import { literalSvgLabelLayout, normalizeSvgLabelFontSize, placeSvgLabel, svgLabelLayoutSettings } from './labels/svgLabelLayout.ts'
 import { maxSvgPathInlineNodePreviews } from './svgPathInlineNodes.ts'
-import { currentSvgPointNodeGeometry, pendingSvgPointNodeGeometry, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
+import { currentSvgPointNodeLayout, pendingSvgPointNodeLayout, type SvgPointNodeCommits } from './svgPointNodeLayout.ts'
 
 export type SvgPreviewHitTestTargetKind =
   | 'geometryHandle'
@@ -1166,9 +1166,10 @@ function collectPointCandidate(
   }
 
   const distance = distanceVec2(center, point)
-  const geometry = pointCommits === undefined ? pendingSvgPointNodeGeometry(pointStratum)
-    : currentSvgPointNodeGeometry(pointStratum, pointCommits, documentRevision, fontGeneration)
-  if (geometry === null) return true
+  const layout = pointCommits === undefined ? pendingSvgPointNodeLayout(pointStratum)
+    : currentSvgPointNodeLayout(pointStratum, pointCommits, documentRevision, fontGeneration)
+  if (layout === null) return true
+  const { geometry } = layout
   const localPoint = { x: point.x - center.x, y: point.y - center.y }
   const boundaryDistance = geometry.kind === 'circle'
     ? Math.max(distance - geometry.radius, 0)
@@ -1176,7 +1177,9 @@ function collectPointCandidate(
       ? 0
       : distanceToClosedPolyline(localPoint, geometry.vertices)
 
-  if (boundaryDistance > 6) {
+  const miterHit = layout.miterJoins.some((join) => pointInPolygon(localPoint, join)
+    || distanceToClosedPolyline(localPoint, join) <= 6)
+  if (boundaryDistance > 6 + layout.stroke / 2 && !miterHit) {
     return true
   }
 

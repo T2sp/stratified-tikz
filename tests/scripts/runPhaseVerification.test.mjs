@@ -481,14 +481,14 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
   test(`${phase} rejects an otherwise successful Phase 31F report`, (t) => {
     const fixture = checkoutFixture(t)
     fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(combinedLabelGroups)
-    assert.throws(() => verify(t, fixture, phase), /15 required groups/)
+    assert.throws(() => verify(t, fixture, phase), phase === '32A' ? /15 required groups/ : /16 required groups/)
   })
 }
 for (const fault of ['scenarios', 'terminal', 'identity', 'artifacts', 'corrupt-artifacts', 'page-error']) {
   test(`32A rejects exit-zero point evidence with missing ${fault}`, (t) => {
     const fixture = checkoutFixture(t)
     const evidence = completePointEvidence(fixture)
-    if (fault === 'scenarios') evidence.evidence.pop()
+    if (fault === 'scenarios') evidence.evidence.shift()
     if (fault === 'terminal') evidence.evidence[0].result = 'started'
     if (fault === 'identity') evidence.checkout.trackedDiffSha256 = 'obsolete'
     if (fault === 'artifacts') fixture.env.STZ_TEST_POINT_ARTIFACTS = 'no'
@@ -498,3 +498,44 @@ for (const fault of ['scenarios', 'terminal', 'identity', 'artifacts', 'corrupt-
     assert.throws(() => verify(t, fixture, '32A'), /incomplete or invalid/)
   })
 }
+
+for (const phase of ['32B', '32C', '32D']) {
+  test(`${phase} rejects complete 32A evidence that omits new paint scenarios`, (t) => {
+    const fixture = checkoutFixture(t)
+    const evidence = completePointEvidence(fixture)
+    fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups.filter((group) => group !== 'point-node-paint-import-persistence'))
+    evidence.evidence = evidence.evidence.filter((entry) => entry.group !== 'point-node-paint-import-persistence')
+    fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+    assert.throws(() => verify(t, fixture, phase), /16 required groups/)
+  })
+}
+test('32A continues accepting its complete pre-paint group and scenario set', (t) => {
+  const fixture = checkoutFixture(t)
+  const evidence = completePointEvidence(fixture)
+  fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups.filter((group) => group !== 'point-node-paint-import-persistence'))
+  evidence.evidence = evidence.evidence.filter((entry) => entry.group !== 'point-node-paint-import-persistence')
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.equal(verify(t, fixture, '32A').status, 'passed')
+})
+for (const fault of ['missing-scenario', 'started-only', 'checkout', 'missing-artifact', 'page-error']) {
+  test(`32B rejects exit-zero paint evidence: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    const evidence = completePointEvidence(fixture)
+    const index = evidence.evidence.findIndex((entry) => entry.name === 'point-paint-pending-transparent-edit')
+    if (fault === 'missing-scenario') evidence.evidence.splice(index, 1)
+    if (fault === 'started-only') evidence.evidence[index].result = 'started'
+    if (fault === 'checkout') evidence.checkout.untrackedSha256['paint-fixture.ts'] = 'wrong-checkout'
+    if (fault === 'missing-artifact') evidence.evidence[index].artifacts = ['point-paint-pending-transparent-edit.json']
+    if (fault === 'page-error') evidence.pageErrors = ['paint rejected']
+    fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+    assert.throws(() => verify(t, fixture, '32B'), /incomplete or invalid/)
+  })
+}
+
+test('32A cannot advertise a completed paint extension with missing paint scenarios', (t) => {
+  const fixture = checkoutFixture(t)
+  const evidence = completePointEvidence(fixture)
+  evidence.evidence = evidence.evidence.filter((entry) => entry.group !== 'point-node-paint-import-persistence')
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.throws(() => verify(t, fixture, '32A'), /Missing completed point-node scenario/)
+})

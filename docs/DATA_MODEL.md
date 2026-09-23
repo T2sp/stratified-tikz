@@ -2430,3 +2430,16 @@ In 2D mode, this maps screen coordinates to `(x, y, 0)`.
 In 3D mode, this maps screen coordinates to the chosen work plane.
 
 For MVP, this function may initially support only simple orthographic cameras.
+
+
+## Phase 32B saved point paint
+
+New saves use envelope version **2**, superseding the historical version-1
+wrapper examples above. `Diagram.version` remains 1. Both envelope versions
+load; point strata and saved user point presets materialize independent paint
+without changing raw text, geometry, codimension or old shape/size semantics.
+`PointStyle.paint` owns text, fill and stroke settings. If present it is
+authoritative; the legacy `color`/`fill` fields are compatibility metadata.
+See [normalization and precedence](IMPORTED_POINT_PAINT.md) and
+[32B implementation/evidence](PHASE_32B_IMPLEMENTATION.md) for the precise schema,
+validation, migration, cloning and export contracts.

@@ -1768,11 +1768,12 @@ report/log paths, inspected artifacts and remaining gates.
 
 ## Phase 32: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation and acceptance harness added; fresh parent browser
-verification and independent review remain open. The 31F prerequisite was
-confirmed from accepted evidence before implementation. 32B–32D remain planned. The detailed scope,
-compatibility rules, reference fixtures, and acceptance criteria are in the
-[Phase 32 implementation plan](./PHASE_32_PLAN.md).
+Status: 32A is accepted by the complete `gtRban` parent report and independent
+review. 32B independent paint, migration, ordered import and cumulative harness
+are implemented; fresh parent acceptance and independent review remain
+open. 32C and 32D remain planned. See the
+[Phase 32 plan](./PHASE_32_PLAN.md) and
+[32B implementation and evidence](./PHASE_32B_IMPLEMENTATION.md).
 
 | Subphase | Responsibility |
 | --- | --- |
@@ -1787,5 +1788,5 @@ bounding-box scaling pass. Preserve legacy square/triangle regular polygons,
 white hollow fill, and the existing `size / 2` inner-separation convention.
 Phase 32A adds no schema or TikZ changes; it does not implement later stages.
 See [32A verification and handoff](PHASE_32A_IMPLEMENTATION.md) for executed checks
-and the pending browser/review gates. The four slugs are registered, with
-cumulative browser requirements for the implemented 32A groups.
+and historical handoffs. The four slugs are registered. 32B adds
+`point-node-paint-import-persistence` to the cumulative 31F and 32A requirements.

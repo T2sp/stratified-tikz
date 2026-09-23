@@ -1,3 +1,4 @@
+import { normalizePointStyle } from './styles.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
 import {
   cloneCamera3D,
@@ -105,7 +106,10 @@ import { getLayerMetadata, normalizeLayerMetadataForDiagram } from './layers.ts'
 import { validateDiagram } from './validation.ts'
 
 export const savedDiagramFormat = 'stratified-tikz-diagram'
-export const savedDiagramVersion = 1
+// File v2 materializes independent point paint, including saved user presets.
+// v1 remains readable with legacy black text, white hollow fill and 0.4pt stroke.
+// Diagram.version stays 1; coordinates and source text are never rewritten here.
+export const savedDiagramVersion = 2
 
 export type PersistentDiagram = {
   version: 1
@@ -545,7 +549,7 @@ function parseSavedDiagramFile(
     }
   }
 
-  if (parsed.version !== savedDiagramVersion) {
+  if (parsed.version !== 1 && parsed.version !== savedDiagramVersion) {
     return {
       ok: false,
       error: 'Saved file version is not supported.',
@@ -869,7 +873,8 @@ function toPersistentDiagram(
     cleanedDiagram.userStylePresets === undefined ||
     cleanedDiagram.userStylePresets.length === 0
       ? undefined
-      : cleanedDiagram.userStylePresets
+      : cleanedDiagram.userStylePresets.map((preset) => preset.kind === 'point'
+        ? { ...preset, style: normalizePointStyle(preset.style) } : preset)
   const externalTikzStyleSources =
     cleanedDiagram.externalTikzStyleSources === undefined ||
     cleanedDiagram.externalTikzStyleSources.length === 0
@@ -910,7 +915,8 @@ function toPersistentDiagram(
       : { importedTikzStyleReferences }),
     ...(variables === undefined ? {} : { variables }),
     ...(coordinateAnchors === undefined ? {} : { coordinateAnchors }),
-    strata: cleanedDiagram.strata,
+    strata: cleanedDiagram.strata.map((stratum) => stratum.geometricKind === 'point'
+      ? { ...stratum, style: normalizePointStyle(stratum.style) } : stratum),
     labels: cleanedDiagram.labels,
     ...(pathCrossings === undefined ? {} : { pathCrossings }),
   }
@@ -1267,6 +1273,9 @@ function normalizeLoadedStrata(savedStrata: unknown[]): Stratum[] {
 }
 
 function normalizeLoadedStratum(stratum: unknown): unknown {
+  if (isRecord(stratum) && stratum.geometricKind === 'point' && isRecord(stratum.style)) {
+    return { ...stratum, style: normalizeLoadedPointStyle(stratum.style) }
+  }
   if (!isRecord(stratum) || stratum.geometricKind !== 'curve') {
     return stratum
   }
@@ -1616,7 +1625,11 @@ function normalizeLoadedExternalTikzStyleSources(
         )
       }
 
-      return [{ id: savedSource.id, name, loadHint }]
+      if (savedSource.rawSource !== undefined && typeof savedSource.rawSource !== 'string') {
+        errors.push(`${sourcePath}.rawSource must be a string.`)
+      }
+      return [{ id: savedSource.id, name, loadHint,
+        ...(typeof savedSource.rawSource === 'string' ? { rawSource: savedSource.rawSource } : {}) }]
     },
   )
 
@@ -1729,6 +1742,13 @@ function normalizeLoadedImportedTikzStyleReferences(
         warnings,
       )
 
+      if (savedReference.rawOptions !== undefined && typeof savedReference.rawOptions !== 'string') {
+        errors.push(`${referencePath}.rawOptions must be a string.`)
+      }
+      if (savedReference.previewDiagnostics !== undefined &&
+          (!Array.isArray(savedReference.previewDiagnostics) || !savedReference.previewDiagnostics.every((item) => typeof item === 'string'))) {
+        errors.push(`${referencePath}.previewDiagnostics must be an array of strings.`)
+      }
       return [
         {
           id: savedReference.id,
@@ -1737,6 +1757,9 @@ function normalizeLoadedImportedTikzStyleReferences(
           displayName,
           targets,
           ...(options === undefined ? {} : { options }),
+          ...(typeof savedReference.rawOptions === 'string' ? { rawOptions: savedReference.rawOptions } : {}),
+          ...(Array.isArray(savedReference.previewDiagnostics) && savedReference.previewDiagnostics.every((item) => typeof item === 'string')
+            ? { previewDiagnostics: [...savedReference.previewDiagnostics] as string[] } : {}),
         },
       ]
     },
@@ -2247,7 +2270,7 @@ function loadedUserStylePreset(
         id,
         name,
         kind,
-        style: style as PointStyle,
+        style: normalizeLoadedPointStyle(style),
         tikzStyleName,
         ...importedStyleReference,
       }
@@ -2261,6 +2284,14 @@ function loadedUserStylePreset(
         ...importedStyleReference,
       }
   }
+}
+
+function normalizeLoadedPointStyle(style: Record<string, unknown>): PointStyle {
+  // Leave explicit paint intact for strict validation, including malformed values.
+  // Only the absent legacy field is materialized; there is no lossy repair.
+  return style.paint === undefined
+    ? normalizePointStyle(style as PointStyle)
+    : style as PointStyle
 }
 
 function loadedOptionalImportedTikzStyleReferenceId(

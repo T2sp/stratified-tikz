@@ -49,16 +49,24 @@ export const pointNodeScenarios = {
     "point-native-pending-transparent-edit", "point-native-pending-white-load",
     "point-whole-node-fallback-opacity-validation",
   ],
+  "point-node-paint-import-persistence": [
+    "point-paint-native-inspector-history", "point-paint-imported-presets-persistence",
+    "point-paint-lifecycle-dimming", "point-paint-pending-transparent-edit",
+    "point-paint-pending-white-load",
+  ],
 };
 export function pointNodeScenarioArtifacts(name) {
-  return [`${name}.json`, ...(name.startsWith("point-native-pending-")
+  return [`${name}.json`, ...((name.startsWith("point-native-pending-") || name.startsWith("point-paint-pending-"))
     ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`]
     : name === "point-whole-node-fallback-opacity-validation" ? ["point-fallback.svg"]
+      : name === "point-paint-imported-presets-persistence" ? ["point-paint-saved.json", "point-paint-import.sty"]
+      : name === "point-paint-native-inspector-history" ? ["point-paint-legacy.json"]
       : name === "point-native-direct-cursor-workplanes-inspector-persistence"
         ? ["point-native-2d.json", "point-native-3d.json"] : [])];
 }
 const pointNodeGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)];
-const phase32Groups = { "32A": pointNodeGroups, "32B": pointNodeGroups,
+const pointNodeMathGroups = pointNodeGroups.filter((group) => group !== "point-node-paint-import-persistence");
+const phase32Groups = { "32A": pointNodeMathGroups, "32B": pointNodeGroups,
   "32C": pointNodeGroups, "32D": pointNodeGroups };
 
 export function browserChecksForPhase(phase) {
@@ -208,7 +216,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
     || new Set(completed).size !== completed.length
     || completed.some((group) => !pointNodeGroups.includes(group))
     || !requiredGroups.every((group) => completed.includes(group))
-    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeGroups].some((groups) =>
+    || ![freeLabelGroups, inlineCompleteGroups, allLabelGroups, combinedLabelGroups, pointNodeMathGroups, pointNodeGroups].some((groups) =>
       groups.length === completed.length && groups.every((group) => completed.includes(group)))) {
     throw new Error(`Phase ${phase} browser evidence must complete ${requiredGroups.length} required groups; only complete supported group sets are accepted`);
   }
@@ -225,6 +233,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
       throw new Error("Point-node browser evidence checkout mismatch");
     }
     for (const [group, names] of Object.entries(pointNodeScenarios)) {
+      if (!completed.includes(group)) continue;
       for (const name of names) {
         const records = evidence.evidence?.filter((entry) => entry.name === name) ?? [];
         if (records.length !== 1 || records[0].group !== group || records[0].result !== "passed"

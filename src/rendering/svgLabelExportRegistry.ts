@@ -2,6 +2,7 @@ import type { LabelAnchor, PointStyle } from '../model/types.ts'
 import type { LabelLayoutSettings } from './labels/labelMetrics.ts'
 import { normalizeSvgLabelFontSize, svgLabelFontFamily } from './labels/svgLabelLayout.ts'
 import type { SvgLabelRuntime } from './labels/svgLabelRuntime.ts'
+import { clonePointStyle } from '../model/styles.ts'
 
 /** Runtime-only committed label inputs. No model objects or callbacks are retained. */
 export type SvgLabelExportCapture = Readonly<{
@@ -28,7 +29,7 @@ type SvgLabelExportCaptureInput = Omit<SvgLabelExportCapture, 'fontFamily' | 'bo
 export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLabelExportCapture {
   return Object.freeze({
     runtime: input.runtime,
-    pointStyle: input.pointStyle === undefined ? undefined : Object.freeze({ ...input.pointStyle }),
+    pointStyle: input.pointStyle === undefined ? undefined : freezePointStyle(input.pointStyle),
     source: input.source,
     position: Object.freeze({ x: input.position.x, y: input.position.y }),
     fontSize: normalizeSvgLabelFontSize(input.fontSize),
@@ -46,6 +47,18 @@ export function captureSvgLabelExport(input: SvgLabelExportCaptureInput): SvgLab
       lineGapEm: input.settings.lineGapEm,
     }),
   })
+}
+
+function freezePointStyle(style: PointStyle): Readonly<PointStyle> {
+  const copy = clonePointStyle(style)
+  if (copy.paint) {
+    Object.freeze(copy.paint.text)
+    Object.freeze(copy.paint.fill)
+    if (copy.paint.stroke.dashPattern) Object.freeze(copy.paint.stroke.dashPattern)
+    Object.freeze(copy.paint.stroke)
+    Object.freeze(copy.paint)
+  }
+  return Object.freeze(copy)
 }
 
 const captures = new WeakMap<Element, SvgLabelExportCapture>()

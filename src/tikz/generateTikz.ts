@@ -1,3 +1,4 @@
+import { getPointPaint } from '../model/styles.ts'
 import type {
   BoundaryPathSnapshot,
   ClosedPathBoundary,
@@ -89,6 +90,8 @@ import {
 import { stylePresetStylesEqual } from '../model/stylePresets.ts'
 import {
   importedStylePresetStyle,
+  parseTikzsetStyles,
+  parseTikzStylePreviewOptions,
   normalizeSingleLineCommentText,
 } from '../model/importedTikzStyles.ts'
 import {
@@ -6616,14 +6619,43 @@ function pointStyleTikzOptions(
   colorBaseName: string,
   context: GenerateContext,
 ): string[] {
-  const pointColor = context.colors.define(colorBaseName, style.color)
-
+  // Legacy input remains readable and byte-compatible; normalized loaded/created
+  // points carry explicit paint. Empty historic text was always black.
+  if (style.paint === undefined) {
+    const pointColor = context.colors.define(colorBaseName, style.color)
+    return [
+      ...pointShapeOptions(style.shape, context),
+      `fill=${style.fill === 'filled' ? pointColor : 'white'}`,
+      `draw=${pointColor}`,
+      `opacity=${formatNumber(style.opacity)}`,
+      `inner sep=${formatNumber(style.size / 2)}pt`,
+    ]
+  }
   return [
     ...pointShapeOptions(style.shape, context),
-    `fill=${style.fill === 'filled' ? pointColor : 'white'}`,
-    `draw=${pointColor}`,
-    `opacity=${formatNumber(style.opacity)}`,
+    ...pointPaintTikzOptions(style, colorBaseName, context),
     `inner sep=${formatNumber(style.size / 2)}pt`,
+  ]
+}
+
+function pointPaintTikzOptions(style: PointStyle, colorBaseName: string, context: GenerateContext): string[] {
+  const paint = getPointPaint(style)
+  const color = (suffix: string, value: HexColor) => context.colors.define(`${colorBaseName}${suffix}`, value)
+  const dash = paint.stroke.dashPattern?.map((length, index) => `${index % 2 === 0 ? 'on' : 'off'} ${formatNumber(length)}pt`).join(' ')
+  return [
+    `fill=${paint.fill.enabled ? color('Fill', paint.fill.color) : 'none'}`,
+    `draw=${paint.stroke.enabled ? color('Stroke', paint.stroke.color) : 'none'}`,
+    `text=${color('Text', paint.text.color)}`,
+    // PGF general opacity assigns the two graphics alphas. Emit effective
+    // values individually; overall application opacity is multiplied once.
+    `fill opacity=${formatNumber(style.opacity * paint.fill.opacity)}`,
+    `draw opacity=${formatNumber(style.opacity * paint.stroke.opacity)}`,
+    `text opacity=${formatNumber(style.opacity * paint.text.opacity)}`,
+    `line width=${formatNumber(paint.stroke.width)}pt`,
+    dash === undefined ? lineStyleToTikzOption(paint.stroke.lineStyle) ?? 'solid' : `dash pattern=${dash}`,
+    `dash phase=${formatNumber(paint.stroke.dashPhase)}pt`,
+    `line cap=${paint.stroke.lineCap}`,
+    `line join=${paint.stroke.lineJoin}`,
   ]
 }
 
@@ -6650,18 +6682,26 @@ function pointStyleOptionsForElement(
     context,
   )
 
-  if (presetStyleOption !== null) {
-    return [presetStyleOption, ...(importedStyle?.options ?? [])]
+  if (presetStyleOption !== null && importedStyle === null) {
+    return [presetStyleOption]
   }
 
   if (importedStyle !== null) {
+    const unresolved = importedPointUnresolvedFields(importedStyle.reference, context)
     return [
+      ...(presetStyleOption === null ? [] : [presetStyleOption]),
+      // Leave text alpha inherited until external options have run. An early
+      // explicit text opacity would mask an unknown style's fill opacity.
+      ...(unresolved.length === 0 ? [] : pointPaintTikzOptions(style, colorBaseName, context).filter((option) => !option.startsWith('text opacity='))),
+      ...pointShapeOptions(style.shape, context),
+      `inner sep=${formatNumber(style.size / 2)}pt`,
       ...importedStyle.options,
       ...pointImportedStyleOverrideOptions(
         importedStyle.reference,
         style,
         colorBaseName,
         context,
+        unresolved,
       ),
     ]
   }
@@ -6841,47 +6881,60 @@ function filledSurfaceImportedStyleOverrideOptions(
   return options
 }
 
+function importedPointUnresolvedFields(reference: ImportedTikzStyleReference, context: GenerateContext): string[] {
+  const source = context.externalTikzStyleSources.get(reference.sourceId)
+  const colors = source?.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource).colors
+  const preview = parseTikzStylePreviewOptions(reference.options ?? '', {
+    styles: [...context.importedTikzStyleReferences.values()], key: reference.key, colors,
+  })
+  const unresolved = new Set(preview.unresolvedFields ?? [])
+  if (unresolved.has('textOpacity') || (preview.textOpacity === undefined && unresolved.has('fillOpacity'))) unresolved.add('effectiveTextOpacity')
+  return [...unresolved]
+}
+
 function pointImportedStyleOverrideOptions(
   reference: ImportedTikzStyleReference,
   style: PointStyle,
   colorBaseName: string,
   context: GenerateContext,
+  unresolvedFields: readonly string[],
 ): string[] {
   const baseline = importedBaselineStyle('point', reference, context)
-
-  if (baseline.kind !== 'pointStyle') {
-    return pointStyleTikzOptions(style, colorBaseName, context)
+  const currentPaint = getPointPaint(style)
+  const baselinePaint = baseline.kind === 'pointStyle' ? getPointPaint(baseline) : currentPaint
+  const baselineOpacity = baseline.kind === 'pointStyle' ? baseline.opacity : style.opacity
+  const unresolved = new Set(unresolvedFields)
+  const affectedFields: Record<string, string[]> = {
+    fill: currentPaint.fill.enabled ? ['fillColor', 'fillEnabled'] : ['fillEnabled'],
+    draw: currentPaint.stroke.enabled ? ['drawColor', 'drawEnabled'] : ['drawEnabled'],
+    text: ['textColor'], 'fill opacity': ['fillOpacity'], 'draw opacity': ['drawOpacity'],
+    'text opacity': ['effectiveTextOpacity'], 'line width': ['lineWidth'],
+    'dash pattern': ['dashPattern'], 'dash phase': ['dashPhase'],
+    'line cap': ['lineCap'], 'line join': ['lineJoin'],
   }
-
-  const options: string[] = []
-  let pointColor: string | null = null
-
-  function pointColorName(): string {
-    pointColor ??= context.colors.define(colorBaseName, style.color)
-    return pointColor
+  const unchanged: Record<string, boolean> = {
+    fill: currentPaint.fill.color === baselinePaint.fill.color && currentPaint.fill.enabled === baselinePaint.fill.enabled,
+    draw: currentPaint.stroke.color === baselinePaint.stroke.color && currentPaint.stroke.enabled === baselinePaint.stroke.enabled,
+    text: currentPaint.text.color === baselinePaint.text.color,
+    'fill opacity': currentPaint.fill.opacity === baselinePaint.fill.opacity && style.opacity === baselineOpacity,
+    'draw opacity': currentPaint.stroke.opacity === baselinePaint.stroke.opacity && style.opacity === baselineOpacity,
+    'text opacity': currentPaint.text.opacity === baselinePaint.text.opacity && style.opacity === baselineOpacity,
+    'line width': currentPaint.stroke.width === baselinePaint.stroke.width,
+    'dash pattern': currentPaint.stroke.lineStyle === baselinePaint.stroke.lineStyle && JSON.stringify(currentPaint.stroke.dashPattern) === JSON.stringify(baselinePaint.stroke.dashPattern),
+    'dash phase': currentPaint.stroke.dashPhase === baselinePaint.stroke.dashPhase,
+    'line cap': currentPaint.stroke.lineCap === baselinePaint.stroke.lineCap,
+    'line join': currentPaint.stroke.lineJoin === baselinePaint.stroke.lineJoin,
   }
-
-  if (style.shape !== baseline.shape) {
-    options.push(...pointShapeOptions(style.shape, context))
-  }
-
-  if (style.fill !== baseline.fill || style.color !== baseline.color) {
-    options.push(`fill=${style.fill === 'filled' ? pointColorName() : 'white'}`)
-  }
-
-  if (style.color !== baseline.color || style.fill !== baseline.fill) {
-    options.push(`draw=${pointColorName()}`)
-  }
-
-  if (style.opacity !== baseline.opacity) {
-    options.push(`opacity=${formatNumber(style.opacity)}`)
-  }
-
-  if (style.size !== baseline.size) {
-    options.push(`inner sep=${formatNumber(style.size / 2)}pt`)
-  }
-
-  return options
+  const paintOptions = pointPaintTikzOptions(style, colorBaseName, context).filter((option) => {
+    const rawKey = option.split('=')[0]
+    const key = ['solid', 'dotted', 'densely dotted', 'dashed'].includes(rawKey) ? 'dash pattern' : rawKey
+    return !unchanged[key] || !(affectedFields[key] ?? []).some((affected) => unresolved.has(affected))
+  })
+  return [
+    ...paintOptions,
+    ...(baseline.kind !== 'pointStyle' || style.shape !== baseline.shape ? pointShapeOptions(style.shape, context) : []),
+    ...(baseline.kind !== 'pointStyle' || style.size !== baseline.size ? [`inner sep=${formatNumber(style.size / 2)}pt`] : []),
+  ]
 }
 
 function labelImportedStyleOverrideOptions(
@@ -6934,7 +6987,7 @@ function importedBaselineStyle(
       candidate.importedTikzStyleReferenceId === reference.id,
   )
 
-  return preset?.style ?? importedStylePresetStyle(kind, reference.options)
+  return preset?.style ?? importedStylePresetStyle(kind, reference.options, { styles: [...context.importedTikzStyleReferences.values()], key: reference.key })
 }
 
 function matchingUserStylePreset(

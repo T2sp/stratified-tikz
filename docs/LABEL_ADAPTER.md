@@ -738,3 +738,19 @@ legacy contour size. Runtime failures, parser failures, and export deadlines
 retain complete literal source. Point browser acceptance is pending in this
 child environment; see `PHASE_32A_IMPLEMENTATION.md`. Paint expansion, new shape
 algorithms and layout/anchor controls remain 32B–32D work.
+
+
+## Phase 32B paint boundary
+
+32B reuses the same source/font request identity, cached validated SVG and body
+measurements. Point paint is applied only by the synchronous view: inherited
+MathJax paint takes the node's text color while explicit internal colors remain
+unchanged. Independent text/fill/stroke alphas and disabled paints are resolved
+outside the adapter. They are never input to parsing or conversion.
+
+`captureSvgLabelExport` deep-copies and freezes the optional point paint,
+including all nested objects and dash arrays. `SvgPointNodeView` applies the
+captured paint during detached whole-node reconstruction; subsequent edits cannot
+alter captured output. Free-label and path-inline semantics remain unchanged.
+The accepted 32A `gtRban` report supersedes the historical pending note above;
+32B's added native scenarios require their own fresh parent report and review.

@@ -1,0 +1,21 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\begin{tikzpicture}
+% Expected from independent PGF PDF operators (not application resolver).
+\node[draw=green,fill=blue,text=red,draw opacity=.8,fill opacity=.7,opacity=.2] at (0,0) {A};
+\node[draw=green,fill=blue,text=red,opacity=.2,draw opacity=.8,fill opacity=.7] at (2,0) {B};
+\node[draw=green,fill=blue,text=red,text opacity=.6,opacity=.2] at (4,0) {C};
+\node[draw=green,fill=blue,text=red,opacity=.2,text opacity=.6] at (6,0) {D};
+\node[draw=green,fill=blue,text=red,color=blue] at (0,-2) {E};
+\node[draw=green,fill=blue,color=blue,text=red] at (2,-2) {F};
+\node[draw=green,fill=none,text=red] at (4,-2) {G};
+\node[draw=none,fill=white,text=red,text opacity=0] at (6,-2) {H};
+\node[draw=green,fill=none,text=red,dotted,line width=2pt] at (0,-4) {I};
+\node[draw=green,fill=none,text=red,line width=2pt,dotted] at (2,-4) {J};
+\end{tikzpicture}
+\end{document}

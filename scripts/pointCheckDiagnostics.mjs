@@ -18,10 +18,10 @@ export async function boundedPointDiagnostic(operation, name, timeoutMs = 2000) 
 }
 
 /** Called before assertions. Diagnostic records never count as passing scenarios. */
-export function createPointDiagnostics({ artifactDir, observe }) {
+export function createPointDiagnostics({ artifactDir, observe, artifactPrefix = 'point-observation' }) {
   let index = 0
   return async (group, scenario, details) => {
-    const artifact = `point-observation-${String(++index).padStart(4, '0')}.json`
+    const artifact = `${artifactPrefix}-${String(++index).padStart(4, '0')}.json`
     const observation = { group, scenario, result: 'observed', ...details }
     await writeFile(resolve(artifactDir, artifact), JSON.stringify(observation, null, 2) + '\n')
     await observe(`${scenario}-observed`, { group, artifact })

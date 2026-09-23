@@ -1346,9 +1346,41 @@ existing deadline and full-source fallback, reconstructs the whole point using
 the shared view, validates both contour and body, and retains cloned parent
 visibility/opacity. Overlay exclusion and duplicate-click policy are unchanged.
 
-32A acceptance remains gated on fresh parent browser evidence and independent
-review. Native assertions are registered for the three point groups in addition
+32A acceptance is established by the `gtRban` parent evidence and independent
+review (see the 32B prerequisite audit). Native assertions are registered for the three point groups in addition
 to all twelve Phase 31F groups; missing scenario records/artifacts, terminal
 failure, page errors, and checkout mismatches stop the runner before review.
 The fresh-process verifier loading contract remains in force. 32B–32D slugs
 inherit completed groups; their future groups must be activated in those stages.
+
+
+## Phase 32B point paint contract
+
+Saved-file envelope v2 adds explicit independent `PointStyle.paint`; the internal
+diagram version stays 1. Both old envelope v1 and v2 are accepted, with legacy
+point strata and user presets normalized to the same effective paint. Legacy
+`color`/`fill` metadata is consulted only when paint is absent. Explicit paint
+is authoritative and validated as a whole. The source text, codim, ambient
+dimension, shape and size conventions are unchanged.
+
+Text has color/opacity; fill has enabled/color/opacity; stroke has enabled/color/
+opacity/width/lineStyle/dashPattern/dashPhase/lineCap/lineJoin. Width and dash
+lengths are finite TeX-point values: width is positive and dash lengths are
+nonnegative; phase may be signed. Alphas are
+finite in [0,1]; colors are six-digit hex values after literal import resolution.
+Disabled paint is distinct from alpha zero. Legacy hollow remains white-filled.
+The overall application opacity multiplies each resolved paint once. Imported
+general/specific PGF opacity keys resolve in option order before that multiplier;
+they are not all multiplied together.
+
+Clone, preset, clipboard, bulk editing and export-capture boundaries deep-copy
+paint objects and dash arrays. The existing body/layout lifecycle remains
+source-dependent; color/opacity edits do not trigger MathJax compilation.
+Contour fill and stroke have independent SVG alphas, body color inherits into
+validated math geometry, and explicit math color survives. Stroke width affects
+painted bounds and picking, separate from body and shape bounds.
+
+The browser policy adds `point-node-paint-import-persistence` cumulatively to all
+31F and 32A groups. Completion still requires fresh terminal success, named
+scenario observations, actual standalone downloads, matching checkout identity,
+and independent review. See [32B evidence and grammar](PHASE_32B_IMPLEMENTATION.md).

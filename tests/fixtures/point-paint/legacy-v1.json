@@ -1,0 +1,35 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 1,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 2,
+    "strata": [
+      {
+        "id": "legacy-hollow",
+        "codim": 2,
+        "geometricKind": "point",
+        "name": "Legacy hollow",
+        "text": "  $F$\t\\alpha\n  ",
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "stylePresetId": "legacy-preset",
+        "style": {
+          "kind": "pointStyle", "color": "#AABBCC", "opacity": 0.5,
+          "shape": "square", "fill": "hollow", "size": 9
+        },
+        "layer": 0
+      }
+    ],
+    "labels": [],
+    "userStylePresets": [
+      {
+        "id": "legacy-preset", "name": "Legacy hollow", "kind": "point",
+        "tikzStyleName": "legacyHollow",
+        "style": {
+          "kind": "pointStyle", "color": "#AABBCC", "opacity": 0.5,
+          "shape": "square", "fill": "hollow", "size": 9
+        }
+      }
+    ]
+  }
+}

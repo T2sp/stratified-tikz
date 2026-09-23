@@ -1,18 +1,15 @@
 # Phase 32 Plan: Point-node math, paint, geometric shapes, and layout
 
-Status: 32A implementation and the source/metric/persistence/coordinate/XML-Canvas
-corrections are preserved. The latest historical parent (`cCLyYw`) completed
-11/15 groups and eight point scenarios, then failed the first point export's
-radius comparison against a renderer contaminated by the font-readiness test.
-Chrome reported the injected family's name as `"Times New Roman"`; name-based
-cleanup missed it. The targeted harness fix owns and removes that exact face,
-checks native metric/contour restoration in the reused page, and validates
-click-time App/download/reference font compatibility before geometry assertions.
-Fresh complete parent browser acceptance and independent review remain pending.
-The child cannot start the localhost server (`EPERM`); this supplies no native
-pass. All 15 groups / 11 point scenarios and required artifacts remain mandatory.
-32B–32D remain deferred. See PHASE_32A_IMPLEMENTATION.md for actual results and
-final-checkout handoff.
+Status: 32A is accepted. The `gtRban` parent report completed all 15 groups,
+all 11 named point scenarios and required artifacts, followed by an independent
+passing review. Its tracked diff and four then-untracked file hashes match the
+32A changes committed in `1d3e748` and merged into `595139d`. This supersedes the
+historical contaminated-reference failure and the earlier child-only handoff.
+See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
+
+32B implementation and cumulative acceptance harness are added; fresh parent
+browser verification and independent review remain required. 32C and 32D remain deferred. Historical 32A
+evidence does not establish acceptance of the 32B checkout.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

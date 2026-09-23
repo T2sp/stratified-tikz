@@ -609,8 +609,32 @@ export type CubicBezierControlMode =
       secondOffsetReference: 'end'
     }
 
+export const pointStrokeCaps = ['butt', 'round', 'rect'] as const
+export const pointStrokeJoins = ['miter', 'round', 'bevel'] as const
+
+/** Independent paint. Width, dash lengths and phase are in TeX points. */
+export type PointPaint = {
+  text: { color: HexColor; opacity: Opacity }
+  fill: { enabled: boolean; color: HexColor; opacity: Opacity }
+  stroke: {
+    enabled: boolean
+    color: HexColor
+    opacity: Opacity
+    /** Positive TeX points; disable the stroke explicitly instead of width zero. */
+    width: number
+    lineStyle: LineStyle
+    dashPattern?: number[]
+    dashPhase: number
+    lineCap: (typeof pointStrokeCaps)[number]
+    lineJoin: (typeof pointStrokeJoins)[number]
+  }
+}
+
 export type PointStyle = {
   kind: 'pointStyle'
+  /** Authoritative paint when present; absence denotes legacy paint semantics. */
+  paint?: PointPaint
+  /** Legacy compatibility metadata; ignored for paint when paint is present. */
   color: HexColor
   opacity: Opacity
   shape: PointShape
@@ -655,6 +679,7 @@ export type ExternalTikzStyleSource = {
   id: string
   name: string
   loadHint: string
+  rawSource?: string
 }
 
 export type ImportedTikzStyleReference = {
@@ -664,6 +689,8 @@ export type ImportedTikzStyleReference = {
   displayName: string
   targets: TikzStyleTarget[]
   options?: string
+  rawOptions?: string
+  previewDiagnostics?: string[]
 }
 
 export type UserRegionStylePreset = {

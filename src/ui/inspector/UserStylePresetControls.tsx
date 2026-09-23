@@ -1,3 +1,5 @@
+import { PointPaintFields } from './PointPaintFields.tsx'
+import { getPointPaint, updatePointColor, updatePointFill } from '../../model/styles.ts'
 import { useMemo, useState } from 'react'
 import {
   labelAnchors,
@@ -523,6 +525,9 @@ function ImportedPresetDetails({
           for this element kind.
         </span>
       )}
+      {reference.previewDiagnostics?.map((message, index) => (
+        <span key={`${index}-${message}`} className="style-preset-warning">{message}</span>
+      ))}
       {reference.options !== undefined && (
         <span className="style-preset-options">
           Preview options: {reference.options}
@@ -795,11 +800,12 @@ function PresetStyleFields({
     case 'point':
       return (
         <>
+          <PointPaintFields style={preset.style} prefix="Preset " onChange={onChange} />
           <EditableColorField
             label="Preset color"
-            value={preset.style.color}
+            value={getPointPaint(preset.style).stroke.color}
             onChange={(color) =>
-              onChange({ ...preset.style, color: color as HexColor })
+              onChange(updatePointColor(preset.style, color as HexColor))
             }
           />
           <EditableOpacityField
@@ -822,7 +828,7 @@ function PresetStyleFields({
             label="Preset fill"
             value={preset.style.fill}
             options={pointFills}
-            onChange={(fill) => onChange({ ...preset.style, fill })}
+            onChange={(fill) => onChange(updatePointFill(preset.style, fill))}
           />
         </>
       )

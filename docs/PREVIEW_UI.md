@@ -1641,3 +1641,36 @@ The JSON load variable-resolution dialog is a modal outside the preview overlay
 stack. It traps focus while open, handles Escape inside the modal flow, and sits
 above the toolbar, quick style bar, popovers, layer window, work-plane overlay,
 direct input drawer, and inspector drawer.
+
+
+## Independent point paint (Phase 32B)
+
+The point inspector and saved point-preset editor expose Text color/opacity,
+Fill enabled/color/opacity, and Border enabled/color/opacity/width/line style,
+dash phase, cap and join. Width and dash phase are in TeX points. Numeric edits
+commit through the existing validated inspector transaction; invalid/nonfinite
+drafts do not modify the diagram. Bulk point styles and style copy/paste retain
+the independent fields. The combined Color and filled/hollow quick controls
+remain convenience operations; hollow explicitly selects white fill. Disable
+Fill for genuine transparency, and disable Border for no outline. Zero alpha is
+saved separately from either enabled switch.
+
+Text paint reaches inherited MathJax paths and literal fallback. Explicit color
+inside supported math remains intact. Paint changes do not request another body
+conversion. Fill and border overlap using their own operation alphas; overall
+Opacity and hidden-point dimming each apply once. Wide borders participate in
+painted bounds, highlighting and picking without increasing body padding.
+
+Both `\tikzstyle` and `\tikzset` imported presets resolve supported literal
+paint and bounded named-style references in order. Unsupported values/options
+appear as preview diagnostics and remain available to external TikZ export.
+Imported partial styles use materialized application node defaults consistently
+in preview and export. This is not arbitrary TeX execution or support for the
+deferred 32C/32D shapes and layout options. See
+[paint grammar and compatibility](PHASE_32B_IMPLEMENTATION.md).
+
+New JSON saves use envelope version 2 and explicit point paint, including saved
+presets; version 1 files retain legacy white hollow, black text and 0.4pt borders.
+Point body source remains unchanged. SVG capture owns an immutable deep copy of
+paint before settlement. Current 32B native acceptance remains a parent-runner
+gate; historical 32A evidence is not evidence for the new paint scenarios.

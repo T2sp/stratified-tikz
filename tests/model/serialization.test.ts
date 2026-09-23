@@ -1,3 +1,4 @@
+import { normalizePointStyle } from '../../src/model/styles.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -73,7 +74,8 @@ test('serializeDiagram includes format, version, and diagram data', () => {
   assert.equal(parsed.diagram.version, twoDimensionalExample.version)
   assert.equal(parsed.diagram.ambientDimension, twoDimensionalExample.ambientDimension)
   assert.equal('camera' in parsed.diagram, false)
-  assert.deepEqual(parsed.diagram.strata, twoDimensionalExample.strata)
+  assert.deepEqual(parsed.diagram.strata, twoDimensionalExample.strata.map((stratum) =>
+    stratum.geometricKind === 'point' ? { ...stratum, style: normalizePointStyle(stratum.style) } : stratum))
   assert.deepEqual(parsed.diagram.labels, twoDimensionalExample.labels)
 })
 
@@ -3126,7 +3128,9 @@ function ensureLayerMetadataAndPathArrowDefaults(diagram: Diagram): Diagram {
   return {
     ...layered,
     strata: layered.strata.map((stratum) =>
-      stratum.geometricKind === 'curve' && stratum.arrows === undefined
+      stratum.geometricKind === 'point'
+        ? { ...stratum, style: normalizePointStyle(stratum.style) }
+        : stratum.geometricKind === 'curve' && stratum.arrows === undefined
         ? {
             ...stratum,
             arrows: clonePathArrowOptions(defaultPathArrowOptions),

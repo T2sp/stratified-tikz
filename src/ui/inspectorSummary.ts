@@ -1,3 +1,4 @@
+import { getPointPaint } from '../model/styles.ts'
 import type {
   AmbientDimension,
   ClosedPathBoundary,
@@ -588,7 +589,9 @@ export function formatStratumStyleSummary(style: StratumStyle): string {
       ])
     case 'pointStyle':
       return joinStyleSummary([
-        `color: ${style.color}`,
+        `text color: ${getPointPaint(style).text.color}`,
+        `fill color: ${getPointPaint(style).fill.enabled ? getPointPaint(style).fill.color : 'none'}`,
+        `border color: ${getPointPaint(style).stroke.enabled ? getPointPaint(style).stroke.color : 'none'}`,
         formatStyleNumber('opacity', style.opacity),
         `shape: ${style.shape}`,
         `fill: ${style.fill}`,

@@ -1,3 +1,4 @@
+import { clonePointStyle } from './styles.ts'
 import { visibilitySortModes } from './types.ts'
 import type {
   CurveStyle,
@@ -206,7 +207,7 @@ export function hiddenCurveStyleFromBase(
 
 export function hiddenPointStyleFromBase(baseStyle: PointStyle): PointStyle {
   return {
-    ...baseStyle,
+    ...clonePointStyle(baseStyle),
     kind: 'pointStyle',
     opacity: clampOpacity(baseStyle.opacity * hiddenPointOpacityMultiplier),
   }

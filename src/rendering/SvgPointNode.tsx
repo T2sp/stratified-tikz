@@ -6,6 +6,7 @@ import { captureSvgLabelExport, registerSvgLabelExportCapture } from './svgLabel
 import { svgPointNodeLayout, type SvgPointNodeCommit } from './svgPointNodeLayout.ts'
 import { svgPointNodeTextFontFamily, svgPointNodeTextFontSize } from './svgPointNodeText.ts'
 import { SvgPointNodeView } from './svgPointNodeView.ts'
+import { getPointPaint } from '../model/styles.ts'
 
 export function SvgPointNode({ runtime, source, position, style, ownerIdentity, selected, onLayout }: {
   runtime: SvgLabelRuntime; source: string; position: Vec2; style: PointStyle; ownerIdentity: string
@@ -20,10 +21,11 @@ export function SvgPointNode({ runtime, source, position, style, ownerIdentity, 
     onLayout(snapshot)
     return () => onLayout(null)
   }, [onLayout, snapshot])
+  const textPaint = getPointPaint(style).text
   const capture = useMemo(() => captureSvgLabelExport({ runtime, source, position,
     fontSize: svgPointNodeTextFontSize, fontFamily: svgPointNodeTextFontFamily,
-    color: '#000000', opacity: style.opacity, anchor: 'center', ownerIdentity,
-    boundsTarget: false, settings, pointStyle: style }), [runtime, source, position, style, ownerIdentity, settings])
+    color: textPaint.color, opacity: style.opacity * textPaint.opacity, anchor: 'center', ownerIdentity,
+    boundsTarget: false, settings, pointStyle: style }), [runtime, source, position, style, textPaint.color, textPaint.opacity, ownerIdentity, settings])
   const elementRef = useCallback((node: SVGGElement | null) => node === null
     ? undefined : registerSvgLabelExportCapture(node, capture), [capture])
   return createElement(SvgPointNodeView, { capture, state, selected, elementRef })

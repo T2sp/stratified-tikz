@@ -1,3 +1,4 @@
+import { clonePointStyle, clonePointPaint, getPointPaint, updatePointColor, updatePointFill } from '../model/styles.ts'
 import {
   arrowHeadKinds,
   endpointArrowModes,
@@ -6,6 +7,8 @@ import {
   midArrowDirections,
   pointFills,
   pointShapes,
+  pointStrokeCaps,
+  pointStrokeJoins,
 } from '../model/types.ts'
 import { ensureLayerMetadata, formatLayerValue, normalizeLayerValue } from '../model/layers.ts'
 import {
@@ -127,6 +130,18 @@ export type BulkStyleFieldId =
   | 'point.size'
   | 'point.shape'
   | 'point.fill'
+  | 'point.textColor'
+  | 'point.textOpacity'
+  | 'point.fillEnabled'
+  | 'point.fillColor'
+  | 'point.fillOpacity'
+  | 'point.strokeEnabled'
+  | 'point.strokeColor'
+  | 'point.strokeOpacity'
+  | 'point.strokeWidth'
+  | 'point.strokeLineStyle'
+  | 'point.strokeCap'
+  | 'point.strokeJoin'
   | 'label.color'
   | 'label.opacity'
   | 'label.fontSize'
@@ -375,7 +390,7 @@ export function createBulkStyleEditorModel(
             'point.color',
             'Color',
             'color',
-            commonBulkValue(points.map((point) => point.style.color)),
+            commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.color)),
           ),
           bulkField(
             'point.opacity',
@@ -403,6 +418,18 @@ export function createBulkStyleEditorModel(
             commonBulkValue(points.map((point) => point.style.fill)),
             pointFills,
           ),
+          bulkField('point.textColor', 'Text color', 'color', commonBulkValue(points.map((point) => getPointPaint(point.style).text.color))),
+          bulkField('point.textOpacity', 'Text opacity', 'opacity', commonBulkValue(points.map((point) => getPointPaint(point.style).text.opacity))),
+          bulkField('point.fillEnabled', 'Fill enabled', 'select', commonBulkValue(points.map((point) => String(getPointPaint(point.style).fill.enabled))), ['true', 'false']),
+          bulkField('point.fillColor', 'Fill color', 'color', commonBulkValue(points.map((point) => getPointPaint(point.style).fill.color))),
+          bulkField('point.fillOpacity', 'Fill opacity', 'opacity', commonBulkValue(points.map((point) => getPointPaint(point.style).fill.opacity))),
+          bulkField('point.strokeEnabled', 'Border enabled', 'select', commonBulkValue(points.map((point) => String(getPointPaint(point.style).stroke.enabled))), ['true', 'false']),
+          bulkField('point.strokeColor', 'Border color', 'color', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.color))),
+          bulkField('point.strokeOpacity', 'Border opacity', 'opacity', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.opacity))),
+          bulkField('point.strokeWidth', 'Border width', 'positiveNumber', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.width))),
+          bulkField('point.strokeLineStyle', 'Border line style', 'select', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.lineStyle)), lineStyles),
+          bulkField('point.strokeCap', 'Border cap', 'select', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.lineCap)), pointStrokeCaps),
+          bulkField('point.strokeJoin', 'Border join', 'select', commonBulkValue(points.map((point) => getPointPaint(point.style).stroke.lineJoin)), pointStrokeJoins),
         ],
         arrowFields: [],
       }
@@ -1367,7 +1394,7 @@ function updatePointBulkStyleField(
         ? stratum
         : clearStyleReferences({
             ...stratum,
-            style: { ...stratum.style, color },
+            style: updatePointColor(stratum.style, color),
           })
     }
     case 'point.opacity': {
@@ -1376,7 +1403,7 @@ function updatePointBulkStyleField(
         ? stratum
         : clearStyleReferences({
             ...stratum,
-            style: { ...stratum.style, opacity },
+            style: { ...clonePointStyle(stratum.style), opacity },
           })
     }
     case 'point.size': {
@@ -1385,7 +1412,7 @@ function updatePointBulkStyleField(
         ? stratum
         : clearStyleReferences({
             ...stratum,
-            style: { ...stratum.style, size },
+            style: { ...clonePointStyle(stratum.style), size },
           })
     }
     case 'point.shape': {
@@ -1394,7 +1421,7 @@ function updatePointBulkStyleField(
         ? stratum
         : clearStyleReferences({
             ...stratum,
-            style: { ...stratum.style, shape },
+            style: { ...clonePointStyle(stratum.style), shape },
           })
     }
     case 'point.fill': {
@@ -1403,11 +1430,35 @@ function updatePointBulkStyleField(
         ? stratum
         : clearStyleReferences({
             ...stratum,
-            style: { ...stratum.style, fill },
+            style: updatePointFill(stratum.style, fill),
           })
     }
-    default:
-      return stratum
+    default: {
+      const paint = clonePointPaint(getPointPaint(stratum.style))
+      const color = colorInput(value)
+      const opacity = opacityInput(value)
+      const width = typeof value === 'number' ? value : Number(value)
+      switch (fieldId) {
+        case 'point.textColor': if (color === null) return stratum; paint.text.color = color; break
+        case 'point.textOpacity': if (opacity === null) return stratum; paint.text.opacity = opacity; break
+        case 'point.fillEnabled': if (value !== 'true' && value !== 'false') return stratum; paint.fill.enabled = value === 'true'; break
+        case 'point.fillColor': if (color === null) return stratum; paint.fill.color = color; break
+        case 'point.fillOpacity': if (opacity === null) return stratum; paint.fill.opacity = opacity; break
+        case 'point.strokeEnabled': if (value !== 'true' && value !== 'false') return stratum; paint.stroke.enabled = value === 'true'; break
+        case 'point.strokeColor': if (color === null) return stratum; paint.stroke.color = color; break
+        case 'point.strokeOpacity': if (opacity === null) return stratum; paint.stroke.opacity = opacity; break
+        case 'point.strokeWidth': if (!Number.isFinite(width) || width <= 0) return stratum; paint.stroke.width = width; break
+        case 'point.strokeLineStyle': {
+          const lineStyle = lineStyleInput(value)
+          if (lineStyle === null) return stratum
+          paint.stroke.lineStyle = lineStyle; delete paint.stroke.dashPattern; break
+        }
+        case 'point.strokeCap': if (value !== 'butt' && value !== 'round' && value !== 'rect') return stratum; paint.stroke.lineCap = value; break
+        case 'point.strokeJoin': if (value !== 'miter' && value !== 'round' && value !== 'bevel') return stratum; paint.stroke.lineJoin = value; break
+        default: return stratum
+      }
+      return clearStyleReferences({ ...stratum, style: { ...stratum.style, paint } })
+    }
   }
 }
 

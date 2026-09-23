@@ -173,6 +173,23 @@ const api = {
         color: '#3870a0', opacity: .65, fill: 'hollow' } })]
     return serializeDiagram(diagram)
   },
+  // Literal version-1 input intentionally lacks paint on both point strata and
+  // saved presets. Only the native Load JSON action may normalize this fixture.
+  pointPaintLegacyDocumentJson() {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    const style = { kind: 'pointStyle' as const, shape: 'circle' as const, size: 3,
+      color: '#3870a0' as const, opacity: 1, fill: 'hollow' as const }
+    diagram.strata = ['app-point', 'copy-point', 'bulk-point'].map((id, index) => createPointStratum({
+      ambientDimension: 2, id, text: index === 0 ? ' 日本 $x+\\color{purple}{y}$ ' : `copy ${index} $g_j$`,
+      position: { x: index === 0 ? 0 : index === 1 ? -2 : 2, y: index === 0 ? 0 : -1.5, z: 0 }, style,
+    }))
+    const raw = JSON.parse(serializeDiagram(diagram)) as { version: number; diagram: Diagram }
+    raw.version = 1
+    for (const stratum of raw.diagram.strata) if (stratum.geometricKind === 'point') delete stratum.style.paint
+    raw.diagram.userStylePresets = [{ id: 'legacy-paint-preset', name: 'Legacy hollow', kind: 'point',
+      tikzStyleName: 'legacyHollow', style: { ...style, shape: 'square' } }]
+    return JSON.stringify(raw)
+  },
   exportDocumentJson(ambientDimension: 2 | 3 = 2) {
     const diagram = createEmptyDiagram({ ambientDimension })
     const z = ambientDimension === 3 ? 0.5 : 0

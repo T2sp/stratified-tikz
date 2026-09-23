@@ -248,8 +248,8 @@ test('preview parser reads common line styles', () => {
   )
 })
 
-test('preview parser approximates thick line width', () => {
-  assert.equal(parseTikzStylePreviewOptions('thick').lineWidth, 2)
+test('preview parser follows PGF thick line width', () => {
+  assert.equal(parseTikzStylePreviewOptions('thick').lineWidth, 0.8)
 })
 
 test('imported color styles create editable presets in the preset list', () => {

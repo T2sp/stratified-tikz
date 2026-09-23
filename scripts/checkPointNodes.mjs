@@ -34,7 +34,7 @@ export async function inspectPoint(page, id) {
       radius: contour.localName === 'circle' ? Number(contour.getAttribute('r')) : null,
       contour: contour.outerHTML, center: coord(0, 0), inside: coord(east.x * .98, east.y * .98),
       outside: coord(shape.x + shape.width + 9, 0), transform: point.getAttribute('transform'),
-      opacity: contour.getAttribute('opacity'), outerOpacity: outer.getAttribute('opacity'),
+      opacity: String(Number(getComputedStyle(contour).fillOpacity) * Number(getComputedStyle(contour).opacity)), outerOpacity: outer.getAttribute('opacity'),
       pointerEvents: getComputedStyle(outer).pointerEvents,
       highlight: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r'),
     }
@@ -167,7 +167,7 @@ export async function runPointNodeChecks(context) {
   assert.notEqual(recovered.request, failed.request); invariant(beforeFont, await state())
   await page.mouse.click(recovered.inside.x, recovered.inside.y)
   assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
-  assert.equal(Number((await inspect()).highlight), recovered.radius + 6)
+  assert.equal(Number((await inspect()).highlight), recovered.radius + .24 + 6, 'Selection includes half the legacy .4pt border at 1.2 SVG units/pt')
   // A late native font changes actual ordinary-text width, not just a counter.
   await mutate({ text: 'mmmm WWWW $unclosed' }); await settle()
   const beforeFontFace = await inspect(), beforeFontModel = await state()
@@ -302,7 +302,7 @@ export async function runPointNodeChecks(context) {
   await page.mouse.down(); await page.mouse.move(dragHandle.x + dragHandle.width / 2 + 20, dragHandle.y + dragHandle.height / 2 - 10, { steps: 3 }); await page.mouse.up()
   assert.ok((await state()).dragCount > 0)
   const dragged = await state()
-  await mutate({ position: { x: .5, y: .2, z: .1 }, style: { ...dragged.points[0].style, color: '#804080', opacity: .45 } })
+  await mutate({ position: { x: .5, y: .2, z: .1 }, style: { ...dragged.points[0].style, opacity: .45, paint: { ...dragged.points[0].style.paint, fill: { ...dragged.points[0].style.paint.fill, color: '#804080' }, stroke: { ...dragged.points[0].style.paint.stroke, color: '#804080' } } } })
   await settle()
   assert.equal((await state()).invocationCount, beforeCamera.invocationCount)
   assert.equal((await inspect()).request, oldPoint.request)

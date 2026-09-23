@@ -2,6 +2,7 @@ import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
+  pointStylesEqual,
   cloneRegionStyle,
   cloneSheetStyle,
 } from './styles.ts'
@@ -359,11 +360,7 @@ export function stylePresetStylesEqual(
     case 'pointStyle':
       return (
         second.kind === 'pointStyle' &&
-        first.color === second.color &&
-        first.opacity === second.opacity &&
-        first.shape === second.shape &&
-        first.fill === second.fill &&
-        first.size === second.size
+        pointStylesEqual(first, second)
       )
     case 'labelStyle':
       return (

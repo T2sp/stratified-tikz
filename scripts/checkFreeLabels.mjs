@@ -6,31 +6,24 @@
  * STZ_BROWSER_EXECUTABLE=/absolute/path/to/chrome node scripts/checkFreeLabels.mjs
  */
 import assert from 'node:assert/strict'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createServer } from 'vite'
+import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
 import { runAppChecks } from './checkFreeLabelsApp.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
 import { runPointThenAppChecks } from './checkPointNodes.mjs'
+import { runPointNodePaintChecks } from './checkPointNodePaint.mjs'
 import { pointNodeScenarios } from './automation/phase-verification.mjs'
 import { runCombinedLabelChecks } from './checkCombinedLabels.mjs'
 import { runSettledSvgExportChecks, runSettledSvgVisibilityChecks } from './checkSettledSvgExports.mjs'
 
 const artifactDir = resolve(process.env.STZ_SMOKE_ARTIFACT_DIR ?? '/private/tmp/stz-free-labels-' + Date.now())
 await mkdir(artifactDir, { recursive: true })
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
-const diff = git('diff', 'HEAD', '--binary')
-const untrackedNames = git('ls-files', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean)
-const untracked = Object.fromEntries(await Promise.all(untrackedNames.map(async (file) => [file, await readFile(file, 'utf8')])))
-const checkout = { revision: git('rev-parse', 'HEAD').trim(), status: git('status', '--short'),
-  trackedDiffSha256: createHash('sha256').update(diff).digest('hex'),
-  untrackedSha256: Object.fromEntries(Object.entries(untracked).map(([file, text]) =>
-    [file, createHash('sha256').update(text).digest('hex')])) }
+const { checkout, diff, untracked } = captureBrowserCheckoutSnapshot()
 await writeFile(resolve(artifactDir, 'checkout.diff'), diff)
 await writeFile(resolve(artifactDir, 'checkout-untracked.json'), JSON.stringify(untracked, null, 2))
 const scenarios = [
@@ -473,6 +466,8 @@ try {
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   await runPointThenAppChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
     setStage: (value) => { stage = value } }, runAppChecks)
+  await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
+    setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'
   await startGroup('settled-SVG-export-standalone')
   await runSettledSvgVisibilityChecks({ browser, page, record, observe, artifactDir })

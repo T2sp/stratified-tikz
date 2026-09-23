@@ -1742,3 +1742,21 @@ The generated output should remain readable, even if it uses generated intermedi
 ```tex
 \coordinate (curveA_split_1) at (...);
 ```
+
+
+## Independent point paint (Phase 32B)
+
+Explicit point paint emits named xcolor definitions for text, enabled fill and
+enabled stroke, with separate `text opacity`, `fill opacity`, `draw opacity`,
+`line width`, dash style/pattern/phase, cap and join. Disabled fill/border emits
+`fill=none`/`draw=none`; alpha zero remains an enabled paint. Standalone and
+inlineMath modes use the same resolved options and preserve raw body text.
+Legacy programmatic styles without paint retain their established option form;
+saved/reloaded v2 styles express the same appearance with explicit paint.
+
+Imported styles retain external file load hints and style references. Necessary
+application defaults are materialized around the external key so a text-only
+preset does not silently become an unfilled PGF rectangle in TikZ. Supported
+local paint overrides follow the external key. Unsupported preview options are
+diagnosed and retained for TikZ; preview does not execute style files or TeX
+macros. See [the grammar, default precedence and PGF references](PHASE_32B_IMPLEMENTATION.md).
