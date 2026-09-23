@@ -98,7 +98,7 @@ checks reject old 32A reports for 32B, missing terminal/scenario/artifact eviden
 checkout mismatch and failed verification before review/commit. The existing
 fresh-process verifier is retained.
 
-## Verification
+## Original implementation verification (historical)
 
 Missing native evidence remains an acceptance gap. Screenshots, helper tests and historical 32A results do not close
 32B's browser/review gates.
@@ -133,7 +133,7 @@ production filename reproduces the same 25 errors:
 `/private/tmp/stz-32b-tikz-lint-baseline.log`. No unrelated lint cleanup was made;
 repository-wide lint was not run because this demonstrates existing debt.
 
-## Exact parent handoff
+## Original implementation parent handoff (historical)
 
 From the final checkout in the browser-capable parent environment:
 
@@ -220,3 +220,115 @@ the complete changed/new file inventory; ignored build outputs are excluded.
 - `tests/scripts/runPhaseRunner.test.mjs`
 - `tests/scripts/runPhaseVerification.test.mjs`
 - `tests/tikz/generateTikz.test.ts`
+
+## Targeted circle-selection assertion correction
+
+This correction started on `phase/32b-color-opacity-outline` at clean
+`a2f2ba66faa9afe299dc5471ccc18bb43b043f42`, which includes the fix prompt and
+prior implementation. No existing implementation, PGF fixture, FontFace cleanup,
+verification policy or commit/review gate was replaced. No production geometry,
+font metrics, schema or dependencies changed. 32C/32D remain deferred.
+
+The historical parent report at
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-mGKjaz/verification.json`
+and verifier response at
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-XephXb/response.json`
+have matching before/after fingerprint
+`8556ca895ef531add08c6a0d54164e18206c6eb1657bba22575530af5119eb02`.
+That parent launched Chrome 153.0.8010.53: tests (2,679), build, diff and
+label-assets passed. Free-label acceptance failed in the owned-font callback,
+after 112 passing records, 10/16 completed groups and 3/16 point scenarios.
+It was an executed selection assertion failure, not a browser-startup failure.
+
+Its observations 0114/0115 record contour radius `70.76046333097682`, border
+width `0.48` SVG units, and highlight `77.00046333097681`. The stale
+`radius + 6` oracle expected `76.76046333097682`: it omitted exactly
+`0.4pt * 1.2 / 2 = 0.24` SVG units, apart from binary floating-point arithmetic.
+Observations 0117/0119 retain successful ownership-based font removal, the same
+document/FontFaceSet, and restored radius `70.7953467895476`. Cleanup success
+does not turn the incomplete font scenario into a pass. Six historical groups
+remained incomplete: point body/layout/lifecycle, point picking/visibility,
+point settled export, point paint/import/persistence, real-App JSON/history,
+and standalone settled export. The last five were not reached.
+
+`scripts/pointSelectionOracle.mjs` now supplies one independent circle contract
+to resource recovery, injected-font selection, and selected restored geometry:
+
+```text
+expectedBorderWidth = declared.enabled ? declared.widthPt * 1.2 : 0
+expectedHighlightRadius = currentNativeContourRadius + expectedBorderWidth / 2 + 6
+```
+
+The resource fixture explicitly declares the legacy enabled 0.4pt, opacity-1
+border. The oracle independently checks contour stroke presence, stored width
+and opacity against declared paint; rendered width cannot redefine the expected
+contract. Disabled borders retain the positive stored SVG width attribute but
+contribute zero geometry. Enabled zero-opacity borders still contribute their
+half-width. Missing, blank and nonfinite measurements fail. The highlight's own
+3-unit outline is separate. No tolerance was increased. This circle-only oracle
+does not replace polygon miter-aware bounds or picking.
+
+Before lifecycle assertions, including each post-click selection check, saved
+observations include exact source, owner, request/current font generation,
+declared paint, native contour/stroke attributes, expected components, actual
+highlight/delta and model/history state. Restored selection uses the restored
+contour. Finally-safe owned-face removal, same-page restoration, later-owner
+reference checks and primary-error preservation remain in place; observation
+records do not count as passed scenarios.
+
+The registered `tests/scripts/pointSelectionOracle.test.mjs` adds 16 regressions
+using the actual selected `SvgPointNodeView` SVG output: legacy 0.4pt, enabled
+4pt, disabled stored 4pt and enabled zero-opacity borders; missing/doubled
+half-width; stale pre-font-change selection; malformed/missing measurements;
+wrong rendered width with a self-consistent wrong highlight; and diagnostic
+persistence before failure. Its deterministic measurement providers exercise
+view synchronization; they do not claim native FontFace acceptance.
+
+### Correction verification and remaining gates
+
+All commands use `PATH=/opt/homebrew/bin:$PATH`, Node v26.9.0, npm 11.19.1.
+The first correction runner report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-Ir6IeD/verification.json`.
+It predates this documentation update and is not final-checkout acceptance.
+
+| Command | Executed correction result |
+| --- | --- |
+| `node --test tests/scripts/pointSelectionOracle.test.mjs tests/scripts/ownedFontFace.test.mjs tests/scripts/pointCheckDiagnostics.test.mjs tests/rendering/svgPointPaint.test.ts` | 51 passed; `/private/tmp/stz-32b-selection-focused.log` |
+| `node scripts/automation/run-phase.mjs 32B verify` | Exit 1: npm test **2,695 passed**, build and diff passed; stopped at label-assets localhost `listen EPERM` before Chrome; free-labels not reached by runner |
+| `npx tsc -p tsconfig.app.json --strict` | Passed; `/private/tmp/stz-32b-selection-strict-tsc.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed; `/private/tmp/stz-32b-selection-fixture-tsc.log` |
+| `node --check` on the two changed/new scripts and new test | Passed |
+| Focused ESLint, recommended JS rules with Node/browser globals | Passed; `/private/tmp/stz-32b-selection-eslint.log`; config `/private/tmp/stz-32b-selection-eslint.config.mjs` |
+| Direct `npm run check:free-labels` with the runner's cached Playwright/Chrome paths | Exit 1 at `development-server-listen`, `listen EPERM 127.0.0.1:5173`; `/private/tmp/stz-32b-selection-child-free-labels-configured.log` |
+
+An initial bare direct free-label command failed earlier at Playwright import;
+its log is `/private/tmp/stz-32b-selection-child-free-labels.log`. The configured
+attempt above uses the established runner paths, introduces no dependency, and
+retains evidence in `/private/tmp/stz-32b-selection-child-free-labels/`.
+These child startup failures are separate from the historical parent's 0.24
+selection discrepancy. Existing unrelated lint debt documented above remains
+unchanged; repository-wide lint was not run.
+
+After this documentation update the same runner and configured direct browser
+check are rerun, with final results, exact commands, artifact inventory,
+before/after binary-aware checkout identity and fingerprint recorded outside
+the source tree in `/private/tmp/stz-32b-selection-handoff.json`. Keeping the
+fingerprint external avoids changing the checkout by documenting its own hash.
+
+Required but unexecuted in this child: native label-assets assertions; all 16
+free-label groups and all 16 point scenarios (11 cumulative 32A plus all five
+32B paint scenarios listed above); corresponding required native JSON/SVG/PNG
+artifacts; and the subsequent independent phase review. Empty page-error arrays
+with no launched browser do not establish acceptance. The handoff lists each
+unexecuted group/scenario and required artifact explicitly.
+
+The browser-capable parent must run all five commands successfully on the exact
+final tree and inspect terminal/scenario/artifact evidence before independently
+reviewing it through the existing runner workflow. `32B verify` itself performs
+no review. Its failure stops that workflow; no review, commit or push gate was
+bypassed. Phase 32B remains **implemented, awaiting acceptance and review**.
+
+Correction files: `scripts/checkPointNodes.mjs`, new
+`scripts/pointSelectionOracle.mjs`, new
+`tests/scripts/pointSelectionOracle.test.mjs`, `package.json`, this document,
+and `docs/PREVIEW_UI.md`.

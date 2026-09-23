@@ -1674,3 +1674,15 @@ presets; version 1 files retain legacy white hollow, black text and 0.4pt border
 Point body source remains unchanged. SVG capture owns an immutable deep copy of
 paint before settlement. Current 32B native acceptance remains a parent-runner
 gate; historical 32A evidence is not evidence for the new paint scenarios.
+
+Circle selection includes the current contour radius, half the enabled border
+width (`width in TeX points * 1.2 / 2`), and the existing 6-unit selection
+padding. Disabled borders add zero even with a positive stored width; enabled
+zero-opacity borders still add their half-width. Polygon miter expansion keeps
+its separate geometry contract. The native font-readiness checks now verify
+this paint-aware circle expectation independently, with selected-view negative
+controls and pre-assertion diagnostics. The earlier parent failure omitted the
+legacy border's 0.24-unit half-width in its assertion; production selection
+geometry was unchanged. The current child cannot launch the browser server,
+so fresh parent acceptance and independent review remain pending. See the
+[targeted correction evidence and handoff](PHASE_32B_IMPLEMENTATION.md#targeted-circle-selection-assertion-correction).

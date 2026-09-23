@@ -6,6 +6,11 @@ import { observePointLiteral, assertPositionedLiteral, pointLiteralNegativeContr
 import { createPointDiagnostics, capturePointCheck } from './pointCheckDiagnostics.mjs'
 import { runNativePointChecks } from './checkPointNodesApp.mjs'
 import { withOwnedFontFace, observeOwnedFontFace, assertRestoredPointFont } from './ownedFontFace.mjs'
+import { observeCircleSelection, assertCircleSelection } from './pointSelectionOracle.mjs'
+
+// Independent declaration for the resource/font fixture below, including its
+// legacy border contract. Do not resolve this expectation from production paint.
+const resourceBorder = Object.freeze({ enabled: true, widthPt: .4, opacity: 1 })
 
 export async function inspectPoint(page, id) {
   const point = await page.evaluate((id) => {
@@ -18,6 +23,7 @@ export async function inspectPoint(page, id) {
     const b = body.getBBox()
     const bounds = body.getAttribute('data-label-bounds').split(' ').map(Number)
     const shape = contour.getBBox()
+    const radiusAttribute = contour.getAttribute('r')
     const coord = (x, y) => { const p = new DOMPoint(x, y).matrixTransform(matrix); return { x: p.x, y: p.y } }
     const east = contour.localName === 'circle' ? { x: Number(contour.getAttribute('r')), y: 0 }
       : { x: contour.points.getItem(0).x, y: contour.points.getItem(0).y }
@@ -31,12 +37,14 @@ export async function inspectPoint(page, id) {
       texts: [...body.querySelectorAll('text')].map((e) => e.textContent),
       bounds, body: { x: b.x, y: b.y, width: b.width, height: b.height },
       shape: { x: shape.x, y: shape.y, width: shape.width, height: shape.height },
-      radius: contour.localName === 'circle' ? Number(contour.getAttribute('r')) : null,
+      radius: contour.localName === 'circle' && radiusAttribute?.trim() ? Number(radiusAttribute) : null,
+      contourAttributes: { kind: contour.localName, radius: radiusAttribute, stroke: contour.getAttribute('stroke'),
+        strokeWidth: contour.getAttribute('stroke-width'), strokeOpacity: contour.getAttribute('stroke-opacity') },
       contour: contour.outerHTML, center: coord(0, 0), inside: coord(east.x * .98, east.y * .98),
       outside: coord(shape.x + shape.width + 9, 0), transform: point.getAttribute('transform'),
       opacity: String(Number(getComputedStyle(contour).fillOpacity) * Number(getComputedStyle(contour).opacity)), outerOpacity: outer.getAttribute('opacity'),
       pointerEvents: getComputedStyle(outer).pointerEvents,
-      highlight: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r'),
+      highlight: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r') ?? null,
     }
   }, id)
   if (point) point.literalObservation = await observePointLiteral(page, { id })
@@ -66,7 +74,15 @@ export async function runPointNodeChecks(context) {
   const diagnose = createPointDiagnostics(context)
   let scenario = 'point-language-shapes-2d-3d', caseDetails = {}
   const inspect = async () => {
-    return capturePointCheck(() => inspectPoint(page, 'p'), (details) => diagnose(scenario.startsWith('point-contour') || scenario.startsWith('point-camera') || scenario.startsWith('point-hidden') ? pickingGroup : bodyGroup, scenario, { ...caseDetails, ...details }))
+    return capturePointCheck(() => inspectPoint(page, 'p'), async (details) => {
+      // Persist the complete selection calculation and model/history identity
+      // before any lifecycle assertion, including failures during restoration.
+      const selectionDetails = scenario === 'point-resource-retry-font-readiness' ? {
+        circleSelection: observeCircleSelection(details.point, resourceBorder), state: await state(),
+      } : {}
+      return diagnose(scenario.startsWith('point-contour') || scenario.startsWith('point-camera') || scenario.startsWith('point-hidden') ? pickingGroup : bodyGroup,
+        scenario, { ...caseDetails, ...details, ...selectionDetails })
+    })
   }
   const mutate = (change) => page.evaluate((change) => window.stzLabels.mutatePoint('p', change), change)
   const invariant = (a, b) => { for (const key of ['json', 'history', 'tikz', 'inlineTikz']) assert.equal(a[key], b[key], key) }
@@ -166,8 +182,11 @@ export async function runPointNodeChecks(context) {
   const recovered = await inspect(); assert.equal(recovered.status, 'ready'); assertPointLayout(recovered)
   assert.notEqual(recovered.request, failed.request); invariant(beforeFont, await state())
   await page.mouse.click(recovered.inside.x, recovered.inside.y)
+  const recoveredSelection = await inspect()
   assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
-  assert.equal(Number((await inspect()).highlight), recovered.radius + .24 + 6, 'Selection includes half the legacy .4pt border at 1.2 SVG units/pt')
+  assertCircleSelection(observeCircleSelection(recoveredSelection, resourceBorder))
+  assert.equal(recoveredSelection.request, recovered.request)
+  assert.equal(recoveredSelection.radius, recovered.radius)
   // A late native font changes actual ordinary-text width, not just a counter.
   await mutate({ text: 'mmmm WWWW $unclosed' }); await settle()
   const beforeFontFace = await inspect(), beforeFontModel = await state()
@@ -189,7 +208,7 @@ export async function runPointNodeChecks(context) {
         && JSON.parse(point.getAttribute('data-point-node'))[1] === runtime.documentRevision
     }, undefined, { timeout: 30_000 })
   }
-  let beforeOwnership, afterFontFace, afterOwnership, afterFontRemoval, restoredOwnership, laterReference
+  let beforeOwnership, afterFontFace, afterOwnership, afterFontRemoval, restoredOwnership, laterReference, fontSelection
   const lifecycle = await withOwnedFontFace(page, {
     family: 'Times New Roman', source: 'local("Courier New")',
     acquired: async (handle) => {
@@ -212,9 +231,15 @@ export async function runPointNodeChecks(context) {
       assert.notEqual(afterFontFace.request, beforeFontFace.request)
       assert.notEqual(afterFontFace.literalObservation.lines[0].width, beforeFontFace.literalObservation.lines[0].width, 'Owned native font changes actual width')
       assert.notEqual(afterFontFace.radius, beforeFontFace.radius, 'Font-ready ink measurement changes the contour')
-      await page.mouse.click(afterFontFace.outside.x, afterFontFace.outside.y); assert.equal((await state()).selection, null)
-      await page.mouse.click(afterFontFace.inside.x, afterFontFace.inside.y); assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
-      assert.equal(Number((await inspect()).highlight), afterFontFace.radius + 6)
+      await page.mouse.click(afterFontFace.outside.x, afterFontFace.outside.y)
+      await inspect()
+      assert.equal((await state()).selection, null)
+      await page.mouse.click(afterFontFace.inside.x, afterFontFace.inside.y)
+      fontSelection = await inspect()
+      assert.deepEqual((await state()).selection, { kind: 'stratum', id: 'p' })
+      assertCircleSelection(observeCircleSelection(fontSelection, resourceBorder))
+      assert.equal(fontSelection.request, afterFontFace.request)
+      assert.equal(fontSelection.radius, afterFontFace.radius)
       invariant(beforeFontModel, await state())
     },
     restore: async (removal, handle) => {
@@ -233,6 +258,9 @@ export async function runPointNodeChecks(context) {
       assertRestoredPointFont(beforeFontFace, afterFontRemoval)
       assert.notEqual(afterFontRemoval.request, afterFontFace?.request ?? beforeFontFace.request)
       invariant(beforeFontModel, restoredModel)
+      if (restoredModel.selection?.kind === 'stratum' && restoredModel.selection.id === 'p') {
+        assertCircleSelection(observeCircleSelection(afterFontRemoval, resourceBorder))
+      }
       // mount() deliberately reuses this document and runtime. A later reference
       // must retain the restored native measurements under its new owner.
       await mount([{ id: 'p', text: beforeFontFace.source, style: beforeFontFace.style }])
@@ -256,7 +284,8 @@ export async function runPointNodeChecks(context) {
       cleanupErrors: cleanupErrors.map((error) => ({ message: error.message, stack: error.stack })) }),
   })
   await saved('point-resource-retry-font-readiness', { failed, recovered, beforeFontFace, afterFontFace, afterFontRemoval,
-    laterReference, beforeOwnership, afterOwnership, restoredOwnership, lifecycle, state: await state() }, bodyGroup)
+    laterReference, recoveredSelection, fontSelection, declaredBorder: resourceBorder,
+    beforeOwnership, afterOwnership, restoredOwnership, lifecycle, state: await state() }, bodyGroup)
 
 
   context.setStage?.(pickingGroup)
