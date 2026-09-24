@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { assertPointPaint, assertRasterPointOverlap, assertResponsivePointPaint, captureResponsivePointPaint,
-  restorePointDisplayScale, setPointDisplayScale } from '../../scripts/pointPaintOracle.mjs'
+  measureResponsivePointPaint, restorePointDisplayScale, setPointDisplayScale } from '../../scripts/pointPaintOracle.mjs'
 import { assertResponsiveCaptureStable, responsivePointFraming, responsivePointProbes } from '../../scripts/pointResponsiveFraming.mjs'
 
 test('paint oracle rejects coupled colors, lost zero opacity, dropped dash and lost explicit math color', () => {
@@ -23,6 +23,39 @@ test('independent raster oracle rejects group-opacity compositing and double dim
   assert.doesNotThrow(() => assertRasterPointOverlap(observation))
   assert.throws(() => assertRasterPointOverlap({ ...observation, overlap: [0, 101, 54, 97] }))
   assert.throws(() => assertRasterPointOverlap({ ...observation, fill: [0, 0, 255, 26] }))
+})
+
+test('responsive diagnostics read the foreground leaf font and readiness, separately from the group font', async () => {
+  const box = { x: 0, y: 0, width: 26, height: 12 }, ctm = { a: .5, b: 0, c: 0, d: .5, e: 150, f: 110 }
+  const node = (attributes = {}) => ({ getAttribute: (name) => attributes[name] ?? null,
+    getBBox: () => box, getBoundingClientRect: () => box, getScreenCTM: () => ctm })
+  const text = { ...node({ x: '0', y: '0' }), textContent: 'Scale' }
+  const contour = { ...node({ r: '41.507105564650516' }), localName: 'circle' }
+  const point = { ...node(), children: [contour], querySelector: () => null }
+  const title = { textContent: 'Scale' }
+  const body = { ...node(), parentElement: point, querySelector: () => title, querySelectorAll: () => [text] }
+  title.parentElement = body
+  const root = { ...node({ viewBox: '0 0 520 360' }), querySelectorAll: () => [title] }
+  const fontChecks = [], fonts = Object.assign(new Set(), { status: 'loaded', check: (font, source) => {
+    fontChecks.push({ font, source }); return true
+  } })
+  const leafCss = { font: '12px "Times New Roman", Times, serif', fontFamily: '"Times New Roman", Times, serif',
+    fontSize: '12px', fontWeight: '400', fontStyle: 'normal', getPropertyValue: (key) => ({
+      'font-family': '"Times New Roman", Times, serif', 'font-size': '12px', 'font-weight': '400', 'font-style': 'normal',
+    })[key] ?? 'normal' }
+  const page = { evaluate: async (callback, args) => runInNewContext(`(${callback})(${JSON.stringify(args)})`, {
+    document: { documentElement: root, querySelector: () => null, fonts }, window: {},
+    getComputedStyle: (element) => element === text ? leafCss : { font: '16px Inter, Arial, sans-serif', strokeWidth: '24', strokeOpacity: '1' },
+    innerWidth: 1200, innerHeight: 900, devicePixelRatio: 2, scrollX: 0, scrollY: 0,
+    XMLSerializer: class { serializeToString() { return '<svg />' } },
+  }) }
+  const observed = await measureResponsivePointPaint(page, { standalone: true })
+  assert.equal(observed.body.font, leafCss.font)
+  assert.equal(observed.body.inheritedGroupFont, '16px Inter, Arial, sans-serif')
+  assert.equal(observed.body.texts[0].properties['font-size'], '12px')
+  assert.equal(observed.body.texts[0].checked, true)
+  assert.equal(observed.body.fontReadiness.status, 'loaded')
+  assert.deepEqual(fontChecks, [{ font: 'normal 400 12px "Times New Roman", Times, serif', source: 'Scale' }])
 })
 
 // Synthetic observations test the oracle's fault sensitivity; native acceptance

@@ -1011,3 +1011,161 @@ namespace and scaling findings. Interim implementation inspection is not that
 acceptance review, and `32B verify` does not review. Phase 32B remains incomplete
 until both gates pass; no browser restriction, partial prior report or helper test
 waives them.
+
+## Saved SVG body contract versus display-scale text measurements (2026-09-24)
+
+This handoff supersedes the preceding framing handoff for the current correction.
+The checkout began clean on `phase/32b-color-opacity-outline`, at
+`ef8c50cd7dde032d65d482a11ea028d1a2ad21af`. That revision incorporates the
+historical `9710e9252f2dd6c8d71a2d0d11bf2f99a14b66cd` working-tree fixes and
+updated targeted prompt. All nine historical tracked diff sections match the
+incorporated changes. The formerly untracked `scripts/pointResponsiveFraming.mjs`
+is now tracked with the same SHA256
+`76e516efb016a9a8486349e678c187aa45b4e7567e799d85d4a0e54726804328`.
+No reset, production geometry/export change, dependency addition or PGF reference
+regeneration was performed for this measurement-contract correction.
+
+### Observed parent failure and immutable file evidence
+
+Inspected the `verification.json`, command log, checkout snapshots, scenario
+records, actual saved XML, app-framed and scale-specific JSON/SVG/PNG evidence
+under `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-F4Fxc7/`,
+and `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-xx19j0/response.json`.
+The parent's before/after fingerprint was
+`41ff7e9818ac6df5cd04cc30c75f625d2723ffaf0f22757dbdf2227f61163dd0`.
+It passed 2,836 tests, build, diff and label-assets with Node v26.9.0 / Chrome
+153.0.8010.53. Free-labels reached 14/16 groups, 19/20 point scenarios and 153
+records, with empty page errors. Namespace aliases, all eleven 32A scenarios,
+all five earlier paint scenarios, and responsive circle/triangle previews passed.
+
+The first transparent solid-circle download completed framing, physical paint,
+export-envelope and coherent native/full-root captures at 0.5 and 2. Its body
+subtree and contour declarations are identical in the saved SVG and both raster
+SVGs: title/foreground `Scale`, outer `translate(0 0)`, inner
+`translate(-12.9931640625 4)`, text at `(0,0)` with start/alphabetic alignment,
+Times New Roman/Times/serif, size 12, weight 400, normal style, radius
+`41.507105564650516` and 24-local-unit border. Root CSS alone supplied the display
+resize. Native measurements were:
+
+| CSS scale | Root display | Body x | Body y | Body width | Body height |
+| --- | --- | --- | --- | --- | --- |
+| 0.5 | 260 × 180 | -12.9931640625 | -6 | 26 | 12 |
+| 2 | 1040 × 720 | -12.9931640625 | -6.5 | 25.9921875 | 13 |
+
+Within each screenshot the retained measurements agreed. These native text
+bounds are not saved layout records; their exact cross-scale comparison was an
+invalid invariant. This evidence does not identify a specific browser hinting
+mechanism or font-loading race. The old `body.font` diagnostic described the
+inherited enclosing group (`16px Inter, Arial, sans-serif`), not the explicitly
+styled foreground text. Diagnostics now report actual leaf longhands, requested
+font/check, document font status/faces, text bounds and screen CTMs; the group
+font is separately named `inheritedGroupFont`.
+
+That partial parent run completed **no responsive download scenario**. Its later
+assertions, other five download combinations and separate
+`settled-SVG-export-standalone` group remained unexecuted. It did not reach a
+fresh independent acceptance review. Its passed preview cases are historical
+native evidence, not final-tree acceptance of this correction.
+
+### Replacement checks and failure sensitivity
+
+`pointResponsiveBody.mjs` parses the unmodified downloaded XML into a
+namespace-aware structural baseline before resizing. Expanded element/attribute
+names, deterministic CSS property ordering and XML serialization whitespace
+handling preserve meaningful content, declarations and order. Only the explicitly
+controlled root display CSS and temporary root-style bookkeeping may vary;
+viewBox, all other styles/transforms, foreground text, local placement and contour
+geometry remain exact. Expected source/font/baselines and point placement are
+independently declared fixture inputs. The full ancestor placement, native
+root-relative body position and local transforms are checked so an identically
+wrong file and observation cannot establish their own correct placement.
+
+Each scale uses bounded font/layout settling, actual leaf font/readiness,
+the existing detached XHTML Canvas source/line observer and native SVG fragments.
+The existing positioned-literal baseline, centering, whitespace, visibility and
+containment tolerances are unchanged. The Canvas contract supplies independent
+local expectations; native SVG boxes remain finite positive visibility and
+containment observations and are never forced to equal Canvas metrics. Structure
+and diagnostic observations are saved before assertions. Literal measurement
+probes and settling must leave the document unchanged.
+
+Each of the six actual App downloads (transparent/white × solid circle/solid
+triangle/dashed circle) is reopened directly once and kept through
+**0.5 → 2 → 0.5**. Return captures use distinct `-return-scale-0.5` names. Native
+paint masks, dash/phase checks, exact contour bounds, framing margins, bounded
+native/full-root PNGs and PNG dimensions remain required. Independent literal
+observations and the associated capture must share text geometry/CTMs, and the
+return scale must recover the initial screen placement. Exact before/after
+`assertResponsiveCaptureStable()` comparisons within one screenshot remain intact.
+
+Native negative controls mutate foreground content, shift the body by one local
+unit while still inside the contour, and change the font family. They must fail
+for the intended content/placement/font reason. `finally` restores the exact
+original DOM, a final positive observation must pass, and root-style cleanup must
+restore the entire positive document. Disk bytes, model/history/source/request
+identity and owned-page cleanup remain checked; secondary cleanup errors cannot
+replace the primary failure.
+
+Registered regressions accept the reported native bounds pair and reject missing,
+nonfinite, invisible or changed text measurements, wrong source/font/size,
+baseline/transform/ancestor/CSS displacement and contour/viewBox changes. They
+also exercise canonicalization, independent placement, negative-control cleanup
+and primary-error preservation. The parent policy retains **16 groups / 20 named
+point scenarios**, adds 32 failure regressions, and requires all **91 responsive
+download artifacts**, three captures per file, actual font readiness, stable
+captures, restored controls with matching rejection reasons, and immutable
+file/document evidence. Partial captures cannot complete the scenario.
+
+### Executed checks and final-tree handoff
+
+All commands use `PATH=/opt/homebrew/bin:$PATH` (Node v26.9.0, npm 11.19.1).
+Logs and exact supplemental commands are under
+`/private/tmp/stz-32b-body.v2N7nG/`.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | Initial full run: **2,903 passed**, zero failures/skips (`npm-test.log`); final five cleanup/placement regressions were subsequently added and passed in the focused run below. The frozen verifier reruns the final registered suite. |
+| `npm run build` | Passed after the full suite, sequentially (`npm-build.log`); existing >500kB chunk warning only. |
+| `node --test tests/scripts/pointResponsiveBody.test.mjs tests/scripts/pointPaintOracle.test.mjs tests/scripts/standaloneSvgCapture.test.mjs tests/scripts/pointLiteralOracle.test.ts tests/scripts/pointLiteralMetrics.test.ts tests/scripts/pointOracleCanvas.test.ts tests/scripts/pointCheckDiagnostics.test.mjs` | **134 passed**, zero failures/skips (`focused-final.log`), including all 39 new body-contract regressions. |
+| `node --test tests/scripts/runPhaseVerification.test.mjs` | **136 passed**, zero failures (`/private/tmp/stz-download-policy-complete-tests.log`). |
+| `npx tsc -p tsconfig.app.json --strict` | Passed (`production-strict.log`). |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed (`fixtures-strict.log`). |
+| Recommended JavaScript ESLint with Node/browser globals on all seven changed/new scripts/tests | Passed, zero errors/warnings (`javascript-eslint.log`; exact configuration/invocation in `changed-eslint.mjs`). |
+| `node --check` on the same seven `.mjs` files | Passed; exact commands/results in `script-syntax.json`. |
+| `git diff --check` | Passed; final result retained in `diff-check.log`. |
+
+Established unrelated lint/type debt is unchanged; no repository-wide cleanup or
+new production TypeScript was introduced. A read-only integration inspection
+identified the ancestor-placement and declared text-rendering gaps above; both
+were corrected and regressed. This inspection is not the independent acceptance
+review required after passing final-tree browser verification.
+
+The direct configured `node scripts/checkFreeLabels.mjs` attempt stopped before
+browser launch at `development-server-listen`, `listen EPERM 127.0.0.1:5173`.
+See `free-labels-initial.log` and `free-labels-initial/free-labels-evidence.json`.
+A separate file-only helper attempt also failed at Chrome startup before opening
+or observing the historical SVG (`file-only-helper-native-attempt.json`). No
+native assertion executed in either child attempt. Neither failure diagnoses the
+parent's measurement assertion or waives native coverage; permissions and
+assertions were not relaxed.
+
+After these documentation edits, the frozen checkout is checked with:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+Exact final command outcomes, verification report location, remaining gates and
+binary-aware checkout identity are retained externally in
+`/private/tmp/stz-32b-body.v2N7nG/handoff.json`, with `verification-final.log`,
+`final-checkout.json`, `final-checkout.diff` and `final-checkout-untracked.json`.
+The snapshot includes both new untracked helper/test files. Keeping the final
+fingerprint outside tracked documentation avoids a self-referential hash.
+
+Fresh browser-capable parent verification must pass all five commands, both
+browser checks, all 16 groups and all 20 point scenarios on that same final tree,
+including all six downloads and scale/return-scale artifacts with empty page
+errors. Only then may the independent review against
+`prompts/phase-32b-review.md` accept that tree, including the preserved namespace
+and geometric-scaling production corrections. `32B verify` does not perform
+review. Phase 32B remains incomplete until both gates pass; 32C/32D remain deferred.

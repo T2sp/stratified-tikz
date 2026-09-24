@@ -74,8 +74,9 @@ export function pointNodeScenarioArtifacts(name) {
   if (name === "point-paint-responsive-downloads") {
     return [`${name}.json`, ...["transparent", "white"].flatMap((background) => ["", "-triangle", "-dashed"].flatMap((shape) => {
       const stem = `point-paint-responsive-${background}${shape}`;
-      return [`${stem}.svg`, ...["0.5", "2"].flatMap((scale) =>
-        [`${stem}-scale-${scale}.json`, `${stem}-scale-${scale}.png`, `${stem}-scale-${scale}.raster.svg`])];
+      return [`${stem}.svg`, `${stem}-body-baseline.json`, `${stem}-body-controls.json`,
+        ...["scale-0.5", "scale-2", "return-scale-0.5"].flatMap((capture) =>
+          [`${stem}-${capture}.json`, `${stem}-${capture}.png`, `${stem}-${capture}-full.png`, `${stem}-${capture}.raster.svg`])];
     }))];
   }
   return [`${name}.json`, ...((name.startsWith("point-native-pending-") || name.startsWith("point-paint-pending-"))
@@ -202,13 +203,40 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
   }
   if (!Array.isArray(evidence.cases)) throw new Error(`Missing responsive point paint cases: ${name}`);
   if (name === "point-paint-responsive-downloads") {
-    const cases = evidence.cases.flatMap((entry) => Array.isArray(entry?.scales) ? entry.scales : []);
     const required = ["transparent", "white"].flatMap((background) =>
-      [["circle", "solid"], ["triangle", "solid"], ["circle", "dashed"]].flatMap(([shape, variant]) =>
-        [0.5, 2].map((scale) => ({ background, shape, variant, scale }))));
-    if (evidence.cases.length !== 6 || cases.length !== required.length || !required.every((expected) =>
-      cases.filter((entry) => Object.entries(expected).every(([key, value]) => entry?.[key] === value)).length === 1)) {
+      [["circle", "solid"], ["triangle", "solid"], ["circle", "dashed"]].map(([shape, variant]) =>
+        ({ background, shape, variant })));
+    const matchesCase = (entry, expected) => Object.entries(expected).every(([key, value]) => entry?.[key] === value);
+    if (evidence.cases.length !== required.length || !required.every((expected) =>
+      evidence.cases.filter((entry) => matchesCase(entry, expected)
+        && Array.isArray(entry.scales) && entry.scales.length === 2 && [0.5, 2].every((scale) =>
+          entry.scales.filter((sample) => matchesCase(sample, expected) && sample.scale === scale).length === 1)).length === 1)) {
       throw new Error("Responsive point downloads must cover both backgrounds, both scales, solid circle/triangle and dashed circle");
+    }
+    const recordedObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
+      && Object.keys(value).length > 0;
+    const checkedBody = (sample) => sample?.bodyContractPassed === true && recordedObject(sample.bodyObservation)
+      && recordedObject(sample.bodyObservation.structure)
+      && sample.output?.capture?.coordinatesStable === true
+      && sample.bodyObservation.literal?.documentUnchanged === true
+      && sample.bodyObservation.literal.fontReadiness?.status === "loaded"
+      && sample.bodyObservation.literal.fontReadiness.checked === true
+      && sample.bodyObservation.settling?.documentUnchanged === true
+      && sample.bodyObservation.settling.status === "loaded"
+      && Array.isArray(sample.bodyObservation.settling.leaves) && sample.bodyObservation.settling.leaves.length > 0
+      && sample.bodyObservation.settling.leaves.every((leaf) => leaf?.readiness?.status === "loaded" && leaf.readiness.checked === true);
+    const controls = [["text-mutation", /foreground content\/order/u],
+      ["body-displacement", /body local placement transform/u], ["font-change", /text font family/u]];
+    if (!evidence.cases.every((entry) => recordedObject(entry.baseline)
+      && recordedObject(entry.baseline.fixture) && recordedObject(entry.baseline.saved)
+      && entry.fileUnchanged === true && entry.documentRestored === true
+      && entry.scales.every(checkedBody) && checkedBody(entry.returnScale) && entry.returnScale.scale === 0.5
+      && matchesCase(entry.returnScale, { background: entry.background, shape: entry.shape, variant: entry.variant })
+      && Array.isArray(entry.negativeControls) && entry.negativeControls.length === controls.length
+      && controls.every(([kind, reason]) => entry.negativeControls.filter((control) => control?.kind === kind
+        && control.rejected === true && control.documentUnchanged === true
+        && typeof control.reason === "string" && reason.test(control.reason)).length === 1))) {
+      throw new Error("Responsive point downloads must complete immutable body/font checks, restored negative controls and the return-scale capture");
     }
   } else if (evidence.cases.length !== 2 || ![0.5, 2].every((scale) =>
     evidence.cases.filter((entry) => entry?.scale === scale && entry.negativeControlRejected === true).length === 1)) {

@@ -7,9 +7,15 @@ passing review. Its tracked diff and four then-untracked file hashes match the
 historical contaminated-reference failure and the earlier child-only handoff.
 See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
 
-32B implementation and cumulative acceptance harness are added; fresh parent
-browser verification and independent review remain required. 32C and 32D remain deferred. Historical 32A
-evidence does not establish acceptance of the 32B checkout.
+32B implementation and cumulative acceptance harness are added. The latest
+`F4Fxc7` parent run passed responsive circle/triangle previews but stopped on an
+invalid cross-scale native text-bounds comparison in the download scenario.
+The corrected harness separates immutable SVG structure from per-scale native
+text measurements and requires return-scale/control evidence for all six exports.
+Fresh parent browser verification and independent review remain required; no
+responsive download or remaining settled-export acceptance is claimed from that
+partial run. 32C and 32D remain deferred. Historical 32A evidence does not
+establish acceptance of the 32B checkout.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

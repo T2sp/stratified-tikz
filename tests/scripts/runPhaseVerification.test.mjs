@@ -486,12 +486,15 @@ test('32B preserves its original groups and scenarios and requires namespace and
     }
   }
   const downloads = pointNodeScenarioArtifacts('point-paint-responsive-downloads')
-  assert.equal(downloads.length, 43)
+  assert.equal(downloads.length, 91)
   assert.equal(downloads[0], 'point-paint-responsive-downloads.json')
   for (const background of ['transparent', 'white']) for (const shape of ['', '-triangle', '-dashed']) {
-    assert.ok(downloads.includes(`point-paint-responsive-${background}${shape}.svg`))
-    for (const scale of ['0.5', '2']) for (const extension of ['json', 'png', 'raster.svg']) {
-      assert.ok(downloads.includes(`point-paint-responsive-${background}${shape}-scale-${scale}.${extension}`))
+    const stem = `point-paint-responsive-${background}${shape}`
+    for (const suffix of ['.svg', '-body-baseline.json', '-body-controls.json']) {
+      assert.ok(downloads.includes(`${stem}${suffix}`))
+    }
+    for (const capture of ['scale-0.5', 'scale-2', 'return-scale-0.5']) for (const suffix of ['.json', '.png', '-full.png', '.raster.svg']) {
+      assert.ok(downloads.includes(`${stem}-${capture}${suffix}`))
     }
   }
 })
@@ -509,6 +512,12 @@ test('point SVG artifact gate accepts sanitized structure and rejects absent/dam
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
+  const bodySample = (background, shape, variant, scale) => ({ background, shape, variant, scale,
+    bodyContractPassed: true, output: { capture: { coordinatesStable: true } },
+    bodyObservation: { structure: { title: 'Scale' },
+      literal: { source: 'Scale', documentUnchanged: true, fontReadiness: { status: 'loaded', checked: true } },
+      settling: { documentUnchanged: true, status: 'loaded', leaves: [{ readiness: { status: 'loaded', checked: true } }] } },
+  })
   const evidence = { checkout: captureCheckoutIdentity({ cwd: fixture.cwd, env: fixture.env }),
     evidence: Object.entries(pointNodeScenarios).flatMap(([group, names]) => names.map((name) =>
       ({ group, name, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) }))) }
@@ -518,7 +527,13 @@ function completePointEvidence(fixture) {
       ...(name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
-            scales: [.5, 2].map((scale) => ({ background, shape, variant, scale })) }))),
+            baseline: { fixture: { source: 'Scale' }, saved: { title: 'Scale' } }, fileUnchanged: true, documentRestored: true,
+            scales: [.5, 2].map((scale) => bodySample(background, shape, variant, scale)),
+            returnScale: bodySample(background, shape, variant, .5),
+            negativeControls: [['text-mutation', 'foreground content/order'], ['body-displacement', 'body local placement transform'],
+              ['font-change', 'text font family']].map(([kind, reason]) =>
+              ({ kind, rejected: true, reason: `displayed file: ${reason}`, documentUnchanged: true })),
+          }))),
       } : name.startsWith('point-paint-responsive-') ? { cases: [.5, 2].map((scale) => ({ scale, negativeControlRejected: true })) }
         : { cases: ['shadowing', 'missing', 'aliases'].map((name) => ({ name, source: 'fixture style',
           output: { standalone: 'fixture', inlineMath: 'fixture' },
@@ -530,6 +545,58 @@ function completePointEvidence(fixture) {
     },
   ])))
   return evidence
+}
+
+for (const fault of [
+  'missing-baseline', 'empty-baseline', 'missing-baseline-fixture', 'missing-baseline-structure', 'changed-file', 'unrestored-document',
+  'missing-body-observation', 'empty-body-observation', 'missing-body-structure', 'unchecked-body',
+  'missing-return-scale', 'wrong-return-scale', 'wrong-return-shape', 'unchecked-return-body',
+  'missing-return-body-observation', 'extra-original-scale', 'mixed-case-scales',
+  'unstable-capture', 'unrestored-literal', 'unready-literal-font', 'unchecked-literal-font',
+  'unrestored-settling', 'unsettled-fonts', 'missing-leaf-font', 'unready-leaf-font', 'unchecked-leaf-font',
+  'missing-control', 'duplicate-control', 'accepted-control', 'missing-control-reason', 'wrong-control-reason', 'unrestored-control',
+]) {
+  test(`32B rejects partial responsive body evidence: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const downloads = artifacts['point-paint-responsive-downloads.json']
+    const entry = downloads.cases[0]
+    if (fault === 'missing-baseline') delete entry.baseline
+    if (fault === 'empty-baseline') entry.baseline = {}
+    if (fault === 'missing-baseline-fixture') delete entry.baseline.fixture
+    if (fault === 'missing-baseline-structure') delete entry.baseline.saved
+    if (fault === 'changed-file') entry.fileUnchanged = false
+    if (fault === 'unrestored-document') entry.documentRestored = false
+    if (fault === 'missing-body-observation') delete entry.scales[0].bodyObservation
+    if (fault === 'empty-body-observation') entry.scales[1].bodyObservation = {}
+    if (fault === 'missing-body-structure') delete entry.returnScale.bodyObservation.structure
+    if (fault === 'unchecked-body') entry.scales[1].bodyContractPassed = false
+    if (fault === 'missing-return-scale') delete entry.returnScale
+    if (fault === 'wrong-return-scale') entry.returnScale.scale = 2
+    if (fault === 'wrong-return-shape') entry.returnScale.shape = 'triangle'
+    if (fault === 'unchecked-return-body') entry.returnScale.bodyContractPassed = false
+    if (fault === 'missing-return-body-observation') delete entry.returnScale.bodyObservation
+    if (fault === 'extra-original-scale') entry.scales.push(entry.returnScale)
+    if (fault === 'mixed-case-scales') [entry.scales[0], downloads.cases[1].scales[0]] = [downloads.cases[1].scales[0], entry.scales[0]]
+    if (fault === 'unstable-capture') entry.scales[0].output.capture.coordinatesStable = false
+    if (fault === 'unrestored-literal') entry.scales[0].bodyObservation.literal.documentUnchanged = false
+    if (fault === 'unready-literal-font') entry.scales[1].bodyObservation.literal.fontReadiness.status = 'loading'
+    if (fault === 'unchecked-literal-font') entry.returnScale.bodyObservation.literal.fontReadiness.checked = false
+    if (fault === 'unrestored-settling') entry.scales[0].bodyObservation.settling.documentUnchanged = false
+    if (fault === 'unsettled-fonts') entry.returnScale.bodyObservation.settling.status = 'loading'
+    if (fault === 'missing-leaf-font') entry.scales[1].bodyObservation.settling.leaves = []
+    if (fault === 'unready-leaf-font') entry.scales[0].bodyObservation.settling.leaves[0].readiness.status = 'loading'
+    if (fault === 'unchecked-leaf-font') entry.returnScale.bodyObservation.settling.leaves[0].readiness.checked = false
+    if (fault === 'missing-control') entry.negativeControls.pop()
+    if (fault === 'duplicate-control') entry.negativeControls[1] = entry.negativeControls[0]
+    if (fault === 'accepted-control') entry.negativeControls[0].rejected = false
+    if (fault === 'missing-control-reason') entry.negativeControls[1].reason = ''
+    if (fault === 'wrong-control-reason') entry.negativeControls[0].reason = entry.negativeControls[2].reason
+    if (fault === 'unrestored-control') entry.negativeControls[2].documentUnchanged = false
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+  })
 }
 for (const phase of ['32A', '32B', '32C', '32D']) {
   test(`${phase} requires cumulative implemented point scenarios and accepts complete evidence`, (t) => {

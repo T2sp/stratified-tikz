@@ -6,6 +6,8 @@ import { captureResponsivePointPaint, assertResponsivePointPaint, setPointDispla
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
 import { responsivePointProbes, responsivePointFraming } from './pointResponsiveFraming.mjs'
+import { createResponsiveBodyBaseline, observeResponsiveBody, assertResponsiveBody,
+  responsiveBodyNegativeControls } from './pointResponsiveBody.mjs'
 
 async function cleanupResponsive(primary, operations) {
   let failure = primary
@@ -24,7 +26,8 @@ export async function runResponsivePointPaintChecks({ browser, page, artifactDir
   const fixture = (shape, variant) => page.evaluate(({ shape, variant }) => window.stzAppLabels.pointResponsivePaintDocumentJson(shape, variant), { shape, variant })
   async function capture(target, stem, options = {}) {
     const persist = async (observation) => {
-      await writeFile(resolve(artifactDir, `${stem}.json`), JSON.stringify({ declared, ...observation }, null, 2) + '\n')
+      await writeFile(resolve(artifactDir, `${stem}.json`), JSON.stringify({ declared,
+        bodyObservation: options.bodyObservation, ...observation }, null, 2) + '\n')
       if (observation.xml) await writeFile(resolve(artifactDir, `${stem}${options.standalone ? '.raster' : ''}.svg`), observation.xml)
       await diagnose({ boundary: 'responsive-native-paint', stem, declared, observation: { ...observation, xml: undefined } })
     }
@@ -185,21 +188,39 @@ export async function runResponsivePointPaintChecks({ browser, page, artifactDir
       let standalonePrimary
       try {
         await standalone.goto(pathToFileURL(svgPath).href)
-        const entry = { shape, variant, background, declared, identity, framed, svgPath, errors, requests, scales: [] }
+        const originalDocument = await standalone.evaluate(() => new XMLSerializer().serializeToString(document))
+        // Parse the actual immutable bytes, not a later sample whose corruption
+        // could otherwise become the reference for all display scales.
+        const baseline = await createResponsiveBodyBaseline(standalone, xml)
+        await writeFile(resolve(artifactDir, `${stem}-body-baseline.json`), JSON.stringify(baseline, null, 2) + '\n')
+        const entry = { shape, variant, background, declared, identity, framed, svgPath, baseline, errors, requests, scales: [] }
         cases.push(entry)
-        for (const scale of [.5, 2]) {
+        for (const [index, scale] of [.5, 2, .5].entries()) {
           await setPointDisplayScale(standalone, scale, true)
-          const name = `${stem}-scale-${scale}`
-          const output = await capture(standalone, name, { standalone: true, shape, variant, scale })
+          const name = `${stem}-${index === 2 ? 'return-' : ''}scale-${scale}`
+          const bodyObservation = await observeResponsiveBody(standalone, { diagnose: (observation) =>
+            diagnose({ boundary: 'responsive-download-literal', name, observation }) })
+          // Retain the independent literal/font/structure observation even if
+          // coverage, the native screenshot or its pixel-mask assertion fails.
+          const output = await capture(standalone, name, { standalone: true, shape, variant, scale, bodyObservation })
           const envelope = await standalone.evaluate(() => ({
             backgroundCount: [...document.documentElement.children].filter((element) => element.localName === 'rect' && element.getAttribute('fill') === '#ffffff').length,
             forbidden: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
             externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href')).filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
           }))
-          const result = { scale, shape, variant, background, declared, output, envelope, errors, requests }
-          entry.scales.push(result)
-          const persist = (screenshot) => writeFile(resolve(artifactDir, `${name}.json`), JSON.stringify({ ...result, screenshot }, null, 2) + '\n')
+          const result = { scale, shape, variant, background, declared, bodyObservation, output, envelope, errors, requests }
+          if (index === 2) entry.returnScale = result
+          else entry.scales.push(result)
+          const persist = (screenshot) => {
+            if (screenshot) result.screenshot = screenshot
+            return writeFile(resolve(artifactDir, `${name}.json`), JSON.stringify(result, null, 2) + '\n')
+          }
           await persist(); await diagnose({ boundary: 'responsive-download-before-assertions', result })
+          assertResponsiveBody(bodyObservation, baseline)
+          assert.deepEqual(output.body.texts.map(({ text, bounds, ctm }) => ({ text, bounds, ctm })),
+            bodyObservation.settling.leaves.map(({ text, bounds, ctm }) => ({ text, bounds, ctm })),
+            'Independent literal observation and this native capture use the same text geometry and screen coordinates')
+          result.bodyContractPassed = true
           assertResponsivePointPaint(output, { scale, shape, variant, standalone: true })
           assert.equal(envelope.backgroundCount, background === 'white' ? 1 : 0)
           assert.equal(envelope.forbidden, 0); assert.deepEqual(envelope.externalReferences, [])
@@ -209,8 +230,23 @@ export async function runResponsivePointPaintChecks({ browser, page, artifactDir
           await captureStandaloneSvg(standalone, resolve(artifactDir, `${name}-full.png`), persist)
         }
         const [small, large] = entry.scales.map(({ output }) => output)
-        assert.deepEqual(small.body.bounds, large.body.bounds, 'Download body layout is invariant under CSS resize')
         assert.deepEqual(small.contour.shapeBounds, large.contour.shapeBounds, 'Download path geometry is invariant under CSS resize')
+        assert.deepEqual(small.contour.shapeBounds, entry.returnScale.output.contour.shapeBounds, 'Return-scale path geometry is invariant')
+        assert.deepEqual(small.body.ctm, entry.returnScale.output.body.ctm, 'Return-scale body screen placement is restored')
+        assert.deepEqual(small.body.texts.map(({ ctm }) => ctm), entry.returnScale.output.body.texts.map(({ ctm }) => ctm),
+          'Return-scale text screen placement is restored')
+        entry.negativeControls = await responsiveBodyNegativeControls(standalone, baseline, async (observation) => {
+          await writeFile(resolve(artifactDir, `${stem}-body-controls.json`), JSON.stringify(observation, null, 2) + '\n')
+          await diagnose({ boundary: 'responsive-download-body-control', stem, observation })
+        })
+        await writeFile(resolve(artifactDir, `${stem}-body-controls.json`), JSON.stringify(entry.negativeControls, null, 2) + '\n')
+        await restorePointDisplayScale(standalone)
+        assert.equal(await standalone.evaluate(() => new XMLSerializer().serializeToString(document)), originalDocument,
+          'Responsive observation, controls and root-style cleanup restore the complete positive document')
+        entry.documentRestored = true
+        assert.equal(await readFile(svgPath, 'utf8'), xml, 'The downloaded SVG bytes remain unchanged through every scale/control')
+        entry.fileUnchanged = true
+        await diagnose({ boundary: 'responsive-download-complete', entry })
         assert.ok(!xml.includes('data-svg-export-exclude'))
         assert.equal((await state()).json, before.json); assert.equal((await state()).history, before.history)
         await assertIdentity(identity)

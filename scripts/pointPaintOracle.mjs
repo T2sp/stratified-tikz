@@ -147,6 +147,17 @@ export async function measureResponsivePointPaint(page, { id = 'app-point', sour
     const rect = (element) => { const b = element.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
     const bbox = (element) => { const b = element.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
     const css = getComputedStyle(contour), rootCss = getComputedStyle(root)
+    const texts = [...body.querySelectorAll('text')].map((text) => {
+      const css = getComputedStyle(text)
+      const declaration = `${css.fontStyle} ${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
+      return { text: text.textContent, font: css.font, declaration,
+        properties: Object.fromEntries(['font-family', 'font-size', 'font-weight', 'font-style',
+          'font-stretch', 'font-kerning', 'letter-spacing', 'word-spacing', 'white-space',
+          'text-anchor', 'dominant-baseline', 'alignment-baseline'].map((key) => [key, css.getPropertyValue(key)])),
+        checked: document.fonts.check(declaration, text.textContent || 'Mg'),
+        x: text.getAttribute('x'), y: text.getAttribute('y'), transform: text.getAttribute('transform'),
+        bounds: bbox(text), ctm: matrix(text) }
+    })
     const state = window.stzAppLabels?.state()
     const diagram = state && JSON.parse(state.json).diagram
     return { root: { rect: rect(root), ctm: matrix(root), viewBox: root.getAttribute('viewBox'),
@@ -159,7 +170,11 @@ export async function measureResponsivePointPaint(page, { id = 'app-point', sour
         lineCap: css.strokeLinecap, lineJoin: css.strokeLinejoin },
       body: { bounds: bbox(body), ctm: matrix(body), request: body.getAttribute('data-label-request'),
         source: standalone ? body.querySelector(':scope > title')?.textContent : body.getAttribute('data-label-source'),
-        font: getComputedStyle(body).font },
+        // A group's inherited font can differ from an explicitly styled text
+        // leaf. Retain both with unambiguous names; only leaves describe ink.
+        font: texts[0]?.font ?? null, inheritedGroupFont: getComputedStyle(body).font, texts,
+        fontReadiness: { status: document.fonts.status, size: document.fonts.size,
+          faces: [...document.fonts].map((face) => ({ family: face.family, style: face.style, weight: face.weight, status: face.status })) } },
       layout: { shapeBounds: point.getAttribute('data-point-shape-bounds')?.split(' ').map(Number),
         paintedBounds: point.getAttribute('data-point-painted-bounds')?.split(' ').map(Number),
         selectionRadius: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r') ?? null },
