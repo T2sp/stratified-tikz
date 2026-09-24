@@ -9,17 +9,19 @@ export const responsiveBodyFixture = Object.freeze({ source: 'Scale', family: 'T
 /** Runs unchanged against detached saved XML and the directly reopened document.
  * Expanded names ignore namespace-prefix/attribute-order serialization only.
  * Text/title whitespace and every non-display style/transform remain exact. */
-export function responsiveBodyStructureInDocument({ xml } = {}) {
+export function responsiveBodyStructureInDocument({ xml, background } = {}) {
   const owner = xml === undefined ? document : new DOMParser().parseFromString(xml, 'image/svg+xml')
   const root = owner.documentElement
   const display = new Set(['position', 'left', 'top', 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height', 'z-index'])
   const controlled = (name) => display.has(name) || /^(?:margin|padding|border)(?:-|$)/u.test(name)
   const attributes = (element) => [...element.attributes]
     .filter((attribute) => attribute.namespaceURI !== 'http://www.w3.org/2000/xmlns/'
-      && !(element === root && attribute.localName === 'data-responsive-original-style'))
+      && !(element === root && attribute.namespaceURI === null && attribute.name === 'data-responsive-original-style'))
     .map((attribute) => {
       let value = attribute.value
-      if (attribute.namespaceURI === null && attribute.localName === 'style') {
+      // Foreign XML elements need not expose CSSStyleDeclaration. Preserve the
+      // raw attribute so invalid namespace diagnostics survive collection.
+      if (attribute.namespaceURI === null && attribute.localName === 'style' && element.style?.[Symbol.iterator]) {
         value = [...element.style].filter((name) => element !== root || !controlled(name))
           .sort().map((name) => [name, element.style.getPropertyValue(name), element.style.getPropertyPriority(name)])
         if (!value.length) return null
@@ -53,7 +55,20 @@ export function responsiveBodyStructureInDocument({ xml } = {}) {
     if (local) rootToPoint = new DOMMatrix([local.a, local.b, local.c, local.d, local.e, local.f]).multiply(rootToPoint)
   }
   const raw = (element) => element && Object.fromEntries([...element.attributes].map((attribute) => [attribute.name, attribute.value]))
-  return { tree: snapshot(root), declaration: { sourceTitles: titles.map((title) => title.textContent),
+  const elements = [root, ...root.querySelectorAll('*')]
+  const markerName = 'data-stratified-tikz-export-background'
+  // Collect even malformed/namespaced markers. Excluding them from runtime
+  // metadata is not permission: both documents must pass the mode declaration.
+  const exportBackground = { root: { namespace: root.namespaceURI, name: root.localName, attributes: attributes(root) },
+    markers: elements.flatMap((element) => [...element.attributes]
+      .filter((attribute) => attribute.localName === markerName)
+      .map((attribute) => ({ attribute: { namespace: attribute.namespaceURI, name: attribute.localName, value: attribute.value },
+        node: snapshot(element), directRootChild: element.parentElement === root,
+        elementIndex: [...root.children].indexOf(element) }))),
+    rootRectangles: [...root.children].filter((element) => element.localName === 'rect')
+      .map((element) => ({ node: snapshot(element), elementIndex: [...root.children].indexOf(element) })),
+    stylingElements: elements.filter((element) => ['style', 'link', 'animate', 'animateMotion', 'animateTransform', 'set'].includes(element.localName)).map(snapshot) }
+  return { expectedBackground: background, exportBackground, tree: snapshot(root), declaration: { sourceTitles: titles.map((title) => title.textContent),
     body: body && { attributes: attributes(body), transform: matrix(body) },
     point: point && { attributes: attributes(point), transform: matrix(point) },
     rootToPoint: rootToPoint && Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => [key, rootToPoint[key]])),
@@ -62,19 +77,20 @@ export function responsiveBodyStructureInDocument({ xml } = {}) {
     ancestors, contour: contour && snapshot(contour) },
     rootStyle: root.getAttribute('style'), temporaryRootStyle: root.getAttribute('data-responsive-original-style'),
     parserErrors: owner.querySelectorAll('parsererror').length,
-    runtimeAttributes: [...root.querySelectorAll('*'), root].flatMap((element) => [...element.attributes]
-      .filter((attribute) => attribute.name.startsWith('data-') && !(element === root && attribute.name === 'data-responsive-original-style'))
-      .map((attribute) => ({ element: element.localName, name: attribute.name }))) }
+    runtimeAttributes: elements.flatMap((element) => [...element.attributes]
+      .filter((attribute) => attribute.localName.startsWith('data-') && attribute.localName !== markerName
+        && !(element === root && attribute.namespaceURI === null && attribute.name === 'data-responsive-original-style'))
+      .map((attribute) => ({ element: element.localName, namespace: attribute.namespaceURI, name: attribute.name }))) }
 }
 
 /** Collect first; callers persist this saved-file baseline before asserting it. */
-export async function createResponsiveBodyBaseline(page, xml) {
-  return { fixture: responsiveBodyFixture, saved: await boundedPointDiagnostic(() =>
-    page.evaluate(responsiveBodyStructureInDocument, { xml }), 'responsive saved body structure', 5000) }
+export async function createResponsiveBodyBaseline(page, xml, background) {
+  return { fixture: responsiveBodyFixture, expectedBackground: background, saved: await boundedPointDiagnostic(() =>
+    page.evaluate(responsiveBodyStructureInDocument, { xml, background }), 'responsive saved body structure', 5000) }
 }
 
-export async function observeResponsiveBody(page, { diagnose } = {}) {
-  const structure = await boundedPointDiagnostic(() => page.evaluate(responsiveBodyStructureInDocument), 'responsive body structure', 5000)
+export async function observeResponsiveBody(page, { background, diagnose } = {}) {
+  const structure = await boundedPointDiagnostic(() => page.evaluate(responsiveBodyStructureInDocument, { background }), 'responsive body structure', 5000)
   if (diagnose) await diagnose({ boundary: 'responsive-body-before-settling', structure })
   const settling = await boundedPointDiagnostic(() => page.evaluate(async () => {
     const before = new XMLSerializer().serializeToString(document), initialFontStatus = document.fonts.status
@@ -105,10 +121,69 @@ export async function observeResponsiveBody(page, { diagnose } = {}) {
 
 const families = (value) => value?.split(',').map((part) => part.trim().replace(/^(["'])(.*)\1$/u, '$2'))
 const identity = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
-function assertDeclaration(snapshot, name) {
+const svgNamespace = 'http://www.w3.org/2000/svg'
+const backgroundMarker = 'data-stratified-tikz-export-background'
+const localAttribute = (node, name) => node?.attributes.find((attribute) => attribute.namespace === null && attribute.name === name)?.value
+const localNumber = (value) => typeof value === 'string' && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/iu.test(value.trim())
+  ? Number(value) : NaN
+const whiteFill = (value) => typeof value === 'string' && /^(?:white|#fff(?:fff)?|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))$/iu.test(value.trim())
+const rectangleBounds = (node) => ['x', 'y', 'width', 'height'].map((name) => localNumber(localAttribute(node, name)))
+
+/** Independent fixture declaration, never inferred from the inspected marker or
+ * obtained by rerunning production sanitization. Local viewBox units, not CSS
+ * screenshot dimensions, define the background in both saved and live XML. */
+export function assertResponsiveBackground(snapshot, expectedBackground, name) {
+  assert.ok(['transparent', 'white'].includes(expectedBackground), `${name}: explicit expected background mode`)
+  assert.equal(snapshot.expectedBackground, expectedBackground, `${name}: fixture background mode`)
+  const background = snapshot.exportBackground
+  assert.ok(background, `${name}: missing export background structure`)
+  assert.equal(background.root.namespace, svgNamespace, `${name}: background SVG root namespace`)
+  assert.equal(background.root.name, 'svg', `${name}: background SVG root element`)
+  const viewBox = localAttribute(background.root, 'viewBox')?.trim().split(/[\s,]+/u).map(localNumber)
+  assert.ok(viewBox?.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0,
+    `${name}: background finite positive local viewBox`)
+  const rectAttributes = new Set(['x', 'y', 'width', 'height', 'fill', backgroundMarker])
+  // Recognize an unmarked copy of the exporter's plain rectangle too, without
+  // classifying ordinary white-filled diagram content as export metadata.
+  const coveringWhiteRectangles = background.rootRectangles.filter(({ node }) => node.namespace === svgNamespace
+    && node.children.length === 0 && node.attributes.every((attribute) => attribute.namespace === null && rectAttributes.has(attribute.name))
+    && whiteFill(localAttribute(node, 'fill')) && rectangleBounds(node).every((value, index) => value === viewBox[index]))
+  if (expectedBackground === 'transparent') {
+    assert.deepEqual(background.markers, [], `${name}: transparent export has no background marker`)
+    assert.deepEqual(coveringWhiteRectangles, [], `${name}: transparent export has no export background rectangle`)
+    return
+  }
+  assert.equal(background.markers.length, 1, `${name}: white export has exactly one background marker`)
+  const marker = background.markers[0], node = marker.node
+  assert.deepEqual(marker.attribute, { namespace: null, name: backgroundMarker, value: 'white' }, `${name}: background marker namespace/value`)
+  assert.equal(node.namespace, svgNamespace, `${name}: background rect SVG namespace`)
+  assert.equal(node.name, 'rect', `${name}: background rect element`)
+  assert.equal(marker.directRootChild, true, `${name}: background direct root child`)
+  assert.equal(marker.elementIndex, 0, `${name}: background first root element child`)
+  assert.deepEqual(rectangleBounds(node), viewBox, `${name}: background bounds cover local viewBox`)
+  assert.ok(whiteFill(localAttribute(node, 'fill')), `${name}: background white fill`)
+  // These fixtures export a plain rect. Reject declarations that can override
+  // its geometry/paint (CSS geometry, transform, opacity, visibility, rounded
+  // corners, clipping, filters, etc.), including inherited root overrides.
+  assert.deepEqual(node.attributes.filter((attribute) => attribute.namespace !== null || !rectAttributes.has(attribute.name)), [],
+    `${name}: background has no paint/transform overrides`)
+  assert.deepEqual(node.children, [], `${name}: background has no overriding children`)
+  assert.equal(coveringWhiteRectangles.length, 1, `${name}: exactly one export background rectangle`)
+  const rootAttributes = new Set(['viewBox', 'preserveAspectRatio', 'version', 'width', 'height', 'style', 'color', 'font-family'])
+  assert.deepEqual(background.root.attributes.filter((attribute) => attribute.namespace !== null || !rootAttributes.has(attribute.name)), [],
+    `${name}: background root has no paint/transform overrides`)
+  const rootStyle = localAttribute(background.root, 'style') ?? []
+  assert.ok(Array.isArray(rootStyle), `${name}: background canonical root style`)
+  assert.deepEqual(rootStyle.filter(([property]) => !['color', 'font-family'].includes(property)), [],
+    `${name}: background root style has no paint/transform overrides`)
+  assert.deepEqual(background.stylingElements, [], `${name}: background has no stylesheet/animation overrides`)
+}
+
+function assertDeclaration(snapshot, name, background) {
   assert.ok(snapshot, `${name}: missing structure`)
   assert.equal(snapshot.parserErrors, 0, `${name}: standalone parsing`)
   assert.deepEqual(snapshot.runtimeAttributes, [], `${name}: sanitized runtime attributes`)
+  assertResponsiveBackground(snapshot, background, name)
   const declaration = snapshot.declaration
   assert.deepEqual(declaration?.sourceTitles, [responsiveBodyFixture.source], `${name}: exact source title`)
   assert.deepEqual(declaration.foreground.map(({ text }) => text), [responsiveBodyFixture.source], `${name}: foreground content/order`)
@@ -147,8 +222,8 @@ function finiteBounds(bounds, name) {
  * Native SVG bounds are diagnostics/visibility inputs; different CSS scales are
  * never required to produce identical glyph boxes or Canvas ink measurements. */
 export function assertResponsiveBody(observation, baseline) {
-  assertDeclaration(baseline?.saved, 'saved file')
-  assertDeclaration(observation?.structure, 'displayed file')
+  assertDeclaration(baseline?.saved, 'saved file', baseline?.expectedBackground)
+  assertDeclaration(observation?.structure, 'displayed file', baseline?.expectedBackground)
   const original = baseline.saved.declaration, current = observation.structure.declaration
   assert.deepEqual(current.foreground, original.foreground, 'Saved foreground text/font/coordinates remain invariant')
   assert.deepEqual(current.body, original.body, 'Saved body local placement remains invariant')
@@ -219,7 +294,7 @@ export async function responsiveBodyNegativeControls(page, baseline, diagnose) {
     }, kind)
     let primary, result
     try {
-      const observation = await observeResponsiveBody(page, { diagnose })
+      const observation = await observeResponsiveBody(page, { background: baseline.expectedBackground, diagnose })
       result = { kind, observation, rejected: false }
       if (diagnose) await diagnose({ boundary: 'responsive-body-control-before-assertions', ...result })
       assert.throws(() => assertResponsiveBody(observation, baseline), (error) => {
@@ -246,7 +321,7 @@ export async function responsiveBodyNegativeControls(page, baseline, diagnose) {
     }
     results.push(result)
   }
-  const restored = await observeResponsiveBody(page, { diagnose })
+  const restored = await observeResponsiveBody(page, { background: baseline.expectedBackground, diagnose })
   if (diagnose) await diagnose({ boundary: 'responsive-body-controls-restored', restored })
   assertResponsiveBody(restored, baseline)
   return results

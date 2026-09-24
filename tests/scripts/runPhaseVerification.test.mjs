@@ -512,9 +512,13 @@ test('point SVG artifact gate accepts sanitized structure and rejects absent/dam
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
+  const bodyStructure = (background) => ({ title: 'Scale', expectedBackground: background,
+    exportBackground: { markers: background === 'white'
+      ? [{ attribute: { namespace: null, name: 'data-stratified-tikz-export-background', value: 'white' } }] : [] },
+  })
   const bodySample = (background, shape, variant, scale) => ({ background, shape, variant, scale,
     bodyContractPassed: true, output: { capture: { coordinatesStable: true } },
-    bodyObservation: { structure: { title: 'Scale' },
+    bodyObservation: { structure: bodyStructure(background),
       literal: { source: 'Scale', documentUnchanged: true, fontReadiness: { status: 'loaded', checked: true } },
       settling: { documentUnchanged: true, status: 'loaded', leaves: [{ readiness: { status: 'loaded', checked: true } }] } },
   })
@@ -527,7 +531,8 @@ function completePointEvidence(fixture) {
       ...(name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
-            baseline: { fixture: { source: 'Scale' }, saved: { title: 'Scale' } }, fileUnchanged: true, documentRestored: true,
+            baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
+            fileUnchanged: true, documentRestored: true,
             scales: [.5, 2].map((scale) => bodySample(background, shape, variant, scale)),
             returnScale: bodySample(background, shape, variant, .5),
             negativeControls: [['text-mutation', 'foreground content/order'], ['body-displacement', 'body local placement transform'],
@@ -545,6 +550,27 @@ function completePointEvidence(fixture) {
     },
   ])))
   return evidence
+}
+for (const background of ['transparent', 'white']) {
+  for (const boundary of ['baseline', 'saved', 'scale-0.5', 'scale-2', 'return-scale-0.5']) {
+    for (const fault of ['missing-mode', 'wrong-mode', ...(boundary === 'baseline' ? [] : ['missing-background', 'empty-background'])]) {
+      test(`32B requires ${background} background evidence at ${boundary}: ${fault}`, (t) => {
+        const fixture = checkoutFixture(t)
+        completePointEvidence(fixture)
+        const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+        const entry = artifacts['point-paint-responsive-downloads.json'].cases.find((sample) => sample.background === background)
+        const target = boundary === 'baseline' ? entry.baseline : boundary === 'saved' ? entry.baseline.saved
+          : boundary === 'return-scale-0.5' ? entry.returnScale.bodyObservation.structure
+            : entry.scales.find((sample) => `scale-${sample.scale}` === boundary).bodyObservation.structure
+        if (fault === 'missing-mode') delete target.expectedBackground
+        if (fault === 'wrong-mode') target.expectedBackground = background === 'white' ? 'transparent' : 'white'
+        if (fault === 'missing-background') delete target.exportBackground
+        if (fault === 'empty-background') target.exportBackground = {}
+        fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+        assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+      })
+    }
+  }
 }
 
 for (const fault of [

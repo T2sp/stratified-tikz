@@ -8,13 +8,14 @@ historical contaminated-reference failure and the earlier child-only handoff.
 See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
 
 32B implementation and cumulative acceptance harness are added. The latest
-`F4Fxc7` parent run passed responsive circle/triangle previews but stopped on an
-invalid cross-scale native text-bounds comparison in the download scenario.
-The corrected harness separates immutable SVG structure from per-scale native
-text measurements and requires return-scale/control evidence for all six exports.
-Fresh parent browser verification and independent review remain required; no
-responsive download or remaining settled-export acceptance is claimed from that
-partial run. 32C and 32D remain deferred. Historical 32A evidence does not
+`1MopVV` parent run passed responsive circle/triangle previews and all three
+transparent download cases, then rejected the intentional white export-background
+marker as runtime metadata. The corrected harness independently validates the
+fixture's expected background mode, marker, local geometry and paint in both
+saved and reopened SVGs, preserving body/font, return-scale and control checks.
+Fresh parent browser verification and independent review remain required; the
+download scenario and remaining white/settled-export checks were incomplete in
+that partial run. 32C and 32D remain deferred. Historical 32A evidence does not
 establish acceptance of the 32B checkout.
 
 Implement the following stages in the user's requested order. Each stage must

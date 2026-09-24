@@ -191,20 +191,20 @@ export async function runResponsivePointPaintChecks({ browser, page, artifactDir
         const originalDocument = await standalone.evaluate(() => new XMLSerializer().serializeToString(document))
         // Parse the actual immutable bytes, not a later sample whose corruption
         // could otherwise become the reference for all display scales.
-        const baseline = await createResponsiveBodyBaseline(standalone, xml)
+        const baseline = await createResponsiveBodyBaseline(standalone, xml, background)
         await writeFile(resolve(artifactDir, `${stem}-body-baseline.json`), JSON.stringify(baseline, null, 2) + '\n')
         const entry = { shape, variant, background, declared, identity, framed, svgPath, baseline, errors, requests, scales: [] }
         cases.push(entry)
         for (const [index, scale] of [.5, 2, .5].entries()) {
           await setPointDisplayScale(standalone, scale, true)
           const name = `${stem}-${index === 2 ? 'return-' : ''}scale-${scale}`
-          const bodyObservation = await observeResponsiveBody(standalone, { diagnose: (observation) =>
+          const bodyObservation = await observeResponsiveBody(standalone, { background, diagnose: (observation) =>
             diagnose({ boundary: 'responsive-download-literal', name, observation }) })
           // Retain the independent literal/font/structure observation even if
           // coverage, the native screenshot or its pixel-mask assertion fails.
           const output = await capture(standalone, name, { standalone: true, shape, variant, scale, bodyObservation })
           const envelope = await standalone.evaluate(() => ({
-            backgroundCount: [...document.documentElement.children].filter((element) => element.localName === 'rect' && element.getAttribute('fill') === '#ffffff').length,
+            backgroundCount: document.querySelectorAll('[data-stratified-tikz-export-background]').length,
             forbidden: document.querySelectorAll('parsererror,foreignObject,image,script,[data-svg-export-exclude]').length,
             externalReferences: [...document.querySelectorAll('[href]')].map((element) => element.getAttribute('href')).filter((href) => !href.startsWith('#') || !document.getElementById(href.slice(1))),
           }))

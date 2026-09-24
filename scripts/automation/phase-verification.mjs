@@ -215,8 +215,10 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
     }
     const recordedObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
       && Object.keys(value).length > 0;
-    const checkedBody = (sample) => sample?.bodyContractPassed === true && recordedObject(sample.bodyObservation)
-      && recordedObject(sample.bodyObservation.structure)
+    const recordedBackground = (structure, background) => recordedObject(structure)
+      && structure.expectedBackground === background && recordedObject(structure.exportBackground);
+    const checkedBody = (sample, background) => sample?.bodyContractPassed === true && recordedObject(sample.bodyObservation)
+      && recordedBackground(sample.bodyObservation.structure, background)
       && sample.output?.capture?.coordinatesStable === true
       && sample.bodyObservation.literal?.documentUnchanged === true
       && sample.bodyObservation.literal.fontReadiness?.status === "loaded"
@@ -228,9 +230,11 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
     const controls = [["text-mutation", /foreground content\/order/u],
       ["body-displacement", /body local placement transform/u], ["font-change", /text font family/u]];
     if (!evidence.cases.every((entry) => recordedObject(entry.baseline)
-      && recordedObject(entry.baseline.fixture) && recordedObject(entry.baseline.saved)
+      && entry.baseline.expectedBackground === entry.background
+      && recordedObject(entry.baseline.fixture) && recordedBackground(entry.baseline.saved, entry.background)
       && entry.fileUnchanged === true && entry.documentRestored === true
-      && entry.scales.every(checkedBody) && checkedBody(entry.returnScale) && entry.returnScale.scale === 0.5
+      && entry.scales.every((sample) => checkedBody(sample, entry.background))
+      && checkedBody(entry.returnScale, entry.background) && entry.returnScale.scale === 0.5
       && matchesCase(entry.returnScale, { background: entry.background, shape: entry.shape, variant: entry.variant })
       && Array.isArray(entry.negativeControls) && entry.negativeControls.length === controls.length
       && controls.every(([kind, reason]) => entry.negativeControls.filter((control) => control?.kind === kind
@@ -245,8 +249,9 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
 }
 
 /** Artifact envelope check, not an XML safety/parser replacement. Native reopen
- * checks validate rendering/paint/geometry. Sanitized SVG has no data-* markers;
- * require balanced elements and an actual sibling contour + titled body tree. */
+ * checks validate rendering/paint/geometry and the intentional white export
+ * background marker; other runtime data-* attributes remain forbidden.
+ * Require balanced elements and an actual sibling contour + titled body tree. */
 export function hasWholePointSvg(svg) {
   const stack = [], roots = [];
   const tokens = svg.match(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<(?:"[^"]*"|'[^']*'|[^'">])*>/gu) ?? [];

@@ -1,6 +1,12 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: the prior checkout passed parent verification, then independent review
+Status: 32B remains incomplete. The latest `1MopVV` parent run completed the
+three transparent responsive downloads, then the body oracle misclassified the
+intentional white export-background marker as runtime metadata. See the final
+section for the scoped contract correction and current verification handoff.
+Fresh browser-capable parent verification and independent review remain required.
+
+Historically, the prior checkout passed parent verification, then independent review
 rejected it for two Medium production defects: imported-style namespace lookup
 and responsive point-border geometry. This targeted correction addresses both;
 fresh verification and subsequent independent review of the corrected checkout
@@ -1168,4 +1174,147 @@ including all six downloads and scale/return-scale artifacts with empty page
 errors. Only then may the independent review against
 `prompts/phase-32b-review.md` accept that tree, including the preserved namespace
 and geometric-scaling production corrections. `32B verify` does not perform
+review. Phase 32B remains incomplete until both gates pass; 32C/32D remain deferred.
+
+## Intentional white export-background contract (2026-09-25)
+
+This handoff supersedes the preceding saved-body handoff. Work began on a clean
+`phase/32b-color-opacity-outline` checkout at
+`5ff8289bb15cdec412469269947c659a63408c31`, initial fingerprint
+`7fa7726260c8c25183129ac81044c3bdc9b1cd432b3d6b26bf97b76e7eacb950`.
+That commit incorporates all eight historical tracked patches from the `ef8c50`
+parent checkout and both formerly untracked body helper/test files byte-for-byte;
+it also updates the targeted fix prompt. Nothing was reset or restarted.
+
+### Prior parent evidence and demonstrated cause
+
+Inspected `verification.json`, `05-check-free-labels/command.log`, checkout
+snapshots, saved SVGs, baselines, scale/return JSON and raster SVGs/PNGs,
+App-framing artifacts and body controls under
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-1MopVV/`,
+plus `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-um8Dcd/response.json`.
+The matching historical before/after fingerprint is
+`5ebdfe6a8e4600b4e6b4ceda9a7943cf632a23a183bbeadf84fe26709fed219a`.
+The parent passed 2,908 tests, build, diff and label-assets with Node v26.9.0 /
+Chrome 153.0.8010.53. Free-labels stopped at 14/16 groups, 19/20 named point
+scenarios and 153 completed records, with empty page errors.
+
+Observations `0579`, `0638` and `0697` confirm that all three transparent download
+cases completed 0.5 → 2 → 0.5, independent body/font/literal checks, coherent
+native/full-root captures, intended control rejections, exact DOM restoration
+and unchanged disk bytes. The overall download scenario did **not** complete.
+White solid-circle scale 0.5 retained its native PNG and observation, but failed
+before `bodyContractPassed`, subsequent paint/envelope checks and full-root
+capture. White scale 2/return-scale, white triangle/dashed-circle and the separate
+`settled-SVG-export-standalone` group were unexecuted. Only 50/91 required
+responsive artifacts existed, and fresh independent acceptance review was not
+reached. Partial captures are not passing acceptance evidence.
+
+The downloaded white SVG correctly starts with an SVG `rect` at `(0,0)`, sized
+`520 × 360`, filled `#ffffff`, with unnamespaced
+`data-stratified-tikz-export-background="white"`, covering its local viewBox.
+`insertWhiteSvgExportBackground()` intentionally inserts this marker after
+removing runtime metadata and old backgrounds. Existing export tests require
+one in white mode, none in transparent mode and no duplication on repeated
+sanitization; the settled-export harness already distinguishes it from runtime
+metadata. The body collector instead classified every `data-*` as runtime
+metadata. This was an oracle defect, not a demonstrated production export defect.
+
+### Scoped correction and regressions
+
+The download fixture now explicitly passes `transparent` or `white` into the
+saved-file baseline and each reopened observation, including the three native
+negative controls and restored positive observation. Expected mode and observed
+root/marker attributes, namespaces, parent/order, local geometry and paint are
+persisted before assertions. Neither marker presence nor later matching samples
+can establish the expected mode.
+
+Both saved and displayed declarations independently validate the background.
+White requires one unnamespaced marker with value `white` on an SVG `rect`,
+directly under the root as its first element, with white fill and exact local
+viewBox bounds. These fixtures require the exporter's plain rectangle; extra
+paint/transform/visibility/clipping/animation declarations and inherited root
+paint overrides fail. Transparent rejects marked backgrounds and unmarked
+copies of the plain full-viewBox export rectangle. Ordinary white diagram content,
+including an outlined full-viewBox drawing rectangle, is not identified solely
+by its fill. CSS screenshot dimensions never supply local rectangle geometry.
+Foreign XML elements without a CSS style object retain raw diagnostic attributes
+before their invalid namespace is rejected.
+
+Only the separately validated export marker is removed from the runtime-attribute
+list. All other runtime `data-*` attributes, including namespaced variants and
+attributes on the background itself, remain forbidden. The owned temporary
+root-style exception remains limited to that unnamespaced attribute on the root.
+The background node, marker, attributes and order remain in canonical full-root
+comparisons; changing even an otherwise valid numeric spelling between scales
+fails comparison. No sanitization or downloaded-file repair is performed.
+
+The registered body test file retains all 39 existing tests and adds **62**
+collection-boundary regressions with a faithful DOM fixture matching the actual
+export's rectangle and point/body/title/text structure. They cover both modes,
+nonzero viewBox/CSS scaling, malformed/missing/duplicate markers, namespaces,
+location/order, bounds/fill/overrides, unrelated runtime metadata, identical
+corruption in baseline and sample, and later changed/removed backgrounds.
+Source/font/baseline, displaced-body, native metrics, same-capture coordinates,
+negative-control restoration and primary-error tests remain intact. The verifier
+adds **36** missing/wrong-mode/background-observation regressions and retains all
+16 groups, 20 named point scenarios and 91 responsive-download artifacts.
+
+Production namespace/alias resolution and PGF references, geometric contour
+scaling, independent paint, immutable click-time export, fixture framing and
+native paint/selection probes are unchanged. No dependency, schema, production
+rendering/export change or PGF regeneration was made. A separate read-only
+implementation inspection found two collection edge cases (ordinary outlined
+white content and foreign XML styles); both were corrected and regressed. This
+inspection is not the independent Phase 32B acceptance review.
+
+### Executed checks and frozen-tree handoff
+
+All commands use `PATH=/opt/homebrew/bin:$PATH`, Node v26.9.0. Logs and exact
+supplemental invocations are under `/private/tmp/stz-32b-background.BebSPe/`.
+
+| Check | Result |
+| --- | --- |
+| `node --test tests/scripts/pointResponsiveBody.test.mjs tests/ui/svgPreviewExport.test.ts` | **120 passed**, zero failures/skips (`focused-final.log`). |
+| Broader body/export/paint/capture/literal/Canvas/diagnostics/verifier focused suite | **384 passed**, zero failures/skips (`focused.log`); ran before the last three collection edge tests, which passed above and in the full suite. Exact invocation: `commands.json`. |
+| `npm test` | **3,006 passed**, zero failures/skips (`npm-test.log`), including all 101 body tests and 172 policy tests. |
+| `npm run build` | Exit 0, run after `npm test` completed (`npm-build.log`); existing nonblocking >500kB chunk warning only. |
+| `npx tsc -p tsconfig.app.json --strict` | Exit 0 (`production-strict.log`). |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Exit 0 (`fixtures-strict.log`). |
+| `node --check` on all five changed `.mjs` scripts/tests | Exit 0 (`script-syntax.json`); final body-test syntax rechecked after the last regressions. |
+| Recommended JavaScript ESLint, Node/browser globals, on those same five files | Exit 0, zero errors/warnings (`javascript-eslint.log`; executable configuration: `changed-eslint.mjs`). |
+| `git diff --check` | Exit 0 (`diff-check.log`). |
+
+No unrelated lint/type debt was changed. The first direct free-label attempt
+lacked configured external Playwright and stopped at import; the configured
+retry used the existing cached Playwright and installed Chrome and stopped at
+`development-server-listen`, `listen EPERM 127.0.0.1:5173`, before browser launch.
+See `free-labels-initial.log`, `free-labels-configured.log` and
+`free-labels-configured/free-labels-evidence.json`. The latter reports no browser
+version, no completed groups and all 16 unexecuted. This child restriction is
+separate from the prior parent's white-marker assertion. No permissions or
+acceptance assertions were weakened.
+
+After documentation is finalized, the frozen checkout is checked with:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+Its exact command outcomes, report location and before/after binary-aware
+checkout identity are retained externally in
+`/private/tmp/stz-32b-background.BebSPe/handoff.json`, alongside
+`verification-final.log`, `final-checkout.json`, `final-checkout.diff` and
+`final-checkout-untracked.json`. These snapshots include any nonignored untracked
+files; the formerly untracked body helper/test are now tracked. Keeping the final
+fingerprint outside this tracked document avoids a self-referential hash.
+
+The browser-capable parent must verify that same final tree: all five commands,
+both native browser checks, all 16 groups / 20 named point scenarios, all six
+actual downloads with 0.5 → 2 → 0.5 and all 91 responsive artifacts, valid white
+background placement, empty page-error arrays, restored controls and unchanged
+files. The remaining white cases and settled-export group have no passing
+final-tree evidence from this child. After verification passes, independently
+review that exact checkout against `prompts/phase-32b-review.md`, including the
+preserved namespace and geometric-scaling corrections. `32B verify` does not
 review. Phase 32B remains incomplete until both gates pass; 32C/32D remain deferred.

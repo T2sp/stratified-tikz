@@ -1022,7 +1022,10 @@ Explicit paint, opacity, transforms, baseline/anchor placement, whitespace
 layout, and path-label white outlines remain. Formula geometry uses local,
 collision-free definitions/paths without application styles, remote fonts,
 `foreignObject`, or bitmap formulas. Transparent output has no added background
-rectangle; white output has exactly one behind the captured diagram.
+rectangle; white output has exactly one behind the captured diagram. This first
+SVG-root element covers the local viewBox and intentionally retains the
+unnamespaced `data-stratified-tikz-export-background="white"` marker; it is export
+metadata, not editor/runtime metadata.
 
 SVG export is independent from TikZ export. Using `Export SVG` never changes the
 diagram model, undo history, TikZ source, or TikZ export mode. The most recently

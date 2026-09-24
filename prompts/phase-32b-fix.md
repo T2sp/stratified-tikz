@@ -1,24 +1,22 @@
-# Phase 32B Targeted Fix Prompt: Recognize the intentional white SVG export background
+# Phase 32B Targeted Fix Prompt: Preserve local override intent and consistent imported-style resolution
 
 ## Environment
 
 Work on the current Phase 32B checkout (reported branch:
-`phase/32b-color-opacity-outline`). Inspect status first and preserve existing
-changes, including untracked `scripts/pointResponsiveBody.mjs` and
-`tests/scripts/pointResponsiveBody.test.mjs`. Keep the saved-body structure
-contract, actual leaf-font/literal checks, return-scale captures, negative
-controls, fixture framing and all prior production corrections. Do not reset
-or restart implementation.
+`phase/32b-color-opacity-outline`). Inspect status and preserve all current
+changes, including the completed white-background, saved-body, font, responsive
+capture and verifier corrections. Do not reset or restart implementation.
 
-The latest parent checked revision `ef8c50cd7dde032d65d482a11ea028d1a2ad21af`
-plus working-tree changes. Its before/after fingerprint was:
+The accepted parent and independent review checked revision
+`5ff8289bb15cdec412469269947c659a63408c31` plus working-tree changes, with
+the unchanged fingerprint:
 
 ```text
-5ebdfe6a8e4600b4e6b4ceda9a7943cf632a23a183bbeadf84fe26709fed219a
+4061512fdc4f58a9d71ec92378920a24dbe8c22406beba9c222aa232c0011742
 ```
 
-This matches the inspected checkout before this prompt update. Obtain fresh
-final-tree evidence after the correction, including untracked files.
+This matches the inspected checkout before this prompt update. New implementation
+requires fresh matching final-tree evidence.
 
 Use Node >=22.12.0 with the supported installation first in PATH:
 
@@ -26,261 +24,320 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Limit work to the demonstrated white-background metadata assertion, focused
-regressions/diagnostics and further demonstrated 32B acceptance failures. Keep
-strict TypeScript, avoid new dependencies and unrelated cleanup, and defer
-32C/32D. Preserve production rendering and export semantics.
+Fix the three demonstrated Phase 32B import/override defects below. Preserve
+32A behavior and defer 32C/32D. Keep strict TypeScript, bounded literal parsing,
+human-readable TikZ, explicit styles and raw source preservation. Avoid new
+dependencies and unrelated cleanup. A small persistent representation of user
+override intent is in scope; document and test its compatibility.
 
-## Latest execution findings
+## Accepted verification and remaining review findings
 
-The parent successfully launches Chrome and passes responsive circle and
-triangle preview scenarios. Within the responsive-download scenario, all three
-transparent combinations complete the new structure/literal, scale-return and
-negative-control checks. Execution then fails on the first white-background
-download at scale 0.5:
+Verification passed. Independent review ran and accepted the required browser
+and PGF evidence, but found three Medium production defects. This is no longer
+a browser-startup, screenshot, text-metric or white-background acceptance gap.
 
-```text
-saved file: sanitized runtime attributes
-actual: [{ element: 'rect', name: 'data-stratified-tikz-export-background' }]
-expected: []
-```
-
-This is separate from the child's localhost startup `EPERM`. It is also a new
-failure after the previous native text-bounds comparison was corrected.
-
-Read this parent directory:
+Read the review and its production-function reproductions:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-1MopVV
+/Users/takamatoshinori/.codex/attachments/cb8fb36b-f1c1-4e0b-b981-c5240a5248ab/pasted-text.txt
+/private/tmp/stz-32b-review-reproductions.log
 ```
 
-Inspect `verification.json`, `05-check-free-labels/command.log`, and these files
-inside `05-check-free-labels/artifacts/`:
-
-- `free-labels-evidence.json` and matching checkout snapshots;
-- `point-paint-responsive-white.svg`, the actual downloaded file;
-- `point-paint-responsive-white-body-baseline.json`;
-- `point-paint-responsive-white-scale-0.5.json`, `.png` and `.raster.svg`;
-- the corresponding white App-framing artifacts;
-- all three transparent download baselines, scale/return-scale artifacts and
-  `-body-controls.json` files;
-- `point-paint-observation-0579.json`, `point-paint-observation-0638.json` and
-  `point-paint-observation-0697.json`, which record completed transparent cases
-  with restored documents and unchanged file bytes.
-
-Verifier handoff:
+Accepted parent evidence:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-um8Dcd/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-xgI0o0/verification.json
 ```
 
-| Observation | Actual parent result |
+Inspect the actual reports and artifacts under its
+`04-check-label-assets` and `05-check-free-labels` directories.
+
+| Observation | Accepted result |
 | --- | --- |
-| `npm test` | Exit 0; 2,908 passed |
-| Build / diff / `check:label-assets` | Exit 0 |
-| `check:free-labels` | Exit 1 at `pointResponsiveBody.mjs:111`, through `checkPointResponsivePaint.mjs:219` |
-| Stage / scenario | `point-node-paint-import-persistence` / `point-paint-responsive-downloads` |
-| Completed groups / evidence records | 14 of 16 / 153 |
-| Completed point scenarios | 19 of 20 |
-| Browser / Node | Chrome 153.0.8010.53 / Node v26.9.0 |
-| Page errors | Empty |
-| Checkout before/after | Same fingerprint |
-| Fresh independent acceptance review | Not reached |
+| Full suite | 3,006 passed; zero failures/skips |
+| Build / diff / both browser checks | Passed |
+| Browser | Chrome 154.0.8037.57 |
+| Node | v26.9.0 |
+| Free-label groups / point scenarios | All 16 / all 20 |
+| Browser evidence records / page errors | 164 / none |
+| Required independent PGF evidence | Present and accepted |
+| Independent review | needs changes; 0 Critical, 3 Medium, 0 Low |
+| Commit readiness | No, due to the production defects below |
 
-All three transparent combinations—solid circle, solid triangle and dashed
-circle—have successful body contracts at 0.5 → 2 → 0.5, native/full-root PNGs,
-correctly rejected and restored text/displacement/font controls, and unchanged
-downloaded bytes. Those are completed cases inside an incomplete scenario;
-the scenario's final evidence record has not been emitted.
+Strict production/fixture/focused paint TypeScript and all 24 changed JavaScript
+syntax/lint checks passed. Of 31 changed TypeScript files, 30 lint cleanly; the
+remaining 25 no-regex-spaces errors were reproduced at the pre-32B baseline.
+Preserve that distinction instead of expanding this task into lint cleanup.
 
-The white solid-circle scale-0.5 native PNG and observations were saved, but the
-body assertion failed before `bodyContractPassed`, subsequent per-scale paint/
-envelope assertions, and the complete-root capture. White scale 2/return-scale,
-white triangle/dashed-circle cases and the separate
-`settled-SVG-export-standalone` group remain unexecuted. Do not infer acceptance
-from the existence of a partial capture.
+### 1. Explicit edits returning to a fallback value lose their TikZ override
 
-## Confirmed cause: export metadata is misclassified as runtime metadata
+Import and apply:
 
-The downloaded white file begins with this SVG-root child:
-
-```xml
-<rect x="0" y="0" width="520" height="360" fill="#ffffff"
-      data-stratified-tikz-export-background="white"/>
+```tex
+\tikzstyle{example}=[fill=\mycolor,text=red]
 ```
 
-Its rectangle covers the root viewBox `0 0 520 360` and precedes the drawing.
-This is an intentional, established export marker:
+Change Fill color to `#123456`, then back to `#000000`.
+Preview/SVG retain black, but both TikZ modes omit the post-`example` fill
+override and restore the external macro's color. Save/reload preserves the bug.
 
-- `src/ui/svgPreviewExport.ts` removes editor/runtime metadata and old marked
-  backgrounds, then inserts a new marked white rectangle only for white mode.
-- `insertWhiteSvgExportBackground()` uses the SVG namespace, white fill,
-  root/viewBox bounds and the first root-element position.
-- `tests/ui/svgPreviewExport.test.ts` explicitly requires exactly one such
-  rectangle in white mode, none in transparent mode, and no duplication after
-  repeated sanitization.
-- `scripts/checkSettledSvgExports.mjs` already distinguishes this marker from
-  unwanted metadata and independently checks the background geometry and mode.
+`pointImportedStyleOverrideOptions()` in `src/tikz/generateTikz.ts`
+compares current paint with the fallback baseline, then suppresses equal fields
+if external resolution is unknown. Equality cannot distinguish an untouched
+fallback from a deliberate local edit that returns to that value. Existing
+tests exercise an edit away from the fallback, but not the return edit.
 
-The new `responsiveBodyStructureInDocument()` collects every `data-*` attribute
-except its temporary root-style bookkeeping as `runtimeAttributes`.
-`assertDeclaration()` then requires that list to be empty. Consequently, it
-rejects valid white output. There is no demonstrated production export defect
-in this failure.
+### 2. Previously imported definitions have inconsistent resolution scope
 
-The existing body-contract unit fixture manually supplies
-`runtimeAttributes: []` and omits a white background. Its injected-metadata test
-does not exercise collecting the real export marker, which explains the missing
-regression coverage.
+Import `base.sty`, then `outer.sty`:
+
+```tex
+% base.sty
+\tikzset{base/.style={fill=red,text=green}}
+% outer.sty
+\tikzset{outer/.style={base,draw=blue}}
+```
+
+Applying the outer point preset currently produces black fill/text and blue
+stroke, with an unsupported-base diagnostic. Import diagnostics and preset
+construction use only the current import's definitions. Export resolves against
+all diagram references, then writes those stale black fallback values after
+`outer`, overriding the intended red/green.
+
+Export usage tracking also registers only the directly selected source.
+Dependency load hints must include the known defining sources needed to make
+the emitted external keys mean what preview resolution assumed.
+
+### 3. Unsupported color redefinitions expose stale or built-in values
+
+Import:
+
+```tex
+\definecolor{red}{cmyk}{1,0,0,0}
+\tikzstyle{myPoint}=[fill=red,text=red]
+```
+
+The parser warns that CMYK is unsupported but retains successful built-in-red
+resolution. Both TikZ modes emit red fill/text after `myPoint`, replacing the
+external cyan definition.
+
+`parseTikzsetStyles()` only stores supported literal definitions.
+`literalTikzColor()` falls back to built-in colors when a name is absent.
+An unsupported redefinition neither invalidates an earlier parsed value nor
+blocks built-in fallback. Merely deleting the old value cannot fix built-in
+names such as `red`.
 
 ## Required reading
 
-Read `AGENTS.md`, the paired 32B implement/review prompts and the latest section
-of `docs/PHASE_32B_IMPLEMENTATION.md`. Inspect:
+Read `AGENTS.md`, the paired 32B implement/review prompts, and the current
+`docs/PHASE_32_PLAN.md` and `docs/PHASE_32B_IMPLEMENTATION.md`. Trace:
 
-- `scripts/pointResponsiveBody.mjs` and its registered tests;
-- `scripts/checkPointResponsivePaint.mjs`, including the existing
-  `background` loop and baseline/observation calls;
-- `src/ui/svgPreviewExport.ts` and `tests/ui/svgPreviewExport.test.ts`;
-- the standalone background checks in `scripts/checkSettledSvgExports.mjs`;
-- the responsive artifact/evidence requirements in
-  `scripts/automation/phase-verification.mjs`.
+- `src/model/importedTikzStyles.ts` and `src/model/importedTikzPaint.ts`;
+- imported source/reference, point style and preset types, validation,
+  serialization/normalization and cloning;
+- `src/model/stylePresets.ts`, `src/ui/diagramUpdates.ts`,
+  `src/ui/styleClipboard.ts`, bulk/quick edits and preset application;
+- `src/ui/inspector/PointStyleEditor.tsx` and `PointPaintFields.tsx`;
+- point imported-style emission, baseline/unresolved-field resolution and
+  external-source load comments in `src/tikz/generateTikz.ts`;
+- `tests/model/pointPaintImport.test.ts`, existing model/UI/TikZ regressions,
+  and `scripts/checkPointNodePaint.mjs` with its fixtures/verifier policy.
 
-Line numbers identify the inspected checkout; locate current equivalents if they
-move. Use the existing export contract as the specification, not an instruction
-to import production sanitization as its own test oracle.
+Review locations were approximately generateTikz.ts:6928,
+importedTikzStyles.ts:450 and :199, and importedTikzPaint.ts:64. Locate current
+functions rather than relying on unchanged line numbers.
 
 ## Required correction
 
-### 1. Make the background expectation explicit
+### 1. Persist explicit local paint intent independently of fallback equality
 
-Carry the expected `transparent` or `white` mode from the download fixture into
-baseline and displayed-file validation. Do not infer the expected mode from the
-marker being inspected or accept an invalid baseline because later samples
-match it.
+Introduce a small typed representation of which paint settings were explicitly
+overridden relative to the active imported style, or an equivalent design that
+preserves the same distinction. Record accepted user edits at the model update
+boundary and carry that intent through export. Do not try to reconstruct it
+solely from current-value equality at export time.
 
-Collect enough structural information to validate marker value, element and
-attribute namespaces, parent/order, rectangle geometry and paint. Retain these
-observations in the saved-file baseline and pre-assertion diagnostics.
+An untouched unresolved external property must retain its external meaning;
+a local edit must remain authoritative even when its value equals the original
+preview fallback. Emit the effective local override after the external style
+key in both standalone and inlineMath output. Do not solve this by always
+overriding every unresolved property, dropping the external reference, or adding
+a dummy numeric/color difference.
 
-For these viewBox-based responsive fixtures, require:
+Keep intent at the property level: editing fill must not accidentally claim
+unknown text or border settings. Account for coupled controls that intentionally
+edit multiple channels, paint enablement, opacity, width and dash settings.
+Preserve existing effective-opacity/dimming behavior.
 
-- Transparent mode: no export-background marker or export-background rectangle.
-  Ordinary white-filled diagram content must not be mistaken for the background.
-- White mode: exactly one unnamespaced
-  `data-stratified-tikz-export-background="white"` attribute on an SVG
-  `rect` that is a direct, first element child of the SVG root, has white fill
-  and covers the root viewBox in local coordinates.
-- The background must remain visible and unshifted; reject paint/transform
-  overrides that defeat the specified background.
-- Any other runtime `data-*` attribute remains forbidden, including one placed
-  on the otherwise valid background rectangle.
+Treat this as authoritative editing state, not a React cache or renderer flag.
+Support serialization/reload, validation, deep cloning, duplicate/copy/paste,
+history and relevant preset/bulk/quick-edit paths. Define what reapplying or
+replacing an imported preset does to its local overrides, and prevent intent
+from leaking to an unrelated imported reference. No new reset UI is required
+if existing preset actions provide the intended reset behavior.
 
-Apply the same independent declaration checks to both the parsed saved file
-and the reopened observations. Do not use CSS screenshot dimensions as the
-rectangle's local geometry or hard-code one captured viewport.
+Keep old diagrams and presets readable. Define deterministic handling of absent
+intent metadata and preserve existing explicit values; do not turn every legacy
+fallback into an override or silently drop distinguishable legacy edits.
+Document the unavoidable ambiguity of historical equal-valued edits rather
+than claiming to reconstruct information old files never stored. Any format
+change must have explicit validation, migration and round-trip tests.
 
-### 2. Permit only the validated export marker
+### 2. Use one coherent ordered context for imports, diagnostics and export
 
-Separate the recognized export-background marker from unexpected runtime
-metadata, then retain the strict empty-list assertion for the latter. Keep the
-background node, marker value, attributes and order in the canonical full-root
-snapshot and all saved/displayed structure comparisons.
+Resolve known styles and colors from the applicable imported sources using a
+shared deterministic context. The second import in the reproduction must see
+the first import when creating presets and diagnostics. Baseline reconstruction,
+unresolved-field analysis and both TikZ modes must use compatible scope and
+ordering. Do not fix the discrepancy by making export ignore known definitions.
 
-Do not allow all `data-*`, all `data-stratified-tikz-*`, or all metadata on
-rectangles. An exact-name exception alone must not authorize the marker on
-arbitrary nodes, with arbitrary values or in transparent mode. Preserve the
-existing narrow handling of owned temporary root-style bookkeeping.
+The two-file example must yield red fill, green text and blue stroke in the
+applied point and SVG, without a false unsupported-base warning. Preserve the
+exact external key and source/reference IDs, raw source/options and stable
+save/reload behavior. Test named colors supplied by prior files as well as
+style references. A prior file containing both color and style declarations
+suffices; adding color-only import UI/result semantics is not required here.
 
-Do not delete the marker from production export, strip it from downloaded
-files before validation, remove the background from structural comparisons,
-rerun the sanitizer to make the test pass, or skip white cases. The change
-belongs in the test contract and its call sites unless fresh evidence proves
-an additional production defect.
+Specify and test later-import, duplicate/redefined-key and missing-dependency
+behavior. In the ordered resolution context, later applicable canonical
+definitions win for the directly invoked key as well as nested references;
+an older reference ID must not silently select a stale root body. A definition
+becoming known later must not turn an earlier unresolved fallback into an
+intentional local override. Distinguish importer-produced preview/fallback
+snapshots from user-authored values. Preserve actual user edits and explicit
+saved styles; do not blindly regenerate all existing presets or overwrite
+already edited points when another file is imported.
 
-### 3. Add regressions at the collection boundary
+Retain canonical alias semantics: `base` and `/tikz/base` share identity;
+`/other/base` is distinct. Nested style bodies use the invocation's runtime
+directory, not a declaration-parent fallback. Keep ordered options, bounded
+expansion, cycle diagnostics and explicitly unsupported runtime directory changes.
 
-Add a positive white-background case using the actual exported structure or a
-faithful DOM fixture that passes through `responsiveBodyStructureInDocument()`.
-Retain transparent positives and verify that white and transparent expectations
-come from the test case. Merely setting a precomputed `runtimeAttributes` list
-to empty would not reproduce or prevent this failure.
+Track the known style/color source dependencies used by resolution and include
+their load hints in deterministic order consistent with that resolution.
+Selecting only `outer` must include both `base.sty` and `outer.sty` hints.
+Deduplicate without silently changing redefinition precedence or depending on
+diagram-element traversal order. Keep hints as comments, preserve custom hints,
+and do not execute files or embed arbitrary raw preambles into generated TikZ.
+Unknown external dependencies remain explicitly unresolved.
 
-Add focused rejection cases for missing/duplicate markers, incorrect marker
-value, wrong mode, wrong element/namespace/location/order, wrong bounds/fill,
-and an unrelated runtime attribute on the background or point content. Cover
-corruption shared by both baseline and observation so equality alone cannot
-legitimize invalid output. Also verify that changing/removing the valid
-background between scale observations fails structural comparison.
+### 3. Represent unsupported color definitions as unknown bindings
 
-Keep existing source/font/baseline, displaced-body-inside-contour, metric,
-capture-coordinate and cleanup regressions. Register any new tests in the
-normal suite. Update evidence consumers only if observation fields change;
-do not weaken their completion conditions.
+Distinguish an undeclared name, a supported literal definition and a recognized
+but unsupported definition. An unsupported redefinition must invalidate earlier
+resolution of that name and prevent fallback to a built-in with the same name.
+Carry this state consistently through the shared import context, preset/baseline
+construction, diagnostics, save/reload reconstruction and export.
 
-### 4. Complete the native matrix with existing controls intact
+Respect declaration/source order: supported then unsupported becomes unresolved;
+unsupported then supported may resolve to the later literal value. Style bodies
+use the effective color environment when invoked after the applicable sources
+load, not a snapshot at the style declaration's textual position. Keep names
+case-sensitive and state local to the diagram's ordered import context; do not
+mutate the global built-in color table or make unrelated colors unknown.
 
-Reopen all six actual App downloads: transparent/white × solid circle, solid
-triangle and dashed circle. Preserve 0.5 → 2 → 0.5 on each unchanged saved file,
-with distinct return-scale artifacts. Check background semantics alongside
-independent body/font/literal and native paint assertions.
+Propagate unresolved color use to the affected paint fields and mixtures,
+including either explicit mixture operand or an implicitly used white operand.
+Retain a deterministic preview fallback with a clear diagnostic, but do not
+present stale built-in/previous colors as successfully resolved.
 
-Keep all three existing native body controls and their intended rejection
-reasons, exact DOM restoration, immutable disk bytes, bounded capture, owned
-resource cleanup and primary-error preservation. Keep root framing, native PNG
-pixel measurements, geometric stroke/dash/selection checks, and model/history/
-request invariants. Do not reintroduce cross-scale text `getBBox()` equality.
+For an untouched unresolved fill/text, preserve the external effect after
+`myPoint` by omitting inappropriate post-key overrides. A later supported
+option or deliberate local edit may override its affected fields, including
+a local edit back to the fallback value addressed in correction 1. Keep known
+unrelated channels intact. Do not add CMYK support, execute TeX or expand the
+supported grammar merely to special-case this reproduction.
 
-Persist the expected mode and observed background structure before assertions,
-so a later failure distinguishes background semantics from unrelated metadata.
-Complete the remaining white cases and settled-export group; diagnose any new
-failure on its own evidence.
+## Regression and native acceptance requirements
 
-## Preserve implemented corrections and acceptance gates
+Register meaningful production-path tests covering:
 
-Keep namespace/alias resolution and its PGF references, geometrically scaling
-contours, independent text/fill/border paint, immutable click-time export,
-interior fixture framing, same-capture coordinate checks, and the independent
-saved-body/leaf-font contract. No schema or production geometry/export change
-is justified by this assertion.
+- The exact macro-fill edit sequence, then save/reload and undo/redo. Both modes
+  must preserve the final local black override after the external key. Untouched
+  unknown fill must still retain its external meaning. Include representative
+  non-color paint edits that return to their fallback values and channel isolation.
+- Sequential imports of the two files, prior-file color definitions, application
+  of the outer preset, accurate diagnostics, dependency hints and both-mode output.
+  Include truly missing dependencies, canonical aliases/redefinitions (including
+  the directly invoked key), later imports and preservation of local edits
+  through save/reload/history.
+- The exact unsupported built-in-red redefinition; supported-custom/built-in then
+  unsupported; reversed order restoring a supported value; affected mixtures;
+  later known paint options and explicit local overrides. Check that unrelated
+  colors remain resolved.
+- Required clone/clipboard/preset/normalization paths for any new persisted
+  intent, including absent or invalid metadata and reference replacement.
 
-Retain all 16 groups, all 20 named point scenarios and the current 91 required
-responsive-download artifacts. Preserve the return-scale, body-contract,
-negative-control/restoration and immutable-file evidence gates. Do not weaken
-fingerprint, artifact, review or commit/push checks.
+Inspect options after the actual external key and resolve generated named color
+definitions when testing effective output. Finding the expected color somewhere
+in a document is insufficient: a prior fallback or unrelated node may contain
+it. Expected results must be independent of the resolver under test.
+
+Extend the production browser harness using native import, preset and Inspector
+events. Demonstrate the edit-away/edit-back sequence, cross-file application,
+unsupported-color diagnostics, save/reload and history behavior, preview paint,
+both generated TikZ modes and actual SVG output. Preserve the existing real
+MathJax/lifecycle/picking and immutable export tests. Record observations before
+assertions and retain bounded capture/error cleanup.
+
+Make coverage of the three review reproductions mandatory in the parent policy,
+either as explicit extensions of existing scenarios or additional named scenarios
+with required artifacts. An old successful 20-scenario report must not satisfy
+the new requirements without their evidence. Keep the existing 16 groups and
+20 scenarios as the baseline; update counts and policy tests if scenarios grow.
+
+Retain accepted PGF references. Use focused independent PGF cases where needed
+to establish disputed source/load-order or override semantics, preserving source,
+commands and actual results. Do not regenerate unrelated reference artifacts or
+use a TypeScript parser's output as independent PGF proof.
+
+## Preserve completed behavior and verification gates
+
+Preserve the accepted namespace corrections, independent paint and single
+dimming multiplication, responsive geometric borders, shared body/layout/picking,
+and immutable click-time SVG capture. Retain legacy node/preset normalization,
+black text, white hollow fill, 0.4pt border, regular-polygon identities and spacing.
+
+Keep the saved-body/leaf-font contract, 0.5 → 2 → 0.5 captures, framing, strict
+same-capture consistency, all three native body controls and the validated
+white-background marker exception. Preserve all six responsive downloads and
+their current 91 required artifacts, plus any newly required evidence. These
+accepted harness corrections are not the target of this follow-up.
+
+Do not weaken fresh-process verification, checkout fingerprints, required
+artifacts, independent review or commit/push gates.
 
 ## Verification and completion criteria
 
-Run the focused responsive-body/export regressions, registered full suite,
-build, applicable strict TypeScript/fixture checks, changed-script syntax,
+Run focused registered model/import/export/UI/history regressions, the full
+suite, build, applicable strict TypeScript/fixture checks, changed-script syntax,
 targeted lint and `git diff --check`. Run `npm test` and `npm run build`
-sequentially because they share asset preparation. Preserve unrelated lint/type
-debt and the nonblocking build warning. Do not regenerate unchanged PGF references.
+sequentially because they share asset preparation. Report established lint
+debt and the nonblocking chunk-size warning separately.
 
-Obtain fresh browser-capable parent verification for the final checkout:
+Obtain fresh browser-capable parent verification of the final checkout:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands, both browser checks, all 16 groups and all 20 named
-point scenarios to pass with required artifacts and empty page-error arrays.
-Inspect all six responsive downloads, including white background placement and
-scale/return-scale evidence. Match evidence to the final checkout and untracked
-files.
+Require all five commands, both browser checks, all cumulative groups/scenarios
+and the new defect-specific evidence to pass, with empty page-error arrays and
+matching final-tree identity. The accepted `xgI0o0` run remains valid historical
+evidence for its unchanged checkout; it does not cover these new fixes.
 
-The child's startup failure and the partial `1MopVV` parent run do not establish
-acceptance of the corrected final tree. After verification passes, independently
-review that same tree against `prompts/phase-32b-review.md`, including the earlier
-namespace and scaling production findings. `32B verify` itself does not review.
-Phase 32B remains incomplete until both gates pass; 32C/32D remain deferred.
+After fresh verification, independently review the same tree against
+`prompts/phase-32b-review.md` and explicitly recheck all three findings.
+The review already ran once and requested changes; do not describe it as never
+performed. `32B verify` itself does not review. Phase 32B is incomplete until
+the three defects are fixed and both acceptance gates pass; 32C/32D remain deferred.
 
 ## Report
 
-Update `docs/PHASE_32B_IMPLEMENTATION.md` and relevant acceptance notes with the
-intentional export-marker contract, its previous misclassification, the narrowly
-scoped oracle correction, collection-boundary regressions, exact commands/results
-and final checkout identity. Distinguish completed transparent cases from the
-incomplete download scenario, remaining white/settled-export checks and fresh
-independent review. Correct nearby claims that sanitization removes every
-`data-*` attribute where this documented export marker is the explicit exception.
+Update `docs/PHASE_32B_IMPLEMENTATION.md` and relevant model/import/export notes
+with the three root causes, chosen intent/persistence semantics, consistent
+scope/dependency ordering, unsupported-color invalidation, registered/native
+regressions, exact commands/results and final checkout identity. Distinguish
+the accepted pre-fix verification from the new implementation's acceptance.
+Report any legacy-file intent ambiguity or unsupported external behavior
+accurately rather than claiming full TeX evaluation.

@@ -1151,8 +1151,10 @@ shared view into a detached snapshot. Later edits or loads affect the live
 Preview and the next export, without mixing revisions into the pending file.
 Successful labels are typeset and failed labels contain complete captured
 source. Transparent mode adds no background; white mode adds one white
-viewBox-sized background rectangle. Sanitization removes editor overlays and
-metadata while preserving formula geometry, explicit paint, opacity, measured
+viewBox-sized background rectangle as the first SVG-root element, with the
+intentional unnamespaced `data-stratified-tikz-export-background="white"` marker.
+Sanitization removes editor overlays and runtime metadata while preserving this
+export marker, formula geometry, explicit paint, opacity, measured
 placement, whitespace and path outlines. One export runs at a time; errors
 restore the action without downloading invalid SVG. See
 [Preview UI](./PREVIEW_UI.md#export-svg) and the
