@@ -490,3 +490,55 @@ success. Once that evidence matches, the existing parent workflow must perform
 the read-only review against `prompts/phase-32b-review.md`; `verify` alone does
 not review. Verification and independent acceptance review remain open, so
 Phase 32B is incomplete. No commit/push or 32C/32D work was performed.
+
+### Current-checkout revalidation (2026-09-24)
+
+The repeated targeted request starts from clean
+`99535517c9d465e265f415d7af0e370f4c00f46e` on
+`phase/32b-color-opacity-outline`. That revision already contains the resolver,
+all five corrected select sites, real invalid-width/recovery assertions,
+production-markup clone regression, 44 registered resolver checks and diagnostics
+described above. Its clean-tree fingerprint is
+`fba4b126c457237c8b37ace37b8526e31f4a68b2e802618971980c7909ce822c`.
+Read-only independent targeted inspection found no concrete additional defect.
+No harness, production, fixture, dependency or verification-policy change was
+necessary in this turn; only this report and the existing preview acceptance
+note were updated. This inspection is not the gated Phase 32B acceptance review.
+
+Fresh commands use `PATH=/opt/homebrew/bin:$PATH` and Node v26.9.0:
+
+| Command | Result and log |
+| --- | --- |
+| `node --test tests/scripts/pointInspectorFields.test.mjs tests/scripts/pointSelectionOracle.test.mjs tests/scripts/pointNativeCoordinateMode.test.mjs tests/scripts/pointCheckDiagnostics.test.mjs tests/scripts/ownedFontFace.test.mjs tests/scripts/pointPaintOracle.test.mjs` | 110 passed; `/private/tmp/stz-32b-current-focused.log` |
+| `node scripts/automation/run-phase.mjs 32B verify` | Tests 2,739 passed, build and diff passed; label-assets localhost `listen EPERM`, free-labels not reached; `/private/tmp/stz-32b-current-verify.log` |
+| `npx tsc -p tsconfig.app.json --strict` | Passed; `/private/tmp/stz-32b-current-strict-tsc.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed; `/private/tmp/stz-32b-current-fixture-tsc.log` |
+| `node --check scripts/checkPointNodePaint.mjs`, `node --check scripts/pointInspectorFields.mjs`, `node --check tests/scripts/pointInspectorFields.test.mjs` | Passed |
+| `node --input-type=module < /private/tmp/stz-32b-inspector.ziacWM/targeted-eslint.mjs` | Zero errors/warnings for the three scripts above; `/private/tmp/stz-32b-current-eslint.log` |
+| `npm run check:free-labels` with the established external Playwright/Chrome environment above and `STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32b-current-free-labels` | Exit 1 at `development-server-listen`, `EPERM 127.0.0.1:5173`; `/private/tmp/stz-32b-current-free-labels.log` |
+
+The initial fresh report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-iQ1jvu/verification.json`;
+its verifier response is `stz-phase-verifier-X5eU6Q/response.json` in the same
+temporary root. Before/after identity matches the clean fingerprint above.
+These results precede this documentation change. The official verify command
+and configured direct free-label check are repeated after the final edits;
+their terminal outcomes, report paths, exact commands and binary-aware final
+checkout identity are saved outside the tree in
+`/private/tmp/stz-32b-current-handoff.json` (logs
+`/private/tmp/stz-32b-current-final-verify.log` and
+`/private/tmp/stz-32b-current-final-free-labels.log`). No self-referential hash is
+written into the tracked report. The unrelated lint baseline remains unchanged.
+
+The old selection issue remains a historical parent pass; the select timeout
+remains the historical parent's executed failure; the adjacent invalid-width
+lookup remains predicted until native execution. Current child startup failure
+provides no new DOM counts or paint-rendering result. All native label-assets
+assertions, all 16 free-label groups and 16 named point scenarios (including all
+five paint scenarios), production wrapped-field/NaN checks and required native
+JSON/SVG/PNG artifacts remain pending for this tree. Empty pre-browser page-error
+arrays are not a pass. After this child returns, the existing browser-capable
+parent must complete fresh verification, then the read-only review against
+`prompts/phase-32b-review.md`. `verify` itself does not review, and no nested
+implementation or commit/push gate was invoked. Phase 32B remains incomplete;
+32C/32D remain deferred.

@@ -1704,3 +1704,9 @@ corrected control counts, DOM/ARIA, selection, paint and request/history identit
 Fresh native execution of this correction and independent review remain required;
 the child startup restriction is separate from the parent's observed locator
 timeout. See [the current handoff](PHASE_32B_IMPLEMENTATION.md#targeted-inspector-field-locator-correction).
+
+The 2026-09-24 revalidation found the resolver correction already committed at
+`9953551`; 110 focused and 2,739 full tests passed. Child browser checks again
+stopped at localhost `EPERM` before native execution. Final-tree evidence and
+the remaining parent verification/review gates are recorded in
+[current-checkout revalidation](PHASE_32B_IMPLEMENTATION.md#current-checkout-revalidation-2026-09-24).

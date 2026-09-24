@@ -1,16 +1,16 @@
-# Phase 32B Targeted Fix Prompt: Resolve Inspector paint fields independently of option and warning text
+# Phase 32B Targeted Fix Prompt: Correct the disabled-control rejection oracle for Playwright label retargeting
 
 ## Environment
 
 Work on the current Phase 32B checkout (reported branch:
-`phase/32b-color-opacity-outline`). Inspect status first and preserve the current
-implementation, all previous 32A corrections, selection-oracle correction,
-fixtures, tests, documentation and user changes, including untracked files.
-Do not reset or restart implementation.
+`phase/32b-color-opacity-outline`). Inspect status first and preserve the existing
+paint implementation, Inspector field resolver, selection-oracle correction,
+previous 32A fixes, fixtures, tests, documentation and user changes. Do not reset
+or restart implementation.
 
-The latest parent checked revision `a2f2ba66faa9afe299dc5471ccc18bb43b043f42`
-plus working-tree changes. Its before/after fingerprint was
-`6475b6191b76ea9ba28d891839ff309d40c97f8407c0ebe782f41e708447c03e`.
+The latest parent checked revision `99535517c9d465e265f415d7af0e370f4c00f46e`
+plus documentation changes. Its before/after fingerprint was
+`20cc7c6c846029df9d248f5fc7ae4195e23eb8ab7e0a4e776cc110fd51e04322`.
 This matches the inspected checkout before this prompt update. The prompt changes
 checkout identity; obtain fresh evidence for the final corrected tree.
 
@@ -20,228 +20,232 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Limit work to the demonstrated Inspector field-locator failure, its adjacent
-validation-message case, focused regressions/diagnostics, and further demonstrated
-32B acceptance failures. Preserve strict TypeScript and avoid new dependencies,
-additional schema changes or unrelated lint cleanup. Keep 32C geometric shapes
-and 32D spacing, minimum dimensions and anchors deferred.
+Limit work to the demonstrated disabled-control negative-test mismatch, focused
+regressions/diagnostics, and further demonstrated 32B acceptance failures.
+Preserve strict TypeScript. Avoid new dependencies, additional schema changes,
+production UI changes to accommodate this test, and unrelated lint cleanup.
+Keep 32C geometric shapes and 32D spacing, minimum dimensions and anchors deferred.
 
 ## Latest execution findings
 
-The previous border half-width fix is now exercised successfully by the parent.
-All eleven cumulative 32A point scenarios passed, including resource/font
-readiness, pointer selection, native Inspector/persistence, transparent/white
-standalone point exports and whole-node fallback. Preserve that correction.
+The original caption-based resolver correction is already present at `9953551`.
+The latest parent now supplies native evidence that the live line-style/cap/join
+edits and Border width invalid-draft/recovery sequence work. Do not repeat the
+previous prompt's claim that these are still only predicted or unexecuted.
 
-The child reported localhost startup `EPERM`, but the latest parent launched
-its browser and reached the first new 32B paint scenario. Its current failure
-is a 30-second wait for an exact label locator, not a server-startup failure.
+The child reported localhost startup `EPERM`; the parent launched Chrome and
+failed later inside the cloned Inspector's disabled-control negative test.
+This is neither the historical 30-second exact-label timeout nor a permissions
+failure. The earlier read-only inspection finding no additional defect is
+superseded by this concrete native test failure. Documentation-only revalidation
+does not correct the newly demonstrated mismatch.
 
 Read this parent directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-yLwzPX
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-7bdmDz
 ```
 
 Inspect `verification.json`, `05-check-free-labels/command.log`, and these files
 inside `05-check-free-labels/artifacts/`:
 
-- `free-labels-evidence.json` and matching checkout snapshots;
-- `point-paint-observation-0001.json` and `point-paint-observation-0002.json`;
-- `point-paint-legacy.json`;
-- completed cumulative point scenario records, especially
-  `point-resource-retry-font-readiness.json` and native export artifacts.
+- `free-labels-evidence.json` and checkout snapshots;
+- `point-paint-observation-0002.json` through `0013.json` for live field edits,
+  mixed paint and invalid-width/recovery;
+- `point-paint-observation-0014.json` through `0019.json` for cloned production
+  select/numeric markup and old/corrected locator counts;
+- `point-paint-observation-0035.json` for the disabled native select;
+- `point-paint-observation-0036.json` through `0038.json` for the failed rejection
+  assertion, completed clone checks and preserved real-App state.
 
 Verifier handoff:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-TDvlPq/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-AWviTj/response.json
 ```
 
 | Observation | Actual parent result |
 | --- | --- |
-| `npm test` | Exit 0; 2,695 passed |
+| `npm test` | Exit 0; 2,739 passed |
 | Build / diff / `check:label-assets` | Exit 0 |
-| `check:free-labels` | Exit 1 at `checkPointNodePaint.mjs:101` |
-| Failure stage | `point-node-paint-import-persistence` |
-| Current scenario | `point-paint-native-inspector-history` |
+| `check:free-labels` | Exit 1 at `pointInspectorFields.mjs:216`, through `reject` at line 198 |
+| Failure stage / scenario | `point-node-paint-import-persistence` / `point-paint-native-inspector-history` |
 | Completed groups / evidence records | 14 of 16 / 145 |
 | Completed point scenarios | All 11 from 32A; 0 of 5 new 32B scenarios |
+| Browser | Chrome 153.0.8010.53; Node v26.9.0 |
 | Browser page errors | Empty |
 | Checkout before/after | Same fingerprint |
-| Independent review | Not reached |
+| Independent acceptance review | Not reached |
 
-The paint group started but did not complete its first scenario. The later
-`settled-SVG-export-standalone` group was not reached. Its absence does not negate
-the completed `point-node-settled-export` group; these are distinct requirements.
+Native observations show all three old exact-label counts are 0 and corrected
+control counts are 1. The real App reaches `dashed`/`round`/`bevel` paint and
+passes its mixed-paint checks. Border width follows `2 -> NaN -> 2`, with
+`aria-invalid` false/true/false, warning association present only while invalid,
+and unchanged saved model/history during invalid input and recovery.
 
-The failure observation retains selection `{ kind: 'stratum', id: 'app-point' }`.
-The seven preceding native field edits reached the model: text red/0.6, fill
-blue/0.35, border green/0.7 and width 2pt. The line style/cap/join remain
-`solid`/`butt`/`miter`. Request count remains 3. This places the failure at the
-first select lookup, after successful loading, selection and basic paint edits;
-it does not establish that the entire mixed-paint scenario passed.
+The clone completes 25 recorded checks before the disabled-control mismatch,
+including all three live/preset select pairs, re-resolution, outside-drawer
+isolation, numeric snapshots and earlier negative cases. These are progress
+within the first paint scenario, not a completed paint scenario. Later paint
+variants, copy/bulk/duplicate, imports/persistence, lifecycle/dimming and paint
+exports remain unverified by this run. The separate later
+`settled-SVG-export-standalone` group was not reached; cumulative
+`point-node-settled-export` did complete.
 
-## Cause: exact associated-label text includes nested descendants
+## Confirmed cause: correct rejection occurs at the wrapping label
 
-The harness currently uses one locator for every field:
+The clone intentionally sets the resolved native select's `disabled` property
+and expects the resolver to reject:
 
 ```js
-const inspector = page.locator('#preview-inspector-drawer')
-const field = (name) => inspector.getByLabel(name, { exact: true })
+await reject('disabled-control', ({ controls }) => controls.evaluate((element) => {
+  element.disabled = true
+}), /Enabled native select/)
 ```
 
-`PointPaintFields` renders `Border line style`, `Border cap` and `Border join`
-through `EditableSelectField` in `src/ui/inspector/InspectorField.tsx`. This shared
-component wraps its caption and native select/options in one HTML label, with
-no separate `aria-label` or `aria-labelledby` on the select:
+The resolver checks the Inspector, caption, wrapper and native control in order.
+Its shared `assertUsable()` calls `locator.isEnabled()` for the wrapper before
+checking the native select. Production fields use a wrapping HTML label.
 
-```html
-<label class="inspector-field">
-  <span class="inspector-field-label">Border line style</span>
-  <select class="inspector-input">...option descendants...</select>
-</label>
+In the installed Playwright 1.62.1, enabled/disabled state queries use
+`retarget(node, 'follow-label')`. A wrapping label is retargeted to its associated
+`label.control`. Consequently, disabling the select also makes the wrapper
+locator's `isEnabled()` return false. The resolver correctly rejects before
+attempting selection, at:
+
+```text
+Enabled Inspector field wrapper: Border line style
+false !== true
 ```
 
-Playwright's associated-label text lookup includes those option descendants.
-Consequently, exact `getByLabel('Border line style')` does not identify this
-control. The same markup/query mismatch was already reproduced natively for
-32A's Coordinate mode control; inspect `scripts/pointNativeCoordinateMode.mjs`.
-Do not conflate this label-text query with a role locator's accessible-name
-computation or assume that every HTML label lookup behaves identically.
+The outer `assert.rejects` then fails because that valid early rejection does
+not match `/Enabled native select/`. The demonstrated defect is an overly
+specific rejection oracle, not acceptance of a disabled control, a renewed
+caption-lookup failure, or a production rendering defect.
 
-The same select usage occurs for all three controls in `setMixedPaint()` and
-for cap/join after imported-preset application. Fix all five select call sites,
-including repeated calls to `setMixedPaint()`, rather than advancing the timeout
-from line style to cap or join.
+There are two related test/evidence gaps:
 
-There is also a directly adjacent problem visible by source inspection: after
-`field('Border width').fill('NaN')`, `EditableParsedNumberField` renders
-`Border width must be a finite number greater than 0.` inside the same label.
-The following exact lookup for `aria-invalid`, and the later corrective fill,
-can fail for the same reason. This is a predicted later failure, not one executed
-by the latest parent. Exercise it explicitly in the corrected harness.
+1. `tests/scripts/pointInspectorFields.test.mjs` uses independent
+   `wrapperEnabled` and `controlEnabled` booleans. The disabled-control fixture
+   leaves the wrapper enabled, so it misses the real label-to-control delegation.
+   Its 44 passing helper tests do not establish native state semantics.
+2. `inspectPointInspectorField()` calls a local DOM predicate
+   `!element.matches(':disabled') && aria-disabled !== 'true'` its `enabled`
+   observation. `0035` therefore reports wrapper `enabled: true` and control
+   `enabled: false`, while Playwright rejects at the wrapper. These values are
+   different measurements, not inconsistent native behavior. Preserve that
+   distinction in diagnostics instead of treating the local predicate as an
+   equivalent implementation of `Locator.isEnabled()`.
 
-The two retained paint observations contain model/runtime state but no Inspector
-DOM or locator counts at the failing boundary. Capture and reproduce those
-counts in the next native run; do not claim new native label measurements from
-source inspection alone. No production paint/rendering defect is demonstrated
-by the reported timeout.
+The parent's configured Playwright module is:
+
+```text
+/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs
+```
+
+Inspect the installed sibling `playwright-core` state-query/retarget implementation
+when confirming this contract; do not change, patch or vendor the dependency.
+No new browser reproduction is claimed merely from reading its source.
 
 ## Required reading
 
 Read `AGENTS.md`, `prompts/phase-32b-implement.md`,
 `prompts/phase-32b-review.md`, `docs/PHASE_32B_IMPLEMENTATION.md`, and relevant
-acceptance contracts in `docs/PREVIEW_UI.md` and `docs/LABEL_ADAPTER.md`.
+acceptance notes in `docs/PREVIEW_UI.md` and `docs/LABEL_ADAPTER.md`.
 
-Trace the failure and existing patterns through:
+Trace the failure through:
 
-- `scripts/checkPointNodePaint.mjs`, `scripts/pointCheckDiagnostics.mjs`,
-  `scripts/pointPaintOracle.mjs`, and `scripts/fixtures/freeLabelsApp.tsx`;
-- `src/ui/inspector/PointPaintFields.tsx`, `InspectorField.tsx`,
-  `PointStyleEditor.tsx`, `UserStylePresetControls.tsx`, and `numericInput.ts`;
-- `scripts/pointNativeCoordinateMode.mjs`, its registered tests, and
-  `scripts/pointNativeSetupDiagnostics.mjs`;
-- the preserved `scripts/pointSelectionOracle.mjs` and its registered tests;
-- `scripts/automation/phase-verification.mjs` and the existing parent verifier
-  workflow in `scripts/automation/run-phase.mjs`.
+- `scripts/pointInspectorFields.mjs`, especially `assertUsable`, resolver order,
+  field diagnostics and the clone's `reject` helper;
+- `tests/scripts/pointInspectorFields.test.mjs` and its selector-aware doubles;
+- `scripts/checkPointNodePaint.mjs`, `scripts/pointCheckDiagnostics.mjs`, and
+  `src/ui/inspector/InspectorField.tsx` / `PointPaintFields.tsx`;
+- the preserved selection-oracle and owned-FontFace regressions;
+- `scripts/automation/phase-verification.mjs` and the existing runner workflow.
 
-Line numbers identify the inspected failure; locate the equivalent current code
-if subsequent changes have shifted them.
+Line numbers identify the inspected failure; locate current equivalents if
+later edits have shifted them.
 
 ## Required correction
 
-### 1. Resolve the intended native control in the active Inspector
+### 1. Assert the intended rejection without prescribing an incorrect boundary
 
-Replace the fragile paint-field lookup with a small, consistently used harness
-resolver scoped to the active `#preview-inspector-drawer`. Identify the exact
-caption in `.inspector-field-label`, then its enclosing `.inspector-field` and
-intended native control. Match the caption itself, independently of select
-option text and inline validation messages. Use the expected native control type
-where relevant and ensure there is exactly one intended wrapper/control.
+Prefer preserving the resolver's current disabled-target rejection and correct
+the clone's expected failure to account for label retargeting. Keep the check
+specific to disabled-state rejection for this exact field. Accepting the known
+wrapper assertion for the wrapping-label case is appropriate; a generic
+`assert.rejects` accepting any error, blanket `/Enabled/`, or catching a timeout
+is not sufficient.
 
-Check the Inspector and control are present, visible and enabled before actions.
-For selects, verify available option values, perform bounded native
-`selectOption`, and verify the returned selection, actual value and resulting
-model property. Ensure line style becomes dashed, cap round and join bevel in
-both the initial mixed-paint edit and applicable imported local overrides.
+Verify the preconditions independently: there is exactly one intended visible
+field and native select, its disabled state is real, and its starting value is
+different from the requested value. Assert that rejection leaves the value
+unchanged and produces no input/change events. In helper tests, also establish
+that `selectOption` was never invoked. An unrelated missing-control error,
+option mismatch or thrown diagnostic error must not count as the expected pass.
 
-Preserve proper scope when the saved-preset editor is also present: its fields
-have a `Preset ` prefix and must not be confused with live point fields. Reject
-missing or ambiguous controls rather than choosing `.first()`/an index. Avoid
-page-wide selects, loose substring matching or a fallback that silently picks
-a different field. Do not simply remove `exact: true` from every locator.
+Do not remove enabled checks, force selection, enable the target before the
+rejection, skip the negative case or increase timeouts. Do not reorder/drop
+wrapper protection solely to make an old error-message regex pass. If a small
+refactoring makes failure categories explicit, preserve all existing absence,
+ambiguity, visibility and disabled-state protections and keep the change local.
+A new general validation framework is not required.
 
-Use the same stable caption/control contract when an invalid numeric draft adds
-warning text. Keep the real Border width `NaN` edit, `aria-invalid` assertion,
-unchanged model/history checks and recovery to 2. Retain the production warning
-and `aria-describedby`; do not remove validation UI to make the test pass.
+### 2. Cover label delegation in focused and native regressions
 
-A test-side correction is sufficient for the demonstrated mismatch. Preserve
-production input behavior, layout and paint semantics. Do not preseed the desired
-paint through fixture APIs, directly patch App/model state, force actions or
-skip the real Inspector edits. Keep the existing color-input event path and
-all native model/history/rendering assertions.
+Extend the existing registered tests with the actual correlated state: a native
+select is disabled and its wrapping label's Playwright enabled query is also
+false. Confirm the intended early rejection and zero native selection attempts.
+Keep an independent disabled wrapper/Inspector case so fixing this expectation
+does not collapse distinct negative controls into one permissive result.
 
-### 2. Exercise the actual wrapped-field boundary
+Use the existing clone of actual production markup to retain a native regression
+for the reported case. Record wrapper and control state before rejection, prove
+no value/event mutation, then verify that the restored enabled control can be
+selected normally. Keep the real App's production handlers/model/history checks;
+clone success alone cannot establish the whole paint workflow.
 
-Add focused registered checks for the resolver and a native regression using
-actual production Inspector field markup. The existing coordinate-mode test
-provides a bounded clone-page pattern; a clone can isolate lookup negative
-controls, while the real App scenario must still invoke production handlers
-and verify resulting paint/history. Handcrafted markup or locator mocks alone
-do not establish that the production structure is handled.
+Ensure remaining negative cases execute, including missing/disabled options and
+wrong requested values/types. Preserve caption/preset isolation, all three
+selects, rerender re-resolution and the real `NaN`/recovery sequence now confirmed
+by the parent. Unit doubles should exercise the discovered relationship without
+claiming to reimplement the browser's full accessibility/state algorithm.
 
-Cover all three select captions, option selection and re-resolution after
-rerender, the numeric field before/after warning text appears and after recovery,
-`Preset `-prefixed fields, and an unrelated control outside the Inspector.
-Reject absent, duplicated, hidden or disabled targets and unavailable options.
-Preserve unrelated controls and ensure invalid drafts do not mutate the saved
-model/history. Include an initial default value different from the desired
-selection so a skipped action cannot satisfy the check.
+### 3. Distinguish local DOM state from Playwright enabled state in evidence
 
-Record the original exact-label match count alongside the corrected locator
-count in native evidence. Prove the original select lookup's mismatch without
-waiting another 30 seconds; then exercise the corrected selection. Do not assert
-a historical exact count if production markup has legitimately changed: report
-the current DOM and distinguish changed label semantics from regression results.
+Add clearly named observations for the local `disabled`/`:disabled`/ARIA state
+and Playwright's queried enabled state at the wrapper and control. Where useful,
+record which native element `label.control` references. Collect locator state
+only when the match is unique; absent or ambiguous targets must remain diagnosable
+without throwing a different error during evidence collection.
 
-### 3. Retain useful evidence before the failing operation
+Do not silently change the meaning of existing diagnostic fields consumed
+elsewhere. Preserve current DOM/caption/option/value observations and explicitly
+identify any local-only predicate. Save the negative-case name, expected/actual
+rejection reason and unchanged-value/event evidence before marking that check
+complete. Maintain bounded diagnostics and cleanup that preserve the primary
+error if evidence capture or page closure also fails.
 
-Before the first select and the invalid-width boundary, save active selection,
-Inspector visibility/expansion state, relevant wrapper/control markup, caption
-text, label text/ARIA attributes, locator counts, native options/current values,
-and the current point paint plus model/history/request identity. Save the
-post-action values and field-validation state as well.
+### 4. Preserve the accepted earlier behavior and cumulative gates
 
-On failure, retain these diagnostics and the original Playwright call log;
-diagnostic or cleanup errors must not replace the primary error. Keep existing
-owned event/download cleanup and source/conversion lifecycle protection. Mark a
-scenario passed only after all its assertions and required artifacts complete.
+Keep the caption-based resolver already in `9953551`, all corrected real-App
+select sites, valid/invalid/recovered numeric behavior, independent border
+half-width selection oracle and ownership-based FontFace cleanup. Preserve
+independent point paint, opacity composition, saved-format v2 migration,
+ordered imports/presets, TikZ overrides, immutable pending SVG capture, raw
+source/history, PGF reference artifacts and binary-aware checkout identity.
 
-### 4. Preserve completed corrections and 32B contracts
-
-Keep the independent border-half-width selection oracle, all 16 new selected-view
-regressions, pre-assertion geometry diagnostics and ownership-based FontFace
-cleanup. Do not restore the old `radius + 6` expectation or change production
-selection/picking geometry to address this unrelated locator failure.
-
-Preserve independent text/fill/border paint, opacity composition, saved-envelope
-v2 migration, preset/import ordering, TikZ overrides, immutable pending SVG
-capture, raw source/history, all earlier 31/32A fixes, retained PGF references,
-and binary-aware checkout identity. Leave unrelated working-tree changes intact.
-
-Do not weaken group/scenario/artifact requirements, fingerprint checks, review
-or commit/push gates. If later native checks reveal another failure, retain its
-evidence and diagnose it before a bounded 32B fix; do not assume it must also be
-a locator problem.
+Do not weaken groups, named scenarios, required artifacts, fingerprint matching,
+review or commit/push gates. If later execution reveals another failure, retain
+its evidence and diagnose it before a bounded 32B correction; do not assume all
+remaining failures are merely error-message mismatches.
 
 ## Verification and completion criteria
 
 Run focused regressions, the registered full suite, build, applicable strict
 TypeScript/fixture checks, changed-script syntax checks, targeted lint and
-`git diff --check` using the supported PATH. Preserve the documented unrelated
-lint baseline rather than expanding this fix into cleanup.
+`git diff --check` with the supported PATH. Preserve the documented unrelated
+lint baseline rather than expanding this task into cleanup.
 
 Obtain fresh browser-capable parent verification for the final checkout:
 
@@ -250,29 +254,28 @@ PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
 Require all five commands to pass, including both browser checks. Inspect the
-terminal result, all 16 required groups, all 16 named point scenarios (11 from
-32A and 5 from 32B), page-error arrays and actual required JSON/SVG/PNG artifacts.
-The paint group must complete Inspector/history, imported presets/persistence,
-lifecycle/dimming, pending transparent-edit and pending white-load acceptance.
-The later standalone settled-export group must also execute and complete.
+terminal result, all 16 groups, all 16 named point scenarios (11 from 32A and
+5 from 32B), page-error arrays and required JSON/SVG/PNG artifacts. The complete
+paint group and later standalone settled-export group must execute successfully.
+Partial clone checks, helper tests and historical reports do not close the gate.
 
 Evidence must match the final checkout, including untracked files and binary
-fixtures. Historical passes, helper tests and partially executed scenarios do
-not close the gate. If browser startup is unavailable in a child, report it
-separately and use the established browser-capable parent path; do not confuse
-that restriction with the latest parent's successful startup and locator failure.
+fixtures. If child browser startup is unavailable, report that limitation
+separately and use the established browser-capable parent path. It does not
+explain this parent's native assertion failure.
 
-After matching verification succeeds, independently review that checkout against
-`prompts/phase-32b-review.md` through the existing workflow. `32B verify` itself
-does not perform review. Phase 32B remains incomplete until verification and
-review both pass; 32C/32D remain deferred.
+After matching verification succeeds, independently review the same checkout
+against `prompts/phase-32b-review.md` through the existing workflow. `32B verify`
+itself does not perform review. Phase 32B remains incomplete until both gates
+pass; 32C/32D remain deferred.
 
 ## Report
 
-Update `docs/PHASE_32B_IMPLEMENTATION.md` and relevant existing acceptance notes
-with the field-locator cause, bounded correction, regressions and actual results.
-Report changed files, exact commands, evidence paths and final checkout identity.
-Separate the old selection issue now passed by the parent, the observed select
-timeout, the predicted invalid-width lookup issue, newly executed verification
-and independent review. List remaining unexecuted checks explicitly; do not
-claim a production rendering defect from this harness timeout.
+Update `docs/PHASE_32B_IMPLEMENTATION.md` and relevant acceptance notes with the
+latest parent's native progress, label-retargeting cause, bounded correction,
+regressions, exact commands/results, evidence paths and final checkout identity.
+Separate historical exact-label/selection failures, now-executed real-App
+selection and NaN recovery, the current negative-test mismatch, fresh acceptance
+and independent review. List remaining unexecuted checks explicitly. Do not
+claim that production paint was defective or that all of the first paint
+scenario passed merely because its earlier field edits now work.
