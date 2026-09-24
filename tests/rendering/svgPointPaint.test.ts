@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
 import { clonePointStyle, getPointPaint, normalizePointStyle, defaultPointStyle } from '../../src/model/styles.ts'
 import { hiddenPointStyleFromBase } from '../../src/model/visibility.ts'
@@ -12,6 +14,7 @@ import { captureSvgLabelExport } from '../../src/rendering/svgLabelExportRegistr
 import { renderSettledSvgLabelDocument, settleSvgExportLabels } from '../../src/ui/svgSettledExport.ts'
 import { collectSvgPreviewSelectionCandidates } from '../../src/rendering/svgHitTesting.ts'
 import { projectToSvgPoint } from '../../src/rendering/svgProjection.ts'
+import { SvgPointNodeView } from '../../src/rendering/svgPointNodeView.ts'
 
 const style = () => {
   const result = normalizePointStyle(defaultPointStyle)
@@ -40,7 +43,7 @@ test('point contour uses separate operation alphas, named PGF dash lengths and n
     fill: '#0000FF', fillOpacity: .15, stroke: '#00FF00', strokeOpacity: .3,
     strokeWidth: 4.8, strokeDasharray: '3.5999999999999996 3.5999999999999996',
     strokeDashoffset: 1.2, strokeLinecap: 'square', strokeLinejoin: 'miter',
-    strokeMiterlimit: 10, vectorEffect: 'non-scaling-stroke',
+    strokeMiterlimit: 10,
   })
   const dimmed = pointStyleToSvgPaint(hiddenPointStyleFromBase(mixed))
   // Visibility's established multiplier is .28; applied once to each operation.
@@ -145,4 +148,67 @@ test('triangle miter tip has the independent 60-degree join extent and remains p
   assert.equal(collectSvgPreviewSelectionCandidates({ diagram, camera: diagram.camera, viewportHeight: 360, point: target })[0]?.id, 'miter')
   point.style.paint!.stroke.lineJoin = 'bevel'
   assert.equal(collectSvgPreviewSelectionCandidates({ diagram, camera: diagram.camera, viewportHeight: 360, point: target }).length, 0)
+})
+
+for (const displayScale of [.5, 2]) {
+  test(`geometric 20pt circle border, selection and candidate tolerance agree at display scale ${displayScale}`, async () => {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    const point = createPointStratum({ ambientDimension: 2, id: 'wide',
+      position: { x: 0, y: 0, z: 0 }, style: style() })
+    point.style.paint!.stroke.width = 20
+    point.style.paint!.stroke.lineStyle = 'solid'
+    diagram.strata = [point]
+    const layout = pendingSvgPointNodeLayout(point)
+    const center = projectToSvgPoint(diagram.camera, point.position, 360)
+    // Independently specified contract: 20 TeX pt = 24 local units, with
+    // half-width 12 and an additional 6 local units of candidate tolerance.
+    assert.equal(layout.stroke, 24)
+    assert.equal(layout.paintedBounds.maxX - layout.geometry.radius, 12)
+    assert.equal(layout.selectionRadius - layout.geometry.radius, 12)
+    assert.equal(pointStyleToSvgPaint(point.style).vectorEffect, undefined)
+    const screenCenter = { x: center.x * displayScale, y: center.y * displayScale }
+    for (const [outsidePath, expectedHit] of [[10, true], [17, true], [20, false]] as const) {
+      const screenProbe = { x: screenCenter.x + (layout.geometry.radius + outsidePath) * displayScale,
+        y: screenCenter.y }
+      const candidates = collectSvgPreviewSelectionCandidates({ diagram, camera: diagram.camera,
+        viewportHeight: 360, point: { x: screenProbe.x / displayScale, y: screenProbe.y / displayScale } })
+      assert.equal(candidates.some(({ id }) => id === point.id), expectedHit)
+    }
+    const input = capture('', point.style)
+    const [state] = await settleSvgExportLabels([input])
+    const exported = renderSettledSvgLabelDocument(input, state)
+    assert.match(exported, /stroke-width="24"/)
+    assert.doesNotMatch(exported, /vector-effect=/)
+    const selected = renderToStaticMarkup(createElement(SvgPointNodeView, { capture: input, state, selected: true }))
+    const selectedRadius = Number(/<circle r="([^"]+)"/.exec(selected)?.[1])
+    assert.ok(Math.abs(selectedRadius - layout.geometry.radius - 18) < 1e-10)
+    // Only the editor overlay retains its non-scaling outline.
+    assert.equal(selected.match(/vector-effect="non-scaling-stroke"/g)?.length, 1)
+    point.style.paint!.stroke.opacity = 0
+    assert.deepEqual(pendingSvgPointNodeLayout(point), layout)
+    point.style.paint!.stroke.enabled = false
+    const disabled = pendingSvgPointNodeLayout(point)
+    assert.equal(disabled.stroke, 0)
+    assert.deepEqual(disabled.body, layout.body)
+    assert.deepEqual(disabled.geometry, layout.geometry)
+    assert.deepEqual(disabled.paintedBounds, layout.geometry.bounds)
+  })
+}
+
+test('geometric dash lengths and phase share the border coordinate system in preview and captured export', async () => {
+  const dashed = style()
+  dashed.paint!.stroke.width = 20
+  dashed.paint!.stroke.dashPattern = [4, 2]
+  dashed.paint!.stroke.dashPhase = 3
+  const input = capture('', dashed)
+  const [state] = await settleSvgExportLabels([input])
+  const painted = pointStyleToSvgPaint(dashed)
+  assert.equal(painted.strokeWidth, 24)
+  assert.equal(painted.strokeDasharray, '4.8 2.4')
+  assert.equal(painted.strokeDashoffset, 3.5999999999999996)
+  assert.equal(painted.vectorEffect, undefined)
+  const exported = renderSettledSvgLabelDocument(input, state)
+  assert.match(exported, /stroke-dasharray="4.8 2.4"/)
+  assert.match(exported, /stroke-dashoffset="3.5999999999999996"/)
+  assert.doesNotMatch(exported, /vector-effect=/)
 })

@@ -190,6 +190,21 @@ const api = {
       tikzStyleName: 'legacyHollow', style: { ...style, shape: 'square' } }]
     return JSON.stringify(raw)
   },
+  // Input documents only: native Load JSON, selection and export remain the
+  // production App paths. Literal declarations are independent oracle inputs.
+  pointResponsivePaintDocumentJson(shape: 'circle' | 'triangle' = 'circle', variant: 'solid' | 'disabled' | 'transparent' | 'dashed' = 'solid') {
+    const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    diagram.strata = [createPointStratum({ ambientDimension: 2, id: 'app-point', text: 'Scale',
+      position: { x: 0, y: 0, z: 0 }, style: { kind: 'pointStyle', shape, size: 32,
+        color: '#cc0000', opacity: 1, fill: 'filled', paint: {
+          text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#cceeff', opacity: 1 },
+          stroke: { enabled: variant !== 'disabled', color: '#cc0000', opacity: variant === 'transparent' ? 0 : 1,
+            width: 20, lineStyle: variant === 'dashed' ? 'dashed' : 'solid',
+            ...(variant === 'dashed' ? { dashPattern: [12, 8] } : {}),
+            dashPhase: variant === 'dashed' ? 3 : 0, lineCap: 'butt', lineJoin: 'miter' },
+        } } })]
+    return serializeDiagram(diagram)
+  },
   exportDocumentJson(ambientDimension: 2 | 3 = 2) {
     const diagram = createEmptyDiagram({ ambientDimension })
     const z = ambientDimension === 3 ? 0.5 : 0

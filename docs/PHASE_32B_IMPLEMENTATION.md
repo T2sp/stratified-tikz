@@ -1,13 +1,86 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: implemented with a corrected disabled-control rejection oracle, awaiting acceptance. Fresh parent browser acceptance and subsequent
-independent review are required before completion. 32C/32D are not implemented.
-No new dependency is introduced.
+Status: the prior checkout passed parent verification, then independent review
+rejected it for two Medium production defects: imported-style namespace lookup
+and responsive point-border geometry. This targeted correction addresses both;
+fresh verification and subsequent independent review of the corrected checkout
+are required before completion. 32C/32D remain deferred. No new dependency or
+schema change is introduced.
 
-The latest executed parent reached real select edits and NaN recovery, then
-failed the clone's overly specific disabled-control expectation. See
-[the current correction and handoff](#disabled-control-label-retargeting-correction-2026-09-24);
-the earlier locator timeout and read-only revalidation below are historical.
+The accepted parent is `stz-phase32b-before-review-yeWQVG`, revision
+`a3f5998bd5b74e8622ca5e599390f2c32f65e070` plus the retained working-tree diff,
+with matching before/after fingerprint
+`17c0b7af52dc566d3f6a3abb8c6de927c755301d57644cf0481705e2f51a434b`.
+All five commands passed, including both browser commands; all 16 groups and
+16 named point scenarios completed with 160 evidence records and empty page-error
+and incomplete-group arrays (Node v26.9.0, Chrome 153.0.8010.53). Actual point
+paint SVG downloads, standalone reopen JSON/PNG, command logs and checkout
+snapshots were inspected. Independent review ran 2,769 passing tests and a
+passing build, found zero Critical and two Medium issues, and returned
+`ready_to_commit: false`. Its additional sandbox-blocked browser launch does
+not invalidate the matching accepted parent evidence.
+
+The earlier Inspector locator, disabled-control and selection-oracle failures
+described below are historical and superseded by that successful parent run.
+Their corrections and evidence are retained. The accepted parent is a baseline,
+not verification of the production changes made in this correction.
+
+## Targeted namespace and responsive-stroke correction (2026-09-24)
+
+The namespace resolver previously tried the declaring style's directory first
+and changed that owner during nested expansion. PGF expands `.style` bodies in
+the active invocation directory; normal node invocation starts in `/tikz`.
+`ns/outer={base}` therefore refers to root `base`, even when `ns/base` exists.
+The resolver now uses that runtime context, with internal canonical identity
+shared by declaration deduplication, lookup and cycle detection. Bare `base`
+and `/tikz/base` obey the same last-definition-wins order, including repeated
+alias overwrites. `/other/base` and relative `tikz/base` remain distinct.
+Raw source/options, saved reference identity, external key spelling and load
+hints are retained. Unknown references stay diagnosed/unresolved, preserving
+external effects until later known options or local paint edits resolve them.
+Runtime `.cd` is explicitly unsupported; it never approximates declaration-relative
+lookup or executes arbitrary TeX. See [the grammar](IMPORTED_POINT_PAINT.md).
+
+The contour's `non-scaling-stroke` previously contradicted local layout at
+responsive display scales. It is removed only from point contours; the shared
+preview/detached view now scales their width, dashes and phase with their body.
+No viewport-dependent layout, cache or export machinery was added. Pure
+regressions retain shape/body/painted-bound distinctions, miter geometry,
+selection tolerance, zero-alpha versus disabled paint, and immutable capture.
+
+Changed production files are `src/model/importedTikzPaint.ts`,
+`src/model/importedTikzStyles.ts`, `src/rendering/svgPointPaint.ts` and the
+contract comment in `src/rendering/svgPointNodeLayout.ts`. Focused model and
+renderer tests, independent PGF fixtures, the native paint harness/oracle,
+document-only native fixtures and verifier policy/tests extend their existing
+coverage. Preview/adapter notes and this report describe the corrected contract.
+There are no new dependencies, schema changes or unrelated lint repairs.
+
+The retained ten-row PGF opacity/color-order fixture remains unchanged.
+The added [namespace reference](../tests/fixtures/point-paint-pgf/namespaces/README.md)
+retains independently compiled PGF results for root shadowing, qualified nested
+references, both alias declaration directions, repeated overwrites and distinct
+absolute directories. Missing root `base` is expected-failure evidence: PGF
+reports unknown `/tikz/base`, even though `ns/base` exists. Bounded resolver
+tests separately cover alias cycles, depth/work termination and unsupported
+runtime `.cd`; recursive PGF compilation is not used for preview limits.
+
+Mandatory browser coverage keeps the original 16 groups and 16 point scenarios
+and adds `point-paint-namespace-aliases`, `point-paint-responsive-circle`,
+`point-paint-responsive-triangle` and `point-paint-responsive-downloads`.
+Namespace coverage uses actual imported-preset application, local edits,
+download/reload and both TikZ modes. Responsive coverage uses measured CSS/root
+SVG transforms below and above one, actual native screenshot pixels, 20pt
+borders, independent 60-degree miter geometry, ordinary and Alt-click probes,
+disabled/zero-alpha states and dash/phase samples. A deliberately non-scaling
+contour must fail the physical-paint oracle. Actual transparent/white downloads
+are reopened outside the App at both scales, with uncropped captures and no
+editor overlays. Existing pending-edit/load isolation checks remain required.
+Observations precede assertions; required artifacts and fail-closed policy
+tests prevent completion from an old 16-scenario report.
+
+These descriptions specify implemented checks, not a claim of fresh native
+execution. The corrected-tree command results and handoff are recorded below.
 
 ## Prerequisite evidence
 
@@ -58,6 +131,16 @@ the source-keyed conversion and measured body. Border width expands painted
 bounds, selection and picking, including polygon miter joins; body and shape
 bounds remain distinct. SVG and PGF use miter limit 10. Dimming multiplies each
 paint once, without introducing a contour group opacity.
+
+Point contours use ordinary geometric SVG scaling. Width, dash lengths and
+phase are TeX points multiplied by 1.2 in local SVG coordinates; responsive
+root viewBox/CSS scaling multiplies their displayed size with the body. A 20pt
+border has local full width 24 and half-width 12 at every display scale.
+Painted bounds and the existing 6-local-unit picking/selection padding therefore
+stay coherent, including polygon miter extensions. Enabled zero-opacity borders
+retain their geometry; disabled borders do not. Only the selection overlay keeps
+its own non-scaling outline. Unrelated curves, handles, markers and formula
+outlines are unchanged.
 
 The whole-point export capture deep-copies and freezes every paint component and
 dash array before waiting. Detached export uses the same point layout/view as
@@ -693,3 +776,83 @@ on the matching final tree, including untracked and binary fixtures. Only after
 that success may the existing workflow perform the independent read-only review
 against `prompts/phase-32b-review.md`. `verify` itself performs no review. Both
 gates remain open; Phase 32B is incomplete and 32C/32D remain deferred.
+
+## Corrected-tree checks and parent handoff (2026-09-24)
+
+This section supersedes the historical handoffs above. The prior `yeWQVG`
+checkout passed native verification and reached independent review; its two
+Medium production findings motivated this correction. It is not missing
+baseline browser evidence. The new production and harness changes require
+fresh acceptance of their own.
+
+Commands use `PATH=/opt/homebrew/bin:$PATH`, Node **v26.9.0**, npm **11.19.1**.
+Unless noted otherwise, logs and auxiliary check scripts are retained under
+`/private/tmp/stz-32b-targeted.ek0IsJ/`.
+
+| Executed check | Result / retained evidence |
+| --- | --- |
+| `npm test` | **2,815 passed**, zero failures/skips; `npm-test.log` |
+| `npm run build` | Passed; existing >500kB chunk warning; `npm-build.log` |
+| `node --test tests/model/pointPaintImport.test.ts tests/model/importedTikzStyles.test.ts tests/tikz/generateTikz.test.ts` | **347 passed**; `/private/tmp/stz-32b-namespace-focused.log` |
+| `node --test tests/rendering/svgPointPaint.test.ts tests/rendering/svgPointNodeGeometry.test.ts tests/rendering/svgPointNodeRuntime.test.ts tests/ui/svgSettledExport.test.ts` | **50 passed**; `rendering-focused.log` |
+| `node --test tests/scripts/runPhaseVerification.test.mjs tests/scripts/browserCheckoutSnapshot.test.mjs tests/scripts/pointPaintOracle.test.mjs` | **116 passed**; `/private/tmp/stz-32b-targeted-policy-final-test.log` |
+| `node --test tests/scripts/runPhaseRunner.test.mjs` | **32 passed**; `/private/tmp/stz-32b-targeted-runner-test.log` |
+| `npx tsc -p tsconfig.app.json --strict` | Passed; `production-strict.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed; `fixtures-strict.log` |
+| `npx tsc -p /private/tmp/stz-32b-targeted.ek0IsJ/tsconfig-paint.json` | Strict changed paint/import tests passed; `paint-tests-strict.log` |
+| Targeted ESLint on the four production TS files, fixture and two changed paint/import tests | Passed, zero errors/warnings; `typescript-eslint.log` |
+| Recommended JavaScript ESLint with Node/browser globals on all seven changed/new `.mjs` files | Passed, zero errors/warnings; `javascript-eslint.log`, exact config in `changed-eslint.mjs` |
+| `node --check` on all seven changed/new `.mjs` files | Passed; exact commands/statuses in `script-syntax.json` |
+| `git diff --check` | Passed; `diff-check.log` |
+| Independent PGF namespace reference | Eleven observations compiled successfully; expected missing-root compilation exit 1. Exact commands/version/logs/PDF/PNG/operators: [retained fixture](../tests/fixtures/point-paint-pgf/namespaces/README.md) |
+
+The established **25 `no-regex-spaces` errors** and **85 broader changed-test
+TypeScript diagnostics** were reproduced against pre-32B `595139d` by the prior
+review and remain documented baseline debt. This correction does not modify
+the affected unrelated tests. Repository-wide lint and a repeat of that broader
+baseline type audit were not run; all applicable changed-code checks above pass.
+
+The configured direct native attempt was:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-phase32b-responsive-child \
+node scripts/checkFreeLabels.mjs
+```
+
+It exited 1 at `development-server-listen`: `listen EPERM 127.0.0.1:5173`,
+before browser launch. The exact log is `/private/tmp/stz-phase32b-responsive-child.log`;
+the fail-closed report is `/private/tmp/stz-phase32b-responsive-child/free-labels-evidence.json`.
+No native assertion executed, all 16 groups remain unexecuted in that attempt,
+and empty page-error arrays do not constitute a pass. No timeout, assertion or
+sandbox permission was weakened. This restriction is separate from the valid
+accepted parent and its subsequent production findings.
+
+After these final documentation edits, the official command is run on the frozen
+corrected tree:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+Its exact terminal result, verification report path, per-command outcomes and
+final binary-aware checkout identity are retained externally in
+`/private/tmp/stz-32b-targeted.ek0IsJ/handoff.json`, alongside `verification-final.log`,
+`final-checkout.json`, `final-checkout.diff` and `final-checkout-untracked.json`.
+Keeping the fingerprint outside the tracked report avoids a self-referential
+checkout hash. Snapshots include the untracked native module and all eleven
+new independent PGF artifacts, including PDF/PNG bytes.
+
+Fresh native execution of the corrected tree remains pending for the
+browser-capable parent: all five required commands, all 16 groups, all **20**
+named point scenarios, successful native paint/download/reopen artifacts,
+empty page errors and a matching final checkout identity. Only after that
+verification succeeds may the independent review against
+`prompts/phase-32b-review.md` accept or reject the same tree, explicitly checking
+both production findings. `32B verify` does not perform review. Read-only
+integration inspections during implementation are not that acceptance gate.
+No fresh passing acceptance review is claimed; Phase 32B remains incomplete
+until both gates pass. 32C shapes and 32D configurable spacing/minima/anchors
+remain deferred.

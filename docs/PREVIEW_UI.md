@@ -1660,10 +1660,20 @@ inside supported math remains intact. Paint changes do not request another body
 conversion. Fill and border overlap using their own operation alphas; overall
 Opacity and hidden-point dimming each apply once. Wide borders participate in
 painted bounds, highlighting and picking without increasing body padding.
+Point contours scale normally with the SVG display transform: border width,
+dash lengths and phase use local units (`TeX pt * 1.2`) just like the body and
+bounds. At responsive scales 0.5 and 2, a 20pt border displays at 12 and 48 CSS
+pixels respectively, with local half-width 12. Picking retains its additional
+6 local units; miter joins retain their independent corner extension. The
+editor selection ring alone keeps its non-scaling outline.
 
 Both `\tikzstyle` and `\tikzset` imported presets resolve supported literal
 paint and bounded named-style references in order. Unsupported values/options
 appear as preview diagnostics and remain available to external TikZ export.
+Relative style references resolve in the invocation's active TikZ directory,
+not the declaring style's directory. Bare `base` and `/tikz/base` share canonical
+identity and last-definition-wins order; raw source and external key spelling
+remain unchanged. A missing root reference is diagnosed even if `ns/base` exists.
 Imported partial styles use materialized application node defaults consistently
 in preview and export. This is not arbitrary TeX execution or support for the
 deferred 32C/32D shapes and layout options. See
@@ -1672,8 +1682,10 @@ deferred 32C/32D shapes and layout options. See
 New JSON saves use envelope version 2 and explicit point paint, including saved
 presets; version 1 files retain legacy white hollow, black text and 0.4pt borders.
 Point body source remains unchanged. SVG capture owns an immutable deep copy of
-paint before settlement. Current 32B native acceptance remains a parent-runner
-gate; historical 32A evidence is not evidence for the new paint scenarios.
+paint before settlement. The `yeWQVG` parent passed all five commands, 16 groups
+and 16 point scenarios; independent review then found namespace lookup and
+responsive-stroke defects. Fresh parent verification and review are required
+for their correction. The harness history below predates that accepted parent.
 
 Circle selection includes the current contour radius, half the enabled border
 width (`width in TeX points * 1.2 / 2`), and the existing 6-unit selection
@@ -1718,7 +1730,8 @@ wrapper/native-select assertion, with independent disabled/unique/visible state
 preconditions, unchanged-value and zero-event proof, and ordinary enabled recovery.
 Diagnostics retain the local DOM predicate separately from Playwright's enabled
 query and `label.control` identity. The helper suite has 74 tests; 140 focused
-and 2,769 full tests pass. The child browser startup restriction remains separate
-from the parent's assertion failure. The corrected clone, remaining paint work,
-all final-tree native groups/artifacts and independent acceptance review remain
-parent gates; see [the current correction and final-tree handoff](PHASE_32B_IMPLEMENTATION.md#disabled-control-label-retargeting-correction-2026-09-24).
+and 2,769 full tests passed at that stage. The subsequent `yeWQVG` parent passed
+these native checks and reached independent review. The child startup limitation
+is separate from either historical parent harness failures or the two production
+findings. See [the current correction report](PHASE_32B_IMPLEMENTATION.md) for
+the findings and fresh corrected-tree gates.

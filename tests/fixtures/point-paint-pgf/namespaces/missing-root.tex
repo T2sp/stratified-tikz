@@ -1,0 +1,11 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\tikzset{ns/.cd,base/.style={text=blue},outer/.style={base}}
+\begin{tikzpicture}
+% Expected negative evidence: /tikz/base is unknown despite /tikz/ns/base.
+\node[ns/outer] at (0,0) {M};
+\end{tikzpicture}
+\end{document}

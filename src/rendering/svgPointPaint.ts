@@ -3,7 +3,11 @@ import type { PointStyle } from '../model/types.ts'
 import { getPointPaint } from '../model/styles.ts'
 import { svgPointNodeTexPointScale } from './svgPointNodeGeometry.ts'
 
-/** PGF paint alpha is applied to each operation, not a composited SVG group. */
+/**
+ * PGF paint alpha is applied to each operation, not a composited SVG group.
+ * Contours scale geometrically with the SVG: width, dashes and phase share the
+ * local units used by layout, miter bounds, picking and detached export.
+ */
 export function pointStyleToSvgPaint(style: PointStyle): SVGProps<SVGPathElement> {
   const { fill, stroke } = getPointPaint(style)
   const scale = svgPointNodeTexPointScale
@@ -21,6 +25,5 @@ export function pointStyleToSvgPaint(style: PointStyle): SVGProps<SVGPathElement
     strokeLinecap: stroke.lineCap === 'rect' ? 'square' : stroke.lineCap,
     strokeLinejoin: stroke.lineJoin,
     strokeMiterlimit: 10,
-    vectorEffect: 'non-scaling-stroke',
   }
 }

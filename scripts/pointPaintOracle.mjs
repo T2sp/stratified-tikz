@@ -93,3 +93,184 @@ export function assertRasterPointOverlap(actual) {
   close(actual.stroke, [0, 128, 0, 77])
   close(actual.overlap, [0, 87, 81, 112])
 }
+
+/** Resize the actual root SVG through CSS, leaving the camera, viewBox, point
+ * model, body and contour alone. Fixed placement makes bounded native captures
+ * and screen-coordinate clicks independent of the App's surrounding drawers. */
+export async function setPointDisplayScale(page, scale, standalone = false) {
+  const size = await page.evaluate(({ scale, standalone }) => {
+    const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
+    const box = root.viewBox.baseVal
+    return { width: Math.ceil(box.width * scale + 40), height: Math.ceil(box.height * scale + 40) }
+  }, { scale, standalone })
+  assert.ok(size.width > 0 && size.height > 0 && size.width <= 4096 && size.height <= 4096,
+    'Responsive native screenshot remains within its bounded viewport')
+  await page.setViewportSize({ width: Math.max(1200, size.width), height: Math.max(900, size.height) })
+  await page.evaluate(({ scale, standalone }) => {
+    const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
+    if (!root.hasAttribute('data-responsive-original-style')) root.setAttribute('data-responsive-original-style', root.getAttribute('style') ?? '')
+    const box = root.viewBox.baseVal
+    for (const [key, value] of Object.entries({ position: 'fixed', left: '20px', top: '20px',
+      width: `${box.width * scale}px`, height: `${box.height * scale}px`, 'min-width': '0', 'min-height': '0',
+      'max-width': 'none', 'max-height': 'none', margin: '0', padding: '0', border: '0', 'z-index': '2147483647' })) root.style.setProperty(key, value, 'important')
+  }, { scale, standalone })
+}
+
+export async function restorePointDisplayScale(page) {
+  await page.evaluate(() => {
+    const root = document.querySelector('[data-responsive-original-style]')
+    if (!root) return
+    const original = root.getAttribute('data-responsive-original-style')
+    if (original) root.setAttribute('style', original)
+    else root.removeAttribute('style')
+    root.removeAttribute('data-responsive-original-style')
+  })
+}
+
+/** A real browser screenshot is the paint oracle. Decode that exact PNG only
+ * to count fixture-red pixels; never redraw the contour at scale 1. The root
+ * and contour screen matrices, body, layout and screenshot crop are retained
+ * before assertions, including for the deliberately broken vector effect. */
+export async function captureResponsivePointPaint(page, { id = 'app-point', source = 'Scale', standalone = false, path, persist }) {
+  const observation = await page.evaluate(({ id, source, standalone, path }) => {
+    const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
+    const body = standalone ? [...root.querySelectorAll('g > title')].find((title) => title.textContent === source)?.parentElement
+      : root.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-label-state]`)
+    const point = body?.parentElement
+    const contour = standalone ? point && [...point.children].find((element) => ['circle', 'polygon'].includes(element.localName))
+      : point?.querySelector(':scope > [data-point-contour]')
+    if (!contour) throw new Error('Responsive point contour is missing')
+    const matrix = (element) => { const m = element.getScreenCTM(); return m && { a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f } }
+    const rect = (element) => { const b = element.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
+    const bbox = (element) => { const b = element.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
+    const css = getComputedStyle(contour), rootCss = getComputedStyle(root)
+    return { root: { rect: rect(root), ctm: matrix(root), viewBox: root.getAttribute('viewBox'),
+      width: root.getAttribute('width'), height: root.getAttribute('height'), cssWidth: rootCss.width, cssHeight: rootCss.height },
+      viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, scroll: { x: scrollX, y: scrollY },
+      contour: { kind: contour.localName, ctm: matrix(contour), radius: Number(contour.getAttribute('r')),
+        vertices: contour.localName === 'polygon' ? [...contour.points].map(({ x, y }) => ({ x, y })) : [],
+        shapeBounds: bbox(contour), strokeWidth: parseFloat(css.strokeWidth), stroke: css.stroke, opacity: Number(css.strokeOpacity),
+        vectorEffect: css.vectorEffect, dash: css.strokeDasharray, dashOffset: parseFloat(css.strokeDashoffset),
+        lineCap: css.strokeLinecap, lineJoin: css.strokeLinejoin },
+      body: { bounds: bbox(body), ctm: matrix(body), request: body.getAttribute('data-label-request'), source },
+      layout: { shapeBounds: point.getAttribute('data-point-shape-bounds')?.split(' ').map(Number),
+        paintedBounds: point.getAttribute('data-point-painted-bounds')?.split(' ').map(Number),
+        selectionRadius: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r') ?? null },
+      selection: window.stzAppLabels?.state().selection,
+      xml: new XMLSerializer().serializeToString(root), capture: { status: 'pending', path } }
+  }, { id, source, standalone, path })
+  await persist(observation)
+  try {
+    const root = standalone ? page.locator('svg').first() : page.locator('svg.svg-diagram')
+    const png = await root.screenshot({ path, timeout: 5000, scale: 'css', animations: 'disabled' })
+    const raster = await page.evaluate(async ({ png, observation }) => {
+      const image = new Image(); image.src = `data:image/png;base64,${png}`
+      let decodeTimer
+      try {
+        await Promise.race([image.decode(), new Promise((_, reject) => {
+          decodeTimer = setTimeout(() => reject(new Error('Native responsive PNG decode exceeded 5000ms')), 5000)
+        })])
+      } finally { clearTimeout(decodeTimer) }
+      const canvas = document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas')
+      canvas.width = image.width; canvas.height = image.height
+      const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(image, 0, 0)
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+      const red = (x, y) => {
+        x = Math.floor(x); y = Math.floor(y)
+        if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return false
+        const index = (y * canvas.width + x) * 4
+        return data[index] >= 100 && data[index + 1] < 80 && data[index + 2] < 80 && data[index + 3] > 127
+      }
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, count = 0
+      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) if (red(x, y)) {
+        minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x + 1); maxY = Math.max(maxY, y + 1); count++
+      }
+      const m = observation.contour.ctm, crop = observation.root.rect
+      const center = { x: m.e - crop.x, y: m.f - crop.y }
+      const row = []
+      for (let x = Math.ceil(center.x); x < canvas.width; x++) if (red(x, center.y)) row.push(x)
+      const radius = observation.contour.radius
+      const phaseSamples = observation.contour.kind === 'circle' ? [3, 6, 15, 17, 27, 30, 39, 41].map((distance) => {
+        const angle = distance / radius, local = { x: radius * Math.cos(angle), y: radius * Math.sin(angle) }
+        const pixel = { x: local.x * m.a + local.y * m.c + center.x, y: local.x * m.b + local.y * m.d + center.y }
+        return { distance, local, pixel, red: red(pixel.x, pixel.y) }
+      }) : []
+      return { width: canvas.width, height: canvas.height, redPixels: count,
+        bounds: count ? { minX, minY, maxX, maxY } : null,
+        eastRun: row.length ? { min: row[0], max: row.at(-1) + 1, width: row.at(-1) + 1 - row[0] } : null,
+        center, phaseSamples, method: 'actual native screenshot PNG, fixture-red pixel mask; no SVG reconstruction' }
+    }, { png: png.toString('base64'), observation: { ...observation, xml: undefined } })
+    observation.raster = raster
+    observation.capture = { status: 'saved', path, bytes: png.length, width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
+    await persist(observation)
+    return observation
+  } catch (error) {
+    observation.capture = { status: 'failed', path, error: { message: error.message, stack: error.stack } }
+    await persist(observation).catch(() => {})
+    throw error
+  }
+}
+
+/** Independent 20pt declaration: 24 local SVG units, 12 half-width; a regular
+ * triangle's 60-degree corner extends 12/sin(30deg)=24 from its vertex. Path
+ * geometry may be observed; neither expected border geometry nor the raster
+ * target is computed from production painted bounds or strokeWidth. */
+export function assertResponsivePointPaint(actual, { scale, shape = 'circle', variant = 'solid', selected = false, standalone = false } = {}) {
+  const near = (value, target, tolerance, label) => assert.ok(Number.isFinite(value) && Math.abs(value - target) <= tolerance,
+    `${label}: ${value} != ${target} (tolerance ${tolerance})`)
+  for (const [name, m] of [['root', actual.root.ctm], ['contour', actual.contour.ctm]]) {
+    near(m.a, scale, 1e-8, `${name} actual CSS display x scale`); near(m.d, scale, 1e-8, `${name} actual CSS display y scale`)
+    near(m.b, 0, 1e-8, `${name} uniform scale`); near(m.c, 0, 1e-8, `${name} uniform scale`)
+  }
+  assert.equal(actual.capture.status, 'saved', 'Native paint screenshot exists')
+  assert.ok(actual.capture.bytes > 24)
+  near(actual.raster.width, actual.root.rect.width, 1, 'Raster preserves root display width')
+  near(actual.raster.height, actual.root.rect.height, 1, 'Raster preserves root display height')
+  const enabled = variant !== 'disabled', visible = enabled && variant !== 'transparent'
+  const halfWidth = enabled ? 12 : 0
+  near(actual.contour.strokeWidth, 24, 1e-8, 'Declared 20pt is 24 local units')
+  assert.equal(actual.contour.stroke === 'none', !enabled)
+  near(actual.contour.opacity, variant === 'transparent' ? 0 : 1, 1e-8, 'Zero opacity remains enabled paint geometry')
+  assert.equal(actual.contour.kind, shape === 'circle' ? 'circle' : 'polygon')
+  if (shape === 'triangle') {
+    assert.equal(actual.contour.vertices.length, 3, 'Supported triangle has three measured vertices')
+    const [top, first, second] = [...actual.contour.vertices].sort((a, b) => a.y - b.y)
+    const u = { x: first.x - top.x, y: first.y - top.y }, v = { x: second.x - top.x, y: second.y - top.y }
+    const cosine = (u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y))
+    near(cosine, .5, 1e-6, 'Native top corner is independently 60 degrees')
+  }
+  const path = actual.contour.shapeBounds
+  const bounds = shape === 'circle' ? [path.x - halfWidth, path.y - halfWidth, path.x + path.width + halfWidth, path.y + path.height + halfWidth]
+    : [path.x - Math.sqrt(3) * halfWidth, path.y - 2 * halfWidth, path.x + path.width + Math.sqrt(3) * halfWidth, path.y + path.height + halfWidth]
+  if (!standalone) {
+    assert.equal(actual.layout.paintedBounds?.length, 4)
+    actual.layout.paintedBounds.forEach((value, index) => near(value, bounds[index], 1e-4, `Independent local painted bound ${index}`))
+  }
+  if (selected) {
+    const radius = shape === 'circle' ? actual.contour.radius : -Math.min(...actual.contour.vertices.map(({ y }) => y))
+    near(Number(actual.layout.selectionRadius), radius + (shape === 'circle' ? halfWidth : 2 * halfWidth) + 6, 1e-4,
+      'Selection ring includes geometric border and existing six-unit padding')
+  }
+  if (!visible) assert.equal(actual.raster.redPixels, 0, 'Disabled/zero-alpha border has no visible red paint')
+  else if (variant === 'solid') {
+    const raster = actual.raster, center = raster.center
+    assert.ok(raster.bounds, 'Visible border has measured native painted pixels')
+    for (const [index, key, offset] of [[0, 'minX', center.x], [1, 'minY', center.y], [2, 'maxX', center.x], [3, 'maxY', center.y]]) {
+      near(raster.bounds[key], bounds[index] * scale + offset, 1.75, `Native physical paint extent ${key}`)
+    }
+    if (shape === 'circle') near(raster.eastRun?.width, 24 * scale, 2, 'Physical border thickness follows measured display CTM')
+  } else if (variant === 'dashed') {
+    assert.deepEqual(actual.contour.dash.split(/[ ,]+/).map(parseFloat), [14.4, 9.6])
+    near(actual.contour.dashOffset, 3.6, 1e-8, 'Declared 3pt dash phase')
+    assert.ok(actual.raster.redPixels > 0)
+    if (shape === 'circle') for (const sample of actual.raster.phaseSamples) {
+      assert.equal(sample.red, (sample.distance + 3.6) % 24 < 14.4,
+        `Native dash/phase at ${sample.distance} local units scales with CTM ${scale}`)
+    }
+  }
+  if (actual.raster.bounds) {
+    assert.ok(actual.raster.bounds.minX > 0 && actual.raster.bounds.minY > 0
+      && actual.raster.bounds.maxX < actual.raster.width && actual.raster.bounds.maxY < actual.raster.height,
+    'Actual contour is not cropped by the native viewport')
+  }
+}

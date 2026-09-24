@@ -85,11 +85,12 @@ if (command.startsWith('run check:')) {
     const groups = JSON.parse(process.env.STZ_TEST_FREE_LABEL_GROUPS)
     const incomplete = process.env.STZ_TEST_FREE_EVIDENCE === 'incomplete'
     const pointEvidence = JSON.parse(process.env.STZ_TEST_POINT_EVIDENCE || '{}')
+    const artifactValues = JSON.parse(process.env.STZ_TEST_POINT_ARTIFACT_VALUES || '{}')
     if (process.env.STZ_TEST_POINT_ARTIFACTS === 'yes') {
       for (const entry of pointEvidence.evidence || []) for (const artifact of entry.artifacts) {
         const content = process.env.STZ_TEST_POINT_CORRUPT === 'yes' ? 'broken' : artifact.endsWith('.svg')
           ? '<svg><g><circle r="20"/><g><title>fixture</title><g><g><text x="0" y="0">fixture</text></g></g></g></g></svg>'
-          : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : '{}'
+          : artifact.endsWith('.png') ? Buffer.from([137,80,78,71,13,10,26,10,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1]) : JSON.stringify(artifactValues[artifact] || {})
         fs.writeFileSync(path.join(artifacts, artifact), content)
       }
     }
@@ -451,6 +452,49 @@ for (const phase of ['31B', '31D']) {
 }
 
 const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
+const targetedPaintScenarios = [
+  'point-paint-namespace-aliases',
+  'point-paint-responsive-circle',
+  'point-paint-responsive-triangle',
+  'point-paint-responsive-downloads',
+]
+test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
+  assert.equal(pointGroups.length, 16)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 20)
+  assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
+    'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
+    'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
+    'point-paint-pending-white-load', ...targetedPaintScenarios,
+  ])
+  const namespace = pointNodeScenarioArtifacts('point-paint-namespace-aliases')
+  assert.equal(namespace.length, 16)
+  assert.equal(namespace[0], 'point-paint-namespace-aliases.json')
+  for (const name of ['shadowing', 'missing', 'aliases']) {
+    for (const suffix of ['.sty', '-saved.json', '-edited.json', '-standalone.tex', '-inlineMath.tex']) {
+      assert.ok(namespace.includes(`point-paint-namespace-${name}${suffix}`))
+    }
+  }
+  for (const shape of ['circle', 'triangle']) {
+    const artifacts = pointNodeScenarioArtifacts(`point-paint-responsive-${shape}`)
+    assert.equal(artifacts.length, shape === 'circle' ? 31 : 25)
+    for (const scale of ['0.5', '2']) {
+      for (const variant of ['', '-non-scaling', '-disabled', '-transparent', ...(shape === 'circle' ? ['-dashed'] : [])]) {
+        for (const extension of ['json', 'svg', 'png']) {
+          assert.ok(artifacts.includes(`point-paint-responsive-${shape}-scale-${scale}${variant}.${extension}`))
+        }
+      }
+    }
+  }
+  const downloads = pointNodeScenarioArtifacts('point-paint-responsive-downloads')
+  assert.equal(downloads.length, 43)
+  assert.equal(downloads[0], 'point-paint-responsive-downloads.json')
+  for (const background of ['transparent', 'white']) for (const shape of ['', '-triangle', '-dashed']) {
+    assert.ok(downloads.includes(`point-paint-responsive-${background}${shape}.svg`))
+    for (const scale of ['0.5', '2']) for (const extension of ['json', 'png', 'raster.svg']) {
+      assert.ok(downloads.includes(`point-paint-responsive-${background}${shape}-scale-${scale}.${extension}`))
+    }
+  }
+})
 test('point SVG artifact gate accepts sanitized structure and rejects absent/damaged bodies and contours', () => {
   const body = '<g><title>literal &lt;source&gt;</title><g><g><text x="0" y="0">literal</text></g></g></g>'
   assert.equal(hasWholePointSvg(`<svg><g><circle r="20"/>${body}</g></svg>`), true)
@@ -469,6 +513,22 @@ function completePointEvidence(fixture) {
     evidence: Object.entries(pointNodeScenarios).flatMap(([group, names]) => names.map((name) =>
       ({ group, name, result: 'passed', artifacts: pointNodeScenarioArtifacts(name) }))) }
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
+    `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
+      ...(name === 'point-paint-responsive-downloads' ? {
+        cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
+          .map(([shape, variant]) => ({ background, shape, variant,
+            scales: [.5, 2].map((scale) => ({ background, shape, variant, scale })) }))),
+      } : name.startsWith('point-paint-responsive-') ? { cases: [.5, 2].map((scale) => ({ scale, negativeControlRejected: true })) }
+        : { cases: ['shadowing', 'missing', 'aliases'].map((name) => ({ name, source: 'fixture style',
+          output: { standalone: 'fixture', inlineMath: 'fixture' },
+          reloadedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
+          editedOutput: { standalone: 'fixture', inlineMath: 'fixture' },
+          uneditedDownload: { boundary: 'download', differencePaths: [] }, uneditedReload: { boundary: 'reload', differencePaths: [] },
+          editedDownload: { boundary: 'download', differencePaths: [] }, editedReload: { boundary: 'reload', differencePaths: [] },
+        })) }),
+    },
+  ])))
   return evidence
 }
 for (const phase of ['32A', '32B', '32C', '32D']) {
@@ -539,3 +599,50 @@ test('32A cannot advertise a completed paint extension with missing paint scenar
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   assert.throws(() => verify(t, fixture, '32A'), /Missing completed point-node scenario/)
 })
+
+test('32B rejects the previously accepted sixteen-scenario paint report after targeted fixes', (t) => {
+  const fixture = checkoutFixture(t)
+  const evidence = completePointEvidence(fixture)
+  evidence.evidence = evidence.evidence.filter((entry) => !targetedPaintScenarios.includes(entry.name))
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-namespace-aliases/)
+})
+
+for (const name of targetedPaintScenarios) {
+  for (const fault of ['missing-scenario', 'started-only', 'duplicate-scenario', 'missing-artifact']) {
+    test(`32B rejects exit-zero targeted paint evidence: ${name} ${fault}`, (t) => {
+      const fixture = checkoutFixture(t)
+      const evidence = completePointEvidence(fixture)
+      const index = evidence.evidence.findIndex((entry) => entry.name === name)
+      if (fault === 'missing-scenario') evidence.evidence.splice(index, 1)
+      if (fault === 'started-only') evidence.evidence[index].result = 'started'
+      if (fault === 'duplicate-scenario') evidence.evidence.push(evidence.evidence[index])
+      if (fault === 'missing-artifact') evidence.evidence[index].artifacts.pop()
+      fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+      assert.throws(() => verify(t, fixture, '32B'), new RegExp(`Missing completed point-node scenario: ${name}`))
+    })
+  }
+}
+
+for (const fault of ['empty-json', 'started-json', 'missing-scale', 'duplicate-scale', 'accepted-negative-control', 'missing-download-background', 'missing-download-shape', 'missing-namespace-case', 'missing-namespace-reload', 'missing-namespace-inline-output']) {
+  test(`32B rejects incomplete targeted JSON even with all named artifacts: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const circle = artifacts['point-paint-responsive-circle.json']
+    const downloads = artifacts['point-paint-responsive-downloads.json']
+    const namespace = artifacts['point-paint-namespace-aliases.json']
+    if (fault === 'empty-json') artifacts['point-paint-namespace-aliases.json'] = {}
+    if (fault === 'started-json') circle.result = 'started'
+    if (fault === 'missing-scale') circle.cases.pop()
+    if (fault === 'duplicate-scale') circle.cases[1] = circle.cases[0]
+    if (fault === 'accepted-negative-control') circle.cases[0].negativeControlRejected = false
+    if (fault === 'missing-download-background') downloads.cases = downloads.cases.filter(({ background }) => background !== 'white')
+    if (fault === 'missing-download-shape') downloads.cases = downloads.cases.filter(({ shape }) => shape !== 'triangle')
+    if (fault === 'missing-namespace-case') namespace.cases.pop()
+    if (fault === 'missing-namespace-reload') delete namespace.cases[0].editedReload
+    if (fault === 'missing-namespace-inline-output') delete namespace.cases[1].reloadedOutput.inlineMath
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+  })
+}

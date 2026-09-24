@@ -752,8 +752,19 @@ outside the adapter. They are never input to parsing or conversion.
 including all nested objects and dash arrays. `SvgPointNodeView` applies the
 captured paint during detached whole-node reconstruction; subsequent edits cannot
 alter captured output. Free-label and path-inline semantics remain unchanged.
-The accepted 32A `gtRban` report supersedes the historical pending note above;
-32B's added native scenarios require their own fresh parent report and review.
+Contours use ordinary geometric SVG scaling: border width, dash lengths and
+phase use the same local TeX-point conversion (`* 1.2`) as layout and picking.
+Responsive viewport scaling therefore preserves border/body proportions in
+preview and detached exports. The selection ring retains its separate
+non-scaling overlay. Font sizing, body conversion/cache keys, camera projection
+and immutable pending capture are unchanged.
+
+The accepted 32B `yeWQVG` parent passed all five checks, 16 groups and 16 point
+scenarios with no page errors. Independent review then rejected namespace
+lookup and responsive border geometry, with zero Critical and two Medium
+findings. That valid baseline supersedes the pending harness notes below, but
+does not validate the corrected tree; fresh parent verification and subsequent
+independent review remain required. 32C/32D remain deferred.
 
 The later `stz-phase32b-before-review-yLwzPX` parent completed all eleven cumulative
 32A point scenarios, then timed out on the first 32B Inspector select's exact
@@ -773,9 +784,10 @@ different things; diagnostics now name and retain both separately.
 
 The bounded test correction requires the exact disabled-field assertion,
 unchanged native value/no events, and normal selection after restoration. Real
-App conversion, history, and paint checks remain in place. The parent completed
+App conversion, history, and paint checks remain in place. That historical parent completed
 all eleven cumulative 32A scenarios but zero complete 32B paint scenarios;
 later variants, imports/persistence, lifecycle/dimming and paint exports remained
-unverified. The corrected final tree still requires fresh parent browser
-acceptance and independent review; child localhost `EPERM` is a separate startup
-limitation. See [the current correction report](PHASE_32B_IMPLEMENTATION.md#disabled-control-label-retargeting-correction-2026-09-24).
+unverified until the subsequent successful `yeWQVG` parent. Child localhost
+`EPERM` is a separate startup limitation. See
+[the current correction report](PHASE_32B_IMPLEMENTATION.md) for the production
+findings and corrected-tree verification/review status.

@@ -12,6 +12,8 @@ export function svgPointNodeLayout(style: PointStyle, state: SvgLabelState) {
     width: body.bounds.maxX - body.bounds.minX, height: body.bounds.maxY - body.bounds.minY,
   })
   const border = getPointPaint(style).stroke
+  // The contour uses ordinary SVG scaling, so this width stays in local units
+  // even when a responsive viewport changes its displayed thickness.
   const stroke = border.enabled ? border.width * svgPointNodeTexPointScale : 0
   const strokeJoin = border.lineJoin
   // Miter corners can extend further than half a stroke beyond the path box.

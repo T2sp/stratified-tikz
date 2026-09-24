@@ -12,6 +12,7 @@ import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { boundedPointDiagnostic, cleanupPointCheck, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
 import { resolvePointInspectorField, selectPointInspectorField, inspectPointInspectorField,
   checkPointInspectorFieldBoundary, POINT_PAINT_SELECT_OPTIONS } from './pointInspectorFields.mjs'
+import { runResponsivePointPaintChecks } from './checkPointResponsivePaint.mjs'
 
 const group = 'point-node-paint-import-persistence'
 const mixed = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
@@ -283,6 +284,79 @@ export async function runPointNodePaintChecks(context) {
     assert.ok((await model()).userStylePresets.some((preset) => preset.id === 'legacy-paint-preset'))
     await saved({ imported, overrides, download, reloaded, final: await state() })
 
+    scenario = 'point-paint-namespace-aliases'
+    const namespaceCases = []
+    const namespaceNodeOptions = (code, key) => {
+      const nodes = [...code.matchAll(/^\s*\\node\s*\[([^\]]*)\]\s*at/gm)]
+        .map((match) => match[1].split(',').map((option) => option.trim()))
+        .filter((options) => options.includes(key))
+      assert.equal(nodes.length, 1, `One actual exported node using external key ${key}`)
+      return nodes[0].slice(nodes[0].indexOf(key) + 1)
+    }
+    const assertNamespaceText = (code, key, color) => {
+      const options = namespaceNodeOptions(code, key)
+      const text = options.find((option) => option.startsWith('text='))
+      assert.ok(text, 'Known/local text paint emits its explicit override after the exact external key')
+      assert.ok(code.split('\n').some((line) => line.trim().toUpperCase() === `\\definecolor{${text.slice(5)}}{HTML}{${color.slice(1)}}`.toUpperCase()),
+        'Explicit named text override agrees with the independently expected color')
+    }
+    for (const [name, source, key, expectedColor] of [
+      ['shadowing', String.raw`\tikzset{base/.style={text=red},ns/.cd,base/.style={text=blue},outer/.style={base}}`, 'ns/outer', '#ff0000'],
+      ['missing', String.raw`\tikzset{ns/.cd,base/.style={text=blue},outer/.style={base}}`, 'ns/outer', '#000000'],
+      ['aliases', String.raw`\tikzset{alias node/.style={text=red},/tikz/alias node/.style={text=blue},alias node/.style={text=green},
+alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
+    ]) {
+      await load(legacy); await settle(); await select()
+      await writeFile(resolve(artifactDir, `point-paint-namespace-${name}.sty`), source)
+      const { event: chooser } = await eventAction(`namespace-${name}`, 'filechooser', () => page.getByRole('button', { name: 'Choose .sty/.tex', exact: true }).click())
+      await chooser.setFiles({ name: `namespace-${name}.sty`, mimeType: 'text/plain', buffer: Buffer.from(source) })
+      await page.waitForFunction((key) => JSON.parse(window.stzAppLabels.state().json).diagram.importedTikzStyleReferences?.some((reference) => reference.key === key), key)
+      const presetButton = inspector.locator('.style-preset-list-item').filter({ hasText: key })
+      assert.equal(await presetButton.count(), 1, `One namespace preset ${key}`)
+      await presetButton.click()
+      await inspector.getByRole('button', { name: 'Apply', exact: true }).click()
+      const current = await point(), diagram = await model(), output = await tikz(), observation = await paintObservation()
+      const reference = diagram.importedTikzStyleReferences.find((item) => item.id === current.importedTikzStyleReferenceId)
+      const entry = { name, source, key, expectedColor, current, reference, output, observation, diagram,
+        warnings: await inspector.locator('.style-preset-warning').allTextContents(), inspector: await inspector.innerText() }
+      namespaceCases.push(entry)
+      await observeCase({ boundary: 'namespace-before-assertions', entry })
+      assert.equal(current.style.paint.text.color.toLowerCase(), expectedColor)
+      assert.equal(reference.key, key)
+      assertPointPaint(observation, { text: name === 'missing' ? 'rgb(0, 0, 0)' : name === 'aliases' ? 'rgb(0, 255, 0)' : 'rgb(255, 0, 0)', textAlpha: 1 })
+      assert.ok(diagram.externalTikzStyleSources.some((item) => item.id === reference.sourceId && item.rawSource === source), 'Exact raw namespace source survives import')
+      for (const code of Object.values(output)) {
+        if (name === 'missing') assert.equal(namespaceNodeOptions(code, key).some((option) => option.startsWith('text=')), false,
+          'Unresolved external text must not become an invented known override')
+        else assertNamespaceText(code, key, expectedColor)
+      }
+      if (name === 'missing') {
+        assert.ok(reference.previewDiagnostics?.some((message) => message.includes('base')))
+        assert.ok(reference.previewDiagnostics.some((message) => entry.warnings.some((warning) => warning.includes(message))),
+          'The actual unresolved-reference diagnostic is visible in the Inspector warning')
+      }
+      entry.uneditedDownload = await saveAppJson({ page, artifactDir, name: `point-paint-namespace-${name}-saved`, owned, diagnose: observeCase })
+      await load(entry.uneditedDownload.json); await settle(); await select()
+      entry.uneditedReload = await checkAppJsonReload({ page, saved: entry.uneditedDownload, diagnose: observeCase })
+      entry.reloadedOutput = await tikz()
+      assert.deepEqual(entry.reloadedOutput, output, 'JSON reload preserves both namespace export modes')
+      await edit('Text color', '#123456')
+      entry.edited = await point(); entry.editedOutput = await tikz()
+      for (const [mode, code] of Object.entries(entry.editedOutput)) {
+        assertNamespaceText(code, key, '#123456')
+        await writeFile(resolve(artifactDir, `point-paint-namespace-${name}-${mode}.tex`), code)
+      }
+      entry.editedDownload = await saveAppJson({ page, artifactDir, name: `point-paint-namespace-${name}-edited`, owned, diagnose: observeCase })
+      await load(entry.editedDownload.json); await settle()
+      entry.editedReload = await checkAppJsonReload({ page, saved: entry.editedDownload, diagnose: observeCase })
+      assert.equal((await point()).style.paint.text.color.toLowerCase(), '#123456')
+      assert.equal((await point()).importedTikzStyleReferenceId, current.importedTikzStyleReferenceId)
+    }
+    await saved({ cases: namespaceCases })
+
+    // Restore the imported mixed paint used by the established lifecycle cases.
+    await load(download.json); await settle()
+
     scenario = 'point-paint-lifecycle-dimming'
     await select()
     const source = ' pending $\\frac{paint}{x}$\t\n tail  '
@@ -375,6 +449,8 @@ export async function runPointNodePaintChecks(context) {
       }
       finally { await cleanupPointCheck(standaloneFailure, () => standalone.close()) }
     }
+    await runResponsivePointPaintChecks({ browser, page, artifactDir, state, load, settle, eventAction,
+      begin: (name) => { scenario = name }, saved, diagnose: observeCase })
     assert.deepEqual(errors, []); await completeGroup(group)
   } catch (error) {
     primary = error

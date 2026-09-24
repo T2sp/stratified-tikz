@@ -53,9 +53,31 @@ export const pointNodeScenarios = {
     "point-paint-native-inspector-history", "point-paint-imported-presets-persistence",
     "point-paint-lifecycle-dimming", "point-paint-pending-transparent-edit",
     "point-paint-pending-white-load",
+    "point-paint-namespace-aliases",
+    "point-paint-responsive-circle", "point-paint-responsive-triangle",
+    "point-paint-responsive-downloads",
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
+  if (name === "point-paint-namespace-aliases") {
+    return [`${name}.json`, ...["shadowing", "missing", "aliases"].flatMap((entry) => {
+      const stem = `point-paint-namespace-${entry}`;
+      return [`${stem}.sty`, `${stem}-saved.json`, `${stem}-edited.json`, `${stem}-standalone.tex`, `${stem}-inlineMath.tex`];
+    })];
+  }
+  if (["point-paint-responsive-circle", "point-paint-responsive-triangle"].includes(name)) {
+    const variants = ["", "-non-scaling", "-disabled", "-transparent",
+      ...(name.endsWith("circle") ? ["-dashed"] : [])];
+    return [`${name}.json`, ...["0.5", "2"].flatMap((scale) => variants.flatMap((variant) =>
+      ["json", "svg", "png"].map((extension) => `${name}-scale-${scale}${variant}.${extension}`)))];
+  }
+  if (name === "point-paint-responsive-downloads") {
+    return [`${name}.json`, ...["transparent", "white"].flatMap((background) => ["", "-triangle", "-dashed"].flatMap((shape) => {
+      const stem = `point-paint-responsive-${background}${shape}`;
+      return [`${stem}.svg`, ...["0.5", "2"].flatMap((scale) =>
+        [`${stem}-scale-${scale}.json`, `${stem}-scale-${scale}.png`, `${stem}-scale-${scale}.raster.svg`])];
+    }))];
+  }
   return [`${name}.json`, ...((name.startsWith("point-native-pending-") || name.startsWith("point-paint-pending-"))
     ? [`${name}.svg`, `${name}.png`, `${name}-standalone.json`]
     : name === "point-whole-node-fallback-opacity-validation" ? ["point-fallback.svg"]
@@ -155,6 +177,43 @@ function evidenceObject(artifactDir, name) {
     throw new Error(`${name} must contain a JSON object`);
   }
   return evidence;
+}
+
+function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (name !== "point-paint-namespace-aliases" && !name.startsWith("point-paint-responsive-")) return;
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed") {
+    throw new Error(`Targeted point paint scenario did not complete: ${name}`);
+  }
+  if (name === "point-paint-namespace-aliases") {
+    const completeOutput = (output) => ["standalone", "inlineMath"].every((mode) =>
+      typeof output?.[mode] === "string" && output[mode].trim() !== "");
+    const completePersistence = (entry, boundary) => entry?.boundary === boundary
+      && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
+    if (!Array.isArray(evidence.cases) || evidence.cases.length !== 3
+      || !["shadowing", "missing", "aliases"].every((caseName) => evidence.cases.filter((entry) =>
+        entry?.name === caseName && typeof entry.source === "string" && entry.source !== ""
+        && completeOutput(entry.output) && completeOutput(entry.reloadedOutput) && completeOutput(entry.editedOutput)
+        && completePersistence(entry.uneditedDownload, "download") && completePersistence(entry.uneditedReload, "reload")
+        && completePersistence(entry.editedDownload, "download") && completePersistence(entry.editedReload, "reload")).length === 1)) {
+      throw new Error("Namespace paint must complete shadowing, missing-reference and alias import/edit/save/reload in both TikZ modes");
+    }
+    return;
+  }
+  if (!Array.isArray(evidence.cases)) throw new Error(`Missing responsive point paint cases: ${name}`);
+  if (name === "point-paint-responsive-downloads") {
+    const cases = evidence.cases.flatMap((entry) => Array.isArray(entry?.scales) ? entry.scales : []);
+    const required = ["transparent", "white"].flatMap((background) =>
+      [["circle", "solid"], ["triangle", "solid"], ["circle", "dashed"]].flatMap(([shape, variant]) =>
+        [0.5, 2].map((scale) => ({ background, shape, variant, scale }))));
+    if (evidence.cases.length !== 6 || cases.length !== required.length || !required.every((expected) =>
+      cases.filter((entry) => Object.entries(expected).every(([key, value]) => entry?.[key] === value)).length === 1)) {
+      throw new Error("Responsive point downloads must cover both backgrounds, both scales, solid circle/triangle and dashed circle");
+    }
+  } else if (evidence.cases.length !== 2 || ![0.5, 2].every((scale) =>
+    evidence.cases.filter((entry) => entry?.scale === scale && entry.negativeControlRejected === true).length === 1)) {
+    throw new Error(`Responsive point paint must reject the non-scaling control at both display scales: ${name}`);
+  }
 }
 
 /** Artifact envelope check, not an XML safety/parser replacement. Native reopen
@@ -261,6 +320,7 @@ function validateBrowserEvidence(name, artifactDir, phase, checkout) {
             throw new Error(`Invalid point-node PNG artifact: ${artifact}`);
           }
         }
+        validateTargetedPaintEvidence(artifactDir, name, group);
       }
     }
   }

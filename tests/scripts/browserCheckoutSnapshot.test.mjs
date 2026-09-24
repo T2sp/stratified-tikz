@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -17,6 +17,10 @@ test('browser checkout snapshots preserve binary untracked fixtures and symlink 
   git('-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'baseline')
   const binary = Buffer.from([137, 80, 78, 71, 0, 13, 10, 255, 192, 128])
   writeFileSync(join(cwd, 'reference.png'), binary)
+  const pgfPath = 'tests/fixtures/point-paint-pgf/namespaces/reference.pdf'
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.5\n'), Buffer.from([37, 226, 227, 207, 211, 10, 0, 255])])
+  mkdirSync(join(cwd, 'tests/fixtures/point-paint-pgf/namespaces'), { recursive: true })
+  writeFileSync(join(cwd, pgfPath), pdf)
   symlinkSync('reference.png', join(cwd, 'reference-link'))
   writeFileSync(join(cwd, 'source.txt'), 'changed\n')
   const result = captureBrowserCheckoutSnapshot({ cwd })
@@ -26,6 +30,8 @@ test('browser checkout snapshots preserve binary untracked fixtures and symlink 
   assert.equal(result.checkout.untrackedSha256['reference.png'], sha(binary))
   assert.notEqual(sha(binary.toString('utf8')), sha(binary), 'Fixture exposes the old lossy UTF-8 bug')
   assert.deepEqual(Buffer.from(result.untracked.files['reference.png'].data, 'base64'), binary)
+  assert.equal(result.checkout.untrackedSha256[pgfPath], sha(pdf))
+  assert.deepEqual(Buffer.from(result.untracked.files[pgfPath].data, 'base64'), pdf)
   assert.equal(result.untracked.files['reference-link'].kind, 'symlink')
   assert.equal(Buffer.from(result.untracked.files['reference-link'].data, 'base64').toString(), 'reference.png')
   assert.equal(sha(result.diff), expected.trackedDiffSha256)

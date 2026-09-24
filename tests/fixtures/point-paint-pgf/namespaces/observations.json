@@ -1,0 +1,90 @@
+{
+  "pgfVersion": "3.1.11a",
+  "engine": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)",
+  "compilationExitCode": 0,
+  "observations": [
+    {
+      "body": "A",
+      "contract": "declaration namespace does not change invocation",
+      "source": "\\tikzset{base/.style={text=red},ns/.cd,base/.style={text=blue},outer/.style={base}}",
+      "invocation": "ns/outer",
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "B",
+      "contract": "qualified nested style preserves invocation directory",
+      "source": "\\tikzset{base/.style={text=green},ns/.cd,base/.style={text=blue},inner/.style={base},outer/.style={ns/inner}}",
+      "invocation": "ns/outer",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "C",
+      "contract": "absolute declaration overwrites relative alias",
+      "source": "\\tikzset{base/.style={text=red},/tikz/base/.style={text=blue}}",
+      "invocation": "base",
+      "textColor": "#0000FF"
+    },
+    {
+      "body": "D",
+      "contract": "relative declaration overwrites absolute alias",
+      "source": "\\tikzset{/tikz/base/.style={text=red},base/.style={text=green}}",
+      "invocation": "/tikz/base",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "E",
+      "contract": "repeated aliases retain final relative overwrite",
+      "source": "\\tikzset{base/.style={text=red},/tikz/base/.style={text=blue},base/.style={text=green}}",
+      "invocation": "base",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "F",
+      "contract": "absolute invocation agrees after repeated overwrite",
+      "source": "\\tikzset{base/.style={text=red},/tikz/base/.style={text=blue},base/.style={text=green}}",
+      "invocation": "/tikz/base",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "G",
+      "contract": "repeated aliases retain final absolute overwrite",
+      "source": "\\tikzset{/tikz/base/.style={text=red},base/.style={text=blue},/tikz/base/.style={text=green}}",
+      "invocation": "base",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "H",
+      "contract": "root is distinct from other absolute and relative tikz directories",
+      "source": "\\tikzset{base/.style={text=red},/other/base/.style={text=blue},tikz/base/.style={text=green},/other/outer/.style={/tikz/base}}",
+      "invocation": "base",
+      "textColor": "#FF0000"
+    },
+    {
+      "body": "I",
+      "contract": "other absolute directory remains distinct",
+      "source": "\\tikzset{base/.style={text=red},/other/base/.style={text=blue},tikz/base/.style={text=green},/other/outer/.style={/tikz/base}}",
+      "invocation": "/other/base",
+      "textColor": "#0000FF"
+    },
+    {
+      "body": "J",
+      "contract": "relative tikz directory is not absolute /tikz",
+      "source": "\\tikzset{base/.style={text=red},/other/base/.style={text=blue},tikz/base/.style={text=green},/other/outer/.style={/tikz/base}}",
+      "invocation": "tikz/base",
+      "textColor": "#00FF00"
+    },
+    {
+      "body": "K",
+      "contract": "absolute nested reference retains meaning",
+      "source": "\\tikzset{base/.style={text=red},/other/base/.style={text=blue},tikz/base/.style={text=green},/other/outer/.style={/tikz/base}}",
+      "invocation": "/other/outer",
+      "textColor": "#FF0000"
+    }
+  ],
+  "negative": {
+    "source": "\\tikzset{ns/.cd,base/.style={text=blue},outer/.style={base}}",
+    "invocation": "ns/outer",
+    "compilationExitCode": 1,
+    "diagnostic": "I do not know the key '/tikz/base'"
+  }
+}

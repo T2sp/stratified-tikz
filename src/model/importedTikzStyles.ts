@@ -1,5 +1,5 @@
 import { tikzStyleTargets } from './types.ts'
-import { literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
+import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
 import type { TikzPaintPreview, TikzPreviewContext } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
 import {
@@ -839,16 +839,17 @@ function mergeDuplicateParsedStyles(
   let skippedDuplicates = 0
 
   for (const style of styles) {
-    if (stylesByKey.has(style.key)) {
+    const identity = canonicalTikzStyleKey(style.key)
+    if (stylesByKey.has(identity)) {
       skippedDuplicates += 1
       warnings.push({
         message: `Duplicate style key "${style.key}" imported once using the later definition.`,
       })
     } else {
-      keyOrder.push(style.key)
+      keyOrder.push(identity)
     }
 
-    stylesByKey.set(style.key, style)
+    stylesByKey.set(identity, style)
   }
 
   return {

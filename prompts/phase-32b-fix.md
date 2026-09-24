@@ -1,24 +1,23 @@
-# Phase 32B Targeted Fix Prompt: Correct imported-style namespaces and responsive point stroke geometry
+# Phase 32B Targeted Fix Prompt: Frame responsive point fixtures before measuring native paint
 
 ## Environment
 
 Work on the current Phase 32B checkout (reported branch:
-`phase/32b-color-opacity-outline`). Inspect status first and preserve all current
-implementation, prior 32A fixes, Inspector locator/disabled-control corrections,
-selection-oracle corrections, fixtures, tests, documentation and user changes.
-Do not reset or restart implementation.
+`phase/32b-color-opacity-outline`). Inspect status first and preserve the namespace/
+canonical-alias correction, geometrically scaling point contours, new PGF fixtures,
+responsive scenarios, prior 31/32A and Inspector fixes, tests, documentation and
+user changes, including untracked files. Do not reset or restart implementation.
 
-The accepted parent verification and subsequent review cover revision
-`a3f5998bd5b74e8622ca5e599390f2c32f65e070` plus working-tree changes. The parent
-before/after fingerprint is:
+The latest parent checked revision `d9345434d8051e045d3dfd9c3a31665af8c1d484`
+plus working-tree changes. Its before/after fingerprint was:
 
 ```text
-17c0b7af52dc566d3f6a3abb8c6de927c755301d57644cf0481705e2f51a434b
+be4e5fe6e9cd755f6994d642c651add632979d7a3dc28750bf4504c0e2357262
 ```
 
-This matches the inspected checkout before this prompt update. Updating this
-prompt and implementing fixes changes checkout identity; obtain fresh evidence
-for the final corrected tree.
+This matches the inspected checkout before this prompt update, including the
+untracked responsive harness and PGF namespace artifacts. Updating this prompt
+and implementing the correction changes identity; obtain fresh final-tree evidence.
 
 Use Node >=22.12.0 with the supported installation first in PATH:
 
@@ -26,276 +25,265 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Scope includes the two demonstrated production defects below and their focused
-regressions, independent references and documentation. Preserve strict TypeScript
-and avoid new dependencies, additional schema changes or unrelated lint cleanup.
-Keep 32C geometric shapes and 32D configurable spacing/minimum dimensions/anchors
-deferred. Fixing existing border geometry consistency belongs to 32B.
+Limit work to the demonstrated responsive-fixture framing/capture failure,
+focused regressions and diagnostics, and further demonstrated 32B acceptance
+failures. Keep strict TypeScript. Avoid new dependencies, schema changes and
+unrelated lint cleanup. Preserve the production fixes and defer 32C/32D.
 
-## Current acceptance and review findings
+## Latest execution findings
 
-Verification passed, and the independent acceptance review ran. This request is
-not another browser-startup or Inspector-harness repair. The review found zero
-Critical issues and two Medium production defects; `ready_to_commit` is false.
-Do not repeat older claims that the current reviewed tree lacks browser evidence
-or that independent review was not reached.
+The earlier `yeWQVG` checkout passed verification before independent review found
+two production defects. Those findings motivated the current namespace and
+stroke-scaling corrections. The latest parent successfully launches Chrome and
+passes namespace acceptance and all five earlier paint scenarios, then fails
+on the first new responsive-circle pixel comparison.
 
-Read the attached review:
+This is separate from the child's localhost `EPERM`. It is also separate from
+the already corrected Inspector locator/disabled-control tests. The new native
+run has not yet established complete responsive paint acceptance or a fresh
+independent acceptance review.
 
-```text
-/Users/takamatoshinori/.codex/attachments/d7fc032f-fd02-429c-b22e-d4cff741a8b3/pasted-text.txt
-```
-
-Accepted parent directory:
+Read this parent directory:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-yeWQVG
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-cI6r6H
 ```
 
-Inspect `verification.json`, the command logs, and
-`05-check-free-labels/artifacts/free-labels-evidence.json`, including actual point
-paint/download/reopen artifacts and the matching checkout snapshots.
+Inspect `verification.json`, `05-check-free-labels/command.log`, and these files
+inside `05-check-free-labels/artifacts/`:
 
-| Observation | Latest actual result |
+- `free-labels-evidence.json` and matching checkout snapshots;
+- `point-paint-responsive-circle-scale-0.5-initial.json`, `.png` and `.svg`;
+- `point-paint-responsive-circle-scale-0.5.json`, `.png` and `.svg`;
+- `point-paint-responsive-circle-scale-0.5-non-scaling.json`, `.png` and `.svg`;
+- responsive probe/control diagnostics, including
+  `point-paint-observation-0147.json` through `0159.json`;
+- completed namespace and earlier paint/download scenario artifacts.
+
+Verifier handoff:
+
+```text
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-HQDJFV/response.json
+```
+
+| Observation | Actual parent result |
 | --- | --- |
-| Parent required commands | All five passed, including both browser commands |
-| Browser evidence | Passed; 16/16 groups, 16/16 named point scenarios, 160 evidence records |
-| Browser page errors / incomplete groups | Empty |
+| `npm test` | Exit 0; 2,815 passed |
+| Build / diff / `check:label-assets` | Exit 0 |
+| `check:free-labels` | Exit 1 at `pointPaintOracle.mjs:259`, called from `checkPointResponsivePaint.mjs:88` |
+| Stage / scenario | `point-node-paint-import-persistence` / `point-paint-responsive-circle` |
+| Completed groups / evidence records | 14 of 16 / 151 |
+| Completed point scenarios | 17 of 20: all 11 cumulative 32A, all five earlier paint, plus namespace aliases |
 | Browser / Node | Chrome 153.0.8010.53 / Node v26.9.0 |
-| Independent review tests / build | 2,769 passed, no failures/skips; build passed |
-| Independent review | Needs changes: two Medium production defects |
-| Checkout before/after | Same fingerprint, matching reviewed tree |
+| Page errors | Empty |
+| Checkout before/after | Same fingerprint |
+| Fresh independent acceptance review | Not reached |
 
-The review's additional exploratory browser launch was sandbox-blocked, but the
-matching parent evidence satisfies the browser gate for this reviewed checkout.
-Existing helper/native checks did not cover the namespace and responsive-stroke
-contracts sufficiently; passing them does not invalidate these findings.
+The initial circle at scale 0.5 was captured, ordinary/Alt inside/outside probes
+ran, and selected/non-scaling-control images were saved. The initial paint-extent
+assertion then failed before the negative-control rejection was evaluated.
+Do not mark this circle case or the control as passed merely because files exist.
+Scale 2, later circle variants, triangle coverage and responsive downloads were
+not reached. The separate `settled-SVG-export-standalone` group also remains
+unexecuted; cumulative point exports and earlier paint exports did pass.
 
-Retain the documented baseline: 25 existing `no-regex-spaces` lint errors and
-85 broader changed-test TypeScript diagnostics were reproduced against pre-32B
-`595139d`. Production/fixture/new-paint strict checks and changed-JavaScript lint
-passed. Do not expand the repair into unrelated debt cleanup.
+## Confirmed cause: the expected contour extends below the captured SVG root
 
-## Defect 1: declaration directory is mistaken for runtime lookup directory
+The saved initial PNG visibly truncates the circle along its bottom edge.
+Its measurements are:
 
-Read `src/model/importedTikzPaint.ts`, `src/model/importedTikzStyles.ts`,
-`tests/model/pointPaintImport.test.ts`, `src/tikz/generateTikz.ts`, and
-`docs/IMPORTED_POINT_PAINT.md`.
+| Quantity | Saved value |
+| --- | --- |
+| Root viewBox | `0 0 520 360` |
+| Root CSS rectangle | `(20,20)`, width 260, height 180 |
+| Root/contour display scale | 0.5 on both axes |
+| Contour screen center | `(78,182)` |
+| Center relative to PNG | `(58,162)` |
+| Contour radius | About `41.50710678` local units |
+| Declared geometric border | 20pt = 24 local units; half-width 12 |
+| Expected PNG bottom | `162 + (41.50710678 + 12) * 0.5 = 188.75355339` |
+| Actual raster bottom / PNG height | 180 / 180 |
+| Actual east border thickness | 12px, matching `24 * 0.5` |
 
-The current resolver searches the declaring style's directory first and changes
-that owner on nested expansion. For:
+The comparison asks a 180px-high image to contain paint ending at 188.75px.
+The discrepancy is clipping, not a 1.75px antialiasing tolerance issue. The saved
+broken non-scaling control has east thickness 24px, while the valid contour has
+12px; both images are clipped at the bottom. This supports the geometric stroke
+correction at the measured east edge but does not establish all remaining
+responsive geometry checks.
 
-```tex
-\tikzset{base/.style={text=red},ns/.cd,base/.style={text=blue},outer/.style={base}}
-```
+`pointResponsivePaintDocumentJson()` places the point at model `(0,0,0)`.
+The normal App framing includes the coordinate axes, and this fixture's origin
+projects to `(116,324)` in the 520-by-360 root. Only 36 local units remain below
+its center, less than the approximately 53.51 required for the border.
+`setPointDisplayScale()` adjusts CSS size/placement and the browser viewport;
+it intentionally leaves the camera, model and root viewBox alone. It does not
+establish that the test content fits inside that root.
 
-applying `ns/outer` from a normal node invocation resolves `base` to `/tikz/base`
-in PGF and renders red. The app instead finds `ns/base`, silently stores blue,
-and emits an explicit blue text override after the external style.
+Increasing only the browser viewport, using a full-page screenshot, or waiting
+longer cannot establish the missing root-content coverage. Do not change actual
+stroke width, contour/body dimensions or production clipping semantics to make
+this test fixture fit.
 
-The style body does not automatically enter the directory of its declaration.
-PGF `.style` expands its body through `pgfkeysalso` using the invocation's active
-key directory; an explicit `.cd` is a separate operation.
+## Required reading
 
-Retained independent evidence is in `/private/tmp/stz-paint-review/`:
+Read `AGENTS.md`, `prompts/phase-32b-implement.md`,
+`prompts/phase-32b-review.md`, and the latest section of
+`docs/PHASE_32B_IMPLEMENTATION.md`. Trace:
 
-- `repro.txt` / `repro.mjs`: app import and incorrect generated TikZ;
-- `namespace.tex`, `namespace.pdf`, `namespace-compilation.txt`,
-  `namespace.log`, `namespace-pdf-operators.txt`: PGF 3.1.11a renders red;
-- `namespace-only.tex`, `namespace-only-compilation.txt`, `namespace-only.log`:
-  removing the root `base` produces unknown `/tikz/base`, while the app still
-  incorrectly resolves the namespaced blue definition without diagnostics.
+- `scripts/fixtures/freeLabelsApp.tsx`, especially the responsive input document;
+- `scripts/checkPointResponsivePaint.mjs`, including both `loadCase()` and the
+  separate download loop that reloads the fixture;
+- `scripts/pointPaintOracle.mjs`, including CSS scaling, capture and assertions;
+- `tests/scripts/pointPaintOracle.test.mjs` and applicable capture tests;
+- the actual App fit/pan/projection path and `scripts/standaloneSvgCapture.mjs`;
+- `scripts/automation/phase-verification.mjs` and its 20-point-scenario policy.
 
-Canonical aliases are also inconsistent. Bare `base` and `/tikz/base` denote
-the same key in the normal TikZ directory, but current parsing/deduplication and
-lookup treat them independently. Normalizing only the final resolver Map is
-insufficient because raw-key deduplication may already have lost declaration
-order. For example, `base(red), /tikz/base(blue), base(green)` must not end in blue
-because an earlier alias retained a later Map position.
+The existing synthetic responsive observations put the node at the root center,
+so they do not reproduce the origin fixture's actual placement. Line numbers
+identify the inspected failure; locate current equivalents if they have shifted.
 
-### Required namespace correction and independent regressions
+## Required correction
 
-1. Separate declaration location from invocation directory. Resolve supported
-   relative references in the active runtime directory, preserving that context
-   through nested style bodies. Explicit qualified/absolute references must
-   retain PGF meaning; do not substitute the declaration owner's directory.
-2. Use consistent canonical key identity for lookup, ordered duplicate handling,
-   and cycle detection. Bare `base` and `/tikz/base` must agree in the normal
-   TikZ context, including last-definition-wins ordering in both declaration
-   directions and repeated alias overwrites. Keep `/other/base` and relative
-   `tikz/base` distinct from `/tikz/base`; do not strip arbitrary path prefixes.
-3. Preserve raw source/options, external style key spelling/load hints, readable
-   TikZ, saved explicit values and reference identity compatibility. Internal
-   canonicalization must not silently rewrite user source. Preserve application
-   defaults, option order and explicit local override precedence.
-4. For missing/unsupported references, retain diagnostics and unresolved-field
-   tracking. Do not fabricate a nearby namespaced definition or emit its paint
-   as a known override. Keep the existing behavior that preserves unresolved
-   external properties unless later known options or actual local edits resolve
-   them. Verify this through both standalone and inline TikZ output.
-5. Keep literal parsing and depth/work/source/diagnostic limits. If literal
-   runtime `.cd` is supported, independently verify its propagation through
-   nested expansion and following options. Otherwise diagnose it explicitly as
-   unsupported/unresolved; do not approximate it as declaration-directory lookup.
-   Do not broaden into executing arbitrary imported TeX, macros or handlers.
+### 1. Establish a fully visible test scene before taking invariant baselines
 
-Add registered tests and retained independent PGF fixtures for root-vs-namespace
-shadowing, a missing root reference despite an existing namespaced key, explicit
-qualified nested references, relative/absolute aliases in both directions,
-repeated alias overwrite and distinct absolute directories. Cover alias-aware
-cycles and depth/work termination in bounded resolver tests; compiling recursive
-PGF styles is not required for these preview limits.
-Use actual compiled PGF results, not expected values generated by the resolver.
-The expected unknown-key compilation failure is valid negative evidence and
-must be identified as such, with its diagnostic retained.
+Use a deliberately interior input-fixture position or the normal preview camera
+pan/framing path to put the point safely inside the existing viewBox. Prefer the
+smallest fixture/setup correction that works for all required shapes and cases.
+Choose framing from the actual supported geometry and available viewport;
+do not hard-code this run's screen coordinates or rewrite generated SVG geometry.
 
-The existing `known nested references ... namespaced lookup` regression at
-`tests/model/pointPaintImport.test.ts:73` encodes the incorrect owner-relative
-rule. Correct its expectations/fixtures to PGF semantics rather than preserving
-it as the specification. Likewise replace the incorrect enclosing-directory-first
-rule documented in `docs/IMPORTED_POINT_PAINT.md`. Retain the existing independent
-ten-row opacity/color-order fixture; extend reference coverage for namespaces
-and aliases without erasing those checks.
+Keep display scale controlled through CSS at exactly 0.5 and 2, confirmed by
+native CTMs. Framing must not substitute camera zoom for display scaling or
+change the 20pt declaration, body source/font, shape size, dash pattern or phase.
+If setup changes the view/pan, finish and settle that setup before capturing the
+model/history/request baseline used for the measured interactions. Do not relax
+invariants during the actual scale/probe/capture sequence.
 
-Exercise real imported-preset application, local edits, JSON save/reload and both
-TikZ modes. The shadowing example must produce red effective paint and no
-invented blue export override. The missing-reference example must be visibly
-unresolved, with raw external key/source preserved.
+Apply the same framed fixture/setup to the real download branch, which loads
+fresh input independently. Frame the actual App before clicking Export, then
+reopen the unmodified downloaded SVG at both CSS scales. Do not repair a saved
+file's viewBox/point positions after download to conceal a truncated export.
 
-## Defect 2: non-scaling border paint disagrees with local bounds and picking
+Allow enough space for the complete circle and triangle miter, all variants,
+selection ring, positive/negative probe locations, and the deliberately broken
+non-scaling control. At scale 0.5 that control has a larger visible border than
+the valid geometric version. The overlay's own 3px non-scaling stroke must also
+fit. A negative control must fail because its physical width is wrong, not
+because the setup clips it.
 
-Read `src/rendering/svgPointPaint.ts`, `svgPointNodeLayout.ts`,
-`svgPointNodeView.ts`, `SvgPointNode.tsx`, `svgHitTesting.ts`, the point export
-capture path, `tests/rendering/svgPointPaint.test.ts`, and
-`scripts/checkPointNodePaint.mjs` / `scripts/pointPaintOracle.mjs`.
+### 2. Check framing independently before pixels or clicks are judged
 
-`pointStyleToSvgPaint()` applies `vector-effect="non-scaling-stroke"` to the
-contour. Shared layout, painted bounds, miter geometry, selection and picking
-instead use local width `declared TeX points * 1.2`. A responsive root SVG/viewBox
-transform makes these contracts disagree even though computed `stroke-width`
-still reports the same nominal value.
+Add a bounded preflight that transforms an independent expected envelope from
+local point coordinates into the actual root/capture/viewport coordinates.
+Use the declared 20pt width, measured path geometry, known miter extension,
+selection/probe padding and relevant negative-control extent. Do not use the
+production painted bounds as the sole oracle for their own correctness.
 
-Read `/private/tmp/stz-32b-review-stroke-scale-repro.json`. It records execution
-of production pure helpers plus stroke geometry derived from vector-effect
-semantics; it is not a new native browser run. With a 20pt border:
+Require the complete envelope and intended click positions to fit with a
+positive margin inside the SVG root and browser viewport/capture area. This
+also applies to disabled/zero-opacity cases, where an empty red-pixel mask
+cannot prove coverage. Record root/viewBox/CSS dimensions, shape/body bounds,
+CTMs, camera/framing state, expected envelope, margins and capture dimensions.
+Report insufficient framing as a setup error before a misleading paint-extent
+comparison. Reject nonfinite/invalid measurements rather than silently clipping
+them to the image bounds.
 
-| Display scale | Modeled local half-width | Non-scaling painted local half-width |
-| --- | --- | --- |
-| 0.5 | 12 | 24 |
-| 2.9076923076923076 | 12 | About 4.127 |
+Keep native raster bounds independent. Do not clamp the expected 188.75 to 180,
+ignore the bottom edge, increase the 1.75px tolerance, shrink the fixture's shape
+or stroke, remove the uncropped-output assertion, or synthesize pixels from
+production geometry. Retain the actual screenshot PNG as the pixel-mask input.
 
-At 0.5, `radius + 20` lies in visible stroke but beyond the current modeled hit
-limit `radius + 18`. At about 2.908, `radius + 17` is selected even though it is
-beyond the actual painted edge plus the existing 6-local-unit tolerance. The
-higher scale is observed in the accepted parent's
-`point-paint-lifecycle-dimming.json` coordinate diagnostics. Resizing standalone
-SVG also changes stroke thickness relative to the node body.
+### 3. Keep measurement and screenshot coordinates coherent
 
-### Required stroke correction and native regressions
+The current helper measures rects/CTMs and then calls `locator.screenshot()`.
+Make scrolling/layout settling explicit before the retained pre-capture snapshot,
+and verify relevant root/contour/body transforms and capture bounds remain
+consistent through capture. Locator screenshot auto-scrolling or a layout shift
+must not pair old coordinates with a new PNG. Persist before/after measurements
+and fail clearly on mismatch, with bounded waiting/capture and primary-error
+preservation. The latest evidence establishes clipping; it does not demonstrate
+that scroll drift caused this particular failure.
 
-Prefer ordinary geometric SVG scaling for point contours, consistent with the
-existing local layout contract. Keep `width * 1.2`, dash lengths/phase, miter
-geometry and current local picking/selection padding coherent. Preview and
-detached settled export already share `SvgPointNodeView`; apply the same rule
-in both. Avoid introducing viewport-dependent layout/cache/export machinery
-when removing the point contour's non-scaling behavior resolves the mismatch.
+Preserve exact CSS-scale observations, native pointer coordinates and saved
+image dimensions. Restore temporary root styles/vector effects and release any
+owned browser resources even when framing, capture or assertion fails. Keep the
+existing safe XML Canvas path for standalone screenshot decoding.
 
-The editor selection ring's own non-scaling outline is a separate overlay and
-may remain so. Do not globally remove vector effects from unrelated curves,
-markers, handles or formula paths. Preserve body/font sizing, camera projection,
-model coordinates, source-keyed conversion reuse, legacy 0.4pt width and size/2
-meaning, disabled/zero-opacity distinctions and immutable pending capture.
+### 4. Add focused framing and capture regressions
 
-Update tests that currently require the defective contour vector effect.
-Demonstrate the coherent paint/bounds/picking contract, not just removal of an
-attribute. Keep shape/body/painted bounds distinct and preserve polygon miter
-extension and the existing picking tolerance. The review's two click examples
-diagnose the old mixed contract; after choosing geometric strokes, derive probe
-expectations from the corrected physical paint and documented tolerance rather
-than preserving the old non-scaling appearance.
+Register meaningful tests using the historical 260-by-180 capture, center
+`(58,162)`, radius about 41.5071 and half-width 12. The old out-of-frame setup
+must be rejected as framing failure; a correctly positioned equivalent must
+retain the same width, source, geometry and physical-paint expectations.
 
-Extend required native acceptance with:
+Cover circle/triangle, scales below/above 1, selected state, transparent/disabled
+variants and the larger non-scaling negative control. Include invalid/stale
+transform or crop measurements so screenshot-coordinate mismatch cannot pass.
+Keep existing centered oracle tests, but do not treat synthetic observations
+alone as proof that the production App fixture is framed correctly.
 
-- A wide 20pt solid circular border at measured uniform display scales below
-  and above 1, such as 0.5 and 2. Its full local width is independently 24 and
-  half-width 12; displayed thickness must follow the actual CTM. Camera zoom
-  alone is not a substitute for responsive SVG display scaling.
-- Native painted extent, local painted bounds and selection alignment checks.
-  Probe inside visible border and beyond the border plus current selection
-  tolerance using both ordinary and Alt-click/candidate selection paths. An
-  ordinary contour click alone can use its group handler and bypass geometric
-  candidate collection. Clear selection before negative probes.
-- A supported triangle's wide miter join at both scales, retaining the existing
-  independent 60-degree-corner geometry, plus disabled-border/zero-opacity
-  distinctions and dash/phase scaling coverage.
-- Actual transparent and white SVG downloads reopened outside the App at scales
-  below and above 1. Border/body proportions, dash lengths/phase, contour extent
-  and uncropped output must agree with the chosen geometry contract. Preserve
-  pending-edit/load capture isolation and removal of editor overlays.
+In native acceptance, prove the preflight succeeds for the real App and actual
+standalone downloads, then run the full independent raster/bounds/selection
+assertions and ordinary/Alt probes. Both the valid and injected non-scaling
+scenes must be uncropped; only the latter must fail the physical-paint oracle.
+Keep restored geometry/style, model/history and request-identity assertions.
 
-Collect the actual root/contour `getScreenCTM`, viewport and CSS dimensions,
-viewBox, device pixel ratio, local/screen probe coordinates, declared width,
-rendered paint observations and selection outcomes before assertions can abort.
-Retain required SVG/JSON/PNG artifacts and bounded capture/error handling.
+## Preserve implemented production corrections and coverage
 
-Use independent native raster/paint measurements retaining the actual display
-transform. `getBBox()` without stroke, computed `strokeWidth`, and the current
-`rasterPointOverlap()` reconstruction at scale 1 cannot establish responsive
-stroke correctness by themselves. Keep the opacity oracle's existing purpose;
-add the missing transform-sensitive check. Include a deliberate non-scaling
-contour negative control that the new test rejects at nonunit scales. Do not
-recompute expected painted extent from the same production layout under test.
+Retain canonical runtime style lookup, alias ordering/cycle detection, unresolved
+reference diagnostics and both TikZ modes. Keep the independent PGF namespace
+fixtures (11 observations plus the expected missing-root compilation failure),
+raw source/persistence and explicit local override behavior. Native namespace
+acceptance now passed; no evidence here justifies redoing that implementation.
 
-## Preserve earlier work and integrate coverage
+Retain geometric point contour scaling, independent paint alphas, painted/miter
+bounds, the six-local-unit picking tolerance and immutable pending export capture.
+Do not reintroduce `non-scaling-stroke` on production point contours or alter
+unrelated overlays/curves. Preserve completed Inspector/FontFace/source/metric/
+persistence fixes and all cumulative groups.
 
-Keep the accepted Inspector caption resolver, exact disabled-rejection oracle,
-local-DOM-vs-Playwright diagnostics, NaN/recovery checks, selection half-width
-oracle and owned-FontFace cleanup. These historical harness failures now pass
-native acceptance and are not the current repair targets.
-
-Preserve 31/32A behavior, separate text/fill/stroke alpha, migration/validation,
-clipboard/bulk/history, import ordering outside the corrected semantics, TikZ
-local override rules, raw source preservation and pending export snapshots.
-Register new tests and integrate the new native cases into the mandatory browser
-workflow. If adding named scenarios/artifacts, extend the verifier policy and
-its fail-closed tests; do not weaken or replace the existing 16 groups/16 point
-scenarios. Preserve binary-aware evidence identity for retained PGF artifacts.
+Keep the four added mandatory scenarios: `point-paint-namespace-aliases`,
+`point-paint-responsive-circle`, `point-paint-responsive-triangle`, and
+`point-paint-responsive-downloads`. The current policy requires 16 groups and
+20 named point scenarios, including required responsive JSON/SVG/PNG artifacts.
+Do not revert to the earlier 16-scenario count, skip cases or weaken fingerprint,
+artifact, review or commit/push gates. Diagnose any further demonstrated failures
+on their evidence instead of assuming every one is a framing problem.
 
 ## Verification and completion criteria
 
-Run focused regressions, the registered full suite, build, applicable strict
-TypeScript/fixture checks, changed-script syntax checks, targeted lint and
-`git diff --check` with the supported PATH. Record independent PGF compilation
-commands/version and expected-failure diagnostics. Preserve baseline lint/type
-debt separately and retain the existing nonblocking build warning accurately.
+Run focused framing/capture/oracle regressions, the registered full suite, build,
+applicable strict TypeScript/fixture checks, changed-script syntax checks,
+targeted lint and `git diff --check` with the supported PATH. Preserve the
+established unrelated lint/type baseline and nonblocking build warning. Do not
+regenerate unchanged PGF reference artifacts merely for this framing repair.
 
-Obtain fresh browser-capable parent verification for the corrected checkout:
+Obtain fresh browser-capable parent verification for the final checkout:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands to pass, including both browser checks, all existing
-16 groups/16 named point scenarios and the newly required namespace/scale
-regressions. Inspect terminal success, page-error arrays, actual required
-artifacts and matching final checkout identity, including untracked/binary files.
-The accepted `yeWQVG` evidence is a valid baseline but does not validate later
-production changes.
+Require all five commands to pass, both browser checks, all 16 groups and all
+20 named point scenarios with actual required artifacts and empty page-error
+arrays. Inspect both scales, all variants, uncropped native controls and actual
+transparent/white responsive downloads. Evidence must match the final checkout,
+including the untracked harness and binary PGF files.
 
-After fresh verification succeeds, independently review that same checkout
-against `prompts/phase-32b-review.md`, explicitly checking both production findings.
-`32B verify` itself does not run review. Phase 32B is complete only after the two
-findings are resolved and both gates pass. If a child cannot start its browser,
-report that separately and use the established browser-capable parent path;
-do not recast the accepted baseline as missing verification.
+The child's startup `EPERM`, the earlier accepted `yeWQVG` tree and the partial
+current `cI6r6H` run are distinct results; none substitutes for the corrected
+final tree's acceptance. After fresh verification succeeds, independently review
+that same tree against `prompts/phase-32b-review.md`, including the original two
+production findings. `32B verify` itself does not review. Phase 32B remains
+incomplete until both gates pass; 32C/32D remain deferred.
 
 ## Report
 
-Update `docs/PHASE_32B_IMPLEMENTATION.md`, `docs/IMPORTED_POINT_PAINT.md` and
-relevant preview/adapter notes with corrected namespace and stroke contracts.
-State that the prior checkout passed verification and was then rejected by
-independent review for two production defects. Report each cause/fix, changed
-files, independent PGF/native regression evidence, exact commands/results,
-final checkout fingerprint and fresh review outcome. List genuinely unexecuted
-checks without carrying forward superseded harness failures. Keep 32C/32D
-explicitly deferred.
+Update `docs/PHASE_32B_IMPLEMENTATION.md` and relevant preview/adapter acceptance
+notes with the proven clipping cause, numeric evidence, framing/capture correction,
+regressions, exact commands/results, artifact paths and final checkout identity.
+Distinguish namespace/earlier paint scenarios already passed, partial responsive
+progress, remaining native checks and fresh independent review. Do not call the
+20pt stroke conversion defective when this failure is explained by the captured
+root ending before the expected contour.

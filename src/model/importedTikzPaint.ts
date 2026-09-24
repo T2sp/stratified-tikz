@@ -35,6 +35,11 @@ export type TikzPreviewContext = {
   colors?: Readonly<Record<string, HexColor>>
   key?: string
 }
+/** Internal identity only: retain the user's key spelling in saved references. */
+export function canonicalTikzStyleKey(key: string): string {
+  const trimmed = key.trim()
+  return trimmed.startsWith('/') ? trimmed : `/tikz/${trimmed}`
+}
 const thickness: Readonly<Record<string, number>> = {
   'ultra thin': .1, 'very thin': .2, thin: .4, semithick: .6,
   thick: .8, 'very thick': 1.2, 'ultra thick': 1.6,
@@ -119,14 +124,14 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   const deferredShapeLayout = /^(?:shape(?: |$)|circle$|rectangle$|ellipse$|diamond$|trapezium(?: |$)|semicircle$|regular polygon(?: |$)|star(?: |$)|isosceles triangle(?: |$)|kite(?: |$)|dart(?: |$)|circular sector(?: |$)|cylinder(?: |$)|aspect$|inner |outer |minimum |anchor$|text (?:width|height|depth)$|align$|font$|node contents$)/
   const resolved = (...fields: string[]) => fields.forEach((field) => unresolved.delete(field))
   let work = 0
-  const styles = new Map((context.styles ?? []).map((style) => [style.key, style.options ?? '']))
+  const styles = new Map((context.styles ?? []).map((style) => [canonicalTikzStyleKey(style.key), style.options ?? '']))
   const warn = (message: string) => { if (diagnostics.length < 64 && !diagnostics.includes(message)) diagnostics.push(message) }
-  const resolveReference = (key: string, owner: string): string | undefined => {
-    const directory = owner.includes('/') ? owner.slice(0, owner.lastIndexOf('/')) : ''
-    const candidates = key.startsWith('/') ? [key] : [directory ? `${directory}/${key}` : key, key, `/tikz/${key}`]
-    return candidates.find((candidate) => styles.has(candidate))
-  }
-  const visit = (body: string, owner: string, active: readonly string[]) => {
+  // A .style body uses the invocation's active directory (/tikz for normal
+  // nodes), not the declaration's parent directory. Keep this context shared
+  // through nested expansion. Runtime .cd is deliberately unsupported; once
+  // encountered, relative options remain unresolved instead of guessing a path.
+  let runtimeDirectoryKnown = true
+  const visit = (body: string, active: readonly string[]) => {
     if (body.length > 100_000) { warn('Preview option input exceeds the 100000-character bound.'); paintFields.forEach((field) => unresolved.add(field)); return }
     for (const rawOption of splitTikzOptions(body)) {
       const option = rawOption.trim()
@@ -137,11 +142,23 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       const rawKey = equals < 0 ? option : option.slice(0, equals).trim()
       const key = rawKey.replace(/^\/tikz\//, '').replace(/\s+/g, ' ')
       const value = equals < 0 ? undefined : unbrace(option.slice(equals + 1))
-      const reference = equals < 0 ? resolveReference(rawKey, owner) : undefined
+      if (rawKey.endsWith('/.cd')) {
+        warn(`Unsupported runtime key directory change: ${option}`)
+        runtimeDirectoryKnown = false
+        paintFields.forEach((field) => unresolved.add(field))
+        continue
+      }
+      if (!runtimeDirectoryKnown && !rawKey.startsWith('/')) {
+        warn(`Unresolved option after unsupported runtime key directory change: ${option}`)
+        paintFields.forEach((field) => unresolved.add(field))
+        continue
+      }
+      const canonicalKey = canonicalTikzStyleKey(rawKey)
+      const reference = equals < 0 && styles.has(canonicalKey) ? canonicalKey : undefined
       if (reference !== undefined) {
         if (active.includes(reference)) { warn(`Cyclic style reference: ${[...active, reference].join(' → ')}`); paintFields.forEach((field) => unresolved.add(field)) }
         else if (active.length >= 16) { warn('Preview style expansion exceeds the 16-level depth bound.'); paintFields.forEach((field) => unresolved.add(field)) }
-        else visit(styles.get(reference)!, reference, [...active, reference])
+        else visit(styles.get(reference)!, [...active, reference])
         continue
       }
       const invalid = () => {
@@ -198,7 +215,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       }
     }
   }
-  visit(options, context.key ?? '', context.key ? [context.key] : [])
+  visit(options, context.key ? [canonicalTikzStyleKey(context.key)] : [])
   if (diagnostics.length) preview.diagnostics = diagnostics
   if (unresolved.size) preview.unresolvedFields = [...unresolved]
   return preview
