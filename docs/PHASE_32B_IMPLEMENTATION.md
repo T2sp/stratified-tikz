@@ -1,8 +1,13 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: implemented, awaiting acceptance. Fresh parent browser acceptance and subsequent
+Status: implemented with a corrected disabled-control rejection oracle, awaiting acceptance. Fresh parent browser acceptance and subsequent
 independent review are required before completion. 32C/32D are not implemented.
 No new dependency is introduced.
+
+The latest executed parent reached real select edits and NaN recovery, then
+failed the clone's overly specific disabled-control expectation. See
+[the current correction and handoff](#disabled-control-label-retargeting-correction-2026-09-24);
+the earlier locator timeout and read-only revalidation below are historical.
 
 ## Prerequisite evidence
 
@@ -491,7 +496,11 @@ the read-only review against `prompts/phase-32b-review.md`; `verify` alone does
 not review. Verification and independent acceptance review remain open, so
 Phase 32B is incomplete. No commit/push or 32C/32D work was performed.
 
-### Current-checkout revalidation (2026-09-24)
+### Historical current-checkout revalidation (2026-09-24)
+
+The later `7bdmDz` parent evidence and targeted correction below supersede this
+read-only inspection's finding of no additional defect and its pending-native
+claims. The commands in this subsection describe that earlier child only.
 
 The repeated targeted request starts from clean
 `99535517c9d465e265f415d7af0e370f4c00f46e` on
@@ -542,3 +551,145 @@ parent must complete fresh verification, then the read-only review against
 `prompts/phase-32b-review.md`. `verify` itself does not review, and no nested
 implementation or commit/push gate was invoked. Phase 32B remains incomplete;
 32C/32D remain deferred.
+
+## Disabled-control label-retargeting correction (2026-09-24)
+
+This fix began with a clean `phase/32b-color-opacity-outline` checkout at
+`a3f5998bd5b74e8622ca5e599390f2c32f65e070`, including the updated prompt.
+Only `scripts/pointInspectorFields.mjs`, its registered test file, and the three
+existing acceptance documents changed. Production paint/UI/schema, caption
+resolution and resolver check order, selection half-width oracle, owned-FontFace
+cleanup, PGF/binary fixtures and cumulative verification/review gates are preserved.
+No dependency, forced selection or timeout increase was introduced.
+
+### Latest parent progress and actual cause
+
+Inspected the complete report, command log, checkout snapshots and paint
+observations `0002`–`0019` and `0035`–`0038` under
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-7bdmDz/`,
+plus `stz-phase-verifier-AWviTj/response.json` in the same temporary root.
+That report checked `99535517c9d465e265f415d7af0e370f4c00f46e` plus documentation;
+before/after fingerprint was
+`20cc7c6c846029df9d248f5fc7ae4195e23eb8ab7e0a4e776cc110fd51e04322`.
+Its binary-aware diff hash and empty untracked snapshot match the report.
+
+Node v26.9.0 / Chrome 153.0.8010.53 executed 2,739 passing tests, build, diff and
+label-assets successfully. Free-labels failed in
+`point-node-paint-import-persistence` / `point-paint-native-inspector-history`.
+There were 14/16 completed groups, 145 evidence records, all eleven cumulative
+32A point scenarios and zero of five completed 32B scenarios. Page errors were
+empty. The complete paint group and subsequent `settled-SVG-export-standalone`
+group did not complete; cumulative `point-node-settled-export` did complete.
+Independent acceptance review was not reached.
+
+Unlike the older `yLwzPX` timeout, this parent provides native observations of
+all three old exact-label counts at zero and corrected control counts at one,
+real App dashed/round/bevel edits and mixed paint, and Border width
+`2 → NaN → 2`. `aria-invalid` was false/true/false; warning association existed
+only while invalid; saved model/history stayed unchanged through invalid input
+and recovery. These are executed results, not predictions. Twenty-five clone
+checks completed, including live/preset select pairs, re-resolution, outside
+isolation, numeric markup and earlier negatives. They are progress inside the
+first paint scenario, not a completed scenario. Observation `0038` preserves
+the real App state after the clone failure.
+
+The disabled native select correctly rejected at its wrapping label:
+`Enabled Inspector field wrapper: Border line style`. The outer expectation
+`/Enabled native select/` rejected that valid earlier boundary. Installed
+Playwright **1.62.1** source in the configured runtime's sibling
+`playwright-core/lib/coreBundle.js` confirms that enabled queries use
+`retarget(node, 'follow-label')`, following `label.control`. Source inspection
+is not a new browser reproduction. The old observation's wrapper `enabled: true`
+was the local `:disabled`/ARIA predicate; it never measured Locator.isEnabled().
+This is a negative-test oracle mismatch, not acceptance of a disabled control
+or a demonstrated production paint defect.
+
+### Bounded correction and regressions
+
+The disabled-control oracle now requires an `AssertionError` with
+`ERR_ASSERTION`, strict false-versus-true enabled metadata, and the exact
+Border line style wrapper or native-select message. Missing controls, wrong
+fields/options, diagnostic errors and timeouts cannot satisfy it. All resolver
+absence, ambiguity, visibility, wrapper and disabled protections remain.
+
+The production-markup clone independently verifies one visible intended
+field/select, `label.control` identity, real disabled property and `:disabled`,
+both queried enabled states false, an enabled requested option and initial
+`solid` different from requested `dashed`. Each negative action records its
+name, expected/actual rejection, original element's before/after value and
+input/change events before marking completion. Disabled rejection must leave
+the value and event list unchanged. Restoring the same control must permit
+ordinary selection and produce input/change events. Independent disabled
+Inspector/wrapper cases, missing/disabled options, wrong requested value/type,
+substring and wrong-control-type cases all remain registered. Real App handlers,
+paint/history checks and the actual NaN/recovery sequence remain intact.
+
+Diagnostic `enabled` retains its existing local-only meaning. Explicit
+`localDomState` records the disabled property, `:disabled`, ARIA and predicate;
+`labelControl` identifies the associated native element and whether it is the
+unique resolved control. Separate `playwrightState.wrapper/control` values
+record Locator.isEnabled() only for unique matches. Missing/ambiguous targets
+retain counts with null queried state; failed queries retain diagnostic errors.
+Bounded failure capture and closure continue to preserve the primary failure.
+
+The registered helper file now has **74 passing tests** (30 added), including
+correlated false wrapper/control states and early wrapper rejection with zero
+selectOption calls, enabled recovery, independent disabled boundaries, narrow
+oracle refusal cases, and diagnostic uniqueness/state distinctions. The doubles
+model the discovered correlation without claiming to implement browser state
+semantics. A separate read-only code inspection found no concrete issue; it is
+not the gated independent Phase 32B acceptance review.
+
+### Executed checks and final-tree handoff
+
+Commands use `PATH=/opt/homebrew/bin:$PATH`, Node v26.9.0, npm 11.19.1.
+Logs are retained in `/private/tmp/stz-32b-disabled.yx1uRu/` unless stated otherwise.
+
+| Command | Executed result |
+| --- | --- |
+| `node --test tests/scripts/pointInspectorFields.test.mjs tests/scripts/pointSelectionOracle.test.mjs tests/scripts/pointNativeCoordinateMode.test.mjs tests/scripts/pointCheckDiagnostics.test.mjs tests/scripts/ownedFontFace.test.mjs tests/scripts/pointPaintOracle.test.mjs` | **140 passed**; `focused-regressions.log` |
+| `node scripts/automation/run-phase.mjs 32B verify` | **2,769 tests passed**, build and diff passed; exit 1 at label-assets localhost `listen EPERM`, before browser launch; free-labels not reached by runner; `verification-initial.log` |
+| `npx tsc -p tsconfig.app.json --strict` | Exit 0; `/private/tmp/stz-32b-disabled-strict-tsc.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Exit 0; `/private/tmp/stz-32b-disabled-fixture-tsc.log` |
+| `node --check scripts/pointInspectorFields.mjs`, `node --check tests/scripts/pointInspectorFields.test.mjs`, `node --check scripts/checkPointNodePaint.mjs` | Exit 0; `syntax-results.json` |
+| `node --input-type=module < /private/tmp/stz-32b-inspector.ziacWM/targeted-eslint.mjs` | Exit 0, zero errors/warnings; `targeted-eslint.log` |
+| Configured direct `npm run check:free-labels` | Exit 1 at `development-server-listen`, localhost `EPERM`; `free-labels-initial.log` and `free-labels-initial/free-labels-evidence.json` |
+
+The initial runner report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-1IVic8/verification.json`,
+with verifier response `stz-phase-verifier-9eI3Je/response.json` in the same root.
+It precedes this documentation update. The build's existing chunk warning and
+unrelated lint baseline remain unchanged; repository-wide lint was not run.
+
+After these final edits, the official verify command and configured direct
+free-label check are repeated on the final checkout. Their exact commands,
+terminal results, report paths, artifact inventory, remaining named scenarios
+and binary-aware before/after identity are recorded externally in
+`/private/tmp/stz-32b-disabled.yx1uRu/handoff.json`, with `final-checkout.json`,
+`final-checkout.diff`, `final-checkout-untracked.json`, `verification-final.log`
+and `free-labels-final.log`. The external identity avoids a self-referential
+tracked fingerprint. Both direct attempts use:
+
+```sh
+export PATH=/opt/homebrew/bin:$PATH
+export STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs
+export STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+export STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32b-disabled.yx1uRu/free-labels-final
+npm run check:free-labels
+```
+
+The child localhost restriction does not explain the parent's native assertion
+failure and does not validate this correction in a browser. Fresh native checks
+remain pending: the corrected disabled/re-enabled clone case and subsequent
+negatives; later paint variants and copy/bulk/duplicate; all five paint scenarios
+(Inspector/history, imports/persistence, lifecycle/dimming, transparent edit and
+white load exports); later standalone settled export; and final-tree confirmation
+of all cumulative groups/scenarios, page errors and required JSON/SVG/PNG files.
+
+The browser-capable parent must run
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify`
+and require all five commands, all 16 groups and all 16 named point scenarios
+on the matching final tree, including untracked and binary fixtures. Only after
+that success may the existing workflow perform the independent read-only review
+against `prompts/phase-32b-review.md`. `verify` itself performs no review. Both
+gates remain open; Phase 32B is incomplete and 32C/32D remain deferred.

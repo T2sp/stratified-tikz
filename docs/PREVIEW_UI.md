@@ -1701,12 +1701,24 @@ The registered browser boundary clones actual production Inspector markup for
 scope, rerender and negative controls; the real App still performs all paint and
 invalid-draft edits. Before/after diagnostics retain original exact-label counts,
 corrected control counts, DOM/ARIA, selection, paint and request/history identity.
-Fresh native execution of this correction and independent review remain required;
-the child startup restriction is separate from the parent's observed locator
-timeout. See [the current handoff](PHASE_32B_IMPLEMENTATION.md#targeted-inspector-field-locator-correction).
+The later `7bdmDz` parent natively executed the corrected lookups, live
+dashed/round/bevel paint and `2 → NaN → 2` recovery with unchanged invalid/recovery
+model/history. It then stopped after 25 clone checks: disabling the select made
+Playwright's wrapping-label enabled query false, so the correct wrapper rejection
+did not match the clone's overly narrow native-select error expectation.
+This was an oracle mismatch; zero of five complete paint scenarios passed.
 
-The 2026-09-24 revalidation found the resolver correction already committed at
+The earlier 2026-09-24 read-only revalidation found the resolver correction already committed at
 `9953551`; 110 focused and 2,739 full tests passed. Child browser checks again
-stopped at localhost `EPERM` before native execution. Final-tree evidence and
-the remaining parent verification/review gates are recorded in
-[current-checkout revalidation](PHASE_32B_IMPLEMENTATION.md#current-checkout-revalidation-2026-09-24).
+stopped at localhost `EPERM` before native execution. The later parent result
+supersedes that inspection's no-additional-defect finding.
+
+The disabled-control oracle now accepts only the exact field's disabled
+wrapper/native-select assertion, with independent disabled/unique/visible state
+preconditions, unchanged-value and zero-event proof, and ordinary enabled recovery.
+Diagnostics retain the local DOM predicate separately from Playwright's enabled
+query and `label.control` identity. The helper suite has 74 tests; 140 focused
+and 2,769 full tests pass. The child browser startup restriction remains separate
+from the parent's assertion failure. The corrected clone, remaining paint work,
+all final-tree native groups/artifacts and independent acceptance review remain
+parent gates; see [the current correction and final-tree handoff](PHASE_32B_IMPLEMENTATION.md#disabled-control-label-retargeting-correction-2026-09-24).

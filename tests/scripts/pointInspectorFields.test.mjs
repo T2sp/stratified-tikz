@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  POINT_PAINT_SELECT_OPTIONS, checkPointInspectorFieldBoundary,
-  resolvePointInspectorField, selectPointInspectorField,
+  DISABLED_BORDER_LINE_STYLE_REJECTION, POINT_PAINT_SELECT_OPTIONS, checkPointInspectorFieldBoundary,
+  inspectPointInspectorField, resolvePointInspectorField, selectPointInspectorField,
 } from '../../scripts/pointInspectorFields.mjs'
 
 // Selector-aware doubles verify orchestration, bounds and failure ownership.
-// They do not implement Playwright label semantics: the registered native App
-// paint scenario clones the actual production Inspector to exercise that DOM.
+// The correlated disabled fixture models the observed wrapping-label result;
+// these doubles do not reimplement Playwright's state/retargeting algorithm.
+// The registered native App paint scenario exercises cloned production markup.
 function inspectorFixture(overrides = {}) {
   const state = {
     inspectorCount: 1, inspectorVisible: true, inspectorEnabled: true,
@@ -16,11 +17,11 @@ function inspectorFixture(overrides = {}) {
     controlEnabled: true, options: [...POINT_PAINT_SELECT_OPTIONS['Border line style']],
     value: 'solid', caption: 'Border line style', selector: 'select', ...overrides,
   }
-  const queries = [], selections = []
+  const queries = [], selections = [], enabledQueries = []
   const node = (prefix) => ({
     count: async () => state[`${prefix}Count`],
     isVisible: async () => state[`${prefix}Visible`],
-    isEnabled: async () => state[`${prefix}Enabled`],
+    isEnabled: async () => { enabledQueries.push(prefix); return state[`${prefix}Enabled`] },
     getAttribute: async (attribute) => {
       assert.equal(attribute, 'aria-disabled')
       return state[`${prefix}AriaDisabled`] ?? null
@@ -72,7 +73,56 @@ function inspectorFixture(overrides = {}) {
   const page = {
     locator(selector) { assert.equal(selector, '#preview-inspector-drawer'); queries.push(selector); return inspector },
   }
-  return { page, state, selections, queries, control }
+  return { page, state, selections, queries, enabledQueries, inspector, captions, wrapper, control }
+}
+
+// DOM properties and queried enabled state are deliberately separate inputs.
+// These stubs exercise diagnostic naming and lookup guards, not browser state.
+function diagnosticFixture(t, overrides = {}) {
+  const fixture = inspectorFixture({ controlDisabled: true, wrapperEnabled: false, controlEnabled: false, ...overrides })
+  const { state } = fixture
+  const previousStyle = Object.getOwnPropertyDescriptor(globalThis, 'getComputedStyle')
+  Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true,
+    value: () => ({ display: 'block', visibility: 'visible' }),
+  })
+  t.after(() => {
+    if (previousStyle) Object.defineProperty(globalThis, 'getComputedStyle', previousStyle)
+    else delete globalThis.getComputedStyle
+  })
+  const element = (prefix, tagName) => ({
+    tagName, id: `${prefix}-id`, outerHTML: `<${tagName.toLowerCase()}></${tagName.toLowerCase()}>`,
+    textContent: prefix === 'caption' ? state.caption : `${state.caption} solid dashed dotted denselyDotted`,
+    getBoundingClientRect: () => ({ width: 160, height: 24 }),
+    getAttribute: (attribute) => attribute === 'aria-disabled' ? state[`${prefix}AriaDisabled`] ?? null : null,
+    matches: (selector) => {
+      assert.equal(selector, ':disabled')
+      return prefix === 'control' && state.controlDisabled
+    },
+  })
+  const native = { ...element('control', 'SELECT'), disabled: state.controlDisabled, value: state.value,
+    options: state.options.map((value) => ({ value, textContent: value, selected: value === state.value, disabled: false })),
+  }
+  const wrapper = { ...element('wrapper', 'LABEL'), control: native,
+    querySelectorAll: (selector) => { assert.equal(selector, 'select'); return Array(state.controlCount).fill(native) },
+    querySelector: (selector) => { assert.equal(selector, 'select'); return state.controlCount ? native : null },
+  }
+  native.labels = [wrapper]
+  for (const [prefix, locator, dom] of [
+    ['inspector', fixture.inspector, element('inspector', 'ASIDE')],
+    ['caption', fixture.captions, element('caption', 'SPAN')],
+    ['wrapper', fixture.wrapper, wrapper], ['control', fixture.control, native],
+  ]) {
+    locator.evaluateAll = async (inspect, selector) => inspect(Array(state[`${prefix}Count`]).fill(dom), selector)
+  }
+  fixture.inspector.getByLabel = (caption, options) => {
+    assert.equal(caption, state.caption)
+    assert.deepEqual(options, { exact: true })
+    return { count: async () => 0 }
+  }
+  const locate = fixture.page.locator
+  fixture.page.locator = (selector) => selector.startsWith('[aria-controls="preview-inspector-drawer"]')
+    ? { evaluateAll: async (inspect, nativeSelector) => inspect([], nativeSelector) } : locate(selector)
+  return fixture
 }
 
 for (const [caption, initial, desired] of [
@@ -129,6 +179,92 @@ for (const [name, overrides] of [
   })
 }
 
+test('disabled native select delegates enabled state to its wrapping label and rejects before selection', async () => {
+  const fixture = inspectorFixture({ wrapperEnabled: false, controlEnabled: false })
+  assert.equal(fixture.state.wrapperCount, 1)
+  assert.equal(fixture.state.controlCount, 1)
+  assert.equal(fixture.state.wrapperVisible, true)
+  assert.equal(fixture.state.controlVisible, true)
+  assert.notEqual(fixture.state.value, 'dashed')
+  await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, 'dashed', {
+    options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+  }), { ...DISABLED_BORDER_LINE_STYLE_REJECTION,
+    message: /^Enabled Inspector field wrapper: Border line style\n/,
+  })
+  assert.deepEqual(fixture.enabledQueries, ['inspector', 'wrapper'], 'Wrapper rejection precedes native state/action queries')
+  assert.deepEqual(fixture.selections, [], 'selectOption is never invoked on the disabled target')
+  assert.equal(fixture.state.value, 'solid')
+  fixture.state.wrapperEnabled = true
+  fixture.state.controlEnabled = true
+  await selectPointInspectorField(fixture.page, fixture.state.caption, 'dashed', {
+    options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+  })
+  assert.deepEqual(fixture.selections, ['dashed'])
+  assert.equal(fixture.state.value, 'dashed')
+})
+
+for (const [name, overrides, message] of [
+  ['independent disabled Inspector', { inspectorEnabled: false }, /^Enabled active Inspector\n/],
+  ['independent disabled wrapper', { wrapperEnabled: false }, /^Enabled Inspector field wrapper: Border line style\n/],
+  ['disabled native control without label delegation', { controlEnabled: false }, /^Enabled native select for Inspector field: Border line style\n/],
+]) {
+  test(`${name} retains its own rejection boundary and zero selection attempts`, async () => {
+    const fixture = inspectorFixture(overrides)
+    await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, 'dashed', {
+      options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+    }), { name: 'AssertionError', code: 'ERR_ASSERTION', actual: false, expected: true, operator: 'strictEqual', message })
+    assert.deepEqual(fixture.selections, [])
+    assert.equal(fixture.state.value, 'solid')
+    if (name === 'independent disabled wrapper') assert.equal(fixture.state.controlEnabled, true)
+  })
+}
+
+for (const overrides of [{ wrapperEnabled: false, controlEnabled: false }, { controlEnabled: false }]) {
+  test(`disabled-control oracle accepts the exact known enabled assertion ${JSON.stringify(overrides)}`, async () => {
+    const fixture = inspectorFixture(overrides)
+    await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, 'dashed', {
+      options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+    }), DISABLED_BORDER_LINE_STYLE_REJECTION)
+    assert.deepEqual(fixture.selections, [])
+    assert.equal(fixture.state.value, 'solid')
+  })
+}
+
+async function rejectionFrom(action) {
+  let rejection
+  await assert.rejects(action, (error) => { rejection = error; return true })
+  return rejection
+}
+
+for (const [name, overrides, requested] of [
+  ['missing native control', { controlCount: 0 }, 'dashed'],
+  ['disabled Inspector', { inspectorEnabled: false }, 'dashed'],
+  ['disabled different field', { caption: 'Border cap', wrapperEnabled: false, controlEnabled: false }, 'round'],
+  ['missing option', { options: ['solid', 'dotted', 'denselyDotted'] }, 'dashed'],
+  ['disabled option', { disabledOptions: ['dashed'] }, 'dashed'],
+  ['unavailable requested value', {}, 'unknown'],
+]) {
+  test(`disabled-control oracle refuses unrelated ${name} rejection`, async () => {
+    const fixture = inspectorFixture(overrides)
+    const error = await rejectionFrom(selectPointInspectorField(fixture.page, fixture.state.caption, requested, {
+      options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+    }))
+    await assert.rejects(assert.rejects(Promise.reject(error), DISABLED_BORDER_LINE_STYLE_REJECTION), { code: 'ERR_ASSERTION' })
+    assert.deepEqual(fixture.selections, [])
+    assert.equal(fixture.state.value, 'solid')
+  })
+}
+
+for (const error of [
+  new Error('arbitrary failure'), new Error('selectOption timed out after 5000ms'),
+  new Error('Inspector diagnostic capture failure'),
+  new Error('Enabled Inspector field wrapper: Border line style\nfalse !== true'),
+]) {
+  test(`disabled-control oracle refuses non-assertion failure: ${error.message.split('\n')[0]}`, async () => {
+    await assert.rejects(assert.rejects(Promise.reject(error), DISABLED_BORDER_LINE_STYLE_REJECTION), { code: 'ERR_ASSERTION' })
+  })
+}
+
 test('selection rejects unavailable desired values and absent expected option contract', async () => {
   const fixture = inspectorFixture()
   await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, 'unknown', {
@@ -136,6 +272,91 @@ test('selection rejects unavailable desired values and absent expected option co
   }), /Available native option/)
   await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, 'dashed'), /Expected native options/)
   assert.deepEqual(fixture.selections, [])
+})
+
+for (const value of [undefined, null, 0, true, ['dashed'], { value: 'dashed' }]) {
+  test(`selection rejects wrong requested value type ${JSON.stringify(value)} before selectOption`, async () => {
+    const fixture = inspectorFixture()
+    await assert.rejects(selectPointInspectorField(fixture.page, fixture.state.caption, value, {
+      options: POINT_PAINT_SELECT_OPTIONS['Border line style'],
+    }), /Available native option/)
+    assert.deepEqual(fixture.selections, [])
+    assert.equal(fixture.state.value, 'solid')
+  })
+}
+
+test('diagnostics distinguish a label local predicate from delegated Playwright enabled state', async (t) => {
+  const fixture = diagnosticFixture(t)
+  const observation = await inspectPointInspectorField(fixture.page, fixture.state.caption, 'select')
+  assert.deepEqual(observation.playwrightState, {
+    wrapper: { count: 1, enabled: false }, control: { count: 1, enabled: false },
+  })
+  assert.deepEqual(fixture.enabledQueries, ['wrapper', 'control'])
+  const [wrapper] = observation.wrappers, [control] = observation.controls
+  assert.equal(wrapper.enabled, true, 'Historical enabled field retains its local DOM meaning')
+  assert.equal(control.enabled, false)
+  assert.deepEqual(wrapper.localDomState, {
+    disabledProperty: null, matchesDisabled: false, ariaDisabled: null, enabledPredicate: true,
+  })
+  assert.deepEqual(control.localDomState, {
+    disabledProperty: true, matchesDisabled: true, ariaDisabled: null, enabledPredicate: false,
+  })
+  assert.deepEqual(wrapper.labelControl, { tag: 'select', id: 'control-id', disabledProperty: true,
+    matchesDisabled: true, ariaDisabled: null, sameAsResolvedControl: true,
+  })
+  assert.equal(control.labelControl, null)
+  assert.match(observation.enabledObservation, /local DOM predicate/)
+  assert.equal(observation.exactLabelCount, 0)
+  assert.equal(observation.correctedControlCount, 1)
+  assert.equal(observation.captionCount, 1)
+  assert.equal(observation.labelSemantics, 'exact-associated-label-mismatch-reproduced')
+  assert.equal(control.value, 'solid')
+  assert.deepEqual(control.options.map(({ value }) => value), POINT_PAINT_SELECT_OPTIONS['Border line style'])
+  assert.equal(control.labels[0].outerHTML, wrapper.outerHTML)
+  assert.deepEqual(fixture.selections, [])
+})
+
+for (const [wrapperCount, controlCount] of [[0, 0], [2, 2], [1, 0], [1, 2], [2, 1]]) {
+  test(`diagnostics query enabled only for unique matches: wrapper=${wrapperCount}, control=${controlCount}`, async (t) => {
+    const fixture = diagnosticFixture(t, { wrapperCount, controlCount })
+    const observation = await inspectPointInspectorField(fixture.page, fixture.state.caption, 'select')
+    assert.deepEqual(observation.playwrightState, {
+      wrapper: { count: wrapperCount, enabled: wrapperCount === 1 ? false : null },
+      control: { count: controlCount, enabled: controlCount === 1 ? false : null },
+    })
+    assert.deepEqual(fixture.enabledQueries, [
+      ...(wrapperCount === 1 ? ['wrapper'] : []), ...(controlCount === 1 ? ['control'] : []),
+    ])
+    assert.equal(observation.wrappers.length, wrapperCount)
+    assert.equal(observation.controls.length, controlCount)
+    if (wrapperCount === 1 && controlCount !== 1) assert.equal(observation.wrappers[0].labelControl.sameAsResolvedControl, false)
+    assert.deepEqual(fixture.selections, [])
+  })
+}
+
+test('diagnostics retain DOM observations when a unique enabled-state query fails', async (t) => {
+  const fixture = diagnosticFixture(t)
+  const failure = new Error('Locator enabled-state query failed')
+  fixture.wrapper.isEnabled = async () => { throw failure }
+  const observation = await inspectPointInspectorField(fixture.page, fixture.state.caption, 'select')
+  assert.deepEqual(observation.playwrightState.wrapper, {
+    count: 1, enabled: null, error: { message: failure.message, stack: failure.stack },
+  })
+  assert.deepEqual(observation.playwrightState.control, { count: 1, enabled: false })
+  assert.equal(observation.wrappers[0].enabled, true)
+  assert.equal(observation.controls[0].value, 'solid')
+  assert.deepEqual(fixture.selections, [])
+})
+
+test('diagnostics retain independently disabled wrapper ARIA and enabled native control', async (t) => {
+  const fixture = diagnosticFixture(t, { wrapperAriaDisabled: 'true', controlDisabled: false, controlEnabled: true })
+  const observation = await inspectPointInspectorField(fixture.page, fixture.state.caption, 'select')
+  assert.equal(observation.wrappers[0].localDomState.ariaDisabled, 'true')
+  assert.equal(observation.wrappers[0].enabled, false)
+  assert.equal(observation.controls[0].enabled, true)
+  assert.deepEqual(observation.playwrightState, {
+    wrapper: { count: 1, enabled: false }, control: { count: 1, enabled: true },
+  })
 })
 
 for (const selector of ['input', '*', 'select, input', '#unrelated', 'input[type="number"]']) {

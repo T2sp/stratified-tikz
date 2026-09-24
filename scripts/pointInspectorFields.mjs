@@ -7,6 +7,13 @@ export const POINT_PAINT_SELECT_OPTIONS = Object.freeze({
   'Border join': Object.freeze(['miter', 'round', 'bevel']),
 })
 
+// Playwright follows label.control for isEnabled(): a disabled select may be
+// rejected at its wrapping label before the resolver reaches the select.
+export const DISABLED_BORDER_LINE_STYLE_REJECTION = Object.freeze({
+  name: 'AssertionError', code: 'ERR_ASSERTION', actual: false, expected: true, operator: 'strictEqual',
+  message: /^Enabled (?:Inspector field wrapper: Border line style|native select for Inspector field: Border line style)\n/,
+})
+
 const inspectorSelector = '#preview-inspector-drawer'
 const nativeSelectors = new Set(['select', 'textarea', 'input[type="text"]', 'input[type="color"]', 'input[type="checkbox"]'])
 
@@ -66,13 +73,27 @@ export async function selectPointInspectorField(page, caption, value, { options 
 /** Non-asserting read-only evidence; missing/ambiguous controls remain visible. */
 export async function inspectPointInspectorField(page, caption, selector) {
   const { inspector, captions, wrappers, controls } = fieldLocators(page, caption, selector)
-  const describe = (elements) => elements.map((element) => {
+  const describe = (elements, selector) => elements.map((element) => {
     const rect = element.getBoundingClientRect(), style = getComputedStyle(element)
+    const localDomState = {
+      disabledProperty: 'disabled' in element ? element.disabled : null,
+      matchesDisabled: element.matches(':disabled'), ariaDisabled: element.getAttribute('aria-disabled'),
+      enabledPredicate: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+    }
+    const labelControl = element.tagName === 'LABEL' ? element.control : null
     return {
       tag: element.tagName.toLowerCase(), outerHTML: element.outerHTML, text: element.textContent,
       visible: style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse'
         && rect.width > 0 && rect.height > 0,
-      enabled: !element.matches(':disabled') && element.getAttribute('aria-disabled') !== 'true',
+      // Preserve the historical local-only measurement for existing consumers.
+      enabled: localDomState.enabledPredicate, localDomState,
+      labelControl: labelControl ? {
+        tag: labelControl.tagName.toLowerCase(), id: labelControl.id,
+        disabledProperty: labelControl.disabled, matchesDisabled: labelControl.matches(':disabled'),
+        ariaDisabled: labelControl.getAttribute('aria-disabled'),
+        sameAsResolvedControl: element.querySelectorAll(selector).length === 1
+          && element.querySelector(selector) === labelControl,
+      } : null,
       ariaLabel: element.getAttribute('aria-label'), ariaLabelledby: element.getAttribute('aria-labelledby'),
       ariaExpanded: element.getAttribute('aria-expanded'), ariaHidden: element.getAttribute('aria-hidden'),
       ariaInvalid: element.getAttribute('aria-invalid'), ariaDescribedby: element.getAttribute('aria-describedby'),
@@ -88,14 +109,25 @@ export async function inspectPointInspectorField(page, caption, selector) {
   })
   const exactLabelCount = await inspector.getByLabel(caption, { exact: true }).count()
   const correctedControlCount = await controls.count()
+  const queriedState = async (locator) => {
+    const count = await locator.count()
+    if (count !== 1) return { count, enabled: null }
+    try {
+      return { count, enabled: await boundedPointDiagnostic(() => locator.isEnabled(), 'Inspector enabled-state observation') }
+    } catch (error) {
+      return { count, enabled: null, error: { message: error.message, stack: error.stack } }
+    }
+  }
   return {
     caption, selector, inspectorCount: await inspector.count(), captionCount: await captions.count(),
     wrapperCount: await wrappers.count(), correctedControlCount, exactLabelCount,
     labelSemantics: exactLabelCount === 0 && correctedControlCount === 1
       ? 'exact-associated-label-mismatch-reproduced' : 'current-exact-associated-label-count-recorded',
-    inspectors: await inspector.evaluateAll(describe), captions: await captions.evaluateAll(describe),
-    wrappers: await wrappers.evaluateAll(describe), controls: await controls.evaluateAll(describe),
-    drawerControls: await page.locator('[aria-controls="preview-inspector-drawer"], #preview-inspector-drawer button[aria-expanded], #preview-inspector-drawer button[aria-label="Expand"], #preview-inspector-drawer button[aria-label="Collapse"]').evaluateAll(describe),
+    playwrightState: { wrapper: await queriedState(wrappers), control: await queriedState(controls) },
+    enabledObservation: 'enabled is the local DOM predicate; playwrightState records Locator.isEnabled()',
+    inspectors: await inspector.evaluateAll(describe, selector), captions: await captions.evaluateAll(describe, selector),
+    wrappers: await wrappers.evaluateAll(describe, selector), controls: await controls.evaluateAll(describe, selector),
+    drawerControls: await page.locator('[aria-controls="preview-inspector-drawer"], #preview-inspector-drawer button[aria-expanded], #preview-inspector-drawer button[aria-label="Expand"], #preview-inspector-drawer button[aria-label="Collapse"]').evaluateAll(describe, selector),
   }
 }
 
@@ -190,12 +222,53 @@ export async function checkPointInspectorFieldBoundary({ browser, page: appPage,
 
     currentCaption = 'Border line style'; currentSelector = 'select'
     const options = POINT_PAINT_SELECT_OPTIONS[currentCaption]
-    const reject = async (name, mutate, pattern) => {
+    const reject = async (name, mutate, pattern, {
+      verifyBefore = () => {},
+      action = () => selectPointInspectorField(page, currentCaption, 'dashed', { options }),
+    } = {}) => {
       await reset()
+      await selectPointInspectorField(page, currentCaption, 'solid', { options })
+      await fieldLocators(page, currentCaption, currentSelector).controls.evaluate((control) => {
+        const events = []
+        // Retain the exact original element, including in absent/duplicate cases.
+        window.stzInspectorRejection = { control, events }
+        for (const type of ['input', 'change']) control.addEventListener(type, () => events.push({ type, value: control.value }))
+      })
       await mutate(fieldLocators(page, currentCaption, currentSelector))
       const before = await inspectPointInspectorField(page, currentCaption, currentSelector)
-      await diagnose({ boundary: `wrapped-inspector-rejection-${name}`, ...before })
-      await assert.rejects(selectPointInspectorField(page, currentCaption, 'dashed', { options }), pattern)
+      const mutationState = () => page.evaluate(() => {
+        const { control, events } = window.stzInspectorRejection
+        return { value: control.value, events: [...events] }
+      })
+      const beforeMutation = await mutationState()
+      const expectedRejection = pattern instanceof RegExp ? pattern.toString() : { ...pattern, message: pattern.message.toString() }
+      await diagnose({ boundary: `wrapped-inspector-rejection-${name}`, negativeCase: name, expectedRejection,
+        beforeMutation, ...before })
+      await verifyBefore(before, beforeMutation)
+      let actualRejection = null, rejectionFailure
+      try {
+        await assert.rejects(async () => {
+          try { await action() } catch (error) {
+            actualRejection = { name: error.name, code: error.code, message: error.message, stack: error.stack,
+              actual: error.actual, expected: error.expected, operator: error.operator }
+            throw error
+          }
+        }, pattern)
+      } catch (error) { rejectionFailure = error }
+      let afterMutation
+      try {
+        afterMutation = await boundedPointDiagnostic(mutationState, 'Inspector rejection mutation capture')
+        const result = { negativeCase: name, expectedRejection, actualRejection, beforeMutation, afterMutation,
+          valueUnchanged: afterMutation.value === beforeMutation.value,
+          eventsUnchanged: JSON.stringify(afterMutation.events) === JSON.stringify(beforeMutation.events) }
+        await boundedPointDiagnostic(() => diagnose({ boundary: `wrapped-inspector-rejection-result-${name}`, ...result }),
+          'Inspector rejection evidence')
+        observations.push(result)
+      } catch (error) { throw rejectionFailure ?? error }
+      if (rejectionFailure) throw rejectionFailure
+      assert.equal(afterMutation.value, beforeMutation.value, `${name}: rejection leaves native value unchanged`)
+      assert.deepEqual(beforeMutation.events, [], `${name}: no events before rejection`)
+      assert.deepEqual(afterMutation.events, [], `${name}: rejection dispatches no input/change events`)
       checks.push(name)
     }
     await reject('absent-inspector', ({ inspector }) => inspector.evaluate((element) => element.remove()), /One active Inspector/)
@@ -213,14 +286,43 @@ export async function checkPointInspectorFieldBoundary({ browser, page: appPage,
     await reject('absent-control', ({ controls }) => controls.evaluate((element) => element.remove()), /One native select/)
     await reject('duplicate-control', ({ controls }) => controls.evaluate((element) => element.after(element.cloneNode(true))), /One native select/)
     await reject('hidden-control', ({ controls }) => controls.evaluate((element) => { element.hidden = true }), /Visible native select/)
-    await reject('disabled-control', ({ controls }) => controls.evaluate((element) => { element.disabled = true }), /Enabled native select/)
+    await reject('disabled-control', ({ controls }) => controls.evaluate((element) => { element.disabled = true }),
+      DISABLED_BORDER_LINE_STYLE_REJECTION, { verifyBefore: async (before, mutation) => {
+        for (const count of ['inspectorCount', 'captionCount', 'wrapperCount', 'correctedControlCount']) assert.equal(before[count], 1, count)
+        const { wrappers, controls } = fieldLocators(page, currentCaption, currentSelector)
+        assert.equal(await wrappers.isVisible(), true, 'Disabled field wrapper remains visible')
+        assert.equal(await controls.isVisible(), true, 'Disabled native select remains visible')
+        assert.equal(before.wrappers[0].tag, 'label')
+        assert.equal(before.wrappers[0].labelControl?.sameAsResolvedControl, true, 'Label delegates to the unique intended select')
+        assert.equal(before.controls[0].localDomState.disabledProperty, true, 'Native disabled property is set')
+        assert.equal(before.controls[0].localDomState.matchesDisabled, true, 'Native select matches :disabled')
+        assert.deepEqual(before.playwrightState, { wrapper: { count: 1, enabled: false }, control: { count: 1, enabled: false } })
+        assert.equal(mutation.value, 'solid'); assert.notEqual(mutation.value, 'dashed')
+        assert.deepEqual(before.controls[0].options.map((option) => option.value), options)
+        assert.equal(before.controls[0].options.find((option) => option.value === 'dashed').disabled, false)
+      } })
+    await fieldLocators(page, currentCaption, currentSelector).controls.evaluate((element) => { element.disabled = false })
+    const restoredBefore = await inspectPointInspectorField(page, currentCaption, currentSelector)
+    assert.deepEqual(restoredBefore.playwrightState, { wrapper: { count: 1, enabled: true }, control: { count: 1, enabled: true } })
+    const restoredSelection = await selectPointInspectorField(page, currentCaption, 'dashed', { options })
+    const restoredEvents = await page.evaluate(() => window.stzInspectorRejection.events)
+    await diagnose({ boundary: 'wrapped-inspector-disabled-control-restored', restoredBefore, restoredSelection, restoredEvents })
+    assert.deepEqual(restoredEvents, [{ type: 'input', value: 'dashed' }, { type: 'change', value: 'dashed' }])
+    checks.push('restored-control-native-selection')
     await reject('unavailable-option', ({ controls }) => controls.locator('option[value="dashed"]').evaluate((element) => element.remove()), /Native option values/)
     await reject('disabled-option', ({ controls }) => controls.locator('option[value="dashed"]').evaluate((element) => { element.disabled = true }), /Enabled native option/)
-    await reset()
-    await assert.rejects(selectPointInspectorField(page, currentCaption, 'unavailable', { options }), /Available native option/)
-    await assert.rejects(resolvePointInspectorField(page, 'Border', 'select'), /One exact Inspector caption/)
-    await assert.rejects(resolvePointInspectorField(page, currentCaption, 'input[type="text"]'), /One native input/)
-    checks.push('unavailable-requested-value', 'caption-substring-rejected', 'wrong-control-type-rejected')
+    await reject('unavailable-requested-value', () => {}, /Available native option/, {
+      action: () => selectPointInspectorField(page, currentCaption, 'unavailable', { options }),
+    })
+    await reject('wrong-requested-value-type', () => {}, /Available native option/, {
+      action: () => selectPointInspectorField(page, currentCaption, 1, { options }),
+    })
+    await reject('caption-substring-rejected', () => {}, /One exact Inspector caption/, {
+      action: () => resolvePointInspectorField(page, 'Border', 'select'),
+    })
+    await reject('wrong-control-type-rejected', () => {}, /One native input/, {
+      action: () => resolvePointInspectorField(page, currentCaption, 'input[type="text"]'),
+    })
     await diagnose({ boundary: 'wrapped-inspector-field-regressions-complete', source: 'production-App-Inspector-clone', checks, observations })
     return { checks, observations }
   } catch (error) {

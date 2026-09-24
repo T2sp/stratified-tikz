@@ -759,9 +759,23 @@ The later `stz-phase32b-before-review-yLwzPX` parent completed all eleven cumula
 32A point scenarios, then timed out on the first 32B Inspector select's exact
 associated-label lookup. Seven native paint edits had reached the model with
 request count unchanged at 3. This establishes a harness locator failure, not an
-adapter/paint rendering defect or a complete mixed-paint pass. The adjacent
-invalid-width warning lookup was predicted from markup and had not executed.
+adapter/paint rendering defect or a complete mixed-paint pass. At that historical
+run the adjacent invalid-width warning lookup had not executed.
 The targeted harness correction matches captions independently of options and
 warnings and retains before/after DOM counts, model/history and request evidence.
-New native measurements and independent review remain parent gates; see
-[the correction report](PHASE_32B_IMPLEMENTATION.md#targeted-inspector-field-locator-correction).
+The subsequent `7bdmDz` parent supplies native dashed/round/bevel edits and mixed
+paint, plus actual `2 → NaN → 2` warning/recovery with unchanged model/history.
+It reached 25 production-markup clone checks, then failed an overly narrow
+disabled-control rejection expectation: Playwright follows `label.control`, so
+disabling the select correctly rejects at the wrapping label first. The local
+DOM `enabled` observation and Playwright's queried enabled state measure
+different things; diagnostics now name and retain both separately.
+
+The bounded test correction requires the exact disabled-field assertion,
+unchanged native value/no events, and normal selection after restoration. Real
+App conversion, history, and paint checks remain in place. The parent completed
+all eleven cumulative 32A scenarios but zero complete 32B paint scenarios;
+later variants, imports/persistence, lifecycle/dimming and paint exports remained
+unverified. The corrected final tree still requires fresh parent browser
+acceptance and independent review; child localhost `EPERM` is a separate startup
+limitation. See [the current correction report](PHASE_32B_IMPLEMENTATION.md#disabled-control-label-retargeting-correction-2026-09-24).
