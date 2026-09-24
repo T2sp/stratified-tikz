@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
+import { responsivePointFraming, assertResponsiveCaptureStable } from './pointResponsiveFraming.mjs'
 
 /** Observe the actual native SVG paint tree. This module never resolves model
  * styles; expected colors/alphas in acceptance are literal independent values. */
@@ -98,41 +100,42 @@ export function assertRasterPointOverlap(actual) {
  * model, body and contour alone. Fixed placement makes bounded native captures
  * and screen-coordinate clicks independent of the App's surrounding drawers. */
 export async function setPointDisplayScale(page, scale, standalone = false) {
-  const size = await page.evaluate(({ scale, standalone }) => {
+  assert.ok(Number.isFinite(scale) && scale > 0, 'CSS display scale must be finite and positive')
+  const size = await boundedPointDiagnostic(() => page.evaluate(({ scale, standalone }) => {
     const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
     const box = root.viewBox.baseVal
     return { width: Math.ceil(box.width * scale + 40), height: Math.ceil(box.height * scale + 40) }
-  }, { scale, standalone })
+  }, { scale, standalone }), 'responsive root size', 5000)
   assert.ok(size.width > 0 && size.height > 0 && size.width <= 4096 && size.height <= 4096,
     'Responsive native screenshot remains within its bounded viewport')
-  await page.setViewportSize({ width: Math.max(1200, size.width), height: Math.max(900, size.height) })
-  await page.evaluate(({ scale, standalone }) => {
+  await boundedPointDiagnostic(() => page.setViewportSize({ width: Math.max(1200, size.width), height: Math.max(900, size.height) }), 'responsive viewport resize', 5000)
+  await boundedPointDiagnostic(() => page.evaluate(({ scale, standalone }) => {
     const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
-    if (!root.hasAttribute('data-responsive-original-style')) root.setAttribute('data-responsive-original-style', root.getAttribute('style') ?? '')
+    if (!root.hasAttribute('data-responsive-original-style')) root.setAttribute('data-responsive-original-style', JSON.stringify(root.getAttribute('style')))
     const box = root.viewBox.baseVal
     for (const [key, value] of Object.entries({ position: 'fixed', left: '20px', top: '20px',
       width: `${box.width * scale}px`, height: `${box.height * scale}px`, 'min-width': '0', 'min-height': '0',
       'max-width': 'none', 'max-height': 'none', margin: '0', padding: '0', border: '0', 'z-index': '2147483647' })) root.style.setProperty(key, value, 'important')
-  }, { scale, standalone })
+  }, { scale, standalone }), 'responsive CSS scale', 5000)
 }
 
 export async function restorePointDisplayScale(page) {
-  await page.evaluate(() => {
+  await boundedPointDiagnostic(() => page.evaluate(() => {
     const root = document.querySelector('[data-responsive-original-style]')
     if (!root) return
-    const original = root.getAttribute('data-responsive-original-style')
-    if (original) root.setAttribute('style', original)
+    const original = JSON.parse(root.getAttribute('data-responsive-original-style'))
+    if (original !== null) root.setAttribute('style', original)
     else root.removeAttribute('style')
     root.removeAttribute('data-responsive-original-style')
-  })
+  }), 'responsive CSS restore', 5000)
 }
 
 /** A real browser screenshot is the paint oracle. Decode that exact PNG only
  * to count fixture-red pixels; never redraw the contour at scale 1. The root
  * and contour screen matrices, body, layout and screenshot crop are retained
  * before assertions, including for the deliberately broken vector effect. */
-export async function captureResponsivePointPaint(page, { id = 'app-point', source = 'Scale', standalone = false, path, persist }) {
-  const observation = await page.evaluate(({ id, source, standalone, path }) => {
+export async function measureResponsivePointPaint(page, { id = 'app-point', source = 'Scale', standalone = false } = {}) {
+  return boundedPointDiagnostic(() => page.evaluate(({ id, source, standalone }) => {
     const root = standalone ? document.documentElement : document.querySelector('svg.svg-diagram')
     const body = standalone ? [...root.querySelectorAll('g > title')].find((title) => title.textContent === source)?.parentElement
       : root.querySelector(`[data-point-id="${CSS.escape(id)}"] [data-label-state]`)
@@ -144,6 +147,8 @@ export async function captureResponsivePointPaint(page, { id = 'app-point', sour
     const rect = (element) => { const b = element.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
     const bbox = (element) => { const b = element.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height } }
     const css = getComputedStyle(contour), rootCss = getComputedStyle(root)
+    const state = window.stzAppLabels?.state()
+    const diagram = state && JSON.parse(state.json).diagram
     return { root: { rect: rect(root), ctm: matrix(root), viewBox: root.getAttribute('viewBox'),
       width: root.getAttribute('width'), height: root.getAttribute('height'), cssWidth: rootCss.width, cssHeight: rootCss.height },
       viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, scroll: { x: scrollX, y: scrollY },
@@ -152,18 +157,55 @@ export async function captureResponsivePointPaint(page, { id = 'app-point', sour
         shapeBounds: bbox(contour), strokeWidth: parseFloat(css.strokeWidth), stroke: css.stroke, opacity: Number(css.strokeOpacity),
         vectorEffect: css.vectorEffect, dash: css.strokeDasharray, dashOffset: parseFloat(css.strokeDashoffset),
         lineCap: css.strokeLinecap, lineJoin: css.strokeLinejoin },
-      body: { bounds: bbox(body), ctm: matrix(body), request: body.getAttribute('data-label-request'), source },
+      body: { bounds: bbox(body), ctm: matrix(body), request: body.getAttribute('data-label-request'),
+        source: standalone ? body.querySelector(':scope > title')?.textContent : body.getAttribute('data-label-source'),
+        font: getComputedStyle(body).font },
       layout: { shapeBounds: point.getAttribute('data-point-shape-bounds')?.split(' ').map(Number),
         paintedBounds: point.getAttribute('data-point-painted-bounds')?.split(' ').map(Number),
         selectionRadius: point.querySelector('[data-svg-export-exclude]')?.getAttribute('r') ?? null },
-      selection: window.stzAppLabels?.state().selection,
-      xml: new XMLSerializer().serializeToString(root), capture: { status: 'pending', path } }
-  }, { id, source, standalone, path })
-  await persist(observation)
+      selection: state?.selection,
+      framingState: { camera: diagram?.camera, view: diagram?.view, uiSettings: state?.uiSettings,
+        previewCameraSummary: document.querySelector('.camera-summary')?.textContent ?? null,
+        modelPosition: diagram?.strata.find((stratum) => stratum.id === id)?.position,
+        pointTransform: point.getAttribute('transform'), rootTransform: root.getAttribute('transform') },
+      xml: new XMLSerializer().serializeToString(root) }
+  }, { id, source, standalone }), 'responsive point measurements', 5000)
+}
+
+export async function settleResponsivePointCapture(page) {
+  await boundedPointDiagnostic(() => page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  })), 'responsive layout settling', 5000)
+}
+
+export async function captureResponsivePointPaint(page, { id = 'app-point', source = 'Scale', standalone = false, path, persist,
+  scale, variant = 'solid' }) {
+  let observation = { capture: { status: 'pending', path } }
+  const save = () => boundedPointDiagnostic(() => persist(observation), 'responsive capture evidence', 5000)
   try {
     const root = standalone ? page.locator('svg').first() : page.locator('svg.svg-diagram')
+    // Explicit scrolling/settling precedes the retained coordinate snapshot.
+    // Preflight then requires the entire root to fit; screenshot auto-scrolling
+    // or any intervening layout/transform change must fail the post-check.
+    await root.scrollIntoViewIfNeeded({ timeout: 5000 })
+    await settleResponsivePointCapture(page)
+    const before = await measureResponsivePointPaint(page, { id, source, standalone })
+    observation = { ...before, capture: observation.capture }
+    await save()
+    observation.framing = responsivePointFraming(before, { scale, variant })
+    await save()
     const png = await root.screenshot({ path, timeout: 5000, scale: 'css', animations: 'disabled' })
-    const raster = await page.evaluate(async ({ png, observation }) => {
+    const after = await measureResponsivePointPaint(page, { id, source, standalone })
+    observation.measurements = { before: { ...before, xml: undefined }, after: { ...after, xml: undefined } }
+    await save()
+    assert.ok(png.length > 24 && png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), 'Native capture is a PNG')
+    const dimensions = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
+    observation.capture = { status: 'captured', path, bytes: png.length, ...dimensions }
+    await save()
+    assertResponsiveCaptureStable(before, after, dimensions)
+    observation.capture.coordinatesStable = true
+
+    const raster = await boundedPointDiagnostic(() => page.evaluate(async ({ png, observation }) => {
       const image = new Image(); image.src = `data:image/png;base64,${png}`
       let decodeTimer
       try {
@@ -199,14 +241,15 @@ export async function captureResponsivePointPaint(page, { id = 'app-point', sour
         bounds: count ? { minX, minY, maxX, maxY } : null,
         eastRun: row.length ? { min: row[0], max: row.at(-1) + 1, width: row.at(-1) + 1 - row[0] } : null,
         center, phaseSamples, method: 'actual native screenshot PNG, fixture-red pixel mask; no SVG reconstruction' }
-    }, { png: png.toString('base64'), observation: { ...observation, xml: undefined } })
+    }, { png: png.toString('base64'), observation: { ...before, xml: undefined } }), 'responsive PNG pixel decoding', 6000)
     observation.raster = raster
-    observation.capture = { status: 'saved', path, bytes: png.length, width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
-    await persist(observation)
+    observation.capture = { ...observation.capture, status: 'saved' }
+    await save()
     return observation
   } catch (error) {
-    observation.capture = { status: 'failed', path, error: { message: error.message, stack: error.stack } }
-    await persist(observation).catch(() => {})
+    if (error.framing) observation.framing = error.framing
+    observation.capture = { ...observation.capture, status: 'failed', path, error: { message: error.message, stack: error.stack } }
+    await save().catch(() => {})
     throw error
   }
 }
@@ -216,6 +259,8 @@ export async function captureResponsivePointPaint(page, { id = 'app-point', sour
  * geometry may be observed; neither expected border geometry nor the raster
  * target is computed from production painted bounds or strokeWidth. */
 export function assertResponsivePointPaint(actual, { scale, shape = 'circle', variant = 'solid', selected = false, standalone = false } = {}) {
+  responsivePointFraming(actual, { scale, variant })
+  if (actual.measurements) assertResponsiveCaptureStable(actual.measurements.before, actual.measurements.after, actual.capture)
   const near = (value, target, tolerance, label) => assert.ok(Number.isFinite(value) && Math.abs(value - target) <= tolerance,
     `${label}: ${value} != ${target} (tolerance ${tolerance})`)
   for (const [name, m] of [['root', actual.root.ctm], ['contour', actual.contour.ctm]]) {
@@ -226,6 +271,11 @@ export function assertResponsivePointPaint(actual, { scale, shape = 'circle', va
   assert.ok(actual.capture.bytes > 24)
   near(actual.raster.width, actual.root.rect.width, 1, 'Raster preserves root display width')
   near(actual.raster.height, actual.root.rect.height, 1, 'Raster preserves root display height')
+  if (actual.raster.bounds) {
+    assert.ok(actual.raster.bounds.minX > 0 && actual.raster.bounds.minY > 0
+      && actual.raster.bounds.maxX < actual.raster.width && actual.raster.bounds.maxY < actual.raster.height,
+    'Actual contour is not cropped by the native viewport')
+  }
   const enabled = variant !== 'disabled', visible = enabled && variant !== 'transparent'
   const halfWidth = enabled ? 12 : 0
   near(actual.contour.strokeWidth, 24, 1e-8, 'Declared 20pt is 24 local units')
@@ -267,10 +317,5 @@ export function assertResponsivePointPaint(actual, { scale, shape = 'circle', va
       assert.equal(sample.red, (sample.distance + 3.6) % 24 < 14.4,
         `Native dash/phase at ${sample.distance} local units scales with CTM ${scale}`)
     }
-  }
-  if (actual.raster.bounds) {
-    assert.ok(actual.raster.bounds.minX > 0 && actual.raster.bounds.minY > 0
-      && actual.raster.bounds.maxX < actual.raster.width && actual.raster.bounds.maxY < actual.raster.height,
-    'Actual contour is not cropped by the native viewport')
   }
 }

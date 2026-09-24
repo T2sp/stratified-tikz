@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertPointPaint, assertRasterPointOverlap, assertResponsivePointPaint } from '../../scripts/pointPaintOracle.mjs'
+import { runInNewContext } from 'node:vm'
+import { assertPointPaint, assertRasterPointOverlap, assertResponsivePointPaint, captureResponsivePointPaint,
+  restorePointDisplayScale, setPointDisplayScale } from '../../scripts/pointPaintOracle.mjs'
+import { assertResponsiveCaptureStable, responsivePointFraming, responsivePointProbes } from '../../scripts/pointResponsiveFraming.mjs'
 
 test('paint oracle rejects coupled colors, lost zero opacity, dropped dash and lost explicit math color', () => {
   const expected = { fill: 'rgb(0, 0, 255)', stroke: 'rgb(0, 128, 0)', fillAlpha: 0, strokeAlpha: .7,
@@ -38,14 +41,19 @@ function responsiveObservation(scale, shape = 'circle', variant = 'solid') {
   const center = { x: 260 * scale, y: 180 * scale }
   const matrix = { a: scale, b: 0, c: 0, d: scale, e: 20, f: 20 }
   return {
-    root: { ctm: matrix, rect: { x: 20, y: 20, width: 520 * scale, height: 360 * scale } },
+    root: { ctm: matrix, rect: { x: 20, y: 20, width: 520 * scale, height: 360 * scale },
+      viewBox: '0 0 520 360', cssWidth: `${520 * scale}px`, cssHeight: `${360 * scale}px` },
+    viewport: { width: 1200, height: 900 }, scroll: { x: 0, y: 0 }, devicePixelRatio: 2,
+    body: { bounds: { x: -20, y: -10, width: 40, height: 20 },
+      ctm: { ...matrix, e: center.x + 20, f: center.y + 20 }, source: 'Scale', request: 'unchanged-body-request' },
+    framingState: { camera: { panX: 0, panY: 0, zoom: 1 } },
     contour: { ctm: { ...matrix, e: center.x + 20, f: center.y + 20 },
       kind: circle ? 'circle' : 'polygon', radius,
       vertices: circle ? [] : [{ x: 0, y: -80 }, { x: -40 * Math.sqrt(3), y: 40 }, { x: 40 * Math.sqrt(3), y: 40 }],
       shapeBounds: path, strokeWidth: 24, stroke: enabled ? 'rgb(204, 0, 0)' : 'none',
       opacity: variant === 'transparent' ? 0 : 1,
       dash: variant === 'dashed' ? '14.4px, 9.6px' : 'none', dashOffset: variant === 'dashed' ? 3.6 : 0 },
-    capture: { status: 'saved', bytes: 1000 },
+    capture: { status: 'saved', bytes: 1000, width: 520 * scale, height: 360 * scale },
     layout: { paintedBounds: bounds, selectionRadius: String(radius + extension * (circle ? 1 : 2) + 6) },
     raster: { width: 520 * scale, height: 360 * scale, center, redPixels: visible ? 500 : 0,
       bounds: visible ? { minX: center.x + bounds[0] * scale, minY: center.y + bounds[1] * scale,
@@ -98,4 +106,384 @@ test('responsive oracle rejects stale transforms, local bounds, selection paddin
   const dash = responsiveObservation(.5, 'circle', 'dashed')
   dash.raster.phaseSamples[2].red = true
   assert.throws(() => assertResponsivePointPaint(dash, { scale: .5, variant: 'dashed' }), /dash\/phase/)
+})
+
+function moveResponsivePoint(actual, x, y) {
+  const { a, d, e, f } = actual.root.ctm
+  actual.contour.ctm.e = x * a + e; actual.contour.ctm.f = y * d + f
+  actual.body.ctm.e = actual.contour.ctm.e; actual.body.ctm.f = actual.contour.ctm.f
+  const old = actual.raster.center
+  const center = { x: x * a, y: y * d }
+  if (actual.raster.bounds) {
+    for (const key of ['minX', 'maxX']) actual.raster.bounds[key] += center.x - old.x
+    for (const key of ['minY', 'maxY']) actual.raster.bounds[key] += center.y - old.y
+  }
+  actual.raster.center = center
+  return actual
+}
+
+function historicalCircle(center = { x: 116, y: 324 }) {
+  const actual = responsiveObservation(.5), radius = 41.50710678
+  actual.contour.radius = radius
+  actual.contour.shapeBounds = { x: -radius, y: -radius, width: radius * 2, height: radius * 2 }
+  const painted = radius + 12
+  actual.layout.paintedBounds = [-painted, -painted, painted, painted]
+  actual.layout.selectionRadius = String(painted + 6)
+  actual.raster.bounds = { minX: 130 - painted * .5, minY: 90 - painted * .5,
+    maxX: 130 + painted * .5, maxY: 90 + painted * .5 }
+  return moveResponsivePoint(actual, center.x, center.y)
+}
+
+test('historical 260-by-180 capture fails setup before its clipped circle pixels can be judged', () => {
+  const actual = historicalCircle()
+  assert.deepEqual(actual.root.rect, { x: 20, y: 20, width: 260, height: 180 })
+  assert.deepEqual(actual.raster.center, { x: 58, y: 162 })
+  assert.equal(actual.contour.ctm.e, 78); assert.equal(actual.contour.ctm.f, 182)
+  assert.ok(Math.abs(actual.raster.bounds.maxY - 188.75355339) < 1e-8)
+  // Reproduce the measured PNG edge. The preflight must not accept that edge
+  // by using the clipped pixels or the application's own painted bounds.
+  actual.raster.bounds.maxY = 180
+  actual.layout.paintedBounds[3] = 36
+  assert.throws(() => responsivePointFraming(actual, { scale: .5 }), (error) => {
+    assert.match(error.message, /Responsive framing setup: complete expected envelope/)
+    assert.equal(error.framing.status, 'failed')
+    assert.ok(Math.abs(162 + error.framing.local.geometric.maxY * .5 - 188.75355339) < 1e-8)
+    assert.ok(Math.abs(error.framing.expected.capture.maxY - 194.75355339) < 1e-8,
+      'Failure retains the larger control envelope instead of clipping it to 180')
+    assert.ok(Math.abs(error.framing.margins.capture.bottom + 14.75355339) < 1e-8)
+    return true
+  })
+  assert.throws(() => assertResponsivePointPaint(actual, { scale: .5 }), /Responsive framing setup:/)
+})
+
+test('interior placement preserves the historical radius, declaration, body source and physical paint target', () => {
+  const original = historicalCircle(), framed = historicalCircle({ x: 260, y: 180 })
+  const unchanged = (actual) => ({ radius: actual.contour.radius, bounds: actual.contour.shapeBounds,
+    width: actual.contour.strokeWidth, body: actual.body.bounds, source: actual.body.source,
+    request: actual.body.request, painted: actual.layout.paintedBounds, thickness: actual.raster.eastRun.width })
+  assert.deepEqual(unchanged(framed), unchanged(original))
+  const coverage = responsivePointFraming(framed, { scale: .5 })
+  assert.equal(coverage.declaredWidthPt, 20); assert.equal(coverage.halfWidth, 12)
+  assert.equal(framed.raster.eastRun.width, 12)
+  assert.ok(coverage.expected.capture.maxY < 180 - 2)
+  assert.doesNotThrow(() => assertResponsivePointPaint(framed, { scale: .5, selected: true }))
+})
+
+for (const scale of [.5, 2]) for (const shape of ['circle', 'triangle']) {
+  test(`framing reserves ${shape} paint, selection, native probes and both stroke models at scale ${scale}`, () => {
+    for (const variant of ['solid', 'dashed', 'transparent', 'disabled']) {
+      const actual = responsiveObservation(scale, shape, variant)
+      // A missing selected overlay and an empty pixel mask do not narrow the
+      // independently required setup envelope.
+      for (const selected of [false, true]) {
+        actual.selection = selected ? [{ id: 'app-point' }] : []
+        const coverage = responsivePointFraming(actual, { scale, variant })
+        assert.equal(coverage.status, 'passed')
+        assert.equal(coverage.selectionStrokePx, 3)
+        assert.equal(coverage.local.selection.maxX,
+          actual.contour.radius + (shape === 'circle' ? 12 : 24) + 6 + 1.5 / scale)
+        assert.ok(Object.values(coverage.margins.capture).every((value) => value >= 2))
+        assert.deepEqual(coverage.probes, responsivePointProbes(actual, variant))
+        for (const probe of Object.values(coverage.probeMargins.capture)) {
+          assert.ok(Object.values(probe).every((value) => value >= 2))
+        }
+        const path = actual.contour.shapeBounds
+        assert.equal(coverage.local.nonScaling.minY, path.y - (shape === 'circle' ? 12 : 24) / scale)
+        assert.equal(coverage.local.geometric.minY, path.y - (shape === 'circle' ? 12 : 24))
+        const injected = structuredClone(actual)
+        injected.contour.vectorEffect = 'non-scaling-stroke'
+        assert.deepEqual(responsivePointFraming(injected, { scale, variant }), coverage,
+          'The injected control must be fully framed independently of its computed vector effect')
+      }
+      const clipped = moveResponsivePoint(structuredClone(actual), 116, 324)
+      assert.throws(() => responsivePointFraming(clipped, { scale, variant }), /Responsive framing setup:/,
+        `${variant} coverage must not depend on a visible red-pixel mask`)
+    }
+  })
+}
+
+test('half-scale setup reserves the larger broken non-scaling circle before physical-width rejection', () => {
+  const actual = moveResponsivePoint(responsiveObservation(.5), 260, 294)
+  const center = actual.contour.ctm.f
+  assert.ok(center + (40 + 12) * .5 <= 198, 'Valid geometric border has a positive margin')
+  assert.ok(center + (40 + 12 + 6) * .5 + 1.5 <= 198, 'Selection overlay also fits')
+  assert.equal(center + (40 + 24) * .5, 199, 'Broken control leaves only one pixel at the bottom')
+  assert.throws(() => responsivePointFraming(actual, { scale: .5 }), /complete expected envelope needs 2px margin/)
+})
+
+test('a cropped negative control fails coverage before it can count as a physical-width rejection', () => {
+  for (const scale of [.5, 2]) for (const shape of ['circle', 'triangle']) {
+    const actual = responsiveObservation(scale, shape)
+    actual.contour.vectorEffect = 'non-scaling-stroke'
+    actual.raster.eastRun.width = 24
+    actual.raster.bounds.maxY = actual.raster.height
+    assert.doesNotThrow(() => responsivePointFraming(actual, { scale }))
+    assert.throws(() => assertResponsivePointPaint(actual, { scale, shape, selected: true }), (error) => {
+      assert.match(error.message, /Actual contour is not cropped by the native viewport/)
+      assert.doesNotMatch(error.message, /Native physical paint extent|Physical border thickness/)
+      return true
+    })
+  }
+})
+
+test('framing rejects nonfinite, stale, unsupported and cropped geometry instead of clamping it', () => {
+  const faults = [
+    ['nonfinite contour CTM', (actual) => { actual.contour.ctm.e = NaN }],
+    ['singular body CTM', (actual) => { actual.body.ctm.a = 0 }],
+    ['sheared root CTM', (actual) => { actual.root.ctm.c = .01 }],
+    ['wrong contour scale', (actual) => { actual.contour.ctm.a = actual.contour.ctm.d = 1 }],
+    ['stale capture origin', (actual) => { actual.root.rect.x += 1 }],
+    ['cropped root width', (actual) => { actual.root.rect.width -= 1 }],
+    ['fractional crop origin', (actual) => { actual.root.rect.x += .25; actual.root.ctm.e += .25 }],
+    ['stale CSS height', (actual) => { actual.root.cssHeight = '179px' }],
+    ['invalid viewBox', (actual) => { actual.root.viewBox = '0 0 520 NaN' }],
+    ['nonpositive viewBox', (actual) => { actual.root.viewBox = '0 0 520 0' }],
+    ['invalid radius', (actual) => { actual.contour.radius = Infinity }],
+    ['stale shape bounds', (actual) => { actual.contour.shapeBounds.width -= 1 }],
+    ['nonfinite body bounds', (actual) => { actual.body.bounds.width = NaN }],
+    ['empty body bounds', (actual) => { actual.body.bounds.height = 0 }],
+    ['body outside capture', (actual) => { actual.body.ctm.f += 200 }],
+    ['cropped viewport', (actual) => { actual.viewport.height = 199 }],
+    ['unbounded viewport', (actual) => { actual.viewport.width = 4097 }],
+    ['invalid scroll', (actual) => { actual.scroll.y = Infinity }],
+    ['invalid pixel ratio', (actual) => { actual.devicePixelRatio = 0 }],
+  ]
+  for (const [name, mutate] of faults) {
+    const actual = responsiveObservation(.5)
+    mutate(actual)
+    assert.throws(() => responsivePointFraming(actual, { scale: .5 }), /Responsive framing setup:/, name)
+  }
+  const triangle = responsiveObservation(.5, 'triangle')
+  triangle.contour.vertices[0].x = 1
+  assert.throws(() => responsivePointFraming(triangle, { scale: .5 }), /triangle top/)
+})
+
+test('capture stability accepts identical geometry but rejects scroll, layout, body and root changes', () => {
+  const before = responsiveObservation(.5)
+  const png = { width: 260, height: 180 }
+  assert.doesNotThrow(() => assertResponsiveCaptureStable(before, structuredClone(before), png))
+  const faults = [
+    (after) => { after.scroll.y = 1 },
+    (after) => { after.root.rect.y += 1 },
+    (after) => { after.root.ctm.f += 1 },
+    (after) => { after.contour.ctm.e += 1 },
+    (after) => { after.contour.ctm.a = NaN },
+    (after) => { after.body.ctm.a *= 2 },
+    (after) => { after.body.bounds.width += 1 },
+    (after) => { after.body.request = 'new-body-request' },
+    (after) => { after.layout.selectionRadius = '80' },
+    (after) => { after.viewport.height += 1 },
+    (after) => { after.devicePixelRatio = 1 },
+    (after) => { after.framingState.camera.panX = 1 },
+  ]
+  for (const mutate of faults) {
+    const after = structuredClone(before)
+    mutate(after)
+    assert.throws(() => assertResponsiveCaptureStable(before, after, png), /Responsive capture coordinate mismatch/)
+  }
+  for (const crop of [{ width: 259, height: 180 }, { width: 260, height: 179 }, { width: NaN, height: 180 }]) {
+    assert.throws(() => assertResponsiveCaptureStable(before, structuredClone(before), crop), /Responsive capture coordinate mismatch: PNG/)
+  }
+})
+
+// Header bytes test orchestration and crop validation only. They are never
+// considered raster acceptance; the fake page returns a separately labelled
+// synthetic raster where a real browser would decode the screenshot bytes.
+function capturePngHeader(width = 260, height = 180) {
+  const bytes = Buffer.alloc(25)
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(bytes)
+  bytes.writeUInt32BE(width, 16); bytes.writeUInt32BE(height, 20)
+  return bytes
+}
+
+function responsiveCapturePage({ before = responsiveObservation(.5), after = before, png = capturePngHeader(), screenshotError } = {}) {
+  const calls = [], checkpoints = [], measurements = [before, after]
+  let measureIndex = 0
+  const native = (actual) => {
+    const copy = structuredClone(actual)
+    delete copy.raster; delete copy.capture
+    copy.xml = '<svg><!-- original native document --></svg>'
+    return copy
+  }
+  const locator = {
+    first() { calls.push('first'); return locator },
+    async scrollIntoViewIfNeeded(options) { calls.push('scroll'); assert.deepEqual(options, { timeout: 5000 }) },
+    async screenshot(options) {
+      calls.push('screenshot')
+      assert.deepEqual(options, { path: 'responsive.png', timeout: 5000, scale: 'css', animations: 'disabled' })
+      assert.equal(checkpoints.at(-1).framing.status, 'passed', 'Preflight evidence must precede the actual image')
+      if (screenshotError) throw screenshotError
+      return png
+    },
+  }
+  const page = {
+    locator(selector) { calls.push(`locator:${selector}`); return locator },
+    async evaluate(_callback, args) {
+      if (args === undefined) { calls.push('settle'); return }
+      if ('png' in args) {
+        calls.push('decode')
+        assert.equal(args.png, png.toString('base64'), 'Pixel decoding uses the actual screenshot bytes')
+        assert.deepEqual(args.observation.contour, before.contour)
+        assert.equal(checkpoints.at(-1).capture.status, 'captured')
+        return { ...structuredClone(before.raster), method: 'synthetic raster for capture orchestration test only' }
+      }
+      calls.push('measure')
+      assert.equal(args.source, 'Scale')
+      assert.ok(measureIndex < measurements.length, 'No hidden capture retries')
+      return native(measurements[measureIndex++])
+    },
+  }
+  const persist = async (observation) => {
+    calls.push(`persist:${observation.capture.status}`)
+    checkpoints.push(structuredClone(observation))
+  }
+  return { page, calls, checkpoints, persist, options: { path: 'responsive.png', scale: .5, persist } }
+}
+
+test('native capture explicitly scrolls and settles before retained measurements, then validates before decoding', async () => {
+  for (const standalone of [false, true]) {
+    const fake = responsiveCapturePage()
+    const captured = await captureResponsivePointPaint(fake.page, { ...fake.options, standalone })
+    assert.deepEqual(fake.calls, [standalone ? 'locator:svg' : 'locator:svg.svg-diagram', ...(standalone ? ['first'] : []),
+      'scroll', 'settle', 'measure', 'persist:pending', 'persist:pending', 'screenshot', 'measure',
+      'persist:pending', 'persist:captured', 'decode', 'persist:saved'])
+    assert.equal(captured.capture.status, 'saved')
+    assert.equal(captured.capture.coordinatesStable, true)
+    assert.deepEqual(captured.measurements.before, captured.measurements.after)
+    assert.equal(captured.capture.width, 260); assert.equal(captured.capture.height, 180)
+    assert.equal(captured.body.source, 'Scale')
+    assert.equal(fake.checkpoints[0].xml, '<svg><!-- original native document --></svg>')
+  }
+})
+
+test('historical out-of-frame capture persists the setup failure and never screenshots or decodes', async () => {
+  const fake = responsiveCapturePage({ before: historicalCircle() })
+  await assert.rejects(captureResponsivePointPaint(fake.page, fake.options), /Responsive framing setup:/)
+  assert.equal(fake.calls.includes('screenshot'), false)
+  assert.equal(fake.calls.includes('decode'), false)
+  assert.deepEqual(fake.calls.slice(0, 4), ['locator:svg.svg-diagram', 'scroll', 'settle', 'measure'])
+  assert.equal(fake.checkpoints.at(-1).capture.status, 'failed')
+  assert.equal(fake.checkpoints.at(-1).contour.ctm.f, 182)
+  assert.match(fake.checkpoints.at(-1).capture.error.message, /complete expected envelope/)
+  assert.equal(fake.checkpoints.at(-1).framing.status, 'failed')
+  assert.ok(Math.abs(fake.checkpoints.at(-1).framing.expected.capture.maxY - 194.75355339) < 1e-8)
+  assert.ok(Math.abs(fake.checkpoints.at(-1).framing.margins.capture.bottom + 14.75355339) < 1e-8)
+})
+
+test('capture coordinate drift keeps both snapshots and rejects the image before its pixels are decoded', async () => {
+  for (const mutate of [
+    (after) => { after.scroll.y = 12 },
+    (after) => { after.root.rect.y += 1; after.root.ctm.f += 1 },
+    (after) => { after.contour.ctm.e += 1 },
+    (after) => { after.body.ctm.f += 1 },
+    (after) => { after.body.bounds.width = NaN },
+  ]) {
+    const before = responsiveObservation(.5), after = structuredClone(before)
+    mutate(after)
+    const fake = responsiveCapturePage({ before, after })
+    await assert.rejects(captureResponsivePointPaint(fake.page, fake.options), /Responsive capture coordinate mismatch/)
+    assert.equal(fake.calls.filter((call) => call === 'screenshot').length, 1)
+    assert.equal(fake.calls.includes('decode'), false)
+    const failed = fake.checkpoints.at(-1)
+    assert.equal(failed.capture.status, 'failed')
+    assert.equal(failed.capture.coordinatesStable, undefined)
+    assert.deepEqual(failed.measurements.before.root, before.root)
+    assert.deepEqual(failed.measurements.after.root, after.root)
+    assert.deepEqual(failed.measurements.after.body, after.body)
+  }
+})
+
+test('invalid PNG bytes and cropped screenshots fail before pixel decoding despite stable measurements', async () => {
+  for (const png of [Buffer.from('not a PNG'), capturePngHeader(259, 180), capturePngHeader(260, 179)]) {
+    const fake = responsiveCapturePage({ png })
+    await assert.rejects(captureResponsivePointPaint(fake.page, fake.options), /Native capture is a PNG|Responsive capture coordinate mismatch: PNG/)
+    assert.equal(fake.calls.filter((call) => call === 'screenshot').length, 1)
+    assert.equal(fake.calls.includes('decode'), false)
+    assert.equal(fake.checkpoints.at(-1).capture.status, 'failed')
+    assert.deepEqual(fake.checkpoints.at(-1).measurements.before, fake.checkpoints.at(-1).measurements.after)
+  }
+})
+
+test('failed diagnostic persistence cannot replace the original screenshot error or trigger capture retries', async () => {
+  const primary = new Error('primary bounded screenshot error')
+  const fake = responsiveCapturePage({ screenshotError: primary })
+  await assert.rejects(captureResponsivePointPaint(fake.page, { ...fake.options, persist: async (observation) => {
+    await fake.persist(observation)
+    if (observation.capture.status === 'failed') throw new Error('secondary diagnostic storage failure')
+  } }), (error) => error === primary)
+  assert.equal(fake.calls.filter((call) => call === 'screenshot').length, 1)
+  assert.equal(fake.calls.includes('decode'), false)
+  assert.equal(fake.checkpoints.at(-1).capture.error.message, primary.message)
+  assert.equal(fake.checkpoints.at(-1).xml, '<svg><!-- original native document --></svg>')
+})
+
+function responsiveStylePage(original) {
+  const attributes = new Map(original === null ? [] : [['style', original]])
+  const calls = { evaluate: 0, viewports: [], properties: [] }
+  const root = {
+    viewBox: { baseVal: { x: 0, y: 0, width: 520, height: 360 } },
+    getAttribute: (name) => attributes.get(name) ?? null,
+    hasAttribute: (name) => attributes.has(name),
+    setAttribute: (name, value) => attributes.set(name, value),
+    removeAttribute: (name) => attributes.delete(name),
+    style: { setProperty(name, value, priority) {
+      calls.properties.push({ name, value, priority })
+      attributes.set('style', `${attributes.get('style') ?? ''}${name}:${value}!${priority};`)
+    } },
+  }
+  const document = {
+    documentElement: root,
+    querySelector(selector) {
+      if (selector === 'svg.svg-diagram') return root
+      assert.equal(selector, '[data-responsive-original-style]')
+      return attributes.has('data-responsive-original-style') ? root : null
+    },
+  }
+  const page = {
+    async evaluate(callback, args) {
+      calls.evaluate++
+      return runInNewContext(`(${callback.toString()})(args)`, { document, args })
+    },
+    async setViewportSize(viewport) { calls.viewports.push(structuredClone(viewport)) },
+  }
+  return { page, root, attributes, calls }
+}
+
+test('display scaling restores absent, empty and existing root styles exactly across repeated CSS scales', async () => {
+  for (const original of [null, '', 'opacity: .7; width: 65%; color: red;']) for (const standalone of [false, true]) {
+    const fake = responsiveStylePage(original)
+    const viewBox = structuredClone(fake.root.viewBox.baseVal)
+    for (const scale of [.5, 2]) {
+      await setPointDisplayScale(fake.page, scale, standalone)
+      assert.equal(fake.attributes.get('data-responsive-original-style'), JSON.stringify(original))
+      assert.deepEqual(fake.calls.properties.findLast(({ name }) => name === 'width'),
+        { name: 'width', value: `${520 * scale}px`, priority: 'important' })
+      assert.deepEqual(fake.calls.properties.findLast(({ name }) => name === 'height'),
+        { name: 'height', value: `${360 * scale}px`, priority: 'important' })
+      assert.deepEqual(fake.root.viewBox.baseVal, viewBox, 'CSS scaling must preserve model/root coordinates')
+    }
+    await restorePointDisplayScale(fake.page)
+    assert.equal(fake.root.getAttribute('style'), original)
+    assert.equal(fake.root.hasAttribute('style'), original !== null)
+    assert.equal(fake.root.hasAttribute('data-responsive-original-style'), false)
+    await restorePointDisplayScale(fake.page)
+    assert.equal(fake.root.getAttribute('style'), original, 'Cleanup is harmless after restoration')
+  }
+})
+
+test('invalid display scales fail before browser or style mutations and oversized capture is bounded', async () => {
+  for (const scale of [NaN, Infinity, -Infinity, 0, -1, '.5', undefined]) {
+    const fake = responsiveStylePage('color: red;')
+    await assert.rejects(setPointDisplayScale(fake.page, scale), /finite and positive/)
+    assert.equal(fake.calls.evaluate, 0)
+    assert.deepEqual(fake.calls.viewports, [])
+    assert.deepEqual(fake.calls.properties, [])
+    assert.equal(fake.root.getAttribute('style'), 'color: red;')
+  }
+  const fake = responsiveStylePage(null)
+  await assert.rejects(setPointDisplayScale(fake.page, 100), /bounded viewport/)
+  assert.equal(fake.calls.evaluate, 1, 'Only the existing viewBox was read')
+  assert.deepEqual(fake.calls.viewports, [])
+  assert.deepEqual(fake.calls.properties, [])
+  assert.equal(fake.root.hasAttribute('data-responsive-original-style'), false)
 })

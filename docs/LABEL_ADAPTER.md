@@ -791,3 +791,18 @@ unverified until the subsequent successful `yeWQVG` parent. Child localhost
 `EPERM` is a separate startup limitation. See
 [the current correction report](PHASE_32B_IMPLEMENTATION.md) for the production
 findings and corrected-tree verification/review status.
+
+The `cI6r6H` parent subsequently passed namespace aliases and the five earlier
+paint cases, but its first responsive circle was clipped by the SVG root:
+expected bottom 188.75px in a 180px PNG. This is a fixture framing failure;
+source/font conversion and the measured 20pt geometric border are unchanged.
+The responsive fixture now uses the axes-fit midpoint before invariant baselines,
+including each fresh real-export input. Independent expected envelopes reserve
+all geometry and the larger non-scaling control even for invisible paint.
+Bounded captures settle first, retain root/body/contour transforms before and
+after screenshots, reject coordinate drift and decode the original native PNG
+using the safe XML Canvas path. Model/history/request identities remain invariant.
+The [framing repair report](PHASE_32B_IMPLEMENTATION.md#responsive-fixture-framing-and-coherent-capture-2026-09-24)
+records 2,836 passing tests and the exact final-tree handoff; child localhost
+`EPERM` establishes no native pass. Complete final-tree browser acceptance and
+subsequent independent review remain pending; 32C/32D remain deferred.

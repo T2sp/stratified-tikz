@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { captureStandaloneSvg, measureStandaloneSvg, standaloneSvgViewport } from '../../scripts/standaloneSvgCapture.mjs'
+import { runInNewContext } from 'node:vm'
+import { captureStandaloneSvg, measureStandaloneSvg, settleStandaloneSvg, standaloneSvgViewport } from '../../scripts/standaloneSvgCapture.mjs'
 
 function measured(change = {}) {
   return {
@@ -40,10 +41,14 @@ function pngHeader(width, height) {
   return bytes
 }
 
-function fakePage(measurements, screenshot) {
-  const calls = { evaluate: 0, viewports: [], screenshots: [] }
+function fakePage(measurements, screenshot, settle = () => {}) {
+  const calls = { evaluate: 0, settles: 0, viewports: [], screenshots: [] }
   const page = {
-    async evaluate() {
+    async evaluate(callback) {
+      if (callback.name === 'settleStandaloneDocument') {
+        calls.settles++
+        return settle()
+      }
       assert.ok(calls.evaluate < measurements.length, 'Every measurement is expected')
       return structuredClone(measurements[calls.evaluate++])
     },
@@ -103,11 +108,54 @@ test('measurement retains the standalone document and body state without requiri
   assert.equal(calls.screenshots.length, 0)
 })
 
+test('XML layout settling scrolls explicitly then waits two frames without an HTML body', async () => {
+  const calls = [], timer = 17
+  await settleStandaloneSvg({ async evaluate(callback) {
+    return runInNewContext(`(${callback.toString()})()`, {
+      window: { scrollTo(options) { calls.push({ scroll: structuredClone(options) }) } },
+      requestAnimationFrame(callback) { calls.push('frame'); callback() },
+      setTimeout(_callback, delay) { calls.push({ deadline: delay }); return timer },
+      clearTimeout(value) { calls.push({ cleared: value }) },
+    })
+  } })
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    { scroll: { left: 0, top: 0, behavior: 'instant' } }, 'frame', 'frame',
+    { deadline: 2000 }, { cleared: timer },
+  ])
+})
+
+test('layout settling deadline rejects stalled frames and releases its browser timer', async () => {
+  let cleared = false
+  await assert.rejects(settleStandaloneSvg({ async evaluate(callback) {
+    return runInNewContext(`(${callback.toString()})()`, {
+      window: { scrollTo() {} }, requestAnimationFrame() {},
+      setTimeout(callback) { queueMicrotask(callback); return 1 },
+      clearTimeout() { cleared = true },
+    })
+  } }), /layout settling exceeded 2000ms/)
+  assert.equal(cleared, true)
+})
+
+test('settling failure preserves its primary error and never measures or screenshots', async (context) => {
+  const path = await imagePath(context), failure = new Error('cannot settle SVG layout')
+  const checkpoints = []
+  const { page, calls } = fakePage([], () => assert.fail('No screenshot before settled coordinates'), () => { throw failure })
+  await assert.rejects(captureStandaloneSvg(page, path, async (capture) => {
+    checkpoints.push(structuredClone(capture))
+    if (capture.status === 'failed') throw new Error('failed diagnostic write')
+  }), (error) => error === failure)
+  assert.equal(calls.settles, 1)
+  assert.equal(calls.evaluate, 0)
+  assert.equal(calls.screenshots.length, 0)
+  assert.deepEqual(checkpoints.at(-1).measurements, [])
+  assert.equal(checkpoints.at(-1).error.message, failure.message)
+})
+
 test('one bounded viewport capture persists measurements first and only saves an existing matching PNG', async (context) => {
   const path = await imagePath(context)
   const checkpoints = []
   const document = measured()
-  const { page, calls } = fakePage([document], async (options) => {
+  const { page, calls } = fakePage([document, document], async (options) => {
     assert.equal(checkpoints.at(-1).status, 'pending')
     assert.deepEqual(checkpoints.at(-1).measurements, [document])
     assert.equal(checkpoints.at(-1).coverage.completeRoot, true)
@@ -117,10 +165,14 @@ test('one bounded viewport capture persists measurements first and only saves an
   const captured = await captureStandaloneSvg(page, path, async (capture) => checkpoints.push(structuredClone(capture)))
   assert.deepEqual(calls.screenshots, [{ path, fullPage: false, scale: 'css', timeout: 5000 }])
   assert.deepEqual(calls.viewports, [])
+  assert.equal(calls.settles, 1)
   assert.equal(captured.status, 'saved')
   assert.equal(captured.fileExists, true)
   assert.equal(captured.retainedPath, path)
   assert.deepEqual(captured.png, { width: 1100, height: 850, bytes: 24 })
+  assert.deepEqual(captured.before, document)
+  assert.deepEqual(captured.after, document)
+  assert.equal(captured.coordinatesStable, true)
   assert.deepEqual(checkpoints.at(-1), captured)
 })
 
@@ -147,7 +199,7 @@ test('a screenshot throw keeps pre-image source observations and its original er
 test('screenshot return without a PNG is failed/missing and retains the checkpoint', async (context) => {
   const path = await imagePath(context)
   const checkpoints = []
-  const { page, calls } = fakePage([measured()], () => undefined)
+  const { page, calls } = fakePage([measured(), measured()], () => undefined)
   await assert.rejects(captureStandaloneSvg(page, path, async (capture) => checkpoints.push(structuredClone(capture))), /ENOENT/)
   assert.equal(calls.screenshots.length, 1)
   assert.equal(checkpoints.at(-1).status, 'failed')
@@ -161,7 +213,7 @@ test('invalid image bytes or cropped PNG dimensions never produce saved evidence
   const path = await imagePath(context)
   for (const bytes of [Buffer.from('not a PNG'), pngHeader(900, 700)]) {
     const checkpoints = []
-    const { page, calls } = fakePage([measured()], (options) => writeFile(options.path, bytes))
+    const { page, calls } = fakePage([measured(), measured()], (options) => writeFile(options.path, bytes))
     await assert.rejects(captureStandaloneSvg(page, path, async (capture) => checkpoints.push(structuredClone(capture))))
     assert.equal(calls.screenshots.length, 1)
     assert.equal(checkpoints.at(-1).status, 'failed')
@@ -176,13 +228,14 @@ test('one viewport adjustment is followed by fresh complete-root measurement bef
   const first = withBounds({ width: 1400, height: 1000 })
   const second = { ...first, viewport: { width: 1416, height: 1016 } }
   const checkpoints = []
-  const { page, calls } = fakePage([first, second], async (options) => {
+  const { page, calls } = fakePage([first, second, second], async (options) => {
     assert.deepEqual(checkpoints.at(-1).measurements, [first, second])
     await writeFile(options.path, pngHeader(1416, 1016))
   })
   const captured = await captureStandaloneSvg(page, path, async (capture) => checkpoints.push(structuredClone(capture)))
   assert.deepEqual(calls.viewports, [second.viewport])
-  assert.equal(calls.evaluate, 2)
+  assert.equal(calls.evaluate, 3)
+  assert.equal(calls.settles, 2)
   assert.equal(calls.screenshots.length, 1)
   assert.deepEqual(captured.coverage, { completeRoot: true, bounds: second.root.bounds, viewport: second.viewport })
 })
@@ -209,4 +262,35 @@ test('failure-diagnostic persistence cannot replace the original capture error',
     if (capture.status === 'failed') throw new Error('diagnostic storage failure')
   }), (error) => error === failure)
   assert.equal(calls.screenshots.length, 1)
+})
+
+test('post-screenshot transform, crop, scroll and document drift persist both measurements and reject evidence', async (context) => {
+  const path = await imagePath(context)
+  const faults = [
+    (after) => { after.root.bounds.x += 1 },
+    (after) => { after.root.bounds.height -= 1 },
+    (after) => { after.root.bounds.width = NaN },
+    (after) => { after.root.viewBox = '0 1 900 700' },
+    (after) => { after.viewport.width += 1 },
+    (after) => { after.scroll.y = 12 },
+    (after) => { after.devicePixelRatio = 1 },
+    (after) => { after.url = 'file:///different.svg' },
+  ]
+  for (const mutate of faults) {
+    const before = measured(), after = structuredClone(before), checkpoints = []
+    mutate(after)
+    const { page, calls } = fakePage([before, after], (options) => writeFile(options.path, pngHeader(1100, 850)))
+    await assert.rejects(captureStandaloneSvg(page, path, async (capture) => checkpoints.push(structuredClone(capture))),
+      /Standalone SVG capture coordinate mismatch/)
+    const failed = checkpoints.at(-1)
+    assert.equal(calls.screenshots.length, 1)
+    assert.deepEqual(failed.before, before)
+    assert.deepEqual(failed.after, after)
+    assert.equal(failed.status, 'failed')
+    assert.equal(failed.fileExists, true)
+    assert.equal(failed.retainedPath, undefined)
+    assert.equal(failed.coordinatesStable, undefined)
+    assert.ok(checkpoints.some((capture) => capture.status === 'pending' && capture.after))
+    assert.equal(checkpoints.some((capture) => capture.status === 'saved'), false)
+  }
 })

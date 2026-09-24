@@ -856,3 +856,158 @@ integration inspections during implementation are not that acceptance gate.
 No fresh passing acceptance review is claimed; Phase 32B remains incomplete
 until both gates pass. 32C shapes and 32D configurable spacing/minima/anchors
 remain deferred.
+
+## Responsive fixture framing and coherent capture (2026-09-24)
+
+This repair starts from clean `phase/32b-color-opacity-outline` revision
+`9710e9252f2dd6c8d71a2d0d11bf2f99a14b66cd`. The earlier namespace/alias and
+geometric contour corrections, responsive harness, and PGF binaries are already
+committed in that revision. They are preserved; no production source, schema,
+dependency, paint width, body source/font, shape size, or reference artifact is
+changed or regenerated here. 32C/32D remain deferred.
+
+### Observed clipping, distinct from stroke scaling
+
+Read the parent `verification.json`, command log, checkout snapshots, native
+responsive JSON/SVG/PNG, observations `0147`–`0159`, completed namespace/earlier
+paint artifacts and verifier handoff under:
+
+- `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-cI6r6H/`
+- `/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-HQDJFV/response.json`
+
+Their binary-aware before/after fingerprint is
+`be4e5fe6e9cd755f6994d642c651add632979d7a3dc28750bf4504c0e2357262`, based on
+`d9345434d8051e045d3dfd9c3a31665af8c1d484` plus changes. The saved diff and all
+12 untracked snapshot hashes match, including binary PGF files.
+
+The root viewBox is `0 0 520 360`, displayed at `(20,20)` with size `260×180`.
+The point center is `(78,182)` on screen, or `(58,162)` inside the PNG. Its
+measured path radius is about `41.50710678`; the declared 20pt border has 24
+local units of width. The expected bottom is
+`162 + (41.50710678 + 12) × 0.5 = 188.75355339`, beyond the 180px image.
+Initial, selected and non-scaling-control PNGs all visibly truncate below.
+The valid east border measures 12px and the control 24px. The failure is root
+clipping, not defective 20pt conversion or insufficient antialiasing tolerance.
+The observations do not demonstrate scroll drift.
+
+That parent passed 2,815 tests, build, diff and label-assets, with Chrome
+153.0.8010.53 / Node v26.9.0. Free-labels failed before responsive control
+rejection: 14/16 groups, 151 evidence records, 17/20 point scenarios. All eleven
+32A scenarios, all five earlier paint scenarios and namespace aliases passed.
+The first circle files are observations, not a passed responsive case/control;
+scale 2, variants, triangles, responsive downloads and the separate
+`settled-SVG-export-standalone` group were not reached. No fresh independent
+acceptance review followed that failed verification.
+
+### Fixture, independent coverage and capture correction
+
+The responsive input now chooses the midpoint of the actual coordinate axes'
+model-space fit bounds. Current supported axes give `(1.375,1.375,0)` and the
+normal App fit projects it to the existing viewBox center `(260,180)`. The same
+input supplies every preview case and the independently loaded download branch.
+No screen coordinate, generated path, viewBox or production clipping rule is
+rewritten. Framing and setup settle before model/history/request baselines;
+CSS alone supplies the measured 0.5 and 2 display scales, checked by native CTMs.
+
+`pointResponsiveFraming.mjs` checks an independent expected envelope using the
+20pt declaration, measured circle/polygon paths, the verified regular triangle's
+60-degree miter, six-local-unit selection padding, the overlay's non-scaling
+3px stroke and the larger non-scaling negative control. It transforms that
+envelope and the measured body into screen, root and capture coordinates.
+Every envelope and intended clear/inside/outside click must have at least 2px
+of margin within the root, capture and browser viewport, including disabled and
+zero-opacity variants. Invalid/nonfinite geometry, singular/stale CTMs, crops
+and inconsistent CSS/viewBox measurements fail as setup errors. Expected bounds
+are never clamped. Failed preflights retain their envelopes and margins.
+
+Each native capture explicitly scrolls and settles before retaining its snapshot,
+then persists root/CSS/viewBox dimensions, path/body bounds, CTMs, model camera,
+preview camera summary, position and framing margins. It saves before/after
+measurements around the bounded screenshot and rejects coordinate/layout/crop
+changes before decoding the exact PNG. Native click coordinates are revalidated
+after selection/layout changes. The standalone full-root helper likewise settles
+without requiring an HTML body and rejects capture drift. XML-safe Canvas PNG
+decoding and the existing 1.75px paint-extent tolerance remain unchanged.
+
+The actual native red-mask uncropped check precedes the physical-width assertion,
+so a clipped control cannot satisfy the narrowly matched negative-control
+rejection. Both scenes must pass coverage; only the injected vector effect must
+fail physical paint. Root styles (including absent versus empty), original vector
+effects and owned pages are restored/released on failure without replacing the
+primary error. Body/path geometry, model/history and request identity remain
+checked through scaling, selection, capture and restoration.
+
+Before each real Export click, the independently reloaded App receives its own
+framed capture. Temporary CSS is restored before export; the downloaded SVG is
+saved unmodified and reopened at both CSS scales for both backgrounds and the
+existing circle/triangle/dash cases. No post-download repair is performed.
+
+### Executed checks and final frozen-tree handoff
+
+Commands use `PATH=/opt/homebrew/bin:$PATH`, Node **v26.9.0**, npm **11.19.1**.
+Logs are retained under `/private/tmp/stz-32b-framing.NeevK3/`.
+
+| Command/check | Executed result |
+| --- | --- |
+| `npm test` | **2,836 passed**, zero failures/skips; `npm-test.log` |
+| `npm run build` | Passed; existing >500kB chunk warning; `npm-build.log` |
+| `node --test tests/scripts/pointPaintOracle.test.mjs tests/scripts/standaloneSvgCapture.test.mjs tests/scripts/pointCheckDiagnostics.test.mjs tests/scripts/pointSelectionOracle.test.mjs tests/scripts/runPhaseVerification.test.mjs tests/scripts/runPhaseRunner.test.mjs tests/scripts/browserCheckoutSnapshot.test.mjs` | **212 passed**; `focused-regressions.log` |
+| `node --test tests/scripts/pointPaintOracle.test.mjs tests/scripts/standaloneSvgCapture.test.mjs` | **45 passed** after the final bounded-capture edits; `capture-regressions.log` |
+| `npx tsc -p tsconfig.app.json --strict` | Passed; `production-strict.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed; `fixtures-strict.log` |
+| `npx eslint scripts/fixtures/freeLabelsApp.tsx` | Passed; `typescript-eslint.log` |
+| Recommended JavaScript ESLint, Node/browser globals, all changed/new `.mjs` files | Passed, zero errors/warnings; `javascript-eslint.log`; exact invocation/config retained in `changed-eslint.mjs` |
+| `node --check` on all changed/new `.mjs` files | Passed; exact commands/status in `script-syntax.json` |
+| `git diff --check` | Passed; `diff-check.log` |
+
+The existing registered files contain 28 oracle tests and 17 standalone capture
+tests (21 added in total). Regressions reproduce the historical 260×180 crop,
+retain the unchanged physical-paint expectations after moving its center, exercise
+circle/triangle and both scales, selection, invisible paint, larger controls,
+invalid measurements, capture drift, failure diagnostics and exact cleanup.
+Synthetic/helper observations do not establish real App framing acceptance.
+
+An initial overlapping `npm test`/`npm run build` launch collided in their shared
+MathJax asset preparation (`ENOTEMPTY`, before build compilation). The retained
+`npm-build-concurrent-preparation-failed.log` records that command-orchestration
+failure. After test completion, the sequential build above passed; the official
+runner below also sequences these commands. The established unrelated lint/type
+baseline is unchanged; repository-wide lint was not rerun.
+
+The configured direct `npm run check:free-labels` attempt stopped at
+`development-server-listen`, `listen EPERM 127.0.0.1:5173`, before browser launch.
+See `free-labels-initial.log` and
+`free-labels-initial/free-labels-evidence.json`. This child restriction is
+separate from the parent's native clipping failure and the earlier accepted
+`yeWQVG` tree. It proves no native responsive case.
+
+After these documentation edits, the final frozen checkout is checked with:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+
+PATH=/opt/homebrew/bin:$PATH \
+STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs \
+STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32b-framing.NeevK3/free-labels-final \
+npm run check:free-labels
+```
+
+Their exact exit statuses, per-command results, verification report/artifact paths,
+remaining native cases and binary-aware final-tree identity are recorded externally
+in `/private/tmp/stz-32b-framing.NeevK3/handoff.json`, with
+`verification-final.log`, `free-labels-final.log`, `final-checkout.json`,
+`final-checkout.diff` and `final-checkout-untracked.json`. Keeping the final
+fingerprint external avoids a self-referential tracked document hash. The snapshot
+includes the new untracked framing helper and the committed PGF binaries.
+
+Fresh browser-capable parent verification remains required: all five commands,
+both browser checks, all 16 groups, all 20 named point scenarios, uncropped valid
+and control scenes at both scales, all variants and actual transparent/white
+responsive downloads, complete JSON/SVG/PNG artifacts, empty page errors and a
+matching final checkout. Only after success may the independent read-only review
+against `prompts/phase-32b-review.md` assess that same tree, including the original
+namespace and scaling findings. Interim implementation inspection is not that
+acceptance review, and `32B verify` does not review. Phase 32B remains incomplete
+until both gates pass; no browser restriction, partial prior report or helper test
+waives them.

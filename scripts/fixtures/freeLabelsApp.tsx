@@ -12,6 +12,7 @@ import { serializeDiagram } from '../../src/model/serialization.ts'
 import { createBrowserTextMeasurementProvider, createLabelService } from '../../src/rendering/labels/labelService.ts'
 import type { LabelConversionResult } from '../../src/rendering/labels/labelService.ts'
 import { createSvgLabelRuntime } from '../../src/rendering/labels/svgLabelRuntime.ts'
+import { createCoordinateAxesGuide } from '../../src/rendering/coordinateAxesGuide.ts'
 import { inspectAndAssertLabelContent, inspectPositionedLiteral, inspectOracleDocumentContext } from './labelBrowserOracle.ts'
 import type { Diagram, PointStratum } from '../../src/model/types.ts'
 
@@ -194,8 +195,17 @@ const api = {
   // production App paths. Literal declarations are independent oracle inputs.
   pointResponsivePaintDocumentJson(shape: 'circle' | 'triangle' = 'circle', variant: 'solid' | 'disabled' | 'transparent' | 'dashed' = 'solid') {
     const diagram = createEmptyDiagram({ ambientDimension: 2 })
+    // App fit-to-view includes the coordinate axes, even for a one-point input.
+    // Their model-space midpoint is deliberately interior; an origin fixture
+    // leaves only the fit padding below it and clips the declared 20pt border.
+    // Native preflight separately proves the complete shape/control envelope.
+    const axes = createCoordinateAxesGuide(2)
+    if (!axes) throw new Error('Responsive point fixture requires coordinate axes')
+    const xs = axes.fitPoints.map(({ x }) => x), ys = axes.fitPoints.map(({ y }) => y)
+    const position = { x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      y: (Math.min(...ys) + Math.max(...ys)) / 2, z: 0 }
     diagram.strata = [createPointStratum({ ambientDimension: 2, id: 'app-point', text: 'Scale',
-      position: { x: 0, y: 0, z: 0 }, style: { kind: 'pointStyle', shape, size: 32,
+      position, style: { kind: 'pointStyle', shape, size: 32,
         color: '#cc0000', opacity: 1, fill: 'filled', paint: {
           text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#cceeff', opacity: 1 },
           stroke: { enabled: variant !== 'disabled', color: '#cc0000', opacity: variant === 'transparent' ? 0 : 1,

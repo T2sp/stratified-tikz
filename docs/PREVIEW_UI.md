@@ -1735,3 +1735,16 @@ these native checks and reached independent review. The child startup limitation
 is separate from either historical parent harness failures or the two production
 findings. See [the current correction report](PHASE_32B_IMPLEMENTATION.md) for
 the findings and fresh corrected-tree gates.
+
+The later `cI6r6H` parent passed namespace aliases and all five earlier paint
+scenarios, then exposed responsive fixture clipping: at scale 0.5 the circle
+needed a PNG bottom of 188.75px, but the root capture ended at 180px. The valid
+20pt border still measured 12px at its east edge; the injected non-scaling control
+measured 24px. The fixture now uses the axes-fit model midpoint, shared by preview
+and fresh downloads. An independent preflight reserves complete paint, triangle
+miters, selection and native probes—including the larger control—before any
+pixel/click judgement. Captures retain and compare before/after coordinates;
+clipped controls cannot count as successful negatives. The final child native
+attempt and browser-capable parent handoff are documented in the
+[framing repair report](PHASE_32B_IMPLEMENTATION.md#responsive-fixture-framing-and-coherent-capture-2026-09-24).
+All 16 groups, 20 point scenarios and subsequent independent review remain required.
