@@ -9,7 +9,9 @@ import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOrac
 import { ownPageEvent } from './ownedPageEvent.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
-import { cleanupPointCheck, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic, cleanupPointCheck, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
+import { resolvePointInspectorField, selectPointInspectorField, inspectPointInspectorField,
+  checkPointInspectorFieldBoundary, POINT_PAINT_SELECT_OPTIONS } from './pointInspectorFields.mjs'
 
 const group = 'point-node-paint-import-persistence'
 const mixed = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
@@ -38,7 +40,47 @@ export async function runPointNodePaintChecks(context) {
   const point = async (id = 'app-point') => (await model()).strata.find((item) => item.id === id)
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
   const inspector = page.locator('#preview-inspector-drawer')
-  const field = (name) => inspector.getByLabel(name, { exact: true })
+  const fieldTypes = { 'Node text': 'textarea', 'Text color': 'input[type="color"]', 'Fill color': 'input[type="color"]',
+    'Border color': 'input[type="color"]', 'Text opacity': 'input[type="text"]', 'Fill opacity': 'input[type="text"]',
+    'Border opacity': 'input[type="text"]', 'Border width': 'input[type="text"]',
+    'Fill enabled': 'input[type="checkbox"]', 'Border enabled': 'input[type="checkbox"]',
+    'Border line style': 'select', 'Border cap': 'select', 'Border join': 'select' }
+  let activeField
+  const field = (name) => {
+    assert.ok(Object.hasOwn(fieldTypes, name), `Declared native Inspector control for ${name}`)
+    activeField = name
+    return resolvePointInspectorField(page, name, fieldTypes[name])
+  }
+  async function fieldObservation(boundary, names = ['Border line style', 'Border cap', 'Border join', 'Border width']) {
+    const snapshot = await state(), diagram = JSON.parse(snapshot.json).diagram
+    const fields = []
+    for (const name of names) fields.push(await inspectPointInspectorField(page, name, fieldTypes[name]))
+    const runtime = await page.evaluate(() => ({ ...window.stzAppLabels.pointRuntime(),
+      pointNodes: [...document.querySelectorAll('[data-point-id="app-point"] [data-point-node]')].map((node) => ({
+        owner: node.getAttribute('data-point-node'), request: node.getAttribute('data-point-request'),
+        bodyRequest: node.querySelector('[data-label-request]')?.getAttribute('data-label-request'),
+        source: node.querySelector('[data-label-source]')?.getAttribute('data-label-source'),
+        status: node.querySelector('[data-label-state]')?.getAttribute('data-label-state'),
+      })) }))
+    return observeCase({ boundary, fields, state: snapshot, runtime,
+      paint: diagram.strata.find((item) => item.id === 'app-point')?.style.paint })
+  }
+  async function selectPaint(name, value, { requireChange = false } = {}) {
+    activeField = name
+    const before = await fieldObservation('before-paint-select', [name])
+    const control = await field(name)
+    if (requireChange) assert.notEqual(await control.inputValue(), value, `${name} starts different from requested value`)
+    const selected = await selectPointInspectorField(page, name, value, { options: POINT_PAINT_SELECT_OPTIONS[name] })
+    const after = await fieldObservation('after-paint-select', [name])
+    const property = { 'Border line style': 'lineStyle', 'Border cap': 'lineCap', 'Border join': 'lineJoin' }[name]
+    assert.equal(after.paint.stroke[property], value, `${name} commits through the production handler`)
+    assert.deepEqual(JSON.parse(after.state.json).diagram.userStylePresets, JSON.parse(before.state.json).diagram.userStylePresets,
+      'Live point selection preserves saved preset fields')
+    assert.equal(after.state.requests, before.state.requests, 'Paint select preserves conversion identity')
+    if (requireChange) assert.equal(JSON.parse(after.state.history).past.length, JSON.parse(before.state.history).past.length + 1,
+      `${name} creates one native history entry`)
+    return selected
+  }
   const undo = () => page.getByRole('button', { name: 'Undo last diagram change', exact: true }).click()
   const redo = () => page.getByRole('button', { name: 'Redo last undone diagram change', exact: true }).click()
   async function eventAction(name, event, action) {
@@ -82,7 +124,7 @@ export async function runPointNodePaintChecks(context) {
     return output
   }
   async function edit(label, value) {
-    const input = field(label)
+    const input = await field(label)
     if (await input.getAttribute('type') === 'color') {
       // Color pickers have no portable Playwright fill action. Dispatch the
       // native input/change events through React's actual production handler.
@@ -92,13 +134,16 @@ export async function runPointNodePaintChecks(context) {
         element.dispatchEvent(new Event('change', { bubbles: true }))
       }, value)
       await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-    } else await input.fill(value)
+    } else await input.fill(value, { timeout: 5000 })
   }
-  async function setMixedPaint() {
+  async function setMixedPaint({ requireChange = false } = {}) {
     for (const [label, value] of [['Text color', '#ff0000'], ['Text opacity', '.6'], ['Fill color', '#0000ff'], ['Fill opacity', '.35'],
       ['Border color', '#008000'], ['Border opacity', '.7'], ['Border width', '2']]) await edit(label, value)
-    await field('Fill enabled').check(); await field('Border enabled').check()
-    await field('Border line style').selectOption('dashed'); await field('Border cap').selectOption('round'); await field('Border join').selectOption('bevel')
+    await (await field('Fill enabled')).check({ timeout: 5000 }); await (await field('Border enabled')).check({ timeout: 5000 })
+    await fieldObservation('before-mixed-paint-selects')
+    await selectPaint('Border line style', 'dashed', { requireChange })
+    await selectPaint('Border cap', 'round', { requireChange })
+    await selectPaint('Border join', 'bevel', { requireChange })
   }
   try {
     context.setStage?.(group); await startGroup(group, scenario)
@@ -112,7 +157,7 @@ export async function runPointNodePaintChecks(context) {
       strokeWidth: .48, text: 'rgb(0, 0, 0)', textAlpha: 1 })
     assert.equal((await point()).codim, 2)
     assert.equal((await model()).userStylePresets[0].style.paint.fill.color.toLowerCase(), '#ffffff')
-    await setMixedPaint()
+    await setMixedPaint({ requireChange: true })
     const painted = await paintObservation()
     assert.deepEqual((await point()).style.paint, mixed)
     assertPointPaint(painted, { ...mixedExpected, explicitMathColor: 'rgb(128, 0, 128)' })
@@ -124,20 +169,46 @@ export async function runPointNodePaintChecks(context) {
       for (const option of ['fill opacity=0.35', 'draw opacity=0.7', 'text opacity=0.6', 'line width=2pt', 'dashed']) assert.ok(output.includes(option), option)
     }
     // A single native field event is a single undo step, including zero alpha.
-    await field('Text opacity').fill('0'); assert.equal((await point()).style.paint.text.opacity, 0)
+    await (await field('Text opacity')).fill('0'); assert.equal((await point()).style.paint.text.opacity, 0)
     const zero = await paintObservation(); assertPointPaint(zero, { ...mixedExpected, textAlpha: 0 })
     await undo(); assert.equal((await point()).style.paint.text.opacity, .6)
     await redo(); assert.equal((await point()).style.paint.text.opacity, 0)
-    await field('Text opacity').fill('.6')
-    const finiteBefore = await state(); await field('Border width').fill('NaN')
-    assert.equal(await field('Border width').getAttribute('aria-invalid'), 'true')
+    await (await field('Text opacity')).fill('.6')
+    const finiteBefore = await state(), numericSnapshots = { before: await inspector.evaluate((element) => element.outerHTML) }
+    const widthBefore = await fieldObservation('before-invalid-border-width', ['Border width'])
+    await (await field('Border width')).fill('NaN', { timeout: 5000 })
+    const widthInvalid = await fieldObservation('after-invalid-border-width', ['Border width'])
+    numericSnapshots.invalid = await inspector.evaluate((element) => element.outerHTML)
+    const invalidWidth = await field('Border width')
+    assert.equal(await invalidWidth.inputValue(), 'NaN', 'Invalid native draft remains visible')
+    assert.equal(await invalidWidth.getAttribute('aria-invalid'), 'true')
+    const warning = await invalidWidth.evaluate((element) => {
+      const id = element.getAttribute('aria-describedby'), warning = id && document.getElementById(id)
+      return { id, text: warning?.textContent, role: warning?.getAttribute('role'),
+        inWrapper: warning ? element.closest('.inspector-field').contains(warning) : false }
+    })
+    assert.ok(warning.id, 'Invalid width retains aria-describedby')
+    assert.deepEqual({ text: warning.text, role: warning.role, inWrapper: warning.inWrapper }, {
+      text: 'Border width must be a finite number greater than 0.', role: 'status', inWrapper: true,
+    })
+    assert.equal(widthInvalid.state.json, finiteBefore.json); assert.equal(widthInvalid.state.history, finiteBefore.history)
+    assert.equal(widthInvalid.state.requests, finiteBefore.requests)
+    await (await field('Border width')).fill('2', { timeout: 5000 })
+    const widthRecovered = await fieldObservation('after-border-width-recovery', ['Border width'])
+    numericSnapshots.recovered = await inspector.evaluate((element) => element.outerHTML)
+    const recoveredWidth = await field('Border width')
+    assert.equal(await recoveredWidth.inputValue(), '2')
+    assert.equal(await recoveredWidth.getAttribute('aria-invalid'), 'false')
+    assert.equal(await recoveredWidth.getAttribute('aria-describedby'), null)
+    assert.equal(widthRecovered.paint.stroke.width, 2)
+    assert.equal(widthRecovered.state.json, finiteBefore.json); assert.equal(widthRecovered.state.history, finiteBefore.history)
+    const fieldBoundary = await checkPointInspectorFieldBoundary({ browser, page, diagnose: observeCase, numericSnapshots })
     assert.equal((await state()).json, finiteBefore.json); assert.equal((await state()).history, finiteBefore.history)
-    await field('Border width').fill('2')
     const variants = []
-    await field('Fill enabled').uncheck(); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'none' })
-    await field('Border enabled').uncheck(); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'none', stroke: 'none' })
-    await field('Fill enabled').check(); await edit('Fill color', '#ffffff')
-    await field('Fill opacity').fill('1'); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'rgb(255, 255, 255)', fillAlpha: 1, stroke: 'none' })
+    await (await field('Fill enabled')).uncheck(); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'none' })
+    await (await field('Border enabled')).uncheck(); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'none', stroke: 'none' })
+    await (await field('Fill enabled')).check(); await edit('Fill color', '#ffffff')
+    await (await field('Fill opacity')).fill('1'); variants.push(await paintObservation()); assertPointPaint(variants.at(-1), { fill: 'rgb(255, 255, 255)', fillAlpha: 1, stroke: 'none' })
     await setMixedPaint()
     await inspector.getByRole('button', { name: 'Copy style', exact: true }).click()
     await select('copy-point'); await inspector.getByRole('button', { name: 'Paste style', exact: true }).click()
@@ -154,7 +225,8 @@ export async function runPointNodePaintChecks(context) {
     duplicated.forEach((item) => assert.deepEqual(item.style.paint, mixed))
     await undo(); assert.equal((await model()).strata.length, beforeDuplicate)
     await redo(); assert.equal((await model()).strata.length, beforeDuplicate + 2)
-    await saved({ before, initial, painted, zero, variants, code, duplicated, final: await state() })
+    await saved({ before, initial, painted, zero, variants, code, duplicated,
+      widthBefore, widthInvalid, warning, widthRecovered, fieldBoundary, final: await state() })
 
     scenario = 'point-paint-imported-presets-persistence'
     await load(legacy); await settle(); await select()
@@ -192,7 +264,9 @@ export async function runPointNodePaintChecks(context) {
     }
     await inspector.locator('.style-preset-list-item').filter({ hasText: 'paint imported node' }).click()
     await inspector.getByRole('button', { name: 'Apply', exact: true }).click()
-    await edit('Border color', '#008000'); await field('Border cap').selectOption('round'); await field('Border join').selectOption('bevel')
+    await edit('Border color', '#008000')
+    await selectPaint('Border cap', 'round', { requireChange: true })
+    await selectPaint('Border join', 'bevel', { requireChange: true })
     const importedMixed = structuredClone((await point()).style.paint)
     const canonicalPaint = (paint) => ({ ...paint, text: { ...paint.text, color: paint.text.color.toLowerCase() },
       fill: { ...paint.fill, color: paint.fill.color.toLowerCase() }, stroke: { ...paint.stroke, color: paint.stroke.color.toLowerCase() } })
@@ -213,17 +287,17 @@ export async function runPointNodePaintChecks(context) {
     await select()
     const source = ' pending $\\frac{paint}{x}$\t\n tail  '
     await page.evaluate((source) => window.stzAppLabels.hold(source), source); held.add(source)
-    await field('Node text').fill(source)
+    await (await field('Node text')).fill(source)
     await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, source)
     const pending = await inspectPoint(page, 'app-point'); assertPointLayout(pending); assertPositionedLiteral(pending.literalObservation, source)
-    const pendingState = await state(); await field('Fill opacity').fill('.2'); await field('Border width').fill('3')
+    const pendingState = await state(); await (await field('Fill opacity')).fill('.2'); await (await field('Border width')).fill('3')
     const pendingPaint = await paintObservation(); assert.equal(pendingPaint.request, pending.request)
     assert.equal((await state()).requests, pendingState.requests)
     assertPointPaint(pendingPaint, { ...mixedExpected, fillAlpha: .2, strokeWidth: 3.6 })
     await page.evaluate((source) => window.stzAppLabels.release(source), source); held.delete(source); await settle()
     const settled = await inspectPoint(page, 'app-point'); assertPointLayout(settled); assert.equal(settled.status, 'ready')
     const fallbackSource = '  $\\missingPaintMacro$\t\n end  '
-    await field('Node text').fill(fallbackSource); await settle()
+    await (await field('Node text')).fill(fallbackSource); await settle()
     const fallback = await inspectPoint(page, 'app-point'); assertPointLayout(fallback); assertPositionedLiteral(fallback.literalObservation, fallbackSource)
     assertPointPaint(await paintObservation(), { ...mixedExpected, fillAlpha: .2, strokeWidth: 3.6 })
     // Production renderer's actual 3D occlusion policy, independent DOM alphas,
@@ -246,7 +320,7 @@ export async function runPointNodePaintChecks(context) {
       const source = `captured ${background} $\\frac{x}{\\sqrt{y}}$`
       await load(legacy); await settle(); await select(); await setMixedPaint()
       await page.evaluate((source) => window.stzAppLabels.hold(source), source); held.add(source)
-      await field('Node text').fill(source)
+      await (await field('Node text')).fill(source)
       await page.waitForFunction((source) => window.stzAppLabels.pending(source)?.started > 0, source)
       const pending = await inspectPoint(page, 'app-point'), paint = await paintObservation()
       assertPointLayout(pending); assertPositionedLiteral(pending.literalObservation, source); assertPointPaint(paint, mixedExpected)
@@ -258,7 +332,7 @@ export async function runPointNodePaintChecks(context) {
         capture = await page.evaluate(() => window.stzAppLabels.pointExportClick())
         await observeCase({ boundary: 'download-click', capture, pending, paint })
         assert.equal(capture.error, undefined); assert.deepEqual(capture.snapshot.points[0].style.paint, mixed)
-        await edit('Text color', '#123456'); await field('Fill enabled').uncheck(); await field('Border width').fill('7'); check()
+        await edit('Text color', '#123456'); await (await field('Fill enabled')).uncheck(); await (await field('Border width')).fill('7'); check()
         if (background === 'white') await load(legacy)
         const after = await state()
         await page.evaluate((source) => window.stzAppLabels.release(source), source); held.delete(source)
@@ -292,14 +366,25 @@ export async function runPointNodePaintChecks(context) {
         await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}.png`), persist)
         await settle(); assert.equal((await state()).json, after.json); assert.equal((await state()).history, after.history)
         await saved(details)
-      } catch (error) { standaloneFailure = error; await observeCase({ boundary: 'standalone-failure', svgPath, error: { message: error.message, stack: error.stack }, requests, standaloneErrors }); throw error }
+      } catch (error) {
+        standaloneFailure = error
+        try { await boundedPointDiagnostic(() => observeCase({ boundary: 'standalone-failure', svgPath,
+          error: { message: error.message, stack: error.stack, log: error.log }, requests, standaloneErrors }), 'standalone paint failure evidence') }
+        catch (diagnosticError) { console.error('Standalone paint failure diagnostics:', diagnosticError) }
+        throw error
+      }
       finally { await cleanupPointCheck(standaloneFailure, () => standalone.close()) }
     }
     assert.deepEqual(errors, []); await completeGroup(group)
   } catch (error) {
     primary = error
-    try { await observeCase({ boundary: 'primary-failure', error: { message: error.message, stack: error.stack }, errors, state: await state() }) }
+    // Persist the original Playwright error/call log independently of DOM reads.
+    // A failed page or diagnostic deadline must not replace the primary error.
+    try { await boundedPointDiagnostic(() => observeCase({ boundary: 'primary-failure',
+      error: { message: error.message, stack: error.stack, log: error.log }, errors, activeField }), 'point paint primary failure evidence') }
     catch (diagnosticError) { console.error('Point paint failure diagnostics:', diagnosticError) }
+    try { await boundedPointDiagnostic(() => fieldObservation('failed-inspector-field', activeField ? [activeField] : undefined), 'point paint Inspector failure capture') }
+    catch (diagnosticError) { console.error('Point paint Inspector diagnostics:', diagnosticError) }
   } finally {
     for (const wait of owned) wait.dispose(primary)
     const cleanup = async (operation) => {

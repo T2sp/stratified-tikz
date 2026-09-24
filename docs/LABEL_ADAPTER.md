@@ -754,3 +754,14 @@ captured paint during detached whole-node reconstruction; subsequent edits canno
 alter captured output. Free-label and path-inline semantics remain unchanged.
 The accepted 32A `gtRban` report supersedes the historical pending note above;
 32B's added native scenarios require their own fresh parent report and review.
+
+The later `stz-phase32b-before-review-yLwzPX` parent completed all eleven cumulative
+32A point scenarios, then timed out on the first 32B Inspector select's exact
+associated-label lookup. Seven native paint edits had reached the model with
+request count unchanged at 3. This establishes a harness locator failure, not an
+adapter/paint rendering defect or a complete mixed-paint pass. The adjacent
+invalid-width warning lookup was predicted from markup and had not executed.
+The targeted harness correction matches captions independently of options and
+warnings and retains before/after DOM counts, model/history and request evidence.
+New native measurements and independent review remain parent gates; see
+[the correction report](PHASE_32B_IMPLEMENTATION.md#targeted-inspector-field-locator-correction).

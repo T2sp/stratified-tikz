@@ -332,3 +332,161 @@ Correction files: `scripts/checkPointNodes.mjs`, new
 `scripts/pointSelectionOracle.mjs`, new
 `tests/scripts/pointSelectionOracle.test.mjs`, `package.json`, this document,
 and `docs/PREVIEW_UI.md`.
+
+## Targeted Inspector field-locator correction
+
+This correction began with a clean `phase/32b-color-opacity-outline` checkout at
+`cc4ae775987e927321c60db8d6ba817bf08d3d5c`, including the preceding corrections
+and updated fix prompt. Its initial fingerprint was
+`05eb9ee1557b51d994e9bcafc54572a0b80130af9b4e8ebc21a3151661eddfb2`.
+Existing production paint, schema, selection geometry, all 16 selected-view
+regressions, font ownership cleanup, PGF/binary fixtures and acceptance gates
+are preserved. No production file or dependency changed. 32C/32D remain deferred.
+
+### Observed parent failure versus prior correction
+
+Read and audited:
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-yLwzPX/verification.json`,
+its `05-check-free-labels/command.log`, evidence/checkout snapshots, paint
+observations 0001/0002, legacy document, completed point records and native
+SVG/PNG exports; and
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-TDvlPq/response.json`.
+The parent checked `a2f2ba66faa9afe299dc5471ccc18bb43b043f42` plus changes with
+matching before/after fingerprint
+`6475b6191b76ea9ba28d891839ff309d40c97f8407c0ebe782f41e708447c03e`.
+
+That report passed tests (2,695), build, diff and label-assets. Chrome
+153.0.8010.53 started successfully and completed 14/16 groups with 145 passing
+records and empty page errors. All eleven 32A point scenarios passed, including
+the independent border-half-width selection expectation, resource/font readiness,
+native persistence and transparent/white whole-node settled exports. Their
+required artifacts exist. The earlier selection issue was exercised successfully.
+
+The first new paint scenario stopped after 30 seconds at exact associated-label
+lookup for `Border line style`. Selection remained `app-point`; text red/.6,
+fill blue/.35, border green/.7 and width 2 reached the model, while line style,
+cap and join remained solid/butt/miter. Requests remained 3. Zero of five 32B
+paint scenarios completed. The distinct later `settled-SVG-export-standalone`
+group was not reached; this does not negate the completed
+`point-node-settled-export` group. Independent review was not reached.
+
+`EditableSelectField` wraps caption and option descendants in one label, so
+Playwright's exact associated-label text query includes more than the caption.
+This is different from a role locator's accessible-name computation. Production
+`EditableParsedNumberField` likewise adds its warning inside the label after an
+invalid draft. The Border width post-`NaN` exact lookup and corrective fill were
+predicted later failures, not observations from that parent. The retained parent
+paint observations contain no Inspector DOM/count measurements; none are inferred
+from source inspection.
+
+### Bounded harness correction and regression coverage
+
+`scripts/pointInspectorFields.mjs` resolves one exact `.inspector-field-label`
+caption inside `#preview-inspector-drawer`, validates its `.inspector-field`
+wrapper, and resolves exactly one expected native control. Inspector, caption,
+wrapper and control must be visible; relevant elements must be enabled. It does
+not select by index, use loose label text, or fall back to page-wide controls.
+Live and `Preset ` fields remain distinct. Selects validate the complete expected
+option values and enabled requested option, use native `selectOption` with a
+5-second bound, and check both returned and actual selected values.
+
+All live paint actions, including the three selects in every `setMixedPaint()`
+call and imported cap/join overrides, use the resolver. Real App assertions
+verify dashed/round/bevel model paint, a changed initial value and one history
+entry for each initial/imported select edit, unchanged presets and conversion
+request count. The existing color input/change event path is preserved; no
+fixture mutation or forced action supplies desired paint.
+
+The real Border width edit still enters `NaN`, then re-resolves while the warning
+is present. It verifies the draft, `aria-invalid`, warning text/role and
+`aria-describedby`, unchanged model/history/requests, and native recovery to 2.
+Its production Inspector HTML before, during and after validation supplies the
+numeric clone regression. The clone also uses actual production select and
+preset markup, replaces wrappers to test re-resolution, preserves a cloned
+outside-Inspector control, and rejects absent/duplicate/hidden/disabled targets,
+wrong control types, substring captions and unavailable/disabled options.
+The real App proves handler and history behavior; clones isolate lookup failures.
+Registered Node checks exercise orchestration/rejections and primary errors,
+without claiming to reproduce Playwright's label engine.
+
+Before the first select and numeric validation boundary, diagnostics retain
+selection, Inspector visibility/expansion markup, caption/wrapper/control DOM,
+label text/ARIA, original exact-label and corrected counts, options/current
+values, paint, source/request/font/document identity and serialized history.
+Post-action observations retain values and validation state. Counts describe
+current markup; changed label semantics are reported rather than asserting a
+historical zero. Original Playwright message/stack/call log is saved separately
+from bounded failure capture. Diagnostic/cleanup errors cannot replace it.
+Scenarios pass only after their assertions and artifacts finish.
+
+Files changed for this correction: `scripts/checkPointNodePaint.mjs`, new
+`scripts/pointInspectorFields.mjs`, new
+`tests/scripts/pointInspectorFields.test.mjs`, test registration in
+`package.json`, and these existing notes: `docs/PHASE_32B_IMPLEMENTATION.md`,
+`docs/PREVIEW_UI.md`, `docs/LABEL_ADAPTER.md`.
+
+### Executed checks and remaining parent gates
+
+Commands use `PATH=/opt/homebrew/bin:$PATH`, Node v26.9.0. The initial correction
+runner report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-63p1vP/verification.json`,
+with handoff `stz-phase-verifier-AL6tad/response.json` under the same temporary
+root. It precedes this results appendix and is not final-tree browser acceptance.
+
+| Executed command | Result |
+| --- | --- |
+| `node --test tests/scripts/pointInspectorFields.test.mjs` | 44 passed; `field-regressions.log` |
+| `node --test tests/scripts/pointSelectionOracle.test.mjs tests/scripts/pointNativeCoordinateMode.test.mjs tests/scripts/pointCheckDiagnostics.test.mjs tests/scripts/ownedFontFace.test.mjs tests/scripts/pointPaintOracle.test.mjs` | 66 passed; `preserved-regressions.log` |
+| `node scripts/automation/run-phase.mjs 32B verify` | Exit 1: tests **2,739 passed**, build and diff passed; label-assets failed at localhost `listen EPERM`; runner did not reach free-labels or review |
+| `npx tsc -p tsconfig.app.json --strict` | Passed; `strict-tsc.log` |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed; `fixture-tsc.log` |
+| `node --check scripts/checkPointNodePaint.mjs` | Passed |
+| `node --check scripts/pointInspectorFields.mjs` | Passed |
+| `node --check tests/scripts/pointInspectorFields.test.mjs` | Passed |
+| Focused ESLint recommended rules with Node/browser globals on the three JS files above | Zero errors/warnings; `targeted-eslint.log` |
+| `git diff --check` | Passed |
+| Direct `npm run check:free-labels` with the external Playwright/Chrome environment below | Exit 1 at `development-server-listen`: `EPERM 127.0.0.1:5173`; zero groups/scenarios executed |
+
+Focused logs and the direct browser evidence live in
+`/private/tmp/stz-32b-inspector.ziacWM/`. The runner's own `01-npm-test`,
+`02-npm-build`, `03-git-diff-check`, and `04-check-label-assets` directories retain
+exact commands, output and statuses. The build's existing chunk-size warning and
+the previously documented unrelated lint baseline are unchanged; no broad lint
+cleanup was performed. The direct browser environment was:
+
+```sh
+export PATH=/opt/homebrew/bin:$PATH
+export STZ_PLAYWRIGHT_MODULE=/Users/takamatoshinori/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs
+export STZ_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+export STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32b-inspector.ziacWM/free-labels
+npm run check:free-labels
+```
+
+After this appendix, the same official verify command is run again against the
+final tree. Its report path, terminal outcome and binary-aware final checkout
+identity (including untracked resolver/tests) are retained outside the tracked
+tree in `/private/tmp/stz-32b-inspector.ziacWM/handoff.json`, alongside
+`final-checkout.json`, `final-checkout.diff`, `final-checkout-untracked.json` and
+`verification-final.log`. This avoids a self-referential fingerprint in a tracked
+document. The final direct free-label attempt uses the same environment with
+`STZ_SMOKE_ARTIFACT_DIR=/private/tmp/stz-32b-inspector.ziacWM/free-labels-final`.
+
+The child restriction is separate from the historical parent's successful startup
+and observed select timeout. No new native exact-label/control counts, actual
+NaN warning/recovery results, or completed 32B browser scenarios are claimed.
+Read-only independent targeted code inspection found no concrete defect; that is
+not the Phase 32B acceptance review.
+
+Still required in the browser-capable parent: run
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify`
+on the final checkout, requiring all five commands, all 16 groups, all 16 named
+point scenarios, empty page-error arrays and actual required JSON/SVG/PNG files.
+Specifically unexecuted here: the production wrapped-field clone and live
+invalid-width regression, all five paint scenarios (Inspector/history,
+imports/persistence, lifecycle/dimming, pending transparent edit and pending
+white load), and the later standalone settled-export group. Cumulative 32A
+scenarios also need current-tree confirmation despite the historical parent's
+success. Once that evidence matches, the existing parent workflow must perform
+the read-only review against `prompts/phase-32b-review.md`; `verify` alone does
+not review. Verification and independent acceptance review remain open, so
+Phase 32B is incomplete. No commit/push or 32C/32D work was performed.

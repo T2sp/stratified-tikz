@@ -1683,6 +1683,24 @@ its separate geometry contract. The native font-readiness checks now verify
 this paint-aware circle expectation independently, with selected-view negative
 controls and pre-assertion diagnostics. The earlier parent failure omitted the
 legacy border's 0.24-unit half-width in its assertion; production selection
-geometry was unchanged. The current child cannot launch the browser server,
-so fresh parent acceptance and independent review remain pending. See the
+geometry was unchanged. The later `yLwzPX` parent completed all eleven 32A point
+scenarios, including font readiness and whole-point settled exports. See the
 [targeted correction evidence and handoff](PHASE_32B_IMPLEMENTATION.md#targeted-circle-selection-assertion-correction).
+
+That parent then stopped at the first 32B Border line style lookup: exact
+associated-label text included nested option text. The paint harness now resolves
+the exact `.inspector-field-label` caption within the active Inspector, validates
+its wrapper and expected native input/select, and rejects ambiguous, hidden or
+disabled targets. Saved-preset captions retain their `Preset ` prefix. Native
+selects verify options, returned/current values, model paint and history. The
+same resolver handles Border width when its real inline warning changes label
+text; invalid `NaN` remains a draft with `aria-describedby` and unchanged history.
+Production fields and paint behavior are unchanged.
+
+The registered browser boundary clones actual production Inspector markup for
+scope, rerender and negative controls; the real App still performs all paint and
+invalid-draft edits. Before/after diagnostics retain original exact-label counts,
+corrected control counts, DOM/ARIA, selection, paint and request/history identity.
+Fresh native execution of this correction and independent review remain required;
+the child startup restriction is separate from the parent's observed locator
+timeout. See [the current handoff](PHASE_32B_IMPLEMENTATION.md#targeted-inspector-field-locator-correction).
