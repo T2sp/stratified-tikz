@@ -2,8 +2,24 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { assertPointPaint, assertRasterPointOverlap, assertResponsivePointPaint, captureResponsivePointPaint,
-  measureResponsivePointPaint, restorePointDisplayScale, setPointDisplayScale } from '../../scripts/pointPaintOracle.mjs'
+  measureResponsivePointPaint, restorePointDisplayScale, setPointDisplayScale,
+  observePostExternalPointPaint, assertPostExternalPointPaint } from '../../scripts/pointPaintOracle.mjs'
 import { assertResponsiveCaptureStable, responsivePointFraming, responsivePointProbes } from '../../scripts/pointResponsiveFraming.mjs'
+
+test('external paint oracle uses the actual post-key options and resolves the final named color', () => {
+  const code = String.raw`\definecolor{before}{HTML}{000000}
+\definecolor{after}{HTML}{123456}
+\node[fill=before,example,fill=after,text=before] at (0,0) {};
+\node[fill=before,unrelated] at (1,0) {};`
+  const output = observePostExternalPointPaint(code, 'example')
+  assertPostExternalPointPaint(output, { fill: '#123456', text: '#000000', draw: null })
+  assert.throws(() => assertPostExternalPointPaint(output, { fill: '#000000' }))
+  assert.throws(() => assertPostExternalPointPaint(output, { fill: null }))
+  const untouched = observePostExternalPointPaint(code.replace('example,fill=after', 'example'), 'example')
+  assertPostExternalPointPaint(untouched, { fill: null })
+  assert.throws(() => assertPostExternalPointPaint(untouched, { fill: '#000000' }))
+  assert.throws(() => observePostExternalPointPaint(code + '\n\\node[example] at (2,0) {};', 'example'))
+})
 
 test('paint oracle rejects coupled colors, lost zero opacity, dropped dash and lost explicit math color', () => {
   const expected = { fill: 'rgb(0, 0, 255)', stroke: 'rgb(0, 128, 0)', fillAlpha: 0, strokeAlpha: .7,

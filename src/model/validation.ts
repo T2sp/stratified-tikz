@@ -70,6 +70,7 @@ import {
   hiddenCurveLineStyles,
   labelVisibilityPolicies,
   pointVisibilityPolicies,
+  pointPaintFields,
   crossingKinds,
   tikzExportModes,
   visibilitySortModes,
@@ -3252,6 +3253,20 @@ function validatePointStyle(
 
   validatePositiveFinite(style.size, `${path}.size`, errors)
   if (style.paint !== undefined) validatePointPaint(style.paint, `${path}.paint`, errors)
+  if (style.importedPaint !== undefined) {
+    const intent: unknown = style.importedPaint
+    const intentPath = `${path}.importedPaint`
+    if (!isRecord(intent)) pushError(errors, intentPath, 'Imported paint metadata must be an object.')
+    else {
+      if (typeof intent.referenceId !== 'string' || intent.referenceId.trim().length === 0) pushError(errors, `${intentPath}.referenceId`, 'Imported paint reference must be non-empty.')
+      validatePointPaint(intent.baseline, `${intentPath}.baseline`, errors)
+      if (!Array.isArray(intent.overriddenFields) || intent.overriddenFields.length > pointPaintFields.length ||
+        !intent.overriddenFields.every((field) => typeof field === 'string' && (pointPaintFields as readonly string[]).includes(field)) ||
+        new Set(intent.overriddenFields).size !== intent.overriddenFields.length) {
+        pushError(errors, `${intentPath}.overriddenFields`, 'Imported paint overrides must be unique supported property names.')
+      }
+    }
+  }
 }
 
 function validatePointPaint(value: unknown, path: string, errors: DiagramValidationIssue[]): void {
@@ -3551,6 +3566,9 @@ function validateImportedTikzStyleReferenceUsages(
   )
 
   diagram.userStylePresets?.forEach((preset, index) => {
+    if (preset.kind === 'point' && isRecord(preset.style.importedPaint) && preset.style.importedPaint.referenceId !== preset.importedTikzStyleReferenceId) {
+      pushError(errors, `userStylePresets[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
+    }
     validateImportedTikzStyleReferenceUsage(
       preset.importedTikzStyleReferenceId,
       stylePresetKindTargets(preset.kind),
@@ -3561,6 +3579,9 @@ function validateImportedTikzStyleReferenceUsages(
   })
 
   diagram.strata.forEach((stratum, index) => {
+    if (stratum.geometricKind === 'point' && isRecord(stratum.style.importedPaint) && stratum.style.importedPaint.referenceId !== stratum.importedTikzStyleReferenceId) {
+      pushError(errors, `strata[${index}].style.importedPaint.referenceId`, 'Imported paint metadata must match the active imported reference.')
+    }
     validateImportedTikzStyleReferenceUsage(
       stratum.importedTikzStyleReferenceId,
       stratumTargets(stratum),

@@ -2434,6 +2434,43 @@ For MVP, this function may initially support only simple orthographic cameras.
 
 ## Phase 32B saved point paint
 
+Imported point paint additionally supports optional `PointStyle.importedPaint`:
+`{ referenceId, baseline: PointPaint, overriddenFields: PointPaintField[] }`.
+This is an additive saved-file v2 extension; `Diagram.version` remains 1.
+The baseline is the importer's last materialized preview, including deterministic
+fallbacks. The override list is authoritative editing state, containing unique
+dotted paint property names (for example `fill.color`, `stroke.width`, or
+`stroke.dashPattern`) and the overall `opacity` property. It is not a rendering
+cache. Validation rejects malformed metadata, invalid baseline paint, unsupported
+or duplicate property names, and metadata whose reference ID differs from the
+point or preset's active imported reference.
+
+New imported point presets start with an empty list. Inspector, bulk/quick and
+saved-preset updates record accepted fields, including equal-valued edits. The
+numeric controls do not accept values on an untouched focus/blur; typing and
+explicit Enter acceptance retain intent even when the numeric value is equal. The
+combined color control claims fill color (when filled) and stroke color; hollow
+or filled controls claim fill enabled/color/opacity; line-style selection claims
+line style and clears a custom dash pattern. Built-in point preset selection
+deliberately chooses all paint fields while retaining the existing external
+reference behavior. Reapplying an imported preset replaces a point's local
+overrides with that preset's own state. Replacing the reference never carries
+intent from the previous reference. Saving an independent user preset or pasting
+into a diagram without the external reference keeps explicit paint and removes
+the provenance. Copies, duplicates and history own deep copies of the list and
+baseline, including any dash arrays.
+
+When later imports change effective definitions, only matching importer-tracked
+snapshots may refresh unoverridden fields; explicit user edits and distinguishable
+manual changes survive. Styles without this metadata retain their saved explicit
+values. On their next accepted edit, the update boundary reconstructs the current
+import baseline, records distinguishable existing values and the edited fields,
+and persists that state. Historical equal-valued edits are unavoidably ambiguous:
+older files did not record intent, so equality alone does not become an override.
+Normal loading does not invent intent or silently regenerate historical styles.
+Untouched unresolved fields retain their external TikZ effect, while deliberate
+local fields remain authoritative after the external key in both output modes.
+
 New saves use envelope version **2**, superseding the historical version-1
 wrapper examples above. `Diagram.version` remains 1. Both envelope versions
 load; point strata and saved user point presets materialize independent paint

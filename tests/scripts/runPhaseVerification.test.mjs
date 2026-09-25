@@ -452,15 +452,19 @@ for (const phase of ['31B', '31D']) {
 }
 
 const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
+const importRegressionScenarios = [
+  'point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
+]
 const targetedPaintScenarios = [
   'point-paint-namespace-aliases',
   'point-paint-responsive-circle',
   'point-paint-responsive-triangle',
   'point-paint-responsive-downloads',
+  ...importRegressionScenarios,
 ]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
-  assert.equal(Object.values(pointNodeScenarios).flat().length, 20)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 23)
   assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
     'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
     'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
@@ -497,6 +501,13 @@ test('32B preserves its original groups and scenarios and requires namespace and
       assert.ok(downloads.includes(`${stem}-${capture}${suffix}`))
     }
   }
+  for (const name of importRegressionScenarios) {
+    const artifacts = pointNodeScenarioArtifacts(name)
+    assert.equal(artifacts.length, name === 'point-paint-cross-file-resolution' ? 15 : 10)
+    for (const suffix of ['.json', '-saved.json', '.svg', '.png', '-standalone.json', '-standalone.tex', '-inlineMath.tex']) {
+      assert.ok(artifacts.includes(`${name}${suffix}`))
+    }
+  }
 })
 test('point SVG artifact gate accepts sanitized structure and rejects absent/damaged bodies and contours', () => {
   const body = '<g><title>literal &lt;source&gt;</title><g><g><text x="0" y="0">literal</text></g></g></g>'
@@ -509,6 +520,43 @@ test('point SVG artifact gate accepts sanitized structure and rejects absent/dam
     `<!-- <g><circle/>${body}</g> --><svg/>`,
   ]) assert.equal(hasWholePointSvg(broken), false, broken)
 })
+function importRegressionEvidence(name) {
+  const snapshot = (key, expected, warnings = []) => {
+    const colors = Object.entries(expected).filter(([, value]) => typeof value === 'string' && value.startsWith('#'))
+    const definitions = colors.map(([channel, value]) => `\\definecolor{${channel}Color}{HTML}{${value.slice(1)}}`).join('\n')
+    const options = Object.entries(expected).filter(([, value]) => value !== null)
+      .map(([channel, value]) => `${channel}=${value.startsWith('#') ? `${channel}Color` : value}`).join(',')
+    const code = `%   \\input{base.sty}\n%   \\input{outer.sty}\n${definitions}\n\\node[${key},${options}] at (0,0) {};`
+    return { key, current: { importedTikzStyleReferenceId: 'fixture-reference' }, warnings,
+      observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] },
+      state: { json: '{}', history: '{}' }, output: { standalone: code, inlineMath: code } }
+  }
+  const result = { download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
+    standalone: { pageErrors: [], observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] } } }
+  if (name === 'point-paint-local-override-intent') {
+    for (const boundary of ['untouched', 'reset']) result[boundary] = snapshot('example', { fill: null, text: '#ff0000' })
+    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('example', { fill: '#123456', text: '#ff0000' })
+    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('example', { fill: '#000000', text: '#ff0000' })
+    result.settingsBefore = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
+    result.settingsFocusBlur = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
+    result.settingsFocusBlur.current.style = { importedPaint: { overriddenFields: [] } }
+    result.settingsFocusBlur.focusBlurControls = ['Fill opacity', 'Border width'].map((name) => ({ name, before: '1', after: '1', focused: true, blurred: true }))
+    result.settingsBack = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': '1', 'line width': '0.4pt' })
+  } else if (name === 'point-paint-cross-file-resolution') {
+    for (const boundary of ['crossFile', 'reloaded']) result[boundary] = snapshot('outer', { fill: '#ff0000', text: '#00ff00', draw: '#0000ff' })
+    result.priorColor = snapshot('outer', { fill: '#123456', text: '#00ff00', draw: '#0000ff' })
+    result.redefined = snapshot('outer', { fill: '#ffff00', text: '#0000ff', draw: '#00ff00' })
+    result.missing = snapshot('outer', { fill: null, text: null, draw: '#0000ff' }, ['Unsupported absent base'])
+    result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
+    for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
+    result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
+  } else {
+    result.unsupported = snapshot('myPoint', { fill: null, text: null, draw: '#000000' }, ['Unsupported red'])
+    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null })
+    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#000000', text: null })
+  }
+  return result
+}
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
@@ -528,7 +576,7 @@ function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
     `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === 'point-paint-responsive-downloads' ? {
+      ...(importRegressionScenarios.includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
             baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
@@ -700,6 +748,57 @@ test('32B rejects the previously accepted sixteen-scenario paint report after ta
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-namespace-aliases/)
 })
+
+test('32B rejects the accepted twenty-scenario pre-fix report without all three review reproductions', (t) => {
+  const fixture = checkoutFixture(t)
+  const evidence = completePointEvidence(fixture)
+  evidence.evidence = evidence.evidence.filter((entry) => !importRegressionScenarios.includes(entry.name))
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-local-override-intent/)
+})
+
+for (const name of importRegressionScenarios) {
+  for (const fault of ['missing-observation', 'missing-inline', 'wrong-final-paint', 'missing-history', 'missing-reload', 'page-error']) {
+    test(`32B requires actual import defect evidence: ${name} ${fault}`, (t) => {
+      const fixture = checkoutFixture(t)
+      completePointEvidence(fixture)
+      const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), entry = artifacts[`${name}.json`]
+      if (fault === 'missing-observation') delete entry.reloaded.observation
+      if (fault === 'missing-inline') delete entry.reloaded.output.inlineMath
+      if (fault === 'wrong-final-paint') entry.reloaded.output.standalone = entry.reloaded.output.standalone.replace(/\\definecolor\{fillColor\}\{HTML\}\{[^}]+\}/, '\\definecolor{fillColor}{HTML}{654321}')
+      if (fault === 'missing-history') delete entry.reloaded.state.history
+      if (fault === 'missing-reload') delete entry.reload
+      if (fault === 'page-error') entry.standalone.pageErrors.push('SVG error')
+      fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    })
+  }
+}
+
+for (const fault of ['claimed-unknown-fill', 'claimed-unknown-text', 'missing-noncolor-return', 'missing-later-import', 'missing-prior-color', 'reversed-hints', 'missing-diagnostic',
+  'missing-focus-blur', 'focus-blur-override', 'focus-blur-history', 'missing-focused-control', 'unblurred-control']) {
+  test(`32B rejects incomplete import regression boundaries: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const intent = artifacts['point-paint-local-override-intent.json'], cross = artifacts['point-paint-cross-file-resolution.json']
+    const unsupported = artifacts['point-paint-unsupported-color-bindings.json']
+    if (fault === 'claimed-unknown-fill') intent.untouched.output.inlineMath = intent.back.output.inlineMath
+    if (fault === 'claimed-unknown-text') unsupported.back.output.standalone = unsupported.back.output.standalone.replace('myPoint,', 'myPoint,text=black,')
+    if (fault === 'missing-noncolor-return') delete intent.settingsBack
+    if (fault === 'missing-later-import') delete cross.later
+    if (fault === 'missing-prior-color') delete cross.priorColor
+    if (fault === 'reversed-hints') cross.crossFile.output.standalone = cross.crossFile.output.standalone.replace('base.sty', 'temp.sty').replace('outer.sty', 'base.sty').replace('temp.sty', 'outer.sty')
+    if (fault === 'missing-diagnostic') unsupported.unsupported.warnings = []
+    if (fault === 'missing-focus-blur') delete intent.settingsFocusBlur
+    if (fault === 'focus-blur-override') intent.settingsFocusBlur.current.style.importedPaint.overriddenFields = ['stroke.width']
+    if (fault === 'focus-blur-history') intent.settingsFocusBlur.state.history = '{"past":[{}]}'
+    if (fault === 'missing-focused-control') intent.settingsFocusBlur.focusBlurControls.pop()
+    if (fault === 'unblurred-control') intent.settingsFocusBlur.focusBlurControls[0].blurred = false
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+  })
+}
 
 for (const name of targetedPaintScenarios) {
   for (const fault of ['missing-scenario', 'started-only', 'duplicate-scenario', 'missing-artifact']) {

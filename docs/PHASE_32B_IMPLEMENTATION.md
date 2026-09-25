@@ -1,10 +1,11 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: 32B remains incomplete. The latest `1MopVV` parent run completed the
-three transparent responsive downloads, then the body oracle misclassified the
-intentional white export-background marker as runtime metadata. See the final
-section for the scoped contract correction and current verification handoff.
-Fresh browser-capable parent verification and independent review remain required.
+Status: 32B remains incomplete pending fresh matching browser-capable parent
+verification and independent review of the targeted import/override fixes below.
+The `xgI0o0` pre-fix parent verification passed; the subsequent independent review
+ran and requested changes for three Medium production defects. Its browser,
+responsive saved-body/font/background and PGF evidence remains accepted for that
+historical tree. See the final section for these fixes and current handoff.
 
 Historically, the prior checkout passed parent verification, then independent review
 rejected it for two Medium production defects: imported-style namespace lookup
@@ -1318,3 +1319,194 @@ final-tree evidence from this child. After verification passes, independently
 review that exact checkout against `prompts/phase-32b-review.md`, including the
 preserved namespace and geometric-scaling corrections. `32B verify` does not
 review. Phase 32B remains incomplete until both gates pass; 32C/32D remain deferred.
+
+## Targeted persistent override and ordered-import correction (2026-09-25)
+
+This correction began on clean `phase/32b-color-opacity-outline` at
+`d3f86a85b9c5ded504496e50467d96b0bc021fc5`. Existing white-background,
+saved-body, leaf-font, responsive-capture, namespace and verifier corrections
+were preserved. No dependencies, CMYK support, TeX execution, 32C/32D features
+or unrelated lint repairs were added.
+
+### Accepted historical evidence and the three causes
+
+Read the supplied independent review and production reproductions at
+`/private/tmp/stz-32b-review-reproductions.log`, plus the actual `xgI0o0`
+`verification.json`, label-assets reports and free-label artifacts. That parent
+verified `5ff8289bb15cdec412469269947c659a63408c31` plus changes with matching
+before/after fingerprint
+`4061512fdc4f58a9d71ec92378920a24dbe8c22406beba9c222aa232c0011742`:
+3,006 tests passed, build/diff/both browser checks passed, Chrome 154.0.8037.57,
+Node v26.9.0, all 16 groups/20 scenarios, 164 records and empty page errors.
+All six .5 → 2 → .5 responsive downloads and accepted independent PGF evidence
+were present. The review ran afterward and returned needs changes, zero Critical,
+three Medium, zero Low, not ready to commit. This was a production correction,
+not a browser-startup or white-background acceptance repair.
+
+1. Export compared current paint only to the unresolved preview fallback. Black
+   after `#123456 → #000000` was indistinguishable from untouched black, so it
+   omitted the necessary post-external-key fill override even after save/reload.
+2. Import diagnostics/presets saw only the current file while export saw more
+   definitions. Old preview snapshots therefore overrode known cross-file colors.
+   Root bodies could also stay stale through an older reference ID, and load
+   comments recorded selected files without their known dependencies.
+3. Parsing discarded unsupported color declarations. Their missing bindings
+   exposed earlier literals or built-in colors such as red, incorrectly replacing
+   an external CMYK definition in exported paint.
+
+### Persisted editing state and compatibility
+
+`PointStyle.importedPaint` is a small optional additive saved-envelope-v2
+extension: `{ referenceId, baseline: PointPaint, overriddenFields: PointPaintField[] }`.
+The baseline identifies importer-produced preview/fallback values; the bounded
+field list records authoritative accepted user edits independently of equality.
+It covers channel color, enablement and opacity, border width/dash/phase/cap/join,
+and overall opacity. It contains no React state, measurements or renderer cache.
+
+The diagram and preset update boundaries initialize missing provenance on a new
+edit and record explicit control fields, including accepted equal values. Coupled
+Color/Fill and built-in presets mark their intentionally selected channels;
+ordinary single-channel edits cannot claim unknown unrelated paint. Bulk/quick
+controls use the same editing contract. Both TikZ modes emit local overrides
+after the actual external key. Enablement-only edits use bare `fill`/`draw` when
+necessary to retain an unresolved color. Existing effective opacity and dimming
+continue to multiply once. A subsequent independent integration audit caught
+pristine numeric blur being treated as an edit; the numeric commit boundary now
+ignores untouched blur while accepting actual input and explicit Enter. Registered
+and mandatory native checks preserve empty intent and unchanged history on focus/blur.
+
+Cloning, duplication, clipboard, history, serialization and preset copies own
+independent nested baseline paint, dash arrays and override lists. Reapplying an
+imported preset replaces point-local overrides with the preset's own style/intent;
+reapplying an unedited imported preset resets point overrides. A different reference
+or detached copy clears unrelated provenance. Malformed metadata, invalid baselines,
+unknown/duplicate fields and reference mismatches fail validation. Envelope versions
+1 and 2 remain readable; Diagram.version stays 1. See [model notes](DATA_MODEL.md).
+
+Absent metadata preserves historical explicit styles and does not fabricate intent
+for every fallback. New edits lazily compare against the shared resolved baseline,
+retaining distinguishable old values before recording the new edit. Manual values
+that differ from a recorded baseline also remain authoritative. Historical edits
+returning exactly to a fallback cannot be recovered: old files never stored that
+information. No claim is made to reconstruct those ambiguous edits.
+
+### One context, ordered dependencies, unknown colors
+
+Import, diagnostics, preset construction, baseline/unresolved-field reconstruction
+and export share `createImportedTikzResolutionContext`. Source-array order is load
+order; later canonical definitions win for roots and nested invocations. `base`
+and `/tikz/base` share identity; `/other/base` remains distinct. Style bodies retain
+the invocation's runtime directory, ordered options, work/depth limits and cycle
+warnings. Runtime directory changes remain explicitly unsupported. Raw source,
+raw options, original key spellings and source/reference IDs are preserved.
+
+On later imports, only tracked importer snapshots refresh their unoverridden
+paint fields and baseline. Actual user edits and metadata-absent explicit saved
+styles are retained, and prior history remains immutable. Refreshing a previously
+unknown dependency never marks its old fallback as a local edit. Diagnostics are
+reconstructed in the same final context. Unrelated presets are not regenerated.
+
+Colors have three states: absent (built-in fallback is allowed), supported literal,
+or recognized unknown (`null`). Unsupported declarations shadow earlier values
+and built-ins; a later supported declaration restores resolution. The effective
+color environment is read at invocation after applicable sources load, not at
+the textual position of a style body. Unknown explicit or implicit-white mixture
+operands propagate uncertainty to the affected channels. Known unrelated paint
+remains resolved. A later unsupported option can retain the last known preview
+value as a diagnosed fallback; it is never treated as successful resolution.
+
+Resolution tracks known style/color source dependencies, including unknown color
+bindings. Export load comments deduplicate by source identity and follow source
+load order independently of element traversal. Selecting outer alone includes
+base then outer; custom hints remain comments. Unknown external dependencies stay
+unresolved. Arbitrary raw preambles are neither embedded nor executed. See the
+[import grammar and export contract](IMPORTED_POINT_PAINT.md).
+
+### Regressions and independent evidence
+
+New registered production tests are `tests/model/pointPaintIntent.test.ts`,
+`tests/model/pointPaintImportContext.test.ts`, and
+`tests/tikz/pointImportedResolution.test.ts`. They exercise exact review inputs,
+return edits and non-color settings, channel isolation, reload/history, cloned and
+copied metadata, preset/reference changes, legacy/invalid metadata, cross-file
+colors/styles, late dependencies, canonical root replacement, ordered hints,
+unsupported declaration order/mixtures and restored supported values. Both-mode
+assertions locate the actual external key and resolve the subsequent generated
+named-color definitions; unrelated or pre-key colors cannot satisfy them.
+
+The new [PGF import-order reference](../tests/fixtures/point-paint-pgf/import-order/README.md)
+compiled successfully with pdfTeX 1.40.29 / PGF 3.1.11a. It retains actual source
+files, command output, PDF, full log, uncompressed page operators and nine manually
+observed rows: cross-file colors, later root aliases, colors declared after bodies,
+untouched macro/CMYK effects and explicit post-key black overrides. Existing
+opacity/namespace references were not regenerated. Expected paint is independent
+of the TypeScript resolver.
+
+Native acceptance adds `point-paint-local-override-intent`,
+`point-paint-cross-file-resolution`, and `point-paint-unsupported-color-bindings`
+through real import/preset/Inspector events. It requires observations before
+assertions, both generated modes with post-key paint checks, JSON download/reload,
+Undo/Redo, preview paint and actual downloaded/reopened SVG/PNG artifacts. Missing
+then later known dependencies and old-reference canonical replacement are covered.
+The fail-closed parent policy now requires **16 groups / 23 named point scenarios**;
+an old successful 20-scenario report cannot pass. All existing lifecycle/MathJax,
+picking, immutable capture, six responsive downloads, 91 responsive artifacts,
+three body controls and validated white-background exception remain mandatory.
+
+### Executed checks and final-tree handoff
+
+Commands use `PATH=/opt/homebrew/bin:$PATH` (Node v26.9.0). The final binary-aware checkout identity is
+retained outside tracked documents in `/private/tmp/stz-32b-import-override-handoff/`
+to avoid a self-referential hash. The final `32B verify` invocation captures the
+same tree, including new untracked tests and PGF fixtures.
+
+
+| Check | Result |
+| --- | --- |
+| `npm test` | **3,086 passed**, zero failures/skips (`/private/tmp/stz-32b-final-tests-complete.log`). |
+| `npm run build` | Passed, executed after that full test process exited (`/private/tmp/stz-32b-final-build-sequential.log`). Existing >500kB chunk-size warning only. |
+| `npx tsc -p tsconfig.app.json --strict` | Passed (`/private/tmp/stz-32b-final-production-strict.log`). |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Passed (`/private/tmp/stz-32b-final-fixture-strict.log`). |
+| `npx tsc --ignoreConfig --noEmit --strict --allowImportingTsExtensions --module esnext --moduleResolution bundler --target es2022 --jsx react-jsx --skipLibCheck --types node tests/model/pointPaintIntent.test.ts tests/model/pointPaintImportContext.test.ts tests/tikz/pointImportedResolution.test.ts tests/ui/inspectorNumericInput.test.ts` | Passed (`/private/tmp/stz-32b-final-focused-strict.log`). |
+| Independent integration audit | Independently replayed all three review inputs through actual production functions; 42 focused tests passed. It found the numeric focus/blur issue above, then inspected its correction. No further concrete defect found; this is **not** the final acceptance review. |
+| Changed JavaScript syntax/recommended ESLint | All **8** changed/new `.mjs` files passed with zero lint errors/warnings; file list and exact results in the external handoff. |
+| Targeted TypeScript/TSX ESLint | **20 of 21 files clean**. InspectorField has **2 pre-existing** errors, reproduced at HEAD: existing effect state synchronization and existing non-component export. Baseline log: `/private/tmp/stz-inspector-field-baseline-lint.log`. |
+| `git diff --check` | Passed (`/private/tmp/stz-32b-final-diff-check.log`); also rerun by the frozen-tree verifier. |
+
+The separately established **25 pre-existing `no-regex-spaces` errors** in
+`tests/tikz/generateTikz.test.ts` remain unchanged; that file is not modified in
+this follow-up. They are not new failures or conflated with the two demonstrated
+InspectorField baseline errors. No repository-wide lint cleanup was performed.
+The build chunk-size warning is nonblocking and separate from lint debt.
+
+An initial full run found 32 runner-fixture failures because the isolated copied
+verifier did not include its newly imported post-key oracle and two transitive
+helpers. The fixture now copies those actual dependencies. All 32 runner tests,
+updated policy rejection tests and the final full suite passed; fresh-process
+loading, checkout checks and review/commit guards remain intact.
+
+The direct configured `node scripts/checkFreeLabels.mjs` attempt failed before
+browser startup at `development-server-listen`, `listen EPERM 127.0.0.1:5173`.
+Its actual report and log are in the handoff's `direct-free-labels` directory;
+no native assertion ran. Permissions and browser assertions were not changed.
+
+After documentation is frozen, execute the required final-tree command:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+Exact final outcomes and report path, before/after checkout identity, tracked
+binary diff and untracked hashes are saved in
+`/private/tmp/stz-32b-import-override-handoff/handoff.json`,
+`verification-final.log`, and `final-checkout.json`. These external records are
+authoritative for the frozen tree; earlier passing reports and intermediate
+fingerprints do not verify the new changes. Browser startup restrictions remain
+pending parent evidence, never a pass. The parent must complete **all five**
+commands, both native browser checks, all **16 groups / 23 scenarios**, the 35 new
+required artifacts and all preserved responsive evidence with empty page errors.
+After that passes, independently review the same tree against
+`prompts/phase-32b-review.md`, explicitly rechecking all three original findings.
+The earlier independent review did run and requested these changes; `32B verify`
+does not itself review. No commit/push or Phase 32B completion is authorized by
+partial verification; 32C/32D remain deferred.

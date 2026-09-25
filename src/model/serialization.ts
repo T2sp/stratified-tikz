@@ -1,4 +1,4 @@
-import { normalizePointStyle } from './styles.ts'
+import { clonePointPaint, getPointPaint, normalizePointStyle } from './styles.ts'
 import { validateCamera3D } from '../geometry/projection.ts'
 import {
   cloneCamera3D,
@@ -107,6 +107,8 @@ import { validateDiagram } from './validation.ts'
 
 export const savedDiagramFormat = 'stratified-tikz-diagram'
 // File v2 materializes independent point paint, including saved user presets.
+// Optional importedPaint provenance is an additive v2 extension. Absence keeps
+// historical explicit values; equal-valued historical edits cannot be inferred.
 // v1 remains readable with legacy black text, white hollow fill and 0.4pt stroke.
 // Diagram.version stays 1; coordinates and source text are never rewritten here.
 export const savedDiagramVersion = 2
@@ -2290,7 +2292,7 @@ function normalizeLoadedPointStyle(style: Record<string, unknown>): PointStyle {
   // Leave explicit paint intact for strict validation, including malformed values.
   // Only the absent legacy field is materialized; there is no lossy repair.
   return style.paint === undefined
-    ? normalizePointStyle(style as PointStyle)
+    ? { ...style, paint: clonePointPaint(getPointPaint(style as PointStyle)) } as PointStyle
     : style as PointStyle
 }
 

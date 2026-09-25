@@ -630,10 +630,28 @@ export type PointPaint = {
   }
 }
 
+/** Properties whose deliberate edits must survive an unresolved external style. */
+export const pointPaintFields = [
+  'text.color', 'text.opacity', 'fill.enabled', 'fill.color', 'fill.opacity',
+  'stroke.enabled', 'stroke.color', 'stroke.opacity', 'stroke.width',
+  'stroke.lineStyle', 'stroke.dashPattern', 'stroke.dashPhase', 'stroke.lineCap',
+  'stroke.lineJoin', 'opacity',
+] as const
+export type PointPaintField = (typeof pointPaintFields)[number]
+
+/** Importer snapshot provenance plus authoritative, property-level local edits. */
+export type ImportedPointPaint = {
+  referenceId: string
+  baseline: PointPaint
+  overriddenFields: PointPaintField[]
+}
+
 export type PointStyle = {
   kind: 'pointStyle'
   /** Authoritative paint when present; absence denotes legacy paint semantics. */
   paint?: PointPaint
+  /** Optional additive saved-file v2 metadata; absent in historical files. */
+  importedPaint?: ImportedPointPaint
   /** Legacy compatibility metadata; ignored for paint when paint is present. */
   color: HexColor
   opacity: Opacity

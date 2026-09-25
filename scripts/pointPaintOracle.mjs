@@ -2,6 +2,30 @@ import assert from 'node:assert/strict'
 import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { responsivePointFraming, assertResponsiveCaptureStable } from './pointResponsiveFraming.mjs'
 
+/** Inspect options on the actual node, after the exact external key. This small
+ * output oracle deliberately does not import the production style resolver. */
+export function observePostExternalPointPaint(code, key) {
+  const nodes = [...code.matchAll(/^\s*\\node\s*\[([^\]]*)\]\s*at/gm)]
+    .map((match) => match[1].split(',').map((option) => option.trim()))
+    .filter((options) => options.includes(key))
+  assert.equal(nodes.length, 1, `One actual exported node using external key ${key}`)
+  const options = nodes[0].slice(nodes[0].indexOf(key) + 1)
+  const colors = new Map([...code.matchAll(/\\definecolor\{([^}]+)\}\{HTML\}\{([\da-fA-F]{6})\}/g)]
+    .map((match) => [match[1], `#${match[2].toLowerCase()}`]))
+  const values = Object.fromEntries(options.filter((option) => option.includes('='))
+    .map((option) => [option.slice(0, option.indexOf('=')), option.slice(option.indexOf('=') + 1)]))
+  return { key, options, values, colors: Object.fromEntries(['fill', 'text', 'draw']
+    .filter((channel) => Object.hasOwn(values, channel)).map((channel) => [channel, colors.get(values[channel]) ?? values[channel]])) }
+}
+
+export function assertPostExternalPointPaint(actual, expected) {
+  for (const [key, value] of Object.entries(expected)) {
+    const values = ['fill', 'text', 'draw'].includes(key) ? actual.colors : actual.values
+    if (value === null) assert.equal(Object.hasOwn(actual.values, key), false, `Unknown external ${key} remains authoritative`)
+    else assert.equal(values[key], value, `Effective ${key} override after ${actual.key}`)
+  }
+}
+
 /** Observe the actual native SVG paint tree. This module never resolves model
  * styles; expected colors/alphas in acceptance are literal independent values. */
 export async function observePointPaint(page, { id, source, standalone = false } = {}) {

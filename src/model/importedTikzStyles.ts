@@ -1,6 +1,6 @@
 import { tikzStyleTargets } from './types.ts'
 import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
-import type { TikzPaintPreview, TikzPreviewContext } from './importedTikzPaint.ts'
+import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
 import {
   defaultCurveStyle,
@@ -9,6 +9,8 @@ import {
   getPointPaint,
   defaultRegionStyle,
   defaultSheetStyle,
+  createImportedPointPaintSnapshot,
+  refreshImportedPointPaintSnapshot,
 } from './styles.ts'
 import type {
   CurveStyle,
@@ -66,7 +68,7 @@ export type ParseTikzsetStylesResult = {
   skipped: number
   warnings: TikzsetParserWarning[]
   rawOptions?: Record<string, string>
-  colors?: Record<string, HexColor>
+  colors?: TikzColorBindings
 }
 
 export type ImportTikzStyleFileResult = {
@@ -170,7 +172,7 @@ export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
   const warnings: TikzsetParserWarning[] = []
   if (text.length > 1_000_000) return { styles: [], skipped: 1, warnings: [{ message: 'Style file exceeds the 1000000-character preview bound.' }] }
   const parsedStyles: ParsedTikzStyleDefinition[] = []
-  const colors: Record<string, HexColor> = {}
+  const colors: Record<string, HexColor | null> = {}
   const rawOptions: Record<string, string> = Object.create(null) as Record<string, string>
   let skipped = 0
   // Mask comments without changing offsets, retaining the exact source separately.
@@ -197,13 +199,82 @@ export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
       const model = readBracedContent(stripped, skipWhitespace(stripped, first.endIndex + 1))
       const value = model.ok ? readBracedContent(stripped, skipWhitespace(stripped, model.endIndex + 1)) : { ok: false as const }
       const color = model.ok && value.ok ? literalDefinedColor(model.content, value.content) : null
-      if (color !== null && /^[a-zA-Z][a-zA-Z0-9:_-]*$/.test(first.content)) colors[first.content] = color
-      else warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
+      const nameSupported = /^[a-zA-Z][a-zA-Z0-9:_-]*$/.test(first.content)
+      // A recognized declaration shadows an earlier binding even when its
+      // model/value is outside our literal grammar. In particular, CMYK red
+      // cannot silently fall back to the built-in red table.
+      if (nameSupported) colors[first.content] = color
+      if (color === null || !nameSupported) warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
       commands.lastIndex = value.ok ? value.endIndex + 1 : first.endIndex + 1
     }
     if (parsedStyles.length > 512) { warnings.push({ message: 'Style file exceeds the 512-definition preview bound.' }); parsedStyles.length = 512; break }
   }
   return { ...mergeDuplicateParsedStyles(parsedStyles, skipped, warnings), rawOptions, colors }
+}
+
+/**
+ * The diagram's source array is the load order. Reconstruct the final color
+ * environment and canonical style definitions in that same order everywhere.
+ * Raw sources describe what loading a file defines; saved reference options
+ * remain the fallback for old files that predate raw-source preservation.
+ */
+export function createImportedTikzResolutionContext(
+  diagram: {
+    externalTikzStyleSources?: readonly ExternalTikzStyleSource[]
+    importedTikzStyleReferences?: readonly ImportedTikzStyleReference[]
+  },
+): TikzPreviewContext {
+  const styles: { key: string; options?: string; sourceId: string }[] = []
+  const colors: Record<string, HexColor | null> = {}
+  const colorSourceIds: Record<string, string> = {}
+  const sources = diagram.externalTikzStyleSources ?? []
+  const references = diagram.importedTikzStyleReferences ?? []
+  const sourceIds = sources.map((source) => source.id)
+  for (const source of sources) {
+    const parsed = source.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource)
+    const parsedKeys = new Set((parsed?.styles ?? []).map((style) => canonicalTikzStyleKey(style.key)))
+    for (const style of parsed?.styles ?? []) styles.push({ ...style, sourceId: source.id })
+    for (const reference of references) {
+      if (reference.sourceId === source.id && !parsedKeys.has(canonicalTikzStyleKey(reference.key))) {
+        styles.push({ key: reference.key, options: reference.options, sourceId: source.id })
+      }
+    }
+    for (const [name, value] of Object.entries(parsed?.colors ?? {})) {
+      colors[name] = value
+      colorSourceIds[name] = source.id
+    }
+  }
+  // Preserve readable legacy references even when their source metadata is
+  // missing. Their stable reference order follows all known source loads.
+  for (const reference of references) {
+    if (!sourceIds.includes(reference.sourceId)) {
+      styles.push({ key: reference.key, options: reference.options, sourceId: reference.sourceId })
+    }
+  }
+  return { styles, colors, colorSourceIds, sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])] }
+}
+
+/** Invoke the key, so an older reference ID never selects a stale root body. */
+export function resolveImportedTikzStyle(
+  reference: ImportedTikzStyleReference,
+  context: TikzPreviewContext,
+): TikzPaintPreview {
+  const preview = resolveTikzPaint(reference.key, { ...context, key: undefined })
+  const dependencies = new Set([reference.sourceId, ...(preview.sourceDependencies ?? [])])
+  return {
+    ...preview,
+    sourceDependencies: [...new Set([...(context.sourceIds ?? []), ...dependencies])].filter((sourceId) => dependencies.has(sourceId)),
+  }
+}
+
+export function importedTikzStylePresetStyle(kind: 'point', reference: ImportedTikzStyleReference, context: TikzPreviewContext): PointStyle
+export function importedTikzStylePresetStyle(kind: StylePresetKind, reference: ImportedTikzStyleReference, context: TikzPreviewContext): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle
+export function importedTikzStylePresetStyle(
+  kind: StylePresetKind,
+  reference: ImportedTikzStyleReference,
+  context: TikzPreviewContext,
+): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
+  return styleFromPreview(kind, resolveImportedTikzStyle(reference, context))
 }
 
 export function importTikzStyleFile(
@@ -259,12 +330,9 @@ export function importTikzStyleFile(
       targets: inferImportedTikzStyleTargets(style.key, style.options),
       options: style.options,
       rawOptions: parseResult.rawOptions?.[style.key] ?? style.options,
-      previewDiagnostics: resolveTikzPaint(style.options, { styles: parseResult.styles, colors: parseResult.colors, key: style.key }).diagnostics ?? [],
+      previewDiagnostics: [] as string[],
     } satisfies ImportedTikzStyleReference
   })
-  for (const reference of references) {
-    for (const message of reference.previewDiagnostics) parseResult.warnings.push({ message: `${reference.key}: ${message}` })
-  }
   const diagramWithReferences: Diagram = {
     ...diagram,
     externalTikzStyleSources: [
@@ -276,9 +344,18 @@ export function importTikzStyleFile(
       ...references,
     ],
   }
+  const context = createImportedTikzResolutionContext(diagramWithReferences)
+  for (const reference of references) {
+    reference.previewDiagnostics = resolveImportedTikzStyle(reference, context).diagnostics ?? []
+    for (const message of reference.previewDiagnostics) parseResult.warnings.push({ message: `${reference.key}: ${message}` })
+  }
+  diagramWithReferences.importedTikzStyleReferences = diagramWithReferences.importedTikzStyleReferences?.map((reference) => ({
+    ...reference,
+    previewDiagnostics: resolveImportedTikzStyle(reference, context).diagnostics ?? [],
+  }))
 
   return {
-    diagram: addDetectedImportedStylePresets(diagramWithReferences, references, parseResult.colors),
+    diagram: refreshImportedPointSnapshots(addDetectedImportedStylePresets(diagramWithReferences, references, context), context),
     source,
     references,
     parseResult,
@@ -334,7 +411,13 @@ export function importedStylePresetStyle(
 ): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
   const preview =
     options === undefined ? {} : parseTikzStylePreviewOptions(options, context)
+  return styleFromPreview(kind, preview)
+}
 
+function styleFromPreview(
+  kind: StylePresetKind,
+  preview: TikzStylePreviewApproximation,
+): CurveStyle | SheetStyle | RegionStyle | LabelStyle | PointStyle {
   switch (kind) {
     case 'curve':
       return curveStyleFromPreview(preview)
@@ -441,13 +524,16 @@ function parseTikzsetBlock(
 function addDetectedImportedStylePresets(
   diagram: Diagram,
   references: readonly ImportedTikzStyleReference[],
-  colors: Readonly<Record<string, HexColor>> = {},
+  context: TikzPreviewContext,
 ): Diagram {
   let nextDiagram = diagram
 
   for (const reference of references) {
     for (const kind of importedStylePresetKindsForReference(reference)) {
-      const style = importedStylePresetStyle(kind, reference.options, { styles: references, colors, key: reference.key })
+      const resolvedStyle = importedTikzStylePresetStyle(kind, reference, context)
+      const style = resolvedStyle.kind === 'pointStyle'
+        ? createImportedPointPaintSnapshot(resolvedStyle, reference.id)
+        : resolvedStyle
       const result = createUserStylePresetFromStyle(
         nextDiagram,
         kind,
@@ -463,6 +549,25 @@ function addDetectedImportedStylePresets(
   }
 
   return nextDiagram
+}
+
+/** Only importer-owned snapshots follow later definitions; authored values stay. */
+function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewContext): Diagram {
+  const references = new Map((diagram.importedTikzStyleReferences ?? []).map((reference) => [reference.id, reference]))
+  const refresh = (style: PointStyle, referenceId: string | undefined): PointStyle => {
+    if (referenceId === undefined || style.importedPaint?.referenceId !== referenceId) return style
+    const reference = references.get(referenceId)
+    return reference === undefined ? style : refreshImportedPointPaintSnapshot(style, importedTikzStylePresetStyle('point', reference, context), referenceId)
+  }
+  return {
+    ...diagram,
+    strata: diagram.strata.map((stratum) => stratum.geometricKind === 'point'
+      ? { ...stratum, style: refresh(stratum.style, stratum.importedTikzStyleReferenceId) }
+      : stratum),
+    userStylePresets: diagram.userStylePresets?.map((preset) => preset.kind === 'point'
+      ? { ...preset, style: refresh(preset.style, preset.importedTikzStyleReferenceId) }
+      : preset),
+  }
 }
 
 function hasColorStyleSignal(

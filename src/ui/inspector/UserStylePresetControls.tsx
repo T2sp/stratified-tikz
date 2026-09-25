@@ -16,6 +16,7 @@ import type {
   LabelAnchor,
   LineStyle,
   PointFill,
+  PointPaintField,
   PointShape,
   StylePresetKind,
   TikzStyleTarget,
@@ -232,13 +233,13 @@ export function UserStylePresetControls({
     setPresetMessage('Preset deleted.')
   }
 
-  function updatePresetStyle(style: StylePresetStyle): void {
+  function updatePresetStyle(style: StylePresetStyle, fields: readonly PointPaintField[] = []): void {
     if (selectedPreset === null) {
       return
     }
 
     onDiagramChange((currentDiagram) =>
-      updateUserStylePresetStyle(currentDiagram, selectedPreset.id, style),
+      updateUserStylePresetStyle(currentDiagram, selectedPreset.id, style, fields),
     )
     setPresetMessage(
       selectedPresetOrigin === 'imported'
@@ -702,7 +703,7 @@ function PresetStyleFields({
   onChange,
 }: {
   preset: UserStylePreset
-  onChange: (style: StylePresetStyle) => void
+  onChange: (style: StylePresetStyle, fields?: readonly PointPaintField[]) => void
 }) {
   switch (preset.kind) {
     case 'region':
@@ -805,13 +806,13 @@ function PresetStyleFields({
             label="Preset color"
             value={getPointPaint(preset.style).stroke.color}
             onChange={(color) =>
-              onChange(updatePointColor(preset.style, color as HexColor))
+              onChange(updatePointColor(preset.style, color as HexColor), preset.style.fill === 'filled' ? ['fill.color', 'stroke.color'] : ['stroke.color'])
             }
           />
           <EditableOpacityField
             label="Preset opacity"
             value={preset.style.opacity}
-            onChange={(opacity) => onChange({ ...preset.style, opacity })}
+            onChange={(opacity) => onChange({ ...preset.style, opacity }, ['opacity'])}
           />
           <EditablePositiveNumberField
             label="Preset size"
@@ -828,7 +829,7 @@ function PresetStyleFields({
             label="Preset fill"
             value={preset.style.fill}
             options={pointFills}
-            onChange={(fill) => onChange(updatePointFill(preset.style, fill))}
+            onChange={(fill) => onChange(updatePointFill(preset.style, fill), ['fill.enabled', 'fill.color', 'fill.opacity'])}
           />
         </>
       )
@@ -845,7 +846,7 @@ function PresetStyleFields({
           <EditableOpacityField
             label="Preset opacity"
             value={preset.style.opacity}
-            onChange={(opacity) => onChange({ ...preset.style, opacity })}
+            onChange={(opacity) => onChange({ ...preset.style, opacity }, ['opacity'])}
           />
           <EditablePositiveNumberField
             label="Preset font"

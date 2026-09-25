@@ -1,12 +1,21 @@
+import { createEmptyDiagram, createPointStratum } from '../../src/model/constructors.ts'
+import { importTikzStyleFile } from '../../src/model/importedTikzStyles.ts'
+import { applyUserStylePresetToStratum } from '../../src/model/stylePresets.ts'
+import { clonePointStyle, getPointPaint } from '../../src/model/styles.ts'
+import type { Diagram } from '../../src/model/types.ts'
+import { generateTikz } from '../../src/tikz/generateTikz.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   parseFiniteNumber,
+  updateStratumStyleById,
   parseOpacity,
   parsePositiveFiniteNumber,
 } from '../../src/ui/diagramUpdates.ts'
 import {
   finiteNumberDraftWarning,
+  inspectorNumericCommitValue,
+  type InspectorNumberParser,
   opacityDraftWarning,
   positiveNumberDraftWarning,
   updateInspectorNumericDraft,
@@ -109,3 +118,65 @@ test('Inspector opacity and positive numeric drafts use their constraints', () =
     'Line width must be a finite number greater than 0.',
   )
 })
+
+test('numeric focus then blur leaves unresolved imported paint and history untouched', () => {
+  for (const [field, draft, parse] of [
+    ['fill.opacity', '1', parseOpacity],
+    ['stroke.width', '0.4', parsePositiveFiniteNumber],
+  ] as const) {
+    const original = importedNumericDiagram()
+    const committed = acceptNumericDraft(original, field, draft, parse, 'blur', false)
+    assert.equal(committed, original)
+    const point = committed.strata[0]
+    assert.ok(point.geometricKind === 'point')
+    assert.deepEqual(point.style.importedPaint?.overriddenFields, [])
+    for (const exportMode of ['standalone', 'inlineMath'] as const) {
+      const options = generateTikz(committed, { exportMode }).match(/example,([\s\S]*?)\] at/)?.[1] ?? ''
+      assert.doesNotMatch(options, /fill opacity=|line width=/)
+    }
+  }
+})
+
+test('numeric typing and Enter explicitly accept equal fallback values; blur after typing retains intent', () => {
+  for (const [trigger, edited] of [['input', false], ['enter', false], ['blur', true]] as const) {
+    for (const [field, draft, parse] of [
+      ['fill.opacity', '1', parseOpacity],
+      ['stroke.width', '0.4', parsePositiveFiniteNumber],
+    ] as const) {
+      const committed = acceptNumericDraft(importedNumericDiagram(), field, draft, parse, trigger, edited)
+      const point = committed.strata[0]
+      assert.ok(point.geometricKind === 'point')
+      assert.deepEqual(point.style.importedPaint?.overriddenFields, [field])
+    }
+  }
+})
+
+test('invalid numeric drafts never create imported override intent for any acceptance trigger', () => {
+  for (const trigger of ['input', 'blur', 'enter'] as const) {
+    const original = importedNumericDiagram()
+    assert.equal(acceptNumericDraft(original, 'stroke.width', '.', parsePositiveFiniteNumber, trigger, true), original)
+  }
+})
+
+function importedNumericDiagram(): Diagram {
+  const diagram = createEmptyDiagram({ ambientDimension: 2 })
+  diagram.strata = [createPointStratum({ ambientDimension: 2, id: 'numeric', position: { x: 0, y: 0, z: 0 } })]
+  const imported = importTikzStyleFile(diagram, 'numeric.sty', String.raw`\tikzstyle{example}=[fill opacity=\alpha,line width=\width]`)
+  const preset = imported.diagram.userStylePresets?.find((entry) => entry.kind === 'point')
+  assert.ok(preset)
+  return applyUserStylePresetToStratum(imported.diagram, 'numeric', preset.id)
+}
+
+function acceptNumericDraft(diagram: Diagram, field: 'fill.opacity' | 'stroke.width', draft: string,
+  parse: InspectorNumberParser, trigger: 'input' | 'blur' | 'enter', edited: boolean): Diagram {
+  const accepted = inspectorNumericCommitValue(updateInspectorNumericDraft(draft, parse, 'Invalid'), trigger, edited)
+  if (accepted === null) return diagram
+  return updateStratumStyleById(diagram, 'numeric', (style) => {
+    if (style.kind !== 'pointStyle') return style
+    const next = clonePointStyle(style)
+    const paint = getPointPaint(next)
+    if (field === 'fill.opacity') paint.fill.opacity = accepted
+    else paint.stroke.width = accepted
+    return next
+  }, [field])
+}

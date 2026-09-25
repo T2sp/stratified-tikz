@@ -1,5 +1,5 @@
 import { PointPaintFields } from './PointPaintFields.tsx'
-import { pointFills, pointShapes } from '../../model/types.ts'
+import { pointFills, pointShapes, pointPaintFields } from '../../model/types.ts'
 import type {
   Diagram,
   HexColor,
@@ -56,6 +56,7 @@ export function PointStyleEditor({
                       style.kind === 'pointStyle'
                         ? cloneStylePreset(preset)
                         : style,
+                      pointPaintFields,
                     ),
                   )
                 }
@@ -85,8 +86,8 @@ export function PointStyleEditor({
             )
           }
         />
-        <PointPaintFields style={point.style} onChange={(next) =>
-          onDiagramChange((diagram) => updateStratumStyleById(diagram, point.id, () => next))} />
+        <PointPaintFields style={point.style} onChange={(next, fields) =>
+          onDiagramChange((diagram) => updateStratumStyleById(diagram, point.id, () => next, fields))} />
         <EditableOpacityField
           label="Opacity"
           value={point.style.opacity}
@@ -94,6 +95,7 @@ export function PointStyleEditor({
             onDiagramChange((diagram) =>
               updateStratumStyleById(diagram, point.id, (style) =>
                 style.kind === 'pointStyle' ? { ...style, opacity } : style,
+                ['opacity'],
               ),
             )
           }

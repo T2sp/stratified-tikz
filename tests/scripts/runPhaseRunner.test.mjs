@@ -38,6 +38,12 @@ function fixture(t, phase = '31B', options = {}) {
   // parent. An absolute runner path into the user's checkout hides ESM staleness.
   const localAutomationDir = join(cwd, 'scripts/automation')
   cpSync(automationDir, localAutomationDir, { recursive: true })
+  // The verifier independently checks generated post-key paint. Keep its real
+  // oracle and transitive helpers in the isolated checkout so both the parent
+  // identity import and each fresh verification worker load the same modules.
+  for (const file of ['pointPaintOracle.mjs', 'pointCheckDiagnostics.mjs', 'pointResponsiveFraming.mjs']) {
+    cpSync(join(automationDir, '..', file), join(cwd, 'scripts', file))
+  }
   const runner = join(localAutomationDir, 'run-phase.mjs')
   for (const [file, source] of Object.entries(options.initialFiles ?? {})) {
     writeFileSync(join(cwd, file), source)

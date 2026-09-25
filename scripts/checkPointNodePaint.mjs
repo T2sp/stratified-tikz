@@ -13,6 +13,7 @@ import { boundedPointDiagnostic, cleanupPointCheck, createPointDiagnostics } fro
 import { resolvePointInspectorField, selectPointInspectorField, inspectPointInspectorField,
   checkPointInspectorFieldBoundary, POINT_PAINT_SELECT_OPTIONS } from './pointInspectorFields.mjs'
 import { runResponsivePointPaintChecks } from './checkPointResponsivePaint.mjs'
+import { runPointImportedPaintChecks } from './checkPointImportedPaint.mjs'
 
 const group = 'point-node-paint-import-persistence'
 const mixed = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
@@ -353,6 +354,9 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
       assert.equal((await point()).importedTikzStyleReferenceId, current.importedTikzStyleReferenceId)
     }
     await saved({ cases: namespaceCases })
+
+    await runPointImportedPaintChecks({ browser, page, artifactDir, inspector, legacy, state, model, point, load, settle, select,
+      eventAction, edit, undo, redo, tikz, owned, begin: (name) => { scenario = name }, saved, diagnose: observeCase })
 
     // Restore the imported mixed paint used by the established lifecycle cases.
     await load(download.json); await settle()

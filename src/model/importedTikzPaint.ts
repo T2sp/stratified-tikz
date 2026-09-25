@@ -8,6 +8,8 @@ export const namedTikzColors: Readonly<Record<string, HexColor>> = {
   violet: '#800080', purple: '#BF0040', brown: '#BF8040', lime: '#BFFF00',
   olive: '#808000', pink: '#FFBFBF', teal: '#008080',
 }
+/** An own null binding shadows both an earlier literal and a built-in name. */
+export type TikzColorBindings = Readonly<Record<string, HexColor | null>>
 export type TikzPaintPreview = {
   color?: HexColor
   fillColor?: HexColor
@@ -29,10 +31,13 @@ export type TikzPaintPreview = {
   pointSize?: number
   diagnostics?: string[]
   unresolvedFields?: string[]
+  sourceDependencies?: string[]
 }
 export type TikzPreviewContext = {
-  styles?: readonly { key: string; options?: string }[]
-  colors?: Readonly<Record<string, HexColor>>
+  styles?: readonly { key: string; options?: string; sourceId?: string }[]
+  colors?: TikzColorBindings
+  colorSourceIds?: Readonly<Record<string, string>>
+  sourceIds?: readonly string[]
   key?: string
 }
 /** Internal identity only: retain the user's key spelling in saved references. */
@@ -59,16 +64,23 @@ export function literalTikzDimension(value: string, signed = false): number | nu
   const result = number * factors[match[2] ?? 'pt']
   return Number.isFinite(result) && (signed || result >= 0) ? result : null
 }
-export function literalTikzColor(value: string, colors: Readonly<Record<string, HexColor>> = {}): HexColor | null {
+export function literalTikzColor(value: string, colors: TikzColorBindings = {}, onBindingUse?: (name: string) => void): HexColor | null {
   const tokens = unbrace(value).split('!').map((token) => token.trim())
-  const lookup = (name: string): HexColor | undefined =>
-    Object.hasOwn(colors, name) ? colors[name] : Object.hasOwn(namedTikzColors, name) ? namedTikzColors[name] : undefined
-  const first = lookup(tokens[0])
-  if (!first || tokens.length > 33) return null
+  const lookup = (name: string): HexColor | null | undefined => {
+    if (Object.hasOwn(colors, name)) { onBindingUse?.(name); return colors[name] }
+    return Object.hasOwn(namedTikzColors, name) ? namedTikzColors[name] : undefined
+  }
+  if (tokens.length > 33) return null
+  // Collect every explicit/implicit operand dependency even when another
+  // operand is unknown; the emitted external mixture still uses them all.
+  const operands = [lookup(tokens[0])]
+  for (let index = 1; index < tokens.length; index += 2) operands.push(lookup(tokens[index + 1] ?? 'white'))
+  const first = operands[0]
+  if (!first) return null
   let channels = [1, 3, 5].map((offset) => Number.parseInt(first.slice(offset, offset + 2), 16))
   for (let index = 1; index < tokens.length; index += 2) {
     const weight = literalTikzNumber(tokens[index])
-    const second = lookup(tokens[index + 1] ?? 'white')
+    const second = operands[(index + 1) / 2]
     if (weight === null || weight < 0 || weight > 100 || !second) return null
     channels = [1, 3, 5].map((offset, index) =>
       channels[index] * weight / 100 +
@@ -114,6 +126,11 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   const preview: TikzPaintPreview = {}
   const diagnostics: string[] = []
   const unresolved = new Set<string>()
+  const dependencies = new Set<string>()
+  const color = (value: string): HexColor | null => literalTikzColor(value, context.colors, (name) => {
+    const sourceId = context.colorSourceIds?.[name]
+    if (sourceId !== undefined) dependencies.add(sourceId)
+  })
   const paintFields = ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity', 'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']
   const keyFields: Record<string, string[]> = {
     fill: ['fillColor', 'fillEnabled'], draw: ['drawColor', 'drawEnabled'], color: ['fillColor', 'drawColor', 'textColor'], text: ['textColor'],
@@ -124,7 +141,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   const deferredShapeLayout = /^(?:shape(?: |$)|circle$|rectangle$|ellipse$|diamond$|trapezium(?: |$)|semicircle$|regular polygon(?: |$)|star(?: |$)|isosceles triangle(?: |$)|kite(?: |$)|dart(?: |$)|circular sector(?: |$)|cylinder(?: |$)|aspect$|inner |outer |minimum |anchor$|text (?:width|height|depth)$|align$|font$|node contents$)/
   const resolved = (...fields: string[]) => fields.forEach((field) => unresolved.delete(field))
   let work = 0
-  const styles = new Map((context.styles ?? []).map((style) => [canonicalTikzStyleKey(style.key), style.options ?? '']))
+  const styles = new Map((context.styles ?? []).map((style) => [canonicalTikzStyleKey(style.key), style]))
   const warn = (message: string) => { if (diagnostics.length < 64 && !diagnostics.includes(message)) diagnostics.push(message) }
   // A .style body uses the invocation's active directory (/tikz for normal
   // nodes), not the declaration's parent directory. Keep this context shared
@@ -156,14 +173,16 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       const canonicalKey = canonicalTikzStyleKey(rawKey)
       const reference = equals < 0 && styles.has(canonicalKey) ? canonicalKey : undefined
       if (reference !== undefined) {
+        const definition = styles.get(reference)!
+        if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
         if (active.includes(reference)) { warn(`Cyclic style reference: ${[...active, reference].join(' → ')}`); paintFields.forEach((field) => unresolved.add(field)) }
         else if (active.length >= 16) { warn('Preview style expansion exceeds the 16-level depth bound.'); paintFields.forEach((field) => unresolved.add(field)) }
-        else visit(styles.get(reference)!, [...active, reference])
+        else visit(definition.options ?? '', [...active, reference])
         continue
       }
-      const invalid = () => {
+      const invalid = (affectedFields?: readonly string[]) => {
         warn(`Unsupported or invalid preview option: ${option}`)
-        const fields = Object.hasOwn(keyFields, key) ? keyFields[key] : deferredShapeLayout.test(key) ? [] : paintFields
+        const fields = affectedFields ?? (Object.hasOwn(keyFields, key) ? keyFields[key] : deferredShapeLayout.test(key) ? [] : paintFields)
         fields.forEach((field) => unresolved.add(field))
       }
       if (key === 'draw' || key === 'fill') {
@@ -172,9 +191,9 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         if (value === undefined || value === '') { preview[enabledKey] = true; resolved(enabledKey) }
         else if (value === 'none') { preview[enabledKey] = false; resolved(enabledKey) }
         else {
-          const color = literalTikzColor(value, context.colors)
-          if (color === null) invalid()
-          else { preview[enabledKey] = true; preview[colorKey] = color; resolved(enabledKey, colorKey) }
+          const resolvedColor = color(value)
+          if (resolvedColor === null) invalid()
+          else { preview[enabledKey] = true; preview[colorKey] = resolvedColor; resolved(enabledKey, colorKey) }
         }
       } else if (key === 'opacity' || key === 'fill opacity' || key === 'draw opacity' || key === 'text opacity') {
         const alpha = value === undefined ? null : literalTikzNumber(value)
@@ -184,10 +203,10 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         else if (key === 'draw opacity') { preview.drawOpacity = alpha; resolved('drawOpacity') }
         else { preview.textOpacity = alpha; resolved('textOpacity') }
       } else if (key === 'color' || key === 'text') {
-        const color = value === undefined ? null : literalTikzColor(value, context.colors)
-        if (color === null) invalid()
-        else if (key === 'text') { preview.textColor = color; resolved('textColor') }
-        else { preview.color = color; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
+        const resolvedColor = value === undefined ? null : color(value)
+        if (resolvedColor === null) invalid()
+        else if (key === 'text') { preview.textColor = resolvedColor; resolved('textColor') }
+        else { preview.color = resolvedColor; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
       } else if (value === undefined && Object.hasOwn(thickness, key)) { preview.lineWidth = thickness[key]; resolved('lineWidth') }
       else if (value === undefined && Object.hasOwn(lineStyles, key)) { preview.lineStyle = lineStyles[key]; delete preview.dashPattern; resolved('dashPattern') }
       else if (key === 'line width' || key === 'inner sep' || key === 'dash phase') {
@@ -209,8 +228,9 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       else if ((key === 'line join' || key === 'join') && (value === 'miter' || value === 'round' || value === 'bevel')) { preview.lineJoin = value; resolved('lineJoin') }
       else if ((key === 'circle' && value === undefined) || (key === 'shape' && value === 'circle')) preview.pointShape = 'circle'
       else {
-        const color = value === undefined ? literalTikzColor(key, context.colors) : null
-        if (color) { preview.color = color; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
+        const resolvedColor = value === undefined ? color(key) : null
+        if (resolvedColor) { preview.color = resolvedColor; delete preview.drawColor; delete preview.fillColor; delete preview.textColor; resolved('fillColor', 'drawColor', 'textColor') }
+        else if (value === undefined && (Object.hasOwn(context.colors ?? {}, key) || key.includes('!'))) invalid(['fillColor', 'drawColor', 'textColor'])
         else invalid()
       }
     }
@@ -218,5 +238,6 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   visit(options, context.key ? [canonicalTikzStyleKey(context.key)] : [])
   if (diagnostics.length) preview.diagnostics = diagnostics
   if (unresolved.size) preview.unresolvedFields = [...unresolved]
+  if (dependencies.size) preview.sourceDependencies = [...new Set([...(context.sourceIds ?? []), ...dependencies])].filter((sourceId) => dependencies.has(sourceId))
   return preview
 }

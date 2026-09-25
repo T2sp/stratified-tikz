@@ -1,4 +1,4 @@
-import { getPointPaint } from '../model/styles.ts'
+import { changedPointPaintFields, getPointPaint } from '../model/styles.ts'
 import type {
   BoundaryPathSnapshot,
   ClosedPathBoundary,
@@ -29,6 +29,7 @@ import type {
   PointShape,
   PointStratum,
   PointStyle,
+  PointPaintField,
   RegionStyle,
   SheetStyle,
   SheetStratum,
@@ -89,9 +90,9 @@ import {
 } from '../model/camera.ts'
 import { stylePresetStylesEqual } from '../model/stylePresets.ts'
 import {
-  importedStylePresetStyle,
-  parseTikzsetStyles,
-  parseTikzStylePreviewOptions,
+  createImportedTikzResolutionContext,
+  importedTikzStylePresetStyle,
+  resolveImportedTikzStyle,
   normalizeSingleLineCommentText,
 } from '../model/importedTikzStyles.ts'
 import {
@@ -403,6 +404,7 @@ type GenerateContext = {
   localStyles: LocalStyleRegistry
   externalTikzStyleSources: Map<string, ExternalTikzStyleSource>
   importedTikzStyleReferences: Map<string, ImportedTikzStyleReference>
+  importedTikzResolution: ReturnType<typeof createImportedTikzResolutionContext>
   externalTikzStyleUsage: ExternalTikzStyleUsageRegistry
   hasSavedPaths: boolean
   requiresTikz3dLibrary: boolean
@@ -712,7 +714,8 @@ function createContext(
         reference,
       ]),
     ),
-    externalTikzStyleUsage: new ExternalTikzStyleUsageRegistry(),
+    importedTikzResolution: createImportedTikzResolutionContext({ externalTikzStyleSources, importedTikzStyleReferences }),
+    externalTikzStyleUsage: new ExternalTikzStyleUsageRegistry(externalTikzStyleSources ?? []),
     hasSavedPaths: false,
     requiresTikz3dLibrary: false,
     requiresCalcLibrary: false,
@@ -6758,10 +6761,10 @@ function importedStyleApplicationForElement(
     return null
   }
 
-  const source = context.externalTikzStyleSources.get(reference.sourceId)
-
-  if (source !== undefined) {
-    context.externalTikzStyleUsage.use(source)
+  const resolution = resolveImportedTikzStyle(reference, context.importedTikzResolution)
+  for (const sourceId of [reference.sourceId, ...(resolution.sourceDependencies ?? [])]) {
+    const source = context.externalTikzStyleSources.get(sourceId)
+    if (source !== undefined) context.externalTikzStyleUsage.use(source)
   }
 
   return {
@@ -6882,11 +6885,7 @@ function filledSurfaceImportedStyleOverrideOptions(
 }
 
 function importedPointUnresolvedFields(reference: ImportedTikzStyleReference, context: GenerateContext): string[] {
-  const source = context.externalTikzStyleSources.get(reference.sourceId)
-  const colors = source?.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource).colors
-  const preview = parseTikzStylePreviewOptions(reference.options ?? '', {
-    styles: [...context.importedTikzStyleReferences.values()], key: reference.key, colors,
-  })
+  const preview = resolveImportedTikzStyle(reference, context.importedTikzResolution)
   const unresolved = new Set(preview.unresolvedFields ?? [])
   if (unresolved.has('textOpacity') || (preview.textOpacity === undefined && unresolved.has('fillOpacity'))) unresolved.add('effectiveTextOpacity')
   return [...unresolved]
@@ -6901,8 +6900,15 @@ function pointImportedStyleOverrideOptions(
 ): string[] {
   const baseline = importedBaselineStyle('point', reference, context)
   const currentPaint = getPointPaint(style)
-  const baselinePaint = baseline.kind === 'pointStyle' ? getPointPaint(baseline) : currentPaint
-  const baselineOpacity = baseline.kind === 'pointStyle' ? baseline.opacity : style.opacity
+  const intent = style.importedPaint?.referenceId === reference.id ? style.importedPaint : undefined
+  // Snapshot provenance distinguishes importer fallback values from local
+  // paint. Also preserve distinguishable manually authored/legacy values;
+  // absent historical metadata cannot recover an equal-valued old edit.
+  const comparisonStyle = intent === undefined ? baseline : { ...style, paint: intent.baseline, opacity: 1 }
+  const overridden = new Set<PointPaintField>([
+    ...(intent?.overriddenFields ?? []),
+    ...(comparisonStyle.kind === 'pointStyle' ? changedPointPaintFields(comparisonStyle, style) : []),
+  ])
   const unresolved = new Set(unresolvedFields)
   const affectedFields: Record<string, string[]> = {
     fill: currentPaint.fill.enabled ? ['fillColor', 'fillEnabled'] : ['fillEnabled'],
@@ -6912,23 +6918,25 @@ function pointImportedStyleOverrideOptions(
     'dash pattern': ['dashPattern'], 'dash phase': ['dashPhase'],
     'line cap': ['lineCap'], 'line join': ['lineJoin'],
   }
-  const unchanged: Record<string, boolean> = {
-    fill: currentPaint.fill.color === baselinePaint.fill.color && currentPaint.fill.enabled === baselinePaint.fill.enabled,
-    draw: currentPaint.stroke.color === baselinePaint.stroke.color && currentPaint.stroke.enabled === baselinePaint.stroke.enabled,
-    text: currentPaint.text.color === baselinePaint.text.color,
-    'fill opacity': currentPaint.fill.opacity === baselinePaint.fill.opacity && style.opacity === baselineOpacity,
-    'draw opacity': currentPaint.stroke.opacity === baselinePaint.stroke.opacity && style.opacity === baselineOpacity,
-    'text opacity': currentPaint.text.opacity === baselinePaint.text.opacity && style.opacity === baselineOpacity,
-    'line width': currentPaint.stroke.width === baselinePaint.stroke.width,
-    'dash pattern': currentPaint.stroke.lineStyle === baselinePaint.stroke.lineStyle && JSON.stringify(currentPaint.stroke.dashPattern) === JSON.stringify(baselinePaint.stroke.dashPattern),
-    'dash phase': currentPaint.stroke.dashPhase === baselinePaint.stroke.dashPhase,
-    'line cap': currentPaint.stroke.lineCap === baselinePaint.stroke.lineCap,
-    'line join': currentPaint.stroke.lineJoin === baselinePaint.stroke.lineJoin,
+  const overrideFields: Record<string, PointPaintField[]> = {
+    fill: ['fill.color', 'fill.enabled'], draw: ['stroke.color', 'stroke.enabled'],
+    text: ['text.color'], 'fill opacity': ['fill.opacity', 'opacity'],
+    'draw opacity': ['stroke.opacity', 'opacity'], 'text opacity': ['text.opacity', 'opacity'],
+    'line width': ['stroke.width'], 'dash pattern': ['stroke.lineStyle', 'stroke.dashPattern'],
+    'dash phase': ['stroke.dashPhase'], 'line cap': ['stroke.lineCap'], 'line join': ['stroke.lineJoin'],
   }
-  const paintOptions = pointPaintTikzOptions(style, colorBaseName, context).filter((option) => {
+  const paintOptions = pointPaintTikzOptions(style, colorBaseName, context).flatMap((option) => {
     const rawKey = option.split('=')[0]
     const key = ['solid', 'dotted', 'densely dotted', 'dashed'].includes(rawKey) ? 'dash pattern' : rawKey
-    return !unchanged[key] || !(affectedFields[key] ?? []).some((affected) => unresolved.has(affected))
+    if (key === 'fill' || key === 'draw') {
+      const channel = key === 'fill' ? 'fill' : 'stroke'
+      // An enablement-only edit must not claim an unresolved external color.
+      // Bare fill/draw enables painting without resetting its color in PGF.
+      if (currentPaint[channel].enabled && overridden.has(`${channel}.enabled`)
+        && !overridden.has(`${channel}.color`) && unresolved.has(key === 'fill' ? 'fillColor' : 'drawColor')) return [key]
+    }
+    return (overrideFields[key] ?? []).some((field) => overridden.has(field))
+      || !(affectedFields[key] ?? []).some((affected) => unresolved.has(affected)) ? [option] : []
   })
   return [
     ...paintOptions,
@@ -6981,13 +6989,7 @@ function importedBaselineStyle(
   reference: ImportedTikzStyleReference,
   context: GenerateContext,
 ): UserStylePreset['style'] {
-  const preset = [...context.userStylePresets.values()].find(
-    (candidate) =>
-      candidate.kind === kind &&
-      candidate.importedTikzStyleReferenceId === reference.id,
-  )
-
-  return preset?.style ?? importedStylePresetStyle(kind, reference.options, { styles: [...context.importedTikzStyleReferences.values()], key: reference.key })
+  return importedTikzStylePresetStyle(kind, reference, context.importedTikzResolution)
 }
 
 function matchingUserStylePreset(
@@ -8409,20 +8411,21 @@ class LocalStyleRegistry {
 }
 
 class ExternalTikzStyleUsageRegistry {
-  private readonly sources: ExternalTikzStyleSource[] = []
+  private readonly sources: readonly ExternalTikzStyleSource[]
   private readonly usedSourceIds = new Set<string>()
 
-  use(source: ExternalTikzStyleSource): void {
-    if (this.usedSourceIds.has(source.id)) {
-      return
-    }
+  constructor(sources: readonly ExternalTikzStyleSource[]) {
+    this.sources = sources
+  }
 
+  use(source: ExternalTikzStyleSource): void {
     this.usedSourceIds.add(source.id)
-    this.sources.push(source)
   }
 
   usedSources(): ExternalTikzStyleSource[] {
-    return [...this.sources]
+    // Import order, never element traversal order, establishes redefinition
+    // precedence when the user follows these external-file load comments.
+    return this.sources.filter((source) => this.usedSourceIds.has(source.id))
   }
 }
 

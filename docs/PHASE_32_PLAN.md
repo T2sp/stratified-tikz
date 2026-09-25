@@ -7,16 +7,19 @@ passing review. Its tracked diff and four then-untracked file hashes match the
 historical contaminated-reference failure and the earlier child-only handoff.
 See the prerequisite audit in [32B implementation](PHASE_32B_IMPLEMENTATION.md).
 
-32B implementation and cumulative acceptance harness are added. The latest
-`1MopVV` parent run passed responsive circle/triangle previews and all three
-transparent download cases, then rejected the intentional white export-background
-marker as runtime metadata. The corrected harness independently validates the
-fixture's expected background mode, marker, local geometry and paint in both
-saved and reopened SVGs, preserving body/font, return-scale and control checks.
-Fresh parent browser verification and independent review remain required; the
-download scenario and remaining white/settled-export checks were incomplete in
-that partial run. 32C and 32D remain deferred. Historical 32A evidence does not
-establish acceptance of the 32B checkout.
+32B's `xgI0o0` parent verification passed all five commands, 16 groups,
+20 point scenarios and accepted PGF evidence on fingerprint
+`4061512fdc4f58a9d71ec92378920a24dbe8c22406beba9c222aa232c0011742`.
+The subsequent independent review ran and found three Medium production defects:
+lost equal-valued local overrides, inconsistent cross-file resolution, and stale
+resolution after unsupported color redefinitions. The targeted fixes add persisted
+property-level intent, a shared ordered source context and unknown color bindings.
+The native policy now requires 23 scenarios in the same 16 groups, preserving all
+six responsive downloads and their 91 required artifacts. Fresh matching parent
+verification and independent review must accept the new tree before 32B is complete.
+32C/32D remain deferred. See the final section of the implementation report for
+executed checks and the frozen-tree handoff; historical browser evidence does
+not cover these new fixes.
 
 Implement the following stages in the user's requested order. Each stage must
 remain usable and pass its own acceptance checks before the next stage begins.

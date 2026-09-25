@@ -1,4 +1,6 @@
-import { clonePointStyle, clonePointPaint, getPointPaint, updatePointColor, updatePointFill } from '../model/styles.ts'
+import { clonePointStyle, clonePointPaint, getPointPaint, markPointPaintOverrides, recordPointPaintEdit, updatePointColor, updatePointFill } from '../model/styles.ts'
+import { preparePointStyleForImportedEdit } from '../model/pointPaintEditing.ts'
+import type { PointPaintField } from '../model/types.ts'
 import {
   arrowHeadKinds,
   endpointArrowModes,
@@ -504,7 +506,11 @@ export function applyBulkStyleField(
       return stratum
     }
 
-    const updated = updateStratumBulkStyleField(stratum, fieldId, value)
+    let updated = updateStratumBulkStyleField(stratum, fieldId, value)
+    if (updated !== stratum && updated.geometricKind === 'point' && stratum.geometricKind === 'point') {
+      const previous = preparePointStyleForImportedEdit(diagram, stratum.style, stratum.importedTikzStyleReferenceId)
+      updated = { ...updated, style: markPointPaintOverrides(recordPointPaintEdit(previous, updated.style), pointBulkPaintFields(stratum.style.fill, fieldId)) }
+    }
     changed = changed || updated !== stratum
     return updated
   })
@@ -1379,6 +1385,27 @@ function updateCurveBulkStyleField(
     }
     default:
       return stratum
+  }
+}
+
+function pointBulkPaintFields(fill: 'filled' | 'hollow', fieldId: BulkStyleFieldId): readonly PointPaintField[] {
+  switch (fieldId) {
+    case 'point.color': return fill === 'filled' ? ['fill.color', 'stroke.color'] : ['stroke.color']
+    case 'point.fill': return ['fill.enabled', 'fill.color', 'fill.opacity']
+    case 'point.opacity': return ['opacity']
+    case 'point.textColor': return ['text.color']
+    case 'point.textOpacity': return ['text.opacity']
+    case 'point.fillEnabled': return ['fill.enabled']
+    case 'point.fillColor': return ['fill.color']
+    case 'point.fillOpacity': return ['fill.opacity']
+    case 'point.strokeEnabled': return ['stroke.enabled']
+    case 'point.strokeColor': return ['stroke.color']
+    case 'point.strokeOpacity': return ['stroke.opacity']
+    case 'point.strokeWidth': return ['stroke.width']
+    case 'point.strokeLineStyle': return ['stroke.lineStyle', 'stroke.dashPattern']
+    case 'point.strokeCap': return ['stroke.lineCap']
+    case 'point.strokeJoin': return ['stroke.lineJoin']
+    default: return []
   }
 }
 

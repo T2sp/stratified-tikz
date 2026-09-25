@@ -63,7 +63,8 @@ import {
 import {
   cloneCurveStyle,
   cloneLabelStyle,
-  clonePointStyle,
+  recordPointPaintEdit,
+  markPointPaintOverrides,
   cloneSheetStyle,
   defaultCurveStyle,
   defaultLabelStyle,
@@ -71,6 +72,7 @@ import {
   normalizePointStyle,
   defaultSheetStyle,
 } from '../model/styles.ts'
+import { preparePointStyleForImportedEdit } from '../model/pointPaintEditing.ts'
 import { resolveSymbolicVariables } from '../model/variables.ts'
 import type {
   AmbientDimension,
@@ -95,6 +97,7 @@ import type {
   PathTemplate,
   PathSegment,
   PointStratum,
+  PointPaintField,
   PolygonSheetStratum,
   SheetStyle,
   Stratum,
@@ -305,6 +308,7 @@ export function updateStratumStyleById(
   diagram: Diagram,
   id: string,
   updater: (style: StratumStyle) => StratumStyle,
+  explicitPointPaintFields: readonly PointPaintField[] = [],
 ): Diagram {
   return updateStratumById(diagram, id, (stratum) => {
     switch (stratum.geometricKind) {
@@ -327,9 +331,10 @@ export function updateStratumStyleById(
           : stratum
       }
       case 'point': {
-        const style = updater(stratum.style)
+        const previous = preparePointStyleForImportedEdit(diagram, stratum.style, stratum.importedTikzStyleReferenceId)
+        const style = updater(previous)
         return style.kind === 'pointStyle'
-          ? clearStylePresetReference({ ...stratum, style: clonePointStyle(style) })
+          ? clearStylePresetReference({ ...stratum, style: markPointPaintOverrides(recordPointPaintEdit(previous, style), explicitPointPaintFields) })
           : stratum
       }
     }

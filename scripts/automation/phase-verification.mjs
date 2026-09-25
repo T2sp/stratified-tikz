@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { observePostExternalPointPaint, assertPostExternalPointPaint } from "../pointPaintOracle.mjs";
 
 const freeLabelGroups = [
   "existing-renderer-regressions",
@@ -56,9 +57,23 @@ export const pointNodeScenarios = {
     "point-paint-namespace-aliases",
     "point-paint-responsive-circle", "point-paint-responsive-triangle",
     "point-paint-responsive-downloads",
+    "point-paint-local-override-intent", "point-paint-cross-file-resolution",
+    "point-paint-unsupported-color-bindings",
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
+  const importRegressionSources = {
+    "point-paint-local-override-intent": ["intent.sty"],
+    "point-paint-cross-file-resolution": ["base.sty", "outer.sty", "base-colors.sty", "outer-colors.sty", "redefined.sty", "missing.sty", "later.sty"],
+    "point-paint-unsupported-color-bindings": ["unsupported.sty"],
+  };
+  if (Object.hasOwn(importRegressionSources, name)) {
+    return [`${name}.json`, ...importRegressionSources[name].map((source) => `${name}-${source}`),
+      `${name}-saved.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`,
+      ...(name === "point-paint-cross-file-resolution" ? [`${name}-later-saved.json`] : []),
+      ...["standalone", "inlineMath"].flatMap((mode) => [`${name}-${mode}.tex`,
+        ...(name === "point-paint-cross-file-resolution" ? [] : [`${name}-untouched-${mode}.tex`])])];
+  }
   if (name === "point-paint-namespace-aliases") {
     return [`${name}.json`, ...["shadowing", "missing", "aliases"].flatMap((entry) => {
       const stem = `point-paint-namespace-${entry}`;
@@ -181,6 +196,10 @@ function evidenceObject(artifactDir, name) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings"].includes(name)) {
+    validateImportedPaintEvidence(artifactDir, name, group);
+    return;
+  }
   if (name !== "point-paint-namespace-aliases" && !name.startsWith("point-paint-responsive-")) return;
   const evidence = evidenceObject(artifactDir, `${name}.json`);
   if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed") {
@@ -245,6 +264,65 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
   } else if (evidence.cases.length !== 2 || ![0.5, 2].every((scale) =>
     evidence.cases.filter((entry) => entry?.scale === scale && entry.negativeControlRejected === true).length === 1)) {
     throw new Error(`Responsive point paint must reject the non-scaling control at both display scales: ${name}`);
+  }
+}
+
+function validateImportedPaintEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  const persistence = (entry, boundary) => entry?.boundary === boundary
+    && Array.isArray(entry.differencePaths) && entry.differencePaths.length === 0;
+  if (evidence.scenario !== name || evidence.group !== group || evidence.result !== "passed"
+    || !persistence(evidence.download, "download") || !persistence(evidence.reload, "reload")
+    || !Array.isArray(evidence.standalone?.pageErrors) || evidence.standalone.pageErrors.length !== 0
+    || !evidence.standalone.observation?.contour || !Array.isArray(evidence.standalone.observation.leaves)
+    || evidence.standalone.observation.leaves.length === 0) {
+    throw new Error(`Imported paint must complete native save/reload and standalone SVG: ${name}`);
+  }
+  const check = (boundary, key, expected) => {
+    const entry = evidence[boundary];
+    if (entry?.key !== key || !entry.current?.importedTikzStyleReferenceId
+      || !entry.observation?.contour || !Array.isArray(entry.observation.leaves) || entry.observation.leaves.length === 0
+      || !entry.state?.json || !entry.state?.history || !Array.isArray(entry.warnings)) {
+      throw new Error(`Missing native imported paint observation: ${name} ${boundary}`);
+    }
+    for (const mode of ["standalone", "inlineMath"]) {
+      if (typeof entry.output?.[mode] !== "string") throw new Error(`Missing imported paint ${mode}: ${name} ${boundary}`);
+      assertPostExternalPointPaint(observePostExternalPointPaint(entry.output[mode], key), expected);
+    }
+  };
+  if (name === "point-paint-local-override-intent") {
+    for (const boundary of ["untouched", "reset"]) check(boundary, "example", { fill: null, text: "#ff0000" });
+    for (const boundary of ["away", "undone"]) check(boundary, "example", { fill: "#123456", text: "#ff0000" });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "example", { fill: "#000000", text: "#ff0000" });
+    check("settingsBefore", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": null, "line width": null });
+    check("settingsFocusBlur", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": null, "line width": null });
+    const noEdit = evidence.settingsFocusBlur, overrides = noEdit.current.style?.importedPaint?.overriddenFields;
+    if (!Array.isArray(overrides) || overrides.length !== 0
+      || noEdit.state.json !== evidence.settingsBefore.state.json || noEdit.state.history !== evidence.settingsBefore.state.history
+      || !Array.isArray(noEdit.focusBlurControls) || noEdit.focusBlurControls.length !== 2
+      || !["Fill opacity", "Border width"].every((name) => noEdit.focusBlurControls.filter((control) => control?.name === name
+        && control.focused === true && control.blurred === true && typeof control.before === "string" && control.before === control.after).length === 1)) {
+      throw new Error("Unedited native numeric focus/blur must preserve unknown paint, local intent and history");
+    }
+    check("settingsBack", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": "1", "line width": "0.4pt" });
+  } else if (name === "point-paint-cross-file-resolution") {
+    for (const boundary of ["crossFile", "reloaded"]) check(boundary, "outer", { fill: "#ff0000", text: "#00ff00", draw: "#0000ff" });
+    check("priorColor", "outer", { fill: "#123456", text: "#00ff00", draw: "#0000ff" });
+    check("redefined", "outer", { fill: "#ffff00", text: "#0000ff", draw: "#00ff00" });
+    check("missing", "outer", { fill: null, text: null, draw: "#0000ff" });
+    check("laterUndone", "outer", { fill: "#000000", text: null });
+    for (const boundary of ["later", "laterRedone", "laterReloaded"]) check(boundary, "outer", { fill: "#000000", text: "#00ff00", draw: "#0000ff" });
+    if (!persistence(evidence.laterDownload, "download") || !persistence(evidence.laterReload, "reload")) throw new Error("Later import must preserve local paint through save/reload");
+    if (!evidence.missing.warnings.some((warning) => warning.includes("absent base"))) throw new Error("Missing dependency diagnostic evidence");
+    for (const output of Object.values(evidence.crossFile.output)) {
+      const base = output.indexOf("%   \\input{base.sty}"), outer = output.indexOf("%   \\input{outer.sty}");
+      if (base < 0 || outer <= base) throw new Error("Cross-file dependency hints must follow source load order");
+    }
+  } else {
+    check("unsupported", "myPoint", { fill: null, text: null, draw: "#000000" });
+    if (!evidence.unsupported.warnings.some((warning) => warning.includes("red"))) throw new Error("Unsupported red diagnostic evidence is required");
+    for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "myPoint", { fill: "#000000", text: null });
   }
 }
 

@@ -14,6 +14,35 @@ to each paint operation; it is not an SVG group opacity. Explicit `paint` values
 are authoritative. Legacy `color`/`fill` fields remain available for old input
 compatibility but do not override explicit paint.
 
+Version 2 also accepts optional `PointStyle.importedPaint` editing metadata:
+`{ referenceId, baseline: PointPaint, overriddenFields: PointPaintField[] }`.
+The baseline records the importer's paint snapshot; the field list records
+explicit local intent independently of value equality. Fields identify one
+property (`fill.color`, `text.opacity`, `stroke.width`, `stroke.dashPattern`,
+and so on); `opacity` identifies the overall multiplier. Both the snapshot and
+field list are validated and deep-cloned, and the reference must match the
+point or preset's active imported reference. Invalid explicit metadata is
+rejected. Replacing/removing that reference clears incompatible metadata.
+
+New imported point presets begin with an empty override list. Accepted local
+edits add their affected fields, including equal-valued edits and coupled
+controls' intentionally edited channels. Editing unknown fill away from black
+and back to black therefore remains an authoritative local black override.
+Changing fill does not claim unresolved text, border, or opacity. Enablement
+alone can emit bare `fill`/`draw`, preserving unknown external color. Preset
+reapplication restores the preset's own values and overrides, resetting edits
+made only on the point. Clipboard, duplication, history and JSON preserve the
+metadata without sharing its mutable paint snapshot or field array.
+
+Old version-1/version-2 diagrams and user presets remain readable without this
+metadata. Their saved explicit values remain authoritative; they are not
+automatically regenerated on another import. Export and the first new edit
+preserve distinguishable differences from the effective imported baseline.
+That first edit also materializes metadata for subsequent operations. An old
+equal-valued local edit is indistinguishable from an untouched fallback because
+old files never recorded the distinction; it cannot be reconstructed reliably.
+Absent metadata therefore does not automatically claim every legacy fallback.
+
 | Input | Effective appearance |
 | --- | --- |
 | Legacy point or user preset without paint | Black text; old color for stroke and filled background; hollow means white background; enabled stroke at 0.4pt; old opacity applies to each paint |
@@ -60,6 +89,25 @@ spelling and raw options are retained. `/other/base` and relative `tikz/base`
 remain distinct from `/tikz/base`. Missing root references are diagnosed even
 if a same-named definition exists in the declaring style's directory.
 
+All applicable imported sources share one ordered resolution context. The
+`externalTikzStyleSources` array is the load order, independent of the order of
+points or saved references. Later canonical definitions win for the directly
+invoked key as well as nested references: selecting an old reference ID does
+not select its stale root body. Raw source declarations supply this context;
+older saved references without raw-source definitions use their saved options.
+The exact selected reference ID, source ID, key spelling, raw source and raw
+options remain unchanged. A second file can use styles and named colors from
+the first, without a false missing-reference diagnostic.
+
+New preset construction, reference diagnostics, point baseline reconstruction,
+unresolved-field analysis and both TikZ modes use that context. When another
+source is imported, only point/preset paint carrying matching importer snapshot
+metadata follows new definitions. Unoverridden channels receive the new
+effective baseline; overridden channels and distinguishable changes from the
+old snapshot keep their values. An earlier unknown fallback becoming known
+does not become a local override. Untracked legacy styles and authored values
+are preserved. Truly missing styles remain diagnosed and unresolved.
+
 Known literal references expand at their exact option position. Runtime `.cd`
 inside a style body is explicitly unsupported: it produces a diagnostic and
 marks paint unresolved. Subsequent relative options, including those in nested
@@ -81,6 +129,12 @@ importable definitions. Malformed declarations are skipped with warnings.
 visible limitations. External source/load hint/style key semantics are retained:
 TikZ references the external key and includes load instructions, without running
 or copying the file's arbitrary definitions into generated code.
+Dependency tracking includes the selected reference's source and the known
+defining sources of effective root/nested styles and color operands. Load hints
+are deduplicated in source load order, preserving custom hints and redefinition
+precedence. Selecting `outer` in `outer.sty` when it invokes `base` in
+`base.sty` therefore includes both comments, with `base.sty` first. The hints
+are comments only; unknown external dependencies are not fabricated or executed.
 
 ## Literal value grammar
 
@@ -111,11 +165,29 @@ The common xcolor names are `black`, `white`, `gray`, `lightgray`, `darkgray`,
 start with an ASCII letter followed by ASCII letters, digits, colon, underscore,
 or hyphen. Other color models, package-specific names, and macros are diagnosed.
 
+Color bindings have three states: undeclared, a supported literal, or a
+recognized but unsupported declaration. The last state is an explicit unknown
+binding (`null` in the reconstructed resolution context), blocking both an
+earlier literal and the built-in table entry of that name. Thus unsupported
+`\definecolor{red}{cmyk}{1,0,0,0}` never resolves successfully as built-in red.
+Supported then unsupported becomes unknown; unsupported then supported takes
+the later literal, within a file and across sources. Styles use the final
+effective color environment when invoked after source loading, including
+declarations textually after the style body. Binding state is reconstructed
+from saved raw sources and stays local to that diagram; global built-ins and
+unrelated names remain unchanged. CMYK is still unsupported.
+
 Mixtures use `name!percentage[!name]` and may chain up to 16 mixtures; percentages
 are 0–100, the omitted second color is white. Intermediate calculations retain
 fractional channels and the final display color is rounded to 8-bit RGB.
 Unknown colors are never silently accepted as black: the unresolved property
-has a visible diagnostic and a deterministic application-default preview.
+has a visible diagnostic and a deterministic preview fallback (the last
+supported option for that property, otherwise the application default).
+An unknown operand invalidates an entire mixture, including an explicitly
+named second operand or an implicitly used `white`. Known operand dependencies
+are retained even if another operand is unknown. An unsupported bare color or
+mixture marks the three color channels unresolved without claiming unknown
+enablement, opacity, or border dimensions.
 
 Zero border width is diagnosed because PGF emits a device hairline while an SVG
 zero-width stroke is invisible; use disabled stroke for an absent border.
@@ -148,6 +220,9 @@ written before the external key, and unchanged unresolved fields are not emitted
 after it; later known options and explicit local edits still take precedence.
 Such unresolved cases remain documented preview
 limitations. Deferred geometry remains the external style's responsibility.
+Known later options resolve only their affected fields. An explicit local
+override remains after the external key even when it returns to the original
+fallback value; an untouched unresolved field remains under external control.
 
 ## Independent reference and checks
 
@@ -169,3 +244,13 @@ original ten-row opacity/color-order fixture is unchanged. Registered tests also
 cover alias-aware cycles and depth/work bounds, real imported preset application,
 explicit local edits, JSON reload/reference identity, both TikZ modes, and
 preservation of unresolved external paint.
+
+[The import-order fixture](../tests/fixtures/point-paint-pgf/import-order/README.md)
+retains independent PGF evidence for source ordering, canonical root
+redefinitions, unsupported CMYK meanings and post-style overrides. Registered
+`pointPaintImportContext.test.ts` regressions exercise sequential imports,
+prior-file named colors, raw identity and save/reload, old-reference winners,
+dependency hints, later definitions, history/local-edit preservation, unknown
+bindings and mixtures, and literal restoration. Export assertions inspect
+options after the actual external key and resolve the generated named color
+definitions against independent expected values.

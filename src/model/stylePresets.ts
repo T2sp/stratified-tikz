@@ -2,13 +2,18 @@ import {
   cloneCurveStyle,
   cloneLabelStyle,
   clonePointStyle,
+  pointStyleForImportedReference,
+  recordPointPaintEdit,
+  markPointPaintOverrides,
   pointStylesEqual,
   cloneRegionStyle,
   cloneSheetStyle,
 } from './styles.ts'
+import { preparePointStyleForImportedEdit } from './pointPaintEditing.ts'
 import type {
   Diagram,
   LabelStyle,
+  PointPaintField,
   Stratum,
   StratumStyle,
   StylePresetKind,
@@ -101,6 +106,7 @@ export function updateUserStylePresetStyle(
   diagram: Diagram,
   presetId: string,
   style: StylePresetStyle,
+  explicitPointPaintFields: readonly PointPaintField[] = [],
 ): Diagram {
   const currentPresets = diagram.userStylePresets ?? []
   const preset = currentPresets.find((current) => current.id === presetId)
@@ -116,7 +122,9 @@ export function updateUserStylePresetStyle(
     preset.id,
     preset.name,
     preset.kind,
-    style,
+    preset.kind === 'point' && style.kind === 'pointStyle'
+      ? markPointPaintOverrides(recordPointPaintEdit(preparePointStyleForImportedEdit(diagram, preset.style, preset.importedTikzStyleReferenceId), style), explicitPointPaintFields)
+      : style,
     preset.tikzStyleName,
     preset.importedTikzStyleReferenceId,
   )
@@ -456,7 +464,7 @@ function createUserStylePreset(
         id,
         name,
         kind,
-        style: clonePointStyle(style),
+        style: pointStyleForImportedReference(style, importedTikzStyleReferenceId),
         tikzStyleName,
         ...importedStyleReference,
       }
@@ -548,7 +556,7 @@ function applyPresetToStratum(
       return preset.kind === 'point'
         ? withImportedTikzStyleReferenceId({
             ...stratum,
-            style: clonePointStyle(preset.style),
+            style: pointStyleForImportedReference(preset.style, preset.importedTikzStyleReferenceId),
             stylePresetId: preset.id,
           }, preset.importedTikzStyleReferenceId)
         : stratum

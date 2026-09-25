@@ -3,6 +3,7 @@ import {
   lineStyles,
   pointFills,
   pointShapes,
+  pointPaintFields,
 } from './types.ts'
 import type {
   CurveStyle,
@@ -14,6 +15,7 @@ import type {
   PathSegmentStyleOverride,
   PointFill,
   PointPaint,
+  PointPaintField,
   PointShape,
   PointStyle,
   RegionStyle,
@@ -263,12 +265,88 @@ export function clonePointPaint(paint: PointPaint): PointPaint {
 }
 
 export function clonePointStyle(style: PointStyle): PointStyle {
-  return { ...style, ...(style.paint === undefined ? {} : { paint: clonePointPaint(style.paint) }) }
+  return { ...style, ...(style.paint === undefined ? {} : { paint: clonePointPaint(style.paint) }),
+    ...(style.importedPaint === undefined ? {} : { importedPaint: {
+      ...style.importedPaint, baseline: clonePointPaint(style.importedPaint.baseline),
+      overriddenFields: [...style.importedPaint.overriddenFields],
+    } }) }
 }
 
 /** Saved-file v2 writes explicit paint; Diagram.version remains 1. */
 export function normalizePointStyle(style: PointStyle): PointStyle {
-  return { ...style, paint: clonePointPaint(getPointPaint(style)) }
+  return { ...clonePointStyle(style), paint: clonePointPaint(getPointPaint(style)) }
+}
+
+export function createImportedPointPaintSnapshot(style: PointStyle, referenceId: string): PointStyle {
+  return { ...clonePointStyle(style), importedPaint: {
+    referenceId, baseline: clonePointPaint(getPointPaint(style)), overriddenFields: [],
+  } }
+}
+
+/** Clear provenance when a style is detached from or assigned another reference. */
+export function pointStyleForImportedReference(style: PointStyle, referenceId: string | undefined): PointStyle {
+  const result = clonePointStyle(style)
+  if (result.importedPaint?.referenceId !== referenceId) delete result.importedPaint
+  return result
+}
+
+export function pointPaintFieldValue(style: PointStyle, field: PointPaintField): unknown {
+  if (field === 'opacity') return style.opacity
+  const paint = getPointPaint(style)
+  const [channel, property] = field.split('.')
+  return Object.entries(paint[channel as keyof PointPaint]).find(([key]) => key === property)?.[1]
+}
+
+export function changedPointPaintFields(before: PointStyle, after: PointStyle): PointPaintField[] {
+  return pointPaintFields.filter((field) =>
+    JSON.stringify(pointPaintFieldValue(before, field)) !== JSON.stringify(pointPaintFieldValue(after, field)))
+}
+
+/** Also call for accepted equal-valued controls: value equality cannot encode intent. */
+export function markPointPaintOverrides(style: PointStyle, fields: readonly PointPaintField[]): PointStyle {
+  const result = clonePointStyle(style)
+  if (result.importedPaint !== undefined) {
+    const overridden = new Set([...result.importedPaint.overriddenFields, ...fields])
+    result.importedPaint.overriddenFields = pointPaintFields.filter((field) => overridden.has(field))
+  }
+  return result
+}
+
+/** Capture distinguishable historical/manual edits without claiming equal fallbacks. */
+export function recordPointPaintEdit(before: PointStyle, after: PointStyle): PointStyle {
+  const result = clonePointStyle(after)
+  if (before.importedPaint === undefined) return result
+  const inherited = result.importedPaint?.referenceId === before.importedPaint.referenceId
+    ? result.importedPaint.overriddenFields : []
+  result.importedPaint = {
+    referenceId: before.importedPaint.referenceId,
+    baseline: clonePointPaint(before.importedPaint.baseline),
+    overriddenFields: [...before.importedPaint.overriddenFields, ...inherited],
+  }
+  return markPointPaintOverrides(result, changedPointPaintFields(before, after))
+}
+
+/** Refresh importer snapshots only; legacy explicit styles have no provenance. */
+export function refreshImportedPointPaintSnapshot(style: PointStyle, resolvedStyle: PointStyle, referenceId: string): PointStyle {
+  if (style.importedPaint?.referenceId !== referenceId) return style
+  const oldBaseline: PointStyle = { ...style, paint: style.importedPaint.baseline, opacity: 1 }
+  const result = markPointPaintOverrides(style, changedPointPaintFields(oldBaseline, style))
+  const overridden = new Set(result.importedPaint?.overriddenFields)
+  const paint = clonePointPaint(getPointPaint(style))
+  const resolved = getPointPaint(resolvedStyle)
+  // Channel-wise copying retains optional dash-pattern deletion as a real value.
+  for (const channel of ['text', 'fill', 'stroke'] as const) {
+    const keys = new Set([...Object.keys(paint[channel]), ...Object.keys(resolved[channel])])
+    for (const property of keys) {
+      if (overridden.has(`${channel}.${property}` as PointPaintField)) continue
+      const value: unknown = Reflect.get(resolved[channel], property)
+      if (value === undefined) Reflect.deleteProperty(paint[channel], property)
+      else Reflect.set(paint[channel], property, Array.isArray(value) ? [...value] : value)
+    }
+  }
+  return { ...result, paint, importedPaint: {
+    referenceId, baseline: clonePointPaint(resolved), overriddenFields: [...overridden],
+  } }
 }
 
 /** Legacy combined-color control updates fill and border, preserving text paint. */
@@ -276,18 +354,20 @@ export function updatePointColor(style: PointStyle, color: HexColor): PointStyle
   const paint = clonePointPaint(getPointPaint(style))
   paint.stroke.color = color
   if (style.fill === 'filled') paint.fill.color = color
-  return { ...style, color, paint }
+  return markPointPaintOverrides({ ...style, color, paint }, style.fill === 'filled'
+    ? ['stroke.color', 'fill.color'] : ['stroke.color'])
 }
 
 /** Hollow remains an opaque-white fill; transparency is fill.enabled=false. */
 export function updatePointFill(style: PointStyle, fill: PointFill): PointStyle {
   const paint = clonePointPaint(getPointPaint(style))
   paint.fill = { enabled: true, color: fill === 'hollow' ? '#FFFFFF' : paint.stroke.color, opacity: 1 }
-  return { ...style, fill, paint }
+  return markPointPaintOverrides({ ...style, fill, paint }, ['fill.enabled', 'fill.color', 'fill.opacity'])
 }
 
 export function pointStylesEqual(first: PointStyle, second: PointStyle): boolean {
   if (first.opacity !== second.opacity || first.shape !== second.shape || first.size !== second.size) return false
+  if (JSON.stringify(first.importedPaint) !== JSON.stringify(second.importedPaint)) return false
   const a = getPointPaint(first)
   const b = getPointPaint(second)
   return a.text.color === b.text.color && a.text.opacity === b.text.opacity &&
