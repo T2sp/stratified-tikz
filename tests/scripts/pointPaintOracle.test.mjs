@@ -3,7 +3,8 @@ import test from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { assertPointPaint, assertRasterPointOverlap, assertResponsivePointPaint, captureResponsivePointPaint,
   measureResponsivePointPaint, restorePointDisplayScale, setPointDisplayScale,
-  observePostExternalPointPaint, assertPostExternalPointPaint } from '../../scripts/pointPaintOracle.mjs'
+  observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint,
+  assertExplicitPointPaint } from '../../scripts/pointPaintOracle.mjs'
 import { assertResponsiveCaptureStable, responsivePointFraming, responsivePointProbes } from '../../scripts/pointResponsiveFraming.mjs'
 
 test('external paint oracle uses the actual post-key options and resolves the final named color', () => {
@@ -19,6 +20,24 @@ test('external paint oracle uses the actual post-key options and resolves the fi
   assertPostExternalPointPaint(untouched, { fill: null })
   assert.throws(() => assertPostExternalPointPaint(untouched, { fill: '#000000' }))
   assert.throws(() => observePostExternalPointPaint(code + '\n\\node[example] at (2,0) {};', 'example'))
+})
+
+test('detached point oracle examines the literal target and checks every explicit paint setting', () => {
+  const code = String.raw`\definecolor{target}{HTML}{123456}
+\definecolor{other}{HTML}{654321}
+\node[fill=target,text=other,draw=target,fill opacity=.25,text opacity=.5,draw opacity=.75,line width=3pt,dash pattern=on 3pt off 2pt,dash phase=1pt,line cap=round,line join=bevel] at (0,0) {Clear target};
+\node[redpoint,fill=other] at (1,0) {Control point};`
+  const expected = { opacity: 1, paint: { text: { color: '#654321', opacity: .5 }, fill: { enabled: true, color: '#123456', opacity: .25 },
+    stroke: { enabled: true, color: '#123456', opacity: .75, width: 3, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } } }
+  const observed = observeLiteralPointPaint(code, 'Clear target')
+  assert.equal(observed.options.includes('redpoint'), false)
+  assertExplicitPointPaint(observed, expected)
+  for (const [before, after] of [['fill=target', 'fill=other'], ['text opacity=.5', 'text opacity=.6'], ['draw opacity=.75', 'draw opacity=1'],
+    ['line width=3pt', 'line width=2pt'], ['dash phase=1pt', 'dash phase=0pt'], ['on 3pt off 2pt', 'on 2pt off 3pt'], ['line cap=round', 'line cap=butt'], ['line join=bevel', 'line join=miter']]) {
+    assert.throws(() => assertExplicitPointPaint(observeLiteralPointPaint(code.replace(before, after), 'Clear target'), expected))
+  }
+  assert.throws(() => observeLiteralPointPaint(code, 'absent target'))
+  assert.throws(() => observeLiteralPointPaint(`${code}\n\\node[fill=target] at (2,0) {Clear target};`, 'Clear target'))
 })
 
 test('paint oracle rejects coupled colors, lost zero opacity, dropped dash and lost explicit math color', () => {

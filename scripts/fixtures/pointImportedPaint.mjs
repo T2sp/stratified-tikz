@@ -13,4 +13,10 @@ export const pointImportedPaintSources = {
   redefined: String.raw`\tikzset{/tikz/outer/.style={fill=yellow,text=blue,draw=green}}`,
   unsupported: String.raw`\definecolor{red}{cmyk}{1,0,0,0}
 \tikzstyle{myPoint}=[fill=red,text=red]`,
+  clear: String.raw`\tikzstyle{redpoint}=[fill=red]`,
+  clearIndependent: String.raw`\tikzset{independent point/.style={fill=blue,fill opacity=.35,text=red,text opacity=.6,draw=green,draw opacity=.7,line width=2pt,dash pattern=on 3pt off 2pt,dash phase=1pt,line cap=round,line join=bevel}}`,
+  mutation: String.raw`\tikzset{
+  myPoint/.style={fill=red,text=red},
+  myPoint/.append style={fill=blue,text=blue}
+}`,
 }

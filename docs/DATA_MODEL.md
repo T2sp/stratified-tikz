@@ -2460,6 +2460,15 @@ into a diagram without the external reference keeps explicit paint and removes
 the provenance. Copies, duplicates and history own deep copies of the list and
 baseline, including any dash arrays.
 
+The quick bar's actual external-style detachment removes `stylePresetId`,
+`importedTikzStyleReferenceId` and point `style.importedPaint` atomically through
+`pointStyleForImportedReference(style, undefined)`. It retains every explicit
+paint value and overall opacity with independent nested copies. Validation is
+unchanged and succeeds immediately, before serialization. The similarly named
+bulk-edit helper only removes a preset association: ordinary paint edits keep
+the external reference and its local-intent metadata. Undo restores the complete
+association/provenance; redo detaches it again without changing explicit paint.
+
 When later imports change effective definitions, only matching importer-tracked
 snapshots may refresh unoverridden fields; explicit user edits and distinguishable
 manual changes survive. Styles without this metadata retain their saved explicit
@@ -2470,6 +2479,16 @@ older files did not record intent, so equality alone does not become an override
 Normal loading does not invent intent or silently regenerate historical styles.
 Untouched unresolved fields retain their external TikZ effect, while deliberate
 local fields remain authoritative after the external key in both output modes.
+
+Unsupported literal-target style mutations are transient ordered declaration
+events reconstructed from saved `rawSource`, not a new saved schema. The shared
+context stores an explicit unresolved definition with its last-known fallback,
+diagnostics and ordered source dependencies. Full definitions, invalidations
+and later full definitions replay in source/declaration order. Saved reference
+fallbacks cannot resurrect an invalidated body as known. All affected paint is
+uncertain until later supported options resolve their individual fields; local
+edits remain authoritative independently of equality with the fallback. Raw
+source/options, stable references and source load order are preserved.
 
 New saves use envelope version **2**, superseding the historical version-1
 wrapper examples above. `Diagram.version` remains 1. Both envelope versions

@@ -128,3 +128,70 @@ test('dependency comments use source order regardless of element traversal and p
     assert.deepEqual(reversedOutput.match(/%\s+\\input\{[^}]+\}/g), output.match(/%\s+\\input\{[^}]+\}/g))
   }
 })
+
+test('unsupported style mutation retains external paint until a local fill edit returns to red fallback', () => {
+  const source = String.raw`\tikzset{myPoint/.style={fill=red,text=red},myPoint/.append style={fill=blue,text=blue}}`
+  const initial = apply(importTikzStyleFile(empty(), 'append.sty', source).diagram, 'myPoint')
+  for (const mode of modes) {
+    const untouched = afterKey(initial, 'myPoint', mode)
+    assert.equal(untouched.color('fill'), undefined)
+    assert.equal(untouched.color('text'), undefined)
+    assert.ok(!untouched.options.some((option) => /^(?:fill|text|draw)=/.test(option)))
+  }
+  let edited = initial
+  for (const color of ['#123456', '#FF0000'] as const) edited = edit(edited, 'fill.color', (style) => {
+    const paint = getPointPaint(style)
+    return { ...style, paint: { ...paint, fill: { ...paint.fill, color } } }
+  })
+  const loaded = parseSavedDiagramJson(serializeDiagram(edited))
+  assert.ok(loaded.ok)
+  assert.deepEqual(point(loaded.diagram).style.importedPaint?.overriddenFields, ['fill.color'])
+  assert.equal(loaded.diagram.externalTikzStyleSources?.[0].rawSource, source)
+  for (const mode of modes) {
+    const actual = afterKey(loaded.diagram, 'myPoint', mode)
+    assert.equal(actual.color('fill'), '#FF0000')
+    assert.equal(actual.color('text'), undefined)
+    assert.equal(actual.color('draw'), undefined)
+    assert.ok(!actual.options.some((option) => /^(?:text|draw|fill opacity|text opacity|draw opacity|line width|dash pattern|dash phase|line cap|line join)=/.test(option)))
+  }
+  assert.deepEqual(point(initial).style.importedPaint?.overriddenFields, [])
+})
+
+test('current mutation exports match the corrected compiled PGF comparison and retain the failing reference', () => {
+  const root = new URL('../fixtures/point-paint-pgf/unsupported-mutations/', import.meta.url)
+  const observations = JSON.parse(readFileSync(new URL('observations.json', root), 'utf8')) as {
+    pgfVersion: string; compilationExitCode: number
+    before: { body: string; operator: string }[]
+    after: { body: string; operator: string }[]
+  }
+  assert.equal(observations.pgfVersion, '3.1.11a')
+  assert.equal(observations.compilationExitCode, 0)
+  assert.match(readFileSync(new URL('compilation.txt', root), 'utf8'), /STZ-PGF-VERSION=3\.1\.11a/)
+  assert.match(readFileSync(new URL('compilation.txt', root), 'utf8'), /Output written on/)
+  for (const [path, rows] of [['before/pdf-operators.txt', observations.before], ['pdf-operators.txt', observations.after]] as const) {
+    const operators = readFileSync(new URL(path, root), 'utf8')
+    let offset = 0
+    for (const row of rows) {
+      const marker = `[(${row.body})]TJ`
+      const index = operators.indexOf(marker, offset)
+      assert.ok(index >= offset, `${path} contains actual node body ${row.body}`)
+      const node = operators.slice(offset, index)
+      const colorBefore = (part: string) => [...part.matchAll(/(?:^|\n)([\d.]+(?: [\d.]+){2} rg)(?=\s)/g)].at(-1)?.[1]
+      assert.equal(colorBefore(node), row.operator, `${path}: effective text paint ${row.body}`)
+      const paint = [...node.matchAll(/(?:^|\n)(?:f|B)\s*\n/g)].at(-1)
+      assert.ok(paint, `${path}: actual filled shape ${row.body}`)
+      assert.equal(colorBefore(node.slice(0, paint.index)), row.operator, `${path}: effective fill paint ${row.body}`)
+      offset = index + marker.length
+    }
+  }
+  const original = createEmptyDiagram({ ambientDimension: 2 })
+  original.strata = [createPointStratum({ ambientDimension: 2, id: 'p', text: 'APP', position: { x: 0, y: 0, z: 0 } })]
+  const applied = apply(importTikzStyleFile(original, 'append.sty', readFileSync(new URL('append.sty', root), 'utf8')).diagram, 'myPoint')
+  for (const mode of modes) {
+    const actual = afterKey(applied, 'myPoint', mode)
+    assert.equal(actual.output, readFileSync(new URL(`generated-${mode}.tex`, root), 'utf8'), `${mode} is the output actually compiled`)
+    assert.equal(actual.color('fill'), undefined)
+    assert.equal(actual.color('text'), undefined)
+    assert.deepEqual(actual.options, [], 'all untouched paint remains before the external key')
+  }
+})

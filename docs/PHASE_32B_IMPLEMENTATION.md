@@ -1510,3 +1510,216 @@ After that passes, independently review the same tree against
 The earlier independent review did run and requested these changes; `32B verify`
 does not itself review. No commit/push or Phase 32B completion is authorized by
 partial verification; 32C/32D remain deferred.
+
+## Targeted detachment and unsupported-mutation correction (2026-09-25)
+
+The checkout supplied for this correction was clean on
+`phase/32b-color-opacity-outline` at
+`d85ce9f4cf3842f3b25e5bbe6bd6407b76fe55cf`, which contains the preceding
+corrections and the updated fix prompt. It was not reset to the older reported
+revision. All 15 formerly untracked helper/test/import-order PGF files in the
+accepted parent's manifest matched their recorded SHA-256 hashes on inspection;
+the existing work and binary artifacts were preserved.
+
+The accepted pre-fix report remains
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-4OOIEu/verification.json`:
+3,086 tests, build/diff/both browser checks, 16 groups / 23 point scenarios,
+167 evidence records, no page errors, Chrome 154.0.8037.57 and Node v26.9.0.
+Its before/after fingerprint was
+`2fcf764109737beb6b1fd02b66d3f5178338a1adb2a4c9480ea1a5a111a9ad0d`.
+The subsequent review independently reproduced two Medium production defects
+and returned `needs_changes`. That accepted browser evidence covers the pre-fix
+tree only; it is not new acceptance for the changes below.
+
+### Atomic external-style detachment
+
+`clearContextQuickStylePresetReferences()` already served single and multiple
+selection. Its actual detachment helper deleted `stylePresetId` and
+`importedTikzStyleReferenceId` but retained point `style.importedPaint`. Validation
+correctly rejected the resulting detached provenance, so saving/reloading and
+redo failed even though undo restored a valid point.
+
+The helper now applies `pointStyleForImportedReference(style, undefined)` when
+detaching a point. All explicit paint, opacity, shape/size, raw text and geometry
+survive, with cloned nested paint and no mutation of presets, unselected points
+or history. Validation and serialization were not weakened. Existing equivalent
+preset/reference replacement and clipboard paths already use this cleanup.
+The similarly named bulk-edit helper intentionally clears only `stylePresetId`;
+ordinary paint edits retain the external reference and provenance.
+
+The registered `tests/ui/pointStyleClear.test.ts` covers the exact redpoint
+reproduction, independent paint with enablement/dash variants, multiple points
+and an unselected imported control, immediate validation/reload, a single effective
+commit, repeated-clear no-op, frozen prior snapshots and valid undo/redo. Both
+TikZ modes inspect each actual target node and resolve named colors, retaining
+other objects' legitimate external invocations and all source/preset records.
+
+### Ordered uncertainty without handler execution
+
+Previously the parser discarded an unsupported `.append style` declaration and
+the shared context rebuilt the earlier red definition as known. Export therefore
+wrote red overrides after the external key, replacing PGF's actual blue effect.
+
+The scanner now retains ordered supported-definition and targeted-invalidation
+events in addition to selectable definitions. Literal targets follow canonical
+aliases and declaration-level `.cd`. Recognizable unsupported handlers, handler
+chains and legacy `\tikzstyle{key}+=[...]` invalidate the target without executing
+their bodies. The shared context carries an explicit unresolved definition,
+last-known preview body, diagnostic and source dependencies. Missing-option
+resolution and saved-reference fallback cannot restore false certainty. A later
+full supported definition restores known resolution; a nested invalidated
+invocation followed by `text=green` restores only text certainty. Unrelated keys
+remain resolved.
+
+The unresolved state is reconstructed from saved raw sources and used by direct
+invocation, nested resolution, preset creation, snapshot refresh and both export
+modes. Stable reference IDs, raw options/source and explicit local edits survive.
+The preview can remain red with a visible warning; this deliberately does not
+claim execution of the blue append. Untouched uncertain paint stays before the
+external key, with supported and explicit local overrides after it. Returning an
+edited fill to fallback red still overrides fill without claiming untouched text.
+
+An independent integration audit also found a missing load hint when an append
+body invoked a literal style from a third file. Recognizable style-list mutation
+bodies now contribute bounded dependency-only discovery: defining, mutating,
+nested-style and named-color source hints remain in load order, including after
+reload. These bodies never apply paint or restore certainty. Arbitrary code
+handlers remain uninterpreted. Mutation-only-file import UI remains outside scope.
+
+Registered model/export regressions cover one/separate blocks, source ordering,
+canonical aliases, `.cd`, distinct `/other` targets, definition/mutation/definition
+restoration, nested field certainty, stale-reference fallback, literal-target
+recognition boundaries, apply before/after mutation, late import refresh,
+save/reload/history and local return edits. Expected colors are literals; export
+checks inspect options after the actual external key and resolve named colors.
+
+### Native and independent PGF evidence
+
+Two new mandatory native scenarios are `point-paint-clear-imported-style` and
+`point-paint-unsupported-mutations`. They use production import/preset/Inspector,
+the actual **TikZ style selector → Clear TikZ style**, native Undo/Redo and actual
+JSON download/reopen. Clear covers single/multiple points, an unselected imported
+control, immediate model validity, unchanged explicit paint/preview, both target
+outputs, and actual SVG downloads reopened outside the App. Mutation covers
+visible diagnostics, red fallback, both modes, local override/return intent,
+history/persistence and retained raw source. Read-only fixture observations
+expose validation and resolution; no fixture mutation bypasses native App events.
+
+The cumulative policy requires **16 groups / 25 named point scenarios**, adding
+**25 mandatory artifacts** (10 mutation, 15 clear). Detached-state checks require
+both reference and provenance absence at cleared/redone/reloaded boundaries;
+the existing imported-state checks still require an active reference. Added
+fail-closed regressions reject old 23-scenario evidence and missing/corrupted
+new observations/artifacts. Fresh-process dependency copying remains intact.
+The prior three import scenarios, all six responsive downloads and their 91
+artifacts, .5 → 2 → .5 checks, body/font controls, white-background validation,
+immutable captures and review/commit gates remain mandatory.
+
+[The focused PGF comparison](../tests/fixtures/point-paint-pgf/unsupported-mutations/README.md)
+preserves the independent review's failing source, generated TikZ, actual PDF,
+compiler log and uncompressed operators byte-for-byte under `before/`. Corrected
+standalone and inline outputs were generated from the actual production code and
+compiled with pdfTeX 1.40.29 / PGF 3.1.11a, exit 0. Both generated nodes and the
+external node are blue fill/text (`0 0 1 rg`); the original generated node was red
+(`1 0 0 rg`). The registered regression checks these independent page operators
+and exact equality of current exports with the files actually compiled. The
+Poppler rendering was visually inspected. Existing opacity, namespace and
+import-order PGF references were not regenerated; no importer/preview TeX execution
+or new dependencies were added. Phase 32C/32D remain deferred.
+
+### Verification and frozen-tree handoff
+
+Commands use `PATH=/opt/homebrew/bin:$PATH`, Node v26.9.0. Exact logs, supplemental
+commands and the final binary-aware checkout snapshot are retained in
+`/private/tmp/stz-32b-detach-mutation-handoff/`. The final identity is external to
+this tracked report to avoid a self-referential hash; it includes new untracked
+tests and all retained/new PGF binaries.
+
+| Executed check | Result |
+| --- | --- |
+| `node --test tests/ui/pointStyleClear.test.ts tests/ui/contextQuickStyleBar.test.ts tests/model/pointPaintIntent.test.ts tests/model/pointPaintImportContext.test.ts tests/tikz/pointImportedResolution.test.ts tests/ui/bulkEditing.test.ts tests/ui/undo.test.ts` | **152 passed**, zero failures/skips (`focused-regressions.log`). |
+| `node --test tests/scripts/runPhaseVerification.test.mjs tests/scripts/runPhaseRunner.test.mjs tests/scripts/pointPaintOracle.test.mjs` | **389 passed**, zero failures/skips (`/private/tmp/stz-new-native-final-policy.log`); includes all 32 isolated runner tests. Synthetic negative verification cases are not browser executions. |
+| `npm test` | **3,231 passed**, zero failures/skips (`npm-test.log`). |
+| `npm run build` | Exit 0, started after the full test process exited (`npm-build.log`). Existing >500kB chunk-size warning only. |
+| `npx tsc -p tsconfig.app.json --strict` | Exit 0 (`production-strict.log`). |
+| `npx tsc -p scripts/fixtures/tsconfig.json` | Exit 0 (`fixtures-strict.log`). |
+| Focused strict TypeScript for clear, intent, import-context and imported-export tests | Exit 0 (`tests-strict.log`; exact flags in `commands.json`). |
+| Syntax and recommended JavaScript ESLint on all **7** changed/new `.mjs` files | Exit 0, zero errors/warnings (`script-checks.json`, `javascript-eslint.log`; executable check is `changed-script-checks.mjs`). |
+| Targeted ESLint on all **7** changed/new `.ts`/`.tsx` files | Exit 0 (`typescript-eslint.log`). |
+| `git diff --check` | Exit 0 (`diff-check.log`), also checked by the final verifier. |
+| Independent read-only integration audit | **92 focused tests passed** after the dependency correction (`/private/tmp/stz-integration-audit-focused.log`); actual PDF bytes and unchanged failing artifacts were independently checked. No remaining concrete functional defect found. This does not satisfy missing native acceptance. |
+
+The established two `InspectorField.tsx` lint errors and 25 `no-regex-spaces`
+errors in `tests/tikz/generateTikz.test.ts` remain untouched. Neither file changed
+in this correction; no repository-wide lint cleanup was performed. Those baseline
+debts are separate from the passing changed-file checks and nonblocking build
+chunk-size warning.
+
+The configured direct free-label run failed at `development-server-listen` with
+`listen EPERM 127.0.0.1:5173`, before browser launch. Its actual log/report are
+`direct-free-labels.log` and `direct-free-labels/free-labels-evidence.json` in that
+handoff. This is a child startup restriction, not passing browser evidence.
+No assertions, permissions or gates were relaxed. The final verifier is run only
+after this report and all code/fixtures are frozen:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+`verification-final.log`, `handoff.json` and `final-checkout.json` record its exact
+outcome and report path, with `final-checkout.diff` and
+`final-checkout-untracked.json` preserving raw binary diff/untracked bytes.
+The final same-tree independent review is retained externally as
+`independent-review.md` with its structured result in `independent-review.json`;
+it must keep readiness false while fresh required browser evidence is missing.
+The browser-capable parent must complete all five commands and both browser checks
+on that same identity, all 16 groups/25 scenarios/new artifacts, preserved
+responsive evidence and empty page errors. Only then may independent review of
+the same tree accept Phase 32B, explicitly rechecking both original findings.
+`32B verify` itself does not review. Missing fresh browser acceptance remains a
+gate even when focused/static tests and the PGF comparison pass.
+
+## Runtime diagnostic snapshot correction (2026-09-25)
+
+The subsequent parent verification at
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-1cbUWu/verification.json`
+passed all 3,231 tests, build, diff check and label assets, but stopped in
+`point-paint-local-override-intent` when `pointPaintModelDiagnostics()` read
+`camera.mode`. The fixture had cast the persistent file's diagram as a runtime
+`Diagram`; `serializeDiagram()` intentionally omits the runtime camera. This
+was a diagnostic boundary error, not evidence of a missing editor camera.
+
+The existing DEV App observer now captures `runtimeDiagramJson` directly from
+the committed `editableDiagram`, separately from the unchanged saved JSON.
+Point paint diagnostics validate and resolve a detached copy of that runtime
+snapshot. They do not reconstruct through the saved-file loader, normalize
+styles, insert a camera, or mutate App/history. The observer depends on the
+complete runtime diagram so runtime-only changes cannot leave stale diagnostics.
+Native JSON download/reload checks still use the persistent snapshot.
+
+Seven registered regressions cover valid 2D/3D imported points, detached
+provenance, invalid runtime cameras, custom IDs, independent diagnostic results
+and immutable prior snapshots. All seven pass, as do strict production,
+fixture and focused-test TypeScript checks. The changed fixtures/test are
+ESLint-clean. App ESLint reproduces the same nine errors and four warnings at
+HEAD, with no new diagnostics; baseline/current JSON reports are retained at
+`/private/tmp/stz-32b-runtime-eslint-{baseline,current}.json`.
+
+The direct browser rerun log is `/private/tmp/stz-32b-runtime-free-labels.log`.
+That rerun passed the previously failing local-override scenario, cross-file
+resolution, unsupported color bindings and unsupported mutations. It then
+exposed an unbounded history-length assertion during multi-point clear: the
+editor correctly retained 100 entries while the check expected 101. Its log
+is preserved as `/private/tmp/stz-32b-runtime-free-labels-history-failure.log`.
+Both the native clear assertion and evidence policy now verify the complete
+100-entry bounded stack, including the exact pre-clear state, oldest-entry
+eviction, a changed current diagram and an empty redo stack. Retained earlier
+snapshots must remain unchanged; merely accepting a capped length is insufficient.
+Policy regressions cover the capacity boundary and reject incorrect commits.
+
+Final cumulative verification is recorded externally in
+`/private/tmp/stz-32b-runtime-final-verification.log`, which identifies the
+fresh worker report and binary-aware checkout fingerprint without introducing
+a self-referential tracked hash. Required acceptance remains all five commands,
+16 groups / 25 named point scenarios and all mandatory artifacts, followed by
+same-tree independent review. The failed `1cbUWu` report cannot satisfy that gate.

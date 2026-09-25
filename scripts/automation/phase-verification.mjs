@@ -11,10 +11,11 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { observePostExternalPointPaint, assertPostExternalPointPaint } from "../pointPaintOracle.mjs";
+import { observePostExternalPointPaint, assertPostExternalPointPaint, observeLiteralPointPaint, assertPointPaint, assertExplicitPointPaint } from "../pointPaintOracle.mjs";
 
 const freeLabelGroups = [
   "existing-renderer-regressions",
@@ -59,6 +60,7 @@ export const pointNodeScenarios = {
     "point-paint-responsive-downloads",
     "point-paint-local-override-intent", "point-paint-cross-file-resolution",
     "point-paint-unsupported-color-bindings",
+    "point-paint-unsupported-mutations", "point-paint-clear-imported-style",
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
@@ -66,7 +68,13 @@ export function pointNodeScenarioArtifacts(name) {
     "point-paint-local-override-intent": ["intent.sty"],
     "point-paint-cross-file-resolution": ["base.sty", "outer.sty", "base-colors.sty", "outer-colors.sty", "redefined.sty", "missing.sty", "later.sty"],
     "point-paint-unsupported-color-bindings": ["unsupported.sty"],
+    "point-paint-unsupported-mutations": ["mutation.sty"],
   };
+  if (name === "point-paint-clear-imported-style") {
+    return [`${name}.json`, `${name}-clear.sty`, `${name}-independent.sty`,
+      ...["", "-multi"].flatMap((suffix) => ["-saved.json", ".svg", ".png", "-standalone.json", "-standalone.tex", "-inlineMath.tex"]
+        .map((extension) => `${name}${suffix}${extension}`))];
+  }
   if (Object.hasOwn(importRegressionSources, name)) {
     return [`${name}.json`, ...importRegressionSources[name].map((source) => `${name}-${source}`),
       `${name}-saved.json`, `${name}.svg`, `${name}.png`, `${name}-standalone.json`,
@@ -196,7 +204,11 @@ function evidenceObject(artifactDir, name) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group) {
-  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings"].includes(name)) {
+  if (name === "point-paint-clear-imported-style") {
+    validateDetachedPaintEvidence(artifactDir, name, group);
+    return;
+  }
+  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations"].includes(name)) {
     validateImportedPaintEvidence(artifactDir, name, group);
     return;
   }
@@ -318,12 +330,108 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
       const base = output.indexOf("%   \\input{base.sty}"), outer = output.indexOf("%   \\input{outer.sty}");
       if (base < 0 || outer <= base) throw new Error("Cross-file dependency hints must follow source load order");
     }
+  } else if (name === "point-paint-unsupported-mutations") {
+    check("mutation", "myPoint", { fill: null, text: null, draw: null });
+    for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null, draw: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "myPoint", { fill: "#ff0000", text: null, draw: null });
+    const source = "\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={fill=blue,text=blue}\n}";
+    for (const boundary of ["mutation", "away", "back", "undone", "redone", "reloaded"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics;
+      assert.equal(diagnostics?.validation?.valid, true, "Mutation boundary model is valid");
+      for (const field of ["fillColor", "textColor"]) assert.ok(diagnostics.resolution?.unresolvedFields?.includes(field), "Mutation retains unresolved paint");
+      assert.ok(diagnostics.reference?.previewDiagnostics?.some((warning) => warning.includes(".append style")), "Reference mutation diagnostic persists");
+      assert.ok(entry.warnings.some((warning) => warning.includes(".append style")), "Mutation diagnostic is visible");
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact mutation source survives");
+      const overrides = entry.current.style?.importedPaint?.overriddenFields;
+      assert.ok(Array.isArray(overrides));
+      assert.equal(overrides.some((field) => field.startsWith("text.")), false, "Fill edits never claim untouched text");
+      if (boundary === "mutation") assert.deepEqual(overrides, []);
+      else assert.ok(overrides.includes("fill.color"), "Return edit remains explicit");
+    }
+    for (const boundary of ["mutation", "back", "redone", "reloaded"]) assertPointPaint(evidence[boundary].observation,
+      { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current.style.paint, evidence.away.current.style.paint);
+    assert.deepEqual(evidence.redone.current.style.paint, evidence.back.current.style.paint);
   } else {
     check("unsupported", "myPoint", { fill: null, text: null, draw: "#000000" });
     if (!evidence.unsupported.warnings.some((warning) => warning.includes("red"))) throw new Error("Unsupported red diagnostic evidence is required");
     for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null });
     for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "myPoint", { fill: "#000000", text: null });
   }
+}
+
+/** Deliberately separate from imported-state checks: a detached point requires
+ * BOTH the external association and importer provenance to be absent. */
+function validateDetachedPaintEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
+  const observed = (entry) => {
+    assert.equal(entry?.modelDiagnostics?.validation?.valid, true, "Clear model is immediately valid");
+    assert.ok(entry.state?.json && entry.state.history && Array.isArray(entry.points));
+    assert.deepEqual(JSON.parse(entry.state.json).diagram.strata, entry.diagram.strata);
+    assert.deepEqual(entry.points.map((point) => point.current), entry.diagram.strata);
+    for (const point of entry.points) assert.ok(point.observation?.contour && point.observation.leaves?.length);
+    for (const mode of ["standalone", "inlineMath"]) assert.equal(typeof entry.output?.[mode], "string");
+  };
+  for (const [kind, ids] of [["single", ["app-point"]], ["multiple", ["app-point", "bulk-point"]]]) {
+    const entry = evidence[kind];
+    assert.deepEqual(entry?.ids, ids);
+    assert.deepEqual(entry.nativeAction, { selector: "TikZ style selector", action: "Clear TikZ style" });
+    for (const boundary of ["before", "cleared", "undone", "redone", "reloaded"]) observed(entry[boundary]);
+    for (const boundary of ["before", "undone"]) for (const id of ids) {
+      const point = entry[boundary].points.find((point) => point.current.id === id).current;
+      assert.ok(point.importedTikzStyleReferenceId);
+      assert.equal(point.style.importedPaint?.referenceId, point.importedTikzStyleReferenceId);
+    }
+    for (const boundary of ["cleared", "redone", "reloaded"]) {
+      const after = entry[boundary];
+      for (const prior of entry.before.points) {
+        const expected = structuredClone(prior.current), actual = after.points.find((point) => point.current.id === expected.id);
+        if (ids.includes(expected.id)) {
+          const key = entry.before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key;
+          delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint;
+          assert.equal(Object.hasOwn(actual.current, "stylePresetId"), false);
+          assert.equal(Object.hasOwn(actual.current, "importedTikzStyleReferenceId"), false);
+          assert.equal(Object.hasOwn(actual.current.style, "importedPaint"), false);
+          for (const code of Object.values(after.output)) {
+            const paint = observeLiteralPointPaint(code, expected.text);
+            assert.equal(paint.options.includes(key), false, "Target point external invocation is detached");
+            assertExplicitPointPaint(paint, expected.style);
+          }
+        }
+        assert.deepEqual(actual.current, expected, "Clear preserves explicit point data and unselected controls");
+        for (const field of ["contour", "bodyBounds", "shapeBounds", "leaves"]) assert.deepEqual(actual.observation[field], prior.observation[field], "Clear preserves native preview");
+      }
+      for (const field of ["userStylePresets", "externalTikzStyleSources", "importedTikzStyleReferences"]) assert.deepEqual(after.diagram[field], entry.before.diagram[field]);
+    }
+    assert.deepEqual(entry.undone.diagram.strata, entry.before.diagram.strata, "Native undo restores imported points");
+    const previous = JSON.parse(entry.before.state.history), committed = JSON.parse(entry.cleared.state.history);
+    assert.ok(previous.present && committed.present, "Clear history includes both current diagrams");
+    // Match the editor's 100-entry undo contract, including oldest-entry eviction.
+    assert.equal(committed.past.length, Math.min(previous.past.length + 1, 100), "One native clear history action");
+    assert.deepEqual(committed.past, [...previous.past, previous.present].slice(-100), "Clear retains earlier snapshots and appends its exact undo state");
+    assert.notDeepEqual(committed.present, previous.present, "Clear changes the current diagram");
+    assert.deepEqual(committed.future, [], "Clear discards redo history");
+    for (const boundary of ["download", "reload"]) {
+      assert.equal(entry[boundary]?.boundary, boundary); assert.deepEqual(entry[boundary].differencePaths, []);
+    }
+    assert.deepEqual(entry.standalone?.pageErrors, []);
+    assert.ok(entry.standalone.observation?.leaves?.length);
+  }
+  const multiple = evidence.multiple, target = multiple.before.points.find((entry) => entry.current.id === "app-point").current;
+  assert.deepEqual(target.style.paint, {
+    text: { color: "#654321", opacity: .5 }, fill: { enabled: true, color: "#123456", opacity: .25 },
+    stroke: { enabled: true, color: "#008000", opacity: .75, width: 3, lineStyle: "solid", dashPattern: [3, 2], dashPhase: 1, lineCap: "round", lineJoin: "bevel" },
+  });
+  assert.ok(multiple.before.points.find((entry) => entry.current.id === "copy-point").current.importedTikzStyleReferenceId, "Unselected imported control exists");
+  assertPointPaint(evidence.single.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+  assertPointPaint(multiple.standalone.observation, { fill: "rgb(18, 52, 86)", fillAlpha: .25, text: "rgb(101, 67, 33)", textAlpha: .5,
+    stroke: "rgb(0, 128, 0)", strokeAlpha: .75, strokeWidth: 3.6, dashed: true, cap: "round", join: "bevel", dashOffset: 1.2 });
+  assert.equal(multiple.standalone.points?.length, 1);
+  assert.equal(multiple.standalone.points[0].id, "bulk-point");
+  assertPointPaint(multiple.standalone.points[0].observation, { fill: "rgb(0, 0, 255)", fillAlpha: .35, text: "rgb(255, 0, 0)", textAlpha: .6,
+    stroke: "rgb(0, 255, 0)", strokeAlpha: .7, strokeWidth: 2.4, dashed: true, cap: "round", join: "bevel", dashOffset: 1.2 });
 }
 
 /** Artifact envelope check, not an XML safety/parser replacement. Native reopen

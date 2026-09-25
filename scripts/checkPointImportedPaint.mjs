@@ -3,7 +3,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { pointImportedPaintSources as sources } from './fixtures/pointImportedPaint.mjs'
-import { observePointPaint, assertPointPaint, observePostExternalPointPaint, assertPostExternalPointPaint } from './pointPaintOracle.mjs'
+import { observePointPaint, assertPointPaint, observePostExternalPointPaint, assertPostExternalPointPaint,
+  observeLiteralPointPaint, assertExplicitPointPaint } from './pointPaintOracle.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
@@ -36,6 +37,7 @@ export async function runPointImportedPaintChecks(context) {
   async function snapshot(boundary, key) {
     const output = await tikz(), current = await point(), diagram = await model()
     const result = { boundary, key, current, diagram, state: await state(), output,
+      modelDiagnostics: await page.evaluate(() => window.stzAppLabels.pointPaintModelDiagnostics()),
       observation: await observePointPaint(page, { id: 'app-point' }),
       warnings: await inspector.locator('.style-preset-warning').allTextContents(), inspector: await inspector.innerText() }
     // Preserve the actual output before the output oracle can reject it.
@@ -58,12 +60,12 @@ export async function runPointImportedPaintChecks(context) {
     await writeOutput(reloaded)
     return { download, reload, reloaded }
   }
-  async function downloadSvg(expected) {
+  async function downloadSvg(expected, suffix = '', extraPoints = []) {
     const source = (await point()).text
     await page.getByLabel('SVG export background', { exact: true }).selectOption('transparent')
     const { event } = await eventAction(`${scenario}-svg`, 'download',
       () => page.getByRole('button', { name: 'Export current diagram view as SVG', exact: true }).click())
-    const path = resolve(artifactDir, `${scenario}.svg`)
+    const path = resolve(artifactDir, `${scenario}${suffix}.svg`)
     await event.saveAs(path)
     const xml = await readFile(path, 'utf8')
     const standalone = await browser.newPage({ viewport: { width: 1000, height: 800 } })
@@ -73,13 +75,16 @@ export async function runPointImportedPaintChecks(context) {
     try {
       await standalone.goto(pathToFileURL(path).href)
       const observation = await observePointPaint(standalone, { source, standalone: true })
-      const details = { source, path, observation, pageErrors, requests }
-      const persist = async (capture) => writeFile(resolve(artifactDir, `${scenario}-standalone.json`), JSON.stringify({ ...details, capture }, null, 2) + '\n')
+      const points = []
+      for (const entry of extraPoints) points.push({ ...entry, observation: await observePointPaint(standalone, { source: entry.source, standalone: true }) })
+      const details = { source, path, observation, points, pageErrors, requests }
+      const persist = async (capture) => writeFile(resolve(artifactDir, `${scenario}${suffix}-standalone.json`), JSON.stringify({ ...details, capture }, null, 2) + '\n')
       await persist(); await diagnose({ boundary: 'standalone-before-assertions', ...details, xml })
       assertPointPaint(observation, expected)
+      for (const entry of points) assertPointPaint(entry.observation, entry.expected)
       assert.equal(observation.forbidden, 0); assert.deepEqual(observation.externalReferences, [])
       assert.deepEqual(pageErrors, []); assert.deepEqual(requests, [pathToFileURL(path).href])
-      await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}.png`), persist)
+      await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}${suffix}.png`), persist)
       return details
     } catch (error) { failure = error; throw error }
     finally { await cleanupPointCheck(failure, () => standalone.close()) }
@@ -187,4 +192,105 @@ export async function runPointImportedPaintChecks(context) {
   const unsupportedStandalone = await downloadSvg({ fill: 'rgb(0, 0, 0)', text: 'rgb(0, 0, 0)', textAlpha: 1 })
   await saved({ unsupported, away: unsupportedAway, back: unsupportedBack, undone: unsupportedUndone, redone: unsupportedRedone,
     ...unsupportedPersistence, standalone: unsupportedStandalone })
+
+  await start('point-paint-unsupported-mutations')
+  await importSource('mutation.sty', sources.mutation, 'myPoint'); await apply('myPoint')
+  const mutation = await snapshot('unsupported-mutation-untouched', 'myPoint')
+  assertOutput(mutation, { fill: null, text: null, draw: null }); await writeOutput(mutation, '-untouched')
+  assertPointPaint(mutation.observation, { fill: 'rgb(255, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
+  assert.ok(mutation.warnings.some((warning) => warning.includes('.append style')), 'The mutation warning is visible in the production Inspector')
+  assert.ok(mutation.modelDiagnostics.reference.previewDiagnostics.some((warning) => warning.includes('.append style')))
+  for (const field of ['fillColor', 'textColor']) assert.ok(mutation.modelDiagnostics.resolution.unresolvedFields.includes(field))
+  await edit('Fill color', '#123456')
+  const mutationAway = await snapshot('mutation-fill-away', 'myPoint'); assertOutput(mutationAway, { fill: '#123456', text: null })
+  await edit('Fill color', '#ff0000')
+  const mutationBack = await snapshot('mutation-fill-back', 'myPoint'); assertOutput(mutationBack, { fill: '#ff0000', text: null })
+  await undo(); const mutationUndone = await snapshot('mutation-undo', 'myPoint'); assertOutput(mutationUndone, { fill: '#123456', text: null })
+  await redo(); const mutationRedone = await snapshot('mutation-redo', 'myPoint'); assertOutput(mutationRedone, { fill: '#ff0000', text: null })
+  const mutationPersistence = await persist('myPoint', { fill: '#ff0000', text: null, draw: null })
+  assert.ok(mutationPersistence.reloaded.diagram.externalTikzStyleSources.some((entry) => entry.rawSource === sources.mutation), 'Raw unsupported source survives native persistence')
+  const mutationStandalone = await downloadSvg({ fill: 'rgb(255, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
+  await saved({ mutation, away: mutationAway, back: mutationBack, undone: mutationUndone, redone: mutationRedone,
+    ...mutationPersistence, standalone: mutationStandalone })
+
+  async function clearSnapshot(boundary) {
+    const output = await tikz(), diagram = await model(), snapshotState = await state()
+    const points = []
+    for (const entry of diagram.strata) if (entry.geometricKind === 'point') points.push({ current: entry,
+      observation: await observePointPaint(page, { id: entry.id }) })
+    const entry = { boundary, output, diagram, state: snapshotState, points,
+      modelDiagnostics: await page.evaluate(() => window.stzAppLabels.pointPaintModelDiagnostics()) }
+    await diagnose(entry)
+    assert.equal(entry.modelDiagnostics.validation.valid, true, JSON.stringify(entry.modelDiagnostics.validation))
+    return entry
+  }
+  async function clearNative() {
+    const menu = page.locator('details.context-quick-style-preset-menu')
+    if (!await menu.evaluate((element) => element.open)) await page.getByLabel('TikZ style selector', { exact: true }).click()
+    await page.getByRole('button', { name: 'Clear TikZ style', exact: true }).click()
+    return { selector: 'TikZ style selector', action: 'Clear TikZ style' }
+  }
+  function clearCheck(before, after, ids) {
+    for (const entry of before.points) {
+      const actual = after.points.find((point) => point.current.id === entry.current.id)
+      const expected = structuredClone(entry.current)
+      if (ids.includes(expected.id)) {
+        assert.ok(expected.importedTikzStyleReferenceId && expected.style.importedPaint)
+        const key = before.diagram.importedTikzStyleReferences.find((ref) => ref.id === expected.importedTikzStyleReferenceId).key
+        delete expected.stylePresetId; delete expected.importedTikzStyleReferenceId; delete expected.style.importedPaint
+        for (const code of Object.values(after.output)) {
+          const paint = observeLiteralPointPaint(code, expected.text)
+          assert.equal(paint.options.includes(key), false, `Cleared ${expected.id} has no external invocation`)
+          assertExplicitPointPaint(paint, expected.style)
+        }
+      }
+      assert.deepEqual(actual.current, expected, `Clear changes only references/provenance on ${expected.id}`)
+      for (const field of ['contour', 'bodyBounds', 'shapeBounds', 'leaves']) assert.deepEqual(actual.observation[field], entry.observation[field], `Clear preserves ${expected.id} ${field}`)
+    }
+    assert.deepEqual(after.diagram.userStylePresets, before.diagram.userStylePresets)
+    assert.deepEqual(after.diagram.externalTikzStyleSources, before.diagram.externalTikzStyleSources)
+    assert.deepEqual(after.diagram.importedTikzStyleReferences, before.diagram.importedTikzStyleReferences)
+  }
+  async function clearCase(ids, suffix) {
+    const before = await clearSnapshot(`${suffix}-before`), nativeAction = await clearNative(), cleared = await clearSnapshot(`${suffix}-cleared`)
+    clearCheck(before, cleared, ids)
+    const previous = JSON.parse(before.state.history), committed = JSON.parse(cleared.state.history)
+    assert.ok(previous.present && committed.present, 'Clear history includes both current diagrams')
+    // The editor retains at most 100 undo entries. At capacity a commit evicts
+    // only the oldest entry; the complete retained stack must still match.
+    assert.equal(committed.past.length, Math.min(previous.past.length + 1, 100), 'One effective native clear action')
+    assert.deepEqual(committed.past, [...previous.past, previous.present].slice(-100), 'Clear retains earlier history and appends its exact undo state')
+    assert.notDeepEqual(committed.present, previous.present, 'Clear changes the current diagram')
+    assert.deepEqual(committed.future, [], 'Clear discards redo history')
+    await undo(); const undone = await clearSnapshot(`${suffix}-undone`)
+    assert.deepEqual(undone.diagram.strata, before.diagram.strata)
+    await redo(); const redone = await clearSnapshot(`${suffix}-redone`); clearCheck(before, redone, ids)
+    const download = await saveAppJson({ page, artifactDir, name: `${scenario}${suffix}-saved`, owned, diagnose })
+    await load(download.json); await settle(); await select()
+    const reload = await checkAppJsonReload({ page, saved: download, diagnose })
+    const reloaded = await clearSnapshot(`${suffix}-reloaded`); clearCheck(before, reloaded, ids)
+    for (const [mode, code] of Object.entries(reloaded.output)) await writeFile(resolve(artifactDir, `${scenario}${suffix}-${mode}.tex`), code)
+    return { ids, nativeAction, before, cleared, undone, redone, reloaded, download, reload }
+  }
+
+  await start('point-paint-clear-imported-style')
+  await importSource('clear.sty', sources.clear, 'redpoint'); await apply('redpoint')
+  await edit('Node text', '  $F$  '); await settle()
+  const single = await clearCase(['app-point'], '')
+  single.standalone = await downloadSvg({ fill: 'rgb(255, 0, 0)', text: 'rgb(0, 0, 0)', textAlpha: 1 })
+  await load(legacy); await settle(); await select()
+  await importSource('independent.sty', sources.clearIndependent, 'independent point')
+  for (const [id, source] of [['app-point', 'Clear target'], ['bulk-point', 'Clear second'], ['copy-point', 'Control point']]) {
+    await select(id); await apply('independent point'); await edit('Node text', source)
+  }
+  await select()
+  for (const [name, value] of [['Fill color', '#123456'], ['Text color', '#654321'], ['Border color', '#008000'],
+    ['Fill opacity', '.25'], ['Text opacity', '.5'], ['Border opacity', '.75'], ['Border width', '3']]) await edit(name, value)
+  await settle(); await select('bulk-point', true)
+  const multiple = await clearCase(['app-point', 'bulk-point'], '-multi')
+  multiple.standalone = await downloadSvg({ fill: 'rgb(18, 52, 86)', fillAlpha: .25, text: 'rgb(101, 67, 33)', textAlpha: .5,
+    stroke: 'rgb(0, 128, 0)', strokeAlpha: .75, strokeWidth: 3.6, dashed: true, cap: 'round', join: 'bevel', dashOffset: 1.2 }, '-multi',
+  [{ id: 'bulk-point', source: 'Clear second', expected: { fill: 'rgb(0, 0, 255)', fillAlpha: .35, text: 'rgb(255, 0, 0)', textAlpha: .6,
+    stroke: 'rgb(0, 255, 0)', strokeAlpha: .7, strokeWidth: 2.4, dashed: true, cap: 'round', join: 'bevel', dashOffset: 1.2 } }])
+  await saved({ single, multiple })
 }

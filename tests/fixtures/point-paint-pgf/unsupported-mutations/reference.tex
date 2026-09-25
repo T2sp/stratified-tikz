@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\input{append.sty}
+\noindent External definition and append (PGF):\par
+\begin{tikzpicture}\node[myPoint] at (0,0) {PGF};\end{tikzpicture}
+\par\bigskip\noindent Corrected standalone output (APP):\par
+\input{generated-standalone.tex}
+\par\bigskip\noindent Corrected inline math output (APP):\par
+\[
+\input{generated-inlineMath.tex}
+\]
+\end{document}

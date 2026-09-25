@@ -10,6 +10,19 @@ export function observePostExternalPointPaint(code, key) {
     .filter((options) => options.includes(key))
   assert.equal(nodes.length, 1, `One actual exported node using external key ${key}`)
   const options = nodes[0].slice(nodes[0].indexOf(key) + 1)
+  return pointOptionPaint(code, options, key)
+}
+
+/** Select one actual target node by its unique literal body. Global source
+ * comments and other points using the same imported key cannot satisfy this. */
+export function observeLiteralPointPaint(code, source) {
+  const nodes = [...code.matchAll(/^\s*\\node\s*\[([^\]]*)\]\s*at\s*\([^)]*\)\s*\{([^\n]*)\};/gm)]
+    .filter((match) => match[2] === source)
+  assert.equal(nodes.length, 1, `One actual exported point with body ${source}`)
+  return pointOptionPaint(code, nodes[0][1].split(',').map((option) => option.trim()), source)
+}
+
+function pointOptionPaint(code, options, key) {
   const colors = new Map([...code.matchAll(/\\definecolor\{([^}]+)\}\{HTML\}\{([\da-fA-F]{6})\}/g)]
     .map((match) => [match[1], `#${match[2].toLowerCase()}`]))
   const values = Object.fromEntries(options.filter((option) => option.includes('='))
@@ -24,6 +37,20 @@ export function assertPostExternalPointPaint(actual, expected) {
     if (value === null) assert.equal(Object.hasOwn(actual.values, key), false, `Unknown external ${key} remains authoritative`)
     else assert.equal(values[key], value, `Effective ${key} override after ${actual.key}`)
   }
+}
+
+export function assertExplicitPointPaint(actual, style) {
+  const { paint, opacity } = style
+  assertPostExternalPointPaint(actual, { fill: paint.fill.enabled ? paint.fill.color.toLowerCase() : 'none',
+    text: paint.text.color.toLowerCase(), draw: paint.stroke.enabled ? paint.stroke.color.toLowerCase() : 'none',
+    'line width': `${paint.stroke.width}pt`, 'dash phase': `${paint.stroke.dashPhase}pt`,
+    'line cap': paint.stroke.lineCap, 'line join': paint.stroke.lineJoin })
+  for (const [option, alpha] of [['fill opacity', paint.fill.opacity], ['text opacity', paint.text.opacity], ['draw opacity', paint.stroke.opacity]]) {
+    assert.equal(Number(actual.values[option]), alpha * opacity, `Explicit ${option}`)
+  }
+  if (paint.stroke.dashPattern) assert.equal(actual.values['dash pattern'],
+    paint.stroke.dashPattern.map((length, index) => `${index % 2 ? 'off' : 'on'} ${length}pt`).join(' '))
+  else assert.ok(actual.options.includes({ solid: 'solid', dashed: 'dashed', dotted: 'dotted', denselyDotted: 'densely dotted' }[paint.stroke.lineStyle]))
 }
 
 /** Observe the actual native SVG paint tree. This module never resolves model

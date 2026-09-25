@@ -1,6 +1,6 @@
 import { tikzStyleTargets } from './types.ts'
 import { canonicalTikzStyleKey, literalDefinedColor, namedTikzColors, resolveTikzPaint, splitTikzOptions } from './importedTikzPaint.ts'
-import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext } from './importedTikzPaint.ts'
+import type { TikzColorBindings, TikzPaintPreview, TikzPreviewContext, TikzStylePreviewDefinition } from './importedTikzPaint.ts'
 import { createUserStylePresetFromStyle } from './stylePresets.ts'
 import {
   defaultCurveStyle,
@@ -59,12 +59,17 @@ export type ParsedTikzStyleDefinition = {
   options: string
 }
 
+export type ParsedTikzStyleDeclaration =
+  | ({ kind: 'definition' } & ParsedTikzStyleDefinition)
+  | { kind: 'mutation'; key: string; diagnostic: string; dependencyOptions?: readonly string[] }
+
 export type TikzsetParserWarning = {
   message: string
 }
 
 export type ParseTikzsetStylesResult = {
   styles: ParsedTikzStyleDefinition[]
+  declarations?: ParsedTikzStyleDeclaration[]
   skipped: number
   warnings: TikzsetParserWarning[]
   rawOptions?: Record<string, string>
@@ -171,7 +176,7 @@ export function normalizeImportedTikzStyleOptions(options: string): string {
 export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
   const warnings: TikzsetParserWarning[] = []
   if (text.length > 1_000_000) return { styles: [], skipped: 1, warnings: [{ message: 'Style file exceeds the 1000000-character preview bound.' }] }
-  const parsedStyles: ParsedTikzStyleDefinition[] = []
+  const declarations: ParsedTikzStyleDeclaration[] = []
   const colors: Record<string, HexColor | null> = {}
   const rawOptions: Record<string, string> = Object.create(null) as Record<string, string>
   let skipped = 0
@@ -183,17 +188,27 @@ export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
     if (!first.ok) { warnings.push({ message: `Skipped malformed \\${command[1]} argument.` }); skipped += 1; continue }
     if (command[1] === 'tikzset') {
       const parsed = parseTikzsetBlock(first.content, warnings, text.slice(first.endIndex - first.content.length, first.endIndex), rawOptions)
-      parsedStyles.push(...parsed.styles)
+      declarations.push(...parsed.declarations)
       skipped += parsed.skipped
       commands.lastIndex = first.endIndex + 1
     } else if (command[1] === 'tikzstyle') {
       let index = skipWhitespace(stripped, first.endIndex + 1)
+      const append = stripped[index] === '+'
+      if (append) index = skipWhitespace(stripped, index + 1)
       if (stripped[index] === '=') index = skipWhitespace(stripped, index + 1)
       const body = readDelimitedContent(stripped, index, '[', ']')
       if (!body.ok || !first.content.trim()) { warnings.push({ message: 'Skipped malformed \\tikzstyle declaration.' }); skipped += 1; continue }
       const key = normalizeTikzPath(first.content)
-      parsedStyles.push({ key, options: normalizeImportedTikzStyleOptions(body.content) })
-      rawOptions[key] = text.slice(index + 1, body.endIndex)
+      if (append) {
+        const mutation = parseUnsupportedStyleMutation(`${key}/.append style={${body.content}}`, '')
+        if (mutation !== null) declarations.push(mutation)
+        warnings.push({ message: mutation?.diagnostic ?? 'Skipped unsupported nonliteral \\tikzstyle append target.' })
+        skipped += 1
+      } else {
+        const style = { key, options: normalizeImportedTikzStyleOptions(body.content) }
+        declarations.push({ kind: 'definition', ...style })
+        rawOptions[key] = text.slice(index + 1, body.endIndex)
+      }
       commands.lastIndex = body.endIndex + 1
     } else {
       const model = readBracedContent(stripped, skipWhitespace(stripped, first.endIndex + 1))
@@ -207,9 +222,9 @@ export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
       if (color === null || !nameSupported) warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
       commands.lastIndex = value.ok ? value.endIndex + 1 : first.endIndex + 1
     }
-    if (parsedStyles.length > 512) { warnings.push({ message: 'Style file exceeds the 512-definition preview bound.' }); parsedStyles.length = 512; break }
+    if (declarations.length > 512) { warnings.push({ message: 'Style file exceeds the 512-definition preview bound.' }); declarations.length = 512; break }
   }
-  return { ...mergeDuplicateParsedStyles(parsedStyles, skipped, warnings), rawOptions, colors }
+  return { ...mergeDuplicateParsedStyles(declarations.flatMap((declaration) => declaration.kind === 'definition' ? [{ key: declaration.key, options: declaration.options }] : []), skipped, warnings), declarations, rawOptions, colors }
 }
 
 /**
@@ -224,7 +239,15 @@ export function createImportedTikzResolutionContext(
     importedTikzStyleReferences?: readonly ImportedTikzStyleReference[]
   },
 ): TikzPreviewContext {
-  const styles: { key: string; options?: string; sourceId: string }[] = []
+  const styles = new Map<string, TikzStylePreviewDefinition>()
+  const addFallback = (reference: ImportedTikzStyleReference) => {
+    const identity = canonicalTikzStyleKey(reference.key)
+    // A saved option snapshot is not a later supported source declaration.
+    // Never let it turn an explicitly invalidated definition back into known.
+    if (styles.get(identity)?.state !== 'unresolved') {
+      styles.set(identity, { key: reference.key, options: reference.options, sourceId: reference.sourceId })
+    }
+  }
   const colors: Record<string, HexColor | null> = {}
   const colorSourceIds: Record<string, string> = {}
   const sources = diagram.externalTikzStyleSources ?? []
@@ -232,11 +255,31 @@ export function createImportedTikzResolutionContext(
   const sourceIds = sources.map((source) => source.id)
   for (const source of sources) {
     const parsed = source.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource)
-    const parsedKeys = new Set((parsed?.styles ?? []).map((style) => canonicalTikzStyleKey(style.key)))
-    for (const style of parsed?.styles ?? []) styles.push({ ...style, sourceId: source.id })
+    const parsedKeys = new Set((parsed?.declarations ?? []).map((declaration) => canonicalTikzStyleKey(declaration.key)))
+    for (const declaration of parsed?.declarations ?? []) {
+      const identity = canonicalTikzStyleKey(declaration.key)
+      if (declaration.kind === 'definition') {
+        styles.set(identity, { key: declaration.key, options: declaration.options, sourceId: source.id })
+      } else {
+        const previous = styles.get(identity)
+        styles.set(identity, {
+          key: declaration.key,
+          options: previous?.options,
+          sourceId: source.id,
+          state: 'unresolved',
+          diagnostics: [...new Set([...(previous?.state === 'unresolved' ? previous.diagnostics : []), declaration.diagnostic])],
+          dependencyOptions: [...(previous?.dependencyOptions ?? []), ...(declaration.dependencyOptions ?? [])],
+          sourceDependencies: [...new Set([
+            ...(previous?.sourceDependencies ?? []),
+            ...(previous?.sourceId === undefined ? [] : [previous.sourceId]),
+            source.id,
+          ])],
+        })
+      }
+    }
     for (const reference of references) {
       if (reference.sourceId === source.id && !parsedKeys.has(canonicalTikzStyleKey(reference.key))) {
-        styles.push({ key: reference.key, options: reference.options, sourceId: source.id })
+        addFallback(reference)
       }
     }
     for (const [name, value] of Object.entries(parsed?.colors ?? {})) {
@@ -248,10 +291,10 @@ export function createImportedTikzResolutionContext(
   // missing. Their stable reference order follows all known source loads.
   for (const reference of references) {
     if (!sourceIds.includes(reference.sourceId)) {
-      styles.push({ key: reference.key, options: reference.options, sourceId: reference.sourceId })
+      addFallback(reference)
     }
   }
-  return { styles, colors, colorSourceIds, sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])] }
+  return { styles: [...styles.values()], colors, colorSourceIds, sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])] }
 }
 
 /** Invoke the key, so an older reference ID never selects a stale root body. */
@@ -461,7 +504,7 @@ function isSafeSingleLineCommentCharacter(character: string): boolean {
 }
 
 type TikzsetBlockParseResult = {
-  styles: ParsedTikzStyleDefinition[]
+  declarations: ParsedTikzStyleDeclaration[]
   skipped: number
 }
 
@@ -482,7 +525,7 @@ function parseTikzsetBlock(
   rawOptions?: Record<string, string>,
 ): TikzsetBlockParseResult {
   const entries = splitTopLevelCommaList(block)
-  const styles: ParsedTikzStyleDefinition[] = []
+  const declarations: ParsedTikzStyleDeclaration[] = []
   let currentDirectory = ''
   let skipped = 0
   let entryOffset = 0
@@ -505,7 +548,7 @@ function parseTikzsetBlock(
     const styleResult = parseStyleEntry(trimmedEntry, currentDirectory)
 
     if (styleResult.ok) {
-      styles.push(styleResult.style)
+      declarations.push({ kind: 'definition', ...styleResult.style })
       if (rawOptions && rawEntry !== undefined) {
         const opening = entry.indexOf('{', entry.indexOf('/.style'))
         const body = readBracedContent(entry, opening)
@@ -514,11 +557,13 @@ function parseTikzsetBlock(
       continue
     }
 
+    const mutation = parseUnsupportedStyleMutation(trimmedEntry, currentDirectory)
+    if (mutation !== null) declarations.push(mutation)
     skipped += 1
-    warnings.push({ message: styleResult.warning })
+    warnings.push({ message: mutation?.diagnostic ?? styleResult.warning })
   }
 
-  return { styles, skipped }
+  return { declarations, skipped }
 }
 
 function addDetectedImportedStylePresets(
@@ -790,6 +835,42 @@ function parseCurrentDirectoryEntry(entry: string): string | null {
   }
 
   return entry.slice(0, markerIndex).trim()
+}
+
+/** Recognize literal targets, without interpreting or executing handler bodies. */
+function parseUnsupportedStyleMutation(entry: string, currentDirectory: string): Extract<ParsedTikzStyleDeclaration, { kind: 'mutation' }> | null {
+  const marker = entry.indexOf('/.')
+  if (marker < 0) return null
+  const target = entry.slice(0, marker).trim()
+  // TeX control sequences, parameter tokens, groups and active characters do
+  // not identify a literal target. Handler chains are still recognizable even
+  // though their expansion/argument semantics remain unsupported.
+  if (!target || /[\\{}#=$%~^&]/.test(target)) return null
+  const handlerMatch = entry.slice(marker + 2).match(/^([a-zA-Z][a-zA-Z0-9\s]*(?:\/\.[a-zA-Z][a-zA-Z0-9\s]*)*)=/)
+  if (handlerMatch === null) return null
+  const handler = handlerMatch[1].trim().replace(/\s+/g, ' ')
+  const dependencyOptions: string[] = []
+  // These handlers take option lists. Retain their bounded literal arguments
+  // only to discover required load hints, never to apply their paint semantics.
+  const baseHandler = handler.split('/.')[0]
+  const bodies = baseHandler === 'add style' ? 2 : ['append style', 'prefix style'].includes(baseHandler) ? 1 : 0
+  let index = marker + 2 + handlerMatch[0].length
+  for (let bodyIndex = 0; bodyIndex < bodies; bodyIndex += 1) {
+    const body = readBracedContent(entry, skipWhitespace(entry, index))
+    if (!body.ok) {
+      if (bodies === 1) dependencyOptions.push(entry.slice(index).trim())
+      break
+    }
+    dependencyOptions.push(body.content)
+    index = body.endIndex + 1
+  }
+  const key = resolveTikzKeyPath(currentDirectory, target)
+  return {
+    kind: 'mutation',
+    key,
+    diagnostic: `Unsupported style mutation ${key}/.${handler}; paint preview uses a fallback and remains unresolved.`,
+    ...(dependencyOptions.length === 0 ? {} : { dependencyOptions }),
+  }
 }
 
 function parseStyleEntry(

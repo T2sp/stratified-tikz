@@ -2,6 +2,7 @@ import {
   defaultCurveStyle,
   defaultLabelStyle,
   defaultPointStyle,
+  pointStyleForImportedReference,
 } from '../model/styles.ts'
 import {
   applyUserStylePresetToLabel,
@@ -15,6 +16,8 @@ import type {
   ImportedTikzStyleReference,
   PointFill,
   StylePresetKind,
+  Stratum,
+  TextLabel,
   UserStylePreset,
 } from '../model/types.ts'
 import { endpointArrowModes, pointFills } from '../model/types.ts'
@@ -813,12 +816,7 @@ function clearContextQuickStylePresetReferences(
   return changed ? { ...diagram, strata, labels } : diagram
 }
 
-function clearStyleReferences<
-  T extends {
-    stylePresetId?: string
-    importedTikzStyleReferenceId?: string
-  },
->(value: T): T {
+function clearStyleReferences<T extends Stratum | TextLabel>(value: T): T {
   if (
     value.stylePresetId === undefined &&
     value.importedTikzStyleReferenceId === undefined
@@ -830,6 +828,10 @@ function clearStyleReferences<
 
   delete nextValue.stylePresetId
   delete nextValue.importedTikzStyleReferenceId
+
+  if (nextValue.geometricKind === 'point') {
+    nextValue.style = pointStyleForImportedReference(nextValue.style, undefined)
+  }
 
   return nextValue
 }

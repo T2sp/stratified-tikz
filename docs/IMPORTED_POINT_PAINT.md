@@ -24,6 +24,13 @@ field list are validated and deep-cloned, and the reference must match the
 point or preset's active imported reference. Invalid explicit metadata is
 rejected. Replacing/removing that reference clears incompatible metadata.
 
+The quick bar's **Clear TikZ style** detaches the preset reference, external
+reference and `importedPaint` together, for a single point or compatible multiple
+points. It clones the retained paint; all explicit channel values, overall
+opacity, body, geometry and unrelated records survive. The result is valid before
+saving, including commit/undo/redo. Ordinary paint edits only detach the preset
+association and retain the active external reference and its editing metadata.
+
 New imported point presets begin with an empty override list. Accepted local
 edits add their affected fields, including equal-valued edits and coupled
 controls' intentionally edited channels. Editing unknown fill away from black
@@ -118,7 +125,36 @@ Cycles and excessive depth/work produce diagnostics and terminate preview work.
 No `.code`, macros, package/preamble execution, parameterized styles, or arbitrary
 PGF/TeX programs are evaluated.
 
-Limits are: 1,000,000 source characters, 512 extracted definitions, 100,000
+Recognizable unsupported declarations targeting a literal key (including
+`.append style`, `.prefix style` and `\tikzstyle{key}+=[...]`) are retained as
+ordered invalidations.
+Supported definitions and these events replay in declaration and source load
+order, with the same canonical aliases and declaration-level `.cd` rules.
+An invalidation gives that key an explicit unresolved definition state; it does
+not merely delete the body. The last supported body can supply deterministic
+preview values, but every paint field becomes uncertain and the reference
+displays a diagnostic. Nested invocation propagates the uncertainty; a subsequent
+supported option such as `text=green` restores only its own fields. Unrelated
+keys, including a distinct `/other/myPoint`, keep their existing resolution.
+A later full supported definition restores known resolution for that key.
+
+This state is reconstructed from preserved raw sources after reload. Stale saved
+reference options cannot replace an invalidated definition. The selected ID and
+raw options remain unchanged. Dependency comments retain defining, mutating and
+required nested/color sources in source load order, even when a later imported
+file has no new reference for the mutated key. Recognizable style-list mutation
+arguments are scanned only for literal style/color dependencies, never applied
+as paint. This separate scan is bounded to 4,096 options / 16 levels and retains
+all imported source hints if its bound or an unknown runtime directory prevents
+precise dependency discovery. Arbitrary code handlers are not interpreted.
+Mutation-only files without any
+supported importable definition retain the existing import behavior; adding that
+UI workflow is outside this correction. Importer snapshots refresh through the
+same context without losing explicit local intent, including edits returning to
+the preview fallback. Both export modes keep defaults before the external key
+and omit untouched uncertain overrides after it. No mutation handler is executed.
+
+Limits are: 1,000,000 source characters, 512 extracted declaration events, 100,000
 characters per option body, 4,096 expanded option steps, 16 reference levels,
 and at most 64 preview diagnostics per resolved style. Oversized source has no
 importable definitions. Malformed declarations are skipped with warnings.
@@ -254,3 +290,9 @@ dependency hints, later definitions, history/local-edit preservation, unknown
 bindings and mixtures, and literal restoration. Export assertions inspect
 options after the actual external key and resolve the generated named color
 definitions against independent expected values.
+
+[The unsupported-mutation comparison](../tests/fixtures/point-paint-pgf/unsupported-mutations/README.md)
+retains the review's original failing source/PDF/operators and a focused PGF
+3.1.11a compilation of corrected output in both modes. The external and corrected
+nodes are blue; the old generated node was red. This proves preservation of the
+external effect, while the bounded preview deliberately retains diagnosed red.

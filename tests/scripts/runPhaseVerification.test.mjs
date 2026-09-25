@@ -455,16 +455,17 @@ const pointGroups = [...combinedLabelGroups, ...Object.keys(pointNodeScenarios)]
 const importRegressionScenarios = [
   'point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
 ]
+const correctionScenarios = ['point-paint-unsupported-mutations', 'point-paint-clear-imported-style']
 const targetedPaintScenarios = [
   'point-paint-namespace-aliases',
   'point-paint-responsive-circle',
   'point-paint-responsive-triangle',
   'point-paint-responsive-downloads',
-  ...importRegressionScenarios,
+  ...importRegressionScenarios, ...correctionScenarios,
 ]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
-  assert.equal(Object.values(pointNodeScenarios).flat().length, 23)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 25)
   assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
     'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
     'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
@@ -550,12 +551,79 @@ function importRegressionEvidence(name) {
     result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
     for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
     result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
+  } else if (name === 'point-paint-unsupported-mutations') {
+    result.mutation = snapshot('myPoint', { fill: null, text: null, draw: null })
+    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null, draw: null })
+    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#ff0000', text: null, draw: null })
+    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={fill=blue,text=blue}\n}'
+    for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloaded']) {
+      const entry = result[boundary]
+      entry.warnings = ['Unsupported myPoint/.append style']
+      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['fillColor', 'textColor'] },
+        reference: { previewDiagnostics: entry.warnings } }
+      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
+      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
+        importedPaint: { overriddenFields: boundary === 'mutation' ? [] : ['fill.color'] } }
+      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
+    }
+    result.standalone.observation = result.reloaded.observation
   } else {
     result.unsupported = snapshot('myPoint', { fill: null, text: null, draw: '#000000' }, ['Unsupported red'])
     for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null })
     for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('myPoint', { fill: '#000000', text: null })
   }
   return result
+}
+function clearRegressionEvidence() {
+  const basePaint = { text: { color: '#000000', opacity: 1 }, fill: { enabled: true, color: '#ff0000', opacity: 1 },
+    stroke: { enabled: true, color: '#000000', opacity: 1, width: .4, lineStyle: 'solid', dashPhase: 0, lineCap: 'butt', lineJoin: 'miter' } }
+  const mixedPaint = { text: { color: '#654321', opacity: .5 }, fill: { enabled: true, color: '#123456', opacity: .25 },
+    stroke: { enabled: true, color: '#008000', opacity: .75, width: 3, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
+  const expectedObservation = (paint) => {
+    const rgb = (hex) => `rgb(${[1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(', ')})`
+    return { contour: { fill: rgb(paint.fill.color), fillAlpha: paint.fill.opacity, stroke: rgb(paint.stroke.color),
+      strokeAlpha: paint.stroke.opacity, strokeWidth: paint.stroke.width * 1.2, dash: paint.stroke.dashPattern ? '3, 2' : 'none',
+      dashOffset: paint.stroke.dashPhase * 1.2, cap: paint.stroke.lineCap, join: paint.stroke.lineJoin },
+    leaves: [{ fill: rgb(paint.text.color), fillAlpha: paint.text.opacity }], bodyBounds: { width: 2 }, shapeBounds: { width: 5 } }
+  }
+  const makeCase = (ids) => {
+    const multiple = ids.length === 2, key = multiple ? 'independent point' : 'redpoint'
+    const secondPaint = { text: { color: '#ff0000', opacity: .6 }, fill: { enabled: true, color: '#0000ff', opacity: .35 },
+      stroke: { enabled: true, color: '#00ff00', opacity: .7, width: 2, lineStyle: 'solid', dashPattern: [3, 2], dashPhase: 1, lineCap: 'round', lineJoin: 'bevel' } }
+    const points = ['app-point', 'bulk-point', 'copy-point'].map((id, index) => ({
+      current: { id, text: ['Clear target', 'Clear second', 'Control point'][index], stylePresetId: 'preset', importedTikzStyleReferenceId: 'reference',
+        style: { opacity: 1, paint: structuredClone(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint), importedPaint: { referenceId: 'reference' } } },
+      observation: expectedObservation(multiple ? index === 0 ? mixedPaint : secondPaint : basePaint),
+    }))
+    const snapshot = (detached) => {
+      const current = structuredClone(points)
+      if (detached) for (const { current: point } of current) if (ids.includes(point.id)) {
+        delete point.stylePresetId; delete point.importedTikzStyleReferenceId; delete point.style.importedPaint
+      }
+      const diagram = { strata: current.map((point) => point.current), userStylePresets: [{ id: 'preset' }],
+        externalTikzStyleSources: [{ id: 'source', rawSource: 'preserved source' }], importedTikzStyleReferences: [{ id: 'reference', key }] }
+      const nodes = current.map(({ current: point }, index) => {
+        const { paint } = point.style
+        const colors = ['fill', 'text', 'stroke'].map((channel) => `\\definecolor{${channel}${index}}{HTML}{${paint[channel].color.slice(1)}}`).join('\n')
+        const dash = paint.stroke.dashPattern ? `dash pattern=on 3pt off 2pt` : 'solid'
+        return `${colors}\n\\node[${point.importedTikzStyleReferenceId ? `${key},` : ''}fill=fill${index},text=text${index},draw=stroke${index},fill opacity=${paint.fill.opacity},text opacity=${paint.text.opacity},draw opacity=${paint.stroke.opacity},line width=${paint.stroke.width}pt,${dash},dash phase=${paint.stroke.dashPhase}pt,line cap=${paint.stroke.lineCap},line join=${paint.stroke.lineJoin}] at (${index},0) {${point.text}};`
+      }).join('\n')
+      // Synthetic policy evidence only; these markers are not browser/model observations.
+      const beforePresent = { clear: 'before', ids }, afterPresent = { clear: 'after', ids }
+      return { points: current, diagram, output: { standalone: nodes, inlineMath: nodes }, modelDiagnostics: { validation: { valid: true } },
+        state: { json: JSON.stringify({ diagram }), history: JSON.stringify({
+          past: detached ? [{ before: 'retained' }, beforePresent] : [{ before: 'retained' }],
+          present: detached ? afterPresent : beforePresent, future: [],
+        }) } }
+    }
+    const entry = { ids, nativeAction: { selector: 'TikZ style selector', action: 'Clear TikZ style' },
+      before: snapshot(false), cleared: snapshot(true), undone: snapshot(false), redone: snapshot(true), reloaded: snapshot(true),
+      download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
+      standalone: { pageErrors: [], observation: points[0].observation,
+        points: multiple ? [{ id: 'bulk-point', observation: points[1].observation }] : [] } }
+    return entry
+  }
+  return { single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
 }
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
@@ -576,7 +644,7 @@ function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
     `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(importRegressionScenarios.includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
+      ...(name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
             baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
@@ -756,6 +824,123 @@ test('32B rejects the accepted twenty-scenario pre-fix report without all three 
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-local-override-intent/)
 })
+
+test('32B rejects accepted 23-scenario evidence lacking both new defect checks', (t) => {
+  const fixture = checkoutFixture(t), evidence = completePointEvidence(fixture)
+  evidence.evidence = evidence.evidence.filter((entry) => !correctionScenarios.includes(entry.name))
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-unsupported-mutations/)
+})
+
+for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloaded']) {
+  for (const fault of ['missing-reference', 'missing-diagnostic', 'missing-unresolved', 'missing-source', 'false-validity', 'claimed-text', 'missing-inline']) {
+    test(`32B requires retained unsupported mutation uncertainty: ${boundary} ${fault}`, (t) => {
+      const fixture = checkoutFixture(t)
+      completePointEvidence(fixture)
+      const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+      const entry = artifacts['point-paint-unsupported-mutations.json'][boundary]
+      if (fault === 'missing-reference') delete entry.current.importedTikzStyleReferenceId
+      if (fault === 'missing-diagnostic') entry.modelDiagnostics.reference.previewDiagnostics = []
+      if (fault === 'missing-unresolved') entry.modelDiagnostics.resolution.unresolvedFields = ['fillColor']
+      if (fault === 'missing-source') entry.diagram.externalTikzStyleSources = []
+      if (fault === 'false-validity') entry.modelDiagnostics.validation.valid = false
+      if (fault === 'claimed-text') entry.output.standalone = entry.output.standalone.replace('myPoint,', 'myPoint,text=red,')
+      if (fault === 'missing-inline') delete entry.output.inlineMath
+      fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    })
+  }
+}
+for (const kind of ['single', 'multiple']) for (const boundary of ['cleared', 'redone', 'reloaded']) {
+  for (const fault of ['retained-reference', 'retained-provenance', 'retained-preset', 'changed-paint', 'changed-control', 'false-validity', 'missing-preview', 'wrong-target-output']) {
+    test(`32B requires explicit detached native state: ${kind} ${boundary} ${fault}`, (t) => {
+      const fixture = checkoutFixture(t)
+      completePointEvidence(fixture)
+      const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+      const entry = artifacts['point-paint-clear-imported-style.json'][kind][boundary], target = entry.points[0]
+      if (fault === 'retained-reference') target.current.importedTikzStyleReferenceId = 'reference'
+      if (fault === 'retained-provenance') target.current.style.importedPaint = { referenceId: 'reference' }
+      if (fault === 'retained-preset') target.current.stylePresetId = 'preset'
+      if (fault === 'changed-paint') target.current.style.paint.stroke.dashPhase = 8
+      if (fault === 'changed-control') entry.points[2].current.style.paint.text.color = '#0000ff'
+      if (fault === 'false-validity') entry.modelDiagnostics.validation.valid = false
+      if (fault === 'missing-preview') delete target.observation
+      if (fault === 'wrong-target-output') entry.output.inlineMath = entry.output.inlineMath.replace('text=text0', 'text=fill0')
+      fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    })
+  }
+}
+for (const fault of ['missing-single', 'missing-multi', 'missing-action', 'missing-history', 'extra-history', 'changed-earlier-history', 'undo-lost-reference',
+  'missing-reload', 'missing-svg', 'missing-second-svg', 'svg-paint', 'svg-error']) {
+  test(`32B rejects incomplete clear workflow evidence: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const clear = artifacts['point-paint-clear-imported-style.json'], entry = clear.multiple
+    if (fault === 'missing-single') delete clear.single
+    if (fault === 'missing-multi') delete clear.multiple
+    if (fault === 'missing-action') delete entry.nativeAction
+    if (fault === 'missing-history') delete entry.cleared.state.history
+    if (fault === 'extra-history') entry.cleared.state.history = JSON.stringify({ past: [{}, {}, {}] })
+    if (fault === 'changed-earlier-history') entry.cleared.state.history = JSON.stringify({ past: [{ changed: true }, {}] })
+    if (fault === 'undo-lost-reference') delete entry.undone.points[0].current.importedTikzStyleReferenceId
+    if (fault === 'missing-reload') delete entry.reload
+    if (fault === 'missing-svg') delete entry.standalone
+    if (fault === 'missing-second-svg') entry.standalone.points = []
+    if (fault === 'svg-paint') entry.standalone.observation.contour.strokeWidth = .4
+    if (fault === 'svg-error') entry.standalone.pageErrors.push('page error')
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+  })
+}
+
+// Exercise the verification policy with synthetic histories at the production
+// capacity. This fake-npm fixture does not claim native undo/redo acceptance.
+function boundedClearHistories(entry, pastCount) {
+  const before = { past: Array.from({ length: pastCount }, (_, index) => ({ retained: index })),
+    present: { clear: 'before', ids: entry.ids }, future: [{ discarded: 'redo branch' }] }
+  const committed = { past: [...before.past, before.present].slice(-100),
+    present: { clear: 'after', ids: entry.ids }, future: [] }
+  entry.before.state.history = JSON.stringify(before)
+  entry.cleared.state.history = JSON.stringify(committed)
+  return { before, committed }
+}
+
+for (const pastCount of [99, 100]) {
+  test(`32B policy accepts one native clear at ${pastCount} prior snapshots using synthetic evidence`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const clear = artifacts['point-paint-clear-imported-style.json']
+    for (const kind of ['single', 'multiple']) boundedClearHistories(clear[kind], pastCount)
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.equal(verify(t, fixture, '32B').status, 'passed')
+  })
+
+  for (const fault of ['no-op', 'extra-commit', 'changed-retained-snapshot', 'missing-previous-present',
+    'wrong-previous-present', 'missing-before-present', 'missing-after-present', 'retained-future']) {
+    test(`32B policy rejects ${fault} at ${pastCount} prior clear snapshots`, (t) => {
+      const fixture = checkoutFixture(t)
+      completePointEvidence(fixture)
+      const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+      const entry = artifacts['point-paint-clear-imported-style.json'].multiple
+      const { before, committed } = boundedClearHistories(entry, pastCount)
+      if (fault === 'no-op') committed.present = structuredClone(before.present)
+      if (fault === 'extra-commit') committed.past = [...before.past, before.present, { extra: 'commit' }].slice(-100)
+      if (fault === 'changed-retained-snapshot') committed.past[0] = { changed: 'retained snapshot' }
+      if (fault === 'missing-previous-present') committed.past.pop()
+      if (fault === 'wrong-previous-present') committed.past[committed.past.length - 1] = { wrong: 'previous present' }
+      if (fault === 'missing-before-present') delete before.present
+      if (fault === 'missing-after-present') delete committed.present
+      if (fault === 'retained-future') committed.future = structuredClone(before.future)
+      entry.before.state.history = JSON.stringify(before)
+      entry.cleared.state.history = JSON.stringify(committed)
+      fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    })
+  }
+}
 
 for (const name of importRegressionScenarios) {
   for (const fault of ['missing-observation', 'missing-inline', 'wrong-final-paint', 'missing-history', 'missing-reload', 'page-error']) {

@@ -1,0 +1,71 @@
+\documentclass{article}
+\usepackage{tikz}
+\pagestyle{empty}
+\pdfcompresslevel=0
+\pdfobjcompresslevel=0
+\begin{document}
+\typeout{STZ-PGF-VERSION=\pgfversion}
+\tikzset{myPoint/.style={fill=red,text=red},myPoint/.append style={fill=blue,text=blue}}
+\begin{tikzpicture}\node[myPoint] at (0,0) {PGF};\end{tikzpicture}
+% ----------------------------------------------------------------------------
+% Styles and colors
+% ----------------------------------------------------------------------------
+
+% External TikZ styles referenced below.
+% Load these files in your LaTeX preamble or before the picture:
+% - append.sty
+% Suggested:
+%   \input{append.sty}
+
+\definecolor{stzPointpFill}{HTML}{FF0000}
+\definecolor{stzPointpStroke}{HTML}{000000}
+\definecolor{stzPointpText}{HTML}{FF0000}
+\pgfdeclarelayer{stratifiedLayer0}
+\pgfsetlayers{stratifiedLayer0,main}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round
+]
+
+    % ----------------------------------------------------------------------------
+    % Coordinates
+    % ----------------------------------------------------------------------------
+
+    \coordinate (pointPoint0p0) at (0,0);
+
+    % ----------------------------------------------------------------------------
+    % Layered drawing commands
+    % ----------------------------------------------------------------------------
+
+    % Layer 0: stratifiedLayer0
+    \begin{pgfonlayer}{stratifiedLayer0}
+        %----------------------------------------
+        % Codimension 2 strata: points
+        %----------------------------------------
+        \node[
+            circle,
+            inner sep=1.5pt,
+            myPoint,
+            fill=stzPointpFill,
+            draw=stzPointpStroke,
+            text=stzPointpText,
+            fill opacity=1,
+            draw opacity=1,
+            text opacity=1,
+            line width=0.4pt,
+            solid,
+            dash phase=0pt,
+            line cap=butt,
+            line join=miter
+        ] at (pointPoint0p0) {APP};
+
+    \end{pgfonlayer}
+
+    % Codimension 0 strata: regions
+    % Codimension 1 strata: curves
+    % Labels
+
+\end{tikzpicture}
+
+\end{document}

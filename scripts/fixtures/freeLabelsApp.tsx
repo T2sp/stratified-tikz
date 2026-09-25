@@ -3,6 +3,7 @@
 import { createRoot } from 'react-dom/client'
 import App from '../../src/App.tsx'
 import { jsonPersistenceExpectation } from './jsonPersistenceExpectation.ts'
+import { pointPaintModelDiagnostics } from './pointPaintModelDiagnostics.ts'
 import type { AppLabelBrowserSnapshot } from '../../src/App.tsx'
 import '../../src/index.css'
 import { createPointStratum, createCurveStratum, createEmptyDiagram } from '../../src/model/constructors.ts'
@@ -99,6 +100,10 @@ let releaseExportClick: (() => void) | undefined
 const api = {
   jsonPersistenceExpectation,
   pointRuntime,
+  pointPaintModelDiagnostics(id = 'app-point') {
+    if (!snapshot) throw new Error('App has not committed its diagnostics')
+    return pointPaintModelDiagnostics(snapshot.runtimeDiagramJson, id)
+  },
   // Capture at the native click boundary, before the production handler owns
   // its immutable snapshot. Later edits/loads must not supply these inputs.
   armPointExportClick(ids: string[]) {

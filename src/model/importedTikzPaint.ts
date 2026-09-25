@@ -33,8 +33,18 @@ export type TikzPaintPreview = {
   unresolvedFields?: string[]
   sourceDependencies?: string[]
 }
+export type TikzStylePreviewDefinition = {
+  key: string
+  options?: string
+  sourceId?: string
+  sourceDependencies?: readonly string[]
+  dependencyOptions?: readonly string[]
+} & (
+  | { state?: 'known' }
+  | { state: 'unresolved'; diagnostics: readonly string[] }
+)
 export type TikzPreviewContext = {
-  styles?: readonly { key: string; options?: string; sourceId?: string }[]
+  styles?: readonly TikzStylePreviewDefinition[]
   colors?: TikzColorBindings
   colorSourceIds?: Readonly<Record<string, string>>
   sourceIds?: readonly string[]
@@ -143,6 +153,51 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   let work = 0
   const styles = new Map((context.styles ?? []).map((style) => [canonicalTikzStyleKey(style.key), style]))
   const warn = (message: string) => { if (diagnostics.length < 64 && !diagnostics.includes(message)) diagnostics.push(message) }
+  // Dependency discovery is deliberately separate from paint resolution. An
+  // unsupported style-list mutation can require nested styles and colors even
+  // though none of its option values are safe to apply to the preview.
+  let dependencyWork = 0
+  const retainAllSourceHints = (message: string) => {
+    warn(message)
+    for (const sourceId of context.sourceIds ?? []) dependencies.add(sourceId)
+  }
+  const collectOptionDependencies = (body: string, active: readonly string[]): void => {
+    if (body.length > 100_000 || active.length > 16) {
+      retainAllSourceHints('Style dependency scan exceeds its preview bound; retaining all imported source hints.')
+      return
+    }
+    for (const rawOption of splitTikzOptions(body)) {
+      const option = rawOption.trim()
+      if (!option) continue
+      dependencyWork += 1
+      if (dependencyWork > 4096) {
+        retainAllSourceHints('Style dependency scan exceeds the 4096-option bound; retaining all imported source hints.')
+        return
+      }
+      const equals = option.indexOf('=')
+      const key = (equals < 0 ? option : option.slice(0, equals)).trim()
+      if (key.endsWith('/.cd')) {
+        retainAllSourceHints('Style dependency scan has an unsupported runtime directory change; retaining all imported source hints.')
+        return
+      }
+      if (/[\\{}#=$%~^&]/.test(key)) continue
+      const identity = canonicalTikzStyleKey(key)
+      const definition = styles.get(identity)
+      if (definition !== undefined) {
+        if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
+        for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
+        if (!active.includes(identity)) {
+          const nestedActive = [...active, identity]
+          collectOptionDependencies(definition.options ?? '', nestedActive)
+          for (const options of definition.dependencyOptions ?? []) collectOptionDependencies(options, nestedActive)
+        }
+      } else if (equals < 0) {
+        color(key)
+      } else if (['fill', 'draw', 'text', 'color'].includes(key.replace(/^\/tikz\//, ''))) {
+        color(option.slice(equals + 1))
+      }
+    }
+  }
   // A .style body uses the invocation's active directory (/tikz for normal
   // nodes), not the declaration's parent directory. Keep this context shared
   // through nested expansion. Runtime .cd is deliberately unsupported; once
@@ -175,9 +230,18 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       if (reference !== undefined) {
         const definition = styles.get(reference)!
         if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
+        for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
         if (active.includes(reference)) { warn(`Cyclic style reference: ${[...active, reference].join(' → ')}`); paintFields.forEach((field) => unresolved.add(field)) }
         else if (active.length >= 16) { warn('Preview style expansion exceeds the 16-level depth bound.'); paintFields.forEach((field) => unresolved.add(field)) }
         else visit(definition.options ?? '', [...active, reference])
+        // The last known body is only a deterministic preview approximation.
+        // Unknown handlers may change every channel; subsequent literal options
+        // can restore certainty for their own fields through resolved().
+        if (definition.state === 'unresolved') {
+          definition.diagnostics.forEach(warn)
+          for (const options of definition.dependencyOptions ?? []) collectOptionDependencies(options, [reference])
+          paintFields.forEach((field) => unresolved.add(field))
+        }
         continue
       }
       const invalid = (affectedFields?: readonly string[]) => {
