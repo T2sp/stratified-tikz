@@ -195,3 +195,56 @@ test('current mutation exports match the corrected compiled PGF comparison and r
     assert.deepEqual(actual.options, [], 'all untouched paint remains before the external key')
   }
 })
+
+test('directory mutation exports preserve external blue text in both compiled modes and retain the former green failure', () => {
+  const root = new URL('../fixtures/point-paint-pgf/mutation-directory/', import.meta.url)
+  type PaintObservation = { body: string; fill: string; text: string; fillOperator: string; textOperator: string }
+  const observations = JSON.parse(readFileSync(new URL('observations.json', root), 'utf8')) as {
+    pgfVersion: string; engine: string; compilationExitCode: number
+    before: PaintObservation[]
+    after: (PaintObservation & { mode: string })[]
+  }
+  assert.equal(observations.pgfVersion, '3.1.11a')
+  assert.match(observations.engine, /pdfTeX .*1\.40\.29/)
+  assert.equal(observations.compilationExitCode, 0)
+  assert.deepEqual(observations.before.map(({ body, text }) => [body, text]), [['PGF', '#0000FF'], ['APP', '#00FF00']])
+  assert.deepEqual(observations.after.map(({ mode, text }) => [mode, text]), [['external', '#0000FF'], ['standalone', '#0000FF'], ['inlineMath', '#0000FF']])
+  const compilation = readFileSync(new URL('compilation.txt', root), 'utf8')
+  assert.match(compilation, /STZ-PGF-VERSION=3\.1\.11a/)
+  assert.match(compilation, /Output written on/)
+  const log = readFileSync(new URL('reference.log.txt', root), 'utf8')
+  assert.match(log, /Version .*1\.40\.29/)
+  for (const mode of modes) assert.ok(log.includes(`(./generated-${mode}.tex`), `${mode} was actually read by the compiler`)
+  for (const [prefix, rows] of [['before/', observations.before], ['', observations.after]] as const) {
+    const operators = readFileSync(new URL(`${prefix}pdf-operators.txt`, root), 'utf8')
+    const pdf = readFileSync(new URL(`${prefix}reference.pdf`, root)).toString('latin1')
+    assert.ok(pdf.startsWith('%PDF-'), `${prefix}retained actual PDF`)
+    assert.ok(pdf.includes(operators.trim()), `${prefix}operators are the retained PDF's uncompressed stream`)
+    let offset = 0
+    for (const row of rows) {
+      const marker = `[(${row.body})]TJ`
+      const index = operators.indexOf(marker, offset)
+      assert.ok(index >= offset, `${prefix}contains actual node body ${row.body}`)
+      const node = operators.slice(offset, index)
+      const colorBefore = (part: string) => [...part.matchAll(/(?:^|\n)([\d.]+(?: [\d.]+){2} rg)(?=\s)/g)].at(-1)?.[1]
+      assert.equal(colorBefore(node), row.textOperator, `${prefix}effective text paint ${row.body}`)
+      const fill = [...node.matchAll(/(?:^|\n)(?:f|B)\s*\n/g)].at(-1)
+      assert.ok(fill, `${prefix}actual filled shape ${row.body}`)
+      assert.equal(row.fill, '#FF0000')
+      assert.equal(row.fillOperator, '1 0 0 rg')
+      assert.equal(colorBefore(node.slice(0, fill.index)), row.fillOperator, `${prefix}effective fill paint ${row.body}`)
+      offset = index + marker.length
+    }
+  }
+  const source = readFileSync(new URL('source.sty', root), 'utf8')
+  assert.equal(source, readFileSync(new URL('before/source.sty', root), 'utf8'), 'correction uses the exact failing external source')
+  const original = createEmptyDiagram({ ambientDimension: 2 })
+  original.strata = [createPointStratum({ ambientDimension: 2, id: 'p', text: 'APP', position: { x: 0, y: 0, z: 0 } })]
+  const applied = apply(importTikzStyleFile(original, 'source.sty', source).diagram, 'outer')
+  for (const mode of modes) {
+    const actual = afterKey(applied, 'outer', mode)
+    assert.equal(actual.output, readFileSync(new URL(`generated-${mode}.tex`, root), 'utf8'), `${mode} current output is exactly the fragment compiled above`)
+    assert.equal(actual.color('text'), undefined)
+    assert.deepEqual(actual.options, [], 'no guessed post-key paint replaces the external runtime-directory effect')
+  }
+})

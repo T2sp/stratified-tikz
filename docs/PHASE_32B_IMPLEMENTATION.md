@@ -1,7 +1,11 @@
 # Phase 32B: Independent point paint and imported styles
 
 Status: 32B remains incomplete pending fresh matching browser-capable parent
-verification and independent review of the targeted import/override fixes below.
+verification and independent review of the App continuity and runtime-directory
+correction in the final section below. The latest supplied `UWQV23` parent run
+failed; its empty page-error array does not establish App document continuity.
+The new acceptance minimum is 16 cumulative groups / 27 named point scenarios.
+The following paragraphs and earlier sections retain historical evidence only.
 The `xgI0o0` pre-fix parent verification passed; the subsequent independent review
 ran and requested changes for three Medium production defects. Its browser,
 responsive saved-body/font/background and PGF evidence remains accepted for that
@@ -1723,3 +1727,158 @@ fresh worker report and binary-aware checkout fingerprint without introducing
 a self-referential tracked hash. Required acceptance remains all five commands,
 16 groups / 25 named point scenarios and all mandatory artifacts, followed by
 same-tree independent review. The failed `1cbUWu` report cannot satisfy that gate.
+
+## App document continuity and mutation directory uncertainty (2026-09-26)
+
+This correction started on clean `phase/32b-color-opacity-outline` at
+`120743b6c42f63b5db3bad31804bcc4f0d6a1c93`. Its difference from the supplied
+`2f2faa1` revision was the updated fix prompt. Existing provenance detachment,
+ordered invalidations, explicit local intent, runtime-only diagnostics and exact
+100-entry history assertions were preserved. No dependency, saved schema,
+permission, Vite configuration, 32C/32D feature or unrelated lint repair changed.
+
+### App continuity: observed failure and unproven trigger
+
+The latest supplied parent report is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-UWQV23/verification.json`.
+It passed 3,256 tests, build, diff and label assets, then lost
+`window.stzAppLabels` when restoring the mixed-paint fixture after the imported
+paint helper returned. Its before/after fingerprint was
+`92acaac8b89c875545026db18eba8fa61ad088b672dc8ea0be05c94614d4169b`.
+Observation 0235 retained valid multi-clear state; 0236 observed a distinct
+standalone SVG; 0237 retained the missing-API failure. The outer screenshot was
+of the renderer, so neither it nor empty `pageErrors` proved App survival.
+
+The retained read-only reproduction at `/private/tmp/stz-32b-paint-reproduction/`
+passed the old 14 paint scenarios with only the initial App navigation before
+cleanup. This is scoped historical evidence, not cumulative acceptance and not
+an identified trigger. Document replacement/reinitialization remains a
+hypothesis. There is no demonstrated page-variable mix-up, external-server reuse
+or production paint cause for this failure. No deterministic fix of its
+intermittent trigger is claimed.
+
+`scripts/ownedAppPage.mjs` now owns the App identity and expected fixture URL
+from creation. An init-script marker identifies each actual document generation
+and remembers the original API object after legitimate startup readiness.
+Subsequent state reads fail closed on URL, generation or API replacement; they
+never wait for recovery, reload or recreate the App. Bounded lifecycle records
+retain main-frame navigation, close/crash, Vite module websocket messages,
+console/request failures, native button actions, filechooser and download events.
+Startup, standalone boundaries and helper return observe root/scripts/readiness
+and API availability without calling the fixture API.
+
+All seven import/clear standalone transitions retain the exact saved JSON,
+separate `runtimeDiagramJson`, full history and editor document revision before
+opening the distinct SVG page and after that page closes. The final transition,
+helper return and next-load boundary must agree. Three additional real App pages
+exercise missing API, replacement API and same-URL reload as negative controls;
+they cannot reset the main scenario's history. The main App is checked again
+after those controls. The next lifecycle scenario is named before its load setup.
+
+Failure records persist the primary error and owned lifecycle before bounded
+DOM/screenshot attempts, independently of Inspector/API diagnostics. DOM capture
+is capped at 512 nodes / 64,000 serialized characters, events at 256, and screenshots
+at the current viewport with explicit deadlines. The owned App failure image has
+its own filename, separate from renderer and standalone images. Late diagnostic
+rejections are owned; cleanup keeps the primary error. Registered helper tests
+cover wrong ownership/API/generation, exact state continuity, DOM bounds, failed
+captures/writes, late rejections and failure evidence retained through cleanup.
+Native controls and the actual App-to-SVG-to-App sequence remain mandatory.
+
+### Production directory uncertainty and independent PGF comparison
+
+The production cause was established: the bounded unsupported-mutation dependency
+scan noticed `/.cd` but discarded its effect on the invocation directory. The
+calling style's later relative `text=green` then incorrectly cleared unresolved
+text and generated a green override after `outer`.
+
+The scan now returns directory certainty through nested literal dependencies;
+runtime `/.cd` and uninspected work/depth/body bounds propagate uncertainty into
+subsequent ordered resolution. Relative paint stays unresolved. Supported
+absolute `/tikz/...` options still resolve their own fields, explicit local
+intent still wins, and paint-only unsupported mutations still allow a later
+known `text=green`. Declaration-level `.cd`, canonical aliases, source order,
+reference identities, load hints and raw-source reconstruction are unchanged.
+An independent HEAD-resolver negative control is retained at
+`/private/tmp/stz-32b-directory-negative-POqIsO/observations.json`.
+
+Seven added registered model/TikZ regressions cover the exact reproduction, nested
+mutation dependencies, conservative bounds, unrelated styles, absolute recovery,
+cross-file order/reconstruction, local fallback-return edits, history/persistence
+and both output modes. They inspect actual target-node options after the external
+key and resolve named colors independently of the production resolver.
+
+Independent audit also found a directory change hidden beyond ordinary preview
+expansion bounds in a retained last-known mutation body. Ordinary body/work/depth
+bailouts now lose invocation-directory certainty and retain source hints, just
+like the separate mutation scan. The new bound regression failed that earlier
+implementation; independent rechecking confirms relative uncertainty, supported
+absolute recovery when budget remains, and unchanged paint-only recovery.
+
+The new [PGF reference](../tests/fixtures/point-paint-pgf/mutation-directory/README.md)
+retains the supplied failing source, generated fragment, log, PDF, operators and
+observations byte-for-byte under `before/`. The supplied old reference compiled
+one generated fragment; compilation of both old modes is not claimed. A fresh
+successful pdfTeX 1.40.29 / PGF 3.1.11a compilation includes the external node and
+both corrected generated modes. Actual node-adjacent PDF operators and the
+inspected PNG show blue text/red fill for all three, while the old APP text was
+green. Exact commands, current generator, both fragments, stdout/log, PDF,
+operators and observations are retained. The registered test requires current
+generated bytes to match those compiled fragments and verifies actual PDF stream
+operators. No TeX runs in the importer or renderer.
+
+### Required evidence and verification handoff
+
+The new native `point-paint-mutation-directory-uncertainty` scenario exercises
+real imports, visible uncertainty, an unaffected style, local text edits and
+return-to-fallback intent, exact bounded history, undo/redo, save/reload, both
+exports and a downloaded/reopened SVG. `point-paint-app-continuity` requires all
+seven actual transitions and three native fault controls with their owned
+failure DOM/images/lifecycle artifacts. The policy requires **16 groups / 27
+named point scenarios**, including 11 directory-case artifacts and 13 continuity
+artifacts. Old 25-scenario reports cannot pass. New fail-closed regressions reject
+false green overrides, lost uncertainty/source/intent/history and missing or
+incorrect ownership/generation/control/capture evidence. The verifier adds no
+new imports, so its existing isolated dependency copies remain sufficient; the
+fresh-process runner regressions remain required. All prior clear/mutation/import
+cases, six responsive downloads and 91 responsive artifacts remain mandatory.
+
+Checks and external handoff use `/private/tmp/stz-32b-continuity-directory-9HrUFj/`.
+Production, fixture and focused-test strict TypeScript checks passed; all five
+changed TypeScript files pass targeted ESLint. All nine changed/new JavaScript
+files pass syntax and recommended ESLint checks. An initial recommended lint run
+found `no-unsafe-finally` in the new control cleanup; cleanup now collects errors
+and throws the primary first outside `finally`, with passing rechecks. The
+registered owned-page/helper suite passed 35 tests, and the focused production
+model/TikZ suite passed 67 after the bound correction. The combined focused
+suite passed 514 tests before that final one-test bound addition; the final
+verifier includes it. Independent focused inspection passed 78 tests after the
+correction; independent policy checks passed 381. Logs retain each run separately.
+
+The configured direct browser attempt failed before browser launch at
+`development-server-listen`, `listen EPERM 127.0.0.1:5173`; its log/report are
+`direct-free-labels.log` and `direct-free-labels/free-labels-evidence.json` in that
+handoff. It completed no native scenario and is not a pass. Browser acceptance,
+including execution of the new transition and negative controls, remains pending
+the browser-capable parent. The established App/InspectorField and
+`generateTikz.test.ts` lint debt remains untouched and separate from the existing
+build chunk-size warning.
+
+After freezing this document and the checkout, run the fresh-process command:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+It runs `npm test` and `npm run build` sequentially, then diff and both required
+browser checks, stopping on failure. `verification-final.log`, `handoff.json`,
+`final-checkout.json`, `final-checkout.diff` and `final-checkout-untracked.json`
+in the external handoff retain exact results, the final report path and matching
+before/after fingerprint including tracked changes, untracked files and binaries.
+The final fingerprint is intentionally not written into tracked documentation.
+The separate independent review is retained there as `independent-review.md` and
+`independent-review.json`; `32B verify` does not perform it. Missing native
+acceptance requires readiness to remain false. The parent must execute all five
+commands against the same final identity, then obtain accepted independent review
+explicitly rechecking both issues. Phase 32B remains incomplete until those gates
+pass; 32C/32D remain deferred.

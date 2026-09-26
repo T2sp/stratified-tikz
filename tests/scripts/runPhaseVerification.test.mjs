@@ -456,16 +456,17 @@ const importRegressionScenarios = [
   'point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
 ]
 const correctionScenarios = ['point-paint-unsupported-mutations', 'point-paint-clear-imported-style']
+const continuityScenarios = ['point-paint-mutation-directory-uncertainty', 'point-paint-app-continuity']
 const targetedPaintScenarios = [
   'point-paint-namespace-aliases',
   'point-paint-responsive-circle',
   'point-paint-responsive-triangle',
   'point-paint-responsive-downloads',
-  ...importRegressionScenarios, ...correctionScenarios,
+  ...importRegressionScenarios, ...correctionScenarios, ...continuityScenarios,
 ]
 test('32B preserves its original groups and scenarios and requires namespace and responsive paint evidence', () => {
   assert.equal(pointGroups.length, 16)
-  assert.equal(Object.values(pointNodeScenarios).flat().length, 25)
+  assert.equal(Object.values(pointNodeScenarios).flat().length, 27)
   assert.deepEqual(pointNodeScenarios['point-node-paint-import-persistence'], [
     'point-paint-native-inspector-history', 'point-paint-imported-presets-persistence',
     'point-paint-lifecycle-dimming', 'point-paint-pending-transparent-edit',
@@ -551,6 +552,26 @@ function importRegressionEvidence(name) {
     result.laterUndone = snapshot('outer', { fill: '#000000', text: null })
     for (const boundary of ['later', 'laterRedone', 'laterReloaded']) result[boundary] = snapshot('outer', { fill: '#000000', text: '#00ff00', draw: '#0000ff' })
     result.laterDownload = { boundary: 'download', differencePaths: [] }; result.laterReload = { boundary: 'reload', differencePaths: [] }
+  } else if (name === 'point-paint-mutation-directory-uncertainty') {
+    result.directory = snapshot('outer', { fill: null, text: null, draw: null })
+    result.independent = snapshot('independent', { fill: '#0000ff', text: '#00ff00', draw: '#ff0000' })
+    result.independent.modelDiagnostics = { validation: { valid: true }, resolution: {} }
+    result.independent.observation = { contour: { fill: 'rgb(0, 0, 255)', stroke: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(0, 255, 0)', fillAlpha: 1 }] }
+    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('outer', { fill: null, text: '#123456', draw: null })
+    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('outer', { fill: null, text: '#ff0000', draw: null })
+    const source = '\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={/other/.cd},\n  /other/text/.style={/tikz/text=blue,/tikz/.cd},\n  outer/.style={myPoint,text=green}\n}'
+    for (const boundary of ['directory', 'away', 'back', 'undone', 'redone', 'reloaded']) {
+      const entry = result[boundary]
+      entry.warnings = ['Unsupported runtime directory /.cd']
+      entry.modelDiagnostics = { validation: { valid: true }, resolution: { unresolvedFields: ['textColor'] }, reference: { previewDiagnostics: entry.warnings } }
+      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
+      entry.current.style = { paint: { text: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#ff0000' } },
+        importedPaint: { overriddenFields: boundary === 'directory' ? [] : ['text.color'] } }
+      entry.observation = { contour: { fill: 'rgb(255, 0, 0)' }, leaves: [{ fill: 'rgb(255, 0, 0)', fillAlpha: 1 }] }
+    }
+    result.away.state.history = JSON.stringify({ past: [{ earlier: 1 }], present: { text: '#123456' }, future: [] })
+    result.back.state.history = JSON.stringify({ past: [{ earlier: 1 }, { text: '#123456' }], present: { text: '#ff0000' }, future: [] })
+    result.standalone.observation = result.reloaded.observation
   } else if (name === 'point-paint-unsupported-mutations') {
     result.mutation = snapshot('myPoint', { fill: null, text: null, draw: null })
     for (const boundary of ['away', 'undone']) result[boundary] = snapshot('myPoint', { fill: '#123456', text: null, draw: null })
@@ -625,6 +646,42 @@ function clearRegressionEvidence() {
   }
   return { single: makeCase(['app-point']), multiple: makeCase(['app-point', 'bulk-point']) }
 }
+function appContinuityEvidence() {
+  // Policy fixtures only; native App transitions and negative controls run in
+  // check:free-labels and cannot be substituted with these synthetic records.
+  const expectedUrl = 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.html'
+  const snapshot = (boundary, pageId = 'app-main', generation = 'document-main') => ({ boundary, pageId, expectedUrl,
+    closed: false, crashed: false, document: { url: expectedUrl, generation, readyState: 'complete',
+      api: { type: 'object', stateType: 'function', sameInstance: true }, root: { children: 1 },
+      scripts: [{ type: 'module', src: 'http://fixture/stratified-tikz/scripts/fixtures/freeLabelsApp.tsx' }] },
+    state: { json: '{}', runtimeDiagramJson: '{}', history: '{}', labelDocumentRevision: 1 } })
+  const names = ['point-paint-local-override-intent', 'point-paint-cross-file-resolution', 'point-paint-unsupported-color-bindings',
+    'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty', 'point-paint-clear-imported-style', 'point-paint-clear-imported-style-multi']
+  const transitions = names.map((name, index) => ({ name, result: 'passed', before: snapshot(`${name}:before-standalone`), after: snapshot(`${name}:after-standalone-close`),
+    standalonePages: [{ pageId: `svg-${index}`, closed: true, events: [{ event: 'main-frame-navigation', url: `file:///tmp/${name}.svg` }, { event: 'close' }] }] }))
+  const files = {}
+  const controls = ['missing-api', 'wrong-api', 'same-url-reload'].map((fault) => {
+    const prefix = `point-paint-app-control-${fault}`, pageId = `app-${fault}`
+    const before = snapshot('startup', pageId, `document-${fault}`)
+    const failed = structuredClone(before); failed.boundary = 'failure'
+    failed.document.dom = { nodes: [{ tag: 'html' }], bytes: 14, maxNodes: 512, maxBytes: 64_000 }
+    if (fault === 'same-url-reload') failed.document.generation += '-new'
+    if (fault === 'missing-api') failed.document.api.type = 'undefined'
+    if (fault === 'wrong-api') failed.document.api.sameInstance = false
+    const evidence = { pageId, expectedUrl, deliberateNegativeControl: true, fault, snapshot: failed,
+      screenshot: `${prefix}-failure.png`, error: { message: fault === 'same-url-reload' ? 'generation changed' : fault === 'missing-api' ? 'API missing' : 'API instance changed' } }
+    files[`${prefix}-failure.json`] = evidence
+    files[`${prefix}-lifecycle.json`] = { pageId, expectedUrl, events: [{ event: 'document-observation', boundary: 'failure' }] }
+    return { fault, result: 'passed', before, evidence }
+  })
+  const evidence = { schema: 1, startup: snapshot('startup-committed'), transitions, controls,
+    helperReturn: snapshot('import-helper-return'), beforeNextLoad: snapshot('before-next-app-load'), afterControls: snapshot('after-native-continuity-controls') }
+  files['point-paint-app-transitions.json'] = { transitions }
+  files['point-paint-app-lifecycle.json'] = { schema: 1, pageId: 'app-main', expectedUrl, expected: { generation: 'document-main' },
+    events: [{ event: 'document-observation', boundary: 'import-helper-return' }] }
+  files['point-paint-app-controls.json'] = { schema: 1, controls }
+  return { evidence, files }
+}
 function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_FREE_LABEL_GROUPS = JSON.stringify(pointGroups)
   fixture.env.STZ_TEST_POINT_ARTIFACTS = 'yes'
@@ -644,7 +701,7 @@ function completePointEvidence(fixture) {
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(Object.fromEntries(targetedPaintScenarios.map((name) => [
     `${name}.json`, { scenario: name, group: 'point-node-paint-import-persistence', result: 'passed',
-      ...(name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
+      ...(name === 'point-paint-app-continuity' ? appContinuityEvidence().evidence : name === 'point-paint-clear-imported-style' ? clearRegressionEvidence() : [...importRegressionScenarios, 'point-paint-unsupported-mutations', 'point-paint-mutation-directory-uncertainty'].includes(name) ? importRegressionEvidence(name) : name === 'point-paint-responsive-downloads' ? {
         cases: ['transparent', 'white'].flatMap((background) => [['circle', 'solid'], ['triangle', 'solid'], ['circle', 'dashed']]
           .map(([shape, variant]) => ({ background, shape, variant,
             baseline: { fixture: { source: 'Scale' }, expectedBackground: background, saved: bodyStructure(background) },
@@ -665,6 +722,9 @@ function completePointEvidence(fixture) {
         })) }),
     },
   ])))
+  fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify({
+    ...JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES), ...appContinuityEvidence().files,
+  })
   return evidence
 }
 for (const background of ['transparent', 'white']) {
@@ -831,6 +891,77 @@ test('32B rejects accepted 23-scenario evidence lacking both new defect checks',
   fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
   assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-unsupported-mutations/)
 })
+
+test('32B rejects historical 25-scenario evidence without directory uncertainty and App continuity', (t) => {
+  const fixture = checkoutFixture(t), evidence = completePointEvidence(fixture)
+  evidence.evidence = evidence.evidence.filter((entry) => !continuityScenarios.includes(entry.name))
+  fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+  assert.throws(() => verify(t, fixture, '32B'), /Missing completed point-node scenario: point-paint-mutation-directory-uncertainty/)
+})
+
+for (const fault of ['false-green', 'missing-inline', 'missing-unresolved', 'lost-source', 'lost-warning', 'lost-reference-warning',
+  'invalid-model', 'lost-local-intent', 'changed-reference', 'affected-independent', 'lost-history', 'changed-redo', 'missing-source-artifact']) {
+  test(`32B rejects incomplete runtime-directory mutation evidence: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t), evidence = completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const entry = artifacts['point-paint-mutation-directory-uncertainty.json']
+    if (fault === 'false-green') entry.directory.output.standalone = entry.directory.output.standalone.replace('outer,', 'outer,text=green,')
+    if (fault === 'missing-inline') delete entry.reloaded.output.inlineMath
+    if (fault === 'missing-unresolved') entry.reloaded.modelDiagnostics.resolution.unresolvedFields = []
+    if (fault === 'lost-source') entry.back.diagram.externalTikzStyleSources = []
+    if (fault === 'lost-warning') entry.directory.warnings = []
+    if (fault === 'lost-reference-warning') entry.directory.modelDiagnostics.reference.previewDiagnostics = []
+    if (fault === 'invalid-model') entry.redone.modelDiagnostics.validation.valid = false
+    if (fault === 'lost-local-intent') entry.back.current.style.importedPaint.overriddenFields = []
+    if (fault === 'changed-reference') entry.reloaded.current.importedTikzStyleReferenceId = 'replacement'
+    if (fault === 'affected-independent') entry.independent.modelDiagnostics.resolution.unresolvedFields = ['textColor']
+    if (fault === 'lost-history') entry.back.state.history = entry.away.state.history
+    if (fault === 'changed-redo') entry.redone.current.style.paint.text.color = '#000000'
+    if (fault === 'missing-source-artifact') {
+      const record = evidence.evidence.find((item) => item.name === entry.scenario)
+      record.artifacts = record.artifacts.filter((name) => !name.endsWith('-directory-mutation.sty'))
+      fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+    }
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /incomplete or invalid/)
+  })
+}
+
+for (const fault of ['missing-transition', 'wrong-owner', 'new-document', 'missing-api', 'changed-history', 'lost-helper-model',
+  'lost-after-controls', 'unclosed-svg', 'missing-lifecycle', 'missing-control', 'wrong-failure-owner', 'unbounded-dom',
+  'wrong-screenshot', 'same-generation-reload', 'missing-api-control-artifact']) {
+  test(`32B rejects incomplete owned App continuity evidence: ${fault}`, (t) => {
+    const fixture = checkoutFixture(t), evidence = completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const entry = artifacts['point-paint-app-continuity.json']
+    if (fault === 'missing-transition') entry.transitions.pop()
+    if (fault === 'wrong-owner') entry.transitions[0].after.pageId = 'renderer-page'
+    if (fault === 'new-document') entry.transitions[0].after.document.generation = 'new-generation'
+    if (fault === 'missing-api') entry.helperReturn.document.api.type = 'undefined'
+    if (fault === 'changed-history') entry.transitions[0].after.state.history = '{"reset":true}'
+    if (fault === 'lost-helper-model') entry.helperReturn.state.runtimeDiagramJson = '{"reset":true}'
+    if (fault === 'lost-after-controls') delete entry.afterControls
+    if (fault === 'unclosed-svg') entry.transitions[0].standalonePages[0].closed = false
+    if (fault === 'missing-lifecycle') artifacts['point-paint-app-lifecycle.json'].events = []
+    if (fault === 'missing-control') entry.controls.pop()
+    if (fault === 'wrong-failure-owner') entry.controls[0].evidence.snapshot.pageId = 'renderer-page'
+    if (fault === 'unbounded-dom') entry.controls[0].evidence.snapshot.document.dom.bytes = 1_000_000
+    if (fault === 'wrong-screenshot') entry.controls[0].evidence.screenshot = 'failure.png'
+    if (fault === 'same-generation-reload') entry.controls[2].evidence.snapshot.document.generation = entry.controls[2].before.document.generation
+    if (fault === 'missing-api-control-artifact') {
+      const record = evidence.evidence.find((item) => item.name === entry.scenario)
+      record.artifacts = record.artifacts.filter((name) => !name.endsWith('control-missing-api-failure.png'))
+      fixture.env.STZ_TEST_POINT_EVIDENCE = JSON.stringify(evidence)
+    }
+    // Keep redundant records consistent, so ownership/content checks (rather
+    // than only an equality comparison of two files) must reject the fault.
+    artifacts['point-paint-app-transitions.json'].transitions = entry.transitions
+    artifacts['point-paint-app-controls.json'].controls = entry.controls
+    for (const control of entry.controls) artifacts[`point-paint-app-control-${control.fault}-failure.json`] = control.evidence
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /incomplete or invalid/)
+  })
+}
 
 for (const boundary of ['mutation', 'away', 'back', 'undone', 'redone', 'reloaded']) {
   for (const fault of ['missing-reference', 'missing-diagnostic', 'missing-unresolved', 'missing-source', 'false-validity', 'claimed-text', 'missing-inline']) {

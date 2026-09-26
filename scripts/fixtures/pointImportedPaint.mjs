@@ -1,4 +1,4 @@
-// Literal inputs and independently specified expected paint for the three
+// Literal inputs and independently specified expected paint for the
 // review reproductions. No production parser/resolver creates these values.
 export const pointImportedPaintSources = {
   intent: String.raw`\tikzstyle{example}=[fill=\mycolor,text=red]
@@ -19,4 +19,11 @@ export const pointImportedPaintSources = {
   myPoint/.style={fill=red,text=red},
   myPoint/.append style={fill=blue,text=blue}
 }`,
+  directoryMutation: String.raw`\tikzset{
+  myPoint/.style={fill=red,text=red},
+  myPoint/.append style={/other/.cd},
+  /other/text/.style={/tikz/text=blue,/tikz/.cd},
+  outer/.style={myPoint,text=green}
+}`,
+  directoryIndependent: String.raw`\tikzset{independent/.style={fill=blue,text=green,draw=red}}`,
 }

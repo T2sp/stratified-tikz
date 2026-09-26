@@ -851,7 +851,8 @@ function parseUnsupportedStyleMutation(entry: string, currentDirectory: string):
   const handler = handlerMatch[1].trim().replace(/\s+/g, ' ')
   const dependencyOptions: string[] = []
   // These handlers take option lists. Retain their bounded literal arguments
-  // only to discover required load hints, never to apply their paint semantics.
+  // only to discover required load hints and runtime directory uncertainty,
+  // never to apply their paint semantics.
   const baseHandler = handler.split('/.')[0]
   const bodies = baseHandler === 'add style' ? 2 : ['append style', 'prefix style'].includes(baseHandler) ? 1 : 0
   let index = marker + 2 + handlerMatch[0].length

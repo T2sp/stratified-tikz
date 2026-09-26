@@ -7,6 +7,7 @@ import { inspectPoint, assertPointLayout } from './checkPointNodes.mjs'
 import { observePointPaint, assertPointPaint, rasterPointOverlap, assertRasterPointOverlap } from './pointPaintOracle.mjs'
 import { observePointLiteral, assertPositionedLiteral } from './pointLiteralOracle.mjs'
 import { ownPageEvent } from './ownedPageEvent.mjs'
+import { createOwnedAppPage, runOwnedAppPageControls, assertOwnedAppState } from './ownedAppPage.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
 import { captureStandaloneSvg } from './standaloneSvgCapture.mjs'
 import { boundedPointDiagnostic, cleanupPointCheck, createPointDiagnostics } from './pointCheckDiagnostics.mjs'
@@ -32,12 +33,14 @@ const importedSource = String.raw`% Phase 32B native import acceptance; literal 
 export async function runPointNodePaintChecks(context) {
   const { browser, origin, page: rendererPage, artifactDir, startGroup, completeGroup, record, observe } = context
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
+  const expectedUrl = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
+  const app = createOwnedAppPage({ page, expectedUrl, artifactDir })
   const errors = [], owned = [], held = new Set()
   page.on('pageerror', (error) => errors.push(error.message))
   const diagnose = createPointDiagnostics({ artifactDir, artifactPrefix: 'point-paint-observation', observe: (name, details) => observe(`paint-${name}`, details) })
   let primary, cleanupFailure, scenario = 'point-paint-native-inspector-history'
   const observeCase = (details) => diagnose(group, scenario, details)
-  const state = () => page.evaluate(() => window.stzAppLabels.state())
+  const state = () => app.readState()
   const model = async () => JSON.parse((await state()).json).diagram
   const point = async (id = 'app-point') => (await model()).strata.find((item) => item.id === id)
   const settle = () => page.waitForFunction(() => !document.querySelector('[data-label-state="pending"]'), undefined, { timeout: 30_000 })
@@ -149,8 +152,9 @@ export async function runPointNodePaintChecks(context) {
   }
   try {
     context.setStage?.(group); await startGroup(group, scenario)
-    await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`)
-    await page.waitForFunction(() => window.stzAppLabels !== undefined)
+    await app.install()
+    await page.goto(expectedUrl)
+    await app.start()
     const legacy = await page.evaluate(() => window.stzAppLabels.pointPaintLegacyDocumentJson())
     await writeFile(resolve(artifactDir, 'point-paint-legacy.json'), legacy)
     await load(legacy); await settle(); await select()
@@ -356,12 +360,19 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
     await saved({ cases: namespaceCases })
 
     await runPointImportedPaintChecks({ browser, page, artifactDir, inspector, legacy, state, model, point, load, settle, select,
-      eventAction, edit, undo, redo, tikz, owned, begin: (name) => { scenario = name }, saved, diagnose: observeCase })
+      eventAction, edit, undo, redo, tikz, owned, withStandalone: app.withStandalone, begin: (name) => { scenario = name }, saved, diagnose: observeCase })
 
-    // Restore the imported mixed paint used by the established lifecycle cases.
-    await load(download.json); await settle()
+    scenario = 'point-paint-app-continuity'
+    const continuity = await app.finish()
+    const controls = await runOwnedAppPageControls({ browser, expectedUrl, artifactDir })
+    const afterControls = await app.checkpoint('after-native-continuity-controls')
+    assertOwnedAppState(continuity.beforeNextLoad.state, afterControls.state)
+    await saved({ ...continuity, controls, afterControls })
 
+    // Name the next scenario before its setup; a failed load is not a passed clear.
     scenario = 'point-paint-lifecycle-dimming'
+    await app.checkpoint('lifecycle-dimming-before-load')
+    await load(download.json); await settle()
     await select()
     const source = ' pending $\\frac{paint}{x}$\t\n tail  '
     await page.evaluate((source) => window.stzAppLabels.hold(source), source); held.add(source)
@@ -458,6 +469,7 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
     assert.deepEqual(errors, []); await completeGroup(group)
   } catch (error) {
     primary = error
+    await app.failure(error, { scenario, activeField, errors })
     // Persist the original Playwright error/call log independently of DOM reads.
     // A failed page or diagnostic deadline must not replace the primary error.
     try { await boundedPointDiagnostic(() => observeCase({ boundary: 'primary-failure',
@@ -473,6 +485,7 @@ alias outer node/.style={/tikz/alias node}}`, 'alias outer node', '#00ff00'],
     }
     for (const source of held) await cleanup(() => page.evaluate((source) => window.stzAppLabels.release(source), source))
     await cleanup(() => page.close())
+    await cleanup(() => app.dispose())
     for (const wait of owned) await cleanup(() => wait.drain())
   }
   if (primary) throw primary

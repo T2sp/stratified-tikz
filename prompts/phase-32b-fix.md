@@ -1,275 +1,251 @@
-# Phase 32B Targeted Fix Prompt: Preserve App-page continuity and runtime-directory uncertainty
+# Phase 32B Targeted Fix Prompt: Diagnose runner termination and complete native acceptance
 
 ## Environment and scope
 
-Work on the current Phase 32B branch, `phase/32b-color-opacity-outline`.
-Inspect status first and preserve all existing work. At this prompt update the
-checkout was clean at `2f2faa123c6aefe3b025fa807b29f9d5bb9760f2` (`Fix 32B`).
-The latest failed parent verification has identical before/after fingerprints:
+Work on `phase/32b-color-opacity-outline`. Inspect status and preserve the
+current implementation and all untracked helpers, tests and PGF artifacts.
+At this prompt update HEAD is `120743b6c42f63b5db3bad31804bcc4f0d6a1c93`, with
+tracked changes and 22 untracked files. The implementation handoff, independent
+review and latest failed parent verification identify the same pre-prompt tree:
 
 ```text
-92acaac8b89c875545026db18eba8fa61ad088b672dc8ea0be05c94614d4169b
+daac0abff5402bef2204970154d6b9144198e558ee8b72569568311bd6a7a11e
 ```
 
-This identifies the checkout before this prompt edit, not a future corrected
-checkout. Obtain fresh final evidence including tracked changes, untracked
-files and binaries. Use Node >=22.12.0:
+This fingerprint describes the checkout before this prompt edit. Recompute the
+final identity after corrections, including untracked files and binary bytes.
+Do not reset, discard or restart the existing implementation.
+
+Use Node >=22.12.0 with the supported installation first in PATH:
 
 ```bash
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Fix the browser acceptance failure and the independently reproduced imported
-paint defect below. Preserve the committed provenance, unsupported-mutation,
-runtime-model diagnostic and bounded-history corrections. Do not restart those
-implementations. Keep Phase 32A behavior and defer 32C/32D. Use strict TypeScript,
-bounded literal parsing and existing dependencies. Do not execute arbitrary
-TeX/PGF in the importer or preview; focused independent PGF fixtures are in scope.
+The immediate task is the runner regression failure below, followed by fresh
+native acceptance of the existing continuity and directory-uncertainty changes.
+Keep strict TypeScript, bounded parsing and existing dependencies. Preserve 32A
+behavior and defer 32C/32D. Do not execute arbitrary TeX in the importer/preview,
+upgrade npm because of its update notice, or perform unrelated lint cleanup.
 
-## Latest verification: failed, not ready for completion
+## Evidence and current status
 
-Parent report and handoff:
+Implementation handoff and independent review:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-UWQV23/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-AdrvZI/response.json
+/private/tmp/stz-32b-continuity-directory-9HrUFj/handoff.json
+/private/tmp/stz-32b-continuity-directory-9HrUFj/independent-review.md
 ```
 
-| Check | Actual result |
+That implementation passed 3,311 tests, build, diff, strict TypeScript and
+targeted checks. Both corrected TikZ modes were independently compiled with PGF.
+The independent review found no remaining concrete code defect after a bounded
+expansion correction, but required native acceptance was missing. Its final
+verifier stopped at `check:label-assets` with localhost `EPERM`; it did not run
+`check:free-labels`. The separate direct free-label attempt also stopped before
+browser startup. Neither establishes a passing native scenario.
+
+The newer parent attempt failed earlier, in `npm test`:
+
+```text
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-kIKYf4/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-kIKYf4/01-npm-test/command.log
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-SeWIhy/response.json
+```
+
+| Latest parent observation | Actual result |
 | --- | --- |
-| `npm test` | 3,256 passed; zero failures/skips |
-| `npm run build` | Passed |
-| `git diff --check` | Passed |
-| `npm run check:label-assets` | Passed |
-| `npm run check:free-labels` | Failed in `point-node-paint-import-persistence` |
-| Runtime | Node v26.9.0; Chrome 154.0.8037.57 |
+| `npm test` | 3,311 total; 3,310 passed, 1 failed; zero skipped/cancelled |
+| Test duration | 809,024.246583 ms |
+| `npm run build`, diff and both browser checks | Not reached in this attempt |
+| Checkout before/after | Identical fingerprint shown above |
+| Verification / commit readiness | Failed; no commit or push |
 
-The command log is `05-check-free-labels/command.log` beside that report;
-its `artifacts/` directory contains the native observations. The run passed
-`point-paint-local-override-intent`, `point-paint-cross-file-resolution`,
-`point-paint-unsupported-color-bindings`, `point-paint-unsupported-mutations`
-and `point-paint-clear-imported-style` before failing. Clear itself is not the
-failing assertion in this run.
+Keep the earlier successful static/PGF evidence separate from this latest failed
+run. It does not cancel the new failure or satisfy native acceptance.
 
-The earlier full success at
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-manual-T7zrqY/verification.json`
-is historical evidence for its recorded revision plus working tree. Do not
-substitute it for acceptance of the new correction or ignore the later failure.
+## 1. Diagnose the runner fixture's abnormal process termination
 
-## 1. Diagnose and correct loss of the owned App fixture
-
-Immediately after `runPointImportedPaintChecks()` returns,
-`scripts/checkPointNodePaint.mjs` restores the previously saved mixed-paint
-fixture with `await load(download.json); await settle()` (approximately line
-362). `load()` calls `state()` before opening the Load JSON control. That read
-fails because `window.stzAppLabels` is undefined:
+The failing test is `31F verify accepts its complete 12-group browser report`,
+currently declared at `tests/scripts/runPhaseRunner.test.mjs:229`. Its assertion
+at approximately line 236 expects the runner process status to equal zero:
 
 ```text
-page.evaluate: TypeError: Cannot read properties of undefined (reading 'state')
-  at state (scripts/checkPointNodePaint.mjs:40:28)
-  at load (scripts/checkPointNodePaint.mjs:93:26)
-  at runPointNodePaintChecks (scripts/checkPointNodePaint.mjs:362:11)
+31F verify accepts its complete 12-group browser report (107059.951209ms)
+null !== 0
 ```
 
-The subsequent Inspector diagnostic fails through the same API at approximately
-line 466. It does not supply the missing page identity information. In the
-failed artifact directory:
+The fixture's `run()` currently uses `spawnSync(process.execPath, ...)` with
+`timeout: 60_000` around line 160. Its failure assertion reports stdout/stderr
+but omits `result.error` and `result.signal`. A timeout is a plausible explanation
+for a null status, not an established diagnosis. Do not equate null with exit
+code 1, presume a changed group policy, or label this the old App-page failure.
 
-- `point-paint-observation-0235.json` is a valid multi-clear reload snapshot.
-- `point-paint-observation-0236.json` observes the standalone SVG.
-- `point-paint-observation-0237.json` preserves the primary missing-API failure,
-  with no recorded page errors.
-- The outer `failure.png` captures the renderer fixture, not the failing owned
-  paint App page. Empty `pageErrors` is not proof that the App document survived.
-
-Current inspection does not demonstrate a page-variable mix-up: the App page
-and standalone SVG page are distinct, and the SVG helper closes its own page.
-The fixture assigns `window.stzAppLabels` once and never deletes it. Document
-replacement or incomplete initialization is plausible; neither is established
-as the actual cause. Port 5174 does not establish external server reuse: the
-parent verifier clears `STZ_BROWSER_BASE_URL` and starts its own server.
-
-A read-only, instrumented rerun of the paint group passed all 14 paint scenarios
-on the same committed sources, with one initial App navigation and no later
-navigation before cleanup. Its artifacts are:
+The last retained nested output is:
 
 ```text
-/private/tmp/stz-32b-paint-reproduce.mjs
-/private/tmp/stz-32b-paint-reproduce.log
-/private/tmp/stz-32b-paint-reproduction/lifecycle.jsonl
-/private/tmp/stz-32b-paint-reproduction/
+Verifier handoff: .../stz-phase-verifier-TAPYpM/response.json
+Verification evidence: .../stz-phase31f-manual-jMFVqX/verification.json
+Verification: npm test
+Verification passed: npm-test
+Verification: npm run build
+Verification passed: npm-build
 ```
 
-This is a scoped reproduction attempt, not a successful cumulative Phase 32B
-report, and does not identify the intermittent trigger.
+These are the isolated runner fixture's commands: its temporary package scripts
+invoke `check.cjs` and emit synthetic browser reports. They are not real browser
+runs or additional application test/build passes. The omitted prefix above is
+`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T`.
 
-### Required correction and evidence
+The nested report and handoff directories were absent when inspected after the
+failure. The fixture's `t.after` unconditionally removes its temporary checkout
+and collected artifact directories, including failed-run evidence.
 
-Trace ownership and document continuity from App-page creation through native
-import/clear/save/download, standalone SVG open/capture/close, helper return and
-the next App load. Add bounded diagnostics that do not depend on `stzAppLabels`:
+Other successful tests in the same log took approximately 107,451 ms, 51,726 ms
+and 442,690 ms. Investigate the wider timing anomaly as well as this fixture.
+Resource contention, scheduling/suspension and child-process stalls remain
+hypotheses; the retained log does not distinguish them. The failed test's total
+duration includes fixture work and cleanup, not just the configured spawn timeout.
 
-- Identify the owned App page and expected fixture URL; retain main-frame
-  navigation, close/crash and relevant console/module/request failure events.
-- Observe actual URL, document readiness, root/scripts and API availability at
-  startup, the helper-return boundary and failure. Retain a document-generation
-  identity so a same-URL reload cannot masquerade as the same App instance.
-- Capture the failing App page's bounded DOM/screenshot before cleanup, separately
-  from the renderer and standalone SVG pages. Persist primary error and lifecycle
-  evidence even when the fixture API, DOM capture or screenshot is unavailable.
-- Attribute any reproducible navigation/reinitialization to its actual trigger
-  before changing page ownership, Vite configuration or readiness sequencing.
-  Keep editor model, history and scenario continuity observable across the
-  standalone work. Mark the next lifecycle scenario before its setup so a setup
-  failure is not mislabeled as an already-passed clear scenario.
+During this prompt-only update, the unchanged implementation passed all 3,311
+tests in 214,213.990875 ms, followed by a passing build. Logs are
+`/private/tmp/stz-32b-runner-prompt-20260927-npm-test.log` and
+`/private/tmp/stz-32b-runner-prompt-20260927-build.log`. No runner fix was made;
+this rerun does not establish the earlier termination's cause or close the
+native acceptance gap. Preserve both outcomes in the investigation.
 
-Fix the demonstrated cause with the smallest change. Do not blindly add sleeps,
-optional chaining, an automatic reload/recreated App, or a rerun-until-green loop.
-A readiness wait is appropriate at legitimate startup; after scenarios begin,
-it must not conceal lost model/history, a wrong page or a new document generation.
-Do not weaken assertions, reset history to avoid the failure, skip the remaining
-paint/export scenarios, or label the failure a production paint defect without
-evidence. If the trigger remains unproven, report that explicitly and retain the
-new diagnostics rather than claiming a deterministic fix.
+### Required investigation and correction
 
-Add registered regression coverage for the corrected lifecycle boundary,
-wrong/missing API or document replacement, failure-evidence ownership, bounded
-capture and cleanup preserving the primary error. Exercise the actual native
-App-to-standalone-to-App transition; stub tests alone do not close this gap.
+Read the fixture, `scripts/automation/run-phase.mjs`,
+`scripts/automation/phase-verification-worker.mjs`,
+`scripts/automation/phase-verification.mjs` and related runner/policy tests.
+Trace the actual fixture runner, verifier worker and spawned command lifecycle.
 
-## 2. Preserve runtime-directory uncertainty inside unsupported mutations
+1. Make abnormal outcomes actionable. Record command/arguments, fixture cwd,
+   configured timeout, elapsed time, PID, `status`, `signal`, and available
+   `error.name`, `error.code`, `error.message` and other useful spawn error fields.
+   Retain stdout/stderr, the last completed stage and report/handoff paths.
+   Distinguish ordinary nonzero exit, spawn failure, signal and timeout. Do not
+   dump unrelated environment secrets or replace the primary error with a
+   secondary diagnostic failure.
+2. Preserve failed-run evidence before cleanup. Retain or copy the relevant
+   fixture logs, worker response and available verification artifacts to an
+   explicitly reported temporary failure directory. Handle partial/missing
+   worker output without inventing completion. Keep normal successful-fixture
+   cleanup. Failure evidence must remain readable after the test exits.
+3. Reproduce the exact case in isolation, then the runner suite and ordinary
+   full-suite conditions. Capture process results and timings. Fix the measured
+   cause with a small change. If a finite timeout needs adjustment, justify its
+   budget from evidence and keep deterministic tests of timeout behavior. Do
+   not merely remove the deadline, skip this case, relax the status assertion,
+   accept null, or retry until green. Avoid changing global test concurrency or
+   production verification policy without evidence that it is necessary.
+4. On timeout/cancellation, ensure the fixture's owned runner/worker/command
+   processes finish or are terminated before deleting their directories. Keep
+   termination bounded and scoped to owned processes; do not kill unrelated
+   Node, Vite or browser processes. Diagnose inherited pipes or delayed cleanup
+   if they contribute to the observed wall time.
 
-Independent read-only review found a separate Medium production export defect.
-This source compiles successfully in PGF:
+Useful initial reproduction:
 
-```tex
-\tikzset{
-  myPoint/.style={fill=red,text=red},
-  myPoint/.append style={/other/.cd},
-  /other/text/.style={/tikz/text=blue,/tikz/.cd},
-  outer/.style={myPoint,text=green}
-}
+```bash
+PATH=/opt/homebrew/bin:$PATH node --test --test-name-pattern='^31F verify accepts its complete 12-group browser report$' tests/scripts/runPhaseRunner.test.mjs
+PATH=/opt/homebrew/bin:$PATH node --test tests/scripts/runPhaseRunner.test.mjs
 ```
 
-Import it and apply `outer` to a point. `resolveTikzPaint()` reports green text
-and omits `textColor` from unresolved fields. Generated output emits a green
-text override after `outer`. Actual PGF renders the external node blue: the
-append changes the active directory, so the later relative `text=green` invokes
-`/other/text`, which explicitly selects blue and restores `/tikz`.
+An isolated pass does not establish a fix for a failure seen in the full suite.
+Retain the failed attempt and explain any demonstrated environmental cause;
+if the trigger remains unproven, say so explicitly. Do not claim that a longer
+budget or one passing rerun proves the cause.
 
-Evidence from pdfTeX 1.40.29 / PGF 3.1.11a is retained at:
+### Required regressions and preserved runner guarantees
 
-```text
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/source.sty
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/generated.tex
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/observations.json
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/reference.tex
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/reference.pdf
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/reference.log
-/private/tmp/stz-32b-review-mutation-directory-BYCyop/pdf-operators.txt
-```
+Add focused registered tests for actionable timeout, signal and spawn-failure
+outcomes and for evidence survival through cleanup. Use controlled short-lived
+fixtures instead of long sleeps. Where process ownership changes, exercise
+child cleanup and late failures without touching unrelated processes.
 
-The PDF operators show external `PGF` blue (`0 0 1 rg`) and generated `APP` green
-(`0 1 0 rg`). Inspect the retained generated fragment and compiler evidence;
-do not claim both export modes were independently compiled without doing so.
+Keep the real fresh-process verifier handoff. A live parent must load verifier
+changes made by its implementation child, including transitive dependencies;
+keep isolated fixture dependency copying accurate. Preserve the 31F twelve-group
+acceptance case and rejection of incomplete/old/tampered reports, bad worker
+responses, checkout mismatch, failed commands and review-time mutations.
+Failure must stop before review, commit or push. An abnormal runner termination
+must never be interpreted as successful verification.
 
-The relevant code is `src/model/importedTikzPaint.ts`: approximately lines
-179–181 notice `/.cd` during dependency discovery, but lines 240–243 process
-unsupported mutation bodies without updating `runtimeDirectoryKnown`. Later
-relative options can therefore restore false certainty. Ordinary runtime `.cd`
-in a supported style body already keeps later relative options unresolved.
+## 2. Preserve completed 32B work and close native acceptance
 
-### Required correction and regressions
+Do not reimplement the previous prompt's production fix. The current working
+tree already propagates directory uncertainty from unsupported mutation bodies
+and nested dependencies, including body/work/depth exhaustion. Preserve later
+relative-option uncertainty, supported absolute-option recovery, local override
+intent, paint-only mutation recovery, source ordering and reconstruction.
+Keep the independent failing and corrected PGF fixtures under
+`tests/fixtures/point-paint-pgf/mutation-directory/`, including actual compilation
+of both corrected modes and generator-to-compiled-byte/operator checks. Do not
+regenerate these or earlier references merely to repair runner orchestration.
 
-Carry runtime-directory uncertainty from recognizable unsupported mutation
-bodies, including nested dependencies, into subsequent ordered resolution.
-A dependency warning/load hint alone is insufficient. Keep later relative paint
-unresolved when its key's meaning is unknown; do not invent a known post-key
-color override. Conservative uncertainty is sufficient: implementing arbitrary
-PGF handlers or full runtime `.cd` evaluation is not required.
+The new `scripts/ownedAppPage.mjs` already checks owned page/URL, document
+generation, API identity, exact saved/runtime JSON, history and editor revision.
+It records API-independent lifecycle/DOM/failure images and preserves primary
+errors through bounded capture and cleanup. Keep the existing seven App → SVG →
+App transitions, helper-return/next-load checks and three separate native
+negative-control pages. Do not reload/recreate the main App, reset history,
+wait away a replaced API/document, or weaken ownership assertions.
 
-Preserve the distinction between declaration-level `.cd` and invocation-time
-`.cd`. Keep canonical aliases, source order, stable reference identity, bounded
-recursion/work, conservative bound failures, saved-source reconstruction and
-load hints. Unrelated styles must remain resolved. Preserve genuinely supported
-absolute options and explicit local override intent without treating uncertain
-relative options as known. Retain the existing case where a paint-only unsupported
-mutation is followed by a known `text=green`; no directory uncertainty should be
-invented for that already-supported recovery case.
+The historical intermittent loss of `window.stzAppLabels` remains unproven.
+Diagnostics and negative-control tests are implemented; they do not establish
+its trigger or a deterministic fix. If fresh native execution fails, use the
+owned App evidence to identify the actual failure before making a targeted
+correction. Do not merge localhost `EPERM`, runner termination and document loss
+into one unsupported diagnosis.
 
-Register focused model/TikZ regressions for the exact reproduction, a nested
-mutation dependency, cross-file ordering and reconstruction, both export modes,
-local override/history/persistence behavior and independent unaffected styles.
-Inspect effective target-node options after its actual external key and resolve
-named colors; do not obtain expected results from the resolver under test.
+Once the runner issue is addressed, obtain native evidence in an authorized
+browser-capable environment. The current cumulative policy requires:
 
-Retain the failing independent PGF case and compile corrected generated output
-to establish that the external effect is preserved. Keep source, exact commands,
-compiler/PGF versions, logs, PDF/operators and observations. Extend native import
-acceptance and its required evidence for the directory-mutation case. Preserve
-visible uncertainty diagnostics and raw source; no arbitrary TeX execution is
-required in the renderer.
+- All 16 groups / 27 named point scenarios, including
+  `point-paint-mutation-directory-uncertainty` and `point-paint-app-continuity`.
+- All seven actual standalone transitions and three native continuity fault
+  controls, including 13 required continuity artifacts.
+- The directory-mutation import/edit/history/persistence scenario and its 11
+  artifacts, plus all existing clear and imported-paint acceptance.
+- All six responsive downloads and 91 responsive artifacts, physical border /
+  body / font checks, .5 → 2 → .5 captures, negative controls, white-background
+  validation and immutable click-time SVG inputs.
 
-## Required reading and preserved behavior
+Preserve detached-provenance cleanup, runtime-model validation separate from
+camera-free persistent JSON, the exact bounded 100-entry history contract,
+unsupported color shadowing, raw source text, 2D/3D semantics and existing
+free/inline-label behavior. Old 25-scenario reports and synthetic policy tests
+cannot satisfy the current native requirements.
 
-Read `AGENTS.md`, the paired 32B implement/review prompts and current
+## Verification, documentation and review
+
+Read `AGENTS.md`, paired 32B implement/review prompts and current
 `docs/PHASE_32B_IMPLEMENTATION.md`, `docs/IMPORTED_POINT_PAINT.md` and
-`docs/DATA_MODEL.md`. Trace the files above plus:
+`docs/DATA_MODEL.md`. Keep implementation changes focused on the demonstrated
+runner/evidence issue and any concretely observed native failure.
 
-- `scripts/checkFreeLabels.mjs`, `scripts/fixtures/freeLabelsApp.tsx`,
-  `scripts/fixtures/pointPaintModelDiagnostics.ts`, `scripts/ownedPageEvent.mjs`,
-  `scripts/pointCheckDiagnostics.mjs` and `scripts/standaloneSvgCapture.mjs`;
-- `src/model/importedTikzStyles.ts`, `src/model/styles.ts`,
-  `src/tikz/generateTikz.ts`, existing import-context/export tests and
-  `scripts/automation/phase-verification.mjs`;
-- `tests/scripts/runPhaseVerification.test.mjs` and fresh-process runner fixtures.
+Run focused regressions, applicable strict TypeScript, changed-script syntax,
+targeted lint and `git diff --check`. Run `npm test` and `npm run build`
+sequentially because they share asset preparation. Distinguish unrelated
+established lint debt and the nonblocking build chunk warning from failures.
 
-Preserve all committed corrections: immediate immutable provenance cleanup on
-single/multiple clear; explicit paint and unselected points; valid undo/redo and
-JSON reload; ordered unsupported mutations without stale fallback resurrection;
-local override intent including return-to-fallback edits; numeric focus/blur
-no-ops; source-order dependencies and unsupported color shadowing.
-
-Keep the read-only `runtimeDiagramJson` snapshot separate from persistent JSON.
-Do not validate a camera-free saved diagram as a runtime `Diagram`, insert a
-camera to hide invalid state, or replace immediate validation with reload-only
-validation. Keep bounded 100-entry history checks verifying the exact retained
-stack and appended pre-action state, changed present and empty future.
-
-Keep 16 cumulative groups / 25 named point scenarios as the minimum, including
-both clear and unsupported mutations and the prior three import scenarios.
-Preserve all six responsive downloads and their 91 required artifacts, physical
-border/body/font checks, .5 → 2 → .5 captures, independent negative controls,
-white-background validation, immutable SVG capture, raw text and 2D/3D semantics.
-If coverage grows, update required observations/artifacts and fail-closed policy
-regressions. Old evidence lacking new assertions must not satisfy acceptance.
-Update isolated runner dependency copying if new verifier imports require it.
-
-## Verification and completion
-
-Run focused registered regressions and appropriate strict TypeScript,
-changed-script syntax and targeted lint checks. Preserve unrelated established
-lint debt and report it separately from the build chunk-size warning.
-Run `npm test` and `npm run build` sequentially because asset preparation is shared.
-
-Before the final freeze, update `docs/PHASE_32B_IMPLEMENTATION.md` with the
-actual correction, reproduction and verification handoff location; update
-model/import notes only as needed for the directory-uncertainty contract.
-Keep the final report path/fingerprint in an external handoff to avoid a
-self-referential tracked hash. Freeze the tree, then obtain fresh verification:
+Before final verification, update the implementation report with the actual
+root-cause findings, changes, command results and external handoff location.
+Do not mark earlier successes as new native results. Freeze code, tests and
+tracked docs; keep the final report path/fingerprint in an external handoff.
+Then run:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands, both browser checks, all cumulative groups/scenarios,
-new regression evidence and required PGF artifacts to pass against the same
-final fingerprint. A scoped successful rerun or missing page errors alone is
-insufficient. Preserve any failed attempts and distinguish established root
-causes from hypotheses. Do not weaken permission, evidence, review or commit gates.
+Require all five commands and current cumulative native evidence to pass on the
+same final tree, including tracked/untracked/binary identity. Preserve failed
+attempts. Any checkout change after verification requires matching verification
+again. Obtain independent read-only review of that same tree against
+`prompts/phase-32b-review.md`; `32B verify` itself does not perform review.
 
-If tracked docs or any other checkout files change after verification, obtain
-matching verification again. Obtain independent review of the same final tree
-against `prompts/phase-32b-review.md`, explicitly rechecking both issues above.
-`32B verify` does not perform that review. Phase 32B remains incomplete until
-verification and independent review accept the corrected tree. Keep 32C/32D deferred.
+Do not commit or push while verification or review is unsuccessful. 32B remains
+incomplete until both gates pass; 32C/32D remain deferred.

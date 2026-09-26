@@ -155,30 +155,33 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
   const warn = (message: string) => { if (diagnostics.length < 64 && !diagnostics.includes(message)) diagnostics.push(message) }
   // Dependency discovery is deliberately separate from paint resolution. An
   // unsupported style-list mutation can require nested styles and colors even
-  // though none of its option values are safe to apply to the preview.
+  // though none of its option values are safe to apply to the preview. Return
+  // whether its invocation directory stays known: a literal .cd in a mutation
+  // or nested dependency also affects the options following that invocation.
   let dependencyWork = 0
   const retainAllSourceHints = (message: string) => {
     warn(message)
     for (const sourceId of context.sourceIds ?? []) dependencies.add(sourceId)
   }
-  const collectOptionDependencies = (body: string, active: readonly string[]): void => {
+  const collectOptionDependencies = (body: string, active: readonly string[]): boolean => {
     if (body.length > 100_000 || active.length > 16) {
       retainAllSourceHints('Style dependency scan exceeds its preview bound; retaining all imported source hints.')
-      return
+      return false
     }
+    let directoryKnown = true
     for (const rawOption of splitTikzOptions(body)) {
       const option = rawOption.trim()
       if (!option) continue
       dependencyWork += 1
       if (dependencyWork > 4096) {
         retainAllSourceHints('Style dependency scan exceeds the 4096-option bound; retaining all imported source hints.')
-        return
+        return false
       }
       const equals = option.indexOf('=')
       const key = (equals < 0 ? option : option.slice(0, equals)).trim()
       if (key.endsWith('/.cd')) {
         retainAllSourceHints('Style dependency scan has an unsupported runtime directory change; retaining all imported source hints.')
-        return
+        return false
       }
       if (/[\\{}#=$%~^&]/.test(key)) continue
       const identity = canonicalTikzStyleKey(key)
@@ -188,8 +191,10 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
         if (!active.includes(identity)) {
           const nestedActive = [...active, identity]
-          collectOptionDependencies(definition.options ?? '', nestedActive)
-          for (const options of definition.dependencyOptions ?? []) collectOptionDependencies(options, nestedActive)
+          directoryKnown = collectOptionDependencies(definition.options ?? '', nestedActive) && directoryKnown
+          for (const options of definition.dependencyOptions ?? []) {
+            directoryKnown = collectOptionDependencies(options, nestedActive) && directoryKnown
+          }
         }
       } else if (equals < 0) {
         color(key)
@@ -197,19 +202,27 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         color(option.slice(equals + 1))
       }
     }
+    return directoryKnown
   }
   // A .style body uses the invocation's active directory (/tikz for normal
   // nodes), not the declaration's parent directory. Keep this context shared
   // through nested expansion. Runtime .cd is deliberately unsupported; once
   // encountered, relative options remain unresolved instead of guessing a path.
   let runtimeDirectoryKnown = true
+  const incompleteExpansion = (message: string) => {
+    // Unvisited options may change the invocation directory as well as paint.
+    // A later relative key cannot recover certainty about either meaning.
+    runtimeDirectoryKnown = false
+    retainAllSourceHints(`${message} Runtime key directory remains unknown; retaining all imported source hints.`)
+    paintFields.forEach((field) => unresolved.add(field))
+  }
   const visit = (body: string, active: readonly string[]) => {
-    if (body.length > 100_000) { warn('Preview option input exceeds the 100000-character bound.'); paintFields.forEach((field) => unresolved.add(field)); return }
+    if (body.length > 100_000) { incompleteExpansion('Preview option input exceeds the 100000-character bound.'); return }
     for (const rawOption of splitTikzOptions(body)) {
       const option = rawOption.trim()
       if (!option) continue
       work += 1
-      if (work > 4096) { warn('Preview style expansion exceeds the 4096-option work bound.'); paintFields.forEach((field) => unresolved.add(field)); return }
+      if (work > 4096) { incompleteExpansion('Preview style expansion exceeds the 4096-option work bound.'); return }
       const equals = option.indexOf('=')
       const rawKey = equals < 0 ? option : option.slice(0, equals).trim()
       const key = rawKey.replace(/^\/tikz\//, '').replace(/\s+/g, ' ')
@@ -232,14 +245,17 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         if (definition.sourceId !== undefined) dependencies.add(definition.sourceId)
         for (const sourceId of definition.sourceDependencies ?? []) dependencies.add(sourceId)
         if (active.includes(reference)) { warn(`Cyclic style reference: ${[...active, reference].join(' → ')}`); paintFields.forEach((field) => unresolved.add(field)) }
-        else if (active.length >= 16) { warn('Preview style expansion exceeds the 16-level depth bound.'); paintFields.forEach((field) => unresolved.add(field)) }
+        else if (active.length >= 16) incompleteExpansion('Preview style expansion exceeds the 16-level depth bound.')
         else visit(definition.options ?? '', [...active, reference])
         // The last known body is only a deterministic preview approximation.
         // Unknown handlers may change every channel; subsequent literal options
-        // can restore certainty for their own fields through resolved().
+        // can restore certainty for their own fields through resolved(), only
+        // while their key's invocation directory remains known.
         if (definition.state === 'unresolved') {
           definition.diagnostics.forEach(warn)
-          for (const options of definition.dependencyOptions ?? []) collectOptionDependencies(options, [reference])
+          for (const options of definition.dependencyOptions ?? []) {
+            runtimeDirectoryKnown = collectOptionDependencies(options, [reference]) && runtimeDirectoryKnown
+          }
           paintFields.forEach((field) => unresolved.add(field))
         }
         continue

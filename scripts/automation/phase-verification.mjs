@@ -61,14 +61,21 @@ export const pointNodeScenarios = {
     "point-paint-local-override-intent", "point-paint-cross-file-resolution",
     "point-paint-unsupported-color-bindings",
     "point-paint-unsupported-mutations", "point-paint-clear-imported-style",
+    "point-paint-mutation-directory-uncertainty", "point-paint-app-continuity",
   ],
 };
 export function pointNodeScenarioArtifacts(name) {
+  if (name === "point-paint-app-continuity") {
+    return [`${name}.json`, "point-paint-app-lifecycle.json", "point-paint-app-transitions.json", "point-paint-app-controls.json",
+      ...["missing-api", "wrong-api", "same-url-reload"].flatMap((fault) =>
+        ["failure.json", "failure.png", "lifecycle.json"].map((suffix) => `point-paint-app-control-${fault}-${suffix}`))];
+  }
   const importRegressionSources = {
     "point-paint-local-override-intent": ["intent.sty"],
     "point-paint-cross-file-resolution": ["base.sty", "outer.sty", "base-colors.sty", "outer-colors.sty", "redefined.sty", "missing.sty", "later.sty"],
     "point-paint-unsupported-color-bindings": ["unsupported.sty"],
     "point-paint-unsupported-mutations": ["mutation.sty"],
+    "point-paint-mutation-directory-uncertainty": ["directory-mutation.sty", "directory-independent.sty"],
   };
   if (name === "point-paint-clear-imported-style") {
     return [`${name}.json`, `${name}-clear.sty`, `${name}-independent.sty`,
@@ -204,11 +211,15 @@ function evidenceObject(artifactDir, name) {
 }
 
 function validateTargetedPaintEvidence(artifactDir, name, group) {
+  if (name === "point-paint-app-continuity") {
+    validateAppContinuityEvidence(artifactDir, name, group);
+    return;
+  }
   if (name === "point-paint-clear-imported-style") {
     validateDetachedPaintEvidence(artifactDir, name, group);
     return;
   }
-  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations"].includes(name)) {
+  if (["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings", "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty"].includes(name)) {
     validateImportedPaintEvidence(artifactDir, name, group);
     return;
   }
@@ -279,6 +290,91 @@ function validateTargetedPaintEvidence(artifactDir, name, group) {
   }
 }
 
+function validateAppContinuityEvidence(artifactDir, name, group) {
+  const evidence = evidenceObject(artifactDir, `${name}.json`);
+  assert.equal(evidence.scenario, name); assert.equal(evidence.group, group); assert.equal(evidence.result, "passed");
+  assert.equal(evidence.schema, 1);
+  const initial = evidence.startup;
+  assert.match(initial?.pageId ?? "", /^app-/);
+  assert.match(initial.expectedUrl, /\/stratified-tikz\/scripts\/fixtures\/freeLabelsApp\.html$/);
+  assert.ok(typeof initial.document?.generation === "string" && initial.document.generation.length > 0);
+  const checkSnapshot = (entry) => {
+    assert.equal(entry?.pageId, initial.pageId, "Continuity evidence belongs to owned App");
+    assert.equal(entry.expectedUrl, initial.expectedUrl);
+    assert.equal(entry.closed, false); assert.equal(entry.crashed, false);
+    assert.equal(entry.document?.url, initial.expectedUrl);
+    assert.equal(entry.document.generation, initial.document.generation, "Same URL cannot hide document replacement");
+    assert.equal(entry.document.api?.type, "object"); assert.equal(entry.document.api.stateType, "function");
+    assert.equal(entry.document.api.sameInstance, true);
+    assert.ok(["interactive", "complete"].includes(entry.document.readyState));
+    assert.ok(entry.document.root?.children > 0);
+    assert.ok(entry.document.scripts?.some((script) => script.type === "module" && script.src.endsWith("/freeLabelsApp.tsx")));
+    for (const key of ["json", "runtimeDiagramJson", "history"]) {
+      assert.ok(typeof entry.state?.[key] === "string" && entry.state[key].length > 0 && entry.state[key].length <= 8_000_000);
+      JSON.parse(entry.state[key]);
+    }
+    assert.ok(Number.isFinite(entry.state.labelDocumentRevision));
+  };
+  checkSnapshot(initial);
+  const required = ["point-paint-local-override-intent", "point-paint-cross-file-resolution", "point-paint-unsupported-color-bindings",
+    "point-paint-unsupported-mutations", "point-paint-mutation-directory-uncertainty", "point-paint-clear-imported-style", "point-paint-clear-imported-style-multi"];
+  assert.equal(evidence.transitions?.length, required.length);
+  for (const name of required) {
+    const entries = evidence.transitions.filter((entry) => entry.name === name);
+    assert.equal(entries.length, 1, `Native App/SVG/App transition required: ${name}`);
+    const entry = entries[0]; assert.equal(entry.result, "passed");
+    checkSnapshot(entry.before); checkSnapshot(entry.after);
+    assert.deepEqual(entry.after.state, entry.before.state, "Standalone work preserves saved/runtime model, history and editor revision");
+    assert.equal(entry.standalonePages?.length, 1);
+    const svg = entry.standalonePages[0];
+    assert.match(svg.pageId, /^svg-/); assert.notEqual(svg.pageId, initial.pageId); assert.equal(svg.closed, true);
+    assert.ok(svg.events.some((event) => event.event === "main-frame-navigation" && event.url.startsWith("file:") && event.url.endsWith(`${name}.svg`)));
+    assert.ok(svg.events.some((event) => event.event === "close"));
+    assert.equal(svg.events.some((event) => event.event === "crash"), false);
+  }
+  checkSnapshot(evidence.helperReturn); checkSnapshot(evidence.beforeNextLoad); checkSnapshot(evidence.afterControls);
+  assert.equal(evidence.helperReturn.boundary, "import-helper-return");
+  assert.equal(evidence.beforeNextLoad.boundary, "before-next-app-load");
+  assert.deepEqual(evidence.helperReturn.state, evidence.transitions.at(-1).after.state);
+  assert.deepEqual(evidence.beforeNextLoad.state, evidence.helperReturn.state);
+  assert.equal(evidence.afterControls.boundary, "after-native-continuity-controls");
+  assert.deepEqual(evidence.afterControls.state, evidence.beforeNextLoad.state);
+  const transitions = evidenceObject(artifactDir, "point-paint-app-transitions.json");
+  assert.deepEqual(transitions.transitions, evidence.transitions);
+  const lifecycle = evidenceObject(artifactDir, "point-paint-app-lifecycle.json");
+  assert.equal(lifecycle.schema, 1); assert.equal(lifecycle.pageId, initial.pageId);
+  assert.equal(lifecycle.expectedUrl, initial.expectedUrl);
+  assert.equal(lifecycle.expected?.generation, initial.document.generation);
+  assert.ok(Array.isArray(lifecycle.events) && lifecycle.events.length > 0 && lifecycle.events.length <= 256);
+  assert.ok(lifecycle.events.some((entry) => entry.event === "document-observation" && entry.boundary === "import-helper-return"));
+  const controls = evidenceObject(artifactDir, "point-paint-app-controls.json");
+  assert.equal(controls.schema, 1); assert.deepEqual(controls.controls, evidence.controls);
+  assert.equal(evidence.controls?.length, 3);
+  for (const fault of ["missing-api", "wrong-api", "same-url-reload"]) {
+    const matches = evidence.controls.filter((entry) => entry.fault === fault);
+    assert.equal(matches.length, 1); const control = matches[0];
+    assert.equal(control.result, "passed"); assert.notEqual(control.before.pageId, initial.pageId);
+    const prefix = `point-paint-app-control-${fault}`;
+    const failure = evidenceObject(artifactDir, `${prefix}-failure.json`);
+    assert.deepEqual(failure, control.evidence);
+    assert.equal(failure.pageId, control.before.pageId); assert.equal(failure.snapshot?.pageId, control.before.pageId);
+    assert.equal(failure.expectedUrl, initial.expectedUrl); assert.equal(failure.snapshot.document.url, initial.expectedUrl);
+    assert.equal(failure.deliberateNegativeControl, true); assert.equal(failure.fault, fault);
+    assert.equal(failure.screenshot, `${prefix}-failure.png`);
+    assert.match(failure.error?.message ?? "", fault === "same-url-reload" ? /generation changed/ : fault === "missing-api" ? /API missing/ : /API instance changed/);
+    const dom = failure.snapshot.document.dom;
+    assert.ok(dom?.nodes?.length > 0 && dom.nodes.length <= 512 && dom.bytes <= 64_000);
+    assert.equal(dom.maxNodes, 512); assert.equal(dom.maxBytes, 64_000);
+    if (fault === "same-url-reload") assert.notEqual(failure.snapshot.document.generation, control.before.document.generation);
+    else assert.equal(failure.snapshot.document.generation, control.before.document.generation);
+    if (fault === "missing-api") assert.equal(failure.snapshot.document.api.type, "undefined");
+    if (fault === "wrong-api") assert.equal(failure.snapshot.document.api.sameInstance, false);
+    const owned = evidenceObject(artifactDir, `${prefix}-lifecycle.json`);
+    assert.equal(owned.pageId, control.before.pageId); assert.equal(owned.expectedUrl, initial.expectedUrl);
+    assert.ok(owned.events.some((entry) => entry.event === "document-observation" && entry.boundary === "failure"));
+  }
+}
+
 function validateImportedPaintEvidence(artifactDir, name, group) {
   const evidence = evidenceObject(artifactDir, `${name}.json`);
   const persistence = (entry, boundary) => entry?.boundary === boundary
@@ -330,6 +426,36 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
       const base = output.indexOf("%   \\input{base.sty}"), outer = output.indexOf("%   \\input{outer.sty}");
       if (base < 0 || outer <= base) throw new Error("Cross-file dependency hints must follow source load order");
     }
+  } else if (name === "point-paint-mutation-directory-uncertainty") {
+    check("directory", "outer", { fill: null, text: null, draw: null });
+    check("independent", "independent", { fill: "#0000ff", text: "#00ff00", draw: "#ff0000" });
+    for (const boundary of ["away", "undone"]) check(boundary, "outer", { fill: null, text: "#123456", draw: null });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "outer", { fill: null, text: "#ff0000", draw: null });
+    const source = "\\tikzset{\n  myPoint/.style={fill=red,text=red},\n  myPoint/.append style={/other/.cd},\n  /other/text/.style={/tikz/text=blue,/tikz/.cd},\n  outer/.style={myPoint,text=green}\n}";
+    for (const boundary of ["directory", "away", "back", "undone", "redone", "reloaded"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics;
+      assert.equal(diagnostics?.validation?.valid, true, "Directory mutation model remains valid");
+      assert.ok(diagnostics.resolution?.unresolvedFields?.includes("textColor"), "Relative text remains unresolved after runtime directory uncertainty");
+      assert.ok(diagnostics.reference?.previewDiagnostics?.some((warning) => /directory|\.cd/.test(warning)), "Reference retains directory diagnostic");
+      assert.ok(entry.warnings.some((warning) => /directory|\.cd/.test(warning)), "Directory uncertainty is visible");
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact directory mutation source survives");
+      assert.deepEqual(entry.current.style?.importedPaint?.overriddenFields, boundary === "directory" ? [] : ["text.color"], "Only accepted local text intent overrides uncertainty");
+      assert.equal(entry.current.importedTikzStyleReferenceId, evidence.directory.current.importedTikzStyleReferenceId, "Reference identity survives edits and persistence");
+    }
+    assert.equal(evidence.independent.modelDiagnostics?.validation?.valid, true);
+    assert.deepEqual(evidence.independent.modelDiagnostics.resolution?.unresolvedFields ?? [], []);
+    assert.deepEqual(evidence.independent.modelDiagnostics.resolution?.diagnostics ?? [], []);
+    assertPointPaint(evidence.independent.observation, { fill: "rgb(0, 0, 255)", text: "rgb(0, 255, 0)", textAlpha: 1, stroke: "rgb(255, 0, 0)" });
+    for (const boundary of ["directory", "back", "redone", "reloaded"]) assertPointPaint(evidence[boundary].observation,
+      { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(255, 0, 0)", text: "rgb(255, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current.style.paint, evidence.away.current.style.paint);
+    assert.deepEqual(evidence.redone.current.style.paint, evidence.back.current.style.paint);
+    const prior = JSON.parse(evidence.away.state.history), back = JSON.parse(evidence.back.state.history);
+    assert.ok(prior.present && back.present);
+    assert.deepEqual(back.past, [...prior.past, prior.present].slice(-100), "Local return edit commits exact bounded history");
+    assert.notDeepEqual(back.present, prior.present);
+    assert.deepEqual(back.future, []);
   } else if (name === "point-paint-unsupported-mutations") {
     check("mutation", "myPoint", { fill: null, text: null, draw: null });
     for (const boundary of ["away", "undone"]) check(boundary, "myPoint", { fill: "#123456", text: null, draw: null });

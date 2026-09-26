@@ -227,6 +227,54 @@ test('runtime cd is explicitly unsupported and never approximated by declaration
   assert.ok(absoluteReference.unresolvedFields?.includes('textColor'))
 })
 
+test('bounded mutation dependency scans cannot claim later relative paint after uninspected directory changes', () => {
+  for (const [name, dependencyOptions, extraStyles] of [
+    ['body size', [`${' '.repeat(100_001)}/other/.cd`], []],
+    ['option work', [`${'fill=red,'.repeat(4097)}/other/.cd`], []],
+    ['nested depth', ['n0'], Array.from({ length: 19 }, (_, index) => ({ key: `n${index}`, options: index === 18 ? '/other/.cd' : `n${index + 1}` }))],
+  ] as const) {
+    const preview = resolveTikzPaint('mutated,text=green,/tikz/draw=blue', {
+      styles: [{ key: 'mutated', state: 'unresolved', options: 'text=red', diagnostics: ['Unsupported mutation'], dependencyOptions }, ...extraStyles],
+      sourceIds: ['root-source', 'dependency-source'],
+    })
+    assert.equal(preview.textColor, '#FF0000', name)
+    assert.ok(preview.unresolvedFields?.includes('textColor'), name)
+    assert.match(preview.diagnostics?.join() ?? '', /dependency scan exceeds/, name)
+    assert.deepEqual(preview.sourceDependencies, ['root-source', 'dependency-source'], name)
+    assert.equal(preview.drawColor, '#0000FF', `${name}: absolute supported paint remains meaningful`)
+    assert.ok(!preview.unresolvedFields?.includes('drawColor'), name)
+  }
+})
+
+test('bounded retained mutation bodies keep a hidden runtime directory change uncertain beyond ordinary expansion', () => {
+  for (const [name, body, extraStyles, bound] of [
+    ['body size', `${' '.repeat(100_001)}/other/.cd`, [], /100000-character bound/],
+    ['option work', `${'fill=red,'.repeat(4097)}/other/.cd`, [], /4096-option work bound/],
+    ['nested depth', 'n0', Array.from({ length: 19 }, (_, index) => ({ key: `n${index}`, options: index === 18 ? '/other/.cd' : `n${index + 1}` })), /16-level depth bound/],
+  ] as const) {
+    const preview = resolveTikzPaint('text=red,mutated,text=green,/tikz/draw=blue', {
+      styles: [{ key: 'mutated', state: 'unresolved', options: body, diagnostics: ['Unsupported mutation'], dependencyOptions: [''] }, ...extraStyles],
+      sourceIds: ['root-source', 'unvisited-directory-source'],
+    })
+    assert.equal(preview.textColor, '#FF0000', `${name}: incomplete last-known body cannot make relative green meaningful`)
+    assert.ok(preview.unresolvedFields?.includes('textColor'), name)
+    assert.match(preview.diagnostics?.join() ?? '', bound, name)
+    assert.match(preview.diagnostics?.join() ?? '', /Runtime key directory remains unknown/, name)
+    assert.deepEqual(preview.sourceDependencies, ['root-source', 'unvisited-directory-source'], name)
+    if (name === 'option work') {
+      assert.ok(preview.unresolvedFields?.includes('drawColor'), 'an exhausted work budget never resumes evaluation')
+    } else {
+      assert.equal(preview.drawColor, '#0000FF', `${name}: absolute paint is still supported while work remains`)
+      assert.ok(!preview.unresolvedFields?.includes('drawColor'), name)
+    }
+  }
+  const paintOnly = resolveTikzPaint('mutated,text=green', {
+    styles: [{ key: 'mutated', state: 'unresolved', options: 'text=red', diagnostics: ['Unsupported mutation'], dependencyOptions: ['fill=blue'] }],
+  })
+  assert.equal(paintOnly.textColor, '#00FF00')
+  assert.ok(!paintOnly.unresolvedFields?.includes('textColor'), 'complete paint-only mutation still permits relative recovery')
+})
+
 test('cyclic, depth, work and file-size bounds produce explicit diagnostics', () => {
   const styles = [{ key: 'a', options: 'b,fill=red' }, { key: 'b', options: 'a,text=blue' }]
   assert.match(resolveTikzPaint('a', { styles }).diagnostics?.join() ?? '', /Cyclic style reference/)

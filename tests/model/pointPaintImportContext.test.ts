@@ -344,6 +344,110 @@ test('nested invalidated invocation keeps all other paint uncertain after known 
   }
 })
 
+test('runtime directory mutation keeps later relative text uncertain in the exact external blue reproduction', () => {
+  const source = String.raw`\tikzset{myPoint/.style={fill=red,text=red},myPoint/.append style={/other/.cd},/other/text/.style={/tikz/text=blue,/tikz/.cd},outer/.style={myPoint,text=green}}`
+  const imported = importTikzStyleFile(diagram(), 'directory.sty', source)
+  const reference = imported.references.find((entry) => entry.key === 'outer')!
+  const applied = reload(apply(imported.diagram, reference))
+  const context = createImportedTikzResolutionContext(applied)
+  const preview = resolveImportedTikzStyle(reference, context)
+  assert.equal(preview.textColor, '#FF0000', 'last supported paint remains a fallback, never a guessed green override')
+  assert.ok(preview.unresolvedFields?.includes('textColor'))
+  assert.match(preview.diagnostics?.join() ?? '', /runtime directory change/)
+  assert.match(preview.diagnostics?.join() ?? '', /Unresolved option after unsupported runtime key directory change: text=green/)
+  assert.match(reference.previewDiagnostics?.join() ?? '', /runtime directory change/)
+  assert.equal(point(applied).importedTikzStyleReferenceId, reference.id)
+  assert.equal(applied.externalTikzStyleSources?.[0].rawSource, source)
+  assert.deepEqual(point(applied).style.importedPaint?.overriddenFields, [])
+  assert.equal(getPointPaint(point(applied).style).text.color, '#FF0000')
+  for (const exportMode of ['standalone', 'inlineMath'] as const) {
+    const after = afterExternal(generateTikz(applied, { exportMode }), 'outer')
+    assert.equal(after, '', 'all uncertain paint stays before the actual external key')
+  }
+  const absolute = resolveTikzPaint('outer,/tikz/text=green,/tikz/fill=blue', context)
+  assert.equal(absolute.textColor, '#00FF00')
+  assert.equal(absolute.fillColor, '#0000FF')
+  assert.ok(!absolute.unresolvedFields?.includes('textColor'))
+  assert.ok(!absolute.unresolvedFields?.includes('fillColor'))
+  assert.ok(absolute.unresolvedFields?.includes('drawColor'))
+})
+
+for (const dependencyPosition of ['before mutation', 'after mutation']) {
+  test(`nested runtime directory mutation retains uncertainty and source order ${dependencyPosition}`, () => {
+    const root = importTikzStyleFile(diagram(), 'root.sty', String.raw`\tikzset{myPoint/.style={fill=red,text=red},outer/.style={myPoint,text=green},unrelated/.style={text=blue}}`)
+    const reference = root.references.find((entry) => entry.key === 'outer')!
+    const nestedSource = String.raw`\tikzset{nested/.style={text=blue},nested/.append style={leaf},leaf/.style={/other/.cd},/other/text/.style={/tikz/text=blue,/tikz/.cd}}`
+    const mutationSource = String.raw`\tikzset{/tikz/.cd,/tikz/myPoint/.append style={nested},other/.style={text=green}}`
+    const sources = dependencyPosition === 'before mutation'
+      ? [['nested.sty', nestedSource], ['mutation.sty', mutationSource]]
+      : [['mutation.sty', mutationSource], ['nested.sty', nestedSource]]
+    let next = apply(root.diagram, reference)
+    for (const [name, source] of sources) next = importTikzStyleFile(next, name, source).diagram
+    const loaded = reload(next)
+    const context = createImportedTikzResolutionContext({ ...loaded, importedTikzStyleReferences: [...loaded.importedTikzStyleReferences!].reverse() })
+    const preview = resolveImportedTikzStyle(reference, context)
+    assert.equal(preview.textColor, '#FF0000')
+    assert.ok(preview.unresolvedFields?.includes('textColor'))
+    assert.match(preview.diagnostics?.join() ?? '', /runtime directory change/)
+    assert.deepEqual(preview.sourceDependencies, loaded.externalTikzStyleSources?.map((source) => source.id))
+    assert.equal(point(loaded).importedTikzStyleReferenceId, reference.id)
+    assert.equal(point(loaded).style.importedPaint?.referenceId, reference.id)
+    assert.deepEqual(point(loaded).style.importedPaint?.overriddenFields, [])
+    assert.deepEqual(loaded.externalTikzStyleSources?.slice(1).map((source) => source.rawSource), sources.map(([, source]) => source))
+    const unrelated = resolveTikzPaint('unrelated', context)
+    assert.equal(unrelated.textColor, '#0000FF')
+    assert.equal(unrelated.unresolvedFields, undefined)
+    assert.equal(unrelated.diagnostics, undefined)
+    for (const exportMode of ['standalone', 'inlineMath'] as const) {
+      const output = generateTikz(loaded, { exportMode })
+      assert.equal(afterExternal(output, 'outer'), '')
+      assert.deepEqual(output.match(/%\s+\\input\{[^}]+\}/g)?.map((hint) => hint.replace(/^%\s+/, '')), loaded.externalTikzStyleSources?.map((source) => source.loadHint))
+    }
+    const restored = importTikzStyleFile(loaded, 'restored.sty', String.raw`\tikzset{myPoint/.style={text=blue}}`)
+    const known = resolveImportedTikzStyle(reference, createImportedTikzResolutionContext(reload(restored.diagram)))
+    assert.equal(known.textColor, '#00FF00', 'full replacement removes invocation directory uncertainty')
+    assert.equal(known.unresolvedFields, undefined)
+    assert.equal(known.diagnostics, undefined)
+  })
+}
+
+test('directory uncertainty preserves explicit text intent through fallback return, history and JSON reconstruction', () => {
+  const source = String.raw`\tikzset{myPoint/.style={fill=red,text=red},myPoint/.append style={/other/.cd},/other/text/.style={/tikz/text=blue,/tikz/.cd},outer/.style={myPoint,text=green}}`
+  const imported = importTikzStyleFile(diagram(), 'directory.sty', source)
+  const reference = imported.references.find((entry) => entry.key === 'outer')!
+  const applied = apply(imported.diagram, reference)
+  const snapshot = serializeDiagram(applied)
+  let state: UndoableEditorState = {
+    editableDiagram: applied, history: createDiagramHistory(applied), selectedElement: null,
+    layerFilter: allLayersFilter, polylineDraft: null, cubicBezierDraft: null, pathDraft: null, sheetPolygonDraft: null,
+  }
+  for (const color of ['#123456', '#FF0000'] as const) {
+    const edited = updateStratumStyleById(state.editableDiagram, 'context-point', (style) => {
+      if (style.kind !== 'pointStyle') return style
+      const paint = getPointPaint(style)
+      return { ...style, paint: { ...paint, text: { ...paint.text, color } } }
+    }, ['text.color'])
+    state = commitDiagramChange(state, { ...state, editableDiagram: edited })
+  }
+  assert.equal(state.history.past.length, 2)
+  const undone = undoLastDiagramChange(state)
+  assert.equal(getPointPaint(point(undone.editableDiagram).style).text.color, '#123456')
+  assert.equal(serializeDiagram(undoLastDiagramChange(undone).editableDiagram), snapshot)
+  const loaded = reload(redoLastDiagramChange(undone).editableDiagram)
+  assert.equal(getPointPaint(point(loaded).style).text.color, '#FF0000')
+  assert.deepEqual(point(loaded).style.importedPaint?.overriddenFields, ['text.color'])
+  assert.ok(resolveImportedTikzStyle(reference, createImportedTikzResolutionContext(loaded)).unresolvedFields?.includes('textColor'))
+  assert.equal(loaded.externalTikzStyleSources?.[0].rawSource, source)
+  assert.equal(serializeDiagram(applied), snapshot, 'history retains immutable imported baseline and raw source')
+  for (const exportMode of ['standalone', 'inlineMath'] as const) {
+    const output = generateTikz(loaded, { exportMode })
+    const after = afterExternal(output, 'outer')
+    assertedColor(output, after, 'text', 'FF0000')
+    assert.doesNotMatch(after, /(?:^|,)(?:fill|draw)=/)
+    assert.equal(after.split(',').length, 1, 'only the explicit local text edit follows the external key')
+  }
+})
+
 for (const handler of ['prefix style', 'add style', 'append code', 'code', 'style args']) {
   test(`recognizable unsupported .${handler} invalidates paint without executing its body`, () => {
     const imported = importTikzStyleFile(diagram(), 'handler.sty', `\\tikzset{myPoint/.style={fill=red,text=red},myPoint/.${handler}={fill=blue,text=blue}}`)

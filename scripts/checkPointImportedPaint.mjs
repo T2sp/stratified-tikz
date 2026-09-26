@@ -14,7 +14,7 @@ import { resolvePointInspectorField } from './pointInspectorFields.mjs'
  * event; the fixture API is used only to observe the resulting production model. */
 export async function runPointImportedPaintChecks(context) {
   const { browser, page, artifactDir, inspector, legacy, state, model, point, load, settle, select,
-    eventAction, edit, undo, redo, tikz, owned, begin, saved, diagnose } = context
+    eventAction, edit, undo, redo, tikz, owned, begin, saved, diagnose, withStandalone } = context
   let scenario
   const start = async (name) => { scenario = name; begin(name); await load(legacy); await settle(); await select() }
   async function importSource(filename, source, key) {
@@ -68,26 +68,29 @@ export async function runPointImportedPaintChecks(context) {
     const path = resolve(artifactDir, `${scenario}${suffix}.svg`)
     await event.saveAs(path)
     const xml = await readFile(path, 'utf8')
-    const standalone = await browser.newPage({ viewport: { width: 1000, height: 800 } })
-    const pageErrors = [], requests = []; let failure
-    standalone.on('pageerror', (error) => pageErrors.push(error.message))
-    standalone.on('request', (request) => requests.push(request.url()))
-    try {
-      await standalone.goto(pathToFileURL(path).href)
-      const observation = await observePointPaint(standalone, { source, standalone: true })
-      const points = []
-      for (const entry of extraPoints) points.push({ ...entry, observation: await observePointPaint(standalone, { source: entry.source, standalone: true }) })
-      const details = { source, path, observation, points, pageErrors, requests }
-      const persist = async (capture) => writeFile(resolve(artifactDir, `${scenario}${suffix}-standalone.json`), JSON.stringify({ ...details, capture }, null, 2) + '\n')
-      await persist(); await diagnose({ boundary: 'standalone-before-assertions', ...details, xml })
-      assertPointPaint(observation, expected)
-      for (const entry of points) assertPointPaint(entry.observation, entry.expected)
-      assert.equal(observation.forbidden, 0); assert.deepEqual(observation.externalReferences, [])
-      assert.deepEqual(pageErrors, []); assert.deepEqual(requests, [pathToFileURL(path).href])
-      await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}${suffix}.png`), persist)
-      return details
-    } catch (error) { failure = error; throw error }
-    finally { await cleanupPointCheck(failure, () => standalone.close()) }
+    return withStandalone(`${scenario}${suffix}`, async (trackStandalone) => {
+      const standalone = await browser.newPage({ viewport: { width: 1000, height: 800 } })
+      trackStandalone(standalone)
+      const pageErrors = [], requests = []; let failure
+      standalone.on('pageerror', (error) => pageErrors.push(error.message))
+      standalone.on('request', (request) => requests.push(request.url()))
+      try {
+        await standalone.goto(pathToFileURL(path).href)
+        const observation = await observePointPaint(standalone, { source, standalone: true })
+        const points = []
+        for (const entry of extraPoints) points.push({ ...entry, observation: await observePointPaint(standalone, { source: entry.source, standalone: true }) })
+        const details = { source, path, observation, points, pageErrors, requests }
+        const persist = async (capture) => writeFile(resolve(artifactDir, `${scenario}${suffix}-standalone.json`), JSON.stringify({ ...details, capture }, null, 2) + '\n')
+        await persist(); await diagnose({ boundary: 'standalone-before-assertions', ...details, xml })
+        assertPointPaint(observation, expected)
+        for (const entry of points) assertPointPaint(entry.observation, entry.expected)
+        assert.equal(observation.forbidden, 0); assert.deepEqual(observation.externalReferences, [])
+        assert.deepEqual(pageErrors, []); assert.deepEqual(requests, [pathToFileURL(path).href])
+        await captureStandaloneSvg(standalone, resolve(artifactDir, `${scenario}${suffix}.png`), persist)
+        return details
+      } catch (error) { failure = error; throw error }
+      finally { await cleanupPointCheck(failure, () => standalone.close()) }
+    })
   }
 
   await start('point-paint-local-override-intent')
@@ -212,6 +215,46 @@ export async function runPointImportedPaintChecks(context) {
   const mutationStandalone = await downloadSvg({ fill: 'rgb(255, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
   await saved({ mutation, away: mutationAway, back: mutationBack, undone: mutationUndone, redone: mutationRedone,
     ...mutationPersistence, standalone: mutationStandalone })
+
+  await start('point-paint-mutation-directory-uncertainty')
+  await importSource('directory-mutation.sty', sources.directoryMutation, 'outer')
+  await importSource('directory-independent.sty', sources.directoryIndependent, 'independent'); await apply('independent')
+  const independent = await snapshot('unaffected-independent-style', 'independent')
+  assertOutput(independent, { fill: '#0000ff', text: '#00ff00', draw: '#ff0000' })
+  assert.deepEqual(independent.modelDiagnostics.resolution.diagnostics ?? [], [])
+  assert.deepEqual(independent.modelDiagnostics.resolution.unresolvedFields ?? [], [])
+  assertPointPaint(independent.observation, { fill: 'rgb(0, 0, 255)', text: 'rgb(0, 255, 0)', textAlpha: 1, stroke: 'rgb(255, 0, 0)' })
+  await apply('outer')
+  const directory = await snapshot('directory-mutation-untouched', 'outer')
+  assertOutput(directory, { fill: null, text: null, draw: null }); await writeOutput(directory, '-untouched')
+  assertPointPaint(directory.observation, { fill: 'rgb(255, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
+  assert.ok(directory.warnings.some((warning) => /directory|\.cd/.test(warning)), 'Directory uncertainty is visible in the production Inspector')
+  assert.ok(directory.modelDiagnostics.reference.previewDiagnostics.some((warning) => /directory|\.cd/.test(warning)))
+  assert.ok(directory.modelDiagnostics.resolution.unresolvedFields.includes('textColor'), 'Later relative text cannot restore unknown runtime-directory meaning')
+  assert.deepEqual(directory.current.style.importedPaint.overriddenFields, [])
+  await edit('Text color', '#123456')
+  const directoryAway = await snapshot('directory-text-away', 'outer'); assertOutput(directoryAway, { fill: null, text: '#123456', draw: null })
+  const directoryPriorJson = JSON.stringify({ directory, independent, directoryAway })
+  await edit('Text color', '#ff0000')
+  const directoryBack = await snapshot('directory-text-back', 'outer'); assertOutput(directoryBack, { fill: null, text: '#ff0000', draw: null })
+  assert.deepEqual(directoryBack.current.style.importedPaint.overriddenFields, ['text.color'])
+  const directoryPrevious = JSON.parse(directoryAway.state.history), directoryCommitted = JSON.parse(directoryBack.state.history)
+  assert.ok(directoryPrevious.present && directoryCommitted.present, 'Directory-mutation history includes current diagrams')
+  assert.deepEqual(directoryCommitted.past, [...directoryPrevious.past, directoryPrevious.present].slice(-100))
+  assert.notDeepEqual(directoryCommitted.present, directoryPrevious.present)
+  assert.deepEqual(directoryCommitted.future, [])
+  await undo(); const directoryUndone = await snapshot('directory-undo', 'outer'); assertOutput(directoryUndone, { fill: null, text: '#123456', draw: null })
+  assert.deepEqual(directoryUndone.current, directoryAway.current, 'Undo restores exact point paint and local intent')
+  await redo(); const directoryRedone = await snapshot('directory-redo', 'outer'); assertOutput(directoryRedone, { fill: null, text: '#ff0000', draw: null })
+  assert.deepEqual(directoryRedone.current, directoryBack.current, 'Redo restores exact point paint and local intent')
+  const directoryPersistence = await persist('outer', { fill: null, text: '#ff0000', draw: null })
+  assert.ok(directoryPersistence.reloaded.diagram.externalTikzStyleSources.some((entry) => entry.rawSource === sources.directoryMutation), 'Invocation-time directory source survives native persistence verbatim')
+  assert.ok(directoryPersistence.reloaded.modelDiagnostics.resolution.unresolvedFields.includes('textColor'), 'Raw-source reconstruction retains directory uncertainty despite local intent')
+  assert.deepEqual(directoryPersistence.reloaded.current.style.importedPaint.overriddenFields, ['text.color'])
+  const directoryStandalone = await downloadSvg({ fill: 'rgb(255, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
+  assert.equal(JSON.stringify({ directory, independent, directoryAway }), directoryPriorJson, 'Native edits/history/reload leave prior directory snapshots immutable')
+  await saved({ directory, independent, away: directoryAway, back: directoryBack, undone: directoryUndone, redone: directoryRedone,
+    ...directoryPersistence, standalone: directoryStandalone })
 
   async function clearSnapshot(boundary) {
     const output = await tikz(), diagram = await model(), snapshotState = await state()

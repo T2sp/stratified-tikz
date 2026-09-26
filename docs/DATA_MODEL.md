@@ -2490,6 +2490,14 @@ uncertain until later supported options resolve their individual fields; local
 edits remain authoritative independently of equality with the fallback. Raw
 source/options, stable references and source load order are preserved.
 
+Recognizable unsupported mutation bodies and nested literal dependencies also
+propagate invocation-time directory uncertainty. Once runtime `/.cd` is found
+(or the bounded scan cannot finish), later relative paint keys stay unresolved;
+supported absolute `/tikz/...` keys may still resolve their own fields. Ordinary
+paint-only mutation recovery remains supported. Declaration-level `.cd` only
+qualifies declarations and does not change invocation certainty. This state is
+reconstructed from raw sources, with no new saved field or TeX execution.
+
 New saves use envelope version **2**, superseding the historical version-1
 wrapper examples above. `Diagram.version` remains 1. Both envelope versions
 load; point strata and saved user point presets materialize independent paint

@@ -134,7 +134,13 @@ An invalidation gives that key an explicit unresolved definition state; it does
 not merely delete the body. The last supported body can supply deterministic
 preview values, but every paint field becomes uncertain and the reference
 displays a diagnostic. Nested invocation propagates the uncertainty; a subsequent
-supported option such as `text=green` restores only its own fields. Unrelated
+supported option such as `text=green` restores only its own fields when the
+invocation directory is still known. Recognizable mutation bodies and their
+nested literal dependencies also carry runtime `/.cd` uncertainty into the
+calling option list. Later relative keys then remain unresolved, because they
+may name handlers in another directory. Explicit supported `/tikz/...` options
+still resolve their own fields; paint-only mutations do not invent directory
+uncertainty. Unrelated
 keys, including a distinct `/other/myPoint`, keep their existing resolution.
 A later full supported definition restores known resolution for that key.
 
@@ -143,10 +149,12 @@ reference options cannot replace an invalidated definition. The selected ID and
 raw options remain unchanged. Dependency comments retain defining, mutating and
 required nested/color sources in source load order, even when a later imported
 file has no new reference for the mutated key. Recognizable style-list mutation
-arguments are scanned only for literal style/color dependencies, never applied
-as paint. This separate scan is bounded to 4,096 options / 16 levels and retains
-all imported source hints if its bound or an unknown runtime directory prevents
-precise dependency discovery. Arbitrary code handlers are not interpreted.
+arguments are scanned only for literal style/color dependencies and directory
+uncertainty, never applied as paint. This separate scan is bounded to 4,096
+options / 16 levels. Exceeding a bound conservatively loses directory certainty;
+either a bound failure or an unknown runtime directory retains all imported
+source hints. Declaration-level `.cd` still only qualifies declaration names.
+Arbitrary code handlers are not interpreted.
 Mutation-only files without any
 supported importable definition retain the existing import behavior; adding that
 UI workflow is outside this correction. Importer snapshots refresh through the
