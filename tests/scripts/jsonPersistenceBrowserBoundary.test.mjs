@@ -6,6 +6,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { saveAppJson, checkAppJsonReload } from '../../scripts/appJsonPersistence.mjs'
 
+test('App download stops before native action when its bounded frame flush fails', async () => {
+  const primary = new Error('App animation frames stalled within 2000ms')
+  let reads = 0
+  const page = { evaluate: async () => { reads++; throw new Error('No state read after failed flush') } }
+  await assert.rejects(saveAppJson({ page, waitForFrames: async () => { throw primary } }), (error) => error === primary)
+  assert.equal(reads, 0)
+})
+
 // Exercise the browser orchestration itself, with independent model/UI/download
 // inputs and a deterministic event source. These are not native-browser passes.
 for (const defect of ['none', 'missing mode', 'stale mode', 'point text', 'history', 'stale observation']) {

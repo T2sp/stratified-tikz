@@ -64,9 +64,10 @@ export function assertPersistenceControls(settings, controls) {
   }
 }
 
-export async function saveAppJson({ page, artifactDir, name, diagnose, owned }) {
+export async function saveAppJson({ page, artifactDir, name, diagnose, owned,
+  waitForFrames = () => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))) }) {
   // Flush committed read-only observations after the preceding native UI action.
-  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  await waitForFrames()
   const before = await page.evaluate(() => window.stzAppLabels.state())
   const originalModel = JSON.parse(before.json)
   const ambientDimension = originalModel.diagram.ambientDimension

@@ -1,10 +1,11 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: 32B remains incomplete pending fresh matching browser-capable parent
-verification and independent review of the App continuity and runtime-directory
-correction in the final section below. The latest supplied `UWQV23` parent run
-failed; its empty page-error array does not establish App document continuity.
-The new acceptance minimum is 16 cumulative groups / 27 named point scenarios.
+Status: 32B remains incomplete pending matching native acceptance and independent
+review. The latest supplied `GPJG0D` parent run reached the real-App ready-stage
+scroll and timed out; its owned App geometry/lifecycle evidence was insufficient
+to establish the trigger. See the final App stability investigation section for
+bounded diagnostics, executed checks and the current external handoff. The
+acceptance minimum remains 16 cumulative groups / 27 named point scenarios.
 The following paragraphs and earlier sections retain historical evidence only.
 The `xgI0o0` pre-fix parent verification passed; the subsequent independent review
 ran and requested changes for three Medium production defects. Its browser,
@@ -2032,3 +2033,187 @@ lifecycle/evidence suite passed in 864.69925ms after that refinement
 (`focused-lifecycle-final.log`); syntax/lint passed again in
 `script-checks-frozen.log`. These pre-freeze checks support the correction; the
 external final verifier is the authoritative matching-tree attempt.
+
+
+## Targeted owned App scroll/stability investigation (2026-09-27)
+
+### Established evidence and remaining uncertainty
+
+The checkout began clean on `phase/32b-color-opacity-outline` at
+`f75e3ac2a0868c87f9d216fa7c401b68f37425cf`. That prompt-update commit includes the
+previous runner changes. All four formerly untracked runner helper/test files
+match their prior handoff SHA256 bytes. No reset, reference regeneration, runner
+deadline, global concurrency, production policy or model/parser change is made.
+The historical pre-prompt fingerprint remains
+`c0708e3431620fc0285ca29136e4a24173fef6ee9bded85b442df2289f54f2ed`; it is not the
+identity of this updated checkout. The external investigation directory is
+`/private/tmp/stz-32b-app-stability-E17WwL/`.
+
+The supplied `stz-phase32b-before-review-GPJG0D` report, command log, cumulative
+JSON and actual `app-failure.png` were inspected before edits. Pending JSON
+and the five persistence records were also audited in
+`parent-persistence-audit.json`. Thirteen groups / 124 records completed; the App stages
+`valid-initial`, `invalid-pending`, `invalid-fallback` and `valid-again-pending`
+passed. Production Download JSON completed while the exact source
+`$\mathord{\mathrm{i}}$` remained pending. Release, Inspector close, the ready
+attribute wait and framing/pan code returned; the original native scroll then
+failed waiting for stability at 29,998.788ms. The remaining ready-stage geometry,
+paint/source/pointer checks, ready JSON, history/obsolete completion and reused-ID
+workflows did not pass. Later paint and standalone-export groups were unexecuted.
+`parent-evidence-audit.json` retains the inspected observations and preservation
+hashes. Original parent files remain untouched.
+
+The actual App screenshot shows the small rendered i and closed Inspector. It
+is a full-document still image, not evidence of viewport reachability, stable
+rectangles, frame progress or uninterrupted document/API ownership during the
+wait. The outer renderer screenshot and page-error array do not describe this
+separate owned page. The later point-paint continuity helper had not run.
+Production CSS/layout inspection found no transition, animation or resize loop
+explaining this failure: Inspector is an absolute overlay and camera expansion
+changes content below the preview. This is inspection, not proof that layout
+never moved. Node replacement, offscreen geometry, stalled frames and lifecycle
+changes remain unresolved alternatives. The earlier App-API loss, runner null
+status, independently observed historical host sleep and this scroll timeout
+remain separate; long durations alone do not establish a cause.
+
+### Focused harness changes
+
+The free-label `runAppChecks` now installs the existing owned-document helper on
+its own page, commits its URL/document/API identity once, and uses atomic owned
+state reads. It records before/after boundaries for Inspector close, ready wait,
+release, pending/ready Download JSON, framing/pan and scroll. Native scrolling
+still calls `scrollIntoViewIfNeeded` with the original 30,000ms deadline. No
+scroll workaround or production geometry change is justified by the current
+evidence; this patch does not claim to have fixed the historical trigger.
+
+`appGeometryDiagnostics.mjs` reads the DOM independently of the App API. It
+records source/request/status, host/browser wall and monotonic clocks, URL and
+document generation/API identity, node identities, SVG/label/ancestor rectangles,
+viewBox/client matrices, window/ancestor scroll offsets, layout/animation state,
+Inspector/camera state, viewport dimensions, focus/visibility and frame progress.
+Navigation, close/crash, download start and local errors are retained, alongside
+visibility/page lifecycle events. Download-byte completion is correlated through
+the existing persistence callback. Records are saved before browser evaluation;
+unavailable/partial capture is explicit. Monitoring uses at most eight samples
+per operation; there are explicit document/event/ancestor/string/byte budgets.
+No endless diagnostic polling or pending-evaluation accumulation is introduced.
+
+The established diagnostic defects are corrected: local errors/actions and the
+primary error are saved before failure capture; browser frame waits have timers
+and host watchdogs; rAF work is cancelled on completion/deadline/disposal; all
+owned cleanup has finite host bounds. The native scroll's own error remains
+primary; its host watchdog includes a bounded protocol/ownership-check margin.
+The original unbounded two-frame waits become bounded two-frame waits. After
+scroll and before native pointer/screenshot use, three consecutive frame samples
+must have identical node identities, geometry, transforms, source/request/status,
+viewport/scroll and relevant layout state. Ownership loss fails immediately.
+Complete label corners and every inside/outside probe must fit the canvas/viewport
+intersection. Pointer selection checks still use `elementFromPoint`, native
+normal/Alt clicks, exact transforms, paint/opacity/font and raw-source assertions.
+The final geometry is compared with the measured geometry after pointer actions.
+`preserveView` still rejects obsolete-result displacement without corrective pan.
+Production camera controls and exact model/history pan invariants are retained.
+The conversion fixture's release frames now have a finite browser deadline;
+held conversion, input, history and document loading semantics are unchanged.
+
+`npm run check:free-labels:app` invokes the complete existing App workflow with
+real downloads, then isolated native fault controls. Controls load a document
+through production Load JSON, measure stable geometry and deliberately stall
+frames, continuously move the SVG, remove/replace the API or reload the same URL.
+They exercise both the unchanged native scroll and the new stability/ownership
+checks. Faults occur only on separate disposable pages. Its report explicitly
+cannot satisfy cumulative phase acceptance. The cumulative runner invokes
+the same App workflow after its full predecessor workload, then runs all five
+new fault controls before the existing App group may complete. It retains all 16
+groups / 27 point scenarios, seven standalone transitions, three existing native
+continuity controls / 13 artifacts, directory scenario / 11 artifacts and six
+responsive downloads / 91 artifacts. Existing runner/parser/PGF requirements,
+raw JSON/CRLF, 100-entry history, 2D/3D and free/inline behavior are unchanged.
+
+### Executed validation and frozen-tree handoff
+
+The baseline focused attempt (`baseline-focused/baseline.json`) and instrumented
+focused attempt (`instrumented-focused/focused-app-evidence.json`) both stopped
+at `development-server-listen`: `listen EPERM 127.0.0.1:5173`. Neither launched a
+browser or produced native geometry evidence. This environment block is distinct
+from the parent timeout. Browser permissions were not changed and no retry-until-
+green, force action, sleep, source shortening or readiness weakening is used.
+Native focused and cumulative reproduction remain pending in the authorized
+browser-capable parent. One future passing attempt alone will not diagnose the
+historical failure; inspect the new samples and preserve any failed attempt.
+
+Focused regressions exercise stalled frames/evaluation, never-stable rectangles,
+replacement identities/transforms/source/scroll, immediate ownership rejection,
+finite browser/host budgets, observer disposal, bounded events and retention of
+the primary error despite capture/image/close failures. The JSON boundary rejects
+a failed frame flush before starting a download. All new tests are registered
+in the explicit package list. Strict production and fixture TypeScript passed;
+changed fixture lint passed. Initial targeted script lint found a throw in a
+finally block; it was moved after cleanup and the corrected syntax/lint checks
+passed. Existing unrelated lint debt and the nonblocking large-chunk build
+warning are unchanged. No dependency was added.
+
+The first pre-freeze execution passed **3,341/3,341 tests**, zero failed/skipped/cancelled,
+in **208,179.722625ms** (`prefreeze-tests.log`). The sequential `npm run build`
+passed (`prefreeze-build.log`) with only the existing >500kB chunk warning.
+The final focused boundary/geometry/cleanup run passed **33/33 tests** in
+586.378291ms (`focused-final-regressions.log`). All seven changed/new `.mjs`
+files pass syntax and recommended ESLint checks (`script-checks-final.log`),
+and `git diff --check` passes. Production/fixture strict checks and fixture
+lint logs are retained alongside them. These are executed checks, not a native
+App diagnosis.
+
+The instrumented cumulative attempt (`instrumented-cumulative.log` and
+`instrumented-cumulative/free-labels-evidence.json`) also failed at localhost
+`EPERM`, before launching the browser or starting any group. It therefore could
+not reproduce the sequence after the predecessor workload. Intermediate attempt
+fingerprints remain in their reports; none is represented as final acceptance.
+
+Independent read-only inspection then identified an acceptance orchestration
+gap: the parent's mandatory cumulative command could finish without the new
+native fault controls, because those were initially only in the focused command.
+`runAppChecksWithGeometryControls` now gates the existing cumulative App group on
+both the complete App workflow and all five controls. Two registered regressions
+prove ordering and primary failure propagation, leaving group completion
+unreachable on either workflow or control failure. The expanded focused run
+passed **52/52 tests** in 1,075.709041ms (`cumulative-controls-regressions.log`);
+all eight changed/new scripts pass syntax and targeted lint again
+(`script-checks-cumulative-controls.log`). The first frozen verifier attempt and
+its identity are retained as superseded evidence. This correction requires a
+new freeze and matching full verification; the earlier attempt is not acceptance.
+
+A further read-only boundedness audit found adjacent one-shot geometry reads,
+legacy condition waits, two later screenshots and Alt-key release still lacked
+complete host bounds/primary retention. These paths are now bounded as well:
+framing, coordinates, viewport, hit-target and source/paint evaluations use
+`readAppGeometry`; condition waits retain native 30s with a 35s host watchdog and
+check document/API ownership before polling. Startup and the new native-control
+waits receive the same watchdog. All three screenshot paths use native 5s / host
+5.5s. `clickAppPointer` bounds down/click/release and retains a failed click if
+modifier release also fails. Additional regressions cover stalled one-shot
+transport, owned late rejection, modifier release failure and immediate condition
+ownership loss. The expanded focused suite passes **54/54 tests** in
+1,057.445625ms (`bounded-paths-regressions.log`). The second frozen verifier
+attempt is retained separately as superseded; it cannot verify these later
+corrections. The original native scroll mechanism/deadline remains unchanged.
+
+Final independent script lint found an unused initial assignment in the new
+stalled-read test (`no-useless-assignment`). `script-checks-bounded-paths.log`
+also contained that failure: the combined shell command had masked its exit
+status, so the earlier passing claim was incorrect. The unused initialization
+is removed. Syntax and targeted lint were rerun as a standalone command;
+`script-checks-final-audited.log` records all eight files with zero errors and
+warnings, exit 0. The expanded focused suite passed **54/54** again
+(`final-audited-regressions.log`). The third frozen verifier result is preserved
+as superseded. Final matching verification follows this test/report correction;
+no production behavior changed for this lint fix.
+
+After these results, code/tests/tracked documentation are frozen again. The final
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify`
+report path, command results, raw binary-aware checkout snapshot and independent
+read-only review are recorded externally in this directory's `handoff.json`,
+`final-checkout.json`, `final-checkout.diff`, `final-checkout-untracked.json`,
+`verification-final.log` and `independent-review.md`. The tracked report contains
+no self-referential final fingerprint. Any subsequent checkout change requires
+matching verification again. Missing native acceptance or unsuccessful review
+keeps 32B incomplete and prohibits commit/push; 32C/32D remain deferred.

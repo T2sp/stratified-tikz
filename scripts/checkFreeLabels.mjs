@@ -13,7 +13,7 @@ import { createServer } from 'vite'
 import { captureBrowserCheckoutSnapshot } from './browserCheckoutSnapshot.mjs'
 import { runGeometryChecks } from './checkFreeLabelGeometry.mjs'
 import { runRaceChecks } from './checkFreeLabelRaces.mjs'
-import { runAppChecks } from './checkFreeLabelsApp.mjs'
+import { runAppChecksWithGeometryControls } from './checkFreeLabelsAppFocused.mjs'
 import { runInlineLabelChecks } from './checkInlineLabels.mjs'
 import { runPointThenAppChecks } from './checkPointNodes.mjs'
 import { runPointNodePaintChecks } from './checkPointNodePaint.mjs'
@@ -465,7 +465,7 @@ try {
   stage = 'combined-free-inline-workflows'
   await runCombinedLabelChecks({ page, record, observe, artifactDir, startGroup, completeGroup })
   await runPointThenAppChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
-    setStage: (value) => { stage = value } }, runAppChecks)
+    setStage: (value) => { stage = value } }, runAppChecksWithGeometryControls)
   await runPointNodePaintChecks({ page, browser, origin, record, observe, artifactDir, startGroup, completeGroup,
     setStage: (value) => { stage = value } })
   stage = 'settled-SVG-export-standalone'

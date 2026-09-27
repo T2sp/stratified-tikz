@@ -4,48 +4,81 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { ownPageEvent } from './ownedPageEvent.mjs'
-import { cleanupPointCheck } from './pointCheckDiagnostics.mjs'
+import { boundedPointDiagnostic } from './pointCheckDiagnostics.mjs'
 import { saveAppJson, checkAppJsonReload } from './appJsonPersistence.mjs'
+import { createOwnedAppPage } from './ownedAppPage.mjs'
+import { clickAppPointer, createAppGeometryDiagnostics, readAppGeometry, waitForAppFrames, waitForStableAppGeometry } from './appGeometryDiagnostics.mjs'
 
 export async function runAppChecks({ browser, origin, record, artifactDir }) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, acceptDownloads: true })
   const errors = []
-  page.on('pageerror', (error) => errors.push(error.message))
+  let droppedErrors = 0
+  const onError = (error) => {
+    errors.push(error.message.slice(0, 4000))
+    if (errors.length > 64) { errors.shift(); droppedErrors++ }
+  }
+  page.on('pageerror', onError)
   const actions = []
   const downloads = new Map(), owned = []
-  let primary, persistenceIndex = 0
-  const diagnosePersistence = async (details) => {
-    await writeFile(resolve(artifactDir, `app-persistence-${String(++persistenceIndex).padStart(4, '0')}.json`),
-      JSON.stringify({ scenario: 'real-App-input-JSON-history-reused-ID-load', result: 'observed', ...details }, null, 2))
+  const expectedUrl = `${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`
+  const app = createOwnedAppPage({ page, expectedUrl, artifactDir, prefix: 'app' })
+  const diagnostics = createAppGeometryDiagnostics({ page, artifactDir })
+  let primary, cleanupFailure, persistenceIndex = 0, stage = { name: 'startup' }, generation
+  const boundary = async (name, operation, details = {}, timeoutMs = 30_000) => {
+    const context = { stage, ...details }
+    return diagnostics.around(name, async () => {
+      await app.checkpoint(`${name}:before`)
+      const result = await operation()
+      await app.checkpoint(`${name}:after`)
+      return result
+    }, context, timeoutMs)
   }
-  const state = () => page.evaluate(() => window.stzAppLabels.state())
+  const diagnosePersistence = async (details) => {
+    await boundedPointDiagnostic(() => writeFile(resolve(artifactDir, `app-persistence-${String(++persistenceIndex).padStart(4, '0')}.json`),
+      JSON.stringify({ scenario: 'real-App-input-JSON-history-reused-ID-load', result: 'observed', ...details }, null, 2)), 'App persistence evidence')
+    await diagnostics.capture(`persistence:${details.boundary}`, { stage, name: details.name, path: details.path })
+  }
+  const state = () => app.readState()
+  const waitFor = (operation, argument) => boundedPointDiagnostic(
+    () => page.waitForFunction(operation, argument, { timeout: 30_000 }), 'App condition wait', 35_000)
   const model = async () => JSON.parse((await state()).json).diagram
   const history = async () => JSON.parse((await state()).history)
   const source = async () => (await model()).labels[0].text
-  const hold = (text) => page.evaluate((input) => window.stzAppLabels.hold(input), text)
+  const hold = (text) => boundedPointDiagnostic(() => page.evaluate((input) => window.stzAppLabels.hold(input), text), 'App hold request')
   const pending = async (text) => {
-    await page.waitForFunction((input) => {
+    await waitFor((input) => {
+      window.__stzAppGeometryDiagnostics.assertOwnership()
       const request = window.stzAppLabels.pending(input)
       return request && request.started > 0 && request.completed === 0 && !request.released
     }, text)
-    return page.evaluate((input) => window.stzAppLabels.pending(input), text)
+    return boundedPointDiagnostic(() => page.evaluate((input) => window.stzAppLabels.pending(input), text), 'App pending request')
   }
   const release = async (text, fail = false) => {
-    const result = await page.evaluate(({ input, failure }) => window.stzAppLabels.release(input, failure), { input: text, failure: fail })
+    const result = await boundary('release', () => page.evaluate(({ input, failure }) => window.stzAppLabels.release(input, failure),
+      { input: text, failure: fail }), { source: text, fail })
     assert.equal(result.completed, result.started, 'Every actually started held request completed before observation')
     actions.push({ action: 'release', ...result })
     return result
   }
-  const settled = (expected = 'ready') => page.waitForFunction((status) =>
-    document.querySelector('[data-label-id="app-label"] [data-label-state]')?.getAttribute('data-label-state') === status, expected)
-  const documentJson = (text, options = {}) => page.evaluate(({ input, settings }) => window.stzAppLabels.documentJson(input, settings), { input: text, settings: options })
+  const settled = (expected = 'ready') => boundary('ready-wait', () => page.waitForFunction(({ status, generation, url }) => {
+    const marker = window.__stzOwnedAppDocument
+    if (location.href !== url || marker?.generation !== generation || marker.api !== window.stzAppLabels) {
+      throw new Error('Owned App continuity lost during ready wait')
+    }
+    return document.querySelector('[data-label-id="app-label"] [data-label-state]')?.getAttribute('data-label-state') === status
+  }, { status: expected, generation, url: expectedUrl }, { timeout: 30_000 }), { expected })
+  const documentJson = (text, options = {}) => boundedPointDiagnostic(() => page.evaluate(({ input, settings }) =>
+    window.stzAppLabels.documentJson(input, settings), { input: text, settings: options }), 'App input document')
   async function load(text, name) {
     const before = await state()
     await diagnosePersistence({ boundary: 'before-load', name, before, payload: text })
     const wait = ownPageEvent(page, 'filechooser', { name, timeoutMs: 30_000 }); owned.push(wait)
     const { event: chooser } = await wait.run(() => page.getByRole('button', { name: 'Load JSON', exact: true }).click({ timeout: 5000 }))
     await chooser.setFiles({ name: `${name}.json`, mimeType: 'application/json', buffer: Buffer.from(text) })
-    await page.waitForFunction((revision) => window.stzAppLabels.state().labelDocumentRevision > revision, before.labelDocumentRevision)
+    await waitFor((revision) => {
+      window.__stzAppGeometryDiagnostics.assertOwnership()
+      return window.stzAppLabels.state().labelDocumentRevision > revision
+    }, before.labelDocumentRevision)
     const after = await state()
     await diagnosePersistence({ boundary: 'after-load', name, before, loaded: after, payload: text })
     if (downloads.has(text)) await checkAppJsonReload({ page, saved: downloads.get(text), diagnose: diagnosePersistence })
@@ -55,7 +88,8 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
       history: JSON.parse(after.history) })
   }
   async function save(name) {
-    const saved = await saveAppJson({ page, artifactDir, name, diagnose: diagnosePersistence, owned })
+    const saved = await boundary('pending-or-ready-download', () => saveAppJson({ page, artifactDir, name,
+      diagnose: diagnosePersistence, owned, waitForFrames: () => waitForAppFrames(page) }), { name })
     downloads.set(saved.json, saved)
     actions.push({ action: 'Download JSON', path: saved.path, source: saved.payload.diagram.labels[0].text })
     return saved.json
@@ -84,15 +118,22 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   async function clearSelection() {
     // Escape follows App's production selection handler; remove text focus so it
     // is intentionally a canvas shortcut, not a textarea editing keystroke.
-    await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() })
-    await page.keyboard.press('Escape')
-    await page.waitForFunction(() => window.stzAppLabels.state().selection === null)
+    await readAppGeometry(page, () => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur() })
+    await boundedPointDiagnostic(() => page.keyboard.press('Escape'), 'App clear-selection key', 5000)
+    await boundedPointDiagnostic(() => page.waitForFunction(({ generation, url }) => {
+      const marker = window.__stzOwnedAppDocument
+      if (location.href !== url || marker?.generation !== generation || marker.api !== window.stzAppLabels) {
+        throw new Error('Owned App continuity lost during selection wait')
+      }
+      return window.stzAppLabels.state().selection === null
+    }, { generation, url: expectedUrl }, { timeout: 30_000 }), 'App clear-selection wait', 35_000)
   }
   async function geometry(preserveView = false) {
+    await diagnostics.capture('framing:before', { stage, preserveView })
     // App's initial Fit uses model positions, not text extents. A long pending
     // source can extend beyond that view. Pan through the real controls before
     // measuring; never clamp probes or shorten the source to make them fit.
-    const framing = await page.evaluate(() => {
+    const framing = await readAppGeometry(page, () => {
       const svg = document.querySelector('svg.svg-diagram')
       const node = document.querySelector('[data-label-id="app-label"] [data-label-state]')
       const [minX, minY, maxX, maxY] = node.getAttribute('data-label-bounds').split(' ').map(Number)
@@ -102,6 +143,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
       return { dx: view.x + view.width / 2 - center.x, dy: center.y - view.y - view.height / 2,
         width: maxX - minX, height: maxY - minY, viewWidth: view.width, viewHeight: view.height }
     })
+    await diagnostics.capture('framing:measured', { stage, preserveView, framing })
     assert.ok(framing.width + 32 < framing.viewWidth && framing.height + 28 < framing.viewHeight,
       'App fixture fits the label and every outside boundary probe in the viewBox')
     if (preserveView) assert.ok(Math.abs(framing.dx) <= 0.001 && Math.abs(framing.dy) <= 0.001,
@@ -120,12 +162,31 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
       assert.equal(after.history, before.history, 'Preview pan adds no diagram history entry')
       actions.push({ action: 'pan preview to frame pointer probes', ...framing })
     }
-    await page.locator('svg.svg-diagram').scrollIntoViewIfNeeded()
-    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
-    return page.evaluate(() => window.stzAppLabels.inspectContent('app-label'))
+    await diagnostics.capture('pan:complete', { stage, preserveView, framing })
+    // Preserve the native scroll and its original deadline. Diagnose failures;
+    // do not replace stability with a force action or a different scroll path.
+    await boundary('scroll', () => page.locator('svg.svg-diagram').scrollIntoViewIfNeeded({ timeout: 30_000 }), { preserveView })
+    await boundary('stable-geometry', () => waitForStableAppGeometry(page), { preserveView })
+    await assertUsableGeometry(await coordinates())
+    return boundedPointDiagnostic(() => page.evaluate(() => window.stzAppLabels.inspectContent('app-label')), 'App painted geometry')
+  }
+  async function assertUsableGeometry(points) {
+    const visible = await readAppGeometry(page, () => {
+      const svg = document.querySelector('svg.svg-diagram'), rect = svg.getBoundingClientRect()
+      const viewport = window.visualViewport
+      const left = Math.max(rect.left, viewport?.offsetLeft ?? 0, 0)
+      const top = Math.max(rect.top, viewport?.offsetTop ?? 0, 0)
+      const right = Math.min(rect.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? innerWidth), innerWidth)
+      const bottom = Math.min(rect.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), innerHeight)
+      return { left, top, right, bottom }
+    })
+    for (const point of [...points.corners, points.center, ...points.probes.flatMap(({ inside, outside }) => [inside, outside])]) {
+      assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y) && point.x > visible.left && point.x < visible.right
+        && point.y > visible.top && point.y < visible.bottom, `Complete App label/probe fits canvas viewport: ${JSON.stringify({ point, visible })}`)
+    }
   }
   async function coordinates() {
-    return page.evaluate(() => {
+    return readAppGeometry(page, () => {
       const element = document.querySelector('[data-label-id="app-label"] [data-label-state]')
       if (!(element instanceof SVGGraphicsElement)) throw new Error('Missing App label geometry')
       const [minX, minY, maxX, maxY] = element.getAttribute('data-label-bounds').split(' ').map(Number)
@@ -135,7 +196,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
       const midX = (minX + maxX) / 2
       const midY = (minY + maxY) / 2
       return { bounds: { minX, minY, maxX, maxY }, matrix: { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, e: matrix.e, f: matrix.f },
-        center: point(midX, midY), probes: [
+        center: point(midX, midY), corners: [point(minX, minY), point(maxX, minY), point(minX, maxY), point(maxX, maxY)], probes: [
           { edge: 'west', inside: point(minX + 0.5, midY), outside: point(minX - 16, midY) },
           { edge: 'east', inside: point(maxX - 0.5, midY), outside: point(maxX + 16, midY) },
           { edge: 'north', inside: point(midX, minY + 0.5), outside: point(midX, minY - 14) },
@@ -145,24 +206,25 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   }
   async function pointer(point, expected, alt = false) {
     await clearSelection()
-    const surface = await page.evaluate(({ x, y }) => {
+    await waitForStableAppGeometry(page)
+    const surface = await readAppGeometry(page, ({ x, y }) => {
       const target = document.elementFromPoint(x, y)
       return { tag: target?.tagName, onCanvas: !!target?.closest('svg.svg-diagram'),
         handle: !!target?.closest('[data-geometry-handle], [data-coordinate-anchor-handle]') }
     }, point)
     assert.ok(surface.onCanvas && !surface.handle, `App pointer probe avoids controls/handles: ${JSON.stringify({ point, surface })}`)
-    if (alt) await page.keyboard.down('Alt')
-    try { await page.mouse.click(point.x, point.y) } finally { if (alt) await page.keyboard.up('Alt') }
-    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+    await clickAppPointer(page, point, alt)
+    await waitForAppFrames(page)
     const selected = (await state()).selection
     assert.deepEqual(selected, expected, `Real App ${alt ? 'Alt-' : ''}click at ${JSON.stringify(point)}`)
     return { point, alt, selection: selected, surface }
   }
   async function inspectStage(name, text, status, obsoletePoint, preserveView = false) {
-    await closeInspector()
+    stage = { name, source: text, status }
+    await boundary('inspector-close', closeInspector)
     await settled(status)
     const painted = await geometry(preserveView)
-    const actual = await page.locator('[data-label-id="app-label"] [data-label-state]').evaluate((element) => ({
+    const actual = await readAppGeometry(page.locator('[data-label-id="app-label"] [data-label-state]'), (element) => ({
       source: element.getAttribute('data-label-source'), status: element.getAttribute('data-label-state'),
       request: JSON.parse(element.getAttribute('data-label-request')),
       literal: [...element.querySelectorAll('[data-label-literal]')].map((node) => node.textContent).join(''),
@@ -202,8 +264,12 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
         ...await pointer(obsoleteClientPoint, null, alt) })
     }
     await pointer(points.center, { kind: 'label', id: 'app-label' })
+    await waitForStableAppGeometry(page)
+    const finalPoints = await coordinates()
+    assert.deepEqual(finalPoints, points, 'Pointer and selection events retain the measured canvas/client transform and bounds')
+    await assertUsableGeometry(finalPoints)
     const screenshot = resolve(artifactDir, `app-${name}.png`)
-    await page.screenshot({ path: screenshot, fullPage: true })
+    await boundedPointDiagnostic(() => page.screenshot({ path: screenshot, fullPage: true, timeout: 5000 }), 'App stage screenshot', 5500)
     const result = { name, actual, painted, ...points, pointerEvidence, screenshot, app: await state() }
     await record(`app-${name}`, result)
     return result
@@ -223,7 +289,10 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     const field = await editor()
     await field.fill(text)
     assert.equal(await field.inputValue(), text, 'The production textarea retains the exact input')
-    await page.waitForFunction((input) => JSON.parse(window.stzAppLabels.state().json).diagram.labels[0].text === input, text)
+    await waitFor((input) => {
+      window.__stzAppGeometryDiagnostics.assertOwnership()
+      return JSON.parse(window.stzAppLabels.state().json).diagram.labels[0].text === input
+    }, text)
     const after = await history()
     assert.equal(after.past.length, before.past.length + 1, 'One textarea input event commits one normal edit (no slider coalescing)')
     assert.equal(after.future.length, 0)
@@ -232,7 +301,10 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
   async function historyAction(kind, expected) {
     const label = kind === 'Undo' ? 'Undo last diagram change' : 'Redo last undone diagram change'
     await page.getByRole('button', { name: label, exact: true }).click()
-    await page.waitForFunction((input) => JSON.parse(window.stzAppLabels.state().json).diagram.labels[0].text === input, expected)
+    await waitFor((input) => {
+      window.__stzAppGeometryDiagnostics.assertOwnership()
+      return JSON.parse(window.stzAppLabels.state().json).diagram.labels[0].text === input
+    }, expected)
     actions.push({ action: kind, expected, history: await history() })
   }
   function oldLayoutOnlyPoint(old, current) {
@@ -253,8 +325,14 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     return point
   }
   try {
-    await page.goto(`${origin}/stratified-tikz/scripts/fixtures/freeLabelsApp.html`)
-    await page.waitForFunction(() => window.stzAppLabels !== undefined && document.querySelector('svg.svg-diagram'))
+    await app.install()
+    await page.goto(expectedUrl)
+    generation = (await boundedPointDiagnostic(() => app.start(), 'App startup readiness', 35_000)).document.generation
+    await diagnostics.install()
+    await waitFor(() => {
+      window.__stzAppGeometryDiagnostics.assertOwnership()
+      return window.stzAppLabels !== undefined && document.querySelector('svg.svg-diagram')
+    })
     const initial = '$F^{(1)}L$'
     await load(await documentJson(initial), 'app-initial')
     await inspectStage('valid-initial', initial, 'ready')
@@ -329,7 +407,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     const rawField = await editor()
     assert.equal(await rawField.inputValue(), raw.replace(/\r\n/g, '\n'), 'Textarea normalization is observed without changing the authoritative imported CRLF source')
     assert.equal(await source(), raw)
-    await page.screenshot({ path: resolve(artifactDir, 'app-raw-crlf-editor.png'), fullPage: true })
+    await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, 'app-raw-crlf-editor.png'), fullPage: true, timeout: 5000 }), 'App CRLF screenshot', 5500)
     await record('app-json-exact-source-and-crlf', { raw, saved: JSON.parse(rawSaved), textarea: await rawField.inputValue(), app: await state() })
     await closeInspector()
     const multilineEdit = raw.replace(/\r\n/g, '\n') + ' edited'
@@ -345,7 +423,7 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     assert.equal(JSON.parse(multilineSaved).diagram.labels[0].text, multilineEdit)
     await closeInspector()
     const multilineReady = await geometry()
-    await page.screenshot({ path: resolve(artifactDir, 'app-multiline-editor-ready.png'), fullPage: true })
+    await boundedPointDiagnostic(() => page.screenshot({ path: resolve(artifactDir, 'app-multiline-editor-ready.png'), fullPage: true, timeout: 5000 }), 'App multiline screenshot', 5500)
     await record('app-supported-physical-newline-editor', { source: multilineEdit, pending: multilinePending, ready: multilineReady, app: await state() })
 
     const documentA = '$\\frac{AAAAAAAA}{BBBBBBBB}$'
@@ -382,11 +460,22 @@ export async function runAppChecks({ browser, origin, record, artifactDir }) {
     assert.deepEqual(errors, [], 'No App browser errors')
   } catch (error) {
     primary = error
-    await page.screenshot({ path: resolve(artifactDir, 'app-failure.png'), fullPage: true, timeout: 5000 }).catch(() => {})
-    throw error
+    // Host evidence is saved before any potentially unavailable browser call.
+    for (const capture of [() => diagnostics.failure(error, { stage, errors, droppedErrors, actions }),
+      () => app.failure(error, { stage, errors, droppedErrors, actions })]) {
+      try { await capture() } catch (secondary) { console.error('App failure capture:', secondary) }
+    }
   } finally {
     for (const wait of owned) wait.dispose()
-    await cleanupPointCheck(primary, () => page.close())
-    for (const wait of owned) await cleanupPointCheck(primary, () => wait.drain())
+    for (const [name, cleanup] of [
+      ['diagnostics', () => diagnostics.dispose()], ['page', () => page.close()], ['ownership', () => app.dispose()],
+      ...owned.map((wait) => ['event', () => wait.drain()]),
+    ]) {
+      try { await boundedPointDiagnostic(cleanup, `App ${name} cleanup`, 2500) }
+      catch (error) { cleanupFailure ??= error; console.error(`App ${name} cleanup:`, error) }
+    }
+    page.off('pageerror', onError)
   }
+  if (primary) throw primary
+  if (cleanupFailure) throw cleanupFailure
 }

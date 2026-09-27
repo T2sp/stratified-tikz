@@ -70,7 +70,13 @@ const runtime = createSvgLabelRuntime({ measurement, service: {
     return pending
   },
 } })
-const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+const frame = () => new Promise<void>((resolve, reject) => {
+  const timer = setTimeout(() => {
+    cancelAnimationFrame(request)
+    reject(new Error('App conversion release animation frame stalled for 2000ms'))
+  }, 2000)
+  const request = requestAnimationFrame(() => { clearTimeout(timer); resolve() })
+})
 const pointRuntime = () => ({ identity: measurement.identity,
   fontGeneration: runtime.getFontGeneration(), documentRevision: snapshot?.labelDocumentRevision })
 function pointExportClickSnapshot(ids: string[]) {
