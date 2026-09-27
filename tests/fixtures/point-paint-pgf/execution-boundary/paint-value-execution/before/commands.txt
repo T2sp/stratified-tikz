@@ -1,0 +1,5 @@
+Working directory: /private/tmp/stz-review-paint-value-exec
+PATH=/opt/homebrew/bin:$PATH node --experimental-strip-types repro.mjs > resolver.json
+/Library/TeX/texbin/pdflatex -interaction=nonstopmode -halt-on-error probe.tex > compilation.txt
+Both final commands exited 0.
+Probe uses actual production imports; expected colors come from actual uncompressed PDF operators.

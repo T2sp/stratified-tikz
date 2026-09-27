@@ -1,0 +1,13 @@
+{
+  "compilations": [
+    {
+      "mode": "standalone",
+      "exitCode": 0
+    },
+    {
+      "mode": "inlineMath",
+      "exitCode": 0
+    }
+  ],
+  "operatorExtractionExitCode": 0
+}

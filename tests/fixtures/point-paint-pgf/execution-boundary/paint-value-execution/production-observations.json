@@ -1,0 +1,508 @@
+{
+  "exactRawSource": "\\tikzset{myPoint/.style={line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}},text=red}}",
+  "rawSourcePreserved": true,
+  "variants": [
+    {
+      "name": "untouched",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "reloaded",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "stale-reloaded",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "preset-reapplied",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "refreshed",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty",
+          "external-style-source-runtime-sty-2"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "local-text-red",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {
+        "text": "#FF0000"
+      },
+      "overriddenFields": [
+        "text.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "text=stzPointpText2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "text=stzPointpText2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "local-text-fallback",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {
+        "text": "#000000"
+      },
+      "overriddenFields": [
+        "text.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "text=stzPointpText2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "text=stzPointpText2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "local-fill-yellow",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {
+        "fill": "#FFFF00"
+      },
+      "overriddenFields": [
+        "fill.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "local-fill-fallback",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {
+        "fill": "#000000"
+      },
+      "overriddenFields": [
+        "fill.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "edited-refreshed",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty",
+          "external-style-source-runtime-sty-2"
+        ]
+      },
+      "local": {
+        "text": "#FF0000",
+        "fill": "#FFFF00"
+      },
+      "overriddenFields": [
+        "text.color",
+        "fill.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2",
+            "text=stzPointpText2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2",
+            "text=stzPointpText2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "undo",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {},
+      "overriddenFields": [],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": []
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": []
+        }
+      }
+    },
+    {
+      "name": "redo",
+      "resolution": {
+        "executionUncertain": true,
+        "diagnostics": [
+          "Unsupported executable paint option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty."
+        ],
+        "unresolvedFields": [
+          "fillColor",
+          "fillEnabled",
+          "drawColor",
+          "drawEnabled",
+          "textColor",
+          "fillOpacity",
+          "drawOpacity",
+          "textOpacity",
+          "lineWidth",
+          "dashPattern",
+          "dashPhase",
+          "lineCap",
+          "lineJoin"
+        ],
+        "sourceDependencies": [
+          "external-style-source-runtime-sty"
+        ]
+      },
+      "local": {
+        "text": "#FF0000",
+        "fill": "#FFFF00"
+      },
+      "overriddenFields": [
+        "text.color",
+        "fill.color"
+      ],
+      "modes": {
+        "standalone": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2",
+            "text=stzPointpText2"
+          ]
+        },
+        "inlineMath": {
+          "optionsAfterExternalKey": [
+            "fill=stzPointpFill2",
+            "text=stzPointpText2"
+          ]
+        }
+      }
+    }
+  ]
+}

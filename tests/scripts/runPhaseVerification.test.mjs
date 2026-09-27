@@ -536,14 +536,28 @@ function importRegressionEvidence(name) {
   const result = { download: { boundary: 'download', differencePaths: [] }, reload: { boundary: 'reload', differencePaths: [] },
     standalone: { pageErrors: [], observation: { contour: { fill: 'rgb(0, 0, 0)' }, leaves: [{ fill: 'rgb(0, 0, 0)' }] } } }
   if (name === 'point-paint-local-override-intent') {
-    for (const boundary of ['untouched', 'reset']) result[boundary] = snapshot('example', { fill: null, text: '#ff0000' })
-    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('example', { fill: '#123456', text: '#ff0000' })
-    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('example', { fill: '#000000', text: '#ff0000' })
+    for (const boundary of ['untouched', 'reset']) result[boundary] = snapshot('example', { fill: null, text: null })
+    for (const boundary of ['away', 'undone']) result[boundary] = snapshot('example', { fill: '#123456', text: null })
+    for (const boundary of ['back', 'redone', 'reloaded']) result[boundary] = snapshot('example', { fill: '#000000', text: null })
     result.settingsBefore = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
     result.settingsFocusBlur = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
     result.settingsFocusBlur.current.style = { importedPaint: { overriddenFields: [] } }
     result.settingsFocusBlur.focusBlurControls = ['Fill opacity', 'Border width'].map((name) => ({ name, before: '1', after: '1', focused: true, blurred: true }))
     result.settingsBack = snapshot('unknown controls', { fill: null, text: null, draw: null, 'fill opacity': '1', 'line width': '0.4pt' })
+    const source = '\\tikzstyle{example}=[fill=\\mycolor,text=red]\n\\tikzstyle{unknown controls}=[fill=\\mycolor,text=\\mytext,draw=\\myborder,fill opacity=\\myalpha,line width=\\mywidth]\n'
+    for (const boundary of ['untouched', 'away', 'back', 'undone', 'redone', 'reloaded', 'reset', 'settingsBefore', 'settingsFocusBlur', 'settingsBack']) {
+      const entry = result[boundary]
+      entry.warnings = ['Unsupported executable paint option: fill=\\mycolor. Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.']
+      entry.modelDiagnostics = { validation: { valid: true }, resolution: { executionUncertain: true, diagnostics: entry.warnings,
+        unresolvedFields: ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity',
+          'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin'] }, reference: { previewDiagnostics: entry.warnings } }
+      entry.diagram = { externalTikzStyleSources: [{ rawSource: source }] }
+      const overriddenFields = ['untouched', 'reset', 'settingsBefore', 'settingsFocusBlur'].includes(boundary) ? []
+        : boundary === 'settingsBack' ? ['fill.opacity', 'stroke.width'] : ['fill.color']
+      entry.current.style = { paint: { fill: { color: ['away', 'undone'].includes(boundary) ? '#123456' : '#000000' } }, importedPaint: { overriddenFields } }
+      entry.observation.leaves[0].fillAlpha = 1
+    }
+    result.standalone.observation = result.reloaded.observation
   } else if (name === 'point-paint-cross-file-resolution') {
     for (const boundary of ['crossFile', 'reloaded']) result[boundary] = snapshot('outer', { fill: '#ff0000', text: '#00ff00', draw: '#0000ff' })
     result.priorColor = snapshot('outer', { fill: '#123456', text: '#00ff00', draw: '#0000ff' })
@@ -1091,6 +1105,39 @@ for (const name of importRegressionScenarios) {
       assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
     })
   }
+}
+
+for (const boundary of ['untouched', 'away', 'back', 'undone', 'redone', 'reloaded', 'reset', 'settingsBefore', 'settingsFocusBlur', 'settingsBack']) {
+  for (const fault of ['stale-red-after-key', 'missing-execution', 'missing-unresolved', 'missing-diagnostic', 'lost-reference-diagnostic', 'invented-text-intent']) {
+    test(`32B executable value intent rejects ${boundary} ${fault}`, (t) => {
+      const fixture = checkoutFixture(t)
+      completePointEvidence(fixture)
+      const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+      const entry = artifacts['point-paint-local-override-intent.json'][boundary]
+      if (fault === 'stale-red-after-key') entry.output.inlineMath = '\\definecolor{staleRed}{HTML}{FF0000}\n'
+        + entry.output.inlineMath.replace(`${entry.key},`, `${entry.key},text=staleRed,`)
+      if (fault === 'missing-execution') delete entry.modelDiagnostics.resolution.executionUncertain
+      if (fault === 'missing-unresolved') entry.modelDiagnostics.resolution.unresolvedFields = ['fillColor', 'lineWidth']
+      if (fault === 'missing-diagnostic') entry.modelDiagnostics.resolution.diagnostics = []
+      if (fault === 'lost-reference-diagnostic') entry.modelDiagnostics.reference.previewDiagnostics = []
+      if (fault === 'invented-text-intent') entry.current.style.importedPaint.overriddenFields.push('text.color')
+      fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+      assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+    })
+  }
+}
+
+for (const field of ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity',
+  'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']) {
+  test(`32B executable value intent rejects reloaded certainty for ${field}`, (t) => {
+    const fixture = checkoutFixture(t)
+    completePointEvidence(fixture)
+    const artifacts = JSON.parse(fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES)
+    const resolution = artifacts['point-paint-local-override-intent.json'].reloaded.modelDiagnostics.resolution
+    resolution.unresolvedFields = resolution.unresolvedFields.filter((value) => value !== field)
+    fixture.env.STZ_TEST_POINT_ARTIFACT_VALUES = JSON.stringify(artifacts)
+    assert.throws(() => verify(t, fixture, '32B'), /evidence is incomplete or invalid/)
+  })
 }
 
 for (const fault of ['claimed-unknown-fill', 'claimed-unknown-text', 'claimed-unknown-handler-paint', 'missing-runtime-uncertainty', 'missing-noncolor-return', 'missing-later-import', 'missing-prior-color', 'reversed-hints', 'missing-diagnostic',

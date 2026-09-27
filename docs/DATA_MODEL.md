@@ -2514,6 +2514,12 @@ retain their narrower recovery rules. No code body is interpreted.
 This invocation-time policy retains the accepted declaration and exact source;
 it does not reject otherwise supported top-level `.style` storage. The flag is
 derived during reconstruction, not a persisted authority or new schema field.
+It also applies to executable values of recognized paint keys: dimension,
+opacity, color/mixture, dash and cap/join handlers can expand TeX even when their
+names are supported. A shared bounded classification runs before literal parsing
+and during retained-list dependency scans, including unknown-directory paths.
+Grouping braces and ordinary invalid literals do not cause this global state;
+their established field-specific diagnostics and recovery remain intact.
 JSON reload reestablishes the uncertainty and reference diagnostics from raw
 source or existing legacy reference options. Import refresh, first editing and
 both exports cannot infer local intent from stale saved snapshot differences

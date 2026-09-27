@@ -1,0 +1,39 @@
+{
+  "preview": {
+    "textColor": "#FF0000",
+    "diagnostics": [
+      "Unsupported or invalid preview option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}}"
+    ],
+    "unresolvedFields": [
+      "lineWidth"
+    ],
+    "sourceDependencies": [
+      "external-style-source-runtime-sty"
+    ]
+  },
+  "parse": {
+    "styles": [
+      {
+        "key": "myPoint",
+        "options": "line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}},text=red"
+      }
+    ],
+    "skipped": 0,
+    "warnings": [
+      {
+        "message": "myPoint: Unsupported or invalid preview option: line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}}"
+      }
+    ],
+    "declarations": [
+      {
+        "kind": "definition",
+        "key": "myPoint",
+        "options": "line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}},text=red"
+      }
+    ],
+    "rawOptions": {
+      "myPoint": "line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}},text=red"
+    },
+    "colors": {}
+  }
+}

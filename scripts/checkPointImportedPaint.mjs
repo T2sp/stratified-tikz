@@ -49,6 +49,24 @@ export async function runPointImportedPaintChecks(context) {
   function assertOutput(entry, expected) {
     for (const actual of Object.values(entry.postExternal)) assertPostExternalPointPaint(actual, expected)
   }
+  function assertIntentOutput(entry, expected, overriddenFields) {
+    assertOutput(entry, { fill: null, text: null, draw: null, color: null, opacity: null,
+      'fill opacity': null, 'draw opacity': null, 'text opacity': null, 'line width': null,
+      'dash pattern': null, 'dash phase': null, 'line cap': null, 'line join': null, ...expected })
+    const diagnostics = entry.modelDiagnostics, resolution = diagnostics?.resolution
+    assert.equal(diagnostics?.validation?.valid, true, 'Executable value leaves a valid opaque imported model')
+    assert.equal(resolution?.executionUncertain, true, 'Recognized executable values retain invocation uncertainty')
+    for (const field of ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity',
+      'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']) {
+      assert.ok(resolution.unresolvedFields?.includes(field), `${field} remains unresolved across local edits and persistence`)
+    }
+    for (const warnings of [resolution.diagnostics, diagnostics.reference?.previewDiagnostics, entry.warnings]) {
+      assert.ok(warnings?.some((warning) => /executable paint option:/.test(warning)), 'Executable recognized value has an actionable diagnostic')
+      assert.ok(warnings?.some((warning) => /bindings and option handlers remain unknown/.test(warning)), 'Diagnostic retains the affected execution boundary')
+    }
+    assert.ok(entry.diagram.externalTikzStyleSources.some((source) => source.rawSource === sources.intent), 'Exact executable value source survives')
+    assert.deepEqual(entry.current.style.importedPaint.overriddenFields, overriddenFields, 'Only accepted edits record local paint intent')
+  }
   async function writeOutput(entry, suffix = '') {
     for (const [mode, code] of Object.entries(entry.output)) await writeFile(resolve(artifactDir, `${scenario}${suffix}-${mode}.tex`), code)
   }
@@ -96,21 +114,24 @@ export async function runPointImportedPaintChecks(context) {
   await start('point-paint-local-override-intent')
   await importSource('intent.sty', sources.intent, 'example'); await apply('example')
   const untouched = await snapshot('untouched-macro', 'example')
-  assertOutput(untouched, { fill: null, text: '#ff0000' }); await writeOutput(untouched, '-untouched')
+  assertIntentOutput(untouched, {}, []); await writeOutput(untouched, '-untouched')
   await edit('Fill color', '#123456')
-  const away = await snapshot('fill-away', 'example'); assertOutput(away, { fill: '#123456' })
+  const away = await snapshot('fill-away', 'example'); assertIntentOutput(away, { fill: '#123456' }, ['fill.color'])
   await edit('Fill color', '#000000')
-  const back = await snapshot('fill-back', 'example'); assertOutput(back, { fill: '#000000', text: '#ff0000' })
-  assertPointPaint(back.observation, { fill: 'rgb(0, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
-  await undo(); const undone = await snapshot('undo-fill-back', 'example'); assertOutput(undone, { fill: '#123456' })
-  await redo(); const redone = await snapshot('redo-fill-back', 'example'); assertOutput(redone, { fill: '#000000' })
-  const persistence = await persist('example', { fill: '#000000', text: '#ff0000' })
-  const standalone = await downloadSvg({ fill: 'rgb(0, 0, 0)', text: 'rgb(255, 0, 0)', textAlpha: 1 })
+  const back = await snapshot('fill-back', 'example'); assertIntentOutput(back, { fill: '#000000' }, ['fill.color'])
+  assertPointPaint(back.observation, { fill: 'rgb(0, 0, 0)', text: 'rgb(0, 0, 0)', textAlpha: 1 })
+  await undo(); const undone = await snapshot('undo-fill-back', 'example'); assertIntentOutput(undone, { fill: '#123456' }, ['fill.color'])
+  await redo(); const redone = await snapshot('redo-fill-back', 'example'); assertIntentOutput(redone, { fill: '#000000' }, ['fill.color'])
+  assert.deepEqual(undone.current, away.current, 'Undo preserves the exact local fill edit and external text')
+  assert.deepEqual(redone.current, back.current, 'Redo preserves the exact fallback-equal fill edit and external text')
+  const persistence = await persist('example', { fill: '#000000', text: null })
+  assertIntentOutput(persistence.reloaded, { fill: '#000000' }, ['fill.color'])
+  const standalone = await downloadSvg({ fill: 'rgb(0, 0, 0)', text: 'rgb(0, 0, 0)', textAlpha: 1 })
   await apply('example')
-  const reset = await snapshot('reapplied-preset', 'example'); assertOutput(reset, { fill: null })
+  const reset = await snapshot('reapplied-preset', 'example'); assertIntentOutput(reset, {}, [])
   await apply('unknown controls')
   const settingsBefore = await snapshot('unknown-settings-untouched', 'unknown controls')
-  assertOutput(settingsBefore, { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
+  assertIntentOutput(settingsBefore, {}, [])
   const focusBlurControls = []
   for (const name of ['Fill opacity', 'Border width']) {
     const control = await resolvePointInspectorField(page, name, 'input[type="text"]')
@@ -124,7 +145,7 @@ export async function runPointImportedPaintChecks(context) {
   const settingsFocusBlur = await snapshot('unknown-settings-unedited-focus-blur', 'unknown controls')
   settingsFocusBlur.focusBlurControls = focusBlurControls
   await diagnose({ boundary: 'native-unedited-focus-blur-before-assertions', settingsBefore, settingsFocusBlur })
-  assertOutput(settingsFocusBlur, { fill: null, text: null, draw: null, 'fill opacity': null, 'line width': null })
+  assertIntentOutput(settingsFocusBlur, {}, [])
   assert.deepEqual(settingsFocusBlur.current.style.importedPaint.overriddenFields, [], 'Focus/blur without input creates no local paint intent')
   assert.equal(settingsFocusBlur.state.json, settingsBefore.state.json, 'Unedited numeric focus/blur preserves the model')
   assert.equal(settingsFocusBlur.state.history, settingsBefore.state.history, 'Unedited numeric focus/blur creates no history entry')
@@ -134,7 +155,7 @@ export async function runPointImportedPaintChecks(context) {
   await edit('Fill opacity', '.25'); await edit('Fill opacity', '1')
   await edit('Border width', '2'); await edit('Border width', '.4')
   const settingsBack = await snapshot('unknown-settings-return', 'unknown controls')
-  assertOutput(settingsBack, { fill: null, text: null, draw: null, 'fill opacity': '1', 'line width': '0.4pt' })
+  assertIntentOutput(settingsBack, { 'fill opacity': '1', 'line width': '0.4pt' }, ['fill.opacity', 'stroke.width'])
   await saved({ untouched, away, back, undone, redone, reset, settingsBefore, settingsFocusBlur, settingsBack, ...persistence, standalone })
 
   await start('point-paint-cross-file-resolution')

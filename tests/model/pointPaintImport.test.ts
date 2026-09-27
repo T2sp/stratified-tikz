@@ -303,12 +303,13 @@ test('common xcolor names, chained mixtures and literal definecolor models are b
 })
 
 test('invalid values and deferred shape/layout options are retained and diagnosed', () => {
-  const options = String.raw`fill=\myColor,text=unknown,draw opacity=1.2,line width=NaN,opacity=0x1,minimum size=1cm,rectangle,isosceles triangle,text width=3cm`
+  const options = String.raw`fill=unknownFill,text=unknown,draw opacity=1.2,line width=NaN,opacity=0x1,minimum size=1cm,rectangle,isosceles triangle,text width=3cm`
   const preview = parseTikzStylePreviewOptions(options)
   assert.equal(preview.fillColor, undefined)
   assert.equal(preview.textColor, undefined)
   assert.equal(preview.pointShape, undefined)
   assert.equal(preview.pointSize, undefined)
+  assert.equal(preview.executionUncertain, undefined, 'ordinary invalid literals do not imply execution')
   assert.equal(preview.diagnostics?.length, 9)
   const result = importTikzStyleFile(diagram(), 'paint.sty', `\\tikzstyle{node}=[${options}]`)
   assert.equal(result.references[0].options, options)
@@ -381,11 +382,10 @@ test('mixed paint local overrides follow external style and overall alpha multip
 test('unknown external paint retains its TikZ meaning until explicitly overridden', () => {
   const result = applied(String.raw`\tikzstyle{node}=[fill=\unknownColor,text=red,rectangle]`, 'node')
   const nodeBlock = generateTikz(result).match(/\\node\[[\s\S]*?\] at/)?.[0] ?? ''
-  assert.match(nodeBlock, /node,/)
-  assert.doesNotMatch(nodeBlock.slice(nodeBlock.indexOf('node,')), /fill=/)
+  assert.match(nodeBlock, /,\s*node\s*\] at$/, 'all untouched paint stays before the external key')
   const point = result.strata[0]
   if (point.geometricKind !== 'point' || !point.style.paint) throw new Error('Expected point paint')
-  point.style = { ...point.style, paint: { ...point.style.paint, fill: { ...point.style.paint.fill, color: '#123456' } } }
+  point.style = markPointPaintOverrides({ ...point.style, paint: { ...point.style.paint, fill: { ...point.style.paint.fill, color: '#123456' } } }, ['fill.color'])
   assert.match(generateTikz(result), /node,[\s\S]*fill=stzPointpaintFill/)
 })
 

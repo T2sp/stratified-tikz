@@ -1,0 +1,236 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 2,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 2,
+    "layers": [
+      {
+        "value": 0,
+        "name": "Layer 0"
+      }
+    ],
+    "userStylePresets": [
+      {
+        "id": "user-curve-mypoint",
+        "name": "myPoint",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-sheet-mypoint",
+        "name": "myPoint",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#4D9DE0",
+          "fillOpacity": 0.35,
+          "strokeColor": "#4D9DE0",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint2",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-region-mypoint",
+        "name": "myPoint",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint3",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-label-mypoint",
+        "name": "myPoint",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#FF0000",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint4",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-point-mypoint",
+        "name": "myPoint",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3,
+          "paint": {
+            "text": {
+              "color": "#FF0000",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "importedPaint": {
+            "referenceId": "imported-style-mypoint",
+            "baseline": {
+              "text": {
+                "color": "#FF0000",
+                "opacity": 1
+              },
+              "fill": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1
+              },
+              "stroke": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1,
+                "width": 0.4,
+                "lineStyle": "solid",
+                "dashPhase": 0,
+                "lineCap": "butt",
+                "lineJoin": "miter"
+              }
+            },
+            "overriddenFields": []
+          }
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint5",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      }
+    ],
+    "externalTikzStyleSources": [
+      {
+        "id": "external-style-source-runtime-sty",
+        "name": "runtime.sty",
+        "rawSource": "\\tikzset{myPoint/.style={line width={+1pt\\relax\\globalcolorstrue\\definecolor{red}{HTML}{0000FF}},text=red}}",
+        "loadHint": "\\input{runtime.sty}"
+      }
+    ],
+    "importedTikzStyleReferences": [
+      {
+        "id": "imported-style-mypoint",
+        "key": "myPoint",
+        "sourceId": "external-style-source-runtime-sty",
+        "displayName": "myPoint",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "text=red",
+        "rawOptions": "text=red",
+        "previewDiagnostics": [
+          "Retained saved diagnostic."
+        ]
+      }
+    ],
+    "strata": [
+      {
+        "id": "p",
+        "codim": 2,
+        "geometricKind": "point",
+        "name": "Point",
+        "text": "APP",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3,
+          "paint": {
+            "text": {
+              "color": "#FF0000",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "importedPaint": {
+            "referenceId": "imported-style-mypoint",
+            "baseline": {
+              "text": {
+                "color": "#FF0000",
+                "opacity": 1
+              },
+              "fill": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1
+              },
+              "stroke": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1,
+                "width": 0.4,
+                "lineStyle": "solid",
+                "dashPhase": 0,
+                "lineCap": "butt",
+                "lineJoin": "miter"
+              }
+            },
+            "overriddenFields": []
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "layer": 0,
+        "stylePresetId": "user-point-mypoint",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      }
+    ],
+    "labels": []
+  }
+}

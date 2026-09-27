@@ -1,0 +1,172 @@
+{
+  "pgfVersion": "3.1.11a",
+  "compilationExitCode": 0,
+  "expectedExternalTextOperator": "0 0 1 rg",
+  "expectationSource": "The preserved independently compiled before/probe.pdf external PGF node, not application resolution.",
+  "observations": [
+    {
+      "mode": "standalone",
+      "nodes": [
+        {
+          "name": "external",
+          "body": "PGF",
+          "textOperator": "0 0 1 rg"
+        },
+        {
+          "name": "untouched",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "reloaded",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "stale-reloaded",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "preset-reapplied",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "refreshed",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-text-red",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-text-fallback",
+          "body": "APP",
+          "textOperator": "0 0 0 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-fill-yellow",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "1 1 0 rg"
+        },
+        {
+          "name": "local-fill-fallback",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "edited-refreshed",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "1 1 0 rg"
+        },
+        {
+          "name": "undo",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "redo",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "1 1 0 rg"
+        }
+      ]
+    },
+    {
+      "mode": "inlineMath",
+      "nodes": [
+        {
+          "name": "external",
+          "body": "PGF",
+          "textOperator": "0 0 1 rg"
+        },
+        {
+          "name": "untouched",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "reloaded",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "stale-reloaded",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "preset-reapplied",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "refreshed",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-text-red",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-text-fallback",
+          "body": "APP",
+          "textOperator": "0 0 0 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "local-fill-yellow",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "1 1 0 rg"
+        },
+        {
+          "name": "local-fill-fallback",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "edited-refreshed",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "1 1 0 rg"
+        },
+        {
+          "name": "undo",
+          "body": "APP",
+          "textOperator": "0 0 1 rg",
+          "fillOperator": "0 0 0 rg"
+        },
+        {
+          "name": "redo",
+          "body": "APP",
+          "textOperator": "1 0 0 rg",
+          "fillOperator": "1 1 0 rg"
+        }
+      ]
+    }
+  ]
+}

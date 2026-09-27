@@ -51,9 +51,9 @@ function state(diagram: Diagram): UndoableEditorState {
 }
 function options(diagram: Diagram, mode: 'standalone' | 'inlineMath'): { tail: string; colors: Map<string, string> } {
   const tikz = generateTikz(diagram, { exportMode: mode })
-  const line = [...tikz.matchAll(/\\node\[([\s\S]*?)\]/g)].map((match) => match[1]).find((entry) => entry.includes('example,'))
+  const line = [...tikz.matchAll(/\\node\[([\s\S]*?)\]/g)].map((match) => match[1].split(',').map((entry) => entry.trim())).find((entries) => entries.includes('example'))
   assert.ok(line, tikz)
-  return { tail: line.slice(line.indexOf('example,') + 'example,'.length).split(',').map((entry) => entry.trim()).join(','),
+  return { tail: line.slice(line.indexOf('example') + 1).join(','),
     colors: new Map([...tikz.matchAll(/\\definecolor\{([^}]+)\}\{HTML\}\{([^}]+)\}/g)].map((match) => [match[1], `#${match[2].toUpperCase()}`])) }
 }
 function assertBlackOverride(diagram: Diagram): void {
@@ -68,11 +68,11 @@ function assertBlackOverride(diagram: Diagram): void {
 test('macro fill edit away and back records local black through reload and production undo/redo', () => {
   const original = fixture()
   assert.deepEqual(point(original).style.importedPaint?.overriddenFields, [])
-  for (const mode of ['standalone', 'inlineMath'] as const) assert.doesNotMatch(options(original, mode).tail, /(?:^|,)\s*fill=/)
+  for (const mode of ['standalone', 'inlineMath'] as const) assert.equal(options(original, mode).tail, '', 'every untouched channel remains external after macro execution')
   const away = edit(original, 'fill.color', (style) => { getPointPaint(style).fill.color = '#123456' })
   const back = edit(away, 'fill.color', (style) => { getPointPaint(style).fill.color = '#000000' })
   assert.deepEqual(point(back).style.importedPaint?.overriddenFields, ['fill.color'])
-  assert.equal(getPointPaint(point(back).style).text.color, '#FF0000')
+  assert.equal(getPointPaint(point(back).style).text.color, '#000000', 'later red cannot resolve against a stale binding')
   let current = state(original)
   current = commitDiagramChange(current, { ...current, editableDiagram: away })
   current = commitDiagramChange(current, { ...current, editableDiagram: back })
@@ -83,8 +83,11 @@ test('macro fill edit away and back records local black through reload and produ
   assert.equal(point(reload(redone)).text, '  $F$  ')
 })
 
-test('legacy diagrams initialize intent at the editing boundary, preserving distinguishable saved edits', () => {
-  const old = fixture()
+for (const [name, source, fields] of [
+  ['ordinary invalid color', String.raw`\tikzstyle{example}=[fill=unknownPlain,text=red]`, ['fill.color', 'stroke.width']],
+  ['executable macro color', String.raw`\tikzstyle{example}=[fill=\mycolor,text=red]`, ['fill.color']],
+] as const) test(`legacy ${name} initializes intent only when saved differences establish authorship`, () => {
+  const old = fixture(source)
   delete point(old).style.importedPaint
   const importedPreset = preset(old)
   delete importedPreset.style.importedPaint
@@ -93,8 +96,13 @@ test('legacy diagrams initialize intent at the editing boundary, preserving dist
   assert.equal(point(loaded).style.importedPaint, undefined)
   const away = edit(loaded, 'fill.color', (style) => { getPointPaint(style).fill.color = '#123456' })
   const back = edit(away, 'fill.color', (style) => { getPointPaint(style).fill.color = '#000000' })
-  assert.deepEqual(point(back).style.importedPaint?.overriddenFields, ['fill.color', 'stroke.width'])
+  assert.deepEqual(point(back).style.importedPaint?.overriddenFields, fields)
   assertBlackOverride(reload(back))
+  for (const mode of ['standalone', 'inlineMath'] as const) {
+    const tail = options(reload(back), mode).tail
+    if (name === 'ordinary invalid color') assert.match(tail, /line width=2\.5pt/)
+    else assert.doesNotMatch(tail, /(?:^|,)(?:line width|text)=/, 'unrecorded old values are not new intent after execution')
+  }
   const equal = edit(loaded, 'fill.color', () => {})
   assertBlackOverride(equal)
 })

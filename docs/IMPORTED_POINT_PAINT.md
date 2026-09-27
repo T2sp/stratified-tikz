@@ -159,6 +159,22 @@ Runtime handler suffixes such as `shape aspect/.style` and nonliteral key tokens
 are checked before deferred-layout classification. A layout-like prefix cannot
 hide a handler definition or restore later paint certainty.
 
+Recognized paint keys use the same executable-value boundary as deferred layout
+keys, before field-specific literal parsing. This includes color/mixture,
+dimension, opacity, dash, cap/join, named thickness and line-style keys, with
+normalized whitespace, aliases and supported absolute `/tikz/...` spellings.
+Backslash, `#`, `~`, `^`, `$`, `&` or `%` in a value conservatively signals
+execution-capable syntax; the payload is never evaluated. Thus
+`line width={+1pt\relax\globalcolorstrue\definecolor{red}{HTML}{0000FF}}`
+invalidates binding/handler certainty for the invocation instead of only
+reporting an invalid width. Subsequent relative or absolute paint cannot restore
+certainty. Ordinary resolution and retained mutation/dependency traversal share
+this rule and their existing bounds, including when the directory is unknown.
+Braces alone are grouping, so valid braced literals remain supported. Plain
+invalid widths, out-of-range opacity and unknown plain colors retain their
+field-specific diagnostics and later supported recovery; parse failure by
+itself does not imply arbitrary execution.
+
 Recognizable unsupported declarations targeting a literal key (including
 `.append style`, `.prefix style` and `\tikzstyle{key}+=[...]`) are retained as
 ordered invalidations.
@@ -445,3 +461,14 @@ equal to the visible fallback; fill-only edits leave text blue. All 18 node
 observations come from actual PDF operators. The supplied failure establishes a
 color-binding side effect; handler mutation receives separate parser regression
 coverage and is not claimed as a second observation from these PDFs.
+
+[The recognized-paint-value follow-up](../tests/fixtures/point-paint-pgf/execution-boundary/paint-value-execution/README.md)
+retains the exact executable `line width={+1pt\relax...}` failure separately.
+The original external node was blue and both application nodes forced red.
+Corrected standalone and inline-math compilations against byte-identical source
+show external blue preserved through import, reload, stale snapshots, preset
+reapplication, refresh and Undo. Explicit red/black text and yellow/black fill
+(including fallback-equal choices) remain effective through persistence,
+refresh and Redo; fill-only edits leave text blue. All 26 observations use actual
+PGF 3.1.11a/pdfTeX 1.40.29 PDF operators. Other paint-value families have parser
+boundary regressions, not independent compilation claims.

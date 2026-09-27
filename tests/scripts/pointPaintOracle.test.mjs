@@ -22,6 +22,19 @@ test('external paint oracle uses the actual post-key options and resolves the fi
   assert.throws(() => observePostExternalPointPaint(code + '\n\\node[example] at (2,0) {};', 'example'))
 })
 
+for (const mode of ['standalone', 'inlineMath']) test(`${mode} executable-value oracle rejects untouched red after the external key while retaining explicit fill`, () => {
+  const fragment = String.raw`\definecolor{staleRed}{HTML}{FF0000}
+\definecolor{editedFill}{HTML}{123456}
+\node[text=staleRed,example,fill=editedFill] at (0,0) {APP};`
+  const output = mode === 'standalone' ? `\\begin{tikzpicture}\n${fragment}\n\\end{tikzpicture}` : `\\tikz{\n${fragment}\n}`
+  assertPostExternalPointPaint(observePostExternalPointPaint(output, 'example'), { fill: '#123456', text: null, draw: null })
+  for (const paint of ['text=staleRed', 'text=red']) {
+    const stale = output.replace('example,fill=editedFill', `example,${paint},fill=editedFill`)
+    assert.throws(() => assertPostExternalPointPaint(observePostExternalPointPaint(stale, 'example'),
+      { fill: '#123456', text: null, draw: null }), /Unknown external text remains authoritative/)
+  }
+})
+
 test('detached point oracle examines the literal target and checks every explicit paint setting', () => {
   const code = String.raw`\definecolor{target}{HTML}{123456}
 \definecolor{other}{HTML}{654321}

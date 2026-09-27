@@ -399,11 +399,14 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
     }
   };
   if (name === "point-paint-local-override-intent") {
-    for (const boundary of ["untouched", "reset"]) check(boundary, "example", { fill: null, text: "#ff0000" });
-    for (const boundary of ["away", "undone"]) check(boundary, "example", { fill: "#123456", text: "#ff0000" });
-    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "example", { fill: "#000000", text: "#ff0000" });
-    check("settingsBefore", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": null, "line width": null });
-    check("settingsFocusBlur", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": null, "line width": null });
+    const externalPaint = { fill: null, text: null, draw: null, color: null, opacity: null,
+      "fill opacity": null, "draw opacity": null, "text opacity": null, "line width": null,
+      "dash pattern": null, "dash phase": null, "line cap": null, "line join": null };
+    for (const boundary of ["untouched", "reset"]) check(boundary, "example", externalPaint);
+    for (const boundary of ["away", "undone"]) check(boundary, "example", { ...externalPaint, fill: "#123456" });
+    for (const boundary of ["back", "redone", "reloaded"]) check(boundary, "example", { ...externalPaint, fill: "#000000" });
+    check("settingsBefore", "unknown controls", externalPaint);
+    check("settingsFocusBlur", "unknown controls", externalPaint);
     const noEdit = evidence.settingsFocusBlur, overrides = noEdit.current.style?.importedPaint?.overriddenFields;
     if (!Array.isArray(overrides) || overrides.length !== 0
       || noEdit.state.json !== evidence.settingsBefore.state.json || noEdit.state.history !== evidence.settingsBefore.state.history
@@ -412,7 +415,31 @@ function validateImportedPaintEvidence(artifactDir, name, group) {
         && control.focused === true && control.blurred === true && typeof control.before === "string" && control.before === control.after).length === 1)) {
       throw new Error("Unedited native numeric focus/blur must preserve unknown paint, local intent and history");
     }
-    check("settingsBack", "unknown controls", { fill: null, text: null, draw: null, "fill opacity": "1", "line width": "0.4pt" });
+    check("settingsBack", "unknown controls", { ...externalPaint, "fill opacity": "1", "line width": "0.4pt" });
+    const source = "\\tikzstyle{example}=[fill=\\mycolor,text=red]\n\\tikzstyle{unknown controls}=[fill=\\mycolor,text=\\mytext,draw=\\myborder,fill opacity=\\myalpha,line width=\\mywidth]\n";
+    for (const boundary of ["untouched", "away", "back", "undone", "redone", "reloaded", "reset", "settingsBefore", "settingsFocusBlur", "settingsBack"]) {
+      const entry = evidence[boundary], diagnostics = entry.modelDiagnostics, resolution = diagnostics?.resolution;
+      assert.equal(diagnostics?.validation?.valid, true, "Executable recognized value model remains valid");
+      assert.equal(resolution?.executionUncertain, true, "Recognized value execution uncertainty persists at every native boundary");
+      for (const field of ["fillColor", "fillEnabled", "drawColor", "drawEnabled", "textColor", "fillOpacity", "drawOpacity",
+        "textOpacity", "lineWidth", "dashPattern", "dashPhase", "lineCap", "lineJoin"]) {
+        assert.ok(resolution.unresolvedFields?.includes(field), `${field} remains unresolved after executable values and local edits`);
+      }
+      for (const warnings of [resolution.diagnostics, diagnostics.reference?.previewDiagnostics, entry.warnings]) {
+        assert.ok(warnings?.some((warning) => /executable paint option:/.test(warning)), "Recognized executable value diagnostic survives");
+        assert.ok(warnings?.some((warning) => /bindings and option handlers remain unknown/.test(warning)), "Binding and handler uncertainty remains actionable");
+      }
+      assert.ok(entry.diagram?.externalTikzStyleSources?.some((entry) => entry.rawSource === source), "Exact executable value source survives every boundary");
+      const expectedOverrides = ["untouched", "reset", "settingsBefore", "settingsFocusBlur"].includes(boundary) ? []
+        : boundary === "settingsBack" ? ["fill.opacity", "stroke.width"] : ["fill.color"];
+      assert.deepEqual(entry.current.style?.importedPaint?.overriddenFields, expectedOverrides, "Only accepted local edits can override uncertain external paint");
+    }
+    for (const boundary of ["untouched", "back", "redone", "reloaded", "reset", "settingsBefore", "settingsFocusBlur", "settingsBack"]) {
+      assertPointPaint(evidence[boundary].observation, { fill: "rgb(0, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+    }
+    assertPointPaint(evidence.standalone.observation, { fill: "rgb(0, 0, 0)", text: "rgb(0, 0, 0)", textAlpha: 1 });
+    assert.deepEqual(evidence.undone.current, evidence.away.current, "Undo preserves local fill and untouched external text");
+    assert.deepEqual(evidence.redone.current, evidence.back.current, "Redo preserves fallback-equal fill intent and untouched external text");
   } else if (name === "point-paint-cross-file-resolution") {
     for (const boundary of ["crossFile", "reloaded"]) check(boundary, "outer", { fill: "#ff0000", text: "#00ff00", draw: "#0000ff" });
     check("priorColor", "outer", { fill: "#123456", text: "#00ff00", draw: "#0000ff" });

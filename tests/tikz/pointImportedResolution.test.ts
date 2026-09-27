@@ -78,20 +78,23 @@ test('post-key paint agrees with independently compiled PGF import-order observa
 })
 
 test('enablement-only edits use bare fill/draw without claiming unknown external colors', () => {
-  for (const channel of ['fill', 'stroke'] as const) {
-    const key = channel === 'fill' ? 'fill' : 'draw'
-    let diagram = apply(importTikzStyleFile(empty(), 'unknown.sty', `\\tikzstyle{example}=[${key}=\\unknown,text=red]`).diagram, 'example')
-    for (const enabled of [false, true]) diagram = edit(diagram, `${channel}.enabled`, (style) => {
-      const paint = getPointPaint(style)
-      return { ...style, paint: { ...paint, [channel]: { ...paint[channel], enabled } } }
-    })
-    const loaded = parseSavedDiagramJson(serializeDiagram(diagram))
-    assert.ok(loaded.ok)
-    for (const mode of modes) {
-      const actual = afterKey(loaded.diagram, 'example', mode)
-      assert.ok(actual.options.includes(key))
-      assert.ok(!actual.options.some((option) => option.startsWith(`${key}=`)))
-      assert.equal(actual.color('text'), '#FF0000')
+  for (const externalColor of ['unknownPlain', String.raw`\unknown`]) {
+    for (const channel of ['fill', 'stroke'] as const) {
+      const key = channel === 'fill' ? 'fill' : 'draw'
+      let diagram = apply(importTikzStyleFile(empty(), 'unknown.sty', `\\tikzstyle{example}=[${key}=${externalColor},text=red]`).diagram, 'example')
+      for (const enabled of [false, true]) diagram = edit(diagram, `${channel}.enabled`, (style) => {
+        const paint = getPointPaint(style)
+        return { ...style, paint: { ...paint, [channel]: { ...paint[channel], enabled } } }
+      })
+      const loaded = parseSavedDiagramJson(serializeDiagram(diagram))
+      assert.ok(loaded.ok)
+      for (const mode of modes) {
+        const actual = afterKey(loaded.diagram, 'example', mode)
+        assert.ok(actual.options.includes(key))
+        assert.ok(!actual.options.some((option) => option.startsWith(`${key}=`)))
+        assert.equal(actual.color('text'), externalColor === 'unknownPlain' ? '#FF0000' : undefined)
+        if (externalColor !== 'unknownPlain') assert.deepEqual(actual.options, [key], 'only recorded enablement follows executable external paint')
+      }
     }
   }
 })

@@ -187,15 +187,20 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     paintFields.forEach((field) => unresolved.add(field))
     retainAllSourceHints(`${message} Runtime color bindings and option handlers remain unknown; later paint cannot restore certainty.`)
   }
-  // Known paint keys with invalid literal arguments retain field-local recovery.
+  // Known paint keys with ordinary invalid literals retain field-local recovery.
   // An unknown key/handler can run arbitrary code; do not guess its effects.
   const hasRuntimeHandlerSyntax = (key: string) => /\/\s*\./.test(key) || /[\\{}#=$%~^&]/.test(key)
   const isPaintOrLayoutKey = (key: string) => !key.includes('/') && !hasRuntimeHandlerSyntax(key) && (Object.hasOwn(keyFields, key)
     || Object.hasOwn(thickness, key) || Object.hasOwn(lineStyles, key) || deferredShapeLayout.test(key))
   const isColorOption = (key: string) => Object.hasOwn(context.colors ?? {}, key)
     || Object.hasOwn(namedTikzColors, key) || key.includes('!')
-  const hasExecutableLayoutValue = (key: string, value: string) => deferredShapeLayout.test(key)
+  // Classify values before literal parsing: recognized handlers can expand TeX
+  // too. Use the same boundary for ordinary and dependency-only traversal,
+  // including normalized /tikz keys. Braces alone are literal grouping.
+  const hasExecutableOptionValue = (key: string, value: string) => isPaintOrLayoutKey(key)
     && /[\\#~^$&%]/.test(value)
+  const executableValueDiagnostic = (key: string, option: string) =>
+    `Unsupported executable ${deferredShapeLayout.test(key) ? 'layout' : 'paint'} option: ${option}`
   const collectOptionDependencies = (body: string, active: readonly string[], directoryKnown = true): boolean => {
     if (body.length > 100_000 || active.length > 16) {
       loseExecutionCertainty('Style dependency scan exceeds its preview bound; unvisited options may execute code.')
@@ -223,8 +228,8 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
       const identity = canonicalTikzStyleKey(key)
       const definition = styles.get(identity)
       if (hasRuntimeHandlerSyntax(key)) loseExecutionCertainty(`Unsupported executable runtime key: ${option}`)
-      if (hasExecutableLayoutValue(paintKey, equals < 0 ? '' : option.slice(equals + 1))) {
-        loseExecutionCertainty(`Unsupported executable layout option: ${option}`)
+      if (hasExecutableOptionValue(paintKey, equals < 0 ? '' : option.slice(equals + 1))) {
+        loseExecutionCertainty(executableValueDiagnostic(paintKey, option))
       }
       // After .cd, even a relative paint-looking key can invoke a retained
       // namespaced code handler. Inspect all matching definitions for effects;
@@ -344,7 +349,7 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
         fields.forEach((field) => unresolved.add(field))
       }
       if (hasRuntimeHandlerSyntax(rawKey)) loseExecutionCertainty(`Unsupported executable runtime key: ${option}`)
-      if (hasExecutableLayoutValue(key, value ?? '')) loseExecutionCertainty(`Unsupported executable layout option: ${option}`)
+      if (hasExecutableOptionValue(key, value ?? '')) loseExecutionCertainty(executableValueDiagnostic(key, option))
       if (!isPaintOrLayoutKey(key) && !(value === undefined && isColorOption(key))) {
         invalid()
         loseExecutionCertainty(`Unsupported executable preview option: ${option}`)

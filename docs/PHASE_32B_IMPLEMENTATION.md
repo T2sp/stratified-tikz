@@ -1,12 +1,12 @@
 # Phase 32B: Independent point paint and imported styles
 
 Status: 32B remains incomplete until matching final verification and independent
-review succeed. The supplied `UD0YeR` parent report passed all five commands,
+review succeed. The supplied `XSgoUN` parent report passed all five commands,
 16 cumulative groups, 27 point scenarios and 281 required artifacts on the
-pre-fix fingerprint `1673235823b56d698409147427446e2d7269ac1f98bee42b3dd07abd15b1aac3`.
-Independent review accepted the execution/scope, handler-boundary and declaration
-limit corrections, but found one Medium runtime-execution defect: a later paint
-option could regain false certainty after arbitrary code changed a color binding.
+pre-fix fingerprint `df0d1cb9183b85a216a665c849d882c95716e2e98d3c3fce7eee7edf894105b5`.
+Independent review accepted the runtime-key, execution/scope, handler-boundary
+and declaration-limit corrections, but found one Medium recognized-value defect:
+executable TeX in a known paint key bypassed invocation execution uncertainty.
 The final section documents this targeted correction and its separate evidence.
 The App diagnostics, cumulative native policy and accepted historical evidence
 are preserved. 32C/32D remain deferred.
@@ -2492,3 +2492,97 @@ final binary-aware identity, report paths and the subsequent independent review
 belong in `/private/tmp/stz-phase32b-runtime-handoff/`. No final fingerprint is
 stored in tracked documentation. Missing verification or review acceptance keeps
 32B incomplete, and any subsequent checkout change requires verification again.
+
+## Targeted recognized-paint-value execution correction (2026-09-27)
+
+The accepted `XSgoUN` verification and independent review in
+`/private/tmp/stz-phase32b-review-FfO6bB/` cover the pre-prompt fingerprint at the
+start of this document. They accepted all five commands, 16 cumulative groups,
+27 point scenarios and 281 required artifacts with no page errors. The review
+found one Medium production defect in recognized paint values. This correction
+starts at clean HEAD `a7f2d153a8ebe36879572621083c1aa7e7c29244` on
+`phase/32b-color-opacity-outline`; that prompt-update commit already contains the
+prior implementation. All 50 formerly untracked runtime fixture/regression files
+match the accepted report's SHA256 hashes. No earlier work or evidence was reset,
+replaced or discarded. Historical browser acceptance does not verify this change.
+
+The exact retained `/private/tmp/stz-review-paint-value-exec/runtime.sty` is:
+
+```tex
+\tikzset{myPoint/.style={line width={+1pt\relax\globalcolorstrue\definecolor{red}{HTML}{0000FF}},text=red}}
+```
+
+Before correction, PGF 3.1.11a produced external blue (`0 0 1 rg`) while both
+application modes forced red (`1 0 0 rg`). The resolver diagnosed only invalid
+width, marked only `lineWidth` unresolved and resolved `text=red` through the
+stale built-in binding. Recognized paint keys escaped both the unknown-key guard
+and the existing deferred-layout value guard. The leading `+1pt` and every
+control sequence remain intact; no numeric prefix is extracted or code executed.
+
+The production change extends the shared value predicate from deferred layout
+to all recognized paint/layout keys. Before scalar parsing, execution-capable
+value syntax uses the existing `loseExecutionCertainty()` path: bindings and
+handlers remain unknown, all paint stays unresolved, diagnostics identify the
+option and all source hints remain available. Both ordinary resolution and
+retained dependency scans share it, including nested/aliased calls, appended and
+prefixed lists, returns to outer options and already-unknown directories. The
+existing body, work, depth, cycle and diagnostic budgets remain unchanged;
+there is no new scan or interpreter. Absolute `/tikz/...` spelling cannot restore
+bindings or handlers. Ordinary invalid literals still receive field-specific
+diagnostics and later supported recovery. Braces alone remain literal grouping.
+
+Registered `importedTikzPaintValueExecution.test.ts` adds the exact reproduction,
+all recognized value families and spellings, active-token controls, ordinary
+invalid/braced literals, dependency-only traversal, raw CRLF/reference/load-hint
+identity, stale snapshots and legacy references. It checks explicit text/fill
+intent, fallback-equal edits, first editing, refresh, preset reapplication and
+Undo/Redo with both-mode post-key assertions. Existing tests now distinguish
+unknown plain colors from executable macro values; enablement-only edits retain
+only the recorded override after executable paint. The legacy-intent controls
+also distinguish recoverable plain colors from executable values: saved width
+differences cannot invent authorship once bindings and handlers are uncertain.
+Existing runtime-key,
+deferred-layout, bounds, paint-only mutation, directory-only recovery and
+rejected-source tests remain registered. The initial focused existing suite
+passed 255 tests; final checks and their logs belong in the external handoff.
+
+The new [paint-value comparison](../tests/fixtures/point-paint-pgf/execution-boundary/paint-value-execution/README.md)
+retains all 19 original review artifacts byte-for-byte and separately compiles
+corrected output against the identical `runtime.sty`, with pdfTeX 1.40.29 / PGF
+3.1.11a. Both mode compilations exited zero. The 26 actual node observations show
+external blue and blue untouched, reloaded, stale-snapshot, reapplied, refreshed
+and Undo text. Recorded red/black text and yellow/black fill retain their requested
+colors, including fallback-equal edits; untouched text with fill edits stays
+blue, and recorded edits survive refresh/Redo. Sources, generated fragments,
+versions, commands, exits, full logs, PDFs and actual operators are retained.
+The registered fixture test compares current production output to these compiled
+fragments. Expected external blue comes from the independent PGF observation,
+not the application resolver. Other recognized-value families establish only
+the conservative classification boundary; they are not claimed as compiled PGF
+variants. The application importer and preview never execute TeX.
+
+The existing native local-override-intent source also uses executable recognized
+values (`fill=\mycolor,text=red`). Its old post-key red expectation is corrected
+to external untouched text. Browser observations retain black preview fallback
+and assert invocation uncertainty, unresolved paint and diagnostics through
+fill edits, history, reload, reapplication and untouched numeric focus/blur.
+The parent policy requires the same state and has negative controls for stale
+post-key paint, missing execution uncertainty and falsely resolved fields.
+No source, native operation, scenario identity or artifact is removed.
+
+No schema, dependency, native timeout, source grammar, declaration limit or
+deferred 32C/32D feature changes. All existing native acceptance remains
+mandatory: 16 groups / 27 point scenarios / 281 required artifacts, seven App →
+SVG → App transitions, three continuity controls, five geometry fault controls,
+the directory scenario, six responsive downloads and 91 responsive artifacts.
+The known baseline lint debt (36 errors and four warnings) is separate from
+focused changed-file lint; the existing build chunk warning remains nonblocking.
+
+Finalize code/tests/documentation before `32B verify`. Final tracked/untracked/
+binary identity, command reports and the subsequent independent read-only review
+are recorded outside the checkout in `/private/tmp/stz-phase32b-value-handoff/`.
+If this child cannot start the browser server, preserve the failure and leave
+both native commands pending for the authorized parent, without relaxing any
+assertion or changing permissions. 32B remains incomplete until matching
+verification and independent review succeed; no commit or push is authorized
+while either gate fails. Any later checkout change requires fresh verification.

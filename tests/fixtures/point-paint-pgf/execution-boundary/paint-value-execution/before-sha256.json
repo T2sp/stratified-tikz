@@ -1,0 +1,119 @@
+{
+  "originalDirectory": "/private/tmp/stz-review-paint-value-exec",
+  "files": [
+    {
+      "originalName": "commands.txt",
+      "retainedName": "commands.txt",
+      "bytes": 373,
+      "sha256": "2edb2294904fd968b9788bc700886672b164e0c801e63416a0ddabc2e8c34ad0"
+    },
+    {
+      "originalName": "compilation.txt",
+      "retainedName": "compilation.txt",
+      "bytes": 7201,
+      "sha256": "4c67ba4e22867ecbc289320141477add997b6e5dd52a1793d81e093e29f34f4a"
+    },
+    {
+      "originalName": "inlineMath.tex",
+      "retainedName": "inlineMath.tex",
+      "bytes": 2484,
+      "sha256": "326481bf6430231c0c947a3d86a9b357aecb0667182483bda9c29a91bd98de4a"
+    },
+    {
+      "originalName": "observations.json",
+      "retainedName": "observations.json",
+      "bytes": 155,
+      "sha256": "1735f206bf6bb31f3b33e84de13f83e6499fe7b18cc8169bca3219058577736a"
+    },
+    {
+      "originalName": "operators.txt",
+      "retainedName": "operators.txt",
+      "bytes": 2313,
+      "sha256": "348dcf0b01f8a3f230ea5ae805ecd0e94ec330ad708dfb7bd9a94d3daa94ddf3"
+    },
+    {
+      "originalName": "probe.aux",
+      "retainedName": "probe.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "originalName": "probe.log",
+      "retainedName": "probe.log.txt",
+      "bytes": 15840,
+      "sha256": "26dcbc961ee2ad88c9e884e9466388c318a74dea4d32b5f70922ccdb6b5f42e2"
+    },
+    {
+      "originalName": "probe.pdf",
+      "retainedName": "probe.pdf",
+      "bytes": 14951,
+      "sha256": "f9700f4433504ab3f87bf09277f507737b012d140dfb32da886730f968289c44"
+    },
+    {
+      "originalName": "probe.tex",
+      "retainedName": "probe.tex",
+      "bytes": 310,
+      "sha256": "b17d85602f7ab1d31aeebe553305cef6162705621ab24b3a1995d0f550d32904"
+    },
+    {
+      "originalName": "repro.mjs",
+      "retainedName": "repro.mjs",
+      "bytes": 1984,
+      "sha256": "3dd82e3646de727010d6276d3baa28a94f1f6652dc8e19d4b0ef1f31387a278a"
+    },
+    {
+      "originalName": "resolver.json",
+      "retainedName": "resolver.json",
+      "bytes": 1072,
+      "sha256": "a2049fa337ece75294837738cf8f74fb707fdbcfd7c20e481f95c899348ae755"
+    },
+    {
+      "originalName": "runtime.sty",
+      "retainedName": "runtime.sty",
+      "bytes": 107,
+      "sha256": "3235c8277501f0af1f0635a1290f06333f7c396db4b21af753eb110c907c0d80"
+    },
+    {
+      "originalName": "sha256.json",
+      "retainedName": "sha256.json",
+      "bytes": 950,
+      "sha256": "ef4103bde328f8fd630259b084bd79d227db859f9bb8f97e8c772575b6d41ac4"
+    },
+    {
+      "originalName": "simple-compilation.txt",
+      "retainedName": "simple-compilation.txt",
+      "bytes": 7192,
+      "sha256": "707ec51ceabd70347ad4c8d7c4237e508fe09604e6587458658fb76f35eef21c"
+    },
+    {
+      "originalName": "simple.aux",
+      "retainedName": "simple.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "originalName": "simple.log",
+      "retainedName": "simple.log.txt",
+      "bytes": 15546,
+      "sha256": "ae3b3ee5c42e801eb49dc2ed7f1b0791e76b692b00869aadc8549320bab48cd7"
+    },
+    {
+      "originalName": "simple.pdf",
+      "retainedName": "simple.pdf",
+      "bytes": 12703,
+      "sha256": "2ed2e107e2f5058b080577db9f5535f2c21d4a4f0edcd20c9d7ba1d9413e24fb"
+    },
+    {
+      "originalName": "simple.tex",
+      "retainedName": "simple.tex",
+      "bytes": 323,
+      "sha256": "6ec7e6de93a004810bca7bd6789b40145355c54fedddac691ba89ec556da97ef"
+    },
+    {
+      "originalName": "standalone.tex",
+      "retainedName": "standalone.tex",
+      "bytes": 2194,
+      "sha256": "465c9f5ec1e44e57e167ac004f2749a055b8c387428f30b2ee230c947cc0a645"
+    }
+  ]
+}
