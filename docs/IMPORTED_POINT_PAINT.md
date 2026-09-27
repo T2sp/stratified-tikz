@@ -72,7 +72,7 @@ its preview limitation is diagnosed.
 
 ## Declarations and bounded expansion
 
-The scanner accepts literal declarations in file order:
+The scanner accepts a complete sequence of top-level literal declarations in file order:
 
 ```tex
 \tikzstyle{base}=[fill=blue,draw=green]
@@ -162,10 +162,62 @@ same context without losing explicit local intent, including edits returning to
 the preview fallback. Both export modes keep defaults before the external key
 and omit untouched uncertain overrides after it. No mutation handler is executed.
 
-Limits are: 1,000,000 source characters, 512 extracted declaration events, 100,000
-characters per option body, 4,096 expanded option steps, 16 reference levels,
-and at most 64 preview diagnostics per resolved style. Oversized source has no
-importable definitions. Malformed declarations are skipped with warnings.
+The execution boundary is a closed cursor grammar, not a search for command
+names. Outside consumed declaration arguments, only whitespace, comments,
+`\tikzset`, `\tikzstyle` and `\definecolor` are supported. Balanced braces
+inside option bodies/color arguments are not local execution groups. Within a
+`\tikzset` block, literal declarations, declaration-level `.cd`, and the
+previously described literal-target mutation invalidations are recognized;
+arbitrary key invocations are outside this boundary. The passive mutation handler
+allowlist is `style`, `append style`, `prefix style`, `add style`, `style args`,
+`style 2 args`, `code`, `append code`, `prefix code`, `code 2 args`, `initial`
+and `default`. `add style` and `style args` require exactly two complete braced
+arguments and no trailing tokens. Other handlers, including `try`, `retry` and
+`code args`, are rejected. A single `/.expanded` suffix is retained only for
+literal arguments without expansion-capable tokens; other chains are rejected.
+This classifies declaration syntax without running a handler. Declarations cannot
+replace supported root paint primitives, `every ...`/`execute at ...` hooks,
+dot-prefixed hook path segments, or the PGF/handler/error namespaces. Such changes
+can affect other keys or the declaration grammar itself. Targets with key-list
+commas are rejected. Ordinary custom namespaces, including `/other/text`, retain
+their separate identities. Unknown commands (including
+package wrappers, macro definitions/invocations and conditionals), local groups,
+nonliteral declaration names/directories, nonliteral color model/value expansion,
+and malformed command arguments reject the entire initial import. No attempt is
+made to execute a condition, recognize an unused macro, or infer group lifetime.
+The diagnostic identifies the unsupported context and asks for top-level literal
+declarations. Literal unsupported color models such as CMYK retain the existing
+per-binding null/diagnostic behavior.
+
+Limits are: 1,000,000 source characters, 512 declaration events (style definitions,
+recognized mutations and color definitions combined), 100,000 characters per
+option body, 4,096 expanded option steps, 16 reference levels, and at most 64
+preview diagnostics per resolved style. Exactly 512 declaration events are
+accepted. The 513th event rejects the whole source, including within one
+`\tikzset` block. Rejected parse results contain no styles, declarations,
+colors or raw-option metadata; they never retain a certain truncated prefix.
+Initial import returns the identical input diagram, null source and no references
+or presets. Existing accepted diagram values therefore remain unaffected.
+
+Already-saved raw sources are retained exactly, including CRLF, unsupported TeX,
+key spelling and load hints. Reconstructing a rejected source sets source-wide
+uncertainty: all imported paint, aliases, color bindings, dependencies and earlier
+source references become unresolved. Neither saved options, legacy snapshots,
+later declarations nor absolute source options restore certainty, since unknown
+execution can redefine any binding or key handler. Every source hint is retained.
+JSON loading appends reconstructed limitations to reference diagnostics without
+dropping prior diagnostics; subsequent save/load preserves them. Preview values
+are explicitly fallbacks; export suppresses untouched paint after the external
+key in both modes. Ordinary supported imports and their ordered per-key mutation
+or runtime-directory recovery retain their previous behavior.
+
+Matching `importedPaint` intent still preserves explicit local edits, including
+an accepted value equal to its preview fallback. Without that metadata, saved
+paint differences cannot prove authorship once raw-source execution is uncertain;
+export does not promote them to local overrides. The first new edit snapshots
+those saved fallback values and claims only the edited fields. Preset reapplication
+and Undo/Redo preserve this distinction. Historical edits without intent metadata
+are inherently ambiguous under this source-wide failure policy.
 
 `ExternalTikzStyleSource.rawSource` preserves the complete imported source.
 `ImportedTikzStyleReference.rawOptions` preserves each original option body;
@@ -304,3 +356,19 @@ retains the review's original failing source/PDF/operators and a focused PGF
 3.1.11a compilation of corrected output in both modes. The external and corrected
 nodes are blue; the old generated node was red. This proves preservation of the
 external effect, while the bounded preview deliberately retains diagnosed red.
+
+
+[The execution-boundary comparison](../tests/fixtures/point-paint-pgf/execution-boundary/README.md)
+retains all four independent failing cases and corrected PGF 3.1.11a/pdfTeX
+1.40.29 comparisons against the unchanged external sources. Initial imports
+reject atomically. Saved/reloaded and preset-reapplied nodes in both export modes
+retain external blue for the unused macro, false conditional and grouped color,
+and external red for declaration overflow. Expected colors come from actual PDF
+paint operators, independently of the application parser.
+
+The same comparison directory contains a
+[handler-execution follow-up](../tests/fixtures/point-paint-pgf/execution-boundary/handler-execution/README.md):
+`run/.try` executes a stored code key at declaration time. The initial intermediate
+fix classified arbitrary handlers as local mutations, incorrectly exporting blue
+while PGF was red. The final boundary rejects that source and stale-source reload
+omits false paint; independent PDF operators show all five corrected nodes red.

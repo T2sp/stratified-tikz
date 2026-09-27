@@ -1,16 +1,16 @@
-# Phase 32B Targeted Fix Prompt: Preserve importer certainty across execution contexts and declaration overflow
+# Phase 32B Targeted Fix Prompt: Preserve paint uncertainty after runtime execution
 
 ## Environment and scope
 
-Work on `phase/32b-color-opacity-outline`. Inspect status and preserve the
-current implementation, including all existing App diagnostics, harness,
-package, documentation and test changes and the four untracked helper/test
-files. At this prompt update HEAD is
-`f75e3ac2a0868c87f9d216fa7c401b68f37425cf`. The accepted parent verification and
-the independently reviewed checkout match this pre-prompt fingerprint:
+Work on `phase/32b-color-opacity-outline`. Inspect status and preserve all
+current production, documentation, package and test changes, including the
+untracked execution-boundary PGF fixtures and registered regression file.
+At this prompt update HEAD is `0cf3811523b4f8851af73ec6e70b7c2cc2f7feb4`.
+The accepted parent verification and independently reviewed checkout match
+this pre-prompt fingerprint:
 
 ```text
-d47b85b1596b340a97f9ca80a0197fce67d450d368d38b605b0cb7e487ed4dff
+1673235823b56d698409147427446e2d7269ac1f98bee42b3dd07abd15b1aac3
 ```
 
 This identifies the tree before this prompt edit. Recompute final identity
@@ -23,234 +23,222 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-Fix only the two Medium production defects identified below: unsupported
-execution/scoping contexts becoming authoritative paint, and declaration-limit
-overflow preserving false certainty. Keep strict TypeScript, bounded parsing,
+Fix only the remaining Medium production defect: execution-capable runtime
+options can invalidate color bindings and option handlers, yet later options
+regain false paint certainty and override correct external TikZ behavior.
+Preserve the completed source execution/scope, declaration-limit, handler
+boundary and persistence corrections. Keep strict TypeScript, bounded parsing,
 existing dependencies and 32A behavior. Do not execute TeX in the importer or
 preview, implement a general TeX interpreter, or expand into deferred 32C/32D.
 
-## Accepted verification and remaining review findings
+## Accepted verification and remaining review finding
 
 The matching parent verification passed all five commands, including both
-browser commands:
+required browser commands:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-T5qkan/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-T5qkan/05-check-free-labels/artifacts/free-labels-evidence.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UD0YeR/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-UD0YeR/05-check-free-labels/artifacts/free-labels-evidence.json
+/private/tmp/stz-phase32b-independent-review-EU8oKW/checks.json
 ```
 
-The review accepts all 16 groups, 27 point scenarios and 281 required artifacts,
-with no incomplete groups or page errors. Before/after identities match the
-reviewed checkout, including untracked files. Independent fresh tests passed
-3,345 cases with zero failures/skips; build, strict production/fixture/new-test
-TypeScript and script syntax checks also passed. Focused lint reported only
-baseline diagnostics independently reproduced at accepted 32A revision
-`595139d`; repository-wide lint was not run. The existing build chunk warning
-is nonblocking.
+The review accepts 16 groups, 27 point scenarios and 281 required artifacts,
+with no page errors. Before/after identities match the reviewed checkout,
+including untracked files. Independent tests on Node v26.9.0 passed 3,441 cases
+with zero failures/skips/cancellations. Build, diff, strict production/fixture/
+changed-test TypeScript, latest-change ESLint and all 51 script syntax checks
+passed. Broader changed-production lint reproduced 11 errors and 4 warnings
+already present at baseline; repository-wide lint was not run. The existing
+large-chunk build warning remains nonblocking.
 
-The supplied independent review nevertheless returned `needs_changes`, with
-zero Critical, two Medium and zero Low issues, and `ready_to_commit: false`.
-These are demonstrated production importer/export defects, not missing native
-acceptance. Do not reopen the earlier scroll, App continuity or runner task
-merely because historical triggers remain unproven. Preserve their fixes and
-accepted coverage.
+Independent review returned `needs_changes`, with zero Critical, one Medium
+and zero Low issues, and `ready_to_commit: false`. Browser acceptance is complete
+and current for this tree. The remaining blocker is the demonstrated production
+export defect below. Do not reclassify it as missing native evidence or reopen
+the earlier runner, scroll or App continuity investigations without new evidence.
 
-Review reproductions and independent compiler evidence:
+## Confirmed reproduction and failure mechanism
+
+Import and apply this exact external source:
+
+```tex
+\tikzset{myPoint/.style={/utils/exec={\definecolor{red}{HTML}{0000FF}},text=red}}
+```
+
+Retained independent evidence:
 
 ```text
-/private/tmp/stz-32b-model-review/commands.txt
-/private/tmp/stz-32b-model-review/production-observations.log
-/private/tmp/stz-32b-model-review/bounds-production-observations.log
+/private/tmp/stz-review-runtime-exec/commands.txt
+/private/tmp/stz-review-runtime-exec/repro.mjs
+/private/tmp/stz-review-runtime-exec/runtime.sty
+/private/tmp/stz-review-runtime-exec/standalone.tex
+/private/tmp/stz-review-runtime-exec/inlineMath.tex
+/private/tmp/stz-review-runtime-exec/observations.json
+/private/tmp/stz-review-runtime-exec/operators.txt
 ```
 
-That directory retains `repro.mjs`, `bounds.mjs`, original `.sty` inputs, both
-export modes, four successful PGF 3.1.11a/pdfTeX 1.40.29 compilations and extracted
-PDF paint operators. Inspect these before changing code. Preserve the failing
-artifacts; put corrected evidence in a separate location.
+PGF 3.1.11a compilation renders the external node blue (`0 0 1 rg`) and both
+application nodes red (`1 0 0 rg`). The generated fragments put
+`text=stzPointpText2` after `myPoint`, with `stzPointpText2` defined as `FF0000`.
+Inspect the original input, reproduction script, compiler log/PDF and operators
+before editing. Preserve these failed artifacts and write corrected evidence
+separately.
 
-## 1. Unsupported execution and local scope must not establish global paint
+The top-level parser accepts the stored `.style` body; its declaration-time
+boundary does not establish the effects when that body is later invoked.
+In `src/model/importedTikzPaint.ts`, `/utils/exec` reaches `invalid()` around
+line 274 and marks paint fields unresolved. The resolver nevertheless keeps
+using its original color environment and handler assumptions. At the later
+`text=red` branch around line 299, it resolves built-in red and removes
+`textColor` from `unresolvedFields`. The warning remains, but the exporter
+therefore emits an untouched red override.
 
-`parseTikzsetStyles()` in `src/model/importedTikzStyles.ts` currently scans
-`\tikzset`, `\tikzstyle` and `\definecolor` with a global regex around line 185.
-It does not establish whether declarations execute or whether their scope
-survives. The exact unused-macro reproduction is:
+This is an invocation-time certainty gap. The existing source-wide
+`sourceDiagnostics` guard for rejected saved sources already prevents false
+recovery in that different path; do not redo the completed top-level scanner
+or overflow correction.
 
-```tex
-\tikzset{myPoint/.style={text=blue}}
-\newcommand{\unusedPaint}{\tikzset{myPoint/.style={text=red}}}
-```
+## Required targeted correction
 
-Importing and applying `myPoint` produces red preview text and explicit red
-options after the external key in both `standalone` and `inlineMath` exports.
-PGF applies blue. A duplicate-key warning does not make that red authoritative.
-The retained false-conditional reproduction has the same mismatch:
+1. Establish a conservative bounded policy for unsupported execution-capable
+   runtime options. Track loss of binding/handler certainty through resolution,
+   or reject affected imports atomically. Do not execute the body, special-case
+   its `\definecolor` payload, or assume only the named color can change.
+   A warning without preserved uncertainty is not sufficient.
+2. Once arbitrary runtime execution may have occurred, later literal-looking
+   paint must not resolve against potentially stale built-in/custom colors or
+   option handlers. An absolute key such as `/tikz/text` establishes a path,
+   not an unchanged handler or color binding. Directory certainty alone cannot
+   justify recovery. Retain diagnostics and prevent `resolved()` or another
+   path from erasing uncertainty without supported semantic justification.
+3. Propagate this state through nested styles, aliases and returns to outer
+   option lists. Inspect retained unsupported-mutation dependency paths as well
+   as ordinary style bodies: an executable option inside an appended/prefixed
+   list must not be ignored merely because that list was scanned only for
+   dependencies or directory changes. Keep source dependencies/load hints.
+   Bound exhaustion must not permit unvisited executable effects to become
+   certain through a later option; keep existing input/work/depth limits.
+4. Apply the policy consistently through raw-source reconstruction, existing
+   saved references/snapshots, preset application and JSON reload. If imports
+   are rejected, require actionable diagnostics and no partial diagram/source/
+   reference/preset mutation, and separately protect already-saved sources.
+   Neither old snapshots nor a legacy fallback may re-establish false certainty.
+5. Preserve untouched external behavior in both `standalone` and `inlineMath`:
+   keep the actual external style key and do not append uncertain importer
+   fallback paint as an authoritative override. Preserve explicit local edits,
+   including an intentional value equal to the visible fallback. Do not infer
+   user intent solely from a stale preview or snapshot. Trace this through
+   imported paint refresh/editing, serialization and `src/tikz/generateTikz.ts`.
 
-```tex
-\tikzset{myPoint/.style={text=blue}}
-\iffalse\tikzset{myPoint/.style={text=red}}\fi
-```
+Keep the distinction between arbitrary execution, a demonstrably paint-only
+mutation, a directory-only change and an ordinary invalid literal. Preserve
+supported literal resolution and justified recovery controls where their
+assumptions hold. Do not indiscriminately disable all later-option recovery;
+equally, arbitrary executable code must not inherit paint-only recovery rules.
+Document any narrowly necessary change to existing recovery expectations.
 
-The proven local-group case affects a color binding, not just a style:
+Preserve exact raw source, key spelling, source order and external load hints
+for retained sources. Do not strip executable options from saved/exported
+source, replace the external key with flattened paint, hard-code blue for the
+reproduction, or suppress the diagnostic to make the output appear correct.
 
-```tex
-\definecolor{Custom}{HTML}{0000FF}
-{\definecolor{Custom}{HTML}{FF0000}}
-\tikzset{myPoint/.style={text=Custom}}
-```
+The color-binding side effect above is independently demonstrated. Changes to
+option handlers are a risk of arbitrary execution, not a second established
+failure in the supplied PDF. Cover that risk with a justified focused regression
+or independent reproduction; distinguish new observations from this evidence.
 
-The importer currently resolves red with no warning; external PGF is blue.
-Fix styles and color bindings together.
+## Registered regressions and independent PGF comparison
 
-### Required correction
-
-Define a conservative, bounded supported execution/scope boundary. Declarations
-inside unsupported macro bodies, conditional branches or local groups must not
-be treated as definitely executed global definitions. Either reject an affected
-import atomically with actionable diagnostics and no partial model mutation,
-or preserve its source with explicit uncertainty that reaches resolution and
-export. Do not silently skip an uncertain later declaration and then declare
-an earlier definition certain unless the supported semantics justify that.
-
-Keep ordinary supported top-level literal declarations working, including
-legitimate braces in options, comments, color values, namespaces and supported
-source ordering. Do not substitute a few string-pattern exclusions for an
-explicit bounded policy, or execute macros/conditions to guess their effects.
-Unsupported or malformed context must produce an actionable diagnostic.
-
-Trace the complete path through `createImportedTikzResolutionContext()`,
-reference diagnostics, preset application, imported point snapshots and
-`src/tikz/generateTikz.ts`. Uncertainty must cover affected color bindings,
-styles, aliases and dependent references, including references from earlier
-source files. Saved `options` or legacy fallback snapshots must not restore
-certainty that preserved raw source invalidated. Preserve unaffected supported
-values where they can be established, without assuming unknown effects are
-local to the key whose name was last scanned.
-
-A parser warning alone is insufficient. The exporter suppresses untouched
-post-key paint based on unresolved fields; uncertain preview fallback values
-must not become authoritative options overriding the external style. Keep
-explicit user edits authoritative, including an intentional value equal to the
-preview fallback. Preserve raw source, key spelling and external load hints
-for accepted imports; do not strip unsupported TeX from saved/exported sources
-to manufacture agreement.
-
-## 2. Declaration overflow must not leave a certain truncated prefix
-
-Around `importedTikzStyles.ts:225`, exceeding 512 declarations currently emits
-a warning, truncates `declarations` and stops. The retained reproduction is:
-
-1. Declare `myPoint/.style={text=blue}`.
-2. Add 511 filler declarations.
-3. Redefine `myPoint/.style={text=red}` as declaration 513.
-
-Preview and both exports use blue, overriding external PGF's actual red.
-The reference contains blue `options`, red `rawOptions` and empty
-`previewDiagnostics`: the 513th entry already changed metadata before truncation.
-
-Keep the finite declaration bound. Reject overflow atomically, or propagate
-unresolved state broadly enough that the incomplete prefix and unseen suffix
-cannot establish authoritative style/color effects. Raising the limit,
-retaining the first 512 as resolved, adding only a warning, or dropping all
-parsed entries while restoring saved fallback references does not fix this.
-Keep definitions, declarations, colors, raw options and diagnostics consistent
-with the chosen policy.
-
-Apply the same policy during raw-source reconstruction and JSON reload, not
-only initial import. Existing saved references/presets and earlier source files
-may be affected by a later overflowing source. If choosing atomic import
-rejection, verify that no partial source/reference/preset/model changes occur,
-and separately handle already-saved raw sources that exceed the bound without
-trusting their old snapshots. Preserve the existing input/work/depth bounds.
-
-## Required regressions and independent PGF comparisons
-
-Add focused registered tests using the actual import → preset/application →
+Add focused registered tests along the real import → preset/application →
 resolution → persistence → export path as appropriate:
 
-- Exact unused `\newcommand`, false conditional and grouped `\definecolor`
-  reproductions, plus grouped style declarations and supported top-level
-  controls. Cover the scanner's supported declaration forms and meaningful
-  nested/comment/brace cases without adding general TeX execution.
-- Exactly 512 versus 513 declarations, both across separate commands and in
-  one `\tikzset` block. Include the retained late redefinition and verify
-  diagnostics and metadata consistency, not just array length.
-- Affected aliases/dependencies and earlier references after a later uncertain
-  source, plus unaffected supported controls where justified by the policy.
-- Exact raw-source and diagnostic persistence through save/load, reapplying an
-  existing preset, and relevant Undo/Redo. Test stale saved references against
-  reconstructed uncertainty and atomic no-mutation behavior if rejecting.
-- Untouched imported paint and intentional local text/fill edits, including an
-  edit equal to the fallback value. In both export modes, inspect the options
-  after the actual external key: uncertain untouched paint must not override
-  it, while explicit local edits must remain effective.
+- The exact retained reproduction, directly and through a nested style/alias,
+  including return to an outer option list. Assert diagnostics and unresolved
+  paint, not just the presence of a warning string.
+- Execution in a retained mutation/dependency path followed by outer paint.
+  Exercise changed work/depth-bound behavior if the correction affects it.
+- Later `text`, `fill`, `draw`, `color`, color mixtures and absolute `/tikz/...`
+  keys cannot regain certainty from potentially changed bindings/handlers.
+  Include a focused handler-side-effect case without executing TeX in tests
+  that exercise the application parser.
+- Save/load with exact raw source and diagnostics, stale saved snapshots,
+  existing-preset reapplication and relevant Undo/Redo. For atomic rejection,
+  prove unchanged state and safe handling of already-saved input.
+- Explicit local text/fill edits, including fallback-equal values, remain
+  authoritative while other untouched uncertain channels stay external.
+  In both modes inspect options after the actual external key; a generic
+  substring check elsewhere in the output cannot prove correct precedence.
+- Supported literal styles, independent resolution without executable effects,
+  justified paint-only recovery and directory-only absolute-option recovery
+  remain covered. Preserve all completed execution-boundary regressions.
 
-Preserve the four independent failing PGF cases (`macro`, `conditional`,
-`groupedColor`, `bounds`). Compile corrected generated output in both modes
-against the same independent external sources, retaining commands, versions,
-logs and actual PDF operators. External nodes must keep blue for the first
-three cases and red for the overflow case; application output must no longer
-force the incorrect color. If an input is rejected atomically, demonstrate the
-rejection and absence of partial output/state, and use retained-source/reload
-coverage to establish that affected saved diagrams cannot emit the old false
-overrides. Do not regenerate expected paint from the application's own parser.
-Compiler use in these independent checks does not authorize TeX execution in
-the application.
+Compile corrected generated output in both modes against the identical
+independent `runtime.sty` source. Retain commands, compiler/PGF versions, logs,
+PDFs and actual paint operators. The external node must remain blue and
+untouched application nodes must no longer force red; intentional local
+overrides must retain their requested behavior. If initial import is rejected,
+prove atomic rejection and exercise retained-source reload/reapplication to
+show that existing diagrams cannot emit the old incorrect overrides.
+Do not derive the expected external paint from the application resolver.
+Independent compiler checks do not authorize TeX execution in the application.
 
 ## Preserve completed work and cumulative acceptance
 
-Keep the current App geometry/ownership diagnostics, bounded frame and host
-waits, original native scroll deadline, real pointer and viewport assertions,
-JSON download boundary and five native geometry fault controls. Keep the
-seven App → SVG → App transitions and three separate continuity controls,
-including all 13 continuity artifacts. The historical failures need not be
-reproduced again to address these importer findings.
+Keep the closed top-level execution/scope grammar, complete passive-handler
+allowlist/argument boundaries, and atomic 512-event limit shared by style,
+mutation and color declarations. Preserve rejected-source diagnostics,
+source-wide uncertainty, exact saved text and explicit override intent.
+Retain the original and corrected PGF fixtures under
+`tests/fixtures/point-paint-pgf/execution-boundary/`, including the
+`handler-execution/` follow-up, and all registered boundary regressions.
+Do not overwrite those references to repair this distinct runtime case.
 
-Preserve the previous runtime-directory uncertainty fix, independent PGF
-references, supported absolute-option recovery, local override intent and
-paint-only mutation recovery. Keep all existing clear/imported-paint scenarios,
-the directory scenario and its 11 artifacts, six responsive downloads and
-91 responsive artifacts. Preserve the current minimum of 16 cumulative groups
-and 27 point scenarios and every currently required artifact; new targeted
-coverage must supplement it. Do not weaken verification policy to accept old
-or incomplete reports.
+Preserve the earlier runtime-directory fix, detached provenance cleanup,
+independent paint/opacity/dimming, immutable SVG capture, bounded 100-entry
+history, raw JSON/CRLF, 2D/3D semantics and free/inline-label behavior.
+Keep App geometry/ownership diagnostics, bounded waits, native scroll deadline,
+real pointer assertions and all five native geometry fault controls. Keep the
+seven App → SVG → App transitions, three continuity controls and 13 artifacts,
+directory scenario and 11 artifacts, and six responsive downloads with all
+91 responsive artifacts.
 
-Keep the runner's 60-second fixture deadline, bounded owned-child cleanup,
-failed-evidence retention, fresh-process verifier loading and transitive
-fixture dependencies. Preserve detached provenance cleanup, the bounded
-100-entry history contract, raw JSON/CRLF, 2D/3D semantics, independent paint,
-opacity/dimming, immutable SVG capture and free/inline-label behavior.
+Preserve the current 16 groups / 27 point scenarios and every required artifact;
+new targeted coverage must supplement the accepted cumulative suite. Keep the
+runner's 60-second fixture deadline, bounded owned-process cleanup, failed
+evidence retention, fresh-process verifier loading and transitive dependencies.
+Do not weaken policy, timeouts or native assertions to pass the new checks.
 
 ## Verification, documentation and review
 
 Read `AGENTS.md`, paired 32B implement/review prompts and current
 `docs/PHASE_32B_IMPLEMENTATION.md`, `docs/IMPORTED_POINT_PAINT.md` and
-`docs/DATA_MODEL.md`. Document the supported execution/scope boundary and
-overflow policy, diagnostics/persistence behavior, reproduced defects and
-corrected independent results. Keep changes confined to these two defects and
-necessary regressions/documentation.
+`docs/DATA_MODEL.md`. Document the runtime execution certainty policy, its
+difference from source rejection/directory-only uncertainty, persistence and
+explicit-edit behavior, and actual before/after evidence. Keep changes limited
+to this finding and necessary regressions/documentation.
 
 Run focused registered tests, applicable strict production/fixture/test
 TypeScript, changed-script syntax, targeted lint and `git diff --check`.
 Run `npm test` and `npm run build` sequentially because they share asset
-preparation. Distinguish established lint debt and the build chunk warning
-from new failures; do not perform unrelated cleanup.
+preparation. Distinguish the established baseline lint diagnostics and build
+chunk warning from new failures; do not perform unrelated cleanup.
 
-The T5qkan parent report is accepted evidence for the pre-fix tree. It does not
-verify subsequent importer changes. Before final verification, finalize code,
-tests and tracked documentation; record final identities and report paths in
-an external handoff. Then run:
+The UD0YeR parent report is accepted for the pre-fix tree. Subsequent production
+changes need fresh matching verification. Finalize code, tests and tracked
+documentation before the final run; record identity and report paths in an
+external handoff. Then run:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands and current cumulative native evidence on that final
-tree, including tracked/untracked/binary identity. Any subsequent checkout
-change requires matching verification again. Obtain independent read-only
-review of the same verified tree against `prompts/phase-32b-review.md`, with
-both Medium findings explicitly reassessed using the independent PGF evidence.
-`32B verify` itself does not perform review.
+Require all five commands and current cumulative native evidence on the same
+final tree, including tracked/untracked/binary identity. Any checkout change
+after verification requires matching verification again. Obtain independent
+read-only review of that verified tree against `prompts/phase-32b-review.md`,
+explicitly reassessing this runtime-execution finding with the corrected
+independent PGF evidence. `32B verify` itself does not perform review.
 
-Do not commit or push while either production finding or verification/review
-remains unsuccessful. 32B is incomplete until both defects and both gates are
-resolved; 32C/32D remain deferred.
+Do not commit or push while the finding or either gate remains unsuccessful.
+32B stays incomplete until the defect, verification and review are resolved;
+32C/32D remain deferred.

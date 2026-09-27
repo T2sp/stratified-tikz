@@ -37,6 +37,7 @@ import {
   normalizeImportedTikzStyleDisplayName,
   normalizeImportedTikzStyleKey,
   normalizeImportedTikzStyleOptions,
+  restoreImportedTikzSourceDiagnostics,
 } from './importedTikzStyles.ts'
 import { clonePathArrowOptions, defaultPathArrowOptions } from './pathArrows.ts'
 import {
@@ -1104,6 +1105,7 @@ function normalizeLoadedDiagram(
     strata,
     labels: normalizedSavedDiagram.labels as TextLabel[],
   }
+  warnings.push(...restoreImportedTikzSourceDiagnostics(diagramWithoutLayers))
   const layerNormalization = normalizeLoadedLayers(
     diagramWithoutLayers,
     normalizedSavedDiagram.layers,

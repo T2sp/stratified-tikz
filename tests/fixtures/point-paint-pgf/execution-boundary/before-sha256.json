@@ -1,0 +1,200 @@
+{
+  "originalDirectory": "/private/tmp/stz-32b-model-review",
+  "files": [
+    {
+      "name": "bounds-compilation.txt",
+      "bytes": 7224,
+      "sha256": "0211e1d6c0c4edc8ae1b1b61245da6fb7f2a7c4b5caa56e2fd9e91bbe0e800c3"
+    },
+    {
+      "name": "bounds-inlineMath.tex",
+      "bytes": 2079,
+      "sha256": "33875655f002df3aa637c9dacc817e5d6bd7cebe408ed9ffc00121bee15d2543"
+    },
+    {
+      "name": "bounds-pdf-operators.txt",
+      "bytes": 1932,
+      "sha256": "fbb4be7ca85eee85424d4f789d13b0cb27c87fbb0dd76cabb34cd729c5433c7c"
+    },
+    {
+      "name": "bounds-production-observations.log",
+      "bytes": 677,
+      "sha256": "36e871a2e24efef321c686f5cb2d1c07ae66714555a6e12ea0a738495011a986"
+    },
+    {
+      "name": "bounds-standalone.tex",
+      "bytes": 1801,
+      "sha256": "e6e64d7c5d1b066e49be8d30c08bc6e3e0676491d33cd454fdc1a77e3061713f"
+    },
+    {
+      "name": "bounds.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "name": "bounds.log",
+      "bytes": 15863,
+      "sha256": "cd4b58c7d45ba9162ec57cc0411f007177b43ce31a75e96a94c0a9f4af7be7e6"
+    },
+    {
+      "name": "bounds.mjs",
+      "bytes": 2081,
+      "sha256": "8da98967b3e3b15010caaeca58f5fa48d320390e1d37d4173479ceb543af7352"
+    },
+    {
+      "name": "bounds.pdf",
+      "bytes": 14570,
+      "sha256": "5b3aa3ed5c6408cf9b477eaf7712a827536c6cc2db4f8663faee2618b40d509f"
+    },
+    {
+      "name": "bounds.sty",
+      "bytes": 20400,
+      "sha256": "a658ccc93b7c496c16888bf3ff5e2236406fec1f43a437678d7a9e8d1ccf9e60"
+    },
+    {
+      "name": "bounds.tex",
+      "bytes": 323,
+      "sha256": "8a8d25866d6c3ea126618e20fdd7e382d8e9213c8a2234a462f5d4f9e6e19520"
+    },
+    {
+      "name": "commands.txt",
+      "bytes": 1528,
+      "sha256": "f43508a473d299efc046bc0a1f8dd100134cc3c87eeddf9ef2f3d53db4237a75"
+    },
+    {
+      "name": "conditional-inlineMath.tex",
+      "bytes": 2089,
+      "sha256": "43dc29f916e9adc7246b3aa8aa70495672cbe852a8223c2f7679cbad1846a87d"
+    },
+    {
+      "name": "conditional-pdf-operators.txt",
+      "bytes": 1932,
+      "sha256": "1ae6cbaed84faace21696560659e980cf3d9a3ec3c1eadca793c067432fda64a"
+    },
+    {
+      "name": "conditional-standalone.tex",
+      "bytes": 1811,
+      "sha256": "6ed92f0ab673707c15e10872c70a733573952340c996d92badb961e9e2ec71ad"
+    },
+    {
+      "name": "conditional.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "name": "conditional.log",
+      "bytes": 15908,
+      "sha256": "fcca6640c4862b9e3bce9dafff3634a36cc21564b1ba0a5310e8af7ed95a3f20"
+    },
+    {
+      "name": "conditional.pdf",
+      "bytes": 14570,
+      "sha256": "b4a5bf9d52131c20b9601d9e2a986d454341518f8f1d0da705c74ac077bc1eda"
+    },
+    {
+      "name": "conditional.sty",
+      "bytes": 82,
+      "sha256": "6baf2b330d2d1f66df90a266b91ac904d950a330dcc86639d2377c2126b9be7e"
+    },
+    {
+      "name": "conditional.tex",
+      "bytes": 338,
+      "sha256": "029f5103dd6bf1e27d2fc642830e501f15cc91d37c42db18b0e555cb1662cd95"
+    },
+    {
+      "name": "focused-tests.log",
+      "bytes": 11174,
+      "sha256": "585baff819b30cd4f398982bac578953f18b80ae3c1a5ae1bf1d0f22047bfd04"
+    },
+    {
+      "name": "groupedColor-inlineMath.tex",
+      "bytes": 2091,
+      "sha256": "7be5aaec1eb9ad0a197f65ce800b7cd4e1aa06f249235cb8ced8fcafa8dc425e"
+    },
+    {
+      "name": "groupedColor-pdf-operators.txt",
+      "bytes": 1932,
+      "sha256": "1ae6cbaed84faace21696560659e980cf3d9a3ec3c1eadca793c067432fda64a"
+    },
+    {
+      "name": "groupedColor-standalone.tex",
+      "bytes": 1813,
+      "sha256": "4e0ddefcab00fdd2bee72bfefd323f31f58a70eecf6be51e995ec1264211702f"
+    },
+    {
+      "name": "groupedColor.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "name": "groupedColor.log",
+      "bytes": 15917,
+      "sha256": "5e7c67b78be517b2cd800f12cde4bbfe9a4fbe9516421e987fe6236fcbe9a555"
+    },
+    {
+      "name": "groupedColor.pdf",
+      "bytes": 14570,
+      "sha256": "cd7c4461a7a78ad8de135c02bb3e4e61b5a6650fc6024d1427c55c2e568dbd66"
+    },
+    {
+      "name": "groupedColor.sty",
+      "bytes": 108,
+      "sha256": "41f927e3115217a3a07045964bc9288024b343080449242fc6c0f5a803a30d51"
+    },
+    {
+      "name": "groupedColor.tex",
+      "bytes": 341,
+      "sha256": "8df72b1f3e5eca1b29a347bf6aff65b9d6940566f4922d26d65dce05020a7034"
+    },
+    {
+      "name": "macro-inlineMath.tex",
+      "bytes": 2077,
+      "sha256": "8d9b779b3db013afa514152b3386def11710fe593f47a17c9850128dce8ca3cc"
+    },
+    {
+      "name": "macro-pdf-operators.txt",
+      "bytes": 1932,
+      "sha256": "1ae6cbaed84faace21696560659e980cf3d9a3ec3c1eadca793c067432fda64a"
+    },
+    {
+      "name": "macro-standalone.tex",
+      "bytes": 1799,
+      "sha256": "cbbeed0f83b8cd024ed390742b0d21be6d63005b02ec7a90f880cfddb4eb7710"
+    },
+    {
+      "name": "macro.aux",
+      "bytes": 32,
+      "sha256": "fbabe80c887f95a1ede6847f22dd91b380bda9d17ae8bfaa72e1741b16aa41e9"
+    },
+    {
+      "name": "macro.log",
+      "bytes": 15854,
+      "sha256": "81c5d64adf1d8e7b1c697c926c1516636ce49bda3240576bd07294bb942bc3bf"
+    },
+    {
+      "name": "macro.pdf",
+      "bytes": 14570,
+      "sha256": "5dddec86859b035959ede77dc38319b5aa79b6fe2b79bbc05938d2c8e4dbb85f"
+    },
+    {
+      "name": "macro.sty",
+      "bytes": 98,
+      "sha256": "9d2d9698544b2ab6732a79a6d9c6f2fc645b1d4d0b58898cc12e54cc84e7166f"
+    },
+    {
+      "name": "macro.tex",
+      "bytes": 320,
+      "sha256": "0e173025109e1c4364367460a62a5bc191a21b50b2d03f4f789ee67efccedbd2"
+    },
+    {
+      "name": "production-observations.log",
+      "bytes": 1277,
+      "sha256": "858ab08bc35f9cbe1c2b80a0195b4b09db45c61a120c1ea3bd4f04e30f395936"
+    },
+    {
+      "name": "repro.mjs",
+      "bytes": 2429,
+      "sha256": "453e01e060fbdf8e322b925561abde7fb12f4789fc0702b4da15873c3780cf37"
+    }
+  ]
+}

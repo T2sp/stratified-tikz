@@ -1,0 +1,234 @@
+{
+  "format": "stratified-tikz-diagram",
+  "version": 2,
+  "diagram": {
+    "version": 1,
+    "ambientDimension": 2,
+    "layers": [
+      {
+        "value": 0,
+        "name": "Layer 0"
+      }
+    ],
+    "userStylePresets": [
+      {
+        "id": "user-curve-mypoint",
+        "name": "myPoint",
+        "kind": "curve",
+        "style": {
+          "kind": "curveStyle",
+          "strokeColor": "#000000",
+          "strokeOpacity": 1,
+          "lineWidth": 1.2,
+          "lineStyle": "solid"
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-sheet-mypoint",
+        "name": "myPoint",
+        "kind": "sheet",
+        "style": {
+          "kind": "sheetStyle",
+          "fillColor": "#4D9DE0",
+          "fillOpacity": 0.35,
+          "strokeColor": "#4D9DE0",
+          "strokeOpacity": 1
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint2",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-region-mypoint",
+        "name": "myPoint",
+        "kind": "region",
+        "style": {
+          "kind": "regionStyle",
+          "fillColor": "#FFFFFF",
+          "fillOpacity": 0,
+          "strokeColor": "#000000",
+          "strokeOpacity": 0
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint3",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-label-mypoint",
+        "name": "myPoint",
+        "kind": "label",
+        "style": {
+          "kind": "labelStyle",
+          "color": "#0000FF",
+          "opacity": 1,
+          "fontSize": 10,
+          "anchor": "center"
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint4",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      },
+      {
+        "id": "user-point-mypoint",
+        "name": "myPoint",
+        "kind": "point",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3,
+          "paint": {
+            "text": {
+              "color": "#0000FF",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "importedPaint": {
+            "referenceId": "imported-style-mypoint",
+            "baseline": {
+              "text": {
+                "color": "#0000FF",
+                "opacity": 1
+              },
+              "fill": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1
+              },
+              "stroke": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1,
+                "width": 0.4,
+                "lineStyle": "solid",
+                "dashPhase": 0,
+                "lineCap": "butt",
+                "lineJoin": "miter"
+              }
+            },
+            "overriddenFields": []
+          }
+        },
+        "tikzStyleName": "stratifiedStyleMyPoint5",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      }
+    ],
+    "externalTikzStyleSources": [
+      {
+        "id": "external-style-source-bounds-sty",
+        "name": "bounds.sty",
+        "rawSource": "\\tikzset{myPoint/.style={text=blue}}\\tikzset{filler0/.style={text=black}}\n\\tikzset{filler1/.style={text=black}}\n\\tikzset{filler2/.style={text=black}}\n\\tikzset{filler3/.style={text=black}}\n\\tikzset{filler4/.style={text=black}}\n\\tikzset{filler5/.style={text=black}}\n\\tikzset{filler6/.style={text=black}}\n\\tikzset{filler7/.style={text=black}}\n\\tikzset{filler8/.style={text=black}}\n\\tikzset{filler9/.style={text=black}}\n\\tikzset{filler10/.style={text=black}}\n\\tikzset{filler11/.style={text=black}}\n\\tikzset{filler12/.style={text=black}}\n\\tikzset{filler13/.style={text=black}}\n\\tikzset{filler14/.style={text=black}}\n\\tikzset{filler15/.style={text=black}}\n\\tikzset{filler16/.style={text=black}}\n\\tikzset{filler17/.style={text=black}}\n\\tikzset{filler18/.style={text=black}}\n\\tikzset{filler19/.style={text=black}}\n\\tikzset{filler20/.style={text=black}}\n\\tikzset{filler21/.style={text=black}}\n\\tikzset{filler22/.style={text=black}}\n\\tikzset{filler23/.style={text=black}}\n\\tikzset{filler24/.style={text=black}}\n\\tikzset{filler25/.style={text=black}}\n\\tikzset{filler26/.style={text=black}}\n\\tikzset{filler27/.style={text=black}}\n\\tikzset{filler28/.style={text=black}}\n\\tikzset{filler29/.style={text=black}}\n\\tikzset{filler30/.style={text=black}}\n\\tikzset{filler31/.style={text=black}}\n\\tikzset{filler32/.style={text=black}}\n\\tikzset{filler33/.style={text=black}}\n\\tikzset{filler34/.style={text=black}}\n\\tikzset{filler35/.style={text=black}}\n\\tikzset{filler36/.style={text=black}}\n\\tikzset{filler37/.style={text=black}}\n\\tikzset{filler38/.style={text=black}}\n\\tikzset{filler39/.style={text=black}}\n\\tikzset{filler40/.style={text=black}}\n\\tikzset{filler41/.style={text=black}}\n\\tikzset{filler42/.style={text=black}}\n\\tikzset{filler43/.style={text=black}}\n\\tikzset{filler44/.style={text=black}}\n\\tikzset{filler45/.style={text=black}}\n\\tikzset{filler46/.style={text=black}}\n\\tikzset{filler47/.style={text=black}}\n\\tikzset{filler48/.style={text=black}}\n\\tikzset{filler49/.style={text=black}}\n\\tikzset{filler50/.style={text=black}}\n\\tikzset{filler51/.style={text=black}}\n\\tikzset{filler52/.style={text=black}}\n\\tikzset{filler53/.style={text=black}}\n\\tikzset{filler54/.style={text=black}}\n\\tikzset{filler55/.style={text=black}}\n\\tikzset{filler56/.style={text=black}}\n\\tikzset{filler57/.style={text=black}}\n\\tikzset{filler58/.style={text=black}}\n\\tikzset{filler59/.style={text=black}}\n\\tikzset{filler60/.style={text=black}}\n\\tikzset{filler61/.style={text=black}}\n\\tikzset{filler62/.style={text=black}}\n\\tikzset{filler63/.style={text=black}}\n\\tikzset{filler64/.style={text=black}}\n\\tikzset{filler65/.style={text=black}}\n\\tikzset{filler66/.style={text=black}}\n\\tikzset{filler67/.style={text=black}}\n\\tikzset{filler68/.style={text=black}}\n\\tikzset{filler69/.style={text=black}}\n\\tikzset{filler70/.style={text=black}}\n\\tikzset{filler71/.style={text=black}}\n\\tikzset{filler72/.style={text=black}}\n\\tikzset{filler73/.style={text=black}}\n\\tikzset{filler74/.style={text=black}}\n\\tikzset{filler75/.style={text=black}}\n\\tikzset{filler76/.style={text=black}}\n\\tikzset{filler77/.style={text=black}}\n\\tikzset{filler78/.style={text=black}}\n\\tikzset{filler79/.style={text=black}}\n\\tikzset{filler80/.style={text=black}}\n\\tikzset{filler81/.style={text=black}}\n\\tikzset{filler82/.style={text=black}}\n\\tikzset{filler83/.style={text=black}}\n\\tikzset{filler84/.style={text=black}}\n\\tikzset{filler85/.style={text=black}}\n\\tikzset{filler86/.style={text=black}}\n\\tikzset{filler87/.style={text=black}}\n\\tikzset{filler88/.style={text=black}}\n\\tikzset{filler89/.style={text=black}}\n\\tikzset{filler90/.style={text=black}}\n\\tikzset{filler91/.style={text=black}}\n\\tikzset{filler92/.style={text=black}}\n\\tikzset{filler93/.style={text=black}}\n\\tikzset{filler94/.style={text=black}}\n\\tikzset{filler95/.style={text=black}}\n\\tikzset{filler96/.style={text=black}}\n\\tikzset{filler97/.style={text=black}}\n\\tikzset{filler98/.style={text=black}}\n\\tikzset{filler99/.style={text=black}}\n\\tikzset{filler100/.style={text=black}}\n\\tikzset{filler101/.style={text=black}}\n\\tikzset{filler102/.style={text=black}}\n\\tikzset{filler103/.style={text=black}}\n\\tikzset{filler104/.style={text=black}}\n\\tikzset{filler105/.style={text=black}}\n\\tikzset{filler106/.style={text=black}}\n\\tikzset{filler107/.style={text=black}}\n\\tikzset{filler108/.style={text=black}}\n\\tikzset{filler109/.style={text=black}}\n\\tikzset{filler110/.style={text=black}}\n\\tikzset{filler111/.style={text=black}}\n\\tikzset{filler112/.style={text=black}}\n\\tikzset{filler113/.style={text=black}}\n\\tikzset{filler114/.style={text=black}}\n\\tikzset{filler115/.style={text=black}}\n\\tikzset{filler116/.style={text=black}}\n\\tikzset{filler117/.style={text=black}}\n\\tikzset{filler118/.style={text=black}}\n\\tikzset{filler119/.style={text=black}}\n\\tikzset{filler120/.style={text=black}}\n\\tikzset{filler121/.style={text=black}}\n\\tikzset{filler122/.style={text=black}}\n\\tikzset{filler123/.style={text=black}}\n\\tikzset{filler124/.style={text=black}}\n\\tikzset{filler125/.style={text=black}}\n\\tikzset{filler126/.style={text=black}}\n\\tikzset{filler127/.style={text=black}}\n\\tikzset{filler128/.style={text=black}}\n\\tikzset{filler129/.style={text=black}}\n\\tikzset{filler130/.style={text=black}}\n\\tikzset{filler131/.style={text=black}}\n\\tikzset{filler132/.style={text=black}}\n\\tikzset{filler133/.style={text=black}}\n\\tikzset{filler134/.style={text=black}}\n\\tikzset{filler135/.style={text=black}}\n\\tikzset{filler136/.style={text=black}}\n\\tikzset{filler137/.style={text=black}}\n\\tikzset{filler138/.style={text=black}}\n\\tikzset{filler139/.style={text=black}}\n\\tikzset{filler140/.style={text=black}}\n\\tikzset{filler141/.style={text=black}}\n\\tikzset{filler142/.style={text=black}}\n\\tikzset{filler143/.style={text=black}}\n\\tikzset{filler144/.style={text=black}}\n\\tikzset{filler145/.style={text=black}}\n\\tikzset{filler146/.style={text=black}}\n\\tikzset{filler147/.style={text=black}}\n\\tikzset{filler148/.style={text=black}}\n\\tikzset{filler149/.style={text=black}}\n\\tikzset{filler150/.style={text=black}}\n\\tikzset{filler151/.style={text=black}}\n\\tikzset{filler152/.style={text=black}}\n\\tikzset{filler153/.style={text=black}}\n\\tikzset{filler154/.style={text=black}}\n\\tikzset{filler155/.style={text=black}}\n\\tikzset{filler156/.style={text=black}}\n\\tikzset{filler157/.style={text=black}}\n\\tikzset{filler158/.style={text=black}}\n\\tikzset{filler159/.style={text=black}}\n\\tikzset{filler160/.style={text=black}}\n\\tikzset{filler161/.style={text=black}}\n\\tikzset{filler162/.style={text=black}}\n\\tikzset{filler163/.style={text=black}}\n\\tikzset{filler164/.style={text=black}}\n\\tikzset{filler165/.style={text=black}}\n\\tikzset{filler166/.style={text=black}}\n\\tikzset{filler167/.style={text=black}}\n\\tikzset{filler168/.style={text=black}}\n\\tikzset{filler169/.style={text=black}}\n\\tikzset{filler170/.style={text=black}}\n\\tikzset{filler171/.style={text=black}}\n\\tikzset{filler172/.style={text=black}}\n\\tikzset{filler173/.style={text=black}}\n\\tikzset{filler174/.style={text=black}}\n\\tikzset{filler175/.style={text=black}}\n\\tikzset{filler176/.style={text=black}}\n\\tikzset{filler177/.style={text=black}}\n\\tikzset{filler178/.style={text=black}}\n\\tikzset{filler179/.style={text=black}}\n\\tikzset{filler180/.style={text=black}}\n\\tikzset{filler181/.style={text=black}}\n\\tikzset{filler182/.style={text=black}}\n\\tikzset{filler183/.style={text=black}}\n\\tikzset{filler184/.style={text=black}}\n\\tikzset{filler185/.style={text=black}}\n\\tikzset{filler186/.style={text=black}}\n\\tikzset{filler187/.style={text=black}}\n\\tikzset{filler188/.style={text=black}}\n\\tikzset{filler189/.style={text=black}}\n\\tikzset{filler190/.style={text=black}}\n\\tikzset{filler191/.style={text=black}}\n\\tikzset{filler192/.style={text=black}}\n\\tikzset{filler193/.style={text=black}}\n\\tikzset{filler194/.style={text=black}}\n\\tikzset{filler195/.style={text=black}}\n\\tikzset{filler196/.style={text=black}}\n\\tikzset{filler197/.style={text=black}}\n\\tikzset{filler198/.style={text=black}}\n\\tikzset{filler199/.style={text=black}}\n\\tikzset{filler200/.style={text=black}}\n\\tikzset{filler201/.style={text=black}}\n\\tikzset{filler202/.style={text=black}}\n\\tikzset{filler203/.style={text=black}}\n\\tikzset{filler204/.style={text=black}}\n\\tikzset{filler205/.style={text=black}}\n\\tikzset{filler206/.style={text=black}}\n\\tikzset{filler207/.style={text=black}}\n\\tikzset{filler208/.style={text=black}}\n\\tikzset{filler209/.style={text=black}}\n\\tikzset{filler210/.style={text=black}}\n\\tikzset{filler211/.style={text=black}}\n\\tikzset{filler212/.style={text=black}}\n\\tikzset{filler213/.style={text=black}}\n\\tikzset{filler214/.style={text=black}}\n\\tikzset{filler215/.style={text=black}}\n\\tikzset{filler216/.style={text=black}}\n\\tikzset{filler217/.style={text=black}}\n\\tikzset{filler218/.style={text=black}}\n\\tikzset{filler219/.style={text=black}}\n\\tikzset{filler220/.style={text=black}}\n\\tikzset{filler221/.style={text=black}}\n\\tikzset{filler222/.style={text=black}}\n\\tikzset{filler223/.style={text=black}}\n\\tikzset{filler224/.style={text=black}}\n\\tikzset{filler225/.style={text=black}}\n\\tikzset{filler226/.style={text=black}}\n\\tikzset{filler227/.style={text=black}}\n\\tikzset{filler228/.style={text=black}}\n\\tikzset{filler229/.style={text=black}}\n\\tikzset{filler230/.style={text=black}}\n\\tikzset{filler231/.style={text=black}}\n\\tikzset{filler232/.style={text=black}}\n\\tikzset{filler233/.style={text=black}}\n\\tikzset{filler234/.style={text=black}}\n\\tikzset{filler235/.style={text=black}}\n\\tikzset{filler236/.style={text=black}}\n\\tikzset{filler237/.style={text=black}}\n\\tikzset{filler238/.style={text=black}}\n\\tikzset{filler239/.style={text=black}}\n\\tikzset{filler240/.style={text=black}}\n\\tikzset{filler241/.style={text=black}}\n\\tikzset{filler242/.style={text=black}}\n\\tikzset{filler243/.style={text=black}}\n\\tikzset{filler244/.style={text=black}}\n\\tikzset{filler245/.style={text=black}}\n\\tikzset{filler246/.style={text=black}}\n\\tikzset{filler247/.style={text=black}}\n\\tikzset{filler248/.style={text=black}}\n\\tikzset{filler249/.style={text=black}}\n\\tikzset{filler250/.style={text=black}}\n\\tikzset{filler251/.style={text=black}}\n\\tikzset{filler252/.style={text=black}}\n\\tikzset{filler253/.style={text=black}}\n\\tikzset{filler254/.style={text=black}}\n\\tikzset{filler255/.style={text=black}}\n\\tikzset{filler256/.style={text=black}}\n\\tikzset{filler257/.style={text=black}}\n\\tikzset{filler258/.style={text=black}}\n\\tikzset{filler259/.style={text=black}}\n\\tikzset{filler260/.style={text=black}}\n\\tikzset{filler261/.style={text=black}}\n\\tikzset{filler262/.style={text=black}}\n\\tikzset{filler263/.style={text=black}}\n\\tikzset{filler264/.style={text=black}}\n\\tikzset{filler265/.style={text=black}}\n\\tikzset{filler266/.style={text=black}}\n\\tikzset{filler267/.style={text=black}}\n\\tikzset{filler268/.style={text=black}}\n\\tikzset{filler269/.style={text=black}}\n\\tikzset{filler270/.style={text=black}}\n\\tikzset{filler271/.style={text=black}}\n\\tikzset{filler272/.style={text=black}}\n\\tikzset{filler273/.style={text=black}}\n\\tikzset{filler274/.style={text=black}}\n\\tikzset{filler275/.style={text=black}}\n\\tikzset{filler276/.style={text=black}}\n\\tikzset{filler277/.style={text=black}}\n\\tikzset{filler278/.style={text=black}}\n\\tikzset{filler279/.style={text=black}}\n\\tikzset{filler280/.style={text=black}}\n\\tikzset{filler281/.style={text=black}}\n\\tikzset{filler282/.style={text=black}}\n\\tikzset{filler283/.style={text=black}}\n\\tikzset{filler284/.style={text=black}}\n\\tikzset{filler285/.style={text=black}}\n\\tikzset{filler286/.style={text=black}}\n\\tikzset{filler287/.style={text=black}}\n\\tikzset{filler288/.style={text=black}}\n\\tikzset{filler289/.style={text=black}}\n\\tikzset{filler290/.style={text=black}}\n\\tikzset{filler291/.style={text=black}}\n\\tikzset{filler292/.style={text=black}}\n\\tikzset{filler293/.style={text=black}}\n\\tikzset{filler294/.style={text=black}}\n\\tikzset{filler295/.style={text=black}}\n\\tikzset{filler296/.style={text=black}}\n\\tikzset{filler297/.style={text=black}}\n\\tikzset{filler298/.style={text=black}}\n\\tikzset{filler299/.style={text=black}}\n\\tikzset{filler300/.style={text=black}}\n\\tikzset{filler301/.style={text=black}}\n\\tikzset{filler302/.style={text=black}}\n\\tikzset{filler303/.style={text=black}}\n\\tikzset{filler304/.style={text=black}}\n\\tikzset{filler305/.style={text=black}}\n\\tikzset{filler306/.style={text=black}}\n\\tikzset{filler307/.style={text=black}}\n\\tikzset{filler308/.style={text=black}}\n\\tikzset{filler309/.style={text=black}}\n\\tikzset{filler310/.style={text=black}}\n\\tikzset{filler311/.style={text=black}}\n\\tikzset{filler312/.style={text=black}}\n\\tikzset{filler313/.style={text=black}}\n\\tikzset{filler314/.style={text=black}}\n\\tikzset{filler315/.style={text=black}}\n\\tikzset{filler316/.style={text=black}}\n\\tikzset{filler317/.style={text=black}}\n\\tikzset{filler318/.style={text=black}}\n\\tikzset{filler319/.style={text=black}}\n\\tikzset{filler320/.style={text=black}}\n\\tikzset{filler321/.style={text=black}}\n\\tikzset{filler322/.style={text=black}}\n\\tikzset{filler323/.style={text=black}}\n\\tikzset{filler324/.style={text=black}}\n\\tikzset{filler325/.style={text=black}}\n\\tikzset{filler326/.style={text=black}}\n\\tikzset{filler327/.style={text=black}}\n\\tikzset{filler328/.style={text=black}}\n\\tikzset{filler329/.style={text=black}}\n\\tikzset{filler330/.style={text=black}}\n\\tikzset{filler331/.style={text=black}}\n\\tikzset{filler332/.style={text=black}}\n\\tikzset{filler333/.style={text=black}}\n\\tikzset{filler334/.style={text=black}}\n\\tikzset{filler335/.style={text=black}}\n\\tikzset{filler336/.style={text=black}}\n\\tikzset{filler337/.style={text=black}}\n\\tikzset{filler338/.style={text=black}}\n\\tikzset{filler339/.style={text=black}}\n\\tikzset{filler340/.style={text=black}}\n\\tikzset{filler341/.style={text=black}}\n\\tikzset{filler342/.style={text=black}}\n\\tikzset{filler343/.style={text=black}}\n\\tikzset{filler344/.style={text=black}}\n\\tikzset{filler345/.style={text=black}}\n\\tikzset{filler346/.style={text=black}}\n\\tikzset{filler347/.style={text=black}}\n\\tikzset{filler348/.style={text=black}}\n\\tikzset{filler349/.style={text=black}}\n\\tikzset{filler350/.style={text=black}}\n\\tikzset{filler351/.style={text=black}}\n\\tikzset{filler352/.style={text=black}}\n\\tikzset{filler353/.style={text=black}}\n\\tikzset{filler354/.style={text=black}}\n\\tikzset{filler355/.style={text=black}}\n\\tikzset{filler356/.style={text=black}}\n\\tikzset{filler357/.style={text=black}}\n\\tikzset{filler358/.style={text=black}}\n\\tikzset{filler359/.style={text=black}}\n\\tikzset{filler360/.style={text=black}}\n\\tikzset{filler361/.style={text=black}}\n\\tikzset{filler362/.style={text=black}}\n\\tikzset{filler363/.style={text=black}}\n\\tikzset{filler364/.style={text=black}}\n\\tikzset{filler365/.style={text=black}}\n\\tikzset{filler366/.style={text=black}}\n\\tikzset{filler367/.style={text=black}}\n\\tikzset{filler368/.style={text=black}}\n\\tikzset{filler369/.style={text=black}}\n\\tikzset{filler370/.style={text=black}}\n\\tikzset{filler371/.style={text=black}}\n\\tikzset{filler372/.style={text=black}}\n\\tikzset{filler373/.style={text=black}}\n\\tikzset{filler374/.style={text=black}}\n\\tikzset{filler375/.style={text=black}}\n\\tikzset{filler376/.style={text=black}}\n\\tikzset{filler377/.style={text=black}}\n\\tikzset{filler378/.style={text=black}}\n\\tikzset{filler379/.style={text=black}}\n\\tikzset{filler380/.style={text=black}}\n\\tikzset{filler381/.style={text=black}}\n\\tikzset{filler382/.style={text=black}}\n\\tikzset{filler383/.style={text=black}}\n\\tikzset{filler384/.style={text=black}}\n\\tikzset{filler385/.style={text=black}}\n\\tikzset{filler386/.style={text=black}}\n\\tikzset{filler387/.style={text=black}}\n\\tikzset{filler388/.style={text=black}}\n\\tikzset{filler389/.style={text=black}}\n\\tikzset{filler390/.style={text=black}}\n\\tikzset{filler391/.style={text=black}}\n\\tikzset{filler392/.style={text=black}}\n\\tikzset{filler393/.style={text=black}}\n\\tikzset{filler394/.style={text=black}}\n\\tikzset{filler395/.style={text=black}}\n\\tikzset{filler396/.style={text=black}}\n\\tikzset{filler397/.style={text=black}}\n\\tikzset{filler398/.style={text=black}}\n\\tikzset{filler399/.style={text=black}}\n\\tikzset{filler400/.style={text=black}}\n\\tikzset{filler401/.style={text=black}}\n\\tikzset{filler402/.style={text=black}}\n\\tikzset{filler403/.style={text=black}}\n\\tikzset{filler404/.style={text=black}}\n\\tikzset{filler405/.style={text=black}}\n\\tikzset{filler406/.style={text=black}}\n\\tikzset{filler407/.style={text=black}}\n\\tikzset{filler408/.style={text=black}}\n\\tikzset{filler409/.style={text=black}}\n\\tikzset{filler410/.style={text=black}}\n\\tikzset{filler411/.style={text=black}}\n\\tikzset{filler412/.style={text=black}}\n\\tikzset{filler413/.style={text=black}}\n\\tikzset{filler414/.style={text=black}}\n\\tikzset{filler415/.style={text=black}}\n\\tikzset{filler416/.style={text=black}}\n\\tikzset{filler417/.style={text=black}}\n\\tikzset{filler418/.style={text=black}}\n\\tikzset{filler419/.style={text=black}}\n\\tikzset{filler420/.style={text=black}}\n\\tikzset{filler421/.style={text=black}}\n\\tikzset{filler422/.style={text=black}}\n\\tikzset{filler423/.style={text=black}}\n\\tikzset{filler424/.style={text=black}}\n\\tikzset{filler425/.style={text=black}}\n\\tikzset{filler426/.style={text=black}}\n\\tikzset{filler427/.style={text=black}}\n\\tikzset{filler428/.style={text=black}}\n\\tikzset{filler429/.style={text=black}}\n\\tikzset{filler430/.style={text=black}}\n\\tikzset{filler431/.style={text=black}}\n\\tikzset{filler432/.style={text=black}}\n\\tikzset{filler433/.style={text=black}}\n\\tikzset{filler434/.style={text=black}}\n\\tikzset{filler435/.style={text=black}}\n\\tikzset{filler436/.style={text=black}}\n\\tikzset{filler437/.style={text=black}}\n\\tikzset{filler438/.style={text=black}}\n\\tikzset{filler439/.style={text=black}}\n\\tikzset{filler440/.style={text=black}}\n\\tikzset{filler441/.style={text=black}}\n\\tikzset{filler442/.style={text=black}}\n\\tikzset{filler443/.style={text=black}}\n\\tikzset{filler444/.style={text=black}}\n\\tikzset{filler445/.style={text=black}}\n\\tikzset{filler446/.style={text=black}}\n\\tikzset{filler447/.style={text=black}}\n\\tikzset{filler448/.style={text=black}}\n\\tikzset{filler449/.style={text=black}}\n\\tikzset{filler450/.style={text=black}}\n\\tikzset{filler451/.style={text=black}}\n\\tikzset{filler452/.style={text=black}}\n\\tikzset{filler453/.style={text=black}}\n\\tikzset{filler454/.style={text=black}}\n\\tikzset{filler455/.style={text=black}}\n\\tikzset{filler456/.style={text=black}}\n\\tikzset{filler457/.style={text=black}}\n\\tikzset{filler458/.style={text=black}}\n\\tikzset{filler459/.style={text=black}}\n\\tikzset{filler460/.style={text=black}}\n\\tikzset{filler461/.style={text=black}}\n\\tikzset{filler462/.style={text=black}}\n\\tikzset{filler463/.style={text=black}}\n\\tikzset{filler464/.style={text=black}}\n\\tikzset{filler465/.style={text=black}}\n\\tikzset{filler466/.style={text=black}}\n\\tikzset{filler467/.style={text=black}}\n\\tikzset{filler468/.style={text=black}}\n\\tikzset{filler469/.style={text=black}}\n\\tikzset{filler470/.style={text=black}}\n\\tikzset{filler471/.style={text=black}}\n\\tikzset{filler472/.style={text=black}}\n\\tikzset{filler473/.style={text=black}}\n\\tikzset{filler474/.style={text=black}}\n\\tikzset{filler475/.style={text=black}}\n\\tikzset{filler476/.style={text=black}}\n\\tikzset{filler477/.style={text=black}}\n\\tikzset{filler478/.style={text=black}}\n\\tikzset{filler479/.style={text=black}}\n\\tikzset{filler480/.style={text=black}}\n\\tikzset{filler481/.style={text=black}}\n\\tikzset{filler482/.style={text=black}}\n\\tikzset{filler483/.style={text=black}}\n\\tikzset{filler484/.style={text=black}}\n\\tikzset{filler485/.style={text=black}}\n\\tikzset{filler486/.style={text=black}}\n\\tikzset{filler487/.style={text=black}}\n\\tikzset{filler488/.style={text=black}}\n\\tikzset{filler489/.style={text=black}}\n\\tikzset{filler490/.style={text=black}}\n\\tikzset{filler491/.style={text=black}}\n\\tikzset{filler492/.style={text=black}}\n\\tikzset{filler493/.style={text=black}}\n\\tikzset{filler494/.style={text=black}}\n\\tikzset{filler495/.style={text=black}}\n\\tikzset{filler496/.style={text=black}}\n\\tikzset{filler497/.style={text=black}}\n\\tikzset{filler498/.style={text=black}}\n\\tikzset{filler499/.style={text=black}}\n\\tikzset{filler500/.style={text=black}}\n\\tikzset{filler501/.style={text=black}}\n\\tikzset{filler502/.style={text=black}}\n\\tikzset{filler503/.style={text=black}}\n\\tikzset{filler504/.style={text=black}}\n\\tikzset{filler505/.style={text=black}}\n\\tikzset{filler506/.style={text=black}}\n\\tikzset{filler507/.style={text=black}}\n\\tikzset{filler508/.style={text=black}}\n\\tikzset{filler509/.style={text=black}}\n\\tikzset{filler510/.style={text=black}}\\tikzset{myPoint/.style={text=red}}",
+        "loadHint": "\\input{bounds.sty}"
+      }
+    ],
+    "importedTikzStyleReferences": [
+      {
+        "id": "imported-style-mypoint",
+        "key": "myPoint",
+        "sourceId": "external-style-source-bounds-sty",
+        "displayName": "myPoint",
+        "targets": [
+          "draw",
+          "filldraw",
+          "node",
+          "curve",
+          "sheet",
+          "point",
+          "label",
+          "region"
+        ],
+        "options": "text=blue",
+        "rawOptions": "text=red",
+        "previewDiagnostics": []
+      }
+    ],
+    "strata": [
+      {
+        "id": "p",
+        "codim": 2,
+        "geometricKind": "point",
+        "name": "Point",
+        "text": "APP",
+        "style": {
+          "kind": "pointStyle",
+          "color": "#000000",
+          "opacity": 1,
+          "shape": "circle",
+          "fill": "filled",
+          "size": 3,
+          "paint": {
+            "text": {
+              "color": "#0000FF",
+              "opacity": 1
+            },
+            "fill": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1
+            },
+            "stroke": {
+              "enabled": true,
+              "color": "#000000",
+              "opacity": 1,
+              "width": 0.4,
+              "lineStyle": "solid",
+              "dashPhase": 0,
+              "lineCap": "butt",
+              "lineJoin": "miter"
+            }
+          },
+          "importedPaint": {
+            "referenceId": "imported-style-mypoint",
+            "baseline": {
+              "text": {
+                "color": "#0000FF",
+                "opacity": 1
+              },
+              "fill": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1
+              },
+              "stroke": {
+                "enabled": true,
+                "color": "#000000",
+                "opacity": 1,
+                "width": 0.4,
+                "lineStyle": "solid",
+                "dashPhase": 0,
+                "lineCap": "butt",
+                "lineJoin": "miter"
+              }
+            },
+            "overriddenFields": []
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "layer": 0,
+        "stylePresetId": "user-point-mypoint",
+        "importedTikzStyleReferenceId": "imported-style-mypoint"
+      }
+    ],
+    "labels": []
+  }
+}

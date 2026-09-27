@@ -48,6 +48,8 @@ export type TikzPreviewContext = {
   colors?: TikzColorBindings
   colorSourceIds?: Readonly<Record<string, string>>
   sourceIds?: readonly string[]
+  /** Unknown source execution can redefine any style, color or key handler. */
+  sourceDiagnostics?: readonly string[]
   key?: string
 }
 /** Internal identity only: retain the user's key spelling in saved references. */
@@ -142,6 +144,15 @@ export function resolveTikzPaint(options: string, context: TikzPreviewContext = 
     if (sourceId !== undefined) dependencies.add(sourceId)
   })
   const paintFields = ['fillColor', 'fillEnabled', 'drawColor', 'drawEnabled', 'textColor', 'fillOpacity', 'drawOpacity', 'textOpacity', 'lineWidth', 'dashPattern', 'dashPhase', 'lineCap', 'lineJoin']
+  // No safe prefix/suffix or local key boundary exists for a rejected saved
+  // source. Do not traverse legacy options: even built-in color bindings and
+  // absolute option handlers may have changed. The caller supplies a visible
+  // fallback while these fields prohibit authoritative post-key paint.
+  if (context.sourceDiagnostics?.length) return {
+    diagnostics: context.sourceDiagnostics.slice(0, 64),
+    unresolvedFields: paintFields,
+    sourceDependencies: [...(context.sourceIds ?? [])],
+  }
   const keyFields: Record<string, string[]> = {
     fill: ['fillColor', 'fillEnabled'], draw: ['drawColor', 'drawEnabled'], color: ['fillColor', 'drawColor', 'textColor'], text: ['textColor'],
     opacity: ['fillOpacity', 'drawOpacity'], 'fill opacity': ['fillOpacity'], 'draw opacity': ['drawOpacity'], 'text opacity': ['textOpacity'],

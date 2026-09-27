@@ -1,0 +1,18 @@
+Read-only production review; all generated artifacts outside checkout.
+Node: v26.9.0 (/opt/homebrew/bin/node)
+TeX: pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)
+Observed PGF: 3.1.11a (recorded in each compiler .log)
+
+PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz-32b-model-review/repro.mjs > /private/tmp/stz-32b-model-review/production-observations.log
+PATH=/opt/homebrew/bin:$PATH node /private/tmp/stz-32b-model-review/bounds.mjs > /private/tmp/stz-32b-model-review/bounds-production-observations.log
+cd /private/tmp/stz-32b-model-review
+pdflatex -interaction=nonstopmode -halt-on-error macro.tex
+pdflatex -interaction=nonstopmode -halt-on-error conditional.tex
+pdflatex -interaction=nonstopmode -halt-on-error groupedColor.tex
+pdflatex -interaction=nonstopmode -halt-on-error bounds.tex > bounds-compilation.txt
+All four compilations returned exit 0; .log and .pdf files retained.
+PDF uses pdfcompresslevel=0/pdfobjcompresslevel=0; first stream containing [(PGF)]TJ was extracted verbatim to each *-pdf-operators.txt.
+macro/conditional/groupedColor: external PGF text = 0 0 1 rg (blue), standalone and inline APP text = 1 0 0 rg (red).
+bounds: external PGF text = 1 0 0 rg (red), standalone and inline APP text = 0 0 1 rg (blue).
+
+PATH=/opt/homebrew/bin:$PATH node --test tests/model/pointPaint.test.ts tests/model/pointPaintImport.test.ts tests/model/pointPaintImportContext.test.ts tests/model/pointPaintIntent.test.ts tests/tikz/pointImportedResolution.test.ts > /private/tmp/stz-32b-model-review/focused-tests.log

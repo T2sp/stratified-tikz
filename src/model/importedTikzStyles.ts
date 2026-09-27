@@ -52,6 +52,19 @@ const shapeStyleTargets: readonly TikzStyleTarget[] = [
   'label',
 ]
 const colorSignalTokens = Object.keys(namedTikzColors)
+// These handlers store definitions; they do not invoke the target key. Unknown
+// handlers (including .try/.retry) are execution, not key-local invalidations.
+const passiveDeclarationHandlers = new Set([
+  'style', 'append style', 'prefix style', 'add style', 'style args', 'style 2 args',
+  'code', 'append code', 'prefix code', 'code 2 args',
+  'initial', 'default',
+])
+const previewPrimitiveKeys = new Set([
+  'draw', 'fill', 'color', 'text', 'opacity', 'draw opacity', 'fill opacity', 'text opacity',
+  'line width', 'dash pattern', 'dash phase', 'line cap', 'cap', 'line join', 'join',
+  'ultra thin', 'very thin', 'thin', 'semithick', 'thick', 'very thick', 'ultra thick',
+  'solid', 'dashed', 'dotted', 'densely dotted', 'circle', 'shape', 'inner sep',
+])
 export type TikzStylePreviewApproximation = TikzPaintPreview
 
 export type ParsedTikzStyleDefinition = {
@@ -74,6 +87,8 @@ export type ParseTikzsetStylesResult = {
   warnings: TikzsetParserWarning[]
   rawOptions?: Record<string, string>
   colors?: TikzColorBindings
+  /** The entire source is outside the supported execution/declaration budget. */
+  executionDiagnostics?: string[]
 }
 
 export type ImportTikzStyleFileResult = {
@@ -175,29 +190,45 @@ export function normalizeImportedTikzStyleOptions(options: string): string {
 
 export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
   const warnings: TikzsetParserWarning[] = []
-  if (text.length > 1_000_000) return { styles: [], skipped: 1, warnings: [{ message: 'Style file exceeds the 1000000-character preview bound.' }] }
+  const reject = (reason: string): ParseTikzsetStylesResult => {
+    const message = `${reason} Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed.`
+    return { styles: [], declarations: [], colors: {}, rawOptions: {}, skipped: 1, warnings: [{ message }], executionDiagnostics: [message] }
+  }
+  if (text.length > 1_000_000) return reject('Style file exceeds the 1000000-character preview bound.')
   const declarations: ParsedTikzStyleDeclaration[] = []
   const colors: Record<string, HexColor | null> = {}
   const rawOptions: Record<string, string> = Object.create(null) as Record<string, string>
   let skipped = 0
+  let declarationCount = 0
   // Mask comments without changing offsets, retaining the exact source separately.
   const stripped = maskTexComments(text)
-  const commands = /\\(tikzset|tikzstyle|definecolor)\b/g
-  for (let command = commands.exec(stripped); command !== null; command = commands.exec(stripped)) {
+  // A closed, cursor-based grammar: only complete declaration commands may
+  // consume source at top level. Their balanced arguments are opaque here.
+  // Never search ahead into an unknown command, local group or conditional.
+  const commands = /\\(tikzset|tikzstyle|definecolor)(?![a-zA-Z@])/y
+  let cursor = 0
+  while ((cursor = skipWhitespace(stripped, cursor)) < stripped.length) {
+    commands.lastIndex = cursor
+    const command = commands.exec(stripped)
+    if (command === null) return reject(`Unsupported execution/scope context at character ${cursor + 1}: ${summarizeEntry(stripped.slice(cursor, cursor + 80))}.`)
     const first = readBracedContent(stripped, skipWhitespace(stripped, commands.lastIndex))
-    if (!first.ok) { warnings.push({ message: `Skipped malformed \\${command[1]} argument.` }); skipped += 1; continue }
+    if (!first.ok) return reject(`Malformed \\${command[1]} argument at character ${cursor + 1}.`)
     if (command[1] === 'tikzset') {
-      const parsed = parseTikzsetBlock(first.content, warnings, text.slice(first.endIndex - first.content.length, first.endIndex), rawOptions)
+      const parsed = parseTikzsetBlock(first.content, warnings, text.slice(first.endIndex - first.content.length, first.endIndex), rawOptions, 512 - declarationCount)
+      if (parsed.rejection !== undefined) return reject(parsed.rejection)
       declarations.push(...parsed.declarations)
+      declarationCount += parsed.declarations.length
       skipped += parsed.skipped
-      commands.lastIndex = first.endIndex + 1
+      cursor = first.endIndex + 1
     } else if (command[1] === 'tikzstyle') {
       let index = skipWhitespace(stripped, first.endIndex + 1)
       const append = stripped[index] === '+'
       if (append) index = skipWhitespace(stripped, index + 1)
-      if (stripped[index] === '=') index = skipWhitespace(stripped, index + 1)
+      if (stripped[index] !== '=') return reject('Malformed \\tikzstyle declaration: expected = before the option body.')
+      index = skipWhitespace(stripped, index + 1)
       const body = readDelimitedContent(stripped, index, '[', ']')
-      if (!body.ok || !first.content.trim()) { warnings.push({ message: 'Skipped malformed \\tikzstyle declaration.' }); skipped += 1; continue }
+      if (!body.ok || !isSupportedDeclarationTarget(first.content)) return reject('Malformed, nonliteral or reserved \\tikzstyle declaration target.')
+      if (++declarationCount > 512) return reject('Style file exceeds the 512-declaration preview bound.')
       const key = normalizeTikzPath(first.content)
       if (append) {
         const mutation = parseUnsupportedStyleMutation(`${key}/.append style={${body.content}}`, '')
@@ -209,20 +240,23 @@ export function parseTikzsetStyles(text: string): ParseTikzsetStylesResult {
         declarations.push({ kind: 'definition', ...style })
         rawOptions[key] = text.slice(index + 1, body.endIndex)
       }
-      commands.lastIndex = body.endIndex + 1
+      cursor = body.endIndex + 1
     } else {
       const model = readBracedContent(stripped, skipWhitespace(stripped, first.endIndex + 1))
       const value = model.ok ? readBracedContent(stripped, skipWhitespace(stripped, model.endIndex + 1)) : { ok: false as const }
-      const color = model.ok && value.ok ? literalDefinedColor(model.content, value.content) : null
+      if (!model.ok || !value.ok) return reject('Malformed \\definecolor declaration.')
+      if (/[\\{}#=$%~^&]/.test(model.content + value.content)) return reject('Nonliteral \\definecolor model or value; unknown expansion can affect other bindings.')
+      if (++declarationCount > 512) return reject('Style file exceeds the 512-declaration preview bound.')
+      const color = literalDefinedColor(model.content, value.content)
       const nameSupported = /^[a-zA-Z][a-zA-Z0-9:_-]*$/.test(first.content)
+      if (!nameSupported) return reject('Nonliteral \\definecolor binding name.')
       // A recognized declaration shadows an earlier binding even when its
       // model/value is outside our literal grammar. In particular, CMYK red
       // cannot silently fall back to the built-in red table.
-      if (nameSupported) colors[first.content] = color
-      if (color === null || !nameSupported) warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
-      commands.lastIndex = value.ok ? value.endIndex + 1 : first.endIndex + 1
+      colors[first.content] = color
+      if (color === null) warnings.push({ message: `Unsupported literal \\definecolor: ${first.content}` })
+      cursor = value.endIndex + 1
     }
-    if (declarations.length > 512) { warnings.push({ message: 'Style file exceeds the 512-definition preview bound.' }); declarations.length = 512; break }
   }
   return { ...mergeDuplicateParsedStyles(declarations.flatMap((declaration) => declaration.kind === 'definition' ? [{ key: declaration.key, options: declaration.options }] : []), skipped, warnings), declarations, rawOptions, colors }
 }
@@ -253,8 +287,12 @@ export function createImportedTikzResolutionContext(
   const sources = diagram.externalTikzStyleSources ?? []
   const references = diagram.importedTikzStyleReferences ?? []
   const sourceIds = sources.map((source) => source.id)
+  const sourceDiagnostics: string[] = []
   for (const source of sources) {
     const parsed = source.rawSource === undefined ? undefined : parseTikzsetStyles(source.rawSource)
+    for (const diagnostic of parsed?.executionDiagnostics ?? []) {
+      if (sourceDiagnostics.length < 64) sourceDiagnostics.push(`${source.name}: ${diagnostic} Saved raw source is retained; all imported paint remains unresolved.`)
+    }
     const parsedKeys = new Set((parsed?.declarations ?? []).map((declaration) => canonicalTikzStyleKey(declaration.key)))
     for (const declaration of parsed?.declarations ?? []) {
       const identity = canonicalTikzStyleKey(declaration.key)
@@ -294,7 +332,25 @@ export function createImportedTikzResolutionContext(
       addFallback(reference)
     }
   }
-  return { styles: [...styles.values()], colors, colorSourceIds, sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])] }
+  return {
+    styles: [...styles.values()], colors, colorSourceIds,
+    sourceIds: [...new Set([...sourceIds, ...references.map((reference) => reference.sourceId)])],
+    ...(sourceDiagnostics.length === 0 ? {} : { sourceDiagnostics }),
+  }
+}
+
+/** Reconstruct limitations in old saves without rewriting source or inventing intent. */
+export function restoreImportedTikzSourceDiagnostics(diagram: Diagram): string[] {
+  const context = createImportedTikzResolutionContext(diagram)
+  if (!context.sourceDiagnostics?.length) return []
+  diagram.importedTikzStyleReferences = diagram.importedTikzStyleReferences?.map((reference) => ({
+    ...reference,
+    previewDiagnostics: [...new Set([
+      ...(reference.previewDiagnostics ?? []),
+      ...(resolveImportedTikzStyle(reference, context).diagnostics ?? []),
+    ])],
+  }))
+  return [...context.sourceDiagnostics]
 }
 
 /** Invoke the key, so an older reference ID never selects a stale root body. */
@@ -506,6 +562,7 @@ function isSafeSingleLineCommentCharacter(character: string): boolean {
 type TikzsetBlockParseResult = {
   declarations: ParsedTikzStyleDeclaration[]
   skipped: number
+  rejection?: string
 }
 
 type BracedContentResult =
@@ -523,6 +580,7 @@ function parseTikzsetBlock(
   warnings: TikzsetParserWarning[],
   rawBlock?: string,
   rawOptions?: Record<string, string>,
+  remainingDeclarations = 512,
 ): TikzsetBlockParseResult {
   const entries = splitTopLevelCommaList(block)
   const declarations: ParsedTikzStyleDeclaration[] = []
@@ -541,6 +599,7 @@ function parseTikzsetBlock(
 
     const cdPath = parseCurrentDirectoryEntry(trimmedEntry)
     if (cdPath !== null) {
+      if (!isLiteralDeclarationKey(cdPath)) return { declarations, skipped, rejection: 'Nonliteral declaration key directory.' }
       currentDirectory = resolveTikzKeyPath(currentDirectory, cdPath)
       continue
     }
@@ -548,6 +607,7 @@ function parseTikzsetBlock(
     const styleResult = parseStyleEntry(trimmedEntry, currentDirectory)
 
     if (styleResult.ok) {
+      if (declarations.length >= remainingDeclarations) return { declarations, skipped, rejection: 'Style file exceeds the 512-declaration preview bound.' }
       declarations.push({ kind: 'definition', ...styleResult.style })
       if (rawOptions && rawEntry !== undefined) {
         const opening = entry.indexOf('{', entry.indexOf('/.style'))
@@ -558,9 +618,11 @@ function parseTikzsetBlock(
     }
 
     const mutation = parseUnsupportedStyleMutation(trimmedEntry, currentDirectory)
-    if (mutation !== null) declarations.push(mutation)
+    if (mutation === null) return { declarations, skipped, rejection: `Unsupported declaration context: ${summarizeEntry(trimmedEntry)}.` }
+    if (declarations.length >= remainingDeclarations) return { declarations, skipped, rejection: 'Style file exceeds the 512-declaration preview bound.' }
+    declarations.push(mutation)
     skipped += 1
-    warnings.push({ message: mutation?.diagnostic ?? styleResult.warning })
+    warnings.push({ message: mutation.diagnostic })
   }
 
   return { declarations, skipped }
@@ -598,6 +660,9 @@ function addDetectedImportedStylePresets(
 
 /** Only importer-owned snapshots follow later definitions; authored values stay. */
 function refreshImportedPointSnapshots(diagram: Diagram, context: TikzPreviewContext): Diagram {
+  // A source-wide failure has no established replacement baseline. Keep saved
+  // fallbacks and intent, without promoting old differences during refresh.
+  if (context.sourceDiagnostics?.length) return diagram
   const references = new Map((diagram.importedTikzStyleReferences ?? []).map((reference) => [reference.id, reference]))
   const refresh = (style: PointStyle, referenceId: string | undefined): PointStyle => {
     if (referenceId === undefined || style.importedPaint?.referenceId !== referenceId) return style
@@ -849,6 +914,22 @@ function parseUnsupportedStyleMutation(entry: string, currentDirectory: string):
   const handlerMatch = entry.slice(marker + 2).match(/^([a-zA-Z][a-zA-Z0-9\s]*(?:\/\.[a-zA-Z][a-zA-Z0-9\s]*)*)=/)
   if (handlerMatch === null) return null
   const handler = handlerMatch[1].trim().replace(/\s+/g, ' ')
+  const handlers = handler.split('/.')
+  if (!passiveDeclarationHandlers.has(handlers[0])) return null
+  const argumentStart = marker + 2 + handlerMatch[0].length
+  if (handlers[0] === 'style args' || handlers[0] === 'add style') {
+    // PGF consumes two TeX arguments for these handlers. Trailing tokens run
+    // immediately rather than becoming stored style/code; never skip them.
+    const first = readBracedContent(entry, skipWhitespace(entry, argumentStart))
+    const second = first.ok ? readBracedContent(entry, skipWhitespace(entry, first.endIndex + 1)) : { ok: false as const }
+    if (!second.ok || entry.slice(second.endIndex + 1).trim()) return null
+  }
+  // Preserve prior literal expanded-definition controls without evaluating any
+  // expansion. Other chains or expansion-capable arguments have unknown scope.
+  if (handlers.length > 1 && (handlers.length !== 2 || handlers[1] !== 'expanded'
+    || /[\\#~^$&%]/.test(entry.slice(argumentStart)))) return null
+  const key = resolveTikzKeyPath(currentDirectory, target)
+  if (!isSupportedDeclarationTarget(key)) return null
   const dependencyOptions: string[] = []
   // These handlers take option lists. Retain their bounded literal arguments
   // only to discover required load hints and runtime directory uncertainty,
@@ -865,7 +946,6 @@ function parseUnsupportedStyleMutation(entry: string, currentDirectory: string):
     dependencyOptions.push(body.content)
     index = body.endIndex + 1
   }
-  const key = resolveTikzKeyPath(currentDirectory, target)
   return {
     kind: 'mutation',
     key,
@@ -892,10 +972,10 @@ function parseStyleEntry(
 
   const rawKey = entry.slice(0, markerIndex).trim()
 
-  if (rawKey.length === 0) {
+  if (!isLiteralDeclarationKey(rawKey) || !isSupportedDeclarationTarget(resolveTikzKeyPath(currentDirectory, rawKey))) {
     return {
       ok: false,
-      warning: `Skipped style entry with an empty key: ${summarizeEntry(entry)}`,
+      warning: `Skipped style entry with an empty or nonliteral key: ${summarizeEntry(entry)}`,
     }
   }
 
@@ -961,6 +1041,20 @@ function maskTexComments(text: string): string {
   }).join('')
 }
 
+function isLiteralDeclarationKey(key: string): boolean {
+  return key.trim().length > 0 && !/[\\{},#=$%~^&]/.test(key)
+}
+
+function isSupportedDeclarationTarget(key: string): boolean {
+  if (!isLiteralDeclarationKey(key)) return false
+  const identity = canonicalTikzStyleKey(normalizeTikzPath(key))
+  // Hooks/handler namespaces can change how every later declaration executes.
+  if (identity.split('/').some((part) => part.startsWith('.')) || /^\/(?:handlers|errors|pgf)(?:\/|$)/.test(identity)) return false
+  if (!identity.startsWith('/tikz/')) return true
+  const relative = identity.slice('/tikz/'.length).replace(/\s+/g, ' ')
+  return !previewPrimitiveKeys.has(relative) && !/^(?:every |execute at )/.test(relative)
+}
+
 function readDelimitedContent(text: string, start: number, open: string, close: string): BracedContentResult {
   if (text[start] !== open) return { ok: false }
   let depth = 1
@@ -970,6 +1064,7 @@ function readDelimitedContent(text: string, start: number, open: string, close: 
     if (char === '\\') { index += 1; continue }
     if (char === '{') braces += 1
     if (char === '}') braces -= 1
+    if (braces < 0) return { ok: false }
     if (braces !== 0) continue
     if (char === open) depth += 1
     if (char === close) depth -= 1

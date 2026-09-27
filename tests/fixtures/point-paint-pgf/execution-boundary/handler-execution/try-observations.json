@@ -1,0 +1,62 @@
+{
+  "rejected": {
+    "sameDiagramIdentity": true,
+    "unchangedJson": true,
+    "references": 0,
+    "styles": 0,
+    "declarations": 0,
+    "colors": {},
+    "rawOptions": {},
+    "diagnostics": [
+      "Unsupported declaration context: run/.try={}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed."
+    ]
+  },
+  "reloaded": {
+    "rawSourceUnchanged": true,
+    "reference": {
+      "id": "imported-style-mypoint",
+      "key": "myPoint",
+      "sourceId": "external-style-source-try-sty",
+      "displayName": "myPoint",
+      "targets": [
+        "draw",
+        "filldraw",
+        "node",
+        "curve",
+        "sheet",
+        "point",
+        "label",
+        "region"
+      ],
+      "options": "text=blue",
+      "rawOptions": "text=blue",
+      "previewDiagnostics": [
+        "try.sty: Unsupported declaration context: run/.try={}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed. Saved raw source is retained; all imported paint remains unresolved."
+      ]
+    },
+    "resolution": {
+      "diagnostics": [
+        "try.sty: Unsupported declaration context: run/.try={}. Import rejected: use only top-level literal declarations within the preview bounds; no TeX execution or scope evaluation is performed. Saved raw source is retained; all imported paint remains unresolved."
+      ],
+      "unresolvedFields": [
+        "fillColor",
+        "fillEnabled",
+        "drawColor",
+        "drawEnabled",
+        "textColor",
+        "fillOpacity",
+        "drawOpacity",
+        "textOpacity",
+        "lineWidth",
+        "dashPattern",
+        "dashPhase",
+        "lineCap",
+        "lineJoin"
+      ],
+      "sourceDependencies": [
+        "external-style-source-try-sty"
+      ]
+    },
+    "presetReapplicationRoundTrip": true
+  }
+}

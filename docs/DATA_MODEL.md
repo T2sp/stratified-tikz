@@ -2498,6 +2498,27 @@ paint-only mutation recovery remains supported. Declaration-level `.cd` only
 qualifies declarations and does not change invocation certainty. This state is
 reconstructed from raw sources, with no new saved field or TeX execution.
 
+Execution-context failures and declaration overflow are also reconstructed from
+raw sources, without adding a saved schema field. Initial import rejects them
+atomically with empty parse metadata and an unchanged diagram. The supported
+source grammar is a sequence of top-level literal declaration commands/comments;
+macro definitions, conditionals, local groups and arbitrary execution are outside
+it. Passive declaration handlers use an explicit allowlist and complete argument
+boundaries; execution handlers such as `/.try`, unknown chains, and replacements
+of built-in paint/handler hooks reject the source rather than invalidating only
+the last literal key. A shared 512-event budget includes definitions, mutations and colors; event
+513 rejects the entire source rather than resolving its prefix.
+
+When such a source already exists in saved JSON, it remains byte-for-byte intact.
+Reconstruction invalidates all imported paint, including earlier sources, aliases,
+colors and stale reference/preset options. JSON loading retains old diagnostics
+and appends the reconstructed source limitation. These diagnostics round-trip;
+no stored fallback can restore certainty. Explicit imported-paint intent remains
+authoritative, including equal-valued edits. Legacy values without intent are
+kept as preview fallbacks but cannot imply local overrides under source-wide
+uncertainty. Their first accepted edit snapshots the saved fallback and records
+only the actual edited fields. No TeX is executed during import, loading or preview.
+
 New saves use envelope version **2**, superseding the historical version-1
 wrapper examples above. `Diagram.version` remains 1. Both envelope versions
 load; point strata and saved user point presets materialize independent paint

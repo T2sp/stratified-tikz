@@ -6904,10 +6904,18 @@ function pointImportedStyleOverrideOptions(
   // Snapshot provenance distinguishes importer fallback values from local
   // paint. Also preserve distinguishable manually authored/legacy values;
   // absent historical metadata cannot recover an equal-valued old edit.
-  const comparisonStyle = intent === undefined ? baseline : { ...style, paint: intent.baseline, opacity: 1 }
+  // Historical snapshots do not store a baseline overall opacity. Under a
+  // source failure only recorded intent can establish that multiplier as local.
+  const comparisonStyle = intent === undefined ? baseline : {
+    ...style, paint: intent.baseline,
+    opacity: context.importedTikzResolution.sourceDiagnostics?.length ? style.opacity : 1,
+  }
+  // A source-wide execution failure makes old fallback values untrustworthy.
+  // Only recorded provenance can distinguish them from intentional local paint.
+  const inferLegacyOverrides = intent !== undefined || !context.importedTikzResolution.sourceDiagnostics?.length
   const overridden = new Set<PointPaintField>([
     ...(intent?.overriddenFields ?? []),
-    ...(comparisonStyle.kind === 'pointStyle' ? changedPointPaintFields(comparisonStyle, style) : []),
+    ...(inferLegacyOverrides && comparisonStyle.kind === 'pointStyle' ? changedPointPaintFields(comparisonStyle, style) : []),
   ])
   const unresolved = new Set(unresolvedFields)
   const affectedFields: Record<string, string[]> = {

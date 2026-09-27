@@ -450,7 +450,9 @@ test('directory uncertainty preserves explicit text intent through fallback retu
 
 for (const handler of ['prefix style', 'add style', 'append code', 'code', 'style args']) {
   test(`recognizable unsupported .${handler} invalidates paint without executing its body`, () => {
-    const imported = importTikzStyleFile(diagram(), 'handler.sty', `\\tikzset{myPoint/.style={fill=red,text=red},myPoint/.${handler}={fill=blue,text=blue}}`)
+    const argument = handler === 'add style' ? '{}{fill=blue,text=blue}'
+      : handler === 'style args' ? '{#1}{fill=blue,text=blue}' : '{fill=blue,text=blue}'
+    const imported = importTikzStyleFile(diagram(), 'handler.sty', `\\tikzset{myPoint/.style={fill=red,text=red},myPoint/.${handler}=${argument}}`)
     const preview = resolveTikzPaint('myPoint', createImportedTikzResolutionContext(imported.diagram))
     assert.equal(preview.fillColor, '#FF0000')
     assert.ok(preview.unresolvedFields?.includes('fillColor'))
@@ -554,8 +556,12 @@ test('recognizable handler chains and legacy tikzstyle append retain uncertainty
     assert.deepEqual(parsed.declarations, [], `unsupported nonliteral target ${target} is not guessed`)
     assert.ok(parsed.warnings.length)
   }
-  const invocation = importTikzStyleFile(diagram(), 'invocation.sty', prefix + String.raw`\tikzset{myPoint=blue}`)
-  assert.equal(resolveTikzPaint('myPoint', createImportedTikzResolutionContext(invocation.diagram)).unresolvedFields, undefined, 'ordinary unsupported invocation is not a definition mutation')
+  const beforeInvocation = importTikzStyleFile(diagram(), 'definition.sty', prefix).diagram
+  const invocation = importTikzStyleFile(beforeInvocation, 'invocation.sty', String.raw`\tikzset{myPoint=blue}`)
+  assert.equal(invocation.diagram, beforeInvocation, 'executing an arbitrary key is outside the declaration-only source grammar')
+  assert.equal(invocation.source, null)
+  assert.ok(invocation.parseResult.executionDiagnostics?.length)
+  assert.equal(resolveTikzPaint('myPoint', createImportedTikzResolutionContext(invocation.diagram)).unresolvedFields, undefined, 'rejected input cannot mutate the earlier accepted definition')
 })
 
 test('mutating and required dependency sources remain ordered, and a later full source restores old-reference resolution', () => {

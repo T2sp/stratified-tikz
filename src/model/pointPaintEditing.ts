@@ -12,7 +12,11 @@ export function preparePointStyleForImportedEdit(
   if (referenceId === undefined || clean.importedPaint !== undefined) return clean
   const reference = diagram.importedTikzStyleReferences?.find((entry) => entry.id === referenceId)
   if (reference === undefined) return clean
-  const baseline = importedTikzStylePresetStyle('point', reference, createImportedTikzResolutionContext(diagram))
+  const context = createImportedTikzResolutionContext(diagram)
+  // Unsupported source execution invalidates historical fallback comparisons.
+  // Start from the saved paint so this edit claims only its accepted fields.
+  if (context.sourceDiagnostics?.length) return createImportedPointPaintSnapshot(clean, referenceId)
+  const baseline = importedTikzStylePresetStyle('point', reference, context)
   const snapshot = createImportedPointPaintSnapshot(baseline, referenceId)
   return markPointPaintOverrides({ ...clean, importedPaint: snapshot.importedPaint }, changedPointPaintFields(baseline, clean))
 }

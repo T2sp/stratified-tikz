@@ -1,11 +1,14 @@
 # Phase 32B: Independent point paint and imported styles
 
-Status: 32B remains incomplete pending matching native acceptance and independent
-review. The latest supplied `GPJG0D` parent run reached the real-App ready-stage
-scroll and timed out; its owned App geometry/lifecycle evidence was insufficient
-to establish the trigger. See the final App stability investigation section for
-bounded diagnostics, executed checks and the current external handoff. The
-acceptance minimum remains 16 cumulative groups / 27 named point scenarios.
+Status: 32B remains incomplete until matching final verification and independent
+review succeed. The supplied `T5qkan` parent report passed all five commands,
+16 cumulative groups, 27 point scenarios and 281 required artifacts on the
+pre-fix fingerprint `d47b85b1596b340a97f9ca80a0197fce67d450d368d38b605b0cb7e487ed4dff`.
+Independent review then found two Medium importer defects: execution/scope
+uncertainty and declaration-limit overflow becoming authoritative paint. The
+final section documents these targeted corrections and the new external handoff.
+The App diagnostics, cumulative native policy and accepted historical evidence
+are preserved. 32C/32D remain deferred.
 The following paragraphs and earlier sections retain historical evidence only.
 The `xgI0o0` pre-fix parent verification passed; the subsequent independent review
 ran and requested changes for three Medium production defects. Its browser,
@@ -2217,3 +2220,145 @@ read-only review are recorded externally in this directory's `handoff.json`,
 no self-referential final fingerprint. Any subsequent checkout change requires
 matching verification again. Missing native acceptance or unsuccessful review
 keeps 32B incomplete and prohibits commit/push; 32C/32D remain deferred.
+
+
+## Targeted execution/scope and declaration-overflow correction (2026-09-27)
+
+The actual starting tree was clean on `phase/32b-color-opacity-outline` at
+`0cf3811523b4f8851af73ec6e70b7c2cc2f7feb4`, the prompt-update commit after the
+supplied `f75e3ac2` revision. It already contains the previous implementation and
+all four formerly untracked App helper/test files. Their bytes match the accepted
+parent report's SHA256 entries; the external `parent-preservation.json` records
+this check. Nothing was reset, discarded, committed or pushed.
+
+The original `/private/tmp/stz-32b-model-review/` command log, observations,
+reproduction scripts, external sources and PDF operators were inspected before
+editing. An unused `\newcommand` and false conditional incorrectly made preview
+and both exports red while PGF remained blue; a locally grouped `\definecolor`
+had the same effect without a warning. Declaration 513 redefined blue to red,
+while the truncated importer exported blue and retained contradictory blue
+`options`/red `rawOptions` with empty reference diagnostics. All four failing
+sources, outputs, PDFs and operators remain preserved, with SHA256 manifests in
+[the new comparison fixture](../tests/fixtures/point-paint-pgf/execution-boundary/README.md).
+Corrected evidence is separate from the original review directory.
+
+The parser now consumes a closed sequence of complete top-level declaration
+commands with balanced opaque arguments; it cannot search ahead into an unknown
+macro, conditional or local group. Unsupported execution/context or malformed
+command boundaries reject initial import atomically. The same rejection applies
+to nonliteral names/directories/color argument expansion and the 513th declaration
+event (styles, recognizable mutation events and colors share the 512-event bound).
+The whole parsed result is discarded: no partial styles, declarations, colors,
+raw options, references, presets or diagram mutation. Ordinary comments, braces
+inside options, literal colors, namespaces, source ordering and the previous
+bounded mutation/directory semantics remain supported. No dependency, general
+TeX interpreter or application compiler execution was added.
+
+For already-saved sources, reconstruction carries source-wide diagnostics into
+paint resolution; unknown effects cannot safely be restricted to the last key
+scanned. All imported paint becomes unresolved, including aliases/dependencies,
+colors and references from earlier files. Saved options and legacy snapshots
+cannot re-establish certainty, and all external load hints are kept. JSON reload
+retains exact source/options and prior diagnostic strings and adds reconstructed
+limitations. Both export modes omit untouched uncertain post-key paint. Existing
+explicit intent remains authoritative; the first edit of uncertain legacy paint
+records only the newly edited fields, including equal-fallback edits. Preset
+reapplication and history retain this distinction. See
+[the complete boundary/persistence policy](IMPORTED_POINT_PAINT.md).
+
+The registered `pointPaintExecutionBoundary.test.ts` covers exact reproductions,
+grouped declarations, nested/comment/brace controls, 512 versus 513 in separate
+commands and a single block, shared color/mutation limits, atomic state identity,
+source-wide aliases and earlier references, stale saved snapshots, diagnostics,
+CRLF preservation, preset application, Undo/Redo and explicit text/fill intent
+in both modes. One earlier arbitrary top-level key-invocation assertion is
+updated to require atomic rejection and preservation of the previously accepted
+diagram; all its handler/directory tests remain. Existing browser fixtures,
+runner code, deadlines, requirements and cumulative artifacts are unchanged.
+
+Independent corrected PGF compilations use the identical external `.sty` bytes
+and pdfTeX 1.40.29 / PGF 3.1.11a. Initial atomic rejection is demonstrated with
+unchanged serialized state. Retained-source JSON reload and existing-preset
+reapplication generate both modes; each compiled comparison contains the external
+node and four application nodes. Actual PDF operators show blue for all five
+macro/conditional/grouped-color nodes, and red for all five overflow nodes.
+The old application nodes had the opposite colors. These expectations are not
+computed by the application parser. Commands, versions, full logs, PDFs,
+uncompressed operators and generated fragments are retained in the new fixture.
+
+The external work/handoff directory is
+`/private/tmp/stz-32b-execution-fix-hCVgf2/`. Final identities, binary-aware diff,
+untracked file hashes, report paths and independent read-only review are written
+there after code/tests/tracked documentation freeze. No final self-referential
+fingerprint is stored in this document. The accepted T5qkan report verifies only
+the pre-fix tree. Final `32B verify` must run all five commands on this tree;
+missing native execution remains pending for the authorized parent, with no
+weakened assertions or sandbox-permission changes. Any subsequent checkout edit
+requires matching verification again. No commit/push is allowed while either
+gate is unsuccessful.
+
+Pre-freeze validation passed **3,391/3,391 tests** in 214,250.117417ms, followed
+sequentially by a successful `npm run build`. During the ordinary pre-freeze run,
+six final regressions and their narrow guards were added for malformed legacy
+`\tikzstyle` delimiters and stale overall-opacity inference. The final focused
+suite passed **168/168**, including all **52** new boundary regressions, in
+1,407.81725ms. This distinction is retained: the frozen verifier must include
+all 3,397 registered cases and is the matching full-suite gate.
+Strict production TypeScript, strict fixture/new-test TypeScript, targeted lint,
+all five new/retained-copy script syntax checks and `git diff --check` pass.
+Repository-wide lint was not run; established unrelated lint debt was untouched.
+The existing >500kB build chunk warning remains nonblocking. A failed raw source
+has no established replacement snapshot, so further supported imports preserve
+saved fallbacks/intent; overall opacity without a historical baseline cannot
+be inferred as a local edit under source-wide uncertainty. Explicit accepted
+opacity edits remain authoritative.
+
+Code, tests and tracked documentation are now frozen for the required
+`PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify`.
+Final results and the same-tree independent review will be recorded externally
+in `handoff.json`, `final-checkout.json`, `final-checkout.diff`,
+`final-checkout-untracked.json`, `verification-final.log`,
+`independent-review.md` and `independent-review.json`. Browser startup failures
+in this child environment remain pending parent acceptance, not passing checks.
+
+
+Independent read-only review of the first frozen tree (`8f9fae9a...`) found one
+remaining form of the same execution-boundary defect: arbitrary `/.handler`
+syntax was still classified as a local mutation. A passive `run/.code` followed
+by `run/.try` executes the code during source loading and can redefine another
+key. The review's new PGF comparison showed external red and both application
+nodes blue. A second probe used `/.code args` with trailing TeX tokens and had
+the same mismatch. Both original probes remain untouched under the external
+handoff directory's `reviewer-probes/`; the superseded review and verifier report
+are retained. The superseded verifier passed 3,397 tests, build and diff check,
+then failed `check:label-assets` at localhost `listen EPERM`; its remaining
+browser check was not run, and it cannot verify subsequent corrections.
+
+The final source policy therefore uses an explicit passive declaration-handler
+allowlist, exact complete braced arguments for supported two-argument forms,
+and a literal-only single `/.expanded` suffix. Executing/unknown handlers and
+chains reject atomically. Declarations replacing root paint primitives, implicit
+hooks or handler namespaces also reject: unknown effects cannot be assumed local
+to that name. Namespaced controls remain supported. Two malformed old mutation
+test inputs now use valid two-argument syntax while preserving their original
+uncertainty assertions; separate regressions require rejection of malformed or
+executing forms. The new
+[handler fixture](../tests/fixtures/point-paint-pgf/execution-boundary/handler-execution/README.md)
+preserves the original wrong PDF and compiles corrected reload/reapply outputs
+in both modes. All five independently observed nodes are red. None of the four
+original corrected compiler comparisons was rewritten.
+
+This additional correction supersedes the first freeze above. Final focused and
+strict results, new binary-aware identity, the rerun of all five verification
+commands (subject to the unchanged stop-on-failure rule), and the renewed
+read-only review are recorded in the external handoff. The final parent native
+gate still requires all 16 groups, 27 point scenarios and every existing artifact.
+No harness requirement, timeout, browser permission or acceptance policy changed.
+
+Final handler-boundary validation passed **212/212 focused tests**, including
+**96** new registered regressions, in 2,316.551875ms. Strict production and
+fixture/test TypeScript, targeted changed-code/script lint, all eight retained
+and new fixture script syntax checks, and `git diff --check` passed. The final
+frozen verifier now includes **3,441** registered tests and runs build only after
+the full test process exits. Its external report supersedes the first attempt;
+tracked documentation is not changed after this freeze.
