@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import test from 'node:test'
+import nodeTest from 'node:test'
+import { runOwnedRunnerProcess } from './helpers/ownedRunnerProcess.mjs'
+import { createRunnerFixtureEvidence, runnerDiagnostics } from './helpers/runnerFixtureEvidence.mjs'
+
+const fixtureEvidence = new WeakMap()
+// Capture assertion failures before the fixture's after hook removes its files.
+function test(name, body) {
+  return nodeTest(name, async t => {
+    try { await body(t) }
+    catch (error) { fixtureEvidence.get(t)?.preserve(error); throw error }
+  })
+}
 
 const automationDir = fileURLToPath(new URL('../../scripts/automation/', import.meta.url))
 const verifierFile = 'scripts/automation/phase-verification.mjs'
@@ -23,10 +34,12 @@ const combinedLabelGroups = [...settledExportGroups, 'combined-free-inline-workf
 
 function fixture(t, phase = '31B', options = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'stz-runner-test-'))
-  const artifacts = new Set()
-  t.after(() => {
-    rmSync(cwd, { recursive: true, force: true })
-    for (const path of artifacts) rmSync(path, { recursive: true, force: true })
+  const evidence = createRunnerFixtureEvidence(cwd)
+  fixtureEvidence.set(t, evidence)
+  const inFlight = new Set()
+  t.after(async () => {
+    await Promise.allSettled([...inFlight])
+    evidence.cleanup()
   })
   const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
   const git = (...args) => {
@@ -155,27 +168,29 @@ if (prompt.startsWith('REVIEW_FIXTURE')) {
   git('-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Fixture baseline')
   const initialHead = git('rev-parse', 'HEAD')
   const initialBranch = git('branch', '--show-current')
+  let runCount = 0
   const run = (mode, extraEnv = {}) => {
-    const result = spawnSync(process.execPath, [runner, phase, mode], {
-      cwd, encoding: 'utf8', timeout: 60_000,
-      env: { ...env, CODEX_BIN: codex, STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(allLabelGroups), ...extraEnv },
-    })
-    for (const match of (result.stdout + result.stderr).matchAll(/(?:Verification evidence:|evidence:) ([^\n]+\/verification\.json)/g)) {
-      artifacts.add(dirname(match[1].trim()))
-    }
-    for (const match of (result.stdout + result.stderr).matchAll(/Verifier handoff: ([^\n]+)/g)) {
-      artifacts.add(dirname(match[1].trim()))
-    }
-    try {
-      const checks = readFileSync(join(cwd, 'logs/checks.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)
-      for (const check of checks) {
-        if (check.artifactDir) {
-          // Browser artifacts are a child of the verification directory.
-          artifacts.add(join(check.artifactDir, '..', '..'))
-        }
+    const pending = (async () => {
+      const result = await runOwnedRunnerProcess(process.execPath, [runner, phase, mode], {
+        cwd, timeoutMs: 60_000, signal: t.signal,
+        logsDirectory: join(cwd, 'logs', `runner-${++runCount}`),
+        env: { ...env, CODEX_BIN: codex, STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(allLabelGroups), ...extraEnv },
+      })
+      evidence.collect(result)
+      const { outcome, elapsedMs, wallElapsedMs, processWaitMs, timeoutMs, lastCompletedStage } = result.diagnostic
+      t.diagnostic(`Runner result: ${JSON.stringify({ pid: result.pid, status: result.status,
+        signal: result.signal, outcome, elapsedMs, wallElapsedMs, processWaitMs, timeoutMs, lastCompletedStage })}`)
+      if (!['success', 'nonzero'].includes(outcome) || !result.diagnostic.cleanup.complete) {
+        evidence.preserve(new Error(runnerDiagnostics(result)))
+        // Abnormal termination is never accepted by an ordinary policy test,
+        // even if a leaking leader happened to report status zero or one.
+        assert.fail(runnerDiagnostics(result))
       }
-    } catch { /* Early usage failures have no check log. */ }
-    return result
+      return result
+    })()
+    inFlight.add(pending)
+    pending.then(() => inFlight.delete(pending), () => inFlight.delete(pending))
+    return pending
   }
   return { cwd, git, run, initialHead, initialBranch }
 }
@@ -187,7 +202,7 @@ function reportFromOutput(result) {
 }
 
 function assertStoppedBeforeReview({ cwd, git, initialHead }, result) {
-  assert.notEqual(result.status, 0, result.stdout + result.stderr)
+  assert.notEqual(result.status, 0, runnerDiagnostics(result))
   assert.match(result.stderr, /Verification failed\. Not committing or pushing/)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
@@ -205,12 +220,12 @@ function oldElevenGroupVerifier() {
   return { current, old }
 }
 
-test('verify mode accepts pending changes and never invokes Codex or changes branches/commits', t => {
+test('verify mode accepts pending changes and never invokes Codex or changes branches/commits', async t => {
   const { cwd, git, run, initialHead, initialBranch } = fixture(t)
   writeFileSync(join(cwd, 'pending.txt'), 'uncommitted work')
   writeFileSync(join(cwd, '.gitignore'), 'logs/\nlocal-build/\n')
-  const result = run('verify', { CODEX_BIN: join(cwd, 'must-not-run-codex') })
-  assert.equal(result.status, 0, result.stdout + result.stderr)
+  const result = await run('verify', { CODEX_BIN: join(cwd, 'must-not-run-codex') })
+  assert.equal(result.status, 0, runnerDiagnostics(result))
   assert.match(result.stdout, /Verification passed/)
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.equal(git('branch', '--show-current'), initialBranch)
@@ -226,14 +241,14 @@ test('verify mode accepts pending changes and never invokes Codex or changes bra
 })
 
 for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups], ['31D', allLabelGroups], ['31E', settledExportGroups], ['31F', combinedLabelGroups]]) {
-  test(`${phase} verify accepts its complete ${groups.length}-group browser report`, t => {
+  test(`${phase} verify accepts its complete ${groups.length}-group browser report`, async t => {
     const { cwd, git, run, initialHead, initialBranch } = fixture(t, phase)
     writeFileSync(join(cwd, 'pending.txt'), 'uncommitted inline fixture')
-    const result = run('verify', {
+    const result = await run('verify', {
       CODEX_BIN: join(cwd, 'must-not-run-codex'),
       STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(groups),
     })
-    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.equal(result.status, 0, runnerDiagnostics(result))
     assert.match(result.stdout, /Verification passed/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
     assert.equal(git('branch', '--show-current'), initialBranch)
@@ -243,12 +258,12 @@ for (const [phase, groups] of [['31C', freeLabelGroups], ['31C', allLabelGroups]
 }
 
 for (const missing of [inlineLabelGroups, ...inlineLabelGroups.map(group => [group])]) {
-  test(`31D verify rejects missing ${missing.join(' and ')} with exit-zero browser command`, t => {
+  test(`31D verify rejects missing ${missing.join(' and ')} with exit-zero browser command`, async t => {
     const { git, run, initialHead, initialBranch } = fixture(t, '31D')
-    const result = run('verify', {
+    const result = await run('verify', {
       STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(allLabelGroups.filter(group => !missing.includes(group))),
     })
-    assert.equal(result.status, 1, result.stdout + result.stderr)
+    assert.equal(result.status, 1, runnerDiagnostics(result))
     assert.match(result.stderr, /Phase 31D.*10 required groups/)
     assert.match(result.stderr, /Verification failed. Not committing or pushing/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
@@ -256,20 +271,20 @@ for (const missing of [inlineLabelGroups, ...inlineLabelGroups.map(group => [gro
   })
 }
 
-test('31D implementation with old eight-group evidence stops before review', t => {
+test('31D implementation with old eight-group evidence stops before review', async t => {
   const { cwd, git, run, initialHead } = fixture(t, '31D')
-  const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(freeLabelGroups) })
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  const result = await run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(freeLabelGroups) })
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Phase 31D.*10 required groups/)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.equal(git('rev-list', '--count', 'HEAD'), '1')
 })
 
-test('31F implementation with old eleven-group evidence stops before review', t => {
+test('31F implementation with old eleven-group evidence stops before review', async t => {
   const { cwd, git, run, initialHead } = fixture(t, '31F')
-  const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(settledExportGroups) })
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  const result = await run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(settledExportGroups) })
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Phase 31F.*12 required groups/)
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
@@ -277,14 +292,14 @@ test('31F implementation with old eleven-group evidence stops before review', t 
 })
 
 for (const mode of ['implement', 'fix']) {
-  test(`31F ${mode} reloads the verifier changed from eleven to twelve groups by its live child`, t => {
+  test(`31F ${mode} reloads the verifier changed from eleven to twelve groups by its live child`, async t => {
     const { current, old } = oldElevenGroupVerifier()
     const { cwd, git, run, initialHead } = fixture(t, '31F', { initialFiles: { [verifierFile]: old } })
-    const result = run(mode, {
+    const result = await run(mode, {
       STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
       STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups),
     })
-    assert.equal(result.status, 1, result.stdout + result.stderr)
+    assert.equal(result.status, 1, runnerDiagnostics(result))
     assert.match(result.stderr, /Review found Critical or Medium issues\. Not committing/)
     const changes = JSON.parse(readFileSync(join(cwd, 'logs/implementation-module-changes.json'), 'utf8'))
     assert.equal(changes.parentPid, result.pid, 'The child edits while this same parent is alive')
@@ -308,12 +323,12 @@ for (const mode of ['implement', 'fix']) {
   })
 }
 
-test('the live-child regression detects the original retained-startup-import defect', t => {
+test('the live-child regression detects the original retained-startup-import defect', async t => {
   const { current, old } = oldElevenGroupVerifier()
   const setup = fixture(t, '31F', {
     initialFiles: { [verifierFile]: old }, retainStartupVerifier: true,
   })
-  const result = setup.run('implement', {
+  const result = await setup.run('implement', {
     STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups),
   })
@@ -324,7 +339,7 @@ test('the live-child regression detects the original retained-startup-import def
   assert.equal(report.checks.at(-1).exitCode, 0)
 })
 
-test('post-implementation loading refreshes participating verifier dependencies too', t => {
+test('post-implementation loading refreshes participating verifier dependencies too', async t => {
   const { current } = oldElevenGroupVerifier()
   const policyFile = 'scripts/automation/fixture-group-policy.mjs'
   const indirectVerifier = current.replace(
@@ -335,13 +350,13 @@ test('post-implementation loading refreshes participating verifier dependencies 
     [verifierFile]: indirectVerifier,
     [policyFile]: `export const combinedLabelGroups = ${JSON.stringify(settledExportGroups)};\n`,
   } })
-  const result = setup.run('implement', {
+  const result = await setup.run('implement', {
     STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({
       [policyFile]: `export const combinedLabelGroups = ${JSON.stringify(combinedLabelGroups)};\n`,
     }),
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups),
   })
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Review found Critical or Medium issues\. Not committing/)
   assert.equal(reportFromOutput(result).status, 'passed')
   assert.match(readFileSync(join(setup.cwd, 'logs/review-prompt.txt'), 'utf8'), /check:free-labels: passed, exit 0/)
@@ -349,10 +364,10 @@ test('post-implementation loading refreshes participating verifier dependencies 
   assert.equal(setup.git('rev-parse', 'HEAD'), setup.initialHead)
 })
 
-test('a live child updates the policy and old eleven-group evidence fails with command exit zero', t => {
+test('a live child updates the policy and old eleven-group evidence fails with command exit zero', async t => {
   const { current, old } = oldElevenGroupVerifier()
   const setup = fixture(t, '31F', { initialFiles: { [verifierFile]: old } })
-  const result = setup.run('implement', {
+  const result = await setup.run('implement', {
     STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(settledExportGroups),
   })
@@ -369,14 +384,14 @@ test('a live child updates the policy and old eleven-group evidence fails with c
   assert.ok(result.stdout.includes(check.logPath), 'The browser command log remains actionable')
 })
 
-test('fresh verifier command failure keeps its actual exit, error, report and log before review', t => {
+test('fresh verifier command failure keeps its actual exit, error, report and log before review', async t => {
   const setup = fixture(t, '31F')
-  const result = setup.run('implement', {
+  const result = await setup.run('implement', {
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups),
     STZ_TEST_FAIL_STAGE: 'free-browser', STZ_TEST_COMMAND_EXIT_CODE: '17',
   })
   assertStoppedBeforeReview(setup, result)
-  assert.equal(result.status, 17, result.stdout + result.stderr)
+  assert.equal(result.status, 17, runnerDiagnostics(result))
   assert.match(result.stderr, /check:free-labels failed: exit 17/)
   const report = reportFromOutput(result)
   assert.equal(report.status, 'failed')
@@ -404,14 +419,14 @@ const handoffFaults = [
 ]
 
 for (const [name, changedFiles] of handoffFaults) {
-  test(`${name} after implementation cannot reuse an earlier success or enter review`, t => {
+  test(`${name} after implementation cannot reuse an earlier success or enter review`, async t => {
     const setup = fixture(t, '31F')
     const groups = { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) }
-    const prior = setup.run('verify', groups)
-    assert.equal(prior.status, 0, prior.stdout + prior.stderr)
+    const prior = await setup.run('verify', groups)
+    assert.equal(prior.status, 0, runnerDiagnostics(prior))
     const priorReport = reportFromOutput(prior)
     assert.equal(priorReport.status, 'passed')
-    const result = setup.run('implement', {
+    const result = await setup.run('implement', {
       ...groups, STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify(changedFiles()),
     })
     assertStoppedBeforeReview(setup, result)
@@ -421,28 +436,28 @@ for (const [name, changedFiles] of handoffFaults) {
   })
 }
 
-test('a worker replaying an earlier passed report cannot approve the implemented checkout', t => {
+test('a worker replaying an earlier passed report cannot approve the implemented checkout', async t => {
   const setup = fixture(t, '31F')
   const groups = { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) }
-  const prior = setup.run('verify', groups)
-  assert.equal(prior.status, 0, prior.stdout + prior.stderr)
+  const prior = await setup.run('verify', groups)
+  assert.equal(prior.status, 0, runnerDiagnostics(prior))
   const priorReport = reportFromOutput(prior)
   const replayWorker = `import { writeFileSync } from 'node:fs';
 writeFileSync(process.argv[4], JSON.stringify(${JSON.stringify({
     report: priorReport, requiredChecks: priorReport.checks.map(({ name }) => name),
   })}));
 `
-  const result = setup.run('implement', {
+  const result = await setup.run('implement', {
     ...groups, STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [workerFile]: replayWorker }),
   })
   assertStoppedBeforeReview(setup, result)
   assert.equal(JSON.parse(readFileSync(priorReport.summaryPath, 'utf8')).status, 'passed')
 })
 
-test('parent browser evidence is handed to the review while child Codex remains sandboxed', t => {
+test('parent browser evidence is handed to the review while child Codex remains sandboxed', async t => {
   const { cwd, git, run, initialHead } = fixture(t)
-  const result = run('implement')
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  const result = await run('implement')
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Not committing/)
   const prompt = readFileSync(join(cwd, 'logs/review-prompt.txt'), 'utf8')
   assert.match(prompt, /Verification evidence from the parent runner/)
@@ -459,19 +474,19 @@ test('parent browser evidence is handed to the review while child Codex remains 
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
 })
 
-test('a review that changes verified content cannot commit even when it returns ready_to_commit', t => {
+test('a review that changes verified content cannot commit even when it returns ready_to_commit', async t => {
   const { git, run, initialHead } = fixture(t)
-  const result = run('implement', { STZ_TEST_REVIEW_MUTATES: 'yes' })
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  const result = await run('implement', { STZ_TEST_REVIEW_MUTATES: 'yes' })
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Checkout changed during review/)
   assert.equal(git('rev-parse', 'HEAD'), initialHead)
   assert.equal(git('rev-list', '--count', 'HEAD'), '1')
 })
 
-test('a review cannot redefine the identity gate or rewrite the verified report to approve its edits', t => {
+test('a review cannot redefine the identity gate or rewrite the verified report to approve its edits', async t => {
   const { cwd, git, run, initialHead } = fixture(t)
-  const result = run('implement', { STZ_TEST_REVIEW_TAMPERS_GATE: 'yes' })
-  assert.equal(result.status, 1, result.stdout + result.stderr)
+  const result = await run('implement', { STZ_TEST_REVIEW_TAMPERS_GATE: 'yes' })
+  assert.equal(result.status, 1, runnerDiagnostics(result))
   assert.match(result.stderr, /Checkout changed during review/)
   assert.match(readFileSync(join(cwd, verifierFile), 'utf8'), /verificationMatchesCheckout\(report, options = \{\}\) \{ return true;/)
   const summary = JSON.parse(readFileSync(join(cwd, 'logs/codex/31B-review-summary.json'), 'utf8'))
@@ -482,9 +497,9 @@ test('a review cannot redefine the identity gate or rewrite the verified report 
 })
 
 for (const phase of ['32A', '32B', '32C', '32D']) {
-  test(`${phase} runner rejects old Phase 31F evidence before review or commit`, (t) => {
+  test(`${phase} runner rejects old Phase 31F evidence before review or commit`, async (t) => {
     const { cwd, git, run, initialHead } = fixture(t, phase)
-    const result = run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
+    const result = await run('implement', { STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, phase === '32A' ? /15 required groups/ : /16 required groups/)
     assert.equal(git('rev-parse', 'HEAD'), initialHead)
@@ -492,13 +507,13 @@ for (const phase of ['32A', '32B', '32C', '32D']) {
     assert.doesNotMatch(result.stdout, /\$ git (?:add|commit|push)\b/)
   })
 }
-test('32A running parent refreshes point browser policy after its implementation child', (t) => {
+test('32A running parent refreshes point browser policy after its implementation child', async (t) => {
   const current = readFileSync(join(automationDir, 'phase-verification.mjs'), 'utf8')
   const obsolete = current.replace('if (["31C", "31D", "31E", "31F", ...Object.keys(phase32Groups)].includes(normalized))',
     'if (["31C", "31D", "31E", "31F"].includes(normalized))')
   assert.notEqual(obsolete, current)
   const { cwd, git, run, initialHead } = fixture(t, '32A', { initialFiles: { [verifierFile]: obsolete } })
-  const result = run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
+  const result = await run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(combinedLabelGroups) })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /15 required groups/)
@@ -506,13 +521,13 @@ test('32A running parent refreshes point browser policy after its implementation
   assert.throws(() => readFileSync(join(cwd, 'logs/review-prompt.txt')), { code: 'ENOENT' })
 })
 
-test('32B live parent reloads newly required paint evidence before review and commit', (t) => {
+test('32B live parent reloads newly required paint evidence before review and commit', async (t) => {
   const current = readFileSync(join(automationDir, 'phase-verification.mjs'), 'utf8')
   const obsolete = current.replace('"32B": pointNodeGroups', '"32B": pointNodeMathGroups')
   assert.notEqual(obsolete, current)
   const { cwd, git, run, initialHead } = fixture(t, '32B', { initialFiles: { [verifierFile]: obsolete } })
   const pointMathGroups = [...combinedLabelGroups, 'point-node-body-layout-lifecycle', 'point-node-picking-visibility', 'point-node-settled-export']
-  const result = run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
+  const result = await run('implement', { STZ_TEST_IMPLEMENTATION_FILES: JSON.stringify({ [verifierFile]: current }),
     STZ_TEST_FREE_LABEL_GROUPS: JSON.stringify(pointMathGroups) })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /16 required groups/)

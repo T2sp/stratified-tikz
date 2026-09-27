@@ -1882,3 +1882,153 @@ acceptance requires readiness to remain false. The parent must execute all five
 commands against the same final identity, then obtain accepted independent review
 explicitly rechecking both issues. Phase 32B remains incomplete until those gates
 pass; 32C/32D remain deferred.
+
+## Runner termination investigation and evidence ownership (2026-09-27)
+
+The checkout supplied to this turn was clean on
+`phase/32b-color-opacity-outline` at
+`73698463338ee5c0ca60afe0519f815b2a0fce24`, rather than the earlier dirty tree at
+`120743b`. The newer commit already contains that implementation and all 22
+formerly untracked files. Independent SHA-256 comparison against the old handoff
+confirmed that every one of those files, including PGF PDF/PNG bytes, is unchanged.
+No production importer, App continuity, native scenario, policy, PGF reference,
+dependency, permission, global test concurrency or 32C/32D feature changed here.
+
+### Historical outcomes and demonstrated timing cause
+
+The earlier continuity/directory handoff passed 3,311 tests, build and static/PGF
+checks but stopped at native server startup. The later parent report
+`stz-phase32b-before-review-kIKYf4/verification.json` instead failed `npm test`:
+3,310 of 3,311 passed in 809,024.246583 ms. Its sole assertion was the 31F
+12-group runner's `null !== 0`; build, diff and browsers were not reached.
+The subsequent unchanged prompt-update run passed all 3,311 in
+214,213.990875 ms and built successfully. These remain distinct historical
+outcomes; the passing rerun did not correct or diagnose the null status.
+
+Read-only macOS power logs establish that the failed run occurred during
+maintenance wakes following an earlier idle sleep. Sleep intervals of 109s,
+52s and 444s overlap its exact 00:50:55–01:04:25 +0900 execution window and
+closely match the 107,059/107,451ms runner/policy outliers, 51,726ms mutation
+policy outlier and 442,690ms history-policy outlier. This is concrete evidence
+of host suspension and a strong explanation for the wider timing anomaly.
+Per-test start timestamps and the old spawn error/signal were not retained,
+so the exact null-status mechanism **remains unproven**. In particular, the
+historical result cannot be called a demonstrated `ETIMEDOUT`, exit code 1,
+changed group policy, App document loss or localhost permission failure.
+
+The real chain is fixture runner → fresh verifier worker → npm/git → synthetic
+`check.cjs`. Its nested test/build/browser messages are fixture commands, not
+additional application checks or native acceptance. Only the outer fixture had
+a 60,000ms deadline. Its old synchronous spawn stopped the immediate runner and
+then unconditional cleanup removed the checkout, response and reports. A short
+controlled probe demonstrated the ownership defect: at 400ms it returned null,
+SIGTERM and ETIMEDOUT while its child was still alive and later wrote a completion
+marker. This probe did **not** reproduce inherited-pipe delay or the historical
+107s wall time. The old nested report and worker response are already absent.
+
+The complete audit, raw filtered power events, original paths and probe data are
+linked from `/private/tmp/stz-32b-runner-investigation-8CHXcc/timing-audit.md` and
+`timing-audit.json`. The 60-second fixture deadline is unchanged: ordinary runner
+processes take about a second, and measured timings do not justify extending it.
+No power settings were changed; a wake assertion was neither implemented nor
+claimed as a proven fix for the historical termination.
+
+### Focused correction and regression coverage
+
+The test-only `ownedRunnerProcess.mjs` uses asynchronous spawning in a new POSIX
+process group with file-backed stdout/stderr. It records command/arguments, cwd,
+PID, configured deadline, monotonic and wall elapsed times, actual status/signal,
+explicit spawn error fields, and cleanup signals/budgets. It distinguishes
+ordinary nonzero exit, timeout, cancellation, signal, synchronous/asynchronous
+spawn failure and a leader leaving live descendants. Null status stays null.
+The real runner and fresh-process verifier loading, including transitive fixture
+dependencies, are unchanged.
+
+Timeout/cancellation or surviving descendants trigger TERM for the owned group,
+then KILL after 250ms if needed, with a 1,000ms completion budget and bounded
+leader-exit collection. No executable-name search or unrelated process is killed.
+Cleanup must confirm group termination before removing directories; otherwise
+originals remain and the test fails. File-backed output avoids depending on
+inherited-pipe closure, without claiming pipes caused the old delay. Even a
+leader's zero exit cannot make an orphaned child count as successful verification.
+
+The fixture records the last observed started/completed verification stages and
+all printed response/report paths. A failed assertion or abnormal process result
+copies the checkout logs and available worker/verification artifacts into an
+explicitly printed `stz-runner-failure-*` directory before ordinary cleanup.
+Missing responses and truncated/running reports remain missing/truncated/running.
+Capture failures retain originals and do not replace the primary failure.
+Successful fixture tests keep their normal cleanup, including expected policy
+rejections. Test output includes actual process timings and status classifications.
+
+Fourteen registered regressions cover success/nonzero context, timeout, signal,
+missing executable, synchronous spawn exception, cancellation before/after spawn,
+TERM-ignoring runner/worker/command descendants with KILL escalation, an unrelated
+live process, zero/nonzero leaking leaders, late stderr, finite deadlines,
+evidence readable after the test process exits, successful cleanup, incomplete
+termination and secondary evidence-write errors. The existing 32 runner cases
+retain complete 31F acceptance, obsolete/incomplete/tampered policy rejection,
+fresh transitive loading, command/response failures and review-time mutation gates.
+An independent focused review found the synchronous-spawn exception hole during
+this work; it is corrected and covered before final verification.
+
+### Verification and external handoff
+
+All commands use `/opt/homebrew/bin` first in PATH, Node v26.9.0. The external
+handoff directory is `/private/tmp/stz-32b-runner-investigation-8CHXcc/`.
+Initial reproduction: exact 31F case passed in 857.027167ms; original runner suite
+passed 32/32 in 38,825.978041ms; ordinary full-suite exploration passed 3,311/3,311
+in 205,484.390875ms. These are baseline observations, not final-tree acceptance.
+After ownership/evidence changes, the exact case passed in 936.003791ms. The
+intermediate runner/helper/evidence suite passed 45/45 in 37,324.924625ms, before
+the independently found synchronous-spawn case was added. Final full verification
+includes that additional registered regression.
+
+Strict production and fixture TypeScript checks passed. All five changed/new
+JavaScript files pass syntax and recommended Node ESLint checks. The first lint
+attempt caught one unused test import, which was corrected; both attempts are
+retained. Existing unrelated App/InspectorField and TikZ-test lint debt is untouched.
+
+The configured direct `check:free-labels` attempt again failed at
+`development-server-listen` with `listen EPERM 127.0.0.1:5173`. It completed no
+native group or scenario and started no browser. Its actual log and partial
+report are `direct-free-labels.log` and `direct-free-labels/free-labels-evidence.json`.
+This attempt predates final freeze and is not matching native acceptance.
+
+After recording the completed pre-freeze test/build results below, freeze code,
+tests and this document and run exactly:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
+```
+
+Final report/response paths, command results and binary-aware tracked/untracked
+identity are recorded externally in `handoff.json`, `final-checkout.json`,
+`final-checkout.diff` and `final-checkout-untracked.json`; no self-referential
+fingerprint is inserted into this tracked report. `verification-final.log` retains
+the real fresh-worker result. Independent read-only review of that exact identity
+is recorded in `independent-review.md` and `independent-review.json`.
+
+Native acceptance still requires all five commands, 16 groups / 27 point
+scenarios, all seven App → SVG → App transitions, three separate continuity
+fault controls and 13 artifacts, directory import/edit/history/persistence and
+11 artifacts, all six responsive downloads and 91 artifacts, and all preserved
+32A/free/inline/clear/import checks. Host sleep, runner termination, localhost
+EPERM and historical App API loss remain separate findings. The App-loss trigger
+is still unproven. Any missing native result keeps verification/review readiness
+false; the browser-capable parent must complete matching evidence and independent
+review before a commit or push. Phase 32B remains incomplete and 32C/32D deferred.
+
+Pre-freeze ordinary execution completed **3,325/3,325 tests**, zero failed,
+skipped or cancelled, in **229,127.502292ms** (`fixed-full-suite.log`, exit 0).
+The exact 31F case took 832.113083ms; its runner and the other 37 invocations
+record actual PID/status/outcome and process durations of 357.7–1,684.2ms in
+`process-timing-summary.json`. `npm run build` started only after that test
+process exited and passed (`fixed-build.log`, exit 0); the existing >500kB chunk
+warning is nonblocking. A final artifact-discovery refinement also retains
+unprinted partial reports referenced by complete `checks.jsonl` records, ignoring
+a truncated trailing record without inventing completion. The final 14-test
+lifecycle/evidence suite passed in 864.69925ms after that refinement
+(`focused-lifecycle-final.log`); syntax/lint passed again in
+`script-checks-frozen.log`. These pre-freeze checks support the correction; the
+external final verifier is the authoritative matching-tree attempt.

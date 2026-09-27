@@ -1,15 +1,17 @@
-# Phase 32B Targeted Fix Prompt: Diagnose runner termination and complete native acceptance
+# Phase 32B Targeted Fix Prompt: Diagnose native App scroll stability and complete acceptance
 
 ## Environment and scope
 
 Work on `phase/32b-color-opacity-outline`. Inspect status and preserve the
-current implementation and all untracked helpers, tests and PGF artifacts.
-At this prompt update HEAD is `120743b6c42f63b5db3bad31804bcc4f0d6a1c93`, with
-tracked changes and 22 untracked files. The implementation handoff, independent
-review and latest failed parent verification identify the same pre-prompt tree:
+current implementation and untracked runner helpers/tests. At this prompt
+update HEAD is `73698463338ee5c0ca60afe0519f815b2a0fce24`, with tracked changes
+to `docs/PHASE_32B_IMPLEMENTATION.md`, `package.json` and
+`tests/scripts/runPhaseRunner.test.mjs`, plus four untracked helper/test files.
+The runner handoff and latest failed parent verification identify the same
+pre-prompt tree:
 
 ```text
-daac0abff5402bef2204970154d6b9144198e558ee8b72569568311bd6a7a11e
+c0708e3431620fc0285ca29136e4a24173fef6ee9bded85b442df2289f54f2ed
 ```
 
 This fingerprint describes the checkout before this prompt edit. Recompute the
@@ -22,186 +24,192 @@ Use Node >=22.12.0 with the supported installation first in PATH:
 export PATH=/opt/homebrew/bin:$PATH
 ```
 
-The immediate task is the runner regression failure below, followed by fresh
-native acceptance of the existing continuity and directory-uncertainty changes.
-Keep strict TypeScript, bounded parsing and existing dependencies. Preserve 32A
-behavior and defer 32C/32D. Do not execute arbitrary TeX in the importer/preview,
-upgrade npm because of its update notice, or perform unrelated lint cleanup.
+The immediate task is the native App geometry/stability failure below, followed
+by complete same-tree acceptance. Preserve the completed runner hardening,
+directory-uncertainty fix and App continuity work. Keep strict TypeScript,
+bounded parsing, existing dependencies and 32A behavior; defer 32C/32D.
+Do not execute arbitrary TeX in the importer/preview, upgrade npm because of
+its update notice, or perform unrelated lint cleanup.
 
 ## Evidence and current status
 
-Implementation handoff and independent review:
+Completed runner implementation and independent review:
 
 ```text
-/private/tmp/stz-32b-continuity-directory-9HrUFj/handoff.json
-/private/tmp/stz-32b-continuity-directory-9HrUFj/independent-review.md
+/private/tmp/stz-32b-runner-investigation-8CHXcc/handoff.json
+/private/tmp/stz-32b-runner-investigation-8CHXcc/independent-review.md
 ```
 
-That implementation passed 3,311 tests, build, diff, strict TypeScript and
-targeted checks. Both corrected TikZ modes were independently compiled with PGF.
-The independent review found no remaining concrete code defect after a bounded
-expansion correction, but required native acceptance was missing. Its final
-verifier stopped at `check:label-assets` with localhost `EPERM`; it did not run
-`check:free-labels`. The separate direct free-label attempt also stopped before
-browser startup. Neither establishes a passing native scenario.
+That implementation passed 3,325 tests, build, diff, strict TypeScript and
+targeted lint. It retained the 60-second fixture deadline, added actionable
+process diagnostics, preserved failed evidence and bounded cleanup of owned
+child processes. Independent review found no remaining concrete code defect,
+but returned `needs_changes` for missing native acceptance: its final verifier
+stopped at localhost `EPERM` before browser startup. The separate direct
+free-label attempt also stopped before startup.
 
-The newer parent attempt failed earlier, in `npm test`:
+The newer parent run did launch the browser and failed later:
 
 ```text
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-kIKYf4/verification.json
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-kIKYf4/01-npm-test/command.log
-/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-SeWIhy/response.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-GPJG0D/verification.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-GPJG0D/05-check-free-labels/command.log
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase32b-before-review-GPJG0D/05-check-free-labels/artifacts/free-labels-evidence.json
+/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T/stz-phase-verifier-wST3PW/response.json
 ```
 
 | Latest parent observation | Actual result |
 | --- | --- |
-| `npm test` | 3,311 total; 3,310 passed, 1 failed; zero skipped/cancelled |
-| Test duration | 809,024.246583 ms |
-| `npm run build`, diff and both browser checks | Not reached in this attempt |
-| Checkout before/after | Identical fingerprint shown above |
+| `npm test` | 3,325 passed; zero failed/skipped/cancelled |
+| Build, diff, `check:label-assets` | Passed |
+| `check:free-labels` | Failed at `real-App-workflows` |
+| Runtime | Node v26.9.0; Chrome 154.0.8037.57 |
+| Cumulative free-label report | 13 completed groups; 124 evidence records |
+| Real-App group | `real-App-input-JSON-history-reused-ID-load` incomplete |
+| Later groups | `settled-SVG-export-standalone` and `point-node-paint-import-persistence` unexecuted |
+| Checkout before/after | Identical pre-prompt fingerprint shown above |
 | Verification / commit readiness | Failed; no commit or push |
 
-Keep the earlier successful static/PGF evidence separate from this latest failed
-run. It does not cancel the new failure or satisfy native acceptance.
+This runtime failure is not the earlier startup `EPERM`. The historical
+`window.stzAppLabels` loss and old runner null-status trigger remain unproven.
+Host sleep was independently observed overlapping historical runner timing
+anomalies; that does not establish the cause of this new browser timeout.
+The latest parent test duration was 3,126,609.6615 ms. Preserve timing evidence
+without treating long duration alone as proof of suspension or resource pressure.
 
-## 1. Diagnose the runner fixture's abnormal process termination
+## 1. Diagnose the actual App scroll/stability failure
 
-The failing test is `31F verify accepts its complete 12-group browser report`,
-currently declared at `tests/scripts/runPhaseRunner.test.mjs:229`. Its assertion
-at approximately line 236 expects the runner process status to equal zero:
-
-```text
-31F verify accepts its complete 12-group browser report (107059.951209ms)
-null !== 0
-```
-
-The fixture's `run()` currently uses `spawnSync(process.execPath, ...)` with
-`timeout: 60_000` around line 160. Its failure assertion reports stdout/stderr
-but omits `result.error` and `result.signal`. A timeout is a plausible explanation
-for a null status, not an established diagnosis. Do not equate null with exit
-code 1, presume a changed group policy, or label this the old App-page failure.
-
-The last retained nested output is:
+The primary failure is:
 
 ```text
-Verifier handoff: .../stz-phase-verifier-TAPYpM/response.json
-Verification evidence: .../stz-phase31f-manual-jMFVqX/verification.json
-Verification: npm test
-Verification passed: npm-test
-Verification: npm run build
-Verification passed: npm-build
+locator.scrollIntoViewIfNeeded: Timeout 29998.788000000175ms exceeded.
+  - attempting scroll into view action
+  - waiting for element to be stable
+at geometry (scripts/checkFreeLabelsApp.mjs:123:43)
+at inspectStage (scripts/checkFreeLabelsApp.mjs:164:21)
+at runAppChecks (scripts/checkFreeLabelsApp.mjs:280:5)
+at runPointThenAppChecks (scripts/checkPointNodes.mjs:371:3)
+at scripts/checkFreeLabels.mjs:467:3
 ```
 
-These are the isolated runner fixture's commands: its temporary package scripts
-invoke `check.cjs` and emit synthetic browser reports. They are not real browser
-runs or additional application test/build passes. The omitted prefix above is
-`/var/folders/vk/7kf940pd4bx8f6cg3rzlmtc80000gn/T`.
+Read `scripts/checkFreeLabelsApp.mjs`, its geometry/pointer helpers, the App
+fixture, production preview/camera/Inspector layout and the cumulative caller.
+Use the exact current sequence, including the real JSON download:
 
-The nested report and handoff directories were absent when inspected after the
-failure. The fixture's `t.after` unconditionally removes its temporary checkout
-and collected artifact directories, including failed-run evidence.
+1. `app-valid-initial`, `app-invalid-pending` and `app-invalid-fallback` passed.
+2. The valid source `$\mathord{\mathrm{i}}$` was held and edited;
+   `app-valid-again-pending` passed.
+3. `save('app-valid-pending')` completed through the production download control.
+   The pending JSON and five persistence diagnostic artifacts were retained.
+4. `release(valid)` ran. `inspectStage('valid-again-ready', valid, 'ready')`
+   closed the Inspector and completed its ready-state wait, then entered
+   `geometry()`. Its framing and any pan invariants returned before the scroll
+   call timed out. A ready attribute alone does not prove stable geometry.
+5. This ready stage's remaining source/paint/geometry/pointer checks and later
+   ready JSON, Undo/Redo, obsolete-completion and reused-ID load workflows did
+   not complete. Do not infer their success from the passing pending stage.
 
-Other successful tests in the same log took approximately 107,451 ms, 51,726 ms
-and 442,690 ms. Investigate the wider timing anomaly as well as this fixture.
-Resource contention, scheduling/suspension and child-process stalls remain
-hypotheses; the retained log does not distinguish them. The failed test's total
-duration includes fixture work and cleanup, not just the configured spawn timeout.
+Inspect artifacts from the failing run before editing. `app-failure.png` is
+the screenshot of the actual App page; it shows the App, canvas and rendered
+small `i` after the timeout. A full-page still image does not establish viewport
+reachability, stable rectangles or uninterrupted document/API ownership during
+the wait. The outer `failure.png` belongs to the separate renderer fixture.
+Likewise, outer `pageErrors: []` does not report the owned App page's local
+errors. Do not interpret either as evidence that the App disappeared or stayed
+error-free.
 
-During this prompt-only update, the unchanged implementation passed all 3,311
-tests in 214,213.990875 ms, followed by a passing build. Logs are
-`/private/tmp/stz-32b-runner-prompt-20260927-npm-test.log` and
-`/private/tmp/stz-32b-runner-prompt-20260927-build.log`. No runner fix was made;
-this rerun does not establish the earlier termination's cause or close the
-native acceptance gap. Preserve both outcomes in the investigation.
+### Required evidence and targeted correction
 
-### Required investigation and correction
+The free-label `runAppChecks` owns a separate page. Its current catch saves
+`app-failure.png`, then cleanup closes that page; local `errors` and `actions`
+and failure-time geometry/lifecycle state are not retained. The existing
+`ownedAppPage.mjs` continuity helper is wired into the later point-paint group,
+which this run never reached. Do not claim it already diagnosed this failure.
 
-Read the fixture, `scripts/automation/run-phase.mjs`,
-`scripts/automation/phase-verification-worker.mjs`,
-`scripts/automation/phase-verification.mjs` and related runner/policy tests.
-Trace the actual fixture runner, verifier worker and spawned command lifecycle.
+1. Add bounded, phase-specific evidence on the actual owned App page around
+   pending download, release, ready wait, framing/pan and scroll. Record stage,
+   source/request/status, wall and monotonic timestamps, page URL, document
+   generation and API identity. Retain local page errors/actions and lifecycle
+   events, including navigation, close/crash, visibility and frame progress.
+   Capture before the potentially blocking operation as well as on failure;
+   use existing ownership/diagnostic helpers where appropriate without a broad
+   harness rewrite. Do not depend on the App API for every diagnostic.
+2. Collect a small bounded sequence of SVG/label/ancestor rectangles, viewBox,
+   client transforms, window/ancestor scroll offsets, viewport dimensions and
+   relevant layout/animation state. Correlate Inspector/camera changes and
+   downloaded-file completion with those samples. Distinguish node replacement,
+   actual layout movement, offscreen geometry, stalled animation frames or
+   lifecycle changes using evidence, rather than choosing a cause from the
+   Playwright error text alone. Preserve the original timeout if capture fails.
+3. Give diagnostic capture and any frame/stability waits finite host-side
+   budgets as well as browser-side bounds, so stalled frames or evaluation
+   cannot hang cleanup. Retain available JSON/DOM/images before closing the
+   owned page; dispose pending work and keep cleanup scoped to owned resources.
+   Report partial or unavailable evidence explicitly. Do not replace a primary
+   failure with a later screenshot, state-read or close failure.
+4. Reproduce the exact valid → invalid → valid pending/ready flow, including
+   the pending JSON download, both in a focused run and after the cumulative
+   predecessor workload. Measure the cause and make the smallest appropriate
+   harness or production correction. If the trigger remains unproven, state
+   that and preserve the failed attempt. One passing rerun is not a diagnosis.
 
-1. Make abnormal outcomes actionable. Record command/arguments, fixture cwd,
-   configured timeout, elapsed time, PID, `status`, `signal`, and available
-   `error.name`, `error.code`, `error.message` and other useful spawn error fields.
-   Retain stdout/stderr, the last completed stage and report/handoff paths.
-   Distinguish ordinary nonzero exit, spawn failure, signal and timeout. Do not
-   dump unrelated environment secrets or replace the primary error with a
-   secondary diagnostic failure.
-2. Preserve failed-run evidence before cleanup. Retain or copy the relevant
-   fixture logs, worker response and available verification artifacts to an
-   explicitly reported temporary failure directory. Handle partial/missing
-   worker output without inventing completion. Keep normal successful-fixture
-   cleanup. Failure evidence must remain readable after the test exits.
-3. Reproduce the exact case in isolation, then the runner suite and ordinary
-   full-suite conditions. Capture process results and timings. Fix the measured
-   cause with a small change. If a finite timeout needs adjustment, justify its
-   budget from evidence and keep deterministic tests of timeout behavior. Do
-   not merely remove the deadline, skip this case, relax the status assertion,
-   accept null, or retry until green. Avoid changing global test concurrency or
-   production verification policy without evidence that it is necessary.
-4. On timeout/cancellation, ensure the fixture's owned runner/worker/command
-   processes finish or are terminated before deleting their directories. Keep
-   termination bounded and scoped to owned processes; do not kill unrelated
-   Node, Vite or browser processes. Diagnose inherited pipes or delayed cleanup
-   if they contribute to the observed wall time.
+Do not solve this by increasing/removing the timeout, unconditional sleeps,
+retrying until green, skipping the ready stage, disabling animations globally,
+forcing clicks, or removing the stability requirement. If a different scrolling
+or framing mechanism is justified, demonstrate equivalent stable, visible
+native geometry before measurement, screenshot and pointer actions. Do not
+reload/recreate the App, reset history, silently reacquire a replaced document
+or API, mutate the model through a fixture shortcut, shorten the label source,
+clamp probes or weaken readiness/source ownership assertions.
 
-Useful initial reproduction:
+### Required geometry guarantees and regressions
 
-```bash
-PATH=/opt/homebrew/bin:$PATH node --test --test-name-pattern='^31F verify accepts its complete 12-group browser report$' tests/scripts/runPhaseRunner.test.mjs
-PATH=/opt/homebrew/bin:$PATH node --test tests/scripts/runPhaseRunner.test.mjs
-```
+Keep the existing camera framing through production controls and its exact
+saved JSON/history invariants. The label and every inside/outside probe must
+fit the usable canvas viewport, with consistent transforms after scrolling.
+Preserve `elementFromPoint` checks, real native pointer actions, selection/Alt
+behavior, paint/opacity/font observations and raw source/request assertions.
+Keep `preserveView` for obsolete-completion observations: corrective pan must
+not conceal movement caused by an obsolete result.
 
-An isolated pass does not establish a fix for a failure seen in the full suite.
-Retain the failed attempt and explain any demonstrated environmental cause;
-if the trigger remains unproven, say so explicitly. Do not claim that a longer
-budget or one passing rerun proves the cause.
+Add focused regressions for the demonstrated defect and any new bounded
+diagnostic/wait behavior. Exercise actual pending-to-ready geometry after the
+download and relevant Inspector/camera layout changes. Controlled failure
+cases should cover the changed stability/ownership paths, including a stalled
+or never-stable target and primary-error retention where applicable. Keep
+native acceptance of the full valid/invalid/valid sequence, Undo/Redo during
+held conversion, obsolete completions, CRLF/raw JSON and reused-ID document
+loading. Unit/mocked diagnostics alone cannot establish native success.
 
-### Required regressions and preserved runner guarantees
+## 2. Preserve completed fixes and cumulative acceptance
 
-Add focused registered tests for actionable timeout, signal and spawn-failure
-outcomes and for evidence survival through cleanup. Use controlled short-lived
-fixtures instead of long sleeps. Where process ownership changes, exercise
-child cleanup and late failures without touching unrelated processes.
+Do not reopen the completed runner task without new evidence. Keep
+`tests/scripts/helpers/ownedRunnerProcess.mjs`,
+`tests/scripts/helpers/runnerFixtureEvidence.mjs`, their registered regressions
+and existing runner cases. Preserve the 60,000 ms deadline, explicit
+status/signal/spawn-error and wall/monotonic diagnostics, file-backed output,
+bounded owned-process-group termination and failed evidence surviving cleanup.
+Never kill unrelated processes or interpret null/abnormal status as success.
+Keep fresh-process verifier loading and transitive fixture dependencies,
+complete 31F twelve-group acceptance, and rejection of incomplete/tampered
+reports, worker failures, checkout mismatch and review-time mutation. Synthetic
+fixture reports are not native browser evidence. Avoid unrelated global test
+concurrency or production policy changes.
 
-Keep the real fresh-process verifier handoff. A live parent must load verifier
-changes made by its implementation child, including transitive dependencies;
-keep isolated fixture dependency copying accurate. Preserve the 31F twelve-group
-acceptance case and rejection of incomplete/old/tampered reports, bad worker
-responses, checkout mismatch, failed commands and review-time mutations.
-Failure must stop before review, commit or push. An abnormal runner termination
-must never be interpreted as successful verification.
+Preserve the directory-uncertainty fix for unsupported mutation bodies and
+nested dependencies, including body/work/depth exhaustion. Keep later relative
+uncertainty, supported absolute-option recovery, local override intent,
+paint-only recovery, source order and reconstruction. Retain the independent
+failing/corrected PGF fixtures under
+`tests/fixtures/point-paint-pgf/mutation-directory/`, actual compilation of both
+corrected modes and generator-to-compiled-byte/operator checks. Do not
+regenerate references merely to repair App acceptance orchestration.
 
-## 2. Preserve completed 32B work and close native acceptance
+Keep the existing owned App page/URL/document/API assertions, exact
+saved/runtime JSON, history and revision checks, seven App → SVG → App
+transitions, helper-return/next-load checks and three separate native fault
+controls. Do not wait away ownership failure or weaken the continuity contract.
 
-Do not reimplement the previous prompt's production fix. The current working
-tree already propagates directory uncertainty from unsupported mutation bodies
-and nested dependencies, including body/work/depth exhaustion. Preserve later
-relative-option uncertainty, supported absolute-option recovery, local override
-intent, paint-only mutation recovery, source ordering and reconstruction.
-Keep the independent failing and corrected PGF fixtures under
-`tests/fixtures/point-paint-pgf/mutation-directory/`, including actual compilation
-of both corrected modes and generator-to-compiled-byte/operator checks. Do not
-regenerate these or earlier references merely to repair runner orchestration.
-
-The new `scripts/ownedAppPage.mjs` already checks owned page/URL, document
-generation, API identity, exact saved/runtime JSON, history and editor revision.
-It records API-independent lifecycle/DOM/failure images and preserves primary
-errors through bounded capture and cleanup. Keep the existing seven App → SVG →
-App transitions, helper-return/next-load checks and three separate native
-negative-control pages. Do not reload/recreate the main App, reset history,
-wait away a replaced API/document, or weaken ownership assertions.
-
-The historical intermittent loss of `window.stzAppLabels` remains unproven.
-Diagnostics and negative-control tests are implemented; they do not establish
-its trigger or a deterministic fix. If fresh native execution fails, use the
-owned App evidence to identify the actual failure before making a targeted
-correction. Do not merge localhost `EPERM`, runner termination and document loss
-into one unsupported diagnosis.
-
-Once the runner issue is addressed, obtain native evidence in an authorized
-browser-capable environment. The current cumulative policy requires:
+The cumulative policy in `scripts/automation/phase-verification.mjs` requires:
 
 - All 16 groups / 27 named point scenarios, including
   `point-paint-mutation-directory-uncertainty` and `point-paint-app-continuity`.
@@ -213,39 +221,43 @@ browser-capable environment. The current cumulative policy requires:
   body / font checks, .5 → 2 → .5 captures, negative controls, white-background
   validation and immutable click-time SVG inputs.
 
-Preserve detached-provenance cleanup, runtime-model validation separate from
-camera-free persistent JSON, the exact bounded 100-entry history contract,
+Keep detached-provenance cleanup, runtime-model validation separate from
+camera-free persistent JSON, the bounded 100-entry history contract,
 unsupported color shadowing, raw source text, 2D/3D semantics and existing
-free/inline-label behavior. Old 25-scenario reports and synthetic policy tests
-cannot satisfy the current native requirements.
+free/inline-label behavior. Partial runs and old 25-scenario reports do not
+satisfy the current requirements.
 
 ## Verification, documentation and review
 
 Read `AGENTS.md`, paired 32B implement/review prompts and current
 `docs/PHASE_32B_IMPLEMENTATION.md`, `docs/IMPORTED_POINT_PAINT.md` and
 `docs/DATA_MODEL.md`. Keep implementation changes focused on the demonstrated
-runner/evidence issue and any concretely observed native failure.
+App failure and its evidence. Preserve all previous failed attempts and
+distinguish established findings from hypotheses.
 
 Run focused regressions, applicable strict TypeScript, changed-script syntax,
 targeted lint and `git diff --check`. Run `npm test` and `npm run build`
 sequentially because they share asset preparation. Distinguish unrelated
 established lint debt and the nonblocking build chunk warning from failures.
+Obtain native execution in an authorized browser-capable environment; report
+an actual environment block separately if it prevents that execution.
 
-Before final verification, update the implementation report with the actual
-root-cause findings, changes, command results and external handoff location.
-Do not mark earlier successes as new native results. Freeze code, tests and
-tracked docs; keep the final report path/fingerprint in an external handoff.
-Then run:
+Before final verification, update the implementation report with actual
+findings, changes, command results and the external handoff location. Freeze
+code, tests and tracked docs; keep the final report path/fingerprint in an
+external handoff. Then run:
 
 ```bash
 PATH=/opt/homebrew/bin:$PATH node scripts/automation/run-phase.mjs 32B verify
 ```
 
-Require all five commands and current cumulative native evidence to pass on the
-same final tree, including tracked/untracked/binary identity. Preserve failed
-attempts. Any checkout change after verification requires matching verification
-again. Obtain independent read-only review of that same tree against
+Require all five commands and current cumulative native evidence to pass on
+the same final tree, including tracked/untracked/binary identity. Any checkout
+change after verification requires matching verification again. Obtain an
+independent read-only review of that same tree against
 `prompts/phase-32b-review.md`; `32B verify` itself does not perform review.
+The earlier `needs_changes` review and four newly passing commands do not
+complete either final gate.
 
 Do not commit or push while verification or review is unsuccessful. 32B remains
 incomplete until both gates pass; 32C/32D remain deferred.
